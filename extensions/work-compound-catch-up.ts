@@ -18,11 +18,11 @@ import {
 	inspectCompoundSource,
 	readConfinedFile,
 	sha256,
-} from "./work-compound-source.js";
+} from "./work-compound-source.ts";
 import {
 	assertCompletePrivateWorkflowParity,
 	verifyPrivateWorkflowGeneration,
-} from "./work-private-workflows.js";
+} from "./work-private-workflows.ts";
 import {
 	translateVerifiedWorkflows,
 	writePrivateWorkflowGeneration,

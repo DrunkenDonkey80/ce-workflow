@@ -24,7 +24,7 @@ function prepare(root) {
   mkdirSync(path.join(cwd, '.pi'), { recursive: true });
   save(path.join(cwd, '.pi/settings.json'), settings);
   cpSync(path.join(here, 'PLAN.md'), path.join(cwd, 'PLAN.md'));
-  const sources = ['extensions/work-models.ts', 'extensions/work-compaction.js', ...['PLAN.md', 'observe.mjs', 'verify.mjs', 'run.mjs'].map(f => 'benchmarks/context-continuity/v2/' + f)];
+  const sources = ['extensions/work-models.ts', 'extensions/work-compaction.ts', ...['PLAN.md', 'observe.mjs', 'verify.mjs', 'run.mjs'].map(f => 'benchmarks/context-continuity/v2/' + f)];
   const manifest = { createdAt: new Date().toISOString(), cwd, model: 'zai/glm-5.3:high', settings,
     sourceHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(),
     hashes: Object.fromEntries(sources.map(f => [f, sha(readFileSync(path.join(repo, f)))])),

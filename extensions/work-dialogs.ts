@@ -204,6 +204,13 @@ async function nativeListDialog(ctx, options) {
 	}
 }
 
+export function progressBar(complete, total, width = 12) {
+	const safeTotal = Math.max(0, Number(total) || 0);
+	const safeComplete = Math.max(0, Math.min(safeTotal, Number(complete) || 0));
+	const filled = safeTotal ? Math.round((safeComplete / safeTotal) * width) : 0;
+	return `[${"█".repeat(filled)}${"░".repeat(width - filled)}]`;
+}
+
 export async function showListDialog(ctx, options) {
 	const {
 		title,

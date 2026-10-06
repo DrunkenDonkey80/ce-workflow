@@ -21,12 +21,12 @@ import {
 	storePath,
 	updateWorkItem,
 	validateStore,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	compatibilityVerificationContract,
 	inlineResultArtifact,
 	verificationProofRecord,
-} from "../extensions/work-verification-contract.js";
+} from "../extensions/work-verification-contract.ts";
 
 const dirs = [];
 function repo() {
@@ -540,7 +540,7 @@ try {
 	const contender = path.join(lockDir, "contend-lock.mjs");
 	writeFileSync(
 		contender,
-		`import { mutateStore } from ${JSON.stringify(new URL("../extensions/work-store.js", import.meta.url).href)}; mutateStore(process.argv[2], () => {});`,
+		`import { mutateStore } from ${JSON.stringify(new URL("../extensions/work-store.ts", import.meta.url).href)}; mutateStore(process.argv[2], () => {});`,
 	);
 	const beforeContender = readFileSync(storePath(lockDir), "utf8");
 	assert.throws(() =>
@@ -554,7 +554,7 @@ try {
 	const staleWriter = path.join(lockDir, "stale-lock.mjs");
 	writeFileSync(
 		staleWriter,
-		`import { acquireLock } from ${JSON.stringify(new URL("../extensions/work-store.js", import.meta.url).href)}; acquireLock(process.argv[2]);`,
+		`import { acquireLock } from ${JSON.stringify(new URL("../extensions/work-store.ts", import.meta.url).href)}; acquireLock(process.argv[2]);`,
 	);
 	execFileSync(process.execPath, [staleWriter, lockDir]);
 	mutateStore(lockDir, (store) =>

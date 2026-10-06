@@ -4,7 +4,7 @@ import {
 	resetDialogStateForTest,
 	showListDialog,
 	showTreeWorkspaceDialog,
-} from "../extensions/work-dialogs.js";
+} from "../extensions/work-dialogs.ts";
 
 const colorCalls = [];
 const theme = {

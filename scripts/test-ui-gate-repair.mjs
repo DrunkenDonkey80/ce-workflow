@@ -16,7 +16,7 @@ import {
 	defaultEscalation,
 	runUiGateRepairLoop,
 	withGateLease,
-} from "../extensions/work-ui-gate.js";
+} from "../extensions/work-ui-gate.ts";
 
 const root = mkdtempSync(path.join(tmpdir(), "ui-gate-repair-"));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

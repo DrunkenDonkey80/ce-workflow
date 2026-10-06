@@ -16,13 +16,13 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { initStore, loadStore, mutateStore } from "../extensions/work-store.js";
+import { initStore, loadStore, mutateStore } from "../extensions/work-store.ts";
 
 const {
 	cleanupImprovementReportBundles,
 	resolveReportingSource,
 	submitImprovementReport,
-} = await import("../extensions/work-improvement-reporting.js");
+} = await import("../extensions/work-improvement-reporting.ts");
 const { default: workModelsExtension } = await import(
 	"../extensions/work-models.ts"
 );

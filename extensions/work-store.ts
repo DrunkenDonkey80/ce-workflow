@@ -14,7 +14,7 @@ import path from "node:path";
 import {
 	validateVerificationContract,
 	verificationContractStatus,
-} from "./work-verification-contract.js";
+} from "./work-verification-contract.ts";
 
 export const WORK_STORE_VERSION = 1;
 export const INITIATIVE_LABEL = "initiative";

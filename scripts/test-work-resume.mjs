@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import process from "node:process";
-import { loadStore } from "../extensions/work-store.js";
+import { loadStore } from "../extensions/work-store.ts";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const {
@@ -48,7 +48,7 @@ const {
 } = await import(
 	pathToFileURL(
 		realpathSync(
-			path.join(import.meta.dirname, "../extensions/background-verifiers.js"),
+			path.join(import.meta.dirname, "../extensions/background-verifiers.ts"),
 		),
 	).href
 );

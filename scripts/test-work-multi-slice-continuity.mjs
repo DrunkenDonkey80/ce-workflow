@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createWorkItem, initStore, readyWorkItems, updateWorkItem } from "../extensions/work-store.js";
-import { verificationContractStatus, verificationProofRecord } from "../extensions/work-verification-contract.js";
+import { createWorkItem, initStore, readyWorkItems, updateWorkItem } from "../extensions/work-store.ts";
+import { verificationContractStatus, verificationProofRecord } from "../extensions/work-verification-contract.ts";
 
 const cwd = mkdtempSync(path.join(os.tmpdir(), "work-multi-slice-"));
 const store = initStore(cwd);

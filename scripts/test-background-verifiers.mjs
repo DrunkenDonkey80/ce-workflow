@@ -52,7 +52,7 @@ import {
 	renderTriageClaim,
 	renderVerifierFinding,
 	verifierTelemetryEvents,
-} from "../extensions/background-verifiers.js";
+} from "../extensions/background-verifiers.ts";
 const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
 process.env.GIT_CONFIG_COUNT = String(gitConfigCount + 1);
 process.env[`GIT_CONFIG_KEY_${gitConfigCount}`] = "core.autocrlf";

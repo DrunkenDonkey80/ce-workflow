@@ -3,7 +3,7 @@ import {
 	INITIATIVE_LABEL,
 	INITIATIVE_SCHEMA_VERSION,
 	validateStore,
-} from "./work-store.js";
+} from "./work-store.ts";
 
 export const INITIATIVE_PROJECTION_VERSION = 2;
 export const INITIATIVE_PROPOSAL_VERSION = 1;

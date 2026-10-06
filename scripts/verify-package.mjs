@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const root = process.cwd();
@@ -74,7 +75,7 @@ check(
 );
 check(
 	"explicit improvement reporting is packaged",
-	existsSync(path.join(root, "extensions/work-improvement-reporting.js")) &&
+	existsSync(path.join(root, "extensions/work-improvement-reporting.ts")) &&
 		existsSync(path.join(root, "scripts/test-work-improvement-reporting.mjs")),
 );
 check(
@@ -217,7 +218,7 @@ const normalPaths = [
 ];
 for (const rel of normalPaths) {
 	const text = read(rel)
-		.replaceAll("legacy-beads-migration.js", "")
+		.replaceAll("legacy-beads-migration.ts", "")
 		.replaceAll("work-remove-beads", "")
 		.replaceAll("remove-beads", "")
 		.replaceAll(".beads", "");
@@ -373,7 +374,7 @@ check(
 		evaluationDocs.includes("sandboxCommand"),
 );
 const models = read("extensions/work-models.ts");
-const verifierStore = read("extensions/background-verifiers.js");
+const verifierStore = read("extensions/background-verifiers.ts");
 check(
 	"background verifier tools are registered with the extension",
 	[
@@ -402,22 +403,22 @@ check(
 		["f7", "f8", "f9"].every((key) =>
 			models.includes(`registerShortcut?.("${key}"`),
 		) &&
-		models.includes('title: "Orchestrator"'),
+		models.includes('title: workflowOn ? "Orchestrator" : "Utilities"'),
 );
 const helper = read("scripts/work-helper.mjs");
 check(
 	"models use native store directly",
-	models.includes('from "./work-store.js"') &&
+	models.includes('from "./work-store.ts"') &&
 		models.includes("loadStore") &&
 		!models.includes("nativeRead") &&
 		!models.includes("bdJson"),
 );
 check(
 	"helper uses native store directly",
-	helper.includes('from "../extensions/work-store.js"') &&
+	helper.includes('import("../extensions/work-store.ts")') &&
 		!helper.includes("workItems(argv)"),
 );
-const initiatives = read("extensions/work-initiatives.js");
+const initiatives = read("extensions/work-initiatives.ts");
 check(
 	"initiative domain is packaged with one-way dependencies",
 	initiatives.includes("projectInitiativeHierarchy") &&
@@ -497,6 +498,7 @@ check(
 );
 
 const tests = [
+	"test-jev-tools.mjs",
 	"test-background-verifiers.mjs",
 	"test-ui-gate-fidelity.mjs",
 	"test-ui-gate-hardening.mjs",
@@ -531,6 +533,43 @@ check(
 	tests.filter((script) => script === "test-background-verifiers.mjs").length ===
 		1,
 );
+// Legacy workflow switch (workOrchestrator.workflow.enabled; unset = off), read like the extension does.
+const readJson = (file) => {
+	try {
+		return JSON.parse(readFileSync(file, "utf8"));
+	} catch {
+		return {};
+	}
+};
+const switchOf = (settings) => settings.workOrchestrator?.workflow?.enabled;
+const workflowOn =
+	process.env.CE_WORKFLOW_ENABLED === "1" ||
+	(process.env.CE_WORKFLOW_ENABLED !== "0" &&
+		(switchOf(readJson(path.join(root, ".pi", "settings.json"))) ??
+			switchOf(readJson(path.join(process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent"), "settings.json")))) === true);
+// Tests that stay meaningful with the workflow off; every other test is workflow-only.
+const GENERAL_TESTS = new Set([
+	"test-jev-tools.mjs",
+	"test-work-ask-remote.mjs",
+	"test-work-compaction.mjs",
+	"test-work-compaction-notifications.mjs",
+	"test-work-compound-source.mjs",
+	"test-work-cswap-menu.mjs",
+	"test-work-dialogs.mjs",
+	"test-work-extension-scout.mjs",
+	"test-work-knowledge.mjs",
+	"test-work-knowledge-retrieval.mjs",
+	"test-work-microcompact-agent.mjs",
+	"test-work-native-smoke.mjs",
+	"test-work-plan3.mjs",
+	"test-work-prompt-commands.mjs",
+	"test-work-settings.mjs",
+	"test-work-store.mjs",
+	"test-work-store-performance.mjs",
+	"test-work-subscription-footer.mjs",
+	"test-work-telemetry.mjs",
+	"test-work-usage.mjs",
+]);
 const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
 const testEnvironment = {
 	...process.env,
@@ -538,8 +577,13 @@ const testEnvironment = {
 	[`GIT_CONFIG_KEY_${gitConfigCount}`]: "core.autocrlf",
 	[`GIT_CONFIG_VALUE_${gitConfigCount}`]: "false",
 	PI_CODING_AGENT_DIR: path.join(root, ".pi-test-empty-agent"),
+	CE_WORKFLOW_ENABLED: workflowOn ? "1" : "0",
 };
 for (const script of [...new Set(tests)]) {
+	if (!workflowOn && !GENERAL_TESTS.has(script)) {
+		process.stdout.write(`skip - ${script} (workflow disabled)\n`);
+		continue;
+	}
 	try {
 		execFileSync(process.execPath, [path.join("scripts", script)], {
 			cwd: root,

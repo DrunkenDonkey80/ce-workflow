@@ -25,7 +25,7 @@ import {
 	renderKnowledge,
 	resolveKnowledge,
 	searchKnowledge,
-} from "../extensions/work-knowledge.js";
+} from "../extensions/work-knowledge.ts";
 
 const root = mkdtempSync(join(tmpdir(), "ce-knowledge-"));
 const cwd = join(root, "project");
@@ -49,7 +49,7 @@ try {
 			kind: "environment",
 			scope: "user",
 			authority: "human",
-			paths: ["extensions\\opendesign-client.js"],
+			paths: ["extensions\\opendesign-client.ts"],
 			symbols: ["resolveOpenDesignCommand"],
 			source: {
 				sessionId: "session-od",
@@ -60,7 +60,7 @@ try {
 		{ ...options, allowedAuthorities: ["human"] },
 	);
 	assert.equal(first.deduplicated, false);
-	assert.equal(first.record.paths[0], "extensions/opendesign-client.js");
+	assert.equal(first.record.paths[0], "extensions/opendesign-client.ts");
 	assert.equal(knowledgeWriteCount(cwd, "goal:knowledge-test", options), 1);
 	assert.equal(knowledgeWriteCount(cwd, "goal:other", options), 0);
 	assert.ok(readFileSync(options.userPath, "utf8").endsWith("\n"));
@@ -72,7 +72,7 @@ try {
 			kind: "environment",
 			scope: "user",
 			authority: "observed",
-			paths: ["extensions/opendesign-client.js"],
+			paths: ["extensions/opendesign-client.ts"],
 			symbols: ["resolveOpenDesignCommand"],
 		},
 		options,
@@ -90,7 +90,7 @@ try {
 			kind: "environment",
 			scope: "user",
 			authority: "observed",
-			paths: ["extensions/opendesign-client.js"],
+			paths: ["extensions/opendesign-client.ts"],
 			symbols: ["resolveOpenDesignCommand"],
 		},
 		options,
@@ -565,7 +565,7 @@ try {
 			userPath: join(concurrentRoot, "user.jsonl"),
 		};
 		const moduleUrl = pathToFileURL(
-			join(process.cwd(), "extensions", "work-knowledge.js"),
+			join(process.cwd(), "extensions", "work-knowledge.ts"),
 		).href;
 		const runChild = (claim) =>
 			new Promise((resolveChild, rejectChild) => {

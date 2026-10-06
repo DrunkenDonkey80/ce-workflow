@@ -27,7 +27,7 @@ import {
 	runReadOnlyLaneBatch,
 	saveLaneStore,
 	transitionLane,
-} from "../extensions/read-only-lanes.js";
+} from "../extensions/read-only-lanes.ts";
 import workModelsExtension, {
 	executeOrchestratorAction,
 	launchCurrentTaskReadOnlyLanes,

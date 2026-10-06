@@ -20,7 +20,7 @@ import {
 	mutateStore,
 	saveStore,
 	updateWorkItem,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 
 const helper = realpathSync(path.join(import.meta.dirname, "work-helper.mjs"));
 const cwd = mkdtempSync(path.join(tmpdir(), "work-helper-contract-"));

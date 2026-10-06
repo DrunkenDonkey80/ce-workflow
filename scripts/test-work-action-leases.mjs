@@ -18,7 +18,7 @@ import {
 	occupiedWorkActionLease,
 	reconcileWorkActionLeaseLiveness,
 	settleWorkActionLease,
-} from "../extensions/work-action-leases.js";
+} from "../extensions/work-action-leases.ts";
 import {
 	appendWorkNote,
 	createWorkItem,
@@ -26,7 +26,7 @@ import {
 	loadStore,
 	saveStore,
 	updateWorkItem,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	driveWorkActionLeases,
 	launchDirectAction,
@@ -38,7 +38,7 @@ import {
 	createLaneEnvelope,
 	queueLane,
 	runReadOnlyLaneBatch,
-} from "../extensions/read-only-lanes.js";
+} from "../extensions/read-only-lanes.ts";
 import { workflowChildParams } from "./work-command-fixture.mjs";
 
 function assert(value, message) {

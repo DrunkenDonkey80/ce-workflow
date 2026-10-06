@@ -19,7 +19,7 @@ import {
 	sendFleetMessage,
 	transcriptEvents,
 	WorkFleetComponent,
-} from "../extensions/work-fleet.js";
+} from "../extensions/work-fleet.ts";
 
 const store = {
 	items: {

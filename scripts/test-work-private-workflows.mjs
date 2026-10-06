@@ -11,7 +11,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { sha256 } from "../extensions/work-compound-source.js";
+import { sha256 } from "../extensions/work-compound-source.ts";
 import {
 	legacyCompoundRemovalRecommendation,
 	privateWorkflowActivationWarning,
@@ -19,7 +19,7 @@ import {
 import {
 	dispatchPrivateWorkflow,
 	verifyPrivateWorkflowGeneration,
-} from "../extensions/work-private-workflows.js";
+} from "../extensions/work-private-workflows.ts";
 import {
 	activatePendingPrivateWorkflowRelease,
 	classifyPrivateWorkflowRelease,
@@ -29,7 +29,7 @@ import {
 	readPrivateWorkflowActivationState,
 	resolveLatestOfficialStableRelease,
 	rollbackPrivateWorkflowRelease,
-} from "../extensions/work-compound-catch-up.js";
+} from "../extensions/work-compound-catch-up.ts";
 import { translateVerifiedWorkflows } from "./generate-work-private-workflows.mjs";
 
 let checks = 0;
@@ -1040,7 +1040,7 @@ check(() => {
 		"package manifest",
 	);
 	assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
-	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.ts"]);
+	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.ts", "extensions/plan3.ts"]);
 	assert.deepEqual(packageManifest.pi.skills, ["./skills"]);
 	assert.equal(
 		packageManifest.peerDependencies["pi-compound-engineering"],

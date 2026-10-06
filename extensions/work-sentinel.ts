@@ -9,11 +9,11 @@ import {
 	promoteLane,
 	runReadOnlyLaneBatch,
 	transitionLane,
-} from "./read-only-lanes.js";
+} from "./read-only-lanes.ts";
 import {
 	captureVerifierCheckpoint,
 	scheduleVerifierBatch,
-} from "./background-verifiers.js";
+} from "./background-verifiers.ts";
 
 export const SENTINEL_ARTIFACT_VERSION = 1;
 export const SENTINEL_STALE_REASONS = Object.freeze({

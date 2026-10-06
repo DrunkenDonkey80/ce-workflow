@@ -36,8 +36,11 @@ import {
 } from "./workflow-evaluation-score.mjs";
 import { verifyCsvProject } from "../benchmarks/workflow-evaluation/v1/projects/csv-expenses/acceptance/verify.mjs";
 import { verifyCalculatorProject } from "../benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify.mjs";
-import { initStore, loadStore } from "../extensions/work-store.js";
-import { describePrivateWorkflowForEvaluation } from "../extensions/work-private-workflows.js";
+import { createJiti } from "jiti";
+// Extensions are TypeScript; Node cannot strip types under node_modules, so load them through jiti.
+const extensionJiti = createJiti(import.meta.url);
+const { initStore, loadStore } = await extensionJiti.import("../extensions/work-store.ts");
+const { describePrivateWorkflowForEvaluation } = await extensionJiti.import("../extensions/work-private-workflows.ts");
 
 const scriptRoot = path.dirname(fileURLToPath(import.meta.url));
 const defaultSourceRoot = path.dirname(scriptRoot);

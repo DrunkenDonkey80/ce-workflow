@@ -2,7 +2,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { lstatSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, join } from "node:path";
-import { normalizeSourcePath, readConfinedFile } from "./work-compound-source.js";
+import { normalizeSourcePath, readConfinedFile } from "./work-compound-source.ts";
 
 export const EXTENSION_SCOUT_LEDGER = ".pi/work-extension-scout.json";
 const DAY_MS = 24 * 60 * 60 * 1000;

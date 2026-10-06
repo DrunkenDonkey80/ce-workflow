@@ -7,7 +7,7 @@ import path from "node:path";
 import { stripTypeScriptTypes } from "node:module";
 import { runInNewContext } from "node:vm";
 import { patchAskUserSource, REMOTE_HELPERS } from "./patch-ask-user-remote-answer.mjs";
-import { registerRemoteAskAnswers } from "../extensions/work-ask-remote.js";
+import { registerRemoteAskAnswers } from "../extensions/work-ask-remote.ts";
 
 const listeners = new Map();
 const outbox = [];

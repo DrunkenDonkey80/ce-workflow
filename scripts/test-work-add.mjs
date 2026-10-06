@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { saveStore } from "../extensions/work-store.js";
+import { saveStore } from "../extensions/work-store.ts";
 import { assert, installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const {

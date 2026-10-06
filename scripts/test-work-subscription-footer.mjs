@@ -12,7 +12,7 @@ import {
 	stripAnsi,
 	truncatePlain,
 	visibleWidth,
-} from "../extensions/subscription-footer.js";
+} from "../extensions/subscription-footer.ts";
 
 const theme = {
 	fg: (color, text) =>

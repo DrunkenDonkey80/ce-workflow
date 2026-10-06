@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { contentText, contextFilterCutIndex, formatCompactionSummary } from '../../extensions/work-compaction.js';
+import { contentText, contextFilterCutIndex, formatCompactionSummary } from '../../extensions/work-compaction.ts';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const text = message => contentText(message.content);
@@ -141,8 +141,8 @@ async function replay(root, output) {
   const events = eventSource.trim().split(/\r?\n/).map(JSON.parse);
   const manifest = JSON.parse(readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   const config = manifest.settings.workOrchestrator.context;
-  const formatterSource = readFileSync(new URL('../../extensions/work-compaction.js', import.meta.url));
-  assert.equal(hash(formatterSource), manifest.hashes['extensions/work-compaction.js'], 'Replay requires the captured formatter version');
+  const formatterSource = readFileSync(new URL('../../extensions/work-compaction.ts', import.meta.url));
+  assert.equal(hash(formatterSource), manifest.hashes['extensions/work-compaction.ts'], 'Replay requires the captured formatter version');
   // Same SDK session projection used by scripts/audit-payload-strip.mjs.
   let globalRoot;
   try { globalRoot = execSync('npm root -g', { encoding: 'utf8' }).trim(); }

@@ -8,7 +8,7 @@ import {
 	createWorkItem,
 	initStore,
 	saveStore,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 
 const cwd = mkdtempSync(path.join(os.tmpdir(), "work-capability-adapters-"));
 const helper = realpathSync(path.join(import.meta.dirname, "work-helper.mjs"));

@@ -11,7 +11,7 @@ const { assert, installWorkflowFixture } = await import(
 );
 const { createWorkItem, mutateStore } = await import(
 	pathToFileURL(
-		realpathSync(path.join(import.meta.dirname, "../extensions/work-store.js")),
+		realpathSync(path.join(import.meta.dirname, "../extensions/work-store.ts")),
 	).href
 );
 

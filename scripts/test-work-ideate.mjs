@@ -37,7 +37,7 @@ const {
 const { dispatchPrivateWorkflow } = await import(
 	pathToFileURL(
 		realpathSync(
-			path.join(import.meta.dirname, "../extensions/work-private-workflows.js"),
+			path.join(import.meta.dirname, "../extensions/work-private-workflows.ts"),
 		),
 	).href
 );

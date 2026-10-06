@@ -16,7 +16,7 @@ import {
 	normalizeVerificationShards,
 	runVerificationShardBatch,
 	VERIFICATION_GATE_VERSION,
-} from "../extensions/read-only-lanes.js";
+} from "../extensions/read-only-lanes.ts";
 const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
 const globalSettingsDir = mkdtempSync(
 	path.join(os.tmpdir(), "ce-verification-settings-"),

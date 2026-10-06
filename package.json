@@ -28,7 +28,8 @@
   },
   "pi": {
     "extensions": [
-      "extensions/work-models.ts"
+      "extensions/work-models.ts",
+      "extensions/plan3.ts"
     ],
     "skills": [
       "./skills"

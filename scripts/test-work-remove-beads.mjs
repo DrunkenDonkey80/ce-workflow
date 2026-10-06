@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 
 const { migrateLegacyBeads, detectWorkStoreState, MigrationError } =
-	await import("../extensions/legacy-beads-migration.js");
+	await import("../extensions/legacy-beads-migration.ts");
 const { buildWorkRemoveBeadsState } = await import(
 	"../extensions/work-models.ts"
 );

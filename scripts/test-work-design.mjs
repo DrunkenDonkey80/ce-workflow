@@ -27,8 +27,8 @@ import {
 	validateDesignArtifactRelativePath,
 	validateDesignHandoff,
 	writeConfinedDesignArtifact,
-} from "../extensions/work-design.js";
-import { openDesignPayloadDigest } from "../extensions/opendesign-client.js";
+} from "../extensions/work-design.ts";
+import { openDesignPayloadDigest } from "../extensions/opendesign-client.ts";
 import {
 	advanceDesignSession,
 	answerDesignClarification,
@@ -51,7 +51,7 @@ import {
 	syncDesignSession,
 	waiveDesignSession,
 } from "../extensions/work-models.ts";
-import { loadStore } from "../extensions/work-store.js";
+import { loadStore } from "../extensions/work-store.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "ce-work-design-"));
 function fixture(name) {

@@ -15,8 +15,8 @@ import {
 	resolveOpenDesignCommand,
 	validateOpenDesignToolCall,
 	validateStartRecovery,
-} from "../extensions/opendesign-client.js";
-import { designLifecycleTelemetry } from "../extensions/work-design.js";
+} from "../extensions/opendesign-client.ts";
+import { designLifecycleTelemetry } from "../extensions/work-design.ts";
 import { designReviewChoices } from "../extensions/work-models.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "ce-opendesign-client-"));

@@ -2,7 +2,7 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { migrateLegacyBeads } from "../extensions/legacy-beads-migration.js";
+import { migrateLegacyBeads } from "../extensions/legacy-beads-migration.ts";
 
 if (process.platform !== "win32") process.exit(0);
 const dir = mkdtempSync(path.join(tmpdir(), "work-remove-beads-win-"));

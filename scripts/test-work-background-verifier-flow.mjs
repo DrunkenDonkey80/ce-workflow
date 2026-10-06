@@ -31,7 +31,7 @@ const {
 	verifierStatus,
 } = await import(
 	pathToFileURL(
-		path.join(import.meta.dirname, "../extensions/background-verifiers.js"),
+		path.join(import.meta.dirname, "../extensions/background-verifiers.ts"),
 	).href
 );
 const { assert, seedNativeStore, workflowChildParams } = await import(

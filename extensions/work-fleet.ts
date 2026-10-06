@@ -10,9 +10,9 @@ import {
 	realpathSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
-import { loadVerifierStore } from "./background-verifiers.js";
-import { loadLaneStore } from "./read-only-lanes.js";
-import { loadStore } from "./work-store.js";
+import { loadVerifierStore } from "./background-verifiers.ts";
+import { loadLaneStore } from "./read-only-lanes.ts";
+import { loadStore } from "./work-store.ts";
 
 const REFRESH_MS = 750;
 const RECENT_TERMINAL_LIMIT = 20;

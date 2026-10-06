@@ -18,7 +18,7 @@ import {
 	recordOperationResult,
 	saveAnalysisReviewProposal,
 	setAnalysisCandidateEnabled,
-} from "../extensions/background-verifiers.js";
+} from "../extensions/background-verifiers.ts";
 import {
 	materializeVerifierAnalysis,
 	reconcileAnalysisFinalizations,
@@ -29,7 +29,7 @@ import {
 	createWorkItem,
 	loadStore,
 	mutateStore,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -206,7 +206,7 @@ try {
 	assert.deepEqual(first[0].candidateIds, repeated[0].candidateIds);
 	assert.deepEqual(
 		analysisReviewProjection(
-			await import("../extensions/background-verifiers.js").then(
+			await import("../extensions/background-verifiers.ts").then(
 				({ loadVerifierStore }) => loadVerifierStore(cwd),
 			),
 		)[0]

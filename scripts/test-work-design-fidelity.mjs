@@ -7,7 +7,7 @@ import path from "node:path";
 import {
 	validateDesignFidelityEvidence,
 	validateReferenceCaptureReceipt,
-} from "../extensions/work-design.js";
+} from "../extensions/work-design.ts";
 import { verifyCalculatorRedesign } from "../benchmarks/workflow-evaluation/v1/projects/calculator/acceptance/verify-redesign.mjs";
 
 const hash = (value) => crypto.createHash("sha256").update(value).digest("hex");

@@ -12,7 +12,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { OpenDesignClient } from "../extensions/opendesign-client.js";
+import { OpenDesignClient } from "../extensions/opendesign-client.ts";
 import {
 	buildWorkResumeState,
 	executeOrchestratorAction,

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { validateDesignFidelityEvidence } from "../../../../../../extensions/work-design.js";
+import { validateDesignFidelityEvidence } from "../../../../../../extensions/work-design.ts";
 
 const sha256 = (file) =>
 	crypto.createHash("sha256").update(readFileSync(file)).digest("hex");

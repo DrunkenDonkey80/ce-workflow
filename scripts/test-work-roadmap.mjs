@@ -13,7 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { initStore, loadStore, saveStore } from "../extensions/work-store.js";
+import { initStore, loadStore, saveStore } from "../extensions/work-store.ts";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const workModelsPath = realpathSync(

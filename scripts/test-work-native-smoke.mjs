@@ -67,7 +67,7 @@ try {
 		{ cwd: host, stdio: "pipe" },
 	);
 	const installed = path.join(host, "node_modules", "pi-work-orchestrator");
-	assert(existsSync(path.join(installed, "extensions", "work-store.js")));
+	assert(existsSync(path.join(installed, "extensions", "work-store.ts")));
 	// The extension entry is TypeScript and Node refuses to strip types under
 	// node_modules, so load it exactly like Pi does: through Pi's own jiti.
 	const piPackage = path.join(
@@ -78,12 +78,9 @@ try {
 	);
 	assert(existsSync(piPackage), `pi is not installed globally: ${piPackage}`);
 	const { createJiti } = createRequire(piPackage)("jiti");
-	const models = await createJiti(
-		path.join(installed, "extensions", "smoke.mjs"),
-	).import(path.join(installed, "extensions", "work-models.ts"));
-	const storeApi = await import(
-		pathToFileURL(path.join(installed, "extensions", "work-store.js")).href
-	);
+	const jiti = createJiti(path.join(installed, "extensions", "smoke.mjs"));
+	const models = await jiti.import(path.join(installed, "extensions", "work-models.ts"));
+	const storeApi = await jiti.import(path.join(installed, "extensions", "work-store.ts"));
 
 	// Exercise native 200k through Pi's actual installed extension loader/SDK,
 	// not the raw-Node fallback used by the unit tests. No provider call is made.
@@ -106,15 +103,17 @@ try {
 		context: { contextMessages: messages, contextEntries: messages.map((message, index) => ({
 			sourceEntry: { type: "message", id: `native-${index}`, message }, messages: [message],
 		})) } };
-	const model = { provider: "test", id: "native", api: "openai-completions", input: ["text"], contextWindow: 1_000_000, maxTokens: 8192 };
-	let nativeCalls = 0;
+	const model = { provider: "test", id: "native", api: "openai-completions", input: ["text"], contextWindow: 500_000, maxTokens: 8192 };
+	let nativeCalls = 0, sawRequest = false;
 	const nativeWarnings = [];
-	const result = await loaded.extensions[0].handlers.get("turn_end")[0](event, {
+	// Several extensions handle turn_end (e.g. the Jev compaction note); the compaction handler is the one returning entries.
+	const runTurnEnd = async (turn, ctx) => { for (const handler of loaded.extensions[0].handlers.get("turn_end")) { const out = await handler(turn, ctx); if (out) return out; } };
+	const result = await runTurnEnd(event, {
 		cwd: compactCwd, model, mode: "print", getContextUsage: () => ({ tokens: 200_000 }),
 		ui: { setStatus() {}, notify: message => nativeWarnings.push(message) },
 		modelRegistry: { streamSimple: (_model, context) => {
 			nativeCalls += 1;
-			assert(JSON.stringify(context).includes("Preserve the original request"));
+			sawRequest ||= JSON.stringify(context).includes("Preserve the original request");
 			return { result: async () => ({ role: "assistant", api: model.api, provider: model.provider, model: model.id,
 				content: [{ type: "text", text: "Native summary from Pi's generator" }], stopReason: "stop", timestamp: 5,
 				usage: { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, totalTokens: 15,
@@ -124,10 +123,12 @@ try {
 		compact() { assert.fail("live-turn compaction must not use the aborting manual API"); },
 		abort() { assert.fail("live-turn compaction must not abort"); },
 	});
-	assert.equal(nativeCalls, 1, nativeWarnings.join("\n"));
+	// ~740 KB exceeds the 500 KB request budget (1 byte per window token), so it is summarized in two chunks.
+	assert.equal(nativeCalls, 2, nativeWarnings.join("\n"));
+	assert(sawRequest, "chunked summary still includes the original request");
 	assert.equal(result.entries[0].summary, "Native summary from Pi's generator");
 	assert.equal(result.entries[0].firstKeptEntryId, "native-3");
-	assert.equal(result.entries[0].usage.output, 5);
+	assert.equal(result.entries[0].usage.output, 10, "usage summed across chunks");
 
 	// Ultrafull must survive a session reopen as a compaction entry + untouched tail.
 	const { SessionManager } = await import(pathToFileURL(path.join(sdkRoot, "dist/core/session-manager.js")).href);
@@ -138,7 +139,7 @@ try {
 	messages.forEach(message => fullSession.appendMessage(message));
 	const projection = fullSession.buildSessionProjection();
 	let fullCalls = 0;
-	const fullResult = await loaded.extensions[0].handlers.get("turn_end")[0]({ ...event,
+	const fullResult = await runTurnEnd({ ...event,
 		context: { contextMessages: projection.messages, contextEntries: projection.entries },
 	}, {
 		cwd: compactCwd, model, mode: "print", isIdle: () => false,
@@ -166,6 +167,45 @@ try {
 	assert.match(resumedMessages.find(message => message.role === "compactionSummary").summary, /Full checkpoint survives restart/);
 	assert.deepEqual(resumedMessages.at(-1), messages.at(-1), "retained evidence is not stripped on reload");
 	assert(!resumedMessages.some(message => message.content === "Preserve the original request"), "the real checkpoint replaces older messages");
+
+	// Installed Jev tools through Pi's real SDK + codemode: faux main model, fake classifier, no network.
+	const sdk = await import(pathToFileURL(path.join(sdkRoot, "dist/index.js")).href);
+	const ai = await import(pathToFileURL(path.join(sdkRoot, "node_modules/@earendil-works/pi-ai/dist/index.js")).href);
+	const { createJevTools } = await jiti.import(path.join(installed, "extensions/jev-tools.ts"));
+	const jevCwd = path.join(temp, "jev");
+	mkdirSync(jevCwd);
+	writeFileSync(path.join(jevCwd, "Battery.kt"), "val temperature = 24\n");
+	const jevModel = { provider: "openrouter", id: "typesafe/jev-1.13", contextWindow: 32000 };
+	const jevUsage = { input: 10, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 11, cost: { input: 0.001, output: 0, cacheRead: 0, cacheWrite: 0, total: 0.001 } };
+	const classifier = { getModelOfType: () => jevModel, getProviderAuthStatus: () => ({ configured: true }),
+		classify: async (m, c) => ({ provider: m.provider, model: m.id, stopReason: "stop", usage: jevUsage,
+			answers: Object.fromEntries(Object.keys(c.questions).map(id => [id, { type: "bool", probability: 0.9 }])) }) };
+	let jevEnabled = true, jev;
+	const jevExtension = pi => { jev = createJevTools({ on: pi.on.bind(pi), registerTool: tool => pi.registerTool({ ...tool,
+		execute: (id, args, signal, update, ctx) => tool.execute(id, args, signal, update, { cwd: ctx.cwd, modelRegistry: classifier }) }) },
+		() => ({ workOrchestrator: { jev: { enabled: jevEnabled } } })); jev.refresh({ cwd: jevCwd, modelRegistry: classifier }); };
+	const faux = ai.fauxProvider({ provider: "faux", models: [{ id: "main", contextWindow: 100000 }] });
+	const jevRuntime = await sdk.ModelRuntime.create({ authPath: path.join(temp, "jev-auth.json"), modelsPath: null, refreshOnCreate: false });
+	jevRuntime.registerNativeProvider(faux.provider);
+	const script = `const r = await tools.jev_triage({jobs:[{id:"a",questions:{rel:{type:"bool",instructions:"Battery data?",criteria:{true:"yes",false:"no"}}},sources:[{path:"Battery.kt"}]}]});\nreturn {status:r.results[0].status, band:r.results[0].answers.rel.band, usageInPayload:"usage" in r};`;
+	const loader = new sdk.DefaultResourceLoader({ cwd: jevCwd, agentDir: path.join(temp, "agent"), noExtensions: true, noSkills: true, noPromptTemplates: true,
+		noThemes: true, noContextFiles: true, extensionFactories: [sdk.createCodemodeExtension({ models: false }), jevExtension] });
+	await loader.reload();
+	const { session: jevSession } = await sdk.createAgentSession({ cwd: jevCwd, agentDir: path.join(temp, "agent"), modelRuntime: jevRuntime,
+		model: faux.getModel("main"), resourceLoader: loader, sessionManager: sdk.SessionManager.inMemory(jevCwd),
+		settingsManager: sdk.SettingsManager.inMemory(), tools: ["codemode", "jev_triage"] });
+	const codemodeResults = () => jevSession.messages.filter(m => m.role === "toolResult" && m.toolName === "codemode");
+	faux.setResponses([ai.fauxAssistantMessage(ai.fauxToolCall("codemode", { code: script })), ai.fauxAssistantMessage("done")]);
+	await jevSession.prompt("classify");
+	let viaCodemode = codemodeResults().at(-1);
+	assert.match(viaCodemode.content.map(c => c.text).join(""), /"status":"ok","band":"likely","usageInPayload":false/, "codemode receives structuredContent");
+	assert.equal(viaCodemode.usage?.totalTokens, 11, "nested classifier usage rolls up once onto the codemode result");
+	jevEnabled = false; jev.refresh();
+	faux.setResponses([ai.fauxAssistantMessage(ai.fauxToolCall("codemode", { code: script })), ai.fauxAssistantMessage("done")]);
+	await jevSession.prompt("classify again");
+	viaCodemode = codemodeResults().at(-1);
+	assert.equal(viaCodemode.isError, true, "Off hides jev_triage from codemode");
+	assert.equal(viaCodemode.usage, undefined);
 
 	const clean = path.join(temp, "clean");
 	mkdirSync(clean);

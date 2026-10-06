@@ -14,8 +14,8 @@ import {
 	acquireRepositoryAdmissionLock,
 	loadLaneStore,
 	repositoryMutationLocked,
-} from "./read-only-lanes.js";
-import { loadStore, readyWorkItems, storePath } from "./work-store.js";
+} from "./read-only-lanes.ts";
+import { loadStore, readyWorkItems, storePath } from "./work-store.ts";
 
 export const WORK_ACTION_LEASE_VERSION = 2;
 const OCCUPIED = new Set([

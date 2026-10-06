@@ -14,12 +14,12 @@ import {
 	loadStore,
 	saveStore,
 	updateWorkItem,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	compatibilityVerificationContract,
 	inlineResultArtifact,
 	verificationProofRecord,
-} from "../extensions/work-verification-contract.js";
+} from "../extensions/work-verification-contract.ts";
 
 const epics = [
 	{

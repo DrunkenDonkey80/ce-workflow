@@ -22,7 +22,7 @@ import {
 	reviewInspectedExtensions,
 	runExtensionScout,
 	writeExtensionScoutLedger,
-} from "../extensions/work-extension-scout.js";
+} from "../extensions/work-extension-scout.ts";
 
 function assert(value, message) {
 	if (!value) throw new Error(message);

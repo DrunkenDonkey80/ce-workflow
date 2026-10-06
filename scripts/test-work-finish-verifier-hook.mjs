@@ -11,7 +11,7 @@ const { default: workModelsExtension } = await import(
 );
 const { loadVerifierStore } = await import(
 	pathToFileURL(
-		path.join(import.meta.dirname, "../extensions/background-verifiers.js"),
+		path.join(import.meta.dirname, "../extensions/background-verifiers.ts"),
 	).href
 );
 const { assert } = await import(

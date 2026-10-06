@@ -9,8 +9,8 @@ import {
 	initStore,
 	loadStore,
 	saveStore,
-} from "../extensions/work-store.js";
-import { verificationContractStatus } from "../extensions/work-verification-contract.js";
+} from "../extensions/work-store.ts";
+import { verificationContractStatus } from "../extensions/work-verification-contract.ts";
 
 const cwd = mkdtempSync(path.join(os.tmpdir(), "work-goal-owned-slice-"));
 const helper = realpathSync(path.join(import.meta.dirname, "work-helper.mjs"));

@@ -4,12 +4,12 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createDesignFidelityContract } from "../extensions/work-design.js";
+import { createDesignFidelityContract } from "../extensions/work-design.ts";
 import {
 	createWorkItem,
 	initStore,
 	saveStore,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 
 const cwd = mkdtempSync(path.join(os.tmpdir(), "work-browser-adapter-"));
 const helper = realpathSync(path.join(import.meta.dirname, "work-helper.mjs"));

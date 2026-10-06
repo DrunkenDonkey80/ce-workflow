@@ -1,7 +1,7 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeSourcePath, sha256 } from "./work-compound-source.js";
+import { normalizeSourcePath, sha256 } from "./work-compound-source.ts";
 
 const RESOURCE_ROOT = fileURLToPath(
 	new URL("./private-workflows/", import.meta.url),

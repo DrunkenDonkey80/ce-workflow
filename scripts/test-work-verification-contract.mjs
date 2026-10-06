@@ -7,7 +7,7 @@ import {
 	closeWorkItem,
 	createWorkItem,
 	initStore,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	fileArtifact,
 	inferVerificationContract,
@@ -17,7 +17,7 @@ import {
 	verificationContractStatus,
 	verificationProofRecord,
 	verificationWaiverRecord,
-} from "../extensions/work-verification-contract.js";
+} from "../extensions/work-verification-contract.ts";
 
 const operation = (command, value = "0") => ({
 	command,

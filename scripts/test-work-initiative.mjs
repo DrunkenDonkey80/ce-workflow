@@ -19,12 +19,12 @@ import {
 	storePath,
 	updateWorkItem,
 	validateStore,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	INITIATIVE_PROJECTION_VERSION,
 	normalizeInitiativeProposal,
 	projectInitiativeHierarchy,
-} from "../extensions/work-initiatives.js";
+} from "../extensions/work-initiatives.ts";
 import {
 	applyInitiativeReconciliation,
 	approveInitiativeReconciliation,
@@ -69,7 +69,7 @@ try {
 	const initiativeSourceText = "# Initiative intent\n";
 	assert.doesNotMatch(
 		readFileSync(
-			new URL("../extensions/work-initiatives.js", import.meta.url),
+			new URL("../extensions/work-initiatives.ts", import.meta.url),
 			"utf8",
 		),
 		/from ["'].+work-models\.ts["']/,

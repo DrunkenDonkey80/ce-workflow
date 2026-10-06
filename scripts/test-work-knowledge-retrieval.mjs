@@ -6,7 +6,7 @@ import path from "node:path";
 import {
 	recordKnowledge,
 	searchKnowledge,
-} from "../extensions/work-knowledge.js";
+} from "../extensions/work-knowledge.ts";
 
 let fixture;
 try {

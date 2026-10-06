@@ -14,7 +14,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { matchFidelity } from "./ui-gate/fidelity-matcher.mjs";
 import { runGate } from "./ui-gate/gate.mjs";
-import { validateDesignHandoff } from "../extensions/work-design.js";
+import { validateDesignHandoff } from "../extensions/work-design.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fixtures = path.join(root, "scripts", "fixtures", "ui-gate");

@@ -19,8 +19,8 @@ import {
 	initStore,
 	loadStore,
 	saveStore,
-} from "../extensions/work-store.js";
-import { compatibilityVerificationContract } from "../extensions/work-verification-contract.js";
+} from "../extensions/work-store.ts";
+import { compatibilityVerificationContract } from "../extensions/work-verification-contract.ts";
 
 const mod = await import(
 	pathToFileURL(path.join(import.meta.dirname, "../extensions/work-models.ts"))

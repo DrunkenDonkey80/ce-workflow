@@ -12,7 +12,7 @@ import {
 	appendWorkNote,
 	mutateStore,
 	updateWorkItem,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 const { assert, installWorkflowFixture, workflowChildParams } = await import(
 	pathToFileURL(
 		realpathSync(path.join(import.meta.dirname, "work-command-fixture.mjs")),

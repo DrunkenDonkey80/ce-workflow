@@ -17,8 +17,10 @@ import workModelsExtension, {
 	launchKnowledgeDiscoverer,
 	noteExcludedModels,
 	requestContextFilter,
+	researchCompactionTrigger,
 	resetContextFilter,
 	stripProcessedPayloads,
+	summarizeNativeContext,
 	workSubagentToolCall,
 } from "../extensions/work-models.ts";
 
@@ -140,10 +142,9 @@ try {
 	);
 	workModelsExtension(pi);
 	for (const tool of Object.values(tools)) {
-		assert.equal(tool.exposure, tool.name === "research_mode" || tool.name.startsWith("work_") ? "model-only" : undefined);
+		assert.equal(tool.exposure, tool.name.startsWith("work_") ? "model-only" : undefined);
 	}
-	assert.equal((await tools.research_mode.execute("default", { action: "status" }, undefined, null, ctx)).details.enabled, true, "agent control defaults on");
-	await commands.research.handler("auto off", ctx);
+	assert.equal(tools.research_mode, undefined, "agent cannot toggle research mode");
 	await launchKnowledgeDiscoverer(pi, ctx, [
 		{
 			role: "user",
@@ -962,8 +963,8 @@ try {
 		{ role: "assistant", content: "y".repeat(130_000) }];
 	const activeCtx = { ...ctx, model: { contextWindow: 200_000 } };
 	requestContextFilter(activeCtx);
-	await assert.rejects(hooks.context({ messages: oversizedRequest }, activeCtx), /overflow/,
-		"an oversized protected request cannot be silently clipped");
+	const protectedContext = await hooks.context({ messages: oversizedRequest }, activeCtx);
+	assert(JSON.stringify(protectedContext).includes("x".repeat(130_000)), "protected request survives a rolling target overflow without clipping");
 	assert.equal(oversizedRequest[0].content.length, 130_000);
 	resetContextFilter();
 	const activeMessages = [
@@ -1282,7 +1283,7 @@ try {
 	}));
 	let memoryCalls = 0;
 	const hybridContext = { ...ctx, modelRegistry: {
-		find: (provider, id) => provider === "test" && id === "summary" ? { provider, id } : undefined,
+		find: (provider, id) => provider === "test" && id === "summary" ? { provider, id, contextWindow: 1_000_000 } : undefined,
 		streamSimple() {
 			memoryCalls++;
 			return { result: async () => ({ stopReason: "stop", usage: { input: 10, output: 5 },
@@ -1394,6 +1395,15 @@ try {
 	await tools.research_note.execute("note", { note: "Observed result: source.md:12" });
 	assert.match(readFileSync(notebook, "utf8"), /Observed result: source.md:12/);
 	assert.equal(requestContextFilter(researchCtx), false, "no early cut above our threshold");
+	// Research auto-compacts at the boundary only near 90% of the window (D04).
+	assert.equal(researchCompactionTrigger({ model: { contextWindow: 200_000 } }), 180_000);
+	const researchBoundary = [];
+	const boundaryCtx = (tokens) => ({ ...researchCtx, model: { provider: "test", id: "current", contextWindow: 200_000 },
+		getContextUsage: () => ({ tokens }), ui: { ...researchCtx.ui, notify: (message) => researchBoundary.push(message), setStatus: (_key, value) => value && researchBoundary.push(value) } });
+	assert.equal(await hooks.turn_end({ context: { contextMessages: [] } }, boundaryCtx(150_000)), undefined);
+	assert.equal(researchBoundary.length, 0, "research below 90% does not compact");
+	await hooks.turn_end({ context: { contextMessages: [] } }, boundaryCtx(185_000));
+	assert(researchBoundary.some((message) => /^Compacting/.test(message)), "research at 90% compacts at the boundary");
 	assert.equal(await hooks.context({ messages: evidence }, researchCtx), undefined, "including full processed read contents");
 	assert.equal(await hooks.session_before_compact({ preparation }, researchCtx), undefined, "native compaction must fall through");
 	await hooks.session_compact({}, researchCtx);
@@ -1402,8 +1412,13 @@ try {
 	assert.equal(researchEntries.at(-1).data.notes, notebook, "finished answers never exit research mode");
 	await hooks.session_tree({}, { ...researchCtx, sessionManager: { ...researchCtx.sessionManager, getBranch: () => researchEntries.filter(entry => entry.data?.mode === "research").slice(0, 1) } });
 	assert.equal(requestContextFilter(researchCtx), false, "restore research mode on the selected branch");
-	await commands.research.handler("off", researchCtx);
-	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: notebook, agentControl: false });
+	// Plan3 drives research through the shared event bus (LC-01); a repeated "on" is a no-op.
+	const researchEntryCount = researchEntries.length;
+	listeners.get("plan3:research")({ ctx: researchCtx, enabled: true });
+	assert.equal(researchEntries.length, researchEntryCount);
+	listeners.get("plan3:research")({ ctx: researchCtx, enabled: false });
+	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: notebook });
+
 	assert.equal(researchWidgets.at(-1), undefined, "banner disappears on exit");
 	assert.equal(exitCompactions, 0, "manual exit never compacts, even above 150k");
 	assert.equal(requestContextFilter(researchCtx), true);
@@ -1437,7 +1452,7 @@ try {
 	await hooks.session_tree({}, researchCtx);
 	assert.match(researchWidgets.at(-1)[0], /RESEARCH STOPPING/, "pending exit survives branch restoration");
 	await hooks.agent_settled({}, researchCtx);
-	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: pendingNotebook, agentControl: false });
+	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: pendingNotebook });
 	assert.equal(researchWidgets.at(-1), undefined, "banner disappears only after work settles");
 	assert.equal(exitCompactions, 0, "deferred exit does not compact when idle");
 	assert.match(readFileSync(pendingNotebook, "utf8"), /Finding while stopping/);
@@ -1539,6 +1554,38 @@ try {
 	assert.equal(nativeDraft.type, "compaction");
 	assert.equal(nativeDraft.firstKeptEntryId, "boundary-6", "retention keeps tool calls and results together");
 	assert.equal(nativeDraft.usage.output, 5);
+	const giantNativeMessages = [{ role: "user", content: `BEGIN ${"Requirements 😀 and decisions. ".repeat(24_000)} END` }];
+	const originalGiantNative = JSON.stringify(giantNativeMessages);
+	const nativeChunks = [];
+	const boundedCtx = { ...nativeCtx, model: { ...nativeCtx.model, contextWindow: 272_000 } };
+	const boundedSummary = await summarizeNativeContext(giantNativeMessages, boundedCtx, { previousSummary: "Prior decisions",
+		summarize: async (messages, _model, _reserve, _key, _headers, signal, _instructions, previous) => {
+			assert(!signal.aborted);
+			const text = messages[0].content[0].text;
+			assert(Buffer.byteLength(text, "utf8") + Buffer.byteLength(previous ?? "", "utf8") <= 272_000);
+			assert(!/[\uD800-\uDBFF]$/.test(text), "never split a Unicode surrogate pair");
+			nativeChunks.push(text);
+			assert.equal(previous, nativeChunks.length === 1 ? "Prior decisions" : "Merged native checkpoint");
+			return { text: "Merged native checkpoint", usage: { input: 10, output: 5, cost: { total: 0.2 } } };
+		} });
+	assert(nativeChunks.length > 1, "single-message overflow is split before ACP sees it");
+	assert(nativeChunks.join("").includes(giantNativeMessages[0].content), "every original request character participates");
+	assert.equal(JSON.stringify(giantNativeMessages), originalGiantNative);
+	assert.equal(boundedSummary.usage.output, nativeChunks.length * 5);
+	assert(Math.abs(boundedSummary.usage.cost.total - nativeChunks.length * 0.2) < 1e-9);
+	const hugePrior = "Earlier approved scope. ".repeat(20_000);
+	const priorChunks = [];
+	await summarizeNativeContext([{ role: "user", content: "Newest request" }], boundedCtx, { previousSummary: hugePrior,
+		summarize: async (messages) => { priorChunks.push(messages[0].content[0].text); return { text: "Merged old and new" }; } });
+	assert(priorChunks.join("").includes(hugePrior), "oversized previous summaries are summarized, not clipped");
+	assert(priorChunks.join("").includes("Newest request"));
+	await assert.rejects(summarizeNativeContext(giantNativeMessages, boundedCtx, { summarize: async () => { throw new Error("Upstream failed"); } }), /Upstream failed/);
+	assert.equal(JSON.stringify(giantNativeMessages), originalGiantNative, "a failed chunk leaves raw history intact");
+	const triggerWarnings = [];
+	const headroomCtx = { ...boundedCtx, getContextUsage: () => ({ tokens: 172_000 }), ui: { ...boundedCtx.ui, notify: message => triggerWarnings.push(message) } };
+	assert.equal(await hooks.turn_end(boundary, { ...headroomCtx, getContextUsage: () => ({ tokens: 171_231 }) }), undefined);
+	const headroomCheckpoint = await hooks.turn_end(boundary, headroomCtx);
+	assert(headroomCheckpoint?.entries?.[0]?.type === "compaction" || triggerWarnings.at(-1)?.includes("native summary generator is unavailable"), "272k advertised windows compact before ACP's 204k effective input ceiling");
 	await assert.rejects(buildBoundaryCompaction(boundary, nativeCtx, "native-200k", async () => ({ text: "" })), /empty/);
 	await assert.rejects(buildBoundaryCompaction(boundary, { ...nativeCtx, signal: AbortSignal.abort() }, "native-200k", async () => ({ text: "Discard me" })), /cancelled/);
 	const autoNative = await hooks.turn_end(boundary, nativeCtx);
@@ -1661,77 +1708,46 @@ try {
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "Read fine print" }, undefined, null,
 		{ ...visionCtx, modelRegistry: { find: () => ({ input: ["text", "image"] }), streamSimple: () => ({ result: async () => ({ stopReason: "error", errorMessage: "private-provider-token" }) }) } }), /Vision model failed/);
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, AbortSignal.abort(), null, visionCtx), /cancelled|abort/i);
-	// Agent-owned research defaults on, respects explicit overrides, and is boundary-only.
-	const phaseCtx = { ...fullCtx, getContextUsage: () => ({ tokens: 1 }) };
-	const phase = (action, note, context = phaseCtx) => tools.research_mode.execute("phase", { action, note }, undefined, null, context);
-	await hooks.session_tree({}, { ...phaseCtx, sessionManager: { ...phaseCtx.sessionManager, getBranch: () => [] } });
-	assert.equal((await phase("status")).details.enabled, true, "new branches default on");
-	await hooks.session_tree({}, { ...phaseCtx, sessionManager: { ...phaseCtx.sessionManager, getBranch: () => [
-		{ type: "custom", customType: "work-research-context", data: { mode: "off", notes: null } },
+	// Research is user-controlled; old auto settings cannot restore agent authority.
+	const manualCtx = { ...fullCtx, getContextUsage: () => ({ tokens: 1 }) };
+	await hooks.session_tree({}, { ...manualCtx, sessionManager: { ...manualCtx.sessionManager, getBranch: () => [] } });
+	assert.equal(tools.research_mode, undefined);
+	assert.doesNotMatch((await hooks.before_agent_start({ prompt: "Read a file and investigate a bug" }, manualCtx))?.systemPrompt ?? "", /RESEARCH MODE/);
+	await hooks.session_tree({}, { ...manualCtx, sessionManager: { ...manualCtx.sessionManager, getBranch: () => [
+		{ type: "custom", customType: "work-research-context", data: { mode: "off", notes: null, agentControl: true } },
 	] } });
-	assert.equal((await phase("status")).details.enabled, true, "legacy session state defaults on");
-	await commands.research.handler("auto off", phaseCtx);
-	await hooks.session_tree({}, phaseCtx);
-	assert.equal((await phase("status")).details.enabled, false, "explicit off survives restoration");
-	await assert.rejects(async () => phase("enter", "Investigate"), /disabled/);
-	await commands.research.handler("auto on", phaseCtx);
-	await assert.rejects(async () => phase("enter", " "), /purpose or handoff/);
-	await hooks.session_tree({}, phaseCtx);
-	assert.equal((await phase("status")).details.enabled, true, "explicit on survives branch restoration");
-	pi.getActiveTools = () => ["read", "edit"];
-	assert.equal((await hooks.context({ messages: boundaryMessages }, phaseCtx))?.messages?.some(message => message.customType === "work-research-phase") ?? false, false, "tool-restricted children get no unavailable research hint");
-	delete pi.getActiveTools;
-	const phaseNotebooks = new Set();
+	assert.equal(tools.research_mode, undefined, "legacy auto-on setting cannot expose a control tool");
+	const autoNotices = [];
+	const entriesBeforeAuto = researchEntries.length;
+	for (const action of ["auto", "auto on", "auto off"])
+		await commands.research.handler(action, { ...manualCtx,
+			ui: { ...manualCtx.ui, notify: message => autoNotices.push(message) },
+			sendUserMessage: () => assert.fail("retired auto commands must not launch exploration"),
+		});
+	assert.equal(researchEntries.length, entriesBeforeAuto, "retired auto commands never change mode");
+	assert.equal(autoNotices.length, 3);
+	assert(autoNotices.every(message => message.includes("Automatic research was removed")));
+	const manualNotebooks = new Set();
 	for (const mode of ["native", "ultrafull", "ultracompact", "native-200k"]) {
 		selectCompactMode(mode);
-		const high = { ...phaseCtx, getContextUsage: () => ({ tokens: 220_000 }) };
-		const entered = await phase("enter", "Purpose: preserve the request and investigate evidence", high);
-		assert.equal(entered.details.mode, "research", "entry is immediate");
-		assert.match(entered.content[0].text, /RESEARCH MODE/);
-		phaseNotebooks.add(entered.details.notes);
+		const high = { ...manualCtx, getContextUsage: () => ({ tokens: 220_000 }) };
+		await commands.research.handler("on", high);
+		const entered = researchEntries.at(-1).data;
+		assert.equal(entered.mode, "research");
+		assert.equal("agentControl" in entered, false, "no auto permission is persisted");
+		manualNotebooks.add(entered.notes);
 		assert.match(researchWidgets.at(-1)[0], /RESEARCH MODE/);
-		assert.deepEqual((await phase("enter", "Do not duplicate this purpose")).details, entered.details, "repeated entry is a no-op");
-		assert.doesNotMatch(readFileSync(entered.details.notes, "utf8"), /Do not duplicate this purpose/);
-		for (const [toolName, input] of [["bash", { command: "git diff" }], ["compress", { content: [] }], ["some_tool", {}], ["write", { path: "product.js" }]])
-			assert.equal((await hooks.tool_call({ toolName, input }, phaseCtx))?.block, undefined, `${toolName} is available during research`);
-		assert.equal((await hooks.tool_call({ toolName: "bash", input: { command: "git commit -m x" } }, phaseCtx)).block, true, "commit stays blocked");
-		const finished = await phase("finish", "Conclusion: choose A. Source: evidence.md:12. Rejected B. Next: implement only if authorized.");
-		assert.equal(finished.details.mode, "off", "exit is immediate");
-		assert.match(finished.content[0].text, /Research OFF/);
-		assert.match(readFileSync(finished.details.notes, "utf8"), /Source: evidence.md:12/);
-		assert.equal((await hooks.context({ messages: boundaryMessages }, phaseCtx))?.messages?.some(message => message.customType === "work-research-phase") ?? false, false, "no per-request research hint");
+		await tools.research_note.execute("manual-note", { note: "Manual research finding" });
+		await commands.research.handler("off", { ...high, isIdle: () => true });
+		assert.equal(researchEntries.at(-1).data.mode, "off");
+		assert.match(readFileSync(entered.notes, "utf8"), /Manual research finding/);
 	}
 	selectCompactMode("ultrafull");
-	const crowdedPhaseCtx = { ...phaseCtx, getContextUsage: () => ({ tokens: 220_000 }) };
-	assert.equal((await hooks.turn_end(boundary, crowdedPhaseCtx)).entries[0].type, "compaction", "ordinary Ultrafull threshold applies after exit");
-	await phase("enter", "Manual override wins");
-	phaseNotebooks.add((await phase("status")).details.notes);
-	await shortcuts["ctrl+r"].handler(phaseCtx);
-	assert.equal((await phase("status")).details.enabled, false);
-	await assert.rejects(async () => phase("finish", "Cannot override user"), /disabled/);
-	await hooks.agent_settled({}, { ...phaseCtx, isIdle: () => true });
-	assert.equal((await phase("status")).details.mode, "off");
-	await commands.research.handler("auto on", phaseCtx);
-	await phase("enter", "Interrupted entry is safely restored");
-	phaseNotebooks.add((await phase("status")).details.notes);
-	await hooks.session_tree({}, phaseCtx);
-	assert.equal((await phase("status")).details.mode, "research");
-	await commands.research.handler("auto off", phaseCtx);
-	await hooks.session_tree({}, phaseCtx);
-	const manuallyActive = (await phase("status")).details;
-	assert.equal(manuallyActive.enabled, false);
-	assert.equal(manuallyActive.mode, "research");
-	const manualNotebook = readFileSync(manuallyActive.notes, "utf8");
-	assert.deepEqual((await phase("enter")).details, manuallyActive, "already-on research accepts entry without permission or a new note");
-	assert.deepEqual((await phase("enter", "Keep manual research unchanged")).details, manuallyActive);
-	assert.equal(readFileSync(manuallyActive.notes, "utf8"), manualNotebook, "no duplicate purpose or notebook mutation");
-	await assert.rejects(async () => phase("finish", "Cannot exit manual research"), /disabled/);
-	await commands.research.handler("off", { ...phaseCtx, isIdle: () => false });
-	await assert.rejects(async () => phase("enter", "Cannot cancel a manual exit"), /disabled/);
-	await commands.research.handler("off", { ...phaseCtx, isIdle: () => true });
-	assert.equal(aborts, abortsBeforeNative, "phase transitions never abort live tools");
-	for (const file of phaseNotebooks) rmSync(path.dirname(file), { recursive: true, force: true });
-	console.log("ok - compaction fallback, research phases and on-demand non-vision image bridge");
+	const crowdedManualCtx = { ...manualCtx, getContextUsage: () => ({ tokens: 220_000 }) };
+	assert.equal((await hooks.turn_end(boundary, crowdedManualCtx)).entries[0].type, "compaction", "ordinary Ultrafull threshold applies after manual exit");
+	assert.equal(aborts, abortsBeforeNative, "manual transitions never abort live tools");
+	for (const file of manualNotebooks) rmSync(path.dirname(file), { recursive: true, force: true });
+	console.log("ok - compaction fallback, manual research and on-demand non-vision image bridge");
 } finally {
 	await hooks.session_shutdown?.({}, ctx);
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;

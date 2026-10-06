@@ -16,8 +16,8 @@ import {
 import path from "node:path";
 import process from "node:process";
 import { runGate } from "../scripts/ui-gate/gate.mjs";
-import { occupiedWorkActionLease } from "./work-action-leases.js";
-import { showListDialog } from "./work-dialogs.js";
+import { occupiedWorkActionLease } from "./work-action-leases.ts";
+import { showListDialog } from "./work-dialogs.ts";
 
 const LOCK_STALE_MS = 5 * 60_000;
 const LOCK_POLL_MS = 50;

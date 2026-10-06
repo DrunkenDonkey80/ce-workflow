@@ -12,7 +12,7 @@ import { pathToFileURL } from "node:url";
 import {
 	classifyShadowAssurance,
 	workflowBehaviorFingerprint,
-} from "../extensions/workflow-telemetry.js";
+} from "../extensions/workflow-telemetry.ts";
 import { seedNativeStore } from "./work-command-fixture.mjs";
 
 const { implementationExecutionPolicy, withCommandTelemetry } = await import(

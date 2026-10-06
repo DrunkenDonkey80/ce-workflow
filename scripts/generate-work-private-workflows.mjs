@@ -2,11 +2,14 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
+import { createJiti } from "jiti";
+// Extensions are TypeScript; Node cannot strip types under node_modules, so load them through jiti.
+const extensionJiti = createJiti(import.meta.url);
+const {
 	normalizeSourcePath,
 	readConfinedFile,
 	sha256,
-} from "../extensions/work-compound-source.js";
+} = await extensionJiti.import("../extensions/work-compound-source.ts");
 
 export const TRANSLATOR_VERSION = 6;
 export const BRAINSTORM_SOURCE = "skills/ce-brainstorm/SKILL.md";

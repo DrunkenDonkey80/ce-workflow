@@ -24,7 +24,7 @@ import {
 	initStore,
 	mutateStore,
 	storePath,
-} from "./work-store.js";
+} from "./work-store.ts";
 
 const PACKAGE_NAME = "pi-work-orchestrator";
 const REPORT_ROOT = [".pi", "self-improvement-reports"];

@@ -8,7 +8,7 @@ import {
 	filesFromOps,
 	formatCompactionSummary,
 	latestCompactionNote,
-} from "../extensions/work-compaction.js";
+} from "../extensions/work-compaction.ts";
 
 assert.equal(latestCompactionNote([]), "");
 assert.equal(
@@ -505,7 +505,7 @@ const foreignPrevious = formatCompactionSummary({
 assert.doesNotMatch(foreignPrevious, /STALE-FOREIGN-CLAIM/);
 assert.match(foreignPrevious, /keep this/);
 
-const { compactMemory, decodeMemory, gather, fallbackMemory, coreText } = await import("../extensions/work-compaction-memory.js");
+const { compactMemory, decodeMemory, gather, fallbackMemory, coreText } = await import("../extensions/work-compaction-memory.ts");
 const messages = [
 	{ role: "user", content: "Keep the supplier rollover and approval rule." },
 	{ role: "toolResult", toolName: "inspect", content: "Supplier rollover is 07:15 UTC; independent approval required." },
@@ -520,7 +520,10 @@ const registry = {
 		assert.equal(context.tools, undefined);
 		const task = context.messages[0].content[0].text;
 		let source;
-		try { source = JSON.parse(task.slice(task.indexOf('\n') + 1)).delta[1].source; }
+		try {
+			const payload = JSON.parse(task.slice(task.indexOf('\n') + 1));
+			source = payload.delta[1]?.source ?? JSON.parse(decodeMemory(payload.previous).tail).knowledge[0].sources[0];
+		}
 		catch (error) { assert.fail(`Invalid compaction request JSON: ${error.message}`); }
 		const text = responseMode === "invalid" ? "not JSON" : JSON.stringify({
 			checkpoint: responseMode === "large" ? "x".repeat(17000) : "Rollover 07:15 UTC; independent approval required.",
@@ -565,7 +568,34 @@ assert.equal(unavailable.mode, "fallback");
 assert.equal(calls, 4);
 await assert.rejects(compactMemory({ messages, registry, model: "test/summary", signal: AbortSignal.abort() }), /cancelled/);
 assert.equal(calls, 4);
-await assert.rejects(compactMemory({ messages: [{ role: "user", content: "x".repeat(32000) }], registry }), /overflow/);
+const longRequest = "Keep all original requirements. ".repeat(2200);
+const protectedMemory = await compactMemory({ messages: [{ role: "user", content: longRequest }], registry });
+assert.equal(decodeMemory(protectedMemory.summary).records[0].text, longRequest, "32k rolling target must not reject or clip protected user history");
+assert(protectedMemory.summary.length > 32000);
+const protectedAgain = await compactMemory({ messages: [{ role: "user", content: longRequest }], previousSummary: protectedMemory.summary, registry });
+assert.equal(decodeMemory(protectedAgain.summary).records.length, 1, "replaying the same source does not duplicate protected history");
+const longWithTail = await compactMemory({ messages: [{ role: "user", content: longRequest }], previousSummary: hybrid.summary, registry, limit: 8000 });
+assert(longWithTail.summary.includes(decodeMemory(hybrid.summary).tail), "preserve prior checkpoint even when user core exceeds the target");
+assert(decodeMemory(longWithTail.summary).records.some(record => record.text === longRequest));
+let oversizedCalls = 0;
+const oversizedFallback = await compactMemory({ messages: [{ role: "user", content: "z".repeat(300_000) }], model: "test/small",
+	registry: { find: () => ({ contextWindow: 100_000 }), streamSimple: () => { oversizedCalls++; throw new Error("Must not reach ACP"); } } });
+assert.equal(oversizedCalls, 0, "oversized hybrid requests never enter ACP's preflight retry loop");
+assert.equal(oversizedFallback.mode, "fallback");
+assert.equal(decodeMemory(oversizedFallback.summary).records[0].text.length, 300_000);
+// Large tool output is trimmed/dropped (oldest first) to fit the compactor instead of skipping it.
+const bulky = [{ role: "user", content: "Keep the rollover rule." }, ...Array.from({ length: 300 }, (_, i) =>
+	({ role: "toolResult", toolName: "bash", content: `run ${i} ` + "y".repeat(5000) }))];
+let fittedTask;
+const fitted = await compactMemory({ messages: bulky, model: "test/small", registry: { find: () => ({ contextWindow: 100_000 }),
+	streamSimple: (_m, context) => { fittedTask = context.messages[0].content[0].text; let delta;
+		try { delta = JSON.parse(fittedTask.slice(fittedTask.indexOf("\n") + 1)).delta; } catch (error) { assert.fail(`Invalid compaction request JSON: ${error.message}`); }
+		return { result: async () => ({ content: [{ type: "text", text: JSON.stringify({ checkpoint: "ok", knowledge: [{ claim: "c", status: "observed", sources: [delta.at(-1).source] }] }) }], stopReason: "stop" }) }; } } });
+assert.equal(fitted.mode, "hybrid", "oversized tool output no longer forces fallback");
+assert(Buffer.byteLength(fittedTask, "utf8") <= 100_000);
+assert.match(fittedTask, /older records omitted/);
+assert.match(fittedTask, /Keep the rollover rule/, "protected requests survive fitting");
+assert.match(fittedTask, /run 299 /, "newest evidence survives fitting");
 const records = gather(later);
 const frame = { coreRecords: [], core: coreText([]) };
 const preserved = fallbackMemory(frame, decodeMemory(hybrid.summary).tail, records, 32000);

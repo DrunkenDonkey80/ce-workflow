@@ -24,6 +24,13 @@ function finiteNumber(value, fallback) {
 	return Number.isFinite(number) ? number : fallback;
 }
 
+// Leave room for provider/proxy output reservation, prompts, and token-estimation drift.
+export function compactionInputBytes(model = {}) {
+	// One byte per token of window: English/JSON/code runs ~3–4 bytes per token, so this lands near 25–35% of the window.
+	// ponytail: assumes text-like input; halve again if dense non-Latin transcripts start overflowing.
+	return Math.max(1, Math.floor(Number(model.contextWindow ?? model.context_window) || 200_000));
+}
+
 export function contentText(content) {
 	if (!content) return "";
 	if (typeof content === "string") return content;

@@ -54,7 +54,7 @@ function prepare(root) {
       cases.push({ id, policy, repetition, cwd, task: common + (policy === "checkpoint" ? checkpointInstruction : "") });
     }
   }
-  const sourceFiles = ["extensions/work-models.ts", "extensions/work-compaction.js", "benchmarks/context-continuity/v1/extension.mjs", "benchmarks/context-continuity/v1/fixture.mjs", "scripts/benchmark-context-continuity.mjs"];
+  const sourceFiles = ["extensions/work-models.ts", "extensions/work-compaction.ts", "benchmarks/context-continuity/v1/extension.mjs", "benchmarks/context-continuity/v1/fixture.mjs", "scripts/benchmark-context-continuity.mjs"];
   const manifest = {
     createdAt: new Date().toISOString(), model: "zai/glm-5.3", thinking: "high", root,
     gitHead: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim(),

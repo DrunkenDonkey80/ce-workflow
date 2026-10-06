@@ -18,7 +18,7 @@ import {
 	scanRepositoryCallSites,
 	sha256,
 	withCompoundQuarantine,
-} from "../extensions/work-compound-source.js";
+} from "../extensions/work-compound-source.ts";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(scriptDir, "..");

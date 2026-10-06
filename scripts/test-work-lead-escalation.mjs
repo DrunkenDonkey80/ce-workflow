@@ -25,11 +25,11 @@ const {
 	currentWorkActionLeases,
 	fenceWorkActionLease,
 	readWorkActionLeaseEvents,
-} = await import("../extensions/work-action-leases.js");
+} = await import("../extensions/work-action-leases.ts");
 const { createWorkItem, initStore, loadStore, saveStore, updateWorkItem } =
-	await import("../extensions/work-store.js");
+	await import("../extensions/work-store.ts");
 const { inlineResultArtifact, verificationProofRecord } = await import(
-	"../extensions/work-verification-contract.js"
+	"../extensions/work-verification-contract.ts"
 );
 const { workflowChildParams } = await import("./work-command-fixture.mjs");
 

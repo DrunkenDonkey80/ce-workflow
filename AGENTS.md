@@ -23,7 +23,7 @@ Never retain or describe a workflow optimization as successful from focused test
 
 ## Dialog UX Rule
 
-Use the shared `extensions/work-dialogs.js` overlay system for every
+Use the shared `extensions/work-dialogs.ts` overlay system for every
 ce-workflow selection or checklist menu. Every dialog shows one muted purpose
 line directly below its title. Escape goes to the parent and closes only at the
 root; Enter and Space toggle checklist rows without moving the cursor; parent
@@ -33,6 +33,17 @@ filtering. Keep native UI fallbacks for non-TUI modes.
 ## Fast Commit-and-Push Rule
 
 For direct commit-and-push requests, use this path: one parallel preflight (`status`, `diff --stat`, branch/remote); inspect only unexpected or sensitive untracked files and never stage credentials; run one batched LSP check plus the smallest relevant tests; stage tracked changes with `git add -u`, then commit and push `master`; finish with one status/ahead check. If status and diff disagree, use `git diff-index` once instead of repeated probes. Do not create temporary comparison files.
+
+## Extension File Rule
+
+Write every extension module (anything under `extensions/` or imported by an
+extension) as `.ts`, never `.js`. Pi's jiti loader compiles `.ts` fresh on
+`/reload`, but `.js` in this `"type": "module"` package goes through Node's
+native ESM cache and stays stale until Pi restarts. Import siblings with the
+`.ts` specifier. Scripts that may run from an installed `node_modules` copy
+must load extension modules through jiti (`createJiti(import.meta.url).import`),
+because Node refuses to strip types under `node_modules`; tests run from the
+repo may import `.ts` natively.
 
 ## Branch Rule
 

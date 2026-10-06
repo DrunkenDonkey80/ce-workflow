@@ -8,7 +8,7 @@ import {
 	createDesignSession,
 	designSessionPath,
 	saveDesignSession,
-} from "../extensions/work-design.js";
+} from "../extensions/work-design.ts";
 import {
 	buildWorkBrainstormState,
 	buildWorkFinishState,
@@ -16,7 +16,7 @@ import {
 	buildWorkResumeState,
 	designPlanningAuthority,
 } from "../extensions/work-models.ts";
-import { appendWorkNote, mutateStore } from "../extensions/work-store.js";
+import { appendWorkNote, mutateStore } from "../extensions/work-store.ts";
 import { installWorkflowFixture } from "./work-command-fixture.mjs";
 
 const nonUiRoot = fs.mkdtempSync(

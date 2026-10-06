@@ -12,7 +12,7 @@ import path from "node:path";
 import {
 	acknowledgeWorkActionLease,
 	acquireWorkActionLease,
-} from "../extensions/work-action-leases.js";
+} from "../extensions/work-action-leases.ts";
 import {
 	buildWorkResumeState,
 	driveWorkActionLeases,
@@ -20,7 +20,7 @@ import {
 import {
 	loadVerifierStore,
 	scheduleVerifierBatch,
-} from "../extensions/background-verifiers.js";
+} from "../extensions/background-verifiers.ts";
 import {
 	createWorkItem,
 	initStore,
@@ -28,12 +28,12 @@ import {
 	mutateStore,
 	saveStore,
 	updateWorkItem,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	compatibilityVerificationContract,
 	inlineResultArtifact,
 	verificationProofRecord,
-} from "../extensions/work-verification-contract.js";
+} from "../extensions/work-verification-contract.ts";
 
 function assert(value, message) {
 	if (!value) throw new Error(message);

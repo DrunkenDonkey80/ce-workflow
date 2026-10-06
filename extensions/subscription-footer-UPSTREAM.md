@@ -1,6 +1,6 @@
 # Subscription footer upstream provenance
 
-`extensions/subscription-footer.js` copies and adapts provider quota parsing, public
+`extensions/subscription-footer.ts` copies and adapts provider quota parsing, public
 Statuspage incident polling, compact quota-bar rendering, and polling/cache lifecycle
 ideas from `pi-usage-bar` at pinned revision:
 

@@ -19,7 +19,7 @@ import {
 	storePath,
 	validateStore,
 	WorkStoreError,
-} from "./work-store.js";
+} from "./work-store.ts";
 
 const TYPES = new Set(["epic", "task", "bug", "decision", "idea"]);
 const STATUSES = new Set([

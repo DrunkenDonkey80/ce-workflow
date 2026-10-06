@@ -8,7 +8,7 @@ import {
 	readConfinedFile,
 	sha256,
 	withCompoundQuarantine,
-} from "../extensions/work-compound-source.js";
+} from "../extensions/work-compound-source.ts";
 
 let checks = 0;
 const check = (fn, label) => {

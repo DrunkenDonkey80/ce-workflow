@@ -8,15 +8,15 @@ import {
 	laneStorePath,
 	loadLaneStore,
 	queueLane,
-} from "../extensions/read-only-lanes.js";
-import { captureVerifierCheckpoint } from "../extensions/background-verifiers.js";
+} from "../extensions/read-only-lanes.ts";
+import { captureVerifierCheckpoint } from "../extensions/background-verifiers.ts";
 import {
 	SENTINEL_ARTIFACT_VERSION,
 	createSentinelLane,
 	runAdvisorySentinel,
 	scheduleSentinelFrozenDiff,
 	sentinelStatus,
-} from "../extensions/work-sentinel.js";
+} from "../extensions/work-sentinel.ts";
 
 const roots = [];
 function repository() {

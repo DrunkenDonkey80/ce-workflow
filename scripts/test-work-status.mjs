@@ -8,7 +8,7 @@ import {
 	initStore,
 	createWorkItem,
 	saveStore,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	buildWorkStatus,
 	buildWorkReportState,

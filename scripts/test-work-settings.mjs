@@ -1788,6 +1788,116 @@ try {
 		!readdirSync(globalDir).some((name) => name.endsWith(".tmp")),
 		"successful imports leave no temporary files",
 	);
+
+	// Legacy workflow switch: unset = off; the Settings row persists it and reloads.
+	const previousWorkflow = process.env.CE_WORKFLOW_ENABLED;
+	delete process.env.CE_WORKFLOW_ENABLED;
+	writeSettings({});
+	writeGlobalSettings({});
+	assert(!mod.workflowEnabled(cwd), "unset workflow switch is off");
+	let reloads = 0;
+	let workflowVisits = 0;
+	await invoke("work-settings", "", {
+		...ctx,
+		mode: "rpc",
+		reload: async () => {
+			reloads += 1;
+		},
+		ui: {
+			notify: ctx.ui.notify,
+			select: async (title, labels) =>
+				title === "Settings: Global" && workflowVisits++ === 0
+					? labels.find((label) => label.includes("Workflow (legacy orchestration)"))
+					: undefined,
+		},
+	});
+	assert(
+		readGlobalSettings().workOrchestrator.workflow.enabled === true &&
+			reloads === 1 &&
+			mod.workflowEnabled(cwd),
+		"workflow row persists the switch and reloads the runtime",
+	);
+	// Plan3 second-opinion list: add, reorder, remove persist in order.
+	const planScript = [
+		["Settings: Global", "Plan3 → Plan models"],
+		["Plan models", "Add model"], ["Plan model: choose model", "gpt-6-astra"], ["Plan model: choose effort", "High —"],
+		["Plan models", "Add model"], ["Plan model: choose model", "claude-opus-5-5"], ["Plan model: choose effort", "High —"],
+		["Plan models", "Add model"], ["Plan model: choose model", "glm-5.3"], ["Plan model: choose effort", "Low —"],
+		["Plan models", "2."], ["Plan model", "Move up"],
+		["Plan models", "3."], ["Plan model", "Remove"],
+	];
+	await invoke("work-settings", "", {
+		...ctx,
+		mode: "rpc",
+		modelRegistry: { getAvailable: async () => [
+			{ provider: "openai-codex", id: "gpt-6-astra", name: "gpt-6-astra" },
+			{ provider: "anthropic", id: "claude-opus-5-5", name: "claude-opus-5-5" },
+			{ provider: "zai", id: "glm-5.3", name: "glm-5.3" },
+		] },
+		ui: {
+			notify: ctx.ui.notify,
+			select: async (title, labels) => {
+				const step = planScript[0];
+				if (!step || step[0] !== title) return undefined;
+				planScript.shift();
+				return labels.find((label) => label.includes(step[1]));
+			},
+		},
+	});
+	assert(
+		planScript.length === 0 &&
+			JSON.stringify(readGlobalSettings().workOrchestrator.plan3.models) ===
+				JSON.stringify([
+					{ model: "anthropic/claude-opus-5-5", thinking: "high" },
+					{ model: "openai-codex/gpt-6-astra", thinking: "high" },
+				]),
+		`plan models add/reorder/remove persist (${JSON.stringify(planScript[0])})`,
+	);
+	const loadExtension = () => {
+		const loaded = { commands: {}, tools: {}, shortcuts: {} };
+		mod.default({
+			getActiveTools: () => [],
+			setActiveTools: () => {},
+			getThinkingLevel: () => "medium",
+			setThinkingLevel: () => {},
+			on: () => {},
+			events: { on: () => {}, emit: () => {} },
+			registerCommand: (name, config) => {
+				loaded.commands[name] = config;
+			},
+			registerTool: (tool) => {
+				loaded.tools[tool.name] = tool;
+			},
+			registerShortcut: (name, config) => {
+				loaded.shortcuts[name] = config;
+			},
+			appendEntry: () => {},
+			sendUserMessage: () => {},
+			sendMessage: () => {},
+		});
+		return loaded;
+	};
+	process.env.CE_WORKFLOW_ENABLED = "0";
+	const off = loadExtension();
+	assert(
+		!off.shortcuts.f9 &&
+			off.shortcuts.f8 &&
+			!Object.keys(off.tools).some((name) => name.startsWith("work_")) &&
+			off.tools.knowledge,
+		"workflow off registers no F9 and no work_* tools but keeps utilities",
+	);
+	assert(
+		JSON.stringify(off.commands.wo.getArgumentCompletions("").map(({ value }) => value)) === '["compact","fact"]',
+		"workflow off completes only utility /wo subcommands",
+	);
+	const offNotices = [];
+	await off.commands.wo.handler("goal ship it", { cwd, ui: { notify: (message) => offNotices.push(message) } });
+	assert(offNotices.at(-1)?.includes("Workflow is off"), "/wo goal is refused while the workflow is off");
+	process.env.CE_WORKFLOW_ENABLED = "1";
+	const on = loadExtension();
+	assert(on.shortcuts.f9 && on.tools.work_goal_complete, "workflow on restores F9 and work_* tools");
+	if (previousWorkflow === undefined) delete process.env.CE_WORKFLOW_ENABLED;
+	else process.env.CE_WORKFLOW_ENABLED = previousWorkflow;
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });

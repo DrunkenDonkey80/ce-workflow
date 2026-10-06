@@ -27,19 +27,19 @@ import {
 	recordOperationResult,
 	recordTriageDisposition,
 	reopenGroup,
-} from "../extensions/background-verifiers.js";
+} from "../extensions/background-verifiers.ts";
 import {
 	addWorkEvidence,
 	createWorkItem,
 	initStore,
 	mutateStore,
 	updateWorkItem,
-} from "../extensions/work-store.js";
+} from "../extensions/work-store.ts";
 import {
 	compatibilityVerificationContract,
 	inlineResultArtifact,
 	verificationProofRecord,
-} from "../extensions/work-verification-contract.js";
+} from "../extensions/work-verification-contract.ts";
 import { formatPendingFiles } from "./work-hygiene.mjs";
 
 function closeVerifiedTask(store, id) {
@@ -1587,9 +1587,9 @@ assert.equal(
 	1,
 	"unrelated menu actions retain argument dialogs",
 );
-assert.equal(Object.keys(tools).length, 21);
+assert.equal(Object.keys(tools).length, 20);
 assert(tools.compaction_note);
-assert(tools.research_mode);
+assert.equal(tools.research_mode, undefined, "research has no agent-controlled toggle");
 assert(tools.research_note);
 assert(tools.process_image);
 assert(tools.work_monitor_bind);

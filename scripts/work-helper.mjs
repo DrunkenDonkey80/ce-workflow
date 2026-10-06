@@ -12,14 +12,17 @@ import {
 } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
+import { createJiti } from "jiti";
+// Extensions are TypeScript; Node cannot strip types under node_modules, so load them through jiti.
+const extensionJiti = createJiti(import.meta.url);
+const {
 	acquireRepositoryMutationLock,
 	admitVerificationManifest,
 	normalizeVerificationShards,
 	runVerificationShardBatch,
 	VERIFICATION_GATE_VERSION,
-} from "../extensions/read-only-lanes.js";
-import {
+} = await extensionJiti.import("../extensions/read-only-lanes.ts");
+const {
 	addWorkEvidence,
 	appendWorkNote,
 	closeWorkItem,
@@ -29,19 +32,19 @@ import {
 	readyWorkItems,
 	storePath,
 	updateWorkItem,
-} from "../extensions/work-store.js";
+} = await extensionJiti.import("../extensions/work-store.ts");
 import {
 	formatPendingFiles,
 	isGeneratedBuildPath,
 	isRuntimePath,
 	tidyUntrackedFiles,
 } from "./work-hygiene.mjs";
-import {
+const {
 	hasProductionDiff,
 	readReviewPolicy,
-} from "../extensions/work-quality-policy.js";
-import { runCapabilityAdapter } from "../extensions/work-capability-adapters.js";
-import {
+} = await extensionJiti.import("../extensions/work-quality-policy.ts");
+const { runCapabilityAdapter } = await extensionJiti.import("../extensions/work-capability-adapters.ts");
+const {
 	compatibilityVerificationContract,
 	fileArtifact,
 	inlineResultArtifact,
@@ -51,7 +54,7 @@ import {
 	verificationContractStatus,
 	verificationProofRecord,
 	verificationWaiverRecord,
-} from "../extensions/work-verification-contract.js";
+} = await extensionJiti.import("../extensions/work-verification-contract.ts");
 
 const cwd = process.cwd();
 let jiti;
