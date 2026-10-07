@@ -25340,130 +25340,6 @@ async function handleWorkResumeStopCommand(args, pi, ctx) {
 	);
 }
 
-const CSWAP_EXE_EXTENSIONS =
-	process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
-
-// Fast PATH scan (no process spawn) so the menu stays cheap to render.
-function resolveCswap() {
-	const override = process.env.WORK_ORCH_CSWAP_BIN;
-	if (override) return existsSync(override) ? override : null;
-	for (const dir of (process.env.PATH ?? "").split(delimiter).filter(Boolean))
-		for (const ext of CSWAP_EXE_EXTENSIONS) {
-			const candidate = join(dir, `cswap${ext}`);
-			if (existsSync(candidate)) return candidate;
-		}
-	return null;
-}
-
-function cswapUsage(account) {
-	const segments = [];
-	for (const [label, window] of [
-		["5h", account?.usage?.fiveHour],
-		["week", account?.usage?.sevenDay],
-	]) {
-		if (window?.pct == null) continue;
-		const pct = Math.max(0, Math.min(100, Math.round(window.pct)));
-		const filled = Math.round((pct / 100) * 6);
-		if (segments.length) segments.push({ text: ", " });
-		segments.push(
-			{ text: `${label} ` },
-			{
-				text: `[${"█".repeat(filled)}${"░".repeat(6 - filled)}] ${pct}%`,
-				color: pct > 80 ? "error" : pct > 50 ? "warning" : "success",
-			},
-			...(window.countdown ? [{ text: `, in ${window.countdown}` }] : []),
-		);
-	}
-	return segments;
-}
-
-function cswapMenuItems(data) {
-	const accounts = Array.isArray(data?.accounts) ? data.accounts : [];
-	const activeNumber = data?.activeAccountNumber;
-	const items = accounts
-		.map((account, index) => ({ account, index }))
-		.sort((left, right) => {
-			const rank = ({ account }) => {
-				const fiveHour = account?.usage?.fiveHour;
-				const reset = Date.parse(fiveHour?.resetsAt ?? "");
-				return fiveHour?.pct < 50 && Number.isFinite(reset) ? [0, reset] : [1, 0];
-			};
-			const [leftRank, leftReset] = rank(left);
-			const [rightRank, rightReset] = rank(right);
-			return (
-				leftRank - rightRank || leftReset - rightReset || left.index - right.index
-			);
-		})
-		.map(({ account }) => {
-			const name = account.email || account.alias || `Account-${account.number}`;
-			const usage = cswapUsage(account);
-			const labelSegments = [
-				{ text: name },
-				...(usage.length ? [{ text: ", " }, ...usage] : []),
-			];
-			return {
-				value: String(account.number),
-				label: labelSegments.map((segment) => segment.text).join(""),
-				labelSegments,
-				preserveCase: true,
-			};
-		});
-	return { items, activeNumber };
-}
-
-function runCswap(bin, args, cwd) {
-	return parseWorkflowJson(
-		execFileSync(bin, [...args, "--json"], {
-			cwd,
-			encoding: "utf8",
-			timeout: 20000,
-			stdio: ["ignore", "pipe", "pipe"],
-		}),
-		"cswap output",
-	);
-}
-
-async function handleCswapMenu(ctx, bin) {
-	let data;
-	try {
-		data = runCswap(bin, ["list"], ctx.cwd);
-	} catch (error) {
-		notify(
-			ctx,
-			`cswap list failed: ${error instanceof Error ? error.message : String(error)}`,
-			"warning",
-		);
-		return;
-	}
-	const { items, activeNumber } = cswapMenuItems(data);
-	if (!items.length) {
-		notify(ctx, "cswap has no managed accounts.", "warning");
-		return;
-	}
-	const choice = await choose(
-		ctx,
-		"Claude account switcher",
-		items,
-		activeNumber == null ? undefined : String(activeNumber),
-		{ purpose: "Switch the active Claude account. Type to filter." },
-	);
-	if (!choice) return;
-	if (choice === String(activeNumber)) {
-		notify(ctx, `Account-${choice} is already active.`, "info");
-		return;
-	}
-	try {
-		const result = runCswap(bin, ["switch", choice], ctx.cwd);
-		notify(ctx, result.message || `Switched to account ${choice}.`, "info");
-	} catch (error) {
-		notify(
-			ctx,
-			`cswap switch failed: ${error instanceof Error ? error.message : String(error)}`,
-			"warning",
-		);
-	}
-}
-
 function mainEditorActionKey(ctx) {
 	return `${resolve(ctx?.cwd ?? process.cwd())}\u0000${ctx?.sessionManager?.getSessionId?.() ?? `process-${process.pid}`}`;
 }
@@ -26073,7 +25949,6 @@ async function handleWorkReviewAnalysisCommand(ctx, pi) {
 
 async function handleWorkMenuCommand(ctx, pi) {
 	const improvementCount = workImproveCount(ctx.cwd);
-	const cswapBin = resolveCswap();
 	let reviewCount = 0;
 	try {
 		reviewCount = analysisInboxProjection(loadVerifierStore(ctx.cwd)).length;
@@ -26095,16 +25970,6 @@ async function handleWorkMenuCommand(ctx, pi) {
 			description:
 				"Browse, inspect, plan, continue, close, or reopen roadmaps.\nThe last open roadmap or initiative is selected automatically.",
 		},
-		...(cswapBin
-			? [
-					{
-						value: "cswap",
-						label: "🔀 Claude account switcher",
-						description:
-							"Switch the active Claude account via cswap.\nShows 5h and weekly usage and reset times per account.",
-					},
-				]
-			: []),
 		...(reviewCount
 			? [
 					{
@@ -26405,10 +26270,6 @@ async function handleWorkMenuCommand(ctx, pi) {
 					: `Private workflow rollback failed: ${result.reason}`,
 				result.status === "rolled-back" ? "info" : "warning",
 			);
-		}
-		if (selected.value === "cswap") {
-			await handleCswapMenu(ctx, cswapBin);
-			continue;
 		}
 		if (selected.value === "work-roadmap") {
 			activeRoadmapMenuSessions.set(ctx, roadmapRuntime);
@@ -30319,8 +30180,6 @@ export {
 	applyInitiativeReconciliation,
 	approveInitiativeReconciliation,
 	buildWorkInitState,
-	resolveCswap,
-	cswapMenuItems,
 	buildWorkImproveObjective,
 	buildWorkImproveState,
 	buildInitiativeProjection,
@@ -32486,7 +32345,7 @@ export default function workModelsExtension(pi) {
 }
 
 const WORKFLOW_OFF_NOTICE = "Workflow is off — /wo → Settings → Workflow (legacy orchestration) turns it back on.";
-const UTILITY_MENU_VALUES = new Set(["cswap", "work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
+const UTILITY_MENU_VALUES = new Set(["work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
 const UTILITY_SETTING_KINDS = new Set(["workflow", "planModels", "compactionMode", "compactionModel", "jev", "visionModel", "nonVisionModels", "subscriptionFooter", "reset", "export", "import"]);
 
 function onOff(value) {

@@ -559,7 +559,6 @@ const GENERAL_TESTS = new Set([
 	"test-work-compaction.mjs",
 	"test-work-compaction-notifications.mjs",
 	"test-work-compound-source.mjs",
-	"test-work-cswap-menu.mjs",
 	"test-work-dialogs.mjs",
 	"test-work-extension-scout.mjs",
 	"test-work-knowledge.mjs",

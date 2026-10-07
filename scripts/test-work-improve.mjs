@@ -452,8 +452,6 @@ assert(
 	!existsSync(path.join(root, ".pi", "work-runs")),
 	"preview does not emit telemetry or mutate workflow state",
 );
-// Keep the menu deterministic regardless of whether cswap is on PATH here.
-process.env.WORK_ORCH_CSWAP_BIN = path.join(root, "no-such-cswap");
 const menuLabels = [];
 await openWorkflow({
 	cwd: root,
@@ -467,10 +465,6 @@ await openWorkflow({
 });
 assert.match(menuLabels[0], /Roadmaps/);
 assert.match(menuLabels[1], /Improve project \(1\)/);
-assert(
-	!menuLabels.some((label) => label.includes("Claude account switcher")),
-	"cswap entry hidden when the binary is absent",
-);
 mutateStore(root, (store) => {
 	appendWorkNote(
 		store,

@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import packageInfo from "../package.json" with { type: "json" };
 
 const {
 	buildWorkTelemetry,
@@ -162,7 +163,7 @@ try {
 					event.pairId === "pair-fixture" &&
 					event.agentId === "sample-fixture:main" &&
 					event.telemetrySchemaVersion === 1 &&
-					event.workflow.packageVersion === "0.1.0" &&
+					event.workflow.packageVersion === packageInfo.version &&
 					Boolean(event.workflow.gitRevision || event.workflow.dirtySourceHash) &&
 					!(event.workflow.gitRevision && event.workflow.dirtySourceHash) &&
 					event.workflow.routingPolicyRevision === "1" &&

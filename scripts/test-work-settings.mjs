@@ -1955,11 +1955,13 @@ try {
 		"workflow off registers no F9 and no work_* tools but keeps utilities",
 	);
 	let offMenuTitle = "";
+	let offMenuLabels = [];
 	await off.shortcuts.f7.handler({ ...offCtx, mode: "rpc", ui: {
 		notify: ctx.ui.notify,
-		select: async title => { offMenuTitle = title; return undefined; },
+		select: async (title, labels) => { offMenuTitle = title; offMenuLabels = labels; return undefined; },
 	} });
 	assert(offMenuTitle === `Utilities — ${mod.loadedWorkflowBuildLabelForTest}`, "F7 shows the loaded build, including in the native dialog fallback");
+	assert(offMenuLabels.length && offMenuLabels.every(label => ["Telemetry", "Usage report", "Context guard", "Settings", "Catch up packages", "Scout Pi extensions"].some(name => label.includes(name))), "F7 keeps only the supported utility actions");
 	assert(
 		JSON.stringify(off.commands.wo.getArgumentCompletions("").map(({ value }) => value)) === '["compact","fact"]',
 		"workflow off completes only utility /wo subcommands",
