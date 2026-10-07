@@ -36,7 +36,7 @@ const ctx = {
 			if (step[1] === null) return undefined;
 			const label = labels.find((candidate) => candidate.includes(step[1]));
 			assert(label, `no "${step[1]}" in ${title}: ${labels.join(" | ")}`);
-			step[2]?.(labels);
+			await step[2]?.(labels);
 			return label;
 		},
 	},
@@ -354,7 +354,7 @@ try {
 	await run("plan3", `resolve ${authId}`);
 	assert.equal(messages.length, beforeResolve + 1);
 	assert(messages.at(-1).message.includes(JSON.stringify(authFile)));
-	assert.match(messages.at(-1).message, /Blocking first, then Deferred, one at a time[\s\S]*ask_user[\s\S]*keeping it deferred[\s\S]*Do not implement product code/);
+	assert.match(messages.at(-1).message, /Blocking first, then Deferred[\s\S]*ask_user[\s\S]*allowFreeform: true[\s\S]*keeping it deferred[\s\S]*Bundle 2–4 independent questions[\s\S]*dependent questions only after their prerequisites are settled[\s\S]*Do not implement product code/);
 	assert.equal(entries.at(-1).data.planning, true, "resolve keeps the planning state");
 	await writeFile(authFile, (await readFile(authFile, "utf8")).replace("Which session store?", "None.").replace(/- Rate limits[\s\S]*?SSO/, "None."));
 
@@ -431,37 +431,79 @@ try {
 	assert.equal(messages.length, beforeRegular, "ordinary failed compaction still sends nothing");
 	tokens = 0; compactFails = false;
 
-	// Direct resolve: stored choices and free text, no model messages; nested details stay attached.
+	// Resolve batches stored choices/custom answers, supports review, and saves only on submission.
 	const directFile = path.join(directory, "2026-10-07-direct-55555555-plan3.md");
 	const questionOne = "- **Q-01** Which format?\n  - Context: Existing consumers read CSV.\n  - Recommendation: Keep CSV to avoid migration.\n  - Option: Keep CSV — No migration needed.\n  - Option: Use JSON — Requires updating consumers.";
-	await writeFile(directFile, validPlan("55555555", "Direct answers", "draft", "- [ ] **D-01** Implement")
+	const directPlan = validPlan("55555555", "Direct answers", "draft", "- [ ] **D-01** Implement")
 		.replace("### Blocking\n\nNone.", `### Blocking\n\n${questionOne}\n- **Q-02** Which timeout?\n  - detail: preserve this with the question`)
-		.replace("### Deferred\n\nNone.", "### Deferred\n\n1. Another question?\n  - nested detail"));
+		.replace("### Deferred\n\nNone.", "### Deferred\n\n1. Another question?\n  - nested detail");
+	await writeFile(directFile, directPlan);
 	ctx.hasUI = true;
 	const directMessages = messages.length;
-	const inputAnswers = [undefined, "Thirty seconds; existing callers expect it."];
+	const inputAnswers = [undefined, "Thirty seconds; existing callers expect it.", "Forty-five seconds."];
 	ctx.ui.input = async () => inputAnswers.shift();
-	selectScript = [["Resolve blocking question", "Keep CSV", labels => assert(labels.some(label => label.includes("Existing consumers read CSV")), "stored context reaches fallback UI")], ["Resolve blocking question", "Answer directly"], ["Resolve blocking question", "Answer directly"], ["Resolve deferred question", "Keep open for now"]];
+	const prefills = [];
+	selectScript = [
+		["Resolve question 1/3", "Keep CSV", labels => assert(labels.some(label => label.includes("Existing consumers read CSV")), "stored context reaches fallback UI")],
+		["Resolve question 2/3", "Answer directly"], ["Resolve question 2/3", "Answer directly"],
+		["Resolve question 3/3", "Keep open for now"],
+		["Review resolve answers", "1. **Q-01**", async labels => {
+			assert.equal(await readFile(directFile, "utf8"), directPlan, "draft answers are not saved before submission");
+			assert(labels.some(label => label.includes("Thirty seconds")), "review shows custom answers");
+		}],
+		["Resolve question 1/3", "Use JSON"],
+		["Review resolve answers", "2. **Q-02**", () => {
+			ctx.ui.editor = async (_title, prefill) => { prefills.push(prefill); return inputAnswers.shift(); };
+		}],
+		["Resolve question 2/3", "Answer directly"], ["Review resolve answers", "Submit batch (2)"],
+	];
 	await run("plan3", "resolve 55555555");
-	assert.equal(selectScript.length, 0, "cancelled input returns to the same question menu");
+	assert.equal(selectScript.length, 0, "cancelled input returns to the question and review permits edits");
+	assert.deepEqual(prefills, ["Thirty seconds; existing callers expect it."], "custom answer edits retain the draft");
 	assert.equal(messages.length, directMessages, "direct answers never invoke the LLM");
 	const answeredPlan = await readFile(directFile, "utf8");
 	assert.match(answeredPlan, /### Blocking\n\nNone\./);
-	assert.match(answeredPlan, /User answer \(source: \/plan3 resolve; not independently verified\):\n> Keep CSV — No migration needed/);
-	assert.match(answeredPlan, /> Thirty seconds; existing callers expect it\./);
+	assert.match(answeredPlan, /User answer \(source: \/plan3 resolve; not independently verified\):\n> Use JSON — Requires updating consumers/);
+	assert.match(answeredPlan, /> Forty-five seconds\./);
+	assert(!answeredPlan.includes("> Keep CSV —") && !answeredPlan.includes("> Thirty seconds"), "only final answers are saved");
 	assert.match(answeredPlan, /### Deferred\n\n1\. Another question\?\n  - nested detail/);
 	assert.match(answeredPlan, /^status: draft$/m);
 	assert.match(answeredPlan, /- \[ \] \*\*D-01\*\* Implement/, "scope/steps never change from a direct choice");
-	selectScript = [["Resolve deferred question", null]];
+	inputAnswers.push("Discard this draft.");
+	selectScript = [["Resolve question 1/1", "Answer directly"], ["Review resolve answers", null]];
 	await run("plan3", "resolve 55555555");
-	assert.equal(await readFile(directFile, "utf8"), answeredPlan, "Escape changes nothing");
-	selectScript = [["Resolve deferred question", "Discuss with agent"]];
+	assert.equal(await readFile(directFile, "utf8"), answeredPlan, "Escape at review discards the entire draft batch");
+	selectScript = [["Resolve question 1/1", null], ["Review resolve answers", null]];
 	await run("plan3", "resolve 55555555");
-	assert.equal(messages.length, directMessages + 1);
-	assert.match(messages.at(-1).message, /Discuss only this Deferred question[\s\S]*Another question/);
-	assert(!messages.at(-1).message.includes("Which format?"), "discussion sends only the selected question");
-	assert.equal(await readFile(directFile, "utf8"), answeredPlan, "discussion leaves the question open until answered");
-	ctx.hasUI = false; delete ctx.ui.input;
+	assert.equal(await readFile(directFile, "utf8"), answeredPlan, "Escape from a question returns to review without saving");
+
+	// Multiple discussion requests wait for submission, then share one agent turn with saved answers.
+	await writeFile(directFile, directPlan);
+	inputAnswers.push("Custom format choice.");
+	selectScript = [["Resolve question 1/3", "Other answer (free text)"], ["Resolve question 2/3", "Discuss with agent"], ["Resolve question 3/3", "Discuss with agent"],
+		["Review resolve answers", "Submit batch (3)", () => assert.equal(messages.length, directMessages, "discussion is not sent before submission")]];
+	await run("plan3", "resolve 55555555");
+	assert.equal(messages.length, directMessages + 1, "all discussion requests share one model turn");
+	assert.match(messages.at(-1).message, /Discuss only these selected open questions[\s\S]*newly recorded batch answers[\s\S]*Blocking:[\s\S]*Which timeout[\s\S]*Deferred:[\s\S]*Another question/);
+	assert(!messages.at(-1).message.includes("Which format?"), "discussion sends only the selected unresolved questions");
+	const discussedPlan = await readFile(directFile, "utf8");
+	assert.match(discussedPlan, /> Custom format choice\./);
+	assert.match(discussedPlan, /### Blocking\n\n- \*\*Q-02\*\* Which timeout\?/);
+	assert.match(discussedPlan, /### Deferred\n\n1\. Another question\?\n  - nested detail/, "discussion leaves selected questions open");
+
+	// If any answered question changes while the batch is open, save none of it.
+	await writeFile(directFile, directPlan);
+	const changedPlan = directPlan.replace("Which timeout?", "Changed timeout question?");
+	inputAnswers.push("Ten seconds.");
+	selectScript = [["Resolve question 1/3", "Keep CSV"], ["Resolve question 2/3", "Answer directly"], ["Resolve question 3/3", "Keep open for now"],
+		["Review resolve answers", "Submit batch (2)", () => writeFile(directFile, changedPlan)]];
+	await run("plan3", "resolve 55555555");
+	assert.equal(await readFile(directFile, "utf8"), changedPlan, "a stale batch never writes partial answers or overwrites external changes");
+	assert.match(notices.at(-1).message, /Question changed; batch not saved/);
+	assert.equal(messages.length, directMessages + 1, "failed submission sends nothing");
+	assert.equal(inputAnswers.length, 0);
+	assert.equal(selectScript.length, 0);
+	ctx.hasUI = false; delete ctx.ui.input; delete ctx.ui.editor;
 
 	// Exact bare words are shortcuts only during live Plan3 planning and only from the operator.
 	const input = (text, source = "interactive", images) => hooks.get("input")({ text, source, images }, ctx);
