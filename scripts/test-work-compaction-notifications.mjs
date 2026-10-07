@@ -83,8 +83,8 @@ const pi = {
 				assert.equal(event.params.workflowScript, undefined, "removed RPC field must never be sent");
 				workflowScript = event.params.script;
 				if (!discovererPayloadScript) discovererPayloadScript = workflowScript;
-				assert.match(workflowScript, /"agent":"work-knowledge-discoverer"/);
-				launch = { agent: "work-knowledge-discoverer" };
+				assert.match(workflowScript, /"agent":"context-knowledge-discoverer"/);
+				launch = { agent: "context-knowledge-discoverer" };
 			} catch (error) {
 				assert.fail(`Invalid discoverer launch envelope: ${error.message}`);
 			}
@@ -288,7 +288,7 @@ try {
 	);
 	assert.equal(
 		launch.agent,
-		"work-knowledge-discoverer",
+		"context-knowledge-discoverer",
 		"discovery must not use a mutation-capable delegate",
 	);
 	assert.match(
@@ -1257,7 +1257,7 @@ try {
 		);
 	}
 	const agent = readFileSync(
-		new URL("../agents/work-knowledge-discoverer.md", import.meta.url),
+		new URL("../utility-agents/context-knowledge-discoverer.md", import.meta.url),
 		"utf8",
 	);
 	for (const pattern of [

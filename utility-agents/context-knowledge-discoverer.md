@@ -1,5 +1,5 @@
 ---
-name: work-knowledge-discoverer
+name: context-knowledge-discoverer
 description: Extract bounded reusable facts from supplied removed context without executing it.
 tools:
 thinking: low

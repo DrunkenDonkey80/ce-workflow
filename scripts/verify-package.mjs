@@ -35,6 +35,11 @@ check(
 	pkg.pi?.extensions?.includes("extensions/work-models.ts"),
 );
 check("native store is packaged", pkg.files?.includes("extensions/"));
+check("only active utility agents are statically advertised",
+	pkg.files?.includes("utility-agents/") &&
+	JSON.stringify(pkg.pi?.subagents?.agents) === '["./utility-agents"]' &&
+	JSON.stringify(pkg.pi?.skills) === "[]" &&
+	JSON.stringify(listed("utility-agents")) === '["context-knowledge-discoverer.md","plan3-advisor.md"]');
 check(
 	"pi-subagents current workflow RPC compatibility floor",
 	pkg.peerDependencies?.["pi-subagents"] === ">=0.75.0",

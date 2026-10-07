@@ -222,6 +222,20 @@ try {
 	assert.equal(entries.at(-1)[1].tier, "recommend");
 	assert.equal(renderers.get("jev-compaction-note")({ data: { ...entries[0][1], show: false } }), undefined, "silent decisions are logged, not shown");
 	assert(!("sendMessage" in notePi), "never enters model context");
+	// Scope override: global on applies where the project is silent; a project value wins.
+	const scoped = { global: {}, project: {} };
+	const effective = () => ({ workOrchestrator: { jev: { ...scoped.global.workOrchestrator?.jev, ...scoped.project.workOrchestrator?.jev } } });
+	const panelTools = createJevTools({ registerTool() {}, on() {} }, effective);
+	const picks = [];
+	const panelCtx = { cwd, modelRegistry: registry, ui: { select: async (_title, labels) => { const want = picks.shift(); return want && labels.find(l => l.includes(want)); }, confirm: async () => true, notify() {} } };
+	const panel = scope => panelTools.panel(panelCtx, scope, () => structuredClone(scoped[scope]), (_cwd, next) => { scoped[scope] = next; });
+	picks.push("Jev tools"); await panel("global");
+	assert.equal(scoped.global.workOrchestrator.jev.enabled, true, "global toggle writes the global scope");
+	assert.deepEqual(scoped.project, {}, "project untouched");
+	assert.equal(jevStatus(effective(), registry).status, "Ready", "global on applies to a silent project");
+	picks.push("Jev tools"); await panel("project");
+	assert.equal(scoped.project.workOrchestrator.jev.enabled, false, "project toggle flips the effective value into an override");
+	assert.equal(jevStatus(effective(), registry).status, "Off", "project override wins");
 	console.log("ok - Jev opt-in, guards, native shapes/usage, sources, limits, privacy, failure, cancellation, evidence, jev_ask and compaction note");
 } finally {
 	await rm(cwd, { recursive: true, force: true });

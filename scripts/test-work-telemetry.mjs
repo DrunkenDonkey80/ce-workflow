@@ -678,7 +678,14 @@ try {
 			registerTool() {},
 			sendUserMessage: async (message, options) => sent.push({ message, options }),
 		};
-		workModelsExtension(pi);
+		// This section exercises legacy worker telemetry, not the default-off utility surface.
+		const previousWorkflow = process.env.CE_WORKFLOW_ENABLED;
+		process.env.CE_WORKFLOW_ENABLED = "1";
+		try { workModelsExtension(pi); }
+		finally {
+			if (previousWorkflow === undefined) delete process.env.CE_WORKFLOW_ENABLED;
+			else process.env.CE_WORKFLOW_ENABLED = previousWorkflow;
+		}
 		const invoke = (name, args, ctx) =>
 			executeOrchestratorAction(name, args, ctx, pi);
 		const sent = [];

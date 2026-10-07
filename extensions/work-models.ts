@@ -413,27 +413,19 @@ function registerConstrainedTool(pi, tool) {
 	});
 }
 
-function exposeBundledSubagentAgents() {
-	if (!existsSync(WORK_ORCH_AGENT_DIR)) return;
-	const current = process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] ?? "";
-	const entries = current.split(delimiter).filter(Boolean);
-	const normalized =
-		process.platform === "win32"
-			? WORK_ORCH_AGENT_DIR.toLowerCase()
-			: WORK_ORCH_AGENT_DIR;
-	if (
-		entries.some(
-			(entry) =>
-				(process.platform === "win32"
-					? resolve(entry).toLowerCase()
-					: resolve(entry)) === normalized,
-		)
-	)
-		return;
-	process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] = [
-		...entries,
-		WORK_ORCH_AGENT_DIR,
-	].join(delimiter);
+export function exposeBundledSubagentAgents(workflowOn) {
+	const normalize = (dir) =>
+		process.platform === "win32" ? resolve(dir).toLowerCase() : resolve(dir);
+	const utilityDir = join(WORKFLOW_REPO_DIR, "utility-agents");
+	const owned = new Set([WORK_ORCH_AGENT_DIR, utilityDir].map(normalize));
+	// Remove our previous runtime's scan roots on reload; preserve unrelated roots.
+	const entries = (process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] ?? "")
+		.split(delimiter)
+		.filter((entry) => entry && !owned.has(normalize(entry)));
+	if (existsSync(utilityDir)) entries.push(utilityDir);
+	if (workflowOn && existsSync(WORK_ORCH_AGENT_DIR)) entries.push(WORK_ORCH_AGENT_DIR);
+	if (entries.length) process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] = entries.join(delimiter);
+	else delete process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV];
 }
 
 const SLOTS = [
@@ -6359,7 +6351,7 @@ export async function launchKnowledgeDiscoverer(pi, ctx, messages) {
 	if (knowledgeDiscovererCuts.size > 32)
 		knowledgeDiscovererCuts.delete(knowledgeDiscovererCuts.values().next().value);
 	const spawned = await spawnSubagentRpc(pi, {
-		agent: "work-knowledge-discoverer",
+		agent: "context-knowledge-discoverer",
 		acceptance: false,
 		fallbackToInheritedModel: configured.model !== INHERIT_MODEL,
 		...(configured.model === INHERIT_MODEL ? {} : { model: configured.model }),
@@ -30450,7 +30442,7 @@ export default function workModelsExtension(pi) {
 	const workflowOn = workflowEnabled();
 	const registerWorkflowTool = workflowOn ? registerConstrainedTool : () => {};
 	const visionBridge = createVisionBridge();
-	jevTools = createJevTools(pi, readSettings); // Preserve nulls in caller-supplied JSON state.
+	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	registerConstrainedTool(pi, {
 		name: "research_note",
 		label: "Research Note",
@@ -30514,7 +30506,10 @@ export default function workModelsExtension(pi) {
 		readGlobalSettings,
 	});
 	registerWorkUiGate(pi);
-	exposeBundledSubagentAgents();
+	exposeBundledSubagentAgents(workflowOn);
+	pi.on("resources_discover", () =>
+		workflowOn ? { skillPaths: [join(WORKFLOW_REPO_DIR, "skills")] } : {},
+	);
 	const workflowOnlyTools = new Set([
 		"work_goal_complete",
 		"work_goal_human_decision",
@@ -31038,7 +31033,7 @@ export default function workModelsExtension(pi) {
 				reason:
 					"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
 			};
-		if (!workflowTurnAuthorized) {
+		if (!workflowOn || !workflowTurnAuthorized) {
 			const workSubagent = workSubagentToolCall(event, ctx);
 			const workHelper =
 				event.toolName === "bash" &&
@@ -31046,8 +31041,9 @@ export default function workModelsExtension(pi) {
 			if (workflowOnlyTools.has(event.toolName) || workSubagent || workHelper)
 				return {
 					block: true,
-					reason:
-						"Direct request mode does not authorize ce-workflow orchestration. Run `/wo resume <roadmap-id>` from the input, or run `/wo` and choose Resume work.",
+					reason: !workflowOn
+						? "Legacy ce-workflow orchestration is off. Do not use work-* roles, work_* tools or work-helper commands. For authorized ordinary advice use the native oracle agent; do not enable /wo as a workaround."
+						: "Direct request mode does not authorize ce-workflow orchestration. For authorized ordinary advice use the native oracle agent. Use /wo resume <roadmap-id> only for an explicitly requested legacy work-item run.",
 				};
 		}
 	});
@@ -31093,7 +31089,7 @@ export default function workModelsExtension(pi) {
 			goalStatus: () => activeWorkGoal?.status,
 			modelRegistry: ctx.modelRegistry,
 		};
-		if (ctx.mode !== "print") {
+		if (workflowOn && ctx.mode !== "print") {
 			reconcilePendingDirectRuns(ctx.cwd, runtime);
 			void driveWorkActionLeases(ctx.cwd, {
 				...runtime,
@@ -31115,7 +31111,7 @@ export default function workModelsExtension(pi) {
 			}
 		}
 		activeWorkGoalCwd = ctx.cwd;
-		activeWorkGoal = loadWorkGoalFromSession(ctx);
+		activeWorkGoal = workflowOn ? loadWorkGoalFromSession(ctx) : null;
 		if (activeWorkGoal?.status === "active") {
 			if (activeWorkGoal.resumeOnSessionStart) {
 				activeWorkGoal = {
@@ -31230,7 +31226,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("input", async (event, ctx) => {
-		if (isOperatorPauseInput(event)) {
+		if (workflowOn && isOperatorPauseInput(event)) {
 			await requestOrchestratorPause(ctx, pi);
 			return { action: "handled" };
 		}
@@ -31243,6 +31239,7 @@ export default function workModelsExtension(pi) {
 			ctx.ui.notify("Compaction completed", "info");
 			return { action: "handled" };
 		}
+		if (!workflowOn) return;
 		const mainEditorAction = await consumePendingMainEditorAction(event, ctx, {
 			execute: (command, args, actionCtx, options) =>
 				executeOrchestratorAction(command, args, actionCtx, pi, "", options),
@@ -31324,12 +31321,12 @@ export default function workModelsExtension(pi) {
 					pendingCompactionWorkflowAuthorization,
 				)
 			: null;
-		const durableWorkflow = restoreWorkflowAuthorization(
+		const durableWorkflow = workflowOn ? restoreWorkflowAuthorization(
 			ctx.cwd,
 			ctx.sessionManager?.getSessionId?.(),
 			contentText(event.prompt),
 			compactionResumePrompt,
-		);
+		) : null;
 		blockedCompactionResumeTurn =
 			compactionResumePrompt && !compactionAuthorization && !durableWorkflow;
 		blockedInternalBackgroundCompletionTurn = Boolean(
@@ -31349,8 +31346,10 @@ export default function workModelsExtension(pi) {
 		pendingPromptBackedAgentStart = true;
 		const baseSystemPrompt = String(event.systemPrompt ?? "");
 		const marker = extractWorkGoalContinuationMarker(event.prompt);
-		restorePersistedWorkGoalForContinuation(ctx, pi, marker);
-		markWorkGoalContinuationDelivered(event.prompt);
+		if (workflowOn) {
+			restorePersistedWorkGoalForContinuation(ctx, pi, marker);
+			markWorkGoalContinuationDelivered(event.prompt);
+		}
 		const monitorInboundTurn = Boolean(
 			pendingMonitorInbound &&
 				activeWorkGoal?.mode === "monitor" &&
@@ -31371,7 +31370,7 @@ export default function workModelsExtension(pi) {
 			(matchingWorkGoalTurn || backgroundWorkflowCompletionTurn) &&
 			activeWorkGoal?.status === "active";
 		blockedWorkGoalTurn = matchingWorkGoalTurn && !pendingWorkGoalTurn;
-		const meta = parseWorkPromptMeta(event.prompt);
+		const meta = workflowOn ? parseWorkPromptMeta(event.prompt) : null;
 		const goalClarificationTurn = Boolean(
 			activeWorkGoal?.status === "needs_human" &&
 				/^clarify:/i.test(contentText(event.prompt).trim()),
@@ -31379,7 +31378,7 @@ export default function workModelsExtension(pi) {
 		const managedWorkSubagent =
 			/^work-/i.test(process.env.PI_SUBAGENT_CHILD_AGENT ?? "") ||
 			Boolean(managedWorkSubagentSessionName(pi, ctx));
-		const workflowTurn =
+		const workflowTurn = workflowOn && (
 			matchingWorkGoalTurn ||
 			backgroundWorkflowCompletionTurn ||
 			goalClarificationTurn ||
@@ -31387,7 +31386,7 @@ export default function workModelsExtension(pi) {
 			Boolean(meta) ||
 			Boolean(durableWorkflow) ||
 			Boolean(compactionAuthorization) ||
-			Boolean(activeVerifierSynthesis);
+			Boolean(activeVerifierSynthesis));
 		workflowTurnAuthorized = workflowTurn;
 		const turnPolicy = workflowTurn
 			? REVIEW_CYCLE_BUDGET_PROMPT
@@ -32039,7 +32038,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
-		await driveWorkActionLeases(ctx.cwd, {
+		if (workflowOn) await driveWorkActionLeases(ctx.cwd, {
 			pi,
 			mode: ctx.mode,
 			session: ctx.sessionManager?.getSessionId?.(),
@@ -32054,15 +32053,17 @@ export default function workModelsExtension(pi) {
 			pendingSettledAgentEnd = null;
 			await finalizeSettledAgent(event, ctx);
 		}
-		await settleOrchestratorPause(ctx, pi);
-		try {
-			reconcileSuccessorPrefetches(ctx.cwd);
-		} catch {
-			// Prefetch settlement is recoverable on the next safe hook.
+		if (workflowOn) {
+			await settleOrchestratorPause(ctx, pi);
+			try {
+				reconcileSuccessorPrefetches(ctx.cwd);
+			} catch {
+				// Prefetch settlement is recoverable on the next safe hook.
+			}
+			reconcileBackgroundVerifierRuns(ctx.cwd, pi);
+			await presentPendingVerifierBatches(ctx.cwd, ctx, pi);
+			await flushWorkGoalContinuationRetry(ctx, pi);
 		}
-		reconcileBackgroundVerifierRuns(ctx.cwd, pi);
-		await presentPendingVerifierBatches(ctx.cwd, ctx, pi);
-		await flushWorkGoalContinuationRetry(ctx, pi);
 		activePromptBackedAgent = false;
 		blockedCompactionResumeTurn = false;
 		blockedInternalBackgroundCompletionTurn = false;
@@ -32249,7 +32250,7 @@ export default function workModelsExtension(pi) {
 			!activePromptBackedAgent &&
 			internalBackgroundCompletion
 		) {
-			if (backgroundVerifierCompletion)
+			if (workflowOn && backgroundVerifierCompletion)
 				reconcileBackgroundVerifierRuns(ctx.cwd, pi);
 			pendingInternalBackgroundCompletionPrompt = null;
 			hideBackgroundVerifierAbort = true;
@@ -32264,13 +32265,13 @@ export default function workModelsExtension(pi) {
 		recordSelfImprovementHistory(ctx, "turn_start", event);
 	});
 
-	pi.registerCommand(ORCHESTRATOR_GOAL_CONTINUE_COMMAND, {
+	if (workflowOn) pi.registerCommand(ORCHESTRATOR_GOAL_CONTINUE_COMMAND, {
 		description: "Internal orchestrator goal continuation",
 		handler: async (args, ctx) => {
 			await handleWorkGoalResetCommand(args, ctx, pi);
 		},
 	});
-	pi.registerCommand(ORCHESTRATOR_MONITOR_RELOAD_COMMAND, {
+	if (workflowOn) pi.registerCommand(ORCHESTRATOR_MONITOR_RELOAD_COMMAND, {
 		description: "Internal monitor runtime reload",
 		handler: async (_args, ctx) => {
 			await ctx.reload();
@@ -32323,7 +32324,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("wo", {
-		description: "Open Orchestrator, or use /wo goal, /wo pause, /wo resume",
+		description: workflowOn ? "Open Orchestrator, or use /wo goal, /wo pause, /wo resume" : "Open utilities and settings; /wo compact or /wo fact",
 		getArgumentCompletions: (prefix) => {
 			const input = String(prefix ?? "").trim();
 			if (/\s/.test(input)) return null;
@@ -32469,6 +32470,7 @@ export default function workModelsExtension(pi) {
 
 const WORKFLOW_OFF_NOTICE = "Workflow is off — /wo → Settings → Workflow (legacy orchestration) turns it back on.";
 const UTILITY_MENU_VALUES = new Set(["cswap", "work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
+const UTILITY_SETTING_KINDS = new Set(["workflow", "planModels", "compactionMode", "compactionModel", "jev", "visionModel", "nonVisionModels", "subscriptionFooter", "reset", "export", "import"]);
 
 function onOff(value) {
 	return value ? "✓ on" : "○ off";
@@ -32481,6 +32483,17 @@ function workSettingsStatus(ctx) {
 	const resume = workResumeSettings(ctx.cwd);
 	const compactor = compactionModelSettings(ctx.cwd, settings);
 	const visionModel = visionModelSettings(ctx.cwd, settings);
+	if (!workflowEnabled(ctx.cwd)) {
+		notify(ctx, [
+			"Utility settings",
+			"Workflow: off",
+			`Plan3 models: ${(settings.workOrchestrator?.plan3?.models ?? []).map((entry) => entry.model).join(", ") || "None"}`,
+			`Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label}`,
+			`Compaction LLM model: ${modelEffortSummary(compactor.model, compactor.thinking)}`,
+			`Vision model: ${visionModel === NONE_MODEL ? "None" : visionModel}`,
+		].join("\n"), "info");
+		return;
+	}
 	const lines = [
 		"Work settings",
 		"",
@@ -33023,8 +33036,8 @@ async function workSettingsLoop(ctx) {
 			},
 			{
 				kind: "jev", value: "jev",
-				label: `Optional Jev tools: ${jevStatus(projectSettings, ctx.modelRegistry).status} ${SUBMENU_ARROW}`,
-				description: "Project-only upload consent; native OpenRouter login. No automatic classifier calls.",
+				label: `Optional Jev tools: ${jevStatus(mergeSettings(readGlobalSettings(), projectSettings), ctx.modelRegistry).status} ${SUBMENU_ARROW}`,
+				description: "Upload consent per scope (project overrides global); native OpenRouter login. No automatic classifier calls.",
 			},
 			{
 				kind: "visionModel", value: "visionModel",
@@ -33132,7 +33145,7 @@ async function workSettingsLoop(ctx) {
 				label: "Import settings",
 				description: `Replace the ${scope} JSON file from a path or pasted JSON; back up the current file first`,
 			},
-		];
+		].filter((item) => workflowEnabled(ctx.cwd) || UTILITY_SETTING_KINDS.has(item.kind));
 		for (const item of items)
 			item.local = hasProjectOverride(projectSettings, item);
 		const selected = await chooseWorkSetting(ctx, items, selectedIndex, scope);
@@ -33197,7 +33210,7 @@ async function workSettingsLoop(ctx) {
 			continue;
 		}
 		if (pick.kind === "jev") {
-			await jevTools?.panel(ctx, scope, writeSettings);
+			await jevTools?.panel(ctx, scope, (cwd) => readScopedSettings(cwd, scope), (cwd, next) => writeScopedSettings(cwd, scope, next));
 			continue;
 		}
 		if (pick.kind === "subscriptionFooter") {

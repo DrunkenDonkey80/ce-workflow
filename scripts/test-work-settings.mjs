@@ -22,6 +22,10 @@ function assert(ok, message) {
 }
 
 const previousConfigDir = process.env.PI_CODING_AGENT_DIR;
+const previousWorkflow = process.env.CE_WORKFLOW_ENABLED;
+const previousAgentDirs = process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
+// Most of this suite exercises legacy settings; the off surface is tested separately below.
+process.env.CE_WORKFLOW_ENABLED = "1";
 const previousSerial = process.env.WORK_ORCH_SERIAL;
 const previousAskUserContextExpanded = process.env.PI_ASK_USER_CONTEXT_EXPANDED;
 const globalDir = mkdtempSync(path.join(tmpdir(), "work-global-settings-"));
@@ -1790,7 +1794,6 @@ try {
 	);
 
 	// Legacy workflow switch: unset = off; the Settings row persists it and reloads.
-	const previousWorkflow = process.env.CE_WORKFLOW_ENABLED;
 	delete process.env.CE_WORKFLOW_ENABLED;
 	writeSettings({});
 	writeGlobalSettings({});
@@ -1854,13 +1857,13 @@ try {
 		`plan models add/reorder/remove persist (${JSON.stringify(planScript[0])})`,
 	);
 	const loadExtension = () => {
-		const loaded = { commands: {}, tools: {}, shortcuts: {} };
+		const loaded = { commands: {}, tools: {}, shortcuts: {}, hooks: {} };
 		mod.default({
 			getActiveTools: () => [],
 			setActiveTools: () => {},
 			getThinkingLevel: () => "medium",
 			setThinkingLevel: () => {},
-			on: () => {},
+			on: (name, handler) => { (loaded.hooks[name] ??= []).push(handler); },
 			events: { on: () => {}, emit: () => {} },
 			registerCommand: (name, config) => {
 				loaded.commands[name] = config;
@@ -1878,7 +1881,59 @@ try {
 		return loaded;
 	};
 	process.env.CE_WORKFLOW_ENABLED = "0";
+	const legacyDir = path.resolve(import.meta.dirname, "../agents");
+	const utilityDir = path.resolve(import.meta.dirname, "../utility-agents");
+	const unrelatedDir = path.join(cwd, "my-agents");
+	process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = [unrelatedDir, legacyDir].join(path.delimiter);
 	const off = loadExtension();
+	assert(
+		process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS === [unrelatedDir, utilityDir].join(path.delimiter),
+		"workflow off removes stale legacy scan root, keeps utilities and unrelated roots",
+	);
+	assert(
+		JSON.stringify(off.hooks.resources_discover[0]()) === "{}",
+		"workflow off advertises no legacy skills",
+	);
+	assert(!Object.keys(off.commands).some(name => name.startsWith("__orchestrator-")),
+		"workflow off hides internal goal/monitor commands");
+	assert(!/goal|pause|resume|Orchestrator/.test(off.commands.wo.description),
+		"workflow off command description advertises only utilities");
+	const blocked = await off.hooks.tool_call[0]({ toolName: "subagent", input: { agent: "work-advisor" } }, { cwd });
+	assert(blocked?.block && /off/.test(blocked.reason) && /oracle/.test(blocked.reason) && !/wo resume/.test(blocked.reason),
+		"stale work-advisor calls explain off state and normal advisor, not disabled resume");
+	assert(!mod.workSubagentToolCall({ toolName: "subagent", input: { agent: "context-knowledge-discoverer" } }, { cwd }),
+		"active knowledge utility is not misclassified as legacy orchestration");
+	const offCtx = { ...ctx, mode: "print", sessionManager: {
+		getSessionId: () => "off-session",
+		getBranch: () => [{ type: "custom", customType: "work-goal-state", data: {
+			goal: { id: "old-goal", objective: "Old legacy objective", status: "active", resumeOnSessionStart: true },
+		} }],
+	} };
+	for (const handler of off.hooks.session_start) await handler({}, offCtx);
+	const previousChildAgent = process.env.PI_SUBAGENT_CHILD_AGENT;
+	process.env.PI_SUBAGENT_CHILD_AGENT = "work-advisor";
+	try {
+		let result;
+		for (const handler of off.hooks.before_agent_start) {
+			const out = await handler({ prompt: "Hello", systemPrompt: "Base prompt" }, offCtx);
+			if (out) result = out;
+		}
+		assert(result?.systemPrompt === "Base prompt", "off ignores saved legacy goals and stale child identity");
+		const stillBlocked = await off.hooks.tool_call[0]({ toolName: "subagent", input: { agent: "work-advisor" } }, offCtx);
+		assert(stillBlocked?.block, "stale identity cannot authorize legacy roles while off");
+		await off.hooks.agent_settled[0]({}, offCtx);
+	} finally {
+		if (previousChildAgent === undefined) delete process.env.PI_SUBAGENT_CHILD_AGENT;
+		else process.env.PI_SUBAGENT_CHILD_AGENT = previousChildAgent;
+	}
+	let offSettings = [];
+	await invoke("work-settings", "", { ...ctx, mode: "rpc", ui: {
+		notify: ctx.ui.notify,
+		select: async (_title, labels) => { offSettings = labels; return undefined; },
+	} });
+	assert(offSettings.some(label => label.includes("Plan3")) &&
+		!offSettings.some(label => /Model Advisor|Profile:|Model strategy:|Background verifiers|autonomous-goal|Visual design workflow|pre-commit review/.test(label)),
+		"workflow off settings keep Plan3 and hide inactive role/gate/design controls");
 	assert(
 		!off.shortcuts.f9 &&
 			off.shortcuts.f8 &&
@@ -1893,14 +1948,28 @@ try {
 	const offNotices = [];
 	await off.commands.wo.handler("goal ship it", { cwd, ui: { notify: (message) => offNotices.push(message) } });
 	assert(offNotices.at(-1)?.includes("Workflow is off"), "/wo goal is refused while the workflow is off");
+	assert(await off.hooks.input[0]({ text: "orchestrator: work-resume" }, { cwd }) === undefined,
+		"workflow off does not intercept legacy automation input");
+	let statusText = "";
+	await invoke("work-settings", "status", { cwd, ui: { notify: message => { statusText = message; } } });
+	assert(statusText.includes("Workflow: off") && !statusText.includes("Role models") && !statusText.includes("Gates"),
+		"workflow off text status does not advertise inactive orchestration");
 	process.env.CE_WORKFLOW_ENABLED = "1";
 	const on = loadExtension();
 	assert(on.shortcuts.f9 && on.tools.work_goal_complete, "workflow on restores F9 and work_* tools");
+	assert(process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS.split(path.delimiter).includes(legacyDir),
+		"workflow on restores legacy role discovery");
+	assert(on.hooks.resources_discover[0]().skillPaths[0] === path.resolve(import.meta.dirname, "../skills"),
+		"workflow on restores legacy skills");
 	if (previousWorkflow === undefined) delete process.env.CE_WORKFLOW_ENABLED;
 	else process.env.CE_WORKFLOW_ENABLED = previousWorkflow;
 } finally {
 	rmSync(cwd, { recursive: true, force: true });
 	rmSync(globalDir, { recursive: true, force: true });
+	if (previousWorkflow === undefined) delete process.env.CE_WORKFLOW_ENABLED;
+	else process.env.CE_WORKFLOW_ENABLED = previousWorkflow;
+	if (previousAgentDirs === undefined) delete process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
+	else process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = previousAgentDirs;
 	if (previousConfigDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousConfigDir;
 	if (previousSerial === undefined) delete process.env.WORK_ORCH_SERIAL;

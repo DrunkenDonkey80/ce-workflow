@@ -366,6 +366,113 @@ try {
 	const recorded = JSON.parse(await readFile(baselineFile, "utf8"));
 	assert.deepEqual([recorded.capturedAt, recorded.packages[0].version, recorded.packages[0].reviewedVersion, recorded.packages[0].decisions[0].version, recorded.packages[1].version], ["2026-10-06T00:00:00Z", "4.6.0", "4.6.0", "4.6.0", "0.16.0"]);
 
+	// /plan3 write captures the chat without pre-compaction, even when ordinary compaction would fail.
+	assert.deepEqual(commands.get("plan3").getArgumentCompletions("wr").map(item => item.value), ["write"]);
+	tokens = 100_000; compactFails = true;
+	const compactBeforeWrite = compactions, messagesBeforeWrite = messages.length;
+	idle = false; await run("plan3", "write"); idle = true;
+	assert.equal(messages.length, messagesBeforeWrite, "write still requires an idle agent");
+	const beforeWritePlans = await files();
+	await run("plan3", "write");
+	assert.equal(compactions, compactBeforeWrite, "write never calls compactFirst");
+	assert.equal((await files()).length, beforeWritePlans.length + 1);
+	assert.equal(messages.length, messagesBeforeWrite + 1);
+	assert.match(messages.at(-1).message, /current discussion[\s\S]*do not start from scratch[\s\S]*before doing any further research/);
+	assert.match(messages.at(-1).message, /actual discussed request\(s\)[\s\S]*do not invent missing details[\s\S]*source references/);
+	assert.match(messages.at(-1).message, /Option: Title — description\/tradeoff/);
+	assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: true });
+	assert.equal(entries.at(-1).data.planning, true);
+	const captureFile = path.join(directory, (await files()).find(name => !beforeWritePlans.includes(name)));
+	const captureBytes = await readFile(captureFile, "utf8");
+	assert.match(captureBytes, /^plan3: true\nstatus: draft$/m);
+	await run("plan3", "WRITE Capture the current discussion as a plan");
+	assert.equal(compactions, compactBeforeWrite, "a matching topic cannot take the compacting duplicate path");
+	assert.equal(await readFile(captureFile, "utf8"), captureBytes, "old plans are not overwritten");
+	assert.equal((await files()).length, beforeWritePlans.length + 2);
+	for (const alias of ["planify", "create"]) {
+		assert.equal(commands.get("plan3").getArgumentCompletions(alias)[0].value, alias);
+		for (const args of [alias, `${alias} CSV discussion`]) {
+			const beforeAlias = messages.length;
+			await run("plan3", args);
+			assert.equal(messages.length, beforeAlias + 1);
+			assert.match(messages.at(-1).message, /write the current discussion into a plan/);
+			assert.equal(compactions, compactBeforeWrite, `${alias} never compacts`);
+		}
+	}
+	const beforeRegular = messages.length;
+	await run("plan3", "A completely unrelated new request");
+	assert.equal(compactions, compactBeforeWrite + 1, "ordinary new plans still compact first");
+	assert.equal(messages.length, beforeRegular, "ordinary failed compaction still sends nothing");
+	tokens = 0; compactFails = false;
+
+	// Direct resolve: stored choices and free text, no model messages; nested details stay attached.
+	const directFile = path.join(directory, "2026-10-07-direct-55555555-plan3.md");
+	const questionOne = "- **Q-01** Which format?\n  - Context: Existing consumers read CSV.\n  - Recommendation: Keep CSV to avoid migration.\n  - Option: Keep CSV — No migration needed.\n  - Option: Use JSON — Requires updating consumers.";
+	await writeFile(directFile, validPlan("55555555", "Direct answers", "draft", "- [ ] **D-01** Implement")
+		.replace("### Blocking\n\nNone.", `### Blocking\n\n${questionOne}\n- **Q-02** Which timeout?\n  - detail: preserve this with the question`)
+		.replace("### Deferred\n\nNone.", "### Deferred\n\n1. Another question?\n  - nested detail"));
+	ctx.hasUI = true;
+	const directMessages = messages.length;
+	const inputAnswers = [undefined, "Thirty seconds; existing callers expect it."];
+	ctx.ui.input = async () => inputAnswers.shift();
+	selectScript = [["Resolve blocking question", "Keep CSV", labels => assert(labels.some(label => label.includes("Existing consumers read CSV")), "stored context reaches fallback UI")], ["Resolve blocking question", "Answer directly"], ["Resolve blocking question", "Answer directly"], ["Resolve deferred question", "Keep open for now"]];
+	await run("plan3", "resolve 55555555");
+	assert.equal(selectScript.length, 0, "cancelled input returns to the same question menu");
+	assert.equal(messages.length, directMessages, "direct answers never invoke the LLM");
+	const answeredPlan = await readFile(directFile, "utf8");
+	assert.match(answeredPlan, /### Blocking\n\nNone\./);
+	assert.match(answeredPlan, /User answer \(source: \/plan3 resolve; not independently verified\):\n> Keep CSV — No migration needed/);
+	assert.match(answeredPlan, /> Thirty seconds; existing callers expect it\./);
+	assert.match(answeredPlan, /### Deferred\n\n1\. Another question\?\n  - nested detail/);
+	assert.match(answeredPlan, /^status: draft$/m);
+	assert.match(answeredPlan, /- \[ \] \*\*D-01\*\* Implement/, "scope/steps never change from a direct choice");
+	selectScript = [["Resolve deferred question", null]];
+	await run("plan3", "resolve 55555555");
+	assert.equal(await readFile(directFile, "utf8"), answeredPlan, "Escape changes nothing");
+	selectScript = [["Resolve deferred question", "Discuss with agent"]];
+	await run("plan3", "resolve 55555555");
+	assert.equal(messages.length, directMessages + 1);
+	assert.match(messages.at(-1).message, /Discuss only this Deferred question[\s\S]*Another question/);
+	assert(!messages.at(-1).message.includes("Which format?"), "discussion sends only the selected question");
+	assert.equal(await readFile(directFile, "utf8"), answeredPlan, "discussion leaves the question open until answered");
+	ctx.hasUI = false; delete ctx.ui.input;
+
+	// Exact bare words are shortcuts only during live Plan3 planning and only from the operator.
+	const input = (text, source = "interactive", images) => hooks.get("input")({ text, source, images }, ctx);
+	assert.equal(await input("finish"), undefined, "execution/non-planning chat is unaffected");
+	await run("plan3", "write Keyboard shortcuts discussion");
+	const shortcutId = entries.at(-1).data.id;
+	const shortcutFile = path.join(directory, (await files()).find(name => name.includes(shortcutId)));
+	await writeFile(shortcutFile, validPlan(shortcutId, "Keyboard shortcuts", "draft", "- [ ] **K-01** Implement"));
+	const beforeShortcuts = messages.length;
+	for (const text of ["finish this later", "resolve the issue", "ideas for tomorrow", "review the code", "finish.", "/plan3 finish", "create", "write"]) assert.equal(await input(text), undefined);
+	for (const text of ["finish", "resolve", "ideas", "review", "done"]) assert.equal(await input(text, "extension"), undefined, "injected messages never trigger shortcuts");
+	assert.equal(await input("finish", "interactive", [{ type: "image" }]), undefined, "image inputs stay chat");
+	assert.equal(messages.length, beforeShortcuts);
+	idle = false;
+	assert.deepEqual(await input("finish"), { action: "handled" });
+	assert.match(notices.at(-1).message, /idle agent/);
+	idle = true;
+	assert.match(await readFile(shortcutFile, "utf8"), /^status: draft$/m);
+	for (const text of ["ideas", "ideas all", "review", "review all"]) {
+		assert.deepEqual(await input(text), { action: "handled" });
+		assert.match(messages.at(-1).message, new RegExp(`Plan3: ${text.split(" ")[0]} for`));
+	}
+	const afterAdvisors = messages.length;
+	assert.deepEqual(await input("resolve", "rpc"), { action: "handled" });
+	assert.match(notices.at(-1).message, /no open questions/);
+	assert.equal(messages.length, afterAdvisors, "resolve with no questions sends nothing");
+	assert.deepEqual(await input("  FINISH  "), { action: "handled" });
+	assert.match(await readFile(shortcutFile, "utf8"), /^status: ready$/m);
+	assert.equal(entries.at(-1).data.planning, false);
+	assert.equal(await input("review"), undefined, "shortcuts stop after finish");
+	await writeFile(shortcutFile, validPlan(shortcutId, "Keyboard shortcuts", "draft", "- [ ] **K-01** Implement"));
+	await run("resume3", shortcutId);
+	assert.deepEqual(await input("done"), { action: "handled" });
+	assert.match(await readFile(shortcutFile, "utf8"), /^status: ready$/m);
+	entries.push({ type: "custom", customType: "plan3-current", data: { id: "deadbeef", planning: true } });
+	assert.equal(await input("finish"), undefined, "stale pointers cannot target an unrelated plan");
+
 	console.log("Plan3 command self-checks passed");
 } finally {
 	await rm(cwd, { recursive: true, force: true });

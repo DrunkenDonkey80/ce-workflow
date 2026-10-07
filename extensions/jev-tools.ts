@@ -400,13 +400,14 @@ export const JEV_GUIDELINES = [
 const sourceSchema = { type: "object", additionalProperties: false, required: ["path"], properties: { path: { type: "string" }, startLine: { type: "integer", minimum: 1 }, endLine: { type: "integer", minimum: 1 } } };
 const questionsSchema = { type: "object", description: "1–32 native bool/choice/score questions keyed by ID; each has instructions and criteria (bool: true/false descriptions; choice: label map; score: ordered descriptions)." };
 // ponytail: jev_ask is off by default (user, 2026-10-06: files only until it has a use case); `{ ask: true }` re-enables it for experiments.
+// readProject(cwd) returns effective settings: global workOrchestrator.jev overridden by the project's.
 export function createJevTools(pi, readProject, register = tool => pi.registerTool(tool), { ask = false } = {}) {
 	let current, signature, registered = false, ledger = { calls: 0, cost: 0 }, noted = 0, advising, pending = Promise.resolve();
 	const active = new Set();
 	const spend = usage => { if (usage) { ledger.calls++; ledger.cost += usage.cost?.total ?? 0; } };
 	function guard(ctx) {
 		const status = jevStatus(readProject(ctx.cwd), ctx.modelRegistry);
-		requireThat(status.status === "Ready", "Jev is off/unconfigured/unsupported. Enable this project in Settings and use /login → OpenRouter.");
+		requireThat(status.status === "Ready", "Jev is off/unconfigured/unsupported. Enable it in Settings (global or project) and use /login → OpenRouter.");
 		return status;
 	}
 	const tool = {
@@ -531,27 +532,32 @@ export function createJevTools(pi, readProject, register = tool => pi.registerTo
 		const text = `⚠ Jev: ${lead} — context ${data.percent}% full. ${data.reason} (/compact; this note is not sent to the model)`;
 		return { render: width => { const w = Math.max(10, width - 1); return Array.from({ length: Math.ceil(text.length / w) }, (_, i) => text.slice(i * w, (i + 1) * w)); }, invalidate() {} };
 	});
-	return { refresh, pendingAdvice: () => pending, async panel(ctx, scope, writeProject) {
+	return { refresh, pendingAdvice: () => pending, async panel(ctx, scope, readScope, writeScope) {
+		// Each scope stores its own flags; a project value overrides the global one.
+		const where = scope === "global" ? "globally (projects without their own setting)" : "for this project (overrides global)";
 		let cursor;
 		for (;;) {
 			const status = jevStatus(readProject(ctx.cwd), ctx.modelRegistry);
+			const own = readScope(ctx.cwd).workOrchestrator?.jev ?? {};
+			const flag = (key) => typeof own[key] === "boolean" ? (own[key] ? "On" : "Off") : "inherited";
 			const selected = await showListDialog(ctx, {
-				title: "Optional Jev tools", purpose: "Project-only source uploads to OpenRouter/TypeSafe; ordinary tools stay available.", currentValue: cursor,
+				title: "Optional Jev tools", purpose: "Source uploads to OpenRouter/TypeSafe; ordinary tools stay available. Project overrides global.", currentValue: cursor,
 				items: [
-					{ value: "toggle", label: `${status.status} — ${scope === "global" ? "open project Settings to enable" : "toggle for this project"}`, description: `Model: ${status.model}` },
-					{ value: "compaction", label: `Compaction note: ${status.compactionNote ? "On" : "Off"}`, description: "Above 50% context, Jev judges whether the work moved on and shows a warning note. Never compacts. Sends recent conversation text." },
+					{ value: "enabled", label: `Jev tools (${scope}): ${flag("enabled")} · here: ${status.status}`, description: `Toggle ${where}. Model: ${status.model}` },
+					{ value: "compactionNote", label: `Compaction note (${scope}): ${flag("compactionNote")} · here: ${status.compactionNote ? "On" : "Off"}`, description: "Above 50% context, Jev judges whether the work moved on and shows a warning note. Never compacts. Sends recent conversation text." },
 					{ value: "login", label: `OpenRouter: ${status.configured ? "configured (not live-tested)" : "not configured"}`, description: "Use native /login → OpenRouter. Never paste a key into settings." },
 				],
 			});
 			if (!selected) return;
 			cursor = selected.value;
-			if (cursor === "login" || scope === "global") { ctx.ui.notify("Use /login → OpenRouter for credentials; project Settings → Optional Jev tools for upload consent.", "info"); continue; }
-			const compaction = cursor === "compaction";
-			if (compaction ? !status.compactionNote && !(await ctx.ui.confirm?.("Enable the Jev compaction note?", "Above 50% context, recent user requests and the last assistant turn are uploaded to OpenRouter/TypeSafe each turn. It only shows a note; it never compacts."))
-				: !status.enabled && !(await ctx.ui.confirm?.("Enable Jev for this project?", "Selected source ranges/JSON will be uploaded to OpenRouter/TypeSafe. Secret filters are not a guarantee. No automatic calls."))) continue;
-			const settings = readProject(ctx.cwd); settings.workOrchestrator ??= {};
-			settings.workOrchestrator.jev = { enabled: compaction ? status.enabled : !status.enabled, model: status.model, ...(compaction ? !status.compactionNote : status.compactionNote) ? { compactionNote: true } : {} };
-			writeProject(ctx.cwd, settings); refresh(ctx);
+			if (cursor === "login") { ctx.ui.notify("Use /login → OpenRouter for credentials.", "info"); continue; }
+			const next = !status[cursor]; // flip what is in effect here, stored in this scope
+			if (next && !(await ctx.ui.confirm?.(cursor === "enabled" ? `Enable Jev ${where}?` : `Enable the Jev compaction note ${where}?`,
+				cursor === "enabled" ? "Selected source ranges/JSON will be uploaded to OpenRouter/TypeSafe. Secret filters are not a guarantee. No automatic calls."
+					: "Above 50% context, recent user requests and the last assistant turn are uploaded to OpenRouter/TypeSafe each turn. It only shows a note; it never compacts."))) continue;
+			const settings = readScope(ctx.cwd); settings.workOrchestrator ??= {};
+			settings.workOrchestrator.jev = { ...(settings.workOrchestrator.jev ?? {}), [cursor]: next };
+			writeScope(ctx.cwd, settings); refresh(ctx);
 		}
 	} };
 }

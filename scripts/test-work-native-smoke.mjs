@@ -30,6 +30,7 @@ function piReleasePackages() {
 
 const temp = mkdtempSync(path.join(os.tmpdir(), "ce-native-smoke-"));
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+const previousAgentDirs = process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
 process.env.PI_CODING_AGENT_DIR = path.join(temp, "agent");
 const npmCli =
 	process.env.npm_execpath ??
@@ -92,6 +93,27 @@ try {
 	const jiti = createJiti(path.join(installed, "extensions", "smoke.mjs"));
 	const models = await jiti.import(path.join(installed, "extensions", "work-models.ts"));
 	const storeApi = await jiti.import(path.join(installed, "extensions", "work-store.ts"));
+
+	// Real pi-subagents discovery from the packed manifest AND inherited scan roots.
+	const subagentsRoot = [path.join(homedir(), ".pi/agent/npm/node_modules/pi-subagents"),
+		path.join(npmRun(["root", "-g"]).trim(), "pi-subagents")]
+		.find(dir => existsSync(path.join(dir, "src/agents/agents.js")));
+	assert(subagentsRoot, "pi-subagents is not installed");
+	const { discoverAgents } = await import(pathToFileURL(path.join(subagentsRoot, "src/agents/agents.js")).href);
+	mkdirSync(process.env.PI_CODING_AGENT_DIR, { recursive: true });
+	writeFileSync(path.join(process.env.PI_CODING_AGENT_DIR, "settings.json"), JSON.stringify({ packages: [installed] }));
+	delete process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
+	const discoveryCwd = path.join(temp, "discovery");
+	mkdirSync(discoveryCwd);
+	const names = () => discoverAgents(discoveryCwd, "both", undefined, { globalNpmRoot: null }).agents.map(agent => agent.name);
+	for (const enabled of [false, true, false]) {
+		models.exposeBundledSubagentAgents(enabled);
+		const available = names();
+		assert(available.includes("oracle") && available.includes("plan3-advisor") && available.includes("context-knowledge-discoverer"));
+		assert.equal(available.includes("work-advisor"), enabled, "off/on/off updates actual discovery");
+		if (!enabled) assert(!available.some(name => /^(work-|workflow-)/.test(name)), "no legacy roles leak while off");
+	}
+	delete process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
 
 	// Exercise native 200k through Pi's actual installed extension loader/SDK,
 	// not the raw-Node fallback used by the unit tests. No provider call is made.
@@ -342,6 +364,8 @@ try {
 		"native package smoke: PASS clean finish + legacy migration + clone",
 	);
 } finally {
+	if (previousAgentDirs === undefined) delete process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
+	else process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS = previousAgentDirs;
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 	rmSync(temp, {
