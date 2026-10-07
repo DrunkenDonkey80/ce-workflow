@@ -26242,7 +26242,9 @@ async function handleWorkMenuCommand(ctx, pi) {
 			: []),
 	];
 	const workflowOn = workflowEnabled(ctx.cwd);
-	const menuItems = workflowOn ? items : items.filter((item) => UTILITY_MENU_VALUES.has(item.value));
+	const maintenanceHere = sameCheckout(ctx.cwd, WORKFLOW_REPO_DIR);
+	const menuItems = items.filter((item) => (workflowOn || UTILITY_MENU_VALUES.has(item.value)) &&
+		(maintenanceHere || !["work-context", "work-catch-up"].includes(item.value)));
 	const roadmapRuntime = { showAllRoadmaps: false };
 	let selectedIndex = 0;
 	for (;;) {

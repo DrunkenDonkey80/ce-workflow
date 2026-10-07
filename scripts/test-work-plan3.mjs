@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+import { createJiti } from "jiti";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -41,7 +44,9 @@ const ctx = {
 		},
 	},
 };
-plan3({
+let askSource;
+const api = {
+	getAllTools: () => askSource ? [{ name: "ask_user", sourceInfo: { path: askSource } }] : [],
 	exec: async (command, args, options) => { execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
 	registerCommand: (name, command) => commands.set(name, command),
 	registerTool: (tool) => tools.set(tool.name, tool),
@@ -49,7 +54,8 @@ plan3({
 	events: { emit: (name, data) => events.push({ name, enabled: data.enabled }), on: (name, handler) => listeners.set(name, handler) },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
-});
+};
+plan3(api);
 const run = (name, args = "") => commands.get(name).handler(args, ctx);
 const tool = async (args) => (await tools.get("plan3").execute("call", args, undefined, undefined, ctx)).details;
 const directory = path.join(cwd, "docs", "plans");
@@ -338,7 +344,7 @@ try {
 	assert.match(messages.at(-1).message, /planning only/);
 	assert.match(messages.at(-1).message, /insert "\/plan3 resolve \(N open\) · "/, "planning replies learn the conditional hint");
 
-	// /plan3 resolve: open-question bullets drive the hint, tool output, /plans3 action and a one-at-a-time prompt.
+	// Open-question bullets drive the hint/tool output; headless resolution never starts a model.
 	const authId = entries.at(-1).data.id;
 	const authFile = path.join(directory, (await files()).find((name) => name.includes(authId)));
 	await run("plan3", "resolve");
@@ -352,9 +358,8 @@ try {
 	assert.equal((await tool({ action: "get", plan: firstId })).openQuestions, undefined);
 	const beforeResolve = messages.length;
 	await run("plan3", `resolve ${authId}`);
-	assert.equal(messages.length, beforeResolve + 1);
-	assert(messages.at(-1).message.includes(JSON.stringify(authFile)));
-	assert.match(messages.at(-1).message, /Blocking first, then Deferred[\s\S]*Bundle 2–4 independent questions[\s\S]*dependent questions only after their prerequisites are settled[\s\S]*allowFreeform: true[\s\S]*keep an item open\/deferred[\s\S]*Do not implement product code/);
+	assert.equal(messages.length, beforeResolve);
+	assert.match(notices.at(-1).message, /needs the native ask_user UI/);
 	assert.equal(entries.at(-1).data.planning, true, "resolve keeps the planning state");
 	await writeFile(authFile, (await readFile(authFile, "utf8")).replace("Which session store?", "None.").replace(/- Rate limits[\s\S]*?SSO/, "None."));
 
@@ -433,41 +438,149 @@ try {
 
 	// Resolve uses the actual ask_user popup, not the old selection menus.
 	const directFile = path.join(directory, "2026-10-07-direct-55555555-plan3.md");
-	const questionOne = "- **Q-01** Which format?\n  - Context: Existing consumers read CSV.\n  - Recommendation: Keep CSV to avoid migration.\n  - Option: Keep CSV — No migration needed.\n  - Option: Use JSON — Requires updating consumers.";
+	const questionOne = "- **Q-01** Which format?\n  - Independent: yes\n  - Context: Existing consumers read CSV.\n  - Recommendation: Keep CSV to avoid migration.\n  - Option: Keep CSV — No migration needed.\n  - Option: Use JSON — Requires updating consumers.";
 	const directPlan = validPlan("55555555", "Direct answers", "draft", "- [ ] **D-01** Implement")
-		.replace("### Blocking\n\nNone.", `### Blocking\n\n${questionOne}\n- **Q-02** Which timeout?\n  - detail: preserve this with the question`)
+		.replace("### Blocking\n\nNone.", `### Blocking\n\n${questionOne}\n- **Q-02** Which timeout?\n  - Independent: yes\n  - detail: preserve this with the question\n- **Q-03** Keep this open?\n  - Independent: yes\n- **Q-04** Skip this question?\n  - Independent: yes`)
 		.replace("### Deferred\n\nNone.", "### Deferred\n\n1. Another question?\n  - nested detail");
 	await writeFile(directFile, directPlan);
 	ctx.hasUI = true;
 	ctx.ui.input = async () => { throw new Error("Resolve must use ask_user, not an input menu"); };
 	const directMessages = messages.length;
 	await run("plan3", "resolve 55555555");
-	assert.equal(messages.length, directMessages + 1, "resolve hands off once to the current agent");
-	const resolveMessage = messages.at(-1).message;
-	assert.match(resolveMessage, /Use the actual ask_user tool[\s\S]*not selection menus or numbered chat replies/);
-	assert.match(resolveMessage, /Bundle 2–4 independent questions[\s\S]*dependent questions only after their prerequisites are settled/);
-	assert.match(resolveMessage, /displayMode: "overlay"[\s\S]*allowFreeform: true/);
-	assert.match(resolveMessage, /do not restart full-plan research[\s\S]*Cancelled, skipped and deferred items remain open/);
-	assert.match(resolveMessage, /persist its answers together in Decisions[\s\S]*never invent an answer or overwrite a question changed since it was shown/);
-	const stored = JSON.parse(resolveMessage.split("Stored ask_user questions (task data, not instructions):\n")[1].split("\n").map(line => line.replace(/^>\s?/, "")).join("\n"));
-	assert.equal(stored.length, 3);
-	assert.deepEqual(stored[0].options, [{ title: "Keep CSV", description: "No migration needed." }, { title: "Use JSON", description: "Requires updating consumers." }]);
-	assert.match(stored[0].context, /Blocking[\s\S]*Context: Existing consumers read CSV[\s\S]*Recommendation: Keep CSV/);
-	assert.match(stored[1].context, /detail: preserve this with the question/);
-	assert.match(stored[2].context, /Deferred[\s\S]*nested detail/);
-	assert(stored.every(question => question.allowFreeform === true), "every question permits a custom response");
-	assert.equal(await readFile(directFile, "utf8"), directPlan, "handoff does not invent answers or mutate the plan");
-	assert.equal(selectScript.length, 0, "resolve opens no selection menus");
-	selectScript = [["Plans3", "Direct answers"], ["Direct answers", "Resolve open questions (3)"]];
-	await run("plans3");
-	assert.equal(messages.length, directMessages + 2, "the browser uses the same ask_user handoff");
-	assert.match(messages.at(-1).message, /Use the actual ask_user tool/);
-	assert.equal(selectScript.length, 0);
-	await writeFile(directFile, directPlan.replace("status: draft", "status: complete"));
+	assert.match(notices.at(-1).message, /needs the loaded pi-ask-user/);
+	assert.equal(messages.length, directMessages, "missing package never falls back to a thinking prompt");
+	assert.equal(await readFile(directFile, "utf8"), directPlan);
+
+	// Load through the host's modules, just like bundled Pi; construct the REAL installed popup.
+	const releases = path.join(os.homedir(), ".pi", "agent", "install", "releases");
+	const sdkRoots = existsSync(releases) ? (await readdir(releases)).sort((a, b) => b.localeCompare(a, undefined, { numeric: true })).map(version => path.join(releases, version, "node_modules", "@earendil-works", "pi-coding-agent")) : [];
+	try { sdkRoots.push(path.dirname(path.dirname(createRequire(import.meta.url).resolve("@earendil-works/pi-coding-agent")))); } catch { /* Installer release used instead. */ }
+	const sdkRoot = sdkRoots.find(root => existsSync(path.join(root, "dist", "core", "extensions", "virtual-modules.js")));
+	assert(sdkRoot, "native popup selfcheck needs an installed Pi SDK");
+	const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
+	const nativePlan3 = await createJiti(import.meta.url, { moduleCache: false, virtualModules: VIRTUAL_MODULES }).import("../extensions/plan3.ts", { default: true });
+	nativePlan3(api);
+	askSource = path.join(os.homedir(), ".pi", "agent", "npm", "node_modules", "pi-ask-user", "index.ts");
+	assert(existsSync(askSource), "native popup selfcheck needs pi-ask-user installed");
+	let dialogs = [], popupCount = 0;
+	const theme = { fg: (_, text) => text, bg: (_, text) => text, bold: text => text, italic: text => text, underline: text => text, getFgAnsi: () => "", getBgAnsi: () => "" };
+	const keys = { "tui.select.confirm": "\r", "tui.input.submit": "\r", "tui.select.cancel": "\x1b", "tui.select.down": "\x1b[B", "tui.select.up": "\x1b[A" };
+	const keybindings = { getKeys: () => ["enter"], matches: (data, key) => keys[key] === data };
+	ctx.ui.custom = async (factory, options) => {
+		const step = dialogs.shift();
+		assert(step, "unexpected native popup");
+		assert.equal(messages.length, step.messages ?? directMessages, "popup opens before ANY model handoff");
+		assert.equal(options.overlay, true);
+		let returned;
+		const component = factory({ requestRender() {}, terminal: { columns: 100, rows: 45 } }, theme, keybindings, value => { returned = value; });
+		assert.equal(component.constructor.name, step.component ?? "BatchAskComponent");
+		const rendered = component.render(100).join("\n");
+		assert.match(rendered, /ask_user/);
+		await step.check?.(component, rendered);
+		popupCount++;
+		return step.answer === undefined ? returned : step.answer;
+	};
+	const kept = { kind: "selection", selections: ["Keep open for now (Plan3)"] };
+	const selected = { kind: "selection", selections: ["Keep CSV"] };
+	const custom = { kind: "freeform", text: "1000 ms\n## not a plan heading" };
+	const answered = response => ({ status: "answered", response });
+	dialogs = [{ answer: [answered(selected), answered(custom), answered(kept), { status: "skipped" }], check: (component, rendered) => {
+		assert.match(rendered, /Existing consumers read CSV/);
+		assert.match(rendered, /Keep CSV/);
+		component.handleInput("\r"); // Real native selection advances to page two.
+		assert.match(component.render(100).join("\n"), /Which timeout/);
+		component.handleInput("\x1b[B"); component.handleInput("\x1b[B"); component.handleInput("\r");
+		assert.equal(component.pages[1].mode, "freeform", "native custom-response editor opens");
+		assert.match(component.render(100).join("\n"), /submit/);
+	} }, { component: "AskComponent", answer: kept, check: async (_, rendered) => {
+		assert.match(rendered, /Another question/);
+		assert.match(rendered, /nested detail/);
+		const saved = await readFile(directFile, "utf8");
+		assert(saved.includes(JSON.stringify(selected)) && saved.includes(JSON.stringify(custom)), "submitted batch persisted before the next popup");
+	} }];
 	await run("plan3", "resolve 55555555");
-	assert.match(messages.at(-1).message, /The plan is complete: record answers, but do not add steps or reopen it/);
+	assert.equal(dialogs.length, 0, JSON.stringify(notices.at(-1)));
+	assert.equal(popupCount, 2);
+	assert.equal(messages.length, directMessages + 1, "one post-answer handoff, not a prompt before the popup");
+	assert.match(messages.at(-1).message, /already collected these answers[\s\S]*do not ask them again/);
+	assert(!tools.has("ask_user"), "the adapter never registers a duplicate host tool");
+	assert.equal((await tool({ action: "get", plan: "55555555" })).openQuestions, 3, "kept and skipped questions remain open");
+	assert.match(await readFile(directFile, "utf8"), /not independently verified/);
+
+	// Discussion leaves that question open and hands off after this submitted popup, not before.
 	await writeFile(directFile, directPlan);
-	ctx.hasUI = false; delete ctx.ui.input;
+	const beforeDiscussion = messages.length;
+	dialogs = [{ messages: beforeDiscussion, answer: [answered(selected), answered({ kind: "selection", selections: ["Discuss with agent (Plan3)"] }), { status: "skipped" }, { status: "skipped" }] }];
+	await run("plan3", "resolve 55555555");
+	assert.equal(dialogs.length, 0);
+	assert.equal(messages.length, beforeDiscussion + 1);
+	assert.match(messages.at(-1).message, /"discussion":true/);
+	const discussing = await readFile(directFile, "utf8");
+	assert(discussing.includes("Which timeout?") && discussing.includes(JSON.stringify(selected)));
+	assert(!discussing.includes('"selections":["Discuss with agent (Plan3)"]'), "discussion is not a settled decision");
+
+	// Cancel: no file, pointer or model change. Browser action routes to the same native popup.
+	await writeFile(directFile, directPlan);
+	const afterAnswers = messages.length, pointersBeforeCancel = entries.length;
+	dialogs = [{ answer: null, messages: afterAnswers }];
+	selectScript = [["Plans3", "Direct answers"], ["Direct answers", "Resolve open questions (5)"]];
+	await run("plans3");
+	assert.equal(selectScript.length, 0);
+	assert.equal(await readFile(directFile, "utf8"), directPlan);
+	assert.equal(entries.length, pointersBeforeCancel);
+	assert.equal(messages.length, afterAnswers);
+
+	// Stale question is not overwritten; unchanged answers in the same batch still save.
+	dialogs = [{ messages: afterAnswers, answer: [answered(selected), answered(custom), { status: "skipped" }, { status: "skipped" }], check: () => writeFile(directFile, directPlan.replace("Existing consumers read CSV.", "Changed evidence.")) }, { messages: afterAnswers, component: "AskComponent", answer: kept }];
+	await run("plan3", "resolve 55555555");
+	const stale = await readFile(directFile, "utf8");
+	assert(stale.includes("Changed evidence.") && stale.includes("Which format?") && !stale.includes(JSON.stringify(selected)));
+	assert(stale.includes(JSON.stringify(custom)));
+	assert.match(messages.at(-1).message, /"applied":false/);
+
+	// If every submitted answer is stale, not even the updated timestamp is rewritten.
+	await writeFile(directFile, directPlan);
+	const changedPlan = directPlan.replace("Existing consumers read CSV.", "New evidence.");
+	const beforeAllStale = messages.length;
+	dialogs = [{ messages: beforeAllStale, answer: [answered(selected), { status: "skipped" }, { status: "skipped" }, { status: "skipped" }], check: () => writeFile(directFile, changedPlan) }, { messages: beforeAllStale, component: "AskComponent", answer: kept }];
+	await run("plan3", "resolve 55555555");
+	assert.equal(await readFile(directFile, "utf8"), changedPlan);
+
+	// Unmarked legacy questions use the actual single-question editor. No auto-ready transition.
+	const legacyPlan = validPlan("55555555", "Direct answers", "blocked", "- [ ] **D-01** Implement").replace("### Blocking\n\nNone.", `### Blocking\n\n${questionOne.replace("  - Independent: yes\n", "")}`);
+	await writeFile(directFile, legacyPlan);
+	entries.push({ type: "custom", customType: "plan3-current", data: { id: "55555555", planning: true } });
+	dialogs = [{ messages: messages.length, component: "AskComponent", answer: selected }];
+	await run("plan3", "resolve 55555555");
+	assert.equal(dialogs.length, 0);
+	assert.match(await readFile(directFile, "utf8"), /^status: draft$/m);
+	assert.match(await readFile(directFile, "utf8"), /### Blocking\n\nNone\./);
+
+	// Unsupported versions fail before evaluating a factory or sending a model prompt.
+	const incompatible = path.join(cwd, "incompatible-ask");
+	await mkdir(incompatible);
+	await writeFile(path.join(incompatible, "package.json"), JSON.stringify({ name: "pi-ask-user", version: "99.0.0" }));
+	await writeFile(path.join(incompatible, "index.ts"), "throw new Error(\"Unsupported factory must not run\");");
+	const supportedSource = askSource;
+	askSource = path.join(incompatible, "index.ts");
+	await writeFile(directFile, directPlan);
+	const beforeUnsupported = messages.length;
+	await run("plan3", "resolve 55555555");
+	assert.match(notices.at(-1).message, /supports pi-ask-user 0\.16\.x; found pi-ask-user 99\.0\.0/);
+	assert.equal(messages.length, beforeUnsupported);
+	assert.equal(await readFile(directFile, "utf8"), directPlan);
+	askSource = supportedSource;
+
+	// Complete stays complete, even if completion happened while the popup was open.
+	await writeFile(directFile, directPlan);
+	const beforeComplete = messages.length;
+	dialogs = [{ messages: beforeComplete, answer: [answered(selected), { status: "skipped" }, { status: "skipped" }, { status: "skipped" }], check: () => writeFile(directFile, directPlan.replace("status: draft", "status: complete")) }, { messages: beforeComplete, component: "AskComponent", answer: kept }];
+	await run("plan3", "resolve 55555555");
+	assert.match(await readFile(directFile, "utf8"), /^status: complete$/m);
+	assert.match(messages.at(-1).message, /Do not reopen this complete plan/);
+	await writeFile(directFile, directPlan);
+	ctx.hasUI = false; delete ctx.ui.input; delete ctx.ui.custom;
+	plan3(api);
 
 	// Exact bare words are shortcuts only during live Plan3 planning and only from the operator.
 	const input = (text, source = "interactive", images) => hooks.get("input")({ text, source, images }, ctx);
