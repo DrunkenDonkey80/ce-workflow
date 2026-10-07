@@ -13,7 +13,8 @@ const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map();
-const messages = [], notices = [], events = [], statuses = [];
+const messages = [], notices = [], events = [], statuses = [], execCalls = [];
+let execResult = { code: 0, stdout: "", stderr: "", killed: false };
 let entries = [];
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
 const ctx = {
@@ -23,7 +24,7 @@ const ctx = {
 	model: { provider: "anthropic", id: "claude-opus-5-5" },
 	modelRegistry: { getAvailable: async () => ["openai-codex/gpt-6-astra", "anthropic/claude-opus-5-5", "anthropic/claude-opus-4", "zai/glm-5.3"].map((ref) => ({ provider: ref.split("/")[0], id: ref.split("/")[1] })) },
 	getContextUsage: () => ({ tokens }),
-	compact: ({ onComplete, onError }) => { compactions++; compactFails ? onError(new Error(compactError)) : onComplete({}); },
+	compact: ({ onComplete, onError }) => { compactions++; if (compactFails) onError(new Error(compactError)); else onComplete({}); },
 	sessionManager: { getBranch: () => entries },
 	ui: {
 		notify: (message, severity) => notices.push({ message, severity }),
@@ -41,6 +42,7 @@ const ctx = {
 	},
 };
 plan3({
+	exec: async (command, args, options) => { execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
 	registerCommand: (name, command) => commands.set(name, command),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
@@ -54,7 +56,7 @@ const directory = path.join(cwd, "docs", "plans");
 const files = async (dir = directory) => (await readdir(dir)).filter((name) => name.endsWith(".md"));
 const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...gitEnv } });
 let gitEnv = {};
-const validPlan = (id, title, status, stepsText, extra = "") => `---\nplan3: true\nstatus: ${status}\ncreated: 2026-10-01\nupdated: 2021-01-01T00:00:00.000Z\n${extra}---\n\n# ${title}\n\n## Original request\n\n> ${title} please\n\n## Decisions\n\nNone yet.\n\n## Open questions\n\n### Blocking\n\nNone.\n\n### Deferred\n\nNone.\n\n## Phases\n\n${stepsText}\n\n## Resume context\n\nStart with A-01.\n\n## Amendments\n\n- created\n`;
+const validPlan = (_id, title, status, stepsText, extra = "") => `---\nplan3: true\nstatus: ${status}\ncreated: 2026-10-01\nupdated: 2021-01-01T00:00:00.000Z\n${extra}---\n\n# ${title}\n\n## Original request\n\n> ${title} please\n\n## Decisions\n\nNone yet.\n\n## Open questions\n\n### Blocking\n\nNone.\n\n### Deferred\n\nNone.\n\n## Phases\n\n${stepsText}\n\n## Resume context\n\nStart with A-01.\n\n## Amendments\n\n- created\n`;
 
 try {
 	const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -253,7 +255,31 @@ try {
 	await writeFile(path.join(directory, "2026-10-04-fresh-44444444-plan3.md"), validPlan("44444444", "Fresh", "active", "- [x] **F-01** a\n- [wip] **F-02** b", "started: 2026-10-01T00:00:00.000Z\n").replace(/^updated: .*$/m, `updated: ${new Date().toISOString()}`));
 	entries.push({ type: "custom", customType: "plan3-current", data: { id: "11111111" } });
 	let order;
-	selectScript = [["Plans3", "Fresh", (labels) => { order = labels; }], [ "Fresh", "Force finish"], ["Plans3", "Other work"], ["Other work", "Delete"], ["Delete Other work?", "Cancel"], ["Plans3", "Other work"], ["Other work", "Delete"], ["Delete Other work?", "Delete permanently"], ["Plans3", null]];
+	const beforeViewMessages = messages.length, beforeViewEntries = entries.length;
+	const viewFiles = [path.join(directory, "2026-10-04-fresh-44444444-plan3.md"), state.path];
+	const beforeViewBytes = await Promise.all(viewFiles.map(file => readFile(file, "utf8")));
+	selectScript = [["Plans3", "Fresh", labels => { order = labels; }], ["Fresh", "View"], ["Plans3", "Small"], ["Small", "View"], ["Plans3", null]];
+	await run("plans3");
+	assert.equal(selectScript.length, 0, "View returns to the plan list");
+	assert.equal(execCalls.length, 2, "active and archived plans can be viewed");
+	assert.deepEqual(execCalls, viewFiles.map(file => ({
+		command: process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open",
+		args: process.platform === "win32" ? ["url.dll,FileProtocolHandler", file] : [file],
+		options: { timeout: 10_000 },
+	})));
+	assert.equal(messages.length, beforeViewMessages, "View never starts the agent");
+	assert.equal(entries.length, beforeViewEntries, "View does not change the current plan");
+	assert.deepEqual(await Promise.all(viewFiles.map(file => readFile(file, "utf8"))), beforeViewBytes, "View never edits the plan");
+	for (const failure of [{ code: 1, stderr: "no default handler" }, new Error("opener missing")]) {
+		execResult = failure;
+		selectScript = [["Plans3", "Fresh"], ["Fresh", "View"], ["Plans3", null]];
+		await run("plans3");
+		assert.equal(selectScript.length, 0, "opener failure keeps browsing usable");
+		assert.match(notices.at(-1).message, /no default handler|opener missing/);
+		assert.equal(notices.at(-1).severity, "error");
+	}
+	execResult = { code: 0, stdout: "", stderr: "", killed: false };
+	selectScript = [["Plans3", "Fresh"], [ "Fresh", "Force finish"], ["Plans3", "Other work"], ["Other work", "Delete"], ["Delete Other work?", "Cancel"], ["Plans3", "Other work"], ["Other work", "Delete"], ["Delete Other work?", "Delete permanently"], ["Plans3", null]];
 	await run("plan3");
 	assert.equal(selectScript.length, 0);
 	assert.match(order[0], /Other work/, "current plan first");
@@ -472,6 +498,28 @@ try {
 	assert.match(await readFile(shortcutFile, "utf8"), /^status: ready$/m);
 	entries.push({ type: "custom", customType: "plan3-current", data: { id: "deadbeef", planning: true } });
 	assert.equal(await input("finish"), undefined, "stale pointers cannot target an unrelated plan");
+
+	// Runtime test/build guidance belongs only to execution, never planning/capture/resolve/advisors.
+	const testGuidance = /concurrency supported by the existing runner|individual assertions|temporary\/build\/output|Await every result|checks affected by fixes/;
+	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
+		if (!handoff.message.startsWith("Plan3: execute/resume")) assert.doesNotMatch(handoff.message, testGuidance);
+	}
+	for (const heading of ["Plan3: planning only.", "Plan3: write the current discussion into a plan."]) {
+		assert(messages.some(entry => entry.message.startsWith(heading)), `missing ${heading} handoff`);
+	}
+	const execution = messages.find(entry => entry.message.startsWith("Plan3: execute/resume"))?.message;
+	assert(execution, "missing execution handoff");
+	assert.match(execution, /Prefer bounded concurrency supported by the existing runner/);
+	assert.match(execution, /independent suites\/build jobs, not individual assertions/);
+	assert.match(execution, /Isolate temporary\/build\/output paths and filenames/);
+	assert.match(execution, /respect setup\/teardown and build dependencies/);
+	assert.match(execution, /serialize shared hardware, files, databases, ports or process\/global state/);
+	assert.match(execution, /if independence is unproven, run sequentially/);
+	assert.match(execution, /Await every result; report failures and unavailable checks/);
+	assert.match(execution, /Never skip required checks, weaken assertions or treat stale results as current/);
+	assert.match(execution, /Rerun checks affected by fixes/);
+	assert.match(execution, /required validation covers the final relevant code\/input state/);
+	assert.match(execution, /Avoid unjustified repeat runs or new orchestration solely for parallelism/);
 
 	console.log("Plan3 command self-checks passed");
 } finally {

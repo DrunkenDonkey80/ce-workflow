@@ -224,7 +224,7 @@ function writePrompt(file) {
 }
 function executePrompt(plan, stale) {
 	const staleText = stale.length ? `\nChanged in Git since the plan was last updated — re-check these first: ${stale.join(", ")}.` : "";
-	return `Plan3: execute/resume the plan at ${JSON.stringify(plan.file)}.\n${boundary}\n\nRead the entire plan and named authoritative sources. Reconcile its claims with the actual Git state, relevant code and check results; do not trust a checked box as proof.${staleText}\n${clarification}\n${questionFormat}\nIf it is complete, reconcile and report rather than inventing more work. Implement the next unfinished step, then continue through the requested scope in this same agent. ${toolUse} Update the plan after each meaningful step and before pausing: what changed, actual commands and results, unavailable checks, blockers and exact next action. Run the relevant existing checks; fix root causes, not symptoms. Stop dependent work on failure; independent work may continue. Material changes go in Amendments (plan3 add records them for new steps); ask before changing approved scope. When every step and the global validation pass (or the user explicitly accepts a recorded limitation), set status complete with the plan3 tool; that archives the plan. Never fabricate evidence. End with a concise outcome, checks and remaining issues; while Open questions lists items, finish with: Next: /plan3 resolve.`;
+	return `Plan3: execute/resume the plan at ${JSON.stringify(plan.file)}.\n${boundary}\n\nRead the entire plan and named authoritative sources. Reconcile its claims with the actual Git state, relevant code and check results; do not trust a checked box as proof.${staleText}\n${clarification}\n${questionFormat}\nIf it is complete, reconcile and report rather than inventing more work. Implement the next unfinished step, then continue through the requested scope in this same agent. ${toolUse} Update the plan after each meaningful step and before pausing: what changed, actual commands and results, unavailable checks, blockers and exact next action. Run the relevant existing checks; fix root causes, not symptoms. Prefer bounded concurrency supported by the existing runner for independent suites/build jobs, not individual assertions. Isolate temporary/build/output paths and filenames, respect setup/teardown and build dependencies, and serialize shared hardware, files, databases, ports or process/global state; if independence is unproven, run sequentially. Await every result; report failures and unavailable checks. Never skip required checks, weaken assertions or treat stale results as current. Rerun checks affected by fixes; before completion, ensure required validation covers the final relevant code/input state. Avoid unjustified repeat runs or new orchestration solely for parallelism. Stop dependent work on failure; independent work may continue. Material changes go in Amendments (plan3 add records them for new steps); ask before changing approved scope. When every step and the global validation pass (or the user explicitly accepts a recorded limitation), set status complete with the plan3 tool; that archives the plan. Never fabricate evidence. End with a concise outcome, checks and remaining issues; while Open questions lists items, finish with: Next: /plan3 resolve.`;
 }
 function resolvePrompt(plan, question) {
 	const closed = plan.status === "complete"
@@ -505,11 +505,21 @@ export default function plan3(pi) {
 			}
 			const plan = ordered.find((candidate) => candidate.file === selected.value);
 			const action = await showListDialog(ctx, { title: plan.title, purpose: `${plan.status} · ${plan.done}/${plan.total} steps`, items: [
+				{ value: "view", label: "View", description: "Open the Markdown file with the default app" },
 				{ value: "resume", label: "Resume", description: "Continue this plan in the current agent" },
 				...(plan.open ? [{ value: "resolve", label: `Resolve open questions (${plan.open})`, description: "Walk through them one at a time and record the answers" }] : []),
 				...(isOpen(plan) ? [{ value: "finish", label: "Force finish", description: "Mark complete now and archive to docs/plans/done" }] : []),
 				{ value: "delete", label: "Delete", description: "Remove the plan file" },
 			] });
+			if (action?.value === "view") {
+				try {
+					const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
+					const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", plan.file] : [plan.file];
+					const result = await pi.exec(command, args, { timeout: 10_000 });
+					if (result.code !== 0 || result.killed) throw new Error(result.stderr || "Default app could not be launched.");
+					ctx.ui.notify(`Plan3: opened ${plan.file}`, "info");
+				} catch (error) { report(ctx, error); }
+			}
 			if (action?.value === "resume") return idle(ctx) && resume(ctx, plan);
 			if (action?.value === "resolve") return idle(ctx) && resolveQuestions(ctx, plan);
 			if (action?.value === "finish") ctx.ui.notify(`Plan3: force-finished → ${await forceFinish(ctx, plan)}`, "info");
