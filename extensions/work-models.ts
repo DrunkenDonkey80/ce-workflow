@@ -314,6 +314,20 @@ const WORKFLOW_REPO_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
 	"..",
 );
+// Capture at module load: opening F7 must not pretend changed disk files were reloaded.
+function workflowBuildLabel(root = WORKFLOW_REPO_DIR) {
+	try {
+		const manifest = readFileSync(join(root, "package.json"), "utf8");
+		const hash = createHash("sha256").update(manifest);
+		const directory = join(root, "extensions");
+		for (const name of readdirSync(directory).filter(name => name.endsWith(".ts")).sort())
+			hash.update(name).update("\0").update(readFileSync(join(directory, name))).update("\0");
+		return `ce-workflow v${JSON.parse(manifest).version} · build ${hash.digest("hex").slice(0, 8)}`;
+	} catch {
+		return "ce-workflow · build unavailable";
+	}
+}
+const LOADED_WORKFLOW_BUILD_LABEL = workflowBuildLabel();
 const WORK_CATCH_UP_BASELINE_PATH = resolve(
 	WORKFLOW_REPO_DIR,
 	"extensions",
@@ -26368,8 +26382,9 @@ async function handleWorkMenuCommand(ctx, pi) {
 	let selectedIndex = 0;
 	for (;;) {
 		const selected = await showListDialog(ctx, {
-			title: workflowOn ? "Orchestrator" : "Utilities",
+			title: `${workflowOn ? "Orchestrator" : "Utilities"} — ${LOADED_WORKFLOW_BUILD_LABEL}`,
 			purpose: workflowOn ? "Choose any workflow action. Type to filter." : "Settings and utilities; the legacy workflow is off (Settings → Workflow).",
+			subtitle: `Loaded from: ${WORKFLOW_REPO_DIR}`,
 			items: menuItems,
 			currentValue: workflowOn ? "work-roadmap" : "work-settings",
 			selectedIndex,
@@ -30416,6 +30431,8 @@ export {
 	scheduleConfiguredBackgroundVerifiers,
 	createPiSubagentsVerifierAdapter,
 	readEffectiveSettings as effectiveSettingsForTest,
+	workflowBuildLabel as workflowBuildLabelForTest,
+	LOADED_WORKFLOW_BUILD_LABEL as loadedWorkflowBuildLabelForTest,
 	rememberWorkflowEpic as rememberWorkflowEpicForHelper,
 	workResumeSettings as workResumeSettingsForTest,
 	renderWorkIdeateText,

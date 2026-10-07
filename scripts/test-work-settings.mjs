@@ -47,6 +47,19 @@ try {
 	const readGlobalSettings = () =>
 		JSON.parse(readFileSync(globalSettingsFile(), "utf8"));
 
+	// The loaded build stamp works without Git and changes when extension source changes.
+	const buildDir = path.join(cwd, "build-stamp");
+	mkdirSync(path.join(buildDir, "extensions"), { recursive: true });
+	writeFileSync(path.join(buildDir, "package.json"), JSON.stringify({ version: "1.2.3" }));
+	writeFileSync(path.join(buildDir, "extensions", "plan3.ts"), "export default 1;\n");
+	const firstBuild = mod.workflowBuildLabelForTest(buildDir);
+	assert(/^ce-workflow v1\.2\.3 · build [0-9a-f]{8}$/.test(firstBuild), "stamp includes version and source fingerprint");
+	assert(mod.workflowBuildLabelForTest(buildDir) === firstBuild, "unchanged sources produce the same stamp");
+	writeFileSync(path.join(buildDir, "extensions", "plan3.ts"), "export default 2;\n");
+	assert(mod.workflowBuildLabelForTest(buildDir) !== firstBuild, "Plan3-only edits change the build stamp");
+	assert(mod.workflowBuildLabelForTest(path.join(cwd, "missing-package")) === "ce-workflow · build unavailable", "missing metadata cannot break the menu");
+	assert(/^ce-workflow v.+ · build [0-9a-f]{8}$/.test(mod.loadedWorkflowBuildLabelForTest), "loaded package captures a build stamp");
+
 	// Package default stays off; a hidden user default enables every project,
 	// while an explicit project false remains an escape hatch.
 	assert(
@@ -1941,6 +1954,12 @@ try {
 			off.tools.knowledge,
 		"workflow off registers no F9 and no work_* tools but keeps utilities",
 	);
+	let offMenuTitle = "";
+	await off.shortcuts.f7.handler({ ...offCtx, mode: "rpc", ui: {
+		notify: ctx.ui.notify,
+		select: async title => { offMenuTitle = title; return undefined; },
+	} });
+	assert(offMenuTitle === `Utilities — ${mod.loadedWorkflowBuildLabelForTest}`, "F7 shows the loaded build, including in the native dialog fallback");
 	assert(
 		JSON.stringify(off.commands.wo.getArgumentCompletions("").map(({ value }) => value)) === '["compact","fact"]',
 		"workflow off completes only utility /wo subcommands",

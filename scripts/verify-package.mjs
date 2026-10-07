@@ -408,7 +408,7 @@ check(
 		["f7", "f8", "f9"].every((key) =>
 			models.includes(`registerShortcut?.("${key}"`),
 		) &&
-		models.includes('title: workflowOn ? "Orchestrator" : "Utilities"'),
+		models.includes('title: `${workflowOn ? "Orchestrator" : "Utilities"} — ${LOADED_WORKFLOW_BUILD_LABEL}`'),
 );
 const helper = read("scripts/work-helper.mjs");
 check(
