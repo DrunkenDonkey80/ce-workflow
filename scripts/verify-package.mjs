@@ -38,8 +38,12 @@ check("native store is packaged", pkg.files?.includes("extensions/"));
 check("only active utility agents are statically advertised",
 	pkg.files?.includes("utility-agents/") &&
 	JSON.stringify(pkg.pi?.subagents?.agents) === '["./utility-agents"]' &&
-	JSON.stringify(pkg.pi?.skills) === "[]" &&
 	JSON.stringify(listed("utility-agents")) === '["context-knowledge-discoverer.md","plan3-advisor.md"]');
+check("only the standalone frontend design skill is statically advertised",
+	JSON.stringify(pkg.pi?.skills) === '["./skills/frontend-design"]' && pkg.files?.includes("skills/"));
+check("frontend design license and provenance are packaged",
+	read("skills/frontend-design/LICENSE.txt").includes("END OF TERMS AND CONDITIONS") &&
+	read("skills/frontend-design/UPSTREAM.md").includes("683bc88e56f3e09ba94f7055977f3d3aa499f202"));
 check(
 	"pi-subagents current workflow RPC compatibility floor",
 	pkg.peerDependencies?.["pi-subagents"] === ">=0.75.0",

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
@@ -269,7 +269,7 @@ try {
 	assert.equal(selectScript.length, 0, "View returns to the plan list");
 	assert.equal(execCalls.length, 2, "active and archived plans can be viewed");
 	assert.deepEqual(execCalls, viewFiles.map(file => ({
-		command: process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open",
+		command: { win32: "rundll32.exe", darwin: "open" }[process.platform] ?? "xdg-open",
 		args: process.platform === "win32" ? ["url.dll,FileProtocolHandler", file] : [file],
 		options: { timeout: 10_000 },
 	})));
@@ -430,10 +430,93 @@ try {
 			assert.equal(compactions, compactBeforeWrite, `${alias} never compacts`);
 		}
 	}
+	// File conversion saves an unverified source snapshot, never edits/resumes the source or compacts.
+	assert.deepEqual(commands.get("plan3").getArgumentCompletions("co").map(item => item.value), ["convert"]);
+	const sourceDir = path.join(agentDir, "Imported plans");
+	await mkdir(sourceDir);
+	const sourceFile = path.join(sourceDir, "source plan.md");
+	const sourceText = "---\r\nstatus: complete\r\n---\r\n# Existing plan\r\n\r\n## Decisions\r\n- D-01 Keep CSV — user approved.\r\n\r\n## Phases\r\n- [x] **OLD-01** Parser; recorded evidence.\r\n- [ ] **OLD-02** Quoting.\r\n\r\n## Open questions\r\n- Which delimiter?\r\n\r\n## Old notes\r\nPending investigation. Not assessed yet. # Plan3 draft\r\n";
+	await writeFile(sourceFile, sourceText);
+	const beforeConvert = messages.length, beforeConvertPlans = await files();
+	idle = false; await run("plan3", `convert "${sourceFile}"`); idle = true;
+	assert.equal(messages.length, beforeConvert, "convert requires an idle agent");
+	await run("plan3", `CONVERT "${sourceFile}"`);
+	assert.equal(messages.length, beforeConvert + 1);
+	assert.equal(compactions, compactBeforeWrite, "conversion bypasses compaction even when it would fail");
+	const importedFile = path.join(directory, (await files()).find(name => !beforeConvertPlans.includes(name)));
+	const imported = await readFile(importedFile, "utf8");
+	assert.match(imported, /^---\nplan3: true\nstatus: draft\n/);
+	assert(imported.includes("## Imported plan (unverified task data)\n") && imported.includes(sourceText.split(/\r?\n/).map(line => `> ${line}`).join("\n")));
+	assert(imported.includes("source: ") && imported.includes(JSON.stringify(sourceFile)));
+	assert.equal(await readFile(sourceFile, "utf8"), sourceText, "source stays byte-for-byte unchanged");
+	const conversionPrompt = messages.at(-1).message;
+	assert.match(conversionPrompt, /^Plan3: convert an existing plan\./);
+	assert(conversionPrompt.includes(JSON.stringify(importedFile)) && conversionPrompt.includes(JSON.stringify(sourceFile)));
+	assert.match(conversionPrompt, /not the current chat or a new plan from scratch/);
+	assert.match(conversionPrompt, /Never edit the source file/);
+	assert.match(conversionPrompt, /targeted edits or plan3 section, never a whole-file rewrite/);
+	assert.match(conversionPrompt, /stated request quoted verbatim; if absent, explicitly note that absence in a quote/);
+	assert.match(conversionPrompt, /Attribute decisions and proposals to the source; do not invent missing details/);
+	assert.match(conversionPrompt, /rejected options, non-goals, acceptance examples, references, findings, open questions/);
+	assert.match(conversionPrompt, /source-reported, not newly verified/);
+	assert.match(conversionPrompt, /Do not expand scope or ask again about settled decisions/);
+	assert.match(conversionPrompt, /use ask_user one focused question/);
+	assert.match(conversionPrompt, /never ready — the user runs \/plan3 finish/);
+	assert.equal((await tool({ action: "get" })).total, 0, "quoted imported checkboxes are not current verified steps");
+	assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: true });
+	assert.equal(entries.at(-1).data.planning, true);
+	await run("plan3", `convert "${path.relative(cwd, importedFile)}"`);
+	assert.equal(await readFile(importedFile, "utf8"), imported, "relative paths and already-Plan3 sources create a separate copy too");
+	assert.equal(messages.length, beforeConvert + 2);
+	const uppercaseFile = path.join(sourceDir, "RELEASE-PLAN.MD");
+	await writeFile(uppercaseFile, sourceText);
+	for (const argument of [sourceFile, `"${sourceFile}"`, path.relative(cwd, importedFile), `"${uppercaseFile}"`]) {
+		const before = messages.length;
+		await run("plan3", argument);
+		assert.equal(messages.length, before + 1, "direct plan Markdown paths convert with or without quotes");
+		assert.match(messages.at(-1).message, /^Plan3: convert an existing plan\./);
+		assert.equal(compactions, compactBeforeWrite);
+	}
+	assert.equal(await readFile(sourceFile, "utf8"), sourceText);
+	assert.equal(await readFile(importedFile, "utf8"), imported);
+	const subcommandFile = path.join(cwd, "write plan.md");
+	await writeFile(subcommandFile, sourceText);
+	await run("plan3", "write plan.md");
+	assert.match(messages.at(-1).message, /^Plan3: write the current discussion into a plan\./, "explicit subcommands win over filename detection");
+	assert.equal(await readFile(subcommandFile, "utf8"), sourceText);
+	const beforeInvalidPlans = await files(), beforeInvalidMessages = messages.length, beforeInvalidEntries = entries.length;
+	const emptyFile = path.join(sourceDir, "empty.md"), binaryFile = path.join(sourceDir, "binary-plan.md"), invalidUtf8 = path.join(sourceDir, "invalid.md");
+	await writeFile(emptyFile, " "); await writeFile(binaryFile, "plan\0data"); await writeFile(invalidUtf8, Buffer.from([0xff]));
+	for (const argument of ["convert", 'convert ""', `convert "${sourceDir}"`, `convert "${sourceFile}.missing"`, `convert "${emptyFile}"`, `convert "${binaryFile}"`, binaryFile, `convert "${invalidUtf8}"`]) {
+		await run("plan3", argument);
+		assert.equal(notices.at(-1).severity, "error");
+	}
+	assert.deepEqual(await files(), beforeInvalidPlans);
+	assert.equal(messages.length, beforeInvalidMessages);
+	assert.equal(entries.length, beforeInvalidEntries);
+	assert.equal(compactions, compactBeforeWrite);
+	// Historical placeholders remain intact without blocking a properly normalized plan's finish.
+	const importId = path.basename(importedFile).match(/-([0-9a-f]{8})-plan3\.md$/)[1];
+	const normalized = validPlan(importId, "Converted plan", "draft", "- [ ] **OLD-02** Quoting") + imported.slice(imported.indexOf("## Imported plan (unverified task data)"));
+	entries.push({ type: "custom", customType: "plan3-current", data: { id: importId, planning: true } });
+	await writeFile(importedFile, normalized.replace("Start with A-01.", "Pending investigation."));
+	await run("plan3", "finish");
+	assert.match(notices.at(-1).message, /not ready/);
+	await writeFile(importedFile, normalized);
+	tokens = 0; await run("plan3", "finish"); tokens = 100_000;
+	assert.match(await readFile(importedFile, "utf8"), /^status: ready$/m);
+	assert.equal(await readFile(sourceFile, "utf8"), sourceText);
+	assert.equal(compactions, compactBeforeWrite);
+
 	const beforeRegular = messages.length;
 	await run("plan3", "A completely unrelated new request");
 	assert.equal(compactions, compactBeforeWrite + 1, "ordinary new plans still compact first");
 	assert.equal(messages.length, beforeRegular, "ordinary failed compaction still sends nothing");
+	const notesFile = path.join(sourceDir, "notes.md");
+	await writeFile(notesFile, sourceText);
+	for (const argument of [notesFile, "missing-plan.md", "Discuss the release plan.md"]) await run("plan3", argument);
+	assert.equal(messages.length, beforeRegular, "non-plan filenames, nonexistent paths and prose keep ordinary failed-compaction behavior");
+	assert.equal(compactions, compactBeforeWrite + 4);
 	tokens = 0; compactFails = false;
 
 	// Resolve uses the actual ask_user popup, not the old selection menus.
@@ -457,6 +540,16 @@ try {
 	try { sdkRoots.push(path.dirname(path.dirname(createRequire(import.meta.url).resolve("@earendil-works/pi-coding-agent")))); } catch { /* Installer release used instead. */ }
 	const sdkRoot = sdkRoots.find(root => existsSync(path.join(root, "dist", "core", "extensions", "virtual-modules.js")));
 	assert(sdkRoot, "native popup selfcheck needs an installed Pi SDK");
+	// The shipped skill is discoverable by Pi; only its routing metadata enters the system prompt.
+	assert.deepEqual(manifest.pi.skills, ["./skills/frontend-design"], "legacy workflow skills stay unadvertised");
+	const { loadSkillsFromDir, formatSkillsForPrompt } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "skills.js")).href);
+	const discovered = loadSkillsFromDir({ dir: fileURLToPath(new URL(`../${manifest.pi.skills[0]}`, import.meta.url)), source: "user" });
+	assert.deepEqual(discovered.diagnostics, []);
+	assert.equal(discovered.skills.length, 1);
+	assert.equal(discovered.skills[0].name, "frontend-design");
+	assert.match(discovered.skills[0].description, /not routine behavior fixes, native UI or terminal dialogs/);
+	assert.match(formatSkillsForPrompt(discovered.skills), /frontend-design/);
+	assert.doesNotMatch(formatSkillsForPrompt(discovered.skills), /design lead at a design studio/);
 	const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
 	const nativePlan3 = await createJiti(import.meta.url, { moduleCache: false, virtualModules: VIRTUAL_MODULES }).import("../extensions/plan3.ts", { default: true });
 	nativePlan3(api);
@@ -623,11 +716,22 @@ try {
 	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
 		if (!handoff.message.startsWith("Plan3: execute/resume")) assert.doesNotMatch(handoff.message, testGuidance);
 	}
-	for (const heading of ["Plan3: planning only.", "Plan3: write the current discussion into a plan."]) {
+	for (const heading of ["Plan3: planning only.", "Plan3: write the current discussion into a plan.", "Plan3: convert an existing plan."]) {
 		assert(messages.some(entry => entry.message.startsWith(heading)), `missing ${heading} handoff`);
+	}
+	const planning = messages.find(entry => entry.message.startsWith("Plan3: planning only."))?.message;
+	assert.match(planning, /For new or substantially redesigned web UI, read the frontend-design skill/);
+	assert.match(planning, /record its reference, the chosen direction and tokens\/components to reuse in the plan, not the skill text/);
+	assert.match(planning, /Explicit briefs and project conventions win; native\/TUI work follows platform rules/);
+	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
+		assert.doesNotMatch(handoff.message, /design lead at a design studio/, "skill body is never pasted into a handoff");
+		if (!/Plan3: (?:planning only|execute\/resume)/.test(handoff.message)) assert.doesNotMatch(handoff.message, /frontend-design/, "capture, conversion, answers and advisors do not restart design");
 	}
 	const execution = messages.find(entry => entry.message.startsWith("Plan3: execute/resume"))?.message;
 	assert(execution, "missing execution handoff");
+	assert.match(execution, /For web UI steps, consult frontend-design as needed/);
+	assert.match(execution, /follow settled design decisions and existing tokens\/components without restarting brainstorming or expanding scope/);
+	assert.match(execution, /Check usability and accessibility with available project tools; native\/TUI work follows platform rules/);
 	assert.match(execution, /Prefer bounded concurrency supported by the existing runner/);
 	assert.match(execution, /independent suites\/build jobs, not individual assertions/);
 	assert.match(execution, /Isolate temporary\/build\/output paths and filenames/);

@@ -1041,7 +1041,7 @@ check(() => {
 	);
 	assert.deepEqual(packageZeroSurface(), expectedZeroSurface);
 	assert.deepEqual(packageManifest.pi.extensions, ["extensions/work-models.ts", "extensions/plan3.ts"]);
-	assert.deepEqual(packageManifest.pi.skills, ["./skills"]);
+	assert.deepEqual(packageManifest.pi.skills, ["./skills/frontend-design"]);
 	assert.equal(
 		packageManifest.peerDependencies["pi-compound-engineering"],
 		undefined,
