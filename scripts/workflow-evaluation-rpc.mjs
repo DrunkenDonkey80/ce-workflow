@@ -1235,6 +1235,7 @@ export async function runRpcSample(options) {
 				)
 					return fail("prompt-rejected", event.error ?? "prompt rejected");
 				if (event.type === "agent_settled") {
+					if (event.aborted === true) return fail("aborted", "RPC sample aborted");
 					if (promptIndex < prompts.length) {
 						send({
 							id: `prompt-${promptIndex}`,

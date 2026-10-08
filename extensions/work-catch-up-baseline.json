@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-10-06T12:43:35.629Z",
+  "capturedAt": "2026-10-08T05:55:26.885Z",
   "verification": {
     "command": "npm run verify:quiet",
     "fullRuns": 1,
@@ -15,51 +15,108 @@
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "1.0.4",
-      "reviewedAt": "2026-10-06T12:43:35.629Z",
-      "reviewedVersion": "1.0.4",
+      "version": "1.1.0",
+      "reviewedAt": "2026-10-08T05:55:26.885Z",
+      "reviewedVersion": "1.1.0",
       "decisions": [
         {
-          "title": "--tools keeps MCP tools; * patterns; --no-mcp",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "1.0.4: `--tools` now keeps MCP (mcp.json-configured server) tools unless an entry starts with mcp__, and --no-mcp disables MCP for a run. Our --tools callers (benchmark-image-strip-live, benchmark-reasoning-strip-live, workflow-evaluation-rpc) run with --no-extensions, and neither ~/.pi/agent/mcp.json nor .pi/mcp.json exists, so their tool sets are unchanged. Add --no-mcp only if an mcp.json is ever configured.",
-          "version": "1.0.4"
+          "title": "agent_settled.aborted: fail cancelled RPC benchmark samples",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "1.1.0 adds a boolean identifying cancellation at final, notification-only settlement. runRpcSample currently advances options.prompts or requests final stats for every agent_settled (R1:1237–1262); cancellation without an assistant error can therefore become completed. Use event.aborted === true to return the existing fail('aborted', 'RPC sample aborted') before either success branch; preserve absent/false compatibility. Source: S1, S2:34–38/6279–6285, S3 docs/json.md, R1:1082–1085. CU-92/CU-93 implement the shared guard and fixture coverage.",
+          "verification": "node \"scripts/test-workflow-evaluation-rpc.mjs\" — exit 0, ok - workflow evaluation RPC fixtures (5.3s); the same new cancellation assertion failed before the guard with completed vs failed. Covers true final/intermediate cancellation, explicit false and existing absent-flag success, retries and external abort.",
+          "version": "1.1.0"
         },
         {
-          "title": "Codemode tools.read() returns image blocks; image() saves temp files",
-          "pov": "Not-our-problem",
+          "title": "+name/-name CLI and SDK tool selection",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "1.0.3/1.0.4: inside codemode scripts, reading an image file now yields an image block that image() can show, and image() also writes a temp file and names its path. extensions/work-vision.ts projects every image part in outgoing messages for non-vision models, so codemode images are already routed to process_image; no ce-workflow code calls tools.read or image().",
-          "version": "1.0.4"
+          "rationale": "1.1.0 can modify startup defaults instead of replacing them; plain names still form an allowlist, and mixing names/modifiers or modifier globs now fails validation. Keep benchmark-image-strip-live.mjs, benchmark-reasoning-strip-live.mjs and R1:959 explicit tool allowlists: inherited defaults would change controlled experiments or broaden read-only scopes. No existing modifier call needs migration. Source: S1, S2:154–202/4511–4630, S3 docs/cli.md.",
+          "version": "1.1.0"
         },
         {
-          "title": "Hidden tools left out of prompt rules; codemode shows per-tool prompt guidelines (ToolLoadout.getPromptGuidelines)",
-          "pov": "Not-our-problem",
+          "title": "Native durationMs on tool events/render context and persistent Took",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "1.0.4: tools hidden by an extension's prepareLoadout are no longer named in system-prompt rules, and codemode lists each tool's promptGuidelines next to its declaration. ce-workflow does not use prepareLoadout (rg finds none); Jev tools already carry promptSnippet, so they benefit without changes.",
-          "version": "1.0.4"
+          "rationale": "1.1.0 exposes execute-only monotonic milliseconds (absent when a tool did not run), and fixes built-in shell Took after reload. R3:2474–2485 still computes an event-to-event wall duration, but its sole caller at 31530 records activeWorkAgent, created for pendingWorkPrompt at 31371. Changing legacy workflow telemetry and historical comparability is not needed for the Plan3 path; retain it rather than turn this review into telemetry work. Built-in display fixes arrive automatically. Source: S1, S2:6260–6295, R3.",
+          "version": "1.1.0"
         },
         {
-          "title": "Azure provider renamed azure-openai-responses -> azure (breaking)",
+          "title": "outputPad in tool render context and wider transcript padding coverage",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.0.3 breaking rename of a provider key. rg finds no azure-openai-responses in this repo or in ~/.pi/agent settings.json/auth.json; no models.json exists.",
-          "version": "1.0.4"
+          "rationale": "1.1.0 passes horizontal transcript padding to renderers and applies it to tools, shell output, summaries and custom entries; self-shell renderers must apply it themselves. Repository extension search found no renderCall/renderResult/registerToolRenderer or outputPad consumers. Existing work-dialogs.ts overlays are separate UI components, not transcript tool renderers. No padding shim or dialog redesign. Source: S1, S2:4669–4737, S3 docs/tui.md and dist/core/extensions/types.d.ts.",
+          "version": "1.1.0"
         },
         {
-          "title": "Home/End now always move the editor cursor; transcript top/bottom moved to Ctrl+Home/Ctrl+End",
+          "title": "OSC 7501 program status reporting",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.0.3 keybinding change in Pi's editor. extensions/work-dialogs.ts and plan3.ts bind no home/end keys.",
-          "version": "1.0.4"
+          "rationale": "1.1.0 reports working, blocked on UI/login, done, error or idle to supporting terminals after capability negotiation; PI_PROGRAM_STATUS overrides detection. Pi owns the terminal and observes extension UI prompts. ce-workflow supplies dialogs, not an OSC dashboard, so do not emit a duplicate reporter or force a host setting. Real terminal support is unverified. Source: S1, S3 docs/terminal-setup.md#program-status.",
+          "version": "1.1.0"
         },
         {
-          "title": "Codemode built-ins frozen; restart hint after Pi update; output files user-only; OAuth/Bedrock/MCP OAuth/EIO/highlighting fixes",
+          "title": "Claude Haiku 5.5 with adaptive effort and Bedrock caching",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.0.3/1.0.4 runtime robustness fixes in Pi itself; no ce-workflow code patches codemode built-ins, depends on output-file permissions, or touches these providers. Benefit arrives automatically.",
-          "version": "1.0.4"
+          "rationale": "1.1.0 adds an authenticated chat-model catalog entry and supported effort levels. Plan3 chooseAdvisors reads registry availability then filters the already-configured scope (R4:218–224); work-models.ts also uses the registry. Catalog availability is inherited, not a reason to change current model, saved role selections or benchmark defaults. Source: S1, S3 docs/models.md, R3/R4.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "GPT-6 Luna Decisions API and image classifier contexts",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "1.1.0 offers typed classification via OpenAI and optional image blocks. Jev tools deliberately accept JSON/files and resolve only configured OpenRouter classifier IDs (R5:7/22–28); work-vision.ts already handles model vision separately. Adding providers, image inputs or screenshot adjudication would enlarge the requested scope without an acceptance use case. Luna uses API-key authentication, not ChatGPT login, so a provider swap is not drop-in. Source: S1, S3 docs/models.md#use-classifier-models and docs/codemode.md#classify, R5.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "Native llama.cpp decision models through /v1/systemone",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "1.1.0 recognizes decision-model GGUF metadata on llama.cpp >=0.6.0, lists Julia-1/Laya/Kev/lev/OpenJev only as classifiers, and calls their native typed-decision endpoint; ordinary chat models can still classify via next-token probabilities. Pi supplies that discovery. Jev tools remain OpenRouter-only; no local backend, downloads or new configuration are needed. Plan3 chat availability comes from the existing registry, not a hand-maintained local-model list. Local hardware/server behavior is unverified. Source: S1, S3 docs/llama-cpp.md#classification, R4/R5.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "Codemode async discovery documentation and output boundaries",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.1.0 marks searchTools/describeTool/describeNamespace as async and separates text outputs with ==> text N/M <== plus one console_output block. This fixes the model-visible built-in contract; ce-workflow does not implement those helpers or parse those presentation delimiters. benchmark-jev-live.mjs aggregates structured calls/usage, not these headings. No prompt-copy or parser workaround. Source: S1, S2:3080–3198/4738–4761, S3 docs/codemode.md, R6.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "MCP manager responsiveness, whole-login timeout, cancellation and shutdown fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.1.0 opens /mcp before every server connects and bounds the entire OAuth sign-in, aborts it on Esc/shutdown, caps each authorization request at 15s, and avoids refreshing tokens just to close. ce-workflow has no MCP login/manager implementation; controlled RPC invocation R1:943–955 disables discovered/built-in extensions and explicitly loads dependencies. Keep Pi-owned behavior; no extra OAuth or timeout layer. Source: S1, S3 docs/cli.md, R1.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "Managed release retention and standalone launch-directory environment loading",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.1.0 pi update retains the new release and its immediate predecessor, and fixes standalone binaries loading .env/.env.local/.env.development from the launch directory. ce-workflow does not ship a standalone Pi binary; piReleaseRoots and Plan3 self-checks already search retained releases newest-first, not a fixed older directory. No installer/rollback automation or environment-file reliance is introduced. Runtime upgrades are outside this plan; review remains pinned to 1.1.0. Source: S1, R3:22850–22883, R2 scripts/test-work-plan3.mjs:539–545, package.json.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "Image-resize worker, ANSI chunk handling, dim shell headers and transcript selection fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.1.0 ignores Node worker housekeeping messages while resizing images under node --watch, fixes split ANSI codes in !/RPC bash output, preserves !! header dimming and clears fullscreen selection on transcript rebuilds. Pi owns those workers, shell components and transcript selection; work-vision.ts and payload stripping consume normal image/message blocks. No duplicate worker or ANSI parser. Current Node is 24.14.0; affected watch versions (24.19+/26.x) were not exercised. Source: S1, S2:72–131/3223–3313, R3.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "Provider thinking/headers, retryable errors, context estimation and tiered session costs",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.1.0 honors OpenAI-on-Bedrock effort and Codex header overrides, retries server_busy/servers are currently busy and Mistral finish_reason:error, estimates input at 3.5 instead of 4 characters/token, filters disabled Radius models, and corrects prompt-length-tier costs across providers. ce-workflow delegates provider calls to the registry and aggregates supplied usage; the RPC runner waits for agent_settled across retries. Retain existing error/usage gates and context budgets. Historical reported costs may not be comparable; this is not evidence of a performance improvement. Source: S1, S3 docs/extensions.md, R1/R3 and scripts/test-work-usage.mjs.",
+          "version": "1.1.0"
+        },
+        {
+          "title": "Anthropic free-loopback-port login, Herdr links and Termux clipboard fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "1.1.0 falls back from reserved port 53692 during Anthropic browser login (useful on Hyper-V/WSL Windows), fixes clickable Markdown links in Herdr, and repairs Termux paste/API hints. ce-workflow neither owns OAuth callback listeners nor terminal clipboard/link handling. Benefit is inherited from Pi; no UI redesign or platform workaround. These live integrations were not tested. Source: S1, S3 docs/terminal-setup.md.",
+          "version": "1.1.0"
         }
       ]
     },

@@ -844,7 +844,7 @@ const allowedDependencyRead = await runRpcSample({
 	spawnProcess: () => dependencyRead,
 });
 assert.equal(allowedDependencyRead.status, "completed");
-const classify = (processFixture, timeoutMs = 1000, signal) =>
+const classify = (processFixture, timeoutMs = 1000, signal, prompts) =>
 	runRpcSample({
 		packageRoot,
 		revision: "abc",
@@ -855,14 +855,45 @@ const classify = (processFixture, timeoutMs = 1000, signal) =>
 		isolation: "path",
 		stage: "brainstorm",
 		prompt: "x",
+		prompts,
 		answers,
 		timeoutMs,
 		signal,
 		spawnProcess: () => processFixture,
 	});
-async function expectFailure(processFixture, expected, timeoutMs) {
-	const classified = await classify(processFixture, timeoutMs);
+async function expectFailure(processFixture, expected, timeoutMs, prompts) {
+	const classified = await classify(processFixture, timeoutMs, undefined, prompts);
+	assert.equal(classified.status, "failed");
 	assert.equal(classified.failure, expected);
+	return classified;
+}
+const successfulSettlement = await classify(
+	fakeProcess([{ type: "agent_settled", aborted: false }]),
+);
+assert.equal(successfulSettlement.status, "completed");
+for (const prompts of [["x"], ["x", "next"]]) {
+	const cancelledProcess = fakeProcess([{ type: "agent_settled", aborted: true }]);
+	const cancelledResult = await expectFailure(
+		cancelledProcess,
+		"aborted",
+		1000,
+		prompts,
+	);
+	assert.equal(cancelledResult.error, "RPC sample aborted");
+	assert.ok(cancelledResult.initialUsage?.contextUsage);
+	assert.ok(
+		cancelledResult.events.some(
+			(event) => event.type === "agent_settled" && event.aborted === true,
+		),
+	);
+	assert.deepEqual(
+		cancelledProcess.writes
+			.filter((command) => command.type === "prompt")
+			.map((command) => command.message),
+		["x"],
+	);
+	assert.ok(cancelledProcess.writes.some((command) => command.id === "initial-stats"));
+	assert.ok(!cancelledProcess.writes.some((command) => command.id === "stats"));
 }
 const duplicateCommands = [
 	{

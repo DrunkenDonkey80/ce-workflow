@@ -693,14 +693,12 @@ export default function plan3(pi) {
 		return { action: "handled" };
 	});
 
-	pi.registerCommand("plans3", {
+	const commands = { plan3: planCommand, plans3: {
 		description: "Browse Plan3 plans: resume, force finish, delete, convert legacy work",
 		handler: async (_args, ctx) => {
 			try { await browse(ctx); } catch (error) { report(ctx, error); }
 		},
-	});
-
-	pi.registerCommand("resume3", {
+	}, resume3: {
 		description: "Continue the current Plan3 plan, or the plan named by id, filename or path",
 		handler: async (args, ctx) => {
 			if (!idle(ctx)) return;
@@ -713,7 +711,11 @@ export default function plan3(pi) {
 				report(ctx, error);
 			}
 		},
-	});
+	} };
+	pi.registerCommand("plans3", commands.plans3);
+	pi.registerCommand("resume3", commands.resume3);
+	// /wo plan|plans|resume forward here.
+	pi.events?.on?.("plan3:command", ({ ctx, name, args = "" }) => commands[name]?.handler(args, ctx));
 
 	// Other extensions (/wo → Catch up) hand over a generated plan file to plan or continue.
 	pi.events?.on?.("plan3:start", async ({ ctx, file }) => {

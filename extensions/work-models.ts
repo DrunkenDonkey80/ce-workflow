@@ -314,7 +314,7 @@ const WORKFLOW_REPO_DIR = resolve(
 	dirname(fileURLToPath(import.meta.url)),
 	"..",
 );
-// Capture at module load: opening F7 must not pretend changed disk files were reloaded.
+// Capture at module load: opening /wo must not pretend changed disk files were reloaded.
 function workflowBuildLabel(root = WORKFLOW_REPO_DIR) {
 	try {
 		const manifest = readFileSync(join(root, "package.json"), "utf8");
@@ -834,6 +834,8 @@ const finishHelperStarts = new Map();
 const goalSubagentStarts = new Map();
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
+let sessionCwd; // Completions get no ctx; session_start records the project for checkout-only /wo entries.
+const maintenanceCheckout = (cwd = sessionCwd ?? process.cwd()) => sameCheckout(cwd, WORKFLOW_REPO_DIR);
 let activeWorkGoalRunning = false;
 let activeWorkGoalGitBefore = null;
 let activeWorkGoalVerifierFixCommitted = false;
@@ -30988,7 +30990,7 @@ export default function workModelsExtension(pi) {
 				// Saved findings must not prevent the rest of session startup.
 			}
 		}
-		activeWorkGoalCwd = ctx.cwd;
+		activeWorkGoalCwd = sessionCwd = ctx.cwd;
 		activeWorkGoal = workflowOn ? loadWorkGoalFromSession(ctx) : null;
 		if (activeWorkGoal?.status === "active") {
 			if (activeWorkGoal.resumeOnSessionStart) {
@@ -32202,7 +32204,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("wo", {
-		description: workflowOn ? "Open Orchestrator, or use /wo goal, /wo pause, /wo resume" : "Open utilities and settings; /wo compact or /wo fact",
+		description: workflowOn ? "Open Orchestrator, or use /wo goal, /wo pause, /wo resume, /wo plan" : "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo compact or /wo fact",
 		getArgumentCompletions: (prefix) => {
 			const input = String(prefix ?? "").trim();
 			if (/\s/.test(input)) return null;
@@ -32211,14 +32213,21 @@ export default function workModelsExtension(pi) {
 				monitor: "Monitor another Pi session every 10 minutes",
 				pause: "Pause after the current LLM cycle finishes",
 				compact: "Microcompact the work context (same as F8)",
-				resume: "Resume the paused goal, workflow, or direct request",
+				plan: "Plan3: start a plan, or /plan3 subcommand (finish, resolve, ideas, review…)",
+				plans: "Plan3: browse plans (/plans3)",
+				settings: "Open Settings",
+				...(maintenanceCheckout() ? { "catch-up": "Catch up packages", context: "Context guard: status, compact, on, off, set <tokens>" } : {}),
+				telemetry: "Telemetry summary; blank shows today",
+				usage: "Write the HTML usage report",
+				...(extensionScoutEnabled() ? { scout: "Scout Pi extensions in background" } : {}),
+				resume: workflowOn ? "Resume the paused goal, workflow, or direct request" : "Plan3: continue the current or named plan (/resume3)",
 				"resume-work": "Resume native work state directly",
 				design: "Prepare, commission, or resume a visual design",
 				redesign: "Create a redesign initiative and current-UI audit",
 				fact: "Store, search, correct, or forget durable session knowledge",
 			};
 			const items = Object.entries(descriptions)
-				.filter(([value]) => workflowOn || ["compact", "fact"].includes(value))
+				.filter(([value]) => workflowOn || ["plan", "plans", "resume", "compact", "fact", ...Object.keys(WO_UTILITY_ACTIONS)].includes(value))
 				.filter(([value]) => value.startsWith(input))
 				.map(([value, description]) => ({ value, label: value, description }));
 			return items.length ? items : null;
@@ -32226,6 +32235,13 @@ export default function workModelsExtension(pi) {
 		handler: async (args, ctx) => {
 			const [action, rest] = splitFirstWord(args);
 			if (!action) return handleWorkMenuCommand(ctx, pi);
+			// Legacy /wo resume wins only while the legacy workflow is on.
+			const plan3 = { plan: "plan3", plans: "plans3", ...(workflowOn ? {} : { resume: "resume3" }) }[action];
+			if (plan3) return pi.events?.emit?.("plan3:command", { ctx, name: plan3, args: rest });
+			const utility = WO_UTILITY_ACTIONS[action];
+			// Same visibility as the /wo menu: maintenance does not exist outside the ce-workflow checkout.
+			if (utility && (maintenanceCheckout(ctx.cwd) || !["work-context", "work-catch-up"].includes(utility)))
+				return executeOrchestratorAction(utility, rest, ctx, pi);
 			if (!workflowOn && !["compact", "fact", "context-fill"].includes(action))
 				return notify(ctx, WORKFLOW_OFF_NOTICE, "warning");
 			if (action === "context-fill") {
@@ -32328,12 +32344,6 @@ export default function workModelsExtension(pi) {
 			return executeOrchestratorAction("work-resume", rest, ctx, pi);
 		},
 	});
-	pi.registerShortcut?.("f7", {
-		description: "Open workflow orchestrator",
-		handler: async (ctx) => {
-			await handleWorkMenuCommand(ctx, pi);
-		},
-	});
 	pi.registerShortcut?.("f8", {
 		description: "Microcompact work context",
 		handler: async (ctx) => requestMicrocompact(ctx),
@@ -32347,6 +32357,7 @@ export default function workModelsExtension(pi) {
 }
 
 const WORKFLOW_OFF_NOTICE = "Workflow is off — /wo → Settings → Workflow (legacy orchestration) turns it back on.";
+const WO_UTILITY_ACTIONS = { settings: "work-settings", "catch-up": "work-catch-up", context: "work-context", telemetry: "work-telemetry", usage: "work-usage", scout: "work-extension-scout" };
 const UTILITY_MENU_VALUES = new Set(["work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
 const UTILITY_SETTING_KINDS = new Set(["workflow", "planModels", "compactionMode", "compactionModel", "jev", "visionModel", "nonVisionModels", "subscriptionFooter", "reset", "export", "import"]);
 

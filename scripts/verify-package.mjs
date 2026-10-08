@@ -404,12 +404,13 @@ check(
 	].every((status) => verifierStore.includes(`"${status}"`)),
 );
 check(
-	"orchestrator has /wo plus F7/F8/F9 and no legacy work slash commands",
+	"orchestrator has /wo plus F8/F9, no F7 and no legacy work slash commands",
 	!listed("prompts").some((name) => name.startsWith("work-")) &&
 		!models.match(/registerCommand\(["'`]work-/) &&
 		models.includes('registerCommand("wo"') &&
 		!models.includes('registerCommand("wf"') &&
-		["f7", "f8", "f9"].every((key) =>
+		!models.includes('registerShortcut?.("f7"') &&
+		["f8", "f9"].every((key) =>
 			models.includes(`registerShortcut?.("${key}"`),
 		) &&
 		models.includes('title: `${workflowOn ? "Orchestrator" : "Utilities"} — ${LOADED_WORKFLOW_BUILD_LABEL}`'),

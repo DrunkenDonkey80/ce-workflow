@@ -1021,7 +1021,7 @@ assert.deepEqual(
 	commands.wo.getArgumentCompletions("res")?.[0]?.value,
 	"resume",
 );
-assert.match(shortcuts.f7.description, /orchestrator/i);
+assert.equal(shortcuts.f7, undefined, "F7 is removed; /wo opens the menu");
 const openWorkflow = (ctx) => commands.wo.handler("", ctx);
 assert.match(shortcuts.f8.description, /microcompact/i);
 assert.match(shortcuts.f9.description, /fleet/i);
@@ -1038,25 +1038,13 @@ await openWorkflow({
 	mode: "print",
 	ui: {
 		select: async (title, labels) => {
-			assert.equal(title, "Orchestrator");
+			assert.match(title, /^Orchestrator — ce-workflow /);
 			orchestratorLabels = labels;
 			return undefined;
 		},
 	},
 });
 assert.match(orchestratorLabels[0], /Roadmaps/);
-let f7Title;
-await shortcuts.f7.handler({
-	cwd: process.cwd(),
-	mode: "print",
-	ui: {
-		select: async (title) => {
-			f7Title = title;
-			return undefined;
-		},
-	},
-});
-assert.equal(f7Title, "Orchestrator", "F7 opens the same /wo menu");
 for (const action of [
 	"Roadmaps",
 	"Status",

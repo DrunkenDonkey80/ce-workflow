@@ -422,7 +422,6 @@ const pi = {
 	},
 };
 workModelsExtension(pi);
-assert.match(shortcuts.f7.description, /orchestrator/i);
 assert.ok(commands.wo, "/wo opens the orchestrator");
 const openWorkflow = (ctx) => commands.wo.handler("", ctx);
 const notices = [];

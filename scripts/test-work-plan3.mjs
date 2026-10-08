@@ -382,6 +382,9 @@ try {
 	await writeFile(catchUpFile, catchUpText);
 	idle = true;
 	await listeners.get("plan3:start")({ ctx, file: catchUpFile });
+	const beforeForward = notices.length;
+	await listeners.get("plan3:command")({ ctx, name: "resume3", args: "no-such-plan" }); // /wo resume forwards here
+	assert(notices.length > beforeForward, "plan3:command runs the named Plan3 command");
 	assert(messages.at(-1).message.includes(JSON.stringify(catchUpFile)) && /planning only/.test(messages.at(-1).message));
 	assert(/Pending investigation/.test(catchUpText), "finish stays blocked until the review fills Phase 1");
 	const baselineFile = path.join(cwd, "baseline.json");

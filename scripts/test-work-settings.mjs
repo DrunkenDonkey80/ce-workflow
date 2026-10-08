@@ -1870,14 +1870,14 @@ try {
 		`plan models add/reorder/remove persist (${JSON.stringify(planScript[0])})`,
 	);
 	const loadExtension = () => {
-		const loaded = { commands: {}, tools: {}, shortcuts: {}, hooks: {} };
+		const loaded = { commands: {}, tools: {}, shortcuts: {}, hooks: {}, events: { on: () => {}, emit: () => {} } };
 		mod.default({
 			getActiveTools: () => [],
 			setActiveTools: () => {},
 			getThinkingLevel: () => "medium",
 			setThinkingLevel: () => {},
 			on: (name, handler) => { (loaded.hooks[name] ??= []).push(handler); },
-			events: { on: () => {}, emit: () => {} },
+			events: loaded.events,
 			registerCommand: (name, config) => {
 				loaded.commands[name] = config;
 			},
@@ -1909,8 +1909,8 @@ try {
 	);
 	assert(!Object.keys(off.commands).some(name => name.startsWith("__orchestrator-")),
 		"workflow off hides internal goal/monitor commands");
-	assert(!/goal|pause|resume|Orchestrator/.test(off.commands.wo.description),
-		"workflow off command description advertises only utilities");
+	assert(!/goal|pause|Orchestrator/.test(off.commands.wo.description) && /\/wo plan/.test(off.commands.wo.description),
+		"workflow off command description advertises only Plan3 and utilities");
 	const blocked = await off.hooks.tool_call[0]({ toolName: "subagent", input: { agent: "work-advisor" } }, { cwd });
 	assert(blocked?.block && /off/.test(blocked.reason) && /oracle/.test(blocked.reason) && !/wo resume/.test(blocked.reason),
 		"stale work-advisor calls explain off state and normal advisor, not disabled resume");
@@ -1956,15 +1956,16 @@ try {
 	);
 	let offMenuTitle = "";
 	let offMenuLabels = [];
-	await off.shortcuts.f7.handler({ ...offCtx, mode: "rpc", ui: {
+	assert(!off.shortcuts.f7, "F7 is removed; /wo opens the menu");
+	await off.commands.wo.handler("", { ...offCtx, mode: "rpc", ui: {
 		notify: ctx.ui.notify,
 		select: async (title, labels) => { offMenuTitle = title; offMenuLabels = labels; return undefined; },
 	} });
-	assert(offMenuTitle === `Utilities — ${mod.loadedWorkflowBuildLabelForTest}`, "F7 shows the loaded build, including in the native dialog fallback");
+	assert(offMenuTitle === `Utilities — ${mod.loadedWorkflowBuildLabelForTest}`, "/wo shows the loaded build, including in the native dialog fallback");
 	assert(offMenuLabels.length && offMenuLabels.every(label => ["Telemetry", "Usage report", "Settings", "Scout Pi extensions"].some(name => label.includes(name))), "other projects keep only general utility actions");
 	const menuLabelsAt = async menuCwd => {
 		let labels = [];
-		await off.shortcuts.f7.handler({ ...offCtx, cwd: menuCwd, mode: "rpc", ui: {
+		await off.commands.wo.handler("", { ...offCtx, cwd: menuCwd, mode: "rpc", ui: {
 			notify: ctx.ui.notify,
 			select: async (_title, choices) => { labels = choices; return undefined; },
 		} });
@@ -1980,9 +1981,23 @@ try {
 	}
 	process.env.CE_WORKFLOW_ENABLED = "0";
 	assert(
-		JSON.stringify(off.commands.wo.getArgumentCompletions("").map(({ value }) => value)) === '["compact","fact"]',
-		"workflow off completes only utility /wo subcommands",
+		JSON.stringify(off.commands.wo.getArgumentCompletions("").map(({ value }) => value)) === '["compact","plan","plans","settings","telemetry","usage","resume","fact"]',
+		"workflow off completes only Plan3 and utility /wo subcommands; other projects never see catch-up/context",
 	);
+	const plan3Calls = [];
+	off.events.emit = (name, data) => plan3Calls.push([name, data.name, data.args]);
+	for (const sub of ["plan finish", "plans", "resume abc"]) await off.commands.wo.handler(sub, { cwd, ui: { notify() {} } });
+	assert(JSON.stringify(plan3Calls) === JSON.stringify([["plan3:command", "plan3", "finish"], ["plan3:command", "plans3", ""], ["plan3:command", "resume3", "abc"]]), "/wo plan|plans|resume forward to Plan3 while the workflow is off");
+	let woSettings = [];
+	await off.commands.wo.handler("settings", { ...ctx, mode: "rpc", ui: { notify: ctx.ui.notify, select: async (_title, labels) => { woSettings = labels; return undefined; } } });
+	assert(woSettings.some(label => label.includes("Plan3")), "/wo settings opens Settings directly");
+	const catchUpNotices = [];
+	await off.commands.wo.handler("catch-up", { cwd, ui: { notify: (message) => catchUpNotices.push(message) } });
+	assert(catchUpNotices.at(-1)?.includes("Workflow is off") && !/catch-up|checkout/.test(catchUpNotices.at(-1)), "/wo catch-up does not exist outside the ce-workflow checkout");
+	for (const handler of off.hooks.session_start) await handler({}, { ...offCtx, cwd: path.resolve(import.meta.dirname, "..") });
+	const here = off.commands.wo.getArgumentCompletions("").map(({ value }) => value);
+	for (const handler of off.hooks.session_start) await handler({}, offCtx);
+	assert(here.includes("catch-up") && here.includes("context"), "the ce-workflow checkout completes catch-up/context");
 	const offNotices = [];
 	await off.commands.wo.handler("goal ship it", { cwd, ui: { notify: (message) => offNotices.push(message) } });
 	assert(offNotices.at(-1)?.includes("Workflow is off"), "/wo goal is refused while the workflow is off");
