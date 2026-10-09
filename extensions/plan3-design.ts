@@ -182,6 +182,13 @@ export function localPlanDesign(cwd: string, plan: Plan) {
 	catch { return { phase: "recovery", error: "Missing/corrupt local design state" }; }
 }
 export async function enterPlanDesign(cwd: string, plan: Plan) {
+	if (!/^[a-f0-9]{8}$/.test(plan.id)) { // hand-named plan: give it the stable id design artifacts bind to
+		const id = crypto.randomUUID().slice(0, 8), file = plan.file.replace(/\.md$/, `-${id}-plan3.md`);
+		const log = (name: string) => path.join(path.basename(path.dirname(file)) === "done" ? path.dirname(path.dirname(file)) : path.dirname(file), "logs", `${name}.md`);
+		fs.renameSync(plan.file, file);
+		if (fs.existsSync(log(plan.id))) fs.renameSync(log(plan.id), log(id));
+		Object.assign(plan, { id, file });
+	}
 	return withPlanDesignLock(plan.file, () => {
 		let text = planText(cwd, plan);
 		if (!/^status: (draft|blocked|ready)$/m.test(text)) throw new Error("Design starts on a draft/blocked/ready plan; create an explicit planning follow-up for active/complete work.");
@@ -622,7 +629,7 @@ function persistClarification(cwd: string, plan: Plan, state) {
 }
 // Called only inside Plan3's native resolve mutation queue; no model answer/permission arguments.
 export function recordPlanDesignAnswer(cwd: string, plan: Plan, questionText: string, response, decisionEventId: string) {
-	if (!designPointer(planText(cwd, plan))) return;
+	if (!designPointer(read(plan.file, 1_000_000))) return; // plans without a design need no stable id
 	if (localPlanDesign(cwd, plan)?.question?.text !== questionText) return;
 	const state = loadPlanDesign(cwd, plan);
 	if (state.phase !== "clarification") return;

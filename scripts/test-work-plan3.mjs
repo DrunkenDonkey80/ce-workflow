@@ -6,12 +6,12 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
 import { existsSync } from "node:fs";
-import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import plan3, { similarity, optimizeLint } from "../extensions/plan3.ts";
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
-import { enterPlanDesign, loadPlanDesign, localPlanDesign, planDesignGate, transitionPlanDesign, designPointer, publicDesignUrl, preflightDesignReference, addPlanDesignImage, humanPlanDesignDecision, planDesignReview, runPlanDesign, finishNativePlanDesign } from "../extensions/plan3-design.ts";
+import { enterPlanDesign, recordPlanDesignAnswer, loadPlanDesign, localPlanDesign, planDesignGate, transitionPlanDesign, designPointer, publicDesignUrl, preflightDesignReference, addPlanDesignImage, humanPlanDesignDecision, planDesignReview, runPlanDesign, finishNativePlanDesign } from "../extensions/plan3-design.ts";
 import { nativeExportClient, nativeFileName, nativeFileHash } from "../extensions/plan3-native-export.ts";
 import { html as nativeHtml, png as nativePng } from "./fixtures/opendesign/native-export.mjs";
 import { windowCrop, plan3Windows } from "../extensions/plan3-window.ts";
@@ -73,7 +73,7 @@ const validPlan = (_id, title, status, stepsText, extra = "") => `---\nplan3: tr
 try {
 	const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 	assert(manifest.pi.extensions.includes("extensions/plan3.ts"));
-	assert.deepEqual([...commands.keys()], ["plan3", "plans3", "resume3"]);
+	assert.deepEqual([...commands.keys()], ["night", "plan3", "plans3", "resume3"]);
 	assert(tools.has("plan3") && tools.get("plan3").promptSnippet);
 	assert.deepEqual(commands.get("plan3").getArgumentCompletions("re").map((item) => item.value), ["resolve", "review", "review all"]);
 
@@ -87,6 +87,13 @@ try {
 	const [entered, same] = await Promise.all([enterPlanDesign(designCwd, designPlan), enterPlanDesign(designCwd, designPlan)]);
 	assert.equal(entered.ownerId, "plan3-12121212");
 	assert.deepEqual(same, entered, "parallel entry keeps the same identity");
+	const handFile = path.join(designCwd, "docs", "plans", "2026-10-09-hand-named.md");
+	await writeFile(handFile, validPlan("x", "Hand", "draft", "- [ ] **H-01** Do"));
+	const handPlan = { id: "2026-10-09-hand-named", file: handFile };
+	assert.equal(recordPlanDesignAnswer(designCwd, handPlan, "Q", { kind: "freeform", text: "a" }, `dialog-${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}`), undefined, "/plan3 resolve works on hand-named plans without a design");
+	await enterPlanDesign(designCwd, handPlan);
+	assert.match(handPlan.file, new RegExp(`2026-10-09-hand-named-${handPlan.id}-plan3\\.md$`), "hand-named plans get a stable id instead of failing");
+	assert.ok(existsSync(handPlan.file) && !existsSync(handFile));
 	assert.equal(loadPlanDesign(designCwd, designPlan).phase, "brief");
 	assert.match(await readFile(designFile, "utf8"), /^status: draft$/m);
 	assert.match(await readFile(path.join(designCwd, ".gitignore"), "utf8"), /\.pi\//);
@@ -246,6 +253,17 @@ try {
 	assert.deepEqual([state.done, state.total, state.next], [0, 3, "CSV-01"]);
 	await assert.rejects(tool({ action: "step", id: "NOPE", mark: "done" }), /Steps: CSV-01, CSV-02, IO-01/);
 	await assert.rejects(tool({ action: "section", name: "Nope", text: "x" }), /Sections: Original request/);
+	// New plans come from the template, never a hand-written file.
+	const handWritten = { toolName: "write", input: { path: "docs/plans/2026-10-09-invented.md", content: "---\nplan3: true\nstatus: draft\n---\n\n# Invented\n" } };
+	assert.match(hooks.get("tool_call")(handWritten, ctx)?.reason ?? "", /plan3 with action create/);
+	assert.equal(hooks.get("tool_call")({ ...handWritten, input: { ...handWritten.input, content: "# notes" } }, ctx), undefined, "ordinary docs are not plans");
+	const currentBefore = entries.filter(entry => entry.customType === "plan3-current").at(-1);
+	const created = await tool({ action: "create", text: "Library objects to 3D" });
+	assert.match(created.file, /library-objects-to-3d-[0-9a-f]{8}-plan3\.md$/);
+	assert.match(await readFile(created.file, "utf8"), /## Decisions[\s\S]*## Open questions[\s\S]*## Phases/, "standard template");
+	assert.equal(hooks.get("tool_call")({ toolName: "write", input: { path: created.file, content: handWritten.input.content } }, ctx), undefined, "filling the created file is allowed");
+	await unlink(created.file);
+	if (currentBefore) entries.push(currentBefore); // keep the earlier current plan for the checks below
 	state = await tool({ action: "next" });
 	assert.deepEqual([state.started, state.wip], ["CSV-01", ["CSV-01"]]);
 	const beforeSummary = await readFile(csvFile, "utf8");
@@ -867,6 +885,13 @@ try {
 	assert(!tools.has("ask_user"), "the adapter never registers a duplicate host tool");
 	assert.equal((await tool({ action: "get", plan: "55555555" })).openQuestions, 3, "kept and skipped questions remain open");
 	assert.match(await readFile(directFile, "utf8"), /not independently verified/);
+
+	// Hand-written plans without a Decisions section keep the answers instead of failing.
+	assert.match(directPlan, /^## Decisions\r?\n/m);
+	await writeFile(directFile, directPlan.replace(/^## Decisions\r?\n[\s\S]*?(?=^## )/m, ""));
+	dialogs = [{ messages: messages.length, answer: [answered(selected), { status: "skipped" }, { status: "skipped" }, { status: "skipped" }] }];
+	await run("plan3", "resolve 55555555");
+	assert.match(await readFile(directFile, "utf8"), /## Decisions\r?\n\r?\n[\s\S]*not independently verified[\s\S]*## Open questions/, "missing Decisions is created before Open questions");
 
 	// Discussion leaves that question open and hands off after this submitted popup, not before.
 	await writeFile(directFile, directPlan);

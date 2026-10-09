@@ -10,6 +10,7 @@ import { decideIdea, ideaBlock, ideaOptions, ideaPopupContext, ideaResponse, ide
 import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
+import { createNight } from "./plan3-night.ts";
 import { closePersistentOpenDesignClients } from "./opendesign-client.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 
@@ -136,9 +137,15 @@ function activeSteps(lines) {
 	const backlog = section(lines, "Backlog");
 	return steps(lines).filter((step) => !backlog || step.index < backlog.start || step.index >= backlog.end);
 }
-function appendToSection(lines, name, text) {
-	const found = section(lines, name);
-	if (!found) throw new Error(`Unknown section "${name}". Sections: ${sectionNames(lines).join(", ")}`);
+function appendToSection(lines, name, text, create = false) {
+	let found = section(lines, name);
+	if (!found && !create) throw new Error(`Unknown section "${name}". Sections: ${sectionNames(lines).join(", ")}`);
+	if (!found) { // hand-written plans may lack a standard section: add it rather than lose the user's answers
+		const open = section(lines, "Open questions");
+		const at = open ? open.start : lines.length;
+		lines.splice(at, 0, ...(at && lines[at - 1].trim() ? [""] : []), `## ${name}`, "", ...(open ? [""] : []));
+		found = section(lines, name);
+	}
 	let at = found.end;
 	while (at > found.start + 1 && !lines[at - 1].trim()) at--;
 	lines.splice(at, 0, ...(at === found.start + 1 ? [""] : []), ...text.split(/\r?\n/), ...(found.end === lines.length ? [] : [""]));
@@ -374,6 +381,16 @@ export async function chooseAdvisors(ctx, all = false) {
 
 // ---------- prompts ----------
 const quote = (text) => text.split(/\r?\n/).map((line) => `> ${line}`).join("\n");
+// The one way a Plan3 plan file is born: standard sections and a stable id.
+async function newPlanFile(cwd, request, source?: { file: string; text: string }) {
+	await mkdir(plansDir(cwd), { recursive: true });
+	const id = randomUUID().slice(0, 8);
+	const file = path.join(plansDir(cwd), `${today()}-${slugify(request)}-${id}-plan3.md`);
+	// The imported source lives in the sidecar log, so the plan never carries it.
+	if (source) await appendLog(file, `Imported source snapshot (unverified task data)\n\nSource: ${JSON.stringify(source.file)}\n\n${quote(source.text)}`);
+	await writeFile(file, `---\nplan3: true\nstatus: draft\ncreated: ${today()}\nupdated: ${new Date().toISOString()}\n${source ? `source: ${JSON.stringify(`file:${source.file}`)}\n` : ""}---\n\n# Plan3 draft\n\n## Original request\n\n${quote(request)}\n\n## Goal, requirements, and non-goals\n\nPending investigation.\n\n## Decisions\n\nRecord each settled choice, rationale, and source here.\n\n## Open questions\n\n### Blocking\n\nNot assessed yet.\n\n### Deferred\n\nNone recorded.\n\n## Relevant files and approach\n\nPending investigation.\n\n## Phases\n\nUse stable step IDs (- [ ] **ID** text); markers [ ] pending / [wip] / [x] / [f] failed / [blocked]. Each phase needs concrete actions, acceptance examples, and existing verification commands (or an explicit manual check).\n\n## Global validation\n\nPending investigation.\n\n## Resume context\n\nPlanning has not started.\n\n## Amendments\n\nAppend material changes and their reasons; preserve the original request and settled decisions.\n`, { flag: "wx" });
+	return { id, file };
+}
 const planningPrompt = (file, lead) => `Plan3: planning only.\n${boundary}\n\n${lead} ${JSON.stringify(file)}\nRead it and the relevant repository context, then replace placeholders with an implementation-ready plan at this path. Do not implement product code. Set a short one-line title early with the plan3 tool (action title).\nFor new or substantially redesigned web UI, read the frontend-design skill; record its reference, the chosen direction and tokens/components to reuse in the plan, not the skill text. Explicit briefs and project conventions win; native/TUI work follows platform rules.\n${toolUse}\n${clarification}\n${questionFormat}\nPreserve the original request, every decided requirement, non-goal, acceptance example and source reference. Keep the plan proportional: affected files and the smallest reusable approach, ordered phases with stable step IDs (- [ ] **ID** text) and their checks, global acceptance, resume context. Use existing repository commands; do not invent commands or claim checks ran. ${PLAN_SHAPE} You may set draft or blocked; never set ready yourself — the user runs /plan3 finish. ${HINT_RULE}`;
 function writePrompt(file) {
 	return `Plan3: write the current discussion into a plan.\n${boundary}\n\nDraft plan: ${JSON.stringify(file)}\nContinue from the conversation already in context; do not start from scratch or repeat the investigation. Do not compact before saving the discussion. Do not implement product code.\nFirst read the draft, then promptly write a substantive plan using the discussion so its details are durable before doing any further research. Replace the seed Original request with the actual discussed request(s); the optional topic narrows which discussion to capture. Preserve requirements, settled decisions and their rationale, rejected options, non-goals, examples, source references, findings and any existing check results. Distinguish user decisions from agent proposals and assumptions; do not invent missing details or claim unrun checks passed.\nSet a short one-line title with plan3 title. Keep ordered steps with stable IDs (- [ ] **ID** text), relevant files, known checks, global acceptance and exact resume context. Mark already completed work only with the evidence already available. ${PLAN_SHAPE} ${toolUse}\n${questionFormat}\nAfter saving, leave genuinely unresolved questions for /plan3 resolve; do not ask again about settled decisions or reread sources already understood unless a specific gap or changed fact needs checking. Record unresolved or unavailable evidence in Open questions; leave draft or blocked, never ready — the user runs /plan3 finish. ${HINT_RULE}`;
@@ -503,7 +520,8 @@ export default function plan3(pi) {
 	const report = (ctx, error) => ctx.ui.notify(`Plan3: ${error.message}`, "error");
 	const setPointer = (plan, planning) => pi.appendEntry?.(POINTER, { id: plan.id, planning: Boolean(planning) });
 	const research = (ctx, enabled) => pi.events?.emit?.("plan3:research", { ctx, enabled });
-	const send = (message) => pi.sendUserMessage(message, { expandPromptTemplates: false });
+	// followUp: agent_end hooks (shape/optimize repair) can fire while the agent is still streaming; ignored when idle.
+	const send = (message) => pi.sendUserMessage(message, { expandPromptTemplates: false, deliverAs: "followUp" });
 
 	async function refresh(ctx) {
 		try {
@@ -532,7 +550,7 @@ export default function plan3(pi) {
 		else if (fromChat) send(writePrompt(plan.file));
 		else send(planningPrompt(plan.file, lead));
 	}
-	async function resume(ctx, plan) {
+	async function resume(ctx, plan, extra = "") {
 		if (!await compactFirst(ctx, plan)) return;
 		const planning = ["draft", "blocked"].includes(plan.status);
 		if (!planning) {
@@ -542,8 +560,9 @@ export default function plan3(pi) {
 		research(ctx, planning);
 		setPointer(plan, planning);
 		await refresh(ctx);
-		send(planning ? planningPrompt(plan.file, `Continue planning the ${plan.status} plan at`) : executePrompt(plan, await staleFiles(ctx.cwd, plan), resumePacket(await readFile(plan.file, "utf8"))) + designExecutionGuidance(ctx.cwd, plan));
+		send(planning ? planningPrompt(plan.file, `Continue planning the ${plan.status} plan at`) : executePrompt(plan, await staleFiles(ctx.cwd, plan), resumePacket(await readFile(plan.file, "utf8"))) + designExecutionGuidance(ctx.cwd, plan) + extra);
 	}
+	const night = createNight(pi, { listPlans, currentPlan, resume, research });
 
 	// Optimize: code snapshots the plan to the log and records what must survive; agent_end verifies.
 	async function optimize(ctx, plan) {
@@ -642,12 +661,7 @@ export default function plan3(pi) {
 			if (!ctx.hasUI) ctx.ui.notify(`Plan3: similar open plan: ${similar.file}`, "info");
 		}
 		if (!fromChat && !await compactFirst(ctx, null)) return;
-		await mkdir(plansDir(ctx.cwd), { recursive: true });
-		const id = randomUUID().slice(0, 8);
-		const file = path.join(plansDir(ctx.cwd), `${today()}-${slugify(request)}-${id}-plan3.md`);
-		// The imported source lives in the sidecar log, so the plan never carries it.
-		if (source) await appendLog(file, `Imported source snapshot (unverified task data)\n\nSource: ${JSON.stringify(source.file)}\n\n${quote(source.text)}`);
-		await writeFile(file, `---\nplan3: true\nstatus: draft\ncreated: ${today()}\nupdated: ${new Date().toISOString()}\n${source ? `source: ${JSON.stringify(`file:${source.file}`)}\n` : ""}---\n\n# Plan3 draft\n\n## Original request\n\n${quote(request)}\n\n## Goal, requirements, and non-goals\n\nPending investigation.\n\n## Decisions\n\nRecord each settled choice, rationale, and source here.\n\n## Open questions\n\n### Blocking\n\nNot assessed yet.\n\n### Deferred\n\nNone recorded.\n\n## Relevant files and approach\n\nPending investigation.\n\n## Phases\n\nUse stable step IDs (- [ ] **ID** text); markers [ ] pending / [wip] / [x] / [f] failed / [blocked]. Each phase needs concrete actions, acceptance examples, and existing verification commands (or an explicit manual check).\n\n## Global validation\n\nPending investigation.\n\n## Resume context\n\nPlanning has not started.\n\n## Amendments\n\nAppend material changes and their reasons; preserve the original request and settled decisions.\n`, { flag: "wx" });
+		const { id, file } = await newPlanFile(ctx.cwd, request, source);
 		await startPlanning(ctx, { id, file }, "Draft plan:", fromChat, source?.file);
 	}
 
@@ -895,7 +909,7 @@ export default function plan3(pi) {
 				}
 				for (const answer of applied) {
 					recordPlanDesignAnswer(ctx.cwd, plan, answer.text, answer.response, `dialog-${randomUUID()}`);
-					appendToSection(current, "Decisions", `${answer.text}\n  - Answer: ${JSON.stringify(answer.response)}\n  - Source: user via ask_user /plan3 resolve; not independently verified.`);
+					appendToSection(current, "Decisions", `${answer.text}\n  - Answer: ${JSON.stringify(answer.response)}\n  - Source: user via ask_user /plan3 resolve; not independently verified.`, true);
 					answer.applied = true;
 				}
 				if (getMeta(current, "status") === "blocked" && !openCount(subsection(current, "Blocking"))) setMeta(current, "status", planning ? "draft" : "active");
@@ -1034,15 +1048,15 @@ export default function plan3(pi) {
 	pi.registerTool?.({
 		name: "plan3",
 		label: "Plan3",
-		description: "Read and update the current Plan3 plan: get (view resume/step/section for compact reads), title, status, step marks (done with summary moves notes to the sidecar log), next, sections, checkpoint (replaces Resume context), add steps; ideas saves full-detail proposals and reviews each through ask_user; idea reconciles a commented response. Prose bodies stay with write/edit.",
+		description: "Create a Plan3 plan (create, text = the request; writes the standard template with a stable id), then read and update the current Plan3 plan: get (view resume/step/section for compact reads), title, status, step marks (done with summary moves notes to the sidecar log), next, sections, checkpoint (replaces Resume context), add steps; ideas saves full-detail proposals and reviews each through ask_user; idea reconciles a commented response. Prose bodies stay with write/edit.",
 		promptSnippet: "Structured Plan3 plan updates (status, step markers with check evidence, next step, sections, new steps, title)",
-		promptGuidelines: ["Use plan3 instead of hand-editing step markers or status in a Plan3 plan; record the actual command and result as check when completing a step.", "Mark a finished Plan3 step done with a one-line summary, and keep one current Resume context via plan3 checkpoint instead of appending history."],
+		promptGuidelines: ["Create every new plan with plan3 action create, then fill that file in place; never hand-write a new plan file.", "Use plan3 instead of hand-editing step markers or status in a Plan3 plan; record the actual command and result as check when completing a step.", "Mark a finished Plan3 step done with a one-line summary, and keep one current Resume context via plan3 checkpoint instead of appending history."],
 		parameters: {
 			type: "object",
 			additionalProperties: false,
 			required: ["action"],
 			properties: {
-				action: { type: "string", enum: ["get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea"] },
+				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea"] },
 				view: { type: "string", enum: ["resume", "step", "section"], description: "get: resume = compact current-state packet; step = one step's full block (id); section = one section body (name)" },
 				summary: { type: "string", description: "step done/next: required one-line outcome; replaces the step text and moves its notes/checks to the sidecar log" },
 				ideas: { type: "array", minItems: 1, items: ideaSchema, description: "ideas: full-detail proposals; omit to review saved pending/answered ideas" },
@@ -1053,7 +1067,7 @@ export default function plan3(pi) {
 				note: { type: "string", description: "step/next: short note; idea: interpretation of the user's comment" },
 				check: { type: "string", description: "step/next: actual check command and result" },
 				value: { type: "string", enum: STATUSES, description: "status: new status" },
-				text: { type: "string", description: "title: one-line title; section: Markdown; checkpoint: the one current state, next action and blockers; idea: revised accepted requirement, only when requested in the comment" },
+				text: { type: "string", description: "create: the request the plan answers (from the discussion); title: one-line title; section: Markdown; checkpoint: the one current state, next action and blockers; idea: revised accepted requirement, only when requested in the comment" },
 				name: { type: "string", description: "section: heading name, e.g. Decisions, Open questions, Resume context, Amendments" },
 				replace: { type: "boolean", description: "section: replace the body instead of appending" },
 				after: { type: "string", description: "add: insert after this step (default: last step)" },
@@ -1062,6 +1076,14 @@ export default function plan3(pi) {
 			},
 		},
 		async execute(_id, args, _signal, _update, ctx) {
+			if (args.action === "create") {
+				if (!args.text?.trim()) throw new Error("create needs text: the request this plan answers");
+				const plan = await newPlanFile(ctx.cwd, args.text.trim());
+				research(ctx, true);
+				setPointer(plan, true);
+				await refresh(ctx);
+				return { content: [{ type: "text", text: writePrompt(plan.file) }], details: plan };
+			}
 			const plans = await listPlans(ctx.cwd);
 			const plan = args.plan ? await resolvePlan(ctx.cwd, args.plan, plans) : currentPlan(ctx, plans);
 			if (!plan) throw new Error("No open Plan3 plan; pass plan or start one with /plan3.");
@@ -1291,10 +1313,19 @@ export default function plan3(pi) {
 	pi.on?.("session_start", async (_event, ctx) => {
 		const plan = currentPlan(ctx, await listPlans(ctx.cwd));
 		if (plan && pointer(ctx).planning && pointer(ctx).id === plan.id && localPlanDesign(ctx.cwd, plan) && localPlanDesign(ctx.cwd, plan)?.phase !== "abandoned") activateDesign();
+		await night.restore(ctx);
 		return refresh(ctx);
 	});
-	pi.on?.("session_shutdown", () => closePersistentOpenDesignClients());
+	pi.on?.("session_shutdown", () => { night.shutdown(); return closePersistentOpenDesignClients(); });
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
+	// Plans are born from the template (plan3 create), never invented: block writing a NEW plan3 file by hand.
+	// shortcut: covers the write tool only, not shell redirection; extend if agents start bypassing it.
+	pi.on?.("tool_call", (event, ctx) => {
+		if (event.toolName !== "write" || !/^---\r?\nplan3: true\r?\n/.test(String(event.input?.content ?? ""))) return;
+		const file = path.resolve(ctx.cwd, String(event.input?.path ?? ""));
+		if (path.dirname(file).toLowerCase() !== plansDir(ctx.cwd).toLowerCase() || existsSync(file)) return;
+		return { block: true, reason: "New Plan3 plans come from the template: call plan3 with action create and text = the request, then fill the returned file in place (keep its headings)." };
+	});
 	pi.on?.("turn_end", (_event, ctx) => refresh(ctx)); // Steps may be written with write/edit.
 	// Remove only Plan3's trailing model-owned command footer; code owns the phase handoff.
 	pi.on?.("message_end", (event, ctx) => {

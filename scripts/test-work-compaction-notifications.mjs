@@ -1365,10 +1365,10 @@ try {
 		{ role: "toolResult", toolCallId: "research-read", toolName: "read", content: [{ type: "text", text: "Important middle passage. ".repeat(300) }] },
 		{ role: "assistant", content: [{ type: "text", text: "Continue comparing sources." }], stopReason: "stop" },
 	];
-	assert(commands.research && !commands.researc && shortcuts["ctrl+r"]);
+	assert(commands.research && !commands.researc && shortcuts["alt+r"]);
 	await assert.rejects(commands.research.handler("on", researchCtx), /current compaction to finish/);
 	await hooks.session_compact({ compactionEntry: retried.compaction }, researchCtx);
-	await shortcuts["ctrl+r"].handler(researchCtx);
+	await shortcuts["alt+r"].handler(researchCtx);
 	const notebook = researchEntries.at(-1).data.notes;
 	assert.match(researchWidgets.at(-1)[0], /RESEARCH MODE/);
 	assert(notebook.startsWith(path.join(tmpdir(), "pi-research-")));
@@ -1427,10 +1427,10 @@ try {
 	await commands.research.handler(`save ${savedNotes}`, researchCtx);
 	assert.match(readFileSync(savedNotes, "utf8"), /Observed result/);
 	await assert.rejects(commands.research.handler(`save ${savedNotes}`, researchCtx), /EEXIST/, "explicit save never overwrites");
-	await shortcuts["ctrl+r"].handler(researchCtx);
+	await shortcuts["alt+r"].handler(researchCtx);
 	const pendingNotebook = researchEntries.at(-1).data.notes;
 	const busyResearchCtx = { ...researchCtx, isIdle: () => false };
-	await shortcuts["ctrl+r"].handler(busyResearchCtx);
+	await shortcuts["alt+r"].handler(busyResearchCtx);
 	assert.equal(researchEntries.at(-1).data.stopping, true);
 	assert.match(researchWidgets.at(-1)[0], /RESEARCH STOPPING/);
 	assert.equal(requestContextFilter(busyResearchCtx), false, "stopping keeps compaction protection");
@@ -1443,8 +1443,8 @@ try {
 	await hooks.agent_settled({}, { ...researchCtx, hasPendingMessages: () => true });
 	assert.equal(exitCompactions, 0, "never compact while streaming or with queued continuation work");
 	assert.equal(researchEntries.at(-1).data.stopping, true);
-	await shortcuts["ctrl+r"].handler(busyResearchCtx);
-	assert.equal(researchEntries.at(-1).data.stopping, undefined, "Ctrl+R cancels a pending exit");
+	await shortcuts["alt+r"].handler(busyResearchCtx);
+	assert.equal(researchEntries.at(-1).data.stopping, undefined, "Alt+R cancels a pending exit");
 	assert.equal(researchEntries.at(-1).data.notes, pendingNotebook, "cancelling keeps the same notebook");
 	await hooks.agent_settled({}, researchCtx);
 	assert.equal(exitCompactions, 0, "cancelled exit does not compact");
