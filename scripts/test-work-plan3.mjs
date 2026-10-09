@@ -206,6 +206,8 @@ try {
 	const shape = optimizeLint(lintSource, `- [ ] **A1** ${"word ".repeat(40)}\n## Backlog\n\n- [ ] **B1** ${"word ".repeat(60)}\n\n## Resume context\n\n${"x".repeat(1600)}\n`);
 	assert.match(shape[0], /^1 step lines over 200 characters \(A1\)/, "Backlog steps are not shape-checked");
 	assert.match(shape[1], /^Resume context is 1\.6 KB/);
+	assert.deepEqual(optimizeLint(lintSource, "- [wip] **A1** a\n- [wip] **A2** b\n- [wip] **A3** c\n").filter((problem) => /\[wip\]/.test(problem)), ['3 [wip] steps (A1, A2, A3); keep only the step being worked on [wip], set the others to [ ] with a "Partial: <what exists>" sub-bullet']);
+	assert.equal(optimizeLint(lintSource, "- [wip] **A1** a\n- [ ] **A2** b\n").length, 0, "one [wip] step is fine");
 	await run("plan3", "Add CSV import with quoted fields");
 	assert.equal((await files()).length, 2, "headless duplicate still creates");
 	assert.match(notices.at(-1).message, /similar open plan/);
