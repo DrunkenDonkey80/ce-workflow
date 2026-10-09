@@ -1333,6 +1333,18 @@ try {
 	assert.match(await readFile(visualFile, "utf8"), /^status: draft$/m);
 	assert(planDesignGate(cwd, visualPlan).length, "explicit changed sync invalidates approval/reconciliation");
 	const preservedHandoff = await readFile(path.join(snapshotRoot, "DESIGN-HANDOFF.json"), "utf8");
+	// An oversized DESIGN-HANDOFF.md fails sync, stays out of the local snapshot and spends the single repair run.
+	const localMarkdown = await readFile(path.join(snapshotRoot, "DESIGN-HANDOFF.md"), "utf8");
+	await hooks.get("session_shutdown")();
+	const bigState = JSON.parse(await readFile(fakeState, "utf8"));
+	bigState.files["DESIGN-HANDOFF.md"] += "x".repeat(16_384);
+	await writeFile(fakeState, JSON.stringify(bigState));
+	selectScript = [["Plan3 design", "Sync Studio changes"]];
+	await run("plan3", `design ${visualId}`);
+	const oversized = localPlanDesign(cwd, visualPlan);
+	assert.equal(oversized.repairs, 1, "oversized handoff goes to the one repair run");
+	assert.equal(await readFile(path.join(snapshotRoot, "DESIGN-HANDOFF.md"), "utf8"), localMarkdown, "oversized handoff is never written locally");
+	await hooks.get("session_shutdown")();
 	await assert.rejects(designTool({ action: "abandon" }), /Human approval/);
 	selectScript = [["Plan3 design", "Abandon optional design"], ["Abandon optional design", "Abandon this optional design requirement"]];
 	await run("plan3", `design ${visualId}`);
