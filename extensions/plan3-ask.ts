@@ -6,12 +6,12 @@ import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-age
 
 export async function loadPlan3Ask(pi: ExtensionAPI) {
 	const source = pi.getAllTools?.().find(tool => tool.name === "ask_user")?.sourceInfo?.path;
-	if (!source) throw new Error("Plan3 Resolve needs the loaded pi-ask-user extension; no model prompt was sent.");
+	if (!source) throw new Error("Plan3 needs the loaded pi-ask-user extension; no model prompt was sent.");
 	let manifest;
 	try { manifest = JSON.parse(await readFile(path.join(path.dirname(source), "package.json"), "utf8")); }
 	catch (cause) { throw new Error("Cannot verify the installed pi-ask-user package.", { cause }); }
 	if (manifest.name !== "pi-ask-user" || !/^0\.16\./.test(manifest.version))
-		throw new Error(`Plan3 Resolve supports pi-ask-user 0.16.x; found ${manifest.name} ${manifest.version}.`);
+		throw new Error(`Plan3 supports pi-ask-user 0.16.x; found ${manifest.name} ${manifest.version}.`);
 	// Use the host's module instances, including bundled Pi installs; do not resolve
 	// a second SDK/theme singleton from the ask-user package's node_modules.
 	const [sdk, tui, typebox] = await Promise.all([

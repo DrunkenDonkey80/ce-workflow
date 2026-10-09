@@ -1,0 +1,47 @@
+{
+  "audit": {
+    "evidence": [
+      "Read-only inspection of scripts/fixtures/capabilities/browser-calculator.html: tiny capability fixture, not production UI; no source-body transfer.",
+      "Plan ca1c0001 settled scope and actual native ask_user direction answer; no current-UI screenshot inspected or production calculator system found."
+    ],
+    "preserve": [
+      "Settled minimal arithmetic scope and readable result.",
+      "Semantic button/live-result intent; keyboard/focus accessibility; desktop/mobile coverage."
+    ],
+    "reconsider": [
+      "Spacing, display hierarchy and tactile calculator key geometry: new-prototype proposal, not observed production pixels."
+    ],
+    "remove": [
+      "Exclude fixture automatic clicks/localStorage proof and expression-splitting test implementation.",
+      "Exclude dashboard chrome, history/settings/scientific features and unrelated source."
+    ]
+  },
+  "briefHash": "10c700ec3d6b07f7e08ba445d4902a8011e7aa95ef574bdd92d053c7c7a3213a",
+  "clarifications": [],
+  "components": [],
+  "ownerId": "plan3-ca1c0001",
+  "references": [],
+  "scopeHash": "c3b79d22da184b093135534d127c4bafbd213f95ea2b6c7fe1792d93d7ca7a5e",
+  "targets": [
+    {
+      "evidence": [
+        "User-selected disposable web calculator checkpoint in plan ca1c0001; actual ask_user D-05 selected tactile porcelain/cobalt.",
+        "Settled brief defines desktop/mobile arithmetic, decimal, divide-by-zero recovery and keyboard-focus coverage."
+      ],
+      "id": "TARGET-CALCULATOR-WEB",
+      "platform": "web",
+      "requiredFlowIds": [
+        "FLOW-CALCULATE",
+        "FLOW-RECOVER"
+      ],
+      "requiredScreenIds": [
+        "SCREEN-CALCULATOR"
+      ],
+      "requiredViewports": [
+        "desktop",
+        "mobile"
+      ]
+    }
+  ],
+  "version": 1
+}

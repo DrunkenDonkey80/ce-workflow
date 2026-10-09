@@ -40,6 +40,7 @@ import {
 } from "./legacy-beads-migration.ts";
 import { progressBar, showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
+import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { registerWorkUiGate } from "./work-ui-gate.ts";
 import { openWorkFleet } from "./work-fleet.ts";
 import { dispatchPrivateWorkflow } from "./work-private-workflows.ts";
@@ -5361,7 +5362,7 @@ async function editPlanModels(ctx, scope, names) {
 		const list = [...(settings.workOrchestrator?.plan3?.models ?? [])];
 		const selected = await showListDialog(ctx, {
 			title: "Plan models",
-			purpose: "Second opinions for /plan3 ideas and review; the first model from another family is used.",
+			purpose: "Default: first other-family advisor. All: every available configured model except the current one.",
 			items: [
 				...list.map((entry, index) => ({
 					value: `entry:${index}`,
@@ -30322,6 +30323,7 @@ export default function workModelsExtension(pi) {
 	const workflowOn = workflowEnabled();
 	const registerWorkflowTool = workflowOn ? registerConstrainedTool : () => {};
 	const visionBridge = createVisionBridge();
+	cameraController = createCameraController(pi, { readProjectSettings: readSettings, writeProjectSettings: writeSettings });
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	registerConstrainedTool(pi, {
 		name: "research_note",
@@ -32359,7 +32361,7 @@ export default function workModelsExtension(pi) {
 const WORKFLOW_OFF_NOTICE = "Workflow is off — /wo → Settings → Workflow (legacy orchestration) turns it back on.";
 const WO_UTILITY_ACTIONS = { settings: "work-settings", "catch-up": "work-catch-up", context: "work-context", telemetry: "work-telemetry", usage: "work-usage", scout: "work-extension-scout" };
 const UTILITY_MENU_VALUES = new Set(["work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
-const UTILITY_SETTING_KINDS = new Set(["workflow", "planModels", "compactionMode", "compactionModel", "jev", "visionModel", "nonVisionModels", "subscriptionFooter", "reset", "export", "import"]);
+const UTILITY_SETTING_KINDS = new Set(["workflow", "openDesignCommand", "planModels", "compactionMode", "compactionModel", "jev", "visionModel", "nonVisionModels", "camera", "subscriptionFooter", "reset", "export", "import"]);
 
 function onOff(value) {
 	return value ? "✓ on" : "○ off";
@@ -32443,6 +32445,7 @@ function workSettingsStatus(ctx) {
 const SETTINGS_PROFILE = "__profile__";
 const SETTINGS_RESET = "__reset__";
 let subscriptionFooterController;
+let cameraController;
 
 function boolLabel(label, value) {
 	const display = String(label).replace(/^([a-z])/, (letter) =>
@@ -32782,6 +32785,7 @@ export async function importSettings(ctx, scope) {
 		});
 		if (!confirmed) return;
 		await withFileMutationQueue(file, async () => {
+			if (scope === "project") await cameraController?.invalidate(ctx);
 			mkdirSync(dirname(file), { recursive: true });
 			if (existsSync(file)) {
 				backup = `${file}.${new Date().toISOString().replace(/[:.]/g, "-")}.${randomUUID()}.bak`;
@@ -32840,6 +32844,7 @@ async function workSettingsLoop(ctx) {
 		const compactor = compactionModelSettings(ctx.cwd, settings);
 		const visionModel = visionModelSettings(ctx.cwd, settings);
 		const names = await modelDisplayNames(ctx);
+		const camera = cameraSettings(projectSettings);
 		const items = [
 			{
 				kind: "workflow",
@@ -32851,7 +32856,7 @@ async function workSettingsLoop(ctx) {
 				kind: "planModels",
 				value: "planModels",
 				label: `Plan3 → Plan models: [${(settings.workOrchestrator?.plan3?.models ?? []).map((entry) => names.get(entry.model) ?? entry.model).join(", ") || "None"}] ${SUBMENU_ARROW}`,
-				description: "Second opinions for /plan3 ideas and review: the first listed model from another family (all: every one).",
+				description: "Ideas/review: first other-family advisor; all launches every available configured model except the exact current one.",
 			},
 			{
 				kind: "profile",
@@ -33034,6 +33039,11 @@ async function workSettingsLoop(ctx) {
 				label: "Import settings",
 				description: `Replace the ${scope} JSON file from a path or pasted JSON; back up the current file first`,
 			},
+			...(scope === "project" ? [{
+				kind: "camera", value: "camera",
+				label: `Camera (project only): ${camera.enabled ? "ON" : "OFF"} · ${camera.device?.label ?? "None"} ${SUBMENU_ARROW}`,
+				description: "Local TUI only · explicit device/permission · stills, never recorded video",
+			}] : []),
 		].filter((item) => workflowEnabled(ctx.cwd) || UTILITY_SETTING_KINDS.has(item.kind));
 		for (const item of items)
 			item.local = hasProjectOverride(projectSettings, item);
@@ -33045,6 +33055,10 @@ async function workSettingsLoop(ctx) {
 			continue;
 		}
 		const { pick } = selected;
+		if (pick.kind === "camera") {
+			await cameraController.menu(ctx);
+			continue;
+		}
 		if (pick.kind === "export") {
 			await exportSettings(ctx, scope);
 			continue;
@@ -33070,6 +33084,7 @@ async function workSettingsLoop(ctx) {
 				))
 			)
 				continue;
+			if (scope === "project") await cameraController?.invalidate(ctx);
 			settings = readScopedSettings(ctx.cwd, scope);
 			resetAll(settings);
 			delete settings.workOrchestrator;

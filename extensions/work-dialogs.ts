@@ -1,4 +1,30 @@
+import { randomUUID } from "node:crypto";
+
 const dialogCursors = new Map();
+
+// Reuse ask_user's scrollable editor for Plan3 decisions rather than a second UI.
+export function showAskDialog(ctx, ask, params, signal?: AbortSignal, ideaLayout = false) {
+	let askContext = ctx;
+	if (ideaLayout && typeof ctx.ui.custom === "function") {
+		askContext = { ...ctx, ui: { ...ctx.ui, custom: (factory, options) => ctx.ui.custom((tui, ...args) => {
+			const component = factory(tui, ...args);
+			// ponytail: pi-ask-user 0.16 has no layout options; use native options when added.
+			if (typeof component.buildFullContextLines !== "function" || typeof component.getOverlayMaxRenderLines !== "function") throw new Error("The installed ask_user does not support compact Plan3 idea popups.");
+			const contextLines = component.buildFullContextLines.bind(component);
+			component.buildFullContextLines = width => {
+				const lines = contextLines(width).slice();
+				if (stripAnsi(lines[0] ?? "").trim() === "Context:") {
+					lines.shift();
+					while (lines.length && !stripAnsi(lines[0]).trim()) lines.shift();
+				}
+				return lines;
+			};
+			component.getOverlayMaxRenderLines = () => Math.max(1, (Number.isFinite(tui.terminal.rows) ? Math.floor(tui.terminal.rows) : 24) - 2);
+			return component;
+		}, { ...options, overlayOptions: { ...options?.overlayOptions, width: "98%", maxHeight: "100%", margin: 1 } }) } };
+	}
+	return ask.execute(randomUUID(), { ...params, displayMode: "overlay" }, signal, undefined, askContext);
+}
 
 function sentenceCase(value) {
 	return String(value).replace(/^([a-z])/, (letter) => letter.toUpperCase());

@@ -1,0 +1,35 @@
+{
+  "acceptance": [
+    {
+      "criterion": "Implement the approved frozen native design and settled component/brief mapping; validate all agreed targets, flows, states, viewports, behavior and accessibility. Export is not verification.",
+      "id": "DES-NATIVE-SNAPSHOT"
+    }
+  ],
+  "briefHash": "10c700ec3d6b07f7e08ba445d4902a8011e7aa95ef574bdd92d053c7c7a3213a",
+  "conversationId": "ad766e1b-f25e-481e-b374-acbc35d5a446",
+  "exportedAt": "2026-10-09T05:48:12.811Z",
+  "files": [
+    {
+      "bytes": 18768,
+      "format": "html",
+      "path": "native-exports/f4d21864-8491-4f85-9570-92fb96e891c1/design.html",
+      "sha256": "337d6509c46cc63401e884d510b56bb898d4c01ac6e6a11ad96d37757248917c"
+    },
+    {
+      "bytes": 38729,
+      "format": "image",
+      "path": "native-exports/f4d21864-8491-4f85-9570-92fb96e891c1/preview.png",
+      "sha256": "70e7c0529ddd4d7fc13c3b5fe667aaf30dfe80b4bf0bae69cd730872b5c01606"
+    }
+  ],
+  "format": "native-export",
+  "ownerId": "plan3-ca1c0001",
+  "projectId": "plan3-ca1c0001-11f2bb35-5ad5-4a97-9fa4-82f94af29248",
+  "requestBriefPath": "OPEN-DESIGN-APP-BRIEF.md",
+  "requestBriefSha256": "34a3f21740f8a0cede68df22705a9ad7030b31c45e7794ad3e33c946cb1c8bce",
+  "runId": "ee866b01-0cf5-4ae0-8ece-0e44d9d1d892",
+  "snapshotDirectory": "native-exports/f4d21864-8491-4f85-9570-92fb96e891c1",
+  "sourceFile": "porcelain-calculator-prototype.html",
+  "sourceSha256": "337d6509c46cc63401e884d510b56bb898d4c01ac6e6a11ad96d37757248917c",
+  "version": 1
+}

@@ -1944,9 +1944,30 @@ try {
 		notify: ctx.ui.notify,
 		select: async (_title, labels) => { offSettings = labels; return undefined; },
 	} });
-	assert(offSettings.some(label => label.includes("Plan3")) &&
-		!offSettings.some(label => /Model Advisor|Profile:|Model strategy:|Background verifiers|autonomous-goal|Visual design workflow|pre-commit review/.test(label)),
-		"workflow off settings keep Plan3 and hide inactive role/gate/design controls");
+	assert(offSettings.some(label => label.includes("Plan3")) && offSettings.some(label => label.includes("OpenDesign executable:")) &&
+		!offSettings.some(label => /Model Advisor|Profile:|Model strategy:|Background verifiers|autonomous-goal|Visual design workflow|Design review proof|pre-commit review/.test(label)),
+		"workflow off settings keep Plan3/OpenDesign launch and hide inactive role/gate/design controls");
+	assert(!offSettings.some(label => label.includes("Camera (project only)")), "camera controls are never a global setting");
+	const beforeGlobalCamera = readGlobalSettings();
+	writeGlobalSettings({ ...beforeGlobalCamera, workOrchestrator: { ...beforeGlobalCamera.workOrchestrator,
+		camera: { enabled: true, device: { id: "@device_pnp_global", label: "Global camera" } },
+	} });
+	writeSettings({});
+	let projectCameraRender = "";
+	await off.commands.wo.handler("settings", { ...ctx, mode: "tui", hasUI: true, ui: customUi([
+		{ key: "\t" },
+		{ target: "Camera (project only)", key: "enter", capture: lines => { projectCameraRender = lines.join("\n"); } },
+		{ expectText: "Camera: Project only", key: "escape" },
+		{ expectInitial: "Camera (project only)", key: "escape" },
+	]) });
+	assert(projectCameraRender.includes("Camera (project only): OFF") && !projectCameraRender.includes("Global camera"),
+		"camera submenu works with legacy workflow OFF, defaults OFF and ignores global camera values");
+	writeGlobalSettings(beforeGlobalCamera);
+	const beforeOffLaunch = readGlobalSettings();
+	await chooseDesignSetting("OpenDesign executable:", "OpenDesign executable", "Configure command spec", async () => JSON.stringify({ command: process.execPath, args: ["mcp"] }));
+	assert(readGlobalSettings().workOrchestrator.openDesignCommand.command === process.execPath,
+		"OpenDesign launch spec is editable without enabling legacy workflow");
+	writeGlobalSettings(beforeOffLaunch);
 	assert(
 		!off.shortcuts.f9 &&
 			off.shortcuts.f8 &&

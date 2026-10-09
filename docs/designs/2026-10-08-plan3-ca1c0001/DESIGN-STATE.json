@@ -1,0 +1,21 @@
+{
+  "adapterFingerprint": "native-cli",
+  "agentMessage": "",
+  "conversationId": "ad766e1b-f25e-481e-b374-acbc35d5a446",
+  "handoffHash": "a20b0c357ecdba953610f150206c62b5fba5c3ba845cc8d7e10c2d282e184c3a",
+  "hasPendingMutation": false,
+  "markdownHash": "a347b859857334b373fd9714454ab5c9ef30871287a71d94cc8e213d32b7313b",
+  "nativeCollectionPending": false,
+  "nativeExport": true,
+  "nativeSourceFile": "porcelain-calculator-prototype.html",
+  "ownerId": "plan3-ca1c0001",
+  "phase": "review",
+  "prepared": true,
+  "projectId": "plan3-ca1c0001-11f2bb35-5ad5-4a97-9fa4-82f94af29248",
+  "remoteFingerprint": "12b458823c65d853f4bfe708f32a0e769cfab14020c6f3f18d19ce90acb797d0",
+  "repairs": 0,
+  "revision": 1,
+  "runId": "ee866b01-0cf5-4ae0-8ece-0e44d9d1d892",
+  "testOnly": false,
+  "version": 1
+}

@@ -142,7 +142,7 @@ function parseBootstrapArgs(value) {
 		const args = JSON.parse(value ?? "");
 		return Array.isArray(args) &&
 			args.every((arg) => typeof arg === "string") &&
-			args.includes("--headless")
+			(args.length === 0 || args.includes("--headless"))
 			? args
 			: null;
 	} catch {
@@ -164,7 +164,8 @@ async function bootstrapRegisteredDaemon(env, ipcPath) {
 	delete bootstrapEnv.OD_DAEMON_URL;
 	for (const key of Object.keys(bootstrapEnv))
 		if (key.startsWith("OD_SIDECAR_")) delete bootstrapEnv[key];
-	// nosemgrep: javascript.lang.security.detect-child-process.detect-child-process -- installed executable and fixed --headless args are validated above.
+	// Installed absolute executable and normal-desktop/headless args are validated above; spawn does not use a shell.
+	// nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
 	const child = spawn(command, args, {
 		detached: true,
 		env: bootstrapEnv,
@@ -189,7 +190,7 @@ async function bootstrapRegisteredDaemon(env, ipcPath) {
 	}
 	throw error(
 		"daemon-unavailable",
-		"OpenDesign was launched headlessly but did not register its daemon URL.",
+		"OpenDesign was launched but did not register its daemon URL.",
 	);
 }
 
@@ -582,6 +583,7 @@ export class OpenDesignClient {
 		this.nextId = 1;
 		this.pending = new Map();
 		this.stderr = "";
+		this.daemonUrl = "";
 		this.tools = new Set();
 		this.closed = false;
 		this.abortSignal = options.signal;
@@ -619,7 +621,8 @@ export class OpenDesignClient {
 			registeredDaemonUrls.set(ipcPath, daemonUrl);
 			daemonUrlSource = "bootstrap-before-mcp";
 		}
-		const commandArgs = explicitDaemonArgs(this.command, env.OD_DAEMON_URL);
+		this.daemonUrl = env.OD_DAEMON_URL ?? "";
+		const commandArgs = explicitDaemonArgs(this.command, this.daemonUrl);
 		traceOpenDesign(
 			"connect.plan",
 			{
@@ -925,14 +928,22 @@ export async function callOpenDesignTool(options) {
 			return await client.callTool(tool, options.args ?? {});
 		} catch (failure) {
 			lastError = failure;
+			const daemonUnavailable = failure?.category === "tool-failed" &&
+				Boolean(client?.daemonUrl) &&
+				failure.message.startsWith(`cannot reach the OpenDesign daemon at ${client.daemonUrl}. Is it running?`);
 			const transportFailure = [
 				"timeout",
 				"process-exit",
 				"spawn-failed",
 				"protocol-error",
-			].includes(failure?.category);
-			if (persistentEntry && transportFailure)
-				releasePersistentClient(persistentKey, persistentEntry);
+			].includes(failure?.category) || daemonUnavailable;
+			if (transportFailure) {
+				const ipcPath = command.env?.OD_SIDECAR_IPC_PATH ?? process.env.OD_SIDECAR_IPC_PATH;
+				// Discard only this connection's binding; another client may already have discovered the new daemon.
+				if (ipcPath && (!client?.daemonUrl || registeredDaemonUrls.get(ipcPath) === client.daemonUrl))
+					registeredDaemonUrls.delete(ipcPath);
+				if (persistentEntry) releasePersistentClient(persistentKey, persistentEntry);
+			}
 			if (attempt >= attempts || !transportFailure) throw failure;
 		} finally {
 			if (!persistent) {

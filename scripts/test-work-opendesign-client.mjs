@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createServer } from "node:net";
+import { pathToFileURL } from "node:url";
 import {
 	OpenDesignClient,
 	OpenDesignError,
@@ -266,6 +267,67 @@ try {
 	} finally {
 		await new Promise((resolve) => ipcServer.close(resolve));
 	}
+	for (const keepAlive of [false, true]) {
+		const restartIpc = process.platform === "win32" ? `\\\\.\\pipe\\ce-od-restart-${process.pid}-${keepAlive}` : path.join(root, `restart-${keepAlive}.sock`);
+		const peerFile = path.join(root, `restart-${keepAlive}.json`);
+		const peer = () => {
+			try { return JSON.parse(fs.readFileSync(peerFile, "utf8")); }
+			catch (failure) { assert.fail(`Invalid daemon fixture: ${failure.message}`); }
+		};
+		const setPeer = (changes) => fs.writeFileSync(peerFile, JSON.stringify({ ...peer(), ...changes }));
+		fs.writeFileSync(peerFile, JSON.stringify({ daemonUrl: "http://127.0.0.1:54325", status: "running", calls: [] }));
+		let ipcReads = 0;
+		const server = createServer((socket) => socket.once("data", () => {
+			ipcReads++;
+			socket.end(JSON.stringify({ ok: true, result: { url: peer().daemonUrl } }) + "\n");
+		}));
+		await new Promise((resolve, reject) => { server.once("error", reject); server.listen(restartIpc, resolve); });
+		const restartCommand = command("daemon-restart", { FAKE_OD_STATE_FILE: peerFile, OD_SIDECAR_IPC_PATH: restartIpc });
+		const readArgs = { runId: "original-run" };
+		const call = (tool, args, extra = {}) => callOpenDesignTool({ command: restartCommand, keepAlive, tool, args, timeoutMs: 1_000, ...extra });
+		try {
+			assert.equal((await call("get_run", readArgs)).status, "running");
+			setPeer({ daemonUrl: "http://127.0.0.1:54326", status: "failed", error: "Run interrupted because the daemon restarted." });
+			const recovered = await call("get_run", readArgs);
+			assert.equal(recovered.status, "failed", "daemon recovery reports terminal failure, not a new generation");
+			assert.match(recovered.error, /daemon restarted/);
+			assert.equal(ipcReads, 2, "one fresh IPC discovery after the confirmed stale binding");
+			assert.deepEqual(peer().calls.map(({ name, args, daemonUrl }) => ({ name, args, daemonUrl })), [
+				{ name: "get_run", args: readArgs, daemonUrl: "http://127.0.0.1:54325" },
+				{ name: "get_run", args: readArgs, daemonUrl: "http://127.0.0.1:54325" },
+				{ name: "get_run", args: readArgs, daemonUrl: "http://127.0.0.1:54326" },
+			]);
+			if (keepAlive) assert.equal(peer().calls[0].pid, peer().calls[1].pid);
+			assert.notEqual(peer().calls[1].pid, peer().calls[2].pid, "stale MCP process replaced automatically");
+
+			for (const toolError of ["Permission denied", "cannot reach the OpenDesign daemon at http://127.0.0.1:54399. Is it running?"]) {
+				setPeer({ toolError });
+				const before = peer().calls.length;
+				await rejects(call("get_run", readArgs), "tool-failed");
+				assert.equal(peer().calls.length, before + 1, "permission/other-daemon errors are not transport retries");
+				assert.equal(ipcReads, 2);
+			}
+			setPeer({ toolError: undefined, daemonUrl: "http://127.0.0.1:54325" });
+			const payload = { project: "original-project", prompt: "Original brief", requestId: crypto.randomUUID() };
+			const beforeWrite = peer().calls.length;
+			await rejects(call("start_run", payload), "tool-failed");
+			assert.equal(peer().calls.length, beforeWrite + 1, "failed writes never replay automatically");
+			assert.deepEqual(peer().calls.at(-1).args, payload);
+			assert.equal((await call("get_run", readArgs)).status, "failed", "next safe read recovers after write failure");
+			setPeer({ daemonUrl: "http://127.0.0.1:54326" });
+			const beforeDisabled = peer().calls.length;
+			await rejects(call("get_run", readArgs, { retryRead: false }), "tool-failed");
+			assert.equal(peer().calls.length, beforeDisabled + 1, "retryRead:false is respected");
+			assert.equal((await call("get_run", readArgs)).status, "failed");
+			const beforePinned = peer().calls.length;
+			await rejects(call("get_run", readArgs, { command: { ...restartCommand, env: { ...restartCommand.env, OD_DAEMON_URL: "http://127.0.0.1:54325" } } }), "tool-failed");
+			assert(peer().calls.slice(beforePinned).every(({ daemonUrl }) => daemonUrl === "http://127.0.0.1:54325"), "explicit operator URL is never redirected");
+			assert.equal(peer().calls.filter(({ name }) => name === "start_run").length, 1);
+		} finally {
+			closePersistentOpenDesignClients();
+			await new Promise((resolve) => server.close(resolve));
+		}
+	}
 	const bootstrapIpcPath =
 		process.platform === "win32"
 			? `\\\\.\\pipe\\ce-opendesign-bootstrap-${process.pid}-${Date.now()}`
@@ -277,6 +339,7 @@ try {
 		bootstrapScript,
 		`import fs from "node:fs";
 import { createServer } from "node:net";
+if (!process.env.ELECTRON_RUN_AS_NODE) {
 fs.writeFileSync(process.env.FAKE_BOOTSTRAP_PID_FILE, String(process.pid));
 const server = createServer((socket) => {
   let request = "";
@@ -287,47 +350,57 @@ const server = createServer((socket) => {
   });
 });
 server.listen(process.env.FAKE_BOOTSTRAP_IPC);
+}
 `,
 	);
-	let bootstrapPid;
-	try {
-		const attached = await callOpenDesignTool({
-			command: {
-				...command("report-daemon-binding", {
-					FAKE_BOOTSTRAP_IPC: bootstrapIpcPath,
-					FAKE_BOOTSTRAP_PID_FILE: bootstrapPidFile,
-					OD_MCP_BOOTSTRAP_ARGS: JSON.stringify([bootstrapScript, "--headless"]),
-					OD_MCP_BOOTSTRAP_COMMAND: process.execPath,
-					OD_SIDECAR_IPC_PATH: bootstrapIpcPath,
-					WORK_ORCH_OPENDESIGN_TRACE_FILE: bootstrapTraceFile,
-				}),
-				source: "installed",
-			},
-			tool: "get_project",
-			args: { project: "project-1" },
-			timeoutMs: 2_000,
-		});
-		const binding = JSON.parse(attached.project.name);
-		assert.equal(binding.url, "http://127.0.0.1:54323");
-		assert.deepEqual(binding.args, ["--daemon-url", "http://127.0.0.1:54323"]);
-		const traceEvents = fs
-			.readFileSync(bootstrapTraceFile, "utf8")
-			.trim()
-			.split("\n")
-			.map((line) => JSON.parse(line));
-		assert(
-			traceEvents.some(
-				(event) =>
-					event.event === "connect.plan" &&
-					event.daemonUrlSource === "bootstrap-before-mcp" &&
-					event.daemonUrl === "http://127.0.0.1:54323",
-			),
-			"the packaged daemon is ready and explicitly pinned before MCP starts",
-		);
-		bootstrapPid = Number(fs.readFileSync(bootstrapPidFile, "utf8"));
-	} finally {
-		if (Number.isInteger(bootstrapPid)) process.kill(bootstrapPid);
+	for (const desktop of [false, true]) {
+		const modeIpc = `${bootstrapIpcPath}-${desktop ? "desktop" : "headless"}`;
+		let bootstrapPid;
+		try {
+			const attached = await callOpenDesignTool({
+				command: {
+					...command("report-daemon-binding", {
+						FAKE_BOOTSTRAP_IPC: modeIpc,
+						FAKE_BOOTSTRAP_PID_FILE: bootstrapPidFile,
+						OD_MCP_BOOTSTRAP_ARGS: JSON.stringify(desktop ? [] : [bootstrapScript, "--headless"]),
+						OD_MCP_BOOTSTRAP_COMMAND: process.execPath,
+						OD_SIDECAR_IPC_PATH: modeIpc,
+						ELECTRON_RUN_AS_NODE: "1",
+						...(desktop ? { NODE_OPTIONS: `--import=${pathToFileURL(bootstrapScript).href}` } : {}),
+						WORK_ORCH_OPENDESIGN_TRACE_FILE: bootstrapTraceFile,
+					}),
+					source: "installed",
+				},
+				tool: "get_project",
+				args: { project: "project-1" },
+				timeoutMs: 2_000,
+			});
+			const binding = JSON.parse(attached.project.name);
+			assert.equal(binding.url, "http://127.0.0.1:54323");
+			assert.deepEqual(binding.args, ["--daemon-url", "http://127.0.0.1:54323"]);
+			const traceEvents = fs
+				.readFileSync(bootstrapTraceFile, "utf8")
+				.trim()
+				.split("\n")
+				.map((line) => JSON.parse(line));
+			assert(
+				traceEvents.some(
+					(event) =>
+						event.event === "connect.plan" &&
+						event.daemonUrlSource === "bootstrap-before-mcp" &&
+						event.daemonUrl === "http://127.0.0.1:54323",
+				),
+				"the packaged daemon is ready and explicitly pinned before MCP starts",
+			);
+			bootstrapPid = Number(fs.readFileSync(bootstrapPidFile, "utf8"));
+		} finally {
+			if (Number.isInteger(bootstrapPid)) process.kill(bootstrapPid);
+		}
 	}
+	await rejects(callOpenDesignTool({
+		command: { ...command("success", { OD_MCP_BOOTSTRAP_COMMAND: process.execPath, OD_MCP_BOOTSTRAP_ARGS: JSON.stringify(["--inspect"]), OD_SIDECAR_IPC_PATH: `${bootstrapIpcPath}-invalid` }), source: "installed" },
+		tool: "get_project", args: { project: "project-1" }, timeoutMs: 1_000,
+	}), "daemon-unavailable");
 	const delayedIpcPath =
 		process.platform === "win32"
 			? `\\\\.\\pipe\\ce-opendesign-delayed-${process.pid}-${Date.now()}`

@@ -54,7 +54,7 @@ function reportedProjectName() {
 
 function promptBriefHash(prompt) {
 	return (
-		/Set briefHash to ([a-f0-9]{64})/.exec(prompt)?.[1] ??
+		/(?:Set (?:identity\.)?briefHash to|Authoritative briefHash:) ([a-f0-9]{64})/.exec(prompt)?.[1] ??
 		/- Brief hash: ([a-f0-9]{64})/.exec(prompt)?.[1] ??
 		/"briefHash":"([a-f0-9]{64})"/.exec(prompt)?.[1] ??
 		"a".repeat(64)
@@ -64,7 +64,7 @@ function promptBriefHash(prompt) {
 function promptTargets(prompt) {
 	const source = /## Required target matrix\s+```json\s+([\s\S]*?)\s+```/.exec(
 		prompt,
-	)?.[1];
+	)?.[1] ?? /Authoritative targets:\s*(\[[\s\S]*?\n\])/.exec(prompt)?.[1] ?? /Required target matrix \(exact coverage\):\n(\[[^\n]+\])/.exec(prompt)?.[1];
 	try {
 		const targets = JSON.parse(source ?? "[]");
 		if (Array.isArray(targets) && targets.length) return targets;
@@ -183,7 +183,7 @@ function refinementFiles(prompt) {
 		version: 2,
 		targets,
 		variants,
-		selection,
+		...(authorityText ? { selection } : {}),
 		identity: {
 			id: "DESIGN-CALCULATOR",
 			title: "Kids-like bright calculator",
@@ -370,6 +370,22 @@ reader.on("line", (line) => {
 		toolError(message.id, { message: "daemon unavailable token=secret" });
 		return;
 	}
+	let daemonState;
+	if (mode === "daemon-restart") {
+		try { daemonState = JSON.parse(fs.readFileSync(stateFile, "utf8")); }
+		catch {
+			result(message.id, { isError: true, content: [{ type: "text", text: "Invalid daemon fixture state" }] });
+			return;
+		}
+		const daemonUrl = process.env.OD_DAEMON_URL ?? "";
+		daemonState.calls = [...(daemonState.calls ?? []), { name, args, daemonUrl, pid: process.pid }];
+		fs.writeFileSync(stateFile, JSON.stringify(daemonState));
+		const failure = daemonState.toolError ?? (daemonUrl !== daemonState.daemonUrl ? `cannot reach the OpenDesign daemon at ${daemonUrl}. Is it running? Start it with pnpm tools-dev.` : "");
+		if (failure) {
+			result(message.id, { isError: true, content: [{ type: "text", text: failure }] });
+			return;
+		}
+	}
 	const marker = process.env.FAKE_OD_MARKER;
 	if (
 		marker &&
@@ -393,7 +409,10 @@ reader.on("line", (line) => {
 	else if (name === "create_project") {
 		if (mode === "design-e2e") {
 			fixtureState.activeProject = args.id;
+			fixtureState.createdProjects = [...(fixtureState.createdProjects ?? []), args.id];
+			fixtureState.createdPayloads = [...(fixtureState.createdPayloads ?? []), args];
 			saveFixtureState();
+			if (fixtureState.dropCreateOnce) { fixtureState.dropCreateOnce = false; saveFixtureState(); process.exit(4); }
 		}
 		toolResult(message.id, {
 			project: { id: args.id },
@@ -405,35 +424,49 @@ reader.on("line", (line) => {
 			path: args.path,
 			size: Buffer.from(args.content, args.encoding).length,
 		});
-	else if (name === "get_project")
+	else if (name === "get_project") {
+		if (mode === "design-e2e" && (fixtureState.lookupFailure || !fixtureState.createdProjects?.includes(args.project))) {
+			result(message.id, { isError: true, content: [{ type: "text", text: fixtureState.lookupFailure ?? `no project matches ${JSON.stringify(args.project)}` }] });
+			return;
+		}
 		toolResult(message.id, {
 			project: {
 				id: args.project,
 				name: reportedProjectName(),
 			},
 		});
+	}
 	else if (name === "start_run") {
 		if (mode === "design-e2e") {
 			fixtureState.activeProject = args.project;
+			const previousRequest = fixtureState.requests?.[args.requestId];
+			if (previousRequest) {
+				toolResult(message.id, { runId: previousRequest.runId, projectId: args.project, requestId: args.requestId, studioUrl: fixtureState.startStudioUrl ?? `https://example.test/studio/${previousRequest.runId}`, resumed: args.resume === true });
+				return;
+			}
 			fixtureState.runPhase = args.prompt.includes("Candidate delivery contract")
 				? "candidates"
 				: "refinement";
-			fixtureState.activeRun = `${fixtureState.runPhase}-run`;
+			fixtureState.activeRun = `${fixtureState.runPhase}-run-${Object.keys(fixtureState.requests ?? {}).length + 1}`;
+			fixtureState.requests = { ...fixtureState.requests, [args.requestId]: { ...args, runId: fixtureState.activeRun } };
 			if (fixtureState.runPhase === "candidates") candidateFiles(args.prompt);
 			else refinementFiles(args.prompt);
 			saveFixtureState();
+			if (fixtureState.dropStartOnce) { fixtureState.dropStartOnce = false; saveFixtureState(); process.exit(4); }
 		}
 		toolResult(message.id, {
 			runId: mode === "design-e2e" ? fixtureState.activeRun : "run-1",
 			projectId: args.project,
 			requestId: args.requestId,
+			studioUrl: fixtureState.startStudioUrl ?? `https://example.test/studio/${mode === "design-e2e" ? fixtureState.activeRun : "run-1"}`,
 			resumed: args.resume === true,
 		});
 	} else if (name === "get_run")
 		toolResult(message.id, {
 			runId: args.runId,
 			projectId: mode === "design-e2e" ? fixtureState.activeProject : undefined,
-			status: "succeeded",
+			status: mode === "design-e2e" ? fixtureState.forcedStatus ?? "succeeded" : daemonState?.status ?? "succeeded",
+			error: mode === "design-e2e" ? fixtureState.runError : daemonState?.error,
 			previewUrl:
 				mode === "untrusted-urls"
 					? "https://example.test/preview?token=super-secret"
@@ -441,8 +474,8 @@ reader.on("line", (line) => {
 			studioUrl:
 				mode === "untrusted-urls"
 					? `${"java"}script:alert('unsafe')`
-					: "https://example.test/studio",
-			agentMessage: mode === "untrusted-urls" ? "Done token=super-secret" : "Done",
+					: fixtureState.checkStudioUrl ?? "https://example.test/studio",
+			agentMessage: mode === "untrusted-urls" ? "Done token=super-secret" : mode === "design-e2e" ? fixtureState.question ?? "Done" : "Done",
 		});
 	else if (name === "cancel_run")
 		toolResult(message.id, { runId: args.runId, canceled: true });
