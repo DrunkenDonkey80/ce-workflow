@@ -7,18 +7,18 @@
   ],
   "briefHash": "10c700ec3d6b07f7e08ba445d4902a8011e7aa95ef574bdd92d053c7c7a3213a",
   "conversationId": "ad766e1b-f25e-481e-b374-acbc35d5a446",
-  "exportedAt": "2026-10-09T07:45:35.893Z",
+  "exportedAt": "2026-10-09T10:05:54.659Z",
   "files": [
     {
-      "bytes": 19930,
+      "bytes": 20307,
       "format": "html",
-      "path": "native-exports/c21ffea7-4044-4d5d-ac08-fecc80ba95e9/design.html",
-      "sha256": "54078b635f96119caad771f64d0101ced1c93e43ac795334a09480242ced9b12"
+      "path": "native-exports/050067ef-f3c4-471c-a16b-887c0a0f64fd/design.html",
+      "sha256": "645a243066a1cfa120cd3740c3f9f19f8ae0547718e4c428e9b4f13549f8812c"
     },
     {
       "bytes": 58276,
       "format": "image",
-      "path": "native-exports/c21ffea7-4044-4d5d-ac08-fecc80ba95e9/preview.png",
+      "path": "native-exports/050067ef-f3c4-471c-a16b-887c0a0f64fd/preview.png",
       "sha256": "beb5455c0dea0f9d0e88965adfa7558ab6ebdf44c6f2a3ad689c560a48d373a0"
     }
   ],
@@ -28,8 +28,8 @@
   "requestBriefPath": "OPEN-DESIGN-APP-BRIEF.md",
   "requestBriefSha256": "34a3f21740f8a0cede68df22705a9ad7030b31c45e7794ad3e33c946cb1c8bce",
   "runId": "ee866b01-0cf5-4ae0-8ece-0e44d9d1d892",
-  "snapshotDirectory": "native-exports/c21ffea7-4044-4d5d-ac08-fecc80ba95e9",
-  "sourceFile": "kids-calculator-prototype.html",
-  "sourceSha256": "54078b635f96119caad771f64d0101ced1c93e43ac795334a09480242ced9b12",
+  "snapshotDirectory": "native-exports/050067ef-f3c4-471c-a16b-887c0a0f64fd",
+  "sourceFile": "kids-calculator-corrected.html",
+  "sourceSha256": "645a243066a1cfa120cd3740c3f9f19f8ae0547718e4c428e9b4f13549f8812c",
   "version": 1
 }
