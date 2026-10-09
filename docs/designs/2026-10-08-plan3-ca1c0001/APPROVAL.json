@@ -1,0 +1,14 @@
+{
+  "approvedAt": "2026-10-09T14:03:09.870Z",
+  "authority": "human",
+  "briefHash": "10c700ec3d6b07f7e08ba445d4902a8011e7aa95ef574bdd92d053c7c7a3213a",
+  "decision": "approved",
+  "decisionEventId": "dialog-2635ef88-ed84-4372-bb1a-db995a145b1b",
+  "handoffHash": "cd5f1103382b3d3c210ed5f7e96aa0b8d7e14a79ab3a348eb6488ca7da962c78",
+  "inputHash": "6b05ada2dd63f270b0a16e3c8564d89d488193cfe2f11f1ec3e3133497c6e169",
+  "markdownHash": "de5b42938794dbd463f33727866eff5ea7a8087ff10f6a94e71348d206cfb2d0",
+  "ownerId": "plan3-ca1c0001",
+  "remoteFingerprint": "99d14dffe8d515b0aa06534679e23fb98332a8028d9949cabe98ff869d124c47",
+  "revision": 1,
+  "version": 1
+}

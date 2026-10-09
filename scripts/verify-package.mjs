@@ -571,6 +571,7 @@ const GENERAL_TESTS = new Set([
 	"test-work-microcompact-agent.mjs",
 	"test-work-native-smoke.mjs",
 	"test-work-plan3.mjs",
+	"test-work-screen-read.mjs",
 	"test-work-prompt-commands.mjs",
 	"test-work-settings.mjs",
 	"test-work-store.mjs",

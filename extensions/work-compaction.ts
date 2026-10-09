@@ -216,6 +216,8 @@ function toolCalls(message) {
 }
 
 export const COMPACTION_NOTE_TOOL = "compaction_note";
+// Enforced in code, not the schema: providers with strict schemas silently cut the note at maxLength.
+export const COMPACTION_NOTE_MAX = 2500;
 
 // ponytail: newest note wins even if a later cycle never rewrote it; add per-compaction consumption if stale notes mislead.
 export function latestCompactionNote(messages = []) {
@@ -223,7 +225,7 @@ export function latestCompactionNote(messages = []) {
 		for (const call of toolCalls(message).toReversed()) {
 			if (baseToolName(call?.name ?? call?.function?.name) !== COMPACTION_NOTE_TOOL) continue;
 			const note = normalizeText((call.arguments ?? call.args)?.note);
-			if (note) return note;
+			if (note && note.length <= COMPACTION_NOTE_MAX) return note; // over-long notes were rejected by the tool
 		}
 	return "";
 }

@@ -216,6 +216,7 @@ import {
 	filesFromOps,
 	formatCompactionSummary,
 	COMPACTION_NOTE_TOOL,
+	COMPACTION_NOTE_MAX,
 	latestCompactionNote,
 } from "./work-compaction.ts";
 import { compactMemory } from "./work-compaction-memory.ts";
@@ -6487,7 +6488,7 @@ function compactionNoteNudge(event, ctx) {
 	try { trigger = compactTriggerTokens(ctx, readEffectiveSettings(ctx.cwd)); } catch { return undefined; }
 	if (!tokens || tokens < trigger * 0.85) return undefined;
 	return { messages: [...event.messages, { role: "custom", customType: "compaction-note-nudge", display: false, timestamp: Date.now(),
-		content: `[context] ${tokens.toLocaleString("en-US")} of ~${trigger.toLocaleString("en-US")} tokens before automatic compaction. Keep working; when you reach a natural stopping point, call ${COMPACTION_NOTE_TOOL} once with what you would need to continue (goal, done with exact paths, in progress, decisions, verified results, next action last).` }] };
+		content: `[context] ${tokens.toLocaleString("en-US")} of ~${trigger.toLocaleString("en-US")} tokens before automatic compaction. Keep working; when you reach a natural stopping point, call ${COMPACTION_NOTE_TOOL} once: exact next action first, then only what is not already in the plan, sidecar log or git (boundaries, plan path, HEAD, current step, environment and tool gotchas), under ${COMPACTION_NOTE_MAX} characters.` }] };
 }
 
 function storeCompactionKnowledge(ctx, claims, bucket) {
@@ -30344,13 +30345,15 @@ export default function workModelsExtension(pi) {
 	registerConstrainedTool(pi, {
 		name: COMPACTION_NOTE_TOOL,
 		label: "Compaction Note",
-		description: "Leave a note to your future self that is copied verbatim into the next context compaction summary. Call once when told compaction is near: goal, done work with exact paths and commands, in-progress state, decisions, verified results, and the exact next action last. A newer note replaces the older one.",
+		description: `Leave a note to your future self that is copied verbatim into the next context compaction summary. Call once when told compaction is near. Put the exact next action FIRST, then only what exists nowhere else: boundaries, plan path, HEAD, current step, environment and tool gotchas. Never copy step text, decisions or finished-work details already in the plan, its sidecar log or git. At most ${COMPACTION_NOTE_MAX} characters with normal spacing; longer notes are rejected. A newer note replaces the older one.`,
 		parameters: {
 			type: "object", additionalProperties: false, required: ["note"],
-			properties: { note: { type: "string", minLength: 1, maxLength: 6000 } },
+			properties: { note: { type: "string", minLength: 1 } },
 		},
 		execute(_id, args) {
-			if (!String(args.note ?? "").trim()) throw new Error("The compaction note must not be empty.");
+			const note = String(args.note ?? "").trim();
+			if (!note) throw new Error("The compaction note must not be empty.");
+			if (note.length > COMPACTION_NOTE_MAX) throw new Error(`Not saved: the note is ${note.length} characters; the limit is ${COMPACTION_NOTE_MAX}. Drop anything already in the plan, sidecar log or git and call again with normal spacing.`);
 			return { content: [{ type: "text", text: "Saved; it will be included verbatim in the next compaction summary. Continue working." }] };
 		},
 	});

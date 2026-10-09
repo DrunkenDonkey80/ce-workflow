@@ -46,6 +46,10 @@ Concurrency is 4, with 30-second request and 120-second tool deadlines; no wrapp
 
 Offline self-check: `node "scripts/test-jev-tools.mjs"`.
 
+## Screen read tool
+
+`screen_read` (Windows) returns a small PNG for visual testing: an app window (also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, or an Android screen. `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
+
 ## Plan3
 
 Plan3 is the primary planning/execution flow: one living Markdown plan per task in `docs/plans/` (`plan3: true` frontmatter), worked by the current agent and model. No work items or gates; statuses and checks are agent-reported. Execution commits locally (never pushes) the files it changed after each verified step and checkpoint, picks a recorded `assumed` default for reversible choices instead of asking, and implements each step only to its acceptance (extra hardening goes to Backlog).

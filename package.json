@@ -1,6 +1,6 @@
 {
   "name": "pi-work-orchestrator",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Native work-item Pi workflow package for staged software work orchestration.",
   "type": "module",
   "license": "MIT",
@@ -30,7 +30,8 @@
   "pi": {
     "extensions": [
       "extensions/work-models.ts",
-      "extensions/plan3.ts"
+      "extensions/plan3.ts",
+      "extensions/screen-read.ts"
     ],
     "skills": [
       "./skills/frontend-design"

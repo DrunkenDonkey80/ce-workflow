@@ -1577,6 +1577,9 @@ assert.equal(
 );
 assert.equal(Object.keys(tools).length, 20);
 assert(tools.compaction_note);
+assert.throws(() => tools.compaction_note.execute("n", { note: "x".repeat(2501) }), /Not saved: the note is 2501 characters; the limit is 2500/, "over-long notes are rejected, not silently cut");
+assert.match(tools.compaction_note.execute("n", { note: "Next: run S14 tests." }).content[0].text, /^Saved/);
+assert.match(tools.compaction_note.description, /exact next action FIRST/);
 assert.equal(tools.research_mode, undefined, "research has no agent-controlled toggle");
 assert(tools.research_note);
 assert(tools.process_image);

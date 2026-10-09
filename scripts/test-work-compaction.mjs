@@ -8,6 +8,7 @@ import {
 	filesFromOps,
 	formatCompactionSummary,
 	latestCompactionNote,
+	COMPACTION_NOTE_MAX,
 } from "../extensions/work-compaction.ts";
 
 assert.equal(latestCompactionNote([]), "");
@@ -18,6 +19,14 @@ assert.equal(
 		{ role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: "" } }] },
 	]),
 	"new",
+);
+assert.equal(
+	latestCompactionNote([
+		{ role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: "fits" } }] },
+		{ role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: "x".repeat(COMPACTION_NOTE_MAX + 1) } }] },
+	]),
+	"fits",
+	"a note the tool rejected as too long is not used",
 );
 
 const threshold = (contextWindow, overrides = {}) =>
