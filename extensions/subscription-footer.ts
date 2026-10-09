@@ -124,7 +124,8 @@ function contextBar(percent, cells) {
 	return `${"█".repeat(filled)}${"░".repeat(cells - filled)}`;
 }
 
-export function renderModelRow(ctx, theme, width, thinkingLevel) {
+// `extra` (the Plan3 status) is appended only when it fits whole beside at least 20 columns of folder and model.
+export function renderModelRow(ctx, theme, width, thinkingLevel, extra = "") {
 	if (width < MIN_WIDTH) {
 		const diagnostic = truncatePlain(
 			"Subscription footer needs at least 56 columns",
@@ -133,37 +134,34 @@ export function renderModelRow(ctx, theme, width, thinkingLevel) {
 		return [theme?.fg?.("warning", diagnostic) ?? diagnostic];
 	}
 	const { used, total, percent } = contextValues(ctx);
-	const effort = String(thinkingLevel ?? ctx.thinkingLevel ?? "off");
-	const model = String(ctx.model?.name ?? ctx.model?.id ?? "no model");
+	const level = String(thinkingLevel ?? ctx.thinkingLevel ?? "off");
+	const model = `${String(ctx.model?.name ?? ctx.model?.id ?? "no model")}: ${level.charAt(0).toUpperCase()}${level.slice(1)}`;
 	const folder = resolve(String(ctx.cwd ?? process.cwd()));
 	const fullBar = contextBar(percent, 12);
-	const fullSuffix = ` · Effort: ${effort} · Context [${fullBar}] ${percent}% ${formatTokens(used)}/${formatTokens(total)} · F8 Compact`;
-	const fullFolder = `Folder: ${folder}`;
+	const usage = `${formatTokens(used)}/${formatTokens(total)}`;
+	const fullSuffix = ` | Context [${fullBar}] ${usage}`;
 	const full =
 		width >= FULL_WIDTH &&
 		width >=
-			visibleWidth(fullFolder) +
-				visibleWidth(" · Model: ") +
-				visibleWidth(fullSuffix) +
-				4;
+			visibleWidth(folder) + visibleWidth(model) + visibleWidth(fullSuffix) + 7;
 	const bar = full
 		? fullBar
 		: contextBar(percent, Math.max(4, Math.min(10, width - 52)));
-	const suffix = full
-		? fullSuffix
-		: ` · ${effort} · [${bar}] ${percent}% ${formatTokens(used)}/${formatTokens(total)} · F8 Compact`;
-	const folderText = full ? fullFolder : folder;
+	const base = full ? fullSuffix : ` | [${bar}] ${usage}`;
+	const tail = extra && ` | ${stripAnsi(extra)}`;
+	const suffix =
+		tail && width - visibleWidth(base) - visibleWidth(tail) >= 20
+			? `${base}${tail}`
+			: base;
 	const identityWidth = Math.max(1, width - visibleWidth(suffix));
 	const plainFolder = truncatePlain(
-		folderText,
-		Math.min(identityWidth, visibleWidth(folderText)),
+		folder,
+		Math.min(identityWidth, visibleWidth(folder)),
 	);
-	const modelPrefix = full ? " · Model: " : " · ";
-	const modelWidth =
-		identityWidth - visibleWidth(plainFolder) - visibleWidth(modelPrefix);
+	const modelWidth = identityWidth - visibleWidth(plainFolder) - 3;
 	const identity =
 		modelWidth > 0
-			? `${plainFolder}${modelPrefix}${truncatePlain(model, modelWidth)}`
+			? `${plainFolder} | ${truncatePlain(model, modelWidth)}`
 			: plainFolder;
 	const color = used > 180000 ? "error" : used > 150000 ? "warning" : "text";
 	const styledBar = theme?.fg?.(color, bar) ?? bar;
@@ -1195,13 +1193,17 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			return {
 				invalidate() {},
 				render(width) {
-					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.());
+					const entries = footerData?.getExtensionStatuses?.() ?? new Map();
+					// Plan3 progress joins the first row without its icon; the crowded status row then disappears.
+					const plan3 = stripAnsi(entries.get("plan3") ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
+					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.(), plan3);
 					// Pi's own footer draws ctx.ui.setStatus() entries; a replacement footer must too.
-					const statuses = [...(footerData?.getExtensionStatuses?.() ?? new Map())]
+					const statuses = [...entries]
 						.sort(([a], [b]) => a.localeCompare(b))
 						.map(([, text]) => stripAnsi(text))
 						.join(" ");
-					const status = statuses.trim() ? [theme.fg("dim", truncatePlain(statuses, width))] : [];
+					const absorbed = plan3 && stripAnsi(model[0]).endsWith(` | ${plan3}`);
+					const status = statuses.trim() && !absorbed ? [theme.fg("dim", truncatePlain(statuses, width))] : [];
 					return width < MIN_WIDTH
 						? [...model, ...status]
 						: [...model, ...renderQuotaRows(shown(), states, theme, width, now()), ...status];

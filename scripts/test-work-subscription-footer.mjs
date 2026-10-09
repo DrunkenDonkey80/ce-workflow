@@ -169,11 +169,14 @@ for (const [tokens, color] of [
 const full = renderModelRow(context(175000), theme, 160)[0];
 assert.match(
 	stripAnsi(full),
-	/^Folder: C:\\soft\\Universal\\ce-workflow · Model: /,
+	/^C:\\soft\\Universal\\ce-workflow \| [^|]+: High \| Context \[[█░]{12}\] 175k\/272k$/,
+	"no Folder:/Model:/Effort: labels; effort follows the model; parts split by |",
 );
-assert.match(stripAnsi(full), /Effort: high/);
-assert.match(stripAnsi(full), /Context \[[█░]{12}\]/);
-assert.match(stripAnsi(full), /64% 175k\/272k · F8 Compact$/);
+const withPlan = stripAnsi(renderModelRow(context(175000), theme, 160, undefined, "Plan [██░░░░░░] 12/43 · S11")[0]);
+assert.match(withPlan, /175k\/272k \| Plan \[██░░░░░░\] 12\/43 · S11$/);
+assert.doesNotMatch(withPlan, /%|F8/, "raw counts only, no compact hint");
+assert.ok(visibleWidth(withPlan) <= 160);
+assert.doesNotMatch(stripAnsi(renderModelRow(context(175000), theme, 56, undefined, `P3 [██░░░░░░] 12/43 · ${"S11 ".repeat(5)}`)[0]), /Plan /, "Plan3 progress is left out when it cannot fit whole");
 const standard = renderModelRow(context(175000), theme, 80)[0];
 assert.match(
 	stripAnsi(standard),
@@ -181,7 +184,7 @@ assert.match(
 	"the standard first status row keeps the full current folder",
 );
 const compact = renderModelRow(context(175000), theme, 56)[0];
-assert.match(stripAnsi(compact), /\[[█░]{4,}\] 64% 175k\/272k · F8 Compact$/);
+assert.match(stripAnsi(compact), /\[[█░]{4,}\] 175k\/272k$/);
 assert.match(stripAnsi(compact), /…/);
 const narrow = renderModelRow(context(175000), theme, 55)[0];
 assert.equal(
@@ -658,8 +661,15 @@ assert.ok(
 );
 assert.doesNotMatch(subsetLines, /Copilot|Kimi/);
 // Extension statuses (ctx.ui.setStatus) render as the last line, sorted by key, like Pi's own footer.
-const withStatus = subset.component(new Map([["zz", "\x1b[31mlast\x1b[0m"], ["plan3", "P3 1/3 \u00b7 CSV-02"]])).render(80).map(stripAnsi);
-assert.equal(withStatus.at(-1), "P3 1/3 \u00b7 CSV-02 last");
+const withStatus = subset.component(new Map([["zz", "\x1b[31mlast\x1b[0m"], ["lsp", "LSP Active"]])).render(80).map(stripAnsi);
+assert.equal(withStatus.at(-1), "LSP Active last");
+// Plan3 status moves to the first row without its icon and hides the whole status row.
+const withPlan3 = subset.component(new Map([["zz", "last"], ["plan3", "\u{1f6e0}\ufe0f Plan 1/3 \u00b7 CSV-02"]])).render(120).map(stripAnsi);
+assert.match(withPlan3[0], /\/272k \| Plan 1\/3 \u00b7 CSV-02$/);
+assert.ok(!withPlan3.some((line) => line.includes("last")), "the status row is gone while Plan3 shows in the first row");
+const narrowPlan3 = subset.component(new Map([["zz", "last"], ["plan3", "Plan 1/3 \u00b7 CSV-02 \u00b7 design: review (approve the exported revision)"]])).render(60).map(stripAnsi);
+assert.match(narrowPlan3.at(-1), /^Plan 1\/3 \u00b7 CSV-02 \u00b7 design/, "too narrow: the status row stays");
+assert.doesNotMatch(narrowPlan3[0], /Plan /);
 assert.equal(subset.component().render(80).map(stripAnsi).join("\n"), subsetLines, "no statuses, no extra line");
 assert.equal(requestedIds.length, 3);
 subset.controller.shutdown(subset.ctx);

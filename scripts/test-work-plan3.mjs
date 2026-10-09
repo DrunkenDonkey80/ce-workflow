@@ -176,7 +176,7 @@ try {
 	assert(!/independent Plan3 trial|\/resume3/.test(prompt), "official wording, no /resume3 during planning");
 	assert.equal(messages.at(-1).options.expandPromptTemplates, false);
 	assert.equal(compactions, 0, "tiny context is not compacted");
-	assert.equal(statuses.at(-1), "🛠️ P3 [░░░░░░░░] 0% 0/0");
+	assert.equal(statuses.at(-1), "🛠️ Plan [░░░░░░░░] 0/0");
 	await hooks.get("turn_end")({}, ctx);
 	assert.equal(statuses.length >= 2, true, "footer refreshes after each turn");
 
@@ -197,6 +197,7 @@ try {
 	// Optimize lint: defects seen in real Sol/Astra rewrites; the source's own spellings and paths stay clean.
 	const lintSource = "Paper 80 mm, 255 passed per SRC §§1,7 on COM21; see `a/b/c/d/e` and crates/x/src/y.rs.\n";
 	assert.deepEqual(optimizeLint(lintSource, lintSource), []);
+	assert.deepEqual(optimizeLint("Plan3 run on SRC.\n", "Run C-PLAN3 and C-FULL checks.\n"), [], "hyphenated check IDs are judged by segment, not as one glued word");
 	const lint = optimizeLint(lintSource, "Paper measured80mm, Latest255passed, handles;80mm on COM21.\nauth/key/acl/log; upload/render/page/pixel.\n- [blocked] **Q1** VM proof. Prerequisite: VM.\n  - Prerequisite: VM.\n");
 	assert.match(lint[0], /^3 glued words, e\.g\. measured80mm, Latest255passed, handles;80mm;/);
 	assert.match(lint[1], /^2 slash-chained lists/);
@@ -251,7 +252,7 @@ try {
 	assert.equal(await readFile(csvFile, "utf8"), beforeSummary, "a rejected done changes nothing");
 	state = await tool({ action: "next", summary: "Parser", check: "node --test parser.test.mjs: 4 passed" });
 	assert.deepEqual([state.completed, state.started, state.done], ["CSV-01", "CSV-02", 1]);
-	assert.equal(statuses.at(-1), "🛠️ P3 [███░░░░░] 33% 1/3 · CSV-02");
+	assert.equal(statuses.at(-1), "🛠️ Plan [███░░░░░] 1/3 · CSV-02");
 	await tool({ action: "step", id: "CSV-02", mark: "blocked", note: "needs RFC 4180 decision" });
 	await tool({ action: "section", name: "Decisions", text: "- D1 Use RFC 4180." });
 	state = await tool({ action: "add", after: "CSV-02", steps: ["Escapes", "Multiline"], reason: "split quoting" });
@@ -347,6 +348,33 @@ try {
 		entries.splice(savedEntries);
 	}
 
+	// Planning turns: a finishable draft gets one shape repair; a converted one is also compared with its source snapshot.
+	{
+		const savedEntries = entries.length;
+		const shapeFile = path.join(directory, "2026-10-02-shape-5b5b5b5b-plan3.md");
+		await writeFile(shapeFile, validPlan("5b5b5b5b", "Shape", "draft", `- [ ] **S-01** ${"Parser work ".repeat(20)}`));
+		await mkdir(path.join(directory, "logs"), { recursive: true });
+		await writeFile(path.join(directory, "logs", "5b5b5b5b.md"), "# Log\n\n## 2026-10-01T00:00:00.000Z Imported source snapshot (unverified task data)\n\nSource: \"old.md\"\n\n> Paper 80 mm on COM21.\n>\n> - [ ] **S-01** Parser\n\n## Later\n\nRetried90mm outside the snapshot.\n");
+		await run("resume3", "5b5b5b5b");
+		assert.match(messages.at(-1).message, /bind only this turn: never write them into the plan[\s\S]*Plan shape: every step line under 200 characters/, "planning prompts carry the turn-only rule and the shape rules");
+		await writeFile(shapeFile, (await readFile(shapeFile, "utf8")).replace("Start with A-01.", "Paper measured80mm on COM21."));
+		const sent = messages.length;
+		await hooks.get("agent_end")({}, ctx);
+		assert.equal(messages.length, sent + 1);
+		assert.match(messages.at(-1).message, /^Plan3: the plan shape check found problems in [\s\S]*Source wording is in [\s\S]*\n- 1 glued words, e\.g\. measured80mm;[^\n]*\n- 1 step lines over 200 characters \(S-01\)/, "the convert snapshot is the baseline; COM21 from the source is not flagged");
+		await hooks.get("agent_end")({}, ctx);
+		assert.equal(messages.length, sent + 1, "one repair per plan");
+		assert.match(notices.at(-2).message, /shape check still finds: .*step lines over 200[\s\S]*\/plan3 finish still works/);
+		await hooks.get("agent_end")({}, ctx);
+		assert(!/shape check/.test(notices.at(-1).message + notices.at(-2).message), "the warning follows only the repair turn");
+		await writeFile(shapeFile, validPlan("5b5b5b5b", "Shape", "draft", "- [ ] **S-01** Parser").replace("## Resume context\n", "## Resume context\n\nPending investigation.\n"));
+		await rm(path.join(directory, "logs"), { recursive: true });
+		await hooks.get("agent_end")({}, ctx);
+		assert.equal(messages.length, sent + 1, "mid-planning drafts are not shape-checked");
+		await rm(shapeFile);
+		entries.splice(savedEntries);
+	}
+
 	// /plan3 finish: refuses placeholders without changing bytes, then readies and leaves research.
 	const unfinished = await readFile(csvFile, "utf8");
 	await writeFile(csvFile, unfinished.replace("Next: CSV-03", "Pending investigation."));
@@ -439,7 +467,7 @@ try {
 	assert.match((await tool({ action: "get", plan: "33333333" })).hint, /set status complete/);
 	entries.push({ type: "custom", customType: "plan3-current", data: { id: "33333333" } });
 	await hooks.get("turn_end")({}, ctx);
-	assert.equal(statuses.at(-1), "🛠️ P3 [████████] 100% 1/1");
+	assert.equal(statuses.at(-1), "🛠️ Plan [████████] 1/1");
 	entries.pop();
 	state = await tool({ action: "status", plan: "33333333", value: "complete" });
 	assert.equal(state.path, path.join(directory, "done", "2026-10-03-small-33333333-plan3.md"));

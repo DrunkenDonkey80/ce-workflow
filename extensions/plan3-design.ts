@@ -543,6 +543,8 @@ async function sync(cwd: string, plan: Plan, state, call, completedRun?) {
 		const handoff = validateDesignHandoff(parsed, { briefHash: input.briefHash, targetMatrix: input.targets });
 		for (const variant of handoff.variants) if (variant.previewArtifact && !files.some(file => (file.name ?? file.path) === variant.previewArtifact)) throw new Error(`Missing preview artifact ${variant.previewArtifact}`);
 		const markdown = await remoteFile(call, state, "DESIGN-HANDOFF.md");
+		// Every implementation resume reads the handoff; an oversized one goes back through the one repair run below.
+		if (Buffer.byteLength(markdown) > 16_384) throw new Error(`DESIGN-HANDOFF.md is ${(Buffer.byteLength(markdown) / 1024).toFixed(1)} KB; keep it under 16 KB with decisions, states and the component/token map, not transcripts.`);
 		const changed = previous.handoffHash !== hashDesignValue(handoff) || previous.remoteFingerprint !== fingerprint || previous.markdownHash !== hashDesignValue(markdown);
 		if (!changed && approvedUnchanged) return save(cwd, plan, { ...previous, error: undefined });
 		if (changed) atomic(plan.file, planText(cwd, plan).replace(/^status: ready$/m, "status: draft"));
