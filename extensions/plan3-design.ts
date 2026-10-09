@@ -95,6 +95,11 @@ export function loadPlanDesign(cwd: string, plan: Plan) {
 		throw new Error("Design runtime missing/corrupt: recover .pi/designs; do not create a replacement project/run.", { cause: error });
 	}
 }
+export function planDesignNext(plan: Plan, state, status: string) {
+	if (["ready", "active"].includes(status)) return `/resume3 ${plan.id}`;
+	return ["reconciled", "abandoned"].includes(state.phase) ? "/plan3 finish" : `/plan3 design ${plan.id}`;
+}
+
 function save(cwd: string, plan: Plan, state) {
 	state = { ...state, hasPendingMutation: Boolean(state.operation) };
 	validateState(state, plan);
@@ -104,7 +109,7 @@ function save(cwd: string, plan: Plan, state) {
 	const { operation: _operation, lastStart: _lastStart, ...durable } = state;
 	writeConfinedDesignArtifact(root, "DESIGN-STATE.json", canonicalDesignJson({ ...durable, hasPendingMutation: Boolean(state.operation) }));
 	const text = planText(cwd, plan);
-	const summary = `## Visual design\n\nMode: ${state.nativeExport || state.nativeCollectionPending ? "native OpenDesign export" : "single direction"}\nPhase: ${state.phase} (local snapshot; no live monitoring)\nNext: /plan3 design ${plan.id}\nArtifacts: ${directory(cwd, plan).relative}\n${state.previewUrl ? `Preview: ${state.previewUrl}\n` : ""}${state.studioUrl ? `Studio: ${state.studioUrl}\n` : ""}${state.error ? `Issue: ${String(state.error).replace(/[\r\n]/g, " ")}\n` : ""}`;
+	const summary = `## Visual design\n\nMode: ${state.nativeExport || state.nativeCollectionPending ? "native OpenDesign export" : "single direction"}\nPhase: ${state.phase} (local snapshot; no live monitoring)\nNext: ${planDesignNext(plan, state, text.match(/^status: (\w+)/m)?.[1] ?? "draft")}\nArtifacts: ${directory(cwd, plan).relative}\n${state.previewUrl ? `Preview: ${state.previewUrl}\n` : ""}${state.studioUrl ? `Studio: ${state.studioUrl}\n` : ""}${state.error ? `Issue: ${String(state.error).replace(/[\r\n]/g, " ")}\n` : ""}`;
 	const updated = /^## Visual design\n[\s\S]*?(?=^## |$(?![\s\S]))/m.test(text)
 		? text.replace(/^## Visual design\n[\s\S]*?(?=^## |$(?![\s\S]))/m, `${summary}\n`)
 		: `${text.trimEnd()}\n\n${summary}`;
