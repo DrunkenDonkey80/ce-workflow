@@ -318,6 +318,8 @@ try {
 		assert.match(resumeMessage, /Do not reread the whole plan/);
 		assert.doesNotMatch(resumeMessage, /Read the entire plan/);
 		assert.match(resumeMessage, /Stop only for a required user decision[\s\S]*blocks only its qualification step/);
+		assert.match(resumeMessage, /Context size is never a stop reason[\s\S]*call compaction_note, and keep working/);
+		assert.doesNotMatch(resumeMessage, /hard limit/);
 		// Execution: defaults instead of questions, acceptance-depth work, local commits, never push.
 		assert.match(resumeMessage, /reversible choice with a sensible default, choose it, record one Decisions line marked assumed/);
 		assert.doesNotMatch(resumeMessage, /Never invent an answer/);
@@ -1599,26 +1601,25 @@ try {
 		await writeFile(nativeStateFile, JSON.stringify(realNativeState)); await writeFile(nativeRuntime, JSON.stringify(realNativeState));
 		pageFiles = ["prototype.html", "second.html"];
 		ctx.hasUI = true;
-		selectScript = [["Select saved design page", "prototype.html"], ["Approve native design", "I inspected the native design and approve this exported revision"]];
+		const beforeApprovalMessages = messages.length;
+		// Both pages are pre-checked; Esc exports them. One approval covers every page, then code reconciles and finishes.
+		selectScript = [["Select saved design pages", null], ["Approve native design", "I inspected the native design and approve this exported revision"], ["Plan ready", "Not yet"]];
 		await run("plan3", `design finish ${nativeId}`);
 		assert.equal(selectScript.length, 0);
-		assert.equal(loadPlanDesign(cwd, nativePlan).phase, "approved");
-		assert.match(messages.at(-1).message, /reconcile approved native OpenDesign design, planning only/);
-		assert.match(messages.at(-1).message, /SAME plan|user runs \/plan3 finish again/);
+		assert.equal(loadPlanDesign(cwd, nativePlan).phase, "reconciled");
+		assert.equal(messages.length, beforeApprovalMessages, "approval reconciles in code; no agent planning turn");
+		const reconciledText = await readFile(nativePlan.file, "utf8");
+		assert.match(reconciledText, /^status: ready$/m, "approval leads straight to a ready plan; no second finish");
+		assert.match(reconciledText.split("## Global validation")[1], /\*\*DES-NATIVE-SNAPSHOT\*\* .*visual authority/);
 		const nativeHandoff = JSON.parse(await readFile(path.join(nativeRoot, "DESIGN-HANDOFF.json"), "utf8")), nativeApproval = JSON.parse(await readFile(path.join(nativeRoot, "APPROVAL.json"), "utf8"));
+		assert.deepEqual(nativeHandoff.pages.map(page => page.sourceFile), ["prototype.html", "second.html"]);
+		assert.deepEqual(nativeHandoff.files.map(file => path.basename(file.path)), ["design.html", "preview.png", "design-2.html", "preview-2.png"]);
 		assert.equal(nativeApproval.authority, "human");
-		await assert.rejects(runPlanDesign(cwd, nativePlan, { action: "reconcile" }), /DES-NATIVE-SNAPSHOT/);
-		await writeFile(nativePlan.file, (await readFile(nativePlan.file, "utf8")).replace("**N-01** Implement", "**N-01** Implement DES-NATIVE-SNAPSHOT: validate settled requirements"));
-		await runPlanDesign(cwd, nativePlan, { action: "reconcile" });
 		assert.deepEqual(planDesignGate(cwd, nativePlan), []);
 		const readsBeforeOffline = nativeRequests.length;
-		await hooks.get("agent_end")({}, ctx);
-		assert.equal(notices.at(-1).message, `Next: /plan3 finish — mark ready and leave research mode.`);
-		assert.match(await readFile(nativePlan.file, "utf8"), /^Next: \/plan3 finish$/m);
-		selectScript = [["Plan3 design", "Finish plan"], ["Plan ready", "Start work"]];
+		selectScript = [["Plan3 design", "Start work"]];
 		await run("plan3", `design ${nativeId}`);
 		assert.equal(selectScript.length, 0);
-		assert.match(await readFile(nativePlan.file, "utf8"), /^status: ready$/m);
 		assert.deepEqual(JSON.parse(await readFile(path.join(nativeRoot, "APPROVAL.json"), "utf8")), nativeApproval, "phase handoffs preserve the genuine approval bytes");
 		assert.match(await readFile(nativePlan.file, "utf8"), new RegExp(`^Next: /resume3 ${nativeId}$`, "m"));
 		assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: false });

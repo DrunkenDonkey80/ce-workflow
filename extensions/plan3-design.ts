@@ -205,7 +205,7 @@ export async function enterPlanDesign(cwd: string, plan: Plan) {
 export function designExecutionGuidance(cwd: string, plan: Plan) {
 	const text = read(plan.file, 1_000_000);
 	if (!designPointer(text) || localPlanDesign(cwd, plan)?.phase === "abandoned") return "";
-	if (localPlanDesign(cwd, plan)?.nativeExport) return `\nApproved visual snapshot: ${directory(cwd, plan, text).relative}. Read DESIGN-INPUT.json, DESIGN-BRIEF.md, DESIGN-HANDOFF.json/.md, APPROVAL.json and RECONCILIATION.json and the pinned native HTML/PNG files. Implement against this frozen approved snapshot and settled component/token mapping; validate the agreed states/viewports/behavior/accessibility with project checks. Prototype code is not production source. Do not adopt live OD edits silently; /plan3 design finish collects a new snapshot for reapproval.`;
+	if (localPlanDesign(cwd, plan)?.nativeExport) return `\nApproved visual snapshot: ${directory(cwd, plan, text).relative}. Read DESIGN-INPUT.json, DESIGN-BRIEF.md, DESIGN-HANDOFF.json/.md, APPROVAL.json and RECONCILIATION.json and the pinned native HTML/PNG files. The approved page HTML/PNG pairs are the visual authority (layout, tokens, copy). Verify the implementation, not the prototype, with this project's existing checks plus one visual comparison per page; fix behavior/accessibility defects in product code, never by revising or reapproving the prototype. Prototype code is not production source. Do not adopt live OD edits silently; only a deliberate visual change needs /plan3 design finish and reapproval.`;
 	return `\nApproved visual snapshot: ${directory(cwd, plan, text).relative}. Read DESIGN-INPUT.json, DESIGN-BRIEF.md, DESIGN-HANDOFF.json/.md, APPROVAL.json and RECONCILIATION.json. Use the actual reuse/restyle/new component/token map; verify agreed states/viewports with this project's tests/screenshots/a11y tools. Record and block material deviations for explicit design revision/reapproval. Prototype code is not production source; this is the frozen approved snapshot, not a claim of live Studio currency.`;
 }
 
@@ -329,28 +329,45 @@ export async function humanPlanDesignDecision(cwd: string, plan: Plan, action: s
 		return state;
 	});
 }
-function reconcile(cwd: string, plan: Plan, state) {
-	const current = approvedAuthority(cwd, plan), text = planText(cwd, plan);
+function reconcile(cwd: string, plan: Plan, state, mapMissing = false) {
+	const current = approvedAuthority(cwd, plan);
+	let text = planText(cwd, plan);
 	if (unresolvedDesignQuestions(text)) throw new Error("Resolve open design questions before reconciliation.");
-	const missing = missingCriteria(current.handoff, text);
+	let missing = missingCriteria(current.handoff, text);
+	if (missing.length && mapMissing) {
+		// Approval re-pins visual authority only; mapping criteria needs no agent planning turn.
+		const bullets = current.handoff.acceptance.filter(item => missing.includes(item.id)).map(item => `- **${item.id}** ${item.criterion} Approved snapshot: ${directory(cwd, plan, text).relative}.`).join("\n");
+		const section = /^## Global validation\r?\n[\s\S]*?(?=^## |(?![\s\S]))/m;
+		text = section.test(text) ? text.replace(section, body => `${body.trimEnd()}\n${bullets}\n\n`) : `${text.trimEnd()}\n\n## Global validation\n\n${bullets}\n`;
+		atomic(plan.file, text);
+		missing = missingCriteria(current.handoff, text);
+	}
 	if (missing.length) throw new Error(`Reconciliation omits ${missing.join(", ")}.`);
 	writeConfinedDesignArtifact(directory(cwd, plan).root, "RECONCILIATION.json", canonicalDesignJson({ version: 1, ownerId: state.ownerId, approvalHash: hashDesignValue(current.approval), criteria: current.handoff.acceptance.map(item => item.id), at: new Date().toISOString() }));
 	return save(cwd, plan, transitionPlanDesign(state, "reconciled"));
 }
-const nativeAcceptance = [{ id: "DES-NATIVE-SNAPSHOT", criterion: "Implement the approved frozen native design and settled component/brief mapping; validate all agreed targets, flows, states, viewports, behavior and accessibility. Export is not verification." }];
+export function reconcileApprovedPlanDesign(cwd: string, plan: Plan) {
+	return withPlanDesignLock(plan.file, async () => reconcile(cwd, plan, loadPlanDesign(cwd, plan), true));
+}
+const nativeAcceptance = [{ id: "DES-NATIVE-SNAPSHOT", criterion: "Implement the approved native pages as the visual authority (layout, tokens, copy) with the settled component/brief mapping; verify behavior and accessibility in the implementation with project checks. The prototype is reference only: never QA, revise or reapprove it for behavior defects; fix those in product code." }];
+// Snapshots approved before the wording change stay valid.
+const legacyNativeAcceptance = [{ id: "DES-NATIVE-SNAPSHOT", criterion: "Implement the approved frozen native design and settled component/brief mapping; validate all agreed targets, flows, states, viewports, behavior and accessibility. Export is not verification." }];
 function nativeHandoff(root: string, raw, input, state) {
-	if (raw.version !== 1 || raw.format !== "native-export" || raw.ownerId !== input.ownerId || raw.briefHash !== input.briefHash || raw.projectId !== state.projectId || raw.runId !== state.runId || !/^native-exports\/[a-f0-9-]{36}$/.test(raw.snapshotDirectory ?? "") || !/^[a-f0-9]{64}$/.test(raw.sourceSha256 ?? "") || hashDesignValue(raw.acceptance) !== hashDesignValue(nativeAcceptance) || !Array.isArray(raw.files) || raw.files.length !== 2) throw new Error("Invalid native design snapshot/owner.");
-	nativeFileName(raw.sourceFile);
+	const pages = raw.pages ?? [{ sourceFile: raw.sourceFile, sourceSha256: raw.sourceSha256 }];
+	if (raw.version !== 1 || raw.format !== "native-export" || raw.ownerId !== input.ownerId || raw.briefHash !== input.briefHash || raw.projectId !== state.projectId || raw.runId !== state.runId || !/^native-exports\/[a-f0-9-]{36}$/.test(raw.snapshotDirectory ?? "") || ![nativeAcceptance, legacyNativeAcceptance].some(item => hashDesignValue(item) === hashDesignValue(raw.acceptance)) || !Array.isArray(pages) || !pages.length || pages.length > maxNativePages || pages[0].sourceFile !== raw.sourceFile || pages[0].sourceSha256 !== raw.sourceSha256 || pages.some(page => !/^[a-f0-9]{64}$/.test(page?.sourceSha256 ?? "")) || !Array.isArray(raw.files) || raw.files.length !== pages.length * 2) throw new Error("Invalid native design snapshot/owner.");
+	for (const page of pages) nativeFileName(page.sourceFile);
 	if (!["DESIGN-BRIEF.md", "OPEN-DESIGN-APP-BRIEF.md"].includes(raw.requestBriefPath) || nativeFileHash(Buffer.from(read(confined(root, raw.requestBriefPath)))) !== raw.requestBriefSha256) throw new Error("Native request brief changed; export and reapprove.");
 	for (const [index, file] of raw.files.entries()) {
-		const format = index ? "image" : "html";
-		if (file.format !== format || file.path !== `${raw.snapshotDirectory}/${index ? "preview.png" : "design.html"}`) throw new Error("Invalid native snapshot file path.");
+		const format = index % 2 ? "image" : "html";
+		if (file.format !== format || file.path !== `${raw.snapshotDirectory}/${nativePageName(Math.floor(index / 2), format)}`) throw new Error("Invalid native snapshot file path.");
 		const inspected = inspectNativeExport(confined(root, file.path), format);
 		if (inspected.bytes !== file.bytes || inspected.sha256 !== file.sha256) throw new Error("Native design export changed; collect and reapprove.");
 	}
 	return raw;
 }
-export async function finishNativePlanDesign(cwd: string, plan: Plan, chooseFile?: (files: string[]) => Promise<string | undefined>) {
+const maxNativePages = 64;
+const nativePageName = (page: number, format: "html" | "image") => `${format === "html" ? "design" : "preview"}${page ? `-${page + 1}` : ""}.${format === "html" ? "html" : "png"}`;
+export async function finishNativePlanDesign(cwd: string, plan: Plan, chooseFiles?: (files: string[]) => Promise<string[] | undefined>) {
 	return withPlanDesignLock(plan.file, async () => {
 		let state = loadPlanDesign(cwd, plan);
 		const previousPhase = state.phase;
@@ -378,25 +395,29 @@ export async function finishNativePlanDesign(cwd: string, plan: Plan, chooseFile
 			if (!Array.isArray(metadata.files) || metadata.files.length > 128) throw new Error("Invalid native project file list.");
 			const files = metadata.files.map(file => file.path ?? file.name).filter(name => typeof name === "string" && /\.html?$/i.test(name)).map(nativeFileName);
 			if (!files.length) throw new Error("The native project has no saved HTML design to export.");
-			// ponytail: one HTML page per finish; add multi-page bundles only when explicitly needed.
-			const sourceFile = files.length === 1 ? files[0] : await chooseFile?.(files);
-			if (!sourceFile) { save(cwd, plan, { ...state, phase: ["approved", "reconciled"].includes(previousPhase) ? "review" : previousPhase, error: "Native collection canceled; no new approval." }); return undefined; }
-			if (!files.includes(sourceFile)) throw new Error("Selected HTML file is not in this native project.");
-			const sourceSha256 = nativeFileHash(await client.file(projectId, sourceFile));
+			// One finish/approval covers every selected page; per-page approvals would replace each other's authority.
+			const selected = files.length === 1 ? files : await chooseFiles?.(files);
+			if (!selected?.length) { save(cwd, plan, { ...state, phase: ["approved", "reconciled"].includes(previousPhase) ? "review" : previousPhase, error: "Native collection canceled; no new approval." }); return undefined; }
+			if (selected.length > maxNativePages || selected.some(file => !files.includes(file)) || new Set(selected).size !== selected.length) throw new Error("Selected HTML files are not in this native project.");
 			const snapshotDirectory = `native-exports/${crypto.randomUUID()}`;
 			const snapshot = confined(root, snapshotDirectory); fs.mkdirSync(snapshot, { recursive: true });
-			const exported = [];
-			for (const [format, name] of [["html", "design.html"], ["image", "preview.png"]] as const) {
-				const filePath = `${snapshotDirectory}/${name}`, target = confined(root, filePath);
-				await client.export(projectId, sourceFile, format, target);
-				exported.push({ path: filePath, format, ...inspectNativeExport(target, format) });
+			const exported = [], pages = [];
+			for (const [page, sourceFile] of selected.entries()) {
+				const sourceSha256 = nativeFileHash(await client.file(projectId, sourceFile));
+				for (const format of ["html", "image"] as const) {
+					const filePath = `${snapshotDirectory}/${nativePageName(page, format)}`, target = confined(root, filePath);
+					await client.export(projectId, sourceFile, format, target);
+					exported.push({ path: filePath, format, ...inspectNativeExport(target, format) });
+				}
+				if (nativeFileHash(await client.file(projectId, sourceFile)) !== sourceSha256) throw new Error("The native file changed during export; save/finish editing and collect again. Partial files are retained, not approved.");
+				pages.push({ sourceFile, sourceSha256 });
 			}
-			if (nativeFileHash(await client.file(projectId, sourceFile)) !== sourceSha256) throw new Error("The native file changed during export; save/finish editing and collect again. Partial files are retained, not approved.");
-			const handoff = { version: 1, format: "native-export", ownerId: state.ownerId, briefHash: input.briefHash, requestBriefPath, requestBriefSha256, projectId, runId, conversationId: run.conversationId, sourceFile, sourceSha256, snapshotDirectory, exportedAt: new Date().toISOString(), files: exported, acceptance: nativeAcceptance };
-			const markdown = `# Native OpenDesign handoff\n\nSource: ${projectId} / ${sourceFile}\nCurrent saved-file snapshot at ${handoff.exportedAt}; not an immutable historical run revision.\n\n${exported.map(file => `- ${file.path} (${file.sha256})`).join("\n")}\n\n${nativeAcceptance[0].id}: ${nativeAcceptance[0].criterion}\n\nPrototype is reference-only, not production code. Human approval is pending; mobile, behavior and accessibility are not verified by export.\n`;
+			const [{ sourceFile, sourceSha256 }] = pages;
+			const handoff = { version: 1, format: "native-export", ownerId: state.ownerId, briefHash: input.briefHash, requestBriefPath, requestBriefSha256, projectId, runId, conversationId: run.conversationId, sourceFile, sourceSha256, ...(pages.length > 1 ? { pages } : {}), snapshotDirectory, exportedAt: new Date().toISOString(), files: exported, acceptance: nativeAcceptance };
+			const markdown = `# Native OpenDesign handoff\n\nSource: ${projectId} / ${selected.join(", ")}\nCurrent saved-file snapshot at ${handoff.exportedAt}; not an immutable historical run revision.\n\n${exported.map(file => `- ${file.path} (${file.sha256})`).join("\n")}\n\n${nativeAcceptance[0].id}: ${nativeAcceptance[0].criterion}\n\nPrototype is reference-only, not production code. Human approval is pending. Behavior and accessibility are verified in the implementation, not in this prototype.\n`;
 			writeConfinedDesignArtifact(root, "DESIGN-HANDOFF.json", canonicalDesignJson(handoff));
 			writeConfinedDesignArtifact(root, "DESIGN-HANDOFF.md", markdown);
-			return save(cwd, plan, { ...state, projectId, runId, conversationId: run.conversationId, nativeExport: true, nativeCollectionPending: false, nativeSourceFile: sourceFile, failureStatus: undefined, previewUrl: undefined, studioUrl: undefined, adapterFingerprint: "native-cli", testOnly: Boolean(run.testOnly || state.testOnly), revision: state.revision + 1, handoffHash: hashDesignValue(handoff), markdownHash: hashDesignValue(markdown), remoteFingerprint: hashDesignValue({ projectId, sourceFile, sourceSha256 }), error: undefined });
+			return save(cwd, plan, { ...state, projectId, runId, conversationId: run.conversationId, nativeExport: true, nativeCollectionPending: false, nativeSourceFile: selected.join(", "), failureStatus: undefined, previewUrl: undefined, studioUrl: undefined, adapterFingerprint: "native-cli", testOnly: Boolean(run.testOnly || state.testOnly), revision: state.revision + 1, handoffHash: hashDesignValue(handoff), markdownHash: hashDesignValue(markdown), remoteFingerprint: hashDesignValue(pages.length > 1 ? { projectId, pages } : { projectId, sourceFile, sourceSha256 }), error: undefined });
 		} catch (error) { save(cwd, plan, { ...state, phase: ["approved", "reconciled"].includes(previousPhase) ? "review" : previousPhase, error: redactOpenDesignText(error.message, 500) }); throw error; }
 	});
 }
