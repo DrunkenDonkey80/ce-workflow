@@ -227,7 +227,11 @@ try {
 	await assert.rejects(tool({ action: "section", name: "Nope", text: "x" }), /Sections: Original request/);
 	state = await tool({ action: "next" });
 	assert.deepEqual([state.started, state.wip], ["CSV-01", ["CSV-01"]]);
-	state = await tool({ action: "next", check: "node --test parser.test.mjs: 4 passed" });
+	const beforeSummary = await readFile(csvFile, "utf8");
+	await assert.rejects(tool({ action: "next", check: "node --test parser.test.mjs: 4 passed" }), /CSV-01 done needs summary/);
+	await assert.rejects(tool({ action: "step", id: "CSV-01", mark: "done", summary: " " }), /needs summary/);
+	assert.equal(await readFile(csvFile, "utf8"), beforeSummary, "a rejected done changes nothing");
+	state = await tool({ action: "next", summary: "Parser", check: "node --test parser.test.mjs: 4 passed" });
 	assert.deepEqual([state.completed, state.started, state.done], ["CSV-01", "CSV-02", 1]);
 	assert.equal(statuses.at(-1), "🛠️ P3 [███░░░░░] 33% 1/3 · CSV-02");
 	await tool({ action: "step", id: "CSV-02", mark: "blocked", note: "needs RFC 4180 decision" });
@@ -237,7 +241,7 @@ try {
 	text = await readFile(csvFile, "utf8");
 	assert(text.includes("\r\n") && !/[^\r]\n/.test(text), "CRLF preserved");
 	assert.match(text, /^started: /m);
-	assert.match(text, /- \[x\] \*\*CSV-01\*\* Parser\r\n  - check: node --test parser.test.mjs: 4 passed\r\n- \[blocked\] \*\*CSV-02\*\* Quotes\r\n  - note: needs RFC 4180 decision\r\n- \[ \] \*\*CSV-03\*\* Escapes\r\n- \[ \] \*\*CSV-04\*\* Multiline\r\n/);
+	assert.match(text, /- \[x\] \*\*CSV-01\*\* Parser\r\n- \[blocked\] \*\*CSV-02\*\* Quotes\r\n  - note: needs RFC 4180 decision\r\n- \[ \] \*\*CSV-03\*\* Escapes\r\n- \[ \] \*\*CSV-04\*\* Multiline\r\n/);
 	assert.match(text, /## Decisions\r\n\r\nRecord each settled choice, rationale, and source here\.\r\n- D1 Use RFC 4180\.\r\n/);
 	assert.match(text, /- \d{4}-\d\d-\d\d: Added CSV-03, CSV-04 after CSV-02: split quoting\r\n$/);
 	await tool({ action: "section", name: "Resume context", text: "Next: CSV-03", replace: true });

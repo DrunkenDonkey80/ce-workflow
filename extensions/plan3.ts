@@ -223,6 +223,7 @@ function markStep(lines, id, mark, extras = {}) {
 	if (mark === "wip" && !getMeta(lines, "started")) setMeta(lines, "started", new Date().toISOString());
 	const added = [extras.note && `note: ${extras.note}`, extras.check && `check: ${extras.check}`].filter(Boolean).map((line) => `${step.indent}  - ${line}`);
 	const summary = mark === "done" && extras.summary?.split(/\r?\n/)[0].trim();
+	if (mark === "done" && !summary) throw new Error(`Marking ${id} done needs summary: a one-line outcome (the step shrinks to it; notes and checks move to the sidecar log).`);
 	if (summary) {
 		const end = blockEnd(lines, step);
 		const history = [...lines.slice(step.index, end), ...added];
@@ -906,7 +907,7 @@ export default function plan3(pi) {
 			properties: {
 				action: { type: "string", enum: ["get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea"] },
 				view: { type: "string", enum: ["resume", "step", "section"], description: "get: resume = compact current-state packet; step = one step's full block (id); section = one section body (name)" },
-				summary: { type: "string", description: "step done/next: one-line outcome; replaces the step text and moves its notes/checks to the sidecar log" },
+				summary: { type: "string", description: "step done/next: required one-line outcome; replaces the step text and moves its notes/checks to the sidecar log" },
 				ideas: { type: "array", minItems: 1, items: ideaSchema, description: "ideas: full-detail proposals; omit to review saved pending/answered ideas" },
 				decision: { type: "string", enum: ["accepted", "rejected", "answered"], description: "idea: interpret a commented response; answered does not approve work" },
 				plan: { type: "string", description: "Plan id, filename or docs/plans path; default: the current plan" },
