@@ -31743,6 +31743,7 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
+		pi.events?.emit?.("work:compaction-start", {}); // Plan3 stats time compaction; this handler does the summarizing.
 		if ((researchContext && !forcedUltracompact) || !usesUltraSummary(currentCompactionMode(ctx))) {
 			const preparation = event.preparation;
 			if (!preparation || !generateNativeSummary || !ctx.modelRegistry?.streamSimple) return;

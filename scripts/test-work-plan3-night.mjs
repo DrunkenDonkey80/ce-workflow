@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createNight, nightMessage, stopCheckMessage } from "../extensions/plan3-night.ts";
+import { createNight, nightMessage, OFF_MESSAGE, stopCheckMessage } from "../extensions/plan3-night.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-night-"));
 try {
 	const file = path.join(cwd, "plan.md");
 	await writeFile(file, "v1");
-	let plan = { id: "p1", file, title: "Camera", status: "active", done: 1, total: 3, next: "S2", wip: [] };
+	let plan = { id: "p1", file, title: "Camera", status: "active", done: 1, total: 3, next: "S2", wip: [], human: [] };
 	const commands = new Map(), hooks = new Map(), shortcuts = new Map(), sent = [], resumed = [], research = [], entries = [], notices = [];
 	let idle = false;
 	const pi = {
@@ -74,11 +74,13 @@ try {
 	assert.equal(await settle("aborted"), undefined);
 	assert.match(notices.at(-1).message, /paused: cancelled/);
 	await commands.get("night").handler("off", ctx);
-	assert.equal(sent.at(-1).content.startsWith("NIGHT MODE OFF"), false, "turning off a paused night sends no off note");
+	assert.equal(sent.at(-1).content, OFF_MESSAGE, "turning off a paused night still tells the agent the user is back");
+	assert.equal(sent.at(-1).options.deliverAs, "nextTurn");
 	await commands.get("night").handler("on", ctx);
-	plan = { ...plan, next: undefined, wip: [] };
-	assert.equal(await settle(), undefined);
-	assert.match(notices.at(-1).message, /every remaining step is blocked/);
+	plan = { ...plan, next: undefined, wip: [], human: ["S3"] };
+	assert.equal(await settle(), undefined, "[human] steps are not runnable at night");
+	assert.match(notices.at(-1).message, /every remaining step is blocked or needs you/);
+	plan = { ...plan, human: [] };
 	await commands.get("night").handler("off", ctx);
 	plan = { ...plan, done: 3, next: undefined };
 	await commands.get("night").handler("on", ctx);
@@ -89,7 +91,15 @@ try {
 	plan = { ...plan, done: 1, next: "S2" };
 	await commands.get("night").handler("on", ctx);
 	await commands.get("night").handler("off", ctx);
-	assert.deepEqual(sent.at(-1), { content: "NIGHT MODE OFF: the user is back. Normal rules apply again: ask the user when a decision is needed.", options: { deliverAs: "steer" } });
+	assert.deepEqual(sent.at(-1), { content: OFF_MESSAGE, options: { deliverAs: "steer" } });
+	assert.match(OFF_MESSAGE, /\[human\] steps are runnable again/);
+	plan = { ...plan, done: 3, next: undefined };
+	await commands.get("night").handler("on", ctx);
+	await settle();
+	const beforeComplete = sent.length;
+	await commands.get("night").handler("off", ctx);
+	assert.equal(sent.length, beforeComplete, "a completed night sends no off note");
+	plan = { ...plan, done: 1, next: "S2" };
 
 	// Draft plans are refused; empty rules send only the global message.
 	await rm(path.join(cwd, ".pi", "night.md"));
@@ -121,7 +131,13 @@ try {
 	await writeFile(file, "v4");
 	assert.equal(await stopAt("aborted"), undefined, "Escape is never questioned");
 	assert.equal(await stopAt("completed", { continue: true }), undefined, "another continuation already pending");
-	plan = { ...plan, next: undefined, wip: [] };
+	plan = { ...plan, next: undefined, wip: [], human: ["S55"] };
+	await writeFile(file, "v4b");
+	result = await stopAt();
+	assert.equal(result.continue, true, "the user is present: [human] steps are runnable outside night mode");
+	assert.match(result.entries[0].content, /\[human\] steps \(S55\)[\s\S]*ask_user whether to do S55 now/);
+	plan = { ...plan, human: [] };
+	await writeFile(file, "v4c");
 	assert.equal(await stopAt(), undefined, "nothing runnable");
 	plan = { ...plan, next: "S2" };
 	executing = undefined;

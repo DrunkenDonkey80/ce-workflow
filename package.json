@@ -1,6 +1,6 @@
 {
   "name": "pi-work-orchestrator",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Native work-item Pi workflow package for staged software work orchestration.",
   "type": "module",
   "license": "MIT",

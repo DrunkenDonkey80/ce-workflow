@@ -12,13 +12,13 @@ const RETRY_AFTER_MS = 30 * 60_000;
 export const NIGHT_MESSAGE = `NIGHT MODE: no human will answer until the user returns. Keep working on the current Plan3 plan without stopping until it is complete or no runnable step is left.
 
 - Questions: never wait for an answer. If a human must decide, add it to the plan as a Deferred question for /plan3 resolve and continue with other runnable work. If you need an answer now and the choice is easy to change later, pick the best option, continue, and still record a Deferred question with full context, the options, what you picked and why, and how to reverse it.
-- Blocked steps: mark the step [blocked] with its reason and move on to the next runnable step. Stop only when every remaining step is blocked or done.
+- Steps that need the user (their presence, a physical action, approval or authorization): mark [human] with what is needed and move on. Steps needing something that does not exist yet (a VM, device, signer or account): mark [blocked] with the prerequisite. Stop only when every remaining step is [human], [blocked] or done.
 - Never: reboot, shut down, sleep or log off this computer; reboot or power off devices; push; deploy; delete user data; touch credentials; spend money; or run anything that could stall the session or wait for interactive input. If a step needs one of these, block it with the reason.
 - Work at the smallest depth that meets each step's acceptance; extra hardening goes to Backlog. Commit locally after each verified step.
 - Keep long-running commands bounded with timeouts; never start a process that waits forever.
 - Before stopping, write one plan3 checkpoint that says what was done and what is waiting for the user.`;
-const OFF_MESSAGE = "NIGHT MODE OFF: the user is back. Normal rules apply again: ask the user when a decision is needed.";
-const ASK_BLOCK = "Night mode: no human is available and this question was not shown. Record it in the plan as a Deferred question for /plan3 resolve. If the answer is needed now and easy to change later, pick the best option and record what you picked, why and how to reverse it; otherwise mark the step [blocked] and continue with other runnable work.";
+export const OFF_MESSAGE = "NIGHT MODE OFF: the user is back. Normal rules apply again: ask the user when a decision is needed. [human] steps are runnable again: ask with ask_user before doing each one.";
+const ASK_BLOCK = "Night mode: no human is available and this question was not shown. Record it in the plan as a Deferred question for /plan3 resolve. If the answer is needed now and easy to change later, pick the best option and record what you picked, why and how to reverse it; otherwise mark the step [human] and continue with other runnable work.";
 // shortcut: word match on the shell text; scripts that power off internally are not caught, upgrade to an OS policy if that matters.
 const POWER = /(?:^|[\s;&|(`"'])(?:shutdown(?:\.exe)?|Restart-Computer|Stop-Computer|logoff|psshutdown|reboot|poweroff|halt)(?=$|[\s;&|)`"'])|powrprof|SetSuspendState|systemctl\s+(?:reboot|poweroff|halt|suspend|hibernate)/i;
 
@@ -26,14 +26,15 @@ export const nightMessage = (rules = "") => rules.trim() ? `${NIGHT_MESSAGE}\n\n
 export function nightBlockReason(event) {
 	if (event.toolName === "ask_user") return ASK_BLOCK;
 	if (["bash", "hypa_shell"].includes(event.toolName) && POWER.test(String(event.input?.command ?? "")))
-		return "Night mode blocks reboot, shutdown, sleep and logoff commands. Mark the step [blocked] with the reason and continue with other runnable work.";
+		return "Night mode blocks reboot, shutdown, sleep and logoff commands. Mark the step [human] with the reason and continue with other runnable work.";
 	return "";
 }
 
 const git = promisify(execFile);
+const STATS = ":(exclude,glob)**/*.stats.json"; // Plan3 telemetry changes every turn; it is not progress.
 async function fingerprint(cwd, file) {
 	const out = (args) => git("git", args, { cwd, maxBuffer: 64 * 1024 * 1024 }).then((result) => result.stdout, () => "");
-	const parts = await Promise.all([out(["rev-parse", "HEAD"]), out(["status", "--porcelain"]), out(["diff", "HEAD"]), readFile(file, "utf8").catch(() => "")]);
+	const parts = await Promise.all([out(["rev-parse", "HEAD"]), out(["status", "--porcelain", "--", ".", STATS]), out(["diff", "HEAD", "--", ".", STATS]), readFile(file, "utf8").catch(() => "")]);
 	return createHash("sha256").update(parts.join("\0")).digest("hex");
 }
 
@@ -47,7 +48,9 @@ function keepAwake() {
 	return child;
 }
 
-export const stopCheckMessage = (plan) => `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
+export const stopCheckMessage = (plan) => !plan.wip.length && !plan.next
+	? `Plan3: you stopped while "${plan.title}" has [human] steps (${plan.human.join(", ")}) and the user is here. Ask with ask_user whether to do ${plan.human[0]} now (what you need, how long it takes, your recommendation); on yes mark it wip and do it with the user, on no or later leave it [human]. If the user already declined or asked you to stop, say so in one line and stop.`
+	: `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
 
 export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging }) {
 	let night = null; // { plan, rules, fp, stalls, paused?, complete? }
@@ -73,7 +76,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 
 	async function on(ctx) {
 		const plan = currentPlan(ctx, await listPlans(ctx.cwd));
-		if (!plan || ["draft", "blocked"].includes(plan.status))
+		if (!plan || plan.status === "draft" || (plan.status === "blocked" && !plan.started))
 			return ctx.ui.notify("Night mode needs a Plan3 plan ready for execution; finish planning first.", "warning");
 		let rules = await readRules(ctx.cwd);
 		while (ctx.hasUI) {
@@ -104,12 +107,13 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		else message(nightMessage(rules), { deliverAs: "steer" });
 	}
 	function off(ctx) {
-		const active = night && !night.paused && !night.complete;
+		// A pause usually means everything left needs the user, so the off note matters most then.
+		const back = night && !night.complete;
 		night = null;
 		release();
 		persist();
 		banner(ctx);
-		if (active) message(OFF_MESSAGE, { deliverAs: ctx.isIdle() ? "nextTurn" : "steer" });
+		if (back) message(OFF_MESSAGE, { deliverAs: ctx.isIdle() ? "nextTurn" : "steer" });
 	}
 	const toggle = (ctx) => night ? off(ctx) : on(ctx);
 
@@ -139,7 +143,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 	async function stopCheck(event, ctx) {
 		if (baseline === undefined || event.outcome !== "completed" || event.continue) return;
 		const plan = await runPlan(ctx);
-		if (!plan || plan.status === "complete" || (!plan.next && !plan.wip.length)) return;
+		if (!plan || plan.status === "complete" || (!plan.next && !plan.wip.length && !plan.human.length)) return;
 		const fp = await fingerprint(ctx.cwd, plan.file);
 		if (fp === baseline) return;
 		baseline = fp;
@@ -159,7 +163,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		}
 		const plan = (await listPlans(ctx.cwd)).find((candidate) => candidate.id === night.plan);
 		if (!plan || plan.status === "complete" || (plan.total && plan.done === plan.total)) return stop(ctx, "", true);
-		if (!plan.next && !plan.wip.length) return stop(ctx, "every remaining step is blocked");
+		if (!plan.next && !plan.wip.length) return stop(ctx, "every remaining step is blocked or needs you");
 		const fp = await fingerprint(ctx.cwd, plan.file);
 		night.stalls = fp === night.fp ? night.stalls + 1 : 0;
 		night.fp = fp;

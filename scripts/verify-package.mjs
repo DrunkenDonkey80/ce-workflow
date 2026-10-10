@@ -573,6 +573,7 @@ const GENERAL_TESTS = new Set([
 	"test-work-native-smoke.mjs",
 	"test-work-plan3.mjs",
 	"test-work-plan3-night.mjs",
+	"test-work-plan3-stats.mjs",
 	"test-work-screen-read.mjs",
 	"test-work-prompt-commands.mjs",
 	"test-work-settings.mjs",

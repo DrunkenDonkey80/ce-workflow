@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { similarity, optimizeLint, phaseSettings } from "../extensions/plan3.ts";
+import plan3, { listPlans, similarity, optimizeLint, phaseSettings } from "../extensions/plan3.ts";
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
 import { enterPlanDesign, recordPlanDesignAnswer, loadPlanDesign, localPlanDesign, planDesignGate, transitionPlanDesign, designPointer, publicDesignUrl, preflightDesignReference, addPlanDesignImage, humanPlanDesignDecision, planDesignReview, runPlanDesign, finishNativePlanDesign } from "../extensions/plan3-design.ts";
 import { nativeExportClient, nativeFileName, nativeFileHash } from "../extensions/plan3-native-export.ts";
@@ -345,6 +345,25 @@ try {
 		assert.doesNotMatch(resumeMessage, /Read the entire plan/);
 		assert.match(resumeMessage, /Stop only for a required user decision[\s\S]*blocks only its qualification step/);
 		assert.match(resumeMessage, /Context size is never a stop reason[\s\S]*call compaction_note, and keep working/);
+		// [human] steps: the user's own action, runnable when the user is present; asked, not reported.
+		assert.match(resumeMessage, /marked \[human\], not \[blocked\][\s\S]*Outside night mode the user is present[\s\S]*ask with ask_user/);
+		// A started plan that execution left blocked resumes as execution, not a planning pass; open questions offer a menu first.
+		const humanFile = path.join(directory, "2026-10-08-human-8b8b8b8b-plan3.md");
+		await writeFile(humanFile, validPlan("8b8b8b8b", "Human", "blocked", "### P1 Finish [code]\n\n- [x] **H-01** Software\n- [ ] **H-02** Remove the old certificate", "started: 2026-10-01T00:00:00.000Z\n").replace("### Deferred\n\nNone.", "### Deferred\n\n- **Q-01** Keep logs?\n  - Context: x\n  - Recommendation: Keep.\n  - Option: Keep — safe\n  - Option: Drop — small"));
+		await tool({ action: "step", plan: "8b8b8b8b", id: "H-02", mark: "human", note: "needs the owner at the PC" });
+		assert.match(await readFile(humanFile, "utf8"), /- \[human\] \*\*H-02\*\* Remove the old certificate/);
+		assert.deepEqual((await listPlans(ctx.cwd)).find((plan) => plan.id === "8b8b8b8b").human, ["H-02"]);
+		ctx.hasUI = true;
+		let openMenu;
+		selectScript = [["Human", "Resume work", (labels) => { openMenu = labels; }]];
+		const beforeHuman = messages.length;
+		await run("resume3", "8b8b8b8b");
+		ctx.hasUI = false;
+		assert.equal(selectScript.length, 0, "open questions show a menu on /resume3");
+		assert.match(openMenu[0], /Answer open questions \(1\)/);
+		assert.equal(messages.length, beforeHuman + 1);
+		assert.match(messages.at(-1).message, /^Plan3: execute\/resume the plan/, "blocked + started executes");
+		await rm(humanFile);
 		assert.doesNotMatch(resumeMessage, /hard limit/);
 		// Execution: defaults instead of questions, acceptance-depth work, local commits, never push.
 		assert.match(resumeMessage, /reversible choice with a sensible default, choose it, record one Decisions line marked assumed/);
@@ -626,7 +645,8 @@ try {
 	const beforeViewMessages = messages.length, beforeViewEntries = entries.length;
 	const viewFiles = [path.join(directory, "2026-10-04-fresh-44444444-plan3.md"), state.path];
 	const beforeViewBytes = await Promise.all(viewFiles.map(file => readFile(file, "utf8")));
-	selectScript = [["Plans3", "Fresh", labels => { order = labels; }], ["Fresh", "View"], ["Plans3", "Small"], ["Small", "View"], ["Plans3", null]];
+	let finishedOrder;
+	selectScript = [["Plans3", "Fresh", labels => { order = labels; }], ["Fresh", "View"], ["Plans3", "Show open/finished plans"], ["Plans3", "Small", labels => { finishedOrder = labels; }], ["Small", "View"], ["Plans3", null]];
 	await run("plans3");
 	assert.equal(selectScript.length, 0, "View returns to the plan list");
 	assert.equal(execCalls.length, 2, "active and archived plans can be viewed");
@@ -685,7 +705,8 @@ try {
 	assert.equal(selectScript.length, 0);
 	assert.match(order[0], /Other work/, "current plan first");
 	assert.match(order[1], /\[active\] Fresh — 1\/2 \[█{6}░{6}\] · active \d+d · touched 0m ago/);
-	assert(order.findIndex((label) => label.includes("Small")) > order.findIndex((label) => label.includes("CSV import")), "complete plans last");
+	assert(!order.some((label) => label.includes("Small")), "open view hides finished plans");
+	assert(finishedOrder.some((label) => label.includes("Small")) && !finishedOrder.some((label) => label.includes("Fresh")), "Tab shows finished plans only");
 	const forced = await readFile(path.join(directory, "done", "2026-10-04-fresh-44444444-plan3.md"), "utf8");
 	assert.match(forced, /^status: complete$/m);
 	assert.match(forced, /Force-finished by the user with unfinished steps: F-02/);
