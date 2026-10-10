@@ -32710,7 +32710,7 @@ async function chooseWorkSetting(ctx, items, selectedIndex, scope) {
 		cursorKey: "work-settings",
 		forceCustom: true,
 		selectOnSpace: true,
-		subtitle: "Tab to change scope",
+		subtitle: `Tab to change scope · ${LOADED_WORKFLOW_BUILD_LABEL}`,
 		help:
 			scope === "project"
 				? "Type to filter · Enter/Space change · Delete uses global · Tab global · Esc/Backspace back"
