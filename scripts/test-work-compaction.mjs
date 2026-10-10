@@ -586,6 +586,15 @@ assert.equal(decodeMemory(protectedAgain.summary).records.length, 1, "replaying 
 const longWithTail = await compactMemory({ messages: [{ role: "user", content: longRequest }], previousSummary: hybrid.summary, registry, limit: 8000 });
 assert(longWithTail.summary.includes(decodeMemory(hybrid.summary).tail), "preserve prior checkpoint even when user core exceeds the target");
 assert(decodeMemory(longWithTail.summary).records.some(record => record.text === longRequest));
+// Generated Plan3 prompts are not carried verbatim, and summaries that already hold them heal.
+const plan3Prompt = "Plan3: before executing, tag phases.\nPlan3: execute/resume the plan at \"p.md\".\n" + "resume packet ".repeat(5000);
+const plan3Memory = await compactMemory({ messages: [{ role: "user", content: plan3Prompt }, { role: "user", content: longRequest }], registry });
+const plan3Records = decodeMemory(plan3Memory.summary).records;
+assert.match(plan3Records[0].text, /^Plan3: before executing, tag phases\. \[generated Plan3 prompt, \d+ chars omitted/);
+assert.equal(plan3Records[1].text, longRequest, "typed user requests stay verbatim");
+assert(plan3Memory.summary.length < longRequest.length + 2000);
+const bloated = protectedMemory.summary.replace(JSON.stringify(longRequest), JSON.stringify("One-time before executing: x\n" + longRequest));
+assert.match(decodeMemory(bloated).records[0].text, /^One-time before executing: x \[generated Plan3 prompt/, "summaries holding old prompts heal");
 let oversizedCalls = 0;
 const oversizedFallback = await compactMemory({ messages: [{ role: "user", content: "z".repeat(300_000) }], model: "test/small",
 	registry: { find: () => ({ contextWindow: 100_000 }), streamSimple: () => { oversizedCalls++; throw new Error("Must not reach ACP"); } } });

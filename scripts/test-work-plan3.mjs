@@ -439,7 +439,7 @@ try {
 		const rewrite = { toolName: "write", input: { path: execFile, content: validPlan("7c7c7c7c", "Exec", "active", "- [ ] **E-01** Code") } };
 		assert.equal(hooks.get("tool_call")(rewrite, ctx), undefined);
 		assert.match(rewrite.input.content, /codingModel: anthropic\/claude-opus-5-5\ncodingEffort: low/, "a rewrite keeps the overrides");
-		// [think] phases: an untagged phased plan gets one tagging turn in think mode; turn_end follows the current step's phase.
+		// Phase tags: untagged unfinished phases get a tagging turn in think mode; turn_end follows the current step's phase.
 		await settings({ planningModel: "anthropic/claude-opus-5-5", codingModel: "openai-codex/gpt-6-sol", codingEffort: "medium" });
 		const thinkFile = path.join(directory, "2026-10-02-think-7e7e7e7e-plan3.md");
 		await writeFile(thinkFile, validPlan("7e7e7e7e", "Think", "active", "### P1 — Decide\n\n- [ ] **T-01** Choose protocol\n\n### P2 — Build\n\n- [ ] **T-02** Code it"));
@@ -450,17 +450,24 @@ try {
 		tokens = 0;
 		assert.equal(compactions, compactionsBefore + 1, "tagging compacts first even for the current plan");
 		compactions = compactionsBefore; // Later checks count compactions from zero.
-		assert.match(messages.at(-1).message, /^One-time before executing/, "untagged phases get a tagging turn");
+		assert.match(messages.at(-1).message, /^Plan3: before executing, tag phases/, "untagged phases get a tagging turn");
+		const researchState = () => events.filter((event) => event.name === "plan3:research").at(-1)?.enabled;
+		assert.equal(researchState(), true, "tagging runs in research mode");
+		await hooks.get("turn_end")({}, ctx);
+		assert.equal(researchState(), true, "research stays on until the tagging edit lands");
 		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "high"], "tagging runs in think mode");
-		assert.match(await readFile(thinkFile, "utf8"), /thinkTagged: true/);
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### P1 — Decide", "### P1 — Decide [think]"));
 		await hooks.get("turn_end")({}, ctx);
+		assert.equal(researchState(), true, "one untagged phase left keeps tagging going");
+		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### P2 — Build", "### P2 — Build [code]"));
+		await hooks.get("turn_end")({}, ctx);
 		assert.equal(ref(), "anthropic/claude-opus-5-5", "a [think] step stays on the planning model");
+		assert.equal(researchState(), false, "every unfinished phase tagged ends research mode");
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-01**", "- [x] **T-01**"));
 		await hooks.get("turn_end")({}, ctx);
 		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "the next phase switches back mid-run");
 		await run("resume3", "7e7e7e7e");
-		assert.doesNotMatch(messages.at(-1).message, /One-time before executing/, "tagging happens once");
+		assert.doesNotMatch(messages.at(-1).message, /before executing, tag phases/, "tagged phases need no tagging turn");
 		await rm(thinkFile);
 		const effortCwd = await mkdtemp(path.join(os.tmpdir(), "plan3-effort-"));
 		await mkdir(path.join(effortCwd, ".pi"));
@@ -538,7 +545,7 @@ try {
 	await writeFile(path.join(cwd, "src", "a.js"), "a2\n");
 	gitEnv = { GIT_AUTHOR_DATE: "2022-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2022-01-01T00:00:00Z" };
 	git("commit", "-qam", "change a");
-	await writeFile(csvFile, (await readFile(csvFile, "utf8")).replace("Next: CSV-03", "Touch `src/a.js` and `src/b.js`.").replace(/^updated: .*$/m, "updated: 2021-01-01T00:00:00.000Z\r\nthinkTagged: true\r"));
+	await writeFile(csvFile, (await readFile(csvFile, "utf8")).replace("Next: CSV-03", "Touch `src/a.js` and `src/b.js`.").replace(/^updated: .*$/m, "updated: 2021-01-01T00:00:00.000Z\r").replace(/^(### Phase \d)\r$/gm, "$1 [code]\r"));
 	await run("resume3");
 	assert.equal(compactions, 1, "same plan does not compact");
 	assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: false });
@@ -1241,7 +1248,7 @@ try {
 	// Runtime test/build guidance belongs only to execution, never planning/capture/resolve/advisors.
 	const testGuidance = /concurrency supported by the existing runner|individual assertions|temporary\/build\/output|Await every result|checks affected by fixes/;
 	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
-		if (!handoff.message.startsWith("Plan3: execute/resume")) assert.doesNotMatch(handoff.message, testGuidance);
+		if (!handoff.message.includes("Plan3: execute/resume")) assert.doesNotMatch(handoff.message, testGuidance);
 	}
 	for (const heading of ["Plan3: planning only.", "Plan3: write the current discussion into a plan.", "Plan3: convert an existing plan."]) {
 		assert(messages.some(entry => entry.message.startsWith(heading)), `missing ${heading} handoff`);

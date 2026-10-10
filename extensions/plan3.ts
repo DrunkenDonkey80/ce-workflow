@@ -42,7 +42,7 @@ const toolUse = "Use the plan3 tool for status, step markers (step/next with che
 const PLAN_WARN_BYTES = 40_000; // Resume packet size above which rereading dominates resume cost.
 const DECISION_ID = /\b(?:D|DEC|ADR)-?\d+\b/g;
 // [think] phases run on the planning model at high effort; code switches when the current step's phase changes mode.
-const THINK_RULE = "Tag a phase heading with [think] (### Phase 3: Sync protocol [think]) when its steps are mainly design decisions, investigation or judgment calls a coding model tends to get wrong; such phases run on the planning model at high effort. Leave routine implementation phases untagged and tag sparingly; put decisions in their own phase instead of mixing them into a build phase.";
+const THINK_RULE = "End every phase heading with exactly one tag: [think] (### Phase 3: Sync protocol [think]) when its steps are mainly design decisions, investigation or judgment calls a coding model tends to get wrong, else [code]. [think] phases run on the planning model at high effort, [code] phases on the coding model; use [think] sparingly and put decisions in their own phase instead of mixing them into a build phase.";
 // New plans start lean instead of needing Optimize later; code checks the same limits (shapeLint).
 const PLAN_SHAPE = `Plan shape: every step line under 200 characters, details in indented sub-bullets; work needing a VM, hardware, signing, deployment or a human is its own [blocked] step naming its prerequisite once; later-phase work under ## Backlog; commands listed once and referenced by steps; Resume context is one checkpoint under 1.5 KB; readable sentences, no slash chains (a/b/c/d). ${THINK_RULE}`;
 const OPTIMIZE_RULES = `Plan shape — a current work document, not a transcript:
@@ -59,7 +59,7 @@ const OPTIMIZE_RULES = `Plan shape — a current work document, not a transcript
 11. As small as faithful: cut repetition, not words. Write readable sentences with normal spacing ("80 mm", "255 passed"); never glue words together or chain items with slashes (a/b/c/d). A [blocked] step names its prerequisite once (no duplicate note).
 12. The plan states what is true and what to do next. Never write the constraints of the current conversion/optimization turn (no product edits, no checks, no status change) into it; they bind only this turn.
 13. Flag over-strict requirements; never relax them yourself. Candidates: "no commit" rules (Plan3 execution commits locally after each verified step and never pushes), measure-first or "do not invent numbers" rules where a reversible default would do, test corpora, exhaustive or hostile testing, hardening or research beyond what the Original request needs, and checks no step's acceptance requires. For each, add one Deferred question (at most 8, most costly first; none when nothing is excessive; no intro prose) as "- **Q-NN** Question?" with indented lines "  - Context: <the ID and its cost>", "  - Recommendation: ...", "  - Independent: yes" and three separate option lines: "  - Option: Keep as is \u2014 ...", "  - Option: Relax \u2014 <a concrete default>", "  - Option: Move to Backlog \u2014 ...". The user decides with /plan3 resolve.
-14. Keep [think] tags on phase headings and add missing ones: ${THINK_RULE}`;
+14. Keep [think]/[code] tags on phase headings and add missing ones: ${THINK_RULE}`;
 
 // ---------- parsing ----------
 const split = (text) => ({ eol: text.includes("\r\n") ? "\r\n" : "\n", lines: text.split(/\r?\n/) });
@@ -328,11 +328,14 @@ function stepMode(lines) {
 	const heading = step && lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line));
 	return heading?.startsWith("### ") && THINK.test(heading) ? "think" : "coding";
 }
-// Plans with phase headings but no tags and no thinkTagged mark get one tagging turn on /resume3.
+// An unfinished phase without a [think]/[code] tag gets a tagging turn on /resume3 (old plans, phases added later).
 // A phase is any ### heading with steps under it ("### Phase 2", "### P0 \u2014 \u2026"), matching stepMode.
 const stepHeadings = (lines) => activeSteps(lines).map((step) => lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line)));
-const needsThinkTags = (lines) => !getMeta(lines, "thinkTagged") && stepHeadings(lines).some((heading) => heading?.startsWith("### ")) && !lines.some((line) => line.startsWith("### ") && THINK.test(line));
-const tagPrompt = `One-time before executing: this plan's phases have no [think] tags. Edit only the ### phase headings of unfinished phases. ${THINK_RULE} Change nothing else in the plan, then continue with the execution below; code switches the model when the current step's phase mode changes.
+const needsThinkTags = (lines) => {
+	const headings = stepHeadings(lines);
+	return activeSteps(lines).some((step, index) => step.mark !== "done" && headings[index]?.startsWith("### ") && !/\[(?:think|code)\]/i.test(headings[index]));
+};
+const tagPrompt = `Plan3: before executing, tag phases. Some unfinished phases have no [think]/[code] tag. Edit only those ### phase headings. ${THINK_RULE} Change nothing else in the plan, then continue with the execution below; code switches the model when the current step's phase mode changes.
 
 `;
 
@@ -634,11 +637,12 @@ export default function plan3(pi) {
 			const problems = planDesignGate(ctx.cwd, plan);
 			if (problems.length) return ctx.ui.notify(problems.join("\n"), "warning");
 		}
-		research(ctx, planning);
+		research(ctx, planning || tag); // Tagging reads the whole plan: research mode's larger context.
 		let mode = "planning";
+		tagging = null;
 		if (!planning) {
-			const { eol, lines } = split(await readFile(plan.file, "utf8"));
-			if (tag) { setMeta(lines, "thinkTagged", "true"); await writeFile(plan.file, lines.join(eol)); }
+			const { lines } = split(await readFile(plan.file, "utf8"));
+			if (tag) tagging = { id: plan.id, marks: stepMarks(lines) };
 			mode = tag ? "think" : stepMode(lines); // Tagging is planning judgment; turn_end switches down if needed.
 		}
 		await runPhase(ctx, plan, mode);
@@ -653,11 +657,20 @@ export default function plan3(pi) {
 	};
 	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan });
 	// Mid-run: when the next step's phase changes mode, switch before the next request (phases span hours).
+	let tagging = null;
+	const stepMarks = (lines) => activeSteps(lines).map((step) => step.mark).join();
 	async function followMode(ctx) {
 		const id = executingPlan(ctx);
 		const plan = id && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === id);
 		if (!plan) return;
-		const mode = stepMode(split(await readFile(plan.file, "utf8")).lines);
+		const lines = split(await readFile(plan.file, "utf8")).lines;
+		if (tagging?.id === plan.id) {
+			// Done when every unfinished phase is tagged, or execution already moved a step marker.
+			if (needsThinkTags(lines) && stepMarks(lines) === tagging.marks) return;
+			tagging = null;
+			research(ctx, false);
+		}
+		const mode = stepMode(lines);
 		if ((lastRun(ctx)?.mode ?? "coding") === mode) return;
 		await runPhase(ctx, plan, mode);
 		ctx.ui?.notify?.(`Plan3: ${mode === "think" ? "[think] phase — planning model, high effort" : "coding phase — coding model and effort"}.`, "info");
