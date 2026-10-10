@@ -32,9 +32,10 @@ export function nightBlockReason(event) {
 
 const git = promisify(execFile);
 const STATS = ":(exclude,glob)**/*.stats.json"; // Plan3 telemetry changes every turn; it is not progress.
+const NEEDS = ":(exclude,glob)**/*.needs.json"; // The user switching requirements is not progress either.
 async function fingerprint(cwd, file) {
 	const out = (args) => git("git", args, { cwd, maxBuffer: 64 * 1024 * 1024 }).then((result) => result.stdout, () => "");
-	const parts = await Promise.all([out(["rev-parse", "HEAD"]), out(["status", "--porcelain", "--", ".", STATS]), out(["diff", "HEAD", "--", ".", STATS]), readFile(file, "utf8").catch(() => "")]);
+	const parts = await Promise.all([out(["rev-parse", "HEAD"]), out(["status", "--porcelain", "--", ".", STATS, NEEDS]), out(["diff", "HEAD", "--", ".", STATS, NEEDS]), readFile(file, "utf8").catch(() => "")]);
 	return createHash("sha256").update(parts.join("\0")).digest("hex");
 }
 
@@ -52,7 +53,7 @@ export const stopCheckMessage = (plan) => !plan.wip.length && !plan.next
 	? `Plan3: you stopped while "${plan.title}" has [human] steps (${plan.human.join(", ")}) and the user is here. Ask with ask_user whether to do ${plan.human[0]} now (what you need, how long it takes, your recommendation); on yes mark it wip and do it with the user, on no or later leave it [human]. If the user already declined or asked you to stop, say so in one line and stop.`
 	: `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
 
-export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging }) {
+export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging, switchNeeds = undefined }) {
 	let night = null; // { plan, rules, fp, stalls, paused?, complete? }
 	let baseline; // Outside night mode: fingerprint when the /resume3 run started or was last nudged.
 	let awake, retry;
@@ -97,23 +98,27 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 			if (rules) await mkdir(path.dirname(rulesFile(ctx.cwd)), { recursive: true }).then(() => writeFile(rulesFile(ctx.cwd), `${rules}\n`));
 			else await unlink(rulesFile(ctx.cwd)).catch(() => {});
 		}
+		const needs = await switchNeeds?.(ctx, plan, "night");
 		research(ctx, false);
 		night = { plan: plan.id, rules, fp: await fingerprint(ctx.cwd, plan.file), stalls: 0 };
 		release();
 		awake = keepAwake();
 		persist();
 		banner(ctx);
-		if (ctx.isIdle()) await resume(ctx, plan, `\n\n${nightMessage(rules)}`);
-		else message(nightMessage(rules), { deliverAs: "steer" });
+		const text = needs ? `${nightMessage(rules)}\n\nRequirements: ${needs}` : nightMessage(rules);
+		if (ctx.isIdle()) await resume(ctx, plan, `\n\n${text}`);
+		else message(text, { deliverAs: "steer" });
 	}
-	function off(ctx) {
+	async function off(ctx) {
+		const plan = night && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === night.plan);
+		const needs = plan && await switchNeeds?.(ctx, plan, "day");
 		// A pause usually means everything left needs the user, so the off note matters most then.
 		const back = night && !night.complete;
 		night = null;
 		release();
 		persist();
 		banner(ctx);
-		if (back) message(OFF_MESSAGE, { deliverAs: ctx.isIdle() ? "nextTurn" : "steer" });
+		if (back) message(needs ? `${OFF_MESSAGE}\nRequirements: ${needs}` : OFF_MESSAGE, { deliverAs: ctx.isIdle() ? "nextTurn" : "steer" });
 	}
 	const toggle = (ctx) => night ? off(ctx) : on(ctx);
 

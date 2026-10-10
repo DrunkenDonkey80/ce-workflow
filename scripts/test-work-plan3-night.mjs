@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createNight, nightMessage, OFF_MESSAGE, stopCheckMessage } from "../extensions/plan3-night.ts";
+import { isOn, setBoth, setMode } from "../extensions/plan3-needs.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-night-"));
 try {
@@ -144,6 +145,27 @@ try {
 	await guardHooks.get("agent_start")({}, ctx);
 	await writeFile(file, "v5");
 	assert.equal(await stopAt(), undefined, "not in /resume3");
+	// Requirements: night on/off switch the plan's set and carry the line; the two sets are remembered separately.
+	const needHooks = new Map(), needCommands = new Map(), needSent = [], switched = [];
+	createNight({ registerCommand: (name, command) => needCommands.set(name, command), on: (name, handler) => needHooks.set(name, handler), sendMessage: (message, options) => needSent.push({ content: message.content, options }) }, {
+		listPlans: async () => [plan], currentPlan: (_ctx, plans) => plans[0], resume: async () => {}, research() {},
+		switchNeeds: async (_ctx, target, mode) => { switched.push([target.id, mode]); return `Available now (${mode}): R-vm; off: human.`; },
+	});
+	idle = false;
+	await needCommands.get("night").handler("on", ctx);
+	assert.match(needSent.at(-1).content, /Requirements: Available now \(night\): R-vm; off: human\.$/);
+	await needCommands.get("night").handler("off", ctx);
+	assert.deepEqual(switched, [["p1", "night"], ["p1", "day"]]);
+	assert.equal(needSent.at(-1).content, `${OFF_MESSAGE}\nRequirements: Available now (day): R-vm; off: human.`);
+	let avail = setBoth({}, "R-reboot", true);
+	assert.equal(isOn(avail, "human"), true);
+	avail = setMode(avail, "night");
+	assert.deepEqual([isOn(avail, "human"), isOn(avail, "R-reboot")], [false, true]);
+	avail = { ...avail, night: { ...avail.night, "R-reboot": false } }; // the user unchecks reboot for the night
+	avail = setMode(setMode(avail, "day"), "night");
+	assert.equal(isOn(avail, "R-reboot"), false, "the night set is remembered");
+	assert.equal(isOn(setMode(avail, "day"), "R-reboot"), true, "the day set is untouched");
+	assert.equal(isOn(setMode(avail, "day"), "R-unset"), false, "unset requirements are off");
 	console.log("ok - plan3 night mode");
 } finally {
 	await rm(cwd, { recursive: true, force: true });

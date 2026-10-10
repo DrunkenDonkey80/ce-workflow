@@ -364,6 +364,37 @@ try {
 		assert.equal(messages.length, beforeHuman + 1);
 		assert.match(messages.at(-1).message, /^Plan3: execute\/resume the plan/, "blocked + started executes");
 		await rm(humanFile);
+		// Requirements: the model defines one, code marks the wip step and asks the user; off steps never get picked.
+		const needFile = path.join(directory, "2026-10-08-needs-8c8c8c8c-plan3.md");
+		await writeFile(needFile, validPlan("8c8c8c8c", "Needs", "active", "### P1 Build [code]\n\n- [x] **N-01** Software\n- [wip] **N-02** Flash firmware\n- [ ] **N-03** Docs\n\n### P2 Bench [code]\n\nneeds: R-printer\n\n- [ ] **N-04** Print a test page"));
+		ctx.hasUI = true;
+		selectScript = [["Allow R-reboot?", "Not now"]];
+		let need = await tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-reboot", text: "Restart the device" });
+		assert.deepEqual([need.on, need.target], [false, "N-02"]);
+		let needText = await readFile(needFile, "utf8");
+		assert.match(needText, /## Requirements\n\n- \*\*R-reboot\*\* Restart the device/);
+		assert.match(needText, /- \[wip\] \*\*N-02\*\* Flash firmware\n  - needs: R-reboot/);
+		let needPlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8c8c8c8c");
+		assert.deepEqual([needPlan.wip, needPlan.next, needPlan.waiting.map((step) => step.id)], [[], "N-03", ["N-02", "N-04"]], "off and undefined requirements are not runnable");
+		await assert.rejects(tool({ action: "step", plan: "8c8c8c8c", id: "N-04", mark: "wip" }), /N-04 needs R-printer/);
+		await assert.rejects(tool({ action: "status", plan: "8c8c8c8c", value: "complete" }), /N-03, N-02, N-04/);
+		selectScript = [["Allow R-printer?", "Allow"]];
+		need = await tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-printer", text: "Printer on COM23", id: "P2" });
+		assert.deepEqual([need.on, need.target], [true, "P2"]);
+		assert.equal((await readFile(needFile, "utf8")).match(/needs: R-printer/g).length, 1, "an existing phase need is not duplicated");
+		await assert.rejects(tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-new" }), /pass text/);
+		await assert.rejects(tool({ action: "requirement", plan: "8c8c8c8c", requirement: "reboot" }), /R-<short-name>/);
+		const needView = (await tool({ action: "get", plan: "8c8c8c8c", view: "requirements" })).view;
+		assert.match(needView, /- R-reboot \(off\): Restart the device[\s\S]*Waiting: N-02 needs R-reboot/);
+		assert.match((await tool({ action: "get", plan: "8c8c8c8c", view: "resume" })).view, /## Requirements now\n\nAvailable now \(day\): human, R-printer; off: R-reboot\. Waiting \(not runnable\): N-02 needs R-reboot\./);
+		// The user's checklist: Esc saves; the wip step becomes runnable again.
+		selectScript = [["Requirements", "R-reboot"], ["Requirements", null]];
+		await run("plan3", "needs");
+		needPlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8c8c8c8c");
+		assert.deepEqual([needPlan.wip, needPlan.waiting], [["N-02"], []]);
+		assert.deepEqual(JSON.parse(await readFile(path.join(directory, "logs", "8c8c8c8c.needs.json"), "utf8")).night, { human: false, "R-reboot": false, "R-printer": true }, "the night set copies first answers, user away");
+		ctx.hasUI = false;
+		await rm(needFile);
 		assert.doesNotMatch(resumeMessage, /hard limit/);
 		// Execution: defaults instead of questions, acceptance-depth work, local commits, never push.
 		assert.match(resumeMessage, /reversible choice with a sensible default, choose it, record one Decisions line marked assumed/);
