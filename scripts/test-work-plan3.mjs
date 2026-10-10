@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { similarity, optimizeLint } from "../extensions/plan3.ts";
+import plan3, { similarity, optimizeLint, phaseSettings } from "../extensions/plan3.ts";
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
 import { enterPlanDesign, recordPlanDesignAnswer, loadPlanDesign, localPlanDesign, planDesignGate, transitionPlanDesign, designPointer, publicDesignUrl, preflightDesignReference, addPlanDesignImage, humanPlanDesignDecision, planDesignReview, runPlanDesign, finishNativePlanDesign } from "../extensions/plan3-design.ts";
 import { nativeExportClient, nativeFileName, nativeFileHash } from "../extensions/plan3-native-export.ts";
@@ -50,8 +50,11 @@ const ctx = {
 		},
 	},
 };
-let askSource;
+let askSource, thinking = "high";
 const api = {
+	getThinkingLevel: () => thinking,
+	setThinkingLevel: (level) => { thinking = level; },
+	setModel: async (model) => { if (model.id === "no-auth") return false; ctx.model = model; return true; },
 	getAllTools: () => askSource ? [{ name: "ask_user", sourceInfo: { path: askSource } }] : [],
 	exec: async (command, args, options) => { execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
 	registerCommand: (name, command) => commands.set(name, command),
@@ -331,7 +334,12 @@ try {
 		assert.equal((await tool({ action: "get", plan: "9a9a9a9a" })).warning, undefined, "omitted sections do not count toward the warning");
 		await writeFile(leanFile, text.replace("- D-02 Use 16 kHz.\n", `- D-02 Use 16 kHz.\n${"constraint ".repeat(4000)}\n`));
 		assert.match((await tool({ action: "get", plan: "9a9a9a9a" })).warning, /Resume packet is \d+ KB; \/plans3 \u2192 Optimize/);
+		await writeFile(path.join(agentDir, "settings.json"), JSON.stringify({ workOrchestrator: { plan3: { codingEffort: "medium" } } }));
 		await run("resume3", "9a9a9a9a");
+		assert.equal(thinking, "medium", "execution switches to the coding effort when the run starts");
+		assert.deepEqual(entries.findLast((entry) => entry.customType === "plan3-run").data.home.thinking, "high");
+		await writeFile(path.join(agentDir, "settings.json"), "{}");
+		thinking = "high";
 		const resumeMessage = messages.at(-1).message;
 		assert.match(resumeMessage, /Do not reread the whole plan/);
 		assert.doesNotMatch(resumeMessage, /Read the entire plan/);
@@ -383,6 +391,56 @@ try {
 		assert.match(notices.at(-1).message, /0 open questions kept\. 1 strictness question\(s\) added; run \/plan3 resolve/);
 		await rm(leanFile);
 		await rm(path.join(directory, "logs"), { recursive: true });
+		entries.splice(savedEntries);
+	}
+
+	// Phase switching: execution starts on the coding model/effort, planning on the planning model; unset keeps the session's own value.
+	{
+		const savedEntries = entries.length, savedModel = ctx.model, savedRegistry = ctx.modelRegistry;
+		ctx.modelRegistry = { ...savedRegistry, find: (provider, id) => ({ provider, id }) };
+		const ref = () => `${ctx.model.provider}/${ctx.model.id}`;
+		const execFile = path.join(directory, "2026-10-02-exec-7c7c7c7c-plan3.md"), draftFile = path.join(directory, "2026-10-02-draft-7d7d7d7d-plan3.md");
+		await writeFile(execFile, validPlan("7c7c7c7c", "Exec", "active", "- [ ] **E-01** Code"));
+		await writeFile(draftFile, validPlan("7d7d7d7d", "Draft", "draft", "- [ ] **P-01** Think"));
+		const settings = (plan3) => writeFile(path.join(agentDir, "settings.json"), JSON.stringify({ workOrchestrator: { plan3 } }));
+		await settings({ codingEffort: "medium" });
+		await run("resume3", "7c7c7c7c");
+		assert.equal(thinking, "medium");
+		assert.equal(ref(), "anthropic/claude-opus-5-5", "no coding model keeps the session model");
+		await run("resume3", "7d7d7d7d");
+		assert.equal(thinking, "high", "planning restores the effort the session had");
+		thinking = "xhigh";
+		await run("resume3", "7c7c7c7c");
+		await run("resume3", "7c7c7c7c");
+		await run("plan3", "optimize 7c7c7c7c");
+		assert.equal(thinking, "xhigh", "a manual change becomes the session's level; optimize is planning work");
+		await settings({ planningModel: "anthropic/claude-opus-5-5", codingModel: "openai-codex/gpt-6-sol", codingEffort: "medium" });
+		ctx.model = { provider: "openai-codex", id: "gpt-6-sol" };
+		await run("resume3", "7d7d7d7d");
+		assert.equal(ref(), "anthropic/claude-opus-5-5", "planning switches to the planning model");
+		await run("resume3", "7c7c7c7c");
+		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "coding switches model and effort");
+		await settings({ codingModel: "openai-codex/gpt-6-sol" });
+		ctx.model = { provider: "anthropic", id: "claude-opus-4" };
+		await run("resume3", "7d7d7d7d");
+		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-4", "xhigh"], "a manual model change is kept; unset planning model restores the session's effort");
+		await run("resume3", "7c7c7c7c");
+		await run("resume3", "7d7d7d7d");
+		assert.equal(ref(), "anthropic/claude-opus-4", "unset planning model returns to the session's model");
+		await settings({ codingModel: "openai-codex/no-auth" });
+		await run("resume3", "7c7c7c7c");
+		assert.equal(ref(), "anthropic/claude-opus-4");
+		assert.match(notices.at(-1).message, /could not switch to openai-codex\/no-auth/);
+		const effortCwd = await mkdtemp(path.join(os.tmpdir(), "plan3-effort-"));
+		await mkdir(path.join(effortCwd, ".pi"));
+		await settings({ codingEffort: "medium", codingModel: "openai-codex/gpt-6-sol" });
+		await writeFile(path.join(effortCwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { plan3: { codingEffort: "low" } } }));
+		assert.deepEqual(phaseSettings(effortCwd).coding, { model: "openai-codex/gpt-6-sol", thinking: "low" }, "project wins per key");
+		await rm(effortCwd, { recursive: true, force: true });
+		await writeFile(path.join(agentDir, "settings.json"), "{}");
+		thinking = "high";
+		ctx.model = savedModel; ctx.modelRegistry = savedRegistry;
+		await rm(execFile); await rm(draftFile); await rm(path.join(directory, "logs"), { recursive: true, force: true });
 		entries.splice(savedEntries);
 	}
 
@@ -1649,6 +1707,7 @@ try {
 		assert.match(await readFile(nativePlan.file, "utf8"), new RegExp(`^Next: /resume3 ${nativeId}$`, "m"));
 		assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: false });
 		assert.equal(entries.at(-1).data.planning, false);
+		assert.deepEqual([entries.at(-2).customType, entries.at(-2).data.id], ["plan3-run", nativeId], "execution arms the stop guard");
 		selectScript = [["Plan3 design", null, labels => {
 			assert.match(labels[0], /Start work/, "ready phase puts execution first");
 			assert(!labels.some(label => /Reconcile same plan/.test(label)), "already reconciled is not offered again");

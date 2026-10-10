@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createNight, nightMessage } from "../extensions/plan3-night.ts";
+import { createNight, nightMessage, stopCheckMessage } from "../extensions/plan3-night.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-night-"));
 try {
@@ -102,6 +102,32 @@ try {
 	assert.doesNotMatch(sent.at(-1).content, /Project rules/);
 	await commands.get("night").handler("off", ctx);
 	assert.equal(await readFile(file, "utf8"), "v2");
+
+	// Stop guard outside night mode: only in a /resume3 run that did work and left runnable steps.
+	const guardHooks = new Map();
+	let executing = "p1";
+	createNight({ registerCommand() {}, on: (name, handler) => guardHooks.set(name, handler) }, {
+		listPlans: async () => [plan], currentPlan: (_ctx, plans) => plans[0], resume: async () => {}, research() {}, executingPlan: () => executing,
+	});
+	const stopAt = (outcome = "completed", extra = {}) => guardHooks.get("agent_before_settle")({ outcome, continue: false, ...extra }, ctx);
+	await guardHooks.get("agent_start")({}, ctx);
+	assert.equal(await stopAt(), undefined, "chat answer without changes settles");
+	await writeFile(file, "v3");
+	result = await stopAt();
+	assert.equal(result.continue, true, "stop after work is questioned");
+	assert.equal(result.entries[0].content, stopCheckMessage(plan));
+	assert.match(result.entries[0].content, /next: S2\)/);
+	assert.equal(await stopAt(), undefined, "the reason reply (no new work) settles");
+	await writeFile(file, "v4");
+	assert.equal(await stopAt("aborted"), undefined, "Escape is never questioned");
+	assert.equal(await stopAt("completed", { continue: true }), undefined, "another continuation already pending");
+	plan = { ...plan, next: undefined, wip: [] };
+	assert.equal(await stopAt(), undefined, "nothing runnable");
+	plan = { ...plan, next: "S2" };
+	executing = undefined;
+	await guardHooks.get("agent_start")({}, ctx);
+	await writeFile(file, "v5");
+	assert.equal(await stopAt(), undefined, "not in /resume3");
 	console.log("ok - plan3 night mode");
 } finally {
 	await rm(cwd, { recursive: true, force: true });

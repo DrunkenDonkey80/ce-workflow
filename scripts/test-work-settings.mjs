@@ -1869,6 +1869,28 @@ try {
 				]),
 		`plan models add/reorder/remove persist (${JSON.stringify(planScript[0])})`,
 	);
+	const effortScript = [["Settings: Global", "Plan3 → Coding effort: same as session"], ["Plan3 coding effort", "Medium —"], ["Settings: Global", "Plan3 → Coding model: same as session"], ["Plan3 coding model", "glm-5.3"]];
+	await invoke("work-settings", "", {
+		...ctx,
+		mode: "rpc",
+		modelRegistry: { getAvailable: async () => [{ provider: "zai", id: "glm-5.3", name: "glm-5.3" }] },
+		ui: {
+			notify: ctx.ui.notify,
+			select: async (title, labels) => {
+				const step = effortScript[0];
+				if (!step || step[0] !== title) return undefined;
+				effortScript.shift();
+				return labels.find((label) => label.includes(step[1]));
+			},
+		},
+	});
+	assert(
+		effortScript.length === 0 &&
+			readGlobalSettings().workOrchestrator.plan3.codingEffort === "medium" &&
+			readGlobalSettings().workOrchestrator.plan3.codingModel === "zai/glm-5.3" &&
+			readGlobalSettings().workOrchestrator.plan3.models.length === 2,
+		`coding effort and model persist beside plan models (${JSON.stringify(effortScript[0])})`,
+	);
 	const loadExtension = () => {
 		const loaded = { commands: {}, tools: {}, shortcuts: {}, hooks: {}, events: { on: () => {}, emit: () => {} } };
 		mod.default({

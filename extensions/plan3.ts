@@ -15,6 +15,7 @@ import { closePersistentOpenDesignClients } from "./opendesign-client.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 
 const POINTER = "plan3-current";
+const RUN = "plan3-run";
 const OPTIMIZE = "plan3-optimize";
 const COMPACT_MIN_TOKENS = 20_000; // D09: below this there is nothing worth compacting.
 const DUPLICATE_SIMILARITY = 0.5; // D15: Jaccard overlap of request words.
@@ -230,6 +231,8 @@ export async function listPlans(cwd) {
 const touched = (plan) => plan.updated ?? plan.created ?? "";
 const isOpen = (plan) => plan.status !== "complete";
 
+const lastRun = (ctx) => (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === RUN)?.data;
+
 function pointer(ctx) {
 	const branch = ctx.sessionManager?.getBranch?.() ?? [];
 	for (let i = branch.length - 1; i >= 0; i--)
@@ -367,6 +370,14 @@ export function planModels(cwd) {
 	const agentDir = process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent");
 	const project = readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.plan3?.models;
 	return project ?? readJson(path.join(agentDir, "settings.json")).workOrchestrator?.plan3?.models ?? [];
+}
+// Per-phase model/effort; each key: project setting wins, unset means keep the session's own value.
+export function phaseSettings(cwd) {
+	const agentDir = process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent");
+	const project = readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.plan3 ?? {};
+	const global = readJson(path.join(agentDir, "settings.json")).workOrchestrator?.plan3 ?? {};
+	const pick = (key) => project[key] ?? global[key];
+	return { planning: { model: pick("planningModel") }, coding: { model: pick("codingModel"), thinking: pick("codingEffort") } };
 }
 const family = (model) => String(model).split("/").pop().split("-")[0].toLowerCase();
 // Default prefers another family; all excludes only the exact current model.
@@ -542,7 +553,31 @@ export default function plan3(pi) {
 		}));
 	}
 
+	// Switch model/effort only when a run starts: a mid-run change re-reads the whole context uncached.
+	// home = the session's own value; a manual change since Plan3's last switch becomes the new home.
+	async function runPhase(ctx, plan, planning) {
+		const last = lastRun(ctx) ?? {}, target = phaseSettings(ctx.cwd)[planning ? "planning" : "coding"];
+		const current = { model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined, thinking: pi.getThinkingLevel?.() };
+		const home = {}, set = {};
+		for (const key of ["model", "thinking"]) {
+			home[key] = last.set?.[key] !== undefined && current[key] === last.set[key] ? last.home?.[key] : current[key];
+			set[key] = target[key] ?? home[key];
+		}
+		if (set.model && set.model !== current.model) {
+			const [provider, ...id] = set.model.split("/");
+			const model = ctx.modelRegistry?.find?.(provider, id.join("/"));
+			if (!model || !await pi.setModel?.(model)) {
+				ctx.ui.notify(`Plan3: could not switch to ${set.model}; keeping ${current.model}.`, "warning");
+				set.model = current.model;
+			}
+		}
+		if (set.thinking && set.thinking !== pi.getThinkingLevel?.()) pi.setThinkingLevel?.(set.thinking);
+		set.thinking = pi.getThinkingLevel?.() ?? set.thinking; // the model may clamp the level
+		pi.appendEntry?.(RUN, planning ? { home, set } : { id: plan.id, home, set });
+	}
+
 	async function startPlanning(ctx, plan, lead, fromChat = false, sourceFile?: string) {
+		await runPhase(ctx, plan, true);
 		research(ctx, true);
 		setPointer(plan, true);
 		await refresh(ctx);
@@ -558,11 +593,17 @@ export default function plan3(pi) {
 			if (problems.length) return ctx.ui.notify(problems.join("\n"), "warning");
 		}
 		research(ctx, planning);
+		await runPhase(ctx, plan, planning);
 		setPointer(plan, planning);
 		await refresh(ctx);
 		send(planning ? planningPrompt(plan.file, `Continue planning the ${plan.status} plan at`) : executePrompt(plan, await staleFiles(ctx.cwd, plan), resumePacket(await readFile(plan.file, "utf8"))) + designExecutionGuidance(ctx.cwd, plan) + extra);
 	}
-	const night = createNight(pi, { listPlans, currentPlan, resume, research });
+	// "In /resume3": the last plan /resume3 executed is still the current, non-planning plan.
+	const executingPlan = (ctx) => {
+		const run = lastRun(ctx);
+		return run?.id && run.id === pointer(ctx).id && !pointer(ctx).planning ? run.id : undefined;
+	};
+	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan });
 
 	// Optimize: code snapshots the plan to the log and records what must survive; agent_end verifies.
 	async function optimize(ctx, plan) {
@@ -574,6 +615,7 @@ export default function plan3(pi) {
 		const ids = [...new Set([...steps(lines).map((step) => step.id), ...(decisions ? lines.slice(decisions.start, decisions.end).join("\n").match(DECISION_ID) ?? [] : [])])];
 		await appendLog(plan.file, `Pre-optimize snapshot (${Buffer.byteLength(text)} B)\n\n${quote(text)}`);
 		pi.appendEntry?.(OPTIMIZE, { id: plan.id, ids, open: plan.open, status: plan.status, bytes: Buffer.byteLength(text), sha: sha(text) });
+		await runPhase(ctx, plan, true); // Optimizing is planning work, not coding.
 		setPointer(plan, ["draft", "blocked"].includes(plan.status));
 		research(ctx, true); // Research mode's larger context window fits the whole bloated plan; verification restores it.
 		await refresh(ctx);

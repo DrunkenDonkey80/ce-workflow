@@ -32598,6 +32598,8 @@ function hasProjectOverride(settings, item) {
 		return owns(block?.context, "compactionModel") || owns(block?.context, "compactionThinking");
 	if (item.kind === "jev") return owns(block, "jev");
 	if (item.kind === "planModels") return owns(block?.plan3, "models");
+	if (item.kind === "codingEffort") return owns(block?.plan3, "codingEffort");
+	if (item.kind === "phaseModel") return owns(block?.plan3, item.value);
 	if (item.kind === "workflow") return owns(block, "workflow");
 	if (item.kind === "visionModel") return owns(block, "visionModel");
 	if (item.kind === "nonVisionModels") return owns(block, "nonVisionModels");
@@ -32667,7 +32669,9 @@ function clearProjectOverride(settings, item) {
 		delete block.context?.compactionThinking;
 	} else if (item.kind === "jev") delete block.jev;
 	else if (item.kind === "workflow") delete block.workflow;
-	else if (item.kind === "planModels") delete block.plan3;
+	else if (item.kind === "planModels") delete block.plan3?.models;
+	else if (item.kind === "codingEffort") delete block.plan3?.codingEffort;
+	else if (item.kind === "phaseModel") delete block.plan3?.[item.value];
 	else if (item.kind === "visionModel") delete block.visionModel;
 	else if (item.kind === "nonVisionModels") delete block.nonVisionModels;
 	else if (item.kind === "creativeMode") delete block.creativeMode;
@@ -32903,6 +32907,18 @@ async function workSettingsLoop(ctx) {
 					},
 				];
 			}),
+			...[["planningModel", "Planning model", "/plan3, /resume3 on a draft and optimize switch to this model when they start"], ["codingModel", "Coding model", "/resume3 execution switches to this model when it starts"]].map(([value, name, description]) => ({
+				kind: "phaseModel",
+				value,
+				label: `Plan3 → ${name}: ${names.get(settings.workOrchestrator?.plan3?.[value]) ?? settings.workOrchestrator?.plan3?.[value] ?? "same as session"} ${SUBMENU_ARROW}`,
+				description: `${description}; unset keeps the session's own model. Each switch re-reads the context uncached once.`,
+			})),
+			{
+				kind: "codingEffort",
+				value: "codingEffort",
+				label: `Plan3 → Coding effort: ${settings.workOrchestrator?.plan3?.codingEffort ?? "same as session"} ${SUBMENU_ARROW}`,
+				description: "/resume3 execution switches to this effort when it starts; planning switches back. Each switch re-reads the context uncached once.",
+			},
 			{
 				kind: "backgroundVerifiers",
 				value: "backgroundVerifiers",
@@ -33114,6 +33130,39 @@ async function workSettingsLoop(ctx) {
 		}
 		if (pick.kind === "planModels") {
 			await editPlanModels(ctx, scope, names);
+			continue;
+		}
+		if (pick.kind === "phaseModel") {
+			const model = await choose(ctx, `Plan3 ${pick.value === "codingModel" ? "coding" : "planning"} model`, await modelItems(ctx, false, scope === "project"), settings.workOrchestrator?.plan3?.[pick.value] ?? INHERIT_MODEL);
+			if (!model) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			settings.workOrchestrator.plan3 ??= {};
+			if (model === INHERIT_MODEL) delete settings.workOrchestrator.plan3[pick.value];
+			else settings.workOrchestrator.plan3[pick.value] = model;
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Plan3 ${pick.value === "codingModel" ? "coding" : "planning"} model: ${model === INHERIT_MODEL ? "same as session" : model}`, "info");
+			continue;
+		}
+		if (pick.kind === "codingEffort") {
+			const level = await choose(
+				ctx,
+				"Plan3 coding effort",
+				["same as session", ...THINKING_LEVELS].map((value) => ({
+					value,
+					label: value,
+					description: value === "same as session" ? "Never switch; execution keeps the session effort" : "Effort for /resume3 execution; planning switches back",
+				})),
+				settings.workOrchestrator?.plan3?.codingEffort ?? "same as session",
+			);
+			if (!level) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			settings.workOrchestrator.plan3 ??= {};
+			if (level === "same as session") delete settings.workOrchestrator.plan3.codingEffort;
+			else settings.workOrchestrator.plan3.codingEffort = level;
+			writeScopedSettings(ctx.cwd, scope, settings);
+			ctx.ui.notify(`Plan3 coding effort: ${level}`, "info");
 			continue;
 		}
 		if (pick.kind === "jev") {

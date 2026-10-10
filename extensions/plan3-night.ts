@@ -47,8 +47,11 @@ function keepAwake() {
 	return child;
 }
 
-export function createNight(pi, { listPlans, currentPlan, resume, research }) {
+export const stopCheckMessage = (plan) => `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
+
+export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan }) {
 	let night = null; // { plan, rules, fp, stalls, paused?, complete? }
+	let baseline; // Outside night mode: fingerprint when the /resume3 run started or was last nudged.
 	let awake, retry;
 	const rulesFile = (cwd) => path.join(cwd, ".pi", "night.md");
 	const readRules = (cwd) => readFile(rulesFile(cwd), "utf8").then((text) => text.trim(), () => "");
@@ -123,8 +126,28 @@ export function createNight(pi, { listPlans, currentPlan, resume, research }) {
 		const reason = nightBlockReason(event);
 		if (reason) return { block: true, reason };
 	});
+	const runPlan = async (ctx) => {
+		const id = executingPlan?.(ctx);
+		return id ? (await listPlans(ctx.cwd)).find((plan) => plan.id === id) : undefined;
+	};
+	pi.on?.("agent_start", async (_event, ctx) => {
+		const plan = !night && await runPlan(ctx);
+		baseline = plan ? await fingerprint(ctx.cwd, plan.file) : undefined;
+	});
+	// Outside night mode, a /resume3 run that did work and stops with runnable steps left gets one
+	// "is there a reason?" continue; a stop after no new work (the reason reply, a chat answer) settles.
+	async function stopCheck(event, ctx) {
+		if (baseline === undefined || event.outcome !== "completed" || event.continue) return;
+		const plan = await runPlan(ctx);
+		if (!plan || plan.status === "complete" || (!plan.next && !plan.wip.length)) return;
+		const fp = await fingerprint(ctx.cwd, plan.file);
+		if (fp === baseline) return;
+		baseline = fp;
+		return { entries: [{ type: "custom_message", customType: "plan3-stop-check", content: stopCheckMessage(plan), display: true }], continue: true };
+	}
 	pi.on?.("agent_before_settle", async (event, ctx) => {
-		if (!night || night.paused || night.complete) return;
+		if (!night) return stopCheck(event, ctx);
+		if (night.paused || night.complete) return;
 		if (event.outcome === "aborted") return stop(ctx, "cancelled");
 		if (event.outcome === "error") {
 			// Pi already retried; quota and outages recover later, so try again without counting a stall.
