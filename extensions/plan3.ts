@@ -333,7 +333,7 @@ function stepMode(lines) {
 const stepHeadings = (lines) => activeSteps(lines).map((step) => lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line)));
 const needsThinkTags = (lines) => {
 	const headings = stepHeadings(lines);
-	return activeSteps(lines).some((step, index) => step.mark !== "done" && headings[index]?.startsWith("### ") && !/\[(?:think|code)\]/i.test(headings[index]));
+	return activeSteps(lines).some((step, index) => step.mark !== "x" && headings[index]?.startsWith("### ") && !/\[(?:think|code)\]/i.test(headings[index]));
 };
 const tagPrompt = `Plan3: before executing, tag phases. Some unfinished phases have no [think]/[code] tag. Edit only those ### phase headings. ${THINK_RULE} Change nothing else in the plan and do not start executing; when this turn ends, code leaves research mode and starts execution on the right model.`;
 
@@ -654,13 +654,14 @@ export default function plan3(pi) {
 	};
 	let tagging = null; // { id, extra } while the tagging run is in flight.
 	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging: () => Boolean(tagging) });
-	// Tagging run ended: leave research now and start execution as a new run (a user abort only clears it).
-	async function afterTagging(ctx, messages) {
+	// Tagging run settled: leave research and start execution (a user abort only clears it). Only at agent_settled
+	// does a prompt start a new run with a fresh system prompt; from agent_end it joins the tagging run, research text included.
+	async function afterTagging(ctx, aborted) {
 		const pending = tagging;
 		if (!pending) return false;
 		tagging = null;
 		research(ctx, false, true);
-		if ((Array.isArray(messages) ? messages : []).at(-1)?.stopReason === "aborted") return true;
+		if (aborted) return true;
 		const plan = (await listPlans(ctx.cwd)).find((candidate) => candidate.id === pending.id);
 		if (plan) await resume(ctx, plan, pending.extra, true);
 		return true;
@@ -1501,8 +1502,11 @@ export default function plan3(pi) {
 		return { message: { ...event.message, content: content.map((block, index) => index === lastText ? { ...block, text } : block) } };
 	});
 	// R25: after a planning turn, show exactly one state-aware next action.
+	pi.on?.("agent_settled", async (event, ctx) => {
+		await afterTagging(ctx, event?.aborted).catch((error) => report(ctx, error));
+	});
 	pi.on?.("agent_end", async (_event, ctx) => {
-		if (await afterTagging(ctx, _event?.messages).catch((error) => { report(ctx, error); return true; })) return;
+		if (tagging) return; // agent_settled starts execution.
 		const optimizing = await verifyOptimize(ctx, _event?.messages).catch((error) => report(ctx, error)) !== false;
 		if (optimizing || await verifyShape(ctx, _event?.messages).catch((error) => report(ctx, error)) || !pointer(ctx).planning) return;
 		const plan = currentPlan(ctx, await listPlans(ctx.cwd).catch(() => []));

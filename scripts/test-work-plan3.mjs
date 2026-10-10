@@ -461,18 +461,24 @@ try {
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### P1 — Decide", "### P1 — Decide [think]").replace("### P2 — Build", "### P2 — Build [code]"));
 		const tagEnd = messages.length;
 		await hooks.get("agent_end")({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+		assert.equal(messages.length, tagEnd, "agent_end would queue execution inside the tagging run (research system prompt)");
+		await hooks.get("agent_settled")({ aborted: false }, ctx);
 		assert(events.some((event) => event.name === "plan3:research" && event.force && !event.enabled), "the tagging run's end forces research off before the next run");
 		assert.equal(researchState(), false);
 		assert.equal(messages.length, tagEnd + 1);
 		assert.match(messages.at(-1).message, /^Plan3: execute\/resume the plan/, "execution starts as a new run");
 		assert.equal(ref(), "anthropic/claude-opus-5-5", "a [think] step stays on the planning model");
-		await hooks.get("agent_end")({ messages: [] }, ctx);
+		await hooks.get("agent_settled")({ aborted: false }, ctx);
 		assert.equal(messages.length, tagEnd + 1, "only the tagging run's end starts execution");
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-01**", "- [x] **T-01**"));
 		await hooks.get("turn_end")({}, ctx);
 		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "the next phase switches back mid-run");
 		await run("resume3", "7e7e7e7e");
 		assert.doesNotMatch(messages.at(-1).message, /before executing, tag phases/, "tagged phases need no tagging turn");
+		// Finished phases ([x] steps) never need tags, so they do not trigger a tagging run.
+		await writeFile(thinkFile, validPlan("7e7e7e7e", "Think", "active", "### P0 — Old\n\n- [x] **T-00** Done long ago\n\n### P1 — Decide [think]\n\n- [ ] **T-01** Choose protocol"));
+		await run("resume3", "7e7e7e7e");
+		assert.doesNotMatch(messages.at(-1).message, /before executing, tag phases/, "a finished untagged phase needs no tagging");
 		await rm(thinkFile);
 		const effortCwd = await mkdtemp(path.join(os.tmpdir(), "plan3-effort-"));
 		await mkdir(path.join(effortCwd, ".pi"));
