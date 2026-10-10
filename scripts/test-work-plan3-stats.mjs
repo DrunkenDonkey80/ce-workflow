@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { classify, createStats, recordCommand, recordReply, sanitize, statsItems, emptyStats } from "../extensions/plan3-stats.ts";
+import { classify, commandShape, createStats, recordCommand, recordReply, sanitize, serialHint, statsItems, emptyStats } from "../extensions/plan3-stats.ts";
 
 assert.equal(classify("cd \"C:/x\" && node scripts/test-work-plan3.mjs"), "test");
 assert.equal(classify("cargo nextest run"), "test");
@@ -73,12 +73,35 @@ assert(saved.waitingMs >= 20, "dialog time is waiting for you");
 assert.equal(saved.compactions.count, 1);
 assert.equal(saved.steps["A-02"].testMs, 3000);
 assert.equal(saved.commands["bash\0npm test"].failures, 1);
+assert.deepEqual([saved.steps["A-02"].replies, saved.steps["A-02"].failures, saved.steps["A-02"].models], [1, 1, { "p/m:medium": 1 }], "steps count replies, failed tools and models");
+// Serial waits: two long runs of one command family with different arguments and no edits between send one steer.
+assert.equal(commandShape('cd "hub" && node import-benchmark.ts --round 0 --case bankya-f1 > out.json'), "node import-benchmark.ts");
+assert.equal(commandShape("py -3 -m unittest discover -s tests -p test_a.py"), "py unittest");
+const run = (command, start, edits = 0, ms = 600_000) => ({ shape: commandShape(command), command, ms, start, end: start + ms, edits });
+const first = run("node bench.ts --case a", 0), fired = new Set();
+assert.match(serialHint(first, run("node bench.ts --case b", 600_000), fired), /`node bench.ts` ran twice in a row[\s\S]*keep them sequential; that is fine too/);
+assert.equal(serialHint(first, run("node bench.ts --case c", 600_000), fired), undefined, "once per family");
+assert.equal(serialHint(first, run("node bench.ts --case b", 600_000, 1), new Set()), undefined, "an edit between means a fix-and-rerun loop");
+assert.equal(serialHint(first, run("node bench.ts --case a", 600_000), new Set()), undefined, "the same command again is a rerun, not a fan-out");
+assert.equal(serialHint(first, run("node bench.ts --case b", 300_000), new Set()), undefined, "overlapping runs are already parallel");
+assert.equal(serialHint(first, run("node bench.ts --case b", 600_000, 0, 60_000), new Set()), undefined, "short runs are not worth it");
+const steers = [], hooks3 = new Map();
+createStats({ on: (name, handler) => hooks3.set(name, handler), sendMessage: (message, options) => steers.push([message.content, options.deliverAs]) }, { plan: async () => ({ file: planFile, log }), step: async () => "A-02" });
+await hooks3.get("agent_start")({}, {});
+for (const [id, command] of [["b1", "node bench.ts --case a"], ["b2", "node bench.ts --case b"]]) {
+	hooks3.get("tool_execution_start")({ toolCallId: id, toolName: "bash", args: { command } }, { cwd: directory });
+	hooks3.get("tool_execution_end")({ toolCallId: id, toolName: "bash", isError: false, durationMs: 600_000 });
+}
+assert.equal(steers.length, 1);
+assert.equal(steers[0][1], "steer");
+await hooks3.get("agent_settled")({}, {});
+assert.equal((await readJson(statsPath)).hints.at(-1).shape, "node bench.ts");
 // Stats persist across sessions: a fresh collector adds to the file.
 const hooks2 = new Map();
 createStats({ on: (name, handler) => hooks2.set(name, handler) }, { plan: async () => ({ file: planFile, log }), step: async () => "A-02" });
 await hooks2.get("agent_start")({}, {});
 await hooks2.get("agent_settled")({}, {});
-assert.equal((await readJson(statsPath)).runs, 2);
+assert.equal((await readJson(statsPath)).runs, 3, "the serial-hint run above plus this one");
 
 const labels = statsItems(saved).map((item) => item.label).join("\n");
 assert.match(labels, /Tests: \d+s/);

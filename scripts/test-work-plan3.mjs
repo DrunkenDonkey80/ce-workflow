@@ -364,6 +364,22 @@ try {
 		assert.equal(messages.length, beforeHuman + 1);
 		assert.match(messages.at(-1).message, /^Plan3: execute\/resume the plan/, "blocked + started executes");
 		await rm(humanFile);
+		// [code] phases that read like judgment work are offered once for [think]; the user's unchecks stay [code].
+		const judgeFile = path.join(directory, "2026-10-08-judge-8d8d8d8d-plan3.md");
+		await writeFile(judgeFile, validPlan("8d8d8d8d", "Judge", "active", "### P1 Harness [code]\n\n- [ ] **J-01** Run the benchmark agents and score their prompts\n\n### P2 Eval [code]\n\n- [ ] **J-02** Tune the metric baseline from the experiments\n\n### P3 Wiring [code]\n\n- [ ] **J-03** Add a CLI flag", "started: 2026-10-01T00:00:00.000Z\n"));
+		ctx.hasUI = true;
+		selectScript = [["judgment work", "P2 Eval"], ["judgment work", null]];
+		await run("resume3", "8d8d8d8d");
+		let judged = await readFile(judgeFile, "utf8");
+		assert.match(judged, /### P1 Harness \[think\]/);
+		assert.match(judged, /### P2 Eval \[code\]/);
+		assert.match(judged, /### P3 Wiring \[code\]/);
+		assert.match(judged, /^tagsChecked: [0-9a-f]{8},[0-9a-f]{8}$/m);
+		selectScript = [];
+		await run("resume3", "8d8d8d8d");
+		assert.equal(selectScript.length, 0, "each phase is asked once");
+		ctx.hasUI = false;
+		await rm(judgeFile);
 		// Requirements: the model defines one, code marks the wip step and asks the user; off steps never get picked.
 		const needFile = path.join(directory, "2026-10-08-needs-8c8c8c8c-plan3.md");
 		await writeFile(needFile, validPlan("8c8c8c8c", "Needs", "active", "### P1 Build [code]\n\n- [x] **N-01** Software\n- [wip] **N-02** Flash firmware\n- [ ] **N-03** Docs\n\n### P2 Bench [code]\n\nneeds: R-printer\n\n- [ ] **N-04** Print a test page"));
@@ -1309,7 +1325,7 @@ try {
 	assert.equal(await input("finish"), undefined, "stale pointers cannot target an unrelated plan");
 
 	// Runtime test/build guidance belongs only to execution, never planning/capture/resolve/advisors.
-	const testGuidance = /concurrency supported by the existing runner|individual assertions|temporary\/build\/output|Await every result|checks affected by fixes/;
+	const testGuidance = /Prefer running independent work in parallel|individual assertions|temporary\/build\/output|Await every result|checks affected by fixes/;
 	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
 		if (!handoff.message.includes("Plan3: execute/resume")) assert.doesNotMatch(handoff.message, testGuidance);
 	}
@@ -1329,17 +1345,20 @@ try {
 	assert.match(execution, /For web UI steps, consult frontend-design as needed/);
 	assert.match(execution, /follow settled design decisions and existing tokens\/components without restarting brainstorming or expanding scope/);
 	assert.match(execution, /Check usability and accessibility with available project tools; native\/TUI work follows platform rules/);
-	assert.match(execution, /Prefer bounded concurrency supported by the existing runner/);
-	assert.match(execution, /independent suites\/build jobs, not individual assertions/);
-	assert.match(execution, /Isolate temporary\/build\/output paths and filenames/);
+	assert.match(execution, /run the smallest existing checks that cover the change/);
+	assert.match(execution, /Prefer running independent work in parallel: test suites or modules and build jobs \(not individual assertions\)/);
+	assert.match(execution, /agent or LLM runs that test different cases \(up to 5 at once/);
+	assert.match(execution, /Isolate temporary\/build\/output paths and filenames, ports and fixtures, lock shared counters/);
 	assert.match(execution, /respect setup\/teardown and build dependencies/);
 	assert.match(execution, /serialize shared hardware, files, databases, ports or process\/global state/);
-	assert.match(execution, /if independence is unproven, run sequentially/);
+	assert.match(execution, /Parallelism is a preference, never a goal/);
+	assert.match(execution, /when a quick look cannot show the items are independent, run them one at a time; never risk mixed or corrupted data/);
 	assert.match(execution, /Await every result; report failures and unavailable checks/);
 	assert.match(execution, /Never skip required checks, weaken assertions or treat stale results as current/);
 	assert.match(execution, /Rerun checks affected by fixes/);
 	assert.match(execution, /required validation covers the final relevant code\/input state/);
-	assert.match(execution, /Avoid unjustified repeat runs or new orchestration solely for parallelism/);
+	assert.match(execution, /Avoid unjustified repeat runs\./);
+	assert.doesNotMatch(execution, /solely for parallelism|use \[think\] sparingly/);
 
 	// Public single-direction entry, forwarded routing, guarded tool, and offline fake peer.
 	const visualId = "56565656", visualFile = path.join(directory, `2026-10-08-visual-${visualId}-plan3.md`);
