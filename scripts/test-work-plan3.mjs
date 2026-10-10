@@ -442,7 +442,7 @@ try {
 		// [think] phases: an untagged phased plan gets one tagging turn in think mode; turn_end follows the current step's phase.
 		await settings({ planningModel: "anthropic/claude-opus-5-5", codingModel: "openai-codex/gpt-6-sol", codingEffort: "medium" });
 		const thinkFile = path.join(directory, "2026-10-02-think-7e7e7e7e-plan3.md");
-		await writeFile(thinkFile, validPlan("7e7e7e7e", "Think", "active", "### Phase 1: Decide\n\n- [ ] **T-01** Choose protocol\n\n### Phase 2: Build\n\n- [ ] **T-02** Code it"));
+		await writeFile(thinkFile, validPlan("7e7e7e7e", "Think", "active", "### P1 — Decide\n\n- [ ] **T-01** Choose protocol\n\n### P2 — Build\n\n- [ ] **T-02** Code it"));
 		entries.push({ type: "custom", customType: "plan3-current", data: { id: "7e7e7e7e", planning: false } });
 		const compactionsBefore = compactions;
 		tokens = 50_000;
@@ -453,7 +453,7 @@ try {
 		assert.match(messages.at(-1).message, /^One-time before executing/, "untagged phases get a tagging turn");
 		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "high"], "tagging runs in think mode");
 		assert.match(await readFile(thinkFile, "utf8"), /thinkTagged: true/);
-		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### Phase 1: Decide", "### Phase 1: Decide [think]"));
+		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### P1 — Decide", "### P1 — Decide [think]"));
 		await hooks.get("turn_end")({}, ctx);
 		assert.equal(ref(), "anthropic/claude-opus-5-5", "a [think] step stays on the planning model");
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-01**", "- [x] **T-01**"));

@@ -329,7 +329,9 @@ function stepMode(lines) {
 	return heading?.startsWith("### ") && THINK.test(heading) ? "think" : "coding";
 }
 // Plans with phase headings but no tags and no thinkTagged mark get one tagging turn on /resume3.
-const needsThinkTags = (lines) => !getMeta(lines, "thinkTagged") && lines.some((line) => line.startsWith("### Phase")) && !lines.some((line) => line.startsWith("### ") && THINK.test(line));
+// A phase is any ### heading with steps under it ("### Phase 2", "### P0 \u2014 \u2026"), matching stepMode.
+const stepHeadings = (lines) => activeSteps(lines).map((step) => lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line)));
+const needsThinkTags = (lines) => !getMeta(lines, "thinkTagged") && stepHeadings(lines).some((heading) => heading?.startsWith("### ")) && !lines.some((line) => line.startsWith("### ") && THINK.test(line));
 const tagPrompt = `One-time before executing: this plan's phases have no [think] tags. Edit only the ### phase headings of unfinished phases. ${THINK_RULE} Change nothing else in the plan, then continue with the execution below; code switches the model when the current step's phase mode changes.
 
 `;
