@@ -28,7 +28,10 @@ ce-workflow selection or checklist menu. Every dialog shows one muted purpose
 line directly below its title. Escape goes to the parent and closes only at the
 root; Enter and Space toggle checklist rows without moving the cursor; parent
 cursors survive submenu round trips; every model list supports keyboard
-filtering. Keep native UI fallbacks for non-TUI modes.
+filtering. Every model picker uses `chooseModel()` in `extensions/work-models.ts`
+(Pi-scoped models first, Tab toggles all models, like Pi's own picker); never
+build one from plain `choose()` + `modelItems()`. Keep native UI fallbacks for
+non-TUI modes.
 
 ## Fast Commit-and-Push Rule
 

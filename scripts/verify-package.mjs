@@ -565,6 +565,7 @@ const GENERAL_TESTS = new Set([
 	"test-work-compaction-notifications.mjs",
 	"test-work-compound-source.mjs",
 	"test-work-dialogs.mjs",
+	"test-work-enter-runs.mjs",
 	"test-work-extension-scout.mjs",
 	"test-work-knowledge.mjs",
 	"test-work-knowledge-retrieval.mjs",

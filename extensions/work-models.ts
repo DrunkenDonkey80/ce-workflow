@@ -32364,7 +32364,7 @@ export default function workModelsExtension(pi) {
 const WORKFLOW_OFF_NOTICE = "Workflow is off — /wo → Settings → Workflow (legacy orchestration) turns it back on.";
 const WO_UTILITY_ACTIONS = { settings: "work-settings", "catch-up": "work-catch-up", context: "work-context", telemetry: "work-telemetry", usage: "work-usage", scout: "work-extension-scout" };
 const UTILITY_MENU_VALUES = new Set(["work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
-const UTILITY_SETTING_KINDS = new Set(["workflow", "openDesignCommand", "planModels", "compactionMode", "compactionModel", "jev", "visionModel", "nonVisionModels", "camera", "subscriptionFooter", "reset", "export", "import"]);
+const UTILITY_SETTING_KINDS = new Set(["workflow", "openDesignCommand", "planModels", "phaseModel", "codingEffort", "compactionMode", "compactionModel", "jev", "visionModel", "nonVisionModels", "camera", "subscriptionFooter", "reset", "export", "import"]);
 
 function onOff(value) {
 	return value ? "✓ on" : "○ off";
@@ -33133,7 +33133,7 @@ async function workSettingsLoop(ctx) {
 			continue;
 		}
 		if (pick.kind === "phaseModel") {
-			const model = await choose(ctx, `Plan3 ${pick.value === "codingModel" ? "coding" : "planning"} model`, await modelItems(ctx, false, scope === "project"), settings.workOrchestrator?.plan3?.[pick.value] ?? INHERIT_MODEL);
+			const model = await chooseModel(ctx, `Plan3 ${pick.value === "codingModel" ? "coding" : "planning"} model`, settings.workOrchestrator?.plan3?.[pick.value] ?? INHERIT_MODEL, false, scope === "project");
 			if (!model) continue;
 			settings = readScopedSettings(ctx.cwd, scope);
 			settings.workOrchestrator ??= {};

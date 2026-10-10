@@ -1966,7 +1966,7 @@ try {
 		notify: ctx.ui.notify,
 		select: async (_title, labels) => { offSettings = labels; return undefined; },
 	} });
-	assert(offSettings.some(label => label.includes("Plan3")) && offSettings.some(label => label.includes("OpenDesign executable:")) &&
+	assert(["Plan models", "Planning model", "Coding model", "Coding effort"].every(name => offSettings.some(label => label.includes(`Plan3 → ${name}`))) && offSettings.some(label => label.includes("OpenDesign executable:")) &&
 		!offSettings.some(label => /Model Advisor|Profile:|Model strategy:|Background verifiers|autonomous-goal|Visual design workflow|Design review proof|pre-commit review/.test(label)),
 		"workflow off settings keep Plan3/OpenDesign launch and hide inactive role/gate/design controls");
 	assert(!offSettings.some(label => label.includes("Camera (project only)")), "camera controls are never a global setting");
