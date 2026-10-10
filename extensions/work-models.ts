@@ -223,7 +223,7 @@ import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge } from "./work-vision.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
 import { catchUpPlanText, catchUpReviewBlocker, PLAN3_CATCH_UP_PACKAGES } from "./plan3-catch-up.ts";
-import { listPlans } from "./plan3.ts";
+import { listPlans, setPlanModelPicker } from "./plan3.ts";
 import {
 	buildKnowledgeQuery,
 	correctKnowledge,
@@ -5122,6 +5122,7 @@ async function modelItems(
 	projectScope = false,
 	availableModels,
 	includeChatgptWeb = false,
+	inherit = undefined,
 ) {
 	const items = [];
 	if (allowNone)
@@ -5137,7 +5138,7 @@ async function modelItems(
 			description:
 				"External read-only advisor; sends its assigned question and requested workspace files through chatgpt_consult",
 		});
-	items.push({
+	items.push(inherit ? { value: INHERIT_MODEL, ...inherit } : {
 		value: INHERIT_MODEL,
 		label: projectScope
 			? "Use global model setting"
@@ -5258,6 +5259,7 @@ async function chooseModel(
 	allowNone = false,
 	projectScope = false,
 	includeChatgptWeb = false,
+	inherit = undefined,
 ) {
 	const allItems = await modelItems(
 		ctx,
@@ -5265,6 +5267,7 @@ async function chooseModel(
 		projectScope,
 		undefined,
 		includeChatgptWeb,
+		inherit,
 	);
 	const scopedModels = Array.isArray(ctx.scopedModels)
 		? ctx.scopedModels.filter((entry) => entry?.model)
@@ -5282,6 +5285,7 @@ async function chooseModel(
 		projectScope,
 		scopedModels,
 		includeChatgptWeb,
+		inherit,
 	);
 	const current = allItems.find((item) => item.value === currentModel);
 	let scoped = true;
@@ -30318,6 +30322,11 @@ export {
 };
 
 export default function workModelsExtension(pi) {
+	// Plan3's per-plan Models menu: undefined = cancelled, null = remove the override.
+	setPlanModelPicker(async (ctx, title, current, inheritLabel) => {
+		const model = await chooseModel(ctx, title, current ?? INHERIT_MODEL, false, false, false, { label: inheritLabel, description: "Remove this plan's override" });
+		return model === undefined ? undefined : model === INHERIT_MODEL ? null : model;
+	});
 	process.env.PI_ASK_USER_CONTEXT_EXPANDED ||= "true";
 	workExtensionPi = pi;
 	// Read once at load; the Settings toggle reloads the runtime (D10).

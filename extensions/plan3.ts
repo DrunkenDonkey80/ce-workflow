@@ -41,8 +41,10 @@ const executeClarification = "Investigate factual unknowns with the available to
 const toolUse = "Use the plan3 tool for status, step markers (step/next with check = actual command and result; mark done with a one-line summary), new steps (add), sections, checkpoint (replaces Resume context) and the title; write prose bodies with write/edit.";
 const PLAN_WARN_BYTES = 40_000; // Resume packet size above which rereading dominates resume cost.
 const DECISION_ID = /\b(?:D|DEC|ADR)-?\d+\b/g;
+// [think] phases run on the planning model at high effort; code switches when the current step's phase changes mode.
+const THINK_RULE = "Tag a phase heading with [think] (### Phase 3: Sync protocol [think]) when its steps are mainly design decisions, investigation or judgment calls a coding model tends to get wrong; such phases run on the planning model at high effort. Leave routine implementation phases untagged and tag sparingly; put decisions in their own phase instead of mixing them into a build phase.";
 // New plans start lean instead of needing Optimize later; code checks the same limits (shapeLint).
-const PLAN_SHAPE = "Plan shape: every step line under 200 characters, details in indented sub-bullets; work needing a VM, hardware, signing, deployment or a human is its own [blocked] step naming its prerequisite once; later-phase work under ## Backlog; commands listed once and referenced by steps; Resume context is one checkpoint under 1.5 KB; readable sentences, no slash chains (a/b/c/d).";
+const PLAN_SHAPE = `Plan shape: every step line under 200 characters, details in indented sub-bullets; work needing a VM, hardware, signing, deployment or a human is its own [blocked] step naming its prerequisite once; later-phase work under ## Backlog; commands listed once and referenced by steps; Resume context is one checkpoint under 1.5 KB; readable sentences, no slash chains (a/b/c/d). ${THINK_RULE}`;
 const OPTIMIZE_RULES = `Plan shape — a current work document, not a transcript:
 1. Resume context is ONE current checkpoint under 1.5 KB (state, exact next action, active blockers), replaced via plan3 checkpoint; never stack "LATEST" paragraphs.
 2. Done steps are one line: "- [x] **ID** <summary>"; their notes, checks and history live in the sidecar log. Every step line stays under 200 characters; an open step's details go in indented sub-bullets.
@@ -56,7 +58,8 @@ const OPTIMIZE_RULES = `Plan shape — a current work document, not a transcript
 10. Git is the baseline for unrelated tracked files; never hash files manually.
 11. As small as faithful: cut repetition, not words. Write readable sentences with normal spacing ("80 mm", "255 passed"); never glue words together or chain items with slashes (a/b/c/d). A [blocked] step names its prerequisite once (no duplicate note).
 12. The plan states what is true and what to do next. Never write the constraints of the current conversion/optimization turn (no product edits, no checks, no status change) into it; they bind only this turn.
-13. Flag over-strict requirements; never relax them yourself. Candidates: "no commit" rules (Plan3 execution commits locally after each verified step and never pushes), measure-first or "do not invent numbers" rules where a reversible default would do, test corpora, exhaustive or hostile testing, hardening or research beyond what the Original request needs, and checks no step's acceptance requires. For each, add one Deferred question (at most 8, most costly first; none when nothing is excessive; no intro prose) as "- **Q-NN** Question?" with indented lines "  - Context: <the ID and its cost>", "  - Recommendation: ...", "  - Independent: yes" and three separate option lines: "  - Option: Keep as is \u2014 ...", "  - Option: Relax \u2014 <a concrete default>", "  - Option: Move to Backlog \u2014 ...". The user decides with /plan3 resolve.`;
+13. Flag over-strict requirements; never relax them yourself. Candidates: "no commit" rules (Plan3 execution commits locally after each verified step and never pushes), measure-first or "do not invent numbers" rules where a reversible default would do, test corpora, exhaustive or hostile testing, hardening or research beyond what the Original request needs, and checks no step's acceptance requires. For each, add one Deferred question (at most 8, most costly first; none when nothing is excessive; no intro prose) as "- **Q-NN** Question?" with indented lines "  - Context: <the ID and its cost>", "  - Recommendation: ...", "  - Independent: yes" and three separate option lines: "  - Option: Keep as is \u2014 ...", "  - Option: Relax \u2014 <a concrete default>", "  - Option: Move to Backlog \u2014 ...". The user decides with /plan3 resolve.
+14. Keep [think] tags on phase headings and add missing ones: ${THINK_RULE}`;
 
 // ---------- parsing ----------
 const split = (text) => ({ eol: text.includes("\r\n") ? "\r\n" : "\n", lines: text.split(/\r?\n/) });
@@ -70,6 +73,7 @@ const getMeta = (lines, key) => lines.slice(1, frontEnd(lines)).find((line) => l
 function setMeta(lines, key, value) {
 	const end = frontEnd(lines);
 	const index = lines.slice(0, end).findIndex((line, i) => i > 0 && line.startsWith(`${key}: `));
+	if (value === undefined) { if (index > 0) lines.splice(index, 1); return; }
 	if (index > 0) lines[index] = `${key}: ${value}`;
 	else lines.splice(end, 0, `${key}: ${value}`);
 }
@@ -162,9 +166,10 @@ function subsection(lines, name) {
 	return lines.slice(start + 1, end < 0 ? undefined : end).join("\n").trim();
 }
 // Top-level bullets count; prose that is not None/a placeholder counts as one question.
+// "None. <note>" is still none ("None of the above…" is a question).
 function questionBodies(body) {
 	const blocks = body.split(/(?=^(?:[-*]|\d+\.) )/m).map((block) => block.trim())
-		.filter((block) => block && !/^(?:none(?: recorded)?|not assessed yet)\.?$/i.test(block.replace(/^(?:[-*]|\d+\.)\s+/, "").trim()));
+		.filter((block) => block && !/^(?:none(?: recorded)?|not assessed yet)(?:\.(?:\s|$)|$)/i.test(block.replace(/^(?:[-*]|\d+\.)\s+/, "").trim()));
 	// An intro sentence above bulleted questions is not a question.
 	const bullets = blocks.filter((block) => /^(?:[-*]|\d+\.) /.test(block));
 	return bullets.length ? bullets : blocks;
@@ -208,6 +213,8 @@ function summarize(file, text, folder) {
 		wip: all.filter((step) => step.mark === "wip").map((step) => step.id),
 		next: all.find((step) => step.mark === "pending")?.id,
 		open: openCount(subsection(lines, "Blocking")) + openCount(subsection(lines, "Deferred")),
+		reviewed: getMeta(lines, "reviewed"),
+		overrides: Object.fromEntries(OVERRIDES.map((key) => [key, getMeta(lines, key)]).filter(([, value]) => value)),
 		request: request ? lines.slice(request.start + 1, request.end).filter((line) => line.startsWith(">")).map((line) => line.replace(/^>\s?/, "")).join("\n") : "",
 	};
 }
@@ -313,6 +320,20 @@ function replaceCheckpoint(lines, text) {
 const PACKET_OMIT = /^(?:phases|amendments|ideas|backlog|imported plan|relevant files|references)/i;
 // Some models put a whole step body on its title line; other steps only need their gist in the packet.
 const clipLine = (line) => line.length <= 200 ? line : `${line.slice(0, 200).replace(/\s+\S*$/, "")} \u2026`;
+// Execution mode of the step work continues with: its ### phase heading tagged [think], else coding.
+const THINK = /\[think\]/i;
+function stepMode(lines) {
+	const all = activeSteps(lines);
+	const step = all.find((candidate) => candidate.mark === "wip") ?? all.find((candidate) => candidate.mark === "pending");
+	const heading = step && lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line));
+	return heading?.startsWith("### ") && THINK.test(heading) ? "think" : "coding";
+}
+// Plans with phase headings but no tags and no thinkTagged mark get one tagging turn on /resume3.
+const needsThinkTags = (lines) => !getMeta(lines, "thinkTagged") && lines.some((line) => line.startsWith("### Phase")) && !lines.some((line) => line.startsWith("### ") && THINK.test(line));
+const tagPrompt = `One-time before executing: this plan's phases have no [think] tags. Edit only the ### phase headings of unfinished phases. ${THINK_RULE} Change nothing else in the plan, then continue with the execution below; code switches the model when the current step's phase mode changes.
+
+`;
+
 function resumePacket(text) {
 	const { lines } = split(text);
 	const all = activeSteps(lines);
@@ -371,12 +392,27 @@ export function planModels(cwd) {
 	const project = readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.plan3?.models;
 	return project ?? readJson(path.join(agentDir, "settings.json")).workOrchestrator?.plan3?.models ?? [];
 }
-// Per-phase model/effort; each key: project setting wins, unset means keep the session's own value.
-export function phaseSettings(cwd) {
+// Per-plan front-matter overrides of the phase settings; they apply whenever a run starts on that plan.
+const OVERRIDES = ["planningModel", "codingModel", "codingEffort"];
+const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+// work-models owns the scoped model picker and registers it here (it imports this module, not the reverse).
+let pickModel;
+export const setPlanModelPicker = (picker) => { pickModel = picker; };
+// When a write rewrites an existing plan (optimize, planning), keep the override keys it dropped.
+function keepOverrides(file, input) {
+	try {
+		const old = split(readFileSync(file, "utf8")).lines, next = split(String(input.content));
+		const missing = OVERRIDES.filter((key) => getMeta(old, key) && !getMeta(next.lines, key));
+		for (const key of missing) setMeta(next.lines, key, getMeta(old, key));
+		if (missing.length) input.content = next.lines.join(next.eol);
+	} catch { /* Unclosed front matter: leave the write alone. */ }
+}
+// Per-phase model/effort; each key: plan override, then project, then global; unset keeps the session's own value.
+export function phaseSettings(cwd, plan?) {
 	const agentDir = process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(), ".pi", "agent");
 	const project = readJson(path.join(cwd, ".pi", "settings.json")).workOrchestrator?.plan3 ?? {};
 	const global = readJson(path.join(agentDir, "settings.json")).workOrchestrator?.plan3 ?? {};
-	const pick = (key) => project[key] ?? global[key];
+	const pick = (key) => plan?.overrides?.[key] ?? project[key] ?? global[key];
 	return { planning: { model: pick("planningModel") }, coding: { model: pick("codingModel"), thinking: pick("codingEffort") } };
 }
 const family = (model) => String(model).split("/").pop().split("-")[0].toLowerCase();
@@ -555,8 +591,10 @@ export default function plan3(pi) {
 
 	// Switch model/effort only when a run starts: a mid-run change re-reads the whole context uncached.
 	// home = the session's own value; a manual change since Plan3's last switch becomes the new home.
-	async function runPhase(ctx, plan, planning) {
-		const last = lastRun(ctx) ?? {}, target = phaseSettings(ctx.cwd)[planning ? "planning" : "coding"];
+	// mode: planning | think (planning model, high effort) | coding.
+	async function runPhase(ctx, plan, mode) {
+		const phases = phaseSettings(ctx.cwd, plan);
+		const last = lastRun(ctx) ?? {}, target = mode === "think" ? { model: phases.planning.model, thinking: "high" } : phases[mode];
 		const current = { model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined, thinking: pi.getThinkingLevel?.() };
 		const home = {}, set = {};
 		for (const key of ["model", "thinking"]) {
@@ -573,11 +611,11 @@ export default function plan3(pi) {
 		}
 		if (set.thinking && set.thinking !== pi.getThinkingLevel?.()) pi.setThinkingLevel?.(set.thinking);
 		set.thinking = pi.getThinkingLevel?.() ?? set.thinking; // the model may clamp the level
-		pi.appendEntry?.(RUN, planning ? { home, set } : { id: plan.id, home, set });
+		pi.appendEntry?.(RUN, mode === "planning" ? { home, set } : { id: plan.id, mode, home, set });
 	}
 
 	async function startPlanning(ctx, plan, lead, fromChat = false, sourceFile?: string) {
-		await runPhase(ctx, plan, true);
+		await runPhase(ctx, plan, "planning");
 		research(ctx, true);
 		setPointer(plan, true);
 		await refresh(ctx);
@@ -586,17 +624,25 @@ export default function plan3(pi) {
 		else send(planningPrompt(plan.file, lead));
 	}
 	async function resume(ctx, plan, extra = "") {
-		if (!await compactFirst(ctx, plan)) return;
 		const planning = ["draft", "blocked"].includes(plan.status);
+		// The tagging turn reads the whole plan: compact first so an automatic compaction mid-turn cannot drop it.
+		const tag = !planning && needsThinkTags(split(await readFile(plan.file, "utf8")).lines);
+		if (!await compactFirst(ctx, plan, tag)) return;
 		if (!planning) {
 			const problems = planDesignGate(ctx.cwd, plan);
 			if (problems.length) return ctx.ui.notify(problems.join("\n"), "warning");
 		}
 		research(ctx, planning);
-		await runPhase(ctx, plan, planning);
+		let mode = "planning";
+		if (!planning) {
+			const { eol, lines } = split(await readFile(plan.file, "utf8"));
+			if (tag) { setMeta(lines, "thinkTagged", "true"); await writeFile(plan.file, lines.join(eol)); }
+			mode = tag ? "think" : stepMode(lines); // Tagging is planning judgment; turn_end switches down if needed.
+		}
+		await runPhase(ctx, plan, mode);
 		setPointer(plan, planning);
 		await refresh(ctx);
-		send(planning ? planningPrompt(plan.file, `Continue planning the ${plan.status} plan at`) : executePrompt(plan, await staleFiles(ctx.cwd, plan), resumePacket(await readFile(plan.file, "utf8"))) + designExecutionGuidance(ctx.cwd, plan) + extra);
+		send(planning ? planningPrompt(plan.file, `Continue planning the ${plan.status} plan at`) : (tag ? tagPrompt : "") + executePrompt(plan, await staleFiles(ctx.cwd, plan), resumePacket(await readFile(plan.file, "utf8"))) + designExecutionGuidance(ctx.cwd, plan) + extra);
 	}
 	// "In /resume3": the last plan /resume3 executed is still the current, non-planning plan.
 	const executingPlan = (ctx) => {
@@ -604,6 +650,16 @@ export default function plan3(pi) {
 		return run?.id && run.id === pointer(ctx).id && !pointer(ctx).planning ? run.id : undefined;
 	};
 	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan });
+	// Mid-run: when the next step's phase changes mode, switch before the next request (phases span hours).
+	async function followMode(ctx) {
+		const id = executingPlan(ctx);
+		const plan = id && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === id);
+		if (!plan) return;
+		const mode = stepMode(split(await readFile(plan.file, "utf8")).lines);
+		if ((lastRun(ctx)?.mode ?? "coding") === mode) return;
+		await runPhase(ctx, plan, mode);
+		ctx.ui?.notify?.(`Plan3: ${mode === "think" ? "[think] phase — planning model, high effort" : "coding phase — coding model and effort"}.`, "info");
+	}
 
 	// Optimize: code snapshots the plan to the log and records what must survive; agent_end verifies.
 	async function optimize(ctx, plan) {
@@ -615,7 +671,7 @@ export default function plan3(pi) {
 		const ids = [...new Set([...steps(lines).map((step) => step.id), ...(decisions ? lines.slice(decisions.start, decisions.end).join("\n").match(DECISION_ID) ?? [] : [])])];
 		await appendLog(plan.file, `Pre-optimize snapshot (${Buffer.byteLength(text)} B)\n\n${quote(text)}`);
 		pi.appendEntry?.(OPTIMIZE, { id: plan.id, ids, open: plan.open, status: plan.status, bytes: Buffer.byteLength(text), sha: sha(text) });
-		await runPhase(ctx, plan, true); // Optimizing is planning work, not coding.
+		await runPhase(ctx, plan, "planning"); // Optimizing is planning work, not coding.
 		setPointer(plan, ["draft", "blocked"].includes(plan.status));
 		research(ctx, true); // Research mode's larger context window fits the whole bloated plan; verification restores it.
 		await refresh(ctx);
@@ -724,9 +780,30 @@ export default function plan3(pi) {
 		const compacted = await compactFirst(ctx, plan, true); // The plan is ready either way; a failed compaction was already reported.
 		ctx.ui.notify(`Plan ready · /resume3 ${plan.id}\n${plan.file}`, "info");
 		if (ctx.hasUI && compacted) {
-			const pick = await showListDialog(ctx, { title: "Plan ready", purpose: "Planning is finished and research is off. Start implementation when you choose.", cursorKey: `plan3-ready:${plan.id}`, items: [{ value: "resume", label: "Start work", description: plan.title }, { value: "later", label: "Not yet", description: `Resume later with /resume3 ${plan.id}` }] });
+			const pick = await showListDialog(ctx, { title: "Plan ready", purpose: "Planning is finished and research is off. Start implementation when you choose.", cursorKey: `plan3-ready:${plan.id}`, items: [...await reviewItems(ctx, plan), { value: "resume", label: "Start work", description: plan.title }, { value: "later", label: "Not yet", description: `Resume later with /resume3 ${plan.id}` }] });
 			if (pick?.value === "resume") await resume(ctx, { ...plan, status: "ready" });
+			if (pick?.value?.startsWith("review")) await advise(ctx, "review", pick.value === "review-all", "", plan);
 		}
+	}
+	// Starting an unreviewed ready plan offers the review first; true = handled (review sent or cancelled).
+	async function offerReview(ctx, plan) {
+		if (plan.status !== "ready" || !ctx.hasUI) return false;
+		const items = await reviewItems(ctx, plan);
+		if (!items.length) return false;
+		const pick = await showListDialog(ctx, { title: "Start work", purpose: `${plan.title} was never reviewed.`, cursorKey: `plan3-start:${plan.id}`, items: [...items, { value: "resume", label: "Start work without review", description: plan.title }] });
+		if (pick?.value?.startsWith("review")) await advise(ctx, "review", pick.value === "review-all", "", plan);
+		return pick?.value !== "resume";
+	}
+	// An unreviewed plan offers review before work: one other model starts it directly; several offer one or all.
+	async function reviewItems(ctx, plan) {
+		if (plan.reviewed) return [];
+		const all = await chooseAdvisors(ctx, true);
+		if (all.length === 1) return [{ value: "review-all", label: "Review first", description: `Second opinion from ${all[0].model}, then start work` }];
+		const one = (await chooseAdvisors(ctx, false))[0];
+		return [
+			...(one ? [{ value: "review-one", label: "Review with one advisor", description: one.model }] : []),
+			...(all.length > 1 ? [{ value: "review-all", label: `Review with all ${all.length} advisors`, description: all.map((advisor) => advisor.model).join(", ") }] : []),
+		];
 	}
 
 	function activateDesign() {
@@ -897,13 +974,14 @@ export default function plan3(pi) {
 		}
 	}
 
-	async function advise(ctx, kind, all, focus) {
-		const plan = currentPlan(ctx, await listPlans(ctx.cwd));
+	async function advise(ctx, kind, all, focus, target?) {
+		const plan = target ?? currentPlan(ctx, await listPlans(ctx.cwd));
 		if (!plan) return ctx.ui.notify("Plan3: no open plan; start one with /plan3 <request>.", "info");
 		const advisors = await chooseAdvisors(ctx, all);
 		if (advisors.length) ctx.ui.notify(`Plan3: selected ${advisors.length} advisor(s) for the agent to launch in parallel: ${advisors.map(advisor => `${advisor.model}${advisor.thinking ? ` (${advisor.thinking})` : ""}`).join(", ")}. ${all ? "Only the exact current model, duplicates and unavailable models are excluded." : "Other-family selection; use all for every other configured model."}`, "info");
 		else ctx.ui.notify(all ? "Plan3: no other available configured Plan model; using the current agent only." : "Plan3: no Plan model from another family is available (/wo → Settings → Plan models); using the current agent only.", "warning");
 		setPointer(plan, pointer(ctx).id === plan.id ? pointer(ctx).planning : false);
+		if (kind === "review") await mutate(plan, (lines) => setMeta(lines, "reviewed", today()));
 		send(advisorPrompt(kind, plan, advisors, focus));
 	}
 
@@ -1054,6 +1132,7 @@ export default function plan3(pi) {
 				...(design && !["reconciled", "abandoned"].includes(design.phase) ? [{ value: "design", label: "Continue visual design", description: "Finish the opted-in design phase before marking the plan ready" }] : []),
 				{ value: "view", label: "View", description: "Open the Markdown file with the default app" },
 				{ value: "resume", label: plan.status === "ready" ? "Start work" : plan.status === "active" ? "Continue work" : "Resume", description: ["draft", "blocked"].includes(plan.status) ? "Continue planning with research on" : "Execute this plan with research off" },
+				...(isOpen(plan) && pickModel ? [{ value: "models", label: `Models: ${Object.entries(plan.overrides ?? {}).map(([key, value]) => `${key.replace(/[A-Z].*/, "")} ${key === "codingEffort" ? "effort " : ""}${value}`).join(" · ") || "inherit"}`, description: "Planning/coding model and coding effort for this plan only" }] : []),
 				...(isOpen(plan) ? [{ value: "optimize", label: "Optimize", description: "Compact into a current work document; history moves to the sidecar log" }] : []),
 				...(isOpen(plan) && (!design || ["reconciled", "abandoned"].includes(design.phase)) ? [{ value: "design", label: "Visual design (optional)", description: "Prepare, continue or review an opted-in OpenDesign phase" }] : []),
 				...(isOpen(plan) ? [{ value: "finish", label: "Force finish", description: "Mark complete now and archive to docs/plans/done" }] : []),
@@ -1074,8 +1153,9 @@ export default function plan3(pi) {
 				} catch (error) { report(ctx, error); }
 			}
 			if (action?.value === "ready") return idle(ctx) && finish(ctx, plan);
-			if (action?.value === "resume") return idle(ctx) && resume(ctx, plan);
+			if (action?.value === "resume") return idle(ctx) && !await offerReview(ctx, plan) && resume(ctx, plan);
 			if (action?.value === "optimize") return idle(ctx) && optimize(ctx, plan);
+			if (action?.value === "models") { await editOverrides(ctx, plan); continue; }
 			if (action?.value === "design") { if (idle(ctx)) await designCommand(ctx, plan); continue; }
 			if (action?.value === "resolve") return idle(ctx) && resolveQuestions(ctx, plan);
 			if (action?.value === "finish") ctx.ui.notify(`Plan3: force-finished → ${await forceFinish(ctx, plan)}`, "info");
@@ -1084,6 +1164,29 @@ export default function plan3(pi) {
 				if (confirm?.value === "yes") { await unlink(plan.file); ctx.ui.notify(`Plan3: deleted ${plan.name}`, "info"); }
 			}
 			await refresh(ctx);
+		}
+	}
+
+	// Rows show the plan's override or what it inherits; "inherit" removes the front-matter key.
+	async function editOverrides(ctx, plan) {
+		let cursor;
+		for (;;) {
+			const overrides = (await listPlans(ctx.cwd)).find((candidate) => candidate.file === plan.file)?.overrides ?? {};
+			const base = phaseSettings(ctx.cwd);
+			const inherited = { planningModel: base.planning.model, codingModel: base.coding.model, codingEffort: base.coding.thinking };
+			const label = { planningModel: "Planning model", codingModel: "Coding model", codingEffort: "Coding effort" };
+			const pick = await showListDialog(ctx, { title: `Models: ${plan.title}`, purpose: "Overrides for this plan only; they apply whenever a run starts on it.", currentValue: cursor, items: OVERRIDES.map((key) => ({ value: key, label: `${label[key]}: ${overrides[key] ?? `inherit (${inherited[key] ?? "same as session"})`}` })) });
+			if (!pick) return;
+			cursor = pick.value;
+			const inherit = `Inherit (${inherited[pick.value] ?? "same as session"})`;
+			// undefined = cancelled, null = remove the override.
+			const value = pick.value === "codingEffort"
+				? await showListDialog(ctx, { title: `${label.codingEffort}: ${plan.title}`, purpose: "Effort while executing this plan; planning switches back.", currentValue: overrides.codingEffort ?? "inherit", items: [{ value: "inherit", label: inherit }, ...EFFORTS.map((level) => ({ value: level, label: level }))] }).then((selected) => selected && (selected.value === "inherit" ? null : selected.value))
+				: await pickModel(ctx, `${label[pick.value]}: ${plan.title}`, overrides[pick.value], inherit);
+			if (value === undefined) continue;
+			const { eol, lines } = split(await readFile(plan.file, "utf8"));
+			setMeta(lines, pick.value, value ?? undefined);
+			await writeFile(plan.file, lines.join(eol));
 		}
 	}
 
@@ -1331,6 +1434,7 @@ export default function plan3(pi) {
 				const plans = await listPlans(ctx.cwd);
 				const plan = args.trim() ? await resolvePlan(ctx.cwd, args, plans) : currentPlan(ctx, plans);
 				if (!plan) return ctx.ui.notify("No open Plan3 plan. /plans3 lists them; /plan3 <request> starts one.", "info");
+				if (await offerReview(ctx, plan)) return;
 				await resume(ctx, plan);
 			} catch (error) {
 				report(ctx, error);
@@ -1365,10 +1469,11 @@ export default function plan3(pi) {
 	pi.on?.("tool_call", (event, ctx) => {
 		if (event.toolName !== "write" || !/^---\r?\nplan3: true\r?\n/.test(String(event.input?.content ?? ""))) return;
 		const file = path.resolve(ctx.cwd, String(event.input?.path ?? ""));
-		if (path.dirname(file).toLowerCase() !== plansDir(ctx.cwd).toLowerCase() || existsSync(file)) return;
+		if (path.dirname(file).toLowerCase() !== plansDir(ctx.cwd).toLowerCase()) return;
+		if (existsSync(file)) return keepOverrides(file, event.input);
 		return { block: true, reason: "New Plan3 plans come from the template: call plan3 with action create and text = the request, then fill the returned file in place (keep its headings)." };
 	});
-	pi.on?.("turn_end", (_event, ctx) => refresh(ctx)); // Steps may be written with write/edit.
+	pi.on?.("turn_end", async (_event, ctx) => { await refresh(ctx); await followMode(ctx); }); // Steps may be written with write/edit.
 	// Remove only Plan3's trailing model-owned command footer; code owns the phase handoff.
 	pi.on?.("message_end", (event, ctx) => {
 		if (!pointer(ctx).planning || event.message?.role !== "assistant" || event.message.stopReason !== "stop") return;

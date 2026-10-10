@@ -431,6 +431,37 @@ try {
 		await run("resume3", "7c7c7c7c");
 		assert.equal(ref(), "anthropic/claude-opus-4");
 		assert.match(notices.at(-1).message, /could not switch to openai-codex\/no-auth/);
+		// A per-plan front-matter override beats project/global and survives a rewrite that drops it.
+		await settings({ codingModel: "openai-codex/gpt-6-sol", codingEffort: "medium" });
+		await writeFile(execFile, (await readFile(execFile, "utf8")).replace("status: active", "status: active\ncodingModel: anthropic/claude-opus-5-5\ncodingEffort: low"));
+		await run("resume3", "7c7c7c7c");
+		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "low"], "the plan's override wins");
+		const rewrite = { toolName: "write", input: { path: execFile, content: validPlan("7c7c7c7c", "Exec", "active", "- [ ] **E-01** Code") } };
+		assert.equal(hooks.get("tool_call")(rewrite, ctx), undefined);
+		assert.match(rewrite.input.content, /codingModel: anthropic\/claude-opus-5-5\ncodingEffort: low/, "a rewrite keeps the overrides");
+		// [think] phases: an untagged phased plan gets one tagging turn in think mode; turn_end follows the current step's phase.
+		await settings({ planningModel: "anthropic/claude-opus-5-5", codingModel: "openai-codex/gpt-6-sol", codingEffort: "medium" });
+		const thinkFile = path.join(directory, "2026-10-02-think-7e7e7e7e-plan3.md");
+		await writeFile(thinkFile, validPlan("7e7e7e7e", "Think", "active", "### Phase 1: Decide\n\n- [ ] **T-01** Choose protocol\n\n### Phase 2: Build\n\n- [ ] **T-02** Code it"));
+		entries.push({ type: "custom", customType: "plan3-current", data: { id: "7e7e7e7e", planning: false } });
+		const compactionsBefore = compactions;
+		tokens = 50_000;
+		await run("resume3", "7e7e7e7e");
+		tokens = 0;
+		assert.equal(compactions, compactionsBefore + 1, "tagging compacts first even for the current plan");
+		compactions = compactionsBefore; // Later checks count compactions from zero.
+		assert.match(messages.at(-1).message, /^One-time before executing/, "untagged phases get a tagging turn");
+		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "high"], "tagging runs in think mode");
+		assert.match(await readFile(thinkFile, "utf8"), /thinkTagged: true/);
+		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### Phase 1: Decide", "### Phase 1: Decide [think]"));
+		await hooks.get("turn_end")({}, ctx);
+		assert.equal(ref(), "anthropic/claude-opus-5-5", "a [think] step stays on the planning model");
+		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-01**", "- [x] **T-01**"));
+		await hooks.get("turn_end")({}, ctx);
+		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "the next phase switches back mid-run");
+		await run("resume3", "7e7e7e7e");
+		assert.doesNotMatch(messages.at(-1).message, /One-time before executing/, "tagging happens once");
+		await rm(thinkFile);
 		const effortCwd = await mkdtemp(path.join(os.tmpdir(), "plan3-effort-"));
 		await mkdir(path.join(effortCwd, ".pi"));
 		await settings({ codingEffort: "medium", codingModel: "openai-codex/gpt-6-sol" });
@@ -507,7 +538,7 @@ try {
 	await writeFile(path.join(cwd, "src", "a.js"), "a2\n");
 	gitEnv = { GIT_AUTHOR_DATE: "2022-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2022-01-01T00:00:00Z" };
 	git("commit", "-qam", "change a");
-	await writeFile(csvFile, (await readFile(csvFile, "utf8")).replace("Next: CSV-03", "Touch `src/a.js` and `src/b.js`.").replace(/^updated: .*$/m, "updated: 2021-01-01T00:00:00.000Z\r"));
+	await writeFile(csvFile, (await readFile(csvFile, "utf8")).replace("Next: CSV-03", "Touch `src/a.js` and `src/b.js`.").replace(/^updated: .*$/m, "updated: 2021-01-01T00:00:00.000Z\r\nthinkTagged: true\r"));
 	await run("resume3");
 	assert.equal(compactions, 1, "same plan does not compact");
 	assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: false });
@@ -599,6 +630,29 @@ try {
 	assert.deepEqual(await Promise.all(viewFiles.map(file => readFile(file, "utf8"))), beforeViewBytes);
 	assert.equal(messages.length, beforeViewMessages, "Not yet never starts implementation");
 	await rm(handoffFile); entries.splice(beforeHandoffEntries);
+	// Plan ready offers review when the plan was never reviewed: one other model → "Review first"; several → one or all.
+	{
+		const settingsFile = path.join(agentDir, "settings.json"), savedSettings = await readFile(settingsFile, "utf8").catch(() => "{}");
+		const useModels = (models) => writeFile(settingsFile, JSON.stringify({ workOrchestrator: { plan3: { models: models.map((model) => ({ model, thinking: "high" })) } } }));
+		const reviewFile = path.join(directory, "2026-10-08-review-46464646-plan3.md"), beforeReviewEntries = entries.length;
+		await useModels(["openai-codex/gpt-6-astra", "zai/glm-5.3"]);
+		await writeFile(reviewFile, validPlan("46464646", "Reviewable", "draft", "- [ ] **R-01** Implement"));
+		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Plan ready", "Review with all 2 advisors", (labels) => assert.deepEqual(labels.slice(0, 2).map((label) => label.split(" — ")[0].trim()), ["Review with one advisor", "Review with all 2 advisors"])]];
+		await run("plans3");
+		assert.equal(selectScript.length, 0);
+		assert.deepEqual([...messages.at(-1).message.matchAll(/model: "([^"]+)"/g)].map((match) => match[1]), ["openai-codex/gpt-6-astra:high", "zai/glm-5.3:high"]);
+		assert.match(await readFile(reviewFile, "utf8"), /^reviewed: \d{4}-\d{2}-\d{2}$/m, "review marks the plan");
+		await writeFile(reviewFile, validPlan("46464646", "Reviewable", "draft", "- [ ] **R-01** Implement", "reviewed: 2026-10-01\n"));
+		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Plan ready", "Not yet", (labels) => assert(!labels.some((label) => /Review/.test(label)), "a reviewed plan is not offered review")]];
+		await run("plans3");
+		await useModels(["openai-codex/gpt-6-astra"]);
+		await writeFile(reviewFile, validPlan("46464646", "Reviewable", "draft", "- [ ] **R-01** Implement"));
+		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Plan ready", "Not yet", (labels) => assert.match(labels[0], /Review first/, "one other model starts the review directly")]];
+		await run("plans3");
+		assert.equal(selectScript.length, 0);
+		await writeFile(settingsFile, savedSettings);
+		await rm(reviewFile); entries.splice(beforeReviewEntries);
+	}
 	for (const failure of [{ code: 1, stderr: "no default handler" }, new Error("opener missing")]) {
 		execResult = failure;
 		selectScript = [["Plans3", "Fresh"], ["Fresh", "View"], ["Plans3", null]];
@@ -687,6 +741,8 @@ try {
 	assert.equal(notices.at(-1).message, `Next: /plan3 resolve ${authId} — answer 3 open question(s).`);
 	assert.equal((await tool({ action: "get" })).openQuestions, 3);
 	assert.equal((await tool({ action: "get", plan: firstId })).openQuestions, undefined);
+	await writeFile(authFile, (await readFile(authFile, "utf8")).replace("Which session store?", "None. D-08 is a labeled assumption."));
+	assert.equal((await tool({ action: "get" })).openQuestions, 2, "None. plus a note is not a question");
 	const beforeResolve = messages.length;
 	await run("plan3", `resolve ${authId}`);
 	assert.equal(messages.length, beforeResolve);
@@ -1389,7 +1445,9 @@ try {
 	assert.equal(selectScript.length, 0);
 	assert.equal(messages.length, beforeReadyMessages, "finish never executes without Start work");
 	assert.match(await readFile(visualFile, "utf8"), /^status: ready$/m);
+	selectScript = [["Start work", "Start work without review"]];
 	await run("resume3", visualId);
+	assert.equal(selectScript.length, 0, "/resume3 on an unreviewed ready plan offers review first");
 	assert.match(messages.at(-1).message, /Approved visual snapshot:/);
 	assert.match(messages.at(-1).message, /frozen approved snapshot/);
 	assert.match(messages.at(-1).message, /Prototype code is not production source/);
