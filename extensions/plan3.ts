@@ -335,9 +335,7 @@ const needsThinkTags = (lines) => {
 	const headings = stepHeadings(lines);
 	return activeSteps(lines).some((step, index) => step.mark !== "done" && headings[index]?.startsWith("### ") && !/\[(?:think|code)\]/i.test(headings[index]));
 };
-const tagPrompt = `Plan3: before executing, tag phases. Some unfinished phases have no [think]/[code] tag. Edit only those ### phase headings. ${THINK_RULE} Change nothing else in the plan, then continue with the execution below; code switches the model when the current step's phase mode changes.
-
-`;
+const tagPrompt = `Plan3: before executing, tag phases. Some unfinished phases have no [think]/[code] tag. Edit only those ### phase headings. ${THINK_RULE} Change nothing else in the plan and do not start executing; when this turn ends, code leaves research mode and starts execution on the right model.`;
 
 function resumePacket(text) {
 	const { lines } = split(text);
@@ -571,7 +569,8 @@ export default function plan3(pi) {
 	};
 	const report = (ctx, error) => ctx.ui.notify(`Plan3: ${error.message}`, "error");
 	const setPointer = (plan, planning) => pi.appendEntry?.(POINTER, { id: plan.id, planning: Boolean(planning) });
-	const research = (ctx, enabled) => pi.events?.emit?.("plan3:research", { ctx, enabled });
+	// force: switch now even mid-run (default defers "off" until idle); used at agent_end, before the next run's system prompt.
+	const research = (ctx, enabled, force = false) => pi.events?.emit?.("plan3:research", { ctx, enabled, force });
 	// followUp: agent_end hooks (shape/optimize repair) can fire while the agent is still streaming; ignored when idle.
 	const send = (message) => pi.sendUserMessage(message, { expandPromptTemplates: false, deliverAs: "followUp" });
 
@@ -587,6 +586,7 @@ export default function plan3(pi) {
 	async function compactFirst(ctx, plan, force = false) {
 		if (!force && plan && pointer(ctx).id === plan.id) return true;
 		if ((ctx.getContextUsage?.()?.tokens ?? 0) < COMPACT_MIN_TOKENS || typeof ctx.compact !== "function") return true;
+		research(ctx, false); // Research mode uses Pi's native compaction; plan switches use the configured mode (e.g. Ultrafull). Callers set the next mode.
 		return new Promise((resolve) => ctx.compact({
 			customInstructions: "Plan3 is switching plans; the plan file holds the durable state. Keep only what the next plan needs.",
 			onComplete: () => resolve(true),
@@ -628,49 +628,49 @@ export default function plan3(pi) {
 		else if (fromChat) send(writePrompt(plan.file));
 		else send(planningPrompt(plan.file, lead));
 	}
-	async function resume(ctx, plan, extra = "") {
+	async function resume(ctx, plan, extra = "", noTag = false) {
 		const planning = ["draft", "blocked"].includes(plan.status);
 		// The tagging turn reads the whole plan: compact first so an automatic compaction mid-turn cannot drop it.
-		const tag = !planning && needsThinkTags(split(await readFile(plan.file, "utf8")).lines);
+		const tag = !planning && !noTag && needsThinkTags(split(await readFile(plan.file, "utf8")).lines);
 		if (!await compactFirst(ctx, plan, tag)) return;
 		if (!planning) {
 			const problems = planDesignGate(ctx.cwd, plan);
 			if (problems.length) return ctx.ui.notify(problems.join("\n"), "warning");
 		}
 		research(ctx, planning || tag); // Tagging reads the whole plan: research mode's larger context.
-		let mode = "planning";
-		tagging = null;
-		if (!planning) {
-			const { lines } = split(await readFile(plan.file, "utf8"));
-			if (tag) tagging = { id: plan.id, marks: stepMarks(lines) };
-			mode = tag ? "think" : stepMode(lines); // Tagging is planning judgment; turn_end switches down if needed.
-		}
+		// Research instructions are fixed per run, so tagging is its own run; agent_end leaves research and starts execution.
+		tagging = tag ? { id: plan.id, extra } : null;
+		const mode = planning ? "planning" : tag ? "think" : stepMode(split(await readFile(plan.file, "utf8")).lines);
 		await runPhase(ctx, plan, mode);
 		setPointer(plan, planning);
 		await refresh(ctx);
-		send(planning ? planningPrompt(plan.file, `Continue planning the ${plan.status} plan at`) : (tag ? tagPrompt : "") + executePrompt(plan, await staleFiles(ctx.cwd, plan), resumePacket(await readFile(plan.file, "utf8"))) + designExecutionGuidance(ctx.cwd, plan) + extra);
+		if (tag) return send(`${tagPrompt}\nPlan: ${JSON.stringify(plan.file)}`);
+		send(planning ? planningPrompt(plan.file, `Continue planning the ${plan.status} plan at`) : executePrompt(plan, await staleFiles(ctx.cwd, plan), resumePacket(await readFile(plan.file, "utf8"))) + designExecutionGuidance(ctx.cwd, plan) + extra);
 	}
 	// "In /resume3": the last plan /resume3 executed is still the current, non-planning plan.
 	const executingPlan = (ctx) => {
 		const run = lastRun(ctx);
-		return run?.id && run.id === pointer(ctx).id && !pointer(ctx).planning ? run.id : undefined;
+		return run?.id && run.id === pointer(ctx).id && !pointer(ctx).planning && tagging?.id !== run.id ? run.id : undefined;
 	};
-	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan });
+	let tagging = null; // { id, extra } while the tagging run is in flight.
+	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging: () => Boolean(tagging) });
+	// Tagging run ended: leave research now and start execution as a new run (a user abort only clears it).
+	async function afterTagging(ctx, messages) {
+		const pending = tagging;
+		if (!pending) return false;
+		tagging = null;
+		research(ctx, false, true);
+		if ((Array.isArray(messages) ? messages : []).at(-1)?.stopReason === "aborted") return true;
+		const plan = (await listPlans(ctx.cwd)).find((candidate) => candidate.id === pending.id);
+		if (plan) await resume(ctx, plan, pending.extra, true);
+		return true;
+	}
 	// Mid-run: when the next step's phase changes mode, switch before the next request (phases span hours).
-	let tagging = null;
-	const stepMarks = (lines) => activeSteps(lines).map((step) => step.mark).join();
 	async function followMode(ctx) {
 		const id = executingPlan(ctx);
 		const plan = id && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === id);
 		if (!plan) return;
-		const lines = split(await readFile(plan.file, "utf8")).lines;
-		if (tagging?.id === plan.id) {
-			// Done when every unfinished phase is tagged, or execution already moved a step marker.
-			if (needsThinkTags(lines) && stepMarks(lines) === tagging.marks) return;
-			tagging = null;
-			research(ctx, false);
-		}
-		const mode = stepMode(lines);
+		const mode = stepMode(split(await readFile(plan.file, "utf8")).lines);
 		if ((lastRun(ctx)?.mode ?? "coding") === mode) return;
 		await runPhase(ctx, plan, mode);
 		ctx.ui?.notify?.(`Plan3: ${mode === "think" ? "[think] phase — planning model, high effort" : "coding phase — coding model and effort"}.`, "info");
@@ -1502,6 +1502,7 @@ export default function plan3(pi) {
 	});
 	// R25: after a planning turn, show exactly one state-aware next action.
 	pi.on?.("agent_end", async (_event, ctx) => {
+		if (await afterTagging(ctx, _event?.messages).catch((error) => { report(ctx, error); return true; })) return;
 		const optimizing = await verifyOptimize(ctx, _event?.messages).catch((error) => report(ctx, error)) !== false;
 		if (optimizing || await verifyShape(ctx, _event?.messages).catch((error) => report(ctx, error)) || !pointer(ctx).planning) return;
 		const plan = currentPlan(ctx, await listPlans(ctx.cwd).catch(() => []));

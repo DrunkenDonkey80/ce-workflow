@@ -644,11 +644,22 @@ function quotaColor(value) {
 	return value > 80 ? "error" : value > 50 ? "warning" : "text";
 }
 
-function windowText(window, now, barCells = 8) {
+// Local reset moment for windows longer than 5h: weekday within a week, else day.month ("Tue 12:35", "3.11 12:35").
+// Built by hand: some locales add separators/suffixes ("пн, 10:00 ч.").
+export function resetMoment(resetsAt, now) {
+	const date = new Date(resetsAt);
+	const day = resetsAt - now < 6.5 * 86_400_000
+		? date.toLocaleDateString(undefined, { weekday: "short" }).replace(/\.$/, "")
+		: `${date.getDate()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
+	const pad = (value) => String(value).padStart(2, "0");
+	return `${day.charAt(0).toUpperCase()}${day.slice(1)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function windowText(window, now, barCells = 8, dates = false) {
 	const pct = Math.round(window.usedPercent);
 	const filled = Math.round((pct / 100) * barCells);
 	const reset = window.resetsAt
-		? `(${formatDuration(window.resetsAt - now)})`
+		? `(${formatDuration(window.resetsAt - now)}${dates && window.label !== "5h" ? `, ${resetMoment(window.resetsAt, now)}` : ""})`
 		: "";
 	return `${window.label}${reset} [${"█".repeat(filled)}${"░".repeat(barCells - filled)}] ${pct}%`;
 }
@@ -693,6 +704,7 @@ export function renderQuotaRows(
 	theme,
 	width,
 	now = Date.now(),
+	{ resetDates = false } = {},
 ) {
 	if (width < MIN_WIDTH) return [];
 	const lines = [];
@@ -743,7 +755,7 @@ export function renderQuotaRows(
 		for (const [index, window] of state.snapshot.windows.entries()) {
 			const suffix = index === state.snapshot.windows.length - 1 ? marker : "";
 			let prefix = currentProvider === provider.id ? "" : `${display.label} `;
-			let body = windowText(window, now, 8);
+			let body = windowText(window, now, 8, resetDates);
 			let plain = `${prefix}${body}${suffix}`;
 			if (parts.length && plainWidth + 3 + visibleWidth(plain) > width) {
 				flush();
@@ -751,7 +763,11 @@ export function renderQuotaRows(
 				plain = `${prefix}${body}${suffix}`;
 			}
 			for (let cells = 7; visibleWidth(plain) > width && cells >= 4; cells--) {
-				body = windowText(window, now, cells);
+				body = windowText(window, now, cells, resetDates);
+				plain = `${prefix}${body}${suffix}`;
+			}
+			if (resetDates && visibleWidth(plain) > width) {
+				body = windowText(window, now, 4); // Narrow terminal: the countdown is enough.
 				plain = `${prefix}${body}${suffix}`;
 			}
 			plain = truncatePlain(plain, width);
@@ -1206,7 +1222,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 					const status = statuses.trim() && !absorbed ? [theme.fg("dim", truncatePlain(statuses, width))] : [];
 					return width < MIN_WIDTH
 						? [...model, ...status]
-						: [...model, ...renderQuotaRows(shown(), states, theme, width, now()), ...status];
+						: [...model, ...renderQuotaRows(shown(), states, theme, width, now(), { resetDates: setting().resetDates !== false }), ...status];
 				},
 				dispose() {
 					if (gen === generation) stop({ restore: false });
@@ -1248,5 +1264,6 @@ export function createSubscriptionFooterController(pi, options = {}) {
 export const SUBSCRIPTION_FOOTER_DEFAULTS = Object.freeze({
 	enabled: false,
 	incidents: false,
+	resetDates: true,
 	ownershipNoticeAcknowledged: false,
 });

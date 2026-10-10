@@ -1416,8 +1416,11 @@ try {
 	const researchEntryCount = researchEntries.length;
 	listeners.get("plan3:research")({ ctx: researchCtx, enabled: true });
 	assert.equal(researchEntries.length, researchEntryCount);
-	listeners.get("plan3:research")({ ctx: researchCtx, enabled: false });
-	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: notebook });
+	const busyCtx = { ...researchCtx, isIdle: () => false };
+	listeners.get("plan3:research")({ ctx: busyCtx, enabled: false });
+	assert.equal(researchEntries.at(-1).data.stopping, true, "a mid-run off only defers");
+	listeners.get("plan3:research")({ ctx: busyCtx, enabled: false, force: true });
+	assert.deepEqual(researchEntries.at(-1).data, { mode: "off", notes: notebook }, "force switches off now, before the next run's system prompt");
 
 	assert.equal(researchWidgets.at(-1), undefined, "banner disappears on exit");
 	assert.equal(exitCompactions, 0, "manual exit never compacts, even above 150k");

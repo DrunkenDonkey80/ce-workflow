@@ -6562,7 +6562,7 @@ function persistResearchContext(ctx) {
 	showResearchContext(ctx);
 }
 
-function setResearchContext(ctx, enabled) {
+function setResearchContext(ctx, enabled, force = false) {
 	if (enabled && contextCompactState.inFlight)
 		throw new Error("Wait for the current compaction to finish, then start research mode.");
 	if (enabled && researchContext?.stopping) {
@@ -6571,7 +6571,7 @@ function setResearchContext(ctx, enabled) {
 		return;
 	}
 	if (Boolean(researchContext) === Boolean(enabled)) return;
-	if (!enabled && (ctx.isIdle?.() === false || ctx.hasPendingMessages?.())) {
+	if (!enabled && !force && (ctx.isIdle?.() === false || ctx.hasPendingMessages?.())) {
 		researchContext = { ...researchContext, stopping: true };
 		persistResearchContext(ctx);
 		return;
@@ -32192,10 +32192,10 @@ export default function workModelsExtension(pi) {
 		},
 	});
 	// Plan3 (separate extension) turns research on for planning and off on /plan3 finish.
-	pi.events?.on?.("plan3:research", ({ ctx, enabled }) => {
-		if (!ctx || Boolean(researchContext && !researchContext.stopping) === Boolean(enabled)) return;
+	pi.events?.on?.("plan3:research", ({ ctx, enabled, force }) => {
+		if (!ctx || (Boolean(researchContext && !researchContext.stopping) === Boolean(enabled) && !(force && researchContext?.stopping))) return;
 		try {
-			setResearchContext(ctx, Boolean(enabled));
+			setResearchContext(ctx, Boolean(enabled), force);
 			notifyResearchContext(ctx);
 		} catch (error) {
 			notify(ctx, `Plan3 could not switch research mode: ${formatError(error)}`, "warning");
@@ -32488,6 +32488,11 @@ async function editSubscriptionFooterSettings(ctx) {
 					...boolLabel("provider incident markers", current.incidents),
 					description: "Global only · Claude, Codex, and Copilot public status",
 				},
+				{
+					value: "resetDates",
+					...boolLabel("reset date/time on weekly quotas", current.resetDates),
+					description: "Global only · 7d (3d 17h, Tue 12:35); the 5h window keeps the countdown only",
+				},
 				...PRODUCTION_PROVIDERS.map((entry) => ({
 					value: `provider:${entry.id}`,
 					...boolLabel(`${entry.label} quota row`, !(current.hidden ?? []).includes(entry.id)),
@@ -32540,7 +32545,7 @@ async function editSubscriptionFooterSettings(ctx) {
 		};
 		writeScopedSettings(ctx.cwd, "global", settings);
 		subscriptionFooterController.apply(ctx);
-		if (result.item.value !== "enabled")
+		if (result.item.value === "incidents")
 			ctx.ui.notify(
 				`Provider incident markers: ${current.incidents ? "off" : "on"}`,
 				"info",

@@ -60,7 +60,7 @@ const api = {
 	registerCommand: (name, command) => commands.set(name, command),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
-	events: { emit: (name, data) => events.push({ name, enabled: data.enabled }), on: (name, handler) => listeners.set(name, handler) },
+	events: { emit: (name, data) => events.push({ name, enabled: data.enabled, ...(data.force ? { force: true } : {}) }), on: (name, handler) => listeners.set(name, handler) },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
 };
@@ -444,25 +444,30 @@ try {
 		const thinkFile = path.join(directory, "2026-10-02-think-7e7e7e7e-plan3.md");
 		await writeFile(thinkFile, validPlan("7e7e7e7e", "Think", "active", "### P1 — Decide\n\n- [ ] **T-01** Choose protocol\n\n### P2 — Build\n\n- [ ] **T-02** Code it"));
 		entries.push({ type: "custom", customType: "plan3-current", data: { id: "7e7e7e7e", planning: false } });
-		const compactionsBefore = compactions;
+		const compactionsBefore = compactions, eventsBefore = events.length;
 		tokens = 50_000;
 		await run("resume3", "7e7e7e7e");
+		assert.deepEqual(events.slice(eventsBefore).filter((event) => event.name === "plan3:research").map((event) => event.enabled), [false, true], "research is off while compacting (configured mode), back on for tagging");
 		tokens = 0;
 		assert.equal(compactions, compactionsBefore + 1, "tagging compacts first even for the current plan");
 		compactions = compactionsBefore; // Later checks count compactions from zero.
 		assert.match(messages.at(-1).message, /^Plan3: before executing, tag phases/, "untagged phases get a tagging turn");
 		const researchState = () => events.filter((event) => event.name === "plan3:research").at(-1)?.enabled;
 		assert.equal(researchState(), true, "tagging runs in research mode");
-		await hooks.get("turn_end")({}, ctx);
-		assert.equal(researchState(), true, "research stays on until the tagging edit lands");
+		assert.doesNotMatch(messages.at(-1).message, /execute\/resume the plan/, "tagging is its own run, without the execute prompt");
 		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "high"], "tagging runs in think mode");
-		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### P1 — Decide", "### P1 — Decide [think]"));
 		await hooks.get("turn_end")({}, ctx);
-		assert.equal(researchState(), true, "one untagged phase left keeps tagging going");
-		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### P2 — Build", "### P2 — Build [code]"));
-		await hooks.get("turn_end")({}, ctx);
+		assert.equal(ref(), "anthropic/claude-opus-5-5", "turn_end leaves the tagging run alone");
+		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("### P1 — Decide", "### P1 — Decide [think]").replace("### P2 — Build", "### P2 — Build [code]"));
+		const tagEnd = messages.length;
+		await hooks.get("agent_end")({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+		assert(events.some((event) => event.name === "plan3:research" && event.force && !event.enabled), "the tagging run's end forces research off before the next run");
+		assert.equal(researchState(), false);
+		assert.equal(messages.length, tagEnd + 1);
+		assert.match(messages.at(-1).message, /^Plan3: execute\/resume the plan/, "execution starts as a new run");
 		assert.equal(ref(), "anthropic/claude-opus-5-5", "a [think] step stays on the planning model");
-		assert.equal(researchState(), false, "every unfinished phase tagged ends research mode");
+		await hooks.get("agent_end")({ messages: [] }, ctx);
+		assert.equal(messages.length, tagEnd + 1, "only the tagging run's end starts execution");
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-01**", "- [x] **T-01**"));
 		await hooks.get("turn_end")({}, ctx);
 		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "the next phase switches back mid-run");

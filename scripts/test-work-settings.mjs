@@ -1543,6 +1543,7 @@ try {
 			JSON.stringify({
 				enabled: false,
 				incidents: false,
+				resetDates: true,
 				ownershipNoticeAcknowledged: false,
 			}),
 		"subscription footer defaults off and ignores contradictory project settings",

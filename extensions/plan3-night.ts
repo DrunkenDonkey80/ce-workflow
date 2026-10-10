@@ -49,7 +49,7 @@ function keepAwake() {
 
 export const stopCheckMessage = (plan) => `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
 
-export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan }) {
+export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging }) {
 	let night = null; // { plan, rules, fp, stalls, paused?, complete? }
 	let baseline; // Outside night mode: fingerprint when the /resume3 run started or was last nudged.
 	let awake, retry;
@@ -146,6 +146,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		return { entries: [{ type: "custom_message", customType: "plan3-stop-check", content: stopCheckMessage(plan), display: true }], continue: true };
 	}
 	pi.on?.("agent_before_settle", async (event, ctx) => {
+		if (tagging?.()) return; // The tagging run ends on its own; plan3 starts execution after it.
 		if (!night) return stopCheck(event, ctx);
 		if (night.paused || night.complete) return;
 		if (event.outcome === "aborted") return stop(ctx, "cancelled");

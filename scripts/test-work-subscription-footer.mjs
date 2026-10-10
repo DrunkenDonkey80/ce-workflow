@@ -9,6 +9,8 @@ import {
 	createSubscriptionFooterController,
 	renderModelRow,
 	renderQuotaRows,
+	resetMoment,
+	SUBSCRIPTION_FOOTER_DEFAULTS,
 	stripAnsi,
 	truncatePlain,
 	visibleWidth,
@@ -739,6 +741,23 @@ for (const [index, provider] of renderProviders.entries())
 			],
 		},
 	});
+// Weekly windows can show the local reset moment (default on); 5h keeps the countdown only; narrow widths drop it.
+{
+	const day = 86_400_000;
+	const datedState = new Map([["dated", { authenticated: true, lastSuccessAt: now(), snapshot: { capturedAt: now(), windows: [
+		{ id: "5h", label: "5h", usedPercent: 10, resetsAt: now() + 3_600_000 },
+		{ id: "7d", label: "7d", usedPercent: 20, resetsAt: now() + 3 * day + 17 * 3_600_000 },
+	] } }]]);
+	const datedProvider = [{ id: "dated", label: "Dated" }];
+	const moment = resetMoment(now() + 3 * day + 17 * 3_600_000, now());
+	const dated = stripAnsi(renderQuotaRows(datedProvider, datedState, theme, 200, now(), { resetDates: true }).join(" "));
+	assert.ok(dated.includes(`7d(3d 17h, ${moment})`), dated);
+	assert.match(dated, /5h\(1h 0m\)/, "5h has no date");
+	assert.ok(!stripAnsi(renderQuotaRows(datedProvider, datedState, theme, 200, now()).join(" ")).includes(moment), "off by default in the renderer");
+	for (const line of renderQuotaRows(datedProvider, datedState, theme, 56, now(), { resetDates: true })) assert.ok(visibleWidth(line) <= 56);
+	assert.notEqual(resetMoment(now() + 20 * day, now()), resetMoment(now() + 20 * day - 7 * day, now()), "beyond a week shows the date");
+	assert.equal(SUBSCRIPTION_FOOTER_DEFAULTS.resetDates, true, "setting defaults on");
+}
 const wrapped = renderQuotaRows(
 	renderProviders,
 	renderStates,
