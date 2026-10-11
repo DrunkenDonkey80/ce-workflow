@@ -57,6 +57,22 @@ function requireLocalUI(ctx: ExtensionContext) {
 		throw new Error("Camera controls require the local TUI. Saved permission does not authorize RPC, print or headless camera use.");
 }
 
+function requireWarningUI(ctx: ExtensionContext) {
+	requireLocalUI(ctx);
+	if (typeof ctx.ui.setWidget !== "function" || typeof ctx.ui.theme?.fg !== "function") throw new Error("Camera active-warning UI unavailable; acquisition denied.");
+}
+function cameraWarning(ctx: ExtensionContext, state: "ARMED" | "CAPTURING" | "WATCHING" | "STOPPING" | undefined) {
+	if (!state) { ctx.ui.setWidget?.("camera-access", undefined); return; }
+	requireWarningUI(ctx);
+	ctx.ui.setWidget("camera-access", (_tui, theme) => ({
+		render(width: number) {
+			const text = `CAMERA ${state} - ${state === "ARMED" ? "permission only, hardware closed" : "hardware active until release is confirmed"}`;
+			return [theme.fg(state === "ARMED" ? "warning" : "error", text.slice(0, Math.max(0, width)))];
+		},
+		invalidate() {},
+	}));
+}
+
 export function cameraGrantExpiry(kind: string, now: number, deadlineMs: number) {
 	if (kind === "once") return now + deadlineMs;
 	if (kind === "hour") return now + 60 * 60 * 1000;
@@ -102,7 +118,7 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 			return grant ? { ...grant, device: current.device } : undefined;
 		},
 		async lease(ctx: ExtensionContext, request: { summary: string; watch?: boolean; deadlineMs: number; requestKey: string }, signal?: AbortSignal) {
-			requireLocalUI(ctx);
+			requireWarningUI(ctx);
 			if (!Number.isSafeInteger(request.deadlineMs) || request.deadlineMs <= 0 || request.deadlineMs > 48 * 60 * 60 * 1000 || !/^[a-f0-9]{64}$/.test(request.requestKey))
 				throw new Error("Invalid bounded camera deadline/request scope.");
 			if (acquiring || active) throw new Error("This session already owns or is requesting camera access.");
@@ -133,14 +149,21 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 				let stop: (() => Promise<void>) | undefined;
 				let finishing: Promise<void> | undefined;
 				let timer: ReturnType<typeof setTimeout>;
+				let begun = false;
 				const owner = {
 					lease, signal: abort.signal,
+					async begin() {
+						await owner.guard();
+						cameraWarning(ctx, request.watch ? "WATCHING" : "CAPTURING");
+						begun = true;
+					},
 					cancel() { abort.abort(); },
 					attachStop(callback: () => Promise<void>) {
 						if (abort.signal.aborted || stop) throw new Error("Camera owner was cancelled or already has a backend.");
 						stop = callback;
 					},
 					async guard() {
+						requireWarningUI(ctx);
 						assertCurrent();
 						if (abort.signal.aborted || performance.now() >= monotonicDeadline) throw new Error("Camera ownership expired or was cancelled.");
 						await state.validate(scope, lease);
@@ -152,10 +175,12 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 						abort.abort(); clearTimeout(timer);
 						if (!finishing) finishing = (async () => {
 							// The backend callback must confirm hardware/process closure before metadata ownership is released.
+							if (begun) { try { cameraWarning(ctx, "STOPPING"); } catch { /* Lost UI must not prevent release. */ } }
 							await stop?.();
 							await state.release(scope, lease);
 							signal?.removeEventListener("abort", interrupted);
 							if (active === owner) active = undefined;
+							try { cameraWarning(ctx, undefined); } catch { /* Hardware is already closed. */ }
 						})().catch(error => { finishing = undefined; throw error; });
 						return finishing;
 					},
@@ -165,6 +190,8 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 					catch { console.error("Camera cleanup failed and local UI is unavailable; ownership retained."); }
 				}); };
 				active = owner;
+				try { cameraWarning(ctx, "ARMED"); }
+				catch (error) { await owner.finish(); throw error; }
 				timer = setTimeout(interrupted, Math.max(0, monotonicDeadline - performance.now()));
 				timer.unref();
 				signal?.addEventListener("abort", interrupted, { once: true });

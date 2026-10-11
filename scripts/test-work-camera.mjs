@@ -57,8 +57,13 @@ const controller = createCameraController({ on(name, fn) { listeners.set(name, f
 	writeProjectSettings(_cwd, settings) { project = settings; writes++; },
 	async listDevices() { enumerations++; return [printer, laptop]; },
 });
+const widgets = new Map();
+const theme = { fg: (color, text) => `${color}:${text}` };
+const warning = () => widgets.get("camera-access")?.({}, theme).render(120)[0];
 const ctx = { cwd: projectDir, mode: "tui", hasUI: true, ui: {
 	workDialogsNative: true,
+	theme,
+	setWidget(key, value) { if (value) widgets.set(key, value); else widgets.delete(key); },
 	notify() {},
 	async select(_title, labels) {
 		if (pending) { const fn = pending; pending = undefined; await fn(); }
@@ -138,22 +143,40 @@ const request = (name, deadlineMs = 10000) => ({ summary: name, deadlineMs, requ
 choices = ["One hour"];
 const owned = await controller.lease(ctx, request("Lifecycle test"));
 await owned.guard();
+assert.match(warning(), /^warning:CAMERA ARMED/);
+await owned.begin();
+assert.match(warning(), /^error:CAMERA CAPTURING/);
+assert.ok(widgets.get("camera-access")({}, theme).render(10)[0].length <= 16, "ASCII warning fits narrow width before styling");
 let confirmClosed;
 owned.attachStop(() => new Promise(done => { confirmClosed = done; }));
 const shutdown = listeners.get("session_shutdown")();
 assert.equal(owned.signal.aborted, true, "shutdown aborts the owner before waiting for hardware release");
+assert.match(warning(), /^error:CAMERA STOPPING/);
 await assert.rejects(controller.lease(ctx, request("Overlap")), /already owns/);
 assert.equal(typeof confirmClosed, "function");
 confirmClosed();
 await shutdown;
+assert.equal(warning(), undefined, "warning clears only after closure");
 await assert.rejects(owned.guard(), /cancelled|changed/);
 const retry = await controller.lease(ctx, request("Release failure"));
+await retry.begin();
 let stops = 0;
 retry.attachStop(async () => { if (++stops === 1) throw new Error("Backend still open"); });
 await assert.rejects(retry.finish(), /Backend still open/);
+assert.match(warning(), /^error:CAMERA STOPPING/);
 await assert.rejects(controller.lease(ctx, request("Cannot steal failed release")), /already owns/);
 await retry.finish();
 assert.equal(stops, 2, "failed closure retains ownership and allows an explicit cleanup retry");
+assert.equal(warning(), undefined);
+await assert.rejects(controller.lease({ ...ctx, ui: { ...ctx.ui, setWidget: undefined } }, request("Missing UI")), /warning UI/);
+const watching = await controller.lease(ctx, { ...request("Watch"), watch: true });
+await watching.begin();
+assert.match(warning(), /^error:CAMERA WATCHING/);
+ctx.hasUI = false;
+await assert.rejects(watching.guard(), /local TUI/);
+await watching.finish();
+ctx.hasUI = true;
+assert.equal(warning(), undefined, "cleanup works after UI loss");
 const interruptedSignal = new AbortController();
 const interruptedOwner = await controller.lease(ctx, request("Tool interruption"), interruptedSignal.signal);
 let interruptedStops = 0;
@@ -184,6 +207,7 @@ const supervisorOwner = () => {
 	return {
 		signal: abort.signal, pids,
 		async guard() { if (abort.signal.aborted) throw new Error("cancelled"); },
+		async begin() {},
 		attachStop(fn) { stop = fn; },
 		async worker(workerPid, childPid = 0) { pids.push([workerPid, childPid]); },
 		async finish() { await stop(); released = true; },

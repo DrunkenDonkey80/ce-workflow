@@ -19,6 +19,7 @@ export async function resolveCameraFFmpeg(): Promise<string> {
 type Owner = {
 	signal: AbortSignal;
 	guard(): Promise<void>;
+	begin(): Promise<void>;
 	attachStop(stop: () => Promise<void>): void;
 	worker(workerPid: number, childPid?: number): Promise<void>;
 	finish(): Promise<void>;
@@ -74,6 +75,7 @@ export async function runCameraProcess(owner: Owner, command: string, args: stri
 			void (async () => {
 				await owner.worker(worker.pid!);
 				await owner.guard();
+				await owner.begin();
 				const remaining = Math.floor(durationMs - (performance.now() - startedAt));
 				if (remaining <= 0 || owner.signal.aborted) throw new Error("Camera subprocess request expired before start.");
 				send({ type: "start", command, args, durationMs: remaining, maxBytes });

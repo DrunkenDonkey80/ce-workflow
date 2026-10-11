@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T08:47:30.512Z
+updated: 2026-10-11T08:57:01.871Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -84,6 +84,8 @@ started: 2026-10-08T20:25:28.314Z
 - **D-26 — One workflow mode for targeted checks.** Source: Q-16 Relax. Targeted checks run once in the default mode; C-FULL runs with CE_WORKFLOW_ENABLED set to 0 and to 1 at phase boundaries and before completion.
 - **D-27 — Camera-specific image integration only.** Source: Q-17 Relax. CAM-09 tests actual image return through native vision and one non-vision bridge path, manifest survival after stripping and honest unavailable pixels; other shared-pipeline eviction cases go to Backlog.
 - **D-28 — Local commit after each verified step.** Source: Q-18 Relax. After each verified camera step, commit locally only that step's files with a message naming the step ID; never push. This supersedes only the automatic-commit clause of D-21 and the Non-goals; the no-push rule stays.
+- **D-29 — Continue camera-specific implementation despite unrelated global-check failures.** Source: execution ask_user; selected “Continue camera; keep failures recorded”. Keep unrelated files untouched, use targeted camera checks, and retain the failing workflow-ON full verification as a completion blocker until resolved or explicitly accepted; this is not acceptance of completion or hardware qualification.
+
 
 ## Open questions
 
@@ -114,9 +116,7 @@ Blockers: CAM-02 is [human]: needs R-camera on, the C310 selected in project set
 
 - [x] **CAM-04** Scoped grants and short-lived IPC supervision implemented; synthetic cancellation, expiry, output bounds and abrupt parent-loss tests pass (log).
 - [x] **CAM-06** Bounded owned image storage added with 24-hour startup, activity and timer expiry, immediate eviction and confined deletion (log).
-- [ ] **CAM-08** Implement red CAPTURING and WATCHING warning tied to actual acquisition and confirmed release, with distinct ARMED state.
-  - Camera-specific widget uses semantic error coloring and explicit CAMERA CAPTURING and WATCHING text. Research is a layout example, not red coloring; a setStatus string can be stripped or dimmed by the footer and is insufficient. Fail closed before acquisition if UI is missing; owning UI loss cancels work. Keep warning during warm-up and failed release. Live rendering qualification is CAM-14.
-  - Targeted checks: C-CAMERA, C-FOOTER, C-DIALOGS, C-LSP and C-DIFF; cover new and saved grants, denied modes and lost UI.
+- [x] **CAM-08** Camera warning widget gates acquisition, distinguishes ARMED, CAPTURING and WATCHING, and stays active through confirmed release (log).
 
 ### Phase 3 — Stills and continuous detector [code]
 

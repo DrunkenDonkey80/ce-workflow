@@ -5,6 +5,7 @@ let stop;
 const owner = {
 	signal: abort.signal,
 	async guard() {},
+	async begin() {},
 	attachStop(fn) { stop = fn; },
 	async worker(workerPid, childPid) { if (childPid) console.log(JSON.stringify([workerPid, childPid])); },
 	async finish() { await stop(); },
