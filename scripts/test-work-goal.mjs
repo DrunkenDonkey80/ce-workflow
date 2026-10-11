@@ -1575,7 +1575,8 @@ assert.equal(
 	1,
 	"unrelated menu actions retain argument dialogs",
 );
-assert.equal(Object.keys(tools).length, 20);
+assert.equal(Object.keys(tools).length, 24);
+assert(["camera_capture", "camera_recover", "camera_watch", "camera_stop"].every(name => tools[name]), "camera utilities register independently of goal orchestration");
 assert(tools.compaction_note);
 assert.throws(() => tools.compaction_note.execute("n", { note: "x".repeat(2501) }), /Not saved: the note is 2501 characters; the limit is 2500/, "over-long notes are rejected, not silently cut");
 assert.match(tools.compaction_note.execute("n", { note: "Next: run S14 tests." }).content[0].text, /^Saved/);

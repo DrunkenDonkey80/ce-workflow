@@ -561,6 +561,8 @@ const workflowOn =
 const GENERAL_TESTS = new Set([
 	"test-jev-tools.mjs",
 	"test-work-ask-remote.mjs",
+	"test-work-camera.mjs",
+	"test-work-camera-state.mjs",
 	"test-work-compaction.mjs",
 	"test-work-compaction-notifications.mjs",
 	"test-work-compound-source.mjs",

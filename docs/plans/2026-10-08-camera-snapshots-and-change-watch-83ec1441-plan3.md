@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:27:44.740Z
+updated: 2026-10-11T09:43:35.348Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -103,11 +103,11 @@ None.
 
 ## Resume context
 
-State: active, 8/14 complete. CAM-05 capture/recovery tools, CAM-07 bounded continuous RGB acquisition/detection, and CAM-11 adaptive retention are synthetically verified and locally committed (4c7f981, e96ba25, 8118839). No camera frames acquired. No watch tool or model wake is registered yet.
+State: active, 10/14 done. CAM-12 native ready/early/final wake and CAM-13 single settled capture are implemented, tested and locally committed (2a1a337, 1a4869c). Four camera tools registered. No hardware opened; no push.
 
-Next: implement CAM-12 native watch readiness and lifecycle-bound early/final message delivery. Docs extensions.md and sdk.md read completely; follow related message-types.md/session-format.md and the installed ExtensionAPI declarations before implementing. Use supported native message/event APIs, one busy pending logical delivery coalescing early+final, no model polling, no work items/goals/background verifiers. Then complete CAM-09 registration review, CAM-13 selfchecks/docs and CAM-14 integration. Hardware CAM-02/CAM-10 remain unverified; R-camera is on, R-printer off.
+No remaining runnable camera implementation. CAM-09 software integration is implemented and targeted checks pass, but required full workflow-ON gate fails in three unrelated suites: design-docs (old README heading), private-workflows (old extension inventory), wo-control (old commands). D-29 says preserve unrelated work; owner resolution or explicit acceptance is required. Full workflow-OFF verify passed; final ON run completed without timeout. Camera-caused exposure/count expectations were fixed and pass. Latest camera/state/settings/compaction and diff checks pass; LSP has missing SDK declarations, inconclusive and oversized coverage.
 
-Checks: camera and camera-state scripts plus git diff --check passed after CAM-11; settings and installed-native-package smoke passed after CAM-05. Active LSP: host SDK declarations unavailable; worker semgrep trusted parent IPC advisory and lint hints remain, with one process-check result unconfirmed. Full workflow-ON verification still blocked by the recorded seven unrelated failures/timeout; D-29 permits targeted progress, not completion. Preserve unrelated Plan3 edits and generated sidecars. Local commits only; never push.
+Next external actions: select/enable Logi C310 in native project Camera settings and directly authorize finite local-TUI calibration for CAM-02 and warning trials CAM-14; connect/position representative printer (R-printer off) for CAM-10. R-camera availability is not permission. Recheck the global gate after owner resolves/accepts the three failures. Keep hardware, sustained-load and live-provider qualification incomplete. Preserve unrelated Plan3/footer edits and generated sidecars; local commits only.
 
 ## Phases
 
@@ -135,12 +135,15 @@ Checks: camera and camera-state scripts plus git diff --check passed after CAM-1
 
 ### Phase 5 — Software integration [code]
 
-- [ ] **CAM-09** Integrate both camera suites in GENERAL_TESTS and verify utility registration with legacy workflow OFF and ON.
+- [blocked] **CAM-09** Integrate both camera suites in GENERAL_TESTS and verify utility registration with legacy workflow OFF and ON.
   - Import camera utility through workModelsExtension independently of the legacy switch. package.json already loads work-models.ts and packages extensions; no third extension entry or new image dependency is needed. Modules remain .ts with .ts sibling specifiers; no legacy work_* tools.
   - Deterministic coverage: OFF and deny, selected-device no fallback, direct consent versus remote-answer or import refusal, persisted grants without restart, fixed midnight including timezone and DST, one-watch scope and deadline and atomic concurrency, corrupt, expired or wrong-scope state, request overrun, crop and bytes, revocation, abort, reload, session and tree cleanup, confined storage and all CAM-07, CAM-11, CAM-12 and CAM-13 obligations.
   - Exercise headless child, RPC and print requests with new and saved grants, missing or lost UI and cleanup outside TUI. Settings import and reset cannot enable or mint permission; clearing or changing configuration revokes or cancels without waiting for legacy workflow refresh. Remote ask:answer or intercom ANSWER events while consent is pending must not issue or extend grants.
   - Image integration (D-27): actual image return through native vision and one non-vision bridge path; manifests survive stripping; repeated-looking events keep distinct capture IDs; historical missing pixels are honest, never silently recaptured or treated as directly verified process_image interpretations.
   - Targeted checks: all C-* software checks. Full suite at every phase boundary and before completion; disclose inconclusive LSP coverage. Mock success is software evidence only, not physical and live-UI qualification.
+  - note: Both camera suites added to GENERAL_TESTS; real workModelsExtension registration assertions cover all four camera tools with legacy workflow OFF and ON. Camera documentation added. Running final targeted software checks and both required full-suite modes; known unrelated global failures stay a completion blocker under D-29.
+  - note: Software integration and camera-specific checks pass, including all four tool registrations with workflow OFF/ON, model-only consent exposure, custom-message native vision/explicit non-vision bridge, missing-source honesty, selected-device no fallback and saved-grant RPC/print/JSON denial. Both suites enter GENERAL_TESTS. Updated only camera-caused exposure/count expectations in compaction and goal tests. Full workflow-OFF verify passed; final workflow-ON verify completed with three unrelated failures retained under D-29: test-work-design-docs (old README heading), test-work-private-workflows (stale extension inventory), test-work-wo-control (stale command inventory). These need owner resolution or explicit acceptance; step cannot be verified complete while required global check fails.
+  - check: node scripts/test-work-camera.mjs; node scripts/test-work-camera-state.mjs; node scripts/test-work-settings.mjs; node scripts/test-work-compaction-notifications.mjs; git diff --check: passed. Dialog/footer tests passed; full verify OFF passed; full verify ON after camera-count fix: exit 1, exactly three unrelated failures. Active LSP scripts: one confirmed clean, three inconclusive, goal file too large. Hardware not opened.
 
 ### Phase 6 — External qualification [think]
 
@@ -185,7 +188,7 @@ Canonical software environment: Windows PowerShell, working directory `C:\SOFT\g
 
 Run C-FULL in both workflow modes plus C-DIFF at phase boundaries and before completion. Add shared regression checks when their seams change. C-BACKEND and C-DISCOVERY use the same Windows working directory and existing installed FFmpeg; live camera commands require the selected identity, finite trial bounds and direct authorization specified by qualification steps, not invented universal capture commands.
 
-Recorded current evidence: targeted camera, state, settings and dialogs checks plus diff check passed on the controller and helper state (log). Mock closure and two-process metadata claims are not FFmpeg release evidence. Camera suites are not yet in GENERAL_TESTS. Camera.ts has a missing host SDK declaration warning; state/test probes had zero findings but some push-only results were inconclusive, and work-models exceeds the 5000-line probe cap. Hardware, live red UI, provider routing and watch acceptance remain pending. Historical unrelated Plan3 checks and advisor completion are not camera evidence.
+Recorded current evidence: targeted camera/state/settings, dialogs/footer, compaction integration and diff checks pass. Both camera suites are in GENERAL_TESTS; full workflow-OFF verify passed, and final workflow-ON verify completed with three unrelated failures (OpenDesign README markers, private-workflow extension inventory, /wo command inventory). Camera-caused exposure/count expectations were repaired and pass. CAM-09 remains blocked by that required global gate under D-29. Native and configured non-vision custom-message projection are synthetic evidence only. Active LSP has missing host SDK declarations, inferred-any/style hints, push-only inconclusive results and oversized work-models/goal-test coverage. Hardware, live red UI, provider/printer routing and release qualification remain pending. No hardware was opened.
 
 ## References
 
@@ -193,7 +196,7 @@ All product paths are under `C:\SOFT\git\ce-workflow`; inspect relevant current 
 
 | Reference | Steps and use |
 | --- | --- |
-| `extensions\work-camera.ts`; `extensions\work-camera-state.ts`; `scripts\test-work-camera.mjs`; `scripts\test-work-camera-state.mjs` | CAM-04 through CAM-13: implemented project controls, controller and state helper and deterministic fixtures; acquisition tools remain unregistered. |
+| `extensions\work-camera.ts`; `extensions\work-camera-state.ts`; `scripts\test-work-camera.mjs`; `scripts\test-work-camera-state.mjs` | CAM-04 through CAM-13: project controls, ownership and deterministic fixtures; four camera tools registered independently of the legacy switch. Capture/process/worker/images/detect/retain/watch/tools siblings implement bounded acquisition and evidence delivery. |
 | `extensions\work-models.ts` settingsPath/readSettings/readEffectiveSettings; workSettingsLoop/chooseWorkSetting; owns/hasProjectOverride/clearProjectOverride; UTILITY_SETTING_KINDS; exportSettings/importSettings | CAM-03, CAM-04, CAM-09: project-only rows with workflow OFF, ignore global values, import/reset invalidations. Camera row was appended to preserve cursor mapping; old line 29050 is extensionScoutProjectContext, not settings. |
 | `extensions\work-dialogs.ts` showListDialog | CAM-04, CAM-08, CAM-14: native direct local camera UI with muted purpose line; never showAskDialog/ask_user or a non-TUI fallback for camera consent. |
 | `extensions\work-ask-remote.ts` registerRemoteAskAnswers | CAM-09: optional intercom ask:pending/ask:answer route cannot issue or extend grants. |

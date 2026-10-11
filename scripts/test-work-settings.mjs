@@ -1998,6 +1998,7 @@ try {
 			off.tools.knowledge,
 		"workflow off registers no F9 and no work_* tools but keeps utilities",
 	);
+	assert(["camera_capture", "camera_recover", "camera_watch", "camera_stop"].every(name => off.tools[name]), "workflow OFF registers all camera utilities without enabling hardware");
 	let offMenuTitle = "";
 	let offMenuLabels = [];
 	assert(!off.shortcuts.f7, "F7 is removed; /wo opens the menu");
@@ -2054,6 +2055,7 @@ try {
 	process.env.CE_WORKFLOW_ENABLED = "1";
 	const on = loadExtension();
 	assert(on.shortcuts.f9 && on.tools.work_goal_complete, "workflow on restores F9 and work_* tools");
+	assert(["camera_capture", "camera_recover", "camera_watch", "camera_stop"].every(name => on.tools[name]), "workflow ON registers the same camera utilities");
 	assert(process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS.split(path.delimiter).includes(legacyDir),
 		"workflow on restores legacy role discovery");
 	assert(on.hooks.resources_discover[0]().skillPaths[0] === path.resolve(import.meta.dirname, "../skills"),

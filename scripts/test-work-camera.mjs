@@ -111,7 +111,7 @@ const restarted = createCameraController({ on() {} }, {
 assert.equal((await restarted.permission(ctx)).id, grant.id, "time grant survives reload without starting acquisition");
 await listeners.get("session_shutdown")();
 assert.equal((await restarted.permission(ctx)).id, grant.id, "orderly shutdown preserves the unexpired time grant");
-await assert.rejects(restarted.permission({ ...ctx, mode: "rpc" }), /local TUI/);
+for (const mode of ["rpc", "print", "json"]) await assert.rejects(restarted.permission({ ...ctx, mode }), /local TUI/);
 assert.equal(await restarted.permission({ ...ctx, cwd: otherDir }), undefined, "saved permission cannot move projects");
 const heldLock = join(process.env.PI_CODING_AGENT_DIR, "camera", "state.lock");
 choices = ["48 hours"];
@@ -330,7 +330,9 @@ assert.equal(runCount, 3, "mode query and two finite captures, no catch-up saves
 assert.equal(burst.frames[0].capture.timestamp, 12345);
 assert.equal(fakeCapture.recover({ ...ctx, cwd: otherDir }, burst.frames[0].id), undefined, "history cannot move between projects");
 assert.deepEqual(fakeCapture.recover(ctx, burst.frames[0].id).data, png);
-await assert.rejects(fakeCapture.capture({ ...ctx, mode: "rpc" }, {}), /local TUI/);
+for (const mode of ["rpc", "print", "json"]) await assert.rejects(fakeCapture.capture({ ...ctx, mode }, {}), /local TUI/);
+const noFallback = createCameraCapture(fakeController, { async resolveFFmpeg() { return process.execPath; }, async devices() { return [laptop]; }, async run() { assert.fail("never opens another camera"); } });
+await assert.rejects(noFallback.capture(ctx, {}), /identity changed|unavailable/);
 retained.drop(projectDir, burst.frames[0].id);
 assert.equal(fakeCapture.recover(ctx, burst.frames[0].id), undefined);
 const { cameraTools } = await createJiti(import.meta.url).import("../extensions/work-camera-tools.ts");
@@ -496,6 +498,12 @@ assert.equal(wakeMessages[2].details.outcome, "settled");
 assert.equal(wakeMessages[2].content.filter(part => part.type === "image").length, 1);
 assert.equal(wakeMessages[2].details.frames[0].capture.timestamp, 5100, "settled evidence is the actual fresh terminal frame");
 assert.equal(wakeMessages[2].details.sampling.quietDurationMs, 600);
+const cameraCustomMessage = { role: "custom", ...wakeMessages[2] };
+const nativeProjection = bridge.project([cameraCustomMessage], { provider: "fixture", id: "vision" }, ["fixture/nonvision"], "fixture/vision");
+assert.equal(nativeProjection, undefined, "native vision is not rewritten by the non-vision bridge");
+assert.ok(cameraCustomMessage.content.some(part => part.type === "image"), "native vision retains the actual settled image");
+const customProjection = bridge.project([cameraCustomMessage], { provider: "fixture", id: "nonvision" }, ["fixture/nonvision"], "fixture/vision");
+assert.ok(customProjection.messages[0].content.some(part => part.type === "text" && part.text.includes("another model's interpretation")), "native camera wake uses the configured non-vision bridge");
 const faultyWatch = createCameraWatch({ on() {}, sendMessage(message) { wakeMessages.push(message); } }, watchController, {
 	async acquire(_ctx, _controller, _input, callbacks) { callbacks.owner({ lease: { expiresAt: Date.now() + 1000 }, current() {}, async finish() {} }); callbacks.sample(observation(0, 0, "ready"), geometry); throw new Error("fixture disconnected"); },
 });

@@ -142,7 +142,7 @@ try {
 	);
 	workModelsExtension(pi);
 	for (const tool of Object.values(tools)) {
-		assert.equal(tool.exposure, tool.name.startsWith("work_") ? "model-only" : undefined);
+		assert.equal(tool.exposure, tool.name.startsWith("work_") || tool.name.startsWith("camera_") ? "model-only" : undefined);
 	}
 	assert.equal(tools.research_mode, undefined, "agent cannot toggle research mode");
 	await launchKnowledgeDiscoverer(pi, ctx, [
