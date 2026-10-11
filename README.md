@@ -61,7 +61,7 @@ Offline self-check: `node "scripts/test-jev-tools.mjs"`.
 
 ## Screen read tool
 
-`screen_read` (Windows) returns a small PNG for visual testing: an app window (also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, or an Android screen. `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
+`screen_read` returns a small PNG for visual testing: an app window (Windows only; also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, or an Android screen. `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
 
 ## Plan3
 

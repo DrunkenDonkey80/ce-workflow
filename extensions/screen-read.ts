@@ -1,7 +1,9 @@
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import zlib from "node:zlib";
 
 // One PowerShell/C# helper: window enumeration, PrintWindow capture (minimized windows included) and PNG crop/downscale.
 const source = String.raw`
@@ -155,12 +157,105 @@ export function screenReadPlan(args: ScreenReadArgs, file: string) {
 	throw new Error("target must be window, browser or android.");
 }
 
-export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: AbortSignal, dir = path.join(os.tmpdir(), "pi-screen-read")) {
-	// ponytail: Windows-only (PowerShell + System.Drawing); port Save() to Photon/sharp if agents need it elsewhere.
-	if (process.platform !== "win32") throw new Error("screen_read needs Windows; elsewhere use agent-browser screenshot or android screen capture directly.");
+const CRC = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
+const crc32 = (data: Buffer) => { let c = 0xffffffff; for (const byte of data) c = CRC[(c ^ byte) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function chunk(kind: string, data: Buffer) {
+	const head = Buffer.alloc(4), body = Buffer.concat([Buffer.from(kind, "latin1"), data]), tail = Buffer.alloc(4);
+	head.writeUInt32BE(data.length); tail.writeUInt32BE(crc32(body));
+	return Buffer.concat([head, body, tail]);
+}
+export function encodePng(width: number, height: number, rgba: Buffer) {
+	const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(width, 0); ihdr.writeUInt32BE(height, 4); ihdr[8] = 8; ihdr[9] = 6;
+	const raw = Buffer.alloc(height * (width * 4 + 1));
+	for (let y = 0; y < height; y++) rgba.copy(raw, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4);
+	return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
+// 8-bit non-interlaced RGB/RGBA only: what Chrome and Android screencap write. Returns RGBA.
+export function decodePng(input: Buffer) {
+	if (input.length < 8 || input.readUInt32BE(0) !== 0x89504e47) throw new Error("Screenshot is not a PNG.");
+	let pos = 8, width = 0, height = 0, depth = 0, type = 0, interlace = 0;
+	const idat: Buffer[] = [];
+	while (pos + 8 <= input.length) {
+		const length = input.readUInt32BE(pos), kind = input.toString("latin1", pos + 4, pos + 8), data = input.subarray(pos + 8, pos + 8 + length);
+		if (kind === "IHDR") { width = data.readUInt32BE(0); height = data.readUInt32BE(4); depth = data[8]; type = data[9]; interlace = data[12]; }
+		else if (kind === "IDAT") idat.push(data);
+		else if (kind === "IEND") break;
+		pos += 12 + length;
+	}
+	const channels = type === 6 ? 4 : type === 2 ? 3 : 0;
+	if (depth !== 8 || !channels || interlace) throw new Error(`Unsupported PNG (bit depth ${depth}, color type ${type}${interlace ? ", interlaced" : ""}); expected 8-bit RGB or RGBA.`);
+	if (width < 1 || height < 1 || width * height > 40_000_000) throw new Error("Screenshot has no capturable size.");
+	const raw = zlib.inflateSync(Buffer.concat(idat)), stride = width * channels, px = Buffer.alloc(height * stride);
+	if (raw.length < height * (stride + 1)) throw new Error("Screenshot PNG is truncated.");
+	for (let y = 0; y < height; y++) {
+		const filter = raw[y * (stride + 1)], line = y * (stride + 1) + 1, out = y * stride;
+		for (let x = 0; x < stride; x++) {
+			const a = x >= channels ? px[out + x - channels] : 0, b = y ? px[out - stride + x] : 0, c = x >= channels && y ? px[out - stride + x - channels] : 0;
+			let v = raw[line + x];
+			if (filter === 1) v += a;
+			else if (filter === 2) v += b;
+			else if (filter === 3) v += (a + b) >> 1;
+			else if (filter === 4) { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
+			else if (filter !== 0) throw new Error(`Corrupt PNG filter ${filter}.`);
+			px[out + x] = v & 255;
+		}
+	}
+	if (channels === 4) return { width, height, rgba: px };
+	const rgba = Buffer.alloc(width * height * 4, 255);
+	for (let i = 0, j = 0; i < px.length; i += 3, j += 4) px.copy(rgba, j, i, i + 3);
+	return { width, height, rgba };
+}
+// Crop, then area-average downscale (no upscaling), matching the Windows helper's Save().
+export function processPng(input: Buffer, region: number[] | undefined, maxEdge: number) {
+	const src = decodePng(input);
+	const [rx, ry, rw, rh] = region ?? [0, 0, src.width, src.height];
+	if (rx + rw > src.width || ry + rh > src.height) throw new Error(`region must lie inside the ${src.width}x${src.height} source image.`);
+	const scale = Math.min(1, maxEdge / Math.max(rw, rh)), width = Math.max(1, Math.round(rw * scale)), height = Math.max(1, Math.round(rh * scale));
+	const out = Buffer.alloc(width * height * 4);
+	for (let oy = 0; oy < height; oy++) {
+		const y0 = ry + Math.floor(oy * rh / height), y1 = Math.max(y0 + 1, ry + Math.floor((oy + 1) * rh / height));
+		for (let ox = 0; ox < width; ox++) {
+			const x0 = rx + Math.floor(ox * rw / width), x1 = Math.max(x0 + 1, rx + Math.floor((ox + 1) * rw / width)), sum = [0, 0, 0, 0];
+			for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) for (let k = 0; k < 4; k++) sum[k] += src.rgba[(y * src.width + x) * 4 + k];
+			const n = (y1 - y0) * (x1 - x0);
+			for (let k = 0; k < 4; k++) out[(oy * width + ox) * 4 + k] = Math.round(sum[k] / n);
+		}
+	}
+	let uniform = true;
+	for (let i = 4; i < out.length && uniform; i += 4) uniform = out.readUInt32BE(i) === out.readUInt32BE(0);
+	return { png: encodePng(width, height, out), width, height, sourceWidth: src.width, sourceHeight: src.height, scale: Math.round(scale * 10000) / 10000, uniform };
+}
+
+// Non-Windows path for browser/android: run the CLI, then crop/scale in Node.
+export async function captureFile(plan: { exe: string; runs: string[][]; raw: string; file: string; region?: number[]; maxEdge: number }, signal?: AbortSignal) {
+	try {
+		for (const [i, args] of plan.runs.entries()) {
+			// Output goes to files: a daemon spawned by the tool (agent-browser, adb) inherits pipes and would block reading them to EOF.
+			const log = `${plan.raw}.${i}`, out = await open(`${log}.out`, "w"), err = await open(`${log}.err`, "w");
+			try {
+				const code = await new Promise<number | null>((resolve, reject) => {
+					const child = spawn(plan.exe, args, { stdio: ["ignore", out.fd, err.fd], signal, timeout: 90_000 });
+					child.on("error", reject);
+					child.on("exit", resolve);
+				});
+				if (code !== 0) throw new Error(`${plan.exe} ${args.join(" ")} ${code === null ? "timed out or was stopped" : "failed"}: ${await readFile(`${log}.out`, "utf8")} ${await readFile(`${log}.err`, "utf8")}`.trim().slice(-1500));
+			} finally { await out.close(); await err.close(); }
+		}
+		const { png, ...shot } = processPng(await readFile(plan.raw), plan.region, plan.maxEdge);
+		await writeFile(plan.file, png);
+		return shot;
+	} finally {
+		await rm(plan.raw, { force: true });
+		for (const [i] of plan.runs.entries()) for (const end of ["out", "err"]) await rm(`${plan.raw}.${i}.${end}`, { force: true }).catch(() => {});
+	}
+}
+
+export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: AbortSignal, dir = path.join(os.tmpdir(), "pi-screen-read"), platform = process.platform) {
+	if (platform !== "win32" && args.target === "window") throw new Error("screen_read target=window needs Windows (PrintWindow); browser and android work on every platform.");
 	await mkdir(dir, { recursive: true });
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
+	if (platform !== "win32") return { file, ...await captureFile(plan as Parameters<typeof captureFile>[0], signal) };
 	// env, not argv: no quoting issues; spawn copies it synchronously, so parallel calls cannot mix it up
 	process.env.SCREEN_READ_ARGS = Buffer.from(JSON.stringify(plan), "utf8").toString("base64");
 	const pending = exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(SCRIPT, "utf16le").toString("base64")], { timeout: 120_000, signal });
@@ -184,7 +279,7 @@ export const screenReadTool = (exec: Exec) => ({
 	description: [
 		"Visual read for testing. Returns a PNG downscaled so its longest edge is at most maxEdge (default 1024). Image tokens scale with pixel count, so ask for the least you need: maxEdge 512 shows layout; then zoom with region [x, y, width, height] in SOURCE pixels (reported in every result) for full detail of one area.",
 		"Prefer text when it answers the question: agent-browser snapshot/read for web pages, android layout for devices. Use this for layout, colors, rendering and canvas.",
-		"target=window: a Windows app window by title substring, pid or handle; omit all three to list windows. Works on minimized and background windows without focusing or showing them; launch test apps minimized. minimize=true minimizes a window that popped up after capturing it. Capture only the app under test, not the user's own windows.",
+		"target=window (Windows only): a Windows app window by title substring, pid or handle; omit all three to list windows. Works on minimized and background windows without focusing or showing them; launch test apps minimized. minimize=true minimizes a window that popped up after capturing it. Capture only the app under test, not the user's own windows.",
 		"target=browser: the current agent-browser page (headless; never use --headed for checks). url opens it first; selector captures one element; full captures the whole page; session picks an agent-browser session.",
 		"target=android: android screen capture of the device (serial from `adb devices`; omit when only one is attached).",
 	].join("\n"),
