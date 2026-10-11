@@ -30935,6 +30935,8 @@ export default function workModelsExtension(pi) {
 		if (sourceMaintenanceBlock)
 			return { block: true, reason: sourceMaintenanceBlock };
 		if (event.toolName === "ask_user") {
+			// The optional comment row on every question unless a coded approval explicitly turns it off.
+			if (event.input && event.input.allowComment == null) event.input.allowComment = true;
 			recordWorkGoalAskUserCall(event, pi);
 			recordDirtyRecoveryAskCall(event);
 			recordImprovementApprovalAskCall(event, ctx?.cwd ?? activeWorkGoalCwd);

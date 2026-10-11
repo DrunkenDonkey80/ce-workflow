@@ -640,12 +640,13 @@ export default function plan3(pi) {
 	// followUp: agent_end hooks (shape/optimize repair) can fire while the agent is still streaming; ignored when idle.
 	const send = (message) => pi.sendUserMessage(message, { expandPromptTemplates: false, deliverAs: "followUp" });
 
+	const shortTitle = (title) => title.length > 40 ? `${title.slice(0, 39).trimEnd()}…` : title;
 	async function refresh(ctx) {
 		try {
 			const plan = currentPlan(ctx, await listPlans(ctx.cwd));
 			const focus = plan?.wip[0] ?? plan?.next;
 			const design = plan && localPlanDesign(ctx.cwd, plan);
-			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
+			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
 	}
 	// R10/D12: compact before switching plans; a failed compaction sends nothing.
@@ -953,6 +954,13 @@ export default function plan3(pi) {
 		const problems = [...finishProblems(await readFile(plan.file, "utf8")), ...planDesignGate(ctx.cwd, plan)];
 		if (problems.length) return ctx.ui.notify(`Plan3: ${plan.title} is not ready:\n- ${problems.join("\n- ")}`, "warning");
 		if (!isPlanning(plan) && plan.status !== "ready") return ctx.ui.notify(`Plan3: ${plan.title} is already ${plan.status}; /resume3 continues it.`, "info");
+		// Review before compacting: the agent still holds the planning context to judge and merge findings; finish again afterwards.
+		const reviews = ctx.hasUI ? await reviewItems(ctx, plan) : [];
+		if (reviews.length) {
+			const pick = await showListDialog(ctx, { title: "Finish planning", purpose: `${plan.title} was never reviewed. Review now with the planning context, then finish again.`, cursorKey: `plan3-finish:${plan.id}`, items: [...reviews, { value: "finish", label: "Finish without review", description: "Research off, compact, then start work" }] });
+			if (pick?.value?.startsWith("review")) return advise(ctx, "review", pick.value === "review-all", "", plan);
+			if (pick?.value !== "finish") return;
+		}
 		await mutate(plan, (lines) => {
 			setMeta(lines, "status", "ready");
 			const visual = section(lines, "Visual design");
@@ -964,9 +972,8 @@ export default function plan3(pi) {
 		const compacted = await compactFirst(ctx, plan, true); // The plan is ready either way; a failed compaction was already reported.
 		ctx.ui.notify(`Plan ready · /resume3 ${plan.id}\n${plan.file}`, "info");
 		if (ctx.hasUI && compacted) {
-			const pick = await showListDialog(ctx, { title: "Plan ready", purpose: "Planning is finished and research is off. Start implementation when you choose.", cursorKey: `plan3-ready:${plan.id}`, items: [...await reviewItems(ctx, plan), { value: "resume", label: "Start work", description: plan.title }, { value: "later", label: "Not yet", description: `Resume later with /resume3 ${plan.id}` }] });
+			const pick = await showListDialog(ctx, { title: "Plan ready", purpose: "Planning is finished and research is off. Start implementation when you choose.", cursorKey: `plan3-ready:${plan.id}`, items: [{ value: "resume", label: "Start work", description: plan.title }, { value: "later", label: "Not yet", description: `Resume later with /resume3 ${plan.id}` }] });
 			if (pick?.value === "resume") await resume(ctx, { ...plan, status: "ready" });
-			if (pick?.value?.startsWith("review")) await advise(ctx, "review", pick.value === "review-all", "", plan);
 		}
 	}
 	// Starting an unreviewed ready plan offers the review first; true = handled (review sent or cancelled).
@@ -982,7 +989,7 @@ export default function plan3(pi) {
 	async function reviewItems(ctx, plan) {
 		if (plan.reviewed) return [];
 		const all = await chooseAdvisors(ctx, true);
-		if (all.length === 1) return [{ value: "review-all", label: "Review first", description: `Second opinion from ${all[0].model}, then start work` }];
+		if (all.length === 1) return [{ value: "review-all", label: "Review first", description: `Second opinion from ${all[0].model}` }];
 		const one = (await chooseAdvisors(ctx, false))[0];
 		return [
 			...(one ? [{ value: "review-one", label: "Review with one advisor", description: one.model }] : []),

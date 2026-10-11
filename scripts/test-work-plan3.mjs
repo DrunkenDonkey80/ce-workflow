@@ -186,7 +186,7 @@ try {
 	assert(!/independent Plan3 trial|\/resume3/.test(prompt), "official wording, no /resume3 during planning");
 	assert.equal(messages.at(-1).options.expandPromptTemplates, false);
 	assert.equal(compactions, 0, "tiny context is not compacted");
-	assert.equal(statuses.at(-1), "🛠️ Plan [░░░░░░░░] 0/0");
+	assert.equal(statuses.at(-1), "🛠️ Plan (Plan3 draft) [░░░░░░░░] 0/0");
 	await hooks.get("turn_end")({}, ctx);
 	assert.equal(statuses.length >= 2, true, "footer refreshes after each turn");
 
@@ -275,7 +275,7 @@ try {
 	assert.equal(await readFile(csvFile, "utf8"), beforeSummary, "a rejected done changes nothing");
 	state = await tool({ action: "next", summary: "Parser", check: "node --test parser.test.mjs: 4 passed" });
 	assert.deepEqual([state.completed, state.started, state.done], ["CSV-01", "CSV-02", 1]);
-	assert.equal(statuses.at(-1), "🛠️ Plan [███░░░░░] 1/3 · CSV-02");
+	assert.equal(statuses.at(-1), "🛠️ Plan (CSV import) [███░░░░░] 1/3 · CSV-02");
 	await tool({ action: "step", id: "CSV-02", mark: "blocked", note: "needs RFC 4180 decision" });
 	await tool({ action: "section", name: "Decisions", text: "- D1 Use RFC 4180." });
 	state = await tool({ action: "add", after: "CSV-02", steps: ["Escapes", "Multiline"], reason: "split quoting" });
@@ -688,7 +688,7 @@ try {
 	assert.match((await tool({ action: "get", plan: "33333333" })).hint, /set status complete/);
 	entries.push({ type: "custom", customType: "plan3-current", data: { id: "33333333" } });
 	await hooks.get("turn_end")({}, ctx);
-	assert.equal(statuses.at(-1), "🛠️ Plan [████████] 1/1");
+	assert.equal(statuses.at(-1), "🛠️ Plan (Small) [████████] 1/1");
 	entries.pop();
 	state = await tool({ action: "status", plan: "33333333", value: "complete" });
 	assert.equal(state.path, path.join(directory, "done", "2026-10-03-small-33333333-plan3.md"));
@@ -725,26 +725,28 @@ try {
 	assert.deepEqual(await Promise.all(viewFiles.map(file => readFile(file, "utf8"))), beforeViewBytes);
 	assert.equal(messages.length, beforeViewMessages, "Not yet never starts implementation");
 	await rm(handoffFile); entries.splice(beforeHandoffEntries);
-	// Plan ready offers review when the plan was never reviewed: one other model → "Review first"; several → one or all.
+	// Finish offers review before compacting when the plan was never reviewed: one other model → "Review first"; several → one or all.
 	{
 		const settingsFile = path.join(agentDir, "settings.json"), savedSettings = await readFile(settingsFile, "utf8").catch(() => "{}");
 		const useModels = (models) => writeFile(settingsFile, JSON.stringify({ workOrchestrator: { plan3: { models: models.map((model) => ({ model, thinking: "high" })) } } }));
 		const reviewFile = path.join(directory, "2026-10-08-review-46464646-plan3.md"), beforeReviewEntries = entries.length;
 		await useModels(["openai-codex/gpt-6-astra", "zai/glm-5.3"]);
 		await writeFile(reviewFile, validPlan("46464646", "Reviewable", "draft", "- [ ] **R-01** Implement"));
-		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Plan ready", "Review with all 2 advisors", (labels) => assert.deepEqual(labels.slice(0, 2).map((label) => label.split(" — ")[0].trim()), ["Review with one advisor", "Review with all 2 advisors"])]];
+		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Finish planning", "Review with all 2 advisors", (labels) => assert.deepEqual(labels.slice(0, 2).map((label) => label.split(" — ")[0].trim()), ["Review with one advisor", "Review with all 2 advisors"])]];
 		await run("plans3");
 		assert.equal(selectScript.length, 0);
 		assert.deepEqual([...messages.at(-1).message.matchAll(/model: "([^"]+)"/g)].map((match) => match[1]), ["openai-codex/gpt-6-astra:high", "zai/glm-5.3:high"]);
 		assert.match(await readFile(reviewFile, "utf8"), /^reviewed: \d{4}-\d{2}-\d{2}$/m, "review marks the plan");
+		assert.match(await readFile(reviewFile, "utf8"), /^status: draft$/m, "review keeps planning; finish runs again afterwards");
 		await writeFile(reviewFile, validPlan("46464646", "Reviewable", "draft", "- [ ] **R-01** Implement", "reviewed: 2026-10-01\n"));
 		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Plan ready", "Not yet", (labels) => assert(!labels.some((label) => /Review/.test(label)), "a reviewed plan is not offered review")]];
 		await run("plans3");
 		await useModels(["openai-codex/gpt-6-astra"]);
 		await writeFile(reviewFile, validPlan("46464646", "Reviewable", "draft", "- [ ] **R-01** Implement"));
-		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Plan ready", "Not yet", (labels) => assert.match(labels[0], /Review first/, "one other model starts the review directly")]];
+		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Finish planning", "Finish without review", (labels) => assert.match(labels[0], /Review first/, "one other model starts the review directly")], ["Plan ready", "Not yet"]];
 		await run("plans3");
 		assert.equal(selectScript.length, 0);
+		assert.match(await readFile(reviewFile, "utf8"), /^status: ready$/m, "finishing without review still finishes");
 		await writeFile(settingsFile, savedSettings);
 		await rm(reviewFile); entries.splice(beforeReviewEntries);
 	}
@@ -1078,7 +1080,9 @@ try {
 		assert.match(rendered, /Keep CSV/);
 		component.handleInput("\r"); // Real native selection advances to page two.
 		assert.match(component.render(100).join("\n"), /Which timeout/);
-		component.handleInput("\x1b[B"); component.handleInput("\x1b[B"); component.handleInput("\r");
+		assert.match(component.render(100).join("\n"), /Add extra context/, "Plan3 questions offer the optional comment row");
+		for (let i = 0; i < 3; i++) component.handleInput("\x1b[B"); // Two options, the comment row, then the custom response.
+		component.handleInput("\r");
 		assert.equal(component.pages[1].mode, "freeform", "native custom-response editor opens");
 		assert.match(component.render(100).join("\n"), /submit/);
 	} }, { component: "AskComponent", answer: kept, check: async (_, rendered) => {
@@ -1538,7 +1542,7 @@ try {
 	assert.deepEqual(planDesignGate(cwd, visualPlan), [], "progress/timestamps do not invalidate frozen design authority");
 	await writeFile(visualFile, beforeProgressOnly);
 	await assert.rejects(tool({ action: "status", value: "active" }), /finish again/, "reconciliation still requires the human finish boundary");
-	selectScript = [["Plan ready", "Not yet"]];
+	selectScript = [["Finish planning", "Finish without review"], ["Plan ready", "Not yet"]];
 	const beforeReadyMessages = messages.length;
 	await run("plan3", "finish");
 	assert.equal(selectScript.length, 0);
@@ -1843,7 +1847,7 @@ try {
 		ctx.hasUI = true;
 		const beforeApprovalMessages = messages.length;
 		// Both pages are pre-checked; Esc exports them. One approval covers every page, then code reconciles and finishes.
-		selectScript = [["Select saved design pages", null], ["Approve native design", "I inspected the native design and approve this exported revision"], ["Plan ready", "Not yet"]];
+		selectScript = [["Select saved design pages", null], ["Approve native design", "I inspected the native design and approve this exported revision"], ["Finish planning", "Finish without review"], ["Plan ready", "Not yet"]];
 		await run("plan3", `design finish ${nativeId}`);
 		assert.equal(selectScript.length, 0);
 		assert.equal(loadPlanDesign(cwd, nativePlan).phase, "reconciled");

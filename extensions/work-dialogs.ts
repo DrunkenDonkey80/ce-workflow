@@ -23,7 +23,7 @@ export function showAskDialog(ctx, ask, params, signal?: AbortSignal, ideaLayout
 			return component;
 		}, { ...options, overlayOptions: { ...options?.overlayOptions, width: "98%", maxHeight: "100%", margin: 1 } }) } };
 	}
-	return ask.execute(randomUUID(), { ...params, displayMode: "overlay" }, signal, undefined, askContext);
+	return ask.execute(randomUUID(), { allowComment: true, ...params, displayMode: "overlay" }, signal, undefined, askContext);
 }
 
 function sentenceCase(value) {

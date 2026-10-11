@@ -1730,9 +1730,10 @@ try {
 	// Image files go to the vision model too, so pixels never enter the main context.
 	const shot = path.join(cwd, "shot.png");
 	writeFileSync(shot, Buffer.from(pixels, "base64"));
-	assert.match((await tools.process_image.execute("call", { path: "shot.png", question: "What is the error?" }, undefined, null, { ...visionCtx, cwd })).content[0].text, /of shot\.png.*Error code 42/s);
-	await assert.rejects(tools.process_image.execute("call", { path: "shot.png", image: imageId, question: "What?" }, undefined, null, visionCtx), /exactly one/);
-	await assert.rejects(tools.process_image.execute("call", { path: "notes.txt", question: "What?" }, undefined, null, visionCtx), /not a supported image/);
+	assert.match((await tools.process_image.execute("call", { image: "shot.png", question: "What is the error?" }, undefined, null, { ...visionCtx, cwd })).content[0].text, /of shot\.png.*Error code 42/s);
+	assert.deepEqual(tools.process_image.parameters.required, ["image", "question"], "no optional fields for strict providers to null out");
+	await assert.rejects(tools.process_image.execute("call", { image: "", question: "What?" }, undefined, null, visionCtx), /Pass image/);
+	await assert.rejects(tools.process_image.execute("call", { image: "notes.txt", question: "What?" }, undefined, null, visionCtx), /not a supported image/);
 	// generate_image: OpenRouter image models use generateImages; Codex chat models use the Responses image_generation tool.
 	await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "fox.png" }, undefined, null, visionCtx), /Choose an image generation model/);
 	assert.match(tools.generate_image.promptGuidelines[0], /tools\.generate_image.*not models\.generateImages/, "codemode agents are steered off models.generateImages");
