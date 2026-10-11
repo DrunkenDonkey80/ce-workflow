@@ -621,10 +621,19 @@ export default function plan3(pi) {
 	const report = (ctx, error) => ctx.ui.notify(`Plan3: ${error.message}`, "error");
 	// Dialogs code raises without the user asking (model requirement, auto-resume): mark the session blocked like ask_user
 	// does, so herdr shows it is waiting for the user.
-	async function waitForUser(label, run) {
+	async function herdrBlocked(label, run) {
 		pi.events?.emit?.("herdr:blocked", { active: true, label });
 		try { return await run(); } finally { pi.events?.emit?.("herdr:blocked", { active: false }); }
 	}
+	// One code-raised dialog at a time: a second ui.custom replaces the first, whose promise then never settles
+	// (parallel requirement calls hung the tool and left herdr blocked).
+	let uiChain = Promise.resolve();
+	function serialUI(run) {
+		const next = uiChain.then(run, run);
+		uiChain = next.catch(() => {});
+		return next;
+	}
+	const waitForUser = (label, run) => serialUI(() => herdrBlocked(label, run));
 	const setPointer = (plan, planning) => pi.appendEntry?.(POINTER, { id: plan.id, planning: Boolean(planning) });
 	// force: switch now even mid-run (default defers "off" until idle); used at agent_end, before the next run's system prompt.
 	const research = (ctx, enabled, force = false) => pi.events?.emit?.("plan3:research", { ctx, enabled, force });
@@ -759,12 +768,14 @@ export default function plan3(pi) {
 			return { target };
 		});
 		const file = needsFile(logFile(plan.file));
+		// Re-read inside the queue: a parallel call for the same requirement waits for the first answer instead of asking again.
+		const avail = await serialUI(async () => {
 		let avail = readAvail(file);
 		if (id !== HUMAN && !(id in (avail.day ?? {}))) {
 			let on = false;
 			if (ctx.hasUI && (avail.mode ?? "day") === "day") {
 				const about = requirementDefs(split(await readFile(plan.file, "utf8")).lines).get(id);
-				const pick = await waitForUser(`Plan3: allow ${id}?`, () => showListDialog(ctx, { title: `Allow ${id}?`, purpose: `${about}${marked.target ? ` \u2014 needed by ${marked.target}` : ""}`, cursorKey: "plan3-allow", filter: false, items: [
+				const pick = await herdrBlocked(`Plan3: allow ${id}?`, () => showListDialog(ctx, { title: `Allow ${id}?`, purpose: `${about}${marked.target ? ` \u2014 needed by ${marked.target}` : ""}`, cursorKey: "plan3-allow", filter: false, items: [
 					{ value: "yes", label: "Allow", description: "The agent may do steps that need it" },
 					{ value: "no", label: "Not now", description: "Steps that need it wait; switch it on later with Alt+A" },
 				] }));
@@ -773,6 +784,8 @@ export default function plan3(pi) {
 			avail = setBoth(avail, id, on);
 			writeAvail(file, avail);
 		}
+		return avail;
+		});
 		const on = isOn(avail, id);
 		return { requirement: id, on, ...marked, ...(on ? {} : { hint: `${id} is off: continue with runnable work; the user switches it on with Alt+A.` }) };
 	}

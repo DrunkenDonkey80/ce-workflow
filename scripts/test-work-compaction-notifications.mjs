@@ -18,11 +18,24 @@ import workModelsExtension, {
 	noteExcludedModels,
 	requestContextFilter,
 	researchCompactionTrigger,
+	coldCacheCompactMinutes,
 	resetContextFilter,
 	stripProcessedPayloads,
 	summarizeNativeContext,
 	workSubagentToolCall,
 } from "../extensions/work-models.ts";
+
+// Cold cache + large context offers compaction before the next message.
+{
+	const now = Date.parse("2026-10-11T12:00:00Z");
+	const cold = (tokens, idleMs, extra = {}) => coldCacheCompactMinutes({ cwd: mkdtempSync(path.join(tmpdir(), "ce-cold-")), compact() {}, model: { contextWindow: 1_000_000 }, getContextUsage: () => ({ tokens }), ...extra },
+		[{ type: "message", message: { role: "assistant", timestamp: now - idleMs } }], now);
+	assert.equal(cold(190_000, 20 * 60_000), 20, "cold cache and a large context offer compaction");
+	assert.equal(cold(190_000, 60_000), undefined, "a warm cache sends directly");
+	assert.equal(cold(20_000, 20 * 60_000), undefined, "a small context is not worth compacting");
+	assert.equal(cold(190_000, 20 * 60_000, { model: { contextWindow: 1_000_000, promptCache: { short: 3600 } } }), undefined, "the model's cache lifetime counts");
+	assert.equal(coldCacheCompactMinutes({ compact() {}, getContextUsage: () => ({ tokens: 190_000 }), cwd: mkdtempSync(path.join(tmpdir(), "ce-cold-")) }, [{ type: "usage", kind: "cache_warm", timestamp: new Date(now - 60_000).toISOString() }], now), undefined, "a cache warm-up refreshes the cache");
+}
 
 // Replay the delayed wakeups seen after compaction in LPGSlim and ce-workflow
 // on 2026-09-08. No provider, child process, or real project mutation is needed.

@@ -60,7 +60,7 @@ const api = {
 	registerCommand: (name, command) => commands.set(name, command),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
-	events: { emit: (name, data) => events.push({ name, enabled: data.enabled, ...(data.force ? { force: true } : {}) }), on: (name, handler) => listeners.set(name, handler) },
+	events: { emit: (name, data) => events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }), on: (name, handler) => listeners.set(name, handler) },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
 };
@@ -387,9 +387,16 @@ try {
 		await writeFile(needFile, validPlan("8c8c8c8c", "Needs", "active", "### P1 Build [code]\n\n- [x] **N-01** Software\n- [wip] **N-02** Flash firmware\n- [ ] **N-03** Docs\n\n### P2 Bench [code]\n\nneeds: R-printer\n\n- [ ] **N-04** Print a test page"));
 		ctx.hasUI = true;
 		selectScript = [["Allow R-reboot?", "Not now"]];
-		let need = await tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-reboot", text: "Restart the device" });
-		assert.deepEqual([need.on, need.target], [false, "N-02"]);
-		assert.deepEqual(events.filter((event) => event.name === "herdr:blocked").slice(-2).map((event) => event.name), ["herdr:blocked", "herdr:blocked"], "code-raised dialogs mark the session waiting for the user, like ask_user");
+		// Parallel calls for one requirement ask once; the second waits for the first answer.
+		const eventsBefore = events.length;
+		let [need, again] = await Promise.all([
+			tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-reboot", text: "Restart the device" }),
+			tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-reboot", text: "Restart the device" }),
+		]);
+		assert.deepEqual([need.on, need.target, again.on], [false, "N-02", false]);
+		assert.equal(selectScript.length, 0);
+		assert.deepEqual(events.slice(eventsBefore).filter((event) => event.name === "herdr:blocked").map((event) => event.active), [true, false], "one dialog, released after the answer");
+		assert.deepEqual(events.filter((event) => event.name === "herdr:blocked").slice(-2).map((event) => event.active), [true, false], "code-raised dialogs mark the session waiting for the user, like ask_user");
 		let needText = await readFile(needFile, "utf8");
 		assert.match(needText, /## Requirements\n\n- \*\*R-reboot\*\* Restart the device/);
 		assert.match(needText, /- \[wip\] \*\*N-02\*\* Flash firmware\n  - needs: R-reboot/);

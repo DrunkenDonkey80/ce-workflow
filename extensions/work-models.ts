@@ -7408,6 +7408,45 @@ function runNativeMicrocompact(ctx, customInstructions, force = false) {
 	}
 }
 
+// Cold-cache compaction offer: the next request re-bills the whole prompt anyway, so a large context is cheapest
+// to compact right before it. Returns idle minutes when the offer applies, else undefined.
+export function coldCacheCompactMinutes(ctx, entries, now = Date.now()) {
+	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
+	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
+	const budget = currentCompactionMode(ctx) === "native-200k" ? nativeCompactionTrigger(ctx) : compactTriggerTokens(ctx, readEffectiveSettings(ctx.cwd));
+	if (tokens < 0.6 * budget) return undefined;
+	let last = 0;
+	for (let index = entries.length - 1; index >= 0 && !last; index--) {
+		const entry = entries[index];
+		if (entry.type === "message" && entry.message?.role === "assistant") last = Number(entry.message.timestamp) || Date.parse(entry.timestamp);
+		else if (entry.type === "usage" && entry.kind === "cache_warm") last = Date.parse(entry.timestamp);
+	}
+	const ttl = (ctx.model?.promptCache?.[process.env.PI_CACHE_RETENTION === "long" ? "long" : "short"] ?? 300) * 1000;
+	return last && now - last > ttl ? Math.round((now - last) / 60_000) : undefined;
+}
+
+async function offerColdCacheCompact(event, ctx, pi) {
+	if (event.source !== "interactive" || ctx.mode !== "tui" || ctx.isIdle?.() === false || !event.text?.trim() || event.text.trim().startsWith("/")) return undefined;
+	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
+	if (minutes === undefined) return undefined;
+	const tokens = Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000);
+	const pick = await showListDialog(ctx, {
+		title: "Compact before sending?", cursorKey: "cold-cache-compact", filter: false, selectedIndex: 0,
+		purpose: `The prompt cache expired ${minutes}m ago, so this message re-sends ${tokens}k tokens uncached either way.`,
+		items: [
+			{ value: "yes", label: "Yes, compact first", description: "Compact with your compaction setting, then send the message" },
+			{ value: "no", label: "No, send now", description: "Send the message with the full context" },
+		],
+	});
+	if (pick?.value !== "yes") return undefined;
+	const content = event.images?.length ? [{ type: "text", text: event.text }, ...event.images] : event.text;
+	ctx.compact({
+		onComplete: () => pi.sendUserMessage(content),
+		onError: (error) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); sending without it.`, "warning"); pi.sendUserMessage(content); },
+	});
+	return { action: "handled" };
+}
+
 function maybeCompact(ctx, settings) {
 	if (researchContext) return false;
 	const current = contextSettings(settings);
@@ -31135,6 +31174,8 @@ export default function workModelsExtension(pi) {
 			ctx.ui.notify("Compaction completed", "info");
 			return { action: "handled" };
 		}
+		const coldCache = await offerColdCacheCompact(event, ctx, pi);
+		if (coldCache) return coldCache;
 		if (!workflowOn) return;
 		const mainEditorAction = await consumePendingMainEditorAction(event, ctx, {
 			execute: (command, args, actionCtx, options) =>
