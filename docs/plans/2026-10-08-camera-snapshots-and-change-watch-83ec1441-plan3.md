@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:02:24.913Z
+updated: 2026-10-11T09:06:49.214Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -85,6 +85,8 @@ started: 2026-10-08T20:25:28.314Z
 - **D-27 — Camera-specific image integration only.** Source: Q-17 Relax. CAM-09 tests actual image return through native vision and one non-vision bridge path, manifest survival after stripping and honest unavailable pixels; other shared-pipeline eviction cases go to Backlog.
 - **D-28 — Local commit after each verified step.** Source: Q-18 Relax. After each verified camera step, commit locally only that step's files with a message naming the step ID; never push. This supersedes only the automatic-commit clause of D-21 and the Non-goals; the no-push rule stays.
 - **D-29 — Continue camera-specific implementation despite unrelated global-check failures.** Source: execution ask_user; selected “Continue camera; keep failures recorded”. Keep unrelated files untouched, use targeted camera checks, and retain the failing workflow-ON full verification as a completion blocker until resolved or explicitly accepted; this is not acceptance of completion or hardware qualification.
+- **D-30 — Provisional still limits (assumed).** Source: D-22 permits reversible engineering defaults before calibration. Ordinary still capture uses one second of discarded warm-up, at most eight returned images, 16 million pixels per image, 4 MiB subprocess output per capture, 1024-pixel default overview edge and a ten-minute maximum declared burst deadline. Intervals are minimum waits after confirmed process closure; reopening and warm-up add latency, with no catch-up burst. FullSize requests the largest enumerated native mode and fails rather than silently reducing it; all limits remain unmeasured until CAM-02.
+
 
 
 ## Open questions
@@ -120,11 +122,7 @@ Blockers: D-29 permits targeted camera progress while workflow-ON full verificat
 
 ### Phase 3 — Stills and continuous detector [code]
 
-- [wip] **CAM-05** Implement bounded single or burst capture, validated interval, crop and resolution and actual-image delivery with durable availability manifests.
-  - Depends on CAM-03, CAM-04, CAM-06 and CAM-08; no native capture opens or saves before consent, storage and active warning work. Use provisional bounded defaults under D-22 until CAM-02 calibration.
-  - Prefer enumerated DirectShow alternative identity over ambiguous friendly name or index. Detect required build and device features; missing/changed identity fails closed. Warm up exposure and focus without saving warm-up frames. For ordinary spaced shots, release between captures; document reopening latency and interval semantics and prevent catch-up bursts.
-  - Crop and resize before persistence and delivery. Preserve requested full-size and detail and per-frame identity and manifest through native vision, trimming and non-vision routing; explicitly report unavailable or partial historical evidence.
-  - Targeted checks: C-CAMERA, C-STATE, C-SETTINGS, C-LSP and C-DIFF; synthetic timing overruns, geometry/bytes, image stripping and bridge eviction.
+- [x] **CAM-05** Bounded still/burst and retained-frame recovery tools registered with native mode selection, pre-save crop/scale and durable manifests (log).
 - [ ] **CAM-07** Implement bounded continuous acquisition and fast regional change detection with readiness, actual-frame identity and noise handling.
   - Continuously open authorized acquisition is needed for brief transactions; reopening for each flash is insufficient. Readiness follows warm-up and baseline, before the caller operates the device. Separate acquisition and detection from CAM-11 retention and CAM-12 delivery; no model calls here.
   - Compare region or tiles rather than assuming a whole-frame scene threshold finds small LEDs. Use bounded buffers or pre-event queue if needed. Keep original triggering frames, capture order and on, off, then on returns; global deduplication must not erase events. Routine samples are discarded.

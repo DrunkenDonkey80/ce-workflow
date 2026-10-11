@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 
 const TTL = 24 * 60 * 60 * 1000;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-type Frame = { version: 1; id: string; createdAt: number; expiresAt: number; bytes: number; format: "png" | "jpg" };
+type Frame = { version: 1; id: string; project: string; createdAt: number; expiresAt: number; bytes: number; format: "png" | "jpg"; capture?: Record<string, unknown> };
 // Only matching, validated camera manifests authorize deletion; corrupt entries fail closed.
 export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-camera-images"), now = Date.now, maxFiles = 64, maxBytes = 64 * 1024 * 1024 } = {}) {
 	if (!Number.isSafeInteger(maxFiles) || maxFiles <= 0 || maxFiles > 64 || !Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > 64 * 1024 * 1024) throw new Error("Invalid camera storage budget.");
@@ -30,7 +30,7 @@ export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-cam
 		if (!lstatSync(path).isFile() || lstatSync(path).size > 4096) throw new Error("Invalid camera frame manifest.");
 		let frame: Frame;
 		try { frame = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("Corrupt camera frame manifest."); }
-		if (!frame || frame.version !== 1 || frame.id !== id || !Number.isSafeInteger(frame.createdAt) || frame.createdAt < 0 ||
+		if (!frame || frame.version !== 1 || frame.id !== id || typeof frame.project !== "string" || !isAbsolute(frame.project) || !Number.isSafeInteger(frame.createdAt) || frame.createdAt < 0 ||
 			frame.expiresAt !== frame.createdAt + TTL || !Number.isSafeInteger(frame.bytes) || frame.bytes <= 0 || frame.bytes > maxBytes ||
 			!["png", "jpg"].includes(frame.format)) throw new Error("Invalid camera frame manifest.");
 		return frame;
@@ -58,13 +58,14 @@ export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-cam
 		}
 	}
 	const store = {
+		prepare(cwd: string) { locked(cwd, sweep); },
 		cleanup(cwd: string) { outside(cwd); if (existsSync(root)) locked(cwd, sweep); },
 		start(cwd: string, onError: (error: unknown) => void) {
 			store.cleanup(cwd);
 			if (!timer && existsSync(root)) { timer = setInterval(() => { try { store.cleanup(cwd); } catch (error) { onError(error); } }, 60000); timer.unref(); }
 		},
 		stop() { clearInterval(timer); timer = undefined; },
-		save(cwd: string, data: Buffer, format: "png" | "jpg") {
+		save(cwd: string, data: Buffer, format: "png" | "jpg", capture?: Record<string, unknown>) {
 			if (!Buffer.isBuffer(data) || !data.length || data.length > maxBytes || !["png", "jpg"].includes(format)) throw new Error("Invalid bounded camera image.");
 			return locked(cwd, () => {
 				sweep();
@@ -77,7 +78,8 @@ export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-cam
 				}
 				if (count >= maxFiles || bytes + data.length > maxBytes) throw new Error("Camera image storage budget exhausted.");
 				const createdAt = now();
-				const frame: Frame = { version: 1, id: randomUUID(), createdAt, expiresAt: createdAt + TTL, bytes: data.length, format };
+				const frame: Frame = { version: 1, id: randomUUID(), project: realpathSync(cwd), createdAt, expiresAt: createdAt + TTL, bytes: data.length, format, capture };
+				if (Buffer.byteLength(JSON.stringify(frame)) > 4096) throw new Error("Camera capture manifest exceeds its bound.");
 				const image = file(frame.id, format);
 				// Manifest first: a crash during the image write still leaves its owned TTL record.
 				writeFileSync(file(frame.id, "json"), JSON.stringify(frame), { flag: "wx", mode: 0o600 });
@@ -86,11 +88,11 @@ export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-cam
 				return frame;
 			});
 		},
-		drop(cwd: string, id: string) { locked(cwd, () => { const frame = manifest(id); if (frame) remove(frame); }); },
+		drop(cwd: string, id: string) { locked(cwd, () => { const frame = manifest(id); if (frame) { if (relative(realpathSync(cwd), frame.project) !== "") throw new Error("Camera frame belongs to another project."); remove(frame); } }); },
 		read(cwd: string, id: string) {
 			return locked(cwd, () => {
 				sweep(); const frame = manifest(id);
-				if (!frame) return;
+				if (!frame || relative(realpathSync(cwd), frame.project) !== "") return;
 				const path = file(id, frame.format);
 				if (!existsSync(path)) return;
 				const stat = lstatSync(path);

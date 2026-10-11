@@ -215,6 +215,14 @@ const supervisorOwner = () => {
 		get released() { return released; },
 	};
 };
+choices = ["One hour"];
+const repeatedOwner = await controller.lease(ctx, request("Declared spaced burst", 10000));
+await runCameraProcess(repeatedOwner, process.execPath, ["-e", "process.stdout.write('one')"], { durationMs: 5000, maxBytes: 1024, keepLease: true });
+assert.equal(repeatedOwner.signal.aborted, false, "hardware close between shots does not consume another grant");
+assert.match(warning(), /^warning:CAMERA ARMED/);
+await runCameraProcess(repeatedOwner, process.execPath, ["-e", "process.stdout.write('two')"], { durationMs: 5000, maxBytes: 1024, keepLease: true });
+await repeatedOwner.finish();
+assert.equal(warning(), undefined);
 const normal = supervisorOwner();
 const output = await runCameraProcess(normal, process.execPath, ["-e", "process.stdout.write('frame');"], { durationMs: 5000, maxBytes: 1024 });
 assert.equal(output.stdout.toString(), "frame");
@@ -283,6 +291,72 @@ const redirected = createCameraImages({ directory: join(redirect, "bad-images") 
 assert.throws(() => redirected.save(projectDir, Buffer.from("x"), "jpg"), /outside/);
 assert.equal(existsSync(join(projectDir, "bad-images")), false, "redirected ancestors cannot allocate inside the repository");
 images.stop();
+const { cameraCaptureRequest, cameraModes, cameraStillArgs, cameraPNGSize, createCameraCapture } = await createJiti(import.meta.url).import("../extensions/work-camera-capture.ts");
+assert.throws(() => cameraCaptureRequest({ count: 9 }), /bounded/);
+assert.throws(() => cameraCaptureRequest({ crop: { x: -1, y: 0, width: 1, height: 1 } }), /crop/);
+assert.throws(() => cameraCaptureRequest({ width: 20 }), /size/);
+assert.throws(() => cameraCaptureRequest({ fullSize: true, width: 20, height: 10 }), /Full-size/);
+const modes = cameraModes("[dshow] pixel_format=yuyv422 min s=640x480 fps=5 max s=1280x720 fps=30\n[dshow] vcodec=mjpeg min s=1920x1080 fps=30 max s=1920x1080 fps=30");
+assert.equal(modes[0].width, 1920);
+const overview = cameraStillArgs(printer.id, modes[0], cameraCaptureRequest({}));
+assert.equal(overview.width, 1024);
+assert.ok(overview.args.includes(`video=${printer.id}`));
+assert.ok(!overview.args.some(arg => arg.includes("audio=")));
+assert.equal(cameraStillArgs(printer.id, modes[0], cameraCaptureRequest({ fullSize: true })).width, 1920);
+assert.throws(() => cameraStillArgs(printer.id, modes[0], cameraCaptureRequest({ crop: { x: 1900, y: 0, width: 30, height: 1 } })), /outside/);
+const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jGNcAAAAASUVORK5CYII=", "base64");
+assert.deepEqual(cameraPNGSize(png), { width: 1, height: 1 });
+assert.throws(() => cameraPNGSize(png.subarray(0, 30)), /complete/);
+const retained = createCameraImages({ directory: join(sandbox, "capture-images") });
+let runCount = 0, leaseCount = 0;
+const nativeOwner = supervisorOwner();
+const fakeController = {
+	images: retained, settings() { return { enabled: true, device: printer }; },
+	async lease(_ctx, captureRequest) { assert.ok(captureRequest.summary.includes("full field of view")); leaseCount++; return { ...nativeOwner, async finish() {} }; },
+};
+const fakeCapture = createCameraCapture(fakeController, {
+	async resolveFFmpeg() { return process.execPath; }, async devices() { return [printer]; },
+	async run(_owner, _exe, args) { runCount++; return args.includes("-list_options") ? { stdout: Buffer.alloc(0), stderr: "pixel_format=rgb24 min s=1x1 fps=30 max s=1x1 fps=30", code: 1, receivedAt: 0 } : { stdout: png, stderr: "", code: 0, receivedAt: 12345 }; },
+});
+const burst = await fakeCapture.capture(ctx, { count: 2, intervalMs: 0 });
+assert.equal(burst.frames.length, 2);
+assert.notEqual(burst.frames[0].id, burst.frames[1].id, "identical pixels remain distinct captures");
+assert.equal(leaseCount, 1, "one-use authorization covers exactly the declared burst");
+assert.equal(runCount, 3, "mode query and two finite captures, no catch-up saves");
+assert.equal(burst.frames[0].capture.timestamp, 12345);
+assert.equal(fakeCapture.recover({ ...ctx, cwd: otherDir }, burst.frames[0].id), undefined, "history cannot move between projects");
+assert.deepEqual(fakeCapture.recover(ctx, burst.frames[0].id).data, png);
+await assert.rejects(fakeCapture.capture({ ...ctx, mode: "rpc" }, {}), /local TUI/);
+retained.drop(projectDir, burst.frames[0].id);
+assert.equal(fakeCapture.recover(ctx, burst.frames[0].id), undefined);
+const { cameraTools } = await createJiti(import.meta.url).import("../extensions/work-camera-tools.ts");
+const recovery = cameraTools(fakeController).find(tool => tool.name === "camera_recover");
+const recovered = await recovery.execute("test", { frame: burst.frames[1].id }, undefined, undefined, ctx);
+assert.equal(recovered.content.filter(part => part.type === "image").length, 1);
+const { stripProcessedPayloads } = await import("../extensions/work-models.ts");
+const conversation = [{ role: "toolResult", toolName: "camera_recover", toolCallId: "test", timestamp: 1, ...recovered }];
+const stripped = stripProcessedPayloads(conversation, { imageBeforeTimestamp: Infinity });
+assert.ok(!stripped[0].content.some(part => part.type === "image"));
+assert.ok(stripped[0].content.some(part => part.type === "text" && part.text.includes(burst.frames[1].id)), "manifest survives pixel stripping");
+const { createVisionBridge } = await import("../extensions/work-vision.ts");
+const bridge = createVisionBridge();
+const projected = bridge.project(conversation, { provider: "fixture", id: "nonvision" }, ["fixture/nonvision"], "fixture/vision");
+assert.ok(projected.messages[0].content.some(part => part.type === "text" && part.text.includes("another model's interpretation")));
+assert.ok(projected.messages[0].content.some(part => part.type === "text" && part.text.includes(burst.frames[1].id)));
+retained.drop(projectDir, burst.frames[1].id);
+const unavailable = await recovery.execute("test", { frame: burst.frames[1].id }, undefined, undefined, ctx);
+assert.equal(unavailable.content.some(part => part.type === "image"), false);
+assert.equal(unavailable.details.outcome, "unavailable");
+let partialShots = 0;
+const partialCapture = createCameraCapture(fakeController, {
+	async resolveFFmpeg() { return process.execPath; }, async devices() { return [printer]; },
+	async run(_owner, _exe, args) { if (args.includes("-list_options")) return { stderr: "pixel_format=rgb24 min s=1x1 fps=30 max s=1x1 fps=30" }; if (++partialShots === 2) throw new Error("fixture capture fault"); return { stdout: png, receivedAt: 456 }; },
+});
+const partial = await partialCapture.capture(ctx, { count: 2, intervalMs: 0 });
+assert.equal(partial.outcome, "partial");
+assert.equal(partial.frames.length, 1);
+assert.match(partial.failure, /fixture capture fault/);
+retained.stop();
 console.log("ok - camera metadata, project opt-in, persistent local consent, stale-dialog fences and owned cancellation/release (no hardware)");
 } finally {
 	if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = originalAgentDir;

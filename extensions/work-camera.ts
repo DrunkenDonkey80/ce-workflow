@@ -171,6 +171,12 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 						if (abort.signal.aborted) throw new Error("Camera ownership was cancelled.");
 					},
 					worker(workerPid: number, childPid = 0) { return state.worker(scope, lease, workerPid, childPid); },
+					async endBackend() {
+						await stop?.();
+						stop = undefined; begun = false;
+						await state.worker(scope, lease, 0);
+						if (!abort.signal.aborted) cameraWarning(ctx, "ARMED");
+					},
 					finish(): Promise<void> {
 						abort.abort(); clearTimeout(timer);
 						if (!finishing) finishing = (async () => {

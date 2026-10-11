@@ -23,12 +23,14 @@ type Owner = {
 	attachStop(stop: () => Promise<void>): void;
 	worker(workerPid: number, childPid?: number): Promise<void>;
 	finish(): Promise<void>;
+	endBackend?(): Promise<void>;
 };
 // Internal argument-vector API only; tool arguments never choose an executable or arbitrary arguments.
-export async function runCameraProcess(owner: Owner, command: string, args: string[], { durationMs, maxBytes }: { durationMs: number; maxBytes: number }) {
+export async function runCameraProcess(owner: Owner, command: string, args: string[], { durationMs, maxBytes, keepLease = false, allowNonzero = false }: { durationMs: number; maxBytes: number; keepLease?: boolean; allowNonzero?: boolean }) {
 	if (!isAbsolute(command) || !Array.isArray(args) || !args.every(arg => typeof arg === "string" && !arg.includes("\0")) ||
 		!Number.isSafeInteger(durationMs) || durationMs <= 0 || durationMs > 172800000 ||
 		!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > 64 * 1024 * 1024) throw new Error("Invalid bounded camera subprocess request.");
+	if (keepLease && !owner.endBackend) throw new Error("Camera owner cannot release between captures.");
 	await owner.guard();
 	const workerPath = fileURLToPath(new URL("./work-camera-worker.ts", import.meta.url));
 	const jitiPath = createRequire(import.meta.url).resolve("jiti");
@@ -38,12 +40,14 @@ export async function runCameraProcess(owner: Owner, command: string, args: stri
 	let confirmed = false;
 	let error: Error | undefined;
 	let bytes = 0;
+	let exitCode: number | null = null;
+	let receivedAt = 0;
 	const stdout: Buffer[] = [], stderr: Buffer[] = [];
 	let resolveClosed: () => void;
 	const closure = new Promise<void>(resolve => { resolveClosed = resolve; });
-	let resolveResult: (result: { stdout: Buffer; stderr: string; code: number | null }) => void;
+	let resolveResult: (result: { stdout: Buffer; stderr: string; code: number | null; receivedAt: number }) => void;
 	let rejectResult: (error: Error) => void;
-	const result = new Promise<{ stdout: Buffer; stderr: string; code: number | null }>((resolve, reject) => { resolveResult = resolve; rejectResult = reject; });
+	const result = new Promise<{ stdout: Buffer; stderr: string; code: number | null; receivedAt: number }>((resolve, reject) => { resolveResult = resolve; rejectResult = reject; });
 	// Observe immediately: setup or metadata failure may occur before the caller can await result.
 	void result.catch(() => {});
 	const send = (message: Record<string, unknown>) => { if (worker.connected) worker.send(message, sendError => { if (sendError) error ??= sendError; }); };
@@ -86,23 +90,25 @@ export async function runCameraProcess(owner: Owner, command: string, args: stri
 		} else if (message?.type === "fault") fault(new Error(String(message.message).slice(0, 512)));
 		else if (message?.type === "closed") {
 			confirmed = true;
-			if (message.code !== 0 && !owner.signal.aborted) error ??= new Error(`Camera subprocess failed (${message.code ?? message.signal}).`);
+			exitCode = message.code;
+			if (!allowNonzero && message.code !== 0 && !owner.signal.aborted) error ??= new Error(`Camera subprocess failed (${message.code ?? message.signal}).`);
 		}
 	});
 	for (const [stream, buffers] of [[worker.stdout, stdout], [worker.stderr, stderr]] as const) stream!.on("data", (data: Buffer) => {
 		bytes += data.length;
 		if (bytes > maxBytes) return fault(new Error("Camera process output exceeded its byte limit."));
+		if (stream === worker.stdout && !receivedAt) receivedAt = Date.now();
 		buffers.push(data);
 	});
 	worker.on("error", failure => { error ??= failure; });
-	worker.on("close", code => {
+	worker.on("close", () => {
 		closed = true; clearInterval(guardTimer); owner.signal.removeEventListener("abort", abort); resolveClosed!();
 		if (!confirmed) error ??= new Error("Camera supervisor closed without confirming child release.");
 		if (owner.signal.aborted) error ??= new Error("Camera subprocess cancelled.");
 		if (!started) error ??= new Error("Camera subprocess never started.");
-		if (error) rejectResult!(error); else resolveResult!({ stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString("utf8"), code });
+		if (error) rejectResult!(error); else resolveResult!({ stdout: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString("utf8"), code: exitCode, receivedAt });
 	});
 	if (owner.signal.aborted) abort();
 	try { return await result; }
-	finally { await owner.finish(); }
+	finally { if (keepLease) await owner.endBackend!(); else await owner.finish(); }
 }

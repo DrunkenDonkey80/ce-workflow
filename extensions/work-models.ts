@@ -41,6 +41,7 @@ import {
 import { progressBar, showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
+import { cameraTools } from "./work-camera-tools.ts";
 import { registerWorkUiGate } from "./work-ui-gate.ts";
 import { openWorkFleet } from "./work-fleet.ts";
 import { dispatchPrivateWorkflow } from "./work-private-workflows.ts";
@@ -30334,6 +30335,7 @@ export default function workModelsExtension(pi) {
 	const registerWorkflowTool = workflowOn ? registerConstrainedTool : () => {};
 	const visionBridge = createVisionBridge();
 	cameraController = createCameraController(pi, { readProjectSettings: readSettings, writeProjectSettings: writeSettings });
+	for (const tool of cameraTools(cameraController)) registerConstrainedTool(pi, tool);
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	registerConstrainedTool(pi, {
 		name: "research_note",
