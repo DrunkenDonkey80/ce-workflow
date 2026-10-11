@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:24:49.132Z
+updated: 2026-10-11T09:27:44.740Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -131,10 +131,7 @@ Checks: camera and camera-state scripts plus git diff --check passed after CAM-1
 
 - [x] **CAM-11** Elapsed-time adaptive retention, protected initial burst, rolling tail, reserved final slot and lifetime budgets implemented (log).
 - [x] **CAM-12** Native ready-before-operation watch/stop tools, at-most-two wakeups and lifecycle-safe busy coalescing implemented (log).
-- [ ] **CAM-13** Add settled-state mode to the bounded watcher: readiness, observed activity, fresh-sample quiet interval and one final image and wake.
-  - Initial idle cannot finish an operation not yet visibly started. Qualifying activity starts quiet tracking; meaningful or gradual cumulative change resets it. Fresh valid samples are required throughout the requested interval; stalls, timeout, disconnect and revocation do not yield settled success.
-  - Discard routine samples; retain the actual fresh final frame with validated crop and resolution. Report visual stability with region, timestamps and quiet duration, not job completion. Paused or jammed or invisible printer activity can look stable; caller-side existing status confirmation adds no new camera or printer authority.
-  - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; initial-idle, resumed activity, cumulative drift, faults, final identity and bounded resources.
+- [x] **CAM-13** Settled-state watch mode emits one fresh final image after observed activity and uninterrupted visual quiet (log).
 
 ### Phase 5 — Software integration [code]
 

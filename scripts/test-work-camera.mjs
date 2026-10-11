@@ -370,6 +370,7 @@ assert.equal(detector.frame(off, 1100, 100).type, "change");
 assert.equal(detector.frame(on, 1150, 150).type, "change", "on-off-on preserves every qualifying capture");
 assert.equal(detector.stats().sequence, 4);
 assert.throws(() => detector.assertFresh(651), /stalled/);
+assert.throws(() => detector.frame(off, 2000, 1000), /stalled/, "a delayed incoming frame cannot retroactively establish uninterrupted quiet");
 const drift = createCameraDetector({ width: 2, height: 2 });
 drift.frame(Buffer.alloc(12), 1000, 0);
 assert.equal(drift.frame(Buffer.alloc(12, 3), 1010, 10).type, "sample", "sensor noise does not qualify");
@@ -480,6 +481,38 @@ sampleCallback({ ...observation(2200, 2, "sample"), lastChange: 2100 });
 await watchListeners.get("session_before_tree")();
 sampleCallback(observation(4000, 4));
 assert.equal(wakeMessages.length, 2, "stale branch callbacks cannot wake a switched conversation");
+idle = true;
+await watcher.start(watchCtx, { deadlineMs: 20000, quietMs: 500, mode: "settled" });
+sampleCallback({ ...observation(4000, 1, "sample"), lastChange: 0 });
+assert.equal(wakeMessages.length, 2, "initial idle cannot finish an operation not yet visibly started");
+sampleCallback(observation(4100, 2));
+sampleCallback({ ...observation(4400, 3, "sample"), lastChange: 4100 });
+sampleCallback(observation(4500, 4));
+sampleCallback({ ...observation(4900, 5, "sample"), lastChange: 4500 });
+assert.equal(wakeMessages.length, 2, "resumed activity resets quiet tracking");
+sampleCallback({ ...observation(5100, 6, "sample"), lastChange: 4500 });
+await waitUntil(() => wakeMessages.length === 3);
+assert.equal(wakeMessages[2].details.outcome, "settled");
+assert.equal(wakeMessages[2].content.filter(part => part.type === "image").length, 1);
+assert.equal(wakeMessages[2].details.frames[0].capture.timestamp, 5100, "settled evidence is the actual fresh terminal frame");
+assert.equal(wakeMessages[2].details.sampling.quietDurationMs, 600);
+const faultyWatch = createCameraWatch({ on() {}, sendMessage(message) { wakeMessages.push(message); } }, watchController, {
+	async acquire(_ctx, _controller, _input, callbacks) { callbacks.owner({ lease: { expiresAt: Date.now() + 1000 }, current() {}, async finish() {} }); callbacks.sample(observation(0, 0, "ready"), geometry); throw new Error("fixture disconnected"); },
+});
+await faultyWatch.start(watchCtx, { deadlineMs: 2000, mode: "settled" });
+await waitUntil(() => wakeMessages.length === 4);
+assert.equal(wakeMessages[3].details.outcome, "partial:fault", "disconnect cannot yield settled success");
+assert.match(wakeMessages[3].details.failure, /disconnected/);
+let releaseFails = true;
+const releaseWatch = createCameraWatch({ on() {}, sendMessage(message) { wakeMessages.push(message); } }, watchController, {
+	async acquire(_ctx, _controller, _input, callbacks) { callbacks.owner({ lease: { expiresAt: Date.now() + 1000 }, current() {}, async finish() { if (releaseFails) throw new Error("fixture release unconfirmed"); } }); callbacks.sample(observation(0, 0, "ready"), geometry); throw new Error("fixture stream ended"); },
+});
+await releaseWatch.start(watchCtx, { deadlineMs: 2000, mode: "settled" });
+await waitUntil(() => wakeMessages.length === 5);
+assert.equal(wakeMessages[4].details.outcome, "partial:fault");
+await assert.rejects(releaseWatch.stop(), /release unconfirmed/, "stop cannot claim confirmed closure after a failure");
+releaseFails = false;
+await releaseWatch.stop();
 watchImages.stop();
 console.log("ok - camera metadata, project opt-in, persistent local consent, stale-dialog fences and owned cancellation/release (no hardware)");
 } finally {
