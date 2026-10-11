@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:57:11.639Z
+updated: 2026-10-11T10:58:35.393Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -163,6 +163,7 @@ needs: R-camera, human
   - Printout: readiness, visible activity then one stable-result image; separately test pause or fault and say visually stable, not job completed. If available, existing caller-side printer completion plus a still gives stronger evidence without new integration.
   - Verify OFF opens nothing; A never captures B; disable or expiry releases before warning clears; no video or audio, unbounded files or TTL exception. Do not claim mocks prove physical behavior or complete the plan without deferred qualification evidence or explicit limitation acceptance.
   - Targeted checks: real device, provider and printer trials, CAM-02 limits and CAM-14 observations; full software suite before completion.
+  - note: After live UI acceptance and refreshed software checks, user explicitly chose 'Later — not ready' for representative printer trials. R-printer remains off. No camera or printer activity started; wait for user to provide the setup.
 
 ## Checks
 

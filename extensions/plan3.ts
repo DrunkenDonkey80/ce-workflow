@@ -245,6 +245,9 @@ function summarize(file, text, folder) {
 		next: work.next?.id,
 		waiting: work.waiting,
 		human: all.filter((step) => step.mark === "human").map((step) => step.id),
+		// Steps left by phase mode, so the list shows how much will run on the planning model.
+		left: all.length - all.filter((step) => step.mark === "x").length,
+		think: ((headings) => all.filter((step, index) => step.mark !== "x" && headings[index]?.startsWith("### ") && THINK.test(headings[index])).length)(stepHeadings(lines)),
 		open: openCount(subsection(lines, "Blocking")) + openCount(subsection(lines, "Deferred")),
 		reviewed: getMeta(lines, "reviewed"),
 		overrides: Object.fromEntries(OVERRIDES.map((key) => [key, getMeta(lines, key)]).filter(([, value]) => value)),
@@ -599,7 +602,7 @@ function age(from, to = Date.now()) {
 }
 function planRow(plan) {
 	const timing = [plan.started && `active ${age(plan.started, plan.status === "complete" && plan.updated ? Date.parse(plan.updated) : Date.now())}`, plan.updated && `touched ${age(plan.updated)} ago`].filter(Boolean).join(" · ");
-	return { label: `[${plan.status}] ${plan.title}`, description: `${plan.done}/${plan.total} ${progressBar(plan.done, plan.total)}${timing ? ` · ${timing}` : ""}` };
+	return { label: `[${plan.status}] ${plan.title}`, description: `${plan.done}/${plan.total} ${progressBar(plan.done, plan.total)}${plan.left ? ` · left: ${plan.think} think, ${plan.left - plan.think} code` : ""}${timing ? ` · ${timing}` : ""}` };
 }
 function orderPlans(ctx, plans) {
 	const current = currentPlan(ctx, plans);
@@ -616,6 +619,12 @@ export default function plan3(pi) {
 		return false;
 	};
 	const report = (ctx, error) => ctx.ui.notify(`Plan3: ${error.message}`, "error");
+	// Dialogs code raises without the user asking (model requirement, auto-resume): mark the session blocked like ask_user
+	// does, so herdr shows it is waiting for the user.
+	async function waitForUser(label, run) {
+		pi.events?.emit?.("herdr:blocked", { active: true, label });
+		try { return await run(); } finally { pi.events?.emit?.("herdr:blocked", { active: false }); }
+	}
 	const setPointer = (plan, planning) => pi.appendEntry?.(POINTER, { id: plan.id, planning: Boolean(planning) });
 	// force: switch now even mid-run (default defers "off" until idle); used at agent_end, before the next run's system prompt.
 	const research = (ctx, enabled, force = false) => pi.events?.emit?.("plan3:research", { ctx, enabled, force });
@@ -691,7 +700,7 @@ export default function plan3(pi) {
 		// Requirements defined since the user last looked (by the model, convert or optimize) start off: ask once.
 		if (!planning && ctx.hasUI) {
 			const defs = requirementDefs(split(await readFile(plan.file, "utf8")).lines);
-			if (unset(availOf(plan.file), [...defs.keys()]).length) await chooseAvail(ctx, needsFile(logFile(plan.file)), defs);
+			if (unset(availOf(plan.file), [...defs.keys()]).length) await waitForUser("Plan3: set requirements", () => chooseAvail(ctx, needsFile(logFile(plan.file)), defs));
 		}
 		if (!planning && !tag && ctx.hasUI) await reviewTags(ctx, plan);
 		const mode = planning ? "planning" : tag ? "think" : stepMode(split(await readFile(plan.file, "utf8")).lines, availOf(plan.file));
@@ -705,12 +714,12 @@ export default function plan3(pi) {
 	async function reviewTags(ctx, plan) {
 		const flagged = judgmentPhases(split(await readFile(plan.file, "utf8")).lines);
 		if (!flagged.length) return;
-		const picked = await showListDialog(ctx, {
+		const picked = await waitForUser("Plan3: confirm phase tags", () => showListDialog(ctx, {
 			title: "[code] phases that look like judgment work",
 			purpose: "Checked switch to [think]: planning model, high effort. Unchecked stay [code]. Esc saves; each phase is asked once.",
 			cursorKey: `plan3-tags:${plan.file}`, filter: false, multi: { selected: flagged },
 			items: flagged.map((heading) => ({ value: heading, label: heading.replace(/^###\s*/, ""), preserveCase: true })),
-		});
+		}));
 		if (!picked?.values) return;
 		await mutate(plan, (lines) => {
 			for (const heading of picked.values) { const index = lines.indexOf(heading); if (index >= 0) lines[index] = heading.replace(/\[code\]/i, "[think]"); }
@@ -755,10 +764,10 @@ export default function plan3(pi) {
 			let on = false;
 			if (ctx.hasUI && (avail.mode ?? "day") === "day") {
 				const about = requirementDefs(split(await readFile(plan.file, "utf8")).lines).get(id);
-				const pick = await showListDialog(ctx, { title: `Allow ${id}?`, purpose: `${about}${marked.target ? ` \u2014 needed by ${marked.target}` : ""}`, cursorKey: "plan3-allow", filter: false, items: [
+				const pick = await waitForUser(`Plan3: allow ${id}?`, () => showListDialog(ctx, { title: `Allow ${id}?`, purpose: `${about}${marked.target ? ` \u2014 needed by ${marked.target}` : ""}`, cursorKey: "plan3-allow", filter: false, items: [
 					{ value: "yes", label: "Allow", description: "The agent may do steps that need it" },
 					{ value: "no", label: "Not now", description: "Steps that need it wait; switch it on later with Alt+A" },
-				] });
+				] }));
 				on = pick?.value === "yes";
 			}
 			avail = setBoth(avail, id, on);

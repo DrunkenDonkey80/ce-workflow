@@ -375,6 +375,8 @@ try {
 		assert.match(judged, /### P2 Eval \[code\]/);
 		assert.match(judged, /### P3 Wiring \[code\]/);
 		assert.match(judged, /^tagsChecked: [0-9a-f]{8},[0-9a-f]{8}$/m);
+		const judgePlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8d8d8d8d");
+		assert.deepEqual([judgePlan.left, judgePlan.think], [3, 1], "steps left by phase mode for the plan list");
 		selectScript = [];
 		await run("resume3", "8d8d8d8d");
 		assert.equal(selectScript.length, 0, "each phase is asked once");
@@ -387,6 +389,7 @@ try {
 		selectScript = [["Allow R-reboot?", "Not now"]];
 		let need = await tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-reboot", text: "Restart the device" });
 		assert.deepEqual([need.on, need.target], [false, "N-02"]);
+		assert.deepEqual(events.filter((event) => event.name === "herdr:blocked").slice(-2).map((event) => event.name), ["herdr:blocked", "herdr:blocked"], "code-raised dialogs mark the session waiting for the user, like ask_user");
 		let needText = await readFile(needFile, "utf8");
 		assert.match(needText, /## Requirements\n\n- \*\*R-reboot\*\* Restart the device/);
 		assert.match(needText, /- \[wip\] \*\*N-02\*\* Flash firmware\n  - needs: R-reboot/);
@@ -751,7 +754,7 @@ try {
 	await run("plan3");
 	assert.equal(selectScript.length, 0);
 	assert.match(order[0], /Other work/, "current plan first");
-	assert.match(order[1], /\[active\] Fresh — 1\/2 \[█{6}░{6}\] · active \d+d · touched 0m ago/);
+	assert.match(order[1], /\[active\] Fresh — 1\/2 \[█{6}░{6}\] · left: 0 think, 1 code · active \d+d · touched 0m ago/);
 	assert(!order.some((label) => label.includes("Small")), "open view hides finished plans");
 	assert(finishedOrder.some((label) => label.includes("Small")) && !finishedOrder.some((label) => label.includes("Fresh")), "Tab shows finished plans only");
 	const forced = await readFile(path.join(directory, "done", "2026-10-04-fresh-44444444-plan3.md"), "utf8");
