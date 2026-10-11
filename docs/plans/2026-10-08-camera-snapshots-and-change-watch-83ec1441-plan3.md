@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:36:05.796Z
+updated: 2026-10-11T10:37:42.391Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -152,6 +152,9 @@ needs: R-camera, human
   - check: Watch 7d85af50 initial delivery: sequence 244, 10 retained frames, thinned 1, delayedSamples 0; visible hand passes, actual pulse duration unknown. Await final native delivery without polling.
   - note: Blink watch 7d85af50 final: quiet at seq 315 after 3.07 s; 11 saved (750 KB), 17 thinned; delayedSamples 1 (first local receipt gap observed); last change single marginal tile (0.0806, x176 y24 8x8). Remaining human-only: timed light source (known on-duration) for blink/lag limit, and full Pi process quit+restart identity check.
   - check: Final native delivery received; no polling.
+  - note: User confirms Pi was fully restarted. Proceed with one bounded 320x180 still through native device-specific consent/warning to verify persisted C310 selection. Restart is user-reported; blink timing remains unmeasured.
+  - note: Full Pi restart (user-reported): saved project selection and timed grant persisted; one 320x180 still captured on the same C310 identity (frame 647a51cc, 72 KB). Only remaining CAM-02 item: physical blink duration/lag limit with a timed light source of known on-duration (e.g. LED blinking at known rate or phone strobe app).
+  - check: camera_capture 320x180 after full Pi restart: captured on @device_pnp_...vid_046d&pid_081b...\global.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
