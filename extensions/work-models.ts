@@ -7420,11 +7420,11 @@ function runNativeMicrocompact(ctx, customInstructions, force = false) {
 
 // Cold-cache compaction offer: the next request re-bills the whole prompt anyway, so a large context is cheapest
 // to compact right before it. Returns idle minutes when the offer applies, else undefined.
-export function coldCacheCompactMinutes(ctx, entries, now = Date.now()) {
+export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), share = 0.6) {
 	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
 	const budget = currentCompactionMode(ctx) === "native-200k" ? nativeCompactionTrigger(ctx) : compactTriggerTokens(ctx, readEffectiveSettings(ctx.cwd));
-	if (tokens < 0.6 * budget) return undefined;
+	if (tokens < share * budget) return undefined;
 	let last = 0;
 	for (let index = entries.length - 1; index >= 0 && !last; index--) {
 		const entry = entries[index];
@@ -32019,7 +32019,10 @@ export default function workModelsExtension(pi) {
 		cleanupBenignInstructionDirt(ctx.cwd);
 		await flushWorkGoalContinuationRetry(ctx, pi);
 		const mode = currentCompactionMode(ctx);
-		const forced = boundaryCompactionRequested;
+		// Tools outlived the prompt cache: the next request re-bills everything anyway, so a large context compacts first.
+		const coldMinutes = event.toolResults?.length ? coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? [], Date.now(), 0.65) : undefined;
+		if (coldMinutes !== undefined) ctx.ui.notify(`Prompt cache expired during ${coldMinutes}m of tool work; compacting before the next request.`, "info");
+		const forced = boundaryCompactionRequested || coldMinutes !== undefined;
 		if (!forced) {
 			// Provider usage stays low when an upstream proxy compresses requests; the stored transcript keeps growing.
 			const tokens = Math.max(ctx.getContextUsage?.()?.tokens ?? 0, contextMessagesTokens(event.context?.contextMessages ?? []));

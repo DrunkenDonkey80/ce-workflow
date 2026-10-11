@@ -1565,6 +1565,16 @@ try {
 		manualOptions.onComplete({});
 		assert.equal(await hooks.turn_end(boundary, { ...nativeCtx, getContextUsage: () => ({ tokens: 199_999 }) }), undefined, "no forced compaction below 200k");
 	}
+	// Tool work that outlives the prompt cache compacts a large context before the next request.
+	const toolTurn = { ...boundary, toolResults: [{ role: "toolResult" }] };
+	const lastAsk = ago => ({ ...nativeCtx, getContextUsage: () => ({ tokens: 150_000 }),
+		sessionManager: { ...nativeCtx.sessionManager, getBranch: () => [{ type: "message", message: { role: "assistant", timestamp: Date.now() - ago } }] } });
+	assert.equal(await hooks.turn_end(toolTurn, lastAsk(60_000)), undefined, "a warm cache keeps the context");
+	assert.equal(await hooks.turn_end(boundary, lastAsk(10 * 60_000)), undefined, "a final answer without tools does not compact");
+	assert.equal(await hooks.turn_end(toolTurn, { ...lastAsk(10 * 60_000), getContextUsage: () => ({ tokens: 120_000 }) }), undefined, "below 65% the miss is cheaper than losing context");
+	const coldTurn = await hooks.turn_end(toolTurn, lastAsk(10 * 60_000));
+	assert.match(boundaryWarnings.find(message => /Prompt cache expired/.test(message)) ?? "", /10m of tool work/);
+	assert(coldTurn?.entries?.[0]?.type === "compaction" || boundaryWarnings.at(-1)?.includes("native summary generator is unavailable"), "a cold cache at 65% compacts first");
 	const nativeDraft = await buildBoundaryCompaction(boundary, nativeCtx, "native-200k", async (...args) => {
 		assert(args[0].some(message => message.content?.some?.(part => part.thinking === "Full retained reasoning")), "native summary gets unstripped reasoning");
 		assert(args[0].some(message => message.role === "toolResult" && message.toolCallId === "old" && message.content[0].text.length > 300_000));
