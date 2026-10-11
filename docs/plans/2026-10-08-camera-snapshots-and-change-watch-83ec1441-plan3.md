@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-08T21:35:27.873Z
+updated: 2026-10-11T08:43:54.374Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -23,7 +23,7 @@ started: 2026-10-08T20:25:28.314Z
 - **R1 — Project opt-in:** Enable camera defaults OFF; an explicit project-only device picker is required. Ignore global camera values. Selection alone never opens or enables a camera; do not fall back to another device, especially a user-facing webcam.
 - **R2 — Stills:** One still or a finite series with requested intervals; no audio or recorded video files. Continuous authorized local watch sampling is permitted, not video recording.
 - **R3 — Visible access:** Unmistakable red actual-use indication, including warm-up and monitoring, distinct from enabled configuration or permission. Native acquisition is local-TUI-only, including saved grants; deny RPC, print and headless children before acquisition. Missing warning UI fails closed; losing the owning UI cancels acquisition. Source: Q-12 and D-20.
-- **R4 — Authorization:** Direct human choices: one shot or burst, one hour, current day, or 48 hours. For watches the single-use choice names one bounded watch and shows its maximum duration. Persist fixed project/device-bound time grants across reload/restart, never restart hardware automatically. Current day ends at the displayed local calendar boundary, not rolling 24 hours. Denial grants nothing. Sources: Q-03, Q-05 and Q-06.
+- **R4 — Authorization:** Direct human choices: one shot or burst, one hour, current day, or 48 hours. For watches the single-use choice names one bounded watch and shows its maximum duration. Persist fixed project- and device-bound time grants across reload and restart, never restart hardware automatically. Current day ends at the displayed local calendar boundary, not rolling 24 hours. Denial grants nothing. Sources: Q-03, Q-05 and Q-06.
 - **R5 — Temporary images:** Dedicated camera-owned storage outside the repository; code-owned cleanup after approximately 24 hours. Evicted tail data is deleted immediately. Shutdown delays cleanup until next startup; Windows is not assumed to clean it automatically. Provider copies and Pi session history are not erased by file deletion.
 - **R6 — Model-directed crop and resolution:** Full-size overview followed by validated region and output-size requests; small monitoring images and detailed text crops. Distinguish full field of view from native resolution; never silently downgrade an explicitly requested full-size capture. Crop and downscale before saving and sending subsequent images; cropping limits shared content, not sensor field of view. No mandatory manual crop editor.
 - **R7 — Adaptive multi-change watch:** Preserve several brief LED and screen states in a transaction shorter than two seconds without real-time model analysis. User starting targets: approximately 20 initial images (often five meaningful images), then at most one retained image per five seconds, then approximately one per minute, and approximately 30 seconds without qualifying change to stop. These are not measured guarantees. Elapsed-time stages, one early plus one final delivery, protected initial burst with rolling tail and final slot, and longer explicit grant-bounded requests are selected. Calibrate exact stage windows, thresholds, sampling rate and count and byte limits in CAM-02; do not reopen policy questions. Sources: Q-04 and Q-07 through Q-11.
@@ -48,7 +48,12 @@ started: 2026-10-08T20:25:28.314Z
 - No recorded video or audio, live-preview server, broker daemon, remote monitoring service, automatic printer emergency stop, general surveillance or subscription framework, unbounded watch or provider call per sample.
 - No mandatory manual crop-selection UI. No changes to Plan3 idea dialogs, advisor selection, progress footer or the other session's OpenDesign work.
 - Initial scope: local Windows cameras and an existing compatible FFmpeg installation only. No network or cross-platform backend, bundled or downloaded FFmpeg or Windows-native helper without user-approved scope expansion.
-- The original planning-only implementation and device-access restriction was superseded by D-21; it never authorized live access. Preserve unrelated dirty work and do not automatically commit or push. Historical planning restrictions and advisor dispositions are in (log).
+- The original planning-only implementation and device-access restriction was superseded by D-21; it never authorized live access. Preserve unrelated dirty work; commit locally per D-28 and never push. Historical planning restrictions and advisor dispositions are in (log).
+
+## Requirements
+
+- **R-camera** The Logi C310 HD WebCam (D-23) is connected and chosen by its enumerated identity in the native project Camera settings.
+- **R-printer** A representative printer setup is visible to the selected camera for real printout trials.
 
 ## Decisions
 
@@ -73,6 +78,12 @@ started: 2026-10-08T20:25:28.314Z
 - **D-20 — TUI-only camera access, including saved grants.** Source: applied Q-12 selection. Only an eligible local TUI with usable consent/active-warning UI may open hardware through the native camera capability. RPC, print and headless child sessions cannot acquire merely because the project/device has saved permission or their parent has a TUI. Existing time grants may remain stored until their fixed expiry, but cannot bypass the mode gate or auto-resume hardware. Loss of the owning eligible UI must cancel/release active acquisition and invalidate pending callbacks; metadata/retention cleanup and release must still work outside TUI. No non-TUI camera client/proxy is added. This settles product scope, not live camera permission or verified UI/backend behavior.
 - **D-21 — Execute the approved plan in the current agent/model.** Source: user's current Plan3 execute/resume request, superseding D-07 and the historical planning-turn non-goals/resume restrictions only for implementation. Preserve all settled camera policies and unrelated dirty work; no legacy work/goal/background-verifier orchestration, automatic commit/push or additional delegation. This execution request does not select a physical camera or replace CAM-02's explicit device-specific access/foreground-warning requirement. CAM-01 readback remains supported by twelve preserved applied answers/D-08 through D-20; no implementation or hardware check is implied by that checked box.
 - **D-22 — Implement first; defer hardware checks.** Source: user selected “Implement first; defer hardware checks” in the execution handshake after current FFmpeg/PnP discovery found no accessible camera. Rationale: deliver OFF-default code and deterministic synthetic checks without waiting for a connected camera. This explicitly relaxes CAM-02's calibration-before-implementation ordering, not the permission, visible-warning, storage-before-acquisition or fail-closed device rules. Limits are provisional engineering defaults, never described as measured; CAM-02, live UI verification and CAM-10 remain incomplete until actual evidence is available. This is not permission to open a camera, not approval of non-TUI camera use, and not acceptance of final completion without the deferred checks.
+- **D-23 — Use the Logi C310 HD WebCam for calibration and acceptance.** Source: Q-13 answer “there is a logi camera now - Logi C310 HD WebCam useit”. Metadata-only discovery during reconciliation found it present (PnP Camera class, status OK, VID 046D, PID 081B) with DirectShow video alternative name `@device_pnp_\\?\usb#vid_046d&pid_081b&mi_00#7&16e5c5aa&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\global`; no frames were acquired. Its separate microphone endpoint is never opened (R2). Selection still happens in native project settings, and every trial still needs direct local authorization.
+- **D-24 — Real-time grant trials are narrowed.** Source: Q-14 Relax. CAM-10 real trials cover one shot or burst, one time grant with a reload, revocation and release; grant lifetimes, local midnight and DST rely on CAM-09 fake-clock tests.
+- **D-25 — No reboot trial.** Source: Q-15 Relax. CAM-02 measures identity after unplug and reconnect and after a Pi restart; behavior across a Windows reboot stays an unverified, disclosed limitation.
+- **D-26 — One workflow mode for targeted checks.** Source: Q-16 Relax. Targeted checks run once in the default mode; C-FULL runs with CE_WORKFLOW_ENABLED set to 0 and to 1 at phase boundaries and before completion.
+- **D-27 — Camera-specific image integration only.** Source: Q-17 Relax. CAM-09 tests actual image return through native vision and one non-vision bridge path, manifest survival after stripping and honest unavailable pixels; other shared-pipeline eviction cases go to Backlog.
+- **D-28 — Local commit after each verified step.** Source: Q-18 Relax. After each verified camera step, commit locally only that step's files with a message naming the step ID; never push. This supersedes only the automatic-commit clause of D-21 and the Non-goals; the no-push rule stays.
 
 ## Open questions
 
@@ -82,38 +93,26 @@ None.
 
 ### Deferred
 
-- **Q-13** Which actual connected local Windows camera will be selected for the deferred physical calibration and acceptance?
-  - Context: Current FFmpeg 9.0.2 supports DirectShow, but list_devices reported no discoverable video devices and Windows present Camera/Image inventory returned empty output (exit 1). D-22 explicitly permits implementation first, not completion without CAM-02/CAM-10 evidence. Device identity, warm-up/exposure/FPS, brief-state recovery, driver release, live red warning and representative printer behavior remain unavailable. No frames were acquired. Source: execution discovery and D-22; native project camera controls implemented in CAM-03.
-  - Recommendation: Connect the intended printer-facing camera and select its enumerated alternative identity in the native project Camera submenu, then authorize bounded foreground calibration through direct local UI. A Plan3 answer is readiness/target information only, never a live camera grant.
-  - Option: Select the printer-facing camera — connect it, choose its actual DirectShow identity in project settings and arrange the pending real-camera/printer trials.
-  - Option: Specify another local Windows camera — identify the actual device/setup so availability can be checked; native selection/consent and all physical/live-UI checks still apply, with no network-camera scope expansion.
+None.
 
 ## Resume context
 
-Checkpoint: active; CAM-01 and CAM-03 done; CAM-04 WIP. D-22 permits provisional implementation, not waived physical and live-UI qualification. Q-13 is deferred target readiness, not camera permission. No acquisition tools are registered and no frames were acquired. Preserve unrelated dirty work using Git as baseline.
+State: active. CAM-01 and CAM-03 done; CAM-04 WIP: controller, state helper, persistent consent and mock ownership tests passed (log); no acquisition tools registered. D-22 permits provisional implementation; qualification is not waived. Q-13 to Q-18 settled as D-23 to D-28. The Logi C310 HD WebCam is present by metadata-only discovery; no frames acquired.
 
-Next: finish CAM-04's finite supervised FFmpeg backend using controller lease, guard, attachStop and worker; pin the existing executable and test subprocess cancellation, failure and parent loss with synthetic fixtures. Closure must be confirmed before ownership release. Then CAM-06 storage and CAM-08 warning precede CAM-05 registration. Controller/state helper are wired; persistent consent and mock ownership/close tests passed (log), not hardware evidence. Camera suites still need GENERAL_TESTS integration.
+Next: finish CAM-04's supervised FFmpeg backend through the controller lease, guard, attachStop and worker handles; pin the existing executable and test cancellation, failure and parent loss with synthetic subprocess fixtures. Confirm closure before releasing ownership. Then CAM-06 storage and CAM-08 warning, before CAM-05 registers capture. Commit locally after each verified step (D-28); never push.
 
-Active blockers: no discoverable physical camera; CAM-02 and CAM-10 await selected hardware and direct foreground permission; CAM-14 awaits live eligible TUI and theme verification. Fixed-expiry grants never restart acquisition. Metadata crash locks fail closed; remove only with all Pi stopped. Host SDK declaration warning and incomplete LSP coverage remain recorded in (log).
+Blockers: CAM-02 is [human]: needs R-camera on, the C310 selected in project settings and direct calibration authorization. CAM-14 and CAM-10 also need the warning and capture software; CAM-10 needs R-printer. Crash-left metadata locks fail closed; remove only with all Pi stopped.
 
 ## Phases
 
-### Phase 1 — Policy and project controls
+### Phase 1 — Policy and project controls [think]
 
 - [x] **CAM-01** Resolve source, backend, consent and watch policies; twelve applied answers establish D-08 through D-20 (log).
 - [x] **CAM-03** Add project-only OFF-default settings, explicit selection and direct local consent with TUI gating; targeted synthetic checks passed (log).
 
-### Phase 2 — Safe acquisition prerequisites
+### Phase 2 — Safe acquisition prerequisites [code]
 
-- [wip] **CAM-04** Finish scoped grants and supervised ownership, atomic one-use claims, expiry, revocation and cancellation with confirmed backend release.
-  - Implemented: camera-only state store is wired into the controller; canonical project and exact-device grants, fixed expiry, revocation fencing, bounded corrupt-store refusal, exclusive case-folded device ownership and atomic one-use claims. Controller and mock closure checks passed (log); actual FFmpeg supervision remains unfinished.
-  - Store grants under PI_CODING_AGENT_DIR or the default `C:\Users\Flex\.pi\agent`, outside repository or exportable settings. Validate schema, scope and fixed expiry; use atomic cross-session consumption, revocation and ownership. Store construction and settings-only edits allocate no resources when unused.
-  - Pending approvals bind canonical project and revision plus synchronous assertApproval inside the exclusive lock; alias retargeting, generation, settings or signal changes or interrupted lock waits cannot mint consent. Metadata restore cannot enumerate or acquire; unsupported modes cannot use saved grants or consume single-use permission. Cleanup and release outside TUI must not delete a valid time grant merely because that mode cannot use it.
-  - Existing handle: lease and signal, guard(), attachStop(async callback), worker(workerPid, childPid), finish(). A requestKey must identify a unique native invocation and normalized parameters, not a reusable summary. Deadlines cannot grow during popup dwell; expired requests cannot persist new consent. Once access begins, consume one-use even on failure; no unlimited retry.
-  - Exact next work: resolve and pin existing FFmpeg; supervised argument-vector process with no shell, audio, network or fallback. Test cancellation, faults and parent loss using synthetic subprocess fixtures. A Node IPC supervisor that stops on parent disconnect is an option, not a broker, service or dependency. Wait for close callback before releasing lease; failed close retains ownership for explicit retry.
-  - Register session_shutdown, session_before_switch, session_before_fork and tree navigation cleanup and generation invalidation; session_start restores metadata only. Disable, reload and project/device changes cancel work and suppress obsolete wakes.
-  - State helper: observed backward-clock refusal, 1 MiB schema bound, exclusive state.lock and atomic replacement and process identity fields. Crash-left metadata lock fails closed; remove only with all Pi stopped. Do not reuse legacy work-action-leases.
-  - Targeted checks: C-CAMERA, C-STATE, C-SETTINGS, C-DIALOGS, C-LSP and C-DIFF; subprocess fixtures never open a camera.
+- [x] **CAM-04** Scoped grants and short-lived IPC supervision implemented; synthetic cancellation, expiry, output bounds and abrupt parent-loss tests pass (log).
 - [ ] **CAM-06** Add owned temporary image storage, confined deletion and approximately 24-hour startup, activity and timer cleanup.
   - Storage must work before native acquisition. Delete only camera-generated owned files; no repository photos or scratch scripts. Explain shutdown cleanup delay and provider and session-history limits. Tail eviction deletes immediately; long watches do not exempt burst files from TTL.
   - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; test expiry, confined deletion, corrupt or missing files and bounded disk/memory.
@@ -121,12 +120,12 @@ Active blockers: no discoverable physical camera; CAM-02 and CAM-10 await select
   - Camera-specific widget uses semantic error coloring and explicit CAMERA CAPTURING and WATCHING text. Research is a layout example, not red coloring; a setStatus string can be stripped or dimmed by the footer and is insufficient. Fail closed before acquisition if UI is missing; owning UI loss cancels work. Keep warning during warm-up and failed release. Live rendering qualification is CAM-14.
   - Targeted checks: C-CAMERA, C-FOOTER, C-DIALOGS, C-LSP and C-DIFF; cover new and saved grants, denied modes and lost UI.
 
-### Phase 3 — Stills and continuous detector
+### Phase 3 — Stills and continuous detector [code]
 
-- [ ] **CAM-05** Implement bounded single or burst capture, validated interval/crop and resolution and actual-image delivery with durable availability manifests.
+- [ ] **CAM-05** Implement bounded single or burst capture, validated interval, crop and resolution and actual-image delivery with durable availability manifests.
   - Depends on CAM-03, CAM-04, CAM-06 and CAM-08; no native capture opens or saves before consent, storage and active warning work. Use provisional bounded defaults under D-22 until CAM-02 calibration.
-  - Prefer enumerated DirectShow alternative identity over ambiguous friendly name/index. Detect required build and device features; missing/changed identity fails closed. Warm up exposure and focus without saving warm-up frames. For ordinary spaced shots, release between captures; document reopening latency and interval semantics and prevent catch-up bursts.
-  - Crop and resize before persistence and delivery. Preserve requested full-size and detail and per-frame identity and manifest through native vision, trimming and non-vision routing; explicitly report unavailable/partial historical evidence.
+  - Prefer enumerated DirectShow alternative identity over ambiguous friendly name or index. Detect required build and device features; missing/changed identity fails closed. Warm up exposure and focus without saving warm-up frames. For ordinary spaced shots, release between captures; document reopening latency and interval semantics and prevent catch-up bursts.
+  - Crop and resize before persistence and delivery. Preserve requested full-size and detail and per-frame identity and manifest through native vision, trimming and non-vision routing; explicitly report unavailable or partial historical evidence.
   - Targeted checks: C-CAMERA, C-STATE, C-SETTINGS, C-LSP and C-DIFF; synthetic timing overruns, geometry/bytes, image stripping and bridge eviction.
 - [ ] **CAM-07** Implement bounded continuous acquisition and fast regional change detection with readiness, actual-frame identity and noise handling.
   - Continuously open authorized acquisition is needed for brief transactions; reopening for each flash is insufficient. Readiness follows warm-up and baseline, before the caller operates the device. Separate acquisition and detection from CAM-11 retention and CAM-12 delivery; no model calls here.
@@ -134,7 +133,7 @@ Active blockers: no discoverable physical camera; CAM-02 and CAM-10 await select
   - Provisional sampling, exposure and backpressure limits require CAM-02 measurement; disclose drops and minimum observable state duration. A sub-two-second transaction does not prove every state is observable. Fresh fast samples reset quiet tracking even through minute-spaced saves; stalls are faults, not stability. Noise and debounce must not suppress intended brief states.
   - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; timestamped fast-state, noise, exposure, stall and gradual-change fixtures.
 
-### Phase 4 — Adaptive retention and model wake
+### Phase 4 — Adaptive retention and model wake [code]
 
 - [ ] **CAM-11** Implement elapsed-time adaptive retention, protected initial burst, rolling tail and final slot and whole-watch count and byte limits.
   - Stages anchor to first qualifying post-readiness activity. Filling a stage cap stops saves, not stage-clock advancement or a fresh unlimited burst. Keep approximate user targets explicit; document provisional stage windows and caps and calibrate in CAM-02.
@@ -143,36 +142,40 @@ Active blockers: no discoverable physical camera; CAM-02 and CAM-10 await select
   - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; fake-clock stages, caps versus time, tail eviction, quiet reset and long-watch TTL.
 - [ ] **CAM-12** Implement ready-before-operation, one fast-phase batch plus final delivery, native wake and bounded busy-session coalescing.
   - At most two logical adaptive deliveries; no wakes for sparse tail frames. Early quiet or termination coalesces available evidence into one labeled final delivery. Preserve chronological frame IDs; never reattach already delivered initial frames solely because the burst remains protected.
-  - Return model idle without busy polling. Use supported Pi message and lifecycle APIs, not legacy work items, goals or background verifiers. Bind jobs/callbacks to owning session and lifecycle generation; deliberately aborted/switched conversations must not restart through stale callbacks.
+  - Return model idle without busy polling. Use supported Pi message and lifecycle APIs, not legacy work items, goals or background verifiers. Bind jobs and callbacks to owning session and lifecycle generation; deliberately aborted or switched conversations must not restart through stale callbacks.
   - Stop/release on quiet, deadline, revoke, abort or failure. Requested and displayed deadline is bounded by consent expiry and declared hard maximum; continuing motion cannot extend it. Retention budget filling alone does not stop detection under D-18. Expiry, fault and abort are partial or terminal outcomes, not quiet success.
   - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; busy queues, early termination, no duplicate attachments and stale, session and branch callbacks.
 - [ ] **CAM-13** Add settled-state mode to the bounded watcher: readiness, observed activity, fresh-sample quiet interval and one final image and wake.
   - Initial idle cannot finish an operation not yet visibly started. Qualifying activity starts quiet tracking; meaningful or gradual cumulative change resets it. Fresh valid samples are required throughout the requested interval; stalls, timeout, disconnect and revocation do not yield settled success.
-  - Discard routine samples; retain the actual fresh final frame with validated crop and resolution. Report visual stability with region, timestamps and quiet duration, not job completion. Paused or jammed or invisible printer activity can look stable; caller-side existing status confirmation adds no new camera/printer authority.
+  - Discard routine samples; retain the actual fresh final frame with validated crop and resolution. Report visual stability with region, timestamps and quiet duration, not job completion. Paused or jammed or invisible printer activity can look stable; caller-side existing status confirmation adds no new camera or printer authority.
   - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; initial-idle, resumed activity, cumulative drift, faults, final identity and bounded resources.
 
-### Phase 5 — Software integration
+### Phase 5 — Software integration [code]
 
 - [ ] **CAM-09** Integrate both camera suites in GENERAL_TESTS and verify utility registration with legacy workflow OFF and ON.
   - Import camera utility through workModelsExtension independently of the legacy switch. package.json already loads work-models.ts and packages extensions; no third extension entry or new image dependency is needed. Modules remain .ts with .ts sibling specifiers; no legacy work_* tools.
   - Deterministic coverage: OFF and deny, selected-device no fallback, direct consent versus remote-answer or import refusal, persisted grants without restart, fixed midnight including timezone and DST, one-watch scope and deadline and atomic concurrency, corrupt, expired or wrong-scope state, request overrun, crop and bytes, revocation, abort, reload, session and tree cleanup, confined storage and all CAM-07, CAM-11, CAM-12 and CAM-13 obligations.
-  - Exercise headless child, RPC and print requests with new and saved grants, missing/lost UI and cleanup outside TUI. Settings import and reset cannot enable or mint permission; clearing or changing configuration revokes/cancels without waiting for legacy workflow refresh. Remote ask:answer or intercom ANSWER events while consent is pending must not issue/extend grants.
-  - Image integration: native vision and configured non-vision delivery; at least 64 KiB images after two successful responses; all-image compaction; source eviction or TTL; bridge-cache eviction by unrelated images; repeated-looking events with distinct capture IDs. Manifests survive; historical missing pixels are honest, never silently recaptured or treated as directly verified process_image interpretations.
+  - Exercise headless child, RPC and print requests with new and saved grants, missing or lost UI and cleanup outside TUI. Settings import and reset cannot enable or mint permission; clearing or changing configuration revokes or cancels without waiting for legacy workflow refresh. Remote ask:answer or intercom ANSWER events while consent is pending must not issue or extend grants.
+  - Image integration (D-27): actual image return through native vision and one non-vision bridge path; manifests survive stripping; repeated-looking events keep distinct capture IDs; historical missing pixels are honest, never silently recaptured or treated as directly verified process_image interpretations.
   - Targeted checks: all C-* software checks. Full suite at every phase boundary and before completion; disclose inconclusive LSP coverage. Mock success is software evidence only, not physical and live-UI qualification.
 
-### Phase 6 — External qualification
+### Phase 6 — External qualification [think]
 
-- [blocked] **CAM-02** Calibrate identity, still/crop capability, warm-up, exposure, FPS, brief-state recovery, driver release and sustained load on hardware.
-  - Prerequisite: connected selected local Windows camera (Q-13), explicit device-specific human calibration permission and conspicuous foreground warning until release.
-  - D-22 defers calibration ordering, not acceptance. Existing FFmpeg 9.0.2/dshow metadata and failed device discovery are recorded in (log); no frames were acquired. Define measured numerical limits, reconnect/reboot/driver identity behavior, shortest detectable state, lag/drops and crop geometry; do not infer compatibility from backend types or an OS/app lock.
+needs: R-camera, human
+
+- [human] **CAM-02** Calibrate identity, still and crop capability, warm-up, exposure, FPS, brief-state recovery, driver release and sustained load on hardware.
+  - Prerequisite: Logi C310 HD WebCam (D-23) selected in project settings, explicit device-specific human calibration permission and conspicuous foreground warning until release.
+  - D-22 defers calibration ordering, not acceptance. Existing FFmpeg 9.0.2 dshow metadata and failed device discovery are recorded in (log); no frames were acquired. Define measured numerical limits, identity after unplug and reconnect and after a Pi restart (D-25), driver release, shortest detectable state, lag, drops and crop geometry; do not infer compatibility from backend types or an OS or app lock.
   - Targeted checks: C-BACKEND, C-DISCOVERY and bounded direct-UI camera trials; document measured limits and unsupported timing.
+  - note: Logi C310 discovered by metadata only; needs project selection and direct calibration authorization.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
-  - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup/release remains available.
-  - Targeted checks: live shared-UI trials plus C-FOOTER and C-DIALOGS; retain screenshots/observations and limitations in (log).
-- [blocked] **CAM-10** Run real-camera, provider and printer acceptance for stills, crops, grants, adaptive transactions, settled capture and release/retention.
+  - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
+  - Targeted checks: live shared-UI trials plus C-FOOTER and C-DIALOGS; retain screenshots, observations and limitations in (log).
+- [blocked] **CAM-10** Run real-camera, provider and printer acceptance for stills, crops, grants, adaptive transactions, settled capture and release and retention.
+  - needs: R-printer
   - Prerequisite: calibrated selected camera and representative printer setup, live eligible TUI and explicit direct human trial authorization.
-  - Demonstrate no repeated phone uploads: actual image return to active vision provider, monitoring resolution versus readable text crop, single or burst declared count, all lifetimes, restart and midnight behavior, one-watch scope, busy, reconnect, expiry and release and no automatic restart.
+  - Demonstrate no repeated phone uploads: actual image return to active vision provider, monitoring resolution versus readable text crop, single or burst declared count, one time grant with a reload, revocation (D-24), one-watch scope, busy, reconnect, expiry and release and no automatic restart.
   - Arm and confirm readiness before operation; capture chronological short LED and screen states, continuing change and quiet stop with measured minimum state duration. Demonstrate detection versus retention versus wake cadence, thinning, budgets and partial outcomes, early and final batches and no per-sample calls. Disclose missed or dropped states and sustained-load limits, never claim guaranteed recovery.
   - Printout: readiness, visible activity then one stable-result image; separately test pause or fault and say visually stable, not job completed. If available, existing caller-side printer completion plus a still gives stronger evidence without new integration.
   - Verify OFF opens nothing; A never captures B; disable or expiry releases before warning clears; no video or audio, unbounded files or TTL exception. Do not claim mocks prove physical behavior or complete the plan without deferred qualification evidence or explicit limitation acceptance.
@@ -180,7 +183,7 @@ Active blockers: no discoverable physical camera; CAM-02 and CAM-10 await select
 
 ## Checks
 
-Canonical software environment: Windows PowerShell, working directory `C:\SOFT\git\ce-workflow`; existing Node and npm. Run each targeted command with `$env:CE_WORKFLOW_ENABLED = '0'` and then `'1'`. Commands below are relative to that exact directory; no hardware access is part of the software suite.
+Canonical software environment: Windows PowerShell, working directory `C:\SOFT\git\ce-workflow`; existing Node and npm. Targeted commands run once in the default mode; C-FULL runs with `$env:CE_WORKFLOW_ENABLED = '0'` and then `'1'` (D-26). Commands below are relative to that exact directory; no hardware access is part of the software suite.
 
 | ID | Canonical command or evidence source |
 | --- | --- |
@@ -197,7 +200,7 @@ Canonical software environment: Windows PowerShell, working directory `C:\SOFT\g
 | C-BACKEND | `where.exe ffmpeg; ffmpeg -hide_banner -version; ffmpeg -hide_banner -devices` (metadata, not physical compatibility) |
 | C-DISCOVERY | `ffmpeg -hide_banner -nostdin -list_devices true -f dshow -i dummy`; `powershell -NoProfile -Command "Get-PnpDevice -PresentOnly -Class Camera,Image -ErrorAction SilentlyContinue \| Select-Object Status,Class,FriendlyName \| ConvertTo-Json -Compress"` (device discovery, not live capture consent) |
 
-Run C-FULL in both workflow modes plus C-DIFF at phase boundaries and before completion. Add shared regression checks when their seams change. C-BACKEND/C-DISCOVERY use the same Windows working directory and existing installed FFmpeg; live camera commands require the selected identity, finite trial bounds and direct authorization specified by qualification steps, not invented universal capture commands.
+Run C-FULL in both workflow modes plus C-DIFF at phase boundaries and before completion. Add shared regression checks when their seams change. C-BACKEND and C-DISCOVERY use the same Windows working directory and existing installed FFmpeg; live camera commands require the selected identity, finite trial bounds and direct authorization specified by qualification steps, not invented universal capture commands.
 
 Recorded current evidence: targeted camera, state, settings and dialogs checks plus diff check passed on the controller and helper state (log). Mock closure and two-process metadata claims are not FFmpeg release evidence. Camera suites are not yet in GENERAL_TESTS. Camera.ts has a missing host SDK declaration warning; state/test probes had zero findings but some push-only results were inconclusive, and work-models exceeds the 5000-line probe cap. Hardware, live red UI, provider routing and watch acceptance remain pending. Historical unrelated Plan3 checks and advisor completion are not camera evidence.
 
@@ -207,7 +210,7 @@ All product paths are under `C:\SOFT\git\ce-workflow`; inspect relevant current 
 
 | Reference | Steps and use |
 | --- | --- |
-| `extensions\work-camera.ts`; `extensions\work-camera-state.ts`; `scripts\test-work-camera.mjs`; `scripts\test-work-camera-state.mjs` | CAM-04 through CAM-13: implemented project controls/controller and state helper and deterministic fixtures; acquisition tools remain unregistered. |
+| `extensions\work-camera.ts`; `extensions\work-camera-state.ts`; `scripts\test-work-camera.mjs`; `scripts\test-work-camera-state.mjs` | CAM-04 through CAM-13: implemented project controls, controller and state helper and deterministic fixtures; acquisition tools remain unregistered. |
 | `extensions\work-models.ts` settingsPath/readSettings/readEffectiveSettings; workSettingsLoop/chooseWorkSetting; owns/hasProjectOverride/clearProjectOverride; UTILITY_SETTING_KINDS; exportSettings/importSettings | CAM-03, CAM-04, CAM-09: project-only rows with workflow OFF, ignore global values, import/reset invalidations. Camera row was appended to preserve cursor mapping; old line 29050 is extensionScoutProjectContext, not settings. |
 | `extensions\work-dialogs.ts` showListDialog | CAM-04, CAM-08, CAM-14: native direct local camera UI with muted purpose line; never showAskDialog/ask_user or a non-TUI fallback for camera consent. |
 | `extensions\work-ask-remote.ts` registerRemoteAskAnswers | CAM-09: optional intercom ask:pending/ask:answer route cannot issue or extend grants. |
@@ -223,6 +226,8 @@ Opus's retained recommendations: distinct OFF/ARMED/CAPTURING states, exact iden
 
 ## Backlog
 
+- Shared image-pipeline hardening deferred by D-27: 64 KiB images after two successful responses, all-image compaction, source eviction or TTL and bridge-cache eviction by unrelated images.
+- Camera identity across a Windows reboot (D-25).
 - Cross-platform or network-camera support, packaged/downloaded FFmpeg or Windows-native helpers require separate scope approval.
 - Whole-agent sandboxing, general monitoring infrastructure and unrelated Plan3/OpenDesign work are outside this delivery.
 
@@ -231,4 +236,6 @@ Opus's retained recommendations: distinct OFF/ARMED/CAPTURING states, exact iden
 - Prior reconciliation, review dispositions, submitted answers and execution checks live in (log); Q-01 through Q-12 are settled, not outstanding questions. D-07 is superseded by D-21; the historical no-camera-implementation planning restriction is not current execution scope. All other recorded decision IDs remain active with their recorded meaning.
 - CAM-08 → CAM-08 + CAM-14: split software warning implementation from required blocked live UI and theme qualification. CAM-08 remains open; no qualification was waived or marked done. CAM-03's already recorded synthetic implementation completion is unchanged; its deferred live menu and consent verification is assigned to CAM-14.
 - CAM-02 → CAM-02; CAM-10 → CAM-10: move existing hardware calibration and real acceptance to the final qualification phase under D-22. Physical prerequisites no longer keep authorized software implementation open; both qualification steps remain blocked.
-- CAM-01 through CAM-13 retain stable IDs; no steps merged. CAM-04 remains WIP and existing completion evidence is unchanged. Status stays active; Blocking remains None and Q-13 remains Deferred. Prior history is in (log).
+- Reconcile pass: Q-13 to Q-18 answered as D-23 to D-28; CAM-02, CAM-09, CAM-10, Checks and Non-goals updated to match. CAM-02 marker [blocked] → [human] because the camera now exists and only user selection and authorization remain.
+- Optimize pass: phase tags added (Phase 1 and Phase 6 [think], Phases 2 to 5 [code]); R-camera and R-printer requirements with needs lines added for Phase 6; Q-14 to Q-18 flag over-strict checks for /plan3 resolve. No step ID changed, split or merged.
+- CAM-01 through CAM-13 retain stable IDs; no steps merged. CAM-04 remains WIP and existing completion evidence is unchanged. Status stays active. Prior history is in (log).

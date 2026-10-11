@@ -4,6 +4,9 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+const { runCameraProcess } = await createJiti(import.meta.url).import("../extensions/work-camera-process.ts");
 const { cameraSettings, parseDshowDevices, cameraGrantExpiry, createCameraController } = await createJiti(import.meta.url).import("../extensions/work-camera.ts");
 const { cameraRequestKey } = await createJiti(import.meta.url).import("../extensions/work-camera-state.ts");
 const sandbox = mkdtempSync(join(tmpdir(), "work-camera-ui-"));
@@ -173,6 +176,54 @@ choices = ["One hour"];
 pending = async () => { await new Promise(done => setTimeout(done, 30)); };
 await assert.rejects(controller.choosePermission(ctx, { summary: "Expired declared request", deadlineMs: 10 }), /expired before approval/);
 assert.equal(await controller.permission(ctx), undefined, "expired declared request does not persist a new time grant");
+// Native process supervision tests use Node fixtures, never a camera or FFmpeg input.
+const supervisorOwner = () => {
+	const abort = new AbortController();
+	let stop, released = false;
+	const pids = [];
+	return {
+		signal: abort.signal, pids,
+		async guard() { if (abort.signal.aborted) throw new Error("cancelled"); },
+		attachStop(fn) { stop = fn; },
+		async worker(workerPid, childPid = 0) { pids.push([workerPid, childPid]); },
+		async finish() { await stop(); released = true; },
+		cancel() { abort.abort(); },
+		get released() { return released; },
+	};
+};
+const normal = supervisorOwner();
+const output = await runCameraProcess(normal, process.execPath, ["-e", "process.stdout.write('frame');"], { durationMs: 5000, maxBytes: 1024 });
+assert.equal(output.stdout.toString(), "frame");
+assert.equal(normal.released, true);
+assert.ok(normal.pids.some(([, child]) => child > 0));
+const failure = supervisorOwner();
+await assert.rejects(runCameraProcess(failure, process.execPath, ["-e", "process.exit(7)"], { durationMs: 5000, maxBytes: 1024 }), /failed/);
+assert.equal(failure.released, true);
+const overrun = supervisorOwner();
+await assert.rejects(runCameraProcess(overrun, process.execPath, ["-e", "process.stdout.write('x'.repeat(4096));setInterval(()=>{},1000)"], { durationMs: 5000, maxBytes: 1024 }), /byte limit/);
+assert.equal(overrun.released, true);
+const cancelled = supervisorOwner();
+const running = runCameraProcess(cancelled, process.execPath, ["-e", "setInterval(()=>{},1000)"], { durationMs: 5000, maxBytes: 1024 });
+const waitUntil = async predicate => { const until = Date.now() + 8000; while (!predicate()) { if (Date.now() >= until) throw new Error("fixture readiness timed out"); await new Promise(done => setTimeout(done, 20)); } };
+await waitUntil(() => cancelled.pids.some(([, child]) => child > 0));
+cancelled.cancel();
+await assert.rejects(running, /cancelled/);
+assert.equal(cancelled.released, true);
+const expiredProcess = supervisorOwner();
+await assert.rejects(runCameraProcess(expiredProcess, process.execPath, ["-e", "setInterval(()=>{},1000)"], { durationMs: 1000, maxBytes: 1024 }), /deadline|expired/);
+assert.equal(expiredProcess.released, true);
+const gone = processId => { try { process.kill(processId, 0); return false; } catch (error) { return error.code === "ESRCH"; } };
+// Abrupt parent death must leave the supervisor alive long enough to close its child.
+const parentFixture = fileURLToPath(new URL("./fixtures/camera-parent.mjs", import.meta.url));
+const parent = spawn(process.execPath, [parentFixture], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+let identities = ""; parent.stdout.on("data", data => { identities += data; });
+let parentError = ""; parent.stderr.on("data", data => { parentError += data; });
+await waitUntil(() => identities.includes("\n"));
+const [workerPid, childPid] = JSON.parse(identities.trim());
+const parentClosed = new Promise(done => parent.on("close", done));
+parent.kill("SIGKILL"); await parentClosed;
+await waitUntil(() => gone(workerPid) && gone(childPid));
+assert.equal(parentError, "");
 console.log("ok - camera metadata, project opt-in, persistent local consent, stale-dialog fences and owned cancellation/release (no hardware)");
 } finally {
 	if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
