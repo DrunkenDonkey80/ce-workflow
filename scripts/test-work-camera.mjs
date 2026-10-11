@@ -534,6 +534,21 @@ assert.equal(wakeMessages[4].details.outcome, "partial:fault");
 await assert.rejects(releaseWatch.stop(), /release unconfirmed/, "stop cannot claim confirmed closure after a failure");
 releaseFails = false;
 await releaseWatch.stop();
+let revoked = false;
+const revokeWatch = createCameraWatch({ on() {}, sendMessage(message) { wakeMessages.push(message); } }, watchController, {
+	async acquire(_ctx, _controller, _input, callbacks) {
+		callbacks.owner({ lease: { expiresAt: Date.now() + 10000 }, current() { if (revoked) throw new Error("revoked"); }, cancel() {}, async finish() {} });
+		callbacks.sample(observation(0, 0, "ready"), geometry);
+		callbacks.sample(observation(10, 1), geometry);
+		revoked = true;
+		throw new Error("fixture revoked by settings");
+	},
+});
+await revokeWatch.start(watchCtx, { deadlineMs: 10000 });
+await waitUntil(() => wakeMessages.length === 6);
+assert.equal(wakeMessages[5].details.outcome, "partial:revoked", "user revocation still wakes the model");
+assert.equal(wakeMessages[5].content.filter(part => part.type === "image").length, 0, "no pixels are delivered after revocation");
+assert.match(wakeMessages[5].details.failure, /revoked/);
 watchImages.stop();
 console.log("ok - camera metadata, project opt-in, persistent local consent, stale-dialog fences and owned cancellation/release (no hardware)");
 } finally {

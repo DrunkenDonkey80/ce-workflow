@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:44:10.068Z
+updated: 2026-10-11T10:47:24.732Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -157,6 +157,8 @@ needs: R-camera, human
   - note: User chose live privacy/UI qualification now. Start a bounded watch through native consent/warning; user will observe red warning during acquisition, footer coexistence and clearing after release. Other acceptance cases remain unverified until separately exercised.
   - note: Live trial 1 (settled watch cf73351c, ~25 s, user's active theme): user observed the camera warning was conspicuously red with readable text during the watch, coexisted with the footer/research status, and cleared only after the watch ended. User-reported observation; no screenshot retained. Still unverified live: warm-up phase specifically, ARMED vs CAPTURING distinction, consent dialog summaries/options, revocation, unsupported-mode denial in a live non-TUI session, failed release, loss of owning UI.
   - check: camera_watch settled 30 s chart crop: ready warmupMs 2100, settled at seq 246, 0 delayed samples; ask_user observation: "Red, clear text, cleared after end".
+  - note: Live: ARMED indicator distinct and not red while idle with active grant (user-observed). Live revocation (watch 48157652): settings Revoke turned access off and stopped the watch, but the model was never notified — defect. Cause: revoke invalidates the owner so current() fails, the watch treated itself as stale and silently dropped its terminal delivery. Fix: same-session/same-watch-generation jobs whose owner was revoked now queue a text-only "partial:revoked" notice (no images after consent withdrawal); session switch/stop still deliver nothing. Synthetic test added; live retest after /reload pending. Consent dialog content not remembered by user; re-check on the next fresh grant.
+  - check: node scripts/test-work-camera.mjs ok (new revoke case: outcome partial:revoked, 0 images); git diff --check clean.
 - [blocked] **CAM-10** Run real-camera, provider and printer acceptance for stills, crops, grants, adaptive transactions, settled capture and release and retention.
   - needs: R-printer
   - Prerequisite: calibrated selected camera and representative printer setup, live eligible TUI and explicit direct human trial authorization.

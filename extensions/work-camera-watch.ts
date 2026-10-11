@@ -9,16 +9,19 @@ export function createCameraWatch(pi: ExtensionAPI, controller: ReturnType<typeo
 	let generation = 0;
 	type Owner = Awaited<ReturnType<typeof controller.lease>>;
 	type Policy = ReturnType<typeof createCameraRetention>;
-	type Job = { id: string; ctx: ExtensionContext; session: string; epoch: number; abort: AbortController; owner?: Owner; policy: Policy; pending?: string; earlyDelivered: boolean; delivered: Set<string>; done: boolean; releaseFailed: boolean; ready: boolean; failure: string; sampling?: Record<string, unknown>; mode: string; completion?: Promise<void> };
+	type Job = { id: string; ctx: ExtensionContext; session: string; epoch: number; abort: AbortController; owner?: Owner; policy: Policy; pending?: string; earlyDelivered: boolean; delivered: Set<string>; done: boolean; releaseFailed: boolean; revoked?: boolean; ready: boolean; failure: string; sampling?: Record<string, unknown>; mode: string; completion?: Promise<void> };
 	let job: Job | undefined;
+	const alive = (candidate: Job) => candidate === job && candidate.epoch === generation && !candidate.abort.signal.aborted && candidate.ctx.sessionManager.getSessionId() === candidate.session;
 	const current = (candidate: Job) => {
-		if (candidate !== job || candidate.epoch !== generation || candidate.abort.signal.aborted || candidate.ctx.sessionManager.getSessionId() !== candidate.session) return false;
+		if (!alive(candidate)) return false;
 		try { candidate.owner?.current(); return true; } catch { return false; }
 	};
+	// A revoked watch still tells the model it stopped, but never ships pixels after consent was withdrawn.
+	const deliverable = (candidate: Job) => candidate.revoked ? alive(candidate) : current(candidate);
 	function take(candidate: Job) {
-		if (!candidate.pending || !current(candidate)) return;
+		if (!candidate.pending || !deliverable(candidate)) return;
 		const phase = candidate.pending;
-		const frames = (phase === "initial" ? candidate.policy.initial() : candidate.policy.frames()).filter(frame => !candidate.delivered.has(frame.id));
+		const frames = candidate.revoked ? [] : (phase === "initial" ? candidate.policy.initial() : candidate.policy.frames()).filter(frame => !candidate.delivered.has(frame.id));
 		const content: ({ type: "text"; text: string } | { type: "image"; data: string; mimeType: string })[] = [];
 		for (const frame of frames) {
 			const source = controller.images.read(candidate.ctx.cwd, frame.id);
@@ -33,7 +36,7 @@ export function createCameraWatch(pi: ExtensionAPI, controller: ReturnType<typeo
 		return { customType: "camera-watch", content, display: true, details };
 	}
 	function queue(candidate: Job, phase: string) {
-		if (!current(candidate)) return;
+		if (!deliverable(candidate)) return;
 		// Only IDs/metadata wait while busy; early plus final becomes one terminal batch.
 		candidate.pending = phase;
 		if (candidate.ctx.isIdle()) {
@@ -108,6 +111,10 @@ export function createCameraWatch(pi: ExtensionAPI, controller: ReturnType<typeo
 					if (current(candidate) && candidate.ready) {
 						if (reason !== "quiet" && latest && geometry) candidate.policy.finish(latest, geometry);
 						queue(candidate, reason === "quiet" ? candidate.mode === "settled" ? "settled" : "quiet" : `partial:${reason}`);
+					} else if (alive(candidate) && candidate.ready) {
+						candidate.revoked = true;
+						candidate.failure = `Stopped because camera permission was revoked or project camera settings changed; no further images are delivered. ${candidate.failure}`.trim();
+						queue(candidate, "partial:revoked");
 					} else if (job === candidate && !candidate.releaseFailed) job = undefined;
 				}
 			})();
