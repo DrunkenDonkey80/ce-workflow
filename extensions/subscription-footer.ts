@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import {
 	mkdir,
 	open,
@@ -339,27 +339,37 @@ function claudeParser(payload) {
 // pi-provider-claude-plus ("claude-ex") already polls /api/oauth/usage for the
 // whole account pool into a shared 3-minute cache. When it is installed and
 // fresh, read that file instead of spending our own request against the same
-// per-identity rate budget.
+// per-identity rate budget. One account keeps the plain 5h/7d bars; a pool of
+// several shows what is really left and when more arrives (see poolWindows).
 function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
 	let windows;
 	try {
 		const read = (name) => JSON.parse(readFileSync(join(agentDir, name), "utf8"));
-		const active = table(read("claude-pool.json")).active;
-		const entry = table(table(read("claude-pool-usage.json"))[active]);
-		if (!finite(entry.at) || now() - entry.at > POOL_MAX_AGE_MS)
+		const store = table(read("claude-pool.json"));
+		const usage = table(read("claude-pool-usage.json"));
+		const accounts = Array.isArray(store.accounts) ? store.accounts.filter(Boolean) : [];
+		const labels = accounts.length
+			? accounts.filter((a) => !a.dead && !a.disabled).map((a) => a.label)
+			: [store.active];
+		const entries = labels.map((label) => table(usage[label])).filter((e) => finite(e.at));
+		const t = now();
+		if (!entries.length || t - Math.max(...entries.map((e) => e.at)) > POOL_MAX_AGE_MS)
 			throw new QuotaError("unavailable");
+		// A window past its reset is empty, whatever the last reading said.
+		const used = (w) => {
+			const at = resetTime(table(w).resets_at);
+			const pct = finite(table(w).pct) ? table(w).pct : undefined;
+			return at !== undefined && at <= t ? { pct: 0 } : { pct, at };
+		};
 		windows = complete(
-			[
-				["5h", table(entry.five_hour)],
-				["7d", table(entry.seven_day)],
-			]
-				.filter(([, window]) => finite(window.pct))
-				.map(([id, window]) => ({
-					id,
-					label: id,
-					usedPercent: percent(window.pct),
-					resetsAt: resetTime(window.resets_at),
-				})),
+			accounts.length > 1
+				? poolWindows(store, accounts, entries, used, t)
+				: [
+						["5h", used(entries[0].five_hour)],
+						["7d", used(entries[0].seven_day)],
+					]
+						.filter(([, w]) => finite(w.pct))
+						.map(([id, w]) => ({ id, label: id, usedPercent: percent(w.pct), resetsAt: w.at })),
 		);
 	} catch {
 		windows = undefined;
@@ -367,6 +377,63 @@ function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
 	poolServed = Boolean(windows);
 	return windows;
 }
+
+const LOGIN_WARN_MS = 3 * 86_400_000;
+
+// Pool summary, each piece its own segment:
+//   ×4(D2) [████░░░░] 47% left · +18% in 1d 0h · +35% in 1d 15h · → flex2 · 5h full 47m · !:2d 12h
+// "left" is the average weekly room across live accounts; refills are running
+// totals as each account's weekly reset hands back its share. "5h full" only
+// when no live account can serve now although weekly room remains. (D2) = dead
+// logins (red, need a fresh /login); ! = soonest login end within 3 days (yellow).
+function poolWindows(store, accounts, entries, used, t) {
+	const text = (id, value, color) => ({ id, label: id, usedPercent: 0, text: value, color });
+	const week = entries.map((e) => used(e.seven_day)).filter((w) => w.pct !== undefined);
+	if (!week.length) throw new QuotaError("unavailable");
+	const usedAvg = week.reduce((sum, w) => sum + w.pct, 0) / week.length;
+	const dead = accounts.filter((a) => a.dead).length;
+	const windows = [
+		{
+			id: "7d",
+			label: "7d",
+			usedPercent: percent(usedAvg),
+			text: `×${week.length}${dead ? `(D${dead})` : ""} ${bar(usedAvg, 8)} ${Math.round(100 - usedAvg)}% left`,
+		},
+	];
+	let refilled = 0;
+	for (const [index, w] of week
+		.filter((w) => w.pct > 0 && w.at !== undefined)
+		.sort((a, b) => a.at - b.at)
+		.slice(0, 2)
+		.entries()) {
+		refilled += w.pct / week.length;
+		windows.push(text(`refill-${index}`, `+${Math.round(refilled)}% in ${formatDuration(w.at - t)}`));
+	}
+	const active = typeof store.active === "string" ? store.active : "";
+	if (active) windows.push(text("active", `→ ${active.replace(/^.*:/, "").replace(/@.*$/, "")}`));
+	const serving = entries.map((e) => {
+		const five = used(e.five_hour);
+		const seven = used(e.seven_day);
+		return { free: Math.min(100 - (five.pct ?? 0), 100 - (seven.pct ?? 0)), weekFree: 100 - (seven.pct ?? 0), five };
+	});
+	if (serving.every((s) => s.free < 5) && serving.some((s) => s.weekFree >= 5)) {
+		const next = Math.min(...serving.filter((s) => s.weekFree >= 5 && s.five.at).map((s) => s.five.at));
+		windows.push(text("5h-full", `5h full${Number.isFinite(next) ? ` ${formatDuration(next - t)}` : ""}`, "error"));
+	}
+	const ends = accounts
+		.filter((a) => !a.dead && finite(a.refreshExpires) && a.refreshExpires - t < LOGIN_WARN_MS)
+		.map((a) => a.refreshExpires - t);
+	if (ends.length) {
+		const soonest = Math.min(...ends);
+		windows.push(text("login", `!:${soonest > 0 ? formatDuration(soonest) : "expired"}`, "warning"));
+	}
+	return windows;
+}
+
+const bar = (pct, cells) => {
+	const filled = Math.round((Math.max(0, Math.min(100, pct)) / 100) * cells);
+	return `[${"█".repeat(filled)}${"░".repeat(cells - filled)}]`;
+};
 
 function copilotParser(payload) {
 	const quota = table(
@@ -573,6 +640,13 @@ export const PRODUCTION_PROVIDERS = Object.freeze([
 			preferred: claudePoolQuota,
 			unavailableMs: CLAUDE_UNAVAILABLE_MS,
 		}),
+		// The pool rotates opaque (non-JWT) tokens, so a token-derived identity changes
+		// with every refresh or switch and each session keys the shared cache
+		// differently: followers then show "unavailable". Pool data is pool-wide.
+		identity: (auth) =>
+			existsSync(join(DEFAULT_AGENT_DIR, "claude-pool.json"))
+				? "claude-pool"
+				: authIdentity(auth),
 		get pollMs() {
 			return poolServed ? POLL_MS : CLAUDE_POLL_MS;
 		},
@@ -656,6 +730,7 @@ export function resetMoment(resetsAt, now) {
 }
 
 function windowText(window, now, barCells = 8, dates = false) {
+	if (typeof window.text === "string") return window.text;
 	const pct = Math.round(window.usedPercent);
 	const filled = Math.round((pct / 100) * barCells);
 	const reset = window.resetsAt
@@ -685,9 +760,16 @@ function providerDisplay(provider, state, theme) {
 
 function styleSegment(text, window, providerLabel, styledProviderLabel, theme) {
 	let styled = text;
-	const reset = styled.match(/\([^)]*\)/)?.[0];
+	if (window.color) {
+		const body = providerLabel && styled.startsWith(providerLabel) ? styled.slice(providerLabel.length) : styled;
+		const colored = theme?.fg?.(window.color, body) ?? body;
+		return body === styled ? colored : `${styledProviderLabel}${colored}`;
+	}
+	const dead = styled.match(/\(D\d+\)/)?.[0];
+	const reset = dead ? undefined : styled.match(/\([^)]*\)/)?.[0];
 	if (reset) styled = styled.replace(reset, theme?.fg?.("dim", reset) ?? reset);
-	const quota = styled.match(/\[[█░]+\] \d+%/)?.[0];
+	if (dead) styled = styled.replace(dead, theme?.fg?.("error", dead) ?? dead);
+	const quota = styled.match(/\[[█░]+\] \d+%( left)?/)?.[0];
 	if (quota)
 		styled = styled.replace(
 			quota,

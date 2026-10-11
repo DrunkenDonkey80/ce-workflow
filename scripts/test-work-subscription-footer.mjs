@@ -255,7 +255,7 @@ const writePool = async (at) => {
 		JSON.stringify({
 			acct: {
 				at,
-				five_hour: { pct: 12, resets_at: "2027-01-01T00:00:00Z" },
+				five_hour: { pct: 12, resets_at: "2034-01-01T00:00:00Z" },
 				seven_day: { pct: 40 },
 			},
 		}),
@@ -281,6 +281,70 @@ assert.deepEqual(
 		["7d", 40],
 	],
 	"fresh pool cache is served without a request",
+);
+// Several accounts: weekly room left across live ones, the next refills, and
+// split alerts: D = dead logins (red), ! = soonest login end within 3 days (yellow).
+const T = 2_000_000_000_000;
+const iso = (ms) => new Date(T + ms).toISOString();
+const writeMulti = async (accounts, usageRows) => {
+	await writeFile(join(poolDir, "claude-pool.json"), JSON.stringify({ active: "datecs:a", accounts }));
+	await writeFile(join(poolDir, "claude-pool-usage.json"), JSON.stringify(usageRows));
+};
+await writeMulti(
+	[
+		{ label: "datecs:a" },
+		{ label: "b@x.bg", refreshExpires: T + 2.5 * 86_400_000 },
+		{ label: "c", refreshExpires: T + 9 * 86_400_000 },
+		{ label: "gone", dead: true, refreshExpires: T - 1 },
+	],
+	{
+		"datecs:a": { at: T - 60_000, five_hour: { pct: 60, resets_at: iso(3_600_000) }, seven_day: { pct: 90, resets_at: iso(7_200_000) } },
+		"b@x.bg": { at: T - 600_000, five_hour: { pct: 30, resets_at: iso(-1) }, seven_day: { pct: 30, resets_at: iso(86_400_000) } },
+		c: { at: T - 600_000, five_hour: { pct: 0 }, seven_day: { pct: 60, resets_at: iso(-1) } },
+		gone: { at: T, five_hour: { pct: 100, resets_at: iso(1) }, seven_day: { pct: 100 } },
+	},
+);
+const pool = await poolFetch(poolDir);
+assert.deepEqual(
+	pool.map((w) => [w.text, w.color]),
+	[
+		["×3(D1) [███░░░░░] 60% left", undefined],
+		["+30% in 2h 0m", undefined],
+		["+40% in 1d 0h", undefined],
+		["→ a", undefined],
+		["!:2d 12h", "warning"],
+	],
+	"pool: weekly room averaged over live accounts (passed resets count empty), running refill totals, active, dead count beside the size, login alert",
+);
+assert.equal(pool[0].usedPercent, 40, "the main bar is coloured by pool usage");
+const [row] = renderQuotaRows(
+	[{ id: "claude", label: "Claude" }],
+	new Map([["claude", { authenticated: true, snapshot: { windows: pool }, lastSuccessAt: T }]]),
+	undefined,
+	200,
+	T,
+);
+assert.equal(row, "Claude ×3(D1) [███░░░░░] 60% left · +30% in 2h 0m · +40% in 1d 0h · → a · !:2d 12h");
+const [styledRow] = renderQuotaRows(
+	[{ id: "claude", label: "Claude" }],
+	new Map([["claude", { authenticated: true, snapshot: { windows: pool }, lastSuccessAt: T }]]),
+	theme,
+	200,
+	T,
+);
+assert.ok(styledRow.includes("[31m(D1)[0m"), "dead count is red, not dimmed like a reset time");
+assert.ok(styledRow.includes("[33m!:2d 12h[0m"), "login alert is yellow");
+await writeMulti(
+	[{ label: "a" }, { label: "b" }],
+	{
+		a: { at: T, five_hour: { pct: 100, resets_at: iso(47 * 60_000) }, seven_day: { pct: 50, resets_at: iso(86_400_000) } },
+		b: { at: T, five_hour: { pct: 98, resets_at: iso(90 * 60_000) }, seven_day: { pct: 100, resets_at: iso(3_600_000) } },
+	},
+);
+assert.deepEqual(
+	(await poolFetch(poolDir)).filter((w) => w.id === "5h-full").map((w) => [w.text, w.color]),
+	[["5h full 0h 47m", "error"]],
+	"5h is flagged only when it is what blocks the pool, timed to the nearest 5h reset with weekly room",
 );
 assert.equal(
 	claudeProvider.pollMs,
