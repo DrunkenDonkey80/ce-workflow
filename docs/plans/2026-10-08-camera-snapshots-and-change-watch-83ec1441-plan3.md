@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:22:55.657Z
+updated: 2026-10-11T10:30:19.193Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -165,6 +165,8 @@ needs: R-camera, human
   - check: node scripts/test-work-camera.mjs: ok; git diff --check clean. Live: watches a8f390c8 and c9963781 false initial at seq 67/69.
   - note: Correction: after cc355b5 surfaced changedBoxInWatchPixels, watch 4989808d showed the "untouched scene" changes were real motion at the left frame edge (glass appearing lower-left, brown object moving; last box x8 y32 8x8). The auto-exposure drift hypothesis is unconfirmed; earlier triggers likely the same edge motion. Settle-before-ready (2.1 s measured, baselineSettled true) kept as harmless guard. Detector caught a single 8x8 tile change (maxChange 0.083) — sensitive to small local events. Retention on a busy burst: 9 initial saves + 11 thinned + final, ~985 KB. Practical guidance: crop to the device under watch to exclude ambient motion.
   - check: camera_watch adaptive 60s full FOV after /reload: ready warmupMs 2098 settled; 10 retained frames show left-edge motion; quiet at seq 111.
+  - note: Sustained load (watch 26a12815, crop 620x660 -> 240x256, 10 fps): 4224 samples over ~7 min with 0 delayed samples, no stall, no faults; settle 2.0 s. One single-tile change at sample 4173 (maxChange 0.0807 vs 0.08, crop's lower-right chart edge, no visible difference) ended it as quiet ~5 s later — likely slow ambient-light drift accumulating against the fixed baseline at a high-contrast edge. Implication: hours-long watches in daylight will see occasional marginal edge triggers; use crop + threshold ≥0.1 for static devices, and treat single marginal tiles as weak evidence. Saved settings identity survived 3 /reloads (full Pi process restart not separately exercised; identity is OS/USB-serial-derived).
+  - check: camera_watch adaptive deadline 600000 crop {300,20,620,660} 240x256: delayedSamples 0 at seq 4224; initial at 4173 single tile; quiet at 4224.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
