@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:15:48.956Z
+updated: 2026-10-11T10:19:06.248Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -161,6 +161,8 @@ needs: R-camera, human
   - check: ffmpeg -list_devices dshow before/after replug; PnP VID_046D query (only C548 receiver during window); camera_capture 320x180 succeeded on unchanged identity.
   - note: Different-port reconnect: C310 composite exposes a fixed USB serial (USB\VID_046D&PID_081B\LOGI_C310_HD_WEBCAM), so the interface ID and DirectShow alternative name stay unchanged (7&16e5c5aa&0&0000) across ports. Saved selection continued working on the new port. Risk: two identical C310 units share that serial string; Windows may then derive port-based IDs, so duplicate-unit identity is unverified. Re-enumeration took >20s after the port change. Live absent-device refusal verified: while unenumerated, camera_capture returned "No accessible DirectShow video camera found ... no fallback camera was selected."
   - check: ffmpeg dshow list empty twice (incl. after 15s); camera_capture refused with no fallback; PnP showed same instance IDs; dshow list then same alternative name; camera_capture 320x180 succeeded.
+  - note: Live defect found: two untouched-scene adaptive watches both raised a false "initial" change at sample 67/69 (~7 s after first-frame baseline), then quiet ended the 10-min sustained run after ~12 s. Cause hypothesis: C310 auto-exposure still drifting after the 1 s warm-up. Fix 9bf6897: readiness now waits for 2 s stable picture (channel-mean step ≥1 level or half-threshold tile change restarts window), capped at 10 s with baselineSettled:false; ready reports warmupMs; wakes now surface lastChange {maxChange, changedTiles, possibleExposureShift}. Synthetic tests pass; live retest after /reload pending. Sustained-load still unmeasured.
+  - check: node scripts/test-work-camera.mjs: ok; git diff --check clean. Live: watches a8f390c8 and c9963781 false initial at seq 67/69.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
