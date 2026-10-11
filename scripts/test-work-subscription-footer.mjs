@@ -299,7 +299,7 @@ await writeMulti(
 	],
 	{
 		"datecs:a": { at: T - 60_000, five_hour: { pct: 60, resets_at: iso(3_600_000) }, seven_day: { pct: 90, resets_at: iso(7_200_000) } },
-		"b@x.bg": { at: T - 600_000, five_hour: { pct: 30, resets_at: iso(-1) }, seven_day: { pct: 30, resets_at: iso(86_400_000) } },
+		"b@x.bg": { at: T - 600_000, five_hour: { pct: 30, resets_at: iso(-1) }, seven_day: { pct: 30, resets_at: iso(2 * 86_400_000) } },
 		c: { at: T - 600_000, five_hour: { pct: 0 }, seven_day: { pct: 60, resets_at: iso(-1) } },
 		gone: { at: T, five_hour: { pct: 100, resets_at: iso(1) }, seven_day: { pct: 100 } },
 	},
@@ -308,11 +308,11 @@ const pool = await poolFetch(poolDir);
 assert.deepEqual(
 	pool.map((w) => [w.text, w.color]),
 	[
-		["×3(D1) [███░░░░░] 60% left", undefined],
+		["×3(D1) [███░░░░░] 40%", undefined],
 		["+30% in 2h 0m", undefined],
-		["+40% in 1d 0h", undefined],
+		["+40% in 2d 0h", undefined],
 		["→ a", undefined],
-		["!:2d 12h", "warning"],
+		["ER:2d 12h (b)", "warning"],
 	],
 	"pool: weekly room averaged over live accounts (passed resets count empty), running refill totals, active, dead count beside the size, login alert",
 );
@@ -324,7 +324,7 @@ const [row] = renderQuotaRows(
 	200,
 	T,
 );
-assert.equal(row, "Claude ×3(D1) [███░░░░░] 60% left · +30% in 2h 0m · +40% in 1d 0h · → a · !:2d 12h");
+assert.equal(row, "Claude ×3(D1) [███░░░░░] 40% · +30% in 2h 0m · +40% in 2d 0h · → a · ER:2d 12h (b)");
 const [styledRow] = renderQuotaRows(
 	[{ id: "claude", label: "Claude" }],
 	new Map([["claude", { authenticated: true, snapshot: { windows: pool }, lastSuccessAt: T }]]),
@@ -333,7 +333,19 @@ const [styledRow] = renderQuotaRows(
 	T,
 );
 assert.ok(styledRow.includes("[31m(D1)[0m"), "dead count is red, not dimmed like a reset time");
-assert.ok(styledRow.includes("[33m!:2d 12h[0m"), "login alert is yellow");
+assert.ok(styledRow.includes("[33mER:2d 12h (b)[0m"), "login alert is yellow");
+// An account dying within 24h of waking time with over 15% unspent is called
+// out in red; tonight's hours are removed, so only the shape is timezone-proof.
+await writeMulti(
+	[{ label: "datecs:a" }, { label: "low", refreshExpires: T + 86_400_000 }],
+	{
+		"datecs:a": { at: T, five_hour: { pct: 0 }, seven_day: { pct: 10, resets_at: iso(3 * 86_400_000) } },
+		low: { at: T, five_hour: { pct: 0 }, seven_day: { pct: 83, resets_at: iso(12 * 3_600_000) } },
+	},
+);
+const drain = (await poolFetch(poolDir)).find((w) => w.id === "drain");
+assert.match(drain?.text ?? "", /^7d: \d+h \d+m \(83%\)$/, "soonest dying account with >15% left");
+assert.equal(drain.color, "error");
 await writeMulti(
 	[{ label: "a" }, { label: "b" }],
 	{

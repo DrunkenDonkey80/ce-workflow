@@ -200,5 +200,11 @@ export function createImageTools(pi, { visionModel, imageModel, visionBridge, re
 	register({ ...processImage("the configured vision model"), exposure: "hidden" });
 	register({ ...generateImage("the configured image model"), exposure: "hidden" });
 	for (const event of ["session_start", "session_switch", "before_agent_start"]) pi.on(event, (_event, ctx) => refresh(ctx));
+	// Prompt rules alone did not stop agents from loading multi-MB screenshots into the main context.
+	pi.on("tool_call", (event, ctx) => {
+		const file = event.toolName === "read" && String(event.input?.path ?? "");
+		if (!file || !MIME[extname(file).toLowerCase()] || !ctx?.cwd || visionModel(ctx.cwd) === NONE) return;
+		return { block: true, reason: `Image files go to the vision model: call process_image with image "${file}" and a specific question; only its answer enters your context.` };
+	});
 	return { refresh };
 }

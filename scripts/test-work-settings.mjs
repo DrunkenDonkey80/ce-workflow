@@ -1934,7 +1934,7 @@ try {
 		"workflow off hides internal goal/monitor commands");
 	assert(!/goal|pause|Orchestrator/.test(off.commands.wo.description) && /\/wo plan/.test(off.commands.wo.description),
 		"workflow off command description advertises only Plan3 and utilities");
-	const blocked = await off.hooks.tool_call[0]({ toolName: "subagent", input: { agent: "work-advisor" } }, { cwd });
+	const blocked = (await Promise.all(off.hooks.tool_call.map(hook => hook({ toolName: "subagent", input: { agent: "work-advisor" } }, { cwd })))).find(result => result?.block);
 	assert(blocked?.block && /off/.test(blocked.reason) && /oracle/.test(blocked.reason) && !/wo resume/.test(blocked.reason),
 		"stale work-advisor calls explain off state and normal advisor, not disabled resume");
 	assert(!mod.workSubagentToolCall({ toolName: "subagent", input: { agent: "context-knowledge-discoverer" } }, { cwd }),
@@ -1955,7 +1955,7 @@ try {
 			if (out) result = out;
 		}
 		assert(result?.systemPrompt === "Base prompt", "off ignores saved legacy goals and stale child identity");
-		const stillBlocked = await off.hooks.tool_call[0]({ toolName: "subagent", input: { agent: "work-advisor" } }, offCtx);
+		const stillBlocked = (await Promise.all(off.hooks.tool_call.map(hook => hook({ toolName: "subagent", input: { agent: "work-advisor" } }, offCtx)))).find(result => result?.block);
 		assert(stillBlocked?.block, "stale identity cannot authorize legacy roles while off");
 		await off.hooks.agent_settled[0]({}, offCtx);
 	} finally {

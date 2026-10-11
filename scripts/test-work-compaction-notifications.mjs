@@ -53,6 +53,7 @@ assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: tru
 assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: true } }, workflowContext('```js workflow\nreturn runs.run("main", {agent:"worker"})\n```')), false);
 const hooks = {};
 const contextHooks = [];
+const toolCallHooks = [];
 const tools = {};
 const commands = {};
 const researchEntries = [];
@@ -79,6 +80,7 @@ const pi = {
 				return changed ? { messages } : undefined;
 			};
 		} else hooks[name] = handler;
+		if (name === "tool_call") toolCallHooks.push(handler);
 	},
 	registerTool(tool) { tools[tool.name] = tool; },
 	registerCommand(name, command) { commands[name] = command; },
@@ -1714,8 +1716,12 @@ try {
 	const imageId = /img-[a-f0-9]{16}/.exec(JSON.stringify(projected.messages))[0];
 	assert.equal((await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "text", input: ["text", "image"] } })).messages[0].content.some(part => part.type === "image"), false, "explicit non-vision overrides metadata");
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx), /Configure a vision model/);
+	const readBlock = async file => (await Promise.all(toolCallHooks.map(hook => hook({ toolName: "read", input: { path: file } }, visionCtx)))).find(result => result?.block);
+	assert.equal(await readBlock("shot.PNG"), undefined, "without a vision model, read keeps loading images");
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision", nonVisionModels: ["test/text", "test/vision"] } }));
 	assert.equal(await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "vision" } }), undefined, "selected vision model always keeps images");
+	assert.match((await readBlock("out/shot.PNG"))?.reason ?? "", /process_image with image "out\/shot\.PNG"/, "image reads go to the vision model");
+	assert.equal(await readBlock("notes.md"), undefined, "text files still read normally");
 	const described = await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx);
 	assert.match(described.content[0].text, /Interpretation by test\/vision.*Error code 42/s);
 	assert.equal(described.details.usage.output, 8);

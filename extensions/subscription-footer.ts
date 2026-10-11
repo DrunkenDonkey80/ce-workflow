@@ -351,7 +351,7 @@ function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
 		const labels = accounts.length
 			? accounts.filter((a) => !a.dead && !a.disabled).map((a) => a.label)
 			: [store.active];
-		const entries = labels.map((label) => table(usage[label])).filter((e) => finite(e.at));
+		const entries = labels.map((label) => ({ ...table(usage[label]), label })).filter((e) => finite(e.at));
 		const t = now();
 		if (!entries.length || t - Math.max(...entries.map((e) => e.at)) > POOL_MAX_AGE_MS)
 			throw new QuotaError("unavailable");
@@ -379,13 +379,26 @@ function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
 }
 
 const LOGIN_WARN_MS = 3 * 86_400_000;
+const DRAIN_WARN_MS = 86_400_000;
+
+// Tonight's 00:00-08:00 overlap with [from, to): nobody spends quota asleep.
+// Mirrors upcomingNightMs in pi-provider-claude-ex/usage.ts.
+function upcomingNightMs(from, to) {
+	const start = new Date(from);
+	if (start.getHours() >= 8) start.setDate(start.getDate() + 1);
+	start.setHours(0, 0, 0, 0);
+	const end = new Date(start).setHours(8);
+	return Math.max(0, Math.min(end, to) - Math.max(start.getTime(), from));
+}
 
 // Pool summary, each piece its own segment:
-//   ×4(D2) [████░░░░] 47% left · +18% in 1d 0h · +35% in 1d 15h · → flex2 · 5h full 47m · !:2d 12h
-// "left" is the average weekly room across live accounts; refills are running
+//   ×4(D2) [████░░░░] 53% · +18% in 1d 0h · +35% in 1d 15h · → flex2 · 5h full 47m · 7d: 12h 35m (83%) · ER:2d 12h (flex2)
+// The gauge is the average weekly use across live accounts; refills are running
 // totals as each account's weekly reset hands back its share. "5h full" only
 // when no live account can serve now although weekly room remains. (D2) = dead
-// logins (red, need a fresh /login); ! = soonest login end within 3 days (yellow).
+// logins (red, need a fresh /login); 7d = soonest account dying within 24h of
+// waking time with over 15% unspent, shown as % used (red: drain it); ER = soonest login end
+// within 3 days (yellow).
 function poolWindows(store, accounts, entries, used, t) {
 	const text = (id, value, color) => ({ id, label: id, usedPercent: 0, text: value, color });
 	const week = entries.map((e) => used(e.seven_day)).filter((w) => w.pct !== undefined);
@@ -397,7 +410,7 @@ function poolWindows(store, accounts, entries, used, t) {
 			id: "7d",
 			label: "7d",
 			usedPercent: percent(usedAvg),
-			text: `×${week.length}${dead ? `(D${dead})` : ""} ${bar(usedAvg, 8)} ${Math.round(100 - usedAvg)}% left`,
+			text: `×${week.length}${dead ? `(D${dead})` : ""} ${bar(usedAvg, 8)} ${Math.round(usedAvg)}%`,
 		},
 	];
 	let refilled = 0;
@@ -409,8 +422,9 @@ function poolWindows(store, accounts, entries, used, t) {
 		refilled += w.pct / week.length;
 		windows.push(text(`refill-${index}`, `+${Math.round(refilled)}% in ${formatDuration(w.at - t)}`));
 	}
+	const short = (label) => String(label).replace(/^.*:/, "").replace(/@.*$/, "");
 	const active = typeof store.active === "string" ? store.active : "";
-	if (active) windows.push(text("active", `→ ${active.replace(/^.*:/, "").replace(/@.*$/, "")}`));
+	if (active) windows.push(text("active", `→ ${short(active)}`));
 	const serving = entries.map((e) => {
 		const five = used(e.five_hour);
 		const seven = used(e.seven_day);
@@ -420,12 +434,24 @@ function poolWindows(store, accounts, entries, used, t) {
 		const next = Math.min(...serving.filter((s) => s.weekFree >= 5 && s.five.at).map((s) => s.five.at));
 		windows.push(text("5h-full", `5h full${Number.isFinite(next) ? ` ${formatDuration(next - t)}` : ""}`, "error"));
 	}
-	const ends = accounts
+	// Quota dies at the weekly reset or the login end, whichever comes first;
+	// tonight's 00:00-08:00 is not spendable (same rule as the pool's ranking).
+	const dying = entries
+		.map((e) => {
+			const week = used(e.seven_day);
+			const login = accounts.find((a) => a.label === e.label)?.refreshExpires;
+			const end = Math.min(week.at ?? Infinity, finite(login) ? login : Infinity);
+			return { left: end - t - upcomingNightMs(t, end), free: 100 - (week.pct ?? 100) };
+		})
+		.filter((d) => d.left > 0 && d.left < DRAIN_WARN_MS && d.free > 15)
+		.sort((a, b) => a.left - b.left)[0];
+	if (dying) windows.push(text("drain", `7d: ${formatDuration(dying.left)} (${Math.round(100 - dying.free)}%)`, "error"));
+	const ending = accounts
 		.filter((a) => !a.dead && finite(a.refreshExpires) && a.refreshExpires - t < LOGIN_WARN_MS)
-		.map((a) => a.refreshExpires - t);
-	if (ends.length) {
-		const soonest = Math.min(...ends);
-		windows.push(text("login", `!:${soonest > 0 ? formatDuration(soonest) : "expired"}`, "warning"));
+		.sort((a, b) => a.refreshExpires - b.refreshExpires)[0];
+	if (ending) {
+		const left = ending.refreshExpires - t;
+		windows.push(text("login", `ER:${left > 0 ? formatDuration(left) : "expired"} (${short(ending.label)})`, "warning"));
 	}
 	return windows;
 }
