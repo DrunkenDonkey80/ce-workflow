@@ -17,6 +17,7 @@ export function createCameraDetector({ width, height, fps = 10, threshold = 0.08
 		assertFresh(monotonic: number) { if (lastMonotonic >= 0 && monotonic - lastMonotonic > staleMs) throw new Error("Camera samples stalled; this is a fault, not stability."); },
 		frame(raw: Buffer, receivedAt: number, monotonic: number) {
 			if (raw.length !== width * height * 3 || !Number.isFinite(monotonic) || monotonic < lastMonotonic || !Number.isSafeInteger(receivedAt) || receivedAt < 0) throw new Error("Invalid ordered camera sample.");
+			if (lastMonotonic >= 0 && monotonic - lastMonotonic > staleMs) throw new Error("Camera samples stalled before the next frame; not a quiet interval.");
 			if (lastMonotonic >= 0) delayedSamples += Math.max(0, Math.floor((monotonic - lastMonotonic) * fps / 1000) - 1);
 			lastMonotonic = monotonic; sequence++;
 			if (!baseline) { baseline = Buffer.from(raw); lastChange = monotonic; return { type: "ready", raw: Buffer.from(raw), receivedAt, ...stats() }; }

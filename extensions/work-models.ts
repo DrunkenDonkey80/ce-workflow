@@ -30335,7 +30335,7 @@ export default function workModelsExtension(pi) {
 	const registerWorkflowTool = workflowOn ? registerConstrainedTool : () => {};
 	const visionBridge = createVisionBridge();
 	cameraController = createCameraController(pi, { readProjectSettings: readSettings, writeProjectSettings: writeSettings });
-	for (const tool of cameraTools(cameraController)) registerConstrainedTool(pi, tool);
+	for (const tool of cameraTools(cameraController, pi)) registerConstrainedTool(pi, tool);
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	registerConstrainedTool(pi, {
 		name: "research_note",

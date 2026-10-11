@@ -152,6 +152,7 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 				let begun = false;
 				const owner = {
 					lease, signal: abort.signal,
+					current: assertCurrent,
 					async begin() {
 						await owner.guard();
 						cameraWarning(ctx, request.watch ? "WATCHING" : "CAPTURING");

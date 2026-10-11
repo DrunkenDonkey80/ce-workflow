@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:19:08.494Z
+updated: 2026-10-11T09:24:49.132Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -130,11 +130,7 @@ Checks: camera and camera-state scripts plus git diff --check passed after CAM-1
 ### Phase 4 — Adaptive retention and model wake [code]
 
 - [x] **CAM-11** Elapsed-time adaptive retention, protected initial burst, rolling tail, reserved final slot and lifetime budgets implemented (log).
-- [ ] **CAM-12** Implement ready-before-operation, one fast-phase batch plus final delivery, native wake and bounded busy-session coalescing.
-  - At most two logical adaptive deliveries; no wakes for sparse tail frames. Early quiet or termination coalesces available evidence into one labeled final delivery. Preserve chronological frame IDs; never reattach already delivered initial frames solely because the burst remains protected.
-  - Return model idle without busy polling. Use supported Pi message and lifecycle APIs, not legacy work items, goals or background verifiers. Bind jobs and callbacks to owning session and lifecycle generation; deliberately aborted or switched conversations must not restart through stale callbacks.
-  - Stop/release on quiet, deadline, revoke, abort or failure. Requested and displayed deadline is bounded by consent expiry and declared hard maximum; continuing motion cannot extend it. Retention budget filling alone does not stop detection under D-18. Expiry, fault and abort are partial or terminal outcomes, not quiet success.
-  - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; busy queues, early termination, no duplicate attachments and stale, session and branch callbacks.
+- [x] **CAM-12** Native ready-before-operation watch/stop tools, at-most-two wakeups and lifecycle-safe busy coalescing implemented (log).
 - [ ] **CAM-13** Add settled-state mode to the bounded watcher: readiness, observed activity, fresh-sample quiet interval and one final image and wake.
   - Initial idle cannot finish an operation not yet visibly started. Qualifying activity starts quiet tracking; meaningful or gradual cumulative change resets it. Fresh valid samples are required throughout the requested interval; stalls, timeout, disconnect and revocation do not yield settled success.
   - Discard routine samples; retain the actual fresh final frame with validated crop and resolution. Report visual stability with region, timestamps and quiet duration, not job completion. Paused or jammed or invisible printer activity can look stable; caller-side existing status confirmation adds no new camera or printer authority.
