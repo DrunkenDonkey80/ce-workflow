@@ -7,10 +7,26 @@ import { resolveCameraFFmpeg, runCameraProcess } from "./work-camera-process.ts"
 import type { createCameraController } from "./work-camera.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-type DetectionOptions = { width: number; height: number; fps?: number; threshold?: number; tileSize?: number; noise?: number; staleMs?: number };
-export function createCameraDetector({ width, height, fps = 10, threshold = 0.08, tileSize = 8, noise = 6, staleMs = 3000 }: DetectionOptions) {
-	if (![width, height, tileSize, noise, staleMs].every(Number.isSafeInteger) || width < 1 || height < 1 || width * height > 640 * 480 || tileSize < 1 || tileSize > 64 || noise < 0 || noise > 32 || staleMs < 500 || staleMs > 30000 || !Number.isFinite(fps) || fps < 1 || fps > 30 || !Number.isFinite(threshold) || threshold <= 0 || threshold > 1) throw new Error("Invalid bounded camera detector parameters.");
-	let baseline: Buffer | undefined, sequence = 0, lastMonotonic = -1, lastChange = -1, delayedSamples = 0;
+type DetectionOptions = { width: number; height: number; fps?: number; threshold?: number; tileSize?: number; noise?: number; staleMs?: number; settleMs?: number; maxSettleMs?: number };
+const channelMeans = (raw: Buffer) => { const sums = [0, 0, 0]; for (let index = 0; index < raw.length; index++) sums[index % 3] += raw[index]; return sums.map(sum => sum / (raw.length / 3)); };
+// Live Logi C310 (CAM-02): auto-exposure kept drifting ~7 s after the first frame, so readiness waits for a stable picture.
+export function createCameraDetector({ width, height, fps = 10, threshold = 0.08, tileSize = 8, noise = 6, staleMs = 3000, settleMs = 2000, maxSettleMs = 10000 }: DetectionOptions) {
+	if (![width, height, tileSize, noise, staleMs, settleMs, maxSettleMs].every(Number.isSafeInteger) || width < 1 || height < 1 || width * height > 640 * 480 || tileSize < 1 || tileSize > 64 || noise < 0 || noise > 32 || staleMs < 500 || staleMs > 30000 || settleMs < 0 || maxSettleMs < settleMs || maxSettleMs > 14000 || !Number.isFinite(fps) || fps < 1 || fps > 30 || !Number.isFinite(threshold) || threshold <= 0 || threshold > 1) throw new Error("Invalid bounded camera detector parameters.");
+	let baseline: Buffer | undefined, sequence = 0, lastMonotonic = -1, lastChange = -1, delayedSamples = 0, firstMonotonic = -1;
+	let anchor: { raw: Buffer; means: number[]; monotonic: number } | undefined;
+	const tilesChanged = (raw: Buffer, reference: Buffer, limit: number) => {
+		let maxChange = 0, changedTiles = 0, tiles = 0;
+		for (let y = 0; y < height; y += tileSize) for (let x = 0; x < width; x += tileSize) {
+			let difference = 0, channels = 0;
+			for (let row = y; row < Math.min(y + tileSize, height); row++) for (let col = x; col < Math.min(x + tileSize, width); col++) for (let channel = 0; channel < 3; channel++) {
+				const index = (row * width + col) * 3 + channel, delta = Math.abs(raw[index] - reference[index]);
+				if (delta > noise) difference += delta;
+				channels++;
+			}
+			const change = difference / (channels * 255); maxChange = Math.max(maxChange, change); if (change >= limit) changedTiles++; tiles++;
+		}
+		return { maxChange, changedTiles, tiles };
+	};
 	const stats = () => ({ sequence, lastMonotonic, lastChange, delayedSamples, requestedFps: fps, minimumIdealStateMs: 1000 / fps, observability: "Receipt gaps only: driver buffering, exposure and dropped sensor states are not measurable here. Sampling cannot guarantee every brief state." });
 	return {
 		stats,
@@ -20,17 +36,18 @@ export function createCameraDetector({ width, height, fps = 10, threshold = 0.08
 			if (lastMonotonic >= 0 && monotonic - lastMonotonic > staleMs) throw new Error("Camera samples stalled before the next frame; not a quiet interval.");
 			if (lastMonotonic >= 0) delayedSamples += Math.max(0, Math.floor((monotonic - lastMonotonic) * fps / 1000) - 1);
 			lastMonotonic = monotonic; sequence++;
-			if (!baseline) { baseline = Buffer.from(raw); lastChange = monotonic; return { type: "ready", raw: Buffer.from(raw), receivedAt, ...stats() }; }
-			let maxChange = 0, changedTiles = 0, tiles = 0;
-			for (let y = 0; y < height; y += tileSize) for (let x = 0; x < width; x += tileSize) {
-				let difference = 0, channels = 0;
-				for (let row = y; row < Math.min(y + tileSize, height); row++) for (let col = x; col < Math.min(x + tileSize, width); col++) for (let channel = 0; channel < 3; channel++) {
-					const index = (row * width + col) * 3 + channel, delta = Math.abs(raw[index] - baseline[index]);
-					if (delta > noise) difference += delta;
-					channels++;
-				}
-				const change = difference / (channels * 255); maxChange = Math.max(maxChange, change); if (change >= threshold) changedTiles++; tiles++;
+			if (!baseline) {
+				if (firstMonotonic < 0) firstMonotonic = monotonic;
+				const means = channelMeans(raw);
+				// Any global mean step of a full level or a half-threshold tile change restarts the stability window.
+				const previous = anchor;
+				if (!previous || means.some((mean, channel) => Math.abs(mean - previous.means[channel]) >= 1) || tilesChanged(raw, previous.raw, threshold / 2).changedTiles) anchor = { raw: Buffer.from(raw), means, monotonic };
+				const settled = monotonic - anchor.monotonic >= settleMs;
+				if (!settled && monotonic - firstMonotonic < maxSettleMs) return { type: "warming", raw: Buffer.from(raw), receivedAt, ...stats() };
+				baseline = Buffer.from(raw); lastChange = monotonic;
+				return { type: "ready", raw: Buffer.from(raw), receivedAt, settled, warmupMs: monotonic - firstMonotonic, ...stats() };
 			}
+			const { maxChange, changedTiles, tiles } = tilesChanged(raw, baseline, threshold);
 			if (changedTiles) {
 				// Keep the last qualifying baseline so gradual drift accumulates rather than disappearing.
 				baseline = Buffer.from(raw); lastChange = monotonic;

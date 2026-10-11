@@ -74,18 +74,19 @@ export function createCameraWatch(pi: ExtensionAPI, controller: ReturnType<typeo
 			signal?.addEventListener("abort", interrupt, { once: true });
 			if (signal?.aborted) interrupt();
 			let activity = -1;
-			let reason = "", latest: Parameters<Policy["finish"]>[0] | undefined, geometry: Parameters<Policy["finish"]>[1] | undefined;
+			let reason = "", latest: Parameters<Policy["finish"]>[0] | undefined, geometry: Parameters<Policy["finish"]>[1] | undefined, lastChangeMetrics: Record<string, unknown> | undefined;
 			candidate.completion = (async () => {
 				try {
 					await acquire(ctx, controller, { ...input, summary: `Continuous visual watch, ${input.width ?? 320}x${input.height ?? 180}, ${input.fps ?? 10} samples/s, crop ${input.crop ? JSON.stringify(input.crop) : "full field of view"}; quiet after activity ${quietMs} ms; hard deadline ${input.deadlineMs} ms; maximum initial and final deliveries only` }, {
 						owner(owner) { candidate.owner = owner; },
 						sample(sample, shape) {
-							if (!current(candidate) || reason) return;
+							if (!current(candidate) || reason || sample.type === "warming") return;
+							if (sample.type === "change") lastChangeMetrics = { sequence: sample.sequence, maxChange: sample.maxChange, changedTiles: sample.changedTiles, possibleExposureShift: sample.possibleExposureShift };
 							latest = sample; geometry = shape as typeof geometry;
-							candidate.sampling = { sequence: sample.sequence, delayedSamples: sample.delayedSamples, requestedFps: sample.requestedFps, minimumIdealStateMs: sample.minimumIdealStateMs, observability: sample.observability, quietDurationMs: sample.lastMonotonic - sample.lastChange, region: shape.crop, receivedAt: sample.receivedAt };
+							candidate.sampling = { sequence: sample.sequence, delayedSamples: sample.delayedSamples, requestedFps: sample.requestedFps, minimumIdealStateMs: sample.minimumIdealStateMs, observability: sample.observability, quietDurationMs: sample.lastMonotonic - sample.lastChange, region: shape.crop, receivedAt: sample.receivedAt, ...(lastChangeMetrics && { lastChange: lastChangeMetrics }) };
 							if (sample.type === "ready") {
 								candidate.ready = true;
-								resolveReady!({ watch: candidate.id, outcome: "ready", deadline: candidate.owner!.lease.expiresAt, geometry: shape, quietMs, requestedDeadlineMs: input.deadlineMs, instruction: "Baseline is ready: operate the device now, then return idle. No polling; native initial/final camera messages wake the model. Quiet requires post-readiness activity. Sampling and thresholds remain provisional." });
+								resolveReady!({ watch: candidate.id, outcome: "ready", deadline: candidate.owner!.lease.expiresAt, geometry: shape, baselineSettled: sample.settled, warmupMs: Math.round(sample.warmupMs), quietMs, requestedDeadlineMs: input.deadlineMs, instruction: "Baseline is ready: operate the device now, then return idle. No polling; native initial/final camera messages wake the model. Quiet requires post-readiness activity. Sampling and thresholds remain provisional." });
 							}
 							if (sample.type === "change" && activity < 0) activity = sample.lastMonotonic;
 							if (candidate.mode === "adaptive") candidate.policy.event(sample, geometry!);

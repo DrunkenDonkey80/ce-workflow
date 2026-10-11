@@ -364,7 +364,7 @@ assert.equal(partial.frames.length, 1);
 assert.match(partial.failure, /fixture capture fault/);
 retained.stop();
 const { createCameraDetector, cameraRawFrames, runCameraAcquisition } = await createJiti(import.meta.url).import("../extensions/work-camera-detect.ts");
-const detector = createCameraDetector({ width: 16, height: 16, tileSize: 2, staleMs: 500 });
+const detector = createCameraDetector({ width: 16, height: 16, tileSize: 2, staleMs: 500, settleMs: 0 });
 const off = Buffer.alloc(16 * 16 * 3), on = Buffer.from(off); on.fill(255, 0, 3);
 assert.equal(detector.frame(off, 1000, 0).type, "ready");
 assert.equal(detector.frame(on, 1050, 50).type, "change", "small LED survives a mostly unchanged frame");
@@ -373,7 +373,18 @@ assert.equal(detector.frame(on, 1150, 150).type, "change", "on-off-on preserves 
 assert.equal(detector.stats().sequence, 4);
 assert.throws(() => detector.assertFresh(651), /stalled/);
 assert.throws(() => detector.frame(off, 2000, 1000), /stalled/, "a delayed incoming frame cannot retroactively establish uninterrupted quiet");
-const drift = createCameraDetector({ width: 2, height: 2 });
+const warming = createCameraDetector({ width: 2, height: 2, settleMs: 200, maxSettleMs: 1000 });
+assert.equal(warming.frame(Buffer.alloc(12, 10), 1000, 0).type, "warming");
+assert.equal(warming.frame(Buffer.alloc(12, 12), 1100, 100).type, "warming", "auto-exposure drift restarts the stability window");
+assert.equal(warming.frame(Buffer.alloc(12, 12), 1250, 250).type, "warming");
+const settledReady = warming.frame(Buffer.alloc(12, 12), 1300, 300);
+assert.deepEqual([settledReady.type, settledReady.settled, settledReady.warmupMs], ["ready", true, 300], "ready only after a stable picture");
+const busy = createCameraDetector({ width: 2, height: 2, settleMs: 200, maxSettleMs: 400 });
+for (let step = 0; step < 4; step++) assert.equal(busy.frame(Buffer.alloc(12, step * 40), 1000 + step * 100, step * 100).type, "warming");
+const capped = busy.frame(Buffer.alloc(12, 200), 1400, 400);
+assert.deepEqual([capped.type, capped.settled], ["ready", false], "continuous activity cannot block readiness forever and is reported unsettled");
+assert.throws(() => createCameraDetector({ width: 2, height: 2, maxSettleMs: 15000 }), /Invalid/, "warm-up stays under the 15 s readiness ceiling");
+const drift = createCameraDetector({ width: 2, height: 2, settleMs: 0 });
 drift.frame(Buffer.alloc(12), 1000, 0);
 assert.equal(drift.frame(Buffer.alloc(12, 3), 1010, 10).type, "sample", "sensor noise does not qualify");
 assert.equal(drift.frame(Buffer.alloc(12, 20), 1020, 20).type, "sample");
@@ -389,7 +400,7 @@ assembly.finish();
 assembly.push(Buffer.alloc(1), 3);
 assert.throws(() => assembly.finish(), /partial frame/);
 const acquisitionSamples = [];
-await runCameraAcquisition(ctx, fakeController, { width: 1, height: 1, deadlineMs: 2000, summary: "full field of view detector fixture" }, { owner() {}, sample(sample) { acquisitionSamples.push(sample); } }, undefined, {
+await runCameraAcquisition(ctx, fakeController, { width: 1, height: 1, deadlineMs: 2000, settleMs: 0, summary: "full field of view detector fixture" }, { owner() {}, sample(sample) { acquisitionSamples.push(sample); } }, undefined, {
 	async resolveFFmpeg() { return process.execPath; }, async devices() { return [printer]; },
 	async run(_owner, _exe, args, options) {
 		if (args.includes("-list_options")) return { stderr: "pixel_format=rgb24 min s=1x1 fps=30 max s=1x1 fps=30" };
