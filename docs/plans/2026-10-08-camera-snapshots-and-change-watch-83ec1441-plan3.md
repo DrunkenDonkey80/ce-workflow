@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:19:06.248Z
+updated: 2026-10-11T10:22:55.657Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -163,6 +163,8 @@ needs: R-camera, human
   - check: ffmpeg dshow list empty twice (incl. after 15s); camera_capture refused with no fallback; PnP showed same instance IDs; dshow list then same alternative name; camera_capture 320x180 succeeded.
   - note: Live defect found: two untouched-scene adaptive watches both raised a false "initial" change at sample 67/69 (~7 s after first-frame baseline), then quiet ended the 10-min sustained run after ~12 s. Cause hypothesis: C310 auto-exposure still drifting after the 1 s warm-up. Fix 9bf6897: readiness now waits for 2 s stable picture (channel-mean step ≥1 level or half-threshold tile change restarts window), capped at 10 s with baselineSettled:false; ready reports warmupMs; wakes now surface lastChange {maxChange, changedTiles, possibleExposureShift}. Synthetic tests pass; live retest after /reload pending. Sustained-load still unmeasured.
   - check: node scripts/test-work-camera.mjs: ok; git diff --check clean. Live: watches a8f390c8 and c9963781 false initial at seq 67/69.
+  - note: Correction: after cc355b5 surfaced changedBoxInWatchPixels, watch 4989808d showed the "untouched scene" changes were real motion at the left frame edge (glass appearing lower-left, brown object moving; last box x8 y32 8x8). The auto-exposure drift hypothesis is unconfirmed; earlier triggers likely the same edge motion. Settle-before-ready (2.1 s measured, baselineSettled true) kept as harmless guard. Detector caught a single 8x8 tile change (maxChange 0.083) — sensitive to small local events. Retention on a busy burst: 9 initial saves + 11 thinned + final, ~985 KB. Practical guidance: crop to the device under watch to exclude ambient motion.
+  - check: camera_watch adaptive 60s full FOV after /reload: ready warmupMs 2098 settled; 10 retained frames show left-edge motion; quiet at seq 111.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
