@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:43:35.348Z
+updated: 2026-10-11T09:51:14.086Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -149,11 +149,12 @@ Next external actions: select/enable Logi C310 in native project Camera settings
 
 needs: R-camera, human
 
-- [human] **CAM-02** Calibrate identity, still and crop capability, warm-up, exposure, FPS, brief-state recovery, driver release and sustained load on hardware.
+- [wip] **CAM-02** Calibrate identity, still and crop capability, warm-up, exposure, FPS, brief-state recovery, driver release and sustained load on hardware.
   - Prerequisite: Logi C310 HD WebCam (D-23) selected in project settings, explicit device-specific human calibration permission and conspicuous foreground warning until release.
   - D-22 defers calibration ordering, not acceptance. Existing FFmpeg 9.0.2 dshow metadata and failed device discovery are recorded in (log); no frames were acquired. Define measured numerical limits, identity after unplug and reconnect and after a Pi restart (D-25), driver release, shortest detectable state, lag, drops and crop geometry; do not infer compatibility from backend types or an OS or app lock.
   - Targeted checks: C-BACKEND, C-DISCOVERY and bounded direct-UI camera trials; document measured limits and unsupported timing.
   - note: Logi C310 discovered by metadata only; needs project selection and direct calibration authorization.
+  - note: User chose calibration now via ask_user. FFmpeg 9.0.2 and exact Logi C310 video identity confirmed by metadata-only enumeration; no frames acquired. Scheduling approval is not acquisition consent. Next user /reload and explicit native project camera selection/enablement; every actual trial still needs native consent and visible warning. Budget 20–30 minutes plus any longer sustained-load qualification.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
