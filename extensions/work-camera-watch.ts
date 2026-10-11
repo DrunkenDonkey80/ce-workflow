@@ -81,7 +81,7 @@ export function createCameraWatch(pi: ExtensionAPI, controller: ReturnType<typeo
 						owner(owner) { candidate.owner = owner; },
 						sample(sample, shape) {
 							if (!current(candidate) || reason || sample.type === "warming") return;
-							if (sample.type === "change") lastChangeMetrics = { sequence: sample.sequence, maxChange: sample.maxChange, changedTiles: sample.changedTiles, possibleExposureShift: sample.possibleExposureShift };
+							if (sample.type === "change") lastChangeMetrics = { sequence: sample.sequence, maxChange: sample.maxChange, changedTiles: sample.changedTiles, changedBoxInWatchPixels: sample.changedBox, possibleExposureShift: sample.possibleExposureShift };
 							latest = sample; geometry = shape as typeof geometry;
 							candidate.sampling = { sequence: sample.sequence, delayedSamples: sample.delayedSamples, requestedFps: sample.requestedFps, minimumIdealStateMs: sample.minimumIdealStateMs, observability: sample.observability, quietDurationMs: sample.lastMonotonic - sample.lastChange, region: shape.crop, receivedAt: sample.receivedAt, ...(lastChangeMetrics && { lastChange: lastChangeMetrics }) };
 							if (sample.type === "ready") {

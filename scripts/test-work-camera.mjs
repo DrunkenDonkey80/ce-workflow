@@ -367,7 +367,9 @@ const { createCameraDetector, cameraRawFrames, runCameraAcquisition } = await cr
 const detector = createCameraDetector({ width: 16, height: 16, tileSize: 2, staleMs: 500, settleMs: 0 });
 const off = Buffer.alloc(16 * 16 * 3), on = Buffer.from(off); on.fill(255, 0, 3);
 assert.equal(detector.frame(off, 1000, 0).type, "ready");
-assert.equal(detector.frame(on, 1050, 50).type, "change", "small LED survives a mostly unchanged frame");
+const led = detector.frame(on, 1050, 50);
+assert.equal(led.type, "change", "small LED survives a mostly unchanged frame");
+assert.deepEqual(led.changedBox, { x: 0, y: 0, width: 2, height: 2 }, "change reports where it happened");
 assert.equal(detector.frame(off, 1100, 100).type, "change");
 assert.equal(detector.frame(on, 1150, 150).type, "change", "on-off-on preserves every qualifying capture");
 assert.equal(detector.stats().sequence, 4);

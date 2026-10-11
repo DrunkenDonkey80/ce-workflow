@@ -15,7 +15,7 @@ export function createCameraDetector({ width, height, fps = 10, threshold = 0.08
 	let baseline: Buffer | undefined, sequence = 0, lastMonotonic = -1, lastChange = -1, delayedSamples = 0, firstMonotonic = -1;
 	let anchor: { raw: Buffer; means: number[]; monotonic: number } | undefined;
 	const tilesChanged = (raw: Buffer, reference: Buffer, limit: number) => {
-		let maxChange = 0, changedTiles = 0, tiles = 0;
+		let maxChange = 0, changedTiles = 0, tiles = 0, left = width, top = height, right = 0, bottom = 0;
 		for (let y = 0; y < height; y += tileSize) for (let x = 0; x < width; x += tileSize) {
 			let difference = 0, channels = 0;
 			for (let row = y; row < Math.min(y + tileSize, height); row++) for (let col = x; col < Math.min(x + tileSize, width); col++) for (let channel = 0; channel < 3; channel++) {
@@ -23,9 +23,10 @@ export function createCameraDetector({ width, height, fps = 10, threshold = 0.08
 				if (delta > noise) difference += delta;
 				channels++;
 			}
-			const change = difference / (channels * 255); maxChange = Math.max(maxChange, change); if (change >= limit) changedTiles++; tiles++;
+			const change = difference / (channels * 255); maxChange = Math.max(maxChange, change); tiles++;
+			if (change >= limit) { changedTiles++; left = Math.min(left, x); top = Math.min(top, y); right = Math.max(right, Math.min(x + tileSize, width)); bottom = Math.max(bottom, Math.min(y + tileSize, height)); }
 		}
-		return { maxChange, changedTiles, tiles };
+		return { maxChange, changedTiles, tiles, changedBox: changedTiles ? { x: left, y: top, width: right - left, height: bottom - top } : undefined };
 	};
 	const stats = () => ({ sequence, lastMonotonic, lastChange, delayedSamples, requestedFps: fps, minimumIdealStateMs: 1000 / fps, observability: "Receipt gaps only: driver buffering, exposure and dropped sensor states are not measurable here. Sampling cannot guarantee every brief state." });
 	return {
@@ -47,11 +48,11 @@ export function createCameraDetector({ width, height, fps = 10, threshold = 0.08
 				baseline = Buffer.from(raw); lastChange = monotonic;
 				return { type: "ready", raw: Buffer.from(raw), receivedAt, settled, warmupMs: monotonic - firstMonotonic, ...stats() };
 			}
-			const { maxChange, changedTiles, tiles } = tilesChanged(raw, baseline, threshold);
+			const { maxChange, changedTiles, tiles, changedBox } = tilesChanged(raw, baseline, threshold);
 			if (changedTiles) {
 				// Keep the last qualifying baseline so gradual drift accumulates rather than disappearing.
 				baseline = Buffer.from(raw); lastChange = monotonic;
-				return { type: "change", raw: Buffer.from(raw), receivedAt, maxChange, changedTiles, possibleExposureShift: changedTiles / tiles >= 0.9, ...stats() };
+				return { type: "change", raw: Buffer.from(raw), receivedAt, maxChange, changedTiles, changedBox, possibleExposureShift: changedTiles / tiles >= 0.9, ...stats() };
 			}
 			return { type: "sample", raw: Buffer.from(raw), receivedAt, maxChange, ...stats() };
 		},
