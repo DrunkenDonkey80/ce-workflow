@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:37:42.391Z
+updated: 2026-10-11T10:44:10.068Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -87,6 +87,8 @@ started: 2026-10-08T20:25:28.314Z
 - **D-29 — Continue camera-specific implementation despite unrelated global-check failures.** Source: execution ask_user; selected “Continue camera; keep failures recorded”. Keep unrelated files untouched, use targeted camera checks, and retain the failing workflow-ON full verification as a completion blocker until resolved or explicitly accepted; this is not acceptance of completion or hardware qualification.
 - **D-30 — Provisional still limits (assumed).** Source: D-22 permits reversible engineering defaults before calibration. Ordinary still capture uses one second of discarded warm-up, at most eight returned images, 16 million pixels per image, 4 MiB subprocess output per capture, 1024-pixel default overview edge and a ten-minute maximum declared burst deadline. Intervals are minimum waits after confirmed process closure; reopening and warm-up add latency, with no catch-up burst. FullSize requests the largest enumerated native mode and fails rather than silently reducing it; all limits remain unmeasured until CAM-02.
 - **D-31 — Provisional detection and retention defaults (assumed).** Source: D-22 allows reversible engineering numbers before CAM-02. Continuous acquisition defaults to 320x180 RGB at 10 samples/s, tiles of eight pixels, six-level channel noise floor and 0.08 tile change threshold; three-second stale-sample and 15-second baseline-readiness ceilings. Adaptive retention anchors at first post-readiness change: first two seconds protect up to 20 ordered initial observations; the next stage ends at 60 seconds and saves at least five seconds apart, capped at 12 stage saves; later tail saves are at least a minute apart. Tail retains eight frames, plus one final slot. Whole-watch budgets: 256 lifetime saves and 64 MiB encoded lifetime bytes, 32 MiB resident bytes, with one count and 1 MiB reserved for final evidence. Filling these provisional budgets thins evidence but never disables fast detection. CAM-02 must calibrate observability, noise, CPU, storage and practical stage targets.
+D-32: User explicitly accepted unmeasured physical blink duration/detection latency for this Logi C310 (ask_user: “Accept unmeasured timing for this camera”). This relaxes only that timing acceptance requirement for the tested camera; it does not establish a 100 ms detection guarantee, validate other devices, or waive live warning, printer qualification or global verification. Brief states may be missed; receipt-gap metrics are not sensor-drop measurements.
+
 
 
 
@@ -147,18 +149,14 @@ CAM-09 blocked by D-29 three unrelated workflow-ON failures (design-docs/private
 
 needs: R-camera, human
 
-- [human] **CAM-02** Calibrate the Logi C310 on hardware. Measured so far: 1280x720 native; crop reads 15 mil text (10 mil marginal); bursts add ~2.3 s reopen per shot; identity stable across same/different-port replug; absent camera refused without fallback; ~7 min at 10 fps with 0 local receipt gaps; readiness waits for a stable picture (10 s cap reports unsettled). Still unmeasured: physical blink duration/lag limit, full Pi process restart identity.
-  - note: Correction to premature completion: hand passes are visible in isolated retained frames 225, 228 and 243, but their physical durations were not measured. One sampled frame does NOT establish a 100 ms minimum detectable state, especially with retention thinning, exposure and driver buffering. This trial began with baselineSettled:false and its final result is still pending. delayedSamples:0 only measures local receipt gaps, not sensor drops. Full Pi process restart, measured blink duration/lag and other outstanding CAM-02 qualification remain unverified; do not claim complete or recommend threshold 0.1 as calibrated from these trials.
-  - check: Watch 7d85af50 initial delivery: sequence 244, 10 retained frames, thinned 1, delayedSamples 0; visible hand passes, actual pulse duration unknown. Await final native delivery without polling.
-  - note: Blink watch 7d85af50 final: quiet at seq 315 after 3.07 s; 11 saved (750 KB), 17 thinned; delayedSamples 1 (first local receipt gap observed); last change single marginal tile (0.0806, x176 y24 8x8). Remaining human-only: timed light source (known on-duration) for blink/lag limit, and full Pi process quit+restart identity check.
-  - check: Final native delivery received; no polling.
-  - note: User confirms Pi was fully restarted. Proceed with one bounded 320x180 still through native device-specific consent/warning to verify persisted C310 selection. Restart is user-reported; blink timing remains unmeasured.
-  - note: Full Pi restart (user-reported): saved project selection and timed grant persisted; one 320x180 still captured on the same C310 identity (frame 647a51cc, 72 KB). Only remaining CAM-02 item: physical blink duration/lag limit with a timed light source of known on-duration (e.g. LED blinking at known rate or phone strobe app).
-  - check: camera_capture 320x180 after full Pi restart: captured on @device_pnp_...vid_046d&pid_081b...\global.
-- [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
+- [x] **CAM-02** Logi C310 live trials recorded: native still/crop/burst, settled wake, reconnect and user-reported full restart identity, missing-device refusal and ~7-minute monitoring; physical blink duration/latency expressly left unmeasured under D-32.
+- [wip] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
   - Targeted checks: live shared-UI trials plus C-FOOTER and C-DIALOGS; retain screenshots, observations and limitations in (log).
+  - note: User chose live privacy/UI qualification now. Start a bounded watch through native consent/warning; user will observe red warning during acquisition, footer coexistence and clearing after release. Other acceptance cases remain unverified until separately exercised.
+  - note: Live trial 1 (settled watch cf73351c, ~25 s, user's active theme): user observed the camera warning was conspicuously red with readable text during the watch, coexisted with the footer/research status, and cleared only after the watch ended. User-reported observation; no screenshot retained. Still unverified live: warm-up phase specifically, ARMED vs CAPTURING distinction, consent dialog summaries/options, revocation, unsupported-mode denial in a live non-TUI session, failed release, loss of owning UI.
+  - check: camera_watch settled 30 s chart crop: ready warmupMs 2100, settled at seq 246, 0 delayed samples; ask_user observation: "Red, clear text, cleared after end".
 - [blocked] **CAM-10** Run real-camera, provider and printer acceptance for stills, crops, grants, adaptive transactions, settled capture and release and retention.
   - needs: R-printer
   - Prerequisite: calibrated selected camera and representative printer setup, live eligible TUI and explicit direct human trial authorization.
