@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { showListDialog } from "./work-dialogs.ts";
 import { cameraProject, cameraRequestKey, createCameraState } from "./work-camera-state.ts";
+import { createCameraImages } from "./work-camera-images.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 type CameraDevice = { id: string; label: string };
@@ -75,9 +76,11 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 }) {
 	let generation = 0;
 	const state = createCameraState();
+	const images = createCameraImages();
 	let acquiring = false;
 	let active: { cancel: () => void; finish: () => Promise<void> } | undefined;
 	const controller = {
+		images,
 		settings(ctx: Pick<ExtensionContext, "cwd">) { return cameraSettings(readProjectSettings(ctx.cwd)); },
 		async invalidate(ctx?: Pick<ExtensionContext, "cwd">) {
 			generation++;
@@ -253,7 +256,13 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 			return { ...grant, device };
 		},
 	};
+	pi.on("session_start", (_event, ctx) => {
+		images.start(ctx.cwd, error => {
+			if (ctx.hasUI) ctx.ui.notify(String(error), "error");
+			else console.error("Camera image cleanup failed:", error);
+		});
+	});
 	for (const event of ["session_shutdown", "session_before_switch", "session_before_fork", "session_before_tree", "session_tree"] as const)
-		pi.on(event, () => controller.invalidate());
+		pi.on(event, () => { images.stop(); return controller.invalidate(); });
 	return controller;
 }

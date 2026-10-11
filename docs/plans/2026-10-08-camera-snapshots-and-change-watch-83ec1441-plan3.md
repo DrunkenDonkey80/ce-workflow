@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T08:43:54.374Z
+updated: 2026-10-11T08:47:30.512Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -113,9 +113,7 @@ Blockers: CAM-02 is [human]: needs R-camera on, the C310 selected in project set
 ### Phase 2 — Safe acquisition prerequisites [code]
 
 - [x] **CAM-04** Scoped grants and short-lived IPC supervision implemented; synthetic cancellation, expiry, output bounds and abrupt parent-loss tests pass (log).
-- [ ] **CAM-06** Add owned temporary image storage, confined deletion and approximately 24-hour startup, activity and timer cleanup.
-  - Storage must work before native acquisition. Delete only camera-generated owned files; no repository photos or scratch scripts. Explain shutdown cleanup delay and provider and session-history limits. Tail eviction deletes immediately; long watches do not exempt burst files from TTL.
-  - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; test expiry, confined deletion, corrupt or missing files and bounded disk/memory.
+- [x] **CAM-06** Bounded owned image storage added with 24-hour startup, activity and timer expiry, immediate eviction and confined deletion (log).
 - [ ] **CAM-08** Implement red CAPTURING and WATCHING warning tied to actual acquisition and confirmed release, with distinct ARMED state.
   - Camera-specific widget uses semantic error coloring and explicit CAMERA CAPTURING and WATCHING text. Research is a layout example, not red coloring; a setStatus string can be stripped or dimmed by the footer and is insufficient. Fail closed before acquisition if UI is missing; owning UI loss cancels work. Keep warning during warm-up and failed release. Live rendering qualification is CAM-14.
   - Targeted checks: C-CAMERA, C-FOOTER, C-DIALOGS, C-LSP and C-DIFF; cover new and saved grants, denied modes and lost UI.
