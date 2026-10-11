@@ -4,7 +4,16 @@ import { createHash } from 'node:crypto';
 export function createVisionBridge() {
   const images = new Map();
   const answers = new Map();
+  function remember(part) {
+    const id = `img-${createHash('sha256').update(part.mimeType + ':' + part.data).digest('hex').slice(0, 16)}`;
+    images.delete(id);
+    images.set(id, { type: 'image', data: part.data, mimeType: part.mimeType });
+    // ponytail: retain 32 recent images; reread older images if the research session exceeds this cache.
+    while (images.size > 32) images.delete(images.keys().next().value);
+    return id;
+  }
   return {
+    remember,
     clear() { images.clear(); answers.clear(); },
     project(messages, model, nonVisionModels = [], visionModel) {
       if (!model || `${model.provider}/${model.id}` === visionModel || !nonVisionModels.includes(`${model.provider}/${model.id}`)) return undefined;
@@ -15,11 +24,7 @@ export function createVisionBridge() {
         return { ...message, content: message.content.flatMap(part => {
           if (part?.type === 'text') return [{ ...part, text: part.text.replace('\n[Current model does not support images. The image will be omitted from this request.]', '') }];
           if (part?.type !== 'image') return [part];
-          const id = `img-${createHash('sha256').update(part.mimeType + ':' + part.data).digest('hex').slice(0, 16)}`;
-          images.delete(id);
-          images.set(id, { type: 'image', data: part.data, mimeType: part.mimeType });
-          // ponytail: retain 32 recent images; reread older images if the research session exceeds this cache.
-          while (images.size > 32) images.delete(images.keys().next().value);
+          const id = remember(part);
           return [{ type: 'text', text: `[Image ${id}: pixels are unavailable to this model. Use process_image with a specific question to inspect them. The answer is another model's interpretation, not visual verification.]` }];
         }) };
       });

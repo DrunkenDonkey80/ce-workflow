@@ -24,6 +24,7 @@ import workModelsExtension, {
 	summarizeNativeContext,
 	workSubagentToolCall,
 } from "../extensions/work-models.ts";
+import { fitImage, parseSize, pngSize } from "../extensions/work-images.ts";
 
 // Cold cache + large context offers compaction before the next message.
 {
@@ -155,7 +156,9 @@ try {
 	);
 	workModelsExtension(pi);
 	for (const tool of Object.values(tools)) {
-		assert.equal(tool.exposure, tool.name.startsWith("work_") || tool.name.startsWith("camera_") ? "model-only" : undefined);
+		// Image tools stay hidden until a session shows their model is set.
+		const hidden = ["process_image", "generate_image"].includes(tool.name) && "hidden";
+		assert.equal(tool.exposure, tool.name.startsWith("work_") || tool.name.startsWith("camera_") ? "model-only" : hidden || undefined);
 	}
 	assert.equal(tools.research_mode, undefined, "agent cannot toggle research mode");
 	await launchKnowledgeDiscoverer(pi, ctx, [
@@ -1724,6 +1727,69 @@ try {
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "Read fine print" }, undefined, null,
 		{ ...visionCtx, modelRegistry: { find: () => ({ input: ["text", "image"] }), streamSimple: () => ({ result: async () => ({ stopReason: "error", errorMessage: "private-provider-token" }) }) } }), /Vision model failed/);
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, AbortSignal.abort(), null, visionCtx), /cancelled|abort/i);
+	// Image files go to the vision model too, so pixels never enter the main context.
+	const shot = path.join(cwd, "shot.png");
+	writeFileSync(shot, Buffer.from(pixels, "base64"));
+	assert.match((await tools.process_image.execute("call", { path: "shot.png", question: "What is the error?" }, undefined, null, { ...visionCtx, cwd })).content[0].text, /of shot\.png.*Error code 42/s);
+	await assert.rejects(tools.process_image.execute("call", { path: "shot.png", image: imageId, question: "What?" }, undefined, null, visionCtx), /exactly one/);
+	await assert.rejects(tools.process_image.execute("call", { path: "notes.txt", question: "What?" }, undefined, null, visionCtx), /not a supported image/);
+	// generate_image: OpenRouter image models use generateImages; Codex chat models use the Responses image_generation tool.
+	await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "fox.png" }, undefined, null, visionCtx), /Choose an image generation model/);
+	assert.match(tools.generate_image.promptGuidelines[0], /tools\.generate_image.*not models\.generateImages/, "codemode agents are steered off models.generateImages");
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { imageModel: "openrouter/painter" } }));
+	let painted;
+	const paintCtx = { ...visionCtx, cwd, modelRegistry: { findOfType: (type, provider, id) => type === "image" && id === "painter" ? { provider, id } : undefined,
+		generateImages: async (_model, request) => { painted = request; return { stopReason: "stop", output: [{ type: "image", data: pixels, mimeType: "image/png" }, { type: "image", data: pixels, mimeType: "image/png" }] }; } } };
+	const paintedResult = await tools.generate_image.execute("call", { prompt: "fox", path: "art/fox.png", references: ["shot.png"] }, undefined, null, paintCtx);
+	assert.deepEqual(painted.input.map((part) => part.type), ["text", "image"], "references are sent as input images");
+	assert.deepEqual(paintedResult.details.paths, [path.join(cwd, "art", "fox.png"), path.join(cwd, "art", "fox-2.png")]);
+	assert.equal(readFileSync(path.join(cwd, "art", "fox-2.png")).toString("base64"), pixels);
+	const png = (w, h) => { const b = Buffer.alloc(33); b.write("IHDR", 12, "latin1"); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); return b.toString("base64"); };
+	assert.equal(pngSize(png(1254, 1254)), "1254x1254");
+	assert.equal(pngSize(pixels), undefined);
+	// Codex draws ~1.6 MP in the asked aspect ratio; code scales down to the exact size, never up or across ratios.
+	assert.throws(() => parseSize("big"), /WIDTHxHEIGHT/);
+	assert.throws(() => parseSize("0x10"), /WIDTHxHEIGHT/);
+	const resizes = [];
+	const fakeResize = async (_bytes, mimeType, options) => { resizes.push(options); return { data: png(options.maxWidth, options.maxHeight), mimeType }; };
+	const wide = { type: "image", data: png(1448, 1086), mimeType: "image/png" };
+	assert.equal(pngSize((await fitImage(wide, "800x600", fakeResize)).data), "800x600");
+	assert.equal(await fitImage(wide, "1920x1440", fakeResize), wide, "never upscale");
+	assert.equal(await fitImage(wide, "600x600", fakeResize), wide, "never change the aspect ratio");
+	assert.equal(await fitImage(wide, undefined, fakeResize), wide);
+	assert.deepEqual(resizes.map((o) => [o.maxWidth, o.maxHeight]), [[800, 600]]);
+	paintCtx.modelRegistry.generateImages = async () => ({ stopReason: "stop", output: [{ type: "image", data: png(1254, 1254), mimeType: "image/png" }] });
+	assert.match((await tools.generate_image.execute("call", { prompt: "fox", path: "sq.png", size: "1024x1536" }, undefined, null, paintCtx)).content[0].text,
+		/sq\.png \(1254x1254\).*Requested 1024x1536; this is what the model drew.*Regenerating gives the same size/s, "a size miss is reported, not silently regenerated");
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { imageModel: "openai-codex/sol" } }));
+	const token = `x.${Buffer.from(JSON.stringify({ "https://api.openai.com/auth": { chatgpt_account_id: "acct" } })).toString("base64url")}.y`;
+	const codexCtx = { ...visionCtx, cwd, modelRegistry: { findOfType: () => undefined, find: (provider, id) => ({ provider, id, api: "openai-codex-responses" }), getApiKeyForProvider: async () => token } };
+	const realFetch = globalThis.fetch;
+	let sent;
+	globalThis.fetch = async (url, init) => {
+		sent = { url, headers: init.headers, body: JSON.parse(init.body) };
+		const done = (item) => `data: ${JSON.stringify({ type: "response.output_item.done", item })}
+
+`;
+		return new Response(done({ type: "image_generation_call", result: pixels, output_format: "png", revised_prompt: "A fox." }) + done({ type: "message", content: [{ type: "output_text", text: "Here it is." }] }));
+	};
+	try {
+		const drawn = await tools.generate_image.execute("call", { prompt: "fox", path: "sol.png", size: "1536x1024", quality: "high" }, undefined, null, codexCtx);
+		assert.equal(sent.body.input[0].content[0].text, "fox\n\nOutput: 3:2 aspect ratio (1536x1024 pixels), high detail, fine finish.", "size and quality travel in the prompt");
+		assert.equal(sent.url, "https://chatgpt.com/backend-api/codex/responses");
+		assert.equal(sent.headers["chatgpt-account-id"], "acct");
+		assert.deepEqual([sent.body.model, sent.body.tools[0].type, sent.body.tool_choice.type], ["sol", "image_generation", "image_generation"]);
+		assert.match(drawn.content[0].text, /Saved .*sol\.png.*Revised prompt: A fox\..*Model note: Here it is\./s);
+		globalThis.fetch = async () => new Response(`data: ${JSON.stringify({ type: "response.failed", response: { error: { message: "quota" } } })}
+
+`);
+		await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "sol.png" }, undefined, null, codexCtx), /Image generation failed: quota/);
+	} finally { globalThis.fetch = realFetch; }
+	await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "x.png" }, undefined, null,
+		{ ...codexCtx, modelRegistry: { ...codexCtx.modelRegistry, find: (provider, id) => ({ provider, id, api: "openai-codex-responses", baseUrl: "https://evil.example/v1" }) } }), /Refusing to send the ChatGPT login/);
+	await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "x.png" }, undefined, null,
+		{ ...codexCtx, modelRegistry: { ...codexCtx.modelRegistry, find: (provider, id) => ({ provider, id, api: "anthropic-messages" }) } }), /cannot generate images/);
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision", nonVisionModels: ["test/text", "test/vision"] } }));
 	// Research is user-controlled; old auto settings cannot restore agent authority.
 	const manualCtx = { ...fullCtx, getContextUsage: () => ({ tokens: 1 }) };
 	await hooks.session_tree({}, { ...manualCtx, sessionManager: { ...manualCtx.sessionManager, getBranch: () => [] } });
