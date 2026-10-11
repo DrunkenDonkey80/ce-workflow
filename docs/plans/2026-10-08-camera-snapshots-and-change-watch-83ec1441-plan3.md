@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T08:57:01.871Z
+updated: 2026-10-11T09:02:24.913Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -99,11 +99,11 @@ None.
 
 ## Resume context
 
-State: active. CAM-01 and CAM-03 done; CAM-04 WIP: controller, state helper, persistent consent and mock ownership tests passed (log); no acquisition tools registered. D-22 permits provisional implementation; qualification is not waived. Q-13 to Q-18 settled as D-23 to D-28. The Logi C310 HD WebCam is present by metadata-only discovery; no frames acquired.
+State: active, 5/14 done; CAM-04, CAM-06 and CAM-08 verified synthetically and locally committed. CAM-05 WIP: capture service draft selects enumerated native modes, validates bounded geometry, discards one-second warm-up, releases between spaced PNG stills and records project-bound retained-source manifests. Draft is not yet tested or registered; no frames acquired.
 
-Next: finish CAM-04's supervised FFmpeg backend through the controller lease, guard, attachStop and worker handles; pin the existing executable and test cancellation, failure and parent loss with synthetic subprocess fixtures. Confirm closure before releasing ownership. Then CAM-06 storage and CAM-08 warning, before CAM-05 registers capture. Commit locally after each verified step (D-28); never push.
+Next: extend scripts/test-work-camera.mjs for capture request, mode/filter parsing, fake burst/partial/recovery and shared vision stripping; run targeted checks, then register camera_capture and camera_recover via utility wiring. Finish CAM-05 only after its checks pass; then CAM-07, CAM-11, CAM-12 and CAM-13.
 
-Blockers: CAM-02 is [human]: needs R-camera on, the C310 selected in project settings and direct calibration authorization. CAM-14 and CAM-10 also need the warning and capture software; CAM-10 needs R-printer. Crash-left metadata locks fail closed; remove only with all Pi stopped.
+Blockers: D-29 permits targeted camera progress while workflow-ON full verification remains a completion blocker (7 unrelated failures and 300-second timeout); workflow-OFF full verification passed. Camera hardware, live warning and provider/printer qualification remain unverified; R-camera is on, R-printer off. Native selection and direct foreground authorization remain required. No push.
 
 ## Phases
 
@@ -120,7 +120,7 @@ Blockers: CAM-02 is [human]: needs R-camera on, the C310 selected in project set
 
 ### Phase 3 — Stills and continuous detector [code]
 
-- [ ] **CAM-05** Implement bounded single or burst capture, validated interval, crop and resolution and actual-image delivery with durable availability manifests.
+- [wip] **CAM-05** Implement bounded single or burst capture, validated interval, crop and resolution and actual-image delivery with durable availability manifests.
   - Depends on CAM-03, CAM-04, CAM-06 and CAM-08; no native capture opens or saves before consent, storage and active warning work. Use provisional bounded defaults under D-22 until CAM-02 calibration.
   - Prefer enumerated DirectShow alternative identity over ambiguous friendly name or index. Detect required build and device features; missing/changed identity fails closed. Warm up exposure and focus without saving warm-up frames. For ordinary spaced shots, release between captures; document reopening latency and interval semantics and prevent catch-up bursts.
   - Crop and resize before persistence and delivery. Preserve requested full-size and detail and per-frame identity and manifest through native vision, trimming and non-vision routing; explicitly report unavailable or partial historical evidence.
