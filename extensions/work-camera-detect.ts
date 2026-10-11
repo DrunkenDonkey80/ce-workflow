@@ -35,7 +35,7 @@ export function createCameraDetector({ width, height, fps = 10, threshold = 0.08
 				baseline = Buffer.from(raw); lastChange = monotonic;
 				return { type: "change", raw: Buffer.from(raw), receivedAt, maxChange, changedTiles, possibleExposureShift: changedTiles / tiles >= 0.9, ...stats() };
 			}
-			return { type: "sample", receivedAt, maxChange, ...stats() };
+			return { type: "sample", raw: Buffer.from(raw), receivedAt, maxChange, ...stats() };
 		},
 	};
 }

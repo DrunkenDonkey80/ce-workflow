@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:13:33.736Z
+updated: 2026-10-11T09:17:01.580Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -86,6 +86,8 @@ started: 2026-10-08T20:25:28.314Z
 - **D-28 — Local commit after each verified step.** Source: Q-18 Relax. After each verified camera step, commit locally only that step's files with a message naming the step ID; never push. This supersedes only the automatic-commit clause of D-21 and the Non-goals; the no-push rule stays.
 - **D-29 — Continue camera-specific implementation despite unrelated global-check failures.** Source: execution ask_user; selected “Continue camera; keep failures recorded”. Keep unrelated files untouched, use targeted camera checks, and retain the failing workflow-ON full verification as a completion blocker until resolved or explicitly accepted; this is not acceptance of completion or hardware qualification.
 - **D-30 — Provisional still limits (assumed).** Source: D-22 permits reversible engineering defaults before calibration. Ordinary still capture uses one second of discarded warm-up, at most eight returned images, 16 million pixels per image, 4 MiB subprocess output per capture, 1024-pixel default overview edge and a ten-minute maximum declared burst deadline. Intervals are minimum waits after confirmed process closure; reopening and warm-up add latency, with no catch-up burst. FullSize requests the largest enumerated native mode and fails rather than silently reducing it; all limits remain unmeasured until CAM-02.
+- **D-31 — Provisional detection and retention defaults (assumed).** Source: D-22 allows reversible engineering numbers before CAM-02. Continuous acquisition defaults to 320x180 RGB at 10 samples/s, tiles of eight pixels, six-level channel noise floor and 0.08 tile change threshold; three-second stale-sample and 15-second baseline-readiness ceilings. Adaptive retention anchors at first post-readiness change: first two seconds protect up to 20 ordered initial observations; the next stage ends at 60 seconds and saves at least five seconds apart, capped at 12 stage saves; later tail saves are at least a minute apart. Tail retains eight frames, plus one final slot. Whole-watch budgets: 256 lifetime saves and 64 MiB encoded lifetime bytes, 32 MiB resident bytes, with one count and 1 MiB reserved for final evidence. Filling these provisional budgets thins evidence but never disables fast detection. CAM-02 must calibrate observability, noise, CPU, storage and practical stage targets.
+
 
 
 
@@ -127,11 +129,7 @@ Blockers: D-29 permits targeted camera progress while workflow-ON full verificat
 
 ### Phase 4 — Adaptive retention and model wake [code]
 
-- [ ] **CAM-11** Implement elapsed-time adaptive retention, protected initial burst, rolling tail and final slot and whole-watch count and byte limits.
-  - Stages anchor to first qualifying post-readiness activity. Filling a stage cap stops saves, not stage-clock advancement or a fresh unlimited burst. Keep approximate user targets explicit; document provisional stage windows and caps and calibrate in CAM-02.
-  - Detection and quiet tracking stays fast during five-second and minute retention. Keep chronological acquired event frames, replace and delete old tail data, reserve final evidence and report thinning, replacements and drops. Continue detection until quiet or deadline despite full retention slots.
-  - Bound disk files, bytes, buffers and queued payloads. Simulated watches beyond 24 hours honor photo TTL; retain only metadata for previously delivered initial evidence and do not reattach expired pixels.
-  - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; fake-clock stages, caps versus time, tail eviction, quiet reset and long-watch TTL.
+- [x] **CAM-11** Elapsed-time adaptive retention, protected initial burst, rolling tail, reserved final slot and lifetime budgets implemented (log).
 - [ ] **CAM-12** Implement ready-before-operation, one fast-phase batch plus final delivery, native wake and bounded busy-session coalescing.
   - At most two logical adaptive deliveries; no wakes for sparse tail frames. Early quiet or termination coalesces available evidence into one labeled final delivery. Preserve chronological frame IDs; never reattach already delivered initial frames solely because the burst remains protected.
   - Return model idle without busy polling. Use supported Pi message and lifecycle APIs, not legacy work items, goals or background verifiers. Bind jobs and callbacks to owning session and lifecycle generation; deliberately aborted or switched conversations must not restart through stale callbacks.
