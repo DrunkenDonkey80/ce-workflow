@@ -40,11 +40,14 @@ export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-cam
 		if (existsSync(image) && !lstatSync(image).isFile()) throw new Error("Camera image is redirected or not a regular file.");
 		rmSync(image, { force: true }); rmSync(file(frame.id, "json"), { force: true });
 	}
-	function locked<T>(cwd: string, action: () => T): T {
+	function locked<T>(cwd: string, action: () => T, skipIfBusy = false): T | undefined {
 		outside(cwd); mkdirSync(root, { recursive: true, mode: 0o700 }); outside(cwd);
 		const lock = join(root, "images.lock");
 		let fd: number;
-		try { fd = openSync(lock, "wx", 0o600); } catch { throw new Error("Camera image storage is busy or crash-locked; acquisition refused."); }
+		try { fd = openSync(lock, "wx", 0o600); } catch {
+			if (skipIfBusy) return; // background sweep: another Pi session holds the lock; the next sweep retries
+			throw new Error("Camera image storage is busy or crash-locked; acquisition refused.");
+		}
 		try { return action(); } finally { closeSync(fd); rmSync(lock); }
 	}
 	function sweep() {
@@ -59,7 +62,7 @@ export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-cam
 	}
 	const store = {
 		prepare(cwd: string) { locked(cwd, sweep); },
-		cleanup(cwd: string) { outside(cwd); if (existsSync(root)) locked(cwd, sweep); },
+		cleanup(cwd: string) { outside(cwd); if (existsSync(root)) locked(cwd, sweep, true); },
 		start(cwd: string, onError: (error: unknown) => void) {
 			store.cleanup(cwd);
 			if (!timer && existsSync(root)) { timer = setInterval(() => { try { store.cleanup(cwd); } catch (error) { onError(error); } }, 60000); timer.unref(); }

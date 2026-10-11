@@ -281,6 +281,10 @@ imageTime = firstFrame.expiresAt;
 images.cleanup(projectDir);
 assert.equal(images.read(projectDir, firstFrame.id), undefined);
 assert.equal(existsSync(join(imageDirectory, "personal.jpg")), true);
+writeFileSync(join(imageDirectory, "images.lock"), ""); // another Pi session mid-sweep
+images.cleanup(projectDir);
+assert.throws(() => images.save(projectDir, Buffer.from("x"), "jpg"), /busy/, "acquisition still fails closed on a held lock");
+rmSync(join(imageDirectory, "images.lock"));
 assert.throws(() => images.drop(projectDir, "../personal"), /identity/);
 const corrupt = images.save(projectDir, Buffer.from("test"), "jpg");
 writeFileSync(join(imageDirectory, `camera-${corrupt.id}.json`), "broken");
