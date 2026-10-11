@@ -26,7 +26,7 @@ type Owner = {
 	endBackend?(): Promise<void>;
 };
 // Internal argument-vector API only; tool arguments never choose an executable or arbitrary arguments.
-export async function runCameraProcess(owner: Owner, command: string, args: string[], { durationMs, maxBytes, keepLease = false, allowNonzero = false }: { durationMs: number; maxBytes: number; keepLease?: boolean; allowNonzero?: boolean }) {
+export async function runCameraProcess(owner: Owner, command: string, args: string[], { durationMs, maxBytes, keepLease = false, allowNonzero = false, onData }: { durationMs: number; maxBytes: number; keepLease?: boolean; allowNonzero?: boolean; onData?: (data: Buffer, receivedAt: number) => void }) {
 	if (!isAbsolute(command) || !Array.isArray(args) || !args.every(arg => typeof arg === "string" && !arg.includes("\0")) ||
 		!Number.isSafeInteger(durationMs) || durationMs <= 0 || durationMs > 172800000 ||
 		!Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > 64 * 1024 * 1024) throw new Error("Invalid bounded camera subprocess request.");
@@ -82,7 +82,7 @@ export async function runCameraProcess(owner: Owner, command: string, args: stri
 				await owner.begin();
 				const remaining = Math.floor(durationMs - (performance.now() - startedAt));
 				if (remaining <= 0 || owner.signal.aborted) throw new Error("Camera subprocess request expired before start.");
-				send({ type: "start", command, args, durationMs: remaining, maxBytes });
+				send({ type: "start", command, args, durationMs: remaining, maxBytes, streamOutput: Boolean(onData) });
 			})().catch(fault);
 		} else if (message?.type === "started" && Number.isSafeInteger(message.pid) && message.pid > 0) {
 			started = true;
@@ -95,6 +95,12 @@ export async function runCameraProcess(owner: Owner, command: string, args: stri
 		}
 	});
 	for (const [stream, buffers] of [[worker.stdout, stdout], [worker.stderr, stderr]] as const) stream!.on("data", (data: Buffer) => {
+		if (error) return;
+		if (stream === worker.stdout && onData) {
+			if (data.length > maxBytes) return fault(new Error("Camera streaming chunk exceeded its byte limit."));
+			try { onData(data, Date.now()); } catch (failure) { fault(failure instanceof Error ? failure : new Error(String(failure))); }
+			return;
+		}
 		bytes += data.length;
 		if (bytes > maxBytes) return fault(new Error("Camera process output exceeded its byte limit."));
 		if (stream === worker.stdout && !receivedAt) receivedAt = Date.now();

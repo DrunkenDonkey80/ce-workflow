@@ -34,8 +34,9 @@ process.on("message", (message: any) => {
 	child.on("error", error => { report({ type: "fault", message: error.message }); });
 	for (const [source, target] of [[child.stdout, process.stdout], [child.stderr, process.stderr]] as const) {
 		source!.on("data", (data: Buffer) => {
-			bytes += data.length;
-			if (bytes > limit) { report({ type: "fault", message: "Camera process output exceeded its byte limit." }); stop(); return; }
+			if (closing) return;
+			if (!message.streamOutput || source === child?.stderr) bytes += data.length;
+			if (bytes > limit || data.length > limit) { report({ type: "fault", message: "Camera process output exceeded its byte limit." }); stop(); return; }
 			if (!target.write(data)) source!.pause();
 		});
 		target.on("drain", () => source!.resume());

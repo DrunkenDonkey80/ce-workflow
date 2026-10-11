@@ -228,6 +228,10 @@ const output = await runCameraProcess(normal, process.execPath, ["-e", "process.
 assert.equal(output.stdout.toString(), "frame");
 assert.equal(normal.released, true);
 assert.ok(normal.pids.some(([, child]) => child > 0));
+const streamed = supervisorOwner(); let streamedBytes = 0;
+const streamingResult = await runCameraProcess(streamed, process.execPath, ["-e", "process.stdout.write(Buffer.alloc(1024*1024));"], { durationMs: 5000, maxBytes: 128 * 1024, onData(data) { streamedBytes += data.length; } });
+assert.equal(streamedBytes, 1024 * 1024, "bounded chunks drain without retaining the whole stream");
+assert.equal(streamingResult.stdout.length, 0);
 const failure = supervisorOwner();
 await assert.rejects(runCameraProcess(failure, process.execPath, ["-e", "process.exit(7)"], { durationMs: 5000, maxBytes: 1024 }), /failed/);
 assert.equal(failure.released, true);
@@ -356,6 +360,41 @@ const partial = await partialCapture.capture(ctx, { count: 2, intervalMs: 0 });
 assert.equal(partial.outcome, "partial");
 assert.equal(partial.frames.length, 1);
 assert.match(partial.failure, /fixture capture fault/);
+retained.stop();
+const { createCameraDetector, cameraRawFrames, runCameraAcquisition } = await createJiti(import.meta.url).import("../extensions/work-camera-detect.ts");
+const detector = createCameraDetector({ width: 16, height: 16, tileSize: 2, staleMs: 500 });
+const off = Buffer.alloc(16 * 16 * 3), on = Buffer.from(off); on.fill(255, 0, 3);
+assert.equal(detector.frame(off, 1000, 0).type, "ready");
+assert.equal(detector.frame(on, 1050, 50).type, "change", "small LED survives a mostly unchanged frame");
+assert.equal(detector.frame(off, 1100, 100).type, "change");
+assert.equal(detector.frame(on, 1150, 150).type, "change", "on-off-on preserves every qualifying capture");
+assert.equal(detector.stats().sequence, 4);
+assert.throws(() => detector.assertFresh(651), /stalled/);
+const drift = createCameraDetector({ width: 2, height: 2 });
+drift.frame(Buffer.alloc(12), 1000, 0);
+assert.equal(drift.frame(Buffer.alloc(12, 3), 1010, 10).type, "sample", "sensor noise does not qualify");
+assert.equal(drift.frame(Buffer.alloc(12, 20), 1020, 20).type, "sample");
+const exposure = drift.frame(Buffer.alloc(12, 40), 1030, 30);
+assert.equal(exposure.type, "change", "gradual change accumulates against last qualifying baseline");
+assert.equal(exposure.possibleExposureShift, true, "global exposure changes are flagged, not silently suppressed");
+const ordered = [];
+const assembly = cameraRawFrames(2, 2, (frame, timestamp) => ordered.push([Buffer.from(frame), timestamp]));
+assembly.push(Buffer.alloc(5, 1), 1);
+assembly.push(Buffer.concat([Buffer.alloc(7, 1), Buffer.alloc(12, 2)]), 2);
+assert.deepEqual(ordered.map(([frame]) => frame[0]), [1, 2]);
+assembly.finish();
+assembly.push(Buffer.alloc(1), 3);
+assert.throws(() => assembly.finish(), /partial frame/);
+const acquisitionSamples = [];
+await runCameraAcquisition(ctx, fakeController, { width: 1, height: 1, deadlineMs: 2000, summary: "full field of view detector fixture" }, { owner() {}, sample(sample) { acquisitionSamples.push(sample); } }, undefined, {
+	async resolveFFmpeg() { return process.execPath; }, async devices() { return [printer]; },
+	async run(_owner, _exe, args, options) {
+		if (args.includes("-list_options")) return { stderr: "pixel_format=rgb24 min s=1x1 fps=30 max s=1x1 fps=30" };
+		assert.ok(args.includes("rawvideo")); assert.ok(!args.includes("-frames:v"));
+		options.onData(Buffer.alloc(3), 1000); options.onData(Buffer.alloc(3, 255), 1100); options.onData(Buffer.alloc(3), 1200);
+	},
+});
+assert.deepEqual(acquisitionSamples.map(sample => sample.type), ["ready", "change", "change"]);
 retained.stop();
 console.log("ok - camera metadata, project opt-in, persistent local consent, stale-dialog fences and owned cancellation/release (no hardware)");
 } finally {

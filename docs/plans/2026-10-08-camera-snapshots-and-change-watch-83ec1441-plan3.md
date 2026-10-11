@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:06:49.214Z
+updated: 2026-10-11T09:13:33.736Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -123,11 +123,7 @@ Blockers: D-29 permits targeted camera progress while workflow-ON full verificat
 ### Phase 3 — Stills and continuous detector [code]
 
 - [x] **CAM-05** Bounded still/burst and retained-frame recovery tools registered with native mode selection, pre-save crop/scale and durable manifests (log).
-- [ ] **CAM-07** Implement bounded continuous acquisition and fast regional change detection with readiness, actual-frame identity and noise handling.
-  - Continuously open authorized acquisition is needed for brief transactions; reopening for each flash is insufficient. Readiness follows warm-up and baseline, before the caller operates the device. Separate acquisition and detection from CAM-11 retention and CAM-12 delivery; no model calls here.
-  - Compare region or tiles rather than assuming a whole-frame scene threshold finds small LEDs. Use bounded buffers or pre-event queue if needed. Keep original triggering frames, capture order and on, off, then on returns; global deduplication must not erase events. Routine samples are discarded.
-  - Provisional sampling, exposure and backpressure limits require CAM-02 measurement; disclose drops and minimum observable state duration. A sub-two-second transaction does not prove every state is observable. Fresh fast samples reset quiet tracking even through minute-spaced saves; stalls are faults, not stability. Noise and debounce must not suppress intended brief states.
-  - Targeted checks: C-CAMERA, C-STATE, C-LSP and C-DIFF; timestamped fast-state, noise, exposure, stall and gradual-change fixtures.
+- [x] **CAM-07** Bounded continuous raw-frame acquisition and regional detector implemented, preserving actual ordered trigger frames and baseline readiness (log).
 
 ### Phase 4 — Adaptive retention and model wake [code]
 
