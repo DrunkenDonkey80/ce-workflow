@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T09:17:01.580Z
+updated: 2026-10-11T09:19:08.494Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -103,11 +103,11 @@ None.
 
 ## Resume context
 
-State: active, 5/14 done; CAM-04, CAM-06 and CAM-08 verified synthetically and locally committed. CAM-05 WIP: capture service draft selects enumerated native modes, validates bounded geometry, discards one-second warm-up, releases between spaced PNG stills and records project-bound retained-source manifests. Draft is not yet tested or registered; no frames acquired.
+State: active, 8/14 complete. CAM-05 capture/recovery tools, CAM-07 bounded continuous RGB acquisition/detection, and CAM-11 adaptive retention are synthetically verified and locally committed (4c7f981, e96ba25, 8118839). No camera frames acquired. No watch tool or model wake is registered yet.
 
-Next: extend scripts/test-work-camera.mjs for capture request, mode/filter parsing, fake burst/partial/recovery and shared vision stripping; run targeted checks, then register camera_capture and camera_recover via utility wiring. Finish CAM-05 only after its checks pass; then CAM-07, CAM-11, CAM-12 and CAM-13.
+Next: implement CAM-12 native watch readiness and lifecycle-bound early/final message delivery. Docs extensions.md and sdk.md read completely; follow related message-types.md/session-format.md and the installed ExtensionAPI declarations before implementing. Use supported native message/event APIs, one busy pending logical delivery coalescing early+final, no model polling, no work items/goals/background verifiers. Then complete CAM-09 registration review, CAM-13 selfchecks/docs and CAM-14 integration. Hardware CAM-02/CAM-10 remain unverified; R-camera is on, R-printer off.
 
-Blockers: D-29 permits targeted camera progress while workflow-ON full verification remains a completion blocker (7 unrelated failures and 300-second timeout); workflow-OFF full verification passed. Camera hardware, live warning and provider/printer qualification remain unverified; R-camera is on, R-printer off. Native selection and direct foreground authorization remain required. No push.
+Checks: camera and camera-state scripts plus git diff --check passed after CAM-11; settings and installed-native-package smoke passed after CAM-05. Active LSP: host SDK declarations unavailable; worker semgrep trusted parent IPC advisory and lint hints remain, with one process-check result unconfirmed. Full workflow-ON verification still blocked by the recorded seven unrelated failures/timeout; D-29 permits targeted progress, not completion. Preserve unrelated Plan3 edits and generated sidecars. Local commits only; never push.
 
 ## Phases
 
