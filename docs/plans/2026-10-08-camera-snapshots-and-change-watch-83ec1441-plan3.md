@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:06:57.665Z
+updated: 2026-10-11T10:15:48.956Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -159,6 +159,8 @@ needs: R-camera, human
   - check: camera_capture fullSize; crop {280,180,560,340}; count 3 interval 2000 320x180; camera_watch settled quietMs 3000 deadline 60000: all succeeded on @device_pnp_...vid_046d&pid_081b...\global.
   - note: Same-port unplug/reconnect: DirectShow alternative name unchanged (7&16e5c5aa&0&0000); capture on the saved identity succeeded after reconnect. Windows re-enumeration window observed: immediately after reconnect, dshow and PnP listed no C310 for several seconds. The absent-device refusal was not exercised live (device returned before the capture). Different-port identity, Pi restart identity, shortest detectable state and sustained load still pending.
   - check: ffmpeg -list_devices dshow before/after replug; PnP VID_046D query (only C548 receiver during window); camera_capture 320x180 succeeded on unchanged identity.
+  - note: Different-port reconnect: C310 composite exposes a fixed USB serial (USB\VID_046D&PID_081B\LOGI_C310_HD_WEBCAM), so the interface ID and DirectShow alternative name stay unchanged (7&16e5c5aa&0&0000) across ports. Saved selection continued working on the new port. Risk: two identical C310 units share that serial string; Windows may then derive port-based IDs, so duplicate-unit identity is unverified. Re-enumeration took >20s after the port change. Live absent-device refusal verified: while unenumerated, camera_capture returned "No accessible DirectShow video camera found ... no fallback camera was selected."
+  - check: ffmpeg dshow list empty twice (incl. after 15s); camera_capture refused with no fallback; PnP showed same instance IDs; dshow list then same alternative name; camera_capture 320x180 succeeded.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
