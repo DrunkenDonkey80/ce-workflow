@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-08
-updated: 2026-10-11T10:33:38.349Z
+updated: 2026-10-11T10:36:05.796Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -103,11 +103,9 @@ None.
 
 ## Resume context
 
-State: active, 10/14 done. CAM-12 native ready/early/final wake and CAM-13 single settled capture are implemented, tested and locally committed (2a1a337, 1a4869c). Four camera tools registered. No hardware opened; no push.
-
-No remaining runnable camera implementation. CAM-09 software integration is implemented and targeted checks pass, but required full workflow-ON gate fails in three unrelated suites: design-docs (old README heading), private-workflows (old extension inventory), wo-control (old commands). D-29 says preserve unrelated work; owner resolution or explicit acceptance is required. Full workflow-OFF verify passed; final ON run completed without timeout. Camera-caused exposure/count expectations were fixed and pass. Latest camera/state/settings/compaction and diff checks pass; LSP has missing SDK declarations, inconclusive and oversized coverage.
-
-Next external actions: select/enable Logi C310 in native project Camera settings and directly authorize finite local-TUI calibration for CAM-02 and warning trials CAM-14; connect/position representative printer (R-printer off) for CAM-10. R-camera availability is not permission. Recheck the global gate after owner resolves/accepts the three failures. Keep hardware, sustained-load and live-provider qualification incomplete. Preserve unrelated Plan3/footer edits and generated sidecars; local commits only.
+CAM-02 [human], incomplete: user chose full Pi process restart check now. Next: after user quits/reopens Pi in C:\SOFT\git\ce-workflow and replies restarted, make one bounded camera_capture (320x180) through native consent/warning to check persisted exact C310 selection. Keep camera plugged into current port. /reload is NOT full restart. No active watch: 7d85af50 ended quiet at seq315, one estimated local receipt gap, 11 images/750195 bytes, 17 thinned. Hand passes detected but physical duration/lag unmeasured; timed light source needed. Do not mark CAM-02 complete from single retained samples.
+10/14 done. Live native still 1280x720, crop and burst worked, same/different-port identity stable in tested setup, absent-camera refusal verified. Chart-only watch ran ~7 min/4224 samples with no estimated receipt gaps before marginal one-tile change ended it; not 10-min or sensor-drop verification. Exposure hypothesis unconfirmed; location reporting revealed actual edge movement. Code commits 9bf6897/cc355b5 add bounded stability readiness/change location; synthetic checks and live outputs tested, full verification not rerun afterward.
+CAM-09 blocked by D-29 three unrelated workflow-ON failures (design-docs/private-workflows/wo-control); CAM-14 live-warning/theme qualification pending; CAM-10 representative printer trials pending (R-printer off). Preserve unrelated Plan3 edits and generated sidecars. Local commits only; never push.
 
 ## Phases
 
@@ -149,9 +147,11 @@ Next external actions: select/enable Logi C310 in native project Camera settings
 
 needs: R-camera, human
 
-- [wip] **CAM-02** Calibrate the Logi C310 on hardware. Measured so far: 1280x720 native; crop reads 15 mil text (10 mil marginal); bursts add ~2.3 s reopen per shot; identity stable across same/different-port replug; absent camera refused without fallback; ~7 min at 10 fps with 0 local receipt gaps; readiness waits for a stable picture (10 s cap reports unsettled). Still unmeasured: physical blink duration/lag limit, full Pi process restart identity.
+- [human] **CAM-02** Calibrate the Logi C310 on hardware. Measured so far: 1280x720 native; crop reads 15 mil text (10 mil marginal); bursts add ~2.3 s reopen per shot; identity stable across same/different-port replug; absent camera refused without fallback; ~7 min at 10 fps with 0 local receipt gaps; readiness waits for a stable picture (10 s cap reports unsettled). Still unmeasured: physical blink duration/lag limit, full Pi process restart identity.
   - note: Correction to premature completion: hand passes are visible in isolated retained frames 225, 228 and 243, but their physical durations were not measured. One sampled frame does NOT establish a 100 ms minimum detectable state, especially with retention thinning, exposure and driver buffering. This trial began with baselineSettled:false and its final result is still pending. delayedSamples:0 only measures local receipt gaps, not sensor drops. Full Pi process restart, measured blink duration/lag and other outstanding CAM-02 qualification remain unverified; do not claim complete or recommend threshold 0.1 as calibrated from these trials.
   - check: Watch 7d85af50 initial delivery: sequence 244, 10 retained frames, thinned 1, delayedSamples 0; visible hand passes, actual pulse duration unknown. Await final native delivery without polling.
+  - note: Blink watch 7d85af50 final: quiet at seq 315 after 3.07 s; 11 saved (750 KB), 17 thinned; delayedSamples 1 (first local receipt gap observed); last change single marginal tile (0.0806, x176 y24 8x8). Remaining human-only: timed light source (known on-duration) for blink/lag limit, and full Pi process quit+restart identity check.
+  - check: Final native delivery received; no polling.
 - [blocked] **CAM-14** Qualify live red camera warning, settings and consent UI and research and footer coexistence under the active theme.
   - Prerequisite: eligible local TUI with selected camera and direct human authorization for actual-use and release trials.
   - Verify CAPTURING and WATCHING is conspicuously red during warm-up and use and until confirmed release, including failed release; ARMED is distinct. Check purpose, device, request and expiry summaries, options, revocation, research and widgets and unsupported-mode denial. Loss of owning UI stops acquisition while cleanup and release remain available.
