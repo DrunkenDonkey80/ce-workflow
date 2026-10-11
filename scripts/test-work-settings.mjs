@@ -1970,7 +1970,7 @@ try {
 	assert(["Plan models", "Planning model", "Coding model", "Coding effort"].every(name => offSettings.some(label => label.includes(`Plan3 → ${name}`))) && offSettings.some(label => label.includes("OpenDesign executable:")) &&
 		!offSettings.some(label => /Model Advisor|Profile:|Model strategy:|Background verifiers|autonomous-goal|Visual design workflow|Design review proof|pre-commit review/.test(label)),
 		"workflow off settings keep Plan3/OpenDesign launch and hide inactive role/gate/design controls");
-	assert(!offSettings.some(label => label.includes("Camera (project only)")), "camera controls are never a global setting");
+	assert(offSettings.some(label => label.includes("Camera (project only)")), "global settings list the project-only camera row");
 	const beforeGlobalCamera = readGlobalSettings();
 	writeGlobalSettings({ ...beforeGlobalCamera, workOrchestrator: { ...beforeGlobalCamera.workOrchestrator,
 		camera: { enabled: true, device: { id: "@device_pnp_global", label: "Global camera" } },
@@ -1978,7 +1978,6 @@ try {
 	writeSettings({});
 	let projectCameraRender = "";
 	await off.commands.wo.handler("settings", { ...ctx, mode: "tui", hasUI: true, ui: customUi([
-		{ key: "\t" },
 		{ target: "Camera (project only)", key: "enter", capture: lines => { projectCameraRender = lines.join("\n"); } },
 		{ expectText: "Camera: Project only", key: "escape" },
 		{ expectInitial: "Camera (project only)", key: "escape" },

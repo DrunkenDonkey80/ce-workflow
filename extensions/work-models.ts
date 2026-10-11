@@ -33075,14 +33075,15 @@ async function workSettingsLoop(ctx) {
 				label: "Import settings",
 				description: `Replace the ${scope} JSON file from a path or pasted JSON; back up the current file first`,
 			},
-			...(scope === "project" ? [{
+			// Listed in both scopes but always edits project settings; [local] marks it project-only.
+			{
 				kind: "camera", value: "camera",
 				label: `Camera (project only): ${camera.enabled ? "ON" : "OFF"} · ${camera.device?.label ?? "None"} ${SUBMENU_ARROW}`,
 				description: "Local TUI only · explicit device/permission · stills, never recorded video",
-			}] : []),
+			},
 		].filter((item) => workflowEnabled(ctx.cwd) || UTILITY_SETTING_KINDS.has(item.kind));
 		for (const item of items)
-			item.local = hasProjectOverride(projectSettings, item);
+			item.local = item.kind === "camera" || hasProjectOverride(projectSettings, item);
 		const selected = await chooseWorkSetting(ctx, items, selectedIndex, scope);
 		if (!selected) return;
 		selectedIndex = selected.index;
