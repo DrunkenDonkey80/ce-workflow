@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import {
 	mkdir,
 	open,
@@ -601,6 +601,7 @@ function provider({
 		unavailableMs,
 		resolveAuth: (ctx) => ctx.modelRegistry?.getProviderAuth?.(piProviderId),
 		identity: authIdentity,
+		local: preferred,
 		async fetchQuota(auth, options) {
 			const reused = await preferred?.(options);
 			if (reused) return reused;
@@ -640,13 +641,6 @@ export const PRODUCTION_PROVIDERS = Object.freeze([
 			preferred: claudePoolQuota,
 			unavailableMs: CLAUDE_UNAVAILABLE_MS,
 		}),
-		// The pool rotates opaque (non-JWT) tokens, so a token-derived identity changes
-		// with every refresh or switch and each session keys the shared cache
-		// differently: followers then show "unavailable". Pool data is pool-wide.
-		identity: (auth) =>
-			existsSync(join(DEFAULT_AGENT_DIR, "claude-pool.json"))
-				? "claude-pool"
-				: authIdentity(auth),
 		get pollMs() {
 			return poolServed ? POLL_MS : CLAUDE_POLL_MS;
 		},
@@ -1163,8 +1157,23 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				state.lastSuccessAt = cached.fetchedAt;
 			} catch { /* Missing or corrupt cached quota: fetch fresh. */ }
 		}
+		if (!allowNetwork) {
+			// A local source (the Claude pool's files) costs no request, so every
+			// session reads it itself instead of depending on the polling owner's
+			// cache, which an owner on other code or another identity never fills.
+			let local;
+			try {
+				local = complete(await entry.local?.({ now, agentDir }));
+			} catch { /* No usable local data: keep the owner's cache. */ }
+			if (local && gen === generation) {
+				state.snapshot = { providerId: entry.id, identityKey, fetchedAt: now(), windows: local };
+				state.lastSuccessAt = state.snapshot.fetchedAt;
+				state.failure = undefined;
+			}
+			if (render) requestRender();
+			return;
+		}
 		if (render) requestRender();
-		if (!allowNetwork) return;
 		const pollMs = entry.pollMs ?? POLL_MS;
 		const age =
 			state.lastSuccessAt === undefined

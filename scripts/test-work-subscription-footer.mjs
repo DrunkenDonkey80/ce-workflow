@@ -1380,6 +1380,42 @@ firstProcess.controller.shutdown(firstProcess.ctx);
 secondProcess.controller.shutdown(secondProcess.ctx);
 await rm(sharedAgentDir, { recursive: true, force: true });
 
+// A follower reads a local source (the Claude pool files) itself: an owner that
+// never fills the shared cache (other code, other identity) cannot blank it.
+const localDir = await mkdtemp(join(tmpdir(), "ce-footer-local-"));
+let localPolls = 0;
+const localProvider = {
+	id: "local",
+	label: "Local",
+	piProviderId: "local",
+	identity: () => `id-${localPolls}`,
+	local: () => [{ id: "q", label: "q", usedPercent: 42, resetsAt: reset }],
+	fetchQuota: () => {
+		localPolls++;
+		return new Promise(() => {});
+	},
+};
+const localClock = new Clock();
+const localProcesses = [0, 1].map(() =>
+	harness({
+		providers: [localProvider],
+		auth: () => stored("safe"),
+		fetchImpl: async () => {},
+		clock: localClock,
+		fsImpl: null,
+		agentDir: localDir,
+	}),
+);
+for (const p of localProcesses) p.controller.start(p.ctx);
+await waitFor(
+	() =>
+		localPolls === 1 &&
+		localProcesses.some(({ controller }) => controller.states.get("local").snapshot?.windows[0].usedPercent === 42),
+	"the follower should render the local source while the owner's fetch is pending",
+);
+for (const p of localProcesses) p.controller.shutdown(p.ctx);
+await rm(localDir, { recursive: true, force: true });
+
 // A partial lock left by a crashed owner self-heals after the lock grace period.
 const staleLockDir = await mkdtemp(join(tmpdir(), "ce-footer-stale-lock-"));
 const staleLockPath = join(staleLockDir, "subscription-footer-poll.lock");
