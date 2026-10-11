@@ -14,6 +14,7 @@ assert.equal(screenReadPlan({ target: "window", window: { title: "x" }, maxEdge:
 for (const region of [[0, 0, 1], [-1, 0, 1, 1], [0, 0, 0, 1], [0.5, 0, 1, 1]]) assert.throws(() => screenReadPlan({ target: "window", region }, file), /region/);
 assert.deepEqual(screenReadPlan({ target: "browser", browser: { url: "http://x", selector: "#a", full: true, session: "s" } }, file).runs, [["--session", "s", "open", "http://x"], ["--session", "s", "screenshot", "#a", "C:/tmp/x-raw.png", "--full"]]);
 assert.deepEqual(screenReadPlan({ target: "android", android: { device: "emu" } }, file).runs, [["screen", "capture", "--device=emu", "--output=C:/tmp/x-raw.png"]]);
+assert.deepEqual(screenReadPlan({ target: "android", android: { device: "emu" } }, file).alt, { exe: "adb", runs: [["-s", "emu", "exec-out", "screencap", "-p"]] });
 assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
 
 // Non-Windows path: pure Node PNG decode (all five filters, RGB and RGBA), crop and downscale.
@@ -59,6 +60,10 @@ assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
 		await assert.rejects(readFile(raw2), /ENOENT/, "raw screenshot cleaned up");
 		await assert.rejects(captureFile({ exe: process.execPath, runs: [["-e", "console.error('boom'); process.exit(3)"]], raw: raw2, file: out, maxEdge: 64 }), /failed:.*boom/);
 		await assert.rejects(captureFile({ exe: "no-such-screen-cli", runs: [["x"]], raw: raw2, file: out, maxEdge: 64 }), /ENOENT/);
+		// missing primary CLI: alt runs and its stdout becomes the screenshot (adb exec-out screencap -p)
+		const viaAlt = await captureFile({ exe: "no-such-screen-cli", runs: [["x"]], raw: raw2, file: out, maxEdge: 64, alt: { exe: process.execPath, runs: [["-e", `process.stdout.write(require('fs').readFileSync(${JSON.stringify(src)}))`]] } });
+		assert.deepEqual([viaAlt.width, viaAlt.sourceWidth], [4, 4]);
+		await assert.rejects(captureFile({ exe: "no-such-screen-cli", runs: [["x"]], raw: raw2, file: out, maxEdge: 64, alt: { exe: process.execPath, runs: [["-e", "console.error('no device'); process.exit(1)"]] } }), /failed:.*no device/);
 	} finally { await rm(dir, { recursive: true, force: true }); }
 }
 
@@ -94,6 +99,20 @@ if (process.platform === "win32") {
 		assert.match(result.content[0].text, /source/);
 	} finally {
 		child.kill();
+	}
+	// Live, only when an emulator/device is attached: android CLI, then the adb fallback with android hidden from PATH.
+	const adb = await exec("adb", ["devices"], { timeout: 15_000 }).catch(() => ({}));
+	if (/\tdevice\b/.test(adb.stdout ?? "")) {
+		const cli = await screenRead(exec, { target: "android", maxEdge: 128 });
+		assert.equal(cli.uniform, false);
+		const saved = process.env.PATH;
+		process.env.PATH = saved.split(";").filter(p => !/AndroidCLI/i.test(p)).join(";");
+		try {
+			const viaAdb = await screenRead(exec, { target: "android", maxEdge: 128 });
+			assert.deepEqual([viaAdb.sourceWidth, viaAdb.sourceHeight], [cli.sourceWidth, cli.sourceHeight], "adb fallback captures the same screen");
+			const linux = await screenRead(null, { target: "android", maxEdge: 128 }, undefined, undefined, "linux");
+			assert.deepEqual([linux.sourceWidth, linux.sourceHeight], [cli.sourceWidth, cli.sourceHeight], "Node path adb fallback");
+		} finally { process.env.PATH = saved; }
 	}
 }
 console.log("ok - screen_read");

@@ -121,15 +121,19 @@ if($p.op -eq 'window') {
  if($p.list -or $m.Count -ne 1) { ConvertTo-Json -InputObject @{matches=$m} -Compress -Depth 3 }
  else { ConvertTo-Json -InputObject @{window=$m[0]; shot=[ScreenRead]::Capture($m[0].handle,[int[]]$p.region,[int]$p.maxEdge,[bool]$p.minimize,$p.file)} -Compress -Depth 3 }
 } else {
- $exe=(Get-Command $p.exe -CommandType Application -ErrorAction Stop)[0].Source
+ $name=$p.exe; $runs=$p.runs; $toRaw=$false
+ $cmd=@(Get-Command $name -CommandType Application -ErrorAction SilentlyContinue)
+ if(-not $cmd -and $p.alt) { $name=$p.alt.exe; $runs=$p.alt.runs; $toRaw=$true; $cmd=@(Get-Command $name -CommandType Application -ErrorAction SilentlyContinue) }
+ if(-not $cmd) { throw "$name not found on PATH" }
+ $exe=$cmd[0].Source
  $i=0
- foreach($a in $p.runs) {
+ foreach($a in $runs) {
   # Output goes to files: a daemon spawned by the tool (agent-browser, adb) inherits pipes and would block reading them to EOF.
   $log="$($p.raw).$i"; $i++
   $q=@($a | ForEach-Object { if($_ -match '[\s&|<>^()]') { '"'+$_+'"' } else { $_ } })
-  $pr=Start-Process -FilePath $exe -ArgumentList $q -NoNewWindow -PassThru -RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err"
-  $null=$pr.Handle; if(-not $pr.WaitForExit(90000)) { throw "$($p.exe) $($a -join ' ') timed out" }
-  if($pr.ExitCode) { throw "$($p.exe) $($a -join ' ') failed: $(Get-Content -Raw -Encoding UTF8 "$log.out") $(Get-Content -Raw -Encoding UTF8 "$log.err")" }
+  $pr=Start-Process -FilePath $exe -ArgumentList $q -NoNewWindow -PassThru -RedirectStandardOutput $(if($toRaw){$p.raw}else{"$log.out"}) -RedirectStandardError "$log.err"
+  $null=$pr.Handle; if(-not $pr.WaitForExit(90000)) { throw "$name $($a -join ' ') timed out" }
+  if($pr.ExitCode) { throw "$name $($a -join ' ') failed: $(Get-Content -Raw -Encoding UTF8 "$log.out" -ErrorAction SilentlyContinue) $(Get-Content -Raw -Encoding UTF8 "$log.err" -ErrorAction SilentlyContinue)" }
  }
  $shot=[ScreenRead]::ProcessFile($p.raw,[int[]]$p.region,[int]$p.maxEdge,$p.file)
  Remove-Item "$($p.raw)*" -ErrorAction SilentlyContinue # logs a running daemon still holds stay behind
@@ -153,7 +157,11 @@ export function screenReadPlan(args: ScreenReadArgs, file: string) {
 		const runs = [...(b.url ? [[...session, "open", b.url]] : []), [...session, "screenshot", ...(b.selector ? [b.selector] : []), raw, ...(b.full ? ["--full"] : [])]];
 		return { ...base, op: "file", exe: "agent-browser", runs, raw };
 	}
-	if (args.target === "android") return { ...base, op: "file", exe: "android", runs: [["screen", "capture", ...(args.android?.device ? [`--device=${args.android.device}`] : []), `--output=${raw}`]], raw };
+	if (args.target === "android") {
+		const device = args.android?.device;
+		// alt: plain adb when the android CLI is not installed; screencap writes the PNG to stdout, which goes to raw
+		return { ...base, op: "file", exe: "android", runs: [["screen", "capture", ...(device ? [`--device=${device}`] : []), `--output=${raw}`]], raw, alt: { exe: "adb", runs: [[...(device ? ["-s", device] : []), "exec-out", "screencap", "-p"]] } };
+	}
 	throw new Error("target must be window, browser or android.");
 }
 
@@ -227,26 +235,36 @@ export function processPng(input: Buffer, region: number[] | undefined, maxEdge:
 }
 
 // Non-Windows path for browser/android: run the CLI, then crop/scale in Node.
-export async function captureFile(plan: { exe: string; runs: string[][]; raw: string; file: string; region?: number[]; maxEdge: number }, signal?: AbortSignal) {
+type FilePlan = { exe: string; runs: string[][]; raw: string; file: string; region?: number[]; maxEdge: number; alt?: { exe: string; runs: string[][] } };
+async function runAll(exe: string, runs: string[][], raw: string, toRaw: boolean, signal?: AbortSignal) {
+	for (const [i, args] of runs.entries()) {
+		// Output goes to files: a daemon spawned by the tool (agent-browser, adb) inherits pipes and would block reading them to EOF.
+		const log = `${raw}.${i}`, out = await open(toRaw ? raw : `${log}.out`, "w"), err = await open(`${log}.err`, "w");
+		try {
+			const code = await new Promise<number | null>((resolve, reject) => {
+				const child = spawn(exe, args, { stdio: ["ignore", out.fd, err.fd], signal, timeout: 90_000 });
+				child.on("error", reject);
+				child.on("exit", resolve);
+			});
+			const text = async (f: string) => toRaw && f === raw ? "" : readFile(f, "utf8").catch(() => "");
+			if (code !== 0) throw new Error(`${exe} ${args.join(" ")} ${code === null ? "timed out or was stopped" : "failed"}: ${await text(`${log}.out`)} ${await text(`${log}.err`)}`.trim().slice(-1500));
+		} finally { await out.close(); await err.close(); }
+	}
+}
+
+export async function captureFile(plan: FilePlan, signal?: AbortSignal) {
 	try {
-		for (const [i, args] of plan.runs.entries()) {
-			// Output goes to files: a daemon spawned by the tool (agent-browser, adb) inherits pipes and would block reading them to EOF.
-			const log = `${plan.raw}.${i}`, out = await open(`${log}.out`, "w"), err = await open(`${log}.err`, "w");
-			try {
-				const code = await new Promise<number | null>((resolve, reject) => {
-					const child = spawn(plan.exe, args, { stdio: ["ignore", out.fd, err.fd], signal, timeout: 90_000 });
-					child.on("error", reject);
-					child.on("exit", resolve);
-				});
-				if (code !== 0) throw new Error(`${plan.exe} ${args.join(" ")} ${code === null ? "timed out or was stopped" : "failed"}: ${await readFile(`${log}.out`, "utf8")} ${await readFile(`${log}.err`, "utf8")}`.trim().slice(-1500));
-			} finally { await out.close(); await err.close(); }
+		try { await runAll(plan.exe, plan.runs, plan.raw, false, signal); }
+		catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "ENOENT" || !plan.alt) throw error;
+			await runAll(plan.alt.exe, plan.alt.runs, plan.raw, true, signal);
 		}
 		const { png, ...shot } = processPng(await readFile(plan.raw), plan.region, plan.maxEdge);
 		await writeFile(plan.file, png);
 		return shot;
 	} finally {
 		await rm(plan.raw, { force: true });
-		for (const [i] of plan.runs.entries()) for (const end of ["out", "err"]) await rm(`${plan.raw}.${i}.${end}`, { force: true }).catch(() => {});
+		for (const [i] of [...plan.runs, ...plan.alt?.runs ?? []].entries()) for (const end of ["out", "err"]) await rm(`${plan.raw}.${i}.${end}`, { force: true }).catch(() => {});
 	}
 }
 
@@ -255,7 +273,7 @@ export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: Abor
 	await mkdir(dir, { recursive: true });
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
-	if (platform !== "win32") return { file, ...await captureFile(plan as Parameters<typeof captureFile>[0], signal) };
+	if (platform !== "win32") return { file, ...await captureFile(plan as FilePlan, signal) };
 	// env, not argv: no quoting issues; spawn copies it synchronously, so parallel calls cannot mix it up
 	process.env.SCREEN_READ_ARGS = Buffer.from(JSON.stringify(plan), "utf8").toString("base64");
 	const pending = exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(SCRIPT, "utf16le").toString("base64")], { timeout: 120_000, signal });
@@ -281,7 +299,7 @@ export const screenReadTool = (exec: Exec) => ({
 		"Prefer text when it answers the question: agent-browser snapshot/read for web pages, android layout for devices. Use this for layout, colors, rendering and canvas.",
 		"target=window (Windows only): a Windows app window by title substring, pid or handle; omit all three to list windows. Works on minimized and background windows without focusing or showing them; launch test apps minimized. minimize=true minimizes a window that popped up after capturing it. Capture only the app under test, not the user's own windows.",
 		"target=browser: the current agent-browser page (headless; never use --headed for checks). url opens it first; selector captures one element; full captures the whole page; session picks an agent-browser session.",
-		"target=android: android screen capture of the device (serial from `adb devices`; omit when only one is attached).",
+		"target=android: android screen capture of the device, or `adb exec-out screencap -p` when the android CLI is missing (serial from `adb devices`; omit when only one is attached).",
 	].join("\n"),
 	parameters: {
 		type: "object", additionalProperties: false, required: ["target"],
