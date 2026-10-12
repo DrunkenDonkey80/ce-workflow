@@ -22197,360 +22197,38 @@ async function handleWorkReviewAnalysisCommand(ctx, pi) {
 }
 
 async function handleWorkMenuCommand(ctx, pi) {
-	const improvementCount = workImproveCount(ctx.cwd);
-	let reviewCount = 0;
-	try {
-		reviewCount = analysisInboxProjection(loadVerifierStore(ctx.cwd)).length;
-	} catch {
-		// A missing verifier store simply has no analysis inbox.
-	}
-	let privateWorkflowRollbackAvailable = false;
-	try {
-		privateWorkflowRollbackAvailable = ["pending", "active"].includes(
-			readPrivateWorkflowActivationState(WORKFLOW_REPO_DIR)?.status,
-		);
-	} catch {
-		// Invalid activation state is reported during startup, not while rendering /wo.
-	}
 	const items = [
-		{
-			value: "work-roadmap",
-			label: "🌍 Roadmaps",
-			description:
-				"Browse, inspect, plan, continue, close, or reopen roadmaps.\nThe last open roadmap or initiative is selected automatically.",
-		},
-		...(reviewCount
-			? [
-					{
-						value: "work-review-analysis",
-						label: `🧭 Analysis findings (${reviewCount})`,
-						description:
-							"Review categorized findings before any executable work is created.\nDiscarded findings remain visible and suppress repeats.",
-					},
-				]
-			: []),
-		...(improvementCount
-			? [
-					{
-						value: "work-improve",
-						label: `🔧 Improve project (${improvementCount})`,
-						description:
-							"Process captured workflow improvements.\nOnly the currently available backlog snapshot is included.",
-					},
-				]
-			: []),
-		{
-			value: "work-status",
-			label: "📍 Status",
-			description:
-				"Show current roadmap, action leases, and background verifier state.\nUse this when the next workflow action is unclear.",
-		},
-		{
-			value: "work-resume",
-			label: "⏩ Resume work",
-			description:
-				"Run the selected target autonomously until completion or a real decision.\nLeave the target blank to continue the current roadmap.",
-			argumentTitle: "Roadmap ID or guidance",
-			placeholder: "Blank continues the current roadmap",
-		},
-		{
-			value: "work-goal",
-			label: "🎯 Autonomous goal",
-			description:
-				"Start or manage a multi-step autonomous goal.\nGoals pause for real decisions, limits, errors, or an explicit stop.",
-			argumentTitle: "Goal objective or management action",
-			placeholder:
-				"Describe the objective, or enter status / pause / resume / clear",
-		},
-		{
-			value: "work-stop",
-			label: "🛑 Stop safely",
-			description:
-				"Stop autonomous work at the next clean phase boundary.\nCurrent native work-item and Git state remain resumable.",
-		},
-		{
-			value: "work-init",
-			label: "🧱 Initialize workspace",
-			description:
-				"Initialize the native work-item store without adding AGENTS noise.\nUse once when this project has no workflow workspace.",
-		},
-		{
-			value: "work-report",
-			label: "📄 Blocker report",
-			description:
-				"Show a focused handoff report for blockers and failed evidence.\nBlank targets the current roadmap.",
-			argumentTitle: "Report target",
-			placeholder: "Blank shows the current roadmap",
-		},
-		{
-			value: "work-ideate",
-			label: "💡 Ideas",
-			description:
-				"Open the scored ideas dashboard, or start [wide|narrow] ideation on a topic.\nEnter opens details; ideas can be accepted, rejected, edited, deleted, or brainstormed.",
-			argumentTitle: "Idea topic or action",
-			placeholder:
-				"Blank opens the dashboard; try wide <topic> or edit <id> <text>",
-		},
-		{
-			value: "work-research",
-			label: "🔬 Research",
-			description:
-				"Investigate a complex question with optional configured advisors, web evidence, and critique.\nFindings and scratch artifacts stay in system temp; no work items are created.",
-			argumentTitle: "Research question",
-			placeholder: "Ask a complex question or explore an early idea",
-		},
-		{
-			value: "work-brainstorm",
-			label: "🧠 Brainstorm",
-			description:
-				"Create or link a brainstorm for an idea or freeform topic.\nThe artifact is linked back to native work state.",
-			argumentTitle: "Idea or topic",
-			placeholder: "Describe a new brainstorm, or use idea <id> [artifact-path]",
-		},
-		{
-			value: "work-redesign",
-			label: "🎨 Redesign",
-			description:
-				"Create a visual redesign initiative and current-UI audit phase.\nImplementation planning waits for a durable approved design.",
-			argumentTitle: "Redesign objective",
-			placeholder: "Describe the product surface and desired outcome",
-		},
-		{
-			value: "work-design",
-			label: "🖼️ Visual design",
-			description:
-				"Prepare, commission, or resume a durable visual-design session.\nOpenDesign runs return control and reconcile on the next resume.",
-			argumentTitle: "Design target or action",
-			placeholder: "<work-item-id> or prepare <work-item-id>",
-		},
-		{
-			value: "work-plan",
-			label: "🧭 Plan",
-			description:
-				"Turn an idea, brainstorm, or plan file into a roadmap.\nPlanning preserves requirements and verification contracts.",
-			argumentTitle: "Idea, artifact, or plan path",
-			placeholder: "Describe the idea or enter a local artifact path",
-		},
-		{
-			value: "work-migrate",
-			label: "📦 Migrate work",
-			description:
-				"Normalize legacy plans, TODOs, or tracker state into native work items.\nSource artifacts remain references after migration.",
-			argumentTitle: "Migration sources",
-			placeholder: "Enter one or more source paths",
-		},
-		{
-			value: "work-remove-beads",
-			label: "🧹 Migrate legacy workspace",
-			description:
-				"Verify and migrate a former workflow workspace to native work state.\nOnly legacy workflow artifacts are removed.",
-		},
-		{
-			value: "work-pause",
-			label: "💾 Checkpoint and pause",
-			description:
-				"Checkpoint current work and leave a resumable handoff.\nAn optional note records why work paused.",
-			argumentTitle: "Pause note",
-			placeholder: "Optional handoff note",
-		},
-		{
-			value: "work-analyze",
-			label: "🔎 Analyze",
-			description:
-				"Choose background analyses to run on an immutable scope.\nResults are read-only and attached as evidence.",
-		},
-		{
-			value: "work-simplify",
-			label: "🧹 Simplify code",
-			description:
-				"Find simplifications across settled files, folders, or the project.\nReview findings before the existing workflow applies accepted fixes.",
-		},
-		{
-			value: "work-agent-health",
-			label: "🩺 Agent health",
-			description:
-				"Send a tiny live probe to every selected model.\nReports missing login, provider, model, quota, and request failures.",
-		},
-		{
-			value: "work-small",
-			label: "🟢 Small task",
-			description:
-				"Create one small implementation WorkItem and hand it off safely.\nUse for a narrow, already-understood change.",
-			argumentTitle: "Small task",
-			placeholder: "Describe the change",
-		},
-		{
-			value: "work-med",
-			label: "🟡 Medium task",
-			description:
-				"Create one bounded medium WorkItem and execute it inline.\nUse when implementation needs a little investigation.",
-			argumentTitle: "Medium task",
-			placeholder: "Describe the change",
-		},
-		{
-			value: "work-big",
-			label: "🔴 Large task",
-			description:
-				"Create a planning WorkItem for a large or ambiguous change.\nThe planner slices it before implementation starts.",
-			argumentTitle: "Large task",
-			placeholder: "Describe the outcome and constraints",
-		},
-		{
-			value: "work-finish",
-			label: "✅ Finish work item",
-			description:
-				"Commit reviewed work and close its WorkItem after deterministic gates pass.\nRequires a concrete work-item or roadmap target.",
-			argumentTitle: "Work item to finish",
-			placeholder: "Enter a WorkItem or roadmap ID",
-		},
-		{
-			value: "work-debug",
-			label: "🪲 Debug",
-			description:
-				"Resolve or create a debug WorkItem and run root-cause handling.\nGuidance can follow the target after a colon.",
-			argumentTitle: "Debug target and guidance",
-			placeholder: "<work-item-id>: optional guidance, or describe the bug",
-		},
-		{
-			value: "work-add",
-			label: "➕ Add work",
-			description:
-				"Create explicit work under the active roadmap.\nUse for scope discovered after the roadmap was created.",
-			argumentTitle: "Work to add",
-			placeholder: "Describe the new work",
-		},
-		{
-			value: "work-auto",
-			label: "⚡ Auto-route task",
-			description:
-				"Classify a task, apply deterministic guards, and choose the safe handoff.\nUseful when the right task size is unclear.",
-			argumentTitle: "Task to route",
-			placeholder: "Describe the task",
-		},
-		{
-			value: "fleet",
-			label: "🛰️ Subagent Tasks",
-			description:
-				"Monitor ce-workflow background tasks and their subagents.\nInspect live transcripts or message the selected live subagent.",
-		},
-		{
-			value: "work-telemetry",
-			label: "📊 Telemetry",
-			description:
-				"Summarize orchestrator timing, token, context, and review telemetry.\nBlank shows today's activity.",
-			argumentTitle: "Telemetry filter",
-			placeholder: "Blank shows today; try roadmap <id>",
-		},
-		{
-			value: "work-usage",
-			label: "📈 Usage report",
-			description:
-				"Write a local HTML usage report from existing telemetry.\nNo work items are created or changed.",
-			argumentTitle: "Usage report options",
-			placeholder: "Blank uses the current roadmap; optional: roadmap <id> --open",
-		},
-		{
-			value: "work-context",
-			label: "🧠 Context guard",
-			description:
-				"Inspect or tune proactive context compaction.\nSupports status, compact, on, off, and a token threshold.",
-			argumentTitle: "Context action",
-			placeholder: "Blank shows status; compact / on / off / set <tokens>",
-		},
-		{
-			value: "work-settings",
-			label: "🔧 Settings",
-			description:
-				"Configure effort, role models, background verifiers, and review gates.\nGlobal and project scopes are available in the submenu.",
-		},
-		{
-			value: "work-catch-up",
-			label: "🔄 Catch up packages",
-			description:
-				"Review monitored Pi/plugin releases and verified private-workflow updates.\nExplicit maintenance; no ordinary-work reporting is enabled.",
-		},
-		...(extensionScoutEnabled()
-			? [
-					{
-						value: "work-extension-scout",
-						label: "🔭 Scout Pi extensions",
-						description:
-							"Explicitly scan catalog pages in the background with live progress.\nOpus 5 reviews candidates; nothing is installed automatically.",
-					},
-				]
-			: []),
-		...(privateWorkflowRollbackAvailable
-			? [
-					{
-						value: "private-workflow-rollback",
-						label: "↩️ Roll back private workflows",
-						description:
-							"Restore the retained verified private-workflow generation.\nThe complete active generation is preserved if rollback verification fails.",
-					},
-				]
-			: []),
+		{ value: "work-settings", label: "Settings", description: "Configure Plan3 models, compaction, images and camera. Global and project scopes are available." },
+		...(maintenanceCheckout(ctx.cwd) ? [
+			{ value: "work-context", label: "Context guard", description: "Inspect or tune proactive context compaction.", argumentTitle: "Context action", placeholder: "Blank shows status; compact / on / off / set <tokens>" },
+			{ value: "work-catch-up", label: "Catch up packages", description: "Review the Pi/plugin packages ce-workflow still uses in a Plan3 plan." },
+		] : []),
+		...(extensionScoutEnabled() ? [
+			{ value: "work-extension-scout", label: "Scout Pi extensions", description: "Scan catalog pages with live progress. Review candidates; nothing is installed automatically." },
+		] : []),
 	];
-
-	const maintenanceHere = sameCheckout(ctx.cwd, WORKFLOW_REPO_DIR);
-	const menuItems = items.filter((item) => UTILITY_MENU_VALUES.has(item.value) &&
-		(maintenanceHere || !["work-context", "work-catch-up"].includes(item.value)));
-	const roadmapRuntime = { showAllRoadmaps: false };
 	let selectedIndex = 0;
 	for (;;) {
 		const selected = await showListDialog(ctx, {
-			title: `${"Utilities"} — ${LOADED_WORKFLOW_BUILD_LABEL}`,
-			purpose: "Settings and utilities; the legacy workflow is off (Settings → Workflow).",
+			title: `Utilities — ${LOADED_WORKFLOW_BUILD_LABEL}`,
+			purpose: "Settings and retained utilities.",
 			subtitle: `Loaded from: ${WORKFLOW_REPO_DIR}`,
-			items: menuItems,
+			items,
 			currentValue: "work-settings",
 			selectedIndex,
-			cursorKey: "orchestrator-menu",
+			cursorKey: "utilities-menu",
 			descriptionMinLines: 3,
 			descriptionMaxLines: 3,
 			fixedHeight: true,
 		});
 		if (!selected) return;
 		selectedIndex = selected.index;
-		if (selected.value === "fleet") return openWorkflowFleet(ctx, pi);
-		if (selected.value === "private-workflow-rollback") {
-			const result = rollbackPrivateWorkflowRelease(WORKFLOW_REPO_DIR);
-			return notify(
-				ctx,
-				result.status === "rolled-back"
-					? `Private workflows rolled back (${result.code}): ${result.activeGenerationSha256}`
-					: `Private workflow rollback failed: ${result.reason}`,
-				result.status === "rolled-back" ? "info" : "warning",
-			);
-		}
-		if (selected.value === "work-roadmap") {
-			activeRoadmapMenuSessions.set(ctx, roadmapRuntime);
-			try {
-				const result = await handleWorkRoadmapCommand(
-					"",
-					ctx,
-					pi,
-					"",
-					roadmapRuntime,
-				);
-				if (result?.action === "roadmap-cancel") continue;
-				return result;
-			} finally {
-				activeRoadmapMenuSessions.delete(ctx);
-			}
-		}
-		const item = selected.item;
-		if (
-			MAIN_EDITOR_ACTIONS.has(selected.value) &&
-			(await prepareMainEditorAction(selected.value, ctx))
-		)
-			return;
 		let args = "";
-		if (item.argumentTitle) {
-			args = await ctx.ui.input(item.argumentTitle, item.placeholder);
+		if (selected.item.argumentTitle) {
+			args = await ctx.ui.input(selected.item.argumentTitle, selected.item.placeholder);
 			if (args == null) continue;
 		}
-		if (selected.value === "work-brainstorm") args = menuBrainstormArgs(args);
-		return executeOrchestratorAction(selected.value, args, ctx, pi);
+		return executeUtilityAction(selected.value, args, ctx, pi);
 	}
 }
 
@@ -25425,460 +25103,39 @@ function startExtensionScout(ctx, options = {}) {
 
 
 
-async function executeOrchestratorAction(
-	command,
-	args,
-	ctx,
-	pi,
-	selectionNote = "",
-	options = {},
-) {
+async function executeUtilityAction(command, args, ctx, pi, options = {}) {
 	const name = String(command ?? "").replace(/^\//, "");
 	const text = String(args ?? "");
-	if (name === "work-extension-scout" && !extensionScoutEnabled()) return false;
-	if (
-		LONG_ORCHESTRATOR_ACTIONS.has(name) &&
-		(ctx.mode === "tui" || ctx.hasUI) &&
-		!activeOperationProgress.has(ctx)
-	)
-		return withOperationProgress(
-			ctx,
-			ORCHESTRATOR_ACTION_LABELS[name] ?? "Workflow action",
-			() =>
-				executeOrchestratorAction(command, args, ctx, pi, selectionNote, options),
-		);
-	const builders = {
-		"work-init": buildWorkInitState,
-		"work-pause": buildWorkPauseState,
-		"work-small": buildWorkSmallState,
-		"work-med": buildWorkMedState,
-		"work-big": buildWorkBigState,
-		"work-plan": buildWorkPlanState,
-		"work-master": buildWorkMasterState,
-		"work-migrate": buildWorkMigrateState,
-		"work-remove-beads": buildWorkRemoveBeadsState,
-		"work-debug": buildWorkDebugState,
-		"work-add": buildWorkAddState,
-		"work-auto": buildWorkAutoState,
-	};
-	if (name === "work-extension-scout") {
-		const action = text.trim().toLowerCase();
-		if (action === "stop" || action === "cancel") return stopExtensionScout(ctx);
-		if (action === "review" || action === "re-review")
-			return withCommandTelemetry(name, text, ctx, () =>
-				startExtensionScout(ctx, { ...options, reviewOnly: true }),
-			);
-		if (action.startsWith("review ") || action.startsWith("re-review ")) {
-			const candidates = action
-				.slice(action.indexOf(" ") + 1)
-				.split(/[\s,]+/)
-				.filter(Boolean);
-			return withCommandTelemetry(name, text, ctx, () =>
-				startExtensionScout(ctx, { ...options, reviewOnly: true, candidates }),
-			);
-		}
-		if (action === "status") {
-			const progress = readExtensionScoutLedger(ctx.cwd).progress;
-			if (progress) showExtensionScoutProgress(ctx, progress);
-			notify(
-				ctx,
-				progress
-					? extensionScoutProgressLines(progress).join("\n")
-					: "Extension scout has not run yet.",
-				"info",
-			);
-			return { ok: Boolean(progress), progress };
-		}
-		if (action) {
-			notify(
-				ctx,
-				"Use /wo to start, or type “scout status”, “scout review”, or “stop scout”.",
-				"warning",
-			);
-			return { ok: false, error: "invalid extension scout action" };
-		}
-		return withCommandTelemetry(name, text, ctx, () =>
-			startExtensionScout(ctx, options),
-		);
-	}
-	if (name === "work-goal")
-		return handleWorkGoalCommand(text, "generic", pi, ctx);
-	if (name === "work-redesign")
-		return withCommandTelemetry(name, text, ctx, async () => {
-			const discovery = await collectRedesignDiscovery(ctx, text, {
-				...options,
-				collectBrief:
-					options.collectBrief ??
-					((artifactType) =>
-						designCallTool(ctx.cwd, options)("collect_brief", {
-							artifactType:
-								artifactType === "game" ? "product-prototype" : artifactType,
-						})),
-			});
-			if (discovery.pending || discovery.canceled) {
-				const state = errorState(
-					discovery.canceled
-						? "design-discovery-canceled"
-						: "design-questions-required",
-					discovery.canceled
-						? "UI redesign discovery was canceled before creating work."
-						: `UI redesign needs an answer: ${discovery.pending.question}`,
-					{
-						action: "design-questions-required",
-						question: discovery.pending ?? discovery.canceled,
-					},
-				);
-				notify(ctx, state.message, "warning");
-				return stateTelemetry(state);
-			}
-			const creativeDepth =
-				options.creativeDepth ?? (await chooseCreativeDepth(ctx, text));
-			if (creativeDepth == null) {
-				notify(
-					ctx,
-					"Cancelled at the creative-sidecar prompt — nothing queued.",
-					"info",
-				);
-				return stateTelemetry({ ok: true, action: "cancelled" });
-			}
-			const state = buildWorkRedesignState(ctx.cwd, text, {
-				...options,
-				uiInput: discovery.intake,
-				designAnswers: discovery.answers,
-				designAnswerRecords: discovery.asked,
-				targetMatrix: discovery.targetMatrix,
-				openDesignBriefQuestions: discovery.openDesignBriefQuestions,
-				creativeDepth,
-			});
-			notify(ctx, state.message, state.ok ? "info" : "warning");
-			if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
-			return stateTelemetry(state);
-		});
-	if (name === "work-design")
-		return withCommandTelemetry(name, text, ctx, async () => {
-			const [action, target] = splitFirstWord(text);
-			let state;
-			if (action === "waive") {
-				state = waiveDesignSession(ctx.cwd, target);
-			} else if (action === "answer") {
-				const [ownerId, inlineAnswer] = splitFirstWord(target);
-				const waiting = tryLoadDesignSession(ctx.cwd, ownerId);
-				const answer =
-					inlineAnswer ||
-					(await ctx.ui?.input?.(
-						waiting?.agentMessage || "OpenDesign clarification answer",
-						"",
-					));
-				state = await answerDesignClarification(ctx.cwd, ownerId, answer, options);
-			} else if (action === "sync") {
-				state = await syncDesignSession(ctx.cwd, target, options);
-			} else if (action === "restart") {
-				const waiting = tryLoadDesignSession(ctx.cwd, target);
-				const confirmed = await ctx.ui?.confirm?.(
-					"Restart this OpenDesign session from scratch?",
-					"The active provider run will be canceled and a fresh OpenDesign project/run will start. Existing attempt lineage is retained.",
-				);
-				state = confirmed
-					? await restartDesignSession(ctx.cwd, target, options)
-					: {
-							ok: false,
-							action: "design-restart-canceled",
-							designSession: waiting,
-							message: "OpenDesign restart was not confirmed.",
-							suggestedCommands: [`/wo design restart ${target}`],
-						};
-			} else if (action === "candidates") {
-				const [ownerId, candidateId] = splitFirstWord(target);
-				const session = tryLoadDesignSession(ctx.cwd, ownerId);
-				state = candidateId
-					? await selectDesignCandidate(ctx.cwd, ownerId, candidateId, {
-							...options,
-							authority: options.designDecisionAuthority ?? "human",
-							userInitiated: true,
-							decisionEventId: options.decisionEventId ?? randomUUID(),
-						})
-					: session?.state === "candidate_selection_required"
-						? {
-								ok: true,
-								action: "design-candidates",
-								designSession: session,
-								candidates: session.candidatePreviews,
-								message: `Inspect the three candidate previews, then select one explicitly:\n${session.candidatePreviews
-									.map(
-										(candidate) =>
-											`- ${candidate.id}: ${candidate.title} — ${candidate.url}`,
-									)
-									.join("\n")}`,
-								suggestedCommands: session.candidatePreviews.map(
-									(candidate) => `/wo design candidates ${ownerId} ${candidate.id}`,
-								),
-							}
-						: errorState(
-								"design-candidates-unavailable",
-								"No design candidates are waiting for selection.",
-								{ action: "design-candidates-unavailable", designSession: session },
-							);
-			} else if (action === "approve") {
-				const [ownerId, approvalNotes] = splitFirstWord(target);
-				state = await approveDesignSession(ctx.cwd, ownerId, approvalNotes, {
-					...options,
-					authority: options.designDecisionAuthority ?? "human",
-					userInitiated: true,
-					decisionEventId: options.decisionEventId ?? randomUUID(),
-				});
-			} else if (["review", "revise"].includes(action)) {
-				state = await reviewDesignSession(ctx.cwd, target, ctx, options);
-			} else if (action === "prepare") {
-				const session = tryLoadDesignSession(ctx.cwd, target);
-				if (session) {
-					const readExisting = (relativePath) =>
-						relativePath && existsSync(designArtifactFile(ctx.cwd, relativePath))
-							? readFileSync(designArtifactFile(ctx.cwd, relativePath), "utf8")
-							: undefined;
-					state = prepareDesignSession(ctx.cwd, target, {
-						auditMarkdown: readExisting(session.auditPath),
-						briefMarkdown: readExisting(session.briefPath),
-					});
-				} else {
-					state = errorState(
-						"design-not-found",
-						`No design session exists for ${target || "that target"}.`,
-						{ action: "design-not-found" },
-					);
-				}
-			} else {
-				const ownerId = action === "resume" ? target : action;
-				let advanceOptions = options;
-				if (ownerId && action === "resume") {
-					const waiting = tryLoadDesignSession(ctx.cwd, ownerId);
-					if (
-						waiting?.state === "failed" &&
-						(["run-canceled", "run-failed"].includes(waiting.errorCategory) ||
-							(!waiting.errorCategory && waiting.runId && waiting.startPayload))
-					) {
-						const failedRunStatus =
-							waiting.errorCategory === "run-canceled" ? "canceled" : "failed";
-						const confirmed = ctx.ui?.confirm
-							? await ctx.ui.confirm(
-									`Resume ${failedRunStatus} OpenDesign run?`,
-									"This starts a replacement run from the persisted prompt and project and may incur provider usage.",
-								)
-							: true;
-						if (confirmed) advanceOptions = { ...options, resumeConfirmed: true };
-						else {
-							state = {
-								ok: false,
-								action: "design-run-resume-confirmation-required",
-								designSession: waiting,
-								message: "OpenDesign resume was not confirmed.",
-								suggestedCommands: [`/wo design resume ${ownerId}`],
-							};
-						}
-					}
-				}
-				state =
-					state ??
-					(ownerId
-						? await advanceDesignSession(ctx.cwd, ownerId, advanceOptions)
-						: errorState(
-								"usage",
-								"Usage: /wo design [prepare|resume|restart|answer|candidates|review|sync|approve|waive] <work-item-id>",
-								{ action: "usage" },
-							));
-			}
-			notify(ctx, state.message, state.ok ? "info" : "warning");
-			return stateTelemetry(state);
-		});
-	if (["work-stop", "work-resume-stop"].includes(name))
-		return handleWorkResumeStopCommand(text, pi, ctx);
 	if (name === "work-menu") return handleWorkMenuCommand(ctx, pi);
 	if (name === "work-settings")
-		return text.trim() === "status"
-			? workSettingsStatus(ctx)
-			: workSettingsLoop(ctx);
-	if (name === "work-agent-health") return runAgentHealthMenu(ctx);
+		return text.trim() === "status" ? workSettingsStatus(ctx) : workSettingsLoop(ctx);
 	if (name === "work-context") return handleWorkContextCommand(text, ctx);
-	if (name === "work-improve")
-		return text.trim().split(/\s+/, 1)[0]?.toLowerCase() === "preview"
-			? handleWorkImproveCommand(text, pi, ctx)
-			: withCommandTelemetry(name, text, ctx, () =>
-					handleWorkImproveCommand(text, pi, ctx),
-				);
-	if (name === "work-catch-up") return handleWorkCatchUpCommand(text, pi, ctx);
-	if (name === "work-telemetry") {
-		cleanupBenignInstructionDirt(ctx.cwd);
-		return notify(ctx, buildWorkTelemetry(ctx.cwd, text), "info");
+	if (name === "work-catch-up") return startPlan3CatchUp(text, pi, ctx);
+	if (name !== "work-extension-scout" || !extensionScoutEnabled()) return false;
+	const action = text.trim().toLowerCase();
+	if (action === "stop" || action === "cancel") return stopExtensionScout(ctx);
+	if (action === "review" || action === "re-review")
+		return startExtensionScout(ctx, { ...options, reviewOnly: true });
+	if (action.startsWith("review ") || action.startsWith("re-review ")) {
+		const candidates = action.slice(action.indexOf(" ") + 1).split(/[\s,]+/).filter(Boolean);
+		return startExtensionScout(ctx, { ...options, reviewOnly: true, candidates });
 	}
-	if (name === "work-usage")
-		return withCommandTelemetry(name, text, ctx, async () => {
-			cleanupBenignInstructionDirt(ctx.cwd);
-			const state = buildWorkUsageState(ctx.cwd, text);
-			if (state.ok && state.open)
-				state.browserOpened = openUsageReport(state.path);
-			notify(ctx, renderWorkUsageText(state), state.ok ? "info" : "warning");
-			return stateTelemetry(state);
-		});
-	if (name === "work-ideate")
-		return withCommandTelemetry(name, text, ctx, async () => {
-			if (parseWorkIdeateArgs(text).kind !== "topic") cleanupBenignInstructionDirt(ctx.cwd);
-			return handleWorkIdeateCommand(ctx, pi, text);
-		});
-	if (name === "work-research")
-		return withCommandTelemetry(name, text, ctx, async () => {
-			const question = text.trim();
-			if (!question) {
-				const state = {
-					ok: false,
-					action: "research-usage",
-					message: "Research needs a question.",
-				};
-				notify(ctx, state.message, "warning");
-				return state;
-			}
-			return startExploration(ctx, pi, question, "research");
-		});
-	if (name === "work-brainstorm")
-		return withCommandTelemetry(name, text, ctx, async () => {
-			cleanupBenignInstructionDirt(ctx.cwd);
-			const health =
-				options.brainstormHealth ?? (await brainstormAgentHealthPreflight(ctx));
-			if (!health.proceed) {
-				const state = {
-					ok: false,
-					action: "brainstorm-agent-health-blocked",
-					message:
-						"Brainstorm cancelled before creating work state. Repair model access, then try again.",
-				};
-				notify(ctx, state.message, "warning");
-				return stateTelemetry(state);
-			}
-			let state = buildWorkBrainstormState(ctx.cwd, text, options);
-			if (state.action === "brainstorm-epic-created") {
-				const epic = readWorkItem(ctx.cwd, state.epic.id);
-				if (epic) {
-					const metadata = await synthesizeRoadmapMetadata(ctx.cwd, epic, ctx, {
-						quiet: true,
-					});
-					if (metadata)
-						state = {
-							...state,
-							epic: issueSummary(readWorkItem(ctx.cwd, state.epic.id)),
-						};
-				}
-			}
-			const creativeDepth =
-				state.ok && !state.artifact ? await chooseCreativeDepth(ctx) : "quick";
-			if (creativeDepth == null) {
-				notify(
-					ctx,
-					"Cancelled at the creative-sidecar prompt — nothing queued.",
-					"info",
-				);
-				return stateTelemetry({ ...state, action: "cancelled" });
-			}
-			state = { ...state, creativeDepth };
-			notify(ctx, renderWorkBrainstormText(state), state.ok ? "info" : "warning");
-			if (state.ok)
-				await sendFollowUp(
-					ctx,
-					brainstormHandoffPrompt(state, ctx.cwd, creativeDepth, {
-						offlineModels: health.offlineModels,
-						currentModel: currentModelId(ctx),
-					}),
-					pi,
-				);
-			return stateTelemetry(state);
-		});
-	if (name === "work-finish")
-		return withCommandTelemetry(name, text, ctx, async () => {
-			const mutation = acquireRepositoryMutationLock(ctx.cwd);
-			try {
-				cleanupBenignInstructionDirt(ctx.cwd);
-				let state = buildWorkFinishState(ctx.cwd, text);
-				if (state.ok && !state.handoffPrompt)
-					state = executeWorkFinishStateUnlocked(
-						ctx.cwd,
-						state,
-						ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-					);
-				void launchFinishVerifierJobs(ctx.cwd, state, pi);
-				rememberRecommendedActions(
-					ctx.cwd,
-					recommendedActions(state),
-					"work-finish",
-				);
-				notify(ctx, renderWorkflowActionText(state), state.ok ? "info" : "warning");
-				if (state.handoffPrompt) await sendFollowUp(ctx, state.handoffPrompt, pi);
-				return stateTelemetry(state);
-			} finally {
-				mutation.release();
-			}
-		});
-	if (name === "work-status")
-		return withCommandTelemetry(name, text, ctx, () =>
-			handleWorkStatusCommand(text, ctx, pi),
-		);
-	if (name === "work-report")
-		return withCommandTelemetry(name, text, ctx, () =>
-			handleWorkReportCommand(text, ctx),
-		);
-	if (name === "work-roadmap")
-		return withCommandTelemetry(name, text, ctx, () =>
-			handleWorkRoadmapCommand(text, ctx, pi),
-		);
-	if (name === "work-analyze")
-		return withCommandTelemetry(name, text, ctx, () =>
-			handleWorkAnalyzeCommand(text, ctx, pi),
-		);
-	if (name === "work-simplify")
-		return withCommandTelemetry(name, text, ctx, () =>
-			handleWorkAnalyzeCommand(text, ctx, pi, {
-				title: "Simplify code",
-				operations: ["simplification"],
-				scope: "project",
-			}),
-		);
-	if (name === "work-review-analysis")
-		return withCommandTelemetry(name, text, ctx, () =>
-			handleWorkReviewAnalysisCommand(ctx, pi),
-		);
-	if (name === "work-resume-goal")
-		return withCommandTelemetry(
-			name,
-			text,
-			ctx,
-			() => handleWorkResumeGoalCommand(text, pi, ctx),
-			true,
-		);
-	if (name === "work-resume")
-		return withCommandTelemetry(
-			name,
-			text,
-			ctx,
-			() => handleWorkResumeCommand(text, ctx, pi, selectionNote),
-			true,
-		);
-	if (!builders[name]) return false;
-	return withCommandTelemetry(
-		name,
-		text,
-		ctx,
-		() => handleWorkflowAction(builders[name], text, ctx, pi, selectionNote),
-		[
-			"work-small",
-			"work-med",
-			"work-big",
-			"work-plan",
-			"work-master",
-			"work-migrate",
-			"work-debug",
-		].includes(name),
-	);
+	if (action === "status") {
+		const progress = readExtensionScoutLedger(ctx.cwd).progress;
+		if (progress) showExtensionScoutProgress(ctx, progress);
+		notify(ctx, progress ? extensionScoutProgressLines(progress).join("\n") : "Extension scout has not run yet.", "info");
+		return { ok: Boolean(progress), progress };
+	}
+	if (action) {
+		notify(ctx, "Use /wo to start, or scout status, scout review, or scout stop.", "warning");
+		return { ok: false, error: "invalid extension scout action" };
+	}
+	return startExtensionScout(ctx, options);
 }
 
 
 
-export { resetContextFilter, requestContextFilter, filteredContext, executeOrchestratorAction, workOrchSettings, readEffectiveSettings as effectiveSettingsForTest, workflowBuildLabel as workflowBuildLabelForTest, LOADED_WORKFLOW_BUILD_LABEL as loadedWorkflowBuildLabelForTest };
+export { resetContextFilter, requestContextFilter, filteredContext, executeUtilityAction, workOrchSettings, readEffectiveSettings as effectiveSettingsForTest, workflowBuildLabel as workflowBuildLabelForTest, LOADED_WORKFLOW_BUILD_LABEL as loadedWorkflowBuildLabelForTest };
 
 export default function workModelsExtension(pi) {
 	// Plan3's per-plan Models menu: undefined = cancelled, null = remove the override.
@@ -26601,14 +25858,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 			notify(ctx, `Plan3 could not switch research mode: ${formatError(error)}`, "warning");
 		}
 	});
-	pi.registerCommand("ideate", {
-		description: "Explore ideas in system temp ([none|narrow|wide] selects advisor usage)",
-		handler: async (args, ctx) => {
-			const topic = args.trim();
-			if (!topic) return notify(ctx, "Usage: /ideate [none|narrow|wide] <topic>", "warning");
-			return startExploration(ctx, pi, topic, "ideate");
-		},
-	});
+
 	pi.registerShortcut?.("alt+r", {
 		description: "Toggle persistent research mode",
 		handler: async (ctx) => {
@@ -26632,7 +25882,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   const plan3={plan:"plan3",plans:"plans3",resume:"resume3"}[action];
   if(plan3) return pi.events?.emit?.("plan3:command",{ctx,name:plan3,args:rest});
   const utility=WO_UTILITY_ACTIONS[action];
-  if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeOrchestratorAction(utility,rest,ctx,pi);
+  if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
   if(action==="compact") return requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
   if(action==="context-fill") {
@@ -26651,7 +25901,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 }
 
 
-const WO_UTILITY_ACTIONS = { settings: "work-settings", "catch-up": "work-catch-up", context: "work-context", telemetry: "work-telemetry", usage: "work-usage", scout: "work-extension-scout" };
+const WO_UTILITY_ACTIONS = { settings: "work-settings", "catch-up": "work-catch-up", context: "work-context", scout: "work-extension-scout" };
 const UTILITY_MENU_VALUES = new Set(["work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
 
 
@@ -26661,24 +25911,16 @@ function onOff(value) {
 
 function workSettingsStatus(ctx) {
 	const settings = readEffectiveSettings(ctx.cwd);
-	const resolved = workOrchSettings(ctx.cwd);
-	const performance = workPerformanceSettings(ctx.cwd);
-	const resume = workResumeSettings(ctx.cwd);
 	const compactor = compactionModelSettings(ctx.cwd, settings);
 	const visionModel = visionModelSettings(ctx.cwd, settings);
-
-		notify(ctx, [
-			"Utility settings",
-			"Workflow: off",
-			`Plan3 models: ${(settings.workOrchestrator?.plan3?.models ?? []).map((entry) => entry.model).join(", ") || "None"}`,
-			`Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label}`,
-			`Compaction LLM model: ${modelEffortSummary(compactor.model, compactor.thinking)}`,
-			`Vision model: ${visionModel === NONE_MODEL ? "None" : visionModel}`,
-			`Image generation model: ${imageModelSettings(ctx.cwd, settings) === NONE_MODEL ? "None" : imageModelSettings(ctx.cwd, settings)}`,
-		].join("\n"), "info");
-		return;
-
-
+	notify(ctx, [
+		"Utility settings",
+		`Plan3 models: ${(settings.workOrchestrator?.plan3?.models ?? []).map((entry) => entry.model).join(", ") || "None"}`,
+		`Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label}`,
+		`Compaction LLM model: ${modelEffortSummary(compactor.model, compactor.thinking)}`,
+		`Vision model: ${visionModel === NONE_MODEL ? "None" : visionModel}`,
+		`Image generation model: ${imageModelSettings(ctx.cwd, settings) === NONE_MODEL ? "None" : imageModelSettings(ctx.cwd, settings)}`,
+	].join("\n"), "info");
 }
 
 
@@ -27061,8 +26303,7 @@ async function workSettingsLoop(ctx) {
 			return;
 		}
 		const resolved = workOrchSettings(ctx.cwd, settings);
-		const performance = workPerformanceSettings(ctx.cwd);
-		const resume = workResumeSettings(ctx.cwd, settings);
+
 		const compactor = compactionModelSettings(ctx.cwd, settings);
 		const visionModel = visionModelSettings(ctx.cwd, settings);
 		const names = await modelDisplayNames(ctx);

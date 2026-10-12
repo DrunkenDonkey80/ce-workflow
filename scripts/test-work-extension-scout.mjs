@@ -777,16 +777,16 @@ try {
 	process.env.PI_CODING_AGENT_DIR = agentDir;
 	const previousScoutGate = process.env.CE_WORK_EXTENSION_SCOUT;
 	delete process.env.CE_WORK_EXTENSION_SCOUT;
-	const { executeOrchestratorAction, extensionScoutEnabled } = await import(
+	const { executeUtilityAction, extensionScoutEnabled } = await import(
 		`../extensions/work-models.ts?scout=${Date.now()}`
 	);
 	const disabledNotices = [];
-	const disabledStatus = await executeOrchestratorAction(
-		"work-extension-scout",
-		"status",
-		{ cwd, ui: { notify: (message) => disabledNotices.push(message) } },
-		{},
-	);
+	const disabledStatus = await executeUtilityAction(
+"work-extension-scout",
+"status",
+{ cwd, ui: { notify: (message) => disabledNotices.push(message) } },
+{}
+);
 	assert(
 		disabledStatus === false &&
 			disabledNotices.length === 0 &&
@@ -794,12 +794,12 @@ try {
 		"extension scout is gated off silently by default",
 	);
 	process.env.CE_WORK_EXTENSION_SCOUT = "1";
-	const explicitStatus = await executeOrchestratorAction(
-		"work-extension-scout",
-		"status",
-		{ cwd, ui: { notify() {} } },
-		{},
-	);
+	const explicitStatus = await executeUtilityAction(
+"work-extension-scout",
+"status",
+{ cwd, ui: { notify() {} } },
+{}
+);
 	assert(
 		explicitStatus && explicitStatus.error == null,
 		"explicit scout commands do not require a legacy self-improving flag",
@@ -839,10 +839,10 @@ try {
 			html([entry("pi-old", "Already scanned", "2026-01-01T00:00:00Z")]),
 	});
 	try {
-		await executeOrchestratorAction(
-			"work-extension-scout",
-			"",
-			{
+		await executeUtilityAction(
+"work-extension-scout",
+"",
+{
 				cwd,
 				ui: { notify() {}, setStatus() {}, setWidget() {} },
 				modelRegistry: {
@@ -869,10 +869,9 @@ try {
 					},
 				},
 			},
-			{},
-			"",
-			{ background: false },
-		);
+{},
+{ background: false }
+);
 	} finally {
 		globalThis.fetch = reviewerFetch;
 	}
@@ -900,10 +899,10 @@ try {
 		cachedBefore.packages[routed.name].inspection,
 	);
 	writeExtensionScoutLedger(cwd, cachedBefore);
-	const cachedReview = await executeOrchestratorAction(
-		"work-extension-scout",
-		`review ${routed.name}`,
-		{
+	const cachedReview = await executeUtilityAction(
+"work-extension-scout",
+`review ${routed.name}`,
+{
 			cwd,
 			ui: { notify() {}, setStatus() {}, setWidget() {} },
 			modelRegistry: {
@@ -930,9 +929,8 @@ try {
 				},
 			},
 		},
-		{},
-		"",
-		{
+{},
+{
 			background: false,
 			collectPage: async () => {
 				throw new Error("cached review fetched the catalog");
@@ -940,8 +938,8 @@ try {
 			inspect: async () => {
 				throw new Error("cached review inspected source");
 			},
-		},
-	);
+		}
+);
 	const cachedAfter = readExtensionScoutLedger(cwd);
 	assert(
 		cachedReview.reviewed.length === 1 &&
@@ -953,16 +951,15 @@ try {
 	);
 
 	let blockedPageSignal;
-	const background = await executeOrchestratorAction(
-		"work-extension-scout",
-		"",
-		{
+	const background = await executeUtilityAction(
+"work-extension-scout",
+"",
+{
 			cwd,
 			ui: { notify() {}, setStatus() {}, setWidget() {} },
 		},
-		{},
-		"",
-		{
+{},
+{
 			collectPage: async (page, _fetch, signal) => {
 				if (page === 2) {
 					blockedPageSignal = signal;
@@ -985,18 +982,17 @@ try {
 				};
 			},
 			screen: async () => [],
-		},
-	);
+		}
+);
 	await new Promise((resolve) => setTimeout(resolve, 10));
 	const otherCwd = mkdtempSync(path.join(tmpdir(), "extension-scout-other-"));
 	let otherSignal;
-	const otherBackground = await executeOrchestratorAction(
-		"work-extension-scout",
-		"",
-		{ cwd: otherCwd, ui: { notify() {}, setStatus() {}, setWidget() {} } },
-		{},
-		"",
-		{
+	const otherBackground = await executeUtilityAction(
+"work-extension-scout",
+"",
+{ cwd: otherCwd, ui: { notify() {}, setStatus() {}, setWidget() {} } },
+{},
+{
 			collectPage: async (_page, _fetch, signal) => {
 				otherSignal = signal;
 				await new Promise((_resolve, reject) =>
@@ -1005,15 +1001,15 @@ try {
 					}),
 				);
 			},
-		},
-	);
+		}
+);
 	await new Promise((resolve) => setTimeout(resolve, 10));
-	const stopping = await executeOrchestratorAction(
-		"work-extension-scout",
-		"stop",
-		{ cwd, ui: { notify() {}, setStatus() {}, setWidget() {} } },
-		{},
-	);
+	const stopping = await executeUtilityAction(
+"work-extension-scout",
+"stop",
+{ cwd, ui: { notify() {}, setStatus() {}, setWidget() {} } },
+{}
+);
 	await new Promise((resolve) => setTimeout(resolve, 10));
 	const stoppedProgress = readExtensionScoutLedger(cwd).progress;
 	assert(
@@ -1028,12 +1024,12 @@ try {
 			stoppedProgress.nextPage === 2,
 		"background scouts are independently cancellable per project and persist resumable counts/date",
 	);
-	await executeOrchestratorAction(
-		"work-extension-scout",
-		"stop",
-		{ cwd: otherCwd, ui: { notify() {}, setStatus() {}, setWidget() {} } },
-		{},
-	);
+	await executeUtilityAction(
+"work-extension-scout",
+"stop",
+{ cwd: otherCwd, ui: { notify() {}, setStatus() {}, setWidget() {} } },
+{}
+);
 	await new Promise((resolve) => setTimeout(resolve, 10));
 	rmSync(otherCwd, { recursive: true, force: true });
 
@@ -1043,10 +1039,10 @@ try {
 	const statuses = [];
 	globalThis.fetch = async () => ({ ok: false, status: 503 });
 	try {
-		await executeOrchestratorAction(
-			"work-menu",
-			"",
-			{
+		await executeUtilityAction(
+"work-menu",
+"",
+{
 				cwd,
 				ui: {
 					notify(message) {
@@ -1062,8 +1058,8 @@ try {
 					},
 				},
 			},
-			{},
-		);
+{}
+);
 	} finally {
 		globalThis.fetch = previousFetch;
 	}
@@ -1086,10 +1082,10 @@ try {
 
 	delete process.env.CE_WORK_EXTENSION_SCOUT;
 	let disabledMenuLabels = [];
-	await executeOrchestratorAction(
-		"work-menu",
-		"",
-		{
+	await executeUtilityAction(
+"work-menu",
+"",
+{
 			cwd,
 			ui: {
 				notify() {},
@@ -1099,8 +1095,8 @@ try {
 				},
 			},
 		},
-		{},
-	);
+{}
+);
 	assert(
 		!disabledMenuLabels.some((label) => label.includes("Scout Pi extensions")),
 		"disabled extension scout is absent from /wo menus",
