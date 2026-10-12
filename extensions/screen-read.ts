@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
@@ -135,6 +135,8 @@ if($p.op -eq 'window') {
   $null=$pr.Handle; if(-not $pr.WaitForExit(90000)) { throw "$name $($a -join ' ') timed out" }
   if($pr.ExitCode) { throw "$name $($a -join ' ') failed: $(Get-Content -Raw -Encoding UTF8 "$log.out" -ErrorAction SilentlyContinue) $(Get-Content -Raw -Encoding UTF8 "$log.err" -ErrorAction SilentlyContinue)" }
  }
+ # Some CLIs (android with several devices) print an error yet exit 0 without writing the file.
+ if(-not (Test-Path $p.raw) -or -not (Get-Item $p.raw).Length) { $l="$($p.raw).$($i-1)"; throw "$name wrote no image: $(Get-Content -Raw -Encoding UTF8 "$l.out" -ErrorAction SilentlyContinue) $(Get-Content -Raw -Encoding UTF8 "$l.err" -ErrorAction SilentlyContinue)" }
  $shot=[ScreenRead]::ProcessFile($p.raw,[int[]]$p.region,[int]$p.maxEdge,$p.file)
  Remove-Item "$($p.raw)*" -ErrorAction SilentlyContinue # logs a running daemon still holds stay behind
  ConvertTo-Json -InputObject @{shot=$shot} -Compress -Depth 3
@@ -249,6 +251,11 @@ async function runAll(exe: string, runs: string[][], raw: string, toRaw: boolean
 			const text = async (f: string) => toRaw && f === raw ? "" : readFile(f, "utf8").catch(() => "");
 			if (code !== 0) throw new Error(`${exe} ${args.join(" ")} ${code === null ? "timed out or was stopped" : "failed"}: ${await text(`${log}.out`)} ${await text(`${log}.err`)}`.trim().slice(-1500));
 		} finally { await out.close(); await err.close(); }
+	}
+	// Some CLIs (android with several devices) print an error yet exit 0 without writing the file.
+	if (!(await stat(raw).catch(() => undefined))?.size) {
+		const log = `${raw}.${runs.length - 1}`, text = (f: string) => readFile(f, "utf8").catch(() => "");
+		throw new Error(`${exe} wrote no image: ${await text(`${log}.out`)} ${await text(`${log}.err`)}`.trim().slice(-1500));
 	}
 }
 

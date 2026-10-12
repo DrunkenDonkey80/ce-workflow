@@ -392,12 +392,12 @@ function upcomingNightMs(from, to) {
 }
 
 // Pool summary, each piece its own segment:
-//   ×4(D2) [████░░░░] 53% · +18% in 1d 0h · +35% in 1d 15h · → flex2 · 5h full 47m · 7d: 12h 35m (83%) · ER:2d 12h (flex2)
-// The gauge is the average weekly use across live accounts; refills are running
-// totals as each account's weekly reset hands back its share. "5h full" only
+//   ×4(D2) [████░░░░] 47% · 65% in 1d 0h · 82% in 1d 15h · → flex2 · 5h full 47m · 7d: 12h 35m (17%) · ER:2d 12h (flex2)
+// The gauge is the average weekly quota left across live accounts; refills show where
+// the gauge lands as each account's weekly reset hands back its share. "5h full" only
 // when no live account can serve now although weekly room remains. (D2) = dead
 // logins (red, need a fresh /login); 7d = soonest account dying within 24h of
-// waking time with over 15% unspent, shown as % used (red: drain it); ER = soonest login end
+// waking time with over 15% unspent, shown as % left (red: drain it); ER = soonest login end
 // within 3 days (yellow).
 function poolWindows(store, accounts, entries, used, t) {
 	const text = (id, value, color) => ({ id, label: id, usedPercent: 0, text: value, color });
@@ -410,7 +410,7 @@ function poolWindows(store, accounts, entries, used, t) {
 			id: "7d",
 			label: "7d",
 			usedPercent: percent(usedAvg),
-			text: `×${week.length}${dead ? `(D${dead})` : ""} ${bar(usedAvg, 8)} ${Math.round(usedAvg)}%`,
+			text: `×${week.length}${dead ? `(D${dead})` : ""} ${bar(100 - usedAvg, 8)} ${Math.round(100 - usedAvg)}%`,
 		},
 	];
 	let refilled = 0;
@@ -420,7 +420,7 @@ function poolWindows(store, accounts, entries, used, t) {
 		.slice(0, 2)
 		.entries()) {
 		refilled += w.pct / week.length;
-		windows.push(text(`refill-${index}`, `+${Math.round(refilled)}% in ${formatDuration(w.at - t)}`));
+		windows.push(text(`refill-${index}`, `${Math.round(100 - usedAvg + refilled)}% in ${formatDuration(w.at - t)}`));
 	}
 	const short = (label) => String(label).replace(/^.*:/, "").replace(/@.*$/, "");
 	const active = typeof store.active === "string" ? store.active : "";
@@ -445,7 +445,7 @@ function poolWindows(store, accounts, entries, used, t) {
 		})
 		.filter((d) => d.left > 0 && d.left < DRAIN_WARN_MS && d.free > 15)
 		.sort((a, b) => a.left - b.left)[0];
-	if (dying) windows.push(text("drain", `7d: ${formatDuration(dying.left)} (${Math.round(100 - dying.free)}%)`, "error"));
+	if (dying) windows.push(text("drain", `7d: ${formatDuration(dying.left)} (${Math.round(dying.free)}%)`, "error"));
 	const ending = accounts
 		.filter((a) => !a.dead && finite(a.refreshExpires) && a.refreshExpires - t < LOGIN_WARN_MS)
 		.sort((a, b) => a.refreshExpires - b.refreshExpires)[0];
@@ -751,7 +751,7 @@ export function resetMoment(resetsAt, now) {
 
 function windowText(window, now, barCells = 8, dates = false) {
 	if (typeof window.text === "string") return window.text;
-	const pct = Math.round(window.usedPercent);
+	const pct = Math.round(100 - window.usedPercent);
 	const filled = Math.round((pct / 100) * barCells);
 	const reset = window.resetsAt
 		? `(${formatDuration(window.resetsAt - now)}${dates && window.label !== "5h" ? `, ${resetMoment(window.resetsAt, now)}` : ""})`

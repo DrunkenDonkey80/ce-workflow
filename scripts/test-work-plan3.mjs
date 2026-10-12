@@ -334,6 +334,10 @@ try {
 		assert.match(packet, /Omitted[^\n]*Phases \(\d+ B\), References \(\d+ B\), Backlog \(\d+ B\), Amendments \(\d+ B\)/);
 		assert(!packet.includes("L-99") && !packet.includes("Warning"));
 		assert.equal((await tool({ action: "get", plan: "9a9a9a9a", view: "step", id: "L-03" })).view, "- [wip] **L-03** Docs");
+		const guessed = await tool({ action: "get", plan: "9a9a9a9a", view: "step", id: "Z-99" });
+		assert.equal(guessed.unknownStep, "Z-99", "a guessed step id does not throw");
+		assert.match(guessed.view, /^No step "Z-99"\. Steps: .*L-03/);
+		assert("next" in guessed, "the soft miss still reports the next step");
 		assert.match((await tool({ action: "get", plan: "9a9a9a9a", view: "section", name: "Backlog" })).view, /^## Backlog\n\n- \[ \] \*\*L-99\*\*/);
 		await assert.rejects(tool({ action: "get", plan: "9a9a9a9a", view: "section", name: "Nope" }), /Sections: /);
 		await writeFile(leanFile, text.replace("## Amendments\n", `## Amendments\n\n${"history ".repeat(6000)}\n`));

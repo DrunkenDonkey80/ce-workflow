@@ -308,9 +308,9 @@ const pool = await poolFetch(poolDir);
 assert.deepEqual(
 	pool.map((w) => [w.text, w.color]),
 	[
-		["×3(D1) [███░░░░░] 40%", undefined],
-		["+30% in 2h 0m", undefined],
-		["+40% in 2d 0h", undefined],
+		["×3(D1) [█████░░░] 60%", undefined],
+		["90% in 2h 0m", undefined],
+		["100% in 2d 0h", undefined],
 		["→ a", undefined],
 		["ER:2d 12h (b)", "warning"],
 	],
@@ -324,7 +324,7 @@ const [row] = renderQuotaRows(
 	200,
 	T,
 );
-assert.equal(row, "Claude ×3(D1) [███░░░░░] 40% · +30% in 2h 0m · +40% in 2d 0h · → a · ER:2d 12h (b)");
+assert.equal(row, "Claude ×3(D1) [█████░░░] 60% · 90% in 2h 0m · 100% in 2d 0h · → a · ER:2d 12h (b)");
 const [styledRow] = renderQuotaRows(
 	[{ id: "claude", label: "Claude" }],
 	new Map([["claude", { authenticated: true, snapshot: { windows: pool }, lastSuccessAt: T }]]),
@@ -344,7 +344,7 @@ await writeMulti(
 	},
 );
 const drain = (await poolFetch(poolDir)).find((w) => w.id === "drain");
-assert.match(drain?.text ?? "", /^7d: \d+h \d+m \(83%\)$/, "soonest dying account with >15% left");
+assert.match(drain?.text ?? "", /^7d: \d+h \d+m \(17%\)$/, "soonest dying account with >15% left");
 assert.equal(drain.color, "error");
 await writeMulti(
 	[{ label: "a" }, { label: "b" }],
@@ -637,7 +637,7 @@ assert.match(
 			now(),
 		).join("\n"),
 	),
-	/^GLM\/Z\.ai 5h \[[█░]+\] 17% · 7d\(/,
+	/^GLM\/Z\.ai 5h \[[█░]+\] 83% · 7d\(/,
 	"resetless 5h renders first without countdown",
 );
 const weeklyMonthlyGlm = await glmFetch({
@@ -856,19 +856,19 @@ for (const line of wrapped) {
 }
 assert.ok(
 	wrapped.some((line) => /\x1b\[37m\[[█░]+\] 50%\x1b\[0m/.test(line)),
-	"white styles the bar and percentage through 50%",
+	"white styles quota with at least 50% remaining",
 );
 assert.ok(
-	wrapped.some((line) => /\x1b\[33m\[[█░]+\] 51%\x1b\[0m/.test(line)),
-	"yellow starts above 50%",
+	wrapped.some((line) => /\x1b\[33m\[[█░]+\] 49%\x1b\[0m/.test(line)),
+	"yellow starts below 50% remaining",
 );
 assert.ok(
-	wrapped.some((line) => /\x1b\[33m\[[█░]+\] 80%\x1b\[0m/.test(line)),
-	"yellow continues through 80%",
+	wrapped.some((line) => /\x1b\[33m\[[█░]+\] 20%\x1b\[0m/.test(line)),
+	"yellow continues through 20% remaining",
 );
 assert.ok(
-	wrapped.some((line) => /\x1b\[31m\[[█░]+\] 81%\x1b\[0m/.test(line)),
-	"red starts above 80%",
+	wrapped.some((line) => /\x1b\[31m\[[█░]+\] 19%\x1b\[0m/.test(line)),
+	"red starts below 20% remaining",
 );
 
 const typographyProviders = [
@@ -927,7 +927,7 @@ const typography = renderQuotaRows(
 );
 assert.equal(
 	stripAnsi(typography.join("\n")),
-	"Codex 7d(6d 1h) [█░░░░░░░] 12% │ Claude 5h(3h 55m) [█░░░░░░░] 15% · 7d(6d 10h) [░░░░░░░░] 2% │ GLM/Z.ai 5h [░░░░░░░░] 0% · 7d(4d 22h) [░░░░░░░░] 1%",
+	"Codex 7d(6d 1h) [███████░] 88% │ Claude 5h(3h 55m) [███████░] 85% · 7d(6d 10h) [████████] 98% │ GLM/Z.ai 5h [████████] 100% · 7d(4d 22h) [████████] 99%",
 	"plain quota typography and provider/window delimiters are exact",
 );
 assert.match(
@@ -1169,7 +1169,7 @@ const cachedComponent = cached.component();
 await flush();
 assert.match(
 	stripAnsi(cachedComponent.render(80).join("\n")),
-	/cached.*44%/,
+	/cached.*56%/,
 	"matching cache renders while fetch is pending",
 );
 resolveNetwork([
@@ -1279,7 +1279,7 @@ assert.equal(
 );
 assert.match(
 	stripAnsi(restartedComponent.render(120).join("\n")),
-	/Codex 5h.*70%/,
+	/Codex 5h.*30%/,
 	"fresh matching cache renders without a request",
 );
 await restartClock.advance(119_999);
@@ -1296,7 +1296,7 @@ assert.equal(
 );
 assert.match(
 	stripAnsi(restartedComponent.render(120).join("\n")),
-	/Codex 5h.*70%.*stale 0h 2m · quota rate limited/,
+	/Codex 5h.*30%.*stale 0h 2m · quota rate limited/,
 	"matching restart cache remains visible through quota 429",
 );
 await restartClock.advance(1_199_999);
@@ -1330,7 +1330,7 @@ const mismatchedText = stripAnsi(mismatchedComponent.render(120).join("\n"));
 assert.match(mismatchedText, /Codex quota unavailable · rate limited/);
 assert.doesNotMatch(
 	mismatchedText,
-	/70%|20%/,
+	/30%|80%/,
 	"identity mismatch never publishes another identity's cache",
 );
 mismatchedRestart.controller.shutdown(mismatchedRestart.ctx);
@@ -1529,7 +1529,7 @@ assert.equal(
 await fresh.clock.advance(600000);
 assert.match(
 	stripAnsi(freshComponent.render(80).join("\n")),
-	/recovered.*30%/,
+	/recovered.*70%/,
 	"complete success recovers",
 );
 fresh.controller.shutdown(fresh.ctx);
@@ -1653,7 +1653,7 @@ slowResolve([
 await flush();
 assert.match(
 	stripAnsi(independentComponent.render(80).join("\n")),
-	/Slow old.*10%.*stale/,
+	/Slow old.*90%.*stale/,
 	"partial malformed result retains atomic prior snapshot",
 );
 independent.controller.shutdown(independent.ctx);
@@ -1800,7 +1800,7 @@ await flush();
 assert.equal(statusRequests, 3);
 assert.match(
 	stripAnsi(incidentsComponent.render(120).join("\n")),
-	/Claude ! q.*12%/,
+	/Claude ! q.*88%/,
 	"incident marker does not replace quota",
 );
 assert.equal(incidents.controller.states.get("glm").incident, undefined);

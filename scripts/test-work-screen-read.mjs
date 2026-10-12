@@ -102,15 +102,19 @@ if (process.platform === "win32") {
 	}
 	// Live, only when an emulator/device is attached: android CLI, then the adb fallback with android hidden from PATH.
 	const adb = await exec("adb", ["devices"], { timeout: 15_000 }).catch(() => ({}));
-	if (/\tdevice\b/.test(adb.stdout ?? "")) {
-		const cli = await screenRead(exec, { target: "android", maxEdge: 128 });
+	const serials = [...(adb.stdout ?? "").matchAll(/^(\S+)\tdevice\b/gm)].map(m => m[1]);
+	if (serials.length > 1) // the CLI exits 0 without a file when several devices are online: report its message
+		await assert.rejects(screenRead(exec, { target: "android", maxEdge: 128 }), /wrote no image: .*Multiple devices/s);
+	if (serials.length) {
+		const android = { device: serials[0] };
+		const cli = await screenRead(exec, { target: "android", android, maxEdge: 128 });
 		assert.equal(cli.uniform, false);
 		const saved = process.env.PATH;
 		process.env.PATH = saved.split(";").filter(p => !/AndroidCLI/i.test(p)).join(";");
 		try {
-			const viaAdb = await screenRead(exec, { target: "android", maxEdge: 128 });
+			const viaAdb = await screenRead(exec, { target: "android", android, maxEdge: 128 });
 			assert.deepEqual([viaAdb.sourceWidth, viaAdb.sourceHeight], [cli.sourceWidth, cli.sourceHeight], "adb fallback captures the same screen");
-			const linux = await screenRead(null, { target: "android", maxEdge: 128 }, undefined, undefined, "linux");
+			const linux = await screenRead(null, { target: "android", android, maxEdge: 128 }, undefined, undefined, "linux");
 			assert.deepEqual([linux.sourceWidth, linux.sourceHeight], [cli.sourceWidth, cli.sourceHeight], "Node path adb fallback");
 		} finally { process.env.PATH = saved; }
 	}

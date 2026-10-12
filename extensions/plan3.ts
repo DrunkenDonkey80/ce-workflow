@@ -1542,8 +1542,9 @@ export default function plan3(pi) {
 				}
 				else if (args.view === "step") {
 					const step = steps(lines).find((candidate) => candidate.id === need("id"));
-					if (!step) throw new Error(`Unknown step "${args.id}". Steps: ${steps(lines).map((s) => s.id).join(", ")}`);
-					result = { view: lines.slice(step.index, blockEnd(lines, step)).join("\n") };
+					// A guessed id is a soft miss, not an error: codemode scripts keep running and see the real ids plus next.
+					result = step ? { view: lines.slice(step.index, blockEnd(lines, step)).join("\n") }
+						: { view: `No step "${args.id}". Steps: ${steps(lines).map((s) => s.id).join(", ")}`, unknownStep: args.id };
 				} else if (args.view === "section") {
 					const found = section(lines, need("name"));
 					if (!found) throw new Error(`Unknown section "${args.name}". Sections: ${sectionNames(lines).join(", ")}`);
