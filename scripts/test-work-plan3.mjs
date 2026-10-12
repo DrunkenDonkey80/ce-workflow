@@ -9,8 +9,14 @@ import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions } from "../extensions/plan3.ts";
-// Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.assert.deepEqual(inlineOptions("- **Q-03** Pick. Options: (a) freeze v1, keep hashes; (b) snapshots; (c) leave it. Picked (a).").map(o => o.label), ["(a) freeze v1, keep hashes", "(b) snapshots", "(c) leave it"]);assert.deepEqual(inlineOptions("- **Q-04** Cap? Options: accept as incomplete (current), raise the cap, or send smaller. Any change needs a version.").map(o => o.label), ["accept as incomplete (current)", "raise the cap", "send smaller"]);assert.deepEqual(inlineOptions("- **Q-07** Fix it with v3 or let Luna override?"), []);
+import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices } from "../extensions/plan3.ts";
+// Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
+assert.deepEqual(inlineOptions("- **Q-03** Pick. Options: (a) freeze v1, keep hashes; (b) snapshots; (c) leave it. Picked (a).").map(o => o.label), ["(a) freeze v1, keep hashes", "(b) snapshots", "(c) leave it"]);
+assert.deepEqual(inlineOptions("- **Q-04** Cap? Options: accept as incomplete (current), raise the cap, or send smaller. Any change needs a version.").map(o => o.label), ["accept as incomplete (current)", "raise the cap", "send smaller"]);
+assert.deepEqual(inlineOptions("- **Q-07** Fix it with v3 or let Luna override?"), []);
+// A question with only Context/Recommendation still offers the recommendation as an answer.
+assert.deepEqual(questionChoices("- **Q-02** Which plants?\n  - Context: two files.\n  - Recommendation: S-06 inspects them.").options, [{ label: "Accept recommendation", description: "S-06 inspects them." }]);
+assert.deepEqual(questionChoices("- **Q-05** Which?\n  - Recommendation: A.\n  - Option: A \u2014 first\n  - Option: B \u2014 second").options.map(o => o.label), ["A", "B"]);
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
 import { enterPlanDesign, recordPlanDesignAnswer, loadPlanDesign, localPlanDesign, planDesignGate, transitionPlanDesign, designPointer, publicDesignUrl, preflightDesignReference, addPlanDesignImage, humanPlanDesignDecision, planDesignReview, runPlanDesign, finishNativePlanDesign } from "../extensions/plan3-design.ts";
 import { nativeExportClient, nativeFileName, nativeFileHash } from "../extensions/plan3-native-export.ts";

@@ -214,7 +214,7 @@ export function inlineOptions(text) {
 	const choices = items.map((item) => item.trim()).filter(Boolean);
 	return choices.length < 2 ? [] : choices.map((item) => item.length <= 70 ? { label: item, description: "" } : { label: `${item.slice(0, 69)}…`, description: item });
 }
-function questionChoices(text) {
+export function questionChoices(text) {
 	const lines = text.split("\n");
 	const fields = lines.slice(1).map((line) => line.match(/^\s+- (Context|Recommendation|Option):\s*(.+)$/)).filter(Boolean);
 	const options = fields.filter((field) => field[1] === "Option").map((field) => {
@@ -222,6 +222,9 @@ function questionChoices(text) {
 		return { label, description: description.join(" — ") };
 	});
 	if (!options.length) options.push(...inlineOptions(text));
+	// No choices written at all: the Recommendation is still one answer the user can take.
+	const recommendation = fields.find((field) => field[1] === "Recommendation")?.[2];
+	if (!options.length && recommendation) options.push({ label: "Accept recommendation", description: recommendation });
 	return { title: lines[0].replace(/^(?:[-*]|\d+\.)\s+/, ""), context: lines.slice(1).filter(line => !/^\s+- Option:/.test(line)).join("\n").trim(), options };
 }
 
