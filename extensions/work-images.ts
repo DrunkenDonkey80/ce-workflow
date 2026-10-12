@@ -115,6 +115,14 @@ export async function fitImage(image, size, resize = resizeImage) {
 	return resized ? { ...image, data: resized.data, mimeType: resized.mimeType } : image;
 }
 
+// Pi's resize, or the original when Pi is absent or cannot fit it (the provider then reports the size).
+export async function shrinkImage(image, options, resize = resizeImage) {
+	const resized = resize && await resize(Buffer.from(image.data, "base64"), image.mimeType, options).catch(() => null);
+	if (!resized?.wasResized) return { image };
+	return { image: { ...image, data: resized.data, mimeType: resized.mimeType },
+		note: resized.width !== resized.originalWidth ? `sent at ${resized.width}x${resized.height} of ${resized.originalWidth}x${resized.originalHeight}` : `sent as ${resized.mimeType}` };
+}
+
 export function imageModelCanDraw(model) {
 	return model?.api === "openai-codex-responses";
 }
@@ -149,11 +157,20 @@ export function createImageTools(pi, { visionModel: configured, imageModel, visi
 			if (sources.length > 10) throw new Error("Pass at most 10 images per question.");
 			const source = sources.join(", ");
 			const model = visionModel(ctx.cwd, ctx.model);
-			const ids = sources.map(value => /^img-[a-f0-9]{16}$/.test(value) ? value : visionBridge.remember(readImageFile(resolve(ctx.cwd, value))));
+			// Vision models read files at original resolution, so only shrink past provider limits: 5000px stays under
+			// OpenAI's 30k-patch reject, 4.5MB under Anthropic's 5MB per image, and the shared budget under request caps.
+			const budget = { maxWidth: 5000, maxHeight: 5000, maxBytes: Math.min(4.5, 24 / sources.length) * 1024 * 1024 };
+			const notes = [];
+			const ids = await Promise.all(sources.map(async (value, index) => {
+				if (/^img-[a-f0-9]{16}$/.test(value)) return value;
+				const { image, note } = await shrinkImage(readImageFile(resolve(ctx.cwd, value)), budget);
+				if (note) notes.push(`${sources.length > 1 ? `Image ${index + 1} ` : ""}${note}`);
+				return visionBridge.remember(image);
+			}));
 			const image = ids.length === 1 ? ids[0] : ids;
 			const { text, usage, cached } = await visionBridge.inspect({ image, question: args.question, model, registry: ctx.modelRegistry, signal });
 			return {
-				content: [{ type: "text", text: `Interpretation by ${model} of ${source} (not independently verified):\n${text}` }],
+				content: [{ type: "text", text: `Interpretation by ${model} of ${source} (not independently verified):\n${text}${notes.length ? `\n[${notes.join("; ")}; crop the file to the area of interest for full detail.]` : ""}` }],
 				details: { image: source, model, cached, usage },
 			};
 		},

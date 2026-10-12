@@ -1748,6 +1748,14 @@ try {
 	assert.match(many.content[0].text, new RegExp(`of ${imageId}, shot\\.png`));
 	await assert.rejects(tools.process_image.execute("call", { image: Array(11).fill(imageId), question: "What?" }, undefined, null, visionCtx), /at most 10/);
 	await assert.rejects(tools.process_image.execute("call", { image: [imageId, ""], question: "What?" }, undefined, null, visionCtx), /Pass image/);
+	const { shrinkImage } = await import("../extensions/work-images.ts");
+	const big = { type: "image", data: pixels, mimeType: "image/png" };
+	let asked;
+	const shrunk = await shrinkImage(big, { maxWidth: 5000, maxHeight: 5000, maxBytes: 9 }, async (_bytes, _mime, options) => (asked = options, { data: "eA==", mimeType: "image/jpeg", wasResized: true, width: 3000, height: 2000, originalWidth: 6000, originalHeight: 4000 }));
+	assert.equal(asked.maxWidth, 5000, "provider limits, not Pi's 2000px default");
+	assert.deepEqual([shrunk.image.mimeType, shrunk.note], ["image/jpeg", "sent at 3000x2000 of 6000x4000"]);
+	assert.deepEqual(await shrinkImage(big, {}, async () => ({ wasResized: false })), { image: big }, "fitting images go unchanged");
+	assert.deepEqual(await shrinkImage(big, {}, async () => { throw new Error("photon"); }), { image: big }, "resize failure keeps the original");
 	// generate_image: OpenRouter image models use generateImages; Codex chat models use the Responses image_generation tool.
 	await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "fox.png" }, undefined, null, visionCtx), /Choose an image generation model/);
 	assert.match(tools.generate_image.promptGuidelines[0], /tools\.generate_image.*not models\.generateImages/, "codemode agents are steered off models.generateImages");
