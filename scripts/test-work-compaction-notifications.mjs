@@ -1739,6 +1739,15 @@ try {
 	assert.deepEqual(tools.process_image.parameters.required, ["image", "question"], "no optional fields for strict providers to null out");
 	await assert.rejects(tools.process_image.execute("call", { image: "", question: "What?" }, undefined, null, visionCtx), /Pass image/);
 	await assert.rejects(tools.process_image.execute("call", { image: "notes.txt", question: "What?" }, undefined, null, visionCtx), /not a supported image/);
+	// Several images go in one request, numbered in order.
+	let visionParts;
+	const many = await tools.process_image.execute("call", { image: [imageId, "shot.png"], question: "Which differs?" }, undefined, null,
+		{ ...visionCtx, cwd, modelRegistry: { find: () => ({ input: ["text", "image"] }), streamSimple: (_model, request) => { visionParts = request.messages[0].content; return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: "Same." }] }) }; } } });
+	assert.deepEqual(visionParts.map(part => part.type === "text" ? part.text.slice(0, 8) : part.type), ["Answer t", "Image 1:", "image", "Image 2:", "image"]);
+	assert.match(visionParts[0].text, /2 images/);
+	assert.match(many.content[0].text, new RegExp(`of ${imageId}, shot\\.png`));
+	await assert.rejects(tools.process_image.execute("call", { image: Array(11).fill(imageId), question: "What?" }, undefined, null, visionCtx), /at most 10/);
+	await assert.rejects(tools.process_image.execute("call", { image: [imageId, ""], question: "What?" }, undefined, null, visionCtx), /Pass image/);
 	// generate_image: OpenRouter image models use generateImages; Codex chat models use the Responses image_generation tool.
 	await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "fox.png" }, undefined, null, visionCtx), /Choose an image generation model/);
 	assert.match(tools.generate_image.promptGuidelines[0], /tools\.generate_image.*not models\.generateImages/, "codemode agents are steered off models.generateImages");
