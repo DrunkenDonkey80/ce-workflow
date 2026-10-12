@@ -1102,11 +1102,6 @@ export function imageModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	return String(settings.workOrchestrator?.imageModel ?? NONE_MODEL);
 }
 
-export function nonVisionModelsSettings(cwd, settings = readEffectiveSettings(cwd)) {
-	return Array.isArray(settings.workOrchestrator?.nonVisionModels)
-		? settings.workOrchestrator.nonVisionModels.filter(value => typeof value === "string")
-		: [];
-}
 
 export function compactionModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const configured = settings.workOrchestrator?.context ?? {};
@@ -3755,9 +3750,8 @@ if (blockedInternalBackgroundCompletionTurn) {
 		return event.payload;
 	});
 
-	pi.on("context", (event, ctx) => visionBridge.project(
-		event.messages, ctx.model, nonVisionModelsSettings(ctx.cwd), visionModelSettings(ctx.cwd),
-	));
+	// Every model gets img- references: pixels replayed each turn cost more than a process_image call.
+	pi.on("context", (event) => visionBridge.project(event.messages));
 	pi.on("context", (event, ctx) => filteredContext(event, ctx));
 	pi.on("context", (event, ctx) => compactionNoteNudge(event, ctx));
 	pi.on("agent_end", () => { activePromptBackedAgent = false; });
@@ -4175,7 +4169,6 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "phaseModel") return owns(block?.plan3, item.value);
 	if (item.kind === "visionModel") return owns(block, "visionModel");
 	if (item.kind === "imageModel") return owns(block, "imageModel");
-	if (item.kind === "nonVisionModels") return owns(block, "nonVisionModels");
 	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
 	return false;
 }
@@ -4403,11 +4396,6 @@ async function workSettingsLoop(ctx) {
 				description: "generate_image: a Codex subscription model (e.g. Sol) or an OpenRouter image model draws and saves PNG files.",
 			},
 {
-				kind: "nonVisionModels", value: "nonVisionModels",
-				label: `Models without vision: [${nonVisionModelsSettings(ctx.cwd, settings).length || "None"}] ${SUBMENU_ARROW}`,
-				description: "Only selected models receive image references instead of pixels.",
-			},
-{
 				kind: "openDesignCommand",
 				value: "openDesignCommand",
 				label: `OpenDesign executable: ${openDesignCommand ? "Configured" : "Auto"} ${SUBMENU_ARROW}`,
@@ -4553,24 +4541,6 @@ async function workSettingsLoop(ctx) {
 			continue;
 		}
 
-		if (pick.kind === "nonVisionModels") {
-			const selected = await showListDialog(ctx, {
-				title: "Models without vision",
-				purpose: "Select models that cannot read images; Esc saves and returns.",
-				items: (await ctx.modelRegistry.getAvailable()).map(entry => {
-					const model = entry.model ?? entry;
-					return { value: `${model.provider}/${model.id}`, label: model.name ?? model.id, description: `${model.provider}/${model.id}`, preserveCase: true };
-				}),
-				multi: { selected: nonVisionModelsSettings(ctx.cwd, settings) },
-				forceCustom: true,
-			});
-			if (!selected) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			settings.workOrchestrator ??= {};
-			settings.workOrchestrator.nonVisionModels = selected.values;
-			writeScopedSettings(ctx.cwd, scope, settings);
-			continue;
-		}
 		if (pick.kind === "visionModel" || pick.kind === "imageModel") {
 			const vision = pick.kind === "visionModel";
 			// Vision keeps every model (image metadata is unreliable); drawing needs a Codex model or an image model.

@@ -4,8 +4,11 @@ import { createHash } from 'node:crypto';
 export function createVisionBridge() {
   const images = new Map();
   const answers = new Map();
+  // Context is re-projected every turn; hash each stored part once.
+  const hashes = new WeakMap();
   function remember(part) {
-    const id = `img-${createHash('sha256').update(part.mimeType + ':' + part.data).digest('hex').slice(0, 16)}`;
+    const id = hashes.get(part) ?? `img-${createHash('sha256').update(part.mimeType + ':' + part.data).digest('hex').slice(0, 16)}`;
+    hashes.set(part, id);
     images.delete(id);
     images.set(id, { type: 'image', data: part.data, mimeType: part.mimeType });
     // ponytail: retain 32 recent images; reread older images if the research session exceeds this cache.
@@ -15,8 +18,7 @@ export function createVisionBridge() {
   return {
     remember,
     clear() { images.clear(); answers.clear(); },
-    project(messages, model, nonVisionModels = [], visionModel) {
-      if (!model || `${model.provider}/${model.id}` === visionModel || !nonVisionModels.includes(`${model.provider}/${model.id}`)) return undefined;
+    project(messages) {
       let changed = false;
       const projected = messages.map(message => {
         if (!Array.isArray(message.content) || !message.content.some(part => part?.type === 'image')) return message;
@@ -25,7 +27,7 @@ export function createVisionBridge() {
           if (part?.type === 'text') return [{ ...part, text: part.text.replace('\n[Current model does not support images. The image will be omitted from this request.]', '') }];
           if (part?.type !== 'image') return [part];
           const id = remember(part);
-          return [{ type: 'text', text: `[Image ${id}: pixels are unavailable to this model. Use process_image with a specific question to inspect them. The answer is another model's interpretation, not visual verification.]` }];
+          return [{ type: 'text', text: `[Image ${id}: pixels are kept out of this context. Use process_image with a specific question to inspect them. The answer is another model's interpretation, not visual verification.]` }];
         }) };
       });
       return changed ? { messages: projected } : undefined;

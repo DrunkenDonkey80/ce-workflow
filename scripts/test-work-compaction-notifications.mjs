@@ -1703,22 +1703,21 @@ try {
 			},
 		},
 	};
-	assert.equal(await hooks.context({ messages: [imageMessage] }, visionCtx), undefined, "models are presumed vision-capable unless selected");
-	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "__none_model__", nonVisionModels: ["test/text"] } }));
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "__none_model__" } }));
 	const projected = await hooks.context({ messages: [imageMessage] }, visionCtx);
 	assert.equal(imageMessage.content[1].data, pixels, "saved image remains untouched");
 	assert.equal(projected.messages[0].content.some(part => part.type === "image"), false);
 	assert.doesNotMatch(projected.messages[0].content[0].text, /image will be omitted/);
 	const imageId = /img-[a-f0-9]{16}/.exec(JSON.stringify(projected.messages))[0];
-	assert.equal((await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "text", input: ["text", "image"] } })).messages[0].content.some(part => part.type === "image"), false, "explicit non-vision overrides metadata");
+	assert.equal((await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "text", input: ["text", "image"] } })).messages[0].content.some(part => part.type === "image"), false, "vision-capable models get references too");
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx), /Configure a vision model/);
 	const readBlock = async file => (await Promise.all(toolCallHooks.map(hook => hook({ toolName: "read", input: { path: file } }, visionCtx)))).find(result => result?.block);
 	assert.equal(await readBlock("shot.PNG"), undefined, "without a vision model, read keeps loading images");
 	const seeing = { ...visionCtx, model: { provider: "test", id: "seeing", input: ["text", "image"] } };
 	assert.equal((await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, seeing)).details.model, "test/seeing", "no vision model: the current image-capable model answers");
 	assert.match((await Promise.all(toolCallHooks.map(hook => hook({ toolName: "read", input: { path: "shot.PNG" } }, seeing)))).find(result => result?.block)?.reason ?? "", /process_image/, "and image reads go through it");
-	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision", nonVisionModels: ["test/text", "test/vision"] } }));
-	assert.equal(await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "vision" } }), undefined, "selected vision model always keeps images");
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision" } }));
+	assert.equal((await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "vision" } })).messages[0].content.some(part => part.type === "image"), false, "even the vision model gets references in the main context");
 	assert.match((await readBlock("out/shot.PNG"))?.reason ?? "", /process_image with image "out\/shot\.PNG"/, "image reads go to the vision model");
 	assert.equal(await readBlock("notes.md"), undefined, "text files still read normally");
 	const described = await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx);
@@ -1812,7 +1811,7 @@ try {
 		{ ...codexCtx, modelRegistry: { ...codexCtx.modelRegistry, find: (provider, id) => ({ provider, id, api: "openai-codex-responses", baseUrl: "https://evil.example/v1" }) } }), /Refusing to send the ChatGPT login/);
 	await assert.rejects(tools.generate_image.execute("call", { prompt: "fox", path: "x.png" }, undefined, null,
 		{ ...codexCtx, modelRegistry: { ...codexCtx.modelRegistry, find: (provider, id) => ({ provider, id, api: "anthropic-messages" }) } }), /cannot generate images/);
-	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision", nonVisionModels: ["test/text", "test/vision"] } }));
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision" } }));
 	// Research is user-controlled; old auto settings cannot restore agent authority.
 	const manualCtx = { ...fullCtx, getContextUsage: () => ({ tokens: 1 }) };
 	await hooks.session_tree({}, { ...manualCtx, sessionManager: { ...manualCtx.sessionManager, getBranch: () => [] } });

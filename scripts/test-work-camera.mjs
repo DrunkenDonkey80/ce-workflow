@@ -350,7 +350,7 @@ assert.ok(!stripped[0].content.some(part => part.type === "image"));
 assert.ok(stripped[0].content.some(part => part.type === "text" && part.text.includes(burst.frames[1].id)), "manifest survives pixel stripping");
 const { createVisionBridge } = await import("../extensions/work-vision.ts");
 const bridge = createVisionBridge();
-const projected = bridge.project(conversation, { provider: "fixture", id: "nonvision" }, ["fixture/nonvision"], "fixture/vision");
+const projected = bridge.project(conversation);
 assert.ok(projected.messages[0].content.some(part => part.type === "text" && part.text.includes("another model's interpretation")));
 assert.ok(projected.messages[0].content.some(part => part.type === "text" && part.text.includes(burst.frames[1].id)));
 retained.drop(projectDir, burst.frames[1].id);
@@ -516,11 +516,9 @@ assert.equal(wakeMessages[2].content.filter(part => part.type === "image").lengt
 assert.equal(wakeMessages[2].details.frames[0].capture.timestamp, 5100, "settled evidence is the actual fresh terminal frame");
 assert.equal(wakeMessages[2].details.sampling.quietDurationMs, 600);
 const cameraCustomMessage = { role: "custom", ...wakeMessages[2] };
-const nativeProjection = bridge.project([cameraCustomMessage], { provider: "fixture", id: "vision" }, ["fixture/nonvision"], "fixture/vision");
-assert.equal(nativeProjection, undefined, "native vision is not rewritten by the non-vision bridge");
-assert.ok(cameraCustomMessage.content.some(part => part.type === "image"), "native vision retains the actual settled image");
-const customProjection = bridge.project([cameraCustomMessage], { provider: "fixture", id: "nonvision" }, ["fixture/nonvision"], "fixture/vision");
-assert.ok(customProjection.messages[0].content.some(part => part.type === "text" && part.text.includes("another model's interpretation")), "native camera wake uses the configured non-vision bridge");
+const customProjection = bridge.project([cameraCustomMessage]);
+assert.ok(cameraCustomMessage.content.some(part => part.type === "image"), "the saved wake keeps the actual settled image");
+assert.ok(customProjection.messages[0].content.some(part => part.type === "text" && part.text.includes("another model's interpretation")), "camera wakes reach the model as image references");
 const faultyWatch = createCameraWatch({ on() {}, sendMessage(message) { wakeMessages.push(message); } }, watchController, {
 	async acquire(_ctx, _controller, _input, callbacks) { callbacks.owner({ lease: { expiresAt: Date.now() + 1000 }, current() {}, async finish() {} }); callbacks.sample(observation(0, 0, "ready"), geometry); throw new Error("fixture disconnected"); },
 });
