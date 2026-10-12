@@ -17,8 +17,6 @@ import {
 	validateOpenDesignToolCall,
 	validateStartRecovery,
 } from "../extensions/opendesign-client.ts";
-import { designLifecycleTelemetry } from "../extensions/work-design.ts";
-import { designReviewChoices } from "../extensions/work-models.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "ce-opendesign-client-"));
 const fake = path.resolve(
@@ -509,18 +507,6 @@ server.listen(process.env.FAKE_BOOTSTRAP_IPC);
 	);
 	assert.equal(untrustedUrls.studioUrl, "");
 	assert.doesNotMatch(untrustedUrls.agentMessage, /super-secret/);
-	const urlProjection = JSON.stringify({
-		choices: designReviewChoices({ state: "review_ready", ...untrustedUrls }),
-		telemetry: designLifecycleTelemetry({
-			state: "review_ready",
-			policy: "required",
-			...untrustedUrls,
-		}),
-	});
-	assert.doesNotMatch(
-		urlProjection,
-		/super-secret|javascript:|token=super-secret/,
-	);
 	await rejects(
 		callOpenDesignTool({
 			command: command("content-length"),

@@ -95,7 +95,6 @@ const WORK_CATCH_UP_BASELINE_PATH = resolve(
 	"extensions",
 	"work-catch-up-baseline.json",
 );
-const WORK_ORCH_AGENT_DIR = resolve(WORKFLOW_REPO_DIR, "agents");
 
 const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
 const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
@@ -172,11 +171,11 @@ export function exposeBundledSubagentAgents() {
 	const normalize = (dir) =>
 		process.platform === "win32" ? resolve(dir).toLowerCase() : resolve(dir);
 	const utilityDir = join(WORKFLOW_REPO_DIR, "utility-agents");
-	const owned = new Set([WORK_ORCH_AGENT_DIR, utilityDir].map(normalize));
+	const owned = normalize(utilityDir);
 	// Remove our previous runtime's scan roots on reload; preserve unrelated roots.
 	const entries = (process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] ?? "")
 		.split(delimiter)
-		.filter((entry) => entry && !owned.has(normalize(entry)));
+		.filter((entry) => entry && normalize(entry) !== owned);
 	if (existsSync(utilityDir)) entries.push(utilityDir);
 
 	if (entries.length) process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] = entries.join(delimiter);
@@ -2864,9 +2863,6 @@ function extensionScoutProjectContext(ctx, pi) {
 		}
 	};
 	const packageJson = readJson(join(ctx.cwd, "package.json"));
-	const inventory = readJson(
-		join(ctx.cwd, "extensions", "work-compound-inventory.json"),
-	);
 	const userSettings = readJson(globalSettingsPath());
 	const projectSettings = readJson(join(ctx.cwd, ".pi", "settings.json"));
 	const packageSources = [
@@ -2912,7 +2908,6 @@ function extensionScoutProjectContext(ctx, pi) {
 		projectExtensions: names(join(ctx.cwd, "extensions"), ".js"),
 		agents: names(join(ctx.cwd, "agents"), ".md", 50),
 		skills: names(join(ctx.cwd, "skills"), "", 50),
-		workflowCapabilities: Object.keys(inventory.parityIndex ?? {}).slice(0, 50),
 		contextFiles,
 		activeTools: (pi?.getAllTools?.() ?? [])
 			.map(({ name }) => name)

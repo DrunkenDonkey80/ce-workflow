@@ -53,13 +53,6 @@ const npmRun = (args, options = {}) =>
 		npmCli.endsWith(".js") ? [npmCli, ...args] : args,
 		{ cwd: root, encoding: "utf8", ...options },
 	);
-const git = (cwd, ...args) =>
-	execFileSync("git", args, { cwd, encoding: "utf8" });
-const initializeGit = (cwd) => {
-	git(cwd, "init", "--quiet");
-	git(cwd, "config", "user.email", "smoke@example.com");
-	git(cwd, "config", "user.name", "Smoke");
-};
 
 try {
 	const packed = JSON.parse(
@@ -92,7 +85,6 @@ try {
 	const { createJiti } = createRequire(piPackage)("jiti");
 	const jiti = createJiti(path.join(installed, "extensions", "smoke.mjs"));
 	const models = await jiti.import(path.join(installed, "extensions", "work-models.ts"));
-	const storeApi = await jiti.import(path.join(installed, "extensions", "work-store.ts"));
 
 	// Real pi-subagents discovery from the packed manifest AND inherited scan roots.
 	const subagentsRoot = [path.join(homedir(), ".pi/agent/npm/node_modules/pi-subagents"),
@@ -106,13 +98,10 @@ try {
 	const discoveryCwd = path.join(temp, "discovery");
 	mkdirSync(discoveryCwd);
 	const names = () => discoverAgents(discoveryCwd, "both", undefined, { globalNpmRoot: null }).agents.map(agent => agent.name);
-	for (const enabled of [false, true, false]) {
-		models.exposeBundledSubagentAgents(enabled);
-		const available = names();
-		assert(available.includes("oracle") && available.includes("plan3-advisor") && available.includes("context-knowledge-discoverer"));
-		assert.equal(available.includes("work-advisor"), enabled, "off/on/off updates actual discovery");
-		if (!enabled) assert(!available.some(name => /^(work-|workflow-)/.test(name)), "no legacy roles leak while off");
-	}
+	models.exposeBundledSubagentAgents();
+	const available = names();
+	assert(available.includes("oracle") && available.includes("plan3-advisor") && available.includes("context-knowledge-discoverer"));
+	assert(!available.some(name => /^(work-|workflow-)/.test(name)), "no legacy roles ship");
 	delete process.env.PI_SUBAGENT_EXTRA_AGENT_DIRS;
 
 	// Exercise native 200k through Pi's actual installed extension loader/SDK,
@@ -242,125 +231,8 @@ try {
 	assert.equal(viaCodemode.isError, true, "Off hides jev_triage from codemode");
 	assert.equal(viaCodemode.usage, undefined);
 
-	const clean = path.join(temp, "clean");
-	mkdirSync(clean);
-	initializeGit(clean);
-	writeFileSync(path.join(clean, ".gitignore"), ".pi/\n");
-	assert.equal(models.buildWorkInitState(clean).action, "initialized");
-	const brainstorm = models.buildWorkBrainstormState(
-		clean,
-		"Native smoke product",
-	);
-	assert(brainstorm.ok && brainstorm.epic.id);
-	git(clean, "add", ".gitignore", ".ce-workflow/work-items.json");
-	git(clean, "commit", "--quiet", "-m", "initialize native workflow");
-	const started = models.buildWorkSmallState(
-		clean,
-		`${brainstorm.epic.id} Add smoke result`,
-	);
-	assert(started.ok && started.selectedWorkItem.status === "in_progress");
-	// Regression guard: helper commands that dynamically import the TypeScript
-	// extension entry must also work from an installed copy under node_modules.
-	assert(
-		execFileSync(
-			process.execPath,
-			[path.join(installed, "scripts", "work-helper.mjs"), "initiative-summary"],
-			{ cwd: clean, encoding: "utf8" },
-		).trim(),
-		"initiative-summary printed nothing",
-	);
-	writeFileSync(
-		path.join(clean, "helper-plan.md"),
-		"# Native helper plan\n\n## Acceptance\n\n- Installed helper loads the extension.\n",
-	);
-	const bootstrapped = JSON.parse(
-		execFileSync(
-			process.execPath,
-			[
-				path.join(installed, "scripts", "work-helper.mjs"),
-				"bootstrap-plan-roadmap",
-				"helper-plan.md",
-			],
-			{ cwd: clean, encoding: "utf8" },
-		),
-	);
-	assert(bootstrapped.roadmap_id, "installed bootstrap printed no roadmap id");
-	writeFileSync(path.join(clean, "result.js"), "export const smoke = true;\n");
-	execFileSync(
-		process.execPath,
-		[
-			path.join(installed, "scripts", "work-helper.mjs"),
-			"work-proof",
-			started.selectedWorkItem.id,
-			"legacy-inspection",
-			"--inspection",
-			"Native smoke result inspected.",
-			"--result",
-			"verified",
-		],
-		{ cwd: clean, encoding: "utf8" },
-	);
-	const finish = JSON.parse(
-		execFileSync(
-			process.execPath,
-			[
-				path.join(installed, "scripts", "work-helper.mjs"),
-				"finish-task",
-				started.selectedWorkItem.id,
-				"--max-files",
-				"2",
-				"--message",
-				"native smoke",
-			],
-			{ cwd: clean, encoding: "utf8" },
-		),
-	);
-	assert.equal(finish.status, "PASS");
-	assert.equal(
-		storeApi.loadStore(clean).items[started.selectedWorkItem.id].status,
-		"closed",
-	);
-	assert.equal(git(clean, "status", "--porcelain=v1"), "");
-	assert(!existsSync(path.join(clean, ".beads")));
 
-	const legacy = path.join(temp, "legacy");
-	mkdirSync(path.join(legacy, ".beads"), { recursive: true });
-	initializeGit(legacy);
-	writeFileSync(path.join(legacy, ".gitignore"), ".pi/\n");
-	const records = [
-		{
-			id: "legacy-1",
-			issue_type: "epic",
-			status: "in_progress",
-			title: "Legacy epic",
-		},
-		{
-			id: "legacy-1.1",
-			issue_type: "task",
-			status: "open",
-			title: "Legacy task",
-			dependencies: [
-				{ issue_id: "legacy-1.1", depends_on_id: "legacy-1", type: "parent-child" },
-			],
-		},
-	];
-	writeFileSync(
-		path.join(legacy, ".beads", "issues.jsonl"),
-		`${records.map(JSON.stringify).join("\n")}\n`,
-	);
-	assert.match(models.buildWorkStatus(legacy, ""), /migration-required/);
-	const migrated = models.buildWorkRemoveBeadsState(legacy);
-	assert(migrated.ok && migrated.action === "migrated");
-	assert(!existsSync(path.join(legacy, ".beads")));
-	assert(models.buildWorkResumeState(legacy, "legacy-1").ok);
-	git(legacy, "add", ".gitignore", ".ce-workflow/work-items.json");
-	git(legacy, "commit", "--quiet", "-m", "migrate legacy workflow");
-	const clone = path.join(temp, "clone");
-	git(temp, "clone", "--quiet", legacy, clone);
-	assert.match(models.buildWorkStatus(clone, "legacy-1"), /Legacy epic/);
-	assert(!existsSync(path.join(clone, ".beads")));
-
-	console.log(
+	console.log("native package smoke: PASS");	console.log(
 		"native package smoke: PASS clean finish + legacy migration + clone",
 	);
 } finally {

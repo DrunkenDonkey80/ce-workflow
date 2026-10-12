@@ -1,7 +1,7 @@
 {
   "name": "pi-work-orchestrator",
   "version": "0.1.37",
-  "description": "Native work-item Pi workflow package for staged software work orchestration.",
+  "description": "Plan3 planning and execution, research mode, compaction and utility tools for Pi.",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -11,11 +11,9 @@
     "workflow"
   ],
   "files": [
-    "agents/",
     "utility-agents/",
     "benchmarks/",
     "extensions/",
-    "prompts/",
     "scripts/",
     "skills/",
     "README.md"
@@ -37,11 +35,6 @@
     ],
     "skills": [
       "./skills/frontend-design"
-    ],
-    "prompts": [
-      "./prompts/idea.md",
-      "./prompts/simple.md",
-      "./prompts/complicated.md"
     ],
     "subagents": {
       "agents": [
