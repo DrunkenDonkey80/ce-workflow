@@ -1475,12 +1475,7 @@ try {
 	const taskSettings = JSON.parse(readFileSync(taskSettingsPath, "utf8"));
 	writeFileSync(taskSettingsPath, JSON.stringify({ ...taskSettings,
 		workOrchestrator: { ...taskSettings.workOrchestrator,
-			advisorEnabled: { advisor: true, advisor2: true, advisor3: true },
-			advisorSources: { advisor: "model", advisor2: "model", advisor3: "model" } },
-		subagents: { agentOverrides: {
-			"work-advisor": { model: "test/astra" },
-			"work-advisor-2": { model: "test/opus" },
-			"work-advisor-3": { model: "test/glm" } } },
+			plan3: { models: ["astra", "opus", "glm"].map(id => ({ model: `test/${id}`, thinking: "high" })) } },
 	}));
 	let availabilityChecks = 0;
 	const taskCtx = { ...researchCtx, model: { provider: "test", id: "glm" }, getContextUsage: () => ({ tokens: 1 }),
@@ -1491,11 +1486,11 @@ try {
 	const selectedTaskModels = () => JSON.parse(taskPrompts.at(-1).match(/Slots: (\[[^\n]+?\])\. Wait/)?.[1] ?? "[]").map(slot => slot.model);
 	assert.deepEqual(selectedTaskModels(), ["test/astra", "test/opus"], "Wide on GLM calls Astra and Opus, not GLM");
 	assert.doesNotMatch(taskPrompts.at(-1), /ask_user/, "explicit Wide does not ask again");
-	await commands.ideate.handler("wide compare alternatives", { ...taskCtx, model: { provider: "test", id: "sol" } });
+	await commands.research.handler("wide compare alternatives", { ...taskCtx, model: { provider: "test", id: "sol" } });
 	assert.deepEqual(selectedTaskModels(), ["test/astra", "test/opus", "test/glm"], "Wide on another model calls all three advisors");
 	await commands.research.handler("narrow compare options", { ...taskCtx, model: { provider: "test", id: "astra" } });
 	assert.deepEqual(selectedTaskModels(), ["test/opus"], "Narrow skips the inline advisor before selecting the first other model");
-	await commands.ideate.handler("narrow compare alternatives", { ...taskCtx, model: { provider: "test", id: "sol" },
+	await commands.research.handler("narrow compare alternatives", { ...taskCtx, model: { provider: "test", id: "sol" },
 		modelRegistry: { getAvailable: () => [{ provider: "test", id: "glm" }] } });
 	assert.deepEqual(selectedTaskModels(), ["test/glm"], "Narrow skips unavailable advisors in list order");
 	const checksBeforeNone = availabilityChecks;
@@ -1506,9 +1501,9 @@ try {
 	await commands.research.handler("narrow compare options", { ...taskCtx,
 		modelRegistry: { getAvailable: () => { throw new Error("Unavailable registry"); } } });
 	assert.deepEqual(selectedTaskModels(), [], "availability failures continue safely with the inline agent only");
-	await commands.ideate.handler("improve onboarding", taskCtx);
+	await commands.research.handler("improve onboarding", taskCtx);
 	assert.match(taskPrompts.at(-1), /ask_user/);
-	assert.match(taskPrompts.at(-1), /Do not invoke ideation capture or create WorkItems/);
+	assert.match(taskPrompts.at(-1), /without implementation or work-store capture/);
 	assert.equal(researchEntries.at(-1).data.notes, taskNotebook, "exploration reuses the active temp notebook");
 	await commands.research.handler("off", { ...taskCtx, isIdle: () => false });
 	assert.equal(researchEntries.at(-1).data.stopping, true, "even below 150k protection waits until the work finishes");

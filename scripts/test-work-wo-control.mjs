@@ -9,9 +9,11 @@ const commands = {}, shortcuts = {}, tools = {}, hooks = {};
 const sent = [], notices = [], forwarded = [];
 const previousSwitch = process.env.CE_WORKFLOW_ENABLED;
 const previousAgents = process.env.PI_SUBAGENT_AGENT_DIRS;
+const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 try {
 	// An old configuration cannot reactivate removed orchestration.
 	process.env.CE_WORKFLOW_ENABLED = "1";
+	process.env.PI_CODING_AGENT_DIR = path.join(cwd, "agent");
 	const pi = {
 		on: (name, handler) => { hooks[name] = handler; },
 		registerCommand: (name, config) => { commands[name] = config; },
@@ -36,6 +38,12 @@ try {
 		await commands.wo.handler(`${action} forbidden`, ctx);
 	assert.equal(sent.length, 0);
 	assert.match(notices.at(-1), /Unknown \/wo command/);
+	let labels = [];
+	await commands.wo.handler("settings", { ...ctx, hasUI: true,
+		ui: { ...ctx.ui, select: (_title, choices) => { labels = choices; return undefined; } } });
+	assert(labels.some(label => label.includes("OpenDesign executable")), "settings renders retained design controls");
+	assert(labels.some(label => label.includes("Planning model")), "settings renders Plan3 controls");
+	assert(!labels.some(label => /Workflow|Advisor 1|Effort profile|Background verifiers/.test(label)), "settings has no orchestration controls");
 	const event = { toolName: "ask_user", input: {} };
 	await hooks.tool_call(event, ctx);
 	assert.equal(event.input.allowComment, true);
@@ -43,5 +51,6 @@ try {
 } finally {
 	if (previousSwitch === undefined) delete process.env.CE_WORKFLOW_ENABLED; else process.env.CE_WORKFLOW_ENABLED = previousSwitch;
 	if (previousAgents === undefined) delete process.env.PI_SUBAGENT_AGENT_DIRS; else process.env.PI_SUBAGENT_AGENT_DIRS = previousAgents;
+	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
 	rmSync(cwd, { recursive: true, force: true });
 }

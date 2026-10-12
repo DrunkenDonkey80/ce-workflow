@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-12
-updated: 2026-10-12T08:16:19.970Z
+updated: 2026-10-12T08:39:35.042Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -95,8 +95,8 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 ### Phase 3: Dead-code sweep [code]
 
-- [wip] **S1** Run the AST sweep (D-03) on work-models.ts until stable, then review leftovers for mutually referencing dead groups.
-- [ ] **S2** Delete orphan modules; trim work-design, work-compound-source, work-compaction and work-store to what kept code uses.
+- [x] **S1** Reachability sweep removed unreachable cycles and legacy compaction/goal/role glue; work-models shrank from 33.6k to 4,738 lines, with zero unreachable declarations.
+- [wip] **S2** Delete orphan modules; trim work-design, work-compound-source, work-compaction and work-store to what kept code uses.
 - [ ] **S3** Confirm knowledge and scout pull in no large legacy code; ask the user if they do (D-02).
 
 ### Phase 4: Package, tests and docs [think]
