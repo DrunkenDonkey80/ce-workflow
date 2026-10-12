@@ -1,28 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { execFileSync } from "node:child_process";
-import {
-	appendFileSync,
-	closeSync,
-	copyFileSync,
-	constants as fsConstants,
-	existsSync,
-	mkdirSync,
-	lstatSync,
-	mkdtempSync,
-	openSync,
-	readdirSync,
-	readFileSync,
-	readSync,
-	realpathSync,
-	renameSync,
-	rmSync,
-	statSync,
-	writeFileSync,
-	writeSync,
-} from "node:fs";
+import { appendFileSync, closeSync, copyFileSync, constants as fsConstants, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { StringDecoder } from "node:string_decoder";
+
 import { fileURLToPath } from "node:url";
 import {
 	basename,
@@ -38,7 +19,7 @@ import {
 	migrateLegacyBeads,
 	modernizeLegacyAgentOverrides,
 } from "./legacy-beads-migration.ts";
-import { progressBar, showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.ts";
+import { showListDialog, showTreeWorkspaceDialog } from "./work-dialogs.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
@@ -63,52 +44,8 @@ import {
 	previewInitiativeCandidate,
 	projectInitiativeHierarchy,
 } from "./work-initiatives.ts";
-import {
-	acknowledgeVerifierFailure,
-	analysisInboxProjection,
-	analysisReviewProjection,
-	beginAnalysisCandidateFinalization,
-	blockAnalysisCandidateFinalization,
-	captureVerifierCheckpoint,
-	completeAnalysisCandidateFinalization,
-	claimCompletedGroups,
-	completeAcceptedFix,
-	discardAnalysisCandidates,
-	ingestAnalysisReview,
-	setAnalysisCandidateEnabled,
-	launchQueuedVerifierJobs,
-	loadVerifierStore,
-	mutateVerifierStore,
-	normalizeEffectiveProfiles,
-	reconcileVerifierRuns,
-	recordTriageDisposition,
-	renewAcceptedFixClaim,
-	renderTriageClaim,
-	renderVerifierFinding,
-	reopenGroup,
-	scheduleVerifierBatch,
-	verifierCompletionBlocker,
-	verifierStatus,
-	verifierTelemetryEvents,
-	TERMINAL_FAILURE_STATES,
-	TERMINAL_SUCCESS_STATES,
-	VERIFIER_CHECKPOINT_TOOL_NAMES,
-	VERIFIER_OPERATIONS,
-} from "./background-verifiers.ts";
-import {
-	acknowledgeLaneLaunch,
-	acquireRepositoryMutationLock,
-	captureRepositoryFingerprint,
-	createLaneEnvelope,
-	fingerprintsEqual,
-	laneStatus,
-	laneTelemetryEvents,
-	loadLaneStore,
-	promoteLane,
-	reconcileReadOnlyLanes,
-	runReadOnlyLaneBatch,
-	transitionLane,
-} from "./read-only-lanes.ts";
+import { analysisInboxProjection, analysisReviewProjection, beginAnalysisCandidateFinalization, blockAnalysisCandidateFinalization, captureVerifierCheckpoint, completeAnalysisCandidateFinalization, claimCompletedGroups, discardAnalysisCandidates, ingestAnalysisReview, setAnalysisCandidateEnabled, launchQueuedVerifierJobs, loadVerifierStore, mutateVerifierStore, normalizeEffectiveProfiles, reconcileVerifierRuns, renderTriageClaim, renderVerifierFinding, scheduleVerifierBatch, verifierStatus, verifierTelemetryEvents, TERMINAL_FAILURE_STATES, TERMINAL_SUCCESS_STATES, VERIFIER_CHECKPOINT_TOOL_NAMES, VERIFIER_OPERATIONS } from "./background-verifiers.ts";
+import { acquireRepositoryMutationLock, captureRepositoryFingerprint, fingerprintsEqual, laneStatus, laneTelemetryEvents, loadLaneStore, promoteLane, reconcileReadOnlyLanes, transitionLane } from "./read-only-lanes.ts";
 import {
 	acquireLock,
 	appendWorkNote,
@@ -130,7 +67,7 @@ import {
 	validateExecutableVerificationContract,
 	verificationContractStatus,
 } from "./work-verification-contract.ts";
-import { formatPendingFiles } from "../scripts/work-hygiene.mjs";
+
 import {
 	classifyShadowAssurance,
 	workflowTelemetryIdentity,
@@ -246,15 +183,15 @@ const IMPROVEMENT_REPORT_TOOL = "work_report_improvement";
 const DIRTY_CONTINUE_TOOL = "work_dirty_continue";
 const INITIATIVE_RECONCILE_TOOL = "work_initiative_reconcile";
 const TELEMETRY_DIR_NAME = "work-runs";
-const HISTORY_DIR_NAME = "history";
+
 const PENDING_DIRECT_FILE = "pending-direct.jsonl";
 const WORK_STATE_FILE = "work-orchestrator-state.json";
-const WORK_SHORTCUT_STATUS = "/wo Orchestrator · F8 compact · F9 Fleet";
+
 const UTILITY_SHORTCUT_STATUS = "/wo Utilities · F8 compact";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
 const CHATGPT_WEB_SOURCE = "chatgpt-web";
-const DEFAULT_THINKING = "__default_thinking__";
+
 const IDEA_LABEL = "wo:idea";
 const IDEA_SCHEMA_VERSION = 2;
 const BRAINSTORM_TITLE_MAX = 180;
@@ -265,15 +202,10 @@ const DISPLAY_METADATA_BATCH_SIZE = 40;
 const DISPLAY_METADATA_CONCURRENCY = 8;
 const FINISH_TASK_DEFAULT_MAX_FILES = 8;
 const displayMetadataRuns = new Map();
-const TASK_IMAGE_MIME_EXTENSIONS = new Map([
-	["image/png", ".png"],
-	["image/jpeg", ".jpg"],
-	["image/gif", ".gif"],
-	["image/webp", ".webp"],
-]);
-const RICH_TASK_PENDING_MAX_AGE_MS = 30 * 60 * 1000;
+
+
 const MAIN_EDITOR_ACTION_MARKER = "Idea or prompt:\n";
-const MAIN_EDITOR_ACTION_MAX_AGE_MS = 30 * 60 * 1000;
+
 const MAIN_EDITOR_ACTIONS = new Set([
 	"work-research",
 	"work-brainstorm",
@@ -334,10 +266,10 @@ const NATIVE_EDIT_GUIDANCE =
 	"Use Pi's native edit tool for existing files and write tool for new files. Do not rewrite tracked files through Python, Node, or shell; if unavoidable, re-read immediately. Never run a whole-file/project formatter unless explicitly requested; final diff evidence must come after the last mutating or test tool.";
 const SUBAGENT_RPC_REQUEST_EVENT = "subagents:rpc:v1:request";
 const SUBAGENT_RPC_REPLY_EVENT_PREFIX = "subagents:rpc:v1:reply:";
-const VERIFIER_WORKSPACE_MARKER = ".ce-verifier-workspace.json";
-const VERIFIER_MAX_BYTES = 32_000;
-const VERIFIER_MAX_LINES = 200;
-const VERIFIER_MAX_RESULTS = 100;
+
+
+
+
 const PREFERRED_JSON_SCHEMA_SAMPLING = Object.freeze({
 	type: "json_schema",
 	strict: "prefer",
@@ -587,32 +519,7 @@ const EFFORT_PROFILES = {
 };
 const DEFAULT_PROFILE = "medium";
 const MODEL_STRATEGIES = ["main-first", "round-robin"];
-const PROFILE_GUIDANCE = {
-	low: {
-		summary: "Lean execution for small, familiar, low-risk changes.",
-		pros: "Fastest feedback and lowest token use.",
-		cons: "Skips review and browser gates; weaker on ambiguity.",
-		consumption: "Lowest tokens · shortest time",
-	},
-	medium: {
-		summary: "Balanced default for ordinary product and maintenance work.",
-		pros: "Good coverage with one advisor, browser checks, and light review.",
-		cons: "Uses more time and tokens than Low; skips deeper planning gates.",
-		consumption: "Moderate tokens · moderate time",
-	},
-	high: {
-		summary: "Thorough planning and review for important or complex work.",
-		pros: "All advisors, browser checks, and review.",
-		cons: "Higher latency and token use, especially with several advisors.",
-		consumption: "High tokens · longer time",
-	},
-	max: {
-		summary: "Maximum scrutiny for risky, broad, or release-critical changes.",
-		pros: "Deep planning, maximum core effort, and full code review.",
-		cons: "Slowest and most expensive; unnecessary for routine changes.",
-		consumption: "Highest tokens · longest time",
-	},
-};
+
 const WORK_ORCH_BOOLEANS = [
 	{ key: "advisorVerifyTask", label: "Coded task-vs-plan checklist" },
 	{
@@ -642,7 +549,7 @@ const WORK_PERFORMANCE_FLAGS = [
 		defaultValue: true,
 	},
 ];
-const REVIEW_LEVELS = ["off", "light", "full"];
+
 
 const CREATIVE_MODES = ["off", "ask", "auto"];
 
@@ -689,11 +596,7 @@ function advisorEnabledForSlot(settings, slot) {
 	);
 }
 
-function setAdvisorEnabled(settings, slot, enabled) {
-	const block = workOrchBlock(settings);
-	block.advisorEnabled ??= {};
-	block.advisorEnabled[slot.key] = Boolean(enabled);
-}
+
 
 function slotSourceForSlot(settings, slot) {
 	const source = isCreativeSlot(slot)
@@ -704,15 +607,7 @@ function slotSourceForSlot(settings, slot) {
 		: "model";
 }
 
-function setSlotSource(settings, slot, source) {
-	const block = workOrchBlock(settings);
-	const value = source === CHATGPT_WEB_SOURCE ? CHATGPT_WEB_SOURCE : "model";
-	if (isCreativeSlot(slot)) block.creativeSource = value;
-	else {
-		block.advisorSources ??= {};
-		block.advisorSources[slot.key] = value;
-	}
-}
+
 
 function chatgptConsultAvailable() {
 	try {
@@ -800,14 +695,14 @@ let pendingVerifierSynthesis = null;
 let activeVerifierSynthesis = null;
 let pendingSettledAgentEnd = null;
 const pendingDirtyRecoveries = new Map();
-const pendingImprovementApprovals = new Map();
+
 const pendingInitiativeConversions = new Map();
 const pendingRichTaskComposers = new Map();
 const pendingMainEditorActions = new Map();
 const commandWorkflowStorage = new AsyncLocalStorage();
 const activeRoadmapMenuSessions = new WeakMap();
 const activeOperationProgress = new WeakSet();
-let activeHistoryTask = null;
+
 let activeWorkAgent = null;
 
 
@@ -816,8 +711,8 @@ let activeWorkGoalCwd = null;
 let sessionCwd; // Completions get no ctx; session_start records the project for checkout-only /wo entries.
 const maintenanceCheckout = (cwd = sessionCwd ?? process.cwd()) => sameCheckout(cwd, WORKFLOW_REPO_DIR);
 let activeWorkGoalRunning = false;
-let activeWorkGoalGitBefore = null;
-let activeWorkGoalVerifierFixCommitted = false;
+
+
 
 
 let blockedCompactionResumeTurn = false;
@@ -829,7 +724,7 @@ let workGoalContinuationPending = null;
 let workGoalContinuationRetry = null;
 let workGoalRecovery = null;
 let workGoalCompactionResume = null;
-let workGoalProgressTimer = null;
+
 let workGoalUsageLimitTimer = null;
 
 let orchestratorPauseRequest = null;
@@ -864,33 +759,26 @@ export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
 
-function orchestratorInputHelp() {
-	return `Try: orchestrator list roadmaps | roadmaps | status | resume [last|<id>] | compact | pause | stop | report [id]${extensionScoutEnabled() ? " | scout status" : ""} | 1`;
-}
+
 const WORK_GOAL_STATUS_KEY = "work-goal";
 const WORK_GOAL_PROGRESS_WIDGET_KEY = "work-goal-progress";
-const WORK_GOAL_COMPLETE_MARKER = "WORK_GOAL_COMPLETE";
-const WORK_GOAL_DECISION_MARKER = "WORK_GOAL_NEEDS_HUMAN_DECISION";
+
+
 const WORK_GOAL_CONTINUATION_PREFIX = "work-goal-continuation:";
 const WORK_GOAL_MAX_RETRIES = 4;
-const WORK_IMPROVE_MAX_STALLED_TURNS = 2;
+
 const WORK_PROJECT_DEFAULT_TOKEN_BUDGET = 2_000_000;
-const WORK_PROJECT_NO_PROGRESS_NUDGE_CALLS = 30;
-const WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS = 60;
-const WORK_PROJECT_MAX_NO_PROGRESS_TOOL_FAILURES = 3;
-const WORK_CATCH_UP_MAX_CONTINUATIONS = 20;
+
+
+
+
 const WORK_GOAL_USAGE_LIMIT_RETRY_MS = 10 * 60 * 1000;
 
-const WORK_GOAL_USAGE_LIMIT_RE =
-	/usage[_\s-]*(?:limit|reached)|(?:^|(?:status|http|error|code)[^0-9]{0,8})429\b|too many requests|rate limit|访问量过大|使用上限|限额将在/i;
-const WORK_GOAL_NON_RETRYABLE_RE =
-	/multi-auth rotation failed|credentials tried|unauthori[sz]ed|invalid api key/i;
-const WORK_GOAL_RETRYABLE_RE =
-	/websocket(?: closed| error)|sse response headers timed out|headers timed out|context[_\s-]*length[_\s-]*exceeded|input exceeds the context window|context window|provider returned error|you can retry your request|overloaded|529|503|connection reset|fetch failed|etimedout|socket hang up/i;
-const WORK_GOAL_CONTEXT_OVERFLOW_RE =
-	/context[_\s-]*length|context window|input exceeds|prompt is too long|maximum context length/i;
-const WORK_GOAL_CONTRADICTORY_COMPLETION_RE =
-	/(?<!could\s)\bnot\s+(?:yet\s+)?(?:complete|completed|done|finished)\b|\bstill\s+(?:incomplete|failing|failing\s+tests?|fails?)\b|\btests?\s+still\s+fail(?:ing)?\b|\b(?:is|are|remain(?:s)?|still)\s+blocked\b|\bblocked\s+(?:by|on|due\s+to)\b|\bnot\s+verified\b/i;
+
+
+
+
+
 
 
 
@@ -959,15 +847,7 @@ function readEffectiveSettings(cwd) {
 }
 
 // Legacy ce-workflow orchestration switch; unset means off. CE_WORKFLOW_ENABLED=1|0 overrides (verify-package).
-export function workflowEnabled(cwd = process.cwd()) {
-	const forced = process.env.CE_WORKFLOW_ENABLED;
-	if (forced === "1" || forced === "0") return forced === "1";
-	try {
-		return readEffectiveSettings(cwd).workOrchestrator?.workflow?.enabled === true;
-	} catch {
-		return false;
-	}
-}
+
 
 function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
@@ -1016,128 +896,32 @@ function writeScopedSettings(cwd, scope, settings) {
 	writeSettings(cwd, settings);
 }
 
-const WARP_TITLE = "warp://cli-agent";
-const WORK_WARP_ICONS = {
-	goal: "◎",
-	project: "▣",
-	plan: "◇",
-	brainstorm: "✦",
-	ideate: "✦",
-	debug: "⚑",
-	work: "●",
-};
-
-function warpSettings(cwd) {
-	const value = readEffectiveSettings(cwd).warp;
-	return typeof value === "object" && value !== null
-		? value
-		: { enabled: value };
-}
-
-function warpNotificationEnabled(ctx) {
-	if (!ctx?.cwd) return false;
-	const setting = warpSettings(ctx.cwd).enabled;
-	if (setting === false) return false;
-	if (setting === true || setting === "force") return true;
-	return (
-		process.env.TERM_PROGRAM === "WarpTerminal" &&
-		Boolean(process.env.WARP_CLI_AGENT_PROTOCOL_VERSION)
-	);
-}
-
-function writeTerminal(bytes) {
-	if (process.platform === "win32") {
-		if (process.stdout.isTTY) process.stdout.write(bytes);
-		return;
-	}
-	let fd;
-	try {
-		fd = openSync("/dev/tty", "w");
-		writeSync(fd, bytes);
-	} catch {
-		// no controlling terminal; stay quiet
-	} finally {
-		if (fd !== undefined) {
-			try {
-				closeSync(fd);
-			} catch {
-				// already closed
-			}
-		}
-	}
-}
-
-function warpPayload(event, ctx, extra = {}) {
-	const cwd = ctx?.cwd ?? process.cwd();
-	const rawVersion = Number.parseInt(
-		process.env.WARP_CLI_AGENT_PROTOCOL_VERSION ?? "1",
-		10,
-	);
-	return {
-		v: Number.isFinite(rawVersion) ? Math.min(rawVersion, 1) : 1,
-		agent: "pi",
-		event,
-		session_id: ctx?.sessionManager?.getSessionId?.() ?? "work-orchestrator",
-		cwd,
-		project: basename(cwd),
-		...extra,
-	};
-}
-
-function emitWarp(ctx, event, extra = {}) {
-	if (!warpNotificationEnabled(ctx)) return;
-	writeTerminal(
-		`\x1b]777;notify;${WARP_TITLE};${JSON.stringify(warpPayload(event, ctx, extra))}\x07`,
-	);
-}
-
-function workWarpMode(mode, goal) {
-	if (
-		mode === "self-improving" &&
-		/Project autopilot policy/.test(goal?.objective ?? "")
-	)
-		return "project";
-	if (["generic", "self-improving"].includes(mode)) return "goal";
-	if (
-		["goal", "project", "plan", "brainstorm", "ideate", "debug"].includes(mode)
-	)
-		return mode;
-	if (["big", "med", "master", "migrate", "small"].includes(mode)) return "plan";
-	return "work";
-}
-
-function workWarpTitle(mode, cwd) {
-	return `${WORK_WARP_ICONS[workWarpMode(mode)] ?? WORK_WARP_ICONS.work} - ${basename(cwd)}`;
-}
-
-function setWarpTitle(ctx, title) {
-	if (!warpNotificationEnabled(ctx)) return;
-	ctx?.ui?.setTitle?.(title);
-	writeTerminal(`\x1b]0;${title}\x07`);
-}
-
-function resetWarpTitle(ctx) {
-	const cwd = ctx?.cwd ?? process.cwd();
-	setWarpTitle(ctx, basename(cwd));
-}
 
 
 
-function finishWarpWork(ctx, mode, response = "") {
-	emitWarp(ctx, "stop", {
-		query: `/work-${mode}`,
-		response: truncate(response, 200),
-	});
-	resetWarpTitle(ctx);
-}
 
-function pauseWarpForDecision(ctx, decision) {
-	const cwd = ctx?.cwd ?? process.cwd();
-	emitWarp(ctx, "question_asked", {
-		query: decision?.question ?? "Human decision needed",
-	});
-	setWarpTitle(ctx, `? - ${basename(cwd)}`);
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function telemetryDir(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, TELEMETRY_DIR_NAME);
@@ -1515,33 +1299,7 @@ function clearActiveWorkflowRecord(cwd, workflowRunId) {
 	}
 }
 
-function restoreWorkflowAuthorization(
-	cwd,
-	session,
-	promptText,
-	isCompactionResume,
-) {
-	restoredActiveWorkflow = null;
-	if (!cwd) return null;
-	try {
-		const record = JSON.parse(
-			readFileSync(activeWorkflowRecordPath(cwd), "utf8"),
-		);
-		if (!record?.workflowRunId) return null;
-		if (existsSync(workflowClaimPath(cwd, record.workflowRunId))) return null;
-		if (record.session && session && record.session !== session) return null;
-		const prompt = String(promptText ?? "");
-		if (!isCompactionResume && !prompt.includes(record.workflowRunId))
-			return null;
-		restoredActiveWorkflow = {
-			workflowRunId: record.workflowRunId,
-			activity: record.activity ?? undefined,
-		};
-		return record;
-	} catch {
-		return null;
-	}
-}
+
 
 function completeWorkflowOnce(cwd, completion) {
 	if (!cwd || !completion?.workflowRunId) return "";
@@ -1612,31 +1370,7 @@ function recordPendingDirectRun(cwd, run) {
 	return file;
 }
 
-function recordGoalSubagentLaunch(cwd, goal, toolCallId, args, result) {
-	const input = parseToolArgs(args);
-	if (!goal || input?.action) return "";
-	const details =
-		result && typeof result === "object" ? result.details : undefined;
-	const runId = details?.runId ?? details?.asyncId;
-	const asyncDir = details?.asyncDir;
-	if (!runId && !asyncDir) return "";
-	const candidates = [
-		...JSON.stringify(input).matchAll(/\bwork-\d+(?:\.\d+)*\b/gi),
-	]
-		.map((match) => match[0])
-		.sort((left, right) => right.split(".").length - left.split(".").length);
-	const targetId = workGoalTargetId(goal);
-	return recordPendingDirectRun(cwd, {
-		workflowRunId: `goal-${createHash("sha256").update(String(toolCallId)).digest("hex").slice(0, 16)}`,
-		activity: "work-goal-specialist",
-		action: "goal-subagent",
-		agent: input.agent ?? input.tasks?.[0]?.agent ?? "subagent",
-		epicId: targetId,
-		workItemId: candidates[0] ?? targetId,
-		runId,
-		asyncDir,
-	});
-}
+
 
 const DIRECT_SUCCESS_STATES = TERMINAL_SUCCESS_STATES;
 const DIRECT_TERMINAL_STATES = new Set([
@@ -1768,34 +1502,9 @@ function safeHistoryPathPart(value) {
 	);
 }
 
-function jsonSafe(value) {
-	const seen = new WeakSet();
-	try {
-		return JSON.parse(
-			JSON.stringify(value, (_key, item) => {
-				if (typeof item === "bigint") return item.toString();
-				if (typeof item === "function" || typeof item === "symbol")
-					return undefined;
-				if (item instanceof Error)
-					return { name: item.name, message: item.message, stack: item.stack };
-				if (item && typeof item === "object") {
-					if (seen.has(item)) return "[Circular]";
-					seen.add(item);
-				}
-				return item;
-			}),
-		);
-	} catch {
-		return String(value);
-	}
-}
 
-function selfImprovementHistoryEnabled() {
-	return (
-		process.env.WORK_ORCH_HISTORY_OFF !== "1" &&
-		activeWorkGoal?.mode === "self-improving"
-	);
-}
+
+
 
 function historyTaskFromText(value) {
 	const text = String(value ?? "");
@@ -1812,53 +1521,9 @@ function historyTaskFromText(value) {
 	};
 }
 
-function selfImprovementHistoryTask(event) {
-	const meta = activeWorkAgent?.meta ?? pendingWorkPrompt?.meta ?? {};
-	const fallback = activeHistoryTask ?? historyTaskFromText(event?.prompt);
-	const goal = activeWorkGoal;
-	const key =
-		meta.workItemId ??
-		meta.epicId ??
-		fallback.key ??
-		(goal ? `${goal.mode}-${goal.id}` : "session");
-	return {
-		key,
-		mode: meta.mode ?? goal?.mode,
-		action: meta.action,
-		epicId: meta.epicId,
-		workItemId: meta.workItemId ?? fallback.workItemId,
-		goalId: goal?.id,
-		objective: goal?.objective,
-	};
-}
 
-function compactHistoryEvent(event) {
-	const safe = jsonSafe(event);
-	const encoded = JSON.stringify(safe);
-	if (encoded.length <= 8_000) return safe;
-	const compact = {
-		truncated: true,
-		originalChars: encoded.length,
-	};
-	for (const key of ["toolCallId", "toolName", "isError", "stopReason"])
-		if (safe?.[key] !== undefined) compact[key] = safe[key];
-	if (safe?.prompt !== undefined)
-		compact.prompt = truncate(String(safe.prompt), 2_000);
-	if (safe?.args !== undefined)
-		compact.args = truncate(JSON.stringify(safe.args), 1_500);
-	if (safe?.result !== undefined)
-		compact.result = truncate(JSON.stringify(safe.result), 3_000);
-	if (safe?.message !== undefined)
-		compact.message = truncate(JSON.stringify(safe.message), 3_000);
-	if (Array.isArray(safe?.messages)) {
-		compact.messageCount = safe.messages.length;
-		compact.lastMessage = truncate(
-			JSON.stringify(safe.messages.at(-1) ?? null),
-			3_000,
-		);
-	}
-	return compact;
-}
+
+
 
 
 
@@ -1878,164 +1543,27 @@ function appendTelemetryNote(cwd, workItemId, event, file) {
 	}
 }
 
-function parseWorkPromptMeta(prompt) {
-	const text = String(prompt ?? "");
-	if (!text.includes("work-orchestrator")) return undefined;
-	const lines = text.split(/\r?\n/);
-	const line = (label) =>
-		lines
-			.find((item) => item.startsWith(`${label}:`))
-			?.slice(label.length + 1)
-			.trim();
-	const epic = line("Epic") ?? line("Roadmap") ?? "";
-	const selected = line("Selected WorkItem") ?? line("Idea") ?? "";
-	const target =
-		line("Target WorkItem ID") ??
-		line("Target work item") ??
-		line("Target") ??
-		"";
-	const epicId = epic.match(/^([^\s]+)/)?.[1];
-	const selectedId = selected.match(/^([^\s]+)/)?.[1];
-	const targetId = target.match(/^([^\s]+)/)?.[1];
-	let workItemId;
-	if (targetId && targetId !== "none") workItemId = targetId;
-	else if (selectedId && !selectedId.startsWith("none")) workItemId = selectedId;
-	const inlineLevel = text.match(
-		/WO_INLINE_V1: complete this (small|medium)/,
-	)?.[1];
-	return {
-		mode: text.match(/mode:\s*([^\s]+)/)?.[1],
-		workflowRunId: line("Workflow Run ID"),
-		activity: line("Activity"),
-		action: line("Action"),
-		epicId: epicId === "none" ? undefined : epicId,
-		workItemId,
-		inlineWork: Boolean(inlineLevel),
-		inlineLevel,
-		fastSmall: inlineLevel === "small",
-	};
-}
 
 
 
 
 
-function latestMessageExcerpts(messages = [], limit = 4) {
-	return messages
-		.slice()
-		.reverse()
-		.filter((message) =>
-			["assistant", "toolResult", "user"].includes(message.role),
-		)
-		.slice(0, limit)
-		.reverse()
-		.map(
-			(message) =>
-				`${message.role}: ${truncate(contentText(message.content ?? message.message), 260)}`,
-		)
-		.filter((line) => !line.endsWith(": "));
-}
-
-function failedSubagents(tools = []) {
-	return tools
-		.flatMap((tool) => tool.subagentDetails ?? [])
-		.filter(
-			(item) =>
-				!["completed", "success", "ok", "passed"].includes(
-					String(item.status ?? "").toLowerCase(),
-				),
-		);
-}
-
-function finalTextIndicatesRecoveredWork(text) {
-	return /\b(Outcome:\s*PASS|Review:\s*PASS|Planning boundary complete|Done and pushed|Committed and pushed|Closed (?:WorkItem|planning WorkItem)|Created next ready WorkItem)\b/i.test(
-		text,
-	);
-}
-
-function hasWorkAgentFailure(event, telemetry) {
-	const assistant = finalAssistantMessage(event.messages);
-	const text = assistantVisibleText(assistant);
-	const stopFailed = ["aborted", "error"].includes(
-		String(assistant?.stopReason ?? ""),
-	);
-	const reviewFailed = telemetry.review?.outcome === "fail";
-	const toolFailed = telemetry.tools?.some((tool) => tool.isError);
-	const subagentFailed = failedSubagents(telemetry.tools).length > 0;
-	const recoveredSubagentFailure =
-		subagentFailed &&
-		!stopFailed &&
-		!reviewFailed &&
-		!toolFailed &&
-		finalTextIndicatesRecoveredWork(text);
-	return Boolean(
-		stopFailed ||
-			reviewFailed ||
-			toolFailed ||
-			(subagentFailed && !recoveredSubagentFailure) ||
-			(/\b(fail(?:ed|ure)?|blocked|cannot|unable|timed? out|timeout|error)\b/i.test(
-				text,
-			) &&
-				!/\bPASS\b/i.test(text.slice(0, 500))),
-	);
-}
-
-function failureStatusNote(run, event, telemetry, file) {
-	const assistant = finalAssistantMessage(event.messages);
-	const finalText = truncate(assistantVisibleText(assistant), 900);
-	const erroredTools = telemetry.tools?.filter((tool) => tool.isError) ?? [];
-	const subagents = failedSubagents(telemetry.tools);
-	const lines = [
-		`wo:failure-summary run=${telemetry.id} role=${telemetry.role ?? "work"} action=${run.meta.action ?? run.meta.mode ?? "work"} duration=${formatDuration(telemetry.durationMs)}`,
-		`reason: ${truncate(finalText || telemetry.review?.outcome || "work agent stopped without a passing result", 500)}`,
-		file ? `artifact: ${file}` : "",
-		...erroredTools
-			.slice(0, 3)
-			.map(
-				(tool) =>
-					`tool-error: ${tool.name} ${tool.runId ? `run=${tool.runId} ` : ""}${tool.outputChars ?? 0} chars`,
-			),
-		...subagents
-			.slice(0, 3)
-			.map(
-				(item) =>
-					`subagent: ${item.agent} status=${item.status}${item.artifact ? ` artifact=${item.artifact}` : ""}`,
-			),
-		...latestMessageExcerpts(event.messages).map((line) => `latest: ${line}`),
-		run.meta.workItemId ? `next: /work-report ${run.meta.workItemId}` : "",
-	];
-	return lines.filter(Boolean).join("\n");
-}
 
 
 
-function parseToolArgs(args) {
-	if (typeof args !== "string") return args ?? {};
-	try {
-		return JSON.parse(args);
-	} catch {
-		return {};
-	}
-}
 
-function subagentNamesFromArgs(args) {
-	const names = [];
-	const visit = (value) => {
-		if (!value || typeof value !== "object") return;
-		if (typeof value.agent === "string") names.push(value.agent);
-		if (Array.isArray(value.tasks)) {
-			for (const task of value.tasks) {
-				const count = Math.max(1, Number(task?.count ?? 1));
-				for (let i = 0; i < count; i++) visit(task);
-			}
-		}
-		if (Array.isArray(value.chain)) value.chain.forEach(visit);
-		if (Array.isArray(value.parallel)) value.parallel.forEach(visit);
-		else visit(value.parallel);
-	};
-	visit(parseToolArgs(args));
-	return names;
-}
+
+
+
+
+
+
+
+
+
+
+
+
 
 function subagentUsageTotal(usage) {
 	const total =
@@ -2290,16 +1818,7 @@ function telemetryWaitTimes(event) {
 	};
 }
 
-function toolKind(name, args) {
-	if (name !== "bash") return name;
-	const command = String(parseToolArgs(args).command ?? "").toLowerCase();
-	if (/\b(pytest|unittest|npm\s+(run\s+)?test|gradle\s+test)\b/.test(command))
-		return "test";
-	if (/\b(smoke_|smoke-|adb|emulator|powershell|pwsh)\b/.test(command))
-		return "live-smoke";
-	if (/\bgit\b/.test(command)) return "state";
-	return "shell";
-}
+
 
 
 
@@ -2402,26 +1921,9 @@ async function withOperationProgress(ctx, label, operation) {
 	}
 }
 
-export function privateWorkflowActivationWarning(activation) {
-	if (
-		activation.alreadyReported ||
-		!(activation.status === "rolled-back" || activation.status === "failed") ||
-		!activation.code ||
-		!activation.reason
-	)
-		return undefined;
-	return `Private workflow activation ${activation.status} (${activation.code}): ${activation.reason}`;
-}
 
-export function legacyCompoundRemovalRecommendation(
-	agentDir = process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
-) {
-	return existsSync(
-		join(agentDir, "npm", "node_modules", "pi-compound-engineering"),
-	)
-		? "pi remove npm:pi-compound-engineering"
-		: undefined;
-}
+
+
 
 async function withCommandTelemetry(command, args, ctx, fn, note = false) {
 	const workflow = {
@@ -3916,11 +3418,7 @@ function nativeCompactionTrigger(ctx) {
 	return Math.max(1, Math.floor(Math.min(200_000, window * 0.75 - 32_768)));
 }
 
-function overrides(settings) {
-	settings.subagents ??= {};
-	settings.subagents.agentOverrides ??= {};
-	return settings.subagents.agentOverrides;
-}
+
 
 function compactOverrides(settings) {
 	const current = settings.subagents?.agentOverrides;
@@ -3964,12 +3462,7 @@ function workPerformanceSettings(cwd) {
 	);
 }
 
-function setWorkPerformanceBoolean(settings, key, value) {
-	if (!WORK_PERFORMANCE_FLAGS.some((flag) => flag.key === key)) return false;
-	settings.workPerformance ??= {};
-	settings.workPerformance[key] = Boolean(value);
-	return true;
-}
+
 
 function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	const raw = settings.workOrchestrator ?? {};
@@ -4018,47 +3511,15 @@ function workOrchSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	};
 }
 
-function applyProfile(settings, profileKey) {
-	const profile = EFFORT_PROFILES[profileKey];
-	if (!profile) return false;
-	for (const slot of SLOTS) {
-		const thinking = profile[slot.key];
-		if (!thinking) continue;
-		const current = overrides(settings);
-		for (const agent of slot.agents) {
-			const next = { ...(current[agent] ?? {}) };
-			next.thinking = thinking;
-			current[agent] = next;
-		}
-	}
-	compactOverrides(settings);
-	const block = workOrchBlock(settings);
-	block.profile = profileKey;
-	for (const { key } of WORK_ORCH_BOOLEANS)
-		if (profile[key] !== undefined) block[key] = profile[key];
-	block.codeReviewBeforeCommit = profile.codeReviewBeforeCommit;
-	return true;
-}
 
-function setWorkOrchBoolean(settings, key, value) {
-	if (!WORK_ORCH_BOOLEANS.some((flag) => flag.key === key)) return false;
-	workOrchBlock(settings)[key] = Boolean(value);
-	return true;
-}
 
-function setWorkOrchReviewLevel(settings, value) {
-	const block = workOrchBlock(settings);
-	block.codeReviewBeforeCommit = REVIEW_LEVELS.includes(value) ? value : "off";
-}
 
-function setWorkOrchReviewPolicy(settings, value) {
-	workOrchBlock(settings).reviewPolicy = normalizeReviewPolicy(value);
-}
 
-function setWorkOrchCreativeMode(settings, value) {
-	const block = workOrchBlock(settings);
-	block.creativeMode = CREATIVE_MODES.includes(value) ? value : "ask";
-}
+
+
+
+
+
 
 
 
@@ -4124,37 +3585,11 @@ function effectiveBackgroundVerifierMap(cwd) {
 	return merged;
 }
 
-function setBackgroundVerifierProfile(settings, profile) {
-	const normalized = normalizeEffectiveProfiles([profile])[0];
-	const block = workOrchBlock(settings);
-	block.backgroundVerifiers ??= {};
-	block.backgroundVerifiers[normalized.model] = {
-		operations: normalized.operations,
-		thinking: normalized.thinking,
-	};
-	return normalized;
-}
 
-function removeBackgroundVerifierProfile(settings, model, inherited = false) {
-	const block = settings.workOrchestrator;
-	if (!block?.backgroundVerifiers) return;
-	if (inherited) block.backgroundVerifiers[model] = null;
-	else delete block.backgroundVerifiers[model];
-	if (!Object.keys(block.backgroundVerifiers).length)
-		delete block.backgroundVerifiers;
-	if (!Object.keys(block).length) delete settings.workOrchestrator;
-}
 
-function clearBackgroundVerifierOverride(settings, model) {
-	const block = settings.workOrchestrator;
-	if (!block?.backgroundVerifiers || !owns(block.backgroundVerifiers, model))
-		return false;
-	delete block.backgroundVerifiers[model];
-	if (!Object.keys(block.backgroundVerifiers).length)
-		delete block.backgroundVerifiers;
-	if (!Object.keys(block).length) delete settings.workOrchestrator;
-	return true;
-}
+
+
+
 
 // ponytail: settings are prompt-live; the steps below are appended to the
 // role/plan/brainstorm handoff prompts so configured advisors actually run.
@@ -4232,14 +3667,7 @@ function divergentSources(cwd, offlineModels = [], currentModel = "") {
 	);
 }
 
-function divergentTaskModels(cwd) {
-	const settings = readEffectiveSettings(cwd);
-	const configured = configuredAdvisorSlots(settings).map(
-		(slot) => slotSelection(slot, settings).model,
-	);
-	const models = configured.length ? configured : [INHERIT_MODEL];
-	return DIVERGENT_FRAMES.map((_, index) => models[index % models.length]);
-}
+
 
 function creativeSidecarStep(
 	cwd,
@@ -4584,13 +4012,7 @@ function backupSlotSelection(slot, settings) {
 		: null;
 }
 
-function slotSummary(slot, settings) {
-	const { model, thinking } = slotSelection(slot, settings);
-	const backup = backupSlotSelection(slot, settings);
-	if (slotSourceForSlot(settings, slot) === CHATGPT_WEB_SOURCE)
-		return `Main source:ChatGPT Web${chatgptConsultAvailable() ? "" : " (unavailable)"} • effort:n/a • Backup:${backup ? `${backup.model}/${backup.thinking}` : "none"}`;
-	return `Main model:${model === NONE_MODEL ? "none" : (model ?? "inherit current")} • effort:${thinking} • Backup:${backup ? `${backup.model}/${backup.thinking}` : "none"}`;
-}
+
 
 async function modelDisplayNames(ctx) {
 	try {
@@ -4934,34 +4356,9 @@ async function modelItems(
 	return items;
 }
 
-function setSlot(settings, slot, model, thinking) {
-	const current = overrides(settings);
-	for (const agent of slot.agents) {
-		const next = { ...(current[agent] ?? {}) };
-		if (model === INHERIT_MODEL) delete next.model;
-		else next.model = model;
 
-		if (thinking === DEFAULT_THINKING) delete next.thinking;
-		else next.thinking = thinking;
 
-		current[agent] = next;
-	}
-	compactOverrides(settings);
-}
 
-function setBackupSlot(settings, slot, model, thinking, tombstone = false) {
-	const block = workOrchBlock(settings);
-	block.roleBackups ??= {};
-	if (model === NONE_MODEL) {
-		if (tombstone) block.roleBackups[slot.key] = null;
-		else delete block.roleBackups[slot.key];
-	} else
-		block.roleBackups[slot.key] = {
-			model,
-			thinking: thinking === DEFAULT_THINKING ? slot.defaultThinking : thinking,
-		};
-	if (!Object.keys(block.roleBackups).length) delete block.roleBackups;
-}
 
 
 
@@ -4978,31 +4375,7 @@ function resetAll(settings) {
 	compactOverrides(settings);
 }
 
-function thinkingItemsFor(slot, settings, projectScope = false) {
-	const current = settings.subagents?.agentOverrides ?? {};
-	const selectedThinking = commonValue(
-		slot.agents.map((agent) => current[agent]?.thinking),
-	);
-	return {
-		selectedThinking,
-		items: [
-			{
-				value: DEFAULT_THINKING,
-				label: projectScope
-					? "(blank) use global effort setting"
-					: `(blank) use role default (${slot.defaultThinking})`,
-				description: projectScope
-					? "remove the project effort override"
-					: "stored as no override",
-			},
-			...THINKING_LEVELS.map((level) => ({
-				value: level,
-				label: level,
-				description: "persisted subagent thinking level",
-			})),
-		],
-	};
-}
+
 
 async function chooseModel(
 	ctx,
@@ -5173,169 +4546,11 @@ function verifierOperationLabel(operation) {
 
 
 
-function replaceBackgroundVerifierProfile(settings, scope, oldModel, profile) {
-	if (oldModel === profile.model) {
-		setBackgroundVerifierProfile(settings, profile);
-		return;
-	}
-	if (oldModel)
-		removeBackgroundVerifierProfile(
-			settings,
-			oldModel,
-			scope === "project" &&
-				owns(backgroundVerifierMap(readGlobalSettings()), oldModel),
-		);
-	setBackgroundVerifierProfile(settings, profile);
-}
 
-async function editBackgroundVerifierProfile(ctx, scope, initialModel) {
-	let model = initialModel;
-	const names = await modelDisplayNames(ctx);
-	for (;;) {
-		const scoped = readScopedSettings(ctx.cwd, scope);
-		const profiles = backgroundVerifierProfiles(
-			ctx.cwd,
-			scope === "global" ? scoped : undefined,
-		);
-		const profile = profiles.find((entry) => entry.model === model);
-		if (!profile) return;
-		const local = owns(backgroundVerifierMap(scoped), model);
-		const items = [
-			{
-				kind: "model",
-				value: "model",
-				label: `Model: [${modelEffortSummary(profile.model, profile.thinking, names)}] ${SUBMENU_ARROW}`,
-				description: "Choose the verifier model, then its thinking effort",
-			},
-			...BACKGROUND_VERIFIER_OPERATIONS.map((operation) => ({
-				kind: "operation",
-				value: operation,
-				...boolLabel(
-					verifierOperationLabel(operation),
-					profile.operations.includes(operation),
-				),
-			})),
-			{
-				kind: "add",
-				value: "add",
-				label: `Add background verifier ${SUBMENU_ARROW}`,
-				description: "Start with Test coverage enabled and Model: [Inherit: High]",
-			},
-			...(scope === "project" && local
-				? [
-						{
-							kind: "inherit",
-							value: "inherit",
-							label: "Use global profile",
-							description: "Remove this project profile override",
-						},
-					]
-				: []),
-			{
-				kind: "remove",
-				value: "remove",
-				label: "Remove profile",
-				description: "Disable this verifier for future checkpoints",
-			},
-		];
-		const choice = await choose(
-			ctx,
-			"Background verifier checks",
-			items,
-			undefined,
-			{ cursorKey: `background-verifier:${model}` },
-		);
-		if (!choice) return;
-		if (choice === "model") {
-			const selected = await chooseModelAndEffort(ctx, {
-				title: "Background verifier model",
-				currentModel: profile.model,
-				currentThinking: profile.thinking,
-				effortItems: THINKING_LEVELS.map((value) => ({
-					value,
-					label: value,
-					description: "Persisted verifier thinking level",
-				})),
-			});
-			if (!selected) continue;
-			if (
-				profiles.some(
-					(entry) => entry.model === selected.model && entry.model !== profile.model,
-				)
-			) {
-				ctx.ui.notify(
-					`Background verifier already configured: ${modelDisplayName(selected.model, names)}`,
-					"warning",
-				);
-				continue;
-			}
-			replaceBackgroundVerifierProfile(scoped, scope, model, {
-				...profile,
-				...selected,
-			});
-			writeScopedSettings(ctx.cwd, scope, scoped);
-			model = selected.model;
-			continue;
-		}
-		if (choice === "add") return { action: "add" };
-		if (choice === "inherit") {
-			clearBackgroundVerifierOverride(scoped, model);
-			writeScopedSettings(ctx.cwd, scope, scoped);
-			return;
-		}
-		if (choice === "remove") {
-			removeBackgroundVerifierProfile(
-				scoped,
-				model,
-				scope === "project" &&
-					owns(backgroundVerifierMap(readGlobalSettings()), model),
-			);
-			writeScopedSettings(ctx.cwd, scope, scoped);
-			return;
-		}
-		const operations = profile.operations.includes(choice)
-			? profile.operations.filter((operation) => operation !== choice)
-			: [...profile.operations, choice];
-		if (!operations.length) {
-			removeBackgroundVerifierProfile(
-				scoped,
-				model,
-				scope === "project" &&
-					owns(backgroundVerifierMap(readGlobalSettings()), model),
-			);
-			writeScopedSettings(ctx.cwd, scope, scoped);
-			ctx.ui.notify(
-				`Removed ${modelDisplayName(model, names)}: no checks enabled`,
-				"info",
-			);
-			return;
-		}
-		setBackgroundVerifierProfile(scoped, { ...profile, operations });
-		writeScopedSettings(ctx.cwd, scope, scoped);
-	}
-}
 
-function addBackgroundVerifierProfile(ctx, scope) {
-	const scoped = readScopedSettings(ctx.cwd, scope);
-	const profiles = backgroundVerifierProfiles(
-		ctx.cwd,
-		scope === "global" ? scoped : undefined,
-	);
-	if (profiles.some((profile) => profile.model === INHERIT_MODEL)) {
-		ctx.ui.notify(
-			"Change the existing inherited verifier model before adding another profile",
-			"warning",
-		);
-		return false;
-	}
-	setBackgroundVerifierProfile(scoped, {
-		model: INHERIT_MODEL,
-		operations: ["test-gap"],
-		thinking: "high",
-	});
-	writeScopedSettings(ctx.cwd, scope, scoped);
-	return true;
-}
+
+
+
 
 
 
@@ -7183,30 +6398,14 @@ function run(cwd, command, args) {
 }
 
 const LARGE_OUTPUT_THRESHOLD = 10_000;
-const BOUNDED_OUTPUT_CAP = 10_000;
-const TASK_RAW_THRESHOLD = 10_000;
 
-function artifactPath(cwd, group, prefix, ext = "txt") {
-	const dir = join(telemetryDir(cwd), group);
-	mkdirSync(dir, { recursive: true });
-	return join(
-		dir,
-		`${safeHistoryPathPart(prefix)}-${telemetryId("art")}.${ext}`,
-	);
-}
 
-function writeArtifact(cwd, group, prefix, ext, content) {
-	const file = artifactPath(cwd, group, prefix, ext);
-	writeFileSync(file, String(content ?? ""));
-	return file;
-}
 
-function textHeadTail(value, cap = BOUNDED_OUTPUT_CAP) {
-	const text = String(value ?? "");
-	if (text.length <= cap) return text;
-	const half = Math.max(500, Math.floor((cap - 80) / 2));
-	return `${text.slice(0, half)}\n… truncated ${text.length - half * 2} chars …\n${text.slice(-half)}`;
-}
+
+
+
+
+
 
 function commandSignature(command, args = []) {
 	const parts = [command, ...args].map((part) =>
@@ -7220,69 +6419,7 @@ function commandSignature(command, args = []) {
 	return parts.filter(Boolean).join(" ");
 }
 
-function runBounded(cwd, command, args = [], options = {}) {
-	const override = command === "git" ? process.env.WORK_ORCH_GIT_BIN : undefined;
-	const script = nodeScript(override) ? override : undefined;
-	const actualCommand = script ? process.execPath : (override ?? command);
-	const actualArgs = script ? [script, ...args] : args;
-	let stdout = "";
-	let stderr = "";
-	let exitCode = 0;
-	let bufferOverflow = false;
-	const started = Date.now();
-	try {
-		stdout = execFileSync(actualCommand, actualArgs, {
-			cwd,
-			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
-			maxBuffer: Number(options.maxBuffer ?? 10 * 1024 * 1024),
-		});
-	} catch (error) {
-		exitCode = Number(error.status ?? 1);
-		bufferOverflow = error.code === "ENOBUFS";
-		stdout = String(error.stdout ?? "");
-		stderr = String(error.stderr ?? error.message ?? "");
-	}
-	const prefix = options.name ?? commandSignature(command, args).slice(0, 80);
-	const fullStdoutPath = writeArtifact(
-		cwd,
-		"logs",
-		`${prefix}-stdout`,
-		"txt",
-		stdout,
-	);
-	const fullStderrPath = writeArtifact(
-		cwd,
-		"logs",
-		`${prefix}-stderr`,
-		"txt",
-		stderr,
-	);
-	const cap = Number(options.cap ?? BOUNDED_OUTPUT_CAP);
-	const result = {
-		command: commandSignature(command, args),
-		exit_code: exitCode,
-		duration_ms: Math.max(0, Date.now() - started),
-		stdout_chars: stdout.length,
-		stderr_chars: stderr.length,
-		stdout_summary: textHeadTail(stdout, cap),
-		stderr_summary: textHeadTail(stderr, cap),
-		truncated: stdout.length > cap || stderr.length > cap,
-		buffer_overflow: bufferOverflow,
-		full_stdout_path: fullStdoutPath,
-		full_stderr_path: fullStderrPath,
-	};
-	if (result.truncated)
-		recordWorkTelemetry(cwd, {
-			type: "large-output",
-			command: result.command,
-			ok: exitCode === 0,
-			outputChars: stdout.length + stderr.length,
-			threshold: cap,
-			artifacts: [fullStdoutPath, fullStderrPath],
-		});
-	return result;
-}
+
 
 function compactTaskSummary(issue, options = {}) {
 	const notes = notesOf(issue);
@@ -7315,248 +6452,35 @@ function compactTaskSummary(issue, options = {}) {
 	};
 }
 
-function workflowTaskSummary(cwd, taskId, options = {}) {
-	const issue = readWorkItem(cwd, taskId);
-	const raw = JSON.stringify(issue, null, "\t");
-	const summary = compactTaskSummary(issue, options);
-	if (options.full || raw.length > TASK_RAW_THRESHOLD) {
-		summary.raw_artifact_path = writeArtifact(cwd, "tasks", taskId, "json", raw);
-		if (raw.length > TASK_RAW_THRESHOLD)
-			recordWorkTelemetry(cwd, {
-				type: "large-task-read",
-				workItemId: taskId,
-				ok: true,
-				outputChars: raw.length,
-				threshold: TASK_RAW_THRESHOLD,
-				artifact: summary.raw_artifact_path,
-			});
-	}
-	return summary;
-}
 
-function changedFilesSummary(cwd) {
-	const rows = parsePorcelainStatus(
-		run(cwd, "git", ["status", "--porcelain=v1", "--untracked-files=all"]),
-	);
-	const changedFiles = rows.map((item) => item.path);
-	const fullDiffPath = writeArtifact(
-		cwd,
-		"logs",
-		"git-diff",
-		"patch",
-		safeRun(cwd, "git", ["diff", "--", ...changedFiles]) || "",
-	);
-	return {
-		status: "PASS",
-		changed_files: changedFiles,
-		full_diff_path: fullDiffPath,
-	};
-}
 
-function stagedFilesSummary(cwd) {
-	const staged = run(cwd, "git", ["diff", "--cached", "--name-only"])
-		.split(/\r?\n/)
-		.filter(Boolean);
-	return { status: "PASS", staged_files: staged };
-}
 
-function patternToRegex(pattern) {
-	const escaped = String(pattern)
-		.replace(/[.+^${}()|[\]\\]/g, "\\$&")
-		.replace(/\*/g, ".*");
-	return new RegExp(`^${escaped}$`);
-}
 
-function onlyAllowedFilesChanged(cwd, allowPatterns = []) {
-	const changed = changedFilesSummary(cwd);
-	const tests = allowPatterns.map(patternToRegex);
-	const unexpected = changed.changed_files.filter(
-		(file) => !tests.some((test) => test.test(normalizedRepoPath(file))),
-	);
-	return {
-		...changed,
-		status: unexpected.length ? "FAIL" : "PASS",
-		unexpected_files: unexpected,
-	};
-}
 
-function jsonlRecords(path, ids = []) {
-	const wanted = new Set(ids.map(String));
-	return readFileSync(path, "utf8")
-		.split(/\r?\n/)
-		.filter(Boolean)
-		.flatMap((line) => {
-			try {
-				return [JSON.parse(line)];
-			} catch {
-				return [];
-			}
-		})
-		.filter((record) => !wanted.size || wanted.has(String(record.id)));
-}
 
-function jsonlRecordSummary(path, ids = []) {
-	const records = Object.fromEntries(
-		jsonlRecords(path, ids).map((record) => [
-			record.id,
-			{
-				status: record.status,
-				labels: record.labels ?? [],
-				dependency_ids: depsOf(record),
-				updated_at: record.updated_at,
-			},
-		]),
-	);
-	return { status: "PASS", path, records };
-}
 
-function jsonlRecordDiff(path, ids = [], baselinePath) {
-	const current = jsonlRecordSummary(path, ids).records;
-	const baseline =
-		baselinePath && existsSync(baselinePath)
-			? jsonlRecordSummary(baselinePath, ids).records
-			: {};
-	const records = {};
-	for (const [id, record] of Object.entries(current)) {
-		const before = baseline[id] ?? {};
-		records[id] = {
-			...record,
-			changed_fields: Object.keys(record).filter(
-				(key) => JSON.stringify(record[key]) !== JSON.stringify(before[key]),
-			),
-		};
-	}
-	return { status: "PASS", path, records };
-}
 
-function forbiddenPatternCheck(paths, patterns) {
-	const regexes = patterns.map((pattern) => new RegExp(pattern));
-	const failures = [];
-	for (const file of paths) {
-		const text = readFileSync(file, "utf8");
-		for (const regex of regexes)
-			if (regex.test(text)) failures.push({ path: file, pattern: String(regex) });
-	}
-	return { status: failures.length ? "FAIL" : "PASS", failures };
-}
 
-function runTempCheck(cwd, name, script, inputs = {}, options = {}) {
-	const dir = join(telemetryDir(cwd), "checks");
-	mkdirSync(dir, { recursive: true });
-	const prefix = safeHistoryPathPart(name);
-	const runId = telemetryId("check");
-	const scriptPath = join(dir, `${prefix}-${runId}.mjs`);
-	const inputPath = join(dir, `${prefix}-${runId}-inputs.json`);
-	writeFileSync(scriptPath, script);
-	writeFileSync(inputPath, JSON.stringify(inputs, null, "\t"));
-	const result = runBounded(cwd, process.execPath, [scriptPath, inputPath], {
-		name: `${prefix}-check`,
-		cap: options.cap ?? 4_000,
-	});
-	let parsed;
-	let parseError = false;
-	try {
-		parsed = JSON.parse(readFileSync(result.full_stdout_path, "utf8"));
-		if (
-			!parsed ||
-			typeof parsed !== "object" ||
-			Array.isArray(parsed) ||
-			!["PASS", "FAIL"].includes(parsed.status)
-		)
-			throw new Error("invalid check result");
-	} catch {
-		parseError = true;
-		parsed = { summary: result.stdout_summary };
-	}
-	return {
-		name,
-		status:
-			result.exit_code === 0 && !parseError ? (parsed.status ?? "PASS") : "FAIL",
-		exit_code: result.exit_code,
-		duration_ms: result.duration_ms,
-		summary: parsed.summary ?? result.stderr_summary,
-		key_values: parsed.key_values ?? {},
-		failed_assertions: parseError
-			? ["check output was not valid JSON"]
-			: (parsed.failed_assertions ?? []),
-		full_log_path: result.full_stdout_path,
-		script_path: scriptPath,
-	};
-}
 
-function searchSummary(cwd, query, paths = ["."], options = {}) {
-	const max = String(options.max ?? 20);
-	const result = runBounded(cwd, "rg", ["-n", "-m", max, query, ...paths], {
-		name: `search-${query}`,
-		cap: options.cap ?? 4_000,
-	});
-	const matches = result.stdout_summary.split(/\r?\n/).filter(Boolean);
-	const files = [...new Set(matches.map((line) => line.split(":")[0]))];
-	return {
-		query,
-		searched_paths: paths,
-		matching_file_count: files.length,
-		match_count: matches.length,
-		top_matches: matches.slice(0, Number(max)),
-		suggested_next_files: files.slice(0, 10),
-		full_raw_search_log_path: result.full_stdout_path,
-	};
-}
 
-function prepareTaskExportForGate(cwd, taskIds = []) {
-	const changed = changedFilesSummary(cwd);
-	const staged = stagedFilesSummary(cwd);
-	let store;
-	try {
-		store = loadStore(cwd);
-	} catch (error) {
-		return {
-			status: "SKIP",
-			exported_path: storePath(cwd),
-			changed_files: changed.changed_files,
-			staged_files: staged.staged_files,
-			summary: error.message,
-		};
-	}
-	const missing = taskIds.filter((id) => !store.items[id]);
-	return {
-		status: missing.length ? "FAIL" : "PASS",
-		exported_path: storePath(cwd),
-		consistency_status: missing.length ? "FAIL" : "PASS",
-		missing_ids: missing,
-		changed_files: changed.changed_files,
-		staged_files: staged.staged_files,
-		summary: missing.length
-			? `Missing native work items: ${missing.join(", ")}`
-			: `Native store covers ${taskIds.length} work item(s).`,
-	};
-}
 
-function evidenceSummaryPath(cwd, runId) {
-	return join(
-		telemetryDir(cwd),
-		"evidence",
-		`${safeHistoryPathPart(runId)}-summary.json`,
-	);
-}
 
-function writeEvidenceSummary(cwd, summary) {
-	const runId = summary.run_id ?? telemetryId("run");
-	const file = evidenceSummaryPath(cwd, runId);
-	mkdirSync(dirname(file), { recursive: true });
-	writeFileSync(file, JSON.stringify({ ...summary, run_id: runId }, null, "\t"));
-	return file;
-}
 
-function readEvidenceSummary(cwd, runId) {
-	const file = evidenceSummaryPath(cwd, runId);
-	if (!existsSync(file)) return undefined;
-	try {
-		return JSON.parse(readFileSync(file, "utf8"));
-	} catch {
-		return undefined;
-	}
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function transcriptText(value) {
 	if (typeof value === "string") return value;
@@ -7765,13 +6689,7 @@ function safeRun(cwd, command, args) {
 	}
 }
 
-function gitSnapshot(cwd) {
-	const status = safeRun(cwd, "git", ["status", "--porcelain=v1"]);
-	return {
-		head: safeRun(cwd, "git", ["rev-parse", "--verify", "HEAD"]),
-		dirtyFiles: status ? status.split(/\r?\n/).filter(Boolean).length : 0,
-	};
-}
+
 
 // Normal workflow paths read the native store directly. Legacy state is handled only by /work-remove-beads.
 function loadNativeWorkStore(cwd) {
@@ -8770,7 +7688,7 @@ function isWindowsReservedName(path) {
 	);
 }
 
-export function isGeneratedBuildArtifact(path) {
+function isGeneratedBuildArtifact(path) {
 	const file = normalizedRepoPath(path);
 	const segments = file.split("/");
 	const base = segments[segments.length - 1];
@@ -8861,7 +7779,7 @@ function isFormatterOnlyDirt(cwd, item) {
 	}
 }
 
-export function isWorkflowDirt(cwd, item, planPaths = []) {
+function isWorkflowDirt(cwd, item, planPaths = []) {
 	const file = normalizedRepoPath(item.path);
 	return (
 		isWorkStoreDirt(file) ||
@@ -8948,16 +7866,7 @@ function dirtyRecoveryPrompt(state, command, token) {
 	].join("\n");
 }
 
-function dirtyRecoveryApprovalFingerprint(value) {
-	return JSON.stringify({
-		question: String(value?.question ?? ""),
-		context: String(value?.context ?? ""),
-		options: (value?.options ?? []).map((option) => ({
-			title: String(option?.title ?? ""),
-			description: String(option?.description ?? ""),
-		})),
-	});
-}
+
 
 
 
@@ -10266,19 +9175,7 @@ function acknowledgeDirectActionLease(cwd, lease, direct, spawned) {
 }
 
 // Compatibility telemetry hook for callers that only know the legacy pending-run shape.
-function recordSpawnedDirectRun(cwd, state, direct, spawned) {
-	const identity = directRunIdentity(direct, spawned);
-	return recordPendingDirectRun(cwd, {
-		workflowRunId: currentCommandWorkflow()?.workflowRunId,
-		activity: workflowActivityMarker(),
-		mode: currentCommandWorkflow()?.mode,
-		action: state.action,
-		agent: direct.agent,
-		epicId: state.epic?.id,
-		workItemId: state.selectedWorkItem?.id,
-		...identity,
-	});
-}
+
 
 function markDirectHandoffStarted(cwd, state) {
 	const selected = state?.selectedWorkItem;
@@ -10404,7 +9301,7 @@ async function preflightDirectModelCandidates(direct, registry) {
 	};
 }
 
-export async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
+async function launchDirectAction(cwd, state, direct, pi, runtime = {}) {
 	const preflight = await preflightDirectModelCandidates(
 		direct,
 		runtime.modelRegistry ?? pi?.modelRegistry,
@@ -10550,7 +9447,7 @@ function latestFailurePacket(issue) {
 	}
 }
 
-export function leadEscalationDecision(issue, history = []) {
+function leadEscalationDecision(issue, history = []) {
 	const packet = latestFailurePacket(issue);
 	const repairs = history.filter(
 		(lease) => lease.action === "run-repair",
@@ -10783,7 +9680,7 @@ async function autonomouslyFinishAndResume(cwd, lease, runtime = {}) {
 	};
 }
 
-export async function driveWorkActionLeases(cwd, runtime = {}) {
+async function driveWorkActionLeases(cwd, runtime = {}) {
 	reconcileWorkActionLeaseLiveness(cwd, runtime);
 	const results = [];
 	for (const lease of currentWorkActionLeases(cwd)) {
@@ -11071,23 +9968,7 @@ export function excludedModelParked(model, now = Date.now()) {
 	return false;
 }
 
-export function workSubagentToolCall(event, ctx) {
-	if (event.toolName !== "subagent") return false;
-	const input = event.input ?? {};
-	if (/^work-/i.test(String(input.agent ?? ""))) return true;
-	let source = String(input.workflowScript ?? ""); // Retained legacy calls remain fenced.
-	if (input.workflow === true || input.workflow === "true") {
-		const message = ctx.sessionManager?.getBranch?.().findLast(entry => entry.message?.role === "assistant")?.message;
-		source = (message?.content ?? []).filter(part => part.type === "text").map(part => part.text).join("\n");
-	} else if (typeof input.workflow === "string" && /[\\/]/.test(input.workflow)) {
-		try {
-			const file = resolve(input.cwd ?? ctx.cwd, input.workflow);
-			if (statSync(file).size > 128 * 1024) return true;
-			source = readFileSync(file, "utf8");
-		} catch { return true; } // Uninspectable script paths fail closed in direct mode.
-	}
-	return /agent\s*:\s*["']work-/i.test(source) || /["']agent["']\s*:\s*["']work-/i.test(source);
-}
+
 
 export function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
 	const {
@@ -11114,7 +9995,7 @@ export function spawnSubagentRpc(pi, params, timeoutMs = 2000) {
 	);
 }
 
-export async function resumePausedWorkActionLease(
+async function resumePausedWorkActionLease(
 	cwd,
 	pi,
 	target = "",
@@ -11211,203 +10092,15 @@ export async function resumePausedWorkActionLease(
 	};
 }
 
-function verifierWorkspace(cwd) {
-	const root = resolve(cwd ?? "");
-	let marker;
-	try {
-		marker = JSON.parse(
-			readFileSync(join(root, VERIFIER_WORKSPACE_MARKER), "utf8"),
-		);
-	} catch {
-		throw new Error("Verifier tools require an isolated verifier workspace.");
-	}
-	if (
-		marker?.version !== 1 ||
-		!Array.isArray(marker.paths) ||
-		marker.paths.some((entry) => typeof entry !== "string")
-	)
-		throw new Error("Verifier workspace marker is invalid.");
-	return { root, paths: new Set(marker.paths) };
-}
-function verifierPath(cwd, requested, { directory = false } = {}) {
-	const workspace = verifierWorkspace(cwd);
-	const value = requested ?? (directory ? "." : "");
-	if (
-		typeof value !== "string" ||
-		!value ||
-		isAbsolute(value) ||
-		value.includes("\\") ||
-		(value !== "." &&
-			(value.startsWith("../") || posix.normalize(value) !== value))
-	)
-		throw new Error("Verifier path must be workspace-relative.");
-	const target = resolve(workspace.root, value);
-	const relativeTarget = relative(workspace.root, target);
-	if (relativeTarget.startsWith("..") || isAbsolute(relativeTarget))
-		throw new Error("Verifier path escapes its workspace.");
-	let cursor = workspace.root;
-	for (const part of relativeTarget ? relativeTarget.split(/[\\/]/) : []) {
-		cursor = join(cursor, part);
-		if (lstatSync(cursor).isSymbolicLink())
-			throw new Error("Verifier paths cannot traverse symlinks.");
-	}
-	const normalized = relativeTarget.replace(/\\/g, "/") || ".";
-	if (!directory && !workspace.paths.has(normalized))
-		throw new Error("Verifier path is outside the checkpoint scope.");
-	return { ...workspace, target, relative: normalized };
-}
-function* verifierLines(file) {
-	const descriptor = openSync(file, "r");
-	const chunk = Buffer.allocUnsafe(VERIFIER_MAX_BYTES);
-	const decoder = new StringDecoder("utf8");
-	let pending = "";
-	try {
-		for (let bytes; (bytes = readSync(descriptor, chunk, 0, chunk.length)); ) {
-			pending += decoder.write(chunk.subarray(0, bytes));
-			for (let newline; (newline = pending.indexOf("\n")) !== -1; ) {
-				const line = pending.slice(0, newline).replace(/\r$/, "");
-				if (Buffer.byteLength(line) > VERIFIER_MAX_BYTES)
-					throw new Error("Verifier line exceeds the read limit.");
-				yield line;
-				pending = pending.slice(newline + 1);
-			}
-			if (Buffer.byteLength(pending) > VERIFIER_MAX_BYTES)
-				throw new Error("Verifier line exceeds the read limit.");
-		}
-		pending += decoder.end();
-		if (Buffer.byteLength(pending) > VERIFIER_MAX_BYTES)
-			throw new Error("Verifier line exceeds the read limit.");
-		if (pending) yield pending;
-	} finally {
-		closeSync(descriptor);
-	}
-}
-export function executeVerifierRead(cwd, params = {}) {
-	const { target, relative: file } = verifierPath(cwd, params.path);
-	const startLine = Number(params.startLine ?? 1);
-	const maxLines = Number(params.maxLines ?? VERIFIER_MAX_LINES);
-	if (
-		!Number.isInteger(startLine) ||
-		startLine < 1 ||
-		!Number.isInteger(maxLines) ||
-		maxLines < 1 ||
-		maxLines > VERIFIER_MAX_LINES
-	)
-		throw new Error("Invalid verifier line range.");
-	const lines = [];
-	let outputBytes = 0;
-	let lineNumber = 0;
-	for (const line of verifierLines(target)) {
-		lineNumber += 1;
-		if (lineNumber < startLine) continue;
-		outputBytes += Buffer.byteLength(line);
-		if (outputBytes > VERIFIER_MAX_BYTES)
-			throw new Error(
-				"Verifier read window exceeds the output limit; request fewer lines.",
-			);
-		lines.push(line);
-		if (lines.length === maxLines) break;
-	}
-	return { path: file, startLine, lines };
-}
-export function executeVerifierList(cwd, params = {}) {
-	const {
-		target,
-		relative: directory,
-		paths,
-	} = verifierPath(cwd, params.path, { directory: true });
-	const maxResults = Number(params.maxResults ?? VERIFIER_MAX_RESULTS);
-	if (
-		!Number.isInteger(maxResults) ||
-		maxResults < 1 ||
-		maxResults > VERIFIER_MAX_RESULTS
-	)
-		throw new Error("Invalid verifier result limit.");
-	const entries = readdirSync(target, { withFileTypes: true })
-		.filter((entry) => !entry.isSymbolicLink())
-		.map((entry) =>
-			directory === "." ? entry.name : `${directory}/${entry.name}`,
-		)
-		.filter((entry) =>
-			[...paths].some(
-				(allowed) => allowed === entry || allowed.startsWith(`${entry}/`),
-			),
-		)
-		.sort()
-		.slice(0, maxResults);
-	return { path: directory, entries };
-}
-function verifierFiles(cwd, requested) {
-	const { root, paths } = verifierPath(cwd, requested, { directory: true });
-	if (requested && requested !== "." && paths.has(requested))
-		return [verifierPath(root, requested)];
-	const prefix = requested && requested !== "." ? `${requested}/` : "";
-	return [...paths]
-		.filter((entry) => entry.startsWith(prefix) && existsSync(join(root, entry)))
-		.map((entry) => verifierPath(root, entry));
-}
-export function executeVerifierFind(cwd, params = {}) {
-	const query = String(params.query ?? "");
-	if (!query || query.length > 200)
-		throw new Error("Invalid verifier find query.");
-	const maxResults = Number(params.maxResults ?? VERIFIER_MAX_RESULTS);
-	if (
-		!Number.isInteger(maxResults) ||
-		maxResults < 1 ||
-		maxResults > VERIFIER_MAX_RESULTS
-	)
-		throw new Error("Invalid verifier result limit.");
-	return {
-		matches: verifierFiles(cwd, params.path)
-			.filter((entry) => entry.relative.includes(query))
-			.slice(0, maxResults)
-			.map((entry) => entry.relative),
-	};
-}
-export function executeVerifierGrep(cwd, params = {}) {
-	const query = String(params.query ?? "");
-	if (!query || query.length > 200)
-		throw new Error("Invalid verifier grep query.");
-	const maxResults = Number(params.maxResults ?? VERIFIER_MAX_RESULTS);
-	if (
-		!Number.isInteger(maxResults) ||
-		maxResults < 1 ||
-		maxResults > VERIFIER_MAX_RESULTS
-	)
-		throw new Error("Invalid verifier result limit.");
-	const matches = [];
-	const files = verifierFiles(cwd, params.path);
-	const exactFile = files.length === 1 && files[0].relative === params.path;
-	for (const entry of files) {
-		let lineNumber = 0;
-		try {
-			for (const line of verifierLines(entry.target)) {
-				lineNumber += 1;
-				if (line.includes(query))
-					matches.push({
-						path: entry.relative,
-						line: lineNumber,
-						text: line.slice(0, 500),
-					});
-				if (matches.length >= maxResults) return { matches };
-			}
-		} catch (cause) {
-			if (
-				exactFile ||
-				!(cause instanceof Error) ||
-				cause.message !== "Verifier line exceeds the read limit."
-			)
-				throw cause;
-		}
-	}
-	return { matches };
-}
-function verifierToolResult(value) {
-	return {
-		content: [{ type: "text", text: JSON.stringify(value) }],
-		details: value,
-	};
-}
+
+
+
+
+
+
+
+
+
 
 
 function createPiSubagentsVerifierAdapter(pi) {
@@ -11484,56 +10177,11 @@ function scheduleConfiguredBackgroundVerifiers(cwd, pi, input = {}) {
 	});
 }
 
-export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
-	if (!input.before || !input.after || input.before === input.after) return null;
-	try {
-		if (
-			Object.values(loadVerifierStore(cwd).fixes).some(
-				(fix) => fix.commit === input.after,
-			)
-		)
-			return null;
-	} catch (error) {
-		if (error?.category !== "missing") throw error;
-	}
-	const paths = run(cwd, "git", [
-		"diff",
-		"--name-only",
-		"-z",
-		`${input.before}..${input.after}`,
-		"--",
-	])
-		.split("\0")
-		.map(normalizedRepoPath)
-		.filter(
-			(file) =>
-				file &&
-				!file.startsWith(".ce-workflow/") &&
-				!file.startsWith(".pi/") &&
-				!file.startsWith("docs/plans/"),
-		);
-	if (!paths.length) return null;
-	return scheduleConfiguredBackgroundVerifiers(cwd, pi, {
-		origin: input.origin,
-		currentModel: input.currentModel,
-		paths,
-		scope: "commit",
-	});
-}
 
 
 
-function finishHelperSucceeded(event, workItemId) {
-	if (event.isError) return false;
-	const text = contentText(event.result);
-	const escaped = workItemId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	return (
-		/["']?status["']?\s*:\s*["']PASS["']/i.test(text) &&
-		new RegExp(`["']?work_item_id["']?\\s*:\\s*["']${escaped}["']`, "i").test(
-			text,
-		)
-	);
-}
+
+
 
 
 
@@ -11731,111 +10379,11 @@ async function handleWorkAnalyzeCommand(_args, ctx, pi, defaults = {}) {
 	}
 }
 
-function laneDigest(value) {
-	return createHash("sha256")
-		.update(typeof value === "string" ? value : JSON.stringify(value ?? null))
-		.digest("hex");
-}
 
-function readOnlyLaneEnvelope(
-	cwd,
-	request,
-	settings = readEffectiveSettings(cwd),
-) {
-	if (!["discovery", "debug"].includes(request?.laneKind))
-		throw new Error("Read-only lanes support only current-task discovery/debug");
-	const workItem = readWorkItem(cwd, request.workItemId);
-	if (!workItem) throw new Error(`No WorkItem found for ${request.workItemId}`);
-	const executionRoot = executionRepositoryRoot(cwd);
-	const head = run(executionRoot, "git", ["rev-parse", "HEAD"]);
-	return createLaneEnvelope({
-		repository: executionRoot,
-		laneKind: request.laneKind,
-		producer: request.producer ?? "work-orchestrator",
-		workItemId: request.workItemId,
-		generation: request.generation ?? 1,
-		baseHead: head,
-		checkpoint: request.checkpoint ?? head,
-		workItemHash: laneDigest(workItem),
-		selectionHash: laneDigest(request.selection ?? request.relevantPaths ?? []),
-		relevantPaths: request.relevantPaths ?? [],
-		resourceKeys: request.resourceKeys ?? [],
-		gateVersion: request.gateVersion ?? "work-gates-v1",
-		settingsVersion: laneDigest(settings),
-		promotionOwner: request.promotionOwner ?? "work-orchestrator",
-	});
-}
 
-async function launchCurrentTaskReadOnlyLanes(
-	cwd,
-	requests,
-	adapter,
-	options = {},
-) {
-	const maxLanes = Math.max(1, Number(options.maxLanes) || 3);
-	if (!Array.isArray(requests) || requests.length > maxLanes)
-		throw new Error(
-			`Read-only lane launch is bounded to ${maxLanes} current-task lanes`,
-		);
-	if (typeof adapter?.spawn !== "function")
-		throw new Error("Read-only lane adapter is unavailable");
-	const settings = options.settings ?? readEffectiveSettings(cwd);
-	const envelopes = requests.map((request) =>
-		readOnlyLaneEnvelope(cwd, request, settings),
-	);
-	const byId = new Map(
-		envelopes.map((lane, index) => [lane.id, requests[index]]),
-	);
-	const result = await runReadOnlyLaneBatch(
-		cwd,
-		envelopes,
-		async (lane) => {
-			const request = byId.get(lane.id);
-			const spawned = await adapter.spawn({ ...request, lane });
-			const identity = directRunIdentity(request, spawned);
-			acknowledgeLaneLaunch(cwd, lane.id, {
-				ambiguous: spawned?.ambiguous === true,
-				...identity,
-			});
-			if (!spawned?.ok)
-				throw new Error(
-					spawned?.ambiguous
-						? "ambiguous launch acknowledgement"
-						: (spawned?.message ?? "read-only lane launch failed"),
-				);
-			if (request?.workflowRunId && (identity.runId || identity.asyncDir))
-				recordPendingDirectRun(cwd, {
-					workflowRunId: request.workflowRunId,
-					activity: request.activity ?? "read-only-lane",
-					action: `read-only-${request.laneKind}`,
-					agent: request.agent,
-					workItemId: request.workItemId,
-					...identity,
-				});
-			const settled =
-				typeof adapter.wait === "function"
-					? await adapter.wait(identity, lane)
-					: spawned;
-			return {
-				artifact: settled.artifact ?? {
-					...identity,
-					laneKind: lane.laneKind,
-				},
-				durationMs: settled.durationMs,
-				promote: settled.promote !== false,
-				status:
-					settled.completed === true ? "completed" : (settled.status ?? "running"),
-			};
-		},
-		{
-			maxConcurrency: Math.min(maxLanes, Number(options.maxConcurrency) || 2),
-			failFast: options.failFast,
-			serial: !workPerformanceSettings(cwd).parallelReadOnlyLanes,
-		},
-	);
-	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
-	return result;
-}
+
+
+
 
 function prefetchVerifierStatus(cwd) {
 	try {
@@ -11845,40 +10393,11 @@ function prefetchVerifierStatus(cwd) {
 	}
 }
 
-function prefetchDurationMetrics(lane, discarded) {
-	const started = Date.parse(
-		lane.timestamps.runningAt ?? lane.timestamps.queuedAt,
-	);
-	const durationMs = Math.max(0, Date.now() - started);
-	return {
-		...(lane.metrics ?? {}),
-		durationMs,
-		wastedDurationMs: discarded ? durationMs : 0,
-	};
-}
 
-function discardSuccessorPrefetch(cwd, lane, reason) {
-	const discarded = transitionLane(cwd, lane.id, "discarded", {
-		reason,
-		metrics: prefetchDurationMetrics(lane, true),
-	});
-	for (const event of laneTelemetryEvents(cwd)) recordWorkTelemetry(cwd, event);
-	return { state: "discarded", reason, lane: discarded };
-}
 
-function reconcileSuccessorPrefetches(cwd) {
-	const reconciled = [];
-	for (const lane of Object.values(loadLaneStore(cwd).lanes)) {
-		if (
-			lane.laneKind !== "prefetch" ||
-			["discarded", "promoted"].includes(lane.state)
-		)
-			continue;
-		discardSuccessorPrefetch(cwd, lane, "retired");
-		reconciled.push(lane.id);
-	}
-	return { reconciled, lanes: laneStatus(cwd) };
-}
+
+
+
 
 function reconcileReadOnlyLaneRuns(cwd) {
 	const reconciled = reconcileReadOnlyLanes(cwd);
@@ -12025,7 +10544,7 @@ function renderAnalysisReviewReport(payload, groups) {
 	return `${lines.join("\n")}\n`;
 }
 
-export function materializeVerifierAnalysis(
+function materializeVerifierAnalysis(
 	cwd,
 	{ batchIds, markdown, reportPath },
 ) {
@@ -12163,17 +10682,7 @@ function verifierTriageOwner(ctx) {
 		ctx?.sessionManager?.getSessionId?.() || `process-${process.pid}`,
 	).trim();
 }
-function completedVerifierResumeTarget(store, ownerSession) {
-	const claims = Object.values(store.claims).filter(
-		(claim) => claim.ownerSession === ownerSession && claim.resumeTarget,
-	);
-	if (
-		!claims.length ||
-		claims.some((claim) => store.groups[claim.groupId]?.status === "claimed")
-	)
-		return "";
-	return claims[0].resumeTarget;
-}
+
 function verifierTriageState(cwd, ownerSession, resumeTarget, input = {}) {
 	reconcileBackgroundVerifierRuns(cwd);
 	let claims;
@@ -12235,125 +10744,11 @@ function verifierFindingChanged(cwd, finding) {
 		return true;
 	}
 }
-function checkpointRenameTarget(cwd, finding, candidate) {
-	const source = normalizedRepoPath(finding?.path);
-	const target = normalizedRepoPath(candidate);
-	if (
-		!source ||
-		!target ||
-		target === source ||
-		isAbsolute(target) ||
-		target === ".." ||
-		target.startsWith("../")
-	)
-		return false;
-	let checkpoint = "";
-	for (const revision of [
-		finding?.checkpoint?.snapshot,
-		finding?.checkpoint?.base,
-	]) {
-		if (!/^[0-9a-f]{40,64}$/i.test(revision ?? "")) continue;
-		try {
-			checkpoint = run(cwd, "git", [
-				"rev-parse",
-				"--verify",
-				`${revision}^{commit}`,
-			]);
-			break;
-		} catch {
-			// Revision candidate not resolvable; try the next one.
-		}
-	}
-	if (!checkpoint) return false;
-	const renamedPath = (from, to, path, extra = []) => {
-		const pathspec = extra === null ? [] : ["--", path, ...extra];
-		const fields = run(cwd, "git", [
-			"diff",
-			"--name-status",
-			"-z",
-			"--find-renames",
-			from,
-			to,
-			...pathspec,
-		]).split("\0");
-		for (let index = 0; fields[index]; ) {
-			const status = fields[index++];
-			const first = normalizedRepoPath(fields[index++]);
-			if (/^R\d+$/.test(status)) {
-				const second = normalizedRepoPath(fields[index++]);
-				if (first === path) return second;
-			}
-		}
-		return "";
-	};
-	try {
-		if (renamedPath(checkpoint, "HEAD", source, [target]) === target) return true;
-		// ponytail: linear history walk; persist rename edges if old checkpoints make this hot.
-		const commits = run(cwd, "git", [
-			"rev-list",
-			"--ancestry-path",
-			"--reverse",
-			`${checkpoint}..HEAD`,
-		])
-			.split(/\r?\n/)
-			.filter(Boolean);
-		let current = source;
-		let previous = checkpoint;
-		for (const commit of commits) {
-			current = renamedPath(previous, commit, current, null) || current;
-			previous = commit;
-		}
-		return current === target;
-	} catch {
-		return false;
-	}
-}
 
-function checkpointTargetDeleted(cwd, finding) {
-	const file = normalizedRepoPath(finding?.path);
-	if (
-		!file ||
-		isAbsolute(file) ||
-		file === ".." ||
-		file.startsWith("../") ||
-		existsSync(join(cwd, file))
-	)
-		return false;
-	for (const revision of [
-		finding?.checkpoint?.snapshot,
-		finding?.checkpoint?.base,
-	]) {
-		if (!/^[0-9a-f]{40,64}$/i.test(revision ?? "")) continue;
-		try {
-			run(cwd, "git", ["cat-file", "-e", `${revision}:${file}`]);
-			return true;
-		} catch {
-			// Path absent at that revision; not recoverable there.
-		}
-	}
-	return false;
-}
 
-function currentCodeEvidence(cwd, finding, evidence, allowDeletionOnly = false) {
-	const source = normalizedRepoPath(finding.path);
-	const deleted = checkpointTargetDeleted(cwd, finding);
-	if (!evidence)
-		return deleted && allowDeletionOnly ? `deleted:${source}` : "";
-	if (!/^[0-9a-f]{64}$/i.test(evidence.sha256 ?? "")) return "";
-	const file = normalizedRepoPath(evidence.path);
-	if (file !== source && !checkpointRenameTarget(cwd, finding, file) && !deleted)
-		return "";
-	try {
-		const bytes = readFileSync(join(cwd, file));
-		if (createHash("sha256").update(bytes).digest("hex") !== evidence.sha256)
-			return "";
-		return deleted && file !== source
-			? `deleted:${source};successor:${file}:${evidence.sha256}`
-			: `${file}:${evidence.sha256}`;
-	} catch {
-		return "";
-	}
-}
+
+
+
 
 function workflowHelperGuidance(cwd, state) {
 	if (!cwd || !existsSync(WORK_HELPER_SCRIPT)) return [];
@@ -12565,7 +10960,7 @@ function designWorkflowPolicy(cwd, override) {
 	return "off";
 }
 
-export function substantialUiWork(text) {
+function substantialUiWork(text) {
 	const value = String(text ?? "");
 	return (
 		/\b(?:ui|ux|interface|screen|page|dashboard|website|frontend|visual|game|gameplay|playthrough|layout|style)\b/i.test(
@@ -12578,7 +10973,7 @@ export function substantialUiWork(text) {
 	);
 }
 
-export function extractDesignReferencePaths(text) {
+function extractDesignReferencePaths(text) {
 	const value = String(text ?? "");
 	const windows =
 		value.match(/[A-Za-z]:[\\/][^\r\n"<>|?*]+?\.(?:png|jpe?g|webp)\b/gi) ?? [];
@@ -12590,7 +10985,7 @@ export function extractDesignReferencePaths(text) {
 	return [...new Set([...windows, ...unix].map((item) => item.trim()))];
 }
 
-export function inferUiDesignInput(objective) {
+function inferUiDesignInput(objective) {
 	const text = String(objective ?? "").trim();
 	const projectType = /\b(?:game|gameplay|playthrough)\b/i.test(text)
 		? "game"
@@ -12641,7 +11036,7 @@ function repositoryDesignFiles(cwd) {
 	}
 }
 
-export function detectDesignTargetMatrix(cwd, deviceAnswer = "") {
+function detectDesignTargetMatrix(cwd, deviceAnswer = "") {
 	const evidence = new Map();
 	for (const file of repositoryDesignFiles(cwd)) {
 		let content;
@@ -12684,7 +11079,7 @@ export function detectDesignTargetMatrix(cwd, deviceAnswer = "") {
 	});
 }
 
-export function redesignDiscoveryQuestions(
+function redesignDiscoveryQuestions(
 	intake,
 	targetMatrix = [],
 	answers = {},
@@ -12768,7 +11163,7 @@ export function redesignDiscoveryQuestions(
 	].filter(Boolean);
 }
 
-export async function collectRedesignDiscovery(ctx, objective, options = {}) {
+async function collectRedesignDiscovery(ctx, objective, options = {}) {
 	const intake = inferUiDesignInput(objective);
 	const answers = { ...(options.designAnswers ?? {}) };
 	let targetMatrix = detectDesignTargetMatrix(ctx.cwd, answers.devices);
@@ -13056,7 +11451,7 @@ async function syncDesignCandidates(cwd, session, callTool, run) {
 	});
 }
 
-export async function selectDesignCandidate(
+async function selectDesignCandidate(
 	cwd,
 	ownerId,
 	candidateId,
@@ -13193,7 +11588,7 @@ function designSessionGate(session) {
 	};
 }
 
-export function buildWorkRedesignState(cwd, args = "", options = {}) {
+function buildWorkRedesignState(cwd, args = "", options = {}) {
 	const objective = String(args ?? "").trim();
 	if (!objective)
 		return errorState("usage", "Usage: /wo redesign <objective>", {
@@ -13404,7 +11799,7 @@ function writeDesignArtifact(cwd, relativePath, content) {
 	});
 }
 
-export function prepareDesignSession(cwd, ownerId, input = {}) {
+function prepareDesignSession(cwd, ownerId, input = {}) {
 	let session = tryLoadDesignSession(cwd, ownerId);
 	if (!session) throw new Error(`No design session exists for ${ownerId}.`);
 	const preserve = input.preserve ?? [
@@ -13511,7 +11906,7 @@ export function prepareDesignSession(cwd, ownerId, input = {}) {
 	};
 }
 
-export function waiveDesignSession(cwd, ownerId) {
+function waiveDesignSession(cwd, ownerId) {
 	let session = tryLoadDesignSession(cwd, ownerId);
 	if (!session)
 		return errorState(
@@ -13540,7 +11935,7 @@ export function waiveDesignSession(cwd, ownerId) {
 	};
 }
 
-export async function answerDesignClarification(
+async function answerDesignClarification(
 	cwd,
 	ownerId,
 	answer,
@@ -13633,7 +12028,7 @@ export async function answerDesignClarification(
 	}
 }
 
-export function designReviewChoices(session) {
+function designReviewChoices(session) {
 	const previewUrl = normalizeOpenDesignUrl(session.previewUrl);
 	const studioUrl = normalizeOpenDesignUrl(session.studioUrl);
 	const synced =
@@ -13694,7 +12089,7 @@ export function designReviewChoices(session) {
 	];
 }
 
-export async function reviseDesignSession(
+async function reviseDesignSession(
 	cwd,
 	ownerId,
 	feedback,
@@ -13775,7 +12170,7 @@ export async function reviseDesignSession(
 	}
 }
 
-export async function reviewDesignSession(cwd, ownerId, ctx, options = {}) {
+async function reviewDesignSession(cwd, ownerId, ctx, options = {}) {
 	for (;;) {
 		let session = tryLoadDesignSession(cwd, ownerId);
 		if (!session)
@@ -13929,7 +12324,7 @@ async function fetchDesignFile(callTool, args) {
 	}
 }
 
-export function recordDesignLineage(cwd, session) {
+function recordDesignLineage(cwd, session) {
 	const item = readWorkItem(cwd, session.ownerId);
 	if (!item) return [];
 	const notes = designLineageNotes({
@@ -13954,7 +12349,7 @@ export function recordDesignLineage(cwd, session) {
 	return notes;
 }
 
-export async function syncDesignSession(cwd, ownerId, options = {}) {
+async function syncDesignSession(cwd, ownerId, options = {}) {
 	let session = tryLoadDesignSession(cwd, ownerId);
 	if (!session)
 		return errorState(
@@ -14365,7 +12760,7 @@ function materializeApprovedDesign(cwd, session) {
 	return { session: next, items: [item] };
 }
 
-export async function approveDesignSession(
+async function approveDesignSession(
 	cwd,
 	ownerId,
 	notes = "",
@@ -14555,7 +12950,7 @@ export async function approveDesignSession(
 	}
 }
 
-export async function restartDesignSession(cwd, ownerId, options = {}) {
+async function restartDesignSession(cwd, ownerId, options = {}) {
 	let session = tryLoadDesignSession(cwd, ownerId);
 	if (!session)
 		return errorState(
@@ -14694,7 +13089,7 @@ export async function restartDesignSession(cwd, ownerId, options = {}) {
 	}
 }
 
-export async function advanceDesignSession(cwd, ownerId, options = {}) {
+async function advanceDesignSession(cwd, ownerId, options = {}) {
 	let session = tryLoadDesignSession(cwd, ownerId);
 	if (!session)
 		return errorState(
@@ -16646,7 +15041,7 @@ function planEpicFields(cwd, rel) {
 	};
 }
 
-export function scanPlanOpenQuestions(text) {
+function scanPlanOpenQuestions(text) {
 	const body = stripFrontmatter(String(text ?? ""));
 	const lines = body.split(/\r?\n/);
 	const questions = [];
@@ -16860,7 +15255,7 @@ function materializeExecutablePlan(cwd, epic, units, rel, command) {
 	};
 }
 
-export function bootstrapPlanEpic(
+function bootstrapPlanEpic(
 	cwd,
 	rel,
 	command = "/work-plan",
@@ -18018,37 +16413,7 @@ function buildWorkBrainstormState(cwd, args = "", options = {}) {
 	}
 }
 
-function linkBrainstormArtifactFromFinal(cwd, run, text) {
-	if (run?.meta?.mode !== "brainstorm" || !run.meta.workItemId) return null;
-	const match = String(text ?? "").match(
-		/(?:^|\n)\s*Brainstorm saved:\s*`?([^\r\n`]+?\.md)`?\s*(?:\r?\n|$)/i,
-	);
-	if (!match) return null;
-	const artifact = repoRelativePath(cwd, match[1].trim());
-	if (!artifact || !existsSync(join(cwd, artifact))) return null;
-	const idea = readWorkItem(cwd, run.meta.workItemId);
-	if (
-		!idea ||
-		(run.meta.epicId && parentOf(idea) !== run.meta.epicId) ||
-		notesOf(idea).includes(`brainstorm-path=${artifact}`)
-	)
-		return null;
-	const updated = appendWorkflowWorkItemNote(
-		cwd,
-		run.meta.workItemId,
-		ideaBrainstormNote(artifact, "completed-brainstorm"),
-	);
-	const designSession = tryLoadDesignSession(cwd, run.meta.workItemId);
-	if (designSession)
-		saveDesignSession(cwd, { ...designSession, sourceArtifact: artifact });
-	return {
-		ok: true,
-		action: "brainstorm-linked",
-		artifact,
-		epic: issueSummary(readWorkItem(cwd, parentOf(idea))),
-		idea: issueSummary(updated),
-	};
-}
+
 
 function brainstormHandoffPrompt(
 	state,
@@ -18864,7 +17229,7 @@ function designBriefsForPlanning(cwd, references = []) {
 		});
 }
 
-export function designPlanningAuthority(cwd, ownerId) {
+function designPlanningAuthority(cwd, ownerId) {
 	let session = tryLoadDesignSession(cwd, ownerId);
 	if (!session) return undefined;
 	const recovery =
@@ -19575,55 +17940,9 @@ function samePathSet(left = [], right = []) {
 	return a.size === b.size && [...a].every((item) => b.has(item));
 }
 
-function findingPathMatchesCheckpoint(cwd, finding, candidates = []) {
-	const snapshot = finding?.checkpoint?.snapshot;
-	const file = normalizedRepoPath(finding?.path);
-	if (!file || !/^[0-9a-f]{40,64}$/i.test(snapshot ?? "")) return false;
-	try {
-		run(cwd, "git", ["diff", "--quiet", snapshot, "--", file]);
-		return true;
-	} catch {
-		return candidates.some((candidate) =>
-			checkpointRenameTarget(cwd, finding, candidate),
-		);
-	}
-}
 
-function committedAcceptedFix(cwd, findings, paths) {
-	const snapshots = [
-		...new Set(findings.map((finding) => finding?.checkpoint?.snapshot)),
-	];
-	if (snapshots.length !== 1 || !/^[0-9a-f]{40,64}$/i.test(snapshots[0] ?? ""))
-		return "";
-	try {
-		run(cwd, "git", ["merge-base", "--is-ancestor", snapshots[0], "HEAD"]);
-		const commits = run(cwd, "git", [
-			"log",
-			"--format=%H",
-			`${snapshots[0]}..HEAD`,
-			"--",
-			...paths,
-		])
-			.split(/\r?\n/)
-			.filter(Boolean);
-		return (
-			commits.find((commit) => {
-				const changed = run(cwd, "git", [
-					"diff-tree",
-					"--no-commit-id",
-					"--name-only",
-					"-r",
-					commit,
-				])
-					.split(/\r?\n/)
-					.filter((path) => path && !isWorkStorePath(path));
-				return samePathSet(changed, paths);
-			}) ?? ""
-		);
-	} catch {
-		return "";
-	}
-}
+
+
 
 function ensureOnlyStaged(cwd, files) {
 	const staged = run(cwd, "git", [
@@ -21124,11 +19443,7 @@ function renderWorkRoadmapText(state) {
 		.join("\n");
 }
 
-function buildWorkReport(cwd, args = "") {
-	const parsed = parseWorkReportArgs(args);
-	const state = buildWorkReportState(cwd, args);
-	return parsed.json ? renderWorkReportJson(state) : renderWorkReportText(state);
-}
+
 
 function renderResumeBlockedLines(state) {
 	if (state.action !== "report-blocked") return [];
@@ -21243,15 +19558,9 @@ function renderWorkResumeText(state) {
 		.join("\n");
 }
 
-function renderWorkResumeJson(state) {
-	return JSON.stringify(state, null, "\t");
-}
 
-function buildWorkResume(cwd, args = "") {
-	const parsed = parseWorkResumeArgs(args);
-	const state = buildWorkResumeState(cwd, args);
-	return parsed.json ? renderWorkResumeJson(state) : renderWorkResumeText(state);
-}
+
+
 
 function splitFirstWord(value) {
 	const trimmed = String(value ?? "").trim();
@@ -21574,73 +19883,17 @@ function renderWorkImproveText(state) {
 	].join("\n");
 }
 
-function improvementSafetyNotes(issue) {
-	return noteTextsOf(issue)
-		.map((note) =>
-			note.match(
-				/^\s*wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^\r\n]*\s*$/i,
-			),
-		)
-		.filter(Boolean);
-}
 
-function improvementSafetyDisposition(issue) {
-	const values = improvementSafetyNotes(issue).map((match) =>
-		match[1].toUpperCase(),
-	);
-	const blockedAt = values.lastIndexOf("BLOCKED");
-	if (blockedAt < 0) return values.at(-1);
-	return values.slice(blockedAt + 1).includes("APPROVED")
-		? "APPROVED"
-		: "BLOCKED";
-}
 
-function improvementSafetyFingerprint(issue) {
-	const blocked = improvementSafetyNotes(issue)
-		.filter((match) => match[1].toUpperCase() === "BLOCKED")
-		.map((match) => match[0].trim())
-		.at(-1);
-	return blocked ? createHash("sha256").update(blocked).digest("hex") : "";
-}
 
-function improvementApprovalMatches(goal, issue, id) {
-	const fingerprint = improvementSafetyFingerprint(issue);
-	return Boolean(
-		fingerprint && goal?.improvementApprovalFingerprints?.[id] === fingerprint,
-	);
-}
 
-function workImproveSnapshotIds(goal) {
-	return /^Work-improvement snapshot IDs:\s*(.+)$/m
-		.exec(String(goal?.objective ?? ""))?.[1]
-		?.split(",")
-		.map((id) => id.trim())
-		.filter(Boolean);
-}
 
-function workImproveProgressFingerprint(goal, cwd) {
-	if (goal?.mode !== "improvement") return;
-	const ids = workImproveSnapshotIds(goal) ?? [];
-	const snapshot = ids.map((id) => [id, readWorkItem(cwd, id)]);
-	let verifierProgress = "";
-	try {
-		const store = loadVerifierStore(cwd);
-		verifierProgress = JSON.stringify([
-			Object.keys(store.dispositions ?? {}).sort(),
-			Object.keys(store.fixes ?? {}).sort(),
-		]);
-	} catch {
-		// Verifier state is optional until the first review batch exists.
-	}
-	const source = [
-		JSON.stringify(snapshot),
-		verifierProgress,
-		safeRun(cwd, "git", ["rev-parse", "--verify", "HEAD"]),
-		safeRun(cwd, "git", ["status", "--porcelain=v1"]),
-		safeRun(cwd, "git", ["diff", "--no-ext-diff", "--binary", "HEAD"]),
-	].join("\0");
-	return createHash("sha256").update(source).digest("hex");
-}
+
+
+
+
+
+
 
 function projectGoalProgressFingerprint(cwd) {
 	let workItems = [];
@@ -21667,108 +19920,15 @@ function projectGoalProgressFingerprint(cwd) {
 	return createHash("sha256").update(source).digest("hex");
 }
 
-function workProjectNoProgressNudge() {
-	return [
-		`Progress check: ${WORK_PROJECT_NO_PROGRESS_NUDGE_CALLS} tool calls with no file, commit, or work-item change.`,
-		"Answer in two sentences: what concrete output exists now, and what is the next step?",
-		"If you are repeating yourself, change approach or ask. Do not recap the session.",
-	].join(" ");
-}
 
-function advanceProjectGoalToolBudget(goal, fingerprint, failed = false) {
-	const progressed = goal.projectProgressFingerprint !== fingerprint;
-	return {
-		...goal,
-		projectProgressFingerprint: fingerprint,
-		// Nudge once per no-progress streak; real progress re-arms it.
-		noProgressNudged: progressed ? false : Boolean(goal.noProgressNudged),
-		noProgressToolCalls: progressed
-			? 0
-			: Number(goal.noProgressToolCalls ?? 0) + 1,
-		noProgressToolFailures:
-			progressed || !failed
-				? 0
-				: Number(goal.noProgressToolFailures ?? 0) + 1,
-	};
-}
 
-function improvementSafetyNoteCommand(command) {
-	const script = WORK_HELPER_SCRIPT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const match = new RegExp(
-		String.raw`^node(?:\.exe)?\s+(?:"${script}"|'${script}'|${script})\s+work-note\s+([\w.:-]+)\s+--append-notes\s+(?:"(wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^"$\x60\\\r\n%]*)"|'(wo:improvement-safety\s+(SAFE|APPROVED|BLOCKED)\b[^'$\x60\\\r\n%]*)')$`,
-		"i",
-	).exec(String(command ?? "").trim());
-	if (!match) return;
-	return {
-		id: match[1],
-		disposition: (match[3] ?? match[5]).toUpperCase(),
-	};
-}
 
-function improvementSafetyShellAllowed(command) {
-	const text = String(command ?? "").trim();
-	const cwd = String.raw`(?:"[^"$\x60\r\n]+"|'[^'$\x60\r\n]+'|[\w./:\\-]+)`;
-	const helper = WORK_HELPER_SCRIPT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	const git = String.raw`git(?:\s+-C\s+${cwd})?\s+`;
-	return [
-		new RegExp(
-			String.raw`^node(?:\.exe)?\s+(?:"${helper}"|'${helper}'|${helper})\s+work-(?:summary|children-summary|ready-summary)\s+[\w.:-]+$`,
-			"i",
-		),
-		new RegExp(
-			String.raw`^${git}status(?:\s+--(?:short|branch|porcelain(?:=v1)?))*$`,
-			"i",
-		),
-		new RegExp(
-			String.raw`^${git}diff(?:\s+--(?:cached|staged|stat|name-only|name-status|no-ext-diff|binary))*(?:\s+HEAD)?$`,
-			"i",
-		),
-		new RegExp(
-			String.raw`^${git}log(?:\s+--oneline)?(?:\s+-n\s+[1-9]\d{0,2})?$`,
-			"i",
-		),
-		new RegExp(String.raw`^${git}show(?:\s+--stat)?\s+[\da-f]{4,64}$`, "i"),
-		new RegExp(
-			String.raw`^${git}rev-parse\s+(?:--show-toplevel|--verify\s+HEAD|--abbrev-ref\s+HEAD)$`,
-			"i",
-		),
-	].some((pattern) => pattern.test(text));
-}
 
-const IMPROVEMENT_READ_ONLY_TOOLS = new Set([
-	"ask_user",
-	"ast_grep_dump",
-	"ast_grep_outline",
-	"ast_grep_search",
-	"fetch_content",
-	"get_search_content",
-	"hypa_find",
-	"hypa_grep",
-	"hypa_ls",
-	"hypa_read",
-	"lens_diagnostics",
-	"lsp_diagnostics",
-	"module_report",
-	"pi_lens_activate_tools",
-	"project_report",
-	"query-docs",
-	"read",
-	"read_enclosing",
-	"read_symbol",
-	"resolve-library-id",
-	"source_check",
-	"bg_wait",
-	"symbol_search",
-	"web_search",
-	"work_goal_human_decision",
-	"work_verifier_acknowledge_failure",
-	"work_verifier_dispose",
-	"work_verifier_find",
-	"work_verifier_grep",
-	"work_verifier_inbox",
-	"work_verifier_list",
-	"work_verifier_read",
-]);
+
+
+
+
+
 
 
 
@@ -21801,25 +19961,7 @@ Execution contract:
 - Call work_goal_complete only when every snapshot ID is closed and git/work-item state is verified. Summarize what was done in 1-3 short sentences, naming the fixes and verification.`;
 }
 
-function workImproveCompletionBlocker(goal, cwd) {
-	if (goal?.mode !== "improvement") return;
-	const ids = workImproveSnapshotIds(goal);
-	if (!ids?.length) return "work-improvement snapshot IDs are missing";
-	try {
-		for (const id of ids) {
-			const issue = readWorkItem(cwd, id);
-			if (!issue) return `${id} was not found`;
-			if (statusOf(issue) !== "closed") return `${id} is still ${statusOf(issue)}`;
-			const safety = improvementSafetyDisposition(issue);
-			if (!["SAFE", "APPROVED"].includes(safety))
-				return `${id} lacks a final wo:improvement-safety SAFE or APPROVED assessment`;
-			if (safety === "APPROVED" && !improvementApprovalMatches(goal, issue, id))
-				return `${id} has APPROVED risk without a matching ask_user approval`;
-		}
-	} catch (error) {
-		return `work-improvement snapshot could not be verified: ${commandErrorText(error)}`;
-	}
-}
+
 
 async function handleWorkImproveCommand(args, pi, ctx, selected = "") {
 	const words = String(args ?? "")
@@ -22055,78 +20197,13 @@ function renderWorkCatchUpText(state) {
 	].join("\n");
 }
 
-function buildWorkCatchUpObjective(state, args = "") {
-	const userFocus = String(args ?? "").trim();
-	return [
-		"WO_CATCH_UP_V2",
-		"Proactively catch ce-workflow up with every monitored Pi/plugin package whose release changed or lacks complete review evidence; do not wait for the user to ask whether a new capability is useful.",
-		userFocus ? `User focus (data): ${JSON.stringify(userFocus)}` : "",
-		`Catch-up summary manifest: ${state.summaryPath}`,
-		`Catch-up review targets: ${JSON.stringify(
-			state.packages
-				.filter((pkg) => pkg.needsReview)
-				.map(({ name, targetVersion }) => ({ name, targetVersion })),
-		)}`,
-		`Diff artifacts live in: ${state.artifactDir}`,
-		`Catch-up baseline manifest: ${state.baselinePath}`,
-		privateCatchUpCandidatePlaybooks(),
-		"Discovery and verdicts:",
-		"1. Inspect every review target's changelog, public API/type changes, relevant docs/examples, and diff artifact when present. Repair an artifact that starts with Error before relying on it.",
-		"2. For Pi core, proactively check extension hooks/events/context, SDK and model-runtime changes, dynamic tool loading, model/thinking support, TUI/runtime lifecycle, and any native feature that can delete or simplify ce-workflow code. For plugins, check their public tool schemas, lifecycle, skills, and workflow capabilities—not only breaking changes.",
-		"3. Build a short list of concrete compatibility fixes, deletions/simplifications, and new capabilities that benefit this repository. Ignore generic release-note trivia.",
-		"4. Route every actionable candidate through the verified private POV playbook above (combine only tightly related candidates), preserving its graded verdict and actor-visible recommendation. Invoke the verified private explain playbook only after explicitly marking that candidate tooTechnical because its concise POV is insufficient for an informed actor decision; record the reason and never invoke explain for any other candidate.",
-		"Automatic adoption and implementation loop:",
-		"5. Standing actor decision (overriding only the playbook's per-candidate question): every viable actionable candidate is pre-authorized as Adopt now. Handle candidates one at a time; do not call ask_user, defer, or skip. A Hold remains unresolved until its missing evidence is obtained and blocks baseline advancement.",
-		"6. Implement the smallest complete change immediately and run its focused check before advancing to the next candidate. Record findings graded Reject or Not-our-problem as no-action without asking.",
-		"7. Persist every target review in its baseline package object before advancing it: reviewedAt, reviewedVersion matching the target, plus a non-empty decisions array. Every decision has version matching the target, title, pov, status (adopted|no-action), and rationale; adopted also has verification. Replace the prior release's decisions rather than carrying them forward. This completion manifest is coded-gated so no opportunity disappears.",
-		"8. Run npm run verify:quiet once after all adopted changes. Update capturedAt and each handled package version only after all its decisions are implemented and verified or recorded no-action. Do not advance a partially reviewed package.",
-		workGoalSelfImprovingAppendix(),
-	]
-		.filter(Boolean)
-		.join("\n\n");
-}
+
 
 function isCatchUpGoal(goal) {
 	return String(goal?.objective ?? "").includes("WO_CATCH_UP_V2");
 }
 
-function catchUpCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
-	const objective = String(goal?.objective ?? "");
-	if (!isCatchUpGoal(goal)) return;
-	const targetsText = /^Catch-up (?:review|changed) targets:\s*(.+)$/m.exec(
-		objective,
-	)?.[1];
-	const baselineRef = /^Catch-up baseline manifest:\s*(.+)$/m.exec(
-		objective,
-	)?.[1];
-	if (!targetsText || !baselineRef) return "catch-up manifest data is missing";
-	try {
-		const root = cwd ?? process.cwd();
-		const targets = JSON.parse(targetsText);
-		if (!Array.isArray(targets)) return "catch-up target snapshot is invalid";
-		const baseline = JSON.parse(
-			readFileSync(
-				isAbsolute(baselineRef) ? baselineRef : resolve(root, baselineRef),
-				"utf8",
-			),
-		);
-		const reviewed = new Map(
-			(Array.isArray(baseline.packages) ? baseline.packages : []).map((pkg) => [
-				pkg.name,
-				pkg,
-			]),
-		);
-		for (const target of targets) {
-			const pkg = reviewed.get(target.name);
-			if (pkg?.version !== target.targetVersion)
-				return `${target.name} baseline is not advanced to ${target.targetVersion}`;
-			const reviewBlocker = catchUpReviewBlocker(pkg, target.targetVersion);
-			if (reviewBlocker) return `${target.name} ${reviewBlocker}`;
-		}
-	} catch (error) {
-		return `catch-up manifests could not be verified: ${commandErrorText(error)}`;
-	}
-}
+
 
 async function handleWorkCatchUpCommand(args, pi, ctx) {
 	return startPlan3CatchUp(args, pi, ctx);
@@ -22222,59 +20299,7 @@ function buildWorkSelfImprovingObjective(input = "", options = {}) {
 		.join("\n\n");
 }
 
-function projectGoalSourceMaintenanceBlockReason(
-	event,
-	cwd,
-	goal = activeWorkGoal,
-) {
-	if (
-		goal?.mode !== "project" ||
-		goal.status !== "active" ||
-		sameCheckout(activeWorkGoalCwd ?? cwd, WORKFLOW_REPO_DIR)
-	)
-		return;
-	const tool = String(event?.toolName ?? "");
-	const input = event?.input ?? event?.args ?? {};
-	if (
-		tool === "intercom" &&
-		["ask", "send"].includes(String(input.action ?? "").toLowerCase())
-	)
-		return "Project autopilot cannot contact another session. Report workflow friction once and keep working in the target project.";
-	const normalizedSource = normalizedRepoPath(WORKFLOW_REPO_DIR)
-		.replace(/\/+/g, "/")
-		.toLowerCase();
-	const normalizedInput = normalizedRepoPath(JSON.stringify(input))
-		.replace(/\/+/g, "/")
-		.toLowerCase();
-	const normalizedHelper = normalizedRepoPath(WORK_HELPER_SCRIPT)
-		.replace(/\/+/g, "/")
-		.toLowerCase();
-	const checkedInput = ["bash", "hypa_shell", "subagent"].includes(tool)
-		? normalizedInput.replaceAll(normalizedHelper, "")
-		: normalizedInput;
-	if (
-		[
-			"bash",
-			"edit",
-			"hypa_find",
-			"hypa_grep",
-			"hypa_ls",
-			"hypa_read",
-			"hypa_shell",
-			"lens_diagnostics",
-			"lsp_diagnostics",
-			"module_report",
-			"read",
-			"read_enclosing",
-			"read_symbol",
-			"subagent",
-			"symbol_search",
-			"write",
-		].includes(tool) &&
-		checkedInput.includes(normalizedSource)
-	)
-		return "Project autopilot cannot inspect or mutate the ce-workflow source checkout from another project. Run orchestrator maintenance separately with /wo improve.";
-}
+
 
 function buildWorkResumeGoalObjective(cwd, args = "", options = {}) {
 	const raw = String(args ?? "").trim();
@@ -22400,13 +20425,7 @@ function issueProgressText(issue) {
 		.join("\n");
 }
 
-function normalizeProgressText(value) {
-	return String(value ?? "")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, " ")
-		.trim()
-		.replace(/\s+/g, " ");
-}
+
 
 function extractImplementationUnits(markdown) {
 	const text = String(markdown ?? "");
@@ -22685,101 +20704,19 @@ function planPathForEpic(cwd, epic) {
 	return undefined;
 }
 
-function unitMatchesIssue(unit, issue) {
-	const text = normalizeProgressText(issueProgressText(issue));
-	const key = normalizeProgressText(unit.key);
-	if (key && new RegExp(`\\b${key}\\b`, "i").test(text)) return true;
-	const title = normalizeProgressText(unit.title);
-	if (title.length >= 10 && text.includes(title)) return true;
-	const words = title.split(" ").filter((word) => word.length > 3);
-	if (words.length < 3) return false;
-	const hits = words.filter((word) => text.includes(word)).length;
-	return hits >= Math.min(words.length, 4);
-}
-
-function planProgressForEpic(cwd, epic, childState) {
-	const planPath = planPathForEpic(cwd, epic);
-	if (!planPath) return undefined;
-	const units = extractImplementationUnits(readFileSync(planPath, "utf8"));
-	if (!units.length) return undefined;
-	const matched = new Set();
-	const closed = new Set();
-	for (const slice of childState.slices) {
-		for (const [index, unit] of units.entries()) {
-			if (!unitMatchesIssue(unit, slice)) continue;
-			matched.add(index);
-			if (statusOf(slice) === "closed") closed.add(index);
-		}
-	}
-	if (childState.slices.length && matched.size === 0) return undefined;
-	return {
-		source: "plan",
-		total: units.length,
-		complete: closed.size,
-		created: matched.size,
-		unsliced: units.length - matched.size,
-		path: relative(cwd, planPath),
-	};
-}
-
-function projectGoalProgressState(cwd, goal = activeWorkGoal) {
-	if (!goal || !["active", "needs_human"].includes(goal.status))
-		return undefined;
-	if (workWarpMode(goal.mode, goal) !== "project") return undefined;
-	if (normalReadGate(cwd)) return undefined;
-	let epic = currentRoadmap(cwd);
-	if (!epic) return undefined;
-	try {
-		epic = readWorkItem(cwd, idOf(epic)) ?? epic;
-	} catch {
-		// list output is enough for the slice fallback.
-	}
-	const childState = buildEpicChildState(cwd, epic);
-	const fallback = {
-		source: "slices",
-		total: childState.slices.length,
-		complete: childState.closed.length,
-		created: childState.slices.length,
-		unsliced: 0,
-	};
-	const progress = planProgressForEpic(cwd, epic, childState) ?? fallback;
-	return {
-		title: titleOf(epic),
-		...progress,
-		elapsedMs: Date.now() - (goal.startedAt ?? Date.now()),
-	};
-}
-
-function renderProjectGoalProgress(state) {
-	const total = Number(state.total) || 0;
-	const complete = Number(state.complete) || 0;
-	const left = Math.max(0, total - complete);
-	const noun = state.source === "plan" ? "units" : "slices";
-	const unsliced = state.unsliced ? ` · ${state.unsliced} unsliced` : "";
-	return `${roadmapTerminology(state.title)} ${progressBar(complete, total)} ${complete}/${total} ${noun} (${left} left${unsliced}) · ${formatDuration(state.elapsedMs)} · ${WORK_SHORTCUT_STATUS}`;
-}
-
-function updateWorkGoalProgress(ctx) {
-	if (!ctx?.cwd || !ctx.ui?.setWidget) return;
-	try {
-		const state = projectGoalProgressState(ctx.cwd);
-		ctx.ui.setWidget(
-			WORK_GOAL_PROGRESS_WIDGET_KEY,
-			state ? [renderProjectGoalProgress(state)] : undefined,
-			{ placement: "belowEditor" },
-		);
-	} catch {
-		ctx.ui.setWidget(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
-	}
-}
 
 
 
-function stopWorkGoalProgressTimer(ctx) {
-	if (workGoalProgressTimer) clearInterval(workGoalProgressTimer);
-	workGoalProgressTimer = null;
-	ctx?.ui?.setWidget?.(WORK_GOAL_PROGRESS_WIDGET_KEY, undefined);
-}
+
+
+
+
+
+
+
+
+
+
 
 function workGoalSummary(goal = activeWorkGoal) {
 	if (!goal) return "No active autonomous goal.";
@@ -22961,33 +20898,11 @@ function updateWorkGoalUsage(goal, ctx) {
 	return goal;
 }
 
-function isWorkGoalContextOverflow(assistant) {
-	const message = String(assistant?.errorMessage ?? "");
-	return WORK_GOAL_CONTEXT_OVERFLOW_RE.test(message);
-}
 
-function workGoalAssistantErrorText(assistant) {
-	return [
-		assistant?.errorMessage,
-		assistant?.message,
-		assistantVisibleText(assistant),
-	]
-		.filter(Boolean)
-		.map(String)
-		.join("\n");
-}
 
-function isWorkGoalUsageLimit(assistant) {
-	const providerError = [assistant?.errorMessage, assistant?.message]
-		.filter(Boolean)
-		.map(String)
-		.join("\n");
-	if (WORK_GOAL_USAGE_LIMIT_RE.test(providerError)) return true;
-	return (
-		assistant?.stopReason === "error" &&
-		WORK_GOAL_USAGE_LIMIT_RE.test(assistantVisibleText(assistant))
-	);
-}
+
+
+
 
 function workGoalUsageLimitRetryDelayMs() {
 	const override = Number(process.env.WORK_GOAL_USAGE_LIMIT_RETRY_MS);
@@ -22996,20 +20911,9 @@ function workGoalUsageLimitRetryDelayMs() {
 		: WORK_GOAL_USAGE_LIMIT_RETRY_MS;
 }
 
-function isRetryableWorkGoalInterruption(assistant) {
-	if (assistant?.stopReason !== "error") return false;
-	const message = workGoalAssistantErrorText(assistant);
-	if (!message) return false;
-	if (isWorkGoalUsageLimit(assistant)) return true;
-	if (WORK_GOAL_NON_RETRYABLE_RE.test(message)) return false;
-	return (
-		isWorkGoalContextOverflow(assistant) || WORK_GOAL_RETRYABLE_RE.test(message)
-	);
-}
 
-function isContradictoryWorkGoalCompletion(summary) {
-	return WORK_GOAL_CONTRADICTORY_COMPLETION_RE.test(String(summary ?? ""));
-}
+
+
 
 function escapeXmlText(value) {
 	return String(value ?? "")
@@ -23018,31 +20922,7 @@ function escapeXmlText(value) {
 		.replace(/>/g, "&gt;");
 }
 
-function buildWorkGoalSystemPrompt(goal) {
-	const budgetLine = goal.tokenBudget
-		? `\n- Respect the autonomous goal token budget (${formatWorkGoalBudget(goal)} used); the loop pauses at the limit.`
-		: "";
-	return `Active autonomous goal:
-<work_goal_objective>
-${escapeXmlText(goal.objective)}
-</work_goal_objective>
 
-autonomous goal management rules:
-- The user's objective above is the work prompt; these rules only manage looping, compaction, and human-decision stops.
-- Keep working autonomously until the objective is complete and verified.
-- Before each continuation, autonomous goal will microcompact old reasoning and tool noise; treat native work-item store, git, files, tests, and command output as source of truth.
-- In project mode, let coded action leases own exact role selection and specialist launches; monitor the named run from the kickoff prompt and never duplicate it. In other modes, work directly in this session by default and spawn one exact named specialist only for large/ambiguous planning, root-cause debugging, high-risk isolated writing, or independent review of sensitive/large changes.
-- ${ROLE_TIMEOUT_GUIDANCE}
-- Prefer coded helpers and deterministic checks over asking an LLM to classify, summarize, validate, stage, commit, close, or choose an agent.
-- ${NATIVE_EDIT_GUIDANCE}
-- Do not stop for plan approval, permission to continue, or obvious implementation choices. Pick the clear winner and continue.
-- Use ask_user for every question that truly needs human input: product intent, credentials/accounts, destructive or risky action, production/billing/legal impact, ambiguous priority/scope with no clear winner, hardware/environment access, or a target path/project choice you cannot infer. Ask one focused question and continue from its answer.
-- Set allowComment=true for planning, product, and adoption choices where a selected option may need a caveat. Set allowComment=false for destructive actions and coded binary approvals. Do not enable comments globally as a substitute for choosing per-call semantics.
-- If evidence depends on external hardware/account/environment state, use ask_user to ask the user to make that state available. Once they answer that it is available or tell you to proceed, capture/inspect the artifact yourself immediately instead of asking again.
-- work_goal_human_decision is only a durable fallback after ask_user is unavailable or cancelled; never use it as the first prompt path. If both tools are unavailable, end with ${WORK_GOAL_DECISION_MARKER}: and the question instead of asking a plain-text question.
-- When complete, call work_goal_complete with verification evidence. After it succeeds, send one concise final response summarizing what was completed (and, for improvement goals, what improved) plus verification; do not call more tools. If the tool is unavailable, end with ${WORK_GOAL_COMPLETE_MARKER}: and the evidence.
-- Do not call completion for partial progress, blockers, failing tests, or unverified work. Summaries that say the work is incomplete or tests still fail are rejected.${budgetLine}`;
-}
 
 function buildWorkGoalKickoffPrompt(goal) {
 	return `Work-goal mode is active. Complete this objective fully:\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\n${workGoalMarkerComment(workGoalContinuationMarker(goal))}`;
@@ -23056,12 +20936,7 @@ function workGoalMarkerComment(marker) {
 	return `<!-- ${WORK_GOAL_CONTINUATION_PREFIX}${marker} -->`;
 }
 
-function extractWorkGoalContinuationMarker(prompt) {
-	const pattern = new RegExp(
-		`<!--\\s*${WORK_GOAL_CONTINUATION_PREFIX.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}([^\\s>]+)\\s*-->`,
-	);
-	return pattern.exec(String(prompt ?? ""))?.[1];
-}
+
 
 
 
@@ -23292,43 +21167,15 @@ function scheduleWorkGoalUsageLimitRetry(pi, ctx, goal = activeWorkGoal) {
 	workGoalUsageLimitTimer.unref?.();
 }
 
-function finalAssistantMessage(messages = []) {
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (message?.role === "assistant") return message;
-	}
-	return undefined;
-}
 
-function assistantVisibleText(message) {
-	return contentText(message?.content ?? message?.message);
-}
 
-function parseWorkGoalCompletion(text) {
-	const match = new RegExp(
-		`(?:^|\\n)${WORK_GOAL_COMPLETE_MARKER}:?\\s*([\\s\\S]*)`,
-		"i",
-	).exec(String(text ?? ""));
-	return match ? truncate(match[1] || "completed", 1_500) : "";
-}
 
-function parseWorkGoalDecision(text) {
-	const match = new RegExp(
-		`(?:^|\\n)${WORK_GOAL_DECISION_MARKER}:?\\s*([\\s\\S]*)`,
-		"i",
-	).exec(String(text ?? ""));
-	return match
-		? { question: truncate(match[1], 2_000), source: "marker" }
-		: null;
-}
 
-function likelyHumanDecisionQuestion(text) {
-	const compact = String(text ?? "").trim();
-	if (!/\?\s*$/.test(compact)) return false;
-	return /\b(product|requirement|priority|scope|credential|secret|password|api key|account|billing|legal|production|deploy|delete|destructive|risk|hardware|device|port|path|repository|repo|choose|which option)\b/i.test(
-		compact,
-	);
-}
+
+
+
+
+
 
 function formatDecisionBlock(label, value, splitNumbered = false) {
 	let text = String(value ?? "").trim();
@@ -23349,43 +21196,11 @@ function formatWorkGoalDecision(decision = {}) {
 		.join("\n\n");
 }
 
-function pauseWorkGoalForDecision(decision, ctx, pi) {
-	if (!activeWorkGoal) return;
-	restoreWorkGoalThinking(pi, activeWorkGoal);
-	workGoalContinuationPending = null;
-	activeWorkGoal = {
-		...activeWorkGoal,
-		status: "needs_human",
-		decision,
-		askUserFallbackPending: undefined,
-		updatedAt: Date.now(),
-	};
-	persistWorkGoal(pi);
-	updateWorkGoalStatus(ctx);
-	ctx.ui.notify(
-		`autonomous goal needs human decision:\n${formatWorkGoalDecision(decision)}`,
-		"warning",
-	);
-	pauseWarpForDecision(ctx, decision);
-}
 
-function askUserResponses(event) {
-	if (event.toolName !== "ask_user" || event.isError || event.details?.cancelled)
-		return [];
-	const details = event.details;
-	if (details?.kind !== "batch") return details?.response ? [details.response] : [];
-	if (!Array.isArray(details.questions) || details.questions.length < 2 || details.questions.length > 4 ||
-		!Array.isArray(details.answers) || details.answers.length !== details.questions.length ||
-		!details.answers.every((answer) => answer?.status === "skipped" ||
-			(answer?.status === "answered" && answer.response))) return [];
-	return details.answers.filter((answer) => answer.status === "answered").map((answer) => answer.response);
-}
 
-function askUserPauseSelection(event) {
-	return askUserResponses(event).flatMap((response) => response.selections ?? []).find((selection) =>
-		/^\s*(?:pause|wait)\b/i.test(String(selection)),
-	) ?? "";
-}
+
+
+
 
 
 
@@ -23420,146 +21235,11 @@ function workGoalConfirmationLabel(goal, cwd) {
 	}
 }
 
-function workGoalCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
-	const improveBlocker = workImproveCompletionBlocker(goal, cwd);
-	if (improveBlocker) return improveBlocker;
-	const catchUpBlocker = catchUpCompletionBlocker(goal, cwd);
-	if (catchUpBlocker) return catchUpBlocker;
-	try {
-		reconcileVerifierRuns(cwd);
-		const verifierBlocker = verifierCompletionBlocker(
-			loadVerifierStore(cwd),
-			goal?.startedAt,
-			workGoalBaselineHead(goal),
-		);
-		if (verifierBlocker) return verifierBlocker;
-	} catch (error) {
-		if (error?.category !== "missing") {
-			const kind = error?.category ?? error?.name;
-			return `background verification could not be reconciled${kind ? ` (${kind})` : ""}: ${commandErrorText(error)}`;
-		}
-	}
-	if (goal?.mode !== "project") return;
-	const objective = String(goal.objective ?? "");
-	const project = /^Target project:\s*(.+)$/m.exec(objective)?.[1]?.trim();
-	if (!project) return;
-	const projectCwd = isAbsolute(project)
-		? project
-		: resolve(cwd ?? process.cwd(), project);
-	if (goal.requestedClosureLimit) {
-		try {
-			const current = executableWorkItemStates(projectCwd);
-			const newlyClosed = Object.entries(current).filter(
-				([id, status]) =>
-					status === "closed" && goal.closureBaseline?.[id] !== "closed",
-			).length;
-			if (newlyClosed !== goal.requestedClosureLimit)
-				return `requested exactly ${goal.requestedClosureLimit} executable WorkItem closure${goal.requestedClosureLimit === 1 ? "" : "s"}; observed ${newlyClosed}`;
-		} catch (error) {
-			return `requested closure scope could not be verified: ${commandErrorText(error)}`;
-		}
-	}
-	const id = workGoalTargetId(goal);
-	if (!id) return;
-	try {
-		const item = readWorkItem(projectCwd, id);
-		if (!item) return `target ${id} was not found`;
-		if (statusOf(item) !== "closed")
-			return `target ${id} is still ${statusOf(item)}`;
-	} catch (error) {
-		return `target ${id} could not be verified: ${commandErrorText(error)}`;
-	}
-}
 
-function scheduleActiveWorkGoalTurnVerifiers(ctx, pi) {
-	const started = activeWorkGoalGitBefore;
-	if (
-		activeWorkGoalVerifierFixCommitted ||
-		!started ||
-		started.cwd !== ctx.cwd ||
-		!started.head
-	)
-		return null;
-	const after = gitSnapshot(ctx.cwd).head;
-	if (!after || after === started.head) return null;
-	const verifier = scheduleCommittedRunVerifiers(ctx.cwd, pi, {
-		before: started.head,
-		after,
-		origin: "normal",
-		currentModel: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-	});
-	activeWorkGoalGitBefore = { cwd: ctx.cwd, head: after };
-	return verifier;
-}
 
-function completeActiveWorkGoal(summary, ctx, pi) {
-	const goal = activeWorkGoal;
-	if (!goal) {
-		return {
-			content: [{ type: "text", text: "No active autonomous goal." }],
-			details: {},
-			completed: false,
-		};
-	}
-	const trimmed = String(summary ?? "").trim();
-	let rejection;
-	if (!trimmed) rejection = "summary is empty";
-	else if (isContradictoryWorkGoalCompletion(trimmed))
-		rejection = "summary says the goal is not complete";
-	else {
-		try {
-			scheduleActiveWorkGoalTurnVerifiers(ctx, pi);
-		} catch (error) {
-			rejection = `background verification could not be queued: ${commandErrorText(error)}`;
-		}
-		if (!rejection) rejection = workGoalCompletionBlocker(goal);
-	}
-	if (rejection) {
-		updateWorkGoalUsage(goal, ctx);
-		persistWorkGoal(pi);
-		ctx.ui.notify(
-			`autonomous goal completion rejected: ${rejection}.`,
-			"warning",
-		);
-		return {
-			content: [
-				{
-					type: "text",
-					text: `Goal completion rejected: ${rejection}. The goal is NOT complete; keep working and only call work_goal_complete once it is fully done and verified.`,
-				},
-			],
-			details: { goal: goal.objective, summary: trimmed },
-			terminate: false,
-			completed: false,
-		};
-	}
-	restoreWorkGoalThinking(pi, goal);
-	activeWorkGoal = null;
-	activeWorkGoalRunning = false;
-	workGoalContinuationPending = null;
-	clearWorkGoalRecovery();
-	clearWorkGoalUsageLimitTimer();
 
-	persistWorkGoal(pi, null);
-	updateWorkGoalStatus(ctx, null);
-	stopWorkGoalProgressTimer(ctx);
-	const completionLabel =
-		goal.mode === "improvement"
-			? "Project improvement complete"
-			: "autonomous goal complete";
-	ctx.ui.notify(`${completionLabel}: ${truncate(trimmed, 240)}`, "info");
-	finishWarpWork(ctx, workWarpMode(goal.mode, goal), trimmed);
-	return {
-		content: [
-			{
-				type: "text",
-				text: `${completionLabel}: ${trimmed}\nNow give the user a concise final summary of what was completed and how it was verified.`,
-			},
-		],
-		details: { goal: goal.objective, summary: trimmed },
-		completed: true,
-	};
-}
+
+
 
 async function startWorkGoal(
 	mode,
@@ -23885,26 +21565,7 @@ function latestPiGoal(ctx) {
 	return null;
 }
 
-function currentOrchestratorJob(ctx) {
-	if (activeWorkGoal?.status === "active")
-		return {
-			kind: "work-goal",
-			id: activeWorkGoal.id,
-			mode: activeWorkGoal.mode,
-			status: activeWorkGoal.status,
-		};
-	const goal = latestPiGoal(ctx);
-	if (goal?.status === "active")
-		return { kind: "pi-goal", id: goal.id, status: goal.status };
-	const workflow = activeWorkAgent ?? pendingWorkPrompt;
-	if (workflow?.prompt && ctx.isIdle?.() === false)
-		return {
-			kind: "workflow",
-			prompt: workflow.prompt,
-			workflowRunId: workflow.meta?.workflowRunId,
-		};
-	return { kind: ctx.isIdle?.() === false ? "direct" : "idle" };
-}
+
 
 async function sendPiGoalCommand(pi, command, ctx) {
 	if (typeof pi?.sendUserMessage !== "function")
@@ -23914,27 +21575,7 @@ async function sendPiGoalCommand(pi, command, ctx) {
 	await pi.sendUserMessage(`/goal ${command}`, options);
 }
 
-async function completeOrchestratorPause(job, ctx, pi) {
-	const paused = [];
-	if (activeWorkGoal?.status === "active") {
-		paused.push({
-			kind: "work-goal",
-			id: activeWorkGoal.id,
-			mode: activeWorkGoal.mode,
-			status: activeWorkGoal.status,
-		});
-		await handleWorkGoalCommand("pause", activeWorkGoal.mode, pi, ctx);
-	}
-	const piGoal = latestPiGoal(ctx);
-	if (piGoal?.status === "active") {
-		paused.push({ kind: "pi-goal", id: piGoal.id, status: piGoal.status });
-		await sendPiGoalCommand(pi, "pause", ctx);
-	}
-	if (paused.length)
-		orchestratorPausedJob =
-			paused.length === 1 ? paused[0] : { kind: "group", jobs: paused };
-	else orchestratorPausedJob ??= job;
-}
+
 
 async function resumeOrchestratorJob(job, answer, ctx, pi) {
 	if (orchestratorCompactState) {
@@ -23984,61 +21625,7 @@ async function resumeOrchestratorJob(job, answer, ctx, pi) {
 	);
 }
 
-function compactPausedOrchestrator(job, ctx, pi) {
-	if (contextCompactState.inFlight) {
-		ctx.ui.notify(
-			"Compaction is already in progress; the job remains paused.",
-			"warning",
-		);
-		return false;
-	}
-	if (typeof ctx.compact !== "function") {
-		ctx.ui.notify(
-			"Compaction is unavailable; the job remains paused.",
-			"warning",
-		);
-		return false;
-	}
-	const generation = beginContextCompaction(workGoalTargetId(activeWorkGoal));
-	const state = { job, generation };
-	orchestratorCompactState = state;
-	const finish = (error) => {
-		if (orchestratorCompactState !== state) return;
-		finishContextCompaction(generation);
-		orchestratorCompactState = null;
-		ctx.ui.notify(
-			error
-				? `Microcompaction failed; resuming unchanged: ${formatError(error)}`
-				: job.kind === "idle"
-					? "Microcompaction completed"
-					: "Microcompaction completed; resuming",
-			error ? "warning" : "info",
-		);
-		void resumeOrchestratorJob(job, "", ctx, pi).catch((resumeError) =>
-			ctx.ui.notify(
-				`Could not resume after compaction: ${formatError(resumeError)}`,
-				"warning",
-			),
-		);
-	};
-	ctx.ui.notify(
-		job.kind === "idle"
-			? "Microcompaction started"
-			: "Paused at the LLM cycle boundary; microcompacting",
-		"info",
-	);
-	try {
-		ctx.compact({
-			customInstructions:
-				"work-context on-demand microcompact at a graceful pause: preserve the current goal or direct request, completed work, Git and file state, verification evidence, blockers, and exact next action; omit reasoning and full tool logs.",
-			onComplete: () => finish(),
-			onError: finish,
-		});
-	} catch (error) {
-		finish(error);
-	}
-	return true;
-}
+
 
 
 
@@ -24111,70 +21698,7 @@ async function prepareMainEditorAction(command, ctx) {
 	return true;
 }
 
-export async function consumePendingMainEditorAction(event, ctx, runtime = {}) {
-	const pending = pendingMainEditorActions.get(mainEditorActionKey(ctx));
-	if (!pending || event?.source !== "interactive") return;
-	const now = runtime.now?.() ?? Date.now();
-	if (now - pending.createdAt > MAIN_EDITOR_ACTION_MAX_AGE_MS) {
-		pendingMainEditorActions.delete(mainEditorActionKey(ctx));
-		return;
-	}
-	const text = String(event.text ?? "");
-	const brainstormMarker =
-		pending.action === "work-brainstorm"
-			? /^Idea or promp?t:\s*(?:\r?\n)?/i.exec(text)?.[0]
-			: undefined;
-	if (!text.startsWith(pending.marker) && !brainstormMarker) {
-		pendingMainEditorActions.delete(mainEditorActionKey(ctx));
-		return;
-	}
-	let body = text
-		.slice(
-			text.startsWith(pending.marker)
-				? pending.marker.length
-				: brainstormMarker.length,
-		)
-		.trim();
-	if (!body) {
-		pending.createdAt = now;
-		ctx.ui?.setEditorText?.(pending.marker);
-		ctx.ui?.notify?.("Add an idea or prompt before sending.", "warning");
-		return { action: "handled" };
-	}
-	const explicitFreeform = pending.action === "work-brainstorm";
-	if (explicitFreeform && event.images?.length) {
-		try {
-			const attachments = (runtime.materializeTaskImages ?? materializeTaskImages)(
-				ctx.cwd,
-				event.images,
-			);
-			body += `\n\nAttachments:\n${attachments.map((attachment) => `- ${attachment.path} (${attachment.mimeType}, ${attachment.bytes} bytes)`).join("\n")}`;
-		} catch (error) {
-			pending.createdAt = now;
-			ctx.ui?.setEditorText?.(text);
-			ctx.ui?.notify?.(
-				`Could not save Brainstorm image: ${formatError(error)} Reattach the image and retry.`,
-				"warning",
-			);
-			return { action: "handled" };
-		}
-	}
-	pendingMainEditorActions.delete(mainEditorActionKey(ctx));
-	await withOperationProgress(
-		ctx,
-		ORCHESTRATOR_ACTION_LABELS[pending.action] ?? "Workflow action",
-		() =>
-			explicitFreeform
-				? runtime.execute(pending.action, body, ctx, {
-						explicitFreeform: true,
-						...(pending.brainstormHealth
-							? { brainstormHealth: pending.brainstormHealth }
-							: {}),
-					})
-				: runtime.execute(pending.action, body, ctx),
-	);
-	return { action: "handled" };
-}
+
 
 function analysisProposalDigest(value) {
 	return createHash("sha256")
@@ -24382,7 +21906,7 @@ function completeAnalysisFinalization(cwd, record) {
 	return tasks;
 }
 
-export function reconcileAnalysisFinalizations(cwd) {
+function reconcileAnalysisFinalizations(cwd) {
 	let store;
 	try {
 		store = loadVerifierStore(cwd);
@@ -24397,7 +21921,7 @@ export function reconcileAnalysisFinalizations(cwd) {
 	return completed;
 }
 
-export function reconcileLegacyAnalysisTasks(cwd) {
+function reconcileLegacyAnalysisTasks(cwd) {
 	let work;
 	try {
 		work = loadStore(cwd);
@@ -24472,21 +21996,9 @@ export function reconcileLegacyAnalysisTasks(cwd) {
 	return [...new Set([...resolved, ...candidates.map((item) => item.id)])];
 }
 
-export function validateAnalysisFinalizationInput(group, input) {
-	if (
-		typeof input.proposalDigest !== "string" ||
-		!input.proposalDigest.trim() ||
-		!group ||
-		group.state !== "proposal_ready" ||
-		group.revision !== input.revision ||
-		group.proposalDigest !== input.proposalDigest ||
-		!Array.isArray(group.proposal?.tasks)
-	)
-		throw new Error("stale-analysis-review");
-	return true;
-}
 
-export function validateAnalysisSourceEvidence(cwd, group, store) {
+
+function validateAnalysisSourceEvidence(cwd, group, store) {
 	for (const candidateId of group.candidateIds) {
 		const candidate = store.analysisCandidates[candidateId];
 		const finding = store.findings[candidate?.source?.findingId];
@@ -26014,7 +23526,7 @@ function roadmapMenuNextStep(roadmap) {
 	return "Enter, then choose Resume work.";
 }
 
-export function roadmapMenuItems(_cwd, roadmaps) {
+function roadmapMenuItems(_cwd, roadmaps) {
 	const visible = new Set(roadmaps.map((roadmap) => roadmap.id));
 	const siblings = new Map();
 	for (const roadmap of roadmaps) {
@@ -26337,7 +23849,7 @@ async function runDisplayMetadataJobs(jobs, signal, run) {
 	);
 }
 
-export async function backfillVisibleDisplayMetadata(
+async function backfillVisibleDisplayMetadata(
 	cwd,
 	frame,
 	ctx,
@@ -26541,7 +24053,7 @@ function taskComposerEnvelope(roadmap, parent) {
 	return `Add a task to the roadmap “${roadmap.title}” (${roadmap.id})${destination}.\n\nDescribe the task, its intended outcome, and any constraints.`;
 }
 
-export function createWorkspaceTaskFromText(cwd, roadmapId, parentId, text) {
+function createWorkspaceTaskFromText(cwd, roadmapId, parentId, text) {
 	let store = loadNativeWorkStore(cwd);
 	let roadmap = store.items[roadmapId];
 	if (!roadmap || typeOf(roadmap) !== "epic")
@@ -26588,90 +24100,11 @@ function richTaskComposerKey(ctx) {
 	return `${resolve(ctx?.cwd ?? process.cwd())}\u0000${ctx?.sessionManager?.getSessionId?.() ?? `process-${process.pid}`}`;
 }
 
-export function materializeTaskImages(cwd, images) {
-	if (!Array.isArray(images) || !images.length) return [];
-	const directory = join(resolve(cwd), ".pi", "work-artifacts", "task-images");
-	const written = [];
-	try {
-		const decoded = images.map((image) => {
-			const extension = TASK_IMAGE_MIME_EXTENSIONS.get(image?.mimeType);
-			const data = image?.data;
-			if (
-				image?.type !== "image" ||
-				!extension ||
-				typeof data !== "string" ||
-				!data ||
-				data.startsWith("data:") ||
-				!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
-					data,
-				)
-			)
-				throw new Error("Invalid or unsupported image attachment.");
-			const bytes = Buffer.from(data, "base64");
-			if (!bytes.length || bytes.toString("base64") !== data)
-				throw new Error("Malformed base64 image attachment.");
-			return { bytes, extension, mimeType: image.mimeType };
-		});
-		mkdirSync(directory, { recursive: true });
-		return decoded.map(({ bytes, extension, mimeType }) => {
-			const absolute = join(directory, `${randomUUID()}${extension}`);
-			const descriptor = openSync(absolute, "wx");
-			written.push(absolute);
-			try {
-				writeFileSync(descriptor, bytes);
-			} finally {
-				closeSync(descriptor);
-			}
-			return {
-				path: relative(resolve(cwd), absolute).replaceAll("\\", "/"),
-				mimeType,
-				bytes: bytes.length,
-			};
-		});
-	} catch (error) {
-		for (const file of written) rmSync(file, { force: true });
-		throw error;
-	}
-}
 
-export function transformPendingRichTaskInput(event, ctx, runtime = {}) {
-	const key = richTaskComposerKey(ctx);
-	const pending = pendingRichTaskComposers.get(key);
-	if (!pending) return;
-	if (Date.now() - pending.createdAt > RICH_TASK_PENDING_MAX_AGE_MS) {
-		pendingRichTaskComposers.delete(key);
-		return;
-	}
-	if (event?.source !== "interactive") return;
-	if (!String(event.text ?? "").includes(pending.envelope)) {
-		pendingRichTaskComposers.delete(key);
-		return;
-	}
-	if (!event.images?.length) {
-		pendingRichTaskComposers.delete(key);
-		return;
-	}
-	try {
-		const attachments = (runtime.materializeTaskImages ?? materializeTaskImages)(
-			ctx.cwd,
-			event.images,
-		);
-		pendingRichTaskComposers.delete(key);
-		return {
-			action: "transform",
-			text: `${event.text}\n\nAttachments:\n${attachments.map((attachment) => `- ${attachment.path} (${attachment.mimeType}, ${attachment.bytes} bytes)`).join("\n")}`,
-			images: [],
-		};
-	} catch (error) {
-		ctx.ui?.notify?.(
-			`Could not save task image: ${formatError(error)} Retry the submission.`,
-			"warning",
-		);
-		return { action: "handled" };
-	}
-}
 
-export async function prepareWorkspaceTaskComposer(ctx, roadmap, parent) {
+
+
+async function prepareWorkspaceTaskComposer(ctx, roadmap, parent) {
 	const envelope = taskComposerEnvelope(roadmap, parent);
 	if (
 		typeof ctx.ui.getEditorText === "function" &&
@@ -27990,63 +25423,7 @@ function startExtensionScout(ctx, options = {}) {
 
 
 
-function parseOrchestratorInput(event = {}) {
-	if (!["interactive", "user"].includes(event.source)) return;
-	const match = /^orchestrator(?:\s*[:,;-]\s*|\s+|$)([\s\S]*)$/i.exec(
-		String(event.text ?? "").trim(),
-	);
-	if (!match) return;
-	const rawBody = String(match[1] ?? "").trim();
-	if (rawBody === "?") return { help: orchestratorInputHelp() };
-	const body = rawBody.replace(/[.!?]+$/, "").replace(/\s+/g, " ");
-	const lower = body.toLowerCase();
-	if (!body || ["menu", "open"].includes(lower))
-		return { command: "work-menu", args: "" };
-	if (["help", "?"].includes(lower)) return { help: orchestratorInputHelp() };
-	if (/^list roadmaps?$/.test(lower))
-		return { command: "work-roadmap", args: "list" };
-	if (/^roadmaps?$/.test(lower)) return { command: "work-roadmap", args: "" };
-	if (lower === "status") return { command: "work-status", args: "" };
-	if (["compact", "microcompact"].includes(lower))
-		return { command: "work-context", args: "compact" };
-	if (lower === "pause") return { command: "work-goal", args: "pause" };
-	if (lower === "stop") return { command: "work-stop", args: "" };
-	if (lower === "stop scout" && extensionScoutEnabled())
-		return { command: "work-extension-scout", args: "stop" };
-	const numbered = /^(\d+)$/.exec(body) ?? /^(\d+)\s*[).,:-]\s*(.+)$/.exec(body);
-	if (numbered) {
-		const number = Number(numbered[1]);
-		return Number.isSafeInteger(number) && number > 0
-			? { number, note: String(numbered[2] ?? "").trim() }
-			: {
-					error: "Orchestrator choices start at 1.",
-					help: orchestratorInputHelp(),
-				};
-	}
-	const routed = /^(resume|report|scout|design|redesign)(?:\s+(.+))?$/i.exec(
-		body,
-	);
-	if (routed) {
-		const route = routed[1].toLowerCase();
-		if (route === "scout" && !extensionScoutEnabled())
-			return {
-				error: `Unknown orchestrator command: ${body}`,
-				help: orchestratorInputHelp(),
-			};
-		const command = {
-			resume: "work-resume",
-			report: "work-report",
-			scout: "work-extension-scout",
-			design: "work-design",
-			redesign: "work-redesign",
-		}[route];
-		return { command, args: routed[2] ?? "" };
-	}
-	return {
-		error: `Unknown orchestrator command: ${body}`,
-		help: orchestratorInputHelp(),
-	};
-}
+
 
 async function executeOrchestratorAction(
 	command,
@@ -28499,186 +25876,9 @@ async function executeOrchestratorAction(
 	);
 }
 
-async function executeNumberedWorkAction(action, ctx, pi, selectionNote = "") {
-	const match = String(action ?? "").match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
-	if (!match) return false;
-	return executeOrchestratorAction(
-		match[1],
-		match[2] ?? "",
-		ctx,
-		pi,
-		selectionNote,
-	);
-}
 
-export {
-	askUserResponses,
-	askUserPauseSelection,
-	writeActiveWorkflowRecord,
-	clearActiveWorkflowRecord,
-	restoreWorkflowAuthorization,
-	activeWorkflowRecordPath,
-	workflowClaimPath,
-	buildWorkAddState,
-	buildWorkAutoState,
-	classifyAutoTask,
-	implementationExecutionPolicy,
-	goalOwnedImplementationPrompt,
-	buildWorkGoalSystemPrompt,
-	buildWorkSelfImprovingObjective,
-	buildWorkBigState,
-	buildWorkDebugState,
-	buildWorkFinishState,
-	executeWorkFinishState,
-	buildWorkIdeateState,
-	buildWorkBrainstormState,
-	buildWorkCatchUpState,
-	buildWorkCatchUpObjective,
-	captureIdeationIdeas,
-	parseWorkIdeateArgs,
-	ideaDashboardList,
-	ideateDialogItems,
-	scoreChipColor,
-	startIdeaBrainstorm,
-	handleWorkIdeateCommand,
-	brainstormHandoffPrompt,
-	researchHandoffPrompt,
-	linkBrainstormArtifactFromFinal,
-	menuBrainstormArgs,
-	buildWorkflowIntakeState,
-	applyInitiativeReconciliation,
-	approveInitiativeReconciliation,
-	buildWorkInitState,
-	buildWorkImproveObjective,
-	buildWorkImproveState,
-	buildInitiativeProjection,
-	previewInitiativeReconciliation,
-	buildWorkMasterState,
-	buildWorkMedState,
-	buildWorkPlanState,
-	buildWorkMigrateState,
-	buildWorkRemoveBeadsState,
-	buildWorkPauseState,
-	buildWorkReport,
-	buildWorkReportState,
-	buildWorkRoadmapState,
-	buildWorkResume,
-	buildWorkResumeState,
-	buildWorkSmallState,
-	buildWorkStatus,
-	buildWorkStats,
-	buildWorkTelemetry,
-	buildWorkTelemetryState,
-	buildWorkUsageState,
-	changedFilesSummary,
-	compactTaskSummary,
-	evidenceSummaryPath,
-	forbiddenPatternCheck,
-	jsonlRecordDiff,
-	jsonlRecordSummary,
-	onlyAllowedFilesChanged,
-	optimizationTelemetry,
-	prepareTaskExportForGate,
-	reconcileTranscriptTelemetry,
-	readEvidenceSummary,
-	runBounded,
-	runTempCheck,
-	searchSummary,
-	stagedFilesSummary,
-	workflowTaskSummary,
-	writeEvidenceSummary,
-	directRoleHandoffParams,
-	executeNumberedWorkAction,
-	executeOrchestratorAction,
-	parseOrchestratorInput,
-	workGoalConfirmationLabel,
-	completeWorkflowOnce,
-	matchesTelemetryScope,
-	withCommandTelemetry,
-	sendWorkflowFollowUp,
-	parseWorkPromptMeta,
-	reconcilePendingDirectRuns,
-	recordPendingDirectRun,
-	recordGoalSubagentLaunch,
-	recordSpawnedDirectRun,
-	deriveIdeaStatus,
-	isIdeaIssue,
-	parseIdeationIdeas,
-	recordWorkTelemetry,
-	handleWorkResumeCommand,
-	handleWorkflowAction,
-	handleWorkRoadmapCommand,
-	extractImplementationUnits,
-	parseWorkGoalCommand,
-	parseTokenBudget,
-	formatTokenCount,
-	isContradictoryWorkGoalCompletion,
-	isRetryableWorkGoalInterruption,
-	isWorkGoalContextOverflow,
-	isWorkGoalUsageLimit,
-	parseWorkProjectGoalInput,
 
-	createWorkGoal,
-	workGoalTokenTotal,
-	updateWorkGoalUsage,
-	advanceProjectGoalToolBudget,
-	projectGoalSourceMaintenanceBlockReason,
-	buildWorkResumeGoalObjective,
-	resetContextFilter,
-	requestContextFilter,
-	filteredContext,
-	workGoalCompletionBlocker,
-	workGoalBaselineHead,
-	planResumeAction,
-	progressBar,
-	applyProfile,
-	setWorkOrchBoolean,
-	setWorkOrchReviewLevel,
-	setWorkOrchReviewPolicy,
-	setWorkOrchCreativeMode,
-	creativeSidecarStep,
-	ideateSidecarStep,
-	divergentTaskModels,
-	advisorCriticStep,
-	selectedAgentHealthTargets,
-	probeAgentModel,
-	checkAgentHealth,
-	renderAgentHealth,
-	brainstormAgentHealthPreflight,
-	workOrchSettings,
-	workPerformanceSettings,
-	setWorkPerformanceBoolean,
-	backgroundVerifierProfiles,
-	launchCurrentTaskReadOnlyLanes,
-	reconcileSuccessorPrefetches,
-	reconcileReadOnlyLaneRuns,
-	readOnlyLaneRuntimeStatus,
-	readOnlyLaneEnvelope,
-	reconcileBackgroundVerifierRuns,
-	backgroundVerifierRunStatus,
-	scheduleConfiguredBackgroundVerifiers,
-	createPiSubagentsVerifierAdapter,
-	readEffectiveSettings as effectiveSettingsForTest,
-	workflowBuildLabel as workflowBuildLabelForTest,
-	LOADED_WORKFLOW_BUILD_LABEL as loadedWorkflowBuildLabelForTest,
-	rememberWorkflowEpic as rememberWorkflowEpicForHelper,
-	workResumeSettings as workResumeSettingsForTest,
-	renderWorkIdeateText,
-	renderWorkBrainstormText,
-	renderWorkUsageText,
-	renderWorkReportJson,
-	renderWorkReportText,
-	renderWorkRoadmapText,
-	renderWorkStats,
-	roadmapPreviewText,
-	renderProjectGoalProgress,
-	renderWorkResumeJson,
-	renderWorkResumeText,
-	warpNotificationEnabled,
-	warpPayload,
-	workWarpMode,
-	workWarpTitle,
-};
+export { resetContextFilter, requestContextFilter, filteredContext, executeOrchestratorAction, workOrchSettings, readEffectiveSettings as effectiveSettingsForTest, workflowBuildLabel as workflowBuildLabelForTest, LOADED_WORKFLOW_BUILD_LABEL as loadedWorkflowBuildLabelForTest };
 
 export default function workModelsExtension(pi) {
 	// Plan3's per-plan Models menu: undefined = cancelled, null = remove the override.

@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-12
-updated: 2026-10-12T08:01:40.705Z
+updated: 2026-10-12T08:07:52.159Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -89,8 +89,8 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 - [x] **E4** Removed monitor command, tools, scheduler, wake/reload handling and monitor control tests; residual goal status strings disappear with E2/S1.
 
-- [wip] **E2** Remove the workflowOn branches, legacy commands, work_* tools, F9, menu items, legacy exports and the Workflow setting from work-models.ts.
-- [ ] **E3** Remove /ideate, /wo telemetry, /wo usage, /wo design, /wo redesign, /ui-gate and the legacy catch-up branch (D-04).
+- [x] **E2** Removed workflow switch, legacy public exports, F9/work_* registrations, goal entry points and settings controls; retained utilities have an isolated command regression check.
+- [wip] **E3** Remove /ideate, /wo telemetry, /wo usage, /wo design, /wo redesign, /ui-gate and the legacy catch-up branch (D-04).
 - [ ] **E5** Replace store-writer fixtures in test-work-plan3.mjs with static legacy JSON (D-05) before touching work-store.ts.
 
 ### Phase 3: Dead-code sweep [code]

@@ -22,7 +22,6 @@ import workModelsExtension, {
 	resetContextFilter,
 	stripProcessedPayloads,
 	summarizeNativeContext,
-	workSubagentToolCall,
 } from "../extensions/work-models.ts";
 import { fitImage, parseSize, pngSize } from "../extensions/work-images.ts";
 
@@ -43,14 +42,6 @@ import { fitImage, parseSize, pngSize } from "../extensions/work-images.ts";
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-compaction-notifications-"));
 const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
 process.env.PI_CODING_AGENT_DIR = path.join(cwd, "agent");
-const scriptPath = path.join(cwd, "guard-workflow.js");
-writeFileSync(scriptPath, 'return runs.run("review", { agent: "work-reviewer" })');
-assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: "./guard-workflow.js" } }, { cwd }), true);
-assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: ".\\\\guard-workflow.js" } }, { cwd }), true);
-assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: "./missing.js" } }, { cwd }), true);
-const workflowContext = text => ({ cwd, sessionManager: { getBranch: () => [{ message: { role: "assistant", content: [{ type: "text", text }] } }] } });
-assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: true } }, workflowContext('```js workflow\nreturn runs.run("review", {"agent":"work-reviewer"})\n```')), true);
-assert.equal(workSubagentToolCall({ toolName: "subagent", input: { workflow: true } }, workflowContext('```js workflow\nreturn runs.run("main", {agent:"worker"})\n```')), false);
 const hooks = {};
 const contextHooks = [];
 const toolCallHooks = [];
