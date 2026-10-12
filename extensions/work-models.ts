@@ -43,25 +43,16 @@ import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
-import { registerWorkUiGate } from "./work-ui-gate.ts";
+
 import { openWorkFleet } from "./work-fleet.ts";
 import { dispatchPrivateWorkflow } from "./work-private-workflows.ts";
-import {
-	activatePendingPrivateWorkflowRelease,
-	promoteVerifiedPrivateWorkflowRelease,
-	readPrivateWorkflowActivationState,
-	resolveLatestOfficialStableRelease,
-	rollbackPrivateWorkflowRelease,
-} from "./work-compound-catch-up.ts";
+import { readPrivateWorkflowActivationState, resolveLatestOfficialStableRelease, rollbackPrivateWorkflowRelease } from "./work-compound-catch-up.ts";
 import {
 	createSubscriptionFooterController,
 	PRODUCTION_PROVIDERS,
 	SUBSCRIPTION_FOOTER_DEFAULTS,
 } from "./subscription-footer.ts";
-import {
-	resolveReportingSource,
-	submitImprovementReport,
-} from "./work-improvement-reporting.ts";
+import { resolveReportingSource } from "./work-improvement-reporting.ts";
 import {
 	buildInitiativeReconciliation,
 	decodeInitiativeToken,
@@ -193,11 +184,7 @@ import {
 	settleWorkActionLease,
 	workActionLeaseState,
 } from "./work-action-leases.ts";
-import {
-	hasProductionDiff,
-	normalizeReviewPolicy,
-	REVIEW_POLICIES,
-} from "./work-quality-policy.ts";
+import { hasProductionDiff, normalizeReviewPolicy } from "./work-quality-policy.ts";
 import {
 	collectRecentExtensionPage,
 	inspectQueuedExtensions,
@@ -431,7 +418,7 @@ function registerConstrainedTool(pi, tool) {
 	});
 }
 
-export function exposeBundledSubagentAgents(workflowOn) {
+export function exposeBundledSubagentAgents() {
 	const normalize = (dir) =>
 		process.platform === "win32" ? resolve(dir).toLowerCase() : resolve(dir);
 	const utilityDir = join(WORKFLOW_REPO_DIR, "utility-agents");
@@ -441,7 +428,7 @@ export function exposeBundledSubagentAgents(workflowOn) {
 		.split(delimiter)
 		.filter((entry) => entry && !owned.has(normalize(entry)));
 	if (existsSync(utilityDir)) entries.push(utilityDir);
-	if (workflowOn && existsSync(WORK_ORCH_AGENT_DIR)) entries.push(WORK_ORCH_AGENT_DIR);
+
 	if (entries.length) process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV] = entries.join(delimiter);
 	else delete process.env[SUBAGENT_EXTRA_AGENT_DIRS_ENV];
 }
@@ -656,17 +643,9 @@ const WORK_PERFORMANCE_FLAGS = [
 	},
 ];
 const REVIEW_LEVELS = ["off", "light", "full"];
-const REVIEW_POLICY_DESC = {
-	"risk-based":
-		"Review sensitive, broad, UI, hardware, and other high-risk production diffs",
-	"review-all": "Require independent review for every production diff",
-};
+
 const CREATIVE_MODES = ["off", "ask", "auto"];
-const CREATIVE_MODE_DESC = {
-	off: "use the normal brainstorm or planning flow",
-	ask: "offer Quick or Wide before broad brainstorms and plans",
-	auto: "run three isolated divergent branches without prompting",
-};
+
 const DIVERGENT_FRAMES = [
 	{
 		label: "Inversion and adversary",
@@ -684,11 +663,7 @@ const DIVERGENT_FRAMES = [
 			"Identify the convention everyone treats as fixed, remove it, and explore what becomes possible.",
 	},
 ];
-const REVIEW_LEVEL_DESC = {
-	off: "no pre-commit review (low profile)",
-	light: "one work-reviewer pass on the scoped diff (medium/high)",
-	full: "verified private scoped review on the slice diff (max)",
-};
+
 const SUBMENU_ARROW = "›";
 const BACKGROUND_VERIFIER_OPERATIONS = VERIFIER_OPERATIONS;
 
@@ -834,8 +809,8 @@ const activeRoadmapMenuSessions = new WeakMap();
 const activeOperationProgress = new WeakSet();
 let activeHistoryTask = null;
 let activeWorkAgent = null;
-const finishHelperStarts = new Map();
-const goalSubagentStarts = new Map();
+
+
 let activeWorkGoal = null;
 let activeWorkGoalCwd = null;
 let sessionCwd; // Completions get no ctx; session_start records the project for checkout-only /wo entries.
@@ -843,8 +818,8 @@ const maintenanceCheckout = (cwd = sessionCwd ?? process.cwd()) => sameCheckout(
 let activeWorkGoalRunning = false;
 let activeWorkGoalGitBefore = null;
 let activeWorkGoalVerifierFixCommitted = false;
-let pendingWorkGoalTurn = false;
-let blockedWorkGoalTurn = false;
+
+
 let blockedCompactionResumeTurn = false;
 let blockedInternalBackgroundCompletionTurn = false;
 let internalBackgroundWakeEligible = false;
@@ -884,7 +859,7 @@ const WORK_GOAL_TOOL_NAMES = ["work_goal_complete", "work_goal_human_decision"];
 
 const ORCHESTRATOR_GOAL_CONTINUE_COMMAND = "__orchestrator-goal-continue";
 
-const ORCHESTRATOR_AUTOMATION_PREFIX = "ORCHESTRATOR_RUN_V1";
+
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
@@ -916,64 +891,12 @@ const WORK_GOAL_CONTEXT_OVERFLOW_RE =
 	/context[_\s-]*length|context window|input exceeds|prompt is too long|maximum context length/i;
 const WORK_GOAL_CONTRADICTORY_COMPLETION_RE =
 	/(?<!could\s)\bnot\s+(?:yet\s+)?(?:complete|completed|done|finished)\b|\bstill\s+(?:incomplete|failing|failing\s+tests?|fails?)\b|\btests?\s+still\s+fail(?:ing)?\b|\b(?:is|are|remain(?:s)?|still)\s+blocked\b|\bblocked\s+(?:by|on|due\s+to)\b|\bnot\s+verified\b/i;
-const REVIEW_CYCLE_BUDGET_PROMPT = `## Review cycle budget
-Use one initial review cycle, batch its actionable fixes, and run at most one targeted re-review only when those fixes materially changed production behavior. Skip re-review for test-only, documentation, formatting, traceability, or other mechanical fixes. A simplification pass is not another correctness review. After the targeted re-review, fix and report any residual findings without launching another reviewer. Do not launch a third review cycle unless the user explicitly requests it.
 
-## Verification budget
-During iteration, run only the smallest focused test that covers the changed behavior. Select it from the feature or nearby test names; a monolithic implementation file does not make every test relevant. Run the full package or regression suite once, at the final handoff, only when the acceptance contract requires it or the change is genuinely cross-cutting. Reuse valid full-suite evidence unless production or package-surface files changed afterward. Reviewers and fixers must not rerun an expensive gate when supplied evidence is adequate.`;
-const DIRECT_REQUEST_PROMPT = `## Direct request mode
-This is an ordinary user request, not a ce-workflow run.
-- Work directly in the current agent. Do not create, select, finish, close, or resume work items or autonomous goals.
-- Do not invoke work_* tools, work-* subagents, background verifiers, or ce-workflow helper commands.
-- For routine or mechanical changes, run only the smallest relevant check and do not launch an independent review.
-- ce-workflow orchestration is authorized only by a tagged prompt emitted from an explicit /wo action or user-origin orchestrator command.`;
 
-const IMPROVEMENT_REPORT_TOOL_SCHEMA = {
-	type: "object",
-	properties: {
-		observation: {
-			type: "string",
-			description: "What workflow problem was observed",
-		},
-		expectedBehavior: {
-			type: "string",
-			description: "What should have happened instead",
-		},
-		impact: {
-			type: "string",
-			description: "Why this problem matters",
-		},
-		logs: {
-			type: "array",
-			items: { type: "string" },
-			description: "At least one current-project or Pi runtime log path",
-		},
-		suggestedImprovement: {
-			type: "string",
-			description: "Optional non-authoritative fix suggestion",
-		},
-	},
-	required: ["observation", "expectedBehavior", "impact", "logs"],
-	additionalProperties: false,
-};
 
-const WORK_GOAL_TOOL_SCHEMA = {
-	type: "object",
-	properties: {
-		summary: { type: "string", description: "Completion or decision summary" },
-		question: { type: "string", description: "Human decision question" },
-		whyUserNeeded: {
-			type: "string",
-			description: "Why the agent cannot decide safely",
-		},
-		options: { type: "string", description: "Known options, if any" },
-		recommendation: {
-			type: "string",
-			description: "Recommended option, if one exists",
-		},
-	},
-	additionalProperties: false,
-};
+
+
+
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -1050,7 +973,7 @@ function writeSettings(cwd, settings) {
 	const dir = join(cwd, CONFIG_DIR_NAME);
 	mkdirSync(dir, { recursive: true });
 	writeFileSync(settingsPath(cwd), `${JSON.stringify(settings, null, "\t")}\n`);
-	syncImprovementReportTool(workExtensionPi, { cwd });
+
 	jevTools?.refresh();
 }
 
@@ -1198,12 +1121,7 @@ function resetWarpTitle(ctx) {
 	setWarpTitle(ctx, basename(cwd));
 }
 
-function startWarpWork(ctx, mode, query = "") {
-	const cwd = ctx?.cwd ?? process.cwd();
-	emitWarp(ctx, "session_start");
-	emitWarp(ctx, "prompt_submit", { query: query || `/work-${mode}` });
-	setWarpTitle(ctx, workWarpTitle(mode, cwd));
-}
+
 
 function finishWarpWork(ctx, mode, response = "") {
 	emitWarp(ctx, "stop", {
@@ -1942,49 +1860,7 @@ function compactHistoryEvent(event) {
 	return compact;
 }
 
-function recordSelfImprovementHistory(ctx, type, event = {}) {
-	if (!selfImprovementHistoryEnabled(ctx)) return "";
-	const cwd = ctx?.cwd ?? activeWorkAgent?.cwd ?? activeWorkGoalCwd;
-	if (!cwd) return "";
-	try {
-		if (type === "before_agent_start")
-			activeHistoryTask = historyTaskFromText(event.prompt);
-		const task = selfImprovementHistoryTask(event);
-		const sessionId = ctx?.sessionManager?.getSessionId?.() ?? "no-session";
-		const file = join(
-			telemetryDir(cwd),
-			HISTORY_DIR_NAME,
-			safeHistoryPathPart(task.key),
-			`${safeHistoryPathPart(sessionId)}.jsonl`,
-		);
-		mkdirSync(dirname(file), { recursive: true });
-		appendFileSync(
-			file,
-			`${JSON.stringify({
-				version: 1,
-				id: telemetryId("hist"),
-				timestamp: new Date().toISOString(),
-				type,
-				cwd,
-				sessionId,
-				sessionFile: ctx?.sessionManager?.getSessionFile?.(),
-				task,
-				workflowRunId:
-					activeWorkAgent?.meta?.workflowRunId ??
-					pendingWorkPrompt?.meta?.workflowRunId ??
-					currentCommandWorkflow()?.workflowRunId,
-				activity:
-					activeWorkAgent?.meta?.activity ??
-					pendingWorkPrompt?.meta?.activity ??
-					workflowActivityMarker(),
-				event: compactHistoryEvent(event),
-			})}\n`,
-		);
-		return file;
-	} catch {
-		return "";
-	}
-}
+
 
 function appendTelemetryNote(cwd, workItemId, event, file) {
 	if (!workItemId || process.env.WORK_ORCH_TELEMETRY_NOTES !== "1") return;
@@ -2040,35 +1916,9 @@ function parseWorkPromptMeta(prompt) {
 	};
 }
 
-function messageUsage(messages = []) {
-	const usage = {
-		input: 0,
-		output: 0,
-		cacheRead: 0,
-		cacheWrite: 0,
-		totalTokens: 0,
-		cost: 0,
-	};
-	for (const message of messages) {
-		if (message?.role !== "assistant" || !message.usage) continue;
-		usage.input += Number(message.usage.input ?? 0);
-		usage.output += Number(message.usage.output ?? 0);
-		usage.cacheRead += Number(message.usage.cacheRead ?? 0);
-		usage.cacheWrite += Number(message.usage.cacheWrite ?? 0);
-		usage.totalTokens += Number(message.usage.totalTokens ?? 0);
-		usage.cost += Number(message.usage.cost?.total ?? 0);
-	}
-	return usage;
-}
 
-function summarizeMessages(messages = []) {
-	return {
-		count: messages.length,
-		assistant: messages.filter((message) => message.role === "assistant").length,
-		tools: messages.filter((message) => message.role === "toolResult").length,
-		chars: messages.reduce((sum, message) => sum + textChars(message.content), 0),
-	};
-}
+
+
 
 function latestMessageExcerpts(messages = [], limit = 4) {
 	return messages
@@ -2157,23 +2007,7 @@ function failureStatusNote(run, event, telemetry, file) {
 	return lines.filter(Boolean).join("\n");
 }
 
-function appendFailureStatusNote(cwd, workItemId, run, event, telemetry, file) {
-	if (
-		!workItemId ||
-		statusOf(readWorkItem(cwd, workItemId)) === "closed" ||
-		!hasWorkAgentFailure(event, telemetry)
-	)
-		return;
-	try {
-		appendWorkflowWorkItemNote(
-			cwd,
-			workItemId,
-			failureStatusNote(run, event, telemetry, file),
-		);
-	} catch {
-		// Failure-status capture must never mask the original task result.
-	}
-}
+
 
 function parseToolArgs(args) {
 	if (typeof args !== "string") return args ?? {};
@@ -2467,32 +2301,7 @@ function toolKind(name, args) {
 	return "shell";
 }
 
-function summarizeToolResult(event, started) {
-	const text =
-		typeof event.result === "string"
-			? event.result
-			: JSON.stringify(event.result ?? "");
-	const subagentDetails =
-		event.toolName === "subagent" ? subagentDetailsFromResult(event.result) : [];
-	return {
-		id: event.toolCallId,
-		name: event.toolName,
-		kind: toolKind(event.toolName, started?.args),
-		durationMs: Math.max(0, Date.now() - (started?.startedAt ?? Date.now())),
-		isError: Boolean(event.isError),
-		inputChars: textChars(started?.args),
-		outputChars: text.length,
-		subagents:
-			subagentDetails.length > 0
-				? subagentDetails.map((item) => item.agent)
-				: subagentNamesFromArgs(started?.args),
-		subagentDetails,
-		runId:
-			text.match(/Run:\s*([A-Za-z0-9_-]+)/)?.[1] ??
-			text.match(/Async:\s*[^[]*\[([^\]]+)\]/)?.[1],
-		artifact: text.match(/Artifacts?:\s*\n?-\s*[^:]+:\s*([^\s]+)/)?.[1],
-	};
-}
+
 
 const ORCHESTRATOR_ACTION_LABELS = {
 	"work-add": "Add work",
@@ -3656,22 +3465,7 @@ function usageScope(cwd, args = "") {
 	};
 }
 
-function reviewTelemetry(meta = {}, event = {}) {
-	const review = event.review ?? event.reviewOutcome;
-	const scope = meta.workItemId
-		? `workItem ${meta.workItemId}`
-		: meta.epicId
-			? `diff for roadmap ${meta.epicId}`
-			: "current diff";
-	if (!review) return { scope, outcome: "unknown" };
-	return {
-		scope: review.scope ?? scope,
-		outcome: review.outcome ?? "unknown",
-		findings: review.findings ?? review.findingCount,
-		fixer: review.fixer ?? review.fixerTriggered,
-		rerunOf: review.rerunOf,
-	};
-}
+
 
 function reviewPayoff(review) {
 	if (!review || review.outcome === "unknown") return "unknown";
@@ -4266,15 +4060,7 @@ function setWorkOrchCreativeMode(settings, value) {
 	block.creativeMode = CREATIVE_MODES.includes(value) ? value : "ask";
 }
 
-function setDesignWorkflowSetting(settings, value) {
-	workOrchBlock(settings).visualDesignWorkflow = [
-		"off",
-		"auto",
-		"required",
-	].includes(value)
-		? value
-		: "off";
-}
+
 
 function setOpenDesignCommandSetting(settings, value) {
 	const block = workOrchBlock(settings);
@@ -4282,20 +4068,11 @@ function setOpenDesignCommandSetting(settings, value) {
 	else delete block.openDesignCommand;
 }
 
-function setDesignReviewProofSetting(settings, value) {
-	workOrchBlock(settings).designReviewProof =
-		value === "strict" ? value : "standard";
-}
 
-function setWorkResumeBoolean(settings, key, value) {
-	settings.workResume ??= {};
-	settings.workResume[key] = Boolean(value);
-}
 
-function setWorkResumeThinkingLevel(settings, value) {
-	settings.workResume ??= {};
-	settings.workResume.goalThinkingLevel = value;
-}
+
+
+
 
 function backgroundVerifierMap(settings) {
 	const profiles = settings.workOrchestrator?.backgroundVerifiers;
@@ -5083,20 +4860,7 @@ async function brainstormAgentHealthPreflight(ctx) {
 	};
 }
 
-function profileDescription(key) {
-	const profile = EFFORT_PROFILES[key];
-	const guidance = PROFILE_GUIDANCE[key];
-	return [
-		guidance.summary,
-		`Pros: ${guidance.pros}`,
-		`Cons: ${guidance.cons}`,
-		`Token/time consumption: ${guidance.consumption}`,
-		"Active settings:",
-		...SLOTS.map((slot) => `  ${slot.label}: ${titleCase(profile[slot.key])}`),
-		`  Browser tests on UI changes: ${profile.browserTestsOnUiDiff ? "On" : "Off"}`,
-		`  Pre-commit review: ${titleCase(profile.codeReviewBeforeCommit)}`,
-	].join("\n");
-}
+
 
 async function choose(ctx, title, items, currentValue, options = {}) {
 	const selected = await showListDialog(ctx, {
@@ -5199,11 +4963,7 @@ function setBackupSlot(settings, slot, model, thinking, tombstone = false) {
 	if (!Object.keys(block.roleBackups).length) delete block.roleBackups;
 }
 
-function setModelStrategy(settings, strategy) {
-	workOrchBlock(settings).modelStrategy = MODEL_STRATEGIES.includes(strategy)
-		? strategy
-		: "main-first";
-}
+
 
 function resetAll(settings) {
 	for (const slot of SLOTS) {
@@ -5403,67 +5163,7 @@ async function editPlanModels(ctx, scope, names) {
 	}
 }
 
-async function editSlotModel(ctx, settings, slot, scope, backup = false) {
-	const current = backup
-		? (backupSlotSelection(slot, settings) ?? {
-				model: NONE_MODEL,
-				thinking: slot.defaultThinking,
-			})
-		: slotSelection(slot, settings);
-	const { selectedThinking, items } = thinkingItemsFor(
-		slot,
-		settings,
-		scope === "project",
-	);
-	const selected = await chooseModelAndEffort(ctx, {
-		title: `${backup ? "Backup" : "Model"} ${slot.label}`,
-		currentModel:
-			!backup && slotSourceForSlot(settings, slot) === CHATGPT_WEB_SOURCE
-				? CHATGPT_WEB_SOURCE
-				: (current.model ?? INHERIT_MODEL),
-		currentThinking: backup
-			? current.thinking
-			: (selectedThinking ?? DEFAULT_THINKING),
-		allowNone: backup || isAdvisorSlot(slot),
-		projectScope: scope === "project",
-		includeChatgptWeb: !backup && supportsChatgptWeb(slot),
-		effortItems: items,
-	});
-	if (!selected) return false;
-	if (selected.model === NONE_MODEL) {
-		if (backup)
-			setBackupSlot(
-				settings,
-				slot,
-				NONE_MODEL,
-				selected.thinking,
-				scope === "project" &&
-					Boolean(backupSlotSelection(slot, readGlobalSettings())),
-			);
-		else {
-			setAdvisorEnabled(settings, slot, false);
-			setSlotSource(settings, slot, "model");
-		}
-		writeScopedSettings(ctx.cwd, scope, settings);
-		ctx.ui.notify(
-			`Saved ${backup ? `${slot.label} Backup` : slot.label}: model:none`,
-			"info",
-		);
-		return true;
-	}
-	if (backup) setBackupSlot(settings, slot, selected.model, selected.thinking);
-	else if (selected.model === CHATGPT_WEB_SOURCE) {
-		if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
-		setSlotSource(settings, slot, CHATGPT_WEB_SOURCE);
-	} else {
-		if (isAdvisorSlot(slot)) setAdvisorEnabled(settings, slot, true);
-		if (supportsChatgptWeb(slot)) setSlotSource(settings, slot, "model");
-		setSlot(settings, slot, selected.model, selected.thinking);
-	}
-	writeScopedSettings(ctx.cwd, scope, settings);
-	ctx.ui.notify(`Saved ${slot.label}: ${slotSummary(slot, settings)}`, "info");
-	return true;
-}
+
 
 function verifierOperationLabel(operation) {
 	return operation === "test-gap"
@@ -5471,9 +5171,7 @@ function verifierOperationLabel(operation) {
 		: operation.replaceAll("-", " ");
 }
 
-function backgroundVerifierSummary(profile, names) {
-	return `${modelEffortSummary(profile.model, profile.thinking, names)} · ${profile.operations.map(verifierOperationLabel).join(", ")}`;
-}
+
 
 function replaceBackgroundVerifierProfile(settings, scope, oldModel, profile) {
 	if (oldModel === profile.model) {
@@ -5639,50 +5337,7 @@ function addBackgroundVerifierProfile(ctx, scope) {
 	return true;
 }
 
-async function editBackgroundVerifiers(ctx, scope) {
-	let openModel;
-	for (;;) {
-		const scoped = readScopedSettings(ctx.cwd, scope);
-		let profiles = backgroundVerifierProfiles(
-			ctx.cwd,
-			scope === "global" ? scoped : undefined,
-		);
-		if (!profiles.length) {
-			addBackgroundVerifierProfile(ctx, scope);
-			profiles = backgroundVerifierProfiles(
-				ctx.cwd,
-				scope === "global" ? readScopedSettings(ctx.cwd, scope) : undefined,
-			);
-		}
-		if (openModel || profiles.length === 1) {
-			const model = openModel ?? profiles[0].model;
-			openModel = undefined;
-			const result = await editBackgroundVerifierProfile(ctx, scope, model);
-			if (result?.action !== "add") return;
-			if (addBackgroundVerifierProfile(ctx, scope)) openModel = INHERIT_MODEL;
-			continue;
-		}
-		const names = await modelDisplayNames(ctx);
-		const selected = await choose(ctx, "Background verifiers", [
-			...profiles.map((profile) => ({
-				value: profile.model,
-				label: `Model: [${modelEffortSummary(profile.model, profile.thinking, names)}] ${SUBMENU_ARROW}`,
-				description: profile.operations.map(verifierOperationLabel).join(", "),
-			})),
-			{
-				value: "add",
-				label: `Add background verifier ${SUBMENU_ARROW}`,
-				description: "Start with Test coverage enabled and Model: [Inherit: High]",
-			},
-		]);
-		if (!selected) return;
-		if (selected === "add") {
-			if (addBackgroundVerifierProfile(ctx, scope)) openModel = INHERIT_MODEL;
-			continue;
-		}
-		openModel = selected;
-	}
-}
+
 
 function truncate(value, max = 800) {
 	const text = String(value ?? "")
@@ -7468,11 +7123,7 @@ function isCompactionResumePrompt(value) {
 	);
 }
 
-function isBackgroundWorkflowCompletionPrompt(value) {
-	return /^Background task completed:\s+\*\*workflow\*\*/.test(
-		contentText(value).trim(),
-	);
-}
+
 
 function activeCompactionWorkflowAuthorization(authorization) {
 	if (authorization?.marker !== "work-orchestrator" || pendingSettledAgentEnd)
@@ -9308,63 +8959,9 @@ function dirtyRecoveryApprovalFingerprint(value) {
 	});
 }
 
-function recordDirtyRecoveryAskCall(event) {
-	const input = event?.input ?? event?.params ?? {};
-	const toolCallId = String(event?.toolCallId ?? "");
-	const token = `${input.question ?? ""}\n${input.context ?? ""}`
-		.trimEnd()
-		.match(/Dirty recovery token: ([\w-]+)$/)?.[1];
-	const recovery = token ? pendingDirtyRecoveries.get(token) : undefined;
-	const options = input.options ?? [];
-	const actions = String(options[0]?.description ?? "");
-	if (
-		!recovery ||
-		!toolCallId ||
-		input.allowMultiple !== false ||
-		input.allowFreeform !== false ||
-		input.allowComment !== false ||
-		options.length !== 2 ||
-		options[0]?.title !== "Apply recommendation and continue" ||
-		options[1]?.title !== "Cancel for manual cleanup" ||
-		!recovery.blockedPaths.every((path) =>
-			normalizedRepoPath(actions).includes(normalizedRepoPath(path)),
-		)
-	)
-		return;
-	recovery.approvalFingerprint = dirtyRecoveryApprovalFingerprint(input);
-	recovery.approvalToolCallId = toolCallId;
-}
 
-function approvedDirtyRecovery(ctx, token) {
-	const recovery = pendingDirtyRecoveries.get(token);
-	if (!recovery?.approvalFingerprint) return false;
-	const entries = ctx?.sessionManager?.getBranch?.() ?? [];
-	for (let index = entries.length - 1; index >= 0; index -= 1) {
-		const message = entries[index]?.message;
-		if (entries[index]?.type !== "message" || message?.role !== "toolResult")
-			continue;
-		if (message.toolName !== "ask_user") continue;
-		const details = message.details;
-		if (
-			!`${details?.question ?? ""}\n${details?.context ?? ""}`
-				.trimEnd()
-				.endsWith(`Dirty recovery token: ${token}`)
-		)
-			continue;
-		return (
-			message.toolCallId === recovery.approvalToolCallId &&
-			recovery.approvalFingerprint === dirtyRecoveryApprovalFingerprint(details) &&
-			details.cancelled === false &&
-			details.options?.length === 2 &&
-			details.options[0]?.title === "Apply recommendation and continue" &&
-			details.options[1]?.title === "Cancel for manual cleanup" &&
-			details.response?.kind === "selection" &&
-			details.response.selections?.length === 1 &&
-			details.response.selections[0] === "Apply recommendation and continue"
-		);
-	}
-	return false;
-}
+
+
 
 async function queueDirtyRecovery(state, ctx, pi) {
 	const workflow = currentCommandWorkflow();
@@ -11811,408 +11408,8 @@ function verifierToolResult(value) {
 		details: value,
 	};
 }
-function registerVerifierTools(pi) {
-	const tools = [
-		[
-			"work_verifier_read",
-			"Read a checkpoint-scoped file",
-			{
-				path: { type: "string", minLength: 1, maxLength: 500 },
-				startLine: { type: "integer", minimum: 1, maximum: 1000000 },
-				maxLines: { type: "integer", minimum: 1, maximum: VERIFIER_MAX_LINES },
-			},
-			["path"],
-			executeVerifierRead,
-		],
-		[
-			"work_verifier_list",
-			"List checkpoint-scoped paths",
-			{
-				path: { type: "string", minLength: 1, maxLength: 500 },
-				maxResults: {
-					type: "integer",
-					minimum: 1,
-					maximum: VERIFIER_MAX_RESULTS,
-				},
-			},
-			[],
-			executeVerifierList,
-		],
-		[
-			"work_verifier_find",
-			"Find checkpoint-scoped filenames",
-			{
-				query: { type: "string", minLength: 1, maxLength: 200 },
-				path: { type: "string", minLength: 1, maxLength: 500 },
-				maxResults: {
-					type: "integer",
-					minimum: 1,
-					maximum: VERIFIER_MAX_RESULTS,
-				},
-			},
-			["query"],
-			executeVerifierFind,
-		],
-		[
-			"work_verifier_grep",
-			"Search checkpoint-scoped file text",
-			{
-				query: { type: "string", minLength: 1, maxLength: 200 },
-				path: { type: "string", minLength: 1, maxLength: 500 },
-				maxResults: {
-					type: "integer",
-					minimum: 1,
-					maximum: VERIFIER_MAX_RESULTS,
-				},
-			},
-			["query"],
-			executeVerifierGrep,
-		],
-	];
-	for (const [name, description, properties, required, execute] of tools)
-		registerConstrainedTool(pi, {
-			name,
-			description,
-			parameters: {
-				type: "object",
-				properties,
-				required,
-				additionalProperties: false,
-			},
-			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-				if (!ctx?.cwd) throw new Error("Verifier tool requires a workspace cwd.");
-				return verifierToolResult(execute(ctx.cwd, params));
-			},
-		});
-}
-function registerVerifierTriageTools(pi) {
-	registerConstrainedTool(pi, {
-		name: "work_verifier_acknowledge_failure",
-		label: "Acknowledge verifier infrastructure failure",
-		description:
-			"Durably acknowledge one failed verifier job after another configured verifier covered every failed operation.",
-		parameters: {
-			type: "object",
-			properties: {
-				jobId: { type: "string", minLength: 1 },
-				reason: { type: "string", minLength: 1, maxLength: 1000 },
-			},
-			required: ["jobId", "reason"],
-			additionalProperties: false,
-		},
-		async execute(_id, params, _signal, _update, ctx) {
-			const result = mutateVerifierStore(ctx.cwd, (store) =>
-				acknowledgeVerifierFailure(store, params),
-			);
-			return verifierToolResult({ jobId: params.jobId, ...result });
-		},
-	});
-	registerConstrainedTool(pi, {
-		name: "work_verifier_inbox",
-		label: "Verifier triage inbox",
-		description:
-			"Read only validated, bounded fields for claims owned by this session.",
-		parameters: { type: "object", properties: {}, additionalProperties: false },
-		async execute(_id, _params, _signal, _update, ctx) {
-			const store = loadVerifierStore(ctx.cwd);
-			const ownerSession = verifierTriageOwner(ctx);
-			const claims = Object.values(store.claims)
-				.filter(
-					(claim) =>
-						claim.ownerSession === ownerSession &&
-						store.groups[claim.groupId]?.status === "claimed",
-				)
-				.map((claim) => renderTriageClaim(store, claim.id));
-			return {
-				content: [{ type: "text", text: JSON.stringify(claims) }],
-				details: { claims },
-			};
-		},
-	});
-	registerConstrainedTool(pi, {
-		name: "work_verifier_dispose",
-		label: "Record verifier disposition",
-		description:
-			"Record one validated verifier finding as accepted, rejected, or stale.",
-		parameters: {
-			type: "object",
-			properties: {
-				claimId: { type: "string" },
-				findingId: { type: "string" },
-				disposition: {
-					type: "string",
-					enum: ["accepted", "rejected", "stale"],
-				},
-				reason: { type: "string", minLength: 1, maxLength: 1000 },
-				currentCode: {
-					type: "object",
-					properties: { path: { type: "string" }, sha256: { type: "string" } },
-					required: ["path", "sha256"],
-					additionalProperties: false,
-				},
-			},
-			required: ["claimId", "findingId", "disposition", "reason"],
-			additionalProperties: false,
-		},
-		async execute(_id, params, _signal, _update, ctx) {
-			const cwd = ctx.cwd;
-			const store = loadVerifierStore(cwd);
-			const claim = store.claims[params.claimId];
-			const finding = store.findings[params.findingId];
-			if (!finding) throw new Error("Verifier finding is missing.");
-			const changedTarget = verifierFindingChanged(cwd, finding);
-			const codeEvidence = currentCodeEvidence(
-				cwd,
-				finding,
-				params.currentCode,
-				params.disposition !== "accepted",
-			);
-			if (changedTarget && !codeEvidence)
-				throw new Error(
-					"Changed target requires matching current-code SHA-256 or verified deletion evidence.",
-				);
-			const result = mutateVerifierStore(cwd, (state) =>
-				recordTriageDisposition(state, {
-					claimId: params.claimId,
-					ownerSession: verifierTriageOwner(ctx),
-					findingId: params.findingId,
-					disposition: params.disposition,
-					reason: params.reason,
-					changedTarget,
-					...(codeEvidence ? { currentCodeEvidence: codeEvidence } : {}),
-				}),
-			);
-			const after = loadVerifierStore(cwd);
-			const resumeTarget = completedVerifierResumeTarget(
-				after,
-				verifierTriageOwner(ctx),
-			);
-			if (resumeTarget)
-				await executeOrchestratorAction("work-resume", resumeTarget, ctx, pi);
-			return {
-				content: [
-					{
-						type: "text",
-						text: `Recorded ${result.disposition} for ${result.findingId}.`,
-					},
-				],
-				details: { ...result, resumeTarget, claimId: claim?.id },
-				...(resumeTarget ? { terminate: true } : {}),
-			};
-		},
-	});
-	registerConstrainedTool(pi, {
-		name: "work_verifier_complete_fix",
-		label: "Complete accepted verifier fix",
-		description:
-			"Commit the accepted finding paths plus an optional bounded fixPaths superset, or reconcile an exact ancestor commit, after the main agent has verified them; this never schedules background verification.",
-		parameters: {
-			type: "object",
-			properties: {
-				claimId: { type: "string" },
-				findingIds: { type: "array", minItems: 1, items: { type: "string" } },
-				fixPaths: {
-					type: "array",
-					minItems: 1,
-					maxItems: 20,
-					items: { type: "string", minLength: 1, maxLength: 500 },
-				},
-				verification: {
-					type: "array",
-					minItems: 1,
-					items: { type: "string", minLength: 1, maxLength: 1000 },
-				},
-			},
-			required: ["claimId", "findingIds", "verification"],
-			additionalProperties: false,
-		},
-		async execute(_id, params, _signal, _update, ctx) {
-			const cwd = ctx.cwd;
-			const store = loadVerifierStore(cwd);
-			const claim = store.claims[params.claimId];
-			if (!claim || claim.ownerSession !== verifierTriageOwner(ctx))
-				throw new Error("Verifier claim is not owned by this session.");
-			const group = store.groups[claim.groupId];
-			const findingIds = [...new Set(params.findingIds)].sort();
-			const findingPaths = [
-				...new Set(findingIds.map((id) => store.findings[id]?.path)),
-			];
-			if (
-				!findingPaths.length ||
-				findingPaths.includes(undefined) ||
-				findingIds.some(
-					(id) =>
-						!group.findingIds.includes(id) ||
-						store.dispositions[store.findings[id].dispositionId]?.disposition !==
-							"accepted",
-				)
-			)
-				throw new Error("Only accepted members of this claim can be completed.");
-			const requestedPaths = params.fixPaths ?? findingPaths;
-			const paths = requestedPaths.map((file) =>
-				posix.normalize(normalizedRepoPath(file)),
-			);
-			const omittedFindings = findingIds
-				.map((id) => store.findings[id])
-				.filter((finding) => !paths.includes(normalizedRepoPath(finding.path)));
-			if (
-				requestedPaths.length > 20 ||
-				new Set(paths).size !== paths.length ||
-				paths.some(
-					(file) =>
-						!file ||
-						file === "." ||
-						file === ".." ||
-						file.startsWith("../") ||
-						isAbsolute(file) ||
-						/^(?:\.pi(?:-subagents)?|\.ce-workflow)(?:\/|$)/.test(file),
-				) ||
-				omittedFindings.some(
-					(finding) => !findingPathMatchesCheckpoint(cwd, finding, paths),
-				)
-			)
-				throw new Error(
-					"fixPaths must be unique repository-relative paths; omitted accepted finding paths must remain unchanged from their verifier checkpoint.",
-				);
-			let dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
-				normalizedRepoPath(item.path),
-			);
-			if (dirty.some((file) => !paths.includes(file)))
-				throw new Error(
-					`Accepted fix dirty scope exceeds declared paths; found ${dirty.join(", ")}.`,
-				);
-			if (dirty.length) formatPendingFiles({ cwd, files: dirty });
-			dirty = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
-				normalizedRepoPath(item.path),
-			);
-			if (dirty.some((file) => !paths.includes(file)))
-				throw new Error(
-					`Accepted fix formatter dirt exceeds declared paths; found ${dirty.join(", ")}.`,
-				);
-			let commit = "";
-			if (!dirty.length)
-				commit = committedAcceptedFix(
-					cwd,
-					findingIds.map((id) => store.findings[id]),
-					paths,
-				);
-			if (!dirty.length && !commit)
-				throw new Error(
-					"Accepted fix has no exact ancestor commit after its verifier checkpoint.",
-				);
-			const ownerSession = verifierTriageOwner(ctx);
-			mutateVerifierStore(cwd, (state) =>
-				renewAcceptedFixClaim(state, {
-					claimId: params.claimId,
-					ownerSession,
-					findingIds,
-					verification: params.verification,
-				}),
-			);
-			const base = run(cwd, "git", ["rev-parse", "HEAD"]);
-			let createdCommit = false;
-			if (dirty.length)
-				try {
-					run(cwd, "git", ["add", "--", ...paths]);
-					ensureOnlyStaged(cwd, dirty);
-					run(cwd, "git", [
-						"commit",
-						"-m",
-						"fix(verifier): apply accepted findings",
-					]);
-					commit = run(cwd, "git", ["rev-parse", "HEAD"]);
-					createdCommit = true;
-				} catch (failure) {
-					run(cwd, "git", ["reset", "--mixed", base]);
-					throw failure;
-				}
-			const remaining = dirtyBlockers(cwd, gitDirty(cwd)).map((item) =>
-				normalizedRepoPath(item.path),
-			);
-			if (remaining.length) {
-				if (createdCommit && run(cwd, "git", ["rev-parse", "HEAD"]) === commit)
-					run(cwd, "git", ["reset", "--mixed", base]);
-				throw new Error(
-					`Verifier fix commit left dirty paths: ${remaining.join(", ")}.`,
-				);
-			}
-			let result;
-			try {
-				result = mutateVerifierStore(cwd, (state) =>
-					completeAcceptedFix(state, {
-						claimId: params.claimId,
-						ownerSession,
-						findingIds,
-						commit,
-						verification: params.verification,
-					}),
-				);
-			} catch (failure) {
-				let persisted;
-				try {
-					persisted = Object.values(loadVerifierStore(cwd).fixes).find(
-						(fix) =>
-							fix.claimId === params.claimId &&
-							fix.commit === commit &&
-							fix.findingIds.join("\0") === findingIds.join("\0"),
-					);
-				} catch {
-					// Store unavailable or shape changed; a fresh fix record is fine.
-				}
-				if (persisted) result = persisted;
-				else {
-					if (!createdCommit) throw failure;
-					if (run(cwd, "git", ["rev-parse", "HEAD"]) !== commit)
-						throw new Error(
-							`Verifier store completion failed after commit ${commit}, and HEAD moved before rollback.`,
-							{ cause: failure },
-						);
-					try {
-						run(cwd, "git", ["reset", "--mixed", base]);
-					} catch (rollbackFailure) {
-						throw new AggregateError(
-							[failure, rollbackFailure],
-							`Verifier store completion failed after commit ${commit}, and commit rollback also failed.`,
-						);
-					}
-					throw failure;
-				}
-			}
-			const resumeTarget = completedVerifierResumeTarget(
-				loadVerifierStore(cwd),
-				verifierTriageOwner(ctx),
-			);
-			if (resumeTarget)
-				await executeOrchestratorAction("work-resume", resumeTarget, ctx, pi);
-			return {
-				content: [{ type: "text", text: `Verifier fix committed ${commit}.` }],
-				details: { ...result, commit, origin: "verifier-fix" },
-				terminate: true,
-			};
-		},
-	});
-	registerConstrainedTool(pi, {
-		name: "work_verifier_reopen",
-		label: "Reopen verifier finding group",
-		description:
-			"Explicitly reopen one fully triaged verifier group for one later presentation.",
-		parameters: {
-			type: "object",
-			properties: { groupId: { type: "string" } },
-			required: ["groupId"],
-			additionalProperties: false,
-		},
-		async execute(_id, params, _signal, _update, ctx) {
-			const group = mutateVerifierStore(ctx.cwd, (store) =>
-				reopenGroup(store, { groupId: params.groupId }),
-			);
-			return {
-				content: [{ type: "text", text: `Reopened verifier group ${group.id}.` }],
-				details: group,
-			};
-		},
-	});
-}
+
+
 function createPiSubagentsVerifierAdapter(pi) {
 	return {
 		// The only verifier tools are project-owned, marker-checked executors.
@@ -12324,14 +11521,7 @@ export function scheduleCommittedRunVerifiers(cwd, pi, input = {}) {
 	});
 }
 
-function finishHelperRequest(toolName, args) {
-	if (toolName && toolName !== "bash") return undefined;
-	const command = typeof args === "string" ? args : args?.command;
-	const match = String(command ?? "").match(
-		/\bwork-helper\.mjs["']?\s+finish-(?:task|small)\s+([A-Za-z0-9_.-]+)/,
-	);
-	return match ? { workItemId: match[1] } : undefined;
-}
+
 
 function finishHelperSucceeded(event, workItemId) {
 	if (event.isError) return false;
@@ -12345,36 +11535,7 @@ function finishHelperSucceeded(event, workItemId) {
 	);
 }
 
-function scheduleFinishedHelperVerifiers(cwd, pi, ctx, started, event) {
-	if (!started || !finishHelperSucceeded(event, started.workItemId)) return;
-	const after = run(cwd, "git", ["rev-parse", "HEAD"]);
-	const verifier = scheduleCommittedRunVerifiers(cwd, pi, {
-		before: started.before,
-		after,
-		origin: "normal",
-		currentModel: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
-	});
-	if (!verifier) return;
-	if (verifier.batch?.id)
-		recordWorkTelemetry(cwd, {
-			id: `verifier-scope-${verifier.batch.id}`,
-			type: "verifier-scope",
-			workItemId: started.workItemId,
-			payoff: { backgroundVerifier: { batchId: verifier.batch.id } },
-		});
-	if (verifier.status === "queued") {
-		const models = (verifier.batch?.profiles ?? [])
-			.map((profile) => workStatsDisplayModel(profile.model))
-			.join(", ");
-		ctx.ui?.notify?.(`Background verification queued: ${models}`, "info");
-		void verifier.launch?.catch(() => {});
-	} else if (verifier.status === "not-scheduled") {
-		ctx.ui?.notify?.(
-			`Background verification was not scheduled: ${verifier.reason}`,
-			"warning",
-		);
-	}
-}
+
 
 async function chooseAnalyzeValues(ctx, title, values, selected, options = {}) {
 	const result = await showListDialog(ctx, {
@@ -12909,16 +12070,7 @@ export function materializeVerifierAnalysis(
 	};
 }
 
-function recoverLatestVerifierAnalysis(cwd) {
-	try {
-		const groups = analysisReviewProjection(loadVerifierStore(cwd));
-		return groups.length
-			? { recognized: true, count: groups.length, groups }
-			: null;
-	} catch {
-		return null;
-	}
-}
+
 
 function verifierPresentationPrompt(store, batchId) {
 	const batch = store.batches[batchId];
@@ -21084,86 +20236,7 @@ function initiativeConversionPrompt(cwd, epic) {
 	].join("\n");
 }
 
-function initiativeProposalFromTool(cwd, params) {
-	const targetId = String(params.targetId ?? "").trim();
-	const target = readWorkItem(cwd, targetId);
-	if (!target || target.type !== "epic" || target.initiative)
-		throw new InitiativeError(
-			"invalid_proposal",
-			"The selected target must still be a standalone roadmap.",
-		);
-	const sourceContents = new Map();
-	const sources = asArray(params.sources).map((source) => {
-		const sourcePath = repoRelativePath(cwd, source?.path);
-		let content;
-		try {
-			content = sourcePath && readFileSync(join(cwd, sourcePath), "utf8");
-		} catch {
-			content = undefined;
-		}
-		if (content === undefined)
-			throw new InitiativeError(
-				"invalid_proposal",
-				`Initiative source is missing: ${source?.path ?? ""}`,
-			);
-		const id = String(source.id ?? "").trim();
-		sourceContents.set(id, content);
-		return {
-			id,
-			path: sourcePath,
-			hash: createHash("sha256").update(content).digest("hex"),
-		};
-	});
-	return normalizeInitiativeProposal({
-		schemaVersion: 1,
-		mode: "convert",
-		targetId,
-		initiative: {
-			id: targetId,
-			title: String(params.title ?? target.title).trim(),
-			...(params.description === undefined
-				? {}
-				: { description: String(params.description) }),
-		},
-		sources,
-		groups: asArray(params.groups).map((group) => ({
-			id: String(group?.id ?? "").trim(),
-			title: String(group?.title ?? "").trim(),
-			...(group?.description === undefined
-				? {}
-				: { description: String(group.description) }),
-			...(String(group?.roadmapId ?? "").trim()
-				? { epicId: String(group.roadmapId).trim() }
-				: {}),
-			...(group?.selected === true ? { selected: true } : {}),
-		})),
-		outcomes: asArray(params.outcomes).map((outcome) => {
-			const content = String(outcome?.content ?? "");
-			const sourceId = String(outcome?.sourceId ?? "").trim();
-			const provenance = String(outcome?.provenance ?? "").trim();
-			if (
-				!content.trim() ||
-				!sourceContents.get(sourceId)?.includes(content) ||
-				!provenance.startsWith(`${sourceId}:`)
-			)
-				throw new InitiativeError(
-					"invalid_proposal",
-					`Initiative outcome is not exact text from source ${sourceId || "<missing>"}.`,
-				);
-			return {
-				...(String(outcome?.id ?? "").trim()
-					? { id: String(outcome.id).trim() }
-					: {}),
-				provenance,
-				contentHash: initiativeHash(content),
-				disposition: outcome?.disposition,
-				...(String(outcome?.groupId ?? "").trim()
-					? { groupId: String(outcome.groupId).trim() }
-					: {}),
-			};
-		}),
-	});
-}
+
 
 function currentRoadmap(cwd) {
 	const id = readWorkState(cwd).lastEpicId;
@@ -22697,52 +21770,7 @@ const IMPROVEMENT_READ_ONLY_TOOLS = new Set([
 	"work_verifier_read",
 ]);
 
-function improvementMutationBlockReason(event, cwd, goal = activeWorkGoal) {
-	if (goal?.mode !== "improvement") return;
-	const tool = String(event?.toolName ?? "");
-	const shell = ["bash", "hypa_shell"].includes(tool);
-	const mutating = shell
-		? !improvementSafetyShellAllowed(event?.input?.command)
-		: !IMPROVEMENT_READ_ONLY_TOOLS.has(tool);
-	if (!mutating) return;
-	if (goal.status !== "active")
-		return `Improvement safety blocks ${tool}: the workflow is ${goal.status}. Run /work-goal resume before any source mutation.`;
-	const ids = workImproveSnapshotIds(goal);
-	if (!ids?.length)
-		return `Improvement safety preflight blocks ${tool}: work-improvement snapshot IDs are missing.`;
-	const safetyNote = shell
-		? improvementSafetyNoteCommand(event?.input?.command)
-		: undefined;
-	if (safetyNote && ids.includes(safetyNote.id)) {
-		if (safetyNote.disposition !== "APPROVED") return;
-		try {
-			if (
-				improvementApprovalMatches(
-					goal,
-					readWorkItem(cwd, safetyNote.id),
-					safetyNote.id,
-				)
-				)
-					return;
-			} catch {
-				// Optional safety note read; approval stays unrecorded.
-			}
-	}
-	const pending = ids.filter((id) => {
-		try {
-			const issue = readWorkItem(cwd, id);
-			const disposition = improvementSafetyDisposition(issue);
-			return (
-				disposition !== "SAFE" &&
-				!(disposition === "APPROVED" && improvementApprovalMatches(goal, issue, id))
-			);
-		} catch {
-			return true;
-		}
-	});
-	if (!pending.length) return;
-	return `Improvement safety preflight blocks ${tool}: ${pending.join(", ")} need a final wo:improvement-safety SAFE or APPROVED note. Analyze necessity, blast radius, rollback, and destructive risk first; ask the user before replacing BLOCKED with APPROVED.`;
-}
+
 
 function buildWorkImproveObjective(state) {
 	const helper = shellQuote(WORK_HELPER_SCRIPT);
@@ -23101,39 +22129,8 @@ function catchUpCompletionBlocker(goal, cwd = activeWorkGoalCwd) {
 }
 
 async function handleWorkCatchUpCommand(args, pi, ctx) {
-	if (!workflowEnabled(ctx.cwd)) return startPlan3CatchUp(args, pi, ctx);
-	const state = buildWorkCatchUpState(ctx.cwd);
-	notify(ctx, renderWorkCatchUpText(state), state.ok ? "info" : "warning");
-	if (!state.ok) return;
-	const stableUpdate = state.packages.find(
-		(pkg) =>
-			pkg.source === "official-github-stable-release" && pkg.status === "update",
-	);
-	if (stableUpdate) {
-		const descriptor = readWorkflowJson(
-			resolve(WORKFLOW_REPO_DIR, "extensions", "work-compound-source-policy.json"),
-			"work compound source policy",
-		);
-		const promotion = await promoteVerifiedPrivateWorkflowRelease({
-			repositoryRoot: WORKFLOW_REPO_DIR,
-			descriptor,
-			resolution: stableUpdate.resolution,
-		});
-		notify(
-			ctx,
-			promotion.status === "promoted"
-				? `Private workflow release promoted pending restart: ${promotion.release}; audit=${promotion.auditPath}; pending=${promotion.pendingGenerationPath}; retained prior=${promotion.retainedGenerationPath}`
-				: `Private workflow release ${promotion.status}: ${promotion.reason ?? "promotion stopped"}`,
-			promotion.status === "promoted" ? "info" : "warning",
-		);
-	}
-	if (!state.packages.some((pkg) => pkg.needsReview)) return;
-	await handleWorkGoalCommand(
-		buildWorkCatchUpObjective(state, args),
-		"self-improving",
-		pi,
-		ctx,
-	);
+	return startPlan3CatchUp(args, pi, ctx);
+
 }
 
 // Workflow off: review only the packages ce-workflow still uses, as a Plan3 plan in this repository.
@@ -23354,22 +22351,7 @@ function loadWorkGoalFromSession(ctx) {
 	return goal?.status === "complete" ? null : goal;
 }
 
-function managedWorkSubagentSessionName(pi, ctx) {
-	// Harness-set identity: pi-subagents child sessions are named
-	// subagent-work-<agent>-<uuid>-<n>; session_info.name is not reliably
-	// exposed via getBranch()/getEntries() at before_agent_start, so use the
-	// official pi.getSessionName()/sessionManager.getSessionName() accessors.
-	const name = String(
-		(pi?.getSessionName?.call(pi) ??
-			ctx?.sessionManager?.getSessionName?.call(ctx.sessionManager)) ??
-			"",
-	);
-	return /^subagent-(work-.*?)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-\d+$/i.test(
-		name,
-	)
-		? name
-		: null;
-}
+
 
 function persistWorkGoal(pi, goal = activeWorkGoal, cwd = activeWorkGoalCwd) {
 	pi?.appendEntry?.(WORK_GOAL_STATE_ENTRY_TYPE, { goal: goal ?? null });
@@ -23791,11 +22773,7 @@ function updateWorkGoalProgress(ctx) {
 	}
 }
 
-function startWorkGoalProgressTimer(ctx) {
-	if (workGoalProgressTimer) return;
-	workGoalProgressTimer = setInterval(() => updateWorkGoalProgress(ctx), 15_000);
-	workGoalProgressTimer.unref?.();
-}
+
 
 function stopWorkGoalProgressTimer(ctx) {
 	if (workGoalProgressTimer) clearInterval(workGoalProgressTimer);
@@ -24085,25 +23063,9 @@ function extractWorkGoalContinuationMarker(prompt) {
 	return pattern.exec(String(prompt ?? ""))?.[1];
 }
 
-function markWorkGoalContinuationDelivered(prompt) {
-	const marker = extractWorkGoalContinuationMarker(prompt);
-	if (marker && workGoalContinuationPending?.marker === marker)
-		workGoalContinuationPending = null;
-}
 
-function restorePersistedWorkGoalForContinuation(ctx, pi, marker) {
-	if (activeWorkGoal || !marker) return activeWorkGoal;
-	const persisted = loadWorkGoalFromSession(ctx);
-	if (
-		!["active", "paused"].includes(persisted?.status) ||
-		marker.split(":", 1)[0] !== persisted.id
-	)
-		return null;
-	activeWorkGoal = persisted;
-	activeWorkGoalCwd = ctx.cwd;
-	syncWorkGoalTools(pi, persisted);
-	return persisted;
-}
+
+
 
 function buildWorkGoalContinuePrompt(goal, marker, note = "") {
 	return `Continue the active autonomous goal until it is complete. ${note}\n\n<work_goal_objective>\n${escapeXmlText(goal.objective)}\n</work_goal_objective>\n\nAutomatic continuation #${goal.iteration}. If the human answer asked you to perform an action, do that action first before unrelated work. Do not ask the same question again unless the answer is impossible to act on. Use ask_user for real human-decision blockers; use work_goal_human_decision only if ask_user is unavailable or cancelled. Otherwise choose the clear winner and continue.\n\n${workGoalMarkerComment(marker)}`;
@@ -24425,167 +23387,15 @@ function askUserPauseSelection(event) {
 	) ?? "";
 }
 
-function recordWorkGoalAskUserCall(event, pi) {
-	if (event.toolName !== "ask_user" || activeWorkGoal?.status !== "active")
-		return;
-	activeWorkGoal = {
-		...activeWorkGoal,
-		askUserFallbackPending: {
-			toolCallId: String(event.toolCallId ?? ""),
-			askedAt: Date.now(),
-		},
-		updatedAt: Date.now(),
-	};
-	persistWorkGoal(pi);
-}
 
-function recordWorkGoalAskUserResult(event, pi) {
-	if (event.toolName !== "ask_user" || !activeWorkGoal?.askUserFallbackPending)
-		return;
-	const pending = activeWorkGoal.askUserFallbackPending;
-	if (
-		pending.toolCallId &&
-		event.toolCallId &&
-		String(event.toolCallId) !== pending.toolCallId
-	)
-		return;
-	const responses = askUserResponses(event);
-	const unavailable = event.details?.kind === "batch"
-		? responses.length !== event.details.questions?.length || !responses.length
-		: !responses.length;
-	activeWorkGoal = {
-		...activeWorkGoal,
-		askUserFallbackPending: unavailable
-			? { ...pending, unavailable: true }
-			: undefined,
-		updatedAt: Date.now(),
-	};
-	persistWorkGoal(pi);
-}
 
-function recordImprovementApprovalAskCall(event, cwd) {
-	if (
-		event.toolName !== "ask_user" ||
-		activeWorkGoal?.mode !== "improvement" ||
-		activeWorkGoal.status !== "active"
-	)
-		return;
-	const input = event?.input ?? event?.params ?? {};
-	const toolCallId = String(event?.toolCallId ?? "");
-	const options = Array.isArray(input.options) ? input.options : [];
-	const marker = `${input.question ?? ""}\n${input.context ?? ""}`.match(
-		/^Improvement safety approval IDs:\s*(.+)$/m,
-	)?.[1];
-	const ids = marker
-		?.split(",")
-		.map((id) => id.trim())
-		.filter(Boolean);
-	const snapshot = new Set(workImproveSnapshotIds(activeWorkGoal) ?? []);
-	if (
-		!toolCallId ||
-		input.allowMultiple !== false ||
-		input.allowFreeform !== false ||
-		!options.some((option) => /^\s*approve\b/i.test(String(option?.title))) ||
-		!ids?.length ||
-		new Set(ids).size !== ids.length ||
-		!ids.every((id) => snapshot.has(id))
-	)
-		return;
-	const fingerprints = {};
-	for (const id of ids) {
-		try {
-			const issue = readWorkItem(cwd, id);
-			if (improvementSafetyDisposition(issue) !== "BLOCKED") return;
-			fingerprints[id] = improvementSafetyFingerprint(issue);
-			if (!fingerprints[id]) return;
-		} catch {
-			return;
-		}
-	}
-	pendingImprovementApprovals.set(toolCallId, {
-		goalId: activeWorkGoal.id,
-		cwd: resolve(cwd),
-		ids,
-		fingerprints,
-		question: String(input.question ?? "").trim(),
-	});
-}
 
-function recordImprovementApprovalFromAskUser(event, ctx, pi) {
-	if (event.toolName !== "ask_user") return;
-	const toolCallId = String(event?.toolCallId ?? "");
-	const request = pendingImprovementApprovals.get(toolCallId);
-	pendingImprovementApprovals.delete(toolCallId);
-	if (
-		!request ||
-		event.isError ||
-		event.details?.cancelled ||
-		activeWorkGoal?.id !== request.goalId ||
-		activeWorkGoal.status !== "active" ||
-		resolve(ctx.cwd) !== request.cwd
-	)
-		return;
-	const selection = event.details?.response?.selections?.find((value) =>
-		/^\s*approve\b/i.test(String(value)),
-	);
-	if (!selection) return;
-	for (const id of request.ids) {
-		try {
-			const issue = readWorkItem(ctx.cwd, id);
-			if (
-				improvementSafetyDisposition(issue) !== "BLOCKED" ||
-				improvementSafetyFingerprint(issue) !== request.fingerprints[id]
-			)
-				return;
-		} catch {
-			return;
-		}
-	}
-	activeWorkGoal = {
-		...activeWorkGoal,
-		improvementApprovalAt: Date.now(),
-		improvementApprovedIds: Array.from(
-			new Set([...(activeWorkGoal.improvementApprovedIds ?? []), ...request.ids]),
-		),
-		improvementApprovalFingerprints: {
-			...(activeWorkGoal.improvementApprovalFingerprints ?? {}),
-			...request.fingerprints,
-		},
-		improvementApproval: {
-			question: request.question,
-			answer: String(selection),
-			ids: request.ids,
-		},
-		updatedAt: Date.now(),
-	};
-	persistWorkGoal(pi);
-	updateWorkGoalStatus(ctx);
-}
 
-function pauseWorkGoalFromAskUser(event, ctx, pi) {
-	const selection = askUserPauseSelection(event);
-	if (!selection || activeWorkGoal?.status !== "active") return;
-	restoreWorkGoalThinking(pi, activeWorkGoal);
-	workGoalContinuationPending = null;
-	clearWorkGoalRecovery();
-	clearWorkGoalUsageLimitTimer();
-	activeWorkGoal = {
-		...activeWorkGoal,
-		status: "paused",
-		decision: {
-			question: String(event.details?.question ?? event.details?.questions?.[
-				event.details.answers?.findIndex((answer) => answer?.response?.selections?.includes(selection))
-			]?.question ?? "").trim(),
-			answer: String(selection),
-			source: "ask_user",
-		},
-		askUserFallbackPending: undefined,
-		updatedAt: Date.now(),
-	};
-	persistWorkGoal(pi);
-	updateWorkGoalStatus(ctx);
-	ctx.ui.notify(`autonomous goal paused: ${selection}`, "info");
-}
+
+
+
+
+
 
 function workGoalTargetId(goal) {
 	const objective = String(goal?.objective ?? "");
@@ -25230,54 +24040,13 @@ function compactPausedOrchestrator(job, ctx, pi) {
 	return true;
 }
 
-async function requestOrchestratorPause(ctx, pi, compact = false) {
-	if (orchestratorPauseRequest) {
-		ctx.ui.notify("A graceful pause is already queued.", "info");
-		return;
-	}
-	const job = currentOrchestratorJob(ctx);
-	if (ctx.isIdle?.() === false) {
-		orchestratorPauseRequest = { job, compact, boundaryReached: false };
-		ctx.ui.notify(
-			compact
-				? "Compaction queued after the current LLM cycle finishes"
-				: "Graceful pause queued after the current LLM cycle finishes",
-			"info",
-		);
-		return;
-	}
-	await completeOrchestratorPause(job, ctx, pi);
-	if (compact) compactPausedOrchestrator(job, ctx, pi);
-	else ctx.ui.notify("Job paused. Run /wo resume to continue.", "info");
-}
 
-async function reachOrchestratorPauseBoundary(ctx, pi) {
-	const request = orchestratorPauseRequest;
-	if (!request || request.boundaryReached) return false;
-	request.boundaryReached = true;
-	await completeOrchestratorPause(request.job, ctx, pi);
-	hideGracefulPauseAbort = request.job.kind !== "idle";
-	// Stop before another LLM cycle starts, after this cycle and its tools finish.
-	if (request.job.kind !== "idle") ctx.abort?.();
-	return true;
-}
 
-async function settleOrchestratorPause(ctx, pi) {
-	const request = orchestratorPauseRequest;
-	if (!request?.boundaryReached) return false;
-	orchestratorPauseRequest = null;
-	hideGracefulPauseAbort = false;
-	if (request.compact) return compactPausedOrchestrator(request.job, ctx, pi);
-	ctx.ui.notify("Job paused. Run /wo resume to continue.", "info");
-	return true;
-}
 
-function resetOrchestratorPauseState() {
-	orchestratorPauseRequest = null;
-	orchestratorPausedJob = null;
-	orchestratorCompactState = null;
-	hideGracefulPauseAbort = false;
-}
+
+
+
+
 
 async function handleWorkResumeStopCommand(args, pi, ctx) {
 	const reason = String(args ?? "").trim() || "user requested stop";
@@ -26209,19 +24978,19 @@ async function handleWorkMenuCommand(ctx, pi) {
 				]
 			: []),
 	];
-	const workflowOn = workflowEnabled(ctx.cwd);
+
 	const maintenanceHere = sameCheckout(ctx.cwd, WORKFLOW_REPO_DIR);
-	const menuItems = items.filter((item) => (workflowOn || UTILITY_MENU_VALUES.has(item.value)) &&
+	const menuItems = items.filter((item) => UTILITY_MENU_VALUES.has(item.value) &&
 		(maintenanceHere || !["work-context", "work-catch-up"].includes(item.value)));
 	const roadmapRuntime = { showAllRoadmaps: false };
 	let selectedIndex = 0;
 	for (;;) {
 		const selected = await showListDialog(ctx, {
-			title: `${workflowOn ? "Orchestrator" : "Utilities"} — ${LOADED_WORKFLOW_BUILD_LABEL}`,
-			purpose: workflowOn ? "Choose any workflow action. Type to filter." : "Settings and utilities; the legacy workflow is off (Settings → Workflow).",
+			title: `${"Utilities"} — ${LOADED_WORKFLOW_BUILD_LABEL}`,
+			purpose: "Settings and utilities; the legacy workflow is off (Settings → Workflow).",
 			subtitle: `Loaded from: ${WORKFLOW_REPO_DIR}`,
 			items: menuItems,
-			currentValue: workflowOn ? "work-roadmap" : "work-settings",
+			currentValue: "work-settings",
 			selectedIndex,
 			cursorKey: "orchestrator-menu",
 			descriptionMinLines: 3,
@@ -26273,284 +25042,13 @@ async function handleWorkMenuCommand(ctx, pi) {
 	}
 }
 
-async function handleWorkGoalResetCommand(args, ctx, pi) {
-	const [goalId, marker] = String(args ?? "")
-		.trim()
-		.split(/\s+/, 2);
-	const goal = activeWorkGoal;
-	if (!goal || goal.status !== "active" || goal.id !== goalId) return;
-	const cwd = activeWorkGoalCwd ?? ctx.cwd;
-	const fallback = async (reason) => {
-		recordWorkTelemetry(cwd, {
-			type: "goal-continuation-reset",
-			goalId: goal.id,
-			path: "microcompact-fallback",
-			reason,
-		});
-		ctx.ui.notify(
-			`Fresh-session continuation unavailable (${reason}); microcompacting instead.`,
-			"warning",
-		);
-		return microCompactThenSendWorkGoalPrompt(
-			pi,
-			ctx,
-			goal,
-			buildClaimedWorkGoalContinuePrompt(
-				goal,
-				marker || workGoalContinuationMarker(goal),
-				"Fresh-session reset was unavailable; continued after a work-context microcompact.",
-				ctx,
-				cwd,
-			),
-		);
-	};
-	if (typeof ctx.newSession !== "function") return fallback("API unavailable");
-	if (activeWorkGoal?.id !== goal.id || activeWorkGoal.status !== "active")
-		return;
-	const parentSession = ctx.sessionManager?.getSessionFile?.();
-	try {
-		const result = await ctx.newSession({
-			parentSession,
-			setup: (sessionManager) => {
-				if (activeWorkGoal?.id === goal.id && activeWorkGoal.status === "active")
-					sessionManager.appendCustomEntry(WORK_GOAL_STATE_ENTRY_TYPE, {
-						goal: { ...goal, resumeOnSessionStart: true },
-					});
-			},
-			withSession: async (nextCtx) => {
-				if (activeWorkGoal?.id !== goal.id || activeWorkGoal.status !== "active")
-					return;
-				await nextCtx.sendUserMessage(
-					buildClaimedWorkGoalContinuePrompt(
-						goal,
-						marker || workGoalContinuationMarker(goal),
-						"Started in a fresh session; resume from native work-item store/git and avoid relying on prior chat.",
-						nextCtx,
-						cwd,
-					),
-				);
-			},
-		});
-		if (result?.cancelled) return fallback("reset cancelled");
-		recordWorkTelemetry(cwd, {
-			type: "goal-continuation-reset",
-			goalId: goal.id,
-			path: "new-session",
-		});
-		return true;
-	} catch (error) {
-		return fallback(`reset failed: ${formatError(error)}`);
-	}
-}
 
-function buildWorkGoalPausedPrompt(goal) {
-	return `Paused autonomous goal waiting for a human decision:
-<work_goal_objective>
-${escapeXmlText(goal.objective)}
-</work_goal_objective>
 
-Pending decision:
-${formatWorkGoalDecision(goal.decision)}
 
-Answer the user's clarification only. Ordinary chat never resumes this goal; use \`/wo resume <answer>\`.`;
-}
 
-async function flushWorkGoalContinuationRetry(ctx, pi) {
-	if (!activeWorkGoal || activeWorkGoal.status !== "active") return;
-	if (workGoalContinuationRetry?.goalId !== activeWorkGoal.id) return;
-	if (workGoalHasPendingMessages(ctx)) return;
-	const retry = workGoalContinuationRetry;
-	const sent = await sendWorkGoalContinuation(
-		pi,
-		ctx,
-		activeWorkGoal,
-		retry.note,
-	);
-	if (sent) workGoalContinuationRetry = null;
-}
 
-async function handleWorkGoalAgentEnd(event, ctx, pi) {
-	if (!activeWorkGoal || !["active", "stopping"].includes(activeWorkGoal.status))
-		return;
-	const goal = activeWorkGoal;
-	const assistant = finalAssistantMessage(event.messages);
-	const text = assistantVisibleText(assistant);
-	if (goal.status === "stopping") {
-		restoreWorkGoalThinking(pi, goal);
-		activeWorkGoal = { ...goal, status: "stopped", updatedAt: Date.now() };
-		persistWorkGoal(pi);
-		updateWorkGoalStatus(ctx);
-		ctx.ui.notify("Resume stopped. Run /wo resume to continue.", "info");
-		finishWarpWork(ctx, workWarpMode(goal.mode, goal), "stopped");
-		return;
-	}
-	const completion = parseWorkGoalCompletion(text);
-	if (completion) {
-		const result = completeActiveWorkGoal(completion, ctx, pi);
-		if (result?.completed) return;
-		// Rejected completion (empty/contradictory): keep working.
-	}
-	const decision = parseWorkGoalDecision(text);
-	if (decision || likelyHumanDecisionQuestion(text)) {
-		pauseWorkGoalForDecision(
-			decision ?? { question: truncate(text, 2_000), source: "question" },
-			ctx,
-			pi,
-		);
-		return;
-	}
-	let retrying = false;
-	let compactionInterrupted = false;
-	if (["aborted", "error"].includes(String(assistant?.stopReason ?? ""))) {
-		if (isWorkGoalUsageLimit(assistant)) {
-			restoreWorkGoalThinking(pi, goal);
-			const nextRetryAt = Date.now() + workGoalUsageLimitRetryDelayMs();
-			activeWorkGoal = {
-				...goal,
-				status: "waiting_usage_limit",
-				nextRetryAt,
-				updatedAt: Date.now(),
-			};
-			workGoalContinuationPending = null;
-			clearWorkGoalRecovery();
-			persistWorkGoal(pi);
-			updateWorkGoalStatus(ctx);
-			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
-			ctx.ui.notify(
-				`autonomous goal hit a usage/rate limit; retrying in ${formatDuration(nextRetryAt - Date.now())}.`,
-				"warning",
-			);
-			return;
-		}
-		compactionInterrupted = Boolean(
-			manualMicrocompactGoalResume?.goalId === goal.id,
-		);
-		if (compactionInterrupted || isRetryableWorkGoalInterruption(assistant)) {
-			const nextRetries = (goal.retries ?? 0) + (compactionInterrupted ? 0 : 1);
-			if (!compactionInterrupted && nextRetries > WORK_GOAL_MAX_RETRIES) {
-				restoreWorkGoalThinking(pi, goal);
-				activeWorkGoal = {
-					...goal,
-					status: "paused",
-					retries: 0,
-					updatedAt: Date.now(),
-				};
-				clearWorkGoalRecovery();
-				persistWorkGoal(pi);
-				updateWorkGoalStatus(ctx);
-				ctx.ui.notify(
-					"autonomous goal paused after repeated transient errors. Run /wo resume to retry.",
-					"warning",
-				);
-				return;
-			}
-			retrying = true;
-			workGoalRecovery = {
-				goalId: goal.id,
-				kind: isWorkGoalContextOverflow(assistant)
-					? "compaction_retry"
-					: "provider_retry",
-			};
-			ctx.ui.notify(
-				compactionInterrupted
-					? "Compaction interrupted the active goal turn; continuing after compaction."
-					: `autonomous goal hit a transient error (retry ${nextRetries}/${WORK_GOAL_MAX_RETRIES}); continuing.`,
-				"info",
-			);
-		} else {
-			restoreWorkGoalThinking(pi, goal);
-			activeWorkGoal = { ...goal, status: "paused", updatedAt: Date.now() };
-			clearWorkGoalRecovery();
-			persistWorkGoal(pi);
-			updateWorkGoalStatus(ctx);
-			ctx.ui.notify(
-				"autonomous goal paused after interruption. Run /wo resume to continue.",
-				"warning",
-			);
-			return;
-		}
-	} else {
-		clearWorkGoalRecovery();
-	}
-	const improvementProgress = retrying
-		? undefined
-		: workImproveProgressFingerprint(goal, ctx.cwd);
-	const improvementStalledTurns = improvementProgress
-		? improvementProgress === goal.improvementProgress
-			? (goal.improvementStalledTurns ?? 0) + 1
-			: 0
-		: undefined;
-	if (improvementStalledTurns >= WORK_IMPROVE_MAX_STALLED_TURNS) {
-		activeWorkGoal = {
-			...goal,
-			improvementProgress,
-			improvementStalledTurns,
-		};
-		pauseActiveWorkGoal(
-			`no durable improvement progress across ${WORK_IMPROVE_MAX_STALLED_TURNS} continuations`,
-			pi,
-			ctx,
-		);
-		return;
-	}
-	activeWorkGoal = {
-		...goal,
-		iteration: (goal.iteration ?? 0) + 1,
-		retries: retrying ? (goal.retries ?? 0) + (compactionInterrupted ? 0 : 1) : 0,
-		...(improvementProgress
-			? { improvementProgress, improvementStalledTurns }
-			: {}),
-		updatedAt: Date.now(),
-	};
-	updateWorkGoalUsage(activeWorkGoal, ctx);
-	persistWorkGoal(pi);
-	updateWorkGoalStatus(ctx);
-	if (
-		isCatchUpGoal(activeWorkGoal) &&
-		(activeWorkGoal.iteration ?? 0) -
-			(activeWorkGoal.continuationWindowStart ?? 0) >=
-			WORK_CATCH_UP_MAX_CONTINUATIONS
-	) {
-		pauseActiveWorkGoal(
-			`catch-up reached ${WORK_CATCH_UP_MAX_CONTINUATIONS} automatic continuations; review progress before explicitly resuming`,
-			pi,
-			ctx,
-		);
-		return;
-	}
-	if (
-		activeWorkGoal.tokenBudget !== undefined &&
-		activeWorkGoal.tokensUsed >= activeWorkGoal.tokenBudget
-	) {
-		restoreWorkGoalThinking(pi, activeWorkGoal);
-		workGoalContinuationPending = null;
-		activeWorkGoal = {
-			...activeWorkGoal,
-			status: "budget_limited",
-			updatedAt: Date.now(),
-		};
-		persistWorkGoal(pi);
-		updateWorkGoalStatus(ctx);
-		ctx.ui.notify(
-			`autonomous goal token budget reached: ${formatWorkGoalBudget(activeWorkGoal)}. Run /wo resume to continue over budget or use Autonomous goal → edit --tokens <N> <objective> to raise it.`,
-			"warning",
-		);
-		return;
-	}
 
-	const note = retrying
-		? "The previous turn ended with a transient error. Resume from where you left off; re-check files, tests, and command output."
-		: /\?\s*$/.test(String(text).trim())
-			? "Your last response ended with a non-blocking question; answer it yourself by choosing the clear winner."
-			: "";
-	if (workGoalHasPendingMessages(ctx)) {
-		workGoalContinuationRetry = { goalId: activeWorkGoal.id, note };
-		return;
-	}
-	if (retrying)
-		await sendWorkGoalAnswerContinuation(pi, ctx, activeWorkGoal, note);
-	else await sendWorkGoalContinuation(pi, ctx, activeWorkGoal, note);
-}
+
 
 function formatError(error) {
 	return error instanceof Error ? error.message : String(error);
@@ -26660,79 +25158,7 @@ function pauseActiveWorkGoal(reason, pi, ctx, level = "warning") {
 	notify(ctx, `Autonomous orchestrator paused: ${reason}`, level);
 }
 
-function enforceProjectGoalCircuitBreakers(event, ctx, pi) {
-	if (
-		!activeWorkGoalRunning ||
-		activeWorkGoal?.mode !== "project" ||
-		activeWorkGoal.status !== "active"
-	)
-		return false;
-	updateWorkGoalUsage(activeWorkGoal, ctx);
-	const cwd = activeWorkGoalCwd ?? ctx.cwd;
-	activeWorkGoal = advanceProjectGoalToolBudget(
-		activeWorkGoal,
-		projectGoalProgressFingerprint(cwd),
-		event.isError,
-	);
-	if (
-		activeWorkGoal.tokenBudget !== undefined &&
-		activeWorkGoal.tokensUsed >= activeWorkGoal.tokenBudget
-	) {
-		restoreWorkGoalThinking(pi, activeWorkGoal);
-		activeWorkGoal = {
-			...activeWorkGoal,
-			status: "budget_limited",
-			stopReason: `project token budget reached (${formatWorkGoalBudget(activeWorkGoal)})`,
-			updatedAt: Date.now(),
-		};
-		persistWorkGoal(pi);
-		updateWorkGoalStatus(ctx);
-		notify(ctx, `Autonomous orchestrator paused: ${activeWorkGoal.stopReason}`, "warning");
-		ctx.abort?.();
-		return true;
-	}
-	if (
-		activeWorkGoal.noProgressToolFailures >=
-		WORK_PROJECT_MAX_NO_PROGRESS_TOOL_FAILURES
-	) {
-		pauseActiveWorkGoal(
-			`${WORK_PROJECT_MAX_NO_PROGRESS_TOOL_FAILURES} tool failures without product or work-item progress`,
-			pi,
-			ctx,
-		);
-		ctx.abort?.();
-		return true;
-	}
-	if (
-		activeWorkGoal.noProgressToolCalls >=
-			WORK_PROJECT_NO_PROGRESS_NUDGE_CALLS &&
-		!activeWorkGoal.noProgressNudged
-	) {
-		activeWorkGoal = { ...activeWorkGoal, noProgressNudged: true };
-		persistWorkGoal(pi);
-		if (typeof pi?.sendUserMessage === "function")
-			Promise.resolve(
-				pi.sendUserMessage(workProjectNoProgressNudge(), {
-					deliverAs: "steer",
-				}),
-			).catch(() => {
-				// A refused steer must not abort an otherwise healthy goal.
-			});
-		return false;
-	}
-	if (
-		activeWorkGoal.noProgressToolCalls >= WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS
-	) {
-		pauseActiveWorkGoal(
-			`${WORK_PROJECT_MAX_NO_PROGRESS_TOOL_CALLS} tool calls without product or work-item progress`,
-			pi,
-			ctx,
-		);
-		ctx.abort?.();
-		return true;
-	}
-	return false;
-}
+
 
 async function prepareAutonomousResumeEntry(
 	cwd,
@@ -28858,17 +27284,7 @@ function withSelectionNote(prompt, note) {
 		: prompt;
 }
 
-function recentNumberedWorkAction(cwd, number) {
-	const last = readWorkState(cwd).lastActions;
-	const ageMs = Date.now() - Date.parse(last?.updatedAt ?? "");
-	if (
-		!last?.actions?.length ||
-		!Number.isFinite(ageMs) ||
-		ageMs > 60 * 60 * 1000
-	)
-		return null;
-	return last.actions[number - 1] ?? null;
-}
+
 
 async function handleWorkContextCommand(args, ctx) {
 	let settings;
@@ -29572,12 +27988,7 @@ function startExtensionScout(ctx, options = {}) {
 	return { ok: true, background: true };
 }
 
-function isOperatorPauseInput(event = {}) {
-	if (!["interactive", "rpc", "user"].includes(event.source)) return false;
-	return /^(?:orchestrator\s*[:,;-]?\s*)?pause[.!?]*$/i.test(
-		String(event.text ?? "").trim(),
-	);
-}
+
 
 function parseOrchestratorInput(event = {}) {
 	if (!["interactive", "user"].includes(event.source)) return;
@@ -30278,8 +28689,8 @@ export default function workModelsExtension(pi) {
 	process.env.PI_ASK_USER_CONTEXT_EXPANDED ||= "true";
 	workExtensionPi = pi;
 	// Read once at load; the Settings toggle reloads the runtime (D10).
-	const workflowOn = workflowEnabled();
-	const registerWorkflowTool = workflowOn ? registerConstrainedTool : () => {};
+
+
 	const visionBridge = createVisionBridge();
 	cameraController = createCameraController(pi, { readProjectSettings: readSettings, writeProjectSettings: writeSettings });
 	for (const tool of cameraTools(cameraController, pi)) registerConstrainedTool(pi, tool);
@@ -30327,34 +28738,14 @@ export default function workModelsExtension(pi) {
 	subscriptionFooterController = createSubscriptionFooterController(pi, {
 		readGlobalSettings,
 	});
-	registerWorkUiGate(pi);
-	exposeBundledSubagentAgents(workflowOn);
-	pi.on("resources_discover", () =>
-		workflowOn ? { skillPaths: [join(WORKFLOW_REPO_DIR, "skills")] } : {},
-	);
-	const workflowOnlyTools = new Set([
-		"work_goal_complete",
-		"work_goal_human_decision",
-		"work_report_improvement",
-		"work_dirty_continue",
-		"work_initiative_reconcile",
-		"work_verifier_read",
-		"work_verifier_list",
-		"work_verifier_find",
-		"work_verifier_grep",
-		"work_verifier_acknowledge_failure",
-		"work_verifier_inbox",
-		"work_verifier_dispose",
-		"work_verifier_complete_fix",
-		"work_verifier_reopen",
-	]);
-	let workflowTurnAuthorized = false;
+
+	exposeBundledSubagentAgents();
+
+
+
 
 	if (typeof pi.registerTool === "function") {
-		if (workflowOn) {
-			registerVerifierTools(pi);
-			registerVerifierTriageTools(pi);
-		}
+
 
 
 		registerConstrainedTool(pi, {
@@ -30450,310 +28841,15 @@ export default function workModelsExtension(pi) {
 				};
 			},
 		});
-		registerWorkflowTool(pi, {
-			name: DIRTY_CONTINUE_TOOL,
-			label: "Continue after dirty cleanup",
-			description:
-				"Resume the exact blocked /work-* command after the user approved the proposed non-destructive Git cleanup and the original blocking paths are clean.",
-			parameters: {
-				type: "object",
-				properties: { token: { type: "string" } },
-				required: ["token"],
-				additionalProperties: false,
-			},
-			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-				const token = String(params.token ?? "").trim();
-				const recovery = pendingDirtyRecoveries.get(token);
-				if (!recovery) throw new Error("Dirty recovery token is missing or stale.");
-				if (!approvedDirtyRecovery(ctx, token))
-					throw new Error(
-						"No matching ask_user approval was recorded; cancel for manual cleanup.",
-					);
-				if (resolve(ctx?.cwd ?? process.cwd()) !== resolve(recovery.cwd))
-					throw new Error("Dirty recovery belongs to a different checkout.");
-				let dirty;
-				try {
-					dirty = new Set(
-						gitDirty(executionRepositoryRoot(recovery.cwd)).map((item) =>
-							normalizedRepoPath(item.path),
-						),
-					);
-				} catch {
-					throw new Error("Git status is unavailable; fix it manually.");
-				}
-				const remaining = recovery.blockedPaths.filter((path) =>
-					dirty.has(normalizedRepoPath(path)),
-				);
-				if (remaining.length)
-					throw new Error(
-						`Blocking files remain dirty: ${compactList(remaining)}. Apply the approved cleanup or cancel for manual repair.`,
-					);
-				const parsed = recovery.command.match(/^\/(work-[\w-]+)(?:\s+(.*))?$/);
-				if (!parsed) throw new Error("Blocked orchestrator action is malformed.");
-				pendingDirtyRecoveries.delete(token);
-				const resumed = await executeOrchestratorAction(
-					parsed[1],
-					parsed[2] ?? "",
-					ctx,
-					pi,
-				);
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Approved cleanup is clear; resumed ${ORCHESTRATOR_ACTION_LABELS[parsed[1]] ?? "work"}${resumed?.action ? ` (${resumed.action})` : ""}.`,
-						},
-					],
-					details: { action: parsed[1], outcome: resumed?.action },
-					terminate: true,
-				};
-			},
-		});
 
-		registerWorkflowTool(pi, {
-			name: INITIATIVE_RECONCILE_TOOL,
-			label: "Convert roadmap to initiative",
-			description:
-				"Finish a /wo-selected roadmap conversion after source analysis and any necessary ask_user decisions. Computes hashes, previews, confirms once, and applies atomically.",
-			parameters: {
-				type: "object",
-				properties: {
-					targetId: { type: "string" },
-					title: { type: "string" },
-					description: { type: "string" },
-					sources: {
-						type: "array",
-						minItems: 1,
-						items: {
-							type: "object",
-							properties: {
-								id: { type: "string" },
-								path: { type: "string" },
-							},
-							required: ["id", "path"],
-							additionalProperties: false,
-						},
-					},
-					groups: {
-						type: "array",
-						minItems: 1,
-						items: {
-							type: "object",
-							properties: {
-								id: { type: "string" },
-								title: { type: "string" },
-								description: { type: "string" },
-								roadmapId: { type: "string" },
-								selected: { type: "boolean" },
-							},
-							required: ["id", "title"],
-							additionalProperties: false,
-						},
-					},
-					outcomes: {
-						type: "array",
-						minItems: 1,
-						items: {
-							type: "object",
-							properties: {
-								id: { type: "string" },
-								sourceId: { type: "string" },
-								provenance: { type: "string" },
-								content: { type: "string" },
-								disposition: {
-									type: "string",
-									enum: ["accepted", "rejected", "non_goal"],
-								},
-								groupId: { type: "string" },
-							},
-							required: ["sourceId", "provenance", "content", "disposition"],
-							additionalProperties: false,
-						},
-					},
-				},
-				required: ["targetId", "sources", "groups", "outcomes"],
-				additionalProperties: false,
-			},
-			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-				const cwd = resolve(ctx?.cwd ?? process.cwd());
-				const key = initiativeConversionKey(ctx);
-				const pending = pendingInitiativeConversions.get(key);
-				if (
-					!pending ||
-					pending.cwd !== cwd ||
-					pending.targetId !== String(params.targetId ?? "").trim()
-				)
-					throw new Error(
-						"No matching /wo initiative conversion is active. Select the roadmap and choose Convert to initiative first.",
-					);
-				const proposal = initiativeProposalFromTool(cwd, params);
-				const preview = previewInitiativeReconciliation(cwd, proposal);
-				const previewText = renderInitiativePreview(preview);
-				if (preview.conflicts.length)
-					throw new Error(`Initiative preview conflicts:\n${previewText}`);
-				if (
-					!ctx?.hasUI ||
-					!(await ctx.ui.confirm("Convert roadmap to initiative?", previewText))
-				) {
-					pendingInitiativeConversions.delete(key);
-					return {
-						content: [{ type: "text", text: "Initiative conversion cancelled." }],
-						details: { cancelled: true, preview },
-						terminate: true,
-					};
-				}
-				return withFileMutationQueue(storePath(cwd), async () => {
-					const approval = approveInitiativeReconciliation(cwd, preview.token);
-					const result = applyInitiativeReconciliation(
-						cwd,
-						proposal,
-						preview.token,
-						{ approval },
-					);
-					pendingInitiativeConversions.delete(key);
-					return {
-						content: [
-							{
-								type: "text",
-								text: `Converted ${result.initiativeId} to an initiative with ${preview.proposed.epics.length} child roadmap(s).`,
-							},
-						],
-						details: { result, preview },
-						terminate: true,
-					};
-				});
-			},
-		});
 
-		registerWorkflowTool(pi, {
-			name: IMPROVEMENT_REPORT_TOOL,
-			label: "Report workflow improvement",
-			description:
-				"Explicitly record a ce-workflow problem with local evidence for later maintainer review.",
-			promptSnippet:
-				"Report a concrete ce-workflow problem only when self-improving reporting is enabled",
-			parameters: IMPROVEMENT_REPORT_TOOL_SCHEMA,
-			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-				const cwd = ctx?.cwd ?? process.cwd();
-				if (
-					activeWorkGoal?.mode !== "self-improving" ||
-					activeWorkGoal.status !== "active"
-				)
-					throw new Error(
-						"Workflow improvement reporting is available only during explicit orchestrator maintenance.",
-					);
-				if (
-					activeWorkGoal?.mode === "project" &&
-					Number(activeWorkGoal.improvementReportsRecorded ?? 0) >= 1
-				)
-					throw new Error(
-						"This project run already reported workflow friction. Continue product work; orchestrator maintenance is separate.",
-					);
-				const workflow = currentCommandWorkflow();
-				const sessionId = ctx?.sessionManager?.getSessionId?.();
-				const sessionFile = ctx?.sessionManager?.getSessionFile?.();
-				try {
-					const result = await submitImprovementReport({
-						cwd,
-						packageRoot: WORKFLOW_REPO_DIR,
-						settings: readEffectiveSettings(cwd),
-						withFileMutationQueue,
-						approvedRoots: sessionFile ? [dirname(sessionFile)] : [],
-						report: {
-							...params,
-							producer: basename(cwd),
-							workflowId: workflow?.workflowRunId ?? sessionId,
-						},
-					});
-					const details = {
-						taskId: result.taskId,
-						epicId: result.epicId,
-						bundle: truncate(result.bundle, 240),
-						source: result.source,
-					};
-					if (activeWorkGoal?.mode === "project") {
-						activeWorkGoal = {
-							...activeWorkGoal,
-							improvementReportsRecorded:
-								Number(activeWorkGoal.improvementReportsRecorded ?? 0) + 1,
-							updatedAt: Date.now(),
-						};
-						persistWorkGoal(pi);
-					}
-					return {
-						content: [
-							{
-								type: "text",
-								text: `Workflow improvement report recorded: task ${details.taskId}, roadmap ${details.epicId}, bundle ${details.bundle}.`,
-							},
-						],
-						details,
-					};
-				} catch (error) {
-					throw new Error(
-						`Could not record workflow improvement report: ${truncate(error instanceof Error ? error.message : String(error), 300)}`,
-					);
-				}
-			},
-		});
 
-		registerWorkflowTool(pi, {
-			name: "work_goal_complete",
-			label: "Work Goal Complete",
-			description:
-				"Mark the active autonomous goal complete after the objective is fully done and verified.",
-			promptSnippet:
-				"Mark the active autonomous goal complete after verified completion",
-			promptGuidelines: [
-				"Use work_goal_complete only when the active autonomous goal is fully complete and verified.",
-				"After work_goal_complete succeeds, respond to the user with one concise final summary and do not call more tools.",
-			],
-			parameters: { ...WORK_GOAL_TOOL_SCHEMA, required: ["summary"] },
-			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-				return completeActiveWorkGoal(
-					String(params.summary ?? "completed"),
-					ctx,
-					pi,
-				);
-			},
-		});
 
-		registerWorkflowTool(pi, {
-			name: "work_goal_human_decision",
-			label: "Work Goal Human Decision",
-			description:
-				"Durably pause the active autonomous goal only when ask_user is unavailable or cancelled. Never use this as the first prompt path.",
-			promptSnippet:
-				"Persist a human-decision blocker only after ask_user is unavailable or cancelled",
-			promptGuidelines: [
-				"Use ask_user for every interactive work-goal question; use work_goal_human_decision only as a durable fallback when ask_user is unavailable or cancelled.",
-				"Do not use work_goal_human_decision for plan approval, permission to continue, clear-winner choices, or artifacts the agent can capture.",
-			],
-			parameters: {
-				...WORK_GOAL_TOOL_SCHEMA,
-				required: ["question", "whyUserNeeded"],
-			},
-			async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-				const decision = {
-					question: String(params.question ?? "").trim(),
-					whyUserNeeded: String(params.whyUserNeeded ?? "").trim(),
-					options: String(params.options ?? "").trim(),
-					recommendation: String(params.recommendation ?? "").trim(),
-					source: "tool",
-				};
-				pauseWorkGoalForDecision(decision, ctx, pi);
-				return {
-					content: [
-						{
-							type: "text",
-							text: `autonomous goal paused for human decision.\n${formatWorkGoalDecision(decision)}`,
-						},
-					],
-					details: decision,
-					terminate: true,
-				};
-			},
-		});
+
+
+
+
+
 	}
 
 	pi.on("user_bash", event => {
@@ -30762,176 +28858,27 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("tool_call", (event, ctx) => {
-		if (researchContext && ["bash", "hypa_shell"].includes(event.toolName) &&
+if (researchContext && ["bash", "hypa_shell"].includes(event.toolName) &&
 			researchGitPublicationCommand(event.input?.command))
 			return { block: true, reason: "Research mode blocks Git commit and push; shell exploration is allowed. Exit research mode before committing; pushing still requires explicit user authorization." };
-		try {
+try {
 			maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
 		} catch {
 			maybeCompact(ctx, {});
 		}
-		const sourceMaintenanceBlock = projectGoalSourceMaintenanceBlockReason(
-			event,
-			ctx?.cwd ?? activeWorkGoalCwd,
-		);
-		if (sourceMaintenanceBlock)
-			return { block: true, reason: sourceMaintenanceBlock };
-		if (event.toolName === "ask_user") {
-			// The optional comment row on every question unless a coded approval explicitly turns it off.
-			if (event.input && event.input.allowComment == null) event.input.allowComment = true;
-			recordWorkGoalAskUserCall(event, pi);
-			recordDirtyRecoveryAskCall(event);
-			recordImprovementApprovalAskCall(event, ctx?.cwd ?? activeWorkGoalCwd);
-		}
-		const improvementSafetyBlock = improvementMutationBlockReason(
-			event,
-			ctx?.cwd ?? activeWorkGoalCwd,
-		);
-		if (improvementSafetyBlock)
-			return { block: true, reason: improvementSafetyBlock };
-		if (
-			event.toolName === "work_goal_human_decision" &&
-			ctx.hasUI &&
-			pi.getActiveTools?.().includes("ask_user") &&
-			activeWorkGoal?.askUserFallbackPending?.unavailable !== true
-		)
-			return {
-				block: true,
-				terminate: true,
-				reason:
-					"Use ask_user for the interactive decision. work_goal_human_decision is only a non-interactive fallback.",
-			};
-		if (!workflowOn || !workflowTurnAuthorized) {
-			const workSubagent = workSubagentToolCall(event, ctx);
-			const workHelper =
-				event.toolName === "bash" &&
-				/work-helper\.mjs/i.test(String(event.input?.command ?? ""));
-			if (workflowOnlyTools.has(event.toolName) || workSubagent || workHelper)
-				return {
-					block: true,
-					reason: !workflowOn
-						? "Legacy ce-workflow orchestration is off. Do not use work-* roles, work_* tools or work-helper commands. For authorized ordinary advice use the native oracle agent; do not enable /wo as a workaround."
-						: "Direct request mode does not authorize ce-workflow orchestration. For authorized ordinary advice use the native oracle agent. Use /wo resume <roadmap-id> only for an explicitly requested legacy work-item run.",
-				};
-		}
-	});
+if(event.toolName === "ask_user" && event.input && event.input.allowComment == null) event.input.allowComment = true;
+});
 
-	pi.on("tool_result", (event, ctx) => {
-		recordWorkGoalAskUserResult(event, pi);
-		recordImprovementApprovalFromAskUser(event, ctx, pi);
-		pauseWorkGoalFromAskUser(event, ctx, pi);
-	});
+
 
 	registerRemoteAskAnswers(pi);
 
-	pi.on("session_start", (_event, ctx) => {
-		visionBridge.clear();
-		try {
-			const activation = activatePendingPrivateWorkflowRelease(WORKFLOW_REPO_DIR);
-			if (activation.status === "activated")
-				notify(
-					ctx,
-					`Private workflow release activated after restart: ${activation.activeGenerationSha256}`,
-					"info",
-				);
-			else {
-				const warning = privateWorkflowActivationWarning(activation);
-				if (warning) notify(ctx, warning, "warning");
-			}
-		} catch (error) {
-			notify(
-				ctx,
-				`Private workflow activation blocked: ${formatError(error)}`,
-				"warning",
-			);
-		}
-		const legacyRecommendation = legacyCompoundRemovalRecommendation();
-		if (legacyRecommendation) notify(ctx, legacyRecommendation, "warning");
-		syncImprovementReportTool(pi, ctx);
-		subscriptionFooterController.start(ctx);
-		const runtime = {
-			pi,
-			mode: ctx.mode,
-			session: ctx.sessionManager?.getSessionId?.(),
-			currentSession: () => ctx.sessionManager?.getSessionId?.(),
-			goalStatus: () => activeWorkGoal?.status,
-			modelRegistry: ctx.modelRegistry,
-		};
-		if (workflowOn && ctx.mode !== "print") {
-			reconcilePendingDirectRuns(ctx.cwd, runtime);
-			void driveWorkActionLeases(ctx.cwd, {
-				...runtime,
-				notify: (state) =>
-					notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
-			});
-			try {
-				reconcileSuccessorPrefetches(ctx.cwd);
-				reconcileReadOnlyLaneRuns(ctx.cwd);
-			} catch {
-				// Lane state must not prevent the rest of session startup.
-			}
-			reconcileBackgroundVerifierRuns(ctx.cwd, pi);
-			try {
-				recoverLatestVerifierAnalysis(ctx.cwd);
-				ensureVerifierTriageRoadmap(ctx.cwd);
-			} catch {
-				// Saved findings must not prevent the rest of session startup.
-			}
-		}
-		activeWorkGoalCwd = sessionCwd = ctx.cwd;
-		activeWorkGoal = workflowOn ? loadWorkGoalFromSession(ctx) : null;
-		if (activeWorkGoal?.status === "active") {
-			if (activeWorkGoal.resumeOnSessionStart) {
-				activeWorkGoal = {
-					...activeWorkGoal,
-					resumeOnSessionStart: undefined,
-					updatedAt: Date.now(),
-				};
-				applyWorkGoalThinking(pi, activeWorkGoal, ctx);
-			} else {
-				restoreWorkGoalThinking(pi, activeWorkGoal);
-				activeWorkGoal = {
-					...activeWorkGoal,
-					status: "paused",
-					updatedAt: Date.now(),
-				};
-			}
-			persistWorkGoal(pi);
-		} else {
-			restoreWorkGoalThinking(pi, activeWorkGoal);
-			syncWorkGoalTools(pi);
-			syncImprovementReportTool(pi);
-		}
-		pendingInitiativeConversions.clear();
-		pendingRichTaskComposers.clear();
-		pendingMainEditorActions.clear();
-		goalSubagentStarts.clear();
-		activeWorkGoalRunning = false;
-		pendingWorkGoalTurn = false;
-		blockedWorkGoalTurn = false;
-		blockedCompactionResumeTurn = false;
-		blockedInternalBackgroundCompletionTurn = false;
-		pendingInternalBackgroundCompletionPrompt = null;
-
-		workGoalContinuationPending = null;
-		pendingSettledAgentEnd = null;
-		activeWorkAgent = null;
-		pendingPromptBackedAgentStart = false;
-		activePromptBackedAgent = false;
-		hideBackgroundVerifierAbort = false;
-		hideCompactionResumeAbort = false;
-		pendingVerifierSynthesis = null;
-		activeVerifierSynthesis = null;
-		resetContextCompaction();
-		restoreResearchContext(ctx);
-		resetOrchestratorPauseState();
-		clearWorkGoalRecovery();
-		if (activeWorkGoal?.status === "waiting_usage_limit")
-			scheduleWorkGoalUsageLimitRetry(pi, ctx, activeWorkGoal);
-
-		updateWorkGoalStatus(ctx);
-		updateWorkGoalProgress(ctx);
-		if (extensionScoutEnabled()) {
+	pi.on("session_start", (event, ctx) => {
+visionBridge.clear();
+subscriptionFooterController.start(ctx);
+resetContextCompaction();
+restoreResearchContext(ctx);
+if (extensionScoutEnabled()) {
 			let scoutProgress = readExtensionScoutLedger(ctx.cwd).progress;
 			if (scoutProgress && ["running", "stopping"].includes(scoutProgress.status))
 				scoutProgress = updateExtensionScoutProgress(ctx.cwd, {
@@ -30944,59 +28891,30 @@ export default function workModelsExtension(pi) {
 			ctx.ui?.setStatus?.("work-extension-scout", undefined);
 			ctx.ui?.setWidget?.("work-extension-scout", undefined);
 		}
-		ctx.ui.notify(`work-orchestrator loaded · ${workflowOn ? WORK_SHORTCUT_STATUS : UTILITY_SHORTCUT_STATUS}`, "info");
-		resetWarpTitle(ctx);
-		startWorkGoalProgressTimer(ctx);
-		if (workflowOn && ctx.mode !== "print")
-			void presentPendingVerifierBatches(ctx.cwd, ctx, pi).catch(() => {});
-	});
+ctx.ui.notify(`work-orchestrator loaded · ${UTILITY_SHORTCUT_STATUS}`, "info");
+sessionCwd = ctx.cwd;
+});
 
-	pi.on("session_shutdown", async (_event, ctx) => {
-		subscriptionFooterController.shutdown(ctx);
-		const scoutRuntime = extensionScoutRuns.get(resolve(ctx.cwd));
-		if (scoutRuntime) {
+	pi.on("session_shutdown", async (event, ctx) => {
+subscriptionFooterController.shutdown(ctx);
+const scoutRuntime = extensionScoutRuns.get(resolve(ctx.cwd));
+if (scoutRuntime) {
 			scoutRuntime.detached = true;
 			scoutRuntime.controller.abort(
 				new Error("Extension scout stopped by session shutdown"),
 			);
 		}
-		ctx.ui?.setStatus?.("work-extension-scout", undefined);
-		ctx.ui?.setWidget?.("work-extension-scout", undefined);
-		for (const timer of actionLeaseWatchers.values()) clearInterval(timer);
-		actionLeaseWatchers.clear();
-		finishHelperStarts.clear();
-		goalSubagentStarts.clear();
-		pendingDirtyRecoveries.clear();
-		pendingImprovementApprovals.clear();
-		pendingInitiativeConversions.clear();
-		pendingRichTaskComposers.clear();
-		pendingMainEditorActions.clear();
-		pendingSettledAgentEnd = null;
-		activeWorkAgent = null;
-		pendingPromptBackedAgentStart = false;
-		activePromptBackedAgent = false;
-		hideBackgroundVerifierAbort = false;
-		hideCompactionResumeAbort = false;
-		pendingVerifierSynthesis = null;
-		activeVerifierSynthesis = null;
+ctx.ui?.setStatus?.("work-extension-scout", undefined);
+ctx.ui?.setWidget?.("work-extension-scout", undefined);
+resetContextCompaction();
+researchContext = null;
+researchNotes = null;
+showResearchContext(ctx);
 
-		resetContextCompaction();
-		researchContext = null;
-		researchNotes = null;
-		showResearchContext(ctx);
-		resetOrchestratorPauseState();
-		persistWorkGoal(pi);
-		clearWorkGoalUsageLimitTimer();
-
-		updateWorkGoalStatus(ctx, null);
-		stopWorkGoalProgressTimer(ctx);
-	});
+});
 
 	pi.on("input", async (event, ctx) => {
-		if (workflowOn && isOperatorPauseInput(event)) {
-			await requestOrchestratorPause(ctx, pi);
-			return { action: "handled" };
-		}
+
 		if (
 			isCompactionResumePrompt(event.text) &&
 			!activeCompactionWorkflowAuthorization(
@@ -31008,277 +28926,31 @@ export default function workModelsExtension(pi) {
 		}
 		const coldCache = await offerColdCacheCompact(event, ctx, pi);
 		if (coldCache) return coldCache;
-		if (!workflowOn) return;
-		const mainEditorAction = await consumePendingMainEditorAction(event, ctx, {
-			execute: (command, args, actionCtx, options) =>
-				executeOrchestratorAction(command, args, actionCtx, pi, "", options),
-		});
-		if (mainEditorAction?.action === "handled") return mainEditorAction;
-		const richTaskTransform = transformPendingRichTaskInput(event, ctx);
-		if (richTaskTransform?.action === "handled") return richTaskTransform;
-		const sanitizedEvent = richTaskTransform
-			? { ...event, text: richTaskTransform.text, images: [] }
-			: event;
-		const orchestratorInput = parseOrchestratorInput(sanitizedEvent);
-		if (orchestratorInput) {
-			if (Number.isInteger(orchestratorInput.number)) {
-				const action = recentNumberedWorkAction(ctx.cwd, orchestratorInput.number);
-				if (action) {
-					notify(ctx, `Running ${orchestratorInput.number}. ${action}`, "info");
-					await executeNumberedWorkAction(action, ctx, pi, orchestratorInput.note);
-				} else
-					notify(
-						ctx,
-						"That orchestrator choice is unavailable or expired.",
-						"warning",
-					);
-			} else if (orchestratorInput.error)
-				notify(
-					ctx,
-					`${orchestratorInput.error}\n${orchestratorInput.help}`,
-					"warning",
-				);
-			else if (orchestratorInput.help) notify(ctx, orchestratorInput.help, "info");
-			else
-				await executeOrchestratorAction(
-					orchestratorInput.command,
-					orchestratorInput.args,
-					ctx,
-					pi,
-				);
-			return { action: "handled" };
-		}
-		reconcilePendingDirectRuns(ctx.cwd, {
-			pi,
-			mode: ctx.mode,
-			session: ctx.sessionManager?.getSessionId?.(),
-		});
-		await driveWorkActionLeases(ctx.cwd, {
-			pi,
-			mode: ctx.mode,
-			session: ctx.sessionManager?.getSessionId?.(),
-			currentSession: () => ctx.sessionManager?.getSessionId?.(),
-			goalStatus: () => activeWorkGoal?.status,
-			modelRegistry: ctx.modelRegistry,
-			notify: (state) =>
-				notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
-		});
-		try {
-			reconcileSuccessorPrefetches(ctx.cwd);
-		} catch {
-			// Legacy prefetch cleanup must not block normal input handling.
-		}
-		recordSelfImprovementHistory(ctx, "input", sanitizedEvent);
-		if (!extractWorkGoalContinuationMarker(sanitizedEvent.text))
-			clearWorkGoalRecovery();
-		const automated = String(sanitizedEvent.text ?? "").match(
-			new RegExp(
-				`^${ORCHESTRATOR_AUTOMATION_PREFIX}\\s+(work-[\\w-]+)(?:\\s+([\\s\\S]*))?$`,
-			),
-		);
-		if (automated) {
-			await executeOrchestratorAction(automated[1], automated[2] ?? "", ctx, pi);
-			return { action: "handled" };
-		}
-		return richTaskTransform;
+		return;
+
 	});
 
-	pi.on("before_agent_start", async (event, ctx) => {
-		const compactionResumePrompt = isCompactionResumePrompt(event.prompt);
-		const compactionAuthorization = compactionResumePrompt
-			? activeCompactionWorkflowAuthorization(
-					pendingCompactionWorkflowAuthorization,
-				)
-			: null;
-		const durableWorkflow = workflowOn ? restoreWorkflowAuthorization(
-			ctx.cwd,
-			ctx.sessionManager?.getSessionId?.(),
-			contentText(event.prompt),
-			compactionResumePrompt,
-		) : null;
-		blockedCompactionResumeTurn =
-			compactionResumePrompt && !compactionAuthorization && !durableWorkflow;
-		blockedInternalBackgroundCompletionTurn = Boolean(
-			pendingInternalBackgroundCompletionPrompt &&
-				contentText(event.prompt).trim() ===
-					pendingInternalBackgroundCompletionPrompt,
-		);
-		pendingInternalBackgroundCompletionPrompt = null;
-		pendingCompactionWorkflowAuthorization = null;
-		if (
-			pendingVerifierSynthesis &&
-			contentText(event.prompt).includes(pendingVerifierSynthesis.marker)
-		) {
-			activeVerifierSynthesis = pendingVerifierSynthesis;
-			pendingVerifierSynthesis = null;
-		}
-		pendingPromptBackedAgentStart = true;
-		const baseSystemPrompt = String(event.systemPrompt ?? "");
-		const marker = extractWorkGoalContinuationMarker(event.prompt);
-		if (workflowOn) {
-			restorePersistedWorkGoalForContinuation(ctx, pi, marker);
-			markWorkGoalContinuationDelivered(event.prompt);
-		}
+	pi.on("before_agent_start", (event, ctx) => {
+ blockedCompactionResumeTurn = isCompactionResumePrompt(event.prompt);
+ blockedInternalBackgroundCompletionTurn = Boolean(pendingInternalBackgroundCompletionPrompt && contentText(event.prompt).trim() === pendingInternalBackgroundCompletionPrompt);
+ pendingInternalBackgroundCompletionPrompt = null;
+ pendingPromptBackedAgentStart = true;
+ const systemPrompt=String(event.systemPrompt ?? "");
+ return {systemPrompt:researchContext?`${systemPrompt}\n\n${RESEARCH_INSTRUCTIONS}\nTemporary notebook: ${researchContext.notes}`:systemPrompt};
+});
 
-
-		const matchingWorkGoalTurn = Boolean(
-			activeWorkGoal &&
-				(marker?.startsWith(`${activeWorkGoal.id}:`) ||
-					compactionAuthorization?.goalId === activeWorkGoal.id),
-		);
-		const backgroundWorkflowCompletionTurn = Boolean(
-			activeWorkGoal?.status === "active" &&
-				isBackgroundWorkflowCompletionPrompt(event.prompt),
-		);
-		pendingWorkGoalTurn =
-			(matchingWorkGoalTurn || backgroundWorkflowCompletionTurn) &&
-			activeWorkGoal?.status === "active";
-		blockedWorkGoalTurn = matchingWorkGoalTurn && !pendingWorkGoalTurn;
-		const meta = workflowOn ? parseWorkPromptMeta(event.prompt) : null;
-		const goalClarificationTurn = Boolean(
-			activeWorkGoal?.status === "needs_human" &&
-				/^clarify:/i.test(contentText(event.prompt).trim()),
-		);
-		const managedWorkSubagent =
-			/^work-/i.test(process.env.PI_SUBAGENT_CHILD_AGENT ?? "") ||
-			Boolean(managedWorkSubagentSessionName(pi, ctx));
-		const workflowTurn = workflowOn && (
-			matchingWorkGoalTurn ||
-			backgroundWorkflowCompletionTurn ||
-			goalClarificationTurn ||
-			managedWorkSubagent ||
-			Boolean(meta) ||
-			Boolean(durableWorkflow) ||
-			Boolean(compactionAuthorization) ||
-			Boolean(activeVerifierSynthesis));
-		workflowTurnAuthorized = workflowTurn;
-		const turnPolicy = workflowTurn
-			? REVIEW_CYCLE_BUDGET_PROMPT
-			: DIRECT_REQUEST_PROMPT;
-		const policyHeading = workflowTurn
-			? "## Review cycle budget"
-			: "## Direct request mode";
-		const policySystemPrompt = baseSystemPrompt.includes(policyHeading) ||
-			(!workflowTurn && !workflowOn)
-			? baseSystemPrompt
-			: `${baseSystemPrompt}\n\n${turnPolicy}`.trim();
-		const boundedSystemPrompt = researchContext
-			? `${policySystemPrompt}\n\n${RESEARCH_INSTRUCTIONS}\nTemporary notebook: ${researchContext.notes}`
-			: policySystemPrompt;
-		pendingWorkPrompt = meta
-			? {
-					id: telemetryId("agent"),
-					cwd: ctx.cwd,
-					prompt: String(event.prompt ?? ""),
-					promptChars: String(event.prompt ?? "").length,
-					meta,
-					contextBefore: usageSnapshot(ctx),
-				}
-			: durableWorkflow
-				? {
-						id: telemetryId("agent"),
-						cwd: ctx.cwd,
-						prompt: String(event.prompt ?? ""),
-						promptChars: String(event.prompt ?? "").length,
-						meta: {
-							workflowRunId: durableWorkflow.workflowRunId,
-							activity: durableWorkflow.activity ?? undefined,
-							epicId: durableWorkflow.epicId ?? undefined,
-							workItemId: durableWorkflow.workItemId ?? undefined,
-						},
-						contextBefore: usageSnapshot(ctx),
-					}
-				: null;
-		recordSelfImprovementHistory(ctx, "before_agent_start", event);
-		if (!activeWorkGoal) return { systemPrompt: boundedSystemPrompt };
-		if (
-			activeWorkGoal.status === "needs_human" &&
-			(matchingWorkGoalTurn || goalClarificationTurn)
-		) {
-			return {
-				systemPrompt: `${boundedSystemPrompt}\n\n${buildWorkGoalPausedPrompt(activeWorkGoal)}`,
-			};
-		}
-		if (activeWorkGoal.status !== "active" || !pendingWorkGoalTurn)
-			return { systemPrompt: boundedSystemPrompt };
-		return {
-			systemPrompt: `${boundedSystemPrompt}\n\n${buildWorkGoalSystemPrompt(activeWorkGoal)}`,
-		};
-	});
-
-	pi.on("agent_start", async (event, ctx) => {
-		activePromptBackedAgent = pendingPromptBackedAgentStart;
-		internalBackgroundWakeEligible = !activePromptBackedAgent;
-		pendingPromptBackedAgentStart = false;
-		recordSelfImprovementHistory(ctx, "agent_start", event);
-		if (blockedInternalBackgroundCompletionTurn) {
+	pi.on("agent_start", (event,ctx)=>{
+activePromptBackedAgent = pendingPromptBackedAgentStart;
+internalBackgroundWakeEligible = !activePromptBackedAgent;
+pendingPromptBackedAgentStart = false;
+if (blockedInternalBackgroundCompletionTurn) {
 			blockedInternalBackgroundCompletionTurn = false;
 			activePromptBackedAgent = false;
 			hideBackgroundVerifierAbort = true;
 			ctx.abort();
 			return;
 		}
-		if (blockedWorkGoalTurn) {
-			blockedWorkGoalTurn = false;
-			pendingWorkGoalTurn = false;
-			pendingWorkPrompt = null;
-			ctx.ui.notify(
-				"Ignored a stale autonomous-goal continuation. Resume the goal explicitly to continue.",
-				"warning",
-			);
-			ctx.abort();
-			return;
-		}
-		if (pendingWorkGoalTurn) {
-			activeWorkGoalRunning = true;
-			activeWorkGoalVerifierFixCommitted = false;
-		}
-		pendingWorkGoalTurn = false;
-		if (!pendingWorkPrompt) {
-			if (
-				activeWorkGoalRunning &&
-				["active", "stopping"].includes(activeWorkGoal?.status)
-			) {
-				activeWorkGoalGitBefore = {
-					cwd: ctx.cwd,
-					head: gitSnapshot(ctx.cwd).head,
-				};
-				startWarpWork(
-					ctx,
-					workWarpMode(activeWorkGoal.mode, activeWorkGoal),
-					activeWorkGoal.objective,
-				);
-				updateWorkGoalStatus(ctx);
-			} else {
-				setWarpTitle(ctx, workWarpTitle("work", ctx?.cwd ?? process.cwd()));
-			}
-			return;
-		}
-		activeWorkAgent = {
-			...pendingWorkPrompt,
-			startedAt: Date.now(),
-			gitBefore: gitSnapshot(pendingWorkPrompt.cwd),
-			tools: [],
-			toolStarts: new Map(),
-			uiPromptDepth: 0,
-			uiPromptStartedAt: null,
-			uiPromptWaitMs: 0,
-		};
-		startWarpWork(
-			ctx ?? { cwd: activeWorkAgent.cwd },
-			workWarpMode(activeWorkAgent.meta.mode),
-			`/work-${activeWorkAgent.meta.mode ?? "work"}`,
-		);
-		const evaluationIdentity = evaluationTelemetryIdentity({ role: "main" });
-		if (evaluationIdentity)
-			recordWorkTelemetry(activeWorkAgent.cwd, {
-				type: "agent-dispatched",
-				...evaluationIdentity,
-				startedAt: new Date(activeWorkAgent.startedAt).toISOString(),
-			});
-		updateWorkGoalStatus(ctx);
-		pendingWorkPrompt = null;
-	});
+});
 
 	// pi-subagents sends its compaction-resume message with
 	// pi.sendMessage(..., { triggerTurn: true }), which calls _runAgentPrompt
@@ -31324,282 +28996,15 @@ export default function workModelsExtension(pi) {
 		return event.payload;
 	});
 
-	pi.on("ui_prompt_start", () => {
-		if (!activeWorkAgent) return;
-		if (activeWorkAgent.uiPromptDepth++ === 0)
-			activeWorkAgent.uiPromptStartedAt = Date.now();
-	});
 
-	pi.on("ui_prompt_end", (event) => {
-		if (!activeWorkAgent?.uiPromptDepth) return;
-		activeWorkAgent.uiPromptDepth -= 1;
-		if (
-			activeWorkAgent.uiPromptDepth ||
-			activeWorkAgent.uiPromptStartedAt === null
-		)
-			return;
-		const nativeDurationMs = Number(event.durationMs);
-		activeWorkAgent.uiPromptWaitMs +=
-			Number.isFinite(nativeDurationMs) && nativeDurationMs >= 0
-				? nativeDurationMs
-				: Math.max(0, Date.now() - activeWorkAgent.uiPromptStartedAt);
-		activeWorkAgent.uiPromptStartedAt = null;
-	});
 
-	pi.on("tool_execution_start", async (event, ctx) => {
-		recordSelfImprovementHistory(ctx, "tool_execution_start", event);
-		if (event.toolName === "subagent" && activeWorkGoal)
-			goalSubagentStarts.set(event.toolCallId, {
-				args: event.args,
-				goal: activeWorkGoal,
-			});
-		const helper = finishHelperRequest(event.toolName, event.args);
-		if (helper)
-			try {
-				finishHelperStarts.set(event.toolCallId, {
-					...helper,
-					before: run(ctx.cwd, "git", ["rev-parse", "HEAD"]),
-				});
-			} catch {
-				// The helper reports Git failures itself; do not mask its result.
-			}
-		if (!activeWorkAgent) return;
-		activeWorkAgent.toolStarts.set(event.toolCallId, {
-			startedAt: Date.now(),
-			args: event.args,
-		});
-	});
 
-	pi.on("tool_execution_end", async (event, ctx) => {
-		recordSelfImprovementHistory(ctx, "tool_execution_end", event);
-		if (
-			activeWorkGoalRunning &&
-			event.toolName === "work_verifier_complete_fix" &&
-			event.result?.details?.origin === "verifier-fix"
-		)
-			activeWorkGoalVerifierFixCommitted = true;
-		const goalSubagent = goalSubagentStarts.get(event.toolCallId);
-		goalSubagentStarts.delete(event.toolCallId);
-		if (goalSubagent)
-			recordGoalSubagentLaunch(
-				ctx.cwd,
-				goalSubagent.goal,
-				event.toolCallId,
-				goalSubagent.args,
-				event.result,
-			);
-		updateWorkGoalProgress(ctx);
-		if (enforceProjectGoalCircuitBreakers(event, ctx, pi)) return;
-		if (
-			activeWorkGoal?.status === "active" &&
-			!orchestratorPauseRequest &&
-			!contextCompactState.inFlight
-		)
-			try {
-				maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
-			} catch {
-				maybeCompact(ctx, {});
-			}
-		const helper = finishHelperStarts.get(event.toolCallId);
-		finishHelperStarts.delete(event.toolCallId);
-		if (!activeWorkAgent)
-			try {
-				scheduleFinishedHelperVerifiers(ctx.cwd, pi, ctx, helper, event);
-			} catch (error) {
-				ctx.ui?.notify?.(
-					`Background verification failed to queue: ${error instanceof Error ? error.message : String(error)}`,
-					"warning",
-				);
-			}
-		if (!activeWorkAgent) return;
-		const started = activeWorkAgent.toolStarts.get(event.toolCallId);
-		activeWorkAgent.tools.push(summarizeToolResult(event, started));
-		activeWorkAgent.toolStarts.delete(event.toolCallId);
-	});
 
-	const finalizeSettledAgent = async (event, ctx) => {
-		if (!activeWorkAgent) {
-			const wasWorkGoalTurn = activeWorkGoalRunning;
-			activeWorkGoalRunning = false;
-			const hadWorkGoal = Boolean(activeWorkGoal);
-			if (wasWorkGoalTurn) {
-				try {
-					scheduleActiveWorkGoalTurnVerifiers(ctx, pi);
-				} catch (error) {
-					ctx.ui?.notify?.(
-						`Background verification failed to queue: ${commandErrorText(error)}`,
-						"warning",
-					);
-				}
-				activeWorkGoalGitBefore = null;
-				await handleWorkGoalAgentEnd(event, ctx, pi);
-				activeWorkGoalVerifierFixCommitted = false;
-			}
-			activeHistoryTask = null;
-			if (!hadWorkGoal) resetWarpTitle(ctx);
-			return;
-		}
-		const run = activeWorkAgent;
-		activeWorkAgent = null;
-		const assistant = finalAssistantMessage(event.messages);
-		const linkedBrainstorm = linkBrainstormArtifactFromFinal(
-			run.cwd,
-			run,
-			assistantVisibleText(assistant),
-		);
-		if (linkedBrainstorm?.ok)
-			notify(
-				ctx,
-				`Linked ${linkedBrainstorm.artifact} to ${linkedBrainstorm.idea.id}.`,
-			);
-		const wasWorkGoalTurn = activeWorkGoalRunning;
-		activeWorkGoalRunning = false;
-		const usage = messageUsage(event.messages);
-		const endedAt = Date.now();
-		const durationMs = Math.max(0, endedAt - run.startedAt);
-		const uiPromptWaitMs = Math.min(
-			durationMs,
-			run.uiPromptWaitMs +
-				(run.uiPromptStartedAt === null
-					? 0
-					: Math.max(0, endedAt - run.uiPromptStartedAt)),
-		);
-		const review = reviewTelemetry(run.meta, event);
-		const gitAfter = gitSnapshot(run.cwd);
-		const commitCreated = Boolean(
-			run.gitBefore?.head && gitAfter.head && run.gitBefore.head !== gitAfter.head,
-		);
-		const verifier = commitCreated
-			? scheduleCommittedRunVerifiers(run.cwd, pi, {
-					before: run.gitBefore.head,
-					after: gitAfter.head,
-					origin: run.meta.origin ?? "normal",
-					currentModel: ctx.model
-						? `${ctx.model.provider}/${ctx.model.id}`
-						: undefined,
-				})
-			: null;
-		const testsRun = run.tools.filter((tool) => tool.kind === "test").length;
-		const role = run.meta.inlineWork
-			? `inline-${run.meta.inlineLevel ?? "medium"}`
-			: (handoffRole(run.meta.action) ?? handoffRole(run.meta.mode));
-		const telemetry = {
-			id: run.id,
-			type: "agent",
-			provider: ctx.model?.provider,
-			model: workStatsModel(ctx.model, ctx.model?.provider),
-			modelName: ctx.model?.name,
-			workflowRunId: run.meta.workflowRunId,
-			activity: run.meta.activity,
-			mode: run.meta.mode,
-			action: run.meta.action,
-			role,
-			handoff: { queued: false, started: true, role },
-			epicId: run.meta.epicId,
-			workItemId: run.meta.workItemId,
-			durationMs,
-			uiPromptWaitMs: uiPromptWaitMs || undefined,
-			promptChars: run.promptChars,
-			messages: summarizeMessages(event.messages),
-			tools: run.tools,
-			usage,
-			review,
-			payoff: {
-				role,
-				durationMs,
-				tokens: usage.totalTokens || undefined,
-				filesChanged: gitAfter.dirtyFiles,
-				commitCreated,
-				backgroundVerifier: verifier
-					? { status: verifier.status, batchId: verifier.batch?.id }
-					: undefined,
-				testsRun,
-				reviewOutcome: review?.outcome,
-			},
-			context: { before: run.contextBefore, after: usageSnapshot(ctx) },
-		};
-		const failed = hasWorkAgentFailure(event, telemetry);
-		const evaluationIdentity = evaluationTelemetryIdentity({ role: "main" });
-		const recordEvaluationTerminal = (terminalReason) => {
-			if (!evaluationIdentity) return;
-			recordWorkTelemetry(run.cwd, {
-				type: "agent-terminal",
-				...evaluationIdentity,
-				endedAt: new Date().toISOString(),
-				provider: ctx.model?.provider ?? process.env.CE_EVAL_PROVIDER,
-				model: ctx.model?.id ?? process.env.CE_EVAL_MODEL,
-				effort:
-					ctx.getThinkingLevel?.() ??
-					ctx.thinkingLevel ??
-					process.env.CE_EVAL_EFFORT,
-				tokens: {
-					input: Number(usage.input ?? 0),
-					output: Number(usage.output ?? 0),
-					total: Math.max(
-						Number(usage.totalTokens ?? 0),
-						Number(usage.input ?? 0) + Number(usage.output ?? 0),
-					),
-				},
-				toolCalls: run.tools.length,
-				toolOutputBytes: run.tools.reduce(
-					(sum, tool) => sum + Number(tool.outputChars ?? 0),
-					0,
-				),
-				subagentCalls: run.tools.filter((tool) => tool.name === "subagent").length,
-				retries: 0,
-				questions: run.tools.filter((tool) => tool.name === "ask_user").length,
-				artifactIds: [
-					...new Set(run.tools.map((tool) => tool.artifact).filter(Boolean)),
-				],
-				terminalReason,
-				costScope: "workflow-role",
-			});
-		};
-		const file = recordWorkTelemetry(run.cwd, telemetry);
-		appendTelemetryNote(run.cwd, run.meta.workItemId, telemetry, file);
-		let attemptFinished = false;
-		const finishAttempt = (retry) => {
-			if (attemptFinished) return;
-			attemptFinished = true;
-			recordEvaluationTerminal(
-				retry ? "compaction_retry" : failed ? "failed" : "completed",
-			);
-			if (retry) return;
-			completeWorkflowOnce(
-				run.cwd,
-				{
-					workflowRunId: run.meta.workflowRunId,
-					activity: run.meta.activity,
-					outcome: failed ? "failed" : "completed",
-					action: run.meta.action,
-					epicId: run.meta.epicId,
-					workItemId: run.meta.workItemId,
-				},
-				{
-					pi,
-					mode: ctx.mode,
-					session: ctx.sessionManager?.getSessionId?.(),
-				},
-			);
-			appendFailureStatusNote(
-				run.cwd,
-				run.meta.workItemId,
-				run,
-				event,
-				telemetry,
-				file,
-			);
-		};
-		finishAttempt(false);
-		cleanupBenignInstructionDirt(run.cwd);
-		finishWarpWork(
-			ctx,
-			workWarpMode(run.meta.mode),
-			assistantVisibleText(finalAssistantMessage(event.messages)),
-		);
-		if (wasWorkGoalTurn) await handleWorkGoalAgentEnd(event, ctx, pi);
-		activeHistoryTask = null;
-	};
+
+
+
+
+
 
 	pi.on("context", (event, ctx) => visionBridge.project(
 		event.messages, ctx.model, nonVisionModelsSettings(ctx.cwd), visionModelSettings(ctx.cwd),
@@ -31607,7 +29012,7 @@ export default function workModelsExtension(pi) {
 	pi.on("context", (event, ctx) => filteredContext(event, ctx));
 	pi.on("context", (event, ctx) => compactionNoteNudge(event, ctx));
 	pi.on("agent_end", (event, ctx) => {
-		recordSelfImprovementHistory(ctx, "agent_end", event);
+
 		pendingSettledAgentEnd = event;
 		activePromptBackedAgent = false;
 	});
@@ -31689,27 +29094,7 @@ export default function workModelsExtension(pi) {
 			ctx.ui?.notify?.(`Compaction cancelled without discarding context: ${error.message}`, "warning");
 			return { cancel: true };
 		}
-		const workflowMeta = activeWorkAgent?.meta ?? pendingWorkPrompt?.meta ?? {};
-		const workflowAuthorization = pendingSettledAgentEnd
-			? null
-			: (contextCompactState.workflowAuthorization ??
-				((workflowTurnAuthorized && activePromptBackedAgent) ||
-				activeWorkGoalRunning ||
-				workflowMeta.workflowRunId
-					? {
-							marker: "work-orchestrator",
-							goalId:
-								activeWorkGoalRunning && activeWorkGoal?.status === "active"
-									? activeWorkGoal.id
-									: undefined,
-							workflowRunId: workflowMeta.workflowRunId,
-							activity: workflowMeta.activity,
-							mode: workflowMeta.mode,
-							epicId: workflowMeta.epicId,
-							workItemId:
-								workflowMeta.workItemId ?? compactionTargetId(activeWorkGoal),
-						}
-					: null));
+		const workflowAuthorization = null;
 		return {
 			compaction: {
 				summary: compacted.summary,
@@ -31750,7 +29135,7 @@ export default function workModelsExtension(pi) {
 	pi.on("session_compact", async (event, ctx) => {
 		forcedUltracompact = false;
 		storeCompactionKnowledge(ctx, event.compactionEntry?.details?.knowledgeCandidates, event.compactionEntry?.id);
-		recordSelfImprovementHistory(ctx, "session_compact", event);
+
 		resetContextFilter();
 		imageCompactionCutoff =
 			Date.parse(event.compactionEntry?.timestamp) || Date.now();
@@ -31794,7 +29179,7 @@ export default function workModelsExtension(pi) {
 
 	pi.on("session_compact_failed", (event, ctx) => {
 		forcedUltracompact = false;
-		recordSelfImprovementHistory(ctx, "session_compact_failed", event);
+
 		const generation = contextCompactState.generation;
 		if (contextCompactState.inFlight) finishContextCompaction(generation);
 		manualMicrocompactGoalResume = null;
@@ -31803,32 +29188,13 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("agent_settled", async (_event, ctx) => {
-		if (workflowOn) await driveWorkActionLeases(ctx.cwd, {
-			pi,
-			mode: ctx.mode,
-			session: ctx.sessionManager?.getSessionId?.(),
-			currentSession: () => ctx.sessionManager?.getSessionId?.(),
-			goalStatus: () => activeWorkGoal?.status,
-			modelRegistry: ctx.modelRegistry,
-			notify: (state) =>
-				notify(ctx, renderWorkResumeText(state), state.ok ? "info" : "warning"),
-		});
+
 		if (pendingSettledAgentEnd) {
 			const event = pendingSettledAgentEnd;
 			pendingSettledAgentEnd = null;
-			await finalizeSettledAgent(event, ctx);
+
 		}
-		if (workflowOn) {
-			await settleOrchestratorPause(ctx, pi);
-			try {
-				reconcileSuccessorPrefetches(ctx.cwd);
-			} catch {
-				// Prefetch settlement is recoverable on the next safe hook.
-			}
-			reconcileBackgroundVerifierRuns(ctx.cwd, pi);
-			await presentPendingVerifierBatches(ctx.cwd, ctx, pi);
-			await flushWorkGoalContinuationRetry(ctx, pi);
-		}
+
 		activePromptBackedAgent = false;
 		blockedCompactionResumeTurn = false;
 		blockedInternalBackgroundCompletionTurn = false;
@@ -31844,16 +29210,16 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.on("turn_end", async (event, ctx) => {
-		recordSelfImprovementHistory(ctx, "turn_end", event);
+
 		if (!orchestratorPauseRequest && activeWorkGoal?.status === "active")
 			try {
 				maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
 			} catch {
 				maybeCompact(ctx, {});
 			}
-		await reachOrchestratorPauseBoundary(ctx, pi);
+
 		cleanupBenignInstructionDirt(ctx.cwd);
-		await flushWorkGoalContinuationRetry(ctx, pi);
+
 		const mode = currentCompactionMode(ctx);
 		// Tools outlived the prompt cache: the next request re-bills everything anyway, so a large context compacts first.
 		const coldMinutes = event.toolResults?.length ? coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? [], Date.now(), 0.65) : undefined;
@@ -31940,10 +29306,7 @@ export default function workModelsExtension(pi) {
 						},
 					],
 				};
-				recordSelfImprovementHistory(ctx, "message_end", {
-					...event,
-					message: replacement,
-				});
+
 				return { message: replacement };
 			}
 		}
@@ -31973,13 +29336,10 @@ export default function workModelsExtension(pi) {
 			if (hideGracefulPauseAbort) hideGracefulPauseAbort = false;
 			const { errorMessage: _errorMessage, ...message } = event.message;
 			const replacement = { ...message, stopReason: "stop" };
-			recordSelfImprovementHistory(ctx, "message_end", {
-				...event,
-				message: replacement,
-			});
+
 			return { message: replacement };
 		}
-		recordSelfImprovementHistory(ctx, "message_end", event);
+
 		const backgroundVerifierCompletion = isBackgroundVerifierCompletionMessage(
 			event.message,
 		);
@@ -31996,8 +29356,7 @@ export default function workModelsExtension(pi) {
 			!activePromptBackedAgent &&
 			internalBackgroundCompletion
 		) {
-			if (workflowOn && backgroundVerifierCompletion)
-				reconcileBackgroundVerifierRuns(ctx.cwd, pi);
+
 			pendingInternalBackgroundCompletionPrompt = null;
 			hideBackgroundVerifierAbort = true;
 			ctx.abort?.();
@@ -32008,15 +29367,10 @@ export default function workModelsExtension(pi) {
 		// A new turn without session_compact proves native compaction was abandoned.
 		if (contextCompactState.inFlight && contextCompactState.owner === "native")
 			resetContextCompaction();
-		recordSelfImprovementHistory(ctx, "turn_start", event);
+
 	});
 
-	if (workflowOn) pi.registerCommand(ORCHESTRATOR_GOAL_CONTINUE_COMMAND, {
-		description: "Internal orchestrator goal continuation",
-		handler: async (args, ctx) => {
-			await handleWorkGoalResetCommand(args, ctx, pi);
-		},
-	});
+
 
 	pi.registerCommand("research", {
 		description: "Toggle research mode, or explore a question ([none|narrow|wide] selects advisor usage)",
@@ -32064,160 +29418,42 @@ export default function workModelsExtension(pi) {
 	});
 
 	pi.registerCommand("wo", {
-		description: workflowOn ? "Open Orchestrator, or use /wo goal, /wo pause, /wo resume, /wo plan" : "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo compact or /wo fact",
-		getArgumentCompletions: (prefix) => {
-			const input = String(prefix ?? "").trim();
-			if (/\s/.test(input)) return null;
-			const descriptions = {
-				goal: "Start an autonomous goal with the supplied objective",
-				pause: "Pause after the current LLM cycle finishes",
-				compact: "Microcompact the work context (same as F8)",
-				plan: "Plan3: start a plan, or /plan3 subcommand (finish, resolve, ideas, review…)",
-				plans: "Plan3: browse plans (/plans3)",
-				settings: "Open Settings",
-				...(maintenanceCheckout() ? { "catch-up": "Catch up packages", context: "Context guard: status, compact, on, off, set <tokens>" } : {}),
-				telemetry: "Telemetry summary; blank shows today",
-				usage: "Write the HTML usage report",
-				...(extensionScoutEnabled() ? { scout: "Scout Pi extensions in background" } : {}),
-				resume: workflowOn ? "Resume the paused goal, workflow, or direct request" : "Plan3: continue the current or named plan (/resume3)",
-				"resume-work": "Resume native work state directly",
-				design: "Prepare, commission, or resume a visual design",
-				redesign: "Create a redesign initiative and current-UI audit",
-				fact: "Store, search, correct, or forget durable session knowledge",
-			};
-			const items = Object.entries(descriptions)
-				.filter(([value]) => workflowOn || ["plan", "plans", "resume", "compact", "fact", ...Object.keys(WO_UTILITY_ACTIONS)].includes(value))
-				.filter(([value]) => value.startsWith(input))
-				.map(([value, description]) => ({ value, label: value, description }));
-			return items.length ? items : null;
-		},
-		handler: async (args, ctx) => {
-			const [action, rest] = splitFirstWord(args);
-			if (!action) return handleWorkMenuCommand(ctx, pi);
-			// Legacy /wo resume wins only while the legacy workflow is on.
-			const plan3 = { plan: "plan3", plans: "plans3", ...(workflowOn ? {} : { resume: "resume3" }) }[action];
-			if (plan3) return pi.events?.emit?.("plan3:command", { ctx, name: plan3, args: rest });
-			const utility = WO_UTILITY_ACTIONS[action];
-			// Same visibility as the /wo menu: maintenance does not exist outside the ce-workflow checkout.
-			if (utility && (maintenanceCheckout(ctx.cwd) || !["work-context", "work-catch-up"].includes(utility)))
-				return executeOrchestratorAction(utility, rest, ctx, pi);
-			if (!workflowOn && !["compact", "fact", "context-fill"].includes(action))
-				return notify(ctx, WORKFLOW_OFF_NOTICE, "warning");
-			if (action === "context-fill") {
-				const tokens = Math.max(
-					0,
-					100_000 - (ctx.getContextUsage?.()?.tokens ?? 0),
-				);
-				for (let remaining = tokens; remaining > 0; remaining -= 10_000)
-					pi.sendMessage({
-						customType: "work-context-fill",
-						content: " the".repeat(Math.min(remaining, 10_000)),
-						display: false,
-					});
-				return notify(
-					ctx,
-					tokens
-						? `Added approximately ${tokens} tokens of hidden test context.`
-						: "Context is already at least 100,000 tokens.",
-					"info",
-				);
-			}
-			if (action === "goal") {
-				if (!rest) return notify(ctx, "Usage: /wo goal <objective>", "warning");
-				const goal = stripWorkGoalTokenFlag(rest);
-				if (goal.error) return notify(ctx, goal.error, "warning");
-				return startWorkGoal("generic", goal.text, pi, ctx, goal.budget);
-			}
-			if (action === "pause") return requestOrchestratorPause(ctx, pi);
-			if (action === "compact") return requestMicrocompact(ctx);
-			if (action === "fact") return handleKnowledgeCommand(rest, ctx);
-			if (["design", "redesign"].includes(action))
-				return executeOrchestratorAction(`work-${action}`, rest, ctx, pi);
-			if (action === "resume-work") {
-				if (activeWorkGoal && activeWorkGoal.status !== "active")
-					await handleWorkGoalCommand(
-						"resume",
-						activeWorkGoal?.mode ?? "project",
-						pi,
-						ctx,
-						{ deferPrompt: true },
-					);
-				return executeOrchestratorAction("work-resume", rest, ctx, pi);
-			}
-			if (action !== "resume")
-				return notify(
-					ctx,
-					"Usage: /wo [goal <objective> | pause | resume | resume-work [id] | fact … | design … | redesign <objective>]",
-					"warning",
-				);
-			if (orchestratorPauseRequest)
-				return notify(
-					ctx,
-					"The graceful pause has not reached its boundary yet.",
-					"info",
-				);
-			if (orchestratorPausedJob)
-				return resumeOrchestratorJob(orchestratorPausedJob, rest, ctx, pi);
-			if (activeWorkGoal && activeWorkGoal.status !== "complete") {
-				const requestedTarget = rest.trim();
-				const projectTarget =
-					activeWorkGoal.mode === "project"
-						? workGoalTargetId(activeWorkGoal)
-						: undefined;
-				if (
-					projectTarget &&
-					(!requestedTarget ||
-						requestedTarget === projectTarget ||
-						isNativeWorkItemId(requestedTarget))
-				) {
-					if (activeWorkGoal.status !== "active")
-						await handleWorkGoalCommand("resume", "project", pi, ctx, {
-							deferPrompt: true,
-						});
-					if (activeWorkGoal?.status === "active")
-						return executeOrchestratorAction(
-							"work-resume",
-							requestedTarget || projectTarget,
-							ctx,
-							pi,
-						);
-				}
-				if (!rest && activeWorkGoal.mode === "project")
-					return handleWorkResumeGoalCommand("", pi, ctx);
-				return handleWorkGoalCommand(
-					`resume${rest ? ` ${rest}` : ""}`,
-					activeWorkGoal.mode,
-					pi,
-					ctx,
-				);
-			}
-			const piGoal = latestPiGoal(ctx);
-			if (piGoal && piGoal.status !== "active")
-				return resumeOrchestratorJob(
-					{ kind: "pi-goal", id: piGoal.id, status: piGoal.status },
-					rest,
-					ctx,
-					pi,
-				);
-			return executeOrchestratorAction("work-resume", rest, ctx, pi);
-		},
-	});
+ description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo compact or /wo fact",
+ getArgumentCompletions: (prefix) => {
+  const input=String(prefix ?? "").trim();
+  if (/\s/.test(input)) return null;
+  const descriptions={compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})};
+  const items=Object.entries(descriptions).filter(([value])=>value.startsWith(input)).map(([value,description])=>({value,label:value,description}));
+  return items.length?items:null;
+ },
+ handler: async(args,ctx)=>{
+  const [action,rest]=splitFirstWord(args);
+  if(!action) return handleWorkMenuCommand(ctx,pi);
+  const plan3={plan:"plan3",plans:"plans3",resume:"resume3"}[action];
+  if(plan3) return pi.events?.emit?.("plan3:command",{ctx,name:plan3,args:rest});
+  const utility=WO_UTILITY_ACTIONS[action];
+  if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeOrchestratorAction(utility,rest,ctx,pi);
+  if(action==="compact") return requestMicrocompact(ctx);
+  if(action==="fact") return handleKnowledgeCommand(rest,ctx);
+  if(action==="context-fill") {
+   const tokens=Math.max(0,100_000-(ctx.getContextUsage?.()?.tokens??0));
+   for(let remaining=tokens;remaining>0;remaining-=10_000) pi.sendMessage({customType:"work-context-fill",content:" the".repeat(Math.min(remaining,10_000)),display:false});
+   return notify(ctx,tokens?`Added approximately ${tokens} tokens of hidden test context.`:"Context is already at least 100,000 tokens.","info");
+  }
+  return notify(ctx,"Unknown /wo command. Use /wo for settings and utilities.","warning");
+ }
+});
 	pi.registerShortcut?.("f8", {
 		description: "Microcompact work context",
 		handler: async (ctx) => requestMicrocompact(ctx),
 	});
-	if (workflowOn) pi.registerShortcut?.("f9", {
-		description: "Open Fleet",
-		handler: async (ctx) => {
-			await openWorkflowFleet(ctx, pi);
-		},
-	});
+
 }
 
-const WORKFLOW_OFF_NOTICE = "Workflow is off — /wo → Settings → Workflow (legacy orchestration) turns it back on.";
+
 const WO_UTILITY_ACTIONS = { settings: "work-settings", "catch-up": "work-catch-up", context: "work-context", telemetry: "work-telemetry", usage: "work-usage", scout: "work-extension-scout" };
 const UTILITY_MENU_VALUES = new Set(["work-telemetry", "work-usage", "work-context", "work-settings", "work-catch-up", "work-extension-scout"]);
-const UTILITY_SETTING_KINDS = new Set(["workflow", "openDesignCommand", "planModels", "phaseModel", "codingEffort", "compactionMode", "compactionModel", "jev", "visionModel", "imageModel", "nonVisionModels", "camera", "subscriptionFooter", "reset", "export", "import"]);
+
 
 function onOff(value) {
 	return value ? "✓ on" : "○ off";
@@ -32230,7 +29466,7 @@ function workSettingsStatus(ctx) {
 	const resume = workResumeSettings(ctx.cwd);
 	const compactor = compactionModelSettings(ctx.cwd, settings);
 	const visionModel = visionModelSettings(ctx.cwd, settings);
-	if (!workflowEnabled(ctx.cwd)) {
+
 		notify(ctx, [
 			"Utility settings",
 			"Workflow: off",
@@ -32241,66 +29477,11 @@ function workSettingsStatus(ctx) {
 			`Image generation model: ${imageModelSettings(ctx.cwd, settings) === NONE_MODEL ? "None" : imageModelSettings(ctx.cwd, settings)}`,
 		].join("\n"), "info");
 		return;
-	}
-	const lines = [
-		"Work settings",
-		"",
-		"Profile",
-		`  ${SUBMENU_ARROW} profile: ${resolved.profile}`,
-		"",
-		"Role models / effort",
-		`  ${SUBMENU_ARROW} model strategy: ${resolved.modelStrategy}`,
-		...SLOTS.map(
-			(slot) => `  ${SUBMENU_ARROW} ${slot.label}: ${slotSummary(slot, settings)}`,
-		),
-		"",
-		"Creative analysis",
-		`  ${SUBMENU_ARROW} creative sidecar: ${resolved.creativeMode}`,
-		"  generators reuse Advisor 1–3 models; configured advisors critique the merged result",
-		"",
-		"Visual design",
-		`  ${SUBMENU_ARROW} workflow: ${resolved.visualDesignWorkflow}`,
-		`  ${SUBMENU_ARROW} OpenDesign executable: ${resolved.openDesignCommand ? "configured" : "Auto"}`,
-		`  ${SUBMENU_ARROW} review proof: ${resolved.designReviewProof}`,
-		"",
-		"Background verifiers",
-		...(backgroundVerifierProfiles(ctx.cwd).length
-			? backgroundVerifierProfiles(ctx.cwd).map(
-					(profile) =>
-						`  ${SUBMENU_ARROW} ${profile.model}: ${backgroundVerifierSummary(profile)}`,
-				)
-			: ["  none configured"]),
-		"",
-		"Compaction",
-		`  ${SUBMENU_ARROW} Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label}`,
-		`  ${SUBMENU_ARROW} Compaction LLM model: ${modelEffortSummary(compactor.model, compactor.thinking)}`,
-		`  ${SUBMENU_ARROW} Vision model: ${visionModel === NONE_MODEL ? "None" : visionModel}`,
-		`  ${SUBMENU_ARROW} Image generation model: ${imageModelSettings(ctx.cwd, settings) === NONE_MODEL ? "None" : imageModelSettings(ctx.cwd, settings)}`,
-		`  ${SUBMENU_ARROW} Non-vision models: ${nonVisionModelsSettings(ctx.cwd, settings).join(", ") || "None"}`,
-		"  None: cleaned code; selected model: hybrid summary + knowledge in one call",
-		"",
-		"Performance tweaks (global)",
-		...WORK_PERFORMANCE_FLAGS.map(
-			(flag) =>
-				`  ${performance[flag.key] ? "parallel" : "sequential"} ${flag.label.toLowerCase()}`,
-		),
-		"",
-		"Gates",
-		...WORK_ORCH_BOOLEANS.map(
-			(flag) => `  ${onOff(resolved[flag.key])} ${flag.label}`,
-		),
-		`  ${SUBMENU_ARROW} production review policy: ${resolved.reviewPolicy}`,
-		`  ${SUBMENU_ARROW} pre-commit review: ${resolved.codeReviewBeforeCommit}`,
-		"  implementation: configured Work model (isolated work-worker)",
-		"",
-		"Resume automation",
-		`  ${onOff(resume.newSessionBetweenIterations)} new session between iterations`,
-		`  ${SUBMENU_ARROW} autonomous-goal main effort: ${resume.goalThinkingLevel}`,
-	];
-	notify(ctx, lines.join("\n"), "info");
+
+
 }
 
-const SETTINGS_PROFILE = "__profile__";
+
 const SETTINGS_RESET = "__reset__";
 let subscriptionFooterController;
 let cameraController;
@@ -32399,35 +29580,7 @@ async function editSubscriptionFooterSettings(ctx) {
 	}
 }
 
-async function editPerformanceSettings(ctx) {
-	let selectedIndex = 0;
-	for (;;) {
-		const performance = workPerformanceSettings(ctx.cwd);
-		const result = await showListDialog(ctx, {
-			title: "Performance tweaks: Global",
-			subtitle: "Control workflow concurrency",
-			items: WORK_PERFORMANCE_FLAGS.map((flag) => ({
-				value: flag.key,
-				label: `${performance[flag.key] ? "⇉ parallel" : "→ sequential"} ${flag.label}`,
-				description: "Applies globally to every project",
-			})),
-			selectedIndex,
-			cursorKey: "work-performance-settings",
-			forceCustom: true,
-			selectOnSpace: true,
-			help: "Enter/Space toggle · Esc/Backspace back",
-		});
-		if (!result) return;
-		selectedIndex = result.index;
-		const settings = readGlobalSettings();
-		setWorkPerformanceBoolean(
-			settings,
-			result.item.value,
-			!performance[result.item.value],
-		);
-		writeScopedSettings(ctx.cwd, "global", settings);
-	}
-}
+
 
 function owns(object, key) {
 	return Object.hasOwn(object ?? {}, key);
@@ -32680,7 +29833,7 @@ export async function importSettings(ctx, scope) {
 		"info",
 	);
 	try {
-		syncImprovementReportTool(workExtensionPi, ctx);
+
 		jevTools?.refresh(ctx);
 		if (scope === "global") subscriptionFooterController.apply(ctx);
 	} catch {
@@ -32715,154 +29868,64 @@ async function workSettingsLoop(ctx) {
 		const names = await modelDisplayNames(ctx);
 		const camera = cameraSettings(projectSettings);
 		const items = [
-			{
-				kind: "workflow",
-				value: "workflow",
-				...boolLabel("Workflow (legacy orchestration)", settings.workOrchestrator?.workflow?.enabled === true),
-				description: "Roadmaps, work items, goals, Fleet (F9), work_* tools and verifiers. Toggling reloads the runtime.",
-			},
-			{
+{
 				kind: "planModels",
 				value: "planModels",
 				label: `Plan3 → Plan models: [${(settings.workOrchestrator?.plan3?.models ?? []).map((entry) => names.get(entry.model) ?? entry.model).join(", ") || "None"}] ${SUBMENU_ARROW}`,
 				description: "Ideas/review: first other-family advisor; all launches every available configured model except the exact current one.",
 			},
-			{
-				kind: "profile",
-				value: SETTINGS_PROFILE,
-				label: `Profile: ${titleCase(resolved.profile)} ${SUBMENU_ARROW}`,
-				description:
-					"Low / Medium / High / Max — copy effort and gates onto current settings",
-			},
-			{
-				kind: "modelStrategy",
-				value: "modelStrategy",
-				label: `Model strategy: ${resolved.modelStrategy} ${SUBMENU_ARROW}`,
-				description:
-					"Main first, or durable alternation across configured role candidates",
-			},
-			...SLOTS.flatMap((slot) => {
-				const selected = slotSelection(slot, settings);
-				const backup = backupSlotSelection(slot, settings);
-				const mainSummary =
-					slotSourceForSlot(settings, slot) === CHATGPT_WEB_SOURCE
-						? `ChatGPT Web${chatgptConsultAvailable() ? "" : " (unavailable)"}`
-						: modelEffortSummary(selected.model, selected.thinking, names);
-				const mainLabel = `Model ${slot.label}: [${mainSummary}] ${SUBMENU_ARROW}`;
-				const backupLabel = `   -> Backup: [${backup ? modelEffortSummary(backup.model, backup.thinking, names) : "None"}] ${SUBMENU_ARROW}`;
-				const main = {
-					kind: "slot",
-					value: slot.key,
-					label: mainLabel,
-					labelSegments: [{ text: mainLabel, color: "text" }],
-					description: `Main · ${slot.description}`,
-				};
-				if (isCreativeSlot(slot)) return [main];
-				return [
-					main,
-					{
-						kind: "backupSlot",
-						value: slot.key,
-						label: backupLabel,
-						labelSegments: [{ text: backupLabel, color: "muted" }],
-						description: "Optional fallback; absent preserves Main-only behavior",
-					},
-				];
-			}),
-			...[["planningModel", "Planning model", "/plan3, /resume3 on a draft and optimize switch to this model when they start"], ["codingModel", "Coding model", "/resume3 execution switches to this model when it starts"]].map(([value, name, description]) => ({
+...[["planningModel", "Planning model", "/plan3, /resume3 on a draft and optimize switch to this model when they start"], ["codingModel", "Coding model", "/resume3 execution switches to this model when it starts"]].map(([value, name, description]) => ({
 				kind: "phaseModel",
 				value,
 				label: `Plan3 → ${name}: ${names.get(settings.workOrchestrator?.plan3?.[value]) ?? settings.workOrchestrator?.plan3?.[value] ?? "same as session"} ${SUBMENU_ARROW}`,
 				description: `${description}; unset keeps the session's own model. Each switch re-reads the context uncached once.`,
 			})),
-			{
+{
 				kind: "codingEffort",
 				value: "codingEffort",
 				label: `Plan3 → Coding effort: ${settings.workOrchestrator?.plan3?.codingEffort ?? "same as session"} ${SUBMENU_ARROW}`,
 				description: "/resume3 execution switches to this effort when it starts; planning switches back. Each switch re-reads the context uncached once.",
 			},
-			{
-				kind: "backgroundVerifiers",
-				value: "backgroundVerifiers",
-				label: `Background verifiers ${SUBMENU_ARROW}`,
-				description: backgroundVerifierProfiles(
-					ctx.cwd,
-					scope === "global" ? settings : undefined,
-				).length
-					? `${
-							backgroundVerifierProfiles(
-								ctx.cwd,
-								scope === "global" ? settings : undefined,
-							).length
-						} configured`
-					: "none configured",
-			},
-			{
+{
 				kind: "compactionMode", value: "compactionMode",
 				label: `Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label} ${SUBMENU_ARROW}`,
 				description: "Ultracompact / Ultrafull compact / Native / Native 200k. F8 always forces compaction.",
 			},
-			{
+{
 				kind: "compactionModel",
 				value: "compactionModel",
 				label: `Compaction LLM model: [${modelEffortSummary(compactor.model, compactor.thinking, names)}] ${SUBMENU_ARROW}`,
 				description:
 					"None: cleaned code only. Model: hybrid summary + knowledge in one call.",
 			},
-			{
+{
 				kind: "jev", value: "jev",
 				label: `Optional Jev tools: ${jevStatus(mergeSettings(readGlobalSettings(), projectSettings), ctx.modelRegistry).status} ${SUBMENU_ARROW}`,
 				description: "Upload consent per scope (project overrides global); native OpenRouter login. No automatic classifier calls.",
 			},
-			{
+{
 				kind: "visionModel", value: "visionModel",
 				label: `Vision model: [${visionModel === NONE_MODEL ? "None" : names.get(visionModel) ?? visionModel}] ${SUBMENU_ARROW}`,
 				description: "process_image: answers image questions (files or references) so pixels stay out of the main context; images go to this provider.",
 			},
-			{
+{
 				kind: "imageModel", value: "imageModel",
 				label: `Image generation model: [${imageModelSettings(ctx.cwd, settings) === NONE_MODEL ? "None" : names.get(imageModelSettings(ctx.cwd, settings)) ?? imageModelSettings(ctx.cwd, settings)}] ${SUBMENU_ARROW}`,
 				description: "generate_image: a Codex subscription model (e.g. Sol) or an OpenRouter image model draws and saves PNG files.",
 			},
-			{
+{
 				kind: "nonVisionModels", value: "nonVisionModels",
 				label: `Models without vision: [${nonVisionModelsSettings(ctx.cwd, settings).length || "None"}] ${SUBMENU_ARROW}`,
 				description: "Only selected models receive image references instead of pixels.",
 			},
-			{
-				kind: "creativeMode",
-				value: "creativeMode",
-				label: `Creative sidecar: ${titleCase(resolved.creativeMode)} ${SUBMENU_ARROW}`,
-				description:
-					"3 isolated generators use the Brainstorm / Ideate source; advisors critique the merged result",
-			},
-			{
-				kind: "designWorkflow",
-				value: "visualDesignWorkflow",
-				label: `Visual design workflow: ${resolved.visualDesignWorkflow === "required" ? "Required for UI" : titleCase(resolved.visualDesignWorkflow)} ${SUBMENU_ARROW}`,
-				description:
-					"Off, Auto fallback, or required approval for substantial UI work",
-			},
-			{
+{
 				kind: "openDesignCommand",
 				value: "openDesignCommand",
 				label: `OpenDesign executable: ${resolved.openDesignCommand ? "Configured" : "Auto"} ${SUBMENU_ARROW}`,
 				description:
 					"Auto discovery or a validated command/args/env JSON spec; credentials are rejected",
 			},
-			{
-				kind: "designReviewProof",
-				value: "designReviewProof",
-				label: `Design review proof: ${titleCase(resolved.designReviewProof)} ${SUBMENU_ARROW}`,
-				description: "Standard evidence, or Strict with final human approval proof",
-			},
-			{
-				kind: "performance",
-				value: "performance",
-				label: `Performance tweaks (global only) ${SUBMENU_ARROW}`,
-				description: `Verification ${performance.parallelVerification ? "parallel" : "sequential"} · background/advisors ${performance.parallelBackgroundVerifiers && performance.parallelAdvisors ? "parallel" : "mixed"}`,
-			},
-			{
+{
 				kind: "subscriptionFooter",
 				value: "subscriptionFooter",
 				label: `Subscription footer (global only) ${SUBMENU_ARROW}`,
@@ -32870,38 +29933,7 @@ async function workSettingsLoop(ctx) {
 					? "on · custom context footer owns the active TUI"
 					: "off · Pi's built-in footer remains active",
 			},
-			...WORK_ORCH_BOOLEANS.map((flag) => ({
-				kind: "bool",
-				value: flag.key,
-				...boolLabel(flag.label, resolved[flag.key]),
-			})),
-			{
-				kind: "reviewPolicy",
-				value: "reviewPolicy",
-				label: `Production review: ${resolved.reviewPolicy === "review-all" ? "Review All" : "Risk-based"} ${SUBMENU_ARROW}`,
-				description: REVIEW_POLICY_DESC[resolved.reviewPolicy],
-			},
-			{
-				kind: "reviewLevel",
-				value: "codeReviewBeforeCommit",
-				label: `pre-commit review ${SUBMENU_ARROW}`,
-				description: resolved.codeReviewBeforeCommit,
-			},
-			{
-				kind: "resumeBool",
-				value: "newSessionBetweenIterations",
-				...boolLabel(
-					"new session between iterations",
-					resume.newSessionBetweenIterations,
-				),
-			},
-			{
-				kind: "resumeThinking",
-				value: "goalThinkingLevel",
-				label: `autonomous-goal main effort: ${resume.goalThinkingLevel} ${SUBMENU_ARROW}`,
-				description: "Temporarily override this session while autonomous work runs",
-			},
-			{
+{
 				kind: "reset",
 				value: SETTINGS_RESET,
 				label:
@@ -32913,25 +29945,24 @@ async function workSettingsLoop(ctx) {
 						? "Restore built-in workflow defaults"
 						: "Use global values for every workflow setting",
 			},
-			{
+{
 				kind: "export",
 				value: "exportSettings",
 				label: "Export settings",
 				description: `Show the ${scope} JSON file path and copy its full contents to clipboard`,
 			},
-			{
+{
 				kind: "import",
 				value: "importSettings",
 				label: "Import settings",
 				description: `Replace the ${scope} JSON file from a path or pasted JSON; back up the current file first`,
 			},
-			// Listed in both scopes but always edits project settings; [local] marks it project-only.
-			{
+{
 				kind: "camera", value: "camera",
 				label: `Camera (project only): ${camera.enabled ? "ON" : "OFF"} · ${camera.device?.label ?? "None"} ${SUBMENU_ARROW}`,
 				description: "Local TUI only · explicit device/permission · stills, never recorded video",
-			},
-		].filter((item) => workflowEnabled(ctx.cwd) || UTILITY_SETTING_KINDS.has(item.kind));
+			}
+];
 		for (const item of items)
 			item.local = item.kind === "camera" || hasProjectOverride(projectSettings, item);
 		const selected = await chooseWorkSetting(ctx, items, selectedIndex, scope);
@@ -32987,15 +30018,7 @@ async function workSettingsLoop(ctx) {
 			);
 			continue;
 		}
-		if (pick.kind === "workflow") {
-			settings = readScopedSettings(ctx.cwd, scope);
-			const enabled = settings.workOrchestrator?.workflow?.enabled !== true;
-			settings.workOrchestrator = { ...settings.workOrchestrator, workflow: { ...settings.workOrchestrator?.workflow, enabled } };
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Workflow ${enabled ? "on" : "off"} (${scope}); reloading.`, "info");
-			if (typeof ctx.reload === "function") return ctx.reload();
-			continue;
-		}
+
 		if (pick.kind === "planModels") {
 			await editPlanModels(ctx, scope, names);
 			continue;
@@ -33041,61 +30064,10 @@ async function workSettingsLoop(ctx) {
 			await editSubscriptionFooterSettings(ctx);
 			continue;
 		}
-		if (pick.kind === "performance") {
-			await editPerformanceSettings(ctx);
-			continue;
-		}
-		if (pick.kind === "profile") {
-			const profileKey = await choose(
-				ctx,
-				"Choose effort profile",
-				[
-					...Object.keys(EFFORT_PROFILES).map((key) => ({
-						value: key,
-						label: titleCase(key),
-						description: profileDescription(key),
-					})),
-				],
-				resolved.profile,
-			);
-			if (!profileKey) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			applyProfile(settings, profileKey);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Applied ${profileKey} ${scope} profile`, "info");
-			continue;
-		}
-		if (pick.kind === "modelStrategy") {
-			const strategy = await choose(
-				ctx,
-				"Model strategy",
-				MODEL_STRATEGIES.map((value) => ({
-					value,
-					label: value,
-					description:
-						value === "main-first"
-							? "Try Main, then configured Backup"
-							: "Alternate eligible Main and Backup choices durably",
-				})),
-				resolved.modelStrategy,
-			);
-			if (!strategy) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setModelStrategy(settings, strategy);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			continue;
-		}
-		if (pick.kind === "backgroundVerifiers") {
-			try {
-				await editBackgroundVerifiers(ctx, scope);
-			} catch (error) {
-				ctx.ui.notify(
-					`Could not write background verifiers: ${error instanceof Error ? error.message : String(error)}`,
-					"error",
-				);
-			}
-			continue;
-		}
+
+
+
+
 		if (pick.kind === "nonVisionModels") {
 			const selected = await showListDialog(ctx, {
 				title: "Models without vision",
@@ -33173,51 +30145,8 @@ async function workSettingsLoop(ctx) {
 			);
 			continue;
 		}
-		if (pick.kind === "creativeMode") {
-			const mode = await choose(
-				ctx,
-				"Creative sidecar mode",
-				CREATIVE_MODES.map((value) => ({
-					value,
-					label: value,
-					description: CREATIVE_MODE_DESC[value],
-				})),
-				resolved.creativeMode,
-			);
-			if (!mode) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setWorkOrchCreativeMode(settings, mode);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Creative sidecar: ${mode}`, "info");
-			continue;
-		}
-		if (pick.kind === "designWorkflow") {
-			const policy = await choose(
-				ctx,
-				"Visual design workflow",
-				[
-					{ value: "off", label: "Off", description: "No OpenDesign lifecycle" },
-					{
-						value: "auto",
-						label: "Auto",
-						description:
-							"Use OpenDesign when available, otherwise require text approval",
-					},
-					{
-						value: "required",
-						label: "Required for UI",
-						description: "Block substantial UI planning until approved or waived",
-					},
-				],
-				resolved.visualDesignWorkflow,
-			);
-			if (!policy) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setDesignWorkflowSetting(settings, policy);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Visual design workflow: ${policy}`, "info");
-			continue;
-		}
+
+
 		if (pick.kind === "openDesignCommand") {
 			const mode = await choose(
 				ctx,
@@ -33264,121 +30193,11 @@ async function workSettingsLoop(ctx) {
 			);
 			continue;
 		}
-		if (pick.kind === "designReviewProof") {
-			const proof = await choose(
-				ctx,
-				"Design review proof",
-				[
-					{
-						value: "standard",
-						label: "Standard",
-						description: "Automated fidelity evidence",
-					},
-					{
-						value: "strict",
-						label: "Strict",
-						description: "Also require final human approval proof",
-					},
-				],
-				resolved.designReviewProof,
-			);
-			if (!proof) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setDesignReviewProofSetting(settings, proof);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Design review proof: ${proof}`, "info");
-			continue;
-		}
-		if (pick.kind === "reviewPolicy") {
-			const policy = await choose(
-				ctx,
-				"Production review policy",
-				REVIEW_POLICIES.map((value) => ({
-					value,
-					label: value === "review-all" ? "Review All" : "Risk-based",
-					description: REVIEW_POLICY_DESC[value],
-				})),
-				resolved.reviewPolicy,
-			);
-			if (!policy) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setWorkOrchReviewPolicy(settings, policy);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Production review: ${policy}`, "info");
-			continue;
-		}
-		if (pick.kind === "reviewLevel") {
-			const level = await choose(
-				ctx,
-				"Pre-commit review level",
-				REVIEW_LEVELS.map((value) => ({
-					value,
-					label: value,
-					description: REVIEW_LEVEL_DESC[value],
-				})),
-				resolved.codeReviewBeforeCommit,
-			);
-			if (!level) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setWorkOrchReviewLevel(settings, level);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Pre-commit review: ${level}`, "info");
-			continue;
-		}
-		if (pick.kind === "resumeThinking") {
-			const level = await choose(
-				ctx,
-				"Autonomous-goal main effort",
-				["inherit", ...THINKING_LEVELS].map((value) => ({
-					value,
-					label: value,
-					description:
-						value === "inherit"
-							? "Keep the current session effort"
-							: "Restore the prior effort when work pauses or finishes",
-				})),
-				resume.goalThinkingLevel,
-			);
-			if (!level) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			setWorkResumeThinkingLevel(settings, level);
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(`Autonomous-goal main effort: ${level}`, "info");
-			continue;
-		}
-		if (pick.kind === "slot" || pick.kind === "backupSlot") {
-			const slot = slotByKey(pick.value);
-			if (slot)
-				try {
-					await editSlotModel(
-						ctx,
-						readScopedSettings(ctx.cwd, scope),
-						slot,
-						scope,
-						pick.kind === "backupSlot",
-					);
-				} catch (error) {
-					const target =
-						scope === "global" ? globalSettingsPath() : settingsPath(ctx.cwd);
-					ctx.ui.notify(
-						`Could not write ${target}: ${error instanceof Error ? error.message : String(error)}`,
-						"error",
-					);
-				}
-			continue;
-		}
-		// Boolean flip (live): write immediately.
-		settings = readScopedSettings(ctx.cwd, scope);
-		const current =
-			pick.kind === "resumeBool" ? resume[pick.value] : resolved[pick.value];
-		const next = !current;
-		if (pick.kind === "resumeBool")
-			setWorkResumeBoolean(settings, pick.value, next);
-		else setWorkOrchBoolean(settings, pick.value, next);
-		writeScopedSettings(ctx.cwd, scope, settings);
-		ctx.ui.notify(
-			`${pick.settingLabel ?? pick.label}: ${next ? "on" : "off"}`,
-			"info",
-		);
+
+
+
+
+
+
 	}
 }

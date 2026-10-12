@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: active
 created: 2026-10-12
-updated: 2026-10-12T07:45:15.309Z
+updated: 2026-10-12T08:01:40.705Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -115,7 +115,7 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 ## Resume context
 
-Reviewed and both questions settled (D-07 drop monitor, D-08 delete the repo's legacy store in P3). No open questions; no code changed. Next: E1, the import graph for extensions and scripts with keep, trim or delete per module.
+E1 and E4 committed locally (c127ff0, 5352c2a). E2 in progress: public /wo reduced to Plan3/utilities; F9, work_* registrations and legacy settings rows removed; startup/agent hooks stripped of goal activation and legacy telemetry; first unused-declaration sweep applied. Focused utility, Plan3 and compaction-notifications tests pass. Still remove legacy exports, internal goal branches and unused declarations before E2 is done; follow with E3 menu/utility dispatch cleanup, E5 static conversion fixtures, then S1 graph sweep. Baseline verifier: known screen-read failure plus Plan3 transient failure (passed isolated twice). No push. Stop reason: none; continuing after compaction checkpoint.
 
 ## Amendments
 
