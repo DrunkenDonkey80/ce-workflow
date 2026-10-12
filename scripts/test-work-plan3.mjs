@@ -27,7 +27,7 @@ import { catchUpPlanText, changelogExcerpt, recordCatchUp } from "../extensions/
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
-const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map();
+const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map(), shortcuts = new Map();
 const messages = [], notices = [], events = [], statuses = [], execCalls = [];
 let execResult = { code: 0, stdout: "", stderr: "", killed: false };
 let entries = [];
@@ -64,6 +64,7 @@ const api = {
 	getAllTools: () => askSource ? [{ name: "ask_user", sourceInfo: { path: askSource } }] : [],
 	exec: async (command, args, options) => { execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
 	registerCommand: (name, command) => commands.set(name, command),
+	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
 	events: { emit: (name, data) => events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }), on: (name, handler) => listeners.set(name, handler) },
@@ -559,6 +560,25 @@ try {
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-01**", "- [x] **T-01**"));
 		await hooks.get("turn_end")({}, ctx);
 		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "the next phase switches back mid-run");
+		// alt+= / alt+- bias: Task levels switch at once and end with the phase; Plan levels clamp and last.
+		const press = (key) => shortcuts.get(key).handler(ctx);
+		await press("alt+=");
+		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "high"], "Think:Task switches at once");
+		assert.match(statuses.at(-1), /\x1b\[38;5;151m\[Think:Task\]/);
+		await press("alt+=");
+		await press("alt+=");
+		assert.match(statuses.at(-1), /\x1b\[32m\[Think:Plan\]/, "clamped at Think:Plan");
+		await press("alt+-");
+		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-02** Code it", "- [x] **T-02** Code it\n\n### P3 — More [code]\n\n- [ ] **T-03** More"));
+		await hooks.get("turn_end")({}, ctx);
+		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "Think:Task ends with its phase");
+		assert.doesNotMatch(statuses.at(-1), /\[Think/);
+		await press("alt+-");
+		await press("alt+-");
+		assert.match(statuses.at(-1), /\x1b\[31m\[Work:Plan\]/);
+		await press("alt+=");
+		await press("alt+=");
+		assert.doesNotMatch(statuses.at(-1), /\[(?:Work|Think):/, "level 0 shows nothing");
 		await run("resume3", "7e7e7e7e");
 		assert.doesNotMatch(messages.at(-1).message, /before executing, tag phases/, "tagged phases need no tagging turn");
 		// Finished phases ([x] steps) never need tags, so they do not trigger a tagging run.

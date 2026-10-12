@@ -148,7 +148,7 @@ export function renderModelRow(ctx, theme, width, thinkingLevel, extra = "") {
 		? fullBar
 		: contextBar(percent, Math.max(4, Math.min(10, width - 52)));
 	const base = full ? fullSuffix : ` | [${bar}] ${usage}`;
-	const tail = extra && ` | ${stripAnsi(extra)}`;
+	const tail = extra && ` | ${extra}`; // keeps Plan3's colored bias label
 	const suffix =
 		tail && width - visibleWidth(base) - visibleWidth(tail) >= 20
 			? `${base}${tail}`
@@ -1328,14 +1328,14 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				render(width) {
 					const entries = footerData?.getExtensionStatuses?.() ?? new Map();
 					// Plan3 progress joins the first row without its icon; the crowded status row then disappears.
-					const plan3 = stripAnsi(entries.get("plan3") ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
+					const plan3 = (entries.get("plan3") ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
 					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.(), plan3);
 					// Pi's own footer draws ctx.ui.setStatus() entries; a replacement footer must too.
 					const statuses = [...entries]
 						.sort(([a], [b]) => a.localeCompare(b))
 						.map(([, text]) => stripAnsi(text))
 						.join(" ");
-					const absorbed = plan3 && stripAnsi(model[0]).endsWith(` | ${plan3}`);
+					const absorbed = plan3 && stripAnsi(model[0]).endsWith(` | ${stripAnsi(plan3)}`);
 					const status = statuses.trim() && !absorbed ? [theme.fg("dim", truncatePlain(statuses, width))] : [];
 					return width < MIN_WIDTH
 						? [...model, ...status]

@@ -372,12 +372,25 @@ const PACKET_OMIT = /^(?:phases|amendments|ideas|backlog|imported plan|relevant 
 const clipLine = (line) => line.length <= 200 ? line : `${line.slice(0, 200).replace(/\s+\S*$/, "")} \u2026`;
 // Execution mode of the step work continues with: its ### phase heading tagged [think], else coding.
 const THINK = /\[think\]/i;
-function stepMode(lines, avail = {}) {
+function stepHeading(lines, avail = {}) {
 	const work = workState(lines, avail);
 	const step = work.wip[0] ?? work.next;
-	const heading = step && lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line));
+	return step && lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line));
+}
+function stepMode(lines, avail = {}) {
+	const heading = stepHeading(lines, avail);
 	return heading?.startsWith("### ") && THINK.test(heading) ? "think" : "coding";
 }
+// alt+= / alt+- bias over the phase tags, per session: "Task" levels (\u00b11) end with the current phase, "Plan" levels (\u00b12) last.
+const BIAS = "plan3-bias";
+const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 1: "Think:Task", 2: "Think:Plan" };
+const BIAS_COLOR = { "-2": "31", "-1": "38;5;210", 1: "38;5;151", 2: "32" };
+function biasOf(ctx, plan, lines, avail = {}) {
+	const data = (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === BIAS)?.data;
+	if (!data || data.id !== plan.id) return 0;
+	return Math.abs(data.level) === 1 && data.phase !== headingKey(stepHeading(lines, avail) ?? "") ? 0 : data.level;
+}
+const modeOf = (ctx, plan, lines, avail) => { const bias = biasOf(ctx, plan, lines, avail); return bias > 0 ? "think" : bias < 0 ? "coding" : stepMode(lines, avail); };
 // An unfinished phase without a [think]/[code] tag gets a tagging turn on /resume3 (old plans, phases added later).
 // A phase is any ### heading with steps under it ("### Phase 2", "### P0 \u2014 \u2026"), matching stepMode.
 const stepHeadings = (lines) => activeSteps(lines).map((step) => lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line)));
@@ -660,7 +673,8 @@ export default function plan3(pi) {
 			const plan = currentPlan(ctx, await listPlans(ctx.cwd));
 			const focus = plan?.wip[0] ?? plan?.next;
 			const design = plan && localPlanDesign(ctx.cwd, plan);
-			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
+			const bias = plan ? biasOf(ctx, plan, split(await readFile(plan.file, "utf8")).lines, availOf(plan.file)) : 0;
+			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
 	}
 	// R10/D12: compact before switching plans; a failed compaction sends nothing.
@@ -727,7 +741,7 @@ export default function plan3(pi) {
 			if (unset(availOf(plan.file), [...defs.keys()]).length) await waitForUser("Plan3: set requirements", () => chooseAvail(ctx, needsFile(logFile(plan.file)), defs));
 		}
 		if (!planning && !tag && ctx.hasUI) await reviewTags(ctx, plan);
-		const mode = planning ? "planning" : tag ? "think" : stepMode(split(await readFile(plan.file, "utf8")).lines, availOf(plan.file));
+		const mode = planning ? "planning" : tag ? "think" : modeOf(ctx, plan, split(await readFile(plan.file, "utf8")).lines, availOf(plan.file));
 		await runPhase(ctx, plan, mode);
 		setPointer(plan, planning);
 		await refresh(ctx);
@@ -823,6 +837,20 @@ export default function plan3(pi) {
 		const { avail } = await chooseAvail(ctx, file, defs);
 		return availLine(avail, defs);
 	}
+	// Bias the current plan toward the planning (thinker) or coding model; applies at once while the plan executes.
+	async function shiftBias(ctx, delta) {
+		try {
+			const plan = currentPlan(ctx, await listPlans(ctx.cwd));
+			if (!plan) return ctx.ui?.notify?.("Plan3: no open plan to bias.", "warning");
+			const lines = split(await readFile(plan.file, "utf8")).lines, avail = availOf(plan.file);
+			const level = Math.max(-2, Math.min(2, biasOf(ctx, plan, lines, avail) + delta));
+			pi.appendEntry?.(BIAS, { id: plan.id, level, phase: headingKey(stepHeading(lines, avail) ?? "") });
+			await refresh(ctx);
+			await followMode(ctx);
+		} catch (error) { report(ctx, error); }
+	}
+	pi.registerShortcut?.("alt+=", { description: "Plan3: bias toward the thinking model (Think:Task, then Think:Plan)", handler: (ctx) => shiftBias(ctx, 1) });
+	pi.registerShortcut?.("alt+-", { description: "Plan3: bias toward the coding model (Work:Task, then Work:Plan)", handler: (ctx) => shiftBias(ctx, -1) });
 	pi.registerShortcut?.("alt+a", { description: "Plan3 requirements: what the agent may use now", handler: async (ctx) => { try { await editNeeds(ctx, currentPlan(ctx, await listPlans(ctx.cwd))); } catch (error) { report(ctx, error); } } });
 	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging: () => Boolean(tagging), switchNeeds });
 	// shortcut: a run counts while the session's current plan is the one /resume3 executes, so later chat in that session counts too.
@@ -854,7 +882,7 @@ export default function plan3(pi) {
 		const id = executingPlan(ctx);
 		const plan = id && (await listPlans(ctx.cwd)).find((candidate) => candidate.id === id);
 		if (!plan) return;
-		const mode = stepMode(split(await readFile(plan.file, "utf8")).lines, availOf(plan.file));
+		const mode = modeOf(ctx, plan, split(await readFile(plan.file, "utf8")).lines, availOf(plan.file));
 		if ((lastRun(ctx)?.mode ?? "coding") === mode) return;
 		await runPhase(ctx, plan, mode);
 		ctx.ui?.notify?.(`Plan3: ${mode === "think" ? "[think] phase — planning model, high effort" : "coding phase — coding model and effort"}.`, "info");
