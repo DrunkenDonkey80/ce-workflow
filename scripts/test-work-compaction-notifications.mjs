@@ -1728,6 +1728,9 @@ try {
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx), /Configure a vision model/);
 	const readBlock = async file => (await Promise.all(toolCallHooks.map(hook => hook({ toolName: "read", input: { path: file } }, visionCtx)))).find(result => result?.block);
 	assert.equal(await readBlock("shot.PNG"), undefined, "without a vision model, read keeps loading images");
+	const seeing = { ...visionCtx, model: { provider: "test", id: "seeing", input: ["text", "image"] } };
+	assert.equal((await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, seeing)).details.model, "test/seeing", "no vision model: the current image-capable model answers");
+	assert.match((await Promise.all(toolCallHooks.map(hook => hook({ toolName: "read", input: { path: "shot.PNG" } }, seeing)))).find(result => result?.block)?.reason ?? "", /process_image/, "and image reads go through it");
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision", nonVisionModels: ["test/text", "test/vision"] } }));
 	assert.equal(await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "vision" } }), undefined, "selected vision model always keeps images");
 	assert.match((await readBlock("out/shot.PNG"))?.reason ?? "", /process_image with image "out\/shot\.PNG"/, "image reads go to the vision model");

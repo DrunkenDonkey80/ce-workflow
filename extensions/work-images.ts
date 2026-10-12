@@ -120,8 +120,13 @@ export function imageModelCanDraw(model) {
 }
 
 // Registers process_image and generate_image, shown only while their model is set (like the Jev tools).
-export function createImageTools(pi, { visionModel, imageModel, visionBridge, register }) {
+export function createImageTools(pi, { visionModel: configured, imageModel, visionBridge, register }) {
 	let signature;
+	// No vision model set: a one-shot call to the current image-capable model still keeps pixels out of the main context.
+	const visionModel = (cwd, model) => {
+		const set = configured(cwd);
+		return set === NONE && model?.input?.includes("image") ? `${model.provider}/${model.id}` : set;
+	};
 	const processImage = (model) => ({
 		name: "process_image",
 		label: "Process Image",
@@ -138,7 +143,7 @@ export function createImageTools(pi, { visionModel, imageModel, visionBridge, re
 		async execute(_id, args, signal, _update, ctx) {
 			const source = String(args.image ?? "").trim();
 			if (!source) throw new Error("Pass image: an image file path or an img- reference.");
-			const model = visionModel(ctx.cwd);
+			const model = visionModel(ctx.cwd, ctx.model);
 			const image = /^img-[a-f0-9]{16}$/.test(source) ? source : visionBridge.remember(readImageFile(resolve(ctx.cwd, source)));
 			const { text, usage, cached } = await visionBridge.inspect({ image, question: args.question, model, registry: ctx.modelRegistry, signal });
 			return {
@@ -189,7 +194,7 @@ export function createImageTools(pi, { visionModel, imageModel, visionBridge, re
 	});
 	function refresh(ctx) {
 		if (!ctx?.cwd) return;
-		const vision = visionModel(ctx.cwd), image = imageModel(ctx.cwd);
+		const vision = visionModel(ctx.cwd, ctx.model), image = imageModel(ctx.cwd);
 		const next = `${vision}\n${image}`;
 		if (next === signature) return;
 		signature = next;
@@ -203,7 +208,7 @@ export function createImageTools(pi, { visionModel, imageModel, visionBridge, re
 	// Prompt rules alone did not stop agents from loading multi-MB screenshots into the main context.
 	pi.on("tool_call", (event, ctx) => {
 		const file = event.toolName === "read" && String(event.input?.path ?? "");
-		if (!file || !MIME[extname(file).toLowerCase()] || !ctx?.cwd || visionModel(ctx.cwd) === NONE) return;
+		if (!file || !MIME[extname(file).toLowerCase()] || !ctx?.cwd || visionModel(ctx.cwd, ctx.model) === NONE) return;
 		return { block: true, reason: `Image files go to the vision model: call process_image with image "${file}" and a specific question; only its answer enters your context.` };
 	});
 	return { refresh };
