@@ -1,6 +1,0 @@
-{
-  "name": "csv-expense-analyzer",
-  "private": true,
-  "type": "module",
-  "scripts": { "test": "node --test" }
-}

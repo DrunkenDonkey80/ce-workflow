@@ -1,1 +1,0 @@
-Create a kids-like calculator design that features bright colors.
