@@ -13,7 +13,7 @@ import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
 
-import { resolveLatestOfficialStableRelease } from "./work-compound-catch-up.ts";
+
 import {
 	createSubscriptionFooterController,
 	PRODUCTION_PROVIDERS,
@@ -808,9 +808,7 @@ function parseWorkflowJson(text, label) {
 	}
 }
 
-function readWorkflowJson(file, label) {
-	return parseWorkflowJson(readFileSync(file, "utf8"), label);
-}
+
 
 function knownKnowledgeDiscovererRun(runId) {
 	return (
@@ -2595,54 +2593,6 @@ function buildWorkCatchUpState(cwd, names) {
 	mkdirSync(dir, { recursive: true });
 	const packages = baseline.packages.filter((item) => !names || names.includes(item.name)).map((item) => {
 		const name = String(item.name ?? "").trim();
-		if (item.source === "official-github-stable-release") {
-			const policy = readWorkflowJson(
-				resolve(
-					WORKFLOW_REPO_DIR,
-					"extensions",
-					"work-compound-source-policy.json",
-				),
-				"work compound source policy",
-			);
-			let currentRelease = policy.release;
-			try {
-				currentRelease = JSON.parse(
-					readFileSync(
-						resolve(
-							WORKFLOW_REPO_DIR,
-							"extensions",
-							"private-workflows",
-							"provenance.json",
-						),
-						"utf8",
-					),
-				).release;
-			} catch {
-				// The verified source policy remains the fail-closed current pin.
-			}
-			const prefix = policy.release.slice(0, -policy.version.length);
-			const currentVersion = currentRelease.startsWith(prefix)
-				? currentRelease.slice(prefix.length)
-				: policy.version;
-			const resolution = resolveLatestOfficialStableRelease({
-				...policy,
-				release: currentRelease,
-				version: currentVersion,
-			});
-			return {
-				name,
-				source: item.source,
-				baselineVersion: currentVersion,
-				installedVersion: "",
-				latestVersion: resolution.version ?? "",
-				targetVersion: resolution.version ?? currentVersion,
-				changed: resolution.status === "update",
-				needsReview: false,
-				status: resolution.status,
-				reason: resolution.reason,
-				resolution,
-			};
-		}
 		const baselineVersion = String(item.version ?? "").trim();
 		const latestVersion = npmLatestVersion(name);
 		const installedVersion = installedPackageVersion(name);

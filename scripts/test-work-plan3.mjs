@@ -801,6 +801,22 @@ try {
 		assert.equal(selectScript.length, 0);
 		assert.equal(await readFile(legacyStore, "utf8"), invalid, "invalid or future store is never repaired or overwritten");
 	}
+	const recoveryStore = path.join(cwd, ".pi", "work-store", "work-items.recovery.json");
+	const recoveryBytes = storeBytes.replaceAll("work-1", "recover-1").replace("Legacy epic", "Recovery epic");
+	await mkdir(path.dirname(recoveryStore), { recursive: true });
+	await writeFile(recoveryStore, recoveryBytes);
+	await writeFile(legacyStore, storeBytes.replace('"schemaVersion": 1', '"schemaVersion": 99'));
+	selectScript = [["Plans3", null, (labels) => assert(!labels.some((label) => label.includes("Convert")), "future primary schema never falls back to an older recovery")]];
+	await run("plans3");
+	await writeFile(legacyStore, "{broken");
+	selectScript = [["Plans3", "Convert legacy work (1)"], ["Convert legacy work", "recover-1 Recovery epic"], ["Plans3", null]];
+	await run("plans3");
+	assert.equal(selectScript.length, 0);
+	const recoveredLegacy = await readFile(path.join(directory, (await files()).find(name => name.includes("recovery-epic"))), "utf8");
+	assert.match(recoveredLegacy, /^source: work:recover-1$/m);
+	assert.equal(await readFile(legacyStore, "utf8"), "{broken", "recovery conversion leaves the corrupt primary unchanged");
+	assert.equal(await readFile(recoveryStore, "utf8"), recoveryBytes, "recovery conversion leaves recovery bytes unchanged");
+	await rm(path.dirname(recoveryStore), { recursive: true });
 	await writeFile(legacyStore, storeBytes);
 	ctx.hasUI = false;
 

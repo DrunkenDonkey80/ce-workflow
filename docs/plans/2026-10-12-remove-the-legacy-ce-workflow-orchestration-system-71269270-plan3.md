@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-12
-updated: 2026-10-12T08:39:35.042Z
+updated: 2026-10-12T08:48:21.647Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -115,7 +115,7 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 ## Resume context
 
-E1 and E4 committed locally (c127ff0, 5352c2a). E2 in progress: public /wo reduced to Plan3/utilities; F9, work_* registrations and legacy settings rows removed; startup/agent hooks stripped of goal activation and legacy telemetry; first unused-declaration sweep applied. Focused utility, Plan3 and compaction-notifications tests pass. Still remove legacy exports, internal goal branches and unused declarations before E2 is done; follow with E3 menu/utility dispatch cleanup, E5 static conversion fixtures, then S1 graph sweep. Baseline verifier: known screen-read failure plus Plan3 transient failure (passed isolated twice). No push. Stop reason: none; continuing after compaction checkpoint.
+E1–E5 and S1 are complete and locally committed; S1 reduced work-models.ts from 33.6k to 4,738 lines with a stable reachability graph and zero active LSP errors. S2 is in progress: work-design keeps only Plan3 helper dependencies, work-compound-source only scout confinement helpers, work-store only validated read/list/children APIs (no writers); the private-release catch-up branch/import is removed. Plan3 conversion tests now prove recovery fallback and source-byte preservation; future primary versions refuse fallback. Latest focused Plan3 and scout tests pass; diff --check passes; 4/5 batched LSP paths confirmed clean, one push-only result inconclusive. Next: trim work-compaction legacy profiles/summary branches and its tests, trim work-verification-contract to loader validation, delete orphan extension modules (S2), then S3 dependency review and P1–P3 package/test/docs cleanup. Full verifier and manual /reload are deferred until removal is integrated; baseline has known screen-read machine failure and occasional Plan3 parallel-needs frontmatter race. No blocker; continuing through compaction. Never push.
 
 ## Amendments
 

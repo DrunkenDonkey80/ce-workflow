@@ -1,20 +1,6 @@
-import {
-	closeSync,
-	existsSync,
-	fsyncSync,
-	mkdirSync,
-	openSync,
-	readFileSync,
-	renameSync,
-	rmSync,
-	unlinkSync,
-	writeFileSync,
-} from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import {
-	validateVerificationContract,
-	verificationContractStatus,
-} from "./work-verification-contract.ts";
+import { validateVerificationContract } from "./work-verification-contract.ts";
 
 export const WORK_STORE_VERSION = 1;
 export const INITIATIVE_LABEL = "initiative";
@@ -48,15 +34,9 @@ function runtimeDir(cwd) {
 function recoveryPath(cwd) {
 	return path.join(runtimeDir(cwd), "work-items.recovery.json");
 }
-function candidatePath(cwd) {
-	return path.join(path.dirname(storePath(cwd)), ".work-items.candidate.json");
-}
-function lockPath(cwd) {
-	return path.join(runtimeDir(cwd), "mutation.lock");
-}
-function now(value) {
-	return value ?? new Date().toISOString();
-}
+
+
+
 function error(category, message, details) {
 	return new WorkStoreError(category, message, details);
 }
@@ -79,15 +59,7 @@ function parseSnapshot(content, file) {
 function readValidated(file) {
 	return parseSnapshot(readFileSync(file, "utf8"), file);
 }
-function writeDurable(file, content) {
-	const fd = openSync(file, "w");
-	try {
-		writeFileSync(fd, content, "utf8");
-		fsyncSync(fd);
-	} finally {
-		closeSync(fd);
-	}
-}
+
 
 export function loadStore(cwd = process.cwd()) {
 	const canonical = storePath(cwd);
@@ -111,186 +83,19 @@ export function loadStore(cwd = process.cwd()) {
 	});
 }
 
-export function initStore(cwd = process.cwd(), options = {}) {
-	try {
-		return loadStore(cwd);
-	} catch (error) {
-		if (!(error instanceof WorkStoreError) || error.category !== "missing")
-			throw error;
-	}
-	const lock = acquireLock(cwd);
-	try {
-		try {
-			return loadStore(cwd);
-		} catch (error) {
-			if (!(error instanceof WorkStoreError) || error.category !== "missing")
-				throw error;
-		}
-		const timestamp = now(options.now);
-		const store = {
-			schemaVersion: WORK_STORE_VERSION,
-			metadata: { createdAt: timestamp, updatedAt: timestamp },
-			items: {},
-		};
-		saveStore(cwd, store);
-		return store;
-	} finally {
-		lock.release();
-	}
-}
 
-function canonicalize(value) {
-	if (Array.isArray(value)) return value.map(canonicalize);
-	if (!value || typeof value !== "object") return value;
-	return Object.fromEntries(
-		Object.keys(value)
-			.sort()
-			.map((key) => [key, canonicalize(value[key])]),
-	);
-}
 
-export function serializeStore(store) {
-	validateStore(store);
-	const normalized = canonicalize({
-		...store,
-		items: Object.fromEntries(
-			Object.entries(store.items)
-				.sort(([left], [right]) => left.localeCompare(right))
-				.map(([id, item]) => [
-					id,
-					{
-						...item,
-						dependencies: [...(item.dependencies ?? [])].sort(),
-						labels: [...(item.labels ?? [])].sort(),
-					},
-				]),
-		),
-	});
-	return `${JSON.stringify(normalized, null, 2)}\n`;
-}
 
-export function saveStore(cwd = process.cwd(), store, options = {}) {
-	const content = serializeStore(store);
-	if (options.dryRun) return content;
-	const target = storePath(cwd);
-	const candidate = candidatePath(cwd);
-	const recovery = recoveryPath(cwd);
-	mkdirSync(path.dirname(target), { recursive: true });
-	mkdirSync(path.dirname(recovery), { recursive: true });
-	if (existsSync(target)) {
-		const old = readFileSync(target, "utf8");
-		parseSnapshot(old, target);
-		writeDurable(recovery, old);
-		readValidated(recovery);
-	}
-	if (options.interruptAt === "recovery")
-		throw error("interrupted", "Interrupted after validated recovery write");
-	writeDurable(candidate, content);
-	readValidated(candidate);
-	if (options.interruptAt === "candidate")
-		throw error("interrupted", "Interrupted after validated candidate write");
-	try {
-		renameSync(candidate, target);
-	} catch (cause) {
-		// Windows may reject replacing an existing pathname. The validated recovery
-		// copy makes this remove-and-rename fallback recoverable after interruption.
-		if (existsSync(target)) {
-			try {
-				rmSync(target);
-				renameSync(candidate, target);
-			} catch (fallbackCause) {
-				throw error(
-					"write",
-					`Unable to publish native work store: ${fallbackCause.message}`,
-					{ cause: fallbackCause },
-				);
-			}
-		} else {
-			throw error(
-				"write",
-				`Unable to publish native work store: ${cause.message}`,
-				{ cause },
-			);
-		}
-	}
-	if (options.interruptAt === "replace")
-		throw error("interrupted", "Interrupted after native store replacement");
-	return content;
-}
 
-function lockOwnerIsDead(file) {
-	let pid;
-	try {
-		pid = Number.parseInt(readFileSync(file, "utf8").trim(), 10);
-	} catch {
-		return false;
-	}
-	if (!Number.isInteger(pid) || pid <= 0) return false;
-	try {
-		process.kill(pid, 0);
-		return false;
-	} catch (cause) {
-		return cause?.code === "ESRCH";
-	}
-}
 
-export function acquireLock(cwd = process.cwd()) {
-	const file = lockPath(cwd);
-	mkdirSync(path.dirname(file), { recursive: true });
-	let fd;
-	try {
-		fd = openSync(file, "wx");
-		writeFileSync(fd, `${process.pid}\n`);
-	} catch (cause) {
-		if (cause?.code === "EEXIST") {
-			if (lockOwnerIsDead(file)) {
-				// ponytail: single-host PID lock; replace with an OS lock if PID reuse
-				// or multi-host writers become a real workload.
-				try {
-					unlinkSync(file);
-				} catch (unlinkCause) {
-					if (unlinkCause?.code !== "ENOENT") throw unlinkCause;
-				}
-				return acquireLock(cwd);
-			}
-			throw error("locked", `Another native work-store writer owns ${file}`, {
-				file,
-			});
-		}
-		throw error(
-			"write",
-			`Unable to acquire native work-store lock: ${cause.message}`,
-			{ cause },
-		);
-	}
-	let released = false;
-	return {
-		file,
-		release() {
-			if (released) return;
-			released = true;
-			closeSync(fd);
-			try {
-				unlinkSync(file);
-			} catch (cause) {
-				if (cause?.code !== "ENOENT") throw cause;
-			}
-		},
-	};
-}
 
-export function mutateStore(cwd = process.cwd(), mutate, options = {}) {
-	const lock = acquireLock(cwd);
-	try {
-		const store = loadStore(cwd);
-		const result = mutate(store);
-		store.metadata.updatedAt = now(options.now);
-		saveStore(cwd, store, options);
-		return result === undefined ? store : result;
-	} finally {
-		lock.release();
-	}
-}
+
+
+
+
+
+
+
 
 function stringArray(value, field, file) {
 	if (value === undefined) return;
@@ -623,256 +428,24 @@ export function validateStore(store, file = "work store") {
 	return store;
 }
 
-function nextId(store, parentId) {
-	const base = parentId || "work";
-	const pattern = new RegExp(`^${escapeRegExp(base)}\\.(\\d+)$`);
-	if (!parentId) {
-		let number = 1;
-		while (store.items[`work-${number}`]) number += 1;
-		return `work-${number}`;
-	}
-	let number = 1;
-	for (const id of Object.keys(store.items)) {
-		const match = id.match(pattern);
-		if (match) number = Math.max(number, Number(match[1]) + 1);
-	}
-	return `${base}.${number}`;
-}
-function escapeRegExp(value) {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
-export function createWorkItem(store, input = {}) {
-	validateStore(store);
-	const timestamp = now(input.now);
-	const id = input.id ?? nextId(store, input.parentId);
-	if (store.items[id]) throw error("corrupt", `Work item already exists: ${id}`);
-	const item = {
-		id,
-		type: input.type ?? "task",
-		status: input.status ?? "open",
-		title: input.title ?? "",
-		createdAt: input.createdAt ?? timestamp,
-		updatedAt: input.updatedAt ?? timestamp,
-		...(input.parentId ? { parentId: input.parentId } : {}),
-		...(input.description === undefined
-			? {}
-			: { description: input.description }),
-		...(input.owner === undefined ? {} : { owner: input.owner }),
-		...(input.priority === undefined ? {} : { priority: input.priority }),
-		dependencies: [...(input.dependencies ?? [])],
-		labels: [...(input.labels ?? [])],
-		notes: [...(input.notes ?? [])],
-		evidence: [...(input.evidence ?? [])],
-		dependencyEdges: structuredClone(input.dependencyEdges ?? []),
-		...(input.acceptance === undefined ? {} : { acceptance: input.acceptance }),
-		...(input.executionMode === undefined
-			? {}
-			: { executionMode: input.executionMode }),
-		...(input.ideaLineage
-			? { ideaLineage: structuredClone(input.ideaLineage) }
-			: {}),
-		...(input.initiative
-			? { initiative: structuredClone(input.initiative) }
-			: {}),
-		...(input.reviewResult === undefined
-			? {}
-			: { reviewResult: input.reviewResult }),
-		...(input.verificationSummary
-			? { verificationSummary: structuredClone(input.verificationSummary) }
-			: {}),
-		...(input.implementationScope
-			? { implementationScope: structuredClone(input.implementationScope) }
-			: {}),
-		...(input.executionWindow
-			? { executionWindow: structuredClone(input.executionWindow) }
-			: {}),
-		...(input.verificationContract
-			? { verificationContract: structuredClone(input.verificationContract) }
-			: {}),
-		...(input.verificationRevision
-			? { verificationRevision: input.verificationRevision }
-			: {}),
-		...(input.verificationWaivers
-			? { verificationWaivers: structuredClone(input.verificationWaivers) }
-			: {}),
-		...(input.documentLinks
-			? { documentLinks: structuredClone(input.documentLinks) }
-			: {}),
-		...(input.legacy ? { legacy: structuredClone(input.legacy) } : {}),
-	};
-	validateStore({ ...store, items: { ...store.items, [id]: item } });
-	store.items[id] = item;
-	return item;
-}
 
-export function updateWorkItem(store, id, changes = {}, options = {}) {
-	validateStore(store);
-	const previous = store.items[id];
-	if (!previous) throw error("missing", `Work item is missing: ${id}`);
-	const { id: changedId, now: changedNow, ...fields } = changes;
-	if (changedId !== undefined && changedId !== id)
-		throw error("corrupt", "Work item IDs cannot be changed");
-	const next = {
-		...previous,
-		...fields,
-		id,
-		updatedAt: fields.updatedAt ?? now(changedNow),
-		...(fields.dependencies ? { dependencies: [...fields.dependencies] } : {}),
-		...(fields.labels ? { labels: [...fields.labels] } : {}),
-		...(fields.notes ? { notes: [...fields.notes] } : {}),
-		...(fields.evidence ? { evidence: [...fields.evidence] } : {}),
-		...(fields.initiative
-			? { initiative: structuredClone(fields.initiative) }
-			: {}),
-		...(fields.implementationScope
-			? { implementationScope: structuredClone(fields.implementationScope) }
-			: {}),
-		...(fields.executionWindow
-			? { executionWindow: structuredClone(fields.executionWindow) }
-			: {}),
-		...(fields.verificationContract
-			? { verificationContract: structuredClone(fields.verificationContract) }
-			: {}),
-		...(fields.verificationWaivers
-			? { verificationWaivers: structuredClone(fields.verificationWaivers) }
-			: {}),
-	};
-	const closing = fields.status === "closed" && previous.status !== "closed";
-	if (
-		next.executionWindow?.state === "active" &&
-		["closed", "blocked"].includes(fields.status)
-	)
-		next.executionWindow = {
-			...next.executionWindow,
-			state: fields.status,
-			updatedAt: now(),
-		};
-	if (
-		closing &&
-		["task", "bug"].includes(previous.type) &&
-		!next.verificationContract
-	)
-		throw error(
-			"conflict",
-			`Executable WorkItem ${id} cannot close without a verification contract`,
-		);
-	const proofChanged =
-		previous.status === "closed" &&
-		[
-			"verificationContract",
-			"verificationRevision",
-			"verificationWaivers",
-			"evidence",
-		].some((field) => Object.hasOwn(fields, field));
-	if ((closing || proofChanged) && next.verificationContract) {
-		const proof = verificationContractStatus(next, {
-			cwd: options.cwd,
-			revision: next.verificationRevision,
-			requireContract: true,
-		});
-		if (!proof.ok)
-			throw error(
-				"conflict",
-				`Verification contract is incomplete for ${id}: ${JSON.stringify({ missing: proof.missing, blocked: proof.blocked, stale: proof.stale, untrusted: proof.untrusted })}`,
-				{ verificationStatus: proof },
-			);
-	}
-	validateStore({ ...store, items: { ...store.items, [id]: next } });
-	store.items[id] = next;
-	return next;
-}
 
-export function appendWorkNote(store, id, note, options = {}) {
-	if (typeof note !== "string")
-		throw error("corrupt", "Work-item notes must be strings");
-	const item = getWorkItem(store, id);
-	if (!item) throw error("missing", `Work item is missing: ${id}`);
-	return updateWorkItem(store, id, {
-		notes: [...(item.notes ?? []), note],
-		now: options.now,
-	});
-}
 
-export function addWorkEvidence(store, id, evidence, options = {}) {
-	if (!evidence || typeof evidence !== "object" || Array.isArray(evidence))
-		throw error("corrupt", "Work-item evidence must be an object");
-	const item = getWorkItem(store, id);
-	if (!item) throw error("missing", `Work item is missing: ${id}`);
-	return updateWorkItem(store, id, {
-		evidence: [...(item.evidence ?? []), structuredClone(evidence)],
-		now: options.now,
-	});
-}
 
-export function deleteWorkItem(store, id) {
-	validateStore(store);
-	if (!store.items[id]) throw error("missing", `Work item is missing: ${id}`);
-	if (
-		Object.values(store.items).some(
-			(item) => item.parentId === id || item.dependencies?.includes(id),
-		)
-	)
-		throw error("corrupt", `Cannot delete referenced work item: ${id}`);
-	const items = { ...store.items };
-	delete items[id];
-	validateStore({ ...store, items });
-	delete store.items[id];
-	return store;
-}
 
-export function closeWorkItem(store, id, changes = {}, options = {}) {
-	return updateWorkItem(store, id, { ...changes, status: "closed" }, options);
-}
 
-export function deleteWorkItemSubtree(store, id) {
-	validateStore(store);
-	const selected = store.items[id];
-	if (!selected) throw error("missing", `Work item is missing: ${id}`);
-	const labels = selected.labels ?? [];
-	if (
-		selected.protected === true ||
-		labels.includes("wo:protected") ||
-		labels.includes("wo:protected-root") ||
-		labels.includes("wo:misc") ||
-		(selected.type === "epic" && selected.title === "Misc")
-	)
-		throw error(
-			"conflict",
-			`Work item ${id} is a protected root and cannot be deleted`,
-		);
-	const deletedIds = new Set([id]);
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const item of Object.values(store.items))
-			if (!deletedIds.has(item.id) && deletedIds.has(item.parentId)) {
-				deletedIds.add(item.id);
-				changed = true;
-			}
-	}
-	const external = Object.values(store.items).find(
-		(item) =>
-			!deletedIds.has(item.id) &&
-			item.dependencies?.some((dependency) => deletedIds.has(dependency)),
-	);
-	if (external)
-		throw error(
-			"corrupt",
-			`Cannot delete work subtree ${id}: surviving work item ${external.id} depends on it`,
-		);
-	const items = Object.fromEntries(
-		Object.entries(store.items).filter(([itemId]) => !deletedIds.has(itemId)),
-	);
-	validateStore({ ...store, items });
-	store.items = items;
-	return [...deletedIds];
-}
 
-export function getWorkItem(store, id) {
-	validateStore(store);
-	return store.items[id];
-}
+
+
+
+
+
+
+
+
+
+
 export function listWorkItems(store, filter = {}) {
 	validateStore(store);
 	return Object.values(store.items)
@@ -883,29 +456,4 @@ export function listWorkItems(store, filter = {}) {
 }
 export function childWorkItems(store, parentId) {
 	return listWorkItems(store, { parentId });
-}
-function blockingDependencies(item) {
-	const edges = new Map(
-		(item.dependencyEdges ?? []).map((edge) => [edge.toId, edge.type]),
-	);
-	return (item.dependencies ?? []).filter(
-		(id) =>
-			id !== item.parentId && (!edges.has(id) || /^blocks?$/i.test(edges.get(id))),
-	);
-}
-
-export function readyWorkItems(store) {
-	validateStore(store);
-	return Object.values(store.items)
-		.filter(
-			(item) =>
-				item.type !== "epic" && item.type !== "decision" && item.type !== "idea",
-		)
-		.filter((item) => item.status === "open" || item.status === "planned")
-		.filter((item) =>
-			blockingDependencies(item).every(
-				(id) => store.items[id].status === "closed",
-			),
-		)
-		.sort((left, right) => left.id.localeCompare(right.id));
 }
