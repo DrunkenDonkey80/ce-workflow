@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-12
-updated: 2026-10-12T08:48:21.647Z
+updated: 2026-10-12T09:03:23.008Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -96,8 +96,8 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 ### Phase 3: Dead-code sweep [code]
 
 - [x] **S1** Reachability sweep removed unreachable cycles and legacy compaction/goal/role glue; work-models shrank from 33.6k to 4,738 lines, with zero unreachable declarations.
-- [wip] **S2** Delete orphan modules; trim work-design, work-compound-source, work-compaction and work-store to what kept code uses.
-- [ ] **S3** Confirm knowledge and scout pull in no large legacy code; ask the user if they do (D-02).
+- [x] **S2** Deleted 14 orphan extension modules and private workflow assets; retained only conversion validation, Plan3 design, scout confinement and native compaction helpers.
+- [x] **S3** Knowledge imports only Node built-ins; scout retains a 56-line confined-file/path helper and no legacy workflow dependencies, so no additional approval is needed.
 
 ### Phase 4: Package, tests and docs [think]
 

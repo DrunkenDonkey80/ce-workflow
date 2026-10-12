@@ -6,7 +6,6 @@ import { homedir, tmpdir } from "node:os";
 
 import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { modernizeLegacyAgentOverrides } from "./legacy-beads-migration.ts";
 import { showListDialog } from "./work-dialogs.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
@@ -301,7 +300,7 @@ function globalSettingsPath() {
 function readJsonSettings(file) {
 	if (!existsSync(file)) return {};
 	try {
-		return modernizeLegacyAgentOverrides(JSON.parse(readFileSync(file, "utf8")));
+		return JSON.parse(readFileSync(file, "utf8"));
 	} catch {
 		return {};
 	}

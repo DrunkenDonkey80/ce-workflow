@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import {
-	AUTONOMOUS_GOAL_STATUSES,
 	COMPACTION_PROFILES,
-	compactionProfileFor,
 	compactionThreshold,
 	contextFilterCutIndex,
 	filesFromOps,
@@ -51,20 +49,11 @@ for (const [window, expected] of [
 	assert.ok(result.headroom > 0);
 }
 assert.equal(threshold(272_000).trigger, 150_000);
-assert.deepEqual(AUTONOMOUS_GOAL_STATUSES, ["active"]);
-assert.equal(
-	compactionProfileFor({ goalStatus: "active", targetId: "work-7.2" }),
-	COMPACTION_PROFILES.AUTONOMOUS_GOAL,
-);
-assert.equal(
-	compactionProfileFor({ goalStatus: "paused" }),
-	COMPACTION_PROFILES.FREEFORM,
-);
-assert.equal(
-	compactionProfileFor({ targetId: "work-7.2" }),
-	COMPACTION_PROFILES.WORK_RESUME,
-);
-assert.equal(compactionProfileFor(), COMPACTION_PROFILES.FREEFORM);
+
+
+
+
+
 assert.doesNotThrow(() =>
 	formatCompactionSummary({
 		preparation: { messagesToSummarize: {}, fileOps: null },
@@ -149,7 +138,7 @@ assert.doesNotMatch(
 	freeform,
 	/private chain of thought|secret successful payload/,
 );
-assert.doesNotMatch(freeform, /\/work-resume/);
+
 assert.equal(freeform.includes("\r"), false);
 
 const expandedRequests = formatCompactionSummary({
@@ -224,7 +213,7 @@ const paused = formatCompactionSummary({
 		{ role: "user", content: "Fix the current parser request." },
 	],
 	goal: { id: "wg-old", status: "paused", objective: "Old unrelated goal" },
-	durable: { available: true },
+
 });
 assert.match(paused, /## Objective\nFix the current parser request\./);
 assert.match(paused, /Goal wg-old remains paused/);
@@ -292,63 +281,26 @@ assert.match(
 );
 assert.doesNotMatch(interruptedAfterWrite, /This operation was aborted/);
 
-const durable = {
-	available: true,
-	target: {
-		id: "work-7.2",
-		title: "Adopt deterministic compaction",
-		status: "in_progress",
-		description: "Preserve authoritative workflow state.",
-		acceptance: "All focused lifecycle fixtures pass.",
-	},
-	decisionsAndBlockers: [
-		{ id: "work-7.3", type: "decision", status: "open", title: "Choose rollout" },
-	],
-	verification: ["node scripts/test-work-compaction.mjs passes"],
-	nextAction: "Run /work-resume work-7.2.",
-	git: { head: "abc1234", status: [" M extensions/work-models.ts"] },
-};
-const work = formatCompactionSummary({
-	profile: COMPACTION_PROFILES.WORK_RESUME,
-	preparation,
-	durable,
-	maxSummaryChars: 4_000,
-});
-assert.match(work, /compact context \(work-resume\)/);
-assert.match(work, /work-7\.2/);
-assert.match(work, /All focused lifecycle fixtures pass/);
-assert.match(work, /work-7\.3/);
-assert.match(work, /Run \/work-resume work-7\.2/);
-assert.ok(work.length <= 4_000);
-assert.equal(
-	work,
-	formatCompactionSummary({
-		profile: COMPACTION_PROFILES.WORK_RESUME,
-		preparation,
-		durable,
-		maxSummaryChars: 4_000,
-	}),
-);
 
-const goal = {
-	id: "wg-1",
-	mode: "project",
-	objective: "Finish the active roadmap without losing decisions.",
-	status: "needs_human",
-	iteration: 4,
-	pendingDecision: "Choose safe or fast rollout.",
-};
-const autonomous = formatCompactionSummary({
-	profile: COMPACTION_PROFILES.AUTONOMOUS_GOAL,
-	preparation,
-	durable: { ...durable, nextAction: undefined },
-	goal,
-	maxSummaryChars: 4_000,
-});
-assert.match(autonomous, /compact context \(autonomous-goal\)/);
-assert.match(autonomous, /Finish the active roadmap/);
-assert.match(autonomous, /Choose safe or fast rollout/);
-assert.match(autonomous, /Resolve the pending human decision/);
+
+
+
+
+
+
+
+
+
+const goal = { id: "native-goal", objective: "Finish the current task without losing decisions.", status: "active" };
+const nativeGoal = formatCompactionSummary({ preparation, goal, maxSummaryChars: 4000 });
+assert.match(nativeGoal, /<goal-state>/);
+assert.match(nativeGoal, /native-goal/);
+assert.match(nativeGoal, /Finish the current task without losing decisions/);
+
+
+
+
+
 
 const noisy = {
 	...preparation,
@@ -358,30 +310,26 @@ const noisy = {
 	})),
 };
 const bounded = formatCompactionSummary({
-	profile: COMPACTION_PROFILES.WORK_RESUME,
+
 	preparation: noisy,
-	durable: {
-		...durable,
-		target: { ...durable.target, acceptance: "required acceptance ".repeat(120) },
-	},
+
 	maxSummaryChars: 4_000,
 });
 assert.ok(bounded.length <= 4_000);
 assert.match(bounded, /omitted by compaction budget/);
-assert.match(bounded, /work-7\.2/);
-assert.match(bounded, /Run \/work-resume work-7\.2/);
+
+
 
 let previousSummary = "Legacy context that should survive once.";
 for (let generation = 0; generation < 5; generation += 1) {
 	previousSummary = formatCompactionSummary({
-		profile: COMPACTION_PROFILES.WORK_RESUME,
+
 		preparation: { ...preparation, previousSummary },
-		durable,
+
 		maxSummaryChars: 4_000,
 	});
 	assert.ok(previousSummary.length <= 4_000);
-	assert.match(previousSummary, /work-7\.2/);
-	assert.match(previousSummary, /All focused lifecycle fixtures pass/);
+
 	assert.equal(
 		(previousSummary.match(/## ce-workflow compact context/g) ?? []).length,
 		1,
@@ -389,7 +337,7 @@ for (let generation = 0; generation < 5; generation += 1) {
 }
 
 const machineFiltered = formatCompactionSummary({
-	profile: COMPACTION_PROFILES.AUTONOMOUS_GOAL,
+
 	preparation: {
 		messagesToSummarize: [
 			{
@@ -398,13 +346,13 @@ const machineFiltered = formatCompactionSummary({
 			},
 			{
 				role: "user",
-				content: "<!-- work-goal-continuation:wg-1:2:x --> Continue",
+				content: "Subagent updates above.",
 			},
 			{
 				role: "user",
-				content: "<work_goal_objective>machine objective</work_goal_objective>",
+				content: "New intercom message above.",
 			},
-			{ role: "user", content: "ORCHESTRATOR_RUN_V1 synthetic transport" },
+			{ role: "user", content: "Compaction is complete. Resume the parent task now" },
 			{
 				role: "custom",
 				customType: "work-knowledge",
@@ -420,13 +368,13 @@ assert.match(
 );
 assert.doesNotMatch(
 	machineFiltered,
-	/work-goal-continuation|machine objective|ORCHESTRATOR_RUN_V1|STALE-KNOWLEDGE-MUST-NOT-RECUR/,
+	/Subagent updates above|New intercom message above|Compaction is complete|STALE-KNOWLEDGE-MUST-NOT-RECUR/,
 );
 
 let pinnedHuman = "";
 for (let generation = 0; generation < 15; generation += 1) {
 	pinnedHuman = formatCompactionSummary({
-		profile: COMPACTION_PROFILES.AUTONOMOUS_GOAL,
+
 		preparation: {
 			previousSummary: pinnedHuman,
 			messagesToSummarize: [
@@ -435,7 +383,7 @@ for (let generation = 0; generation < 15; generation += 1) {
 					: []),
 				{
 					role: "user",
-					content: `<!-- work-goal-continuation:wg-1:${generation}:x --> Continue`,
+					content: "Subagent updates above.",
 				},
 			],
 		},
@@ -443,8 +391,8 @@ for (let generation = 0; generation < 15; generation += 1) {
 	});
 	assert.equal(
 		(pinnedHuman.match(/PINNED-HUMAN-CORRECTION/g) ?? []).length,
-		1,
-		`human correction survives generation ${generation + 1} exactly once`,
+		2,
+		`generation ${generation + 1} retains one objective and one latest request without growth`,
 	);
 	const earlier = pinnedHuman.match(
 		/## Earlier compacted context\n([\s\S]*?)(?=\n## |$)/,
@@ -465,9 +413,9 @@ for (let generation = 0; generation < 15; generation += 1) {
 	if (generation < 10) knowledge = knowledgeOne;
 	else if (generation === 10) knowledge = knowledgeTwo;
 	const input = {
-		profile: COMPACTION_PROFILES.WORK_RESUME,
+
 		preparation: { ...preparation, previousSummary: knowledgeSummary },
-		durable,
+
 		knowledge,
 		maxSummaryChars: 4_000,
 	};
@@ -493,16 +441,16 @@ for (let generation = 0; generation < 15; generation += 1) {
 }
 
 const saturatedKnowledge = formatCompactionSummary({
-	profile: COMPACTION_PROFILES.WORK_RESUME,
+
 	preparation: noisy,
-	durable,
+
 	knowledge: `<durable-knowledge untrusted="true">${" knowledge".repeat(500)}</durable-knowledge>`,
 	maxSummaryChars: 4_000,
 });
 assert.ok(saturatedKnowledge.length <= 4_000);
 assert.match(saturatedKnowledge, /## Objective/);
 assert.match(saturatedKnowledge, /## Next action/);
-assert.match(saturatedKnowledge, /Run \/work-resume work-7\.2/);
+
 assert.match(saturatedKnowledge, /## Durable knowledge/);
 
 const foreignPrevious = formatCompactionSummary({

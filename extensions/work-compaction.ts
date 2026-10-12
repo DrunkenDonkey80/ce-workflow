@@ -1,17 +1,6 @@
 export const COMPACTION_PROFILES = Object.freeze({
 	FREEFORM: "freeform",
-	WORK_RESUME: "work-resume",
-	AUTONOMOUS_GOAL: "autonomous-goal",
 });
-export const AUTONOMOUS_GOAL_STATUSES = Object.freeze(["active"]);
-
-export function compactionProfileFor({ goalStatus, targetId } = {}) {
-	if (AUTONOMOUS_GOAL_STATUSES.includes(goalStatus))
-		return COMPACTION_PROFILES.AUTONOMOUS_GOAL;
-	return targetId
-		? COMPACTION_PROFILES.WORK_RESUME
-		: COMPACTION_PROFILES.FREEFORM;
-}
 
 const OMITTED = "[... omitted by compaction budget ...]";
 const DEFAULT_KEEP_RECENT_TOKENS = 30_000;
@@ -466,10 +455,7 @@ export const syntheticWakePrompt = (value) =>
 function syntheticUserRequest(value) {
 	return (
 		syntheticWakePrompt(value) ||
-		/work-goal-continuation:/i.test(value) ||
-		/<work_goal_objective>/i.test(value) ||
-		/^Compaction is complete\. Resume the parent task now\b/i.test(value) ||
-		/^ORCHESTRATOR_RUN_V1\b/i.test(value)
+		/^Compaction is complete\. Resume the parent task now\b/i.test(value)
 	);
 }
 
@@ -547,16 +533,7 @@ function previousHighlights(previousSummary) {
 		.join("\n\n");
 }
 
-function objectiveFor(profile, users, durable, goal, previous) {
-	if (profile === COMPACTION_PROFILES.AUTONOMOUS_GOAL && goal?.objective)
-		return goal.objective;
-	if (profile === COMPACTION_PROFILES.WORK_RESUME && durable?.target)
-		return [
-			`${durable.target.id}: ${durable.target.title}`,
-			durable.target.description,
-		]
-			.filter(Boolean)
-			.join("\n");
+function objectiveFor(users, previous) {
 	const latest = users.at(-1);
 	const previousObjective = sectionFromPrevious(previous, "Objective");
 	if (latest && (!continuationOnlyRequest(latest) || !previousObjective))
@@ -564,21 +541,13 @@ function objectiveFor(profile, users, durable, goal, previous) {
 	return previousObjective || latest || "Continue the current task.";
 }
 
-function nextActionFor(profile, durable, goal) {
-	if (durable?.nextAction) return durable.nextAction;
-	if (profile === COMPACTION_PROFILES.AUTONOMOUS_GOAL) {
-		if (goal?.status === "needs_human")
-			return "Resolve the pending human decision, then continue the autonomous goal.";
-		return "Continue the active autonomous goal from durable state.";
-	}
-	if (profile === COMPACTION_PROFILES.WORK_RESUME && durable?.target?.id)
-		return `Run /work-resume ${durable.target.id}.`;
+function nextActionFor(goal) {
 	if (goal && ["paused", "budget_limited"].includes(goal.status))
 		return `Continue the current user request. Goal ${goal.id} remains ${goal.status}.`;
 	return "Continue the current user request from the objective and retained context.";
 }
 
-function changesAndVerification(files, durable) {
+function changesAndVerification(files) {
 	const lines = [];
 	if (files.modified.length)
 		lines.push(
@@ -588,8 +557,6 @@ function changesAndVerification(files, durable) {
 		lines.push(
 			`Read files:\n${files.read.map((file) => `- ${file}`).join("\n")}`,
 		);
-	if (durable?.verification?.length)
-		lines.push(delimited("verification-evidence", durable.verification));
 	return lines.join("\n\n");
 }
 
@@ -634,7 +601,6 @@ export function formatCompactionSummary({
 	profile = COMPACTION_PROFILES.FREEFORM,
 	preparation = {},
 	currentMessages = [],
-	durable,
 	goal,
 	knowledge = "",
 	maxSummaryChars = DEFAULT_MAX_SUMMARY_CHARS,
@@ -667,13 +633,7 @@ export function formatCompactionSummary({
 		records.filter((record) => record.critical),
 		8,
 	);
-	const objective = objectiveFor(
-		selectedProfile,
-		users,
-		durable,
-		goal,
-		previous,
-	);
+	const objective = objectiveFor(users, previous);
 	const latestRequests = users
 		.toReversed()
 		.map(
@@ -693,26 +653,8 @@ export function formatCompactionSummary({
 				pendingDecision: goal.pendingDecision,
 			}
 		: undefined;
-	let compactDurable = durable;
-	if (durable?.target) {
-		const compactTarget = { ...durable.target };
-		if (selectedProfile === COMPACTION_PROFILES.WORK_RESUME) {
-			compactTarget.title = undefined;
-			compactTarget.description = undefined;
-		}
-		compactDurable = { ...durable, target: compactTarget };
-	}
-	const durableState =
-		selectedProfile === COMPACTION_PROFILES.FREEFORM && !compactGoal
-			? ""
-			: delimited("durable-work-state", {
-					goal: compactGoal,
-					state: compactDurable,
-				});
-	const decisions = delimited("decisions-and-blockers", {
-		pendingDecision: goal?.pendingDecision,
-		related: durable?.decisionsAndBlockers,
-	});
+	const durableState = delimited("goal-state", compactGoal);
+	const decisions = delimited("decisions-and-blockers", { pendingDecision: goal?.pendingDecision });
 	const sections = [
 		{
 			key: "header",
@@ -738,7 +680,7 @@ export function formatCompactionSummary({
 		{
 			key: "next",
 			title: "Next action",
-			raw: nextActionFor(selectedProfile, durable, goal),
+			raw: nextActionFor(goal),
 			cap: 900,
 			minimum: 160,
 		},
@@ -751,7 +693,7 @@ export function formatCompactionSummary({
 		},
 		{
 			key: "durable",
-			title: "Durable work state",
+			title: "Durable goal state",
 			raw: durableState,
 			cap: 3_800,
 			minimum: durableState ? 500 : 0,
@@ -759,17 +701,14 @@ export function formatCompactionSummary({
 		{
 			key: "decisions",
 			title: "Decisions and blockers",
-			raw:
-				goal?.pendingDecision || durable?.decisionsAndBlockers?.length
-					? decisions
-					: "",
+			raw: goal?.pendingDecision ? decisions : "",
 			cap: 1_800,
 			minimum: 0,
 		},
 		{
 			key: "changes",
 			title: "Changes and verification",
-			raw: changesAndVerification(files, durable),
+			raw: changesAndVerification(files),
 			cap: 1_800,
 			minimum: 0,
 		},
