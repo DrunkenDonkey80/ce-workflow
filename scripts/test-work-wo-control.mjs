@@ -93,7 +93,6 @@ try {
 		commands.wo.getArgumentCompletions("").map(({ value }) => value),
 		[
 			"goal",
-			"monitor",
 			"pause",
 			"compact",
 			"resume",
@@ -109,75 +108,6 @@ try {
 		path.join(cwd, ".pi", "settings.json"),
 		JSON.stringify({ workResume: { selfImproving: false }, workOrchestrator: { context: { mode: "ultracompact" } } }),
 	);
-	await commands.wo.handler("monitor peer-session", ctx);
-	assert.match(sent.at(-1).message, /WO_MONITOR_V1/);
-	assert.match(sent.at(-1).message, /peer-session/);
-	assert.match(sent.at(-1).message, /work_monitor_bind/);
-	const monitorKickoff = sent.at(-1).message;
-	assert(activeTools.includes("work_monitor_reload"));
-	assert(activeTools.includes("work_monitor_bind"));
-	const binding = await tools.work_monitor_bind.execute(null, {
-		sessionId: "peer-session-id",
-	});
-	assert.match(binding.content[0].text, /peer-session-id/);
-	await tools.work_monitor_reload.execute();
-	assert.match(sent.at(-1).message, /__orchestrator-monitor-reload/);
-	await commands["__orchestrator-monitor-reload"].handler("", ctx);
-	assert.equal(reloads, 1);
-	const monitorTurn = await hooks.before_agent_start(
-		{ prompt: monitorKickoff, systemPrompt: "base" },
-		ctx,
-	);
-	assert.match(monitorTurn.systemPrompt, /WO_MONITOR_V1/);
-	await hooks.agent_start({}, ctx);
-	await hooks.agent_end(
-		{
-			messages: [
-				{
-					role: "assistant",
-					stopReason: "stop",
-					content: [{ type: "text", text: "Target is healthy." }],
-				},
-			],
-		},
-		ctx,
-	);
-	await hooks.agent_settled({}, ctx);
-	assert(!activeTools.includes("work_monitor_bind"));
-	await hooks.message_end(
-		{
-			message: {
-				role: "custom",
-				customType: "intercom_message",
-				content: "Target asked a routine question.",
-				details: { from: { id: "peer-session-id" } },
-			},
-		},
-		ctx,
-	);
-	assert(activeTools.includes("work_monitor_bind"));
-	const inboundTurn = await hooks.before_agent_start(
-		{ prompt: "Target asked a routine question.", systemPrompt: "base" },
-		ctx,
-	);
-	assert.match(inboundTurn.systemPrompt, /WO_MONITOR_V1/);
-	await hooks.agent_start({}, ctx);
-	await hooks.agent_end(
-		{
-			messages: [
-				{
-					role: "assistant",
-					stopReason: "stop",
-					content: [{ type: "text", text: "Answered from existing evidence." }],
-				},
-			],
-		},
-		ctx,
-	);
-	await hooks.agent_settled({}, ctx);
-	await commands.wo.handler("monitor clear", ctx);
-	assert(!activeTools.includes("work_monitor_reload"));
-	assert(!activeTools.includes("work_monitor_bind"));
 
 	await commands.wo.handler("context-fill", ctx);
 	assert.equal(contextMessages.length, 8);
