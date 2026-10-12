@@ -204,6 +204,16 @@ function questionBodies(body) {
 	return bullets.length ? bullets : blocks;
 }
 const openCount = (body) => questionBodies(body).length;
+// Agents sometimes write "Options: (a) x; (b) y." or "Options: x, y, or z." in prose; offer those as choices too.
+export function inlineOptions(text) {
+	const list = text.replace(/\s+/g, " ").match(/\bOptions?:\s*(.+?)(?:\.\s+(?=[A-Z])|\.?$)/)?.[1];
+	if (!list) return [];
+	const lettered = list.split(/[;,]?\s*\(([a-z])\)\s+/).slice(1);
+	const items = lettered.length >= 4 ? lettered.flatMap((part, index) => index % 2 ? [`(${lettered[index - 1]}) ${part.replace(/[;,]\s*$/, "")}`] : [])
+		: list.split(/;\s+|,\s+(?:or\s+)?|\s+or\s+/);
+	const choices = items.map((item) => item.trim()).filter(Boolean);
+	return choices.length < 2 ? [] : choices.map((item) => item.length <= 70 ? { label: item, description: "" } : { label: `${item.slice(0, 69)}…`, description: item });
+}
 function questionChoices(text) {
 	const lines = text.split("\n");
 	const fields = lines.slice(1).map((line) => line.match(/^\s+- (Context|Recommendation|Option):\s*(.+)$/)).filter(Boolean);
@@ -211,6 +221,7 @@ function questionChoices(text) {
 		const [label, ...description] = field[2].split(" — ");
 		return { label, description: description.join(" — ") };
 	});
+	if (!options.length) options.push(...inlineOptions(text));
 	return { title: lines[0].replace(/^(?:[-*]|\d+\.)\s+/, ""), context: lines.slice(1).filter(line => !/^\s+- Option:/.test(line)).join("\n").trim(), options };
 }
 
