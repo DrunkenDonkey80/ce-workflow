@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-12
-updated: 2026-10-12T08:13:19.990Z
+updated: 2026-10-12T08:16:19.970Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -91,11 +91,11 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 - [x] **E2** Removed workflow switch, legacy public exports, F9/work_* registrations, goal entry points and settings controls; retained utilities have an isolated command regression check.
 - [x] **E3** Replaced orchestrator menu/dispatcher with retained utilities; removed ideate, telemetry/usage/design/UI-gate routes and legacy catch-up launch; scout retains isolated cancellable background flow.
-- [wip] **E5** Replace store-writer fixtures in test-work-plan3.mjs with static legacy JSON (D-05) before touching work-store.ts.
+- [x] **E5** Plan3 conversion now uses a static legacy JSON fixture, no store writers; keeps status/idempotence/byte-preservation checks and refuses corrupt or future schemas without rewriting them.
 
 ### Phase 3: Dead-code sweep [code]
 
-- [ ] **S1** Run the AST sweep (D-03) on work-models.ts until stable, then review leftovers for mutually referencing dead groups.
+- [wip] **S1** Run the AST sweep (D-03) on work-models.ts until stable, then review leftovers for mutually referencing dead groups.
 - [ ] **S2** Delete orphan modules; trim work-design, work-compound-source, work-compaction and work-store to what kept code uses.
 - [ ] **S3** Confirm knowledge and scout pull in no large legacy code; ask the user if they do (D-02).
 

@@ -23,7 +23,6 @@ import { nativeExportClient, nativeFileName, nativeFileHash } from "../extension
 import { html as nativeHtml, png as nativePng } from "./fixtures/opendesign/native-export.mjs";
 import { windowCrop, plan3Windows } from "../extensions/plan3-window.ts";
 import { catchUpPlanText, changelogExcerpt, recordCatchUp } from "../extensions/plan3-catch-up.ts";
-import { createWorkItem, initStore, mutateStore, storePath } from "../extensions/work-store.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
@@ -118,7 +117,7 @@ try {
 	await copyFile(designFile, renamedDesign);
 	assert.equal(loadPlanDesign(designCwd, { ...designPlan, file: renamedDesign }).ownerId, entered.ownerId, "title rename preserves ownership");
 	await assert.rejects(enterPlanDesign(designCwd, { ...designPlan, id: "34343434" }), /pointer/, "another plan cannot share artifacts");
-	assert(!existsSync(storePath(designCwd)), "design does not initialize the legacy store");
+	assert(!existsSync(path.join(designCwd, ".ce-workflow", "work-items.json")), "design does not initialize the legacy store");
 	// Reference URL syntax is not browser eligibility; no navigation occurs without verified isolation.
 	assert.equal(publicDesignUrl("https://example.com/gallery?category=design"), "https://example.com/gallery?category=design");
 	assert.equal(publicDesignUrl("https://[2606:4700:4700::1111]/"), "https://[2606:4700:4700::1111]/");
@@ -780,14 +779,10 @@ try {
 
 	// Legacy conversion: read-only store, markers, idempotent.
 	assert(![".pi", ".ce-workflow"].some((name) => existsSync(path.join(cwd, name))), "Plan3 writes no workflow state");
-	initStore(cwd);
-	mutateStore(cwd, (store) => {
-		createWorkItem(store, { id: "work-1", type: "epic", title: "Legacy epic", description: "Old request", notes: ["note one"] });
-		for (const [n, status] of [[1, "closed"], [2, "in_progress"], [3, "blocked"], [4, "deferred"], [5, "open"], [10, "planned"]])
-			createWorkItem(store, { id: `work-1.${n}`, parentId: "work-1", title: `Child ${n}`, status });
-		createWorkItem(store, { id: "work-2", title: "Finished", status: "closed" });
-	});
-	const storeBytes = await readFile(storePath(cwd), "utf8");
+	const legacyStore = path.join(cwd, ".ce-workflow", "work-items.json");
+	await mkdir(path.dirname(legacyStore), { recursive: true });
+	await copyFile(new URL("./fixtures/legacy-work-items.json", import.meta.url), legacyStore);
+	const storeBytes = await readFile(legacyStore, "utf8");
 	selectScript = [["Plans3", "Convert legacy work (1)"], ["Convert legacy work", "work-1 Legacy epic"], ["Plans3", "CSV import", (labels) => assert(!labels.some((label) => label.includes("Convert")), "converted items are skipped")], ["CSV import", null], ["Plans3", null]];
 	await run("plans3");
 	assert.equal(selectScript.length, 0);
@@ -797,7 +792,16 @@ try {
 	assert.match(converted, /- \[x\] \*\*work-1\.1\*\* Child 1\n- \[wip\] \*\*work-1\.2\*\* Child 2\n- \[blocked\] \*\*work-1\.3\*\* Child 3\n- \[ \] \*\*work-1\.5\*\* Child 5\n- \[ \] \*\*work-1\.10\*\* Child 10/);
 	assert.match(converted, /### Deferred\n\n- work-1\.4: Child 4/);
 	assert.match(converted, /- note one/);
-	assert.equal(await readFile(storePath(cwd), "utf8"), storeBytes, "legacy store unchanged");
+	assert.equal(await readFile(legacyStore, "utf8"), storeBytes, "legacy store unchanged");
+	assert(!existsSync(path.join(cwd, ".pi")), "conversion creates no workflow runtime state");
+	for (const invalid of ["{broken", storeBytes.replace('"schemaVersion": 1', '"schemaVersion": 99')]) {
+		await writeFile(legacyStore, invalid);
+		selectScript = [["Plans3", null, (labels) => assert(!labels.some((label) => label.includes("Convert")), "invalid legacy store is not offered for conversion")]];
+		await run("plans3");
+		assert.equal(selectScript.length, 0);
+		assert.equal(await readFile(legacyStore, "utf8"), invalid, "invalid or future store is never repaired or overwritten");
+	}
+	await writeFile(legacyStore, storeBytes);
 	ctx.hasUI = false;
 
 	// Second opinion: default = first other family; all = every available model except the exact current one.
