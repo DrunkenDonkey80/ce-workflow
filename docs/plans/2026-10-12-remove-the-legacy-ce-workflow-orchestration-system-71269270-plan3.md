@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-12
-updated: 2026-10-12T09:03:23.008Z
+updated: 2026-10-12T09:13:05.910Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -101,8 +101,8 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 ### Phase 4: Package, tests and docs [think]
 
-- [ ] **P1** Delete agents/, skills/work-orchestrator, legacy prompts, legacy scripts, benchmarks and docs; update package.json.
-- [ ] **P2** Delete or trim legacy tests; remove the verify-package workflow switch and legacy checks (D-06).
+- [x] **P1** Deleted agents/, prompts/, legacy skills, scripts, benchmarks (kept context-continuity probes, session-knowledge), legacy docs and fixtures; package.json drops agents/prompts.
+- [x] **P2** verify-package is 141 lines with no workflow switch; it runs jev, advisor and every test-work-*; settings, native-smoke and opendesign tests are trimmed to the retained APIs.
 - [ ] **P3** Update README and AGENTS.md references, delete .ce-workflow/work-items.json (D-08), bump the version and commit locally.
 
 ## Global validation
