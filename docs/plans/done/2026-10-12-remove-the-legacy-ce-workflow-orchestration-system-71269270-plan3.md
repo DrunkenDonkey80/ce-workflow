@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-10-12
-updated: 2026-10-12T09:13:05.910Z
+updated: 2026-10-12T09:15:45.139Z
 reviewed: 2026-10-12
 tagsChecked: 1775df81
 started: 2026-10-12T07:37:44.039Z
@@ -103,7 +103,7 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 - [x] **P1** Deleted agents/, prompts/, legacy skills, scripts, benchmarks (kept context-continuity probes, session-knowledge), legacy docs and fixtures; package.json drops agents/prompts.
 - [x] **P2** verify-package is 141 lines with no workflow switch; it runs jev, advisor and every test-work-*; settings, native-smoke and opendesign tests are trimmed to the retained APIs.
-- [ ] **P3** Update README and AGENTS.md references, delete .ce-workflow/work-items.json (D-08), bump the version and commit locally.
+- [x] **P3** README legacy sections removed, work-items.json deleted, 0.1.38, committed cd3056f
 
 ## Global validation
 
@@ -115,7 +115,7 @@ E1 inventory (import graph of extensions/ and scripts/, 2026-10-12). Baseline `v
 
 ## Resume context
 
-E1–E5 and S1 are complete and locally committed; S1 reduced work-models.ts from 33.6k to 4,738 lines with a stable reachability graph and zero active LSP errors. S2 is in progress: work-design keeps only Plan3 helper dependencies, work-compound-source only scout confinement helpers, work-store only validated read/list/children APIs (no writers); the private-release catch-up branch/import is removed. Plan3 conversion tests now prove recovery fallback and source-byte preservation; future primary versions refuse fallback. Latest focused Plan3 and scout tests pass; diff --check passes; 4/5 batched LSP paths confirmed clean, one push-only result inconclusive. Next: trim work-compaction legacy profiles/summary branches and its tests, trim work-verification-contract to loader validation, delete orphan extension modules (S2), then S3 dependency review and P1–P3 package/test/docs cleanup. Full verifier and manual /reload are deferred until removal is integrated; baseline has known screen-read machine failure and occasional Plan3 parallel-needs frontmatter race. No blocker; continuing through compaction. Never push.
+Implementation finished on master, cd3056f (0.1.38). Package verification has only the accepted machine-specific screen-read failure (D-06). User still needs the manual /reload menu check and legacy-project conversion visibility check. No push. External subscription-footer changes were left untouched.
 
 ## Amendments
 
