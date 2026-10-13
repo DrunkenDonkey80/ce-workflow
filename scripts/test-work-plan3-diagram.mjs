@@ -25,7 +25,7 @@ assert.equal(layout(upload).get("web_client").x, 0, "cycle web_client -> ... -> 
 upload.nodes.find((node) => node.id === "cdn").x = 5000;
 assert.equal(layout(upload).get("cdn").x, 5000, "manual position wins");
 
-const { validateDiagram, diagramPath, loadDiagram, emptyDiagram, saveDiagram, DIAGRAM_BYTES } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
+const { validateDiagram, diagramPath, loadDiagram, emptyDiagram, saveDiagram, applyDiagramOperations, applyDiagram, diagramDependents, DIAGRAM_BYTES } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
 for (const name of ["upload-service", "ce-workflow"]) {
  const sample = JSON.parse(readFileSync(new URL(`./fixtures/diagrams/${name}.diagram.json`, import.meta.url), "utf8"));
  assert.equal(validateDiagram(sample), sample);
@@ -44,6 +44,36 @@ for (const bad of [
  { ...base, notes: [{ id: "note_1", text: "Why?", author: "user", created: "2026-10-13" }] },
  { ...base, nodes: Array.from({ length: 1001 }, (_, i) => ({ ...node, id: `node_${i}` })) },
 ]) assert.throws(() => validateDiagram(bad));
+const built = applyDiagramOperations(base, [
+ { op: "add", entity: "node", value: { id: "backend", label: "Backend", kind: "group" } },
+ { op: "add", entity: "node", value: { ...node, parent: "backend" } },
+ { op: "add", entity: "node", value: { id: "store", label: "Store", kind: "store" } },
+ { op: "add", entity: "edge", value: { from: "api", to: "store" } },
+ { op: "add", entity: "note", value: { target: "api", text: "Size limit?", author: "user", created: "2026-10-13" } },
+]).diagram;
+assert.equal(built.edges[0].id, "api__store");
+assert.equal(built.notes[0].id, "note_1");
+assert.deepEqual(diagramDependents(built, ["api"]).sort(), ["note_1", "store"]);
+assert.deepEqual(diagramDependents(built, ["backend"]), ["api"]);
+assert.deepEqual(diagramDependents(built, ["api__store"]).sort(), ["api", "store"]);
+const updated = applyDiagramOperations(built, [{ op: "update", entity: "node", id: "api", value: { summary: "Now accepts images" } }, { op: "move", entity: "node", id: "api", x: 80, y: 40 }]);
+assert.equal(updated.diagram.nodes.find(node => node.id === "api").x, 80);
+assert.deepEqual(updated.dependents.sort(), ["note_1", "store"]);
+assert.equal(built.nodes.find(node => node.id === "api").x, undefined, "operations never mutate the input");
+const removed = applyDiagramOperations(built, [{ op: "remove", entity: "node", id: "backend" }]);
+assert.deepEqual(removed.diagram.nodes.map(node => node.id), ["store"]);
+assert.equal(removed.diagram.edges.length, 0);
+assert.equal(removed.diagram.notes.length, 0);
+assert.deepEqual(removed.dependents, ["store"]);
+assert.deepEqual(removed.removed.sort(), ["api", "api__store", "backend", "note_1"]);
+for (const operations of [
+ [], [{ op: "update", entity: "node", id: "api", value: { id: "other" } }],
+ [{ op: "update", entity: "node", id: "api", value: JSON.parse('{"__proto__":{"evil":true}}') }],
+ [{ op: "move", entity: "edge", id: "api__store", x: 0, y: 0 }],
+ [{ op: "move", entity: "node", id: "api", x: Infinity, y: 0 }],
+ [{ op: "remove", entity: "node", id: "missing" }],
+ [{ op: "add", entity: "node", value: node }],
+]) assert.throws(() => applyDiagramOperations(built, operations));
 const dir = await mkdtemp(path.join(os.tmpdir(), "plan3-diagram-test-"));
 try {
  const planFile = path.join(dir, "docs", "plans", "sample-12345678-plan3.md");
@@ -66,6 +96,10 @@ try {
  assert(!(await readdir(path.dirname(planFile))).some(file => file.endsWith(".tmp")));
  await assert.rejects(saveDiagram(dir, target, base, 2), /target mismatch/);
  assert.throws(() => diagramPath(dir, { kind: "plan", plan: { ...target.plan, file: path.join(dir, "outside.md") } }), /owner/);
+ const applied = await applyDiagram(dir, target, [{ op: "move", entity: "node", id: "api", x: 60, y: 70 }], 2);
+ assert.equal(applied.diagram.revision, 3);
+ assert.equal(loadDiagram(dir, target).nodes[0].x, 60);
+ await assert.rejects(applyDiagram(dir, target, [{ op: "remove", entity: "node", id: "api" }], 2), /Stale/);
  await writeFile(diagramPath(dir, target), " ".repeat(DIAGRAM_BYTES + 1));
  assert.throws(() => loadDiagram(dir, target), /bounded/);
  const outside = path.join(dir, "external");

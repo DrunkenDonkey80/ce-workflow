@@ -119,3 +119,76 @@ export async function saveDiagram(cwd: string, target: DiagramTarget, value: unk
 		return diagram;
 	});
 }
+
+export function diagramDependents(diagram: Diagram, changed: Iterable<string>): string[] {
+	const ids = new Set(changed), dependent = new Set<string>();
+	for (const edge of diagram.edges) {
+		if (ids.has(edge.id) || ids.has(edge.from)) dependent.add(edge.to);
+		if (ids.has(edge.id) || ids.has(edge.to)) dependent.add(edge.from);
+	}
+	for (const node of diagram.nodes) if (node.parent && ids.has(node.parent)) dependent.add(node.id);
+	for (const note of diagram.notes) if (note.target && ids.has(note.target)) dependent.add(note.id);
+	return [...dependent].filter(id => !ids.has(id));
+}
+
+export function applyDiagramOperations(before: Diagram, operations: unknown) {
+	validateDiagram(before);
+	if (!Array.isArray(operations) || !operations.length || operations.length > 256) throw new Error("Apply needs 1–256 diagram operations.");
+	const diagram = structuredClone(before), changed = new Set<string>(), removed = new Set<string>();
+	for (const operation of operations) {
+		object(operation, ["op", "entity", "id", "value", "x", "y"], "operation");
+		if (!["add", "update", "move", "remove"].some(op => op === operation.op) || !["node", "edge", "note"].some(entity => entity === operation.entity)) throw new Error("Unknown diagram operation/entity.");
+		const list: (DiagramNode | DiagramEdge | DiagramNote)[] = operation.entity === "node" ? diagram.nodes : operation.entity === "edge" ? diagram.edges : diagram.notes;
+		const fields = operation.entity === "node" ? ["id", "label", "kind", "parent", "summary", "tech", "details", "status", "x", "y"] : operation.entity === "edge" ? ["id", "from", "to", "label", "status"] : ["id", "target", "text", "author", "created", "x", "y"];
+		if (operation.op === "add") {
+			object(operation.value, fields, "add value");
+			const value = { ...operation.value };
+			if (value.id === undefined && operation.entity !== "node") {
+				const taken = new Set([...diagram.nodes, ...diagram.edges, ...diagram.notes].map(item => item.id));
+				const base = operation.entity === "edge" ? `${value.from}__${value.to}`.slice(0, 48) : "note";
+				let id = operation.entity === "note" ? "note_1" : base;
+				for (let suffix = 2; taken.has(id); suffix++) id = `${base.slice(0, 48 - String(suffix).length - 1)}_${suffix}`;
+				value.id = id;
+			}
+			if (typeof value.id !== "string" || !ID.test(value.id) || removed.has(value.id) || [...diagram.nodes, ...diagram.edges, ...diagram.notes].some(item => item.id === value.id)) throw new Error("Invalid or duplicate diagram id.");
+			// SAFETY: final validateDiagram checks every field/reference before the candidate can be saved.
+			list.push(value as unknown as DiagramNode | DiagramEdge | DiagramNote);
+			changed.add(value.id);
+			continue;
+		}
+		if (typeof operation.id !== "string" || !ID.test(operation.id)) throw new Error("Operation needs an id.");
+		const index = list.findIndex(item => item.id === operation.id);
+		if (index < 0) throw new Error(`Unknown ${operation.entity}: ${operation.id}`);
+		changed.add(operation.id);
+		if (operation.op === "update") {
+			object(operation.value, fields, "update value");
+			if ("id" in operation.value && operation.value.id !== operation.id) throw new Error("Element ids cannot be changed; add a new element instead.");
+			Object.assign(list[index], operation.value);
+		} else if (operation.op === "move") {
+			if (operation.entity === "edge" || typeof operation.x !== "number" || typeof operation.y !== "number") throw new Error("Move needs a node/note and numeric x,y.");
+			Object.assign(list[index], { x: operation.x, y: operation.y });
+		} else {
+			removed.add(operation.id);
+			if (operation.entity === "node") {
+				let added = true;
+				while (added) { added = false; for (const node of diagram.nodes) if (node.parent && removed.has(node.parent) && !removed.has(node.id)) { removed.add(node.id); added = true; } }
+				for (const edge of diagram.edges) if (removed.has(edge.from) || removed.has(edge.to)) removed.add(edge.id);
+			}
+			for (const note of diagram.notes) if (note.target && removed.has(note.target)) removed.add(note.id);
+			diagram.nodes = diagram.nodes.filter(item => !removed.has(item.id));
+			diagram.edges = diagram.edges.filter(item => !removed.has(item.id));
+			diagram.notes = diagram.notes.filter(item => !removed.has(item.id));
+		}
+	}
+	validateDiagram(diagram);
+	const allChanges = new Set([...changed, ...removed]);
+	const dependents = [...new Set([...diagramDependents(before, allChanges), ...diagramDependents(diagram, allChanges)])].filter(id => !allChanges.has(id));
+	return { diagram, changed: [...allChanges], removed: [...removed], dependents };
+}
+
+export async function applyDiagram(cwd: string, target: DiagramTarget, operations: unknown, expectedRevision: number) {
+	const before = loadDiagram(cwd, target) ?? emptyDiagram(target, target.kind === "plan" ? loadDiagram(cwd, { kind: "product" }) : undefined);
+	if (before.revision !== expectedRevision) throw new Error("Stale diagram revision; reload before editing.");
+	const result = applyDiagramOperations(before, operations);
+	return { ...result, diagram: await saveDiagram(cwd, target, result.diagram, expectedRevision) };
+}

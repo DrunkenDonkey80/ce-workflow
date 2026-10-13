@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T14:08:03.945Z
+updated: 2026-10-13T14:11:39.126Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -143,8 +143,7 @@ Commands (existing; referenced by steps):
 ### Phase 3: Diagram model and agent tool [code]
 
 - [x] **P3-01** Diagram schema validation, bounded/confined loading, seeded creation and revision-checked atomic saves implemented using existing design lock/path/write helpers.
-- [ ] **P3-02** Add apply operations (add, update, move, remove node, edge or note) returning dependents of every changed element.
-  - Dependents: nodes linked by an edge in either direction, children of a changed group, notes anchored to it.
+- [x] **P3-02** Validated add/update/move/remove operations preserve ids, cascade deletions safely, generate default edge/note ids, and report changed elements plus linked/child/note dependents; saves reject stale revisions.
 - [ ] **P3-03** Register the `plan3_diagram` tool (get, apply) with a guideline: after an edit, offer updates to listed dependents through ask_user.
 - [ ] **P3-04** Move the sibling diagram on every plan rename: `archive()`, the plan3 title action and `enterPlanDesign()`; resolve it for archived plans.
   - Rename sites: `extensions/plan3.ts` title action (renames plan and log), `extensions/plan3-design.ts` `enterPlanDesign()` (adds a stable id).
