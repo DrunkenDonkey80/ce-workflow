@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T16:47:14.408Z
+updated: 2026-10-13T17:05:33.989Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -159,7 +159,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 5: Browser workspace [code]
 
-- [ ] **P5-01** Build `extensions/plan3-web/` app shell: diagram left, resizable chat right, top bar with plan title and command buttons, per P1-03 tokens.
+- [x] **P5-01** Built the flat whiteboard app shell with live title/status, command bar, left canvas and keyboard/pointer-resizable chat; responsive stacking follows D24/25.
 - [ ] **P5-02** SVG renderer with rough.js: groups, nodes, labeled edges, semantic zoom bands, pan, node drag saving positions.
 - [ ] **P5-03** Comments: pin to node, edge or canvas; hover cards; inline when zoomed in; sticky-note style.
 - [ ] **P5-04** Chat pane: streaming replies, ctrl+click inserts `@id`, mention chips, browser dialogs for ask_user batches and list menus.
@@ -209,7 +209,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-19/30 complete; Phase 4 full npm run verify:quiet passed after P4-06. Continue P5-01 SVG/rough.js renderer over existing layout.ts, then remaining UI and Phase 6/7 steps inline. Browser CLI/server/chat/dialog/Stop and session-switch isolation implemented and tested, but browser shell not built yet. P4-04/05 commit 8718c4c; P4-06 ready to commit. Preserve unrelated resolving follow-up edits in extensions/plan3.ts (17+/2-) and scripts/test-work-plan3.mjs (6+) plus unrelated stats/needs sidecars. Stage with contextful diff filtering (zero-context filtered patches misplaced three insertions; corrected before 8718c4c). No delegation/background verifier/push. Need verify real Virgil license before vendoring, not assumed OFL. LSP remains non-authoritative for SDK typing. P7-01 requires actual user browser acceptance.
+20/30 complete. P5-01 shell and persistent headless browser test implemented; C-WEB and C-BROWSER passed. Next P5-02: rough.js SVG renderer over existing layout.ts, semantic bands D21, pan/zoom, parent-relative node drag with revision-checked API. Shell buttons/chat/zoom are placeholders until their assigned steps, not complete UI. Context7 quota exceeded; use official Rough.js README/API via web instead. Virgil repo listing proves license path is LICENSE.md (not LICENSE), font Virgil.woff2; must read license and pin assets before vendoring. Browser native binary Windows at %APPDATA%/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe; CLI mouse coordinates must be integers. No delegation/background verifier/push. Preserve unrelated resolve-follow-up hunks and sidecars. P7-01 requires human acceptance.
 
 ## Amendments
 

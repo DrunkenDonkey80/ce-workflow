@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>Plan3 architecture workspace</title>
+ <link rel="stylesheet" href="/styles.css?token=__TOKEN__">
+ <script type="module" src="/app.js?token=__TOKEN__"></script>
+</head>
+<body>
+ <header class="topbar">
+  <div class="workspace-title"><h1 id="title">Architecture workspace</h1><span id="target-kind" class="badge">Plan</span></div>
+  <nav id="commands" aria-label="Plan actions">
+   <button type="button" data-command="resolve" disabled>Resolve questions</button>
+   <button type="button" data-command="ideas" disabled>Ideas</button>
+   <button type="button" data-command="review" disabled>Review</button>
+   <button type="button" data-command="finish" disabled>Finish planning</button>
+   <button type="button" data-command="resume" disabled>Start work</button>
+  </nav>
+ </header>
+ <p id="notice" class="notice" role="status" hidden></p>
+ <main id="workspace" class="workspace">
+  <section id="canvas" class="canvas" aria-label="Diagram workspace">
+   <svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Architecture diagram" tabindex="0"></svg>
+   <p id="empty-diagram" class="empty-diagram">No diagram yet. Ask in the chat, for example: draw the main components.</p>
+   <div id="zoom-controls" class="zoom-controls" aria-label="Diagram zoom">
+    <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+    <output id="zoom-level" aria-label="Zoom level">100%</output>
+    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+    <button id="zoom-fit" type="button">Fit</button>
+   </div>
+   <div id="hover-card" class="hover-card" role="tooltip" hidden></div>
+  </section>
+  <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
+  <aside id="chat" class="chat" aria-label="Live Pi session">
+   <header class="chat-heading"><h2>Live session</h2><span id="connection" role="status">Connecting…</span></header>
+   <section id="activity" class="activity" aria-label="Agent activity"></section>
+   <ol id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></ol>
+   <form id="composer" class="composer">
+    <div id="mentions" class="mentions" aria-label="Mentioned elements"></div>
+    <label for="message-input">Message to Pi</label>
+    <textarea id="message-input" rows="3" maxlength="20000" placeholder="Ask about the architecture…"></textarea>
+    <div class="composer-actions">
+     <span class="input-help">Ctrl+click a box to mention it</span>
+     <button id="stop" type="button" class="danger" hidden>Stop</button>
+     <button id="send" type="submit" disabled>Send</button>
+    </div>
+   </form>
+  </aside>
+ </main>
+ <dialog id="prompt" aria-labelledby="prompt-title"><form id="prompt-form"></form></dialog>
+</body>
+</html>

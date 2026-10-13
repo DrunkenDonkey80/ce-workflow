@@ -36,6 +36,13 @@ try {
  assert.equal((await request("/api/snapshot?target=../../", { headers: auth })).response.status, 400);
  assert.equal((await request("/%2f..%2fpackage.json", { headers: auth })).response.status, 404);
  assert.equal((await request("/layout.js", { headers: auth })).response.headers.get("content-type"), "text/javascript; charset=utf-8");
+ const shell = await request("/", { headers: auth });
+ assert.equal(shell.response.status, 200); assert.match(shell.text, /aria-label="Resize chat pane"/);
+ assert.match(shell.text, /data-command="resolve"/); assert(shell.text.includes(`app.js?token=${token}`));
+ assert(!shell.text.includes("__TOKEN__"));
+ assert.equal((await request("/app.js", { headers: auth })).response.headers.get("content-type"), "text/javascript; charset=utf-8");
+ const css = await request("/styles.css", { headers: auth });
+ assert.match(css.text, /--chat-width: 380px/); assert.match(css.text, /max-width: 899px/);
  const post = { method: "POST", headers: { ...auth, Origin: server.origin, "Content-Type": "application/json" }, body: JSON.stringify({ target: "12345678", text: "hello" }) };
  assert.equal((await request("/api/message", { ...post, headers: { ...auth, "Content-Type": "application/json" } })).response.status, 403);
  assert.equal((await request("/api/message", { ...post, headers: { ...post.headers, Authorization: "Bearer bad" } })).response.status, 401);
