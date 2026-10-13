@@ -14,7 +14,7 @@ async function browser(...args) {
  const result = JSON.parse(stdout); assert(result.success, JSON.stringify(result)); return result.data;
 }
 // agent-browser 0.38.2 drops held mouse modifiers; CDP sends trusted input with explicit bits.
-async function ctrlClick(point, origin) {
+async function withPageCdp(origin, run) {
  const { cdpUrl } = await browser("get", "cdp-url"); assert(cdpUrl.startsWith("ws://127.0.0.1:"));
  const socket = new WebSocket(cdpUrl), pending = new Map(); let sequence = 0;
  socket.addEventListener("message", event => { const value = JSON.parse(event.data), request = pending.get(value.id); if (!request) return; pending.delete(value.id); clearTimeout(request.timer); if (value.error) request.reject(new Error(value.error.message)); else request.resolve(value.result); });
@@ -26,7 +26,7 @@ async function ctrlClick(point, origin) {
   await new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", () => reject(new Error("CDP connection failed")), { once: true }); });
   const { targetInfos } = await send("Target.getTargets"), target = targetInfos.find(item => item.type === "page" && item.url.startsWith(origin + "/")); assert(target, "CDP must attach to our test page only");
   const { sessionId } = await send("Target.attachToTarget", { targetId: target.targetId, flatten: true });
-  for (const [type, buttons] of [["mouseMoved", 0], ["mousePressed", 1], ["mouseReleased", 0]]) await send("Input.dispatchMouseEvent", { ...point, type, modifiers: 2, ...(type === "mouseMoved" ? {} : { button: "left", buttons, clickCount: 1 }) }, sessionId);
+  return await run((method, params) => send(method, params, sessionId));
  } finally { socket.close(); for (const request of pending.values()) { clearTimeout(request.timer); request.reject(new Error("CDP connection closed")); } }
 }
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
@@ -136,6 +136,15 @@ try {
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
  assert(await evaluate("document.querySelectorAll(\"foreignObject .note-text\").length >= 6"));
  assert.equal(await evaluate("document.querySelector(\"foreignObject img\")"), null, "note markup stays inert text");
+ await browser("reload"); await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"6\"");
+ assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition, "saved drag survives the full snapshot after reload");
+ assert.equal(await evaluate("document.querySelectorAll(\"[data-note]\").length"), 6, "saved notes survive reload");
+ await withPageCdp(server.origin, send => send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] }));
+ assert(await evaluate("matchMedia(\"(prefers-reduced-motion: reduce)\").matches"));
+ assert.equal(await evaluate("getComputedStyle(document.getElementById(\"diagram\")).animationDuration"), "0s");
+ await browser("focus", "#zoom-in"); await browser("press", "Tab");
+ assert.equal(await evaluate("document.activeElement.id"), "zoom-fit");
+ assert.equal(await evaluate("getComputedStyle(document.activeElement).outlineWidth"), "2px", "keyboard focus is visibly outlined");
  const reply = { id: "assistant_1", role: "assistant", text: "Reviewing", at: new Date().toISOString(), streaming: true };
  chatRows.set(reply.id, reply); server.publish("message", reply);
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Reviewing\")");
@@ -146,7 +155,7 @@ try {
  const mentionPoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
  await evaluate("window.mentionEvents = []; for (const name of [\"pointerdown\", \"click\"]) document.addEventListener(name, event => window.mentionEvents.push({ name, trusted: event.isTrusted, ctrl: event.ctrlKey, node: event.target.closest(\"[data-node]\")?.dataset.node }), true)");
  const revisionBeforeMention = diagram.revision, movesBeforeMention = edits.length;
- await ctrlClick(mentionPoint, server.origin);
+ await withPageCdp(server.origin, async send => { for (const [type, buttons] of [["mouseMoved", 0], ["mousePressed", 1], ["mouseReleased", 0]]) await send("Input.dispatchMouseEvent", { ...mentionPoint, type, modifiers: 2, ...(type === "mouseMoved" ? {} : { button: "left", buttons, clickCount: 1 }) }); });
  assert.deepEqual(await evaluate("window.mentionEvents"), [{ name: "pointerdown", trusted: true, ctrl: true, node: "web_client" }, { name: "click", trusted: true, ctrl: true, node: "web_client" }]);
  assert.equal(diagram.revision, revisionBeforeMention); assert.equal(edits.length, movesBeforeMention, "modified clicks cannot start a drag");
  assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "@web_client ");
@@ -197,6 +206,11 @@ try {
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
+ const productSample = JSON.parse(await readFile(new URL("./fixtures/diagrams/ce-workflow.diagram.json", import.meta.url), "utf8"));
+ diagram = { ...productSample, kind: "plan", plan: "12345678", revision: diagram.revision + 1 }; server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });
+ await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === " + JSON.stringify(String(diagram.revision)));
+ await browser("click", "#zoom-fit");
+ assert(await evaluate("document.querySelectorAll(\"[data-node]\").length > 0"), "whole-product sample renders");
  const errors = await browser("errors"); assert.deepEqual(errors.errors ?? [], [], "browser JavaScript must run under the strict CSP");
  console.log(`ok - Plan3 browser shell, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {

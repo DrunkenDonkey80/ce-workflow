@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-13
-updated: 2026-10-13T19:42:05.172Z
+updated: 2026-10-13T19:52:24.232Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -166,8 +166,7 @@ Commands (existing; referenced by steps):
 - [x] **P5-03** Added node/edge/canvas note pinning, keyboard pinning, persisted comments, hover/focus cards including collapsed descendants, and pink inline notes at near zoom.
 - [x] **P5-04** Streaming chat, safe mention chips and Ctrl+click, draft-safe message send, all five browser commands, single/batch ask answers and filterable/checklist list menus are working.
 - [x] **P5-06** Added bounded thinking/tool/queue activity disclosures with progress, results, nesting, duration, compaction/error states and busy-only Stop.
-- [wip] **P5-05** Headless check with agent-browser against a test server and the P1-02 samples; inspect with screen_read at small maxEdge.
-  - Acceptance: zoom bands switch, drag persists after reload, a comment shows on hover, a replayed event stream shows working, tool rows and idle, keyboard focus is visible, reduced motion is respected.
+- [x] **P5-05** Qualified both sample diagrams in headless Chrome: reload persistence, semantic bands, native mentions/drag, hover comments, activity replay, visible keyboard focus, reduced motion and narrow stacked layout.
 
 ### Phase 6: Product architecture and standing rule [code]
 
