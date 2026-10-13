@@ -11,6 +11,7 @@ import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, type DiagramTarget } from "./plan3-diagram.ts";
+import { createPlan3Web, type WebTarget } from "./plan3-web.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -689,6 +690,24 @@ export default function plan3(pi) {
 			const bias = plan ? biasOf(ctx, plan, split(await readFile(plan.file, "utf8")).lines, availOf(plan.file)) : 0;
 			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
+	}
+	let webCtx = null, webStopped = false;
+	let webServer: ReturnType<typeof createPlan3Web> | undefined;
+	async function resolveWebTarget(target: WebTarget): Promise<DiagramTarget> {
+		if (!webCtx) throw new Error("Workspace needs a current command context; reopen /plan3 diagram.");
+		if (target.kind === "product") return { kind: "product" };
+		const plan = await resolvePlan(webCtx.cwd, target.id, await listPlans(webCtx.cwd));
+		if (!plan) throw new Error("Displayed plan no longer exists.");
+		return { kind: "plan", plan };
+	}
+	function getWeb(ctx) {
+		if (webStopped) throw new Error("Workspace session has ended.");
+		webCtx = ctx;
+		webServer ??= createPlan3Web({ snapshot: async target => {
+			const resolved = await resolveWebTarget(target);
+			return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title } } : {}) };
+		} }).catch(error => { webServer = undefined; throw error; });
+		return webServer;
 	}
 	// R10/D12: compact before switching plans; a failed compaction sends nothing.
 	async function compactFirst(ctx, plan, force = false) {
@@ -1787,7 +1806,11 @@ export default function plan3(pi) {
 		await night.restore(ctx);
 		return refresh(ctx);
 	});
-	pi.on?.("session_shutdown", () => { night.shutdown(); return closePersistentOpenDesignClients(); });
+	pi.on?.("session_shutdown", async () => {
+		night.shutdown(); webStopped = true; webCtx = null;
+		const pending = webServer; webServer = undefined;
+		await Promise.all([pending?.then(server => server.close()), closePersistentOpenDesignClients()]);
+	});
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
 	// Plans are born from the template (plan3 create), never invented: block writing a NEW plan3 file by hand.
 	// shortcut: covers the write tool only, not shell redirection; extend if agents start bypassing it.
