@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { stripTypeScriptTypes } from "node:module";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
 import { raceRemoteAsk, remoteResponse, remoteBatch, type RemoteListPrompt } from "./ask-user/remote.ts";
 import { bindListDialogBridge, listDialogResponse } from "./work-dialogs.ts";
@@ -114,7 +115,7 @@ export async function createPlan3Web(options: Options) {
 			try { contents = readFileSync(fileURLToPath(new URL(`./plan3-web/${asset[0]}`, import.meta.url))); }
 			catch { throw new WebError(404, "Workspace asset is not installed."); }
 			res.writeHead(200, { "Content-Type": asset[1] });
-			res.end(asset[1].startsWith("font/") ? contents : contents.toString("utf8").replaceAll("__TOKEN__", token));
+			res.end(asset[1].startsWith("font/") ? contents : (asset[0].endsWith(".ts") ? stripTypeScriptTypes(contents.toString("utf8")) : contents.toString("utf8")).replaceAll("__TOKEN__", token));
 		})().catch(error => {
 			clients.delete(res);
 			if (res.destroyed || res.writableEnded) return;

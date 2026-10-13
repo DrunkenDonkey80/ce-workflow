@@ -10,7 +10,7 @@ const { createPlan3Web, createDialogBridge, WebError } = await createJiti(import
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `ce-plan3-ui-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
- const { stdout } = await execute(binary, ["--session", session, "--headed", "false", "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 });
+ const { stdout } = await execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 });
  const result = JSON.parse(stdout); assert(result.success, JSON.stringify(result)); return result.data;
 }
 // agent-browser 0.38.2 drops held mouse modifiers; CDP sends trusted input with explicit bits.

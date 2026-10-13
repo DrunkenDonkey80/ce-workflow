@@ -4,8 +4,9 @@ import rough from "./vendor/rough.js?token=__TOKEN__";
 // @ts-ignore Browser-only module URL.
 import { layout } from "./layout.js?token=__TOKEN__";
 
+import type { Diagram } from "../plan3-diagram.ts";
 const NS = "http://www.w3.org/2000/svg";
-export function element(tag, attributes = {}, text) {
+export function element<K extends keyof SVGElementTagNameMap>(tag: K, attributes = {}, text = undefined) {
  const node = document.createElementNS(NS, tag);
  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
  if (text !== undefined) node.textContent = text;
@@ -14,7 +15,7 @@ export function element(tag, attributes = {}, text) {
 export function seed(id) { let value = 0; for (const char of id) value = Math.imul(value, 31) + char.charCodeAt(0); return (value & 0x7fffffff) || 1; }
 const fills = { new: "#b2f2bb", changed: "#ffec99", removed: "#ced4da", existing: "#a5d8ff" };
 
-export function createDiagramView(svg, handlers) {
+export function createDiagramView(svg: SVGSVGElement, handlers) {
  const rc = rough.svg(svg), view = { x: 32, y: 32, scale: 1 };
  const measure = document.createElement("canvas").getContext("2d");
  measure.font = "16px Virgil";
@@ -34,7 +35,7 @@ export function createDiagramView(svg, handlers) {
  // shortcut: near-band inline fields show bounded excerpts; full text remains in the hover card, expand limits if real diagrams need it.
  const noteSpace = (data, id) => data.notes.filter(note => note.target === id).length * 116;
  const details = node => [...lines(node.summary, 212, 4), ...lines(node.tech, 212, 2), ...lines(node.details, 212, 8)];
- function build(data) {
+ function build(data: Diagram) {
   const byId = new Map(data.nodes.map(node => [node.id, node]));
   const root = id => { let node = byId.get(id); while (node?.parent) node = byId.get(node.parent); return node?.id; };
   const far = view.scale < .6, near = view.scale > 1.6;
@@ -90,7 +91,7 @@ export function createDiagramView(svg, handlers) {
   handlers.notes?.(stage, boxes, view, rc, data, node => 69 + details(node).length * 18);
   svg.replaceChildren(stage); svg.dataset.revision = String(data.revision); svg.dataset.band = view.scale < .6 ? "far" : near ? "near" : "mid";
   document.getElementById("zoom-level").textContent = Math.round(view.scale * 100) + "%";
-  if (focused) svg.querySelector(`[data-node="${focused}"]`)?.focus();
+  if (focused) svg.querySelector<SVGElement>(`[data-node="${focused}"]`)?.focus();
  }
  function zoom(factor, x = svg.clientWidth / 2, y = svg.clientHeight / 2) {
   if (gesture) return;
@@ -117,6 +118,7 @@ export function createDiagramView(svg, handlers) {
  });
  svg.addEventListener("pointerdown", event => {
   if (event.button !== 0 || event.ctrlKey || event.metaKey || !diagram || handlers.pinning?.()) return;
+  if (!(event.target instanceof Element)) return;
   const id = event.target.closest("[data-node]")?.getAttribute("data-node"), node = diagram.nodes.find(node => node.id === id), box = boxes.get(id);
   const parent = boxes.get(node?.parent);
   gesture = { pointer: event.pointerId, x: event.clientX, y: event.clientY, vx: view.x, vy: view.y, scale: view.scale, diagram, node, rx: box ? box.x - (parent ? parent.x + 24 : 0) : 0, ry: box ? box.y - (parent ? parent.y + 56 + (view.scale > 1.6 ? details(diagram.nodes.find(item => item.id === node.parent)).length * 18 + noteSpace(diagram, node.parent) : 0) : 0) : 0, moved: false };
@@ -140,6 +142,7 @@ export function createDiagramView(svg, handlers) {
  for (const name of ["pointercancel", "lostpointercapture"]) svg.addEventListener(name, () => { if (gesture) { gesture = null; draw(); } });
  svg.addEventListener("click", event => {
   if (!handlers.pinning?.() || event.ctrlKey || event.metaKey) return;
+  if (!(event.target instanceof Element)) return;
   const id = event.target.closest("[data-node], [data-edge]"), rect = svg.getBoundingClientRect();
   handlers.pin(id ? { element: id.getAttribute("data-node") ?? id.getAttribute("data-edge") } : { x: (event.clientX - rect.left - view.x) / view.scale, y: (event.clientY - rect.top - view.y) / view.scale });
  });

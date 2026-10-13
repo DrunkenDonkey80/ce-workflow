@@ -354,7 +354,7 @@ async function mutate(plan, change) {
 const today = () => new Date().toISOString().slice(0, 10);
 const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "plan";
 
-function markStep(lines, id, mark, extras = {}) {
+function markStep(lines, id, mark, extras: { note?: string; check?: string; summary?: string } = {}) {
 	const step = steps(lines).find((candidate) => candidate.id === id);
 	if (!step) throw new Error(`Unknown step "${id}". Steps: ${steps(lines).map((s) => s.id).join(", ")}`);
 	lines[step.index] = lines[step.index].replace(/\[( |wip|x|f|blocked|human)?\]/, MARKS[mark]);
@@ -612,15 +612,16 @@ export function similarity(a, b) {
 }
 
 // R20: read-only legacy conversion.
+type LegacyWorkItem = { id: string; title: string; type: string; status: string; parentId?: string };
 function legacyCandidates(cwd, plans) {
 	let store: ReturnType<typeof loadStore>;
 	try { store = loadStore(cwd); } catch { return { store: null, items: [] }; }
 	const converted = new Set(plans.map((plan) => plan.source).filter(Boolean));
-	const items = listWorkItems(store).filter((item) => (!item.parentId || !store.items[item.parentId]) && item.status !== "closed" && !converted.has(`work:${item.id}`));
+	const items = (listWorkItems(store) as LegacyWorkItem[]).filter((item) => (!item.parentId || !store.items[item.parentId]) && item.status !== "closed" && !converted.has(`work:${item.id}`));
 	return { store, items };
 }
 async function convertLegacy(cwd, store, item) {
-	const children = childWorkItems(store, item.id).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+	const children = (childWorkItems(store, item.id) as LegacyWorkItem[]).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 	const work = children.length ? children : [item];
 	const mark = { closed: "[x]", in_progress: "[wip]", blocked: "[blocked]" };
 	const stepLines = work.filter((child) => child.status !== "deferred").map((child) => `- ${mark[child.status] ?? "[ ]"} **${child.id}** ${child.title}`);
@@ -680,8 +681,8 @@ export default function plan3(pi) {
 	}
 	// One code-raised dialog at a time: a second ui.custom replaces the first, whose promise then never settles
 	// (parallel requirement calls hung the tool and left herdr blocked).
-	let uiChain = Promise.resolve();
-	function serialUI(run) {
+	let uiChain: Promise<unknown> = Promise.resolve();
+	function serialUI<T>(run: () => Promise<T>) {
 		const next = uiChain.then(run, run);
 		uiChain = next.catch(() => {});
 		return next;
@@ -709,7 +710,7 @@ export default function plan3(pi) {
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => {
 		try { webInstance?.publish(event, data); }
-		catch (error) { try { webCtx?.ui.notify(`Plan3 browser update failed; terminal remains active: ${error.message}`, "warning"); } catch {} }
+		catch (error) { try { webCtx?.ui.notify(`Plan3 browser update failed; terminal remains active: ${error.message}`, "warning"); } catch { console.warn("Plan3 browser update failed; terminal notification unavailable:", error.message); } }
 	};
 	const chat = createChatMirror(pi, publishWeb);
 	let dialogs = createDialogBridge(pi, publishWeb);
@@ -722,7 +723,7 @@ export default function plan3(pi) {
 			if (!webStopped) publishWeb("diagram", { target, diagram: loadDiagram(event.cwd, resolved) });
 		} catch (error) { if (!webStopped) publishWeb("error", { message: error.message }); }
 	});
-	async function resolveWebTarget(target: WebTarget): Promise<DiagramTarget> {
+	async function resolveWebTarget(target: WebTarget): Promise<{ kind: "product" } | { kind: "plan"; plan: ReturnType<typeof summarize> }> {
 		if (!webCtx) throw new WebError(409, "Workspace needs a current command context; reopen /plan3 diagram.");
 		if (target.kind === "product") return { kind: "product" };
 		const plan = await resolvePlan(webCtx.cwd, target.id, await listPlans(webCtx.cwd));
@@ -837,7 +838,7 @@ export default function plan3(pi) {
 		const phases = phaseSettings(ctx.cwd, plan);
 		const last = lastRun(ctx) ?? {}, target = mode === "think" ? { model: phases.planning.model, thinking: "high" } : phases[mode];
 		const current = { model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined, thinking: pi.getThinkingLevel?.() };
-		const home = {}, set = {};
+		const home: Partial<typeof current> = {}, set: Partial<typeof current> = {};
 		for (const key of ["model", "thinking"]) {
 			home[key] = last.set?.[key] !== undefined && current[key] === last.set[key] ? last.home?.[key] : current[key];
 			set[key] = target[key] ?? home[key];
@@ -1348,7 +1349,7 @@ export default function plan3(pi) {
 						if (!file) continue;
 					}
 					const reference = await addPlanDesignImage(ctx.cwd, plan, file, `dialog-${randomUUID()}`, source);
-					pi.sendMessage?.({ customType: "plan3-reference", content: [{ type: "text", text: JSON.stringify({ referenceId: reference.id, file: reference.file, use: reference.use, limits: reference.limits }) }, { type: "image", data: readFileSync(reference.file).toString("base64"), mimeType: ({ ".png": "image/png", ".webp": "image/webp" })[path.extname(reference.file).toLowerCase()] ?? "image/jpeg" }], display: true }, { triggerTurn: false });
+					pi.sendMessage?.({ customType: "plan3-reference", content: [{ type: "text", text: JSON.stringify({ referenceId: reference.id, file: reference.file, limits: reference.limits }) }, { type: "image", data: readFileSync(reference.file).toString("base64"), mimeType: ({ ".png": "image/png", ".webp": "image/webp" })[path.extname(reference.file).toLowerCase()] ?? "image/jpeg" }], display: true }, { triggerTurn: false });
 					send(`Plan3: reference review planning only for ${JSON.stringify(plan.file)}. ${boundary}\nVisually inspect the supplied/captured image ${JSON.stringify(reference.file)} (id ${reference.id}); disclose blank/stale/hidden/GPU limits ${reference.limits ?? "unknown capture provenance for a supplied image"}. Do not transfer unrelated/private/system content. Use plan3_design reference with referenceId, borrow, avoid and reviewed:true only after actual visual inspection; do not infer pixels from text. Reuse the main plan's settled answers; do not implement. ${HINT_RULE}`);
 					await refresh(ctx);
 					return;
@@ -1667,7 +1668,7 @@ export default function plan3(pi) {
 			const plans = await listPlans(ctx.cwd);
 			const plan = args.plan ? await resolvePlan(ctx.cwd, args.plan, plans) : currentPlan(ctx, plans);
 			if (!plan) throw new Error("No open Plan3 plan; pass plan or start one with /plan3.");
-			let result = {};
+			let result: { file?: string; warning?: string; view?: string; [key: string]: unknown } = {};
 			const need = (key) => { if (args[key] === undefined || args[key] === "") throw new Error(`${args.action} needs ${key}`); return args[key]; };
 			if (args.action === "ideas") {
 				result = await reviewIdeas(ctx, plan, args.ideas, _signal);

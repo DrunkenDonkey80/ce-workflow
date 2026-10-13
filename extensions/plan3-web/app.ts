@@ -1,12 +1,20 @@
-// Browser-only JavaScript-compatible .ts source; served without a build step.
+// Browser-only source; the server strips erasable types without a build step.
+import type { Diagram } from "../plan3-diagram.ts";
+import type { createActivityMirror } from "../plan3-web.ts";
 // @ts-ignore Browser URL includes the workspace token.
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { createPromptView } from "./prompts.js?token=__TOKEN__";
-const $ = id => document.getElementById(id);
+function $(id: "message-input" | "comment-text"): HTMLTextAreaElement;
+function $(id: "send" | "stop" | "comment-save"): HTMLButtonElement;
+function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
+function $(id: "composer" | "comment-form" | "prompt-form"): HTMLFormElement;
+function $(id: "diagram"): SVGSVGElement;
+function $(id: string): HTMLElement;
+function $(id: string): HTMLElement | SVGSVGElement { return document.getElementById(id); }
 const token = "__TOKEN__";
 const target = new URLSearchParams(location.search).get("target") ?? "product";
-const state = { connected: false, diagram: null, plan: null, activity: {}, pinning: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]>>; pinning: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
@@ -25,7 +33,7 @@ function renderShell() {
 
 function renderActivity() {
  const root = $("activity"), data = state.activity, opened = new Map([...root.querySelectorAll("details")].map(item => [item.dataset.id, item.open]));
- const make = (tag, text, className) => { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; };
+ const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = undefined, className = "") => { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; };
  const section = (id, title, open = false) => { const item = make("details"); item.dataset.id = id; item.open = opened.get(id) ?? open; item.append(make("summary", title)); root.append(item); return item; };
  root.replaceChildren();
  if (data.compacting) root.append(make("p", "Compacting session history…", "activity-status"));
@@ -67,7 +75,7 @@ splitter.addEventListener("keydown", event => {
 
 async function post(endpoint, body) {
  const response = await fetch("/api/" + endpoint, { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ target, ...body }) });
- const value = await response.json(); if (!response.ok) { const error = new Error(value.error ?? "Workspace request failed."); error.status = response.status; throw error; } return value;
+ const value = await response.json(); if (!response.ok) { throw Object.assign(new Error(value.error ?? "Workspace request failed."), { status: response.status }); } return value;
 }
 function hover(id, event) {
  if (state.pinning) return;
@@ -157,9 +165,9 @@ function renderChat() {
  const list = $("messages"), follow = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
  const encoder = new TextEncoder();
  while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
- for (const item of [...list.children]) if (!chat.has(item.dataset.id)) item.remove();
+ for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
  for (const row of chat.values()) {
-  let item = [...list.children].find(item => item.dataset.id === row.id);
+  let item = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].find(item => item.dataset.id === row.id);
   if (!item) { item = document.createElement("li"); item.dataset.id = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("small")); list.append(item); }
   item.className = "message " + row.role; item.children[0].textContent = row.role === "user" ? "You" : "Agent";
   item.children[1].textContent = row.text; item.children[2].textContent = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming ? "Streaming…" : "");
@@ -169,7 +177,7 @@ function renderChat() {
 const mentioned = () => [...new Set([...$("message-input").value.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
 function renderMentions() {
  const data = state.diagram, all = [...(data?.nodes ?? []), ...(data?.edges ?? []), ...(data?.notes ?? [])]; $("mentions").replaceChildren();
- for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = entity?.label ?? entity?.text ?? "No matching element; sent as text."; $("mentions").append(chip); }
+ for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = "No matching element; sent as text."; if (entity && "label" in entity) chip.title = entity.label ?? chip.title; if (entity && "text" in entity) chip.title = entity.text; $("mentions").append(chip); }
 }
 $("message-input").addEventListener("input", renderMentions);
 $("message-input").addEventListener("keydown", event => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); $("composer").requestSubmit(); } });
@@ -191,11 +199,11 @@ $("stop").addEventListener("click", async () => { try { await post("stop", {}); 
 
 // Native EventSource reconnects; the server always starts a connection with a fresh full snapshot.
 const events = new EventSource("/api/events?token=" + token + "&target=" + encodeURIComponent(target));
-function applyUpdate(event, update) {
+function applyUpdate(event: MessageEvent, update) {
  try { update(JSON.parse(event.data)); }
  catch (error) { showNotice("Workspace update failed: " + error.message + ". Reopen from the Pi terminal; your message draft is kept."); }
 }
-function listen(name, update) { events.addEventListener(name, event => applyUpdate(event, update)); }
+function listen(name, update) { events.addEventListener(name, (event: MessageEvent) => applyUpdate(event, update)); }
 listen("snapshot", value => {
  state.connected = true; state.diagram = value.diagram; state.plan = value.plan; state.activity = value.activity ?? {};
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
@@ -209,7 +217,7 @@ listen("dialog", value => { promptView.pending(value); renderShell(); });
 listen("dialog_closed", value => { promptView.closed(value.askId); renderShell(); });
 listen("activity", value => { state.activity = value; renderActivity(); renderShell(); });
 events.addEventListener("error", event => {
- if (event.data) { applyUpdate(event, value => showNotice(value.message ?? "Workspace update failed.")); return; }
+ if (event instanceof MessageEvent && event.data) { applyUpdate(event, value => showNotice(value.message ?? "Workspace update failed.")); return; }
  state.connected = false; renderShell();
  showNotice("Connection lost. Return to the Pi terminal and reopen the workspace. Your unsent message is still here.");
 });

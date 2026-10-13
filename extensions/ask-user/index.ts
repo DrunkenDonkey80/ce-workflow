@@ -190,7 +190,7 @@ interface AskBatchDetails {
    cancelled: boolean;
 }
 
-function isBatchDetails<T extends AskToolDetails | AskBatchDetails>(details: T): details is Extract<T, AskBatchDetails> {
+function isBatchDetails(details: AskToolDetails | AskBatchDetails): details is AskBatchDetails {
    return (details as AskBatchDetails).kind === "batch";
 }
 
@@ -3136,11 +3136,12 @@ export function registerAskUser(pi: ExtensionAPI) {
             return new Text(theme.fg("muted", waitingText), 0, 0);
          }
 
-         if (details && isBatchDetails(details)) {
+         if (!details) return new Text(theme.fg("warning", "Cancelled"), 0, 0);
+         if (isBatchDetails(details)) {
             return new Text(formatBatchResult(theme, details, options.expanded), 0, 0);
          }
 
-         if (!details || details.cancelled || !details.response) {
+         if (details.cancelled || !details.response) {
             return new Text(theme.fg("warning", "Cancelled"), 0, 0);
          }
 

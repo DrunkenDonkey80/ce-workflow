@@ -1,13 +1,13 @@
 // Browser-only shared prompt renderer; the server/terminal race owns acceptance.
-function node(tag, properties = {}, text) { const item = document.createElement(tag); Object.assign(item, properties); if (text !== undefined) item.textContent = text; return item; }
-export function createPromptView(dialog, form, post, notice) {
+function node<K extends keyof HTMLElementTagNameMap>(tag: K, properties = {}, text = undefined) { const item = document.createElement(tag); Object.assign(item, properties); if (text !== undefined) item.textContent = text; return item; }
+export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElement, post, notice) {
  const pending = new Map(), cursors = new Map(); let active, sending = false;
  function remove(id) { pending.delete(id); if (active?.askId === id) { active = null; dialog.close(); } show(); }
  async function answer(payload) {
   if (!active || sending) return;
   const id = active.askId; sending = true;
   try { const value = await post("answer", { askId: id, ...payload }); remove(id); if (!value.accepted) notice("This prompt was already answered or closed."); }
-  catch (error) { const message = form.querySelector(".prompt-error"); if (message && active?.askId === id) { message.textContent = error.message + ". Your answer draft is kept."; message.hidden = false; } }
+  catch (error) { const message = form.querySelector<HTMLParagraphElement>(".prompt-error"); if (message && active?.askId === id) { message.textContent = error.message + ". Your answer draft is kept."; message.hidden = false; } }
   finally { sending = false; }
  }
  function button(text, run) { const value = node("button", { type: "button" }, text); value.addEventListener("click", run); return value; }
@@ -44,7 +44,7 @@ export function createPromptView(dialog, form, post, notice) {
     if (item.description) row.append(node("p", { className: "prompt-description" }, item.description));
     rows.append(row);
    }
-   const applyFilter = () => { for (const row of rows.querySelectorAll(".prompt-row")) row.hidden = !row.dataset.search.includes(filter.value.toLowerCase()); cursors.set(ask.title, { ...cursors.get(ask.title), filter: filter.value }); };
+   const applyFilter = () => { for (const row of rows.querySelectorAll<HTMLDivElement>(".prompt-row")) row.hidden = !row.dataset.search.includes(filter.value.toLowerCase()); cursors.set(ask.title, { ...cursors.get(ask.title), filter: filter.value }); };
    filter.addEventListener("input", applyFilter); applyFilter(); form.append(filter, rows);
    const values = () => [...checks].filter(([, input]) => input.checked).map(([id]) => id);
    collect = () => { const chosen = values(); if (ask.multi?.requireOne && !chosen.length) throw new Error("Choose at least one option."); return { action: "back", values: chosen }; };
@@ -57,7 +57,7 @@ export function createPromptView(dialog, form, post, notice) {
     if (event.key === "Enter" && event.target === filter && !ask.multi) { event.preventDefault(); const pick = buttons.find(item => !item.disabled && !item.parentElement.hidden && item.classList.contains("current")) ?? buttons.find(item => !item.disabled && !item.parentElement.hidden); pick?.click(); }
     if (event.key === "Tab" && ask.tabAction) { event.preventDefault(); answer({ action: "tab" }); }
     if (["ArrowDown", "ArrowUp"].includes(event.key) && !ask.multi) {
-     event.preventDefault(); const available = buttons.filter(item => !item.disabled && !item.parentElement.hidden), index = available.indexOf(document.activeElement);
+     event.preventDefault(); const available = buttons.filter(item => !item.disabled && !item.parentElement.hidden), index = available.findIndex(item => item === document.activeElement);
      available[(index + (event.key === "ArrowDown" ? 1 : -1) + available.length) % available.length]?.focus();
     }
    };
@@ -80,7 +80,7 @@ export function createPromptView(dialog, form, post, notice) {
    for (const option of question.options) {
     const input = node("input", { type: question.allowMultiple ? "checkbox" : "radio", name: "question_" + index, value: option.title }); inputs.push(input);
     if (question.allowMultiple) input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); input.checked = !input.checked; } });
-    input.addEventListener("change", () => { const mode = section.querySelector(`input[name="${modeName}"][value="options"]`); if (mode) mode.checked = true; });
+    input.addEventListener("change", () => { const mode = section.querySelector<HTMLInputElement>(`input[name="${modeName}"][value="options"]`); if (mode) mode.checked = true; });
     const row = node("label", { className: "prompt-option" }); row.append(input, node("span", {}, option.title));
     if (option.description) row.append(node("small", { className: "prompt-description" }, option.description)); section.append(row);
    }
@@ -104,7 +104,7 @@ export function createPromptView(dialog, form, post, notice) {
   };
   form.onsubmit = event => { event.preventDefault(); try { answer(collect()); } catch (failure) { error.textContent = failure.message; error.hidden = false; } };
   dialog.oncancel = event => { event.preventDefault(); answer({ cancel: true }); };
-  dialog.showModal(); form.querySelector("input,textarea,button")?.focus();
+  dialog.showModal(); form.querySelector<HTMLElement>("input,textarea,button")?.focus();
  }
  return {
   sync(asks) { for (const id of pending.keys()) if (!asks.some(ask => ask.askId === id)) pending.delete(id); for (const ask of asks) pending.set(ask.askId, ask); if (active && !pending.has(active.askId)) { active = null; dialog.close(); } show(); },

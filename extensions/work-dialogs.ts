@@ -76,7 +76,7 @@ function labelFor(item) {
 	return item.description ? `${label} — ${item.description}` : label;
 }
 
-function itemIndicator(item, { checked, currentValue, multi } = {}) {
+function itemIndicator(item, { checked, currentValue, multi }: { checked?: boolean; currentValue?: string; multi?: boolean } = {}) {
 	if (multi) return checked ? "✓" : "○";
 	if (item.value === currentValue) return "●";
 	if (item.local) return "[local]";
@@ -169,7 +169,7 @@ function sectionLine(theme, title, width) {
 	);
 }
 
-function initialIndex(items, { cursorKey, currentValue, selectedIndex }) {
+function initialIndex(items, { cursorKey, currentValue, selectedIndex = undefined }) {
 	if (Number.isInteger(selectedIndex))
 		return Math.max(0, Math.min(selectedIndex, items.length - 1));
 	const currentIndex = items.findIndex((item) => item.value === currentValue);

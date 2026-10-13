@@ -27,7 +27,7 @@ export async function loadPlan3Ask(pi: ExtensionAPI) {
 		"@earendil-works/pi-coding-agent": sdk,
 		"@earendil-works/pi-tui": tui,
 		"@sinclair/typebox": typebox,
-	} }).import(source);
+	} }).import<{ registerAskUser?: unknown; default?: unknown }>(source);
 	const factory = vendored ? module.registerAskUser : module.default;
 	let ask: ToolDefinition | undefined;
 	if (typeof factory !== "function") throw new Error("pi-ask-user does not export an extension factory.");

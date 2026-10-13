@@ -55,5 +55,11 @@
     "pi-intercom": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@sinclair/typebox": "0.34.41",
+    "@types/node": "22.19.19",
+    "typescript": "5.9.3"
   }
 }

@@ -1,12 +1,14 @@
 // Layered layout for Plan3 diagrams (D10): inside every container, rank children by the edges between them
 // (longest path, left to right), stack each rank vertically; groups size to their content. Manual x, y win.
 // Browser asset (D23); node tests import it directly.
+import type { Diagram, DiagramNode } from "../plan3-diagram.ts";
+export type Box = { x: number; y: number; w: number; h: number };
 export const NODE = { w: 168, h: 64 };
 const GAP = { x: 72, y: 32 }, PAD = 24, TITLE = 32;
 
-export function layout(diagram, nodeSize = (_node) => NODE, groupTitle = (_node) => TITLE) {
+export function layout(diagram: Pick<Diagram, "nodes" | "edges">, nodeSize = (_node: DiagramNode) => NODE, groupTitle = (_node: DiagramNode) => TITLE) {
 	const nodes = diagram.nodes ?? [], byId = new Map(nodes.map((node) => [node.id, node]));
-	const children = new Map();
+	const children = new Map<string, DiagramNode[]>();
 	for (const node of nodes) {
 		const parent = byId.has(node.parent) ? node.parent : "";
 		children.set(parent, [...(children.get(parent) ?? []), node]);
@@ -18,7 +20,7 @@ export function layout(diagram, nodeSize = (_node) => NODE, groupTitle = (_node)
 		if (container && (a[depth - 1] !== container || b[depth - 1] !== container)) return;
 		return a[depth] && b[depth] && a[depth] !== b[depth] ? [a[depth], b[depth]] : undefined;
 	};
-	const boxes = new Map(); // id -> { x, y, w, h } relative to the parent's content origin, then absolute.
+	const boxes = new Map<string, { x?: number; y?: number; w: number; h: number }>(); // id -> { x, y, w, h } relative to the parent's content origin, then absolute.
 	function place(container) {
 		const kids = children.get(container) ?? [];
 		for (const kid of kids) if (kid.kind === "group") place(kid.id);
@@ -56,7 +58,7 @@ export function layout(diagram, nodeSize = (_node) => NODE, groupTitle = (_node)
 	}
 	place("");
 	// Relative to absolute: a child's origin is its parent's corner plus padding and title.
-	const absolute = new Map();
+	const absolute = new Map<string, Box>();
 	const resolve = (id) => {
 		if (absolute.has(id)) return absolute.get(id);
 		const box = boxes.get(id), parent = byId.get(id)?.parent, base = byId.has(parent) ? resolve(parent) : { x: 0, y: 0 };
