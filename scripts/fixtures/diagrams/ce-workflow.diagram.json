@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "kind": "product",
+  "title": "ce-workflow",
+  "revision": 1,
+  "nodes": [
+    { "id": "user", "label": "User", "kind": "client", "summary": "Works in Pi's terminal and the browser workspace." },
+    { "id": "browser_workspace", "label": "Browser workspace", "kind": "client", "summary": "Diagram left, chat right.", "tech": "SVG, rough.js" },
+    { "id": "pi", "label": "Pi", "kind": "external", "summary": "Coding agent host: sessions, models, extension API." },
+    { "id": "extensions", "label": "ce-workflow extensions", "kind": "group" },
+    { "id": "plan3", "label": "plan3", "kind": "service", "parent": "extensions", "summary": "/plan3 commands, plan files, archive.", "tech": "extensions/plan3.ts" },
+    { "id": "plan3_diagram", "label": "plan3-diagram", "kind": "service", "parent": "extensions", "summary": "Diagram model and plan3_diagram tool.", "tech": "extensions/plan3-diagram.ts" },
+    { "id": "plan3_web", "label": "plan3-web", "kind": "service", "parent": "extensions", "summary": "Local server, SSE, chat and dialog bridge.", "tech": "extensions/plan3-web.ts" },
+    { "id": "ask_user", "label": "ask_user", "kind": "service", "parent": "extensions", "summary": "Vendored pi-ask-user with remote answers." },
+    { "id": "work_dialogs", "label": "work-dialogs", "kind": "service", "parent": "extensions", "summary": "Overlay menus for Plan3." },
+    { "id": "storage", "label": "Repository files", "kind": "group" },
+    { "id": "plans", "label": "docs/plans", "kind": "store", "parent": "storage", "summary": "Plan Markdown, sidecar diagrams, done/." },
+    { "id": "product_diagram", "label": "docs/architecture", "kind": "store", "parent": "storage", "summary": "product.diagram.json" },
+    { "id": "settings", "label": ".pi/settings.json", "kind": "store", "parent": "storage" }
+  ],
+  "edges": [
+    { "id": "user__pi", "from": "user", "to": "pi", "label": "terminal" },
+    { "id": "user__browser_workspace", "from": "user", "to": "browser_workspace" },
+    { "id": "browser_workspace__plan3_web", "from": "browser_workspace", "to": "plan3_web", "label": "HTTP + SSE" },
+    { "id": "pi__plan3", "from": "pi", "to": "plan3", "label": "commands, events" },
+    { "id": "plan3_web__pi", "from": "plan3_web", "to": "pi", "label": "sendUserMessage" },
+    { "id": "plan3__plan3_web", "from": "plan3", "to": "plan3_web" },
+    { "id": "plan3__ask_user", "from": "plan3", "to": "ask_user" },
+    { "id": "plan3__work_dialogs", "from": "plan3", "to": "work_dialogs" },
+    { "id": "plan3_web__plan3_diagram", "from": "plan3_web", "to": "plan3_diagram" },
+    { "id": "plan3__plans", "from": "plan3", "to": "plans" },
+    { "id": "plan3_diagram__plans", "from": "plan3_diagram", "to": "plans" },
+    { "id": "plan3_diagram__product_diagram", "from": "plan3_diagram", "to": "product_diagram" },
+    { "id": "plan3__settings", "from": "plan3", "to": "settings" }
+  ],
+  "notes": [
+    { "id": "note_1", "target": "plan3_web", "text": "One server per session; closed on session_shutdown.", "author": "agent", "created": "2026-10-13T12:00:00Z" }
+  ]
+}

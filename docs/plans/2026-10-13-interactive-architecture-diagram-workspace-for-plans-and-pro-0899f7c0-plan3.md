@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T13:40:54.822Z
+updated: 2026-10-13T13:42:20.571Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -196,7 +196,7 @@ Commands (existing; referenced by steps):
 ### Phase 1: Model, look and feasibility [think]
 
 - [x] **P1-01** Schema v1, ids/mentions, zoom bands, plan status and seeding, and .js browser assets recorded as D19–D23.
-- [ ] **P1-02** Hand-write two sample diagrams (the reference upload service, and ce-workflow itself) and check the own layout (D10) on them.
+- [x] **P1-02** Two sample diagrams in scripts/fixtures/diagrams/ and layered layout extensions/plan3-web/layout.js (cycle-safe, manual positions) verified by C-DIAGRAM.
 - [ ] **P1-03** Run the frontend-design token pass for the workspace; record palette, type, layout wireframe and the one bold element in Decisions.
   - Brief is fixed by D4; do not restart brainstorming; check keyboard focus and reduced motion requirements.
 - [ ] **P1-04** Feasibility probes in a scratch extension; record results in Decisions.
