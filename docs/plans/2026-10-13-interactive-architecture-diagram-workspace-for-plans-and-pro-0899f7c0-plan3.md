@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T13:50:35.885Z
+updated: 2026-10-13T13:55:08.695Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -136,9 +136,7 @@ Commands (existing; referenced by steps):
 ### Phase 2: Vendored ask_user [code]
 
 - [x] **P2-01** Vendored pi-ask-user 0.16.0 with MIT license/provenance, .ts imports, pinned version and package registration; native host smoke passed.
-- [ ] **P2-02** Add the native remote channel: emit `ask:pending` for single and batched questions, accept `ask:answer`, first answer wins.
-  - Keep `PI_ASK_USER_REMOTE_ANSWERS` gating for intercom forwarding in `work-ask-remote.ts`; the browser bridge is not gated.
-  - Remove `scripts/patch-ask-user-remote-answer.mjs` and its live test once unused; update `test-work-ask-remote.mjs`.
+- [x] **P2-02** Native single/batch answer channel validates responses, cancels losing UI and cleans listeners; intercom remains opt-in; obsolete patch/live patch test removed.
 - [ ] **P2-03** Point `plan3-ask.ts` at the vendored copy; apply D12 for a loaded pi-ask-user; update README install lines and peer dependencies.
 - [ ] **P2-04** Make catch-up plans for pi-ask-user tell the reviewer to diff upstream against `extensions/ask-user/` and update UPSTREAM.md.
   - Check: C-PLAN3, C-ASKREMOTE, C-DIALOGS, C-LSP pass; existing resolve popup tests run against the vendored copy.

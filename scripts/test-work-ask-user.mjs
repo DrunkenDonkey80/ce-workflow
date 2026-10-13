@@ -24,4 +24,21 @@ await assert.rejects(tool.execute("a", { question: "Choose?" }, undefined, undef
 await assert.rejects(tool.execute("b", { questions: [{ question: "Only one?" }] }, undefined, undefined, { hasUI: false }), /2-4/);
 const result = await tool.execute("c", { question: "Cancelled?" }, AbortSignal.abort(), undefined, { hasUI: false });
 assert.equal(result.details.cancelled, true);
-console.log("ok - vendored ask_user");
+
+const question = { question: "Ship?", options: [{ title: "Ship" }, { title: "Hold" }], allowFreeform: false };
+const ctx = { hasUI: true, ui: { custom: async () => ({ kind: "selection", selections: ["Hold"] }) } };
+const local = await tool.execute("local", question, undefined, undefined, ctx);
+assert.deepEqual(local.details.response, { kind: "selection", selections: ["Hold"] });
+assert.equal(bus.listenerCount("ask:answer"), 0);
+bus.once("ask:pending", event => bus.emit("ask:answer", { askId: event.askId, text: "Ship" }));
+const remote = await tool.execute("remote", question, undefined, undefined, { hasUI: true, ui: { custom: () => assert.fail("remote already answered") } });
+assert.deepEqual(remote.details.response, { kind: "selection", selections: ["Ship"] });
+bus.once("ask:pending", event => {
+ assert.equal(event.questions.length, 2);
+ bus.emit("ask:answer", { askId: event.askId, answers: [{ status: "answered", response: { kind: "selection", selections: ["Ship"] } }, { status: "skipped" }] });
+});
+const batch = await tool.execute("batch", { questions: [question, { ...question, question: "Deploy?" }] }, undefined, undefined, ctx);
+assert.equal(batch.details.cancelled, false);
+assert.deepEqual(batch.details.answers, [{ status: "answered", response: { kind: "selection", selections: ["Ship"] } }, { status: "skipped" }]);
+assert.equal(bus.listenerCount("ask:answer"), 0);
+console.log("ok - vendored ask_user single and batch native answer races");

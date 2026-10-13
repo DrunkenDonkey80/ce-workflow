@@ -40,6 +40,7 @@ import {
    wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import { renderSingleSelectRows, type QuestionOption } from "./single-select-layout.ts";
+import { raceRemoteAsk, remoteResponse, remoteBatch } from "./remote.ts";
 
 const ASK_USER_VERSION = "0.16.0";
 
@@ -1667,15 +1668,6 @@ class AskComponent extends Container {
       ];
    }
 
-   private frameRawLines(rawLines: string[], width: number, innerWidth: number): string[] {
-      const borderColor = (s: string) => this.theme.fg("accent", s);
-      return rawLines.map((line, index) => {
-         if (index === 0) return this.renderTopBorder(width);
-         if (index === rawLines.length - 1) return this.renderBottomBorder(width);
-         const padded = truncateToWidth(line, innerWidth, "", true);
-         return `${borderColor(BOX_BORDER_LEFT)}${padded}${borderColor(BOX_BORDER_RIGHT)}`;
-      });
-   }
 
    private updateStaticText(): void {
       const theme = this.theme;
@@ -2735,14 +2727,15 @@ async function executeBatch(
    const deadlineTimer = deadline === undefined ? undefined : setTimeout(() => batch.abort(), params.timeout);
    let answers: BatchAnswer[] | null;
    try {
-      answers = await whileBlocked(pi, () => runCustomPrompt<BatchAnswer[]>(ctx.ui, {
-         signal: batch.signal,
+      answers = await whileBlocked(pi, () => raceRemoteAsk(pi, { questions, allowComment: settings.allowComment }, batch.signal, undefined,
+         payload => remoteBatch(payload, questions, settings.allowComment), localSignal => runCustomPrompt<BatchAnswer[]>(ctx.ui, {
+         signal: localSignal,
          displayMode: settings.displayMode,
          overlayToggle: settings.shortcuts.overlayToggle,
          createComponent: (tui, theme, keybindings, complete) =>
             new BatchAskComponent(questions, settings, tui, theme, keybindings, complete),
-         fallback: () => askBatchViaDialogs(ctx.ui, questions, settings.allowComment, batch.signal, deadline),
-      }));
+         fallback: () => askBatchViaDialogs(ctx.ui, questions, settings.allowComment, localSignal, deadline),
+      })));
    } finally {
       if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
       signal?.removeEventListener("abort", forwardAbort);
@@ -2966,6 +2959,7 @@ export default function(pi: ExtensionAPI) {
             : (timeout ? { timeout } : undefined);
          const events = createAskEventEmitter(pi);
          const subject: AskEventSubject = { question, context: normalizedContext, options };
+         const remoteSubject = { ...subject, allowMultiple, allowFreeform, allowComment };
 
          if (rawOptions.length > 0 && options.length === 0) {
             throw new Error(
@@ -2987,8 +2981,11 @@ export default function(pi: ExtensionAPI) {
 
          if (options.length === 0) {
             const prompt = normalizedContext ? `${question}\n\nContext:\n${normalizedContext}` : question;
-            const answer = await whileBlocked(pi, () => ctx.ui.input(prompt, "Type your answer...", dialogOpts));
-            const response = signal?.aborted ? null : createFreeformResponse(answer);
+            const response = await whileBlocked(pi, () => raceRemoteAsk(pi, remoteSubject, signal, timeout,
+               payload => remoteResponse(payload, remoteSubject, allowComment), async localSignal => {
+                  const answer = await ctx.ui.input(prompt, "Type your answer...", { ...dialogOpts, signal: localSignal });
+                  return localSignal.aborted ? null : createFreeformResponse(answer);
+               }));
 
             if (!response) {
                events.cancelled(subject);
@@ -3010,8 +3007,9 @@ export default function(pi: ExtensionAPI) {
             details: { question, context: normalizedContext, options, response: null, cancelled: false },
          });
 
-         const result = await whileBlocked(pi, () => runCustomPrompt<AskUIResult>(ctx.ui, {
-            signal,
+         const result = await whileBlocked(pi, () => raceRemoteAsk(pi, remoteSubject, signal, timeout,
+            payload => remoteResponse(payload, remoteSubject, allowComment), localSignal => runCustomPrompt<AskUIResult>(ctx.ui, {
+            signal: localSignal,
             timeout,
             displayMode: settings.displayMode,
             overlayToggle: settings.shortcuts.overlayToggle,
@@ -3039,9 +3037,9 @@ export default function(pi: ExtensionAPI) {
                allowMultiple,
                allowFreeform,
                allowComment,
-               dialogOpts,
+               { ...dialogOpts, signal: localSignal },
             ),
-         }));
+         })));
 
          if (signal?.aborted || result === null) {
             events.cancelled(subject);

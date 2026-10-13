@@ -1,224 +1,101 @@
 #!/usr/bin/env node
-// Offline bridge and optional pi-ask-user patch checks; never patch installed code.
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import path from "node:path";
-import { stripTypeScriptTypes } from "node:module";
-import { runInNewContext } from "node:vm";
-import { patchAskUserSource, REMOTE_HELPERS } from "./patch-ask-user-remote-answer.mjs";
+import { EventEmitter } from "node:events";
+import { createJiti } from "jiti";
 import { registerRemoteAskAnswers } from "../extensions/work-ask-remote.ts";
+const { raceRemoteAsk, remoteResponse, remoteBatch } = await createJiti(import.meta.url).import("../extensions/ask-user/remote.ts");
 
-const listeners = new Map();
-const outbox = [];
-const emits = [];
+const bus = new EventEmitter(), outbox = [], answers = [], hooks = new Map();
 const pi = {
-	on: (name, handler) => {
-		const list = listeners.get(name) ?? [];
-		list.push(handler);
-		listeners.set(name, list);
-	},
-	registerTool() {},
+	on: (name, fn) => hooks.set(name, fn),
 	events: {
-		on: (name, handler) => {
-			const list = listeners.get(name) ?? [];
-			list.push(handler);
-			listeners.set(name, list);
-			return () => list.splice(list.indexOf(handler), 1);
-		},
-		emit: (name, payload) => {
-			if (name === "intercom:outbox-request") outbox.push(payload);
-			if (name === "ask:answer") emits.push(payload);
-		},
+		on: (name, fn) => { bus.on(name, fn); return () => bus.off(name, fn); },
+		emit: (name, payload) => bus.emit(name, payload),
 	},
 };
-const fire = (name, event) =>
-	[...(listeners.get(name) ?? [])].map((h) => h(event));
-
-const multiId = "66666666-7777-8888-9999-000000000000";
-registerRemoteAskAnswers(pi);
+const question = { question: "Ship?", options: [{ title: "Ship" }, { title: "Hold" }], allowMultiple: false, allowFreeform: false };
 const askId = "11111111-2222-3333-4444-555555555555";
-const ask = {
-	askId,
-	question: "Ship it?",
-	options: [{ title: "Ship" }, { title: "Hold" }],
-	allowMultiple: false,
-	allowFreeform: false,
-};
-
-// 1. No peer yet: pending is stored, nothing is forwarded.
-fire("ask:pending", ask);
-assert.equal(outbox.length, 0, "no forward before any intercom peer");
-
-// 2. First inbound from the monitor: peer is learned and pending asks re-forward.
-fire("message_end", {
-	message: {
-		customType: "intercom_message",
-		details: { from: { id: "monitor-1" } },
-		content: "checking in",
-	},
-});
-assert.equal(outbox.length, 1, "pending ask forwarded once a peer appears");
-assert.match(outbox[0].message, new RegExp(`ANSWER ${askId}:`));
-assert.equal(outbox[0].to, "monitor-1");
-
-// 3. A new pending ask forwards immediately to the known peer.
-fire("ask:pending", { ...ask, askId: multiId, allowMultiple: true });
-assert.equal(outbox.length, 2);
-
-// 4. Unrelated reply (no ANSWER token) retries forward, does not answer.
-fire("message_end", {
-	message: {
-		customType: "intercom_message",
-		details: { from: { id: "monitor-1" }, bodyText: "still thinking" },
-	},
-});
-assert.equal(outbox.length, 4, "both pending asks retried");
-assert.equal(emits.length, 0, "no answer emitted");
-
-// 5. Wrong askId: no answer.
-fire("message_end", {
-	message: {
-		customType: "intercom_message",
-		details: {
-			from: { id: "monitor-1" },
-			bodyText: `ANSWER 00000000-0000-0000-0000-000000000000: Ship`,
-		},
-	},
-});
-assert.equal(emits.length, 0);
-
-// 6. Only the exact local recipient may answer a forwarded prompt.
-for (const details of [
-	{ from: { id: "other-peer" } },
-	{ from: { id: "monitor-1" }, crossMachine: { type: "ssh-relay", trust: "ssh-asserted" } },
-	{ from: { id: "monitor-1" }, message: { crossMachine: { type: "ssh-relay", trust: "ssh-asserted" } } },
-]) {
-	fire("message_end", { message: { customType: "intercom_message", details: { ...details, bodyText: `ANSWER ${askId}: Ship` } } });
-	assert.equal(emits.length, 0, "untrusted or unaddressed peer cannot answer");
-}
-// Windows local broker peers have trustedLocal:false; exact local answers still work.
-fire("message_end", {
-	message: {
-		customType: "intercom_message",
-		details: { from: { id: "monitor-1", trustedLocal: false }, bodyText: `ANSWER ${askId}: Hold` },
-	},
-});
-assert.equal(emits.length, 1);
-assert.deepEqual(emits[0], { askId, text: "Hold" });
-
-// 7. Multi-select answers split on " | ".
-fire("message_end", {
-	message: {
-		customType: "intercom_message",
-		details: {
-			from: { id: "monitor-1" },
-			bodyText: `ANSWER ${multiId}: Ship | Hold`,
-		},
-	},
-});
-assert.deepEqual(emits[1], { askId: multiId, selections: ["Ship", "Hold"] });
-
-// 8. ask:answered/ask:cancelled clear pending asks.
-fire("ask:pending", { ...ask, askId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" });
-fire("ask:answered", {});
-const beforeClear = outbox.length;
-fire("message_end", {
-	message: {
-		customType: "intercom_message",
-		details: { from: { id: "monitor-1" } },
-		content: "hello",
-	},
-});
-assert.equal(outbox.length, beforeClear, "cleared asks are not re-forwarded");
-
-// 9. Non-intercom messages are ignored entirely.
-const before = outbox.length;
-fire("message_end", {
-	message: { customType: "subagent-notify", content: `ANSWER ${askId}: Ship` },
-});
-assert.equal(outbox.length, before, "non-intercom messages ignored");
-
-// Shutdown discards the old prompt and routing identity.
-fire("ask:pending", ask);
-fire("session_shutdown", {});
-const beforeShutdown = outbox.length;
-fire("message_end", { message: { customType: "intercom_message", details: { from: { id: "monitor-1" }, bodyText: `ANSWER ${askId}: Ship` } } });
-assert.equal(outbox.length, beforeShutdown);
-assert.equal(emits.length, 2);
-fire("session_shutdown", {});
-fire("ask:pending", ask);
-assert.equal(outbox.length, beforeShutdown, "new session has no remembered peer");
-fire("message_end", { message: { customType: "intercom_message", details: { from: { id: "new-monitor" }, bodyText: `ANSWER ${askId}: Ship` } } });
-assert.equal(emits.length, 2, "answer cannot precede forwarding to its recipient");
-assert.equal(outbox.at(-1).to, "new-monitor");
-fire("ask:cancelled", {});
-
-// 10. Current upstream source patches in memory, idempotently, and rejects drift.
-const target = path.join(
-	homedir(),
-	".pi",
-	"agent",
-	"npm",
-	"node_modules",
-	"pi-ask-user",
-	"index.ts",
-);
-if (existsSync(target)) {
-	const source = readFileSync(target, "utf8");
-	const patched = patchAskUserSource(source);
-	assert.equal(patchAskUserSource(patched), patched);
-	assert.doesNotThrow(() => stripTypeScriptTypes(patched, { mode: "transform" }));
-	assert.match(patched, /signal: localSignal/);
-	assert.throws(() => patchAskUserSource("upstream anchors moved"), /anchor 1 matched 0/);
-	assert.throws(() => patchAskUserSource("ASK_ANSWER_EVENT"), /Legacy remote-answer patch/);
-	assert.equal(readFileSync(target, "utf8"), source, "installed source remains untouched");
+const inbound = (text, from = "monitor", extra = {}) => hooks.get("message_end")?.({ message: { customType: "intercom_message", details: { from: { id: from }, bodyText: text, ...extra } } });
+const old = process.env.PI_ASK_USER_REMOTE_ANSWERS;
+try {
+	delete process.env.PI_ASK_USER_REMOTE_ANSWERS;
+	registerRemoteAskAnswers(pi);
+	assert.equal(bus.listenerCount("ask:pending"), 0, "intercom opt-in remains gated");
+	process.env.PI_ASK_USER_REMOTE_ANSWERS = "1";
+	registerRemoteAskAnswers(pi);
+	bus.on("intercom:outbox-request", event => outbox.push(event));
+	bus.on("ask:answer", event => answers.push(event));
+	bus.emit("ask:pending", { ...question, askId });
+	assert.equal(outbox.length, 0);
+	inbound("hello");
+	assert.equal(outbox.length, 1);
+	assert.equal(outbox[0].to, "monitor");
+	assert(outbox[0].message.includes(`ANSWER ${askId}:`));
+	for (const [from, extra] of [["other", {}], ["monitor", { crossMachine: {} }], ["monitor", { message: { crossMachine: {} } }]]) inbound(`ANSWER ${askId}: Ship`, from, extra);
+	assert.equal(answers.length, 0, "only the forwarded local peer can answer");
+	inbound(`ANSWER ${askId}: Hold`);
+	assert.deepEqual(answers.pop(), { askId, text: "Hold" });
+	bus.emit("ask:closed", { askId });
+	const before = outbox.length;
+	inbound("hello");
+	assert.equal(outbox.length, before);
+	bus.emit("ask:pending", { ...question, askId, allowMultiple: true });
+	inbound(`ANSWER ${askId}: Ship | Hold`);
+	assert.deepEqual(answers.pop(), { askId, selections: ["Ship", "Hold"] });
+	bus.emit("ask:closed", { askId });
+	const batch = [{ status: "answered", response: { kind: "selection", selections: ["Ship"] } }, { status: "skipped" }];
+	bus.emit("ask:pending", { askId, questions: [question, question] });
+	assert(outbox.at(-1).message.includes("answers"));
+	inbound(`ANSWER ${askId}: ${JSON.stringify({ answers: batch })}`);
+	assert.deepEqual(answers.pop(), { askId, answers: batch });
+	hooks.get("session_shutdown")();
+	const afterShutdown = outbox.length;
+	inbound(`ANSWER ${askId}: Ship`);
+	assert.equal(outbox.length, afterShutdown, "shutdown discards pending requests");
+	assert.equal(answers.length, 0);
+} finally {
+	if (old === undefined) delete process.env.PI_ASK_USER_REMOTE_ANSWERS; else process.env.PI_ASK_USER_REMOTE_ANSWERS = old;
 }
 
-// 11. Exercise the injected helper, not an imitation of its race/cleanup logic.
-const helperSource = stripTypeScriptTypes(REMOTE_HELPERS.replaceAll("export const", "const"));
-const env = {};
-const { runRemoteAsk, coerceRemoteAnswer } = runInNewContext(`${helperSource}\n({ runRemoteAsk, coerceRemoteAnswer })`, {
-	AbortController, globalThis: { crypto: globalThis.crypto }, process: { env },
-	parseBooleanPreference: (value) => value === "1",
-	createSelectionResponse: (selections, comment) => ({ kind: "selection", selections, comment }),
-	createFreeformResponse: (text) => text ? ({ kind: "freeform", text }) : null,
-});
-assert.equal(coerceRemoteAnswer({ text: "Unknown" }, ask.options, false, false, false), null);
-assert.equal(coerceRemoteAnswer({ selections: ["Ship", "Hold"] }, ask.options, false, false, false), null);
-let answerHandler;
-let remoteId;
-let disposed = 0;
-let emitted = 0;
-const remotePi = { events: {
-	on: (_name, handler) => { answerHandler = handler; return () => { disposed++; }; },
-	emit: (_name, payload) => { emitted++; remoteId = payload.askId; },
-} };
-assert.equal(await runRemoteAsk(remotePi, ask, false, false, false, undefined, async () => "local"), "local");
-assert.equal(emitted, 0, "disabled bridge is inert");
-env.PI_ASK_USER_REMOTE_ANSWERS = "1";
-let localSignal;
-const pendingAnswer = runRemoteAsk(remotePi, ask, false, false, false, undefined, (signal) => {
-	localSignal = signal;
-	return new Promise((resolve) => signal.addEventListener("abort", () => resolve(null), { once: true }));
-});
+// Exercise the native race directly, without installed-package patches or opt-in flags.
+assert.equal(remoteResponse({ text: "Unknown" }, question, false), undefined);
+assert.equal(remoteResponse({ selections: ["Ship", "Hold"] }, question, false), undefined);
+assert.equal(remoteResponse({ text: "Ship", comment: "unauthorized" }, question, false), undefined);
+assert.deepEqual(remoteResponse({ text: " ship " }, question, true), { kind: "selection", selections: ["Ship"] });
+assert.deepEqual(remoteResponse({ text: "Other" }, { ...question, allowFreeform: true }, false), { kind: "freeform", text: "Other" });
+assert.equal(remoteBatch({ answers: [] }, [question, question], false), undefined);
+assert.equal(remoteBatch({ answers: [{ status: "answered", response: { text: "Unknown" } }, { status: "skipped" }] }, [question, question], false), undefined);
+assert.deepEqual(remoteBatch({ answers: [{ status: "answered", response: { selections: ["Ship"] } }, { status: "skipped" }] }, [question, question], false), [{ status: "answered", response: { kind: "selection", selections: ["Ship"] } }, { status: "skipped" }]);
+
+const races = new EventEmitter();
+const remotePi = { events: { on: (name, fn) => { races.on(name, fn); return () => races.off(name, fn); }, emit: (name, event) => races.emit(name, event) } };
+let id, localSignal, closed = 0;
+races.on("ask:pending", event => { id = event.askId; });
+races.on("ask:closed", () => closed++);
+const wait = signal => new Promise(resolve => { localSignal = signal; signal.addEventListener("abort", () => resolve(null), { once: true }); });
+const decode = value => remoteResponse(value, question, false);
+let pending = raceRemoteAsk(remotePi, { ...question, allowComment: false }, undefined, undefined, decode, wait);
 await Promise.resolve();
-answerHandler({ askId: remoteId, text: "Invalid" });
+races.emit("ask:answer", { askId: id, text: "Invalid" });
 assert.equal(localSignal.aborted, false);
-answerHandler({ askId: remoteId, text: "Ship" });
-assert.equal((await pendingAnswer).selections[0], "Ship");
-assert.equal(localSignal.aborted, true, "remote winner closes losing local UI");
-assert.equal(disposed, 1);
-assert.equal(await runRemoteAsk(remotePi, ask, false, false, false, undefined, async () => "local"), "local");
-assert.equal(disposed, 2, "local winner unsubscribes remote channel");
-await assert.rejects(runRemoteAsk(remotePi, ask, false, false, false, undefined, async () => { throw new Error("UI failed"); }), /UI failed/);
-assert.equal(disposed, 3, "thrown UI error still cleans up");
+races.emit("ask:answer", { askId: id, text: "Ship" });
+races.emit("ask:answer", { askId: id, text: "Hold" });
+assert.deepEqual(await pending, { kind: "selection", selections: ["Ship"] });
+assert.equal(localSignal.aborted, true);
+assert.equal(races.listenerCount("ask:answer"), 0);
+assert.equal(closed, 1);
+assert.equal(await raceRemoteAsk(remotePi, { ...question, allowComment: false }, undefined, undefined, decode, async () => "local"), "local");
+await assert.rejects(raceRemoteAsk(remotePi, { ...question, allowComment: false }, undefined, undefined, decode, async () => { throw new Error("UI failed"); }), /UI failed/);
+assert.equal(races.listenerCount("ask:answer"), 0);
 const caller = new AbortController();
-const cancelled = runRemoteAsk(remotePi, ask, false, false, false, caller.signal, (signal) => new Promise((resolve) => signal.addEventListener("abort", () => resolve(null), { once: true })));
-await Promise.resolve();
-caller.abort();
-assert.equal(await cancelled, null);
-assert.equal(disposed, 4, "caller abort cleans up");
-assert.equal(await runRemoteAsk(remotePi, ask, false, false, false, AbortSignal.abort(), async () => assert.fail("cancelled call must not prompt")), null);
-
-console.log("ok - ask_user remote-answer bridge and optional 0.16 patch");
+pending = raceRemoteAsk(remotePi, { ...question, allowComment: false }, caller.signal, undefined, decode, wait);
+await Promise.resolve(); caller.abort();
+assert.equal(await pending, null);
+assert.equal(localSignal.aborted, true);
+assert.equal(await raceRemoteAsk(remotePi, { ...question, allowComment: false }, AbortSignal.abort(), undefined, decode, () => assert.fail("aborted")), null);
+assert.equal(await raceRemoteAsk(remotePi, { ...question, allowComment: false }, undefined, 10, decode, wait), null);
+assert.equal(races.listenerCount("ask:answer"), 0);
+// A synchronous remote answer before the popup opens must never create a losing dialog.
+races.once("ask:pending", event => races.emit("ask:answer", { askId: event.askId, text: "Ship" }));
+assert.deepEqual(await raceRemoteAsk(remotePi, { ...question, allowComment: false }, undefined, undefined, decode, () => assert.fail("remote already won")), { kind: "selection", selections: ["Ship"] });
+console.log("ok - native ask_user remote channel and intercom forwarding");

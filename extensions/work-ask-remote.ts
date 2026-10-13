@@ -1,10 +1,9 @@
 // Route a blocking ask_user prompt to the intercom peer driving this session so
 // a monitor can genuinely answer it (no cancel, no timeout workaround).
 //
-// Requires pi-ask-user patched by scripts/patch-ask-user-remote-answer.mjs and
-// PI_ASK_USER_REMOTE_ANSWERS=1: without that, `ask:pending` never fires and this
-// is inert. Without pi-intercom the outbox event has no listener, so the ask
-// simply stays local. The local human can always answer first either way.
+// The vendored ask_user emits ask:pending natively. Intercom forwarding still
+// requires PI_ASK_USER_REMOTE_ANSWERS=1; browser answering is independent.
+// Without pi-intercom there is no outbox listener and the prompt stays local.
 const ANSWER_PATTERN = /\bANSWER\s+([0-9a-fA-F-]{36})\s*:\s*([\s\S]+)/;
 const MULTI_SEPARATOR = " | ";
 
@@ -20,6 +19,12 @@ function messageText(message) {
 }
 
 function forwardMessage(ask) {
+	if (ask.questions) return [
+		"This session is blocked on a batch of ask_user questions.",
+		JSON.stringify({ questions: ask.questions, allowComment: ask.allowComment }),
+		`Reply with exactly: ANSWER ${ask.askId}: {"answers":[{"status":"answered","response":{"kind":"selection","selections":["option title"]}},{"status":"skipped"}]}`,
+		"Supply one answer per question in order; freeform response is {kind: freeform, text: answer}.",
+	].join("\n");
 	const options = (ask.options ?? [])
 		.map((option, index) => `${index + 1}. ${option?.title ?? ""}`)
 		.join("\n");
@@ -37,7 +42,7 @@ function forwardMessage(ask) {
 }
 
 export function registerRemoteAskAnswers(pi) {
-	if (typeof pi?.events?.on !== "function") return; // test harnesses without an event bus
+	if (!/^(1|true|yes)$/i.test(process.env.PI_ASK_USER_REMOTE_ANSWERS ?? "") || typeof pi?.events?.on !== "function") return;
 	const pending = new Map();
 	let peerId = "";
 	let requestSeq = 0;
@@ -61,8 +66,7 @@ export function registerRemoteAskAnswers(pi) {
 		pending.set(ask.askId, entry);
 		forward(entry);
 	});
-	pi.events.on("ask:answered", () => pending.clear());
-	pi.events.on("ask:cancelled", () => pending.clear());
+	pi.events.on("ask:closed", ({ askId }) => pending.delete(askId));
 	pi.on("session_shutdown", () => { pending.clear(); peerId = ""; });
 
 	pi.on("message_end", (event) => {
@@ -82,8 +86,14 @@ export function registerRemoteAskAnswers(pi) {
 			return;
 		}
 
-		pending.delete(ask.askId);
 		const answer = match[2].trim();
+		if (ask.questions) {
+			let batch;
+			try { batch = JSON.parse(answer); } catch { return; }
+			if (!batch || !Array.isArray(batch.answers)) return;
+			pi.events.emit("ask:answer", { askId: ask.askId, answers: batch.answers });
+			return;
+		}
 		const selections =
 			ask.allowMultiple && answer.includes(MULTI_SEPARATOR)
 				? answer

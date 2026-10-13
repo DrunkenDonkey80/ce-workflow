@@ -11,6 +11,8 @@ Files: index.ts and single-select-layout.ts. Keep the terminal UI and result con
 - index.ts imports single-select-layout.ts with an explicit .ts specifier for Pi's jiti loader.
 - ASK_USER_VERSION is pinned to 0.16.0 instead of reading upstream package.json (this directory is part of ce-workflow, not a standalone npm package).
 - Two SAFETY comments explain upstream shim schema assertions for the repository's analyzer.
+- Removed unused upstream AskComponent.frameRawLines method (no callers).
+- remote.ts adds validated single/batch answer decoding and an abortable first-answer-wins race, always emitting ask:pending and correlated ask:closed. index.ts wraps each native prompt with it; upstream answer summaries, cancellation and batch skipped states stay unchanged. Browser answers are not environment-gated. Intercom forwarding remains opt-in in work-ask-remote.ts.
 
 ## Updating
 
