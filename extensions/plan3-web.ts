@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
 
 export type WebTarget = { kind: "product" } | { kind: "plan"; id: string };
 type Options = {
@@ -139,4 +140,61 @@ export async function createPlan3Web(options: Options) {
 			return closing;
 		},
 	};
+}
+
+type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; error?: string };
+export function createChatMirror(pi, publish: (event: string, data: unknown) => void) {
+	const rows: ChatRow[] = [], active = new Map<string, string>();
+	let next = 0;
+	const put = (message, streaming: boolean, emit = true, start = false) => {
+		if (!["user", "assistant"].includes(message?.role)) return;
+		const role = message.role;
+		const base = typeof message.timestamp === "number" ? `${role}_${message.timestamp}` : `${role}_${++next}`;
+		let id = active.get(role) ?? base;
+		if (start) {
+			id = base;
+			for (let suffix = 2; rows.some(row => row.id === id); suffix++) id = `${base}_${suffix}`;
+		}
+		active.set(role, id);
+		const content = typeof message.content === "string" ? message.content : (Array.isArray(message.content) ? message.content.map(part => part?.type === "text" && typeof part.text === "string" ? part.text : part?.type === "image" ? "[image]" : "").join("\n") : "");
+		// shortcut: keep 100 recent rows / 512 KB; each row is capped at 64k chars, show truncation in the UI.
+		const row: ChatRow = { id, role, text: content.slice(0, 64_000), streaming, ...(content.length > 64_000 ? { truncated: true } : {}), ...(typeof message.errorMessage === "string" ? { error: message.errorMessage.slice(0, 4000) } : {}) };
+		const index = rows.findIndex(item => item.id === id);
+		if (index < 0) rows.push(row); else rows[index] = row;
+		while (rows.length > 100 || Buffer.byteLength(JSON.stringify(rows)) > 512_000) rows.shift();
+		if (emit) publish("message", row);
+		if (!streaming) active.delete(role);
+	};
+	pi.on("input", event => { publish("input", { text: typeof event.text === "string" ? event.text.slice(0, 64_000) : "", source: event.source, streamingBehavior: event.streamingBehavior }); });
+	pi.on("message_start", event => put(event.message, true, true, true));
+	pi.on("message_update", event => put(event.message, true));
+	pi.on("message_end", event => put(event.message, false));
+	return {
+		snapshot: () => structuredClone(rows),
+		hydrate(ctx) {
+			const live = structuredClone(rows);
+			rows.length = 0;
+			for (const entry of (ctx.sessionManager?.getBranch?.() ?? []).filter(entry => entry.type === "message").slice(-100)) put(entry.message, false, false, true);
+			for (const row of live) {
+				const index = rows.findIndex(item => item.id === row.id);
+				if (index < 0) rows.push(row); else rows[index] = row;
+			}
+			while (rows.length > 100 || Buffer.byteLength(JSON.stringify(rows)) > 512_000) rows.shift();
+			active.clear();
+			for (const row of rows) if (row.streaming) active.set(row.role, row.id);
+		},
+	};
+}
+
+export function forwardDiagramChat(pi, ctx, diagram: Diagram, message: unknown, comments: unknown, publish: (event: string, value: unknown) => void) {
+	const prepared = diagramChatMessage(diagram, message, comments), queued = !ctx.isIdle();
+	try {
+		const pending = pi.sendUserMessage(prepared.message, { expandPromptTemplates: false, ...(queued ? { deliverAs: "followUp" } : {}) });
+		// SDK declaration says void, but live probe found a promise that settles only after the run.
+		void Promise.resolve(pending).catch(error => publish("error", { message: `Message not delivered: ${error instanceof Error ? error.message : String(error)}` }));
+	} catch (error) {
+		publish("error", { message: `Message not delivered: ${error instanceof Error ? error.message : String(error)}` });
+		throw error;
+	}
+	return { queued, mentions: prepared.mentions, unknownMentions: prepared.unknownMentions };
 }

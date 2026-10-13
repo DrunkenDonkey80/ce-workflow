@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
 import { createJiti } from "jiti";
-const { createPlan3Web, webTarget } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
+const { createPlan3Web, webTarget, createChatMirror, forwardDiagramChat } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
 const posted = [];
 const server = await createPlan3Web({ snapshot: target => ({ target, revision: 3, title: "Safe <text>" }), post: (endpoint, value) => { posted.push({ endpoint, value }); return { ok: true }; } });
 const opening = new URL(server.url({ kind: "plan", id: "12345678" })), token = opening.searchParams.get("token");
@@ -62,4 +62,54 @@ try {
  await Promise.all([server.close(), server.close()]);
  await assert.rejects(fetch(`${server.origin}/api/snapshot?target=product`, { headers: auth }));
 } finally { await reader?.cancel(); await server.close(); }
-console.log("ok - plan3 web security, bounded JSON, authenticated SSE and shutdown");
+const chatHooks = new Map(), mirrored = [];
+const mirror = createChatMirror({ on: (name, handler) => chatHooks.set(name, handler) }, (event, value) => mirrored.push({ event, value }));
+const user = { role: "user", timestamp: 1, content: "Hello <script>" }, assistant = { role: "assistant", timestamp: 2, content: [{ type: "text", text: "Reply" }] };
+chatHooks.get("input")({ text: user.content, source: "interactive", streamingBehavior: "followUp" });
+chatHooks.get("message_start")({ message: user }); chatHooks.get("message_end")({ message: user });
+chatHooks.get("message_start")({ message: assistant });
+chatHooks.get("message_update")({ message: { ...assistant, content: [{ type: "text", text: "Reply streamed" }] } });
+chatHooks.get("message_end")({ message: { ...assistant, content: [{ type: "text", text: "Reply complete" }] } });
+assert.equal(mirror.snapshot().length, 2);
+assert.equal(mirror.snapshot()[0].text, user.content, "text remains data, never interpreted as markup");
+assert.equal(mirror.snapshot()[1].text, "Reply complete");
+assert.equal(mirror.snapshot()[1].streaming, false);
+assert(mirrored.some(item => item.event === "input" && item.value.streamingBehavior === "followUp"));
+const branch = { sessionManager: { getBranch: () => [{ type: "message", message: { role: "user", timestamp: 0, content: "Older" } }, { type: "message", message: user }, { type: "message", message: { ...assistant, content: [{ type: "text", text: "Reply complete" }] } }] } };
+mirror.hydrate(branch);
+assert.equal(mirror.snapshot().length, 3, "hydrate adds earlier branch chat without duplicating streamed rows");
+chatHooks.get("message_start")({ message: { ...assistant, content: [] } });
+mirror.hydrate(branch);
+chatHooks.get("message_update")({ message: { ...assistant, content: [{ type: "text", text: "Same-millisecond second reply" }] } });
+assert.equal(mirror.snapshot().length, 4, "same-millisecond messages keep independent ids across reopen");
+assert.equal(mirror.snapshot().at(-1).text, "Same-millisecond second reply");
+chatHooks.get("message_end")({ message: { role: "assistant", timestamp: 3, content: [{ type: "text", text: "x".repeat(70_000) }] } });
+assert(mirror.snapshot().at(-1).truncated);
+for (let timestamp = 4; timestamp < 110; timestamp++) chatHooks.get("message_end")({ message: { role: "user", timestamp, content: "recent" } });
+assert.equal(mirror.snapshot().length, 100);
+const { emptyDiagram, applyDiagramOperations, diagramChatMessage } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
+const contextDiagram = applyDiagramOperations(emptyDiagram({ kind: "product" }), [
+ { op: "add", entity: "node", value: { id: "api", label: "API", kind: "service", details: "Bounded uploads" } },
+ { op: "add", entity: "note", value: { id: "note_1", target: "api", text: "Why no retries?", author: "user", created: "2026-10-13" } },
+]).diagram;
+const prepared = diagramChatMessage(contextDiagram, "Change @api; discuss @note_1 and @missing. Contact a@api.com", ["note_1"]);
+assert.deepEqual(prepared.mentions, ["api", "note_1", "missing"]);
+assert.deepEqual(prepared.unknownMentions, ["missing"]);
+assert.match(prepared.message, /Bounded uploads/);
+assert.match(prepared.message, /Why no retries/);
+assert.match(prepared.message, /untrusted user data/);
+assert.throws(() => diagramChatMessage(contextDiagram, "hello", ["missing"]), /Unknown diagram comment/);
+assert.throws(() => diagramChatMessage(contextDiagram, "x".repeat(20_001)), /bounded/);
+const submitted = [], deliveryErrors = [];
+const sendApi = { sendUserMessage: (message, options) => { submitted.push({ message, options }); return new Promise(() => {}); } };
+const queued = forwardDiagramChat(sendApi, { isIdle: () => false }, contextDiagram, "Edit @api", [], (event, value) => deliveryErrors.push({ event, value }));
+assert(queued.queued, "busy send returns immediately, never awaits the model run");
+assert.equal(submitted.at(-1).options.deliverAs, "followUp");
+assert.equal(submitted.at(-1).options.expandPromptTemplates, false);
+forwardDiagramChat(sendApi, { isIdle: () => true }, contextDiagram, "Edit @api", [], () => {});
+assert.equal(submitted.at(-1).options.deliverAs, undefined);
+forwardDiagramChat({ sendUserMessage: () => Promise.reject(new Error("compaction in progress")) }, { isIdle: () => false }, contextDiagram, "hello", [], (event, value) => deliveryErrors.push({ event, value }));
+await Promise.resolve();
+assert.match(deliveryErrors.at(-1).value.message, /compaction in progress/);
+assert.throws(() => forwardDiagramChat({ sendUserMessage: () => { throw new Error("stale context"); } }, { isIdle: () => true }, contextDiagram, "hello", [], (event, value) => deliveryErrors.push({ event, value })), /stale context/);
+console.log("ok - plan3 web security, SSE, shutdown, chat mirror and non-blocking live forwarding");

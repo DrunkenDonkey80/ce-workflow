@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T14:38:45.636Z
+updated: 2026-10-13T14:49:12.088Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -150,7 +150,7 @@ Commands (existing; referenced by steps):
 ### Phase 4: Local server and session bridge [code]
 
 - [x] **P4-01** Authenticated localhost server binds an ephemeral port, checks Host/Origin/token, applies CSP and body limits, streams sequenced SSE with bounded connections/buffers, and closes idempotently; Plan3 owns one lazy instance and shutdown cleanup.
-- [ ] **P4-02** Chat bridge: POST message to `pi.sendUserMessage` with a context block for mentions and new comments; mirror input and message events to SSE.
+- [x] **P4-02** Browser chat forwards to the same Pi session with explicit diagram target, validated mention/comment context and busy follow-ups; recent branch chat and input/message streaming are mirrored to sequenced SSE without awaiting the model run.
 - [ ] **P4-03** Dialog bridge registry: pending dialogs from ask_user, `showListDialog` and Plan3 popups go to SSE; browser answers resolve them.
   - Terminal and browser race; a late second answer is ignored and the browser closes the dialog.
 - [ ] **P4-07** Snapshot and resync: on connect and reconnect send diagram revision, recent chat and activity, and pending dialogs; events carry sequence ids for dedup.
@@ -218,7 +218,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Phase 3 complete (12/30 steps); full verify:quiet passed after P3-04 and targeted error-tier LSP is zero. Continue P4-01: implement localhost web server and existing-test selfcheck, then remaining Phase 4–6 inline. Preserve unrelated resolving follow-up hunks in extensions/plan3.ts and scripts/test-work-plan3.mjs unstaged. No delegation/push; no external Pi-model CLI probe. Live browser rebinding remains to verify in Phase 4/5, and SDK inferred-project warnings remain a qualification. Phase 7 needs user browser acceptance.
+13/30 complete; next P4-02 chat bridge. Core authenticated server and lazy Plan3 session ownership are implemented; focused web and Plan3 selfchecks pass. Browser commands still need wiring in P4-05, including runtime reuse/shutdown check. Browser assets must be pure JS-compatible .ts served raw with __TOKEN__ substitution; every HTTP asset/API/SSE request uses explicit token (never cookies, which cross localhost ports). Continue inline, no delegation/push/external Pi CLI. Preserve unrelated resolve follow-up changes unstaged in plan3.ts/test-work-plan3. Full verify last passed at Phase 3; rerun Phase 4 after remaining steps.
 
 ## Amendments
 
