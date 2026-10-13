@@ -39,6 +39,15 @@ h2 { font-size: 15px; font-weight: 600; }
 .zoom-controls button { border-color: transparent; }
 #zoom-level { width: 52px; text-align: center; }
 .hover-card { position: absolute; max-width: 340px; max-height: 50%; overflow: auto; background: var(--pink); padding: 12px; border: 1px solid var(--ink); border-radius: 6px; font-size: 13px; white-space: pre-wrap; }
+.hover-card[data-notes="false"] { background: white; }
+.note-text { font: 15px/1.3 Virgil, "Segoe Print", cursive; padding: 8px; height: 100%; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-pin { font-size: 16px; }
+.canvas.pinning, .canvas.pinning #diagram [data-node], .canvas.pinning #diagram [data-edge] { cursor: crosshair; }
+#pin-note[aria-pressed="true"] { background: var(--pink); border-color: var(--ink); }
+#diagram [data-note]:focus-visible > g > path { stroke: var(--focus); stroke-width: 2px; }
+.dialog-purpose { color: #495057; font-size: 13px; margin: 6px 0 16px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+#comment-error { margin-top: 8px; color: #c92a2a; font-size: 13px; }
 .splitter { background: var(--chat); cursor: col-resize; border-inline: 1px solid var(--line); touch-action: none; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }

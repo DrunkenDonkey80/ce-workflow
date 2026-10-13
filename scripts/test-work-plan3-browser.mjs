@@ -14,12 +14,13 @@ async function browser(...args) {
 }
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
 const sample = JSON.parse(await readFile(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
-let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [];
+let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
 const server = await createPlan3Web({ snapshot: target => ({ target, diagram, plan: { id: "12345678", title: sample.title, status: "draft" }, activity: { working: false }, chat: [], dialogs: [] }), post: (endpoint, body) => {
- assert.equal(body.target, "12345678"); assert.equal(endpoint, "/api/move");
+ assert.equal(body.target, "12345678"); assert(["/api/move", "/api/comment"].includes(endpoint));
  if (body.expectedRevision !== diagram.revision) throw new WebError(409, "Stale diagram revision");
- edits.push(body); diagram = applyDiagramOperations(diagram, [{ op: "move", entity: body.entity, id: body.id, x: body.x, y: body.y }]).diagram; diagram.revision++;
+ const operation = endpoint === "/api/move" ? { op: "move", entity: body.entity, id: body.id, x: body.x, y: body.y } : { op: "add", entity: "note", value: { text: body.text, author: "user", created: new Date().toISOString(), ...(body.element ? { target: body.element } : { x: body.x, y: body.y }) } };
+ (endpoint === "/api/move" ? edits : comments).push(body); diagram = applyDiagramOperations(diagram, [operation]).diagram; diagram.revision++;
  server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram }); return { diagram };
 } });
 try {
@@ -77,8 +78,35 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"3\"");
  assert.equal(edits.length, 1); assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition);
  assert(await evaluate("document.getElementById(\"notice\").textContent.includes(\"Positions were not saved\")"));
+ await browser("press", "Escape");
+ await browser("click", "#pin-note"); await browser("click", "[data-node=web_client]");
+ assert(await evaluate("document.getElementById(\"comment-prompt\").open"));
+ await browser("fill", "#comment-text", "Check <img src=x onerror=alert(1)> upload limits"); await browser("click", "#comment-save");
+ await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"4\"");
+ assert.equal(comments[0].element, "web_client"); assert.equal(diagram.notes.at(-1).target, "web_client");
+ await browser("hover", "[data-note=note_4]");
+ assert(await evaluate("document.getElementById(\"hover-card\").textContent.includes(\"upload limits\")"));
+ await browser("press", "Escape");
+ await browser("click", "#pin-note");
+ const commentCanvasTop = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().top)");
+ await browser("mouse", "move", "8", String(commentCanvasTop + 8)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left");
+ assert(await evaluate("document.getElementById(\"comment-prompt\").open"), "canvas click must open the comment dialog");
+ await browser("fill", "#comment-text", "Canvas follow-up"); await browser("click", "#comment-save");
+ await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"5\"");
+ assert.equal(diagram.notes.at(-1).target, undefined); assert(Number.isFinite(comments[1].x));
+ await browser("click", "#pin-note"); await browser("focus", "[data-edge=cdn__web_client]"); await browser("press", "Enter");
+ await browser("fill", "#comment-text", "Check CDN invalidation"); await browser("click", "#comment-save");
+ await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"6\"");
+ assert.equal(comments[2].element, "cdn__web_client"); assert.equal(diagram.notes.at(-1).target, "cdn__web_client");
+ await browser("click", "#zoom-fit"); await browser("hover", "[data-node=backend]");
+ assert(await evaluate("document.getElementById(\"hover-card\").textContent.includes(\"Multipart above 100 MB\")"), "collapsed groups reveal descendant comments");
+ await browser("press", "Escape");
+ for (let i = 0; i < 6; i++) await browser("click", "#zoom-in");
+ assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
+ assert(await evaluate("document.querySelectorAll(\"foreignObject .note-text\").length >= 6"));
+ assert.equal(await evaluate("document.querySelector(\"foreignObject img\")"), null, "note markup stays inert text");
  const errors = await browser("errors"); assert.deepEqual(errors.errors ?? [], [], "browser JavaScript must run under the strict CSP");
- console.log(`ok - Plan3 browser shell, semantic zoom, deterministic strokes, pan, revision-checked drag and responsive resize; session=${session}`);
+ console.log(`ok - Plan3 browser shell, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await server.close();
  if (!process.argv.includes("--keep-browser")) await browser("close");

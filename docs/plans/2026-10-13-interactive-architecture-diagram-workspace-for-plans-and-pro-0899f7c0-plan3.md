@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: active
 created: 2026-10-13
-updated: 2026-10-13T17:26:29.648Z
+updated: 2026-10-13T17:48:51.761Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -163,7 +163,7 @@ Commands (existing; referenced by steps):
 
 - [x] **P5-01** Built the flat whiteboard app shell with live title/status, command bar, left canvas and keyboard/pointer-resizable chat; responsive stacking follows D24/25.
 - [x] **P5-02** Added pinned Rough.js/Virgil SVG rendering, grouped semantic zoom with inline metadata, seeded stable strokes, keyboard/wheel/button zoom, pan, and revision-checked node drag with stale-edit rollback.
-- [ ] **P5-03** Comments: pin to node, edge or canvas; hover cards; inline when zoomed in; sticky-note style.
+- [x] **P5-03** Added node/edge/canvas note pinning, keyboard pinning, persisted comments, hover/focus cards including collapsed descendants, and pink inline notes at near zoom.
 - [ ] **P5-04** Chat pane: streaming replies, ctrl+click inserts `@id`, mention chips, browser dialogs for ask_user batches and list menus.
   - All user and model text is rendered as text, never as HTML.
 - [ ] **P5-06** Activity view in the chat pane (D9): working indicator, thinking stream, tool call rows with progress and results, queued messages, compaction and errors.
@@ -211,7 +211,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-21/30 complete; P5-02 checks all passed, ready to commit. Next P5-03 comments/pinning/hover/inline notes, then chat/dialogs and activity. Browser source is JS-compatible .ts served as .js; imports require token query. Renderer accepts hooks (mention, move, hover, leave, notes) and uses existing layout.ts with optional nodeSize/groupTitle callbacks; default geometry unchanged. Node positions persist parent-relative; near group headers include metadata height. App now has post() helper and revision-conflict reload. C-BROWSER foreground native agent-browser fixture is scripts/test-work-plan3-browser.mjs, mouse coordinates integers; applyDiagramOperations alone does not increment revision, fixture must mimic storage increment. HEAD 7f2a65b before P5-02 commit. No delegation/background verifier/push. Preserve unrelated resolve-follow-up hunks/sidecars. P7-01 human acceptance still required.
+22/30 complete. HEAD d9c5d82 before P5-03 commit; all focused web/diagram/browser checks passed for P5-03. Next P5-04 streaming chat, mention chips and browser ask/list/batch dialogs; then P5-06 activity and P5-05 full visual check. app.ts now has post(), listen()/applyUpdate(), insertMention(), note pin/comment modal and hover card; renderer hooks notes/pin/hover. Browser protocol snapshot uses chat (not messages), dialogs and activity; diagram events carry internal target objects while POST target is scalar id/product. Keep prompt drafts on failed submissions, use textContent (no innerHTML), shared terminal races remain authoritative. Browser tests are foreground Node/native agent-browser, no live Pi/model CLI. No delegation/background verifier/push. Preserve unrelated resolve-follow-up hunks/sidecars. P7-01 needs human acceptance.
 
 ## Amendments
 

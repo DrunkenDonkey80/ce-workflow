@@ -28,8 +28,9 @@
     <output id="zoom-level" aria-label="Zoom level">100%</output>
     <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
     <button id="zoom-fit" type="button">Fit</button>
+    <button id="pin-note" type="button" aria-pressed="false">Add note</button>
    </div>
-   <div id="hover-card" class="hover-card" role="tooltip" hidden></div>
+   <div id="hover-card" class="hover-card" role="tooltip" tabindex="0" hidden></div>
   </section>
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
   <aside id="chat" class="chat" aria-label="Live Pi session">
@@ -48,6 +49,15 @@
    </form>
   </aside>
  </main>
+ <dialog id="comment-prompt" aria-labelledby="comment-title">
+  <form id="comment-form">
+   <h2 id="comment-title">Add a note</h2>
+   <p id="comment-purpose" class="dialog-purpose">Pin a comment to the displayed architecture.</p>
+   <label for="comment-text">Note</label><textarea id="comment-text" required maxlength="8000" rows="5"></textarea>
+   <p id="comment-error" role="alert" hidden></p>
+   <div class="dialog-actions"><button id="comment-cancel" type="button">Cancel</button><button id="comment-save" type="submit">Save note</button></div>
+  </form>
+ </dialog>
  <dialog id="prompt" aria-labelledby="prompt-title"><form id="prompt-form"></form></dialog>
 </body>
 </html>

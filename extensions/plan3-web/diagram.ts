@@ -5,13 +5,13 @@ import rough from "./vendor/rough.js?token=__TOKEN__";
 import { layout } from "./layout.js?token=__TOKEN__";
 
 const NS = "http://www.w3.org/2000/svg";
-function element(tag, attributes = {}, text) {
+export function element(tag, attributes = {}, text) {
  const node = document.createElementNS(NS, tag);
  for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
  if (text !== undefined) node.textContent = text;
  return node;
 }
-function seed(id) { let value = 0; for (const char of id) value = Math.imul(value, 31) + char.charCodeAt(0); return (value & 0x7fffffff) || 1; }
+export function seed(id) { let value = 0; for (const char of id) value = Math.imul(value, 31) + char.charCodeAt(0); return (value & 0x7fffffff) || 1; }
 const fills = { new: "#b2f2bb", changed: "#ffec99", removed: "#ced4da", existing: "#a5d8ff" };
 
 export function createDiagramView(svg, handlers) {
@@ -32,6 +32,7 @@ export function createDiagramView(svg, handlers) {
   if (line) out.push(line); return out;
  }
  // shortcut: near-band inline fields show bounded excerpts; full text remains in the hover card, expand limits if real diagrams need it.
+ const noteSpace = (data, id) => data.notes.filter(note => note.target === id).length * 116;
  const details = node => [...lines(node.summary, 212, 4), ...lines(node.tech, 212, 2), ...lines(node.details, 212, 8)];
  function build(data) {
   const byId = new Map(data.nodes.map(node => [node.id, node]));
@@ -44,7 +45,7 @@ export function createDiagramView(svg, handlers) {
    const key = edge.from + ":" + edge.to;
    if (far && seen.has(key)) return false; seen.add(key); return true;
   });
-  boxes = layout({ nodes: far ? nodes.map(node => ({ ...node, kind: node.kind === "group" ? "service" : node.kind })) : nodes, edges }, node => near ? { w: 240, h: 78 + details(node).length * 18 } : { w: 168, h: 64 }, node => 32 + (near ? details(node).length * 18 : 0));
+  boxes = layout({ nodes: far ? nodes.map(node => ({ ...node, kind: node.kind === "group" ? "service" : node.kind })) : nodes, edges }, node => near ? { w: 240, h: 78 + details(node).length * 18 + noteSpace(data, node.id) } : { w: 168, h: 64 }, node => 32 + (near ? details(node).length * 18 + noteSpace(data, node.id) : 0));
  }
  function draw(data = diagram) {
   if (!data) return;
@@ -61,9 +62,10 @@ export function createDiagramView(svg, handlers) {
    if (near) details(node).forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + 69 + index * 18, class: "node-detail" }, text)));
    if (group && !closed) row.classList.add("group-node");
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(node.id); });
-   row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); handlers.mention(node.id); } });
+   row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: node.id }); else handlers.mention(node.id); } });
    row.addEventListener("pointerenter", event => handlers.hover?.(node.id, event));
-   row.addEventListener("pointerleave", () => handlers.leave?.());
+   row.addEventListener("focus", event => handlers.hover?.(node.id, event)); row.setAttribute("aria-describedby", "hover-card");
+   row.addEventListener("pointerleave", () => handlers.leave?.()); row.addEventListener("blur", () => handlers.leave?.());
    stage.append(row);
   }
   nodes.filter(node => node.kind === "group").forEach(drawNode);
@@ -80,12 +82,12 @@ export function createDiagramView(svg, handlers) {
    row.append(element("line", { x1, y1, x2, y2, class: "edge-hit" }));
    if (view.scale >= .6 && edge.label) row.append(element("text", { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 8, class: "edge-label", "text-anchor": "middle" }, edge.label));
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(edge.id); });
-   row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); handlers.mention(edge.id); } });
-   row.addEventListener("pointerenter", event => handlers.hover?.(edge.id, event)); row.addEventListener("pointerleave", () => handlers.leave?.());
+   row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: edge.id }); else handlers.mention(edge.id); } });
+   row.addEventListener("pointerenter", event => handlers.hover?.(edge.id, event)); row.addEventListener("focus", event => handlers.hover?.(edge.id, event)); row.setAttribute("aria-describedby", "hover-card"); row.addEventListener("pointerleave", () => handlers.leave?.()); row.addEventListener("blur", () => handlers.leave?.());
    stage.append(row);
   }
   nodes.filter(node => node.kind !== "group").forEach(drawNode);
-  handlers.notes?.(stage, boxes, view, rc, data);
+  handlers.notes?.(stage, boxes, view, rc, data, node => 69 + details(node).length * 18);
   svg.replaceChildren(stage); svg.dataset.revision = String(data.revision); svg.dataset.band = view.scale < .6 ? "far" : near ? "near" : "mid";
   document.getElementById("zoom-level").textContent = Math.round(view.scale * 100) + "%";
   if (focused) svg.querySelector(`[data-node="${focused}"]`)?.focus();
@@ -114,10 +116,10 @@ export function createDiagramView(svg, handlers) {
   if (delta) { event.preventDefault(); view.x += delta[0]; view.y += delta[1]; draw(); }
  });
  svg.addEventListener("pointerdown", event => {
-  if (event.button !== 0 || event.ctrlKey || event.metaKey || !diagram) return;
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || !diagram || handlers.pinning?.()) return;
   const id = event.target.closest("[data-node]")?.getAttribute("data-node"), node = diagram.nodes.find(node => node.id === id), box = boxes.get(id);
   const parent = boxes.get(node?.parent);
-  gesture = { pointer: event.pointerId, x: event.clientX, y: event.clientY, vx: view.x, vy: view.y, scale: view.scale, diagram, node, rx: box ? box.x - (parent ? parent.x + 24 : 0) : 0, ry: box ? box.y - (parent ? parent.y + 56 + (view.scale > 1.6 ? details(diagram.nodes.find(item => item.id === node.parent)).length * 18 : 0) : 0) : 0, moved: false };
+  gesture = { pointer: event.pointerId, x: event.clientX, y: event.clientY, vx: view.x, vy: view.y, scale: view.scale, diagram, node, rx: box ? box.x - (parent ? parent.x + 24 : 0) : 0, ry: box ? box.y - (parent ? parent.y + 56 + (view.scale > 1.6 ? details(diagram.nodes.find(item => item.id === node.parent)).length * 18 + noteSpace(diagram, node.parent) : 0) : 0) : 0, moved: false };
   svg.setPointerCapture(event.pointerId); event.preventDefault();
  });
  svg.addEventListener("pointermove", event => {
@@ -136,6 +138,11 @@ export function createDiagramView(svg, handlers) {
   else draw();
  });
  for (const name of ["pointercancel", "lostpointercapture"]) svg.addEventListener(name, () => { if (gesture) { gesture = null; draw(); } });
+ svg.addEventListener("click", event => {
+  if (!handlers.pinning?.() || event.ctrlKey || event.metaKey) return;
+  const id = event.target.closest("[data-node], [data-edge]"), rect = svg.getBoundingClientRect();
+  handlers.pin(id ? { element: id.getAttribute("data-node") ?? id.getAttribute("data-edge") } : { x: (event.clientX - rect.left - view.x) / view.scale, y: (event.clientY - rect.top - view.y) / view.scale });
+ });
  document.fonts.ready.then(() => draw());
  return { render(data) { gesture = null; diagram = data; draw(); if (first && data.nodes.length) { first = false; fit(); } }, fit, zoom };
 }
