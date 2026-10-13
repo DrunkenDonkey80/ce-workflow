@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T15:31:47.830Z
+updated: 2026-10-13T16:28:13.666Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -153,13 +153,8 @@ Commands (existing; referenced by steps):
 - [x] **P4-02** Browser chat forwards to the same Pi session with explicit diagram target, validated mention/comment context and busy follow-ups; recent branch chat and input/message streaming are mirrored to sequenced SSE without awaiting the model run.
 - [x] **P4-03** Dialog registry mirrors pending/closed single, batch and list prompts; validates browser replies and races them against terminal answers. Browser cancellation dismisses native UI; losing overlays/selectors and listeners are cleaned up.
 - [x] **P4-07** Reconnect receives a new full snapshot (diagram revision, chat, bounded activity and live dialogs). SSE subscribes before asynchronous snapshot resolution and buffers intervening events with ordered ids, preventing gaps and stale-dialog resurrection.
-- [ ] **P4-04** Endpoints for comments, node moves and Plan3 commands (resolve, ideas, review, finish, start work) via the stored command ctx.
-  - Commands refuse while the agent is busy, matching `idle(ctx)` in plan3.ts.
-  - Each request names the displayed plan id or the product target; the server resolves it afresh, never using `currentPlan()` defaults.
-  - Start work calls the `/resume3` handler, not a `planCommand` subcommand.
-  - One shared command-in-progress guard covers browser and terminal dispatch, released on error and cancel; `idle(ctx)` alone does not serialize (dialogs and compaction await outside turns, see `serialUI` in plan3.ts).
-- [ ] **P4-05** Add `/plan3 diagram` with alias `uml`, and `/plan3 architecture`, to `SUBCOMMANDS`, completions and the handler; open the default browser.
-  - Check: C-WEB covers token and Origin rejection, SSE delivery, chat forwarding, dialog race, refusal while busy, duplicate Finish and Resolve, and plan B displayed while plan A is current; C-PLAN3 and C-LSP pass.
+- [x] **P4-04** Added revision-checked comment/move endpoints and displayed-target command dispatch; browser and terminal share an idle/error/cancel-safe guard, with start work routed through resume3.
+- [x] **P4-05** Wired diagram/uml and architecture browser commands, completions, reusable per-runtime listener/token, fresh context recovery and diagram broadcasts.
 - [ ] **P4-06** Activity mirror (D9): forward agent, message, tool execution and compaction events plus idle and queue state to SSE; Stop per D13.
   - Use `agent_settled` for idle, plus compaction start, end and failure events; any activity P1-04 found unavailable is listed in README, not claimed.
   - Check: C-WEB covers Stop rejected without token, rejected while idle, and calling abort while working.
@@ -216,7 +211,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-16/30 complete; next P4-04 shared dispatcher, then P4-05 opening/runtime reuse and P4-06 Stop. P4-07 implemented activity cache early because resync needs it: working/compaction/thinking, bounded text tool rows, observed queue inputs. queueExact=false deliberately; SDK input stream cannot prove terminal edits/cancellation parity, and browser queued-input capture needs checking at P4-06. SSE now fences/subscribes before async snapshot and buffers <=8 MB; snapshots <=4 MB, events <=1.1 MB. C-WEB/C-PLAN3/C-DIAGRAM pass. No browser shell/runtime acceptance yet. Need public command route tests for oversize publish not breaking terminal dialogs when workspace is open. Full package verify at Phase 4 boundary; last full pass was Phase 3. Preserve unrelated resolve follow-up hunks; no delegation, background verifier, external Pi/model CLI or push.
+18/30 complete. P4-04/05 endpoints, shared native/browser command guard and CLI browser opening pass focused command/web/diagram tests including SDK-jiti dialog bridge and public HTTP integration. Next P4-06: attach authenticated idle-rejected Stop to ctx.abort, document unavailable queue/compaction observability, verify activity events; then full package verification at Phase 4 boundary. Phase 5 browser shell not built yet. No delegation/background verifier/push. Preserve unrelated resolving follow-up hunks in extensions/plan3.ts and scripts/test-work-plan3.mjs plus unrelated stats/needs sidecars; stage only owned hunks. Browser human acceptance remains P7-01.
 
 ## Amendments
 

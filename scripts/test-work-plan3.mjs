@@ -67,7 +67,7 @@ const api = {
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
-	events: { emit: (name, data) => ["plan3:plans-changed", "plan3:plan-moved"].includes(name) ? planEvents.push({ name, ...data }) : events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }), on: (name, handler) => { listeners.set(name, handler); return () => { if (listeners.get(name) === handler) listeners.delete(name); }; } },
+	events: { emit: (name, data) => { if (["plan3:plans-changed", "plan3:plan-moved"].includes(name)) planEvents.push({ name, ...data }); else events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }); listeners.get(name)?.(data); }, on: (name, handler) => { listeners.set(name, handler); return () => { if (listeners.get(name) === handler) listeners.delete(name); }; } },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
 };
@@ -1136,7 +1136,84 @@ try {
 	assert.doesNotMatch(formatSkillsForPrompt(discovered.skills), /design lead at a design studio/);
 	const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
 	const nativePlan3 = await createJiti(import.meta.url, { moduleCache: false, virtualModules: VIRTUAL_MODULES }).import("../extensions/plan3.ts", { default: true });
+	await hooks.get("session_shutdown")(); // Dispose the first runtime before testing the SDK loader's fresh runtime.
 	nativePlan3(api);
+	// Public workspace commands reuse one listener/token and pin B even while A is current.
+	{
+		const savedEntries = entries, savedMessages = messages.length, savedTokens = tokens;
+		const webCwd = path.join(cwd, "web-command-unit"), plansDir = path.join(webCwd, "docs", "plans");
+		await mkdir(plansDir, { recursive: true });
+		const a = "a1111111", b = "b2222222", target = b;
+		const aFile = path.join(plansDir, `2026-10-13-a-${a}-plan3.md`), bFile = path.join(plansDir, `2026-10-13-b-${b}-plan3.md`);
+		const body = (id, title) => validPlan(id, title, "draft", "### P1 [code] Work\n\n- [ ] **B-01** Implement", "reviewed: 2026-10-13\n").replace("None yet.", "- Keep the existing API.");
+		await writeFile(aFile, body(a, "A")); await writeFile(bFile, body(b, "B"));
+		entries = [{ type: "custom", customType: "plan3-current", data: { id: a, planning: true } }];
+		let expired = false;
+		const webCtx = { ...ctx, cwd: webCwd, hasUI: false, isIdle: () => { if (expired) throw new Error("retired context"); return idle; } };
+		const webDiagram = async args => (await tools.get("plan3_diagram").execute("web-diagram", args, undefined, undefined, webCtx)).details;
+		await webDiagram({ action: "apply", plan: b, expectedRevision: 0, operations: [{ op: "add", entity: "node", value: { id: "api", label: "B API", kind: "service" } }] });
+		const open = async args => { await commands.get("plan3").handler(args, webCtx); return new URL(notices.at(-1).message.replace("Plan3 workspace: ", "")); };
+		const url = await open(`diagram ${b}`), token = url.searchParams.get("token");
+		assert.equal(url.searchParams.get("target"), b);
+		assert.equal(entries.at(-1).data.id, a, "opening B does not silently change the current plan");
+		assert.equal((await open(`uml ${b}`)).href, url.href);
+		const productUrl = await open("architecture");
+		assert.equal(productUrl.origin, url.origin); assert.equal(productUrl.searchParams.get("token"), token);
+		assert.equal(productUrl.searchParams.get("target"), "product");
+		const headers = { Authorization: `Bearer ${token}`, Origin: url.origin, "Content-Type": "application/json" };
+		const post = async (endpoint, value) => { const response = await fetch(`${url.origin}/api/${endpoint}`, { method: "POST", headers, body: JSON.stringify({ target, ...value }) }); return { status: response.status, body: await response.json() }; };
+		const snapshot = async () => { const response = await fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }); assert.equal(response.status, 200); return response.json(); };
+		assert.equal((await snapshot()).plan.id, b);
+		assert.equal((await fetch(`${url.origin}/api/snapshot?target=${b}`)).status, 401);
+		assert.equal((await fetch(`${url.origin}/api/command`, { method: "POST", headers: { ...headers, Origin: "https://foreign.example" }, body: JSON.stringify({ target, command: "review" }) })).status, 403);
+		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 12, y: 34 })).status, 200);
+		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 99, y: 99 })).status, 409);
+		assert.equal((await post("comment", { expectedRevision: 2, element: "api", text: "Keep this boundary" })).status, 200);
+		const edited = (await snapshot()).diagram;
+		assert.deepEqual([edited.nodes[0].x, edited.nodes[0].y], [12, 34]);
+		assert.equal(edited.notes[0].author, "user"); assert.equal(edited.notes[0].target, "api");
+		const sent = await post("message", { text: "Discuss @api", comments: [edited.notes[0].id] });
+		assert.equal(sent.status, 200); assert.deepEqual(sent.body.mentions, ["api"]);
+		assert(messages.at(-1).message.includes(`Architecture workspace (${b})`)); assert(messages.at(-1).message.includes("Keep this boundary"));
+		idle = false; assert.equal((await post("message", { text: "Follow up" })).body.queued, true); assert.equal(messages.at(-1).options.deliverAs, "followUp"); idle = true;
+		assert.equal((await post("move", { expectedRevision: 3, entity: "edge", id: "api", x: 0, y: 0 })).status, 400);
+		assert.equal((await post("command", { command: "convert /private.md" })).status, 400);
+		assert.equal((await post("command", { target: "product", command: "finish" })).status, 400);
+		assert.equal((await post("command", { command: "review" })).status, 200);
+		assert(messages.at(-1).message.includes(JSON.stringify(bFile))); assert(!messages.at(-1).message.includes(JSON.stringify(aFile)));
+		idle = false; assert.equal((await post("command", { command: "review" })).status, 409); idle = true;
+		let finishCallbacks, entered;
+		const compactEntered = new Promise(resolve => { entered = resolve; });
+		tokens = 25_000; webCtx.compact = callbacks => { finishCallbacks = callbacks; entered(); };
+		const finishRequest = post("command", { command: "finish" });
+		await Promise.race([compactEntered, finishRequest.then(result => { throw new Error(`Finish did not enter compaction: ${JSON.stringify(result)}`); })]);
+		assert.equal((await post("command", { command: "finish" })).status, 409);
+		assert.equal((await post("command", { command: "resolve" })).status, 409);
+		await commands.get("plans3").handler("", webCtx); assert.match(notices.at(-1).message, /already in progress/);
+		finishCallbacks.onComplete({}); const finished = await finishRequest; assert.equal(finished.status, 200, JSON.stringify(finished.body));
+		assert.match(await readFile(bFile, "utf8"), /^status: ready$/m); assert.match(await readFile(aFile, "utf8"), /^status: draft$/m);
+		webCtx.compact = ctx.compact; tokens = 0;
+		// The SDK jiti runtime also shares the list bridge; browser cancellation releases the command guard.
+		webCtx.hasUI = true;
+		selectScript = [["Plan ready", null, async () => {
+			const pending = (await snapshot()).dialogs;
+			assert.equal(pending.length, 1); assert.equal(pending[0].kind, "list");
+			assert.equal((await post("command", { command: "finish" })).status, 409);
+			assert.equal((await post("answer", { askId: pending[0].askId, cancel: true })).body.accepted, true);
+		}]];
+		assert.equal((await post("command", { command: "finish" })).status, 200); assert.equal(selectScript.length, 0);
+		webCtx.hasUI = false;
+		const notify = webCtx.ui.notify;
+		webCtx.ui.notify = () => { throw new Error("broken UI"); };
+		assert.equal((await post("command", { command: "review" })).status, 500);
+		webCtx.ui.notify = notify;
+		assert.equal((await post("command", { command: "resume" })).status, 200);
+		assert(messages.at(-1).message.includes(JSON.stringify(bFile))); assert.match(messages.at(-1).message, /execute\/resume/);
+		expired = true; assert.equal((await post("command", { command: "review" })).status, 409); expired = false;
+		await open(`diagram ${b}`); assert.equal((await post("command", { command: "review" })).status, 200);
+		entries = savedEntries; messages.length = savedMessages; tokens = savedTokens;
+	}
+	await run("plan3", "architecture"); // Refresh the same runtime to the main fixture's command context.
 	askSource = fileURLToPath(new URL("../extensions/ask-user/index.ts", import.meta.url));
 	assert(existsSync(askSource), "native popup selfcheck needs vendored ask_user");
 	let dialogs = [], popupCount = 0;
@@ -1166,7 +1243,10 @@ try {
 	const selected = { kind: "selection", selections: ["Keep CSV"] };
 	const custom = { kind: "freeform", text: "1000 ms\n## not a plan heading" };
 	const answered = response => ({ status: "answered", response });
-	dialogs = [{ answer: [answered(selected), answered(custom), answered(kept), { status: "skipped" }], check: (component, rendered) => {
+	dialogs = [{ answer: [answered(selected), answered(custom), answered(kept), { status: "skipped" }], check: async (component, rendered) => {
+		const live = new URL(notices.findLast(notice => notice.message.startsWith("Plan3 workspace: ")).message.replace("Plan3 workspace: ", ""));
+		const duplicate = await fetch(`${live.origin}/api/command`, { method: "POST", headers: { Authorization: `Bearer ${live.searchParams.get("token")}`, Origin: live.origin, "Content-Type": "application/json" }, body: JSON.stringify({ target: "55555555", command: "resolve" }) });
+		assert.equal(duplicate.status, 409, "browser Resolve cannot duplicate the terminal's pending Resolve");
 		assert.match(rendered, /Existing consumers read CSV/);
 		assert.match(rendered, /Keep CSV/);
 		component.handleInput("\r"); // Real native selection advances to page two.
@@ -1391,6 +1471,7 @@ try {
 	assert.equal(await readFile(earlyFile, "utf8"), closedIdeas);
 	entries = beforeIdeasEntries;
 	ctx.hasUI = false; delete ctx.ui.input; delete ctx.ui.custom;
+	await hooks.get("session_shutdown")();
 	plan3(api);
 
 	// Exact bare words are shortcuts only during live Plan3 planning and only from the operator.
@@ -2027,6 +2108,7 @@ try {
 
 	console.log("Plan3 command self-checks passed");
 } finally {
+	await hooks.get("session_shutdown")?.();
 	await rm(cwd, { recursive: true, force: true });
 	await rm(agentDir, { recursive: true, force: true });
 }
