@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
@@ -48,17 +48,17 @@ function body(req: IncomingMessage): Promise<Record<string, unknown>> {
 
 /** One instance per Pi session; the command owner reuses it and closes it on session_shutdown. */
 export async function createPlan3Web(options: Options) {
-	const token = randomBytes(32).toString("hex"), clients = new Set<ServerResponse>();
+	const token = randomBytes(32).toString("hex"), clients = new Map<ServerResponse, { ready: boolean; frames: string[]; bytes: number }>();
 	let origin = "", sequence = 0, closed = false;
 	const valid = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value) && timingSafeEqual(Buffer.from(value), Buffer.from(token));
 	const json = (res: ServerResponse, status: number, value: unknown) => {
 		res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
 		res.end(JSON.stringify(value));
 	};
-	const frame = (event: string, value: unknown) => `id: ${++sequence}\nevent: ${event}\ndata: ${JSON.stringify(value)}\n\n`;
+	const frame = (event: string, value: unknown, id = ++sequence) => `id: ${id}\nevent: ${event}\ndata: ${JSON.stringify(value)}\n\n`;
 	const send = (res: ServerResponse, data: string) => {
 		res.write(data);
-		if (res.writableLength > 2_200_000) { clients.delete(res); res.destroy(); }
+		if (res.writableLength > 8_000_000) { clients.delete(res); res.destroy(); }
 	};
 	const assets = new Map([
 		["/", ["index.html", "text/html; charset=utf-8"]],
@@ -86,11 +86,18 @@ export async function createPlan3Web(options: Options) {
 			if (req.method === "GET" && url.pathname === "/api/snapshot") return json(res, 200, await options.snapshot(webTarget(url.searchParams.get("target"))));
 			if (req.method === "GET" && url.pathname === "/api/events") {
 				if (clients.size >= 8) throw new WebError(429, "Too many workspace connections.");
-				const snapshot = await options.snapshot(webTarget(url.searchParams.get("target")));
-				if (clients.size >= 8) throw new WebError(429, "Too many workspace connections.");
+				const target = webTarget(url.searchParams.get("target")), fence = ++sequence;
+				const connection = { ready: false, frames: [] as string[], bytes: 0 };
+				clients.set(res, connection); res.on("close", () => clients.delete(res));
+				// Subscribe before an async snapshot so changes during initial load cannot disappear.
+				const snapshot = await options.snapshot(target), initial = frame("snapshot", snapshot, fence);
+				if (closed || res.destroyed) return;
+				if (Buffer.byteLength(initial) > 4_000_000) throw new WebError(413, "Workspace snapshot too large.");
 				res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive", "X-Accel-Buffering": "no" });
-				clients.add(res); res.on("close", () => clients.delete(res));
-				send(res, frame("snapshot", snapshot));
+				send(res, initial);
+				connection.ready = true;
+				for (const queued of connection.frames) send(res, queued);
+				connection.frames = []; connection.bytes = 0;
 				return;
 			}
 			if (req.method === "POST") {
@@ -107,6 +114,7 @@ export async function createPlan3Web(options: Options) {
 			res.writeHead(200, { "Content-Type": asset[1] });
 			res.end(asset[1].startsWith("font/") ? contents : contents.toString("utf8").replaceAll("__TOKEN__", token));
 		})().catch(error => {
+			clients.delete(res);
 			if (res.destroyed || res.writableEnded) return;
 			if (res.headersSent) { res.end(); return; }
 			json(res, error instanceof WebError ? error.status : 500, { error: error instanceof Error ? error.message.replaceAll(token, "[token]") : "Workspace request failed." });
@@ -120,7 +128,7 @@ export async function createPlan3Web(options: Options) {
 	const address = server.address();
 	if (!address || typeof address === "string") throw new Error("Workspace did not bind a TCP port.");
 	origin = `http://127.0.0.1:${address.port}`;
-	const heartbeat = setInterval(() => { for (const res of clients) send(res, ": keepalive\n\n"); }, 15_000);
+	const heartbeat = setInterval(() => { for (const [res, connection] of clients) if (connection.ready) send(res, ": keepalive\n\n"); }, 15_000);
 	heartbeat.unref();
 	let closing: Promise<void> | undefined;
 	return {
@@ -131,12 +139,18 @@ export async function createPlan3Web(options: Options) {
 			if (!/^[a-z][a-z0-9_-]{0,40}$/.test(event)) throw new Error("Invalid workspace event name.");
 			const data = frame(event, value);
 			if (Buffer.byteLength(data) > 1_100_000) throw new Error("Workspace event too large.");
-			for (const res of clients) send(res, data);
+			for (const [res, connection] of clients) {
+				if (connection.ready) send(res, data);
+				else {
+					connection.frames.push(data); connection.bytes += Buffer.byteLength(data);
+					if (connection.bytes > 8_000_000) { clients.delete(res); res.destroy(); }
+				}
+			}
 		},
 		close() {
 			if (closing) return closing;
 			closed = true; clearInterval(heartbeat);
-			for (const res of clients) res.end(); clients.clear();
+			for (const res of clients.keys()) res.end(); clients.clear();
 			closing = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 			server.closeIdleConnections(); server.closeAllConnections();
 			return closing;
@@ -242,4 +256,65 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 			bound.clear(); for (const dispose of disposers) dispose();
 		},
 	};
+}
+
+type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; durationMs?: number };
+export function createActivityMirror(pi, publish: (event: string, value: unknown) => void) {
+	const tools: ToolActivity[] = [], queued: { id: string; digest: string; text: string; delivery: string }[] = [];
+	let working = false, compacting = false, thinking = "", error = "", interrupted = false, sequence = 0;
+	const digest = (text: string) => createHash("sha256").update(text).digest("hex");
+	const textOf = message => typeof message?.content === "string" ? message.content : (message?.content ?? []).filter(part => part?.type === "text").map(part => part.text).join("\n");
+	const brief = (value: unknown) => {
+		try {
+			const text = typeof value === "string" ? value : JSON.stringify(value, (_key, item) => item?.type === "image" ? { type: "image", note: "Image omitted from activity" } : item) ?? "";
+			return text.length > 16_000 ? text.slice(0, 16_000) + "\n… truncated" : text;
+		} catch { return "[Unserializable tool data]"; }
+	};
+	const snapshot = ctx => {
+		if (ctx?.hasPendingMessages?.() === false) queued.length = 0;
+		return { working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
+	};
+	const emit = () => publish("activity", snapshot(undefined));
+	const tool = (event, patch: Partial<ToolActivity>) => {
+		if (typeof event.toolCallId !== "string" || typeof event.toolName !== "string") return;
+		const index = tools.findIndex(row => row.id === event.toolCallId);
+		const row = { ...(tools[index] ?? { state: "running" }), id: event.toolCallId, name: event.toolName, ...(event.parentToolCallId ? { parent: event.parentToolCallId } : {}), ...patch };
+		if (index < 0) tools.push(row); else tools[index] = row;
+		// shortcut: latest 50 tool rows / 512 KB, text-only snapshots; native custom renderers stay in the terminal.
+		while (tools.length > 50 || Buffer.byteLength(JSON.stringify(tools)) > 512_000) tools.shift();
+		emit();
+	};
+	pi.on("agent_start", () => { working = true; interrupted = false; thinking = ""; error = ""; emit(); });
+	pi.on("agent_settled", event => {
+		working = false; interrupted = Boolean(event.aborted); queued.length = 0;
+		for (const row of tools) if (row.state === "running") row.state = interrupted ? "interrupted" : "settled";
+		emit();
+	});
+	pi.on("message_start", event => {
+		if (event.message?.role === "user") {
+			const index = queued.findIndex(item => item.digest === digest(textOf(event.message)));
+			if (index >= 0) queued.splice(index, 1);
+			emit();
+		}
+	});
+	pi.on("message_update", event => {
+		if (event.message?.role !== "assistant") return;
+		const content = event.message.content ?? [];
+		thinking = content.filter(part => part.type === "thinking").map(part => part.thinking ?? "[redacted thinking]").join("\n").slice(0, 64_000);
+		if (event.assistantMessageEvent?.type?.startsWith("thinking_")) emit();
+	});
+	pi.on("message_end", event => { if (event.message?.errorMessage) { error = brief(event.message.errorMessage); emit(); } });
+	pi.on("input", event => {
+		if (!event.streamingBehavior || typeof event.text !== "string") return;
+		queued.push({ id: `queued_${++sequence}`, digest: digest(event.text), text: brief(event.text), delivery: event.streamingBehavior });
+		while (queued.length > 100 || Buffer.byteLength(JSON.stringify(queued)) > 512_000) queued.shift();
+		emit();
+	});
+	pi.on("tool_execution_start", event => tool(event, { state: "running", args: brief(event.args) }));
+	pi.on("tool_execution_update", event => tool(event, { progress: brief(event.partialResult) }));
+	pi.on("tool_execution_end", event => tool(event, { state: event.isError ? "error" : "done", result: brief(event.result), durationMs: event.durationMs }));
+	pi.on("session_before_compact", () => { compacting = true; emit(); });
+	pi.on("session_compact", () => { compacting = false; emit(); });
+	pi.on("session_compact_failed", event => { compacting = false; error = event.errorMessage ?? (event.aborted ? "Compaction cancelled" : "Compaction failed"); emit(); });
+	return { snapshot };
 }

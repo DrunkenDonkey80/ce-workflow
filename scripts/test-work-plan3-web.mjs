@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
 import { createJiti } from "jiti";
-const { createPlan3Web, webTarget, createChatMirror, createDialogBridge, forwardDiagramChat } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
+const { createPlan3Web, webTarget, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
 const posted = [];
 const server = await createPlan3Web({ snapshot: target => ({ target, revision: 3, title: "Safe <text>" }), post: (endpoint, value) => { posted.push({ endpoint, value }); return { ok: true }; } });
-const opening = new URL(server.url({ kind: "plan", id: "12345678" })), token = opening.searchParams.get("token");
-const auth = { Authorization: `Bearer ${token}` };
 let reader;
 try {
+ const opening = new URL(server.url({ kind: "plan", id: "12345678" })), token = opening.searchParams.get("token");
+ const auth = { Authorization: `Bearer ${token}` };
  assert.equal(opening.hostname, "127.0.0.1");
  assert.match(token, /^[a-f0-9]{64}$/);
  assert.throws(() => webTarget("../secret"));
@@ -169,4 +169,80 @@ assert.deepEqual(listDialogResponse({ action: "tab" }, { ...listOptions, tabActi
 dialogBridge.close(); dialogBridge.close();
 assert.equal(dialogBridge.snapshot().length, 0);
 assert([...busListeners.values()].every(set => set.size === 0), "all remote race and registry listeners released");
-console.log("ok - plan3 web security, SSE, chat, single/batch/list races and shutdown");
+const activityHooks = new Map(), activityEvents = [];
+const activityMirror = createActivityMirror({ on: (name, handler) => activityHooks.set(name, handler) }, (event, value) => activityEvents.push({ event, value }));
+activityHooks.get("agent_start")({});
+activityHooks.get("input")({ streamingBehavior: "followUp", text: "later" });
+assert.equal(activityMirror.snapshot().queue.length, 1);
+activityHooks.get("message_start")({ message: { role: "user", content: [{ type: "text", text: "later" }] } });
+assert.equal(activityMirror.snapshot().queue.length, 0);
+activityHooks.get("message_update")({ message: { role: "assistant", content: [{ type: "thinking", thinking: "Reasoning" }] }, assistantMessageEvent: { type: "thinking_delta" } });
+activityHooks.get("tool_execution_start")({ toolCallId: "tool1", toolName: "read", args: { path: "example" } });
+activityHooks.get("tool_execution_update")({ toolCallId: "tool1", toolName: "read", partialResult: { content: [{ type: "text", text: "half" }] } });
+activityHooks.get("tool_execution_end")({ toolCallId: "tool1", toolName: "read", result: { content: [{ type: "image", data: "private-base64" }, { type: "text", text: "result" }] }, durationMs: 12, isError: false });
+assert.equal(activityMirror.snapshot().thinking, "Reasoning");
+assert.equal(activityMirror.snapshot().tools[0].state, "done");
+assert(!JSON.stringify(activityMirror.snapshot()).includes("private-base64"));
+assert(!activityHooks.has("agent_end"), "agent_end alone does not mean settled/idle");
+activityHooks.get("session_before_compact")({});
+assert(activityMirror.snapshot().compacting);
+activityHooks.get("session_compact_failed")({ errorMessage: "failed", aborted: false });
+assert.equal(activityMirror.snapshot().compacting, false);
+assert.equal(activityMirror.snapshot().error, "failed");
+activityHooks.get("input")({ streamingBehavior: "steer", text: "cancelled in terminal" });
+assert.equal(activityMirror.snapshot({ isIdle: () => false, hasPendingMessages: () => false }).queue.length, 0);
+assert.equal(activityMirror.snapshot().queueExact, false, "SDK input events do not prove exact queue edits/cancellations");
+activityHooks.get("agent_settled")({ aborted: true });
+assert.equal(activityMirror.snapshot().working, false);
+assert(activityMirror.snapshot().interrupted);
+
+function eventsFrom(response) {
+ const reader = response.body.getReader(), decoder = new TextDecoder(); let buffered = "";
+ return {
+  async next() {
+   while (!buffered.includes("\n\n")) { const part = await reader.read(); assert(!part.done, "SSE ended before expected event"); buffered += decoder.decode(part.value, { stream: true }); }
+   const end = buffered.indexOf("\n\n"), raw = buffered.slice(0, end); buffered = buffered.slice(end + 2);
+   let data;
+   try { data = JSON.parse(/^data: (.*)$/m.exec(raw)?.[1]); } catch (error) { assert.fail(`Invalid test-server SSE JSON: ${error}`); }
+   return { id: Number(/^id: (\d+)$/m.exec(raw)?.[1]), event: /^event: (.*)$/m.exec(raw)?.[1], data };
+  },
+  close: () => reader.cancel(),
+ };
+}
+let resyncServer, releaseSnapshot, enteredSnapshot;
+const snapshotEntered = new Promise(resolve => { enteredSnapshot = resolve; });
+const resyncDialogs = createDialogBridge(askApi, (event, value) => resyncServer?.publish(event, value));
+let nativeResolve, holdSnapshot = true;
+const unanswered = raceRemoteAsk(askApi, question, undefined, undefined, payload => remoteResponse(payload, question, true), () => new Promise(resolve => { nativeResolve = resolve; }));
+const unansweredId = resyncDialogs.snapshot()[0].askId;
+resyncServer = await createPlan3Web({ snapshot: async target => {
+ if (holdSnapshot) { holdSnapshot = false; enteredSnapshot(); await new Promise(resolve => { releaseSnapshot = resolve; }); }
+ return { target, diagram: contextDiagram, chat: mirror.snapshot(), activity: activityMirror.snapshot(), dialogs: resyncDialogs.snapshot() };
+} });
+try {
+ const resyncUrl = new URL(resyncServer.url({ kind: "product" }));
+ const connectUrl = `${resyncServer.origin}/api/events${resyncUrl.search}`;
+ const connecting = fetch(connectUrl, { signal: AbortSignal.timeout(10_000) });
+ await snapshotEntered;
+ resyncServer.publish("activity", { marker: "during asynchronous snapshot" });
+ releaseSnapshot();
+ const first = eventsFrom(await connecting), initial = await first.next(), buffered = await first.next();
+ assert.equal(initial.event, "snapshot");
+ assert.equal(initial.data.diagram.revision, contextDiagram.revision);
+ assert(initial.data.chat.length);
+ assert.equal(initial.data.activity.tools[0].state, "done");
+ assert.equal(initial.data.dialogs[0].askId, unansweredId, "refresh restores unanswered dialog");
+ assert.equal(buffered.event, "activity");
+ assert(buffered.id > initial.id, "no event gap during async snapshot, ids stay ordered");
+ await first.close();
+ nativeResolve({ kind: "selection", selections: ["A"] }); await unanswered;
+ const reconnect = eventsFrom(await fetch(connectUrl, { headers: { "Last-Event-ID": String(buffered.id) }, signal: AbortSignal.timeout(10_000) }));
+ const fresh = await reconnect.next();
+ assert.equal(fresh.event, "snapshot");
+ assert(fresh.id > buffered.id, "fresh snapshot supersedes every pre-disconnect event");
+ assert.equal(fresh.data.dialogs.length, 0, "terminal answer while disconnected cannot resurrect a popup");
+ assert.equal(fresh.data.activity.working, false);
+ assert.equal(new Set([initial.id, buffered.id, fresh.id]).size, 3, "snapshot/event ids are distinct across reconnects");
+ await reconnect.close();
+} finally { resyncDialogs.close(); await resyncServer.close(); }
+console.log("ok - plan3 web security, dialog races, bounded activity and reconnect resync");

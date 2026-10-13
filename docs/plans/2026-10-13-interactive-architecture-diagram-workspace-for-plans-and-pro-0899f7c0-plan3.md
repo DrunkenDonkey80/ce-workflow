@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T15:09:06.477Z
+updated: 2026-10-13T15:31:47.830Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -152,8 +152,7 @@ Commands (existing; referenced by steps):
 - [x] **P4-01** Authenticated localhost server binds an ephemeral port, checks Host/Origin/token, applies CSP and body limits, streams sequenced SSE with bounded connections/buffers, and closes idempotently; Plan3 owns one lazy instance and shutdown cleanup.
 - [x] **P4-02** Browser chat forwards to the same Pi session with explicit diagram target, validated mention/comment context and busy follow-ups; recent branch chat and input/message streaming are mirrored to sequenced SSE without awaiting the model run.
 - [x] **P4-03** Dialog registry mirrors pending/closed single, batch and list prompts; validates browser replies and races them against terminal answers. Browser cancellation dismisses native UI; losing overlays/selectors and listeners are cleaned up.
-- [ ] **P4-07** Snapshot and resync: on connect and reconnect send diagram revision, recent chat and activity, and pending dialogs; events carry sequence ids for dedup.
-  - Check: C-WEB covers refresh during an unanswered question and reconnect after the terminal answered it.
+- [x] **P4-07** Reconnect receives a new full snapshot (diagram revision, chat, bounded activity and live dialogs). SSE subscribes before asynchronous snapshot resolution and buffers intervening events with ordered ids, preventing gaps and stale-dialog resurrection.
 - [ ] **P4-04** Endpoints for comments, node moves and Plan3 commands (resolve, ideas, review, finish, start work) via the stored command ctx.
   - Commands refuse while the agent is busy, matching `idle(ctx)` in plan3.ts.
   - Each request names the displayed plan id or the product target; the server resolves it afresh, never using `currentPlan()` defaults.
@@ -217,7 +216,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-15/30 complete; next P4-07 snapshot/resync, then remaining Phase 4–6 inline. Core server/chat/dialog bridge and focused checks pass, but no usable browser UI yet; command opening/instance reuse still needs P4-05 runtime verification. Snapshot already contains diagram+plan metadata, bounded recent chat and pending dialogs; add resync/activity/dedup coverage next. Full package verification last passed at Phase 3; run once at Phase 4 boundary. Preserve unrelated resolve follow-up hunks in plan3.ts/test-work-plan3.mjs. No delegation, push or external Pi/model CLI. Browser assets must be JS-compatible .ts served with __TOKEN__ substitution, explicit token auth (never cookies). Live acceptance remains P7-01.
+16/30 complete; next P4-04 shared dispatcher, then P4-05 opening/runtime reuse and P4-06 Stop. P4-07 implemented activity cache early because resync needs it: working/compaction/thinking, bounded text tool rows, observed queue inputs. queueExact=false deliberately; SDK input stream cannot prove terminal edits/cancellation parity, and browser queued-input capture needs checking at P4-06. SSE now fences/subscribes before async snapshot and buffers <=8 MB; snapshots <=4 MB, events <=1.1 MB. C-WEB/C-PLAN3/C-DIAGRAM pass. No browser shell/runtime acceptance yet. Need public command route tests for oversize publish not breaking terminal dialogs when workspace is open. Full package verify at Phase 4 boundary; last full pass was Phase 3. Preserve unrelated resolve follow-up hunks; no delegation, background verifier, external Pi/model CLI or push.
 
 ## Amendments
 
