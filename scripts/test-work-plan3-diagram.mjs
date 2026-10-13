@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { layout } from "../extensions/plan3-web/layout.js";
+import { createJiti } from "jiti";
+const { layout } = await createJiti(import.meta.url).import("../extensions/plan3-web/layout.ts");
 
 // Layout (D10) on the two hand-written samples: children inside their group, no unrelated boxes overlap,
 // a cycle does not push its first node right, and manual positions win.

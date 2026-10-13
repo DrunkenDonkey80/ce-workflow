@@ -31,7 +31,8 @@
       "extensions/plan3.ts",
       "extensions/screen-read.ts",
       "extensions/enter-runs.ts",
-      "extensions/advisor-model.ts"
+      "extensions/advisor-model.ts",
+      "extensions/ask-user/index.ts"
     ],
     "skills": [
       "./skills/frontend-design"

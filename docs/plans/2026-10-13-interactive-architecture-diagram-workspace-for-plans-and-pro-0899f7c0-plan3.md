@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T13:44:33.831Z
+updated: 2026-10-13T13:50:35.885Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -73,85 +73,16 @@ Acceptance examples:
 - **D17** 2026-10-13 — First plan diagram in a project offers a product diagram: when the user first opens a plan diagram and no product diagram exists, the workspace asks whether to also create the whole-project architecture diagram, because a project may have only one complicated task. Yes creates it (agent turn, from the code and this plan); D8 applies only once it exists. Source: user comment on Q-08 ("the first time we approve making a diagram for the task it should ask if to make for the project as a whole too"). How a No is remembered is D18.
 - **D18** 2026-10-13 — Declined product diagram (Q-09): a No is remembered per project as `workOrchestrator.plan3.productDiagram: "declined"` in `.pi/settings.json` and the offer is never shown again; `/plan3 architecture` still creates the product diagram on demand. Source: user via /plan3 resolve.
 - **D19** 2026-10-13 (P1-01) — Diagram schema v1: `{ version: 1, kind: "plan"|"product", plan?: <plan id>, title, revision, nodes[], edges[], notes[] }`. Node: `id, label, kind (group|client|service|store|external), parent?, summary?, tech?, details?, status?, x?, y?`; groups are nodes of kind group and nest. Edge: `id, from, to, label?, status?`. Note: `id, target? (node or edge id; absent = canvas with x, y), text, author (user|agent), created`. Notes are sticky notes, not a node kind.
-- **D20** 2026-10-13 (P1-01) — Ids and mentions: every node, edge and note id matches `^[a-z][a-z0-9_]{0,47}---
-plan3: true
-status: ready
-created: 2026-10-13
-updated: 2026-10-13T13:40:36.371Z
-reviewed: 2026-10-13
-started: 2026-10-13T13:40:36.371Z
----
-
-# Interactive architecture diagram workspace for plans and products
-
-## Original request
-
-> now lets talk UML. the idea here is during architectural phases, project description, plans, all of these to be able to see the system. what I'm thinking:
-> 
-> 1. I make a plan, we talk, we chat, I give /plan3 diagram or uml and it opens me out web page that is very interactive - zoom in shows more details, left-drag around the architecture, zoom out leaves the whole block. I can leave comments that are recorded with notes that are visible when zoomed or hover (!). best - I can chat with the plan running now - I click the server and say "add such functionality" and it thinks and it is added and also pops a suggestion to update the X eleements that use it too, so I yes and it continues like that, so a chat interface on the right and a diagram on the left, I want the WHOLE planning to be able to happen from the design area up until I run the thing, then it is saved alongside the plan. and archived with the plan.
-> 
-> 2. I can request whole product diagram, that lists modules, connections etc, see what goes where, actually request changes, a product chat so to speak but in there and mentioning components. I can start typing and ctrl+click on a web client box, it is mentioned in the chat as @web_module or whatever so we are all clear whats there
-> 
-> 3. when the product changes and evolves there is a standing note to update when product architecture changes
-> 
-> I know this is big to swallow, basically we webify our design and work and modify process
-
-Follow-up from the user (2026-10-13): "possible interface: https://excalidraw.nyc3.cdn.digitaloceanspaces.com/lp-cms/media/system%20design.png" — an Excalidraw system-design sketch: hand-drawn black strokes, blue rounded component boxes, gray dashed group containers, pink sticky-note questions, labeled arrows, white canvas.
-
-## Goal, requirements, and non-goals
-
-Goal: a local browser workspace where a Plan3 plan (and the whole product) is seen and changed as an architecture diagram, with the live planning session as a chat on the right, so planning can run end to end from the browser.
-
-Requirements:
-- **R1** `/plan3 diagram [plan]` (alias `/plan3 uml`) opens a local web page: diagram on the left, chat with the current Pi session on the right.
-- **R2** Semantic zoom: zoomed out shows groups as whole blocks; zooming in reveals nodes, then summaries, tech, details and notes. Left-drag pans; nodes can be dragged and their positions persist.
-- **R3** Comments: the user pins notes to a node, edge or canvas spot; they are saved in the diagram, shown on hover always and inline when zoomed in, and visible to the agent.
-- **R4** Chat drives the live session: messages typed in the browser go to the current agent; its replies stream back; ctrl+click on a box inserts `@node_id` into the message and the agent receives the mentioned nodes' current data.
-- **R5** The agent edits the diagram through a validated tool; each edit reports the elements that depend on what changed so the agent can offer follow-up updates, and the browser updates live.
-- **R6** Whole planning in the browser: Plan3 commands (resolve, ideas, review, finish, start work) run from the page, and every ask_user question and Plan3 dialog can be answered in the browser as well as the terminal (first answer wins).
-- **R7** The plan diagram is saved next to the plan and moves with it when the plan is archived.
-- **R8** `/plan3 architecture` opens the same workspace on the whole-product diagram (modules, connections), with the same chat and mentions.
-- **R9** Standing rule: product architecture changes get reconciled into the product diagram (code-enforced, D8).
-- **R10** Excalidraw-like hand-drawn look per the user's reference.
-- **R11** The browser shows what the agent is doing, like Pi's terminal: working or idle, streaming thinking and text, tool calls with progress and results, queued messages, compaction and errors (D9).
-
-Non-goals (v1):
-- No free-hand drawing or Excalidraw editing; the structured model is the source of truth (D1).
-- No multi-user or remote access; the server is local to this machine and this session.
-- No UML notation families (sequence, class, state diagrams); v1 is a component and connection architecture view. Candidate for Backlog.
-- No auto-generation of the product diagram from source code analysis beyond what the agent writes.
-
-Acceptance examples:
-- During planning, `/plan3 diagram` opens the browser on this plan's diagram; zooming out collapses the "Backend" group into one block; zooming in on "UploadAPI" shows its summary and a pinned comment.
-- The user ctrl+clicks "Storage", types "add lifecycle rules to @storage", sends; the agent's reply streams into the chat, a changed Storage box appears, and the agent asks in the browser whether to update UploadAPI and CDN, which link to Storage; choosing yes continues.
-- From the browser the user clicks Resolve, answers open questions in browser dialogs, then Finish and Start work, without touching the terminal.
-- Completing the plan moves `<plan>.md` and its diagram file together into `docs/plans/done/`.
-
-## Decisions
-
-- **D1** 2026-10-13 — Rendering: own SVG renderer over a structured diagram model with an Excalidraw-like hand-drawn look (rough.js, MIT), not an embedded Excalidraw. Rationale: semantic zoom, mentions and reliable agent edits need a structured model; Excalidraw free drawing cannot round-trip. tldraw excluded (paid production license). Source: user via ask_user.
-- **D2** 2026-10-13 — v1 scope is everything: plan diagram with live chat, product diagram with mentions, the standing architecture-update rule, Plan3 commands run from the browser and ask_user answered in the browser. Source: user via ask_user.
-- **D3** 2026-10-13 — ask_user becomes ce-workflow's own tool: copy pi-ask-user 0.16.0 source (MIT; `index.ts` 3155 lines, `single-select-layout.ts` 203 lines) with minimal edits, keep a provenance file in the style of `extensions/subscription-footer-UPSTREAM.md`, and keep `pi-ask-user` in catch-up so upstream releases show what to port. Rationale: browser answering needs a native hook; the existing opt-in patch (`scripts/patch-ask-user-remote-answer.mjs`) is single-question only and not applied on this machine. Source: user via ask_user ("copy source and do minimal edits and add it into catchup").
-- **D4** 2026-10-13 — Visual direction follows the user's reference, using skill `skills/frontend-design/SKILL.md` for the token pass (Phase 1): whiteboard white canvas, rough black strokes, blue component fills, gray dashed group containers, pink sticky notes for comments, labeled arrows; quiet system-font chat pane so the diagram is the one bold element. Source: user reference image plus skill; exact tokens are set in P1-03.
-- **D5** 2026-10-13 (assumed, near-certain) — The browser chat talks to the same live Pi session (same agent, context and plan), not a separate model. Evidence: request says "chat with the plan running now" and "it thinks and it is added".
-- **D6** 2026-10-13 (assumed, near-certain) — Server is Node's `node:http` bound to 127.0.0.1 on an ephemeral port with a per-launch random token, Host and Origin checks, body limits and a strict CSP; started by the command and closed in `session_shutdown`, per Pi's lifecycle rule in `docs/extensions.md` ("Do not start processes, sockets ... in the factory"). No new npm dependency for the server.
-- **D7** 2026-10-13 — Storage (Q-01): plan diagram is a sibling file `docs/plans/<plan-file-stem>.diagram.json`, moved by `archive()` with the plan; product diagram at `docs/architecture/product.diagram.json` (the recommended path; the answer named only the sibling option). Source: user via /plan3 resolve.
-- **D8** 2026-10-13 — Standing rule (Q-02): when a product diagram exists, `/plan3 finish` appends a final [code] step "Reconcile the product architecture diagram with this plan's changes" to every plan; plans with a diagram list their changed elements; completion refuses while that step is open unless it is marked done with "no architecture change". Source: user via /plan3 resolve.
-- **D9** 2026-10-13 — The browser shows agent activity the way Pi's terminal does: working and idle state, streaming thinking and text, running tool calls with their progress and results, queued follow-ups, compaction and errors (R11). Source: user comment on Q-02 ("the interface should show when agent is working, etc just like the real pi does"); Pi 1.1.0 exposes the needed events (`agent_start`, `agent_end`, `message_update`, `tool_execution_start`, `tool_execution_update`, `tool_execution_end`, `session_compact`) and `ctx.isIdle`, `ctx.hasPendingMessages`, `ctx.abort` (dist/core/extensions/types.d.ts).
-- **D10** 2026-10-13 — Layout (Q-03): own small layered layout (rank by edges inside each group, grid fallback) plus persisted manual positions; no layout library. Source: user via /plan3 resolve.
-- **D11** 2026-10-13 — Assets (Q-04): rough.js and the hand-drawn font are vendored into the package with their licenses and served by the local server; no CDN. Source: user via /plan3 resolve.
-- **D12** 2026-10-13 — Coexistence (Q-05): ce-workflow drops the pi-ask-user peer dependency and install line; if pi-ask-user is still loaded, ce-workflow skips registering its copy and warns once to uninstall it (browser answering then falls back to terminal only). Source: user via /plan3 resolve.
-- **D13** 2026-10-13 — Stop button (Q-06): the browser shows Stop only while the agent is working; it calls ctx.abort() through a token-guarded endpoint and the chat records the interruption, matching Escape in the terminal. Whether ctx.abort() works from an HTTP callback is unverified until P1-04. Source: user via /plan3 resolve.
-- **D14** 2026-10-13 (superseded by D15) — Force finish versus D8 (Q-07): Force finish may complete a plan whose architecture-reconciliation step is still open, as an explicit user override; its dialog and the Amendments entry name that open step so the product diagram’s staleness is visible. Ordinary completion still enforces D8. Source: user via /plan3 resolve.
-- **D15** 2026-10-13 — Supersedes D14. Force finish first runs the architecture update, then completes: when a product diagram exists, the agent reconciles it with what was actually built (code and git history of this plan’s work), not with the plan’s unfinished steps, because plans deviate and the last slices may be dropped although the work is done. The plan is archived only after that update is done; unfinished steps are still listed in Amendments as today. Source: user in chat ("force finish but update the architecture to match what we really did").
-- **D16** 2026-10-13 — Aborted or failed Force finish update (Q-08): Force finish then offers a second dialog to archive anyway; the user may waive the architecture update, for example when the plan or project is simple. Choosing not to archive leaves the plan open with the reconciliation step wip, and Force finish again resumes the update. A waiver is recorded in Amendments. Source: user via /plan3 resolve ("user is in control ... user can waive it").
-- **D17** 2026-10-13 — First plan diagram in a project offers a product diagram: when the user first opens a plan diagram and no product diagram exists, the workspace asks whether to also create the whole-project architecture diagram, because a project may have only one complicated task. Yes creates it (agent turn, from the code and this plan); D8 applies only once it exists. Source: user comment on Q-08 ("the first time we approve making a diagram for the task it should ask if to make for the project as a whole too"). How a No is remembered is D18.
- and is unique across the whole diagram; `@id` in chat mentions it. Edge ids default to `<from>__<to>` (suffix `_2` on collision); note ids are `note_<n>`.
+- **D20** 2026-10-13 (P1-01) — Ids and mentions: every node, edge and note id matches `^[a-z][a-z0-9_]{0,47}$` and is unique across the whole diagram; `@id` in chat mentions it. Edge ids default to `<from>__<to>` (suffix `_2` on collision); note ids are `note_<n>`.
 - **D21** 2026-10-13 (P1-01) — Zoom bands by scale: far < 0.6 shows top-level groups as closed blocks with labels and group-to-group edges; mid 0.6–1.6 shows nodes, labels and edge labels; near > 1.6 adds summary, tech, details and inline notes. Notes show on hover in every band.
 - **D22** 2026-10-13 (P1-01, assumed) — Plan versus product: `status` (new|changed|removed|existing) is allowed only in plan diagrams. A new plan diagram is seeded from the product diagram when one exists, every element status existing, so the plan shows its change in context; otherwise it starts empty. Reversible: seeding is one function in plan3-diagram.ts.
 - **D23** 2026-10-13 (P1-01) — Browser assets under `extensions/plan3-web/` are `.js`, `.css` and `.html`: the Extension File Rule covers modules loaded by Pi’s jiti or Node, and these files are served over HTTP to the browser and never imported by an extension (layout.js may be imported by node tests only).
 - **D24** 2026-10-13 (P1-03) — Workspace tokens (frontend-design pass, brief fixed by D4). Palette: canvas white #ffffff; ink #1e1e1e (Excalidraw default stroke, per the reference); component blue #a5d8ff; group gray #868e96 dashed; sticky pink #ffc9c9; focus and links #1971c2. Plan status fills: new #b2f2bb, changed #ffec99, removed hatched #ced4da. Chat pane #f8f9fa with ink text. Type: diagram labels in the vendored hand-drawn font (Virgil, OFL; D11), chat and controls in system-ui at 13/15/18 px, sentence case. Bold element: the hand-drawn diagram; the chat, top bar and dialogs stay flat and quiet (no shadows, one 6 px radius). Copy: Resolve questions, Ideas, Review, Finish planning, Start work, Stop; empty diagram says "No diagram yet. Ask in the chat, for example: draw the main components."
 - **D25** 2026-10-13 (P1-03) — Layout: top bar (title, plan or product badge, command buttons right-aligned); diagram fills the left; chat on the right, 380 px default, resizable 280–640 px; under 900 px wide the chat stacks below the diagram. Zoom controls bottom-left of the canvas (minus, percent, plus, fit). Wireframe: `[title | badge ....... Resolve Ideas Review Finish Start] / [canvas (pan, zoom, notes) | activity + messages / chips + input + Send or Stop]`. Accessibility: 2 px #1971c2 focus outline on every control and on SVG nodes (tabindex 0; Enter mentions, arrows pan, +/- zoom); prefers-reduced-motion disables animated zoom and pan; rough.js uses a fixed seed per element so strokes do not jitter on re-render.
+- **D26** 2026-10-13 (P1-04, live probe: `pi -p --no-session -ne -e probe.ts -e pi-ask-user/index.ts`, gpt-6-luna) — Pass: `ctx.abort()` from an HTTP handler stopped a running tool and gave `agent_settled { aborted: true }` (D13 feasible). Pass: `pi.sendUserMessage(text, { deliverAs: "followUp" })` from an HTTP handler while busy fires `input { source: "extension", streamingBehavior: "followUp" }` and is delivered as a later `message_start` user message. Pass: `message_update.assistantMessageEvent.type` gives text_start/delta/end and toolcall_start/delta/end; `tool_execution_update.partialResult` carries progress. Pass: `pi.getAllTools()` at session_start lists ask_user with `sourceInfo.path` of the loaded pi-ask-user, so D12 detection works.
+- **D27** 2026-10-13 (P1-04, from Pi 1.1.0 dist source) — Duplicate tool names: first registration in extension order wins silently (`runner.getAllRegisteredTools`), so D12 must skip ours explicitly. Stored command ctx: getters are lazy and only throw after session replacement or reload (`assertActive`), so the server keeps the last command ctx and drops it on that error or `session_shutdown`; `ctx.ui` dialogs between turns use the same runner UI (not probed live: print mode has no UI; covered by P7-01). Queue: `queue_update` is session-internal, so the mirror tracks queued items from `input` events with `streamingBehavior` (terminal and browser alike), removes them on the matching user `message_start`, clears on `agent_settled`, and uses `ctx.hasPendingMessages()` as a check. Compaction: `session_before_compact` (start), `session_compact` (end), `session_compact_failed`. `sendUserMessage` throws during compaction and resolves only when the run ends, so HTTP handlers do not await it and report the error to the page.
+- **D28** 2026-10-13 (assumed, supersedes D23's implementation detail) — All script source under extensions/ is .ts per repository AGENTS.md. Browser endpoints serve JavaScript from those sources; Node tests load them through jiti. D1–D18 feature decisions are unchanged.
+
 
 ## Open questions
 
@@ -204,8 +135,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 2: Vendored ask_user [code]
 
-- [ ] **P2-01** Copy pi-ask-user 0.16.0 into `extensions/ask-user/` with LICENSE and UPSTREAM.md listing pinned version and every divergence.
-  - Minimal edits only: imports, module paths, `.ts` specifiers; register from `package.json` `pi.extensions`.
+- [x] **P2-01** Vendored pi-ask-user 0.16.0 with MIT license/provenance, .ts imports, pinned version and package registration; native host smoke passed.
 - [ ] **P2-02** Add the native remote channel: emit `ask:pending` for single and batched questions, accept `ask:answer`, first answer wins.
   - Keep `PI_ASK_USER_REMOTE_ANSWERS` gating for intercom forwarding in `work-ask-remote.ts`; the browser bridge is not gated.
   - Remove `scripts/patch-ask-user-remote-answer.mjs` and its live test once unused; update `test-work-ask-remote.mjs`.
@@ -317,3 +247,4 @@ Append material changes and their reasons; preserve the original request and set
 - 2026-10-13: Added P4-07 after P4-03: Review finding 5: a refreshed or late-opened browser would miss pending dialogs and streaming state.
 - 2026-10-13: D14 superseded by D15 at the user's request: Force finish now updates the product architecture to match what was actually built before archiving, instead of only warning; P6-02 updated, Q-08 opened for an aborted update.
 - 2026-10-13: Added P6-04 after P6-01: User comment on Q-08: a project may have only one complicated task, so the first plan diagram should offer the whole-project diagram (D17).
+- 2026-10-13: Repaired an accidental duplicated plan prefix inside D20 caused by JavaScript replacement-string expansion; original request and D1–D18 preserved. D23's inferred exception was incorrect: repository AGENTS.md applies the .ts rule to anything under extensions/. layout source renamed to layout.ts; browser JavaScript will be served from .ts source, and installed-copy tests use jiti. No scope change.
