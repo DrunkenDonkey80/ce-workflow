@@ -914,6 +914,11 @@ try {
 	assert.match(catchUpText, /^catch-up: {"pi-lens":"4.6.0"}$/m);
 	assert(!catchUpText.includes("pi-intercom") && /every release after the last reviewed version/.test(catchUpText));
 	assert(/research it first/.test(catchUpText) && /work-catch-up-record.mjs/.test(catchUpText));
+	const askCatchUpText = catchUpPlanText({ packages: [{ name: "pi-ask-user", baselineVersion: "0.16.0", targetVersion: "0.17.0", needsReview: true }] });
+	assert.match(askCatchUpText, /extensions\/ask-user\/UPSTREAM\.md/);
+	assert.match(askCatchUpText, /native single\/batch remote-answer race/);
+	assert.match(askCatchUpText, /Do not patch or overwrite the installed upstream package/);
+	assert(!catchUpText.includes("extensions/ask-user/"), "vendored review only appears for an ask_user target");
 	const catchUpFile = path.join(directory, "2026-10-06-catch-up-pi-packages-cafe0001-plan3.md");
 	await writeFile(catchUpFile, catchUpText);
 	idle = true;

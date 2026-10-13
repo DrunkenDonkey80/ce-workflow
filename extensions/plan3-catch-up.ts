@@ -49,6 +49,9 @@ export function catchUpPlanText(state, focus = "", today = new Date().toISOStrin
 	const code = (file) => (file ? `\`${file}\`` : "none");
 	const rows = targets.map((pkg) => `| ${pkg.name} | ${pkg.baselineVersion || "none"} | ${pkg.targetVersion} | ${pkg.installedVersion || "not installed"} | ${code(pkg.diffPath && changelogExcerpt(pkg.diffPath))} | ${pkg.diffPath ? code(pkg.diffPath) : "none (same version: earlier review evidence is incomplete)"} |`);
 	const skeleton = JSON.stringify(Object.fromEntries(targets.map((pkg) => [pkg.name, []])), null, 2);
+	const vendoredAskReview = targets.some(pkg => pkg.name === "pi-ask-user")
+		? "\n   For pi-ask-user, compare the target release index.ts and single-select-layout.ts with extensions/ask-user/. Read extensions/ask-user/UPSTREAM.md; port relevant changes into our vendored copy, preserve the native single/batch remote-answer race and D12 coexistence behavior, update its pinned version/provenance, and verify terminal popup and remote-answer tests. Do not patch or overwrite the installed upstream package."
+		: "";
 	return `---
 plan3: true
 status: draft
@@ -75,7 +78,7 @@ Several releases may lie between the last reviewed version and the target; revie
 
 1. For each target, list the changes in every release since the last reviewed version that could affect ce-workflow: Pi extension hooks/events/context, tool registration and exposure, commands, settings, SDK, TUI, model runtime; for plugins their tool schemas, lifecycle and skills. Skip unrelated trivia.
 2. Understand before judging. When a change touches a feature or term you cannot explain from this repository (for example "codemode can now do X"), research it first: the package's README/docs/examples (Pi docs live in the installed package's docs/), its source in node_modules, context7, or the web. Put a one-line explanation of the feature in the decision rationale. Never grade a change you could not explain.
-3. Map each change to this repository: search extensions/ and scripts/ for the affected API or feature and state what it would fix, delete, simplify or enable here — or why it does not apply.
+3. Map each change to this repository: search extensions/ and scripts/ for the affected API or feature and state what it would fix, delete, simplify or enable here — or why it does not apply.${vendoredAskReview}
 4. Grade it: Adopt or Trial → status "adopted"; Reject or Not-our-problem → status "no-action". Hold is not allowed: when you cannot decide, ask the user with the tradeoff and your recommendation, and record the answer in Decisions.
 5. Record every graded change in the ${DECISIONS} JSON below (a package with nothing relevant gets one Not-our-problem decision saying so). For each adopted change, add a step to Phase 1 with its focused check; when nothing is adopted, replace the Phase 1 placeholder with "None — nothing adopted."
 

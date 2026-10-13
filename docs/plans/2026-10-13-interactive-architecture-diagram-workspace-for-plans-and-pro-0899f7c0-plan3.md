@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T13:59:33.882Z
+updated: 2026-10-13T14:03:51.859Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -138,8 +138,7 @@ Commands (existing; referenced by steps):
 - [x] **P2-01** Vendored pi-ask-user 0.16.0 with MIT license/provenance, .ts imports, pinned version and package registration; native host smoke passed.
 - [x] **P2-02** Native single/batch answer channel validates responses, cancels losing UI and cleans listeners; intercom remains opt-in; obsolete patch/live patch test removed.
 - [x] **P2-03** Plan3 uses vendored popup via host jiti; external 0.16.x remains supported, startup skips ours and warns once; README/peer dependency updated; concurrent plan writes made atomic.
-- [ ] **P2-04** Make catch-up plans for pi-ask-user tell the reviewer to diff upstream against `extensions/ask-user/` and update UPSTREAM.md.
-  - Check: C-PLAN3, C-ASKREMOTE, C-DIALOGS, C-LSP pass; existing resolve popup tests run against the vendored copy.
+- [x] **P2-04** Catch-up plans explicitly review and port vendored ask_user source/provenance while preserving native races and coexistence; Phase 2 full package verification passed.
 
 ### Phase 3: Diagram model and agent tool [code]
 
