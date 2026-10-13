@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T14:16:11.283Z
+updated: 2026-10-13T14:26:49.013Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -145,11 +145,7 @@ Commands (existing; referenced by steps):
 - [x] **P3-01** Diagram schema validation, bounded/confined loading, seeded creation and revision-checked atomic saves implemented using existing design lock/path/write helpers.
 - [x] **P3-02** Validated add/update/move/remove operations preserve ids, cascade deletions safely, generate default edge/note ids, and report changed elements plus linked/child/note dependents; saves reject stale revisions.
 - [x] **P3-03** plan3_diagram get/apply tool exposes schema-aware revisioned edits, preserves separate plan/product state, emits diagram-changed events and asks before dependent edits; bounded Windows rename retry fixes concurrent Plan3-reader EPERM.
-- [ ] **P3-04** Move the sibling diagram on every plan rename: `archive()`, the plan3 title action and `enterPlanDesign()`; resolve it for archived plans.
-  - Rename sites: `extensions/plan3.ts` title action (renames plan and log), `extensions/plan3-design.ts` `enterPlanDesign()` (adds a stable id).
-  - Never overwrite an existing diagram at the destination; on a failed move keep both files and report.
-  - An open workspace rebinds to the new path by plan id.
-  - Check: C-DIAGRAM covers validation, operations, dependents, and rename then reopen then archive with notes and positions intact; C-PLAN3 and C-LSP pass.
+- [x] **P3-04** Title, archive and design stable-id renames move sibling diagrams without clobbering; failures preserve originals. Stable-id path metadata enables workspace rebinding; full Phase 3 verification passed.
 
 ### Phase 4: Local server and session bridge [code]
 

@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { progressBar, showAskDialog, showListDialog } from "./work-dialogs.ts";
 import { decideIdea, ideaBlock, ideaOptions, ideaPopupContext, ideaResponse, ideaSchema, storedIdeas } from "./plan3-ideas.ts";
 import { loadPlan3Ask } from "./plan3-ask.ts";
-import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign } from "./plan3-design.ts";
+import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createNight } from "./plan3-night.ts";
@@ -472,7 +472,7 @@ async function archive(cwd, plan) {
 	if (plan.folder === "done") return plan.file;
 	await mkdir(doneDir(cwd), { recursive: true });
 	const file = path.join(doneDir(cwd), plan.name);
-	await rename(plan.file, file);
+	await movePlanWithDiagram(cwd, plan.file, file);
 	return file;
 }
 
@@ -682,7 +682,8 @@ export default function plan3(pi) {
 	const shortTitle = (title) => title.length > 40 ? `${title.slice(0, 39).trimEnd()}…` : title;
 	async function refresh(ctx) {
 		try {
-			const plan = currentPlan(ctx, await listPlans(ctx.cwd));
+			const plans = await listPlans(ctx.cwd), plan = currentPlan(ctx, plans);
+			pi.events.emit("plan3:plans-changed", { cwd: ctx.cwd, plans: plans.map(({ id, file, title, status }) => ({ id, file, title, status })) });
 			const focus = plan?.wip[0] ?? plan?.next;
 			const design = plan && localPlanDesign(ctx.cwd, plan);
 			const bias = plan ? biasOf(ctx, plan, split(await readFile(plan.file, "utf8")).lines, availOf(plan.file)) : 0;
@@ -1511,10 +1512,11 @@ export default function plan3(pi) {
 			} else if (args.action === "title") {
 				const title = need("text").split(/\r?\n/)[0].trim();
 				await mutate(plan, (lines) => { const i = lines.findIndex((line) => /^# /.test(line)); if (i < 0) lines.splice(frontEnd(lines) + 1, 0, "", `# ${title}`); else lines[i] = `# ${title}`; });
-				const id = /^[0-9a-f]{8}$/.test(plan.id) ? plan.id : randomUUID().slice(0, 8);
+				const id = stablePlanId(ctx.cwd, plan);
 				const file = path.join(path.dirname(plan.file), `${plan.created ?? today()}-${slugify(title)}-${id}-plan3.md`);
-				if (file !== plan.file) await rename(plan.file, file);
+				if (file !== plan.file) await movePlanWithDiagram(ctx.cwd, plan.file, file);
 				if (logFile(file) !== logFile(plan.file) && existsSync(logFile(plan.file))) await rename(logFile(plan.file), logFile(file));
+				pi.events.emit("plan3:plan-moved", { cwd: ctx.cwd, id, file });
 				result = { file };
 			} else if (args.action === "status") {
 				const value = need("value");

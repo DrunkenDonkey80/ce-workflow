@@ -28,7 +28,7 @@ const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
 process.env.PI_CODING_AGENT_DIR = agentDir;
 const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map(), shortcuts = new Map();
-const messages = [], notices = [], events = [], statuses = [], execCalls = [];
+const messages = [], notices = [], events = [], planEvents = [], statuses = [], execCalls = [];
 let execResult = { code: 0, stdout: "", stderr: "", killed: false };
 let entries = [];
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
@@ -67,13 +67,14 @@ const api = {
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
-	events: { emit: (name, data) => events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }), on: (name, handler) => { listeners.set(name, handler); return () => { if (listeners.get(name) === handler) listeners.delete(name); }; } },
+	events: { emit: (name, data) => ["plan3:plans-changed", "plan3:plan-moved"].includes(name) ? planEvents.push({ name, ...data }) : events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }), on: (name, handler) => { listeners.set(name, handler); return () => { if (listeners.get(name) === handler) listeners.delete(name); }; } },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
 };
 plan3(api);
 const run = (name, args = "") => commands.get(name).handler(args, ctx);
 const tool = async (args) => (await tools.get("plan3").execute("call", args, undefined, undefined, ctx)).details;
+const diagram = async args => (await tools.get("plan3_diagram").execute("diagram-call", args, undefined, undefined, ctx)).details;
 const directory = path.join(cwd, "docs", "plans");
 const files = async (dir = directory) => (await readdir(dir)).filter((name) => name.endsWith(".md"));
 const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, ...gitEnv } });
@@ -121,7 +122,11 @@ try {
 	await writeFile(handFile, validPlan("x", "Hand", "draft", "- [ ] **H-01** Do"));
 	const handPlan = { id: "2026-10-09-hand-named", file: handFile };
 	assert.equal(recordPlanDesignAnswer(designCwd, handPlan, "Q", { kind: "freeform", text: "a" }, `dialog-${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}`), undefined, "/plan3 resolve works on hand-named plans without a design");
+	await writeFile(handFile.replace(/\.md$/, ".diagram.json"), JSON.stringify({ ...seedPlan.diagram, plan: "42424242" }));
 	await enterPlanDesign(designCwd, handPlan);
+	assert.equal(handPlan.id, "42424242", "hand-named plans retain their diagram's stable owner id");
+	assert.equal((await diagramTool({ action: "get", plan: handPlan.id })).diagram.plan, handPlan.id);
+	assert(!existsSync(handFile.replace(/\.md$/, ".diagram.json")));
 	assert.match(handPlan.file, new RegExp(`2026-10-09-hand-named-${handPlan.id}-plan3\\.md$`), "hand-named plans get a stable id instead of failing");
 	assert.ok(existsSync(handPlan.file) && !existsSync(handFile));
 	assert.equal(loadPlanDesign(designCwd, designPlan).phase, "brief");
@@ -269,9 +274,15 @@ try {
 	ctx.hasUI = false;
 
 	// Tool: title rename keeps id, refuse ready while planning, marks, next, check, sections, add.
+	const beforeTitleDiagram = await diagram({ action: "apply", plan: firstId, expectedRevision: 0, operations: [
+		{ op: "add", entity: "node", value: { id: "csv", label: "CSV", kind: "service", x: 125, y: 75 } },
+		{ op: "add", entity: "note", value: { id: "note_csv", target: "csv", text: "Preserve quoting", author: "user", created: "2026-10-13" } },
+	] });
 	const renamed = await tool({ action: "title", text: "CSV import" });
 	assert.equal(path.basename(renamed.path), firstName.replace(/-add-csv-import-with-quoted-fields-/, "-csv-import-"));
 	assert(renamed.path.includes(firstId) && !existsSync(firstFile));
+	assert(!existsSync(firstFile.replace(/\.md$/, ".diagram.json")));
+	assert.deepEqual((await diagram({ action: "get", plan: firstId })).diagram, beforeTitleDiagram.diagram);
 	await assert.rejects(tool({ action: "status", value: "ready" }), /\/plan3 finish/);
 	const csvFile = renamed.path;
 	let text = await readFile(csvFile, "utf8");
@@ -735,6 +746,7 @@ try {
 
 	// Completing archives to docs/plans/done; resolution covers the done folder.
 	await writeFile(path.join(directory, "2026-10-03-small-33333333-plan3.md"), validPlan("33333333", "Small", "active", "- [x] **S-01** Done"));
+	const beforeArchiveDiagram = await diagram({ action: "apply", plan: "33333333", expectedRevision: 0, operations: [{ op: "add", entity: "node", value: { id: "small", label: "Small", kind: "service", x: 25, y: 50 } }, { op: "add", entity: "note", value: { id: "note_small", target: "small", text: "Keep me", author: "agent", created: "2026-10-13" } }] });
 	assert.match((await tool({ action: "get", plan: "33333333" })).hint, /set status complete/);
 	entries.push({ type: "custom", customType: "plan3-current", data: { id: "33333333" } });
 	await hooks.get("turn_end")({}, ctx);
@@ -743,6 +755,9 @@ try {
 	state = await tool({ action: "status", plan: "33333333", value: "complete" });
 	assert.equal(state.path, path.join(directory, "done", "2026-10-03-small-33333333-plan3.md"));
 	assert.equal((await tool({ action: "get", plan: "33333333" })).status, "complete");
+	assert.deepEqual((await diagram({ action: "get", plan: "33333333" })).diagram, beforeArchiveDiagram.diagram);
+	assert.equal(planEvents.findLast(event => event.name === "plan3:plans-changed").plans.find(plan => plan.id === "33333333").file, state.path, "workspace rebind metadata uses stable id, including archived plans");
+	assert(!existsSync(path.join(directory, "2026-10-03-small-33333333-plan3.diagram.json")));
 
 	// /plans3 UI: current first, then open by update, then complete; force finish and confirmed delete.
 	ctx.hasUI = true;

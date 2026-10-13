@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { mkdtemp, mkdir, writeFile, readdir, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -26,6 +26,7 @@ upload.nodes.find((node) => node.id === "cdn").x = 5000;
 assert.equal(layout(upload).get("cdn").x, 5000, "manual position wins");
 
 const { validateDiagram, diagramPath, loadDiagram, emptyDiagram, saveDiagram, applyDiagramOperations, applyDiagram, diagramDependents, DIAGRAM_BYTES } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
+const { movePlanWithDiagram } = await createJiti(import.meta.url).import("../extensions/plan3-design.ts");
 for (const name of ["upload-service", "ce-workflow"]) {
  const sample = JSON.parse(readFileSync(new URL(`./fixtures/diagrams/${name}.diagram.json`, import.meta.url), "utf8"));
  assert.equal(validateDiagram(sample), sample);
@@ -84,6 +85,7 @@ try {
  assert.equal(loadDiagram(dir, target), undefined);
  const seeded = emptyDiagram(target, { ...base, nodes: [node] });
  assert.equal(seeded.nodes[0].status, "existing");
+ seeded.notes.push({ id: "note_1", target: "api", text: "Keep this note", author: "user", created: "2026-10-13", x: 20, y: 30 });
  const saved = await saveDiagram(dir, target, seeded, 0);
  assert.equal(saved.revision, 1);
  assert.deepEqual(loadDiagram(dir, target), saved);
@@ -95,11 +97,30 @@ try {
  assert.equal(loadDiagram(dir, target).revision, 2, "failed validation never damages saved data");
  assert(!(await readdir(path.dirname(planFile))).some(file => file.endsWith(".tmp")));
  await assert.rejects(saveDiagram(dir, target, base, 2), /target mismatch/);
+ const large = { ...base, nodes: Array.from({ length: 1000 }, (_, i) => ({ ...node, id: `bulk_${i}`, details: "x".repeat(920) })) };
+ assert.doesNotThrow(() => validateDiagram(large));
+ await assert.rejects(saveDiagram(dir, product, large, 0), /Serialized diagram exceeds/);
+ assert.equal(loadDiagram(dir, product), undefined, "serialization bound failure leaves no unreadable file");
  assert.throws(() => diagramPath(dir, { kind: "plan", plan: { ...target.plan, file: path.join(dir, "outside.md") } }), /owner/);
  const applied = await applyDiagram(dir, target, [{ op: "move", entity: "node", id: "api", x: 60, y: 70 }], 2);
  assert.equal(applied.diagram.revision, 3);
  assert.equal(loadDiagram(dir, target).nodes[0].x, 60);
  await assert.rejects(applyDiagram(dir, target, [{ op: "remove", entity: "node", id: "api" }], 2), /Stale/);
+ const beforeMove = loadDiagram(dir, target), oldSibling = diagramPath(dir, target);
+ const renamed = path.join(path.dirname(planFile), "renamed-12345678-plan3.md");
+ await writeFile(renamed.replace(/\.md$/, ".diagram.json"), "reserved");
+ await assert.rejects(movePlanWithDiagram(dir, planFile, renamed), /already exists/);
+ assert(existsSync(planFile) && existsSync(oldSibling), "collision preserves original plan and diagram");
+ assert.equal(readFileSync(renamed.replace(/\.md$/, ".diagram.json"), "utf8"), "reserved");
+ await rm(renamed.replace(/\.md$/, ".diagram.json"));
+ await movePlanWithDiagram(dir, planFile, renamed);
+ target.plan.file = renamed;
+ assert(!existsSync(planFile) && !existsSync(oldSibling));
+ assert.deepEqual(loadDiagram(dir, target), beforeMove, "rename/reopen preserves notes, ids, positions and revision");
+ const archived = path.join(dir, "docs", "plans", "done", path.basename(renamed));
+ await movePlanWithDiagram(dir, renamed, archived);
+ target.plan.file = archived;
+ assert.deepEqual(loadDiagram(dir, target), beforeMove, "archive/reopen preserves full diagram");
  await writeFile(diagramPath(dir, target), " ".repeat(DIAGRAM_BYTES + 1));
  assert.throws(() => loadDiagram(dir, target), /bounded/);
  const outside = path.join(dir, "external");

@@ -181,11 +181,49 @@ export function localPlanDesign(cwd: string, plan: Plan) {
 	try { return validateState(json(path.join(directory(cwd, plan, text).root, "DESIGN-STATE.json")), plan); }
 	catch { return { phase: "recovery", error: "Missing/corrupt local design state" }; }
 }
+export async function movePlanWithDiagram(cwd: string, from: string, to: string) {
+	const checked = (file: string) => {
+		const relative = path.relative(path.resolve(cwd), path.resolve(file)).replaceAll("\\", "/");
+		if (!/^docs\/plans\/(?:done\/)?[^/]+\.md$/.test(relative)) throw new Error("Plan move escapes docs/plans.");
+		return confined(cwd, relative);
+	};
+	const source = checked(from), destination = checked(to);
+	if (source === destination) return;
+	const sibling = (file: string) => file.replace(/\.md$/, ".diagram.json");
+	return withPlanDesignLock(source, () => withPlanDesignLock(sibling(source), () => {
+		const files = [[source, destination]];
+		const oldDiagram = confined(cwd, path.relative(cwd, sibling(source)).replaceAll("\\", "/"));
+		const newDiagram = confined(cwd, path.relative(cwd, sibling(destination)).replaceAll("\\", "/"));
+		if (fs.existsSync(destination) || fs.existsSync(newDiagram)) throw new Error("Plan/diagram move destination already exists; nothing overwritten.");
+		read(source, 1_000_000);
+		if (fs.existsSync(oldDiagram)) { read(oldDiagram, 1_000_000); files.push([oldDiagram, newDiagram]); }
+		fs.mkdirSync(path.dirname(destination), { recursive: true });
+		const linked: string[][] = [];
+		try {
+			// Hard links reserve both destinations without overwriting; unlink only after both exist.
+			for (const pair of files) { fs.linkSync(pair[0], pair[1]); linked.push(pair); }
+			for (const pair of files) fs.unlinkSync(pair[0]);
+		} catch (cause) {
+			for (const pair of linked) if (!fs.existsSync(pair[0])) fs.linkSync(pair[1], pair[0]);
+			throw new Error("Plan/diagram move failed; original files preserved (destination copies may remain).", { cause });
+		}
+	}));
+}
+
+export function stablePlanId(cwd: string, plan: Plan) {
+	if (/^[a-f0-9]{8}$/.test(plan.id)) return plan.id;
+	const diagramFile = confined(cwd, path.relative(cwd, plan.file.replace(/\.md$/, ".diagram.json")).replaceAll("\\", "/"));
+	if (!fs.existsSync(diagramFile)) return crypto.randomUUID().slice(0, 8);
+	const diagram = json(diagramFile);
+	if (diagram.version !== 1 || diagram.kind !== "plan" || typeof diagram.plan !== "string" || !/^[a-f0-9]{8}$/.test(diagram.plan)) throw new Error("Hand-named plan diagram needs a stable owner id.");
+	return diagram.plan;
+}
+
 export async function enterPlanDesign(cwd: string, plan: Plan) {
 	if (!/^[a-f0-9]{8}$/.test(plan.id)) { // hand-named plan: give it the stable id design artifacts bind to
-		const id = crypto.randomUUID().slice(0, 8), file = plan.file.replace(/\.md$/, `-${id}-plan3.md`);
+		const id = stablePlanId(cwd, plan), file = plan.file.replace(/\.md$/, `-${id}-plan3.md`);
 		const log = (name: string) => path.join(path.basename(path.dirname(file)) === "done" ? path.dirname(path.dirname(file)) : path.dirname(file), "logs", `${name}.md`);
-		fs.renameSync(plan.file, file);
+		await movePlanWithDiagram(cwd, plan.file, file);
 		if (fs.existsSync(log(plan.id))) fs.renameSync(log(plan.id), log(id));
 		Object.assign(plan, { id, file });
 	}

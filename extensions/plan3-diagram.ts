@@ -115,7 +115,9 @@ export async function saveDiagram(cwd: string, target: DiagramTarget, value: unk
 		if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== (before?.revision ?? 0)) throw new Error("Stale diagram revision; reload before editing.");
 		const candidate = validateDiagram(value); identity(candidate, target);
 		const diagram = validateDiagram({ ...candidate, revision: expectedRevision + 1 });
-		atomic(diagramPath(cwd, target), JSON.stringify(diagram, null, 2) + "\n");
+		const contents = JSON.stringify(diagram, null, 2) + "\n";
+		if (Buffer.byteLength(contents) > DIAGRAM_BYTES) throw new Error("Serialized diagram exceeds size bound.");
+		atomic(diagramPath(cwd, target), contents);
 		return diagram;
 	});
 }
