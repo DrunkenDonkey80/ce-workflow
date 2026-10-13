@@ -4,7 +4,7 @@
 export const NODE = { w: 168, h: 64 };
 const GAP = { x: 72, y: 32 }, PAD = 24, TITLE = 32;
 
-export function layout(diagram) {
+export function layout(diagram, nodeSize = (_node) => NODE, groupTitle = (_node) => TITLE) {
 	const nodes = diagram.nodes ?? [], byId = new Map(nodes.map((node) => [node.id, node]));
 	const children = new Map();
 	for (const node of nodes) {
@@ -22,7 +22,7 @@ export function layout(diagram) {
 	function place(container) {
 		const kids = children.get(container) ?? [];
 		for (const kid of kids) if (kid.kind === "group") place(kid.id);
-		const size = (kid) => (kid.kind === "group" ? boxes.get(kid.id) : NODE);
+		const size = (kid) => (kid.kind === "group" ? boxes.get(kid.id) : nodeSize(kid));
 		const all = (diagram.edges ?? []).map((edge) => lifted(container, edge.from, edge.to)).filter(Boolean);
 		// Drop DFS back edges (in node order) so a cycle does not push its first node to the far right.
 		const state = new Map(), back = new Set();
@@ -52,7 +52,7 @@ export function layout(diagram) {
 			x += columnWidth + GAP.x;
 		}
 		for (const kid of kids) { const box = boxes.get(kid.id); width = Math.max(width, box.x + box.w); height = Math.max(height, box.y + box.h); }
-		if (container) boxes.set(container, { w: Math.max(NODE.w, width) + 2 * PAD, h: height + 2 * PAD + TITLE });
+		if (container) boxes.set(container, { w: Math.max(nodeSize(byId.get(container)).w, width) + 2 * PAD, h: height + 2 * PAD + groupTitle(byId.get(container)) });
 	}
 	place("");
 	// Relative to absolute: a child's origin is its parent's corner plus padding and title.
@@ -60,7 +60,7 @@ export function layout(diagram) {
 	const resolve = (id) => {
 		if (absolute.has(id)) return absolute.get(id);
 		const box = boxes.get(id), parent = byId.get(id)?.parent, base = byId.has(parent) ? resolve(parent) : { x: 0, y: 0 };
-		const offset = byId.has(parent) ? { x: PAD, y: PAD + TITLE } : { x: 0, y: 0 };
+		const offset = byId.has(parent) ? { x: PAD, y: PAD + groupTitle(byId.get(parent)) } : { x: 0, y: 0 };
 		const result = { x: base.x + offset.x + box.x, y: base.y + offset.y + box.y, w: box.w, h: box.h };
 		absolute.set(id, result);
 		return result;

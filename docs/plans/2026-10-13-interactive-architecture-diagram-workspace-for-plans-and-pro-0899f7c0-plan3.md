@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T17:05:33.989Z
+updated: 2026-10-13T17:26:29.648Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -82,6 +82,8 @@ Acceptance examples:
 - **D26** 2026-10-13 (P1-04, live probe: `pi -p --no-session -ne -e probe.ts -e pi-ask-user/index.ts`, gpt-6-luna) — Pass: `ctx.abort()` from an HTTP handler stopped a running tool and gave `agent_settled { aborted: true }` (D13 feasible). Pass: `pi.sendUserMessage(text, { deliverAs: "followUp" })` from an HTTP handler while busy fires `input { source: "extension", streamingBehavior: "followUp" }` and is delivered as a later `message_start` user message. Pass: `message_update.assistantMessageEvent.type` gives text_start/delta/end and toolcall_start/delta/end; `tool_execution_update.partialResult` carries progress. Pass: `pi.getAllTools()` at session_start lists ask_user with `sourceInfo.path` of the loaded pi-ask-user, so D12 detection works.
 - **D27** 2026-10-13 (P1-04, from Pi 1.1.0 dist source) — Duplicate tool names: first registration in extension order wins silently (`runner.getAllRegisteredTools`), so D12 must skip ours explicitly. Stored command ctx: getters are lazy and only throw after session replacement or reload (`assertActive`), so the server keeps the last command ctx and drops it on that error or `session_shutdown`; `ctx.ui` dialogs between turns use the same runner UI (not probed live: print mode has no UI; covered by P7-01). Queue: `queue_update` is session-internal, so the mirror tracks queued items from `input` events with `streamingBehavior` (terminal and browser alike), removes them on the matching user `message_start`, clears on `agent_settled`, and uses `ctx.hasPendingMessages()` as a check. Compaction: `session_before_compact` (start), `session_compact` (end), `session_compact_failed`. `sendUserMessage` throws during compaction and resolves only when the run ends, so HTTP handlers do not await it and report the error to the page.
 - **D28** 2026-10-13 (assumed, supersedes D23's implementation detail) — All script source under extensions/ is .ts per repository AGENTS.md. Browser endpoints serve JavaScript from those sources; Node tests load them through jiti. D1–D18 feature decisions are unchanged.
+- **D29** 2026-10-13 — Browser assets pinned: Rough.js 4.6.6 (MIT), Virgil commit 3d4c829dc85b455d4646631ac52bc1517df04217 (SIL OFL 1.1, reserved name Virgil). Official LICENSE.md was read and font provenance independently confirmed; D11/D24's OFL assumption is now verified. Licenses and SHA-256s are in extensions/plan3-web/vendor/UPSTREAM.md. Context7 quota was exhausted; official Rough.js README/wiki provided SVG/seed/dash API evidence.
+
 
 
 ## Open questions
@@ -160,7 +162,7 @@ Commands (existing; referenced by steps):
 ### Phase 5: Browser workspace [code]
 
 - [x] **P5-01** Built the flat whiteboard app shell with live title/status, command bar, left canvas and keyboard/pointer-resizable chat; responsive stacking follows D24/25.
-- [ ] **P5-02** SVG renderer with rough.js: groups, nodes, labeled edges, semantic zoom bands, pan, node drag saving positions.
+- [x] **P5-02** Added pinned Rough.js/Virgil SVG rendering, grouped semantic zoom with inline metadata, seeded stable strokes, keyboard/wheel/button zoom, pan, and revision-checked node drag with stale-edit rollback.
 - [ ] **P5-03** Comments: pin to node, edge or canvas; hover cards; inline when zoomed in; sticky-note style.
 - [ ] **P5-04** Chat pane: streaming replies, ctrl+click inserts `@id`, mention chips, browser dialogs for ask_user batches and list menus.
   - All user and model text is rendered as text, never as HTML.
@@ -209,7 +211,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-20/30 complete. P5-01 shell and persistent headless browser test implemented; C-WEB and C-BROWSER passed. Next P5-02: rough.js SVG renderer over existing layout.ts, semantic bands D21, pan/zoom, parent-relative node drag with revision-checked API. Shell buttons/chat/zoom are placeholders until their assigned steps, not complete UI. Context7 quota exceeded; use official Rough.js README/API via web instead. Virgil repo listing proves license path is LICENSE.md (not LICENSE), font Virgil.woff2; must read license and pin assets before vendoring. Browser native binary Windows at %APPDATA%/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe; CLI mouse coordinates must be integers. No delegation/background verifier/push. Preserve unrelated resolve-follow-up hunks and sidecars. P7-01 requires human acceptance.
+21/30 complete; P5-02 checks all passed, ready to commit. Next P5-03 comments/pinning/hover/inline notes, then chat/dialogs and activity. Browser source is JS-compatible .ts served as .js; imports require token query. Renderer accepts hooks (mention, move, hover, leave, notes) and uses existing layout.ts with optional nodeSize/groupTitle callbacks; default geometry unchanged. Node positions persist parent-relative; near group headers include metadata height. App now has post() helper and revision-conflict reload. C-BROWSER foreground native agent-browser fixture is scripts/test-work-plan3-browser.mjs, mouse coordinates integers; applyDiagramOperations alone does not increment revision, fixture must mimic storage increment. HEAD 7f2a65b before P5-02 commit. No delegation/background verifier/push. Preserve unrelated resolve-follow-up hunks/sidecars. P7-01 human acceptance still required.
 
 ## Amendments
 
