@@ -12,7 +12,7 @@ Files: index.ts and single-select-layout.ts. Keep the terminal UI and result con
 - ASK_USER_VERSION is pinned to 0.16.0 instead of reading upstream package.json (this directory is part of ce-workflow, not a standalone npm package).
 - Two SAFETY comments explain upstream shim schema assertions for the repository's analyzer.
 - Removed unused upstream AskComponent.frameRawLines method (no callers).
-- remote.ts adds validated single/batch answer decoding and an abortable first-answer-wins race, always emitting ask:pending and correlated ask:closed. index.ts wraps each native prompt with it; upstream answer summaries, cancellation and batch skipped states stay unchanged. Browser answers are not environment-gated. Intercom forwarding remains opt-in in work-ask-remote.ts.
+- remote.ts adds validated single/batch answer decoding and an abortable first-answer-wins race, always emitting ask:pending and correlated ask:closed. index.ts wraps each native prompt with it; upstream answer summaries, cancellation and batch skipped states stay unchanged. Browser answers are not environment-gated. The same race carries typed list menus and browser cancellation; work-dialogs.ts aborts losing overlays/selectors. Intercom forwarding remains opt-in in work-ask-remote.ts and skips list menus.
 
 - Factory registration waits for session_start, after all extensions load; if another ask_user exists it skips ours and warns once (D12). registerAskUser is exported so the Plan3 command adapter can instantiate the same tool without lifecycle hooks.
 

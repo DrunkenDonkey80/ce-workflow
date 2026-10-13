@@ -61,7 +61,7 @@ export function registerRemoteAskAnswers(pi) {
 	};
 
 	pi.events.on("ask:pending", (ask) => {
-		if (!ask?.askId) return;
+		if (!ask?.askId || ask.kind === "list") return;
 		const entry = { ...ask, remotePeerId: "" };
 		pending.set(ask.askId, entry);
 		forward(entry);

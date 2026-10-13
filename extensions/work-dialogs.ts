@@ -1,6 +1,30 @@
 import { randomUUID } from "node:crypto";
 
 const dialogCursors = new Map();
+const listBridges = new WeakMap();
+export function bindListDialogBridge(ctx, bridge) {
+	if (bridge) listBridges.set(ctx.ui, bridge); else listBridges.delete(ctx.ui);
+}
+export function listDialogResponse(payload: unknown, options) {
+	if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
+	const value = payload as Record<string, unknown>;
+	if (value.action === "tab") return options.tabAction ? { action: "tab" } : undefined;
+	if (value.action === "back") {
+		if (!options.multi) return null;
+		const initial = new Set(options.multi.selected ?? []);
+		const values = value.values ?? [...initial];
+		if (!Array.isArray(values) || values.some(id => typeof id !== "string" || !options.items.some(item => item.value === id && !item.heading))) return;
+		const selected = [...new Set(values)];
+		if (options.multi.requireOne && !selected.length) return;
+		if (options.items.some(item => item.disabled && selected.includes(item.value) !== initial.has(item.value))) return;
+		return { action: "back", values: selected };
+	}
+	if (options.multi || !["select", "space", "row"].some(action => action === value.action)) return;
+	const index = options.items.findIndex(item => item.value === value.value);
+	const item = options.items[index];
+	if (!item || item.heading || item.disabled || value.action === "space" && !options.spaceAction || value.action === "row" && (!options.rowAction || item.rowAction === false)) return;
+	return { action: value.action, value: item.value, item, index };
+}
 
 // Reuse ask_user's scrollable editor for Plan3 decisions rather than a second UI.
 export function showAskDialog(ctx, ask, params, signal?: AbortSignal, ideaLayout = false) {
@@ -160,6 +184,7 @@ async function nativeListDialog(ctx, options) {
 	if (multi) {
 		const enabled = new Set(multi.selected ?? []);
 		for (;;) {
+			if (options.signal?.aborted) return;
 			const choices = items.map((item) => ({
 				...item,
 				label: indicatedLabel(item, {
@@ -169,7 +194,8 @@ async function nativeListDialog(ctx, options) {
 				preserveCase: true,
 			}));
 			const labels = choices.map(labelFor);
-			const selected = await ctx.ui.select(title, labels);
+			const selected = await ctx.ui.select(title, labels, { signal: options.signal });
+			if (options.signal?.aborted) return;
 			const index = labels.indexOf(selected);
 			if (index < 0) {
 				if (multi.requireOne && !enabled.size) {
@@ -207,7 +233,8 @@ async function nativeListDialog(ctx, options) {
 		}),
 	);
 	for (;;) {
-		const selected = await ctx.ui.select(title, labels);
+		if (options.signal?.aborted) return;
+		const selected = await ctx.ui.select(title, labels, { signal: options.signal });
 		const index = labels.indexOf(selected);
 		if (index < 0) return;
 		if (choices[index].value === "__dialog_tab__") return { action: "tab" };
@@ -238,6 +265,14 @@ export function progressBar(complete, total, width = 12) {
 }
 
 export async function showListDialog(ctx, options) {
+	const bridge = listBridges.get(ctx.ui);
+	if (!bridge) return localListDialog(ctx, options);
+	const result = await bridge(options, signal => localListDialog(ctx, { ...options, signal, remote: true }));
+	if (result?.value) dialogCursors.set(options.cursorKey ?? options.title, result.value);
+	return result ?? undefined;
+}
+async function localListDialog(ctx, options) {
+	if (options.signal?.aborted) return;
 	const {
 		title,
 		items,
@@ -304,10 +339,15 @@ export async function showListDialog(ctx, options) {
 			index = retained >= 0 ? retained : 0;
 			remember();
 		};
+		let finished = false;
 		const close = (result) => {
+			if (finished) return;
+			finished = true;
+			options.signal?.removeEventListener("abort", cancel);
 			remember();
 			done(result);
 		};
+		const cancel = () => close(undefined);
 		const move = (delta) => {
 			if (!visible.length) return;
 			for (let attempts = 0; attempts < visible.length; attempts += 1) {
@@ -418,6 +458,7 @@ export async function showListDialog(ctx, options) {
 					tabAction &&
 					keyMatches(keybindings, data, "tui.input.tab", "tab", "\t")
 				) {
+					if (options.remote) return close({ action: "tab" });
 					const next = tabAction.toggle?.();
 					if (!next) return close({ action: "tab" });
 					source = [...next.items];
@@ -532,7 +573,10 @@ export async function showListDialog(ctx, options) {
 				tui.requestRender();
 			},
 			invalidate() {},
+			dispose() { options.signal?.removeEventListener("abort", cancel); },
 		};
+		options.signal?.addEventListener("abort", cancel, { once: true });
+		if (options.signal?.aborted) cancel();
 		return component;
 	});
 }

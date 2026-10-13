@@ -40,8 +40,15 @@ export function remoteBatch(payload: unknown, questions: RemoteQuestion[], allow
 	return answers;
 }
 
+export interface RemoteListPrompt {
+	kind: "list"; title: string; purpose: string;
+	items: { value: string; label: string; description?: string; heading?: boolean; disabled?: boolean; enabled?: boolean; rowAction?: boolean }[];
+	currentValue?: string; multi?: { selected: string[]; requireOne?: boolean };
+	spaceAction?: boolean; rowAction?: boolean; tabAction?: boolean;
+}
+
 // The native popup and authenticated local browser race; remote answers close the losing UI by aborting its signal.
-export async function raceRemoteAsk<T>(pi: ExtensionAPI, subject: RemoteQuestion & { allowComment: boolean } | { questions: RemoteQuestion[]; allowComment: boolean }, signal: AbortSignal | undefined, timeout: number | undefined,
+export async function raceRemoteAsk<T>(pi: ExtensionAPI, subject: RemoteQuestion & { allowComment: boolean } | { questions: RemoteQuestion[]; allowComment: boolean } | RemoteListPrompt, signal: AbortSignal | undefined, timeout: number | undefined,
 	decode: (payload: unknown) => T | undefined, run: (signal: AbortSignal) => Promise<T | null>): Promise<T | null> {
 	if (signal?.aborted) return null;
 	const askId = randomUUID(), local = new AbortController();
@@ -51,6 +58,7 @@ export async function raceRemoteAsk<T>(pi: ExtensionAPI, subject: RemoteQuestion
 	const abort = () => finish(null);
 	const dispose = pi.events.on("ask:answer", (payload: unknown) => {
 		if (settled || !payload || typeof payload !== "object" || !("askId" in payload) || payload.askId !== askId) return;
+		if ("cancel" in payload && payload.cancel === true) { finish(null); return; }
 		const value = decode(payload);
 		if (value !== undefined) finish(value);
 	});

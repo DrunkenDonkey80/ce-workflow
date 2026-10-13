@@ -3,6 +3,8 @@ import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
+import { raceRemoteAsk, remoteResponse, remoteBatch, type RemoteListPrompt } from "./ask-user/remote.ts";
+import { bindListDialogBridge, listDialogResponse } from "./work-dialogs.ts";
 
 export type WebTarget = { kind: "product" } | { kind: "plan"; id: string };
 type Options = {
@@ -197,4 +199,47 @@ export function forwardDiagramChat(pi, ctx, diagram: Diagram, message: unknown, 
 		throw error;
 	}
 	return { queued, mentions: prepared.mentions, unknownMentions: prepared.unknownMentions };
+}
+
+export function createDialogBridge(pi, publish: (event: string, value: unknown) => void) {
+	const pending = new Map(), bound = new Set(), shutdown = new AbortController();
+	const disposers = [
+		pi.events.on("ask:pending", ask => {
+			if (typeof ask?.askId !== "string" || !/^[a-f0-9-]{36}$/.test(ask.askId)) return;
+			if (ask.kind === "list" ? !Array.isArray(ask.items) : !Array.isArray(ask.questions) && typeof ask.question !== "string") return;
+			pending.set(ask.askId, structuredClone(ask)); publish("dialog", ask);
+		}),
+		pi.events.on("ask:closed", ({ askId }) => { if (pending.delete(askId)) publish("dialog_closed", { askId }); }),
+	];
+	return {
+		snapshot: () => structuredClone([...pending.values()]),
+		answer(value: Record<string, unknown>) {
+			if (typeof value.askId !== "string" || !/^[a-f0-9-]{36}$/.test(value.askId)) throw new WebError(400, "Invalid dialog id.");
+			const ask = pending.get(value.askId);
+			if (!ask) return { accepted: false, closed: true };
+			const decoded = value.cancel === true ? null : ask.kind === "list" ? listDialogResponse(value, ask) : ask.questions ? remoteBatch(value, ask.questions, ask.allowComment) : remoteResponse(value, ask, ask.allowComment);
+			if (decoded === undefined) throw new WebError(400, "Invalid dialog answer.");
+			pi.events.emit("ask:answer", value);
+			if (pending.delete(value.askId)) publish("dialog_closed", { askId: value.askId });
+			return { accepted: true, closed: true };
+		},
+		bind(ctx) {
+			bound.add(ctx.ui);
+			bindListDialogBridge(ctx, (options, run) => {
+				const subject: RemoteListPrompt = {
+					kind: "list", title: options.title, purpose: options.purpose ?? (options.multi ? "Choose one or more options." : "Choose an option to continue."),
+					items: options.items.map(item => ({ value: item.value, label: item.label, description: item.description, heading: item.heading, disabled: item.disabled, enabled: item.enabled, rowAction: item.rowAction })),
+					currentValue: options.currentValue, ...(options.multi ? { multi: { selected: [...(options.multi.selected ?? [])], requireOne: options.multi.requireOne } } : {}),
+					spaceAction: Boolean(options.spaceAction), rowAction: Boolean(options.rowAction), tabAction: Boolean(options.tabAction),
+				};
+				const signal = options.signal ? AbortSignal.any([options.signal, shutdown.signal]) : shutdown.signal;
+				return raceRemoteAsk(pi, subject, signal, undefined, payload => listDialogResponse(payload, options), run);
+			});
+		},
+		close() {
+			shutdown.abort(); pending.clear();
+			for (const ui of bound) bindListDialogBridge({ ui }, undefined);
+			bound.clear(); for (const dispose of disposers) dispose();
+		},
+	};
 }

@@ -11,7 +11,7 @@ import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, type DiagramTarget } from "./plan3-diagram.ts";
-import { createPlan3Web, createChatMirror, forwardDiagramChat, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
+import { createPlan3Web, createChatMirror, createDialogBridge, forwardDiagramChat, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -696,6 +696,7 @@ export default function plan3(pi) {
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => webInstance?.publish(event, data);
 	const chat = createChatMirror(pi, publishWeb);
+	const dialogs = createDialogBridge(pi, publishWeb);
 	async function resolveWebTarget(target: WebTarget): Promise<DiagramTarget> {
 		if (!webCtx) throw new Error("Workspace needs a current command context; reopen /plan3 diagram.");
 		if (target.kind === "product") return { kind: "product" };
@@ -705,6 +706,11 @@ export default function plan3(pi) {
 	}
 	async function postWeb(endpoint, data) {
 		if (!webCtx) throw new WebError(409, "Workspace context expired; reopen /plan3 diagram.");
+		if (endpoint === "/api/answer") {
+			await resolveWebTarget(webTarget(data.target));
+			if (Object.keys(data).some(key => !["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"].includes(key))) throw new WebError(400, "Invalid answer fields.");
+			return dialogs.answer(data);
+		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
 		if (Object.keys(data).some(key => !["target", "text", "comments"].includes(key))) throw new WebError(400, "Invalid message fields.");
 		const target = await resolveWebTarget(webTarget(data.target));
@@ -713,10 +719,10 @@ export default function plan3(pi) {
 	}
 	function getWeb(ctx) {
 		if (webStopped) throw new Error("Workspace session has ended.");
-		webCtx = ctx; chat.hydrate(ctx);
+		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
 		webServer ??= createPlan3Web({ post: postWeb, snapshot: async target => {
 			const resolved = await resolveWebTarget(target);
-			return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined), chat: chat.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title } } : {}) };
+			return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined), chat: chat.snapshot(), dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title } } : {}) };
 		} }).then(server => { webInstance = server; return server; }).catch(error => { webServer = undefined; throw error; });
 		return webServer;
 	}
@@ -1818,7 +1824,7 @@ export default function plan3(pi) {
 		return refresh(ctx);
 	});
 	pi.on?.("session_shutdown", async () => {
-		night.shutdown(); webStopped = true; webCtx = null; webInstance = undefined;
+		night.shutdown(); dialogs.close(); webStopped = true; webCtx = null; webInstance = undefined;
 		const pending = webServer; webServer = undefined;
 		await Promise.all([pending?.then(server => server.close()), closePersistentOpenDesignClients()]);
 	});
