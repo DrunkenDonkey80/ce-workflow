@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-13
-updated: 2026-10-13T20:08:45.033Z
+updated: 2026-10-13T20:13:27.362Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -173,8 +173,7 @@ Commands (existing; referenced by steps):
 - [x] **P6-01** The existing public architecture command creates/opens the product target, with shared live chat and validated product diagram edits.
 - [x] **P6-04** First plan workspace offers whole-project mapping; Yes persists an empty product and asks the live agent to map actual code, No is remembered per project, repeat opens do not duplicate prompts/turns.
 - [x] **P6-02** Finish adds one reserved architecture phase; normal completion checks its done mark, Force finish runs actual-code reconciliation before archive, interrupted updates require resume or an explicit logged waiver.
-- [ ] **P6-03** Document the workspace, commands, storage, security model and vendored ask_user in README and CHANGELOG.
-  - Check: C-VERIFY passes in full.
+- [x] **P6-03** README documents commands, interactions, storage, security, fork upkeep and architecture completion/waiver; CHANGELOG records workspace behavior.
 
 ### Phase 7: Live acceptance [think]
 
