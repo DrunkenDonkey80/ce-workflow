@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T13:42:20.571Z
+updated: 2026-10-13T13:44:33.831Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -150,6 +150,8 @@ Acceptance examples:
 - **D21** 2026-10-13 (P1-01) — Zoom bands by scale: far < 0.6 shows top-level groups as closed blocks with labels and group-to-group edges; mid 0.6–1.6 shows nodes, labels and edge labels; near > 1.6 adds summary, tech, details and inline notes. Notes show on hover in every band.
 - **D22** 2026-10-13 (P1-01, assumed) — Plan versus product: `status` (new|changed|removed|existing) is allowed only in plan diagrams. A new plan diagram is seeded from the product diagram when one exists, every element status existing, so the plan shows its change in context; otherwise it starts empty. Reversible: seeding is one function in plan3-diagram.ts.
 - **D23** 2026-10-13 (P1-01) — Browser assets under `extensions/plan3-web/` are `.js`, `.css` and `.html`: the Extension File Rule covers modules loaded by Pi’s jiti or Node, and these files are served over HTTP to the browser and never imported by an extension (layout.js may be imported by node tests only).
+- **D24** 2026-10-13 (P1-03) — Workspace tokens (frontend-design pass, brief fixed by D4). Palette: canvas white #ffffff; ink #1e1e1e (Excalidraw default stroke, per the reference); component blue #a5d8ff; group gray #868e96 dashed; sticky pink #ffc9c9; focus and links #1971c2. Plan status fills: new #b2f2bb, changed #ffec99, removed hatched #ced4da. Chat pane #f8f9fa with ink text. Type: diagram labels in the vendored hand-drawn font (Virgil, OFL; D11), chat and controls in system-ui at 13/15/18 px, sentence case. Bold element: the hand-drawn diagram; the chat, top bar and dialogs stay flat and quiet (no shadows, one 6 px radius). Copy: Resolve questions, Ideas, Review, Finish planning, Start work, Stop; empty diagram says "No diagram yet. Ask in the chat, for example: draw the main components."
+- **D25** 2026-10-13 (P1-03) — Layout: top bar (title, plan or product badge, command buttons right-aligned); diagram fills the left; chat on the right, 380 px default, resizable 280–640 px; under 900 px wide the chat stacks below the diagram. Zoom controls bottom-left of the canvas (minus, percent, plus, fit). Wireframe: `[title | badge ....... Resolve Ideas Review Finish Start] / [canvas (pan, zoom, notes) | activity + messages / chips + input + Send or Stop]`. Accessibility: 2 px #1971c2 focus outline on every control and on SVG nodes (tabindex 0; Enter mentions, arrows pan, +/- zoom); prefers-reduced-motion disables animated zoom and pan; rough.js uses a fixed seed per element so strokes do not jitter on re-render.
 
 ## Open questions
 
@@ -197,16 +199,8 @@ Commands (existing; referenced by steps):
 
 - [x] **P1-01** Schema v1, ids/mentions, zoom bands, plan status and seeding, and .js browser assets recorded as D19–D23.
 - [x] **P1-02** Two sample diagrams in scripts/fixtures/diagrams/ and layered layout extensions/plan3-web/layout.js (cycle-safe, manual positions) verified by C-DIAGRAM.
-- [ ] **P1-03** Run the frontend-design token pass for the workspace; record palette, type, layout wireframe and the one bold element in Decisions.
-  - Brief is fixed by D4; do not restart brainstorming; check keyboard focus and reduced motion requirements.
-- [ ] **P1-04** Feasibility probes in a scratch extension; record results in Decisions.
-  - Duplicate `ask_user` registration behaviour and how to detect a loaded pi-ask-user (D12).
-  - Activity events from D9 fire with usable payloads; `ctx.abort()` works from an HTTP callback (D13).
-  - Activity coverage: `agent_settled` as the final boundary (retries and compaction can follow `agent_end`), compaction start and failure, and queue contents.
-  - `queue_update` is emitted to session subscribers (`dist/core/agent-session.js:657`), not extension events; find how an extension sees queue changes from the terminal, else record the gap.
-  - A command ctx kept by the server can later run `planCommand` handlers and `ctx.ui` dialogs between turns.
-  - `pi.sendUserMessage` from an HTTP callback when idle and when busy; `message_update` gives streamable assistant text.
-  - Acceptance: each probe has a recorded pass or fail with the observed behaviour; a failure gets a design alternative before Phase 2.
+- [x] **P1-03** Token pass recorded as D24 (palette, type, bold element, copy) and D25 (layout wireframe, focus, reduced motion).
+- [x] **P1-04** Live probe confirmed abort and followUp from HTTP callbacks, streaming payloads and ask_user source detection (D26); source-derived rules for duplicates, stored ctx, queue and compaction recorded (D27).
 
 ### Phase 2: Vendored ask_user [code]
 
