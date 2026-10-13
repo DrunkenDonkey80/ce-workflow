@@ -94,6 +94,26 @@ try {
 	const designPlan = { id: "12121212", file: designFile, title: "Design" };
 	await writeFile(designFile, validPlan(designPlan.id, "Design", "ready", "- [ ] **D-01** Implement"));
 	assert.deepEqual(planDesignGate(designCwd, designPlan), [], "ordinary plans need no design/provider");
+	assert(tools.has("plan3_diagram") && tools.get("plan3_diagram").promptSnippet);
+	const diagramTool = async args => (await tools.get("plan3_diagram").execute("diagram-call", args, undefined, undefined, { ...ctx, cwd: designCwd })).details;
+	const emptyProduct = await diagramTool({ action: "get", target: "product" });
+	assert.equal(emptyProduct.diagram.revision, 0);
+	const savedProduct = await diagramTool({ action: "apply", target: "product", expectedRevision: 0, operations: [
+		{ op: "add", entity: "node", value: { id: "api", label: "API", kind: "service" } },
+		{ op: "add", entity: "node", value: { id: "db", label: "DB", kind: "store" } },
+		{ op: "add", entity: "edge", value: { from: "api", to: "db" } },
+	] });
+	assert.equal(savedProduct.diagram.revision, 1);
+	const seedPlan = await diagramTool({ action: "get", plan: designPlan.id });
+	assert(seedPlan.diagram.nodes.every(node => node.status === "existing"));
+	const savedDiagram = await diagramTool({ action: "apply", plan: designPlan.id, expectedRevision: 0, operations: [{ op: "update", entity: "node", id: "api", value: { summary: "Now stores images", status: "changed" } }] });
+	assert.deepEqual(savedDiagram.dependents, ["db"]);
+	assert.match(savedDiagram.hint, /wait for the user's answer/);
+	assert.equal((await diagramTool({ action: "get", plan: designPlan.id })).diagram.revision, 1);
+	assert.equal((await diagramTool({ action: "get", target: "product" })).diagram.nodes[0].summary, undefined);
+	assert(events.some(event => event.name === "plan3:diagram-changed"));
+	await assert.rejects(diagramTool({ action: "apply", plan: designPlan.id, expectedRevision: 0, operations: [{ op: "remove", entity: "node", id: "api" }] }), /Stale/);
+	await assert.rejects(diagramTool({ action: "apply", target: "product", expectedRevision: 1, operations: [{ op: "move", entity: "node", id: "missing", x: 0, y: 0 }] }), /Unknown node/);
 	const [entered, same] = await Promise.all([enterPlanDesign(designCwd, designPlan), enterPlanDesign(designCwd, designPlan)]);
 	assert.equal(entered.ownerId, "plan3-12121212");
 	assert.deepEqual(same, entered, "parallel entry keeps the same identity");
