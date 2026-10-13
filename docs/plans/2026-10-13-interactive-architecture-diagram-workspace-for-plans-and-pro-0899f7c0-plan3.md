@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T14:03:51.859Z
+updated: 2026-10-13T14:08:03.945Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -142,8 +142,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 3: Diagram model and agent tool [code]
 
-- [ ] **P3-01** Implement `extensions/plan3-diagram.ts`: schema validation, atomic locked save with revision, storage paths per D7.
-  - Reject unknown parents, dangling edges, duplicate ids, oversized text; bounded file size.
+- [x] **P3-01** Diagram schema validation, bounded/confined loading, seeded creation and revision-checked atomic saves implemented using existing design lock/path/write helpers.
 - [ ] **P3-02** Add apply operations (add, update, move, remove node, edge or note) returning dependents of every changed element.
   - Dependents: nodes linked by an edge in either direction, children of a changed group, notes anchored to it.
 - [ ] **P3-03** Register the `plan3_diagram` tool (get, apply) with a guideline: after an edit, offer updates to listed dependents through ask_user.

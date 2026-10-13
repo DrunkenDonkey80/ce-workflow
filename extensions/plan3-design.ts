@@ -30,7 +30,7 @@ function bounded(value: string, label: string, max = 20_000) {
 	if (typeof value !== "string" || !value.trim() || Buffer.byteLength(value) > max || value.includes("\0")) throw new Error(`${label} must be nonempty bounded text.`);
 	return value.trim();
 }
-function confined(cwd: string, relative: string) {
+export function confined(cwd: string, relative: string) {
 	if (!relative || path.isAbsolute(relative) || relative.includes("\\") || relative.split("/").some(part => !part || part === "." || part === ".." || part.trim() !== part || part.endsWith(".") || /^(?:con|prn|aux|nul|com\d|lpt\d)(?:\.|$)/i.test(part) || /[:\x00-\x1f]/.test(part))) throw new Error("Design path escapes the project.");
 	let current = path.resolve(cwd);
 	for (const part of relative.split("/")) {
@@ -41,7 +41,7 @@ function confined(cwd: string, relative: string) {
 	}
 	return current;
 }
-function read(file: string, max = 512_000) {
+export function read(file: string, max = 512_000) {
 	const stat = fs.lstatSync(file);
 	if (!stat.isFile() || stat.isSymbolicLink() || stat.size > max) throw new Error("Design artifact must be a bounded regular file.");
 	return fs.readFileSync(file, "utf8");
@@ -65,7 +65,7 @@ function directory(cwd: string, plan: Plan, text = planText(cwd, plan)) {
 	return { relative: pointer, root: confined(cwd, pointer) };
 }
 function runtime(cwd: string, plan: Plan) { return confined(cwd, `.pi/designs/plan3-${plan.id}.json`); }
-function atomic(file: string, value: string) {
+export function atomic(file: string, value: string) {
 	fs.mkdirSync(path.dirname(file), { recursive: true });
 	const temp = `${file}.${crypto.randomUUID()}.tmp`;
 	try { fs.writeFileSync(temp, value, { flag: "wx", mode: 0o600 }); fs.renameSync(temp, file); }
