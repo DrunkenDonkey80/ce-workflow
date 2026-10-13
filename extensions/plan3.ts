@@ -10,7 +10,7 @@ import { decideIdea, ideaBlock, ideaOptions, ideaPopupContext, ideaResponse, ide
 import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
-import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, type DiagramTarget } from "./plan3-diagram.ts";
+import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createPlan3Web, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
@@ -777,9 +777,38 @@ export default function plan3(pi) {
 		} }).then(server => { webInstance = server; return server; }).catch(error => { webServer = undefined; throw error; });
 		return webServer;
 	}
+	async function createProductDiagram(ctx, planId?: string) {
+		const target = { kind: "product" as const };
+		if (loadDiagram(ctx.cwd, target)) return;
+		const diagram = await saveDiagram(ctx.cwd, target, emptyDiagram(target), 0);
+		publishWeb("diagram", { target, diagram });
+		send(`Create the whole-product architecture diagram for ${JSON.stringify(ctx.cwd)} from the actual code and module connections${planId ? `, also considering Plan3 plan ${planId}` : ""}. Use plan3_diagram get/apply with target product; explain assumptions and ask before materially changing scope. This is documentation, not permission to implement product changes.`);
+	}
+	async function offerProductDiagram(ctx, planId: string) {
+		if (!ctx.hasUI || loadDiagram(ctx.cwd, { kind: "product" })) return;
+		const file = path.join(ctx.cwd, ".pi", "settings.json");
+		if (readJson(file).workOrchestrator?.plan3?.productDiagram === "declined") return;
+		const choice = await waitForUser("Product architecture", () => showListDialog(ctx, {
+			title: "Create a product diagram?", purpose: "Also map the whole project; choosing No remembers it for this project.",
+			items: [{ value: "yes", label: "Yes, map the whole project" }, { value: "no", label: "No, do not offer again" }],
+		}));
+		if (choice?.value === "yes") return createProductDiagram(ctx, planId);
+		if (choice?.value !== "no") return;
+		await withPlanDesignLock(file, async () => {
+			const settings = existsSync(file) ? JSON.parse(await readFile(file, "utf8")) : {};
+			for (const value of [settings, settings.workOrchestrator ?? {}, settings.workOrchestrator?.plan3 ?? {}]) if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid project settings; decline was not saved.");
+			settings.workOrchestrator = { ...settings.workOrchestrator, plan3: { ...settings.workOrchestrator?.plan3, productDiagram: "declined" } };
+			await mkdir(path.dirname(file), { recursive: true });
+			const temporary = file + "." + randomUUID() + ".tmp";
+			try { await writeFile(temporary, JSON.stringify(settings, null, 2) + "\n", { flag: "wx" }); await rename(temporary, file); }
+			finally { await unlink(temporary).catch(error => { if (error.code !== "ENOENT") throw error; }); }
+		});
+	}
 	async function openDiagram(ctx, target: WebTarget) {
 		webTarget(target.kind === "product" ? "product" : target.id);
 		const server = await getWeb(ctx), url = server.url(target);
+		if (target.kind === "product") await createProductDiagram(ctx);
+		else await offerProductDiagram(ctx, target.id);
 		const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
 		const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", url] : [url];
 		try {

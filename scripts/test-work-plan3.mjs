@@ -1112,7 +1112,7 @@ try {
 	await writeFile(directFile, directPlan);
 	ctx.hasUI = true;
 	ctx.ui.input = async () => { throw new Error("Resolve must use ask_user, not an input menu"); };
-	const directMessages = messages.length;
+	let directMessages = messages.length;
 	await run("plan3", "resolve 55555555");
 	assert.match(notices.at(-1).message, /needs the loaded ask_user/);
 	assert.equal(messages.length, directMessages, "missing package never falls back to a thinking prompt");
@@ -1157,7 +1157,25 @@ try {
 		assert.equal(url.searchParams.get("target"), b);
 		assert.equal(entries.at(-1).data.id, a, "opening B does not silently change the current plan");
 		assert.equal((await open(`uml ${b}`)).href, url.href);
+		const settingsFile = path.join(webCwd, ".pi", "settings.json");
+		await mkdir(path.dirname(settingsFile), { recursive: true }); await writeFile(settingsFile, JSON.stringify({ preserved: true, workOrchestrator: { plan3: { codingEffort: "high" } } }));
+		webCtx.hasUI = true;
+		selectScript = [["Create a product diagram?", "No, do not offer again"]];
+		await open(`diagram ${b}`); assert.equal(selectScript.length, 0);
+		const remembered = JSON.parse(await readFile(settingsFile, "utf8"));
+		assert.equal(remembered.workOrchestrator.plan3.productDiagram, "declined"); assert.equal(remembered.preserved, true); assert.equal(remembered.workOrchestrator.plan3.codingEffort, "high");
+		await open(`diagram ${b}`); assert.equal(selectScript.length, 0, "decline is not offered again");
+		await unlink(settingsFile); // Reset this isolated project to exercise its first-open Yes path.
+		const beforeProduct = messages.length;
+		selectScript = [["Create a product diagram?", "Yes, map the whole project"]];
+		await open(`diagram ${b}`); assert.equal(selectScript.length, 0);
+		const productFile = path.join(webCwd, "docs", "architecture", "product.diagram.json");
+		assert.equal(JSON.parse(await readFile(productFile, "utf8")).kind, "product"); assert.equal(messages.length, beforeProduct + 1);
+		assert.match(messages.at(-1).message, /actual code and module connections/); assert.match(messages.at(-1).message, /target product/);
+		await open(`diagram ${b}`); assert.equal(messages.length, beforeProduct + 1, "existing product does not start another generation turn");
+		webCtx.hasUI = false;
 		const productUrl = await open("architecture");
+		assert.equal(messages.length, beforeProduct + 1, "explicit architecture reopens the existing product");
 		assert.equal(productUrl.origin, url.origin); assert.equal(productUrl.searchParams.get("token"), token);
 		assert.equal(productUrl.searchParams.get("target"), "product");
 		const headers = { Authorization: `Bearer ${token}`, Origin: url.origin, "Content-Type": "application/json" };
@@ -1223,6 +1241,7 @@ try {
 		entries = savedEntries; messages.length = savedMessages; tokens = savedTokens;
 	}
 	await run("plan3", "architecture"); // Refresh the same runtime to the main fixture's command context.
+	directMessages = messages.length; // Product generation is requested before the native Resolve fixture starts.
 	askSource = fileURLToPath(new URL("../extensions/ask-user/index.ts", import.meta.url));
 	assert(existsSync(askSource), "native popup selfcheck needs vendored ask_user");
 	let dialogs = [], popupCount = 0;

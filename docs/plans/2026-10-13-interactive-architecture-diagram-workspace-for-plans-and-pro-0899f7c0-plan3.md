@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-13
-updated: 2026-10-13T19:52:24.232Z
+updated: 2026-10-13T19:57:43.040Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -170,8 +170,8 @@ Commands (existing; referenced by steps):
 
 ### Phase 6: Product architecture and standing rule [code]
 
-- [ ] **P6-01** `/plan3 architecture` creates or opens the product diagram; chat edits it through `plan3_diagram` with kind product.
-- [ ] **P6-04** Offer a product diagram on the first plan diagram in a project without one (D17); remember a No per D18; test yes, no and repeat.
+- [x] **P6-01** The existing public architecture command creates/opens the product target, with shared live chat and validated product diagram edits.
+- [x] **P6-04** First plan workspace offers whole-project mapping; Yes persists an empty product and asks the live agent to map actual code, No is remembered per project, repeat opens do not duplicate prompts/turns.
 - [ ] **P6-02** Implement the standing update rule per D8 in `finish()` and every completion route, with tests in C-PLAN3.
   - Insert the reconciliation step idempotently with a stable id; repeated Finish does not duplicate it.
   - Completion checks that step's done mark directly; the existing open-step check covers only wip, next and waiting steps (plan3 status action).
