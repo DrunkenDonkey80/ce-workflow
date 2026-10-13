@@ -1,11 +1,14 @@
 // Browser-only JavaScript-compatible .ts source; served without a build step.
 // @ts-ignore Browser URL includes the workspace token.
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
+// @ts-ignore Browser URL includes the workspace token.
+import { createPromptView } from "./prompts.js?token=__TOKEN__";
 const $ = id => document.getElementById(id);
 const token = "__TOKEN__";
 const target = new URLSearchParams(location.search).get("target") ?? "product";
 const state = { connected: false, diagram: null, plan: null, activity: {}, pinning: false };
-let commentPoint, hoverTimer;
+let commentPoint, hoverTimer, messageSending = false, commandSending = false;
+const chat = new Map();
 
 function showNotice(text) { $("notice").textContent = text; $("notice").hidden = !text; }
 function renderShell() {
@@ -15,6 +18,31 @@ function renderShell() {
  $("commands").hidden = target === "product";
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working" : "Idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
+ for (const button of $("commands").querySelectorAll("button")) button.disabled = !state.connected || !!state.activity.working || commandSending || promptView.busy;
+ $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue follow-up" : "Send";
+ $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
+}
+
+function renderActivity() {
+ const root = $("activity"), data = state.activity, opened = new Map([...root.querySelectorAll("details")].map(item => [item.dataset.id, item.open]));
+ const make = (tag, text, className) => { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; };
+ const section = (id, title, open = false) => { const item = make("details"); item.dataset.id = id; item.open = opened.get(id) ?? open; item.append(make("summary", title)); root.append(item); return item; };
+ root.replaceChildren();
+ if (data.compacting) root.append(make("p", "Compacting session history…", "activity-status"));
+ if (data.interrupted) root.append(make("p", "Run interrupted.", "activity-status"));
+ if (data.error) { const error = make("p", data.error, "activity-error"); error.setAttribute("role", "alert"); root.append(error); }
+ if (data.thinking) section("thinking", "Thinking").append(make("pre", data.thinking));
+ for (const tool of data.tools ?? []) {
+  const row = section(tool.id, tool.name + " · " + tool.state + (tool.durationMs === undefined ? "" : " · " + Math.round(tool.durationMs) + " ms"), tool.state === "running");
+  row.className = "tool-row" + (tool.parent ? " nested-tool" : "") + (tool.state === "error" ? " tool-error" : "");
+  for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
+ }
+ if (data.queue?.length || data.hasPendingMessages) {
+  const queue = section("queue", "Observed queued messages", true);
+  queue.append(make("p", "May be stale; edit or cancel the real queue in Pi.", "activity-caution"));
+  for (const item of data.queue ?? []) queue.append(make("p", item.delivery + ": " + item.text));
+ }
+ if (data.tools?.length) root.append(make("p", "Text-only excerpts; custom tool renderers and images stay in Pi.", "activity-caution"));
 }
 
 const splitter = $("splitter"); let resize;
@@ -85,7 +113,7 @@ function drawNotes(stage, boxes, view, rc, data, detailY) {
   stage.append(row);
  }
 }
-function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); }
+function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); renderMentions(); }
 function pin(point) {
  commentPoint = { ...point, expectedRevision: state.diagram.revision }; state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning");
  $("comment-purpose").textContent = point.element ? "Pin a comment to @" + point.element + "." : "Pin a comment at this canvas position.";
@@ -124,6 +152,43 @@ $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
 
+const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice);
+function renderChat() {
+ const list = $("messages"), follow = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+ const encoder = new TextEncoder();
+ while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
+ for (const item of [...list.children]) if (!chat.has(item.dataset.id)) item.remove();
+ for (const row of chat.values()) {
+  let item = [...list.children].find(item => item.dataset.id === row.id);
+  if (!item) { item = document.createElement("li"); item.dataset.id = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("small")); list.append(item); }
+  item.className = "message " + row.role; item.children[0].textContent = row.role === "user" ? "You" : "Agent";
+  item.children[1].textContent = row.text; item.children[2].textContent = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming ? "Streaming…" : "");
+ }
+ if (follow) list.scrollTop = list.scrollHeight;
+}
+const mentioned = () => [...new Set([...$("message-input").value.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
+function renderMentions() {
+ const data = state.diagram, all = [...(data?.nodes ?? []), ...(data?.edges ?? []), ...(data?.notes ?? [])]; $("mentions").replaceChildren();
+ for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = entity?.label ?? entity?.text ?? "No matching element; sent as text."; $("mentions").append(chip); }
+}
+$("message-input").addEventListener("input", renderMentions);
+$("message-input").addEventListener("keydown", event => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); $("composer").requestSubmit(); } });
+$("composer").addEventListener("submit", async event => {
+ event.preventDefault(); if (messageSending || !state.connected) return;
+ const text = $("message-input").value; if (!text.trim()) return;
+ messageSending = true; renderShell();
+ try { const result = await post("message", { text }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent."); }
+ catch (error) { showNotice(error.message + ". Your message draft is kept."); }
+ finally { messageSending = false; renderShell(); }
+});
+for (const button of $("commands").querySelectorAll("button")) button.addEventListener("click", async () => {
+ if (commandSending) return; commandSending = true; renderShell();
+ try { await post("command", { command: button.dataset.command }); showNotice(""); }
+ catch (error) { showNotice(error.message); }
+ finally { commandSending = false; renderShell(); }
+});
+$("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested."); } catch (error) { showNotice(error.message); } });
+
 // Native EventSource reconnects; the server always starts a connection with a fresh full snapshot.
 const events = new EventSource("/api/events?token=" + token + "&target=" + encodeURIComponent(target));
 function applyUpdate(event, update) {
@@ -133,12 +198,16 @@ function applyUpdate(event, update) {
 function listen(name, update) { events.addEventListener(name, event => applyUpdate(event, update)); }
 listen("snapshot", value => {
  state.connected = true; state.diagram = value.diagram; state.plan = value.plan; state.activity = value.activity ?? {};
- showNotice(""); renderShell(); diagramView.render(state.diagram);
+ chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
+ promptView.sync(value.dialogs ?? []); renderActivity(); renderChat(); renderMentions(); showNotice(""); renderShell(); diagramView.render(state.diagram);
 });
 listen("diagram", value => {
  if ((target === "product" && value.target.kind === "product") || value.target.id === target) { state.diagram = value.diagram; diagramView.render(state.diagram); renderShell(); }
 });
-listen("activity", value => { state.activity = value; renderShell(); });
+listen("message", row => { chat.set(row.id, row); renderChat(); });
+listen("dialog", value => { promptView.pending(value); renderShell(); });
+listen("dialog_closed", value => { promptView.closed(value.askId); renderShell(); });
+listen("activity", value => { state.activity = value; renderActivity(); renderShell(); });
 events.addEventListener("error", event => {
  if (event.data) { applyUpdate(event, value => showNotice(value.message ?? "Workspace update failed.")); return; }
  state.connected = false; renderShell();

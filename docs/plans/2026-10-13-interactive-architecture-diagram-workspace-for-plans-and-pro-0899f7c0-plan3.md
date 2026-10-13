@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-13
-updated: 2026-10-13T17:48:51.761Z
+updated: 2026-10-13T19:42:05.172Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -164,11 +164,9 @@ Commands (existing; referenced by steps):
 - [x] **P5-01** Built the flat whiteboard app shell with live title/status, command bar, left canvas and keyboard/pointer-resizable chat; responsive stacking follows D24/25.
 - [x] **P5-02** Added pinned Rough.js/Virgil SVG rendering, grouped semantic zoom with inline metadata, seeded stable strokes, keyboard/wheel/button zoom, pan, and revision-checked node drag with stale-edit rollback.
 - [x] **P5-03** Added node/edge/canvas note pinning, keyboard pinning, persisted comments, hover/focus cards including collapsed descendants, and pink inline notes at near zoom.
-- [ ] **P5-04** Chat pane: streaming replies, ctrl+click inserts `@id`, mention chips, browser dialogs for ask_user batches and list menus.
-  - All user and model text is rendered as text, never as HTML.
-- [ ] **P5-06** Activity view in the chat pane (D9): working indicator, thinking stream, tool call rows with progress and results, queued messages, compaction and errors.
-  - Stop button visible only while working (D13).
-- [ ] **P5-05** Headless check with agent-browser against a test server and the P1-02 samples; inspect with screen_read at small maxEdge.
+- [x] **P5-04** Streaming chat, safe mention chips and Ctrl+click, draft-safe message send, all five browser commands, single/batch ask answers and filterable/checklist list menus are working.
+- [x] **P5-06** Added bounded thinking/tool/queue activity disclosures with progress, results, nesting, duration, compaction/error states and busy-only Stop.
+- [wip] **P5-05** Headless check with agent-browser against a test server and the P1-02 samples; inspect with screen_read at small maxEdge.
   - Acceptance: zoom bands switch, drag persists after reload, a comment shows on hover, a replayed event stream shows working, tool rows and idle, keyboard focus is visible, reduced motion is respected.
 
 ### Phase 6: Product architecture and standing rule [code]
@@ -211,7 +209,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-22/30 complete. HEAD d9c5d82 before P5-03 commit; all focused web/diagram/browser checks passed for P5-03. Next P5-04 streaming chat, mention chips and browser ask/list/batch dialogs; then P5-06 activity and P5-05 full visual check. app.ts now has post(), listen()/applyUpdate(), insertMention(), note pin/comment modal and hover card; renderer hooks notes/pin/hover. Browser protocol snapshot uses chat (not messages), dialogs and activity; diagram events carry internal target objects while POST target is scalar id/product. Keep prompt drafts on failed submissions, use textContent (no innerHTML), shared terminal races remain authoritative. Browser tests are foreground Node/native agent-browser, no live Pi/model CLI. No delegation/background verifier/push. Preserve unrelated resolve-follow-up hunks/sidecars. P7-01 needs human acceptance.
+24/30 done. P5-04/P5-06 focused browser/web/diagram checks passed; P5-05 now WIP for reload persistence, reduced-motion, visible focus and small screen_read checks. HEAD 63225c4 before chat/activity commit. User authorized one read-only oracle only; it completed with driver diagnosis: agent-browser 0.38.2 does not carry held keyboard modifiers into mouse events. Existing browser test now uses native CDP via verified get cdp-url response {cdpUrl}, explicit modifiers:2, and asserts trusted pointerdown/click on web_client without revision/move. Do not alter production guard or weaken native check. No other delegation/background verifier/push/live model CLI. LSP probe has many inferred-settings frontend DOM/null/implicit-any warnings (not clean); address before final C-LSP gate, do not claim clean. Preserve unrelated plan3.ts/test-work-plan3.mjs hunks and sidecars.
 
 ## Amendments
 

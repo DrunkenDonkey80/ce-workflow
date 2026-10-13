@@ -3,21 +3,52 @@ import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { createJiti } from "jiti";
 const { applyDiagramOperations } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
-const { createPlan3Web, WebError } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
+const { createPlan3Web, createDialogBridge, WebError } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `ce-plan3-ui-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
  const { stdout } = await execute(binary, ["--session", session, "--headed", "false", "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 });
  const result = JSON.parse(stdout); assert(result.success, JSON.stringify(result)); return result.data;
 }
+// agent-browser 0.38.2 drops held mouse modifiers; CDP sends trusted input with explicit bits.
+async function ctrlClick(point, origin) {
+ const { cdpUrl } = await browser("get", "cdp-url"); assert(cdpUrl.startsWith("ws://127.0.0.1:"));
+ const socket = new WebSocket(cdpUrl), pending = new Map(); let sequence = 0;
+ socket.addEventListener("message", event => { const value = JSON.parse(event.data), request = pending.get(value.id); if (!request) return; pending.delete(value.id); clearTimeout(request.timer); if (value.error) request.reject(new Error(value.error.message)); else request.resolve(value.result); });
+ const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
+  const id = ++sequence, timer = setTimeout(() => { pending.delete(id); reject(new Error("CDP timeout: " + method)); }, 10000);
+  pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+ });
+ try {
+  await new Promise((resolve, reject) => { socket.addEventListener("open", resolve, { once: true }); socket.addEventListener("error", () => reject(new Error("CDP connection failed")), { once: true }); });
+  const { targetInfos } = await send("Target.getTargets"), target = targetInfos.find(item => item.type === "page" && item.url.startsWith(origin + "/")); assert(target, "CDP must attach to our test page only");
+  const { sessionId } = await send("Target.attachToTarget", { targetId: target.targetId, flatten: true });
+  for (const [type, buttons] of [["mouseMoved", 0], ["mousePressed", 1], ["mouseReleased", 0]]) await send("Input.dispatchMouseEvent", { ...point, type, modifiers: 2, ...(type === "mouseMoved" ? {} : { button: "left", buttons, clickCount: 1 }) }, sessionId);
+ } finally { socket.close(); for (const request of pending.values()) { clearTimeout(request.timer); request.reject(new Error("CDP connection closed")); } }
+}
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
 const sample = JSON.parse(await readFile(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
-const server = await createPlan3Web({ snapshot: target => ({ target, diagram, plan: { id: "12345678", title: sample.title, status: "draft" }, activity: { working: false }, chat: [], dialogs: [] }), post: (endpoint, body) => {
- assert.equal(body.target, "12345678"); assert(["/api/move", "/api/comment"].includes(endpoint));
+const listeners = new Map(), answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
+const events = { on(name, run) { const rows = listeners.get(name) ?? new Set(); rows.add(run); listeners.set(name, rows); return () => rows.delete(run); }, emit(name, value) { for (const run of listeners.get(name) ?? []) run(value); } };
+events.on("ask:answer", value => answers.push(value));
+const dialogs = createDialogBridge({ events }, (event, value) => server.publish(event, value));
+const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { askId, ...value }); return askId; };
+const server = await createPlan3Web({ snapshot: target => ({ target, diagram, plan: { id: "12345678", title: sample.title, status: "draft" }, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), post: (endpoint, body) => {
+ assert.equal(body.target, "12345678");
+ if (endpoint === "/api/answer") return dialogs.answer(body);
+ if (endpoint === "/api/command") { commands.push(body.command); return { accepted: true }; }
+ if (endpoint === "/api/message") {
+  if (rejectMessage) { rejectMessage = false; throw new WebError(503, "Session temporarily unavailable"); }
+  messages.push(body); const row = { id: "user_" + messages.length, role: "user", text: body.text, at: new Date().toISOString(), streaming: false };
+  chatRows.set(row.id, row); server.publish("message", row); return { accepted: true, queued: activity.working };
+ }
+ if (endpoint === "/api/stop") { activity = { working: false }; server.publish("activity", activity); return { accepted: true }; }
+ assert(["/api/move", "/api/comment"].includes(endpoint));
  if (body.expectedRevision !== diagram.revision) throw new WebError(409, "Stale diagram revision");
  const operation = endpoint === "/api/move" ? { op: "move", entity: body.entity, id: body.id, x: body.x, y: body.y } : { op: "add", entity: "note", value: { text: body.text, author: "user", created: new Date().toISOString(), ...(body.element ? { target: body.element } : { x: body.x, y: body.y }) } };
  (endpoint === "/api/move" ? edits : comments).push(body); diagram = applyDiagramOperations(diagram, [operation]).diagram; diagram.revision++;
@@ -105,9 +136,70 @@ try {
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
  assert(await evaluate("document.querySelectorAll(\"foreignObject .note-text\").length >= 6"));
  assert.equal(await evaluate("document.querySelector(\"foreignObject img\")"), null, "note markup stays inert text");
+ const reply = { id: "assistant_1", role: "assistant", text: "Reviewing", at: new Date().toISOString(), streaming: true };
+ chatRows.set(reply.id, reply); server.publish("message", reply);
+ await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Reviewing\")");
+ reply.text = "Reviewing upload limits: complete."; reply.streaming = false; server.publish("message", reply);
+ await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"complete.\")");
+ assert.equal(await evaluate("document.querySelectorAll(\"#messages [data-id=assistant_1]\").length"), 1, "stream updates reuse their row");
+ await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
+ const mentionPoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
+ await evaluate("window.mentionEvents = []; for (const name of [\"pointerdown\", \"click\"]) document.addEventListener(name, event => window.mentionEvents.push({ name, trusted: event.isTrusted, ctrl: event.ctrlKey, node: event.target.closest(\"[data-node]\")?.dataset.node }), true)");
+ const revisionBeforeMention = diagram.revision, movesBeforeMention = edits.length;
+ await ctrlClick(mentionPoint, server.origin);
+ assert.deepEqual(await evaluate("window.mentionEvents"), [{ name: "pointerdown", trusted: true, ctrl: true, node: "web_client" }, { name: "click", trusted: true, ctrl: true, node: "web_client" }]);
+ assert.equal(diagram.revision, revisionBeforeMention); assert.equal(edits.length, movesBeforeMention, "modified clicks cannot start a drag");
+ assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "@web_client ");
+ await browser("fill", "#message-input", "@web_client @ghost person@cdn.example.com <img src=x onerror=alert(1)>");
+ assert.equal(await evaluate("document.querySelectorAll(\".mention-chip\").length"), 2, "emails are not mentions");
+ await browser("click", "#send"); await browser("wait", "--fn", "document.getElementById(\"message-input\").value === \"\"");
+ assert(messages[0].text.includes("@web_client")); assert.equal(await evaluate("document.querySelector(\"#messages img\")"), null);
+ rejectMessage = true; await browser("fill", "#message-input", "Keep this draft"); await browser("press", "Control+Enter");
+ await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"draft is kept\")");
+ assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this draft");
+ ask({ question: "Pick a colour", context: "Single choice", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ await browser("click", "#prompt-form input[value=Blue]"); await browser("fill", "#prompt-form textarea[placeholder=\"Optional comment\"]", "Matches the boxes"); await browser("click", "#prompt-form button[type=submit]");
+ await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
+ assert.deepEqual(answers.at(-1).selections, ["Blue"]); assert.equal(answers.at(-1).comment, "Matches the boxes");
+ ask({ questions: [{ question: "Pick deploy targets", options: [{ title: "Alpha" }, { title: "Beta" }], allowMultiple: true, allowFreeform: false }, { question: "Name the rollout", options: [], allowMultiple: false, allowFreeform: true }], allowComment: false });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ await browser("focus", "#prompt-form input[value=Alpha]"); await browser("press", "Enter");
+ assert(await evaluate("document.getElementById(\"prompt\").open"), "checklist Enter toggles instead of submitting");
+ await browser("focus", "#prompt-form input[value=Beta]"); await browser("press", "Space");
+ await browser("fill", "#prompt-form textarea[placeholder=\"Write a custom response\"]", "Canary"); await browser("click", "#prompt-form button[type=submit]");
+ await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
+ assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary");
+ const terminalId = ask({ question: "Terminal wins", options: [], allowMultiple: false, allowFreeform: true });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open"); events.emit("ask:closed", { askId: terminalId });
+ await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
+ const picker = { kind: "list", title: "Choose model", purpose: "Search Pi models; Tab shows all models.", tabAction: true, currentValue: "beta", items: [{ value: "alpha", label: "Alpha" }, { value: "beta", label: "Beta" }] };
+ ask(picker); await browser("wait", "--fn", "document.getElementById(\"prompt\").open"); await browser("fill", ".prompt-filter", "Beta"); await browser("press", "Tab");
+ await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.equal(answers.at(-1).action, "tab");
+ ask(picker); await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ assert.equal(await evaluate("document.querySelector(\".prompt-filter\").value"), "Beta", "filter survives model scope round trips");
+ await browser("press", "Enter"); await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.equal(answers.at(-1).value, "beta");
+ ask({ kind: "list", title: "Choose slices", purpose: "Toggle slices; Escape returns.", multi: { selected: ["one"], requireOne: true }, items: [{ value: "one", label: "One" }, { value: "two", label: "Two" }] });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open"); await browser("focus", "#prompt-form input[value=two]"); await browser("press", "Enter");
+ assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
+ await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
+ for (const command of ["resolve", "ideas", "review", "finish", "resume"]) { await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
+ assert.deepEqual(commands, ["resolve", "ideas", "review", "finish", "resume"]);
+ activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);
+ await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
+ assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
+ assert(await evaluate("document.getElementById(\"activity\").textContent.includes(\"May be stale\")"));
+ assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
+ await browser("click", "#activity details[data-id=tool_1] summary");
+ activity.tools[0] = { ...activity.tools[0], state: "error", result: "Read failed", durationMs: 100 }; activity.compacting = false; activity.error = "A safe error"; server.publish("activity", activity);
+ await browser("wait", "--fn", "document.getElementById(\"activity\").textContent.includes(\"Read failed\")");
+ assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool updates preserve disclosure state");
+ await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
+ await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
+ await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
  const errors = await browser("errors"); assert.deepEqual(errors.errors ?? [], [], "browser JavaScript must run under the strict CSP");
  console.log(`ok - Plan3 browser shell, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
- await server.close();
+ dialogs.close(); await server.close();
  if (!process.argv.includes("--keep-browser")) await browser("close");
 }

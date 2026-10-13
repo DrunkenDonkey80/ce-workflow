@@ -65,6 +65,7 @@ export async function createPlan3Web(options: Options) {
 		["/app.js", ["app.ts", "text/javascript; charset=utf-8"]],
 		["/layout.js", ["layout.ts", "text/javascript; charset=utf-8"]],
 		["/diagram.js", ["diagram.ts", "text/javascript; charset=utf-8"]],
+		["/prompts.js", ["prompts.ts", "text/javascript; charset=utf-8"]],
 		["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 		["/vendor/rough.js", ["vendor/rough.ts", "text/javascript; charset=utf-8"]],
 		["/vendor/Virgil.woff2", ["vendor/Virgil.woff2", "font/woff2"]],

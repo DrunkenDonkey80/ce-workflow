@@ -53,6 +53,15 @@ h2 { font-size: 15px; font-weight: 600; }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 #connection { font-size: 13px; color: #495057; }
+.activity:empty { display: none; }
+.activity > * { margin: 8px 16px; }
+.activity details { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.activity summary { cursor: pointer; font-size: 13px; }
+.activity pre, .activity p { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.4 system-ui; }
+.activity strong { display: block; font-size: 13px; margin-top: 8px; }
+.activity .nested-tool { margin-left: 28px; }
+.activity-error, .tool-error summary { color: #c92a2a; }
+.activity-caution { color: #495057; }
 .activity { flex-shrink: 0; max-height: 38%; overflow: auto; }
 .messages { list-style: none; margin: 0; padding: 16px; flex: 1; min-height: 0; overflow: auto; }
 .composer { padding: 12px 16px; border-top: 1px solid var(--line); }
@@ -62,6 +71,25 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .input-help { font-size: 13px; color: #495057; margin-right: auto; }
 .danger { color: #c92a2a; border-color: #c92a2a; }
 #send { background: var(--focus); color: white; border-color: var(--focus); }
+.message { margin-bottom: 20px; overflow-wrap: anywhere; }
+.message > strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.message > div { white-space: pre-wrap; }
+.message > small { font-size: 13px; color: #495057; }
+.mention-chip { padding: 2px 6px; background: var(--blue); border-radius: 6px; font-size: 13px; }
+.prompt-filter { width: 100%; padding: 8px; border: 1px solid var(--group); border-radius: 6px; margin-bottom: 12px; }
+.prompt-row { margin: 6px 0; }
+.prompt-row > button { text-align: left; margin-right: 6px; }
+.prompt-row > button.current { border-color: var(--focus); }
+.prompt-option { display: flex; align-items: start; flex-wrap: wrap; gap: 8px; margin: 8px 0; cursor: pointer; }
+.prompt-option input { margin-top: 4px; }
+.prompt-description { display: block; flex-basis: 100%; margin-left: 24px; color: #495057; font-size: 13px; }
+.prompt-heading { font-weight: 600; margin-top: 12px; }
+.prompt-question { border: 0; padding: 0; margin: 16px 0 24px; }
+.prompt-question legend { font-weight: 600; margin-bottom: 8px; }
+.prompt-context { white-space: pre-wrap; font-size: 13px; margin-bottom: 12px; overflow-wrap: anywhere; }
+.prompt-question textarea { margin-top: 8px; }
+.prompt-modes { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; }
+.prompt-error { color: #c92a2a; margin-top: 12px; font-size: 13px; }
 .mentions { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 dialog { border: 1px solid var(--group); border-radius: 6px; padding: 20px; color: var(--ink); width: min(700px, 94vw); max-height: 90dvh; }
 dialog::backdrop { background: rgba(0, 0, 0, .25); }
