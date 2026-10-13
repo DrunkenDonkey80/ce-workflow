@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T13:59:32.931Z
+updated: 2026-10-13T13:59:33.882Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -226,7 +226,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Planning draft, reviewed; no product code written; no open questions. Settled D1 to D18: D15 Force finish reconciles architecture with what was built, then archives; D16 an aborted update offers archive anyway with a recorded waiver; D17 the first plan diagram offers a product diagram (P6-04); D18 a declined offer is remembered in .pi/settings.json and never repeated. D13 Stop button is to be verified in P1-04. Next action: finish planning; implementation starts at P1-01.
+Execution: P1-01–P1-04 and P2-01–P2-03 done (7/30). Schema/samples/layout/tokens settled; live HTTP abort/followUp probe passed, stored command UI remains source-derived until live acceptance. Vendored ask_user single/batch native races and coexistence implemented; native Plan3 popup tests now use it. Latest focused Plan3/ask tests passed after atomic mutate fix and test-bus disposer correction. Phase 1 full verify passed. LSP probe is not authoritative: no project SDK/type declarations, inherited upstream warnings; no clean claim. Exact next action: P2-04 catch-up provenance instructions, then Phase 2 full verify and diagnostics. No external blockers; continue execution. Pre-existing resolve-flow dirty changes preserved unstaged.
 
 ## Amendments
 
