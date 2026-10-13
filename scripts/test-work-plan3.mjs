@@ -1182,6 +1182,10 @@ try {
 		assert.equal((await post("command", { command: "review" })).status, 200);
 		assert(messages.at(-1).message.includes(JSON.stringify(bFile))); assert(!messages.at(-1).message.includes(JSON.stringify(aFile)));
 		idle = false; assert.equal((await post("command", { command: "review" })).status, 409); idle = true;
+		let aborts = 0; webCtx.abort = async () => { aborts++; idle = true; };
+		assert.equal((await post("stop", {})).status, 409); assert.equal(aborts, 0);
+		idle = false; assert.equal((await post("stop", { extra: true })).status, 400);
+		assert.equal((await post("stop", {})).status, 200); assert.equal(aborts, 1);
 		let finishCallbacks, entered;
 		const compactEntered = new Promise(resolve => { entered = resolve; });
 		tokens = 25_000; webCtx.compact = callbacks => { finishCallbacks = callbacks; entered(); };
@@ -1211,6 +1215,11 @@ try {
 		assert(messages.at(-1).message.includes(JSON.stringify(bFile))); assert.match(messages.at(-1).message, /execute\/resume/);
 		expired = true; assert.equal((await post("command", { command: "review" })).status, 409); expired = false;
 		await open(`diagram ${b}`); assert.equal((await post("command", { command: "review" })).status, 200);
+		await hooks.get("session_switch")({ reason: "new" }, webCtx);
+		await assert.rejects(fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }));
+		const reopened = await open(`diagram ${b}`);
+		assert.notEqual(reopened.searchParams.get("token"), token, "a different conversation gets a fresh capability");
+		assert.equal((await fetch(`${reopened.origin}/api/snapshot?target=${b}`, { headers: { Authorization: `Bearer ${token}` } })).status, 401);
 		entries = savedEntries; messages.length = savedMessages; tokens = savedTokens;
 	}
 	await run("plan3", "architecture"); // Refresh the same runtime to the main fixture's command context.

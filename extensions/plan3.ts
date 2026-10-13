@@ -11,7 +11,7 @@ import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, type DiagramTarget } from "./plan3-diagram.ts";
-import { createPlan3Web, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
+import { createPlan3Web, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -711,7 +711,7 @@ export default function plan3(pi) {
 		catch (error) { try { webCtx?.ui.notify(`Plan3 browser update failed; terminal remains active: ${error.message}`, "warning"); } catch {} }
 	};
 	const chat = createChatMirror(pi, publishWeb);
-	const dialogs = createDialogBridge(pi, publishWeb);
+	let dialogs = createDialogBridge(pi, publishWeb);
 	const activity = createActivityMirror(pi, publishWeb);
 	const disposeDiagram = pi.events.on("plan3:diagram-changed", async event => {
 		if (!webCtx || event.cwd !== webCtx.cwd) return;
@@ -732,6 +732,11 @@ export default function plan3(pi) {
 		if (!webCtx) throw new WebError(409, "Workspace context expired; reopen /plan3 diagram.");
 		const ctx = webCtx;
 		try { ctx.isIdle(); } catch { webCtx = null; throw new WebError(409, "Workspace context expired; reopen /plan3 diagram."); }
+		if (endpoint === "/api/stop") {
+			if (Object.keys(data).some(key => key !== "target")) throw new WebError(400, "Invalid Stop fields.");
+			await resolveWebTarget(webTarget(data.target));
+			return stopLiveRun(ctx);
+		}
 		if (endpoint === "/api/command") {
 			if (Object.keys(data).some(key => !["target", "command"].includes(key)) || !["resolve", "ideas", "ideas all", "ideas select", "review", "review all", "finish", "resume"].includes(data.command)) throw new WebError(400, "Invalid workspace command.");
 			const target = await resolveWebTarget(webTarget(data.target));
@@ -1875,10 +1880,19 @@ export default function plan3(pi) {
 		await night.restore(ctx);
 		return refresh(ctx);
 	});
-	pi.on?.("session_shutdown", async () => {
-		night.shutdown(); dialogs.close(); disposeDiagram(); webStopped = true; webCtx = null; webInstance = undefined;
+	async function closeWeb() {
+		webCtx = null; webInstance = undefined;
 		const pending = webServer; webServer = undefined;
-		await Promise.all([pending?.then(server => server.close()), closePersistentOpenDesignClients()]);
+		try { await pending?.then(server => server.close()); } finally { webInstance = undefined; }
+	}
+	pi.on?.("session_switch", async () => {
+		dialogs.close(); dialogs = createDialogBridge(pi, publishWeb);
+		chat.reset(); activity.reset();
+		await closeWeb(); // An old browser must never control or read the next conversation.
+	});
+	pi.on?.("session_shutdown", async () => {
+		night.shutdown(); dialogs.close(); disposeDiagram(); webStopped = true;
+		await Promise.all([closeWeb(), closePersistentOpenDesignClients()]);
 	});
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
 	// Plans are born from the template (plan3 create), never invented: block writing a NEW plan3 file by hand.

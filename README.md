@@ -108,6 +108,10 @@ Planning prompts require self-contained questions with this Markdown layout (old
 
 Self-check: `node "scripts/test-work-plan3.mjs"`.
 
+**Browser activity:** the loopback workspace transport mirrors streamed chat, visible thinking, bounded plain-text tool arguments/progress/results, tool durations, agent working/settled state, compaction start/end/failure and observed queued inputs. Stop requires the workspace token and an active run, and calls `ctx.abort()` on this live Pi session—not just the displayed diagram. A session switch closes the old listener and clears cached chat/activity; reopen the workspace in the new conversation.
+
+**Parity limits:** queued inputs are observations, not an authoritative queue: Pi does not expose terminal queue edits/cancellations to extensions (`queue_update` is internal). Queue editing remains in the terminal; Stop requests abort, not queue editing. Browser text is truncated/bounded; images, native custom tool renderers and their internal nested rows stay in the terminal. Parent grouping is shown only when a parent tool id is emitted. There is no claim of pixel-for-pixel terminal parity.
+
 ## /wo utilities
 
 `/wo` opens a Utilities menu: Settings, plus **Context guard** and **Catch up packages** in the ce-workflow checkout and **Scout Pi extensions** when enabled. `/wo plan [args]`, `/wo plans` and `/wo resume [plan]` run `/plan3`, `/plans3` and `/resume3`; `/wo compact`, `/wo fact` and `/wo settings` work directly. Only the utility agents `plan3-advisor` and `context-knowledge-discoverer` ship; use the native `oracle` for ordinary advice. Older projects with a `.ce-workflow/work-items.json` store can import it through **Convert legacy work** in `/plans3`; nothing else reads that store.

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
 import { createJiti } from "jiti";
-const { createPlan3Web, webTarget, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
-const posted = [];
-const server = await createPlan3Web({ snapshot: target => ({ target, revision: 3, title: "Safe <text>" }), post: (endpoint, value) => { posted.push({ endpoint, value }); return { ok: true }; } });
+const { createPlan3Web, webTarget, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
+const posted = []; let stopIdle = true, aborts = 0;
+const stopCtx = { isIdle: () => stopIdle, abort: async () => { aborts++; } };
+const server = await createPlan3Web({ snapshot: target => ({ target, revision: 3, title: "Safe <text>" }), post: (endpoint, value) => { posted.push({ endpoint, value }); return endpoint === "/api/stop" ? stopLiveRun(stopCtx) : { ok: true }; } });
 let reader;
 try {
  const opening = new URL(server.url({ kind: "plan", id: "12345678" })), token = opening.searchParams.get("token");
@@ -45,6 +46,12 @@ try {
  assert.equal((await request("/api/unknown", post)).response.status, 404);
  assert.equal((await request("/api/message", post)).response.status, 200);
  assert.deepEqual(posted, [{ endpoint: "/api/message", value: { target: "12345678", text: "hello" } }]);
+ const stopPost = { ...post, body: JSON.stringify({ target: "12345678" }) };
+ assert.equal((await request("/api/stop", { ...stopPost, headers: { Origin: server.origin, "Content-Type": "application/json" } })).response.status, 401);
+ assert.equal((await request("/api/stop", stopPost)).response.status, 409);
+ assert.equal(aborts, 0); stopIdle = false;
+ const stopped = await request("/api/stop", stopPost);
+ assert.equal(stopped.response.status, 200); assert.equal(JSON.parse(stopped.text).accepted, true); assert.equal(aborts, 1);
  const stream = await fetch(`${server.origin}/api/events?target=12345678`, { headers: auth });
  assert.equal(stream.headers.get("content-type"), "text/event-stream");
  reader = stream.body.getReader();
@@ -182,10 +189,17 @@ activityHooks.get("tool_execution_update")({ toolCallId: "tool1", toolName: "rea
 activityHooks.get("tool_execution_end")({ toolCallId: "tool1", toolName: "read", result: { content: [{ type: "image", data: "private-base64" }, { type: "text", text: "result" }] }, durationMs: 12, isError: false });
 assert.equal(activityMirror.snapshot().thinking, "Reasoning");
 assert.equal(activityMirror.snapshot().tools[0].state, "done");
+assert.equal(activityMirror.snapshot().tools[0].durationMs, 12);
+activityHooks.get("tool_execution_start")({ toolCallId: "tool2", toolName: "bash" });
+activityHooks.get("tool_execution_end")({ toolCallId: "tool2", toolName: "bash", result: "ok" });
+assert(Number.isFinite(activityMirror.snapshot().tools[1].durationMs));
+assert.equal(activityMirror.snapshot({ isIdle: () => false, hasPendingMessages: () => true }).hasPendingMessages, true);
 assert(!JSON.stringify(activityMirror.snapshot()).includes("private-base64"));
 assert(!activityHooks.has("agent_end"), "agent_end alone does not mean settled/idle");
 activityHooks.get("session_before_compact")({});
 assert(activityMirror.snapshot().compacting);
+activityHooks.get("session_compact")({}); assert.equal(activityMirror.snapshot().compacting, false);
+activityHooks.get("session_before_compact")({});
 activityHooks.get("session_compact_failed")({ errorMessage: "failed", aborted: false });
 assert.equal(activityMirror.snapshot().compacting, false);
 assert.equal(activityMirror.snapshot().error, "failed");
@@ -245,4 +259,7 @@ try {
  assert.equal(new Set([initial.id, buffered.id, fresh.id]).size, 3, "snapshot/event ids are distinct across reconnects");
  await reconnect.close();
 } finally { resyncDialogs.close(); await resyncServer.close(); }
-console.log("ok - plan3 web security, dialog races, bounded activity and reconnect resync");
+mirror.reset(); activityMirror.reset();
+assert.deepEqual(mirror.snapshot(), []); assert.deepEqual(activityMirror.snapshot().tools, []);
+assert.equal(activityMirror.snapshot().error, ""); assert.equal(activityMirror.snapshot().compacting, false);
+console.log("ok - plan3 web security, Stop, dialog races, bounded activity and reconnect resync");

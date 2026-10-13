@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T16:28:13.666Z
+updated: 2026-10-13T16:47:14.408Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -155,9 +155,7 @@ Commands (existing; referenced by steps):
 - [x] **P4-07** Reconnect receives a new full snapshot (diagram revision, chat, bounded activity and live dialogs). SSE subscribes before asynchronous snapshot resolution and buffers intervening events with ordered ids, preventing gaps and stale-dialog resurrection.
 - [x] **P4-04** Added revision-checked comment/move endpoints and displayed-target command dispatch; browser and terminal share an idle/error/cancel-safe guard, with start work routed through resume3.
 - [x] **P4-05** Wired diagram/uml and architecture browser commands, completions, reusable per-runtime listener/token, fresh context recovery and diagram broadcasts.
-- [ ] **P4-06** Activity mirror (D9): forward agent, message, tool execution and compaction events plus idle and queue state to SSE; Stop per D13.
-  - Use `agent_settled` for idle, plus compaction start, end and failure events; any activity P1-04 found unavailable is listed in README, not claimed.
-  - Check: C-WEB covers Stop rejected without token, rejected while idle, and calling abort while working.
+- [x] **P4-06** Added authenticated busy-only Stop through ctx.abort; mirrored settled/compaction and bounded tool timing/queue activity, documented parity limits, and isolated browser capabilities across conversation switches.
 
 ### Phase 5: Browser workspace [code]
 
@@ -211,7 +209,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-18/30 complete. P4-04/05 endpoints, shared native/browser command guard and CLI browser opening pass focused command/web/diagram tests including SDK-jiti dialog bridge and public HTTP integration. Next P4-06: attach authenticated idle-rejected Stop to ctx.abort, document unavailable queue/compaction observability, verify activity events; then full package verification at Phase 4 boundary. Phase 5 browser shell not built yet. No delegation/background verifier/push. Preserve unrelated resolving follow-up hunks in extensions/plan3.ts and scripts/test-work-plan3.mjs plus unrelated stats/needs sidecars; stage only owned hunks. Browser human acceptance remains P7-01.
+19/30 complete; Phase 4 full npm run verify:quiet passed after P4-06. Continue P5-01 SVG/rough.js renderer over existing layout.ts, then remaining UI and Phase 6/7 steps inline. Browser CLI/server/chat/dialog/Stop and session-switch isolation implemented and tested, but browser shell not built yet. P4-04/05 commit 8718c4c; P4-06 ready to commit. Preserve unrelated resolving follow-up edits in extensions/plan3.ts (17+/2-) and scripts/test-work-plan3.mjs (6+) plus unrelated stats/needs sidecars. Stage with contextful diff filtering (zero-context filtered patches misplaced three insertions; corrected before 8718c4c). No delegation/background verifier/push. Need verify real Virgil license before vendoring, not assumed OFL. LSP remains non-authoritative for SDK typing. P7-01 requires actual user browser acceptance.
 
 ## Amendments
 
@@ -232,3 +230,4 @@ Append material changes and their reasons; preserve the original request and set
 - 2026-10-13: Added P6-04 after P6-01: User comment on Q-08: a project may have only one complicated task, so the first plan diagram should offer the whole-project diagram (D17).
 - 2026-10-13: Repaired an accidental duplicated plan prefix inside D20 caused by JavaScript replacement-string expansion; original request and D1–D18 preserved. D23's inferred exception was incorrect: repository AGENTS.md applies the .ts rule to anything under extensions/. layout source renamed to layout.ts; browser JavaScript will be served from .ts source, and installed-copy tests use jiti. No scope change.
 - 2026-10-13 (P2-03): Focused C-PLAN3 exposed a concurrent reader seeing truncated frontmatter during requirement mutation (test line 403; tool fresh-summary read at plan3.ts:1599). mutate() now writes a unique sibling temp file and atomically renames it under the existing lock. Original concurrent-requirement assertion retained; unrelated dirty resolve-flow edits remain unstaged.
+P4-06 also closes the web listener and resets chat/activity/dialog state on Pi session switches: a capability from one conversation must not silently control or read the next. Public HTTP lifecycle tests cover reopening with a new token.

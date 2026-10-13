@@ -187,6 +187,7 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 	pi.on("message_end", event => put(event.message, false));
 	return {
 		snapshot: () => structuredClone(rows),
+		reset: () => { rows.length = 0; active.clear(); next = 0; },
 		hydrate(ctx) {
 			const live = structuredClone(rows);
 			rows.length = 0;
@@ -200,6 +201,12 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 			for (const row of rows) if (row.streaming) active.set(row.role, row.id);
 		},
 	};
+}
+
+export async function stopLiveRun(ctx) {
+	if (ctx.isIdle()) throw new WebError(409, "No running agent to stop.");
+	await ctx.abort();
+	return { accepted: true };
 }
 
 export function forwardDiagramChat(pi, ctx, diagram: Diagram, message: unknown, comments: unknown, publish: (event: string, value: unknown) => void) {
@@ -258,7 +265,7 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 	};
 }
 
-type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; durationMs?: number };
+type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; startedAt?: number; durationMs?: number };
 export function createActivityMirror(pi, publish: (event: string, value: unknown) => void) {
 	const tools: ToolActivity[] = [], queued: { id: string; digest: string; text: string; delivery: string }[] = [];
 	let working = false, compacting = false, thinking = "", error = "", interrupted = false, sequence = 0;
@@ -271,8 +278,9 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		} catch { return "[Unserializable tool data]"; }
 	};
 	const snapshot = ctx => {
-		if (ctx?.hasPendingMessages?.() === false) queued.length = 0;
-		return { working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
+		const hasPendingMessages = ctx?.hasPendingMessages?.();
+		if (hasPendingMessages === false) queued.length = 0;
+		return { hasPendingMessages, working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
 	};
 	const emit = () => publish("activity", snapshot(undefined));
 	const tool = (event, patch: Partial<ToolActivity>) => {
@@ -310,11 +318,14 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		while (queued.length > 100 || Buffer.byteLength(JSON.stringify(queued)) > 512_000) queued.shift();
 		emit();
 	});
-	pi.on("tool_execution_start", event => tool(event, { state: "running", args: brief(event.args) }));
+	pi.on("tool_execution_start", event => tool(event, { state: "running", startedAt: Date.now(), args: brief(event.args) }));
 	pi.on("tool_execution_update", event => tool(event, { progress: brief(event.partialResult) }));
-	pi.on("tool_execution_end", event => tool(event, { state: event.isError ? "error" : "done", result: brief(event.result), durationMs: event.durationMs }));
+	pi.on("tool_execution_end", event => {
+		const startedAt = tools.find(row => row.id === event.toolCallId)?.startedAt;
+		tool(event, { state: event.isError ? "error" : "done", result: brief(event.result), durationMs: event.durationMs ?? (startedAt === undefined ? undefined : Date.now() - startedAt) });
+	});
 	pi.on("session_before_compact", () => { compacting = true; emit(); });
 	pi.on("session_compact", () => { compacting = false; emit(); });
-	pi.on("session_compact_failed", event => { compacting = false; error = event.errorMessage ?? (event.aborted ? "Compaction cancelled" : "Compaction failed"); emit(); });
-	return { snapshot };
+	pi.on("session_compact_failed", event => { compacting = false; error = brief(event.errorMessage ?? (event.aborted ? "Compaction cancelled" : "Compaction failed")); emit(); });
+	return { snapshot, reset: () => { tools.length = 0; queued.length = 0; working = false; compacting = false; thinking = ""; error = ""; interrupted = false; sequence = 0; } };
 }
