@@ -48,7 +48,6 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
-    "pi-ask-user": "*",
     "pi-intercom": "*",
     "pi-subagents": ">=0.75.0"
   },

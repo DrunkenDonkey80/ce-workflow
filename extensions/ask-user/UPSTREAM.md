@@ -14,6 +14,8 @@ Files: index.ts and single-select-layout.ts. Keep the terminal UI and result con
 - Removed unused upstream AskComponent.frameRawLines method (no callers).
 - remote.ts adds validated single/batch answer decoding and an abortable first-answer-wins race, always emitting ask:pending and correlated ask:closed. index.ts wraps each native prompt with it; upstream answer summaries, cancellation and batch skipped states stay unchanged. Browser answers are not environment-gated. Intercom forwarding remains opt-in in work-ask-remote.ts.
 
+- Factory registration waits for session_start, after all extensions load; if another ask_user exists it skips ours and warns once (D12). registerAskUser is exported so the Plan3 command adapter can instantiate the same tool without lifecycle hooks.
+
 ## Updating
 
 Compare the upstream release's two source files with this directory, port applicable changes, run package verification and terminal/browser dialog checks, and update this version and divergence list. Preserve ce-workflow's remote channel and coexistence handling when those are added.

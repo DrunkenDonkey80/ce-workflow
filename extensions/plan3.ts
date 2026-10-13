@@ -333,7 +333,11 @@ async function mutate(plan, change) {
 		delete result.log;
 		setMeta(lines, "updated", new Date().toISOString());
 		if (log) await appendLog(plan.file, log); // History first: a failed plan write never loses it.
-		await writeFile(plan.file, lines.join(eol));
+		const temp = `${plan.file}.${randomUUID()}.tmp`;
+		try {
+			await writeFile(temp, lines.join(eol), { flag: "wx" });
+			await rename(temp, plan.file); // Readers see the old or new complete plan, never a truncated write.
+		} finally { await unlink(temp).catch(error => { if (error.code !== "ENOENT") throw error; }); }
 		return result;
 	});
 }

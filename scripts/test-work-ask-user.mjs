@@ -13,10 +13,10 @@ try { sdkRoots.push(path.dirname(path.dirname(createRequire(import.meta.url).res
 const sdkRoot = sdkRoots.find(root => existsSync(path.join(root, "dist", "core", "extensions", "virtual-modules.js")));
 assert(sdkRoot, "vendored popup selfcheck needs an installed Pi SDK");
 const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
-const factory = await createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES }).import("../extensions/ask-user/index.ts", { default: true });
+const { default: factory, registerAskUser } = await createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES }).import("../extensions/ask-user/index.ts");
 const bus = new EventEmitter();
 let tool;
-factory({ registerTool: (registered) => { tool = registered; }, events: { on: (name, fn) => { bus.on(name, fn); return () => bus.off(name, fn); }, emit: (name, event) => bus.emit(name, event) } });
+registerAskUser({ registerTool: (registered) => { tool = registered; }, events: { on: (name, fn) => { bus.on(name, fn); return () => bus.off(name, fn); }, emit: (name, event) => bus.emit(name, event) } });
 assert.equal(tool.name, "ask_user");
 assert.equal(tool.executionMode, "sequential");
 assert.equal(tool.parameters.properties.questions.maxItems, 4);
@@ -41,4 +41,16 @@ const batch = await tool.execute("batch", { questions: [question, { ...question,
 assert.equal(batch.details.cancelled, false);
 assert.deepEqual(batch.details.answers, [{ status: "answered", response: { kind: "selection", selections: ["Ship"] } }, { status: "skipped" }]);
 assert.equal(bus.listenerCount("ask:answer"), 0);
-console.log("ok - vendored ask_user single and batch native answer races");
+
+for (const external of [false, true]) {
+ let start, registrations = 0, warnings = 0;
+ factory({ on: (name, fn) => { assert.equal(name, "session_start"); start = fn; },
+   getAllTools: () => external ? [{ name: "ask_user" }] : [],
+   registerTool: () => registrations++ });
+ assert.equal(registrations, 0, "wait for all extension factories before deciding coexistence");
+ start({}, { ui: { notify: () => warnings++ } });
+ start({}, { ui: { notify: () => warnings++ } });
+ assert.equal(registrations, external ? 0 : 1);
+ assert.equal(warnings, external ? 1 : 0);
+}
+console.log("ok - vendored ask_user single/batch races and coexistence");

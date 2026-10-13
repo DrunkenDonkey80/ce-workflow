@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-13
-updated: 2026-10-13T13:55:08.695Z
+updated: 2026-10-13T13:59:32.931Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -137,7 +137,7 @@ Commands (existing; referenced by steps):
 
 - [x] **P2-01** Vendored pi-ask-user 0.16.0 with MIT license/provenance, .ts imports, pinned version and package registration; native host smoke passed.
 - [x] **P2-02** Native single/batch answer channel validates responses, cancels losing UI and cleans listeners; intercom remains opt-in; obsolete patch/live patch test removed.
-- [ ] **P2-03** Point `plan3-ask.ts` at the vendored copy; apply D12 for a loaded pi-ask-user; update README install lines and peer dependencies.
+- [x] **P2-03** Plan3 uses vendored popup via host jiti; external 0.16.x remains supported, startup skips ours and warns once; README/peer dependency updated; concurrent plan writes made atomic.
 - [ ] **P2-04** Make catch-up plans for pi-ask-user tell the reviewer to diff upstream against `extensions/ask-user/` and update UPSTREAM.md.
   - Check: C-PLAN3, C-ASKREMOTE, C-DIALOGS, C-LSP pass; existing resolve popup tests run against the vendored copy.
 
@@ -246,3 +246,4 @@ Append material changes and their reasons; preserve the original request and set
 - 2026-10-13: D14 superseded by D15 at the user's request: Force finish now updates the product architecture to match what was actually built before archiving, instead of only warning; P6-02 updated, Q-08 opened for an aborted update.
 - 2026-10-13: Added P6-04 after P6-01: User comment on Q-08: a project may have only one complicated task, so the first plan diagram should offer the whole-project diagram (D17).
 - 2026-10-13: Repaired an accidental duplicated plan prefix inside D20 caused by JavaScript replacement-string expansion; original request and D1–D18 preserved. D23's inferred exception was incorrect: repository AGENTS.md applies the .ts rule to anything under extensions/. layout source renamed to layout.ts; browser JavaScript will be served from .ts source, and installed-copy tests use jiti. No scope change.
+- 2026-10-13 (P2-03): Focused C-PLAN3 exposed a concurrent reader seeing truncated frontmatter during requirement mutation (test line 403; tool fresh-summary read at plan3.ts:1599). mutate() now writes a unique sibling temp file and atomically renames it under the existing lock. Original concurrent-requirement assertion retained; unrelated dirty resolve-flow edits remain unstaged.

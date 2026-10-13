@@ -67,7 +67,7 @@ const api = {
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
 	on: (name, handler) => hooks.set(name, handler),
-	events: { emit: (name, data) => events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }), on: (name, handler) => listeners.set(name, handler) },
+	events: { emit: (name, data) => events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }), on: (name, handler) => { listeners.set(name, handler); return () => { if (listeners.get(name) === handler) listeners.delete(name); }; } },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
 };
@@ -1074,7 +1074,7 @@ try {
 	ctx.ui.input = async () => { throw new Error("Resolve must use ask_user, not an input menu"); };
 	const directMessages = messages.length;
 	await run("plan3", "resolve 55555555");
-	assert.match(notices.at(-1).message, /needs the loaded pi-ask-user/);
+	assert.match(notices.at(-1).message, /needs the loaded ask_user/);
 	assert.equal(messages.length, directMessages, "missing package never falls back to a thinking prompt");
 	assert.equal(await readFile(directFile, "utf8"), directPlan);
 
@@ -1097,8 +1097,8 @@ try {
 	const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
 	const nativePlan3 = await createJiti(import.meta.url, { moduleCache: false, virtualModules: VIRTUAL_MODULES }).import("../extensions/plan3.ts", { default: true });
 	nativePlan3(api);
-	askSource = path.join(os.homedir(), ".pi", "agent", "npm", "node_modules", "pi-ask-user", "index.ts");
-	assert(existsSync(askSource), "native popup selfcheck needs pi-ask-user installed");
+	askSource = fileURLToPath(new URL("../extensions/ask-user/index.ts", import.meta.url));
+	assert(existsSync(askSource), "native popup selfcheck needs vendored ask_user");
 	let dialogs = [], popupCount = 0;
 	const theme = { fg: (_, text) => text, bg: (_, text) => text, bold: text => text, italic: text => text, underline: text => text, getFgAnsi: () => "", getBgAnsi: () => "" };
 	const keys = { "tui.select.confirm": "\r", "tui.input.submit": "\r", "tui.select.cancel": "\x1b", "tui.select.down": "\x1b[B", "tui.select.up": "\x1b[A" };

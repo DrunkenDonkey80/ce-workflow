@@ -2811,6 +2811,21 @@ function formatBatchResult(theme: Theme, details: AskBatchDetails, expanded: boo
 }
 
 export default function(pi: ExtensionAPI) {
+   let registered = false, warned = false;
+   // All extension factories have run by session_start, independent of package load order.
+   pi.on("session_start", (_event, ctx) => {
+      if (registered) return;
+      if (pi.getAllTools().some(tool => tool.name === "ask_user")) {
+         if (!warned) ctx.ui.notify("ce-workflow: another ask_user is loaded. Uninstall pi-ask-user to enable browser answers; terminal questions remain available.", "warning");
+         warned = true;
+         return;
+      }
+      registerAskUser(pi);
+      registered = true;
+   });
+}
+
+export function registerAskUser(pi: ExtensionAPI) {
    // Flat object shape: union item schemas get stripped or rejected
    // by several providers/proxies (Google function calling,
    // Codex-style backends, cmux), leaving the model to guess the shape
