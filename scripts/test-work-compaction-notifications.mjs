@@ -1731,6 +1731,28 @@ try {
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "Read fine print" }, undefined, null,
 		{ ...visionCtx, modelRegistry: { find: () => ({ input: ["text", "image"] }), streamSimple: () => ({ result: async () => ({ stopReason: "error", errorMessage: "private-provider-token" }) }) } }), /Vision model failed/);
 	await assert.rejects(tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, AbortSignal.abort(), null, visionCtx), /cancelled|abort/i);
+	// The level suffix becomes reasoning effort; the alternative answers only when asked and falls back to the default.
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision:medium", visionAltModel: "test/alt:low" } }));
+	const visionCalls = [];
+	const levelCtx = { ...visionCtx, modelRegistry: { find: (provider, id) => ({ provider, id }), streamSimple: (model, _request, options) => { visionCalls.push([model.id, options.reasoning]); return { result: async () => (model.id === "alt" && visionCalls.length > 2 ? { stopReason: "error" } : { stopReason: "stop", content: [{ type: "text", text: `by ${model.id}` }] }) }; } } };
+	assert.equal((await tools.process_image.execute("call", { image: imageId, question: "Level?" }, undefined, null, levelCtx)).details.model, "test/vision:medium");
+	assert.match((await tools.process_image.execute("call", { image: imageId, question: "Alt?", alternative: true }, undefined, null, levelCtx)).content[0].text, /by alt/);
+	const fellBack = await tools.process_image.execute("call", { image: imageId, question: "Alt again?", alternative: true }, undefined, null, levelCtx);
+	assert.match(fellBack.content[0].text, /^\[Alternative test\/alt:low failed.*answered by the default model\.\]\nInterpretation by test\/vision:medium/s);
+	assert.deepEqual(visionCalls, [["vision", "medium"], ["alt", "low"], ["alt", "low"], ["vision", "medium"]]);
+	{
+		const { createImageTools } = await import("../extensions/work-images.ts");
+		const shown = new Map();
+		const altSetting = { value: "__none_model__" };
+		const { refresh } = createImageTools({ on() {} }, { visionModel: () => "test/vision", visionAltModel: () => altSetting.value, imageModel: () => "__none_model__", visionBridge: {}, register: (tool) => shown.set(tool.name, tool) });
+		refresh({ cwd });
+		assert.equal(shown.get("process_image").parameters.properties.alternative, undefined, "no alternative argument until one is set");
+		altSetting.value = "test/alt:low";
+		refresh({ cwd });
+		assert.match(shown.get("process_image").description, /alternative: true only as a second opinion/, "the alternative is described once set");
+		assert.equal(shown.get("process_image").parameters.properties.alternative.type, "boolean");
+	}
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision" } }));
 	// Image files go to the vision model too, so pixels never enter the main context.
 	const shot = path.join(cwd, "shot.png");
 	writeFileSync(shot, Buffer.from(pixels, "base64"));

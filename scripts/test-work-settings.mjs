@@ -184,11 +184,16 @@ try {
 		ui: customUi([
 			{ target: "Vision model:", key: "enter" },
 			{ target: "Vision Test", key: "enter", capture: lines => { visionChoices = lines.join("\n"); } },
+			{ target: "Xhigh", key: "enter" },
+			{ target: "Alternative vision model:", key: "enter" },
+			{ target: "Text Only", key: "enter" },
+			{ key: "escape" },
 			{ key: "escape" },
 		]),
 	});
 	assert(visionChoices.includes("Vision Test") && visionChoices.includes("Text Only"), "vision picker trusts the selected model");
-	assert(mod.visionModelSettings(cwd) === "test/vision", "selected vision model persists");
+	assert(mod.visionModelSettings(cwd) === "test/vision:xhigh", "selected vision model and effort persist");
+	assert(mod.visionAltModelSettings(cwd) === "__none_model__", "escaping the effort step saves nothing");
 	// Return to default so subsequent settings assertions remain independent.
 	writeSettings({});
 	// Subscription footer is global-only, default-off, cancelable, and live-applied.

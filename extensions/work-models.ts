@@ -32,7 +32,7 @@ import {
 } from "./work-extension-scout.ts";
 import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, contentText, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
 import { compactMemory } from "./work-compaction-memory.ts";
-import { createVisionBridge } from "./work-vision.ts";
+import { createVisionBridge, splitLevel } from "./work-vision.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
 import { catchUpPlanText, catchUpReviewBlocker, PLAN3_CATCH_UP_PACKAGES } from "./plan3-catch-up.ts";
 import { listPlans, setPlanModelPicker } from "./plan3.ts";
@@ -1097,6 +1097,11 @@ async function handleKnowledgeCommand(args, ctx) {
 export function visionModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	return String(settings.workOrchestrator?.visionModel ?? NONE_MODEL);
 }
+export function visionAltModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
+	return String(settings.workOrchestrator?.visionAltModel ?? NONE_MODEL);
+}
+// "provider/id:level" shown as "Name: Level".
+const visionLabel = (ref, names) => { if (ref === NONE_MODEL) return "None"; const { model, level } = splitLevel(ref); return level ? modelEffortSummary(model, level, names) : names?.get(model) ?? model; };
 
 export function imageModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	return String(settings.workOrchestrator?.imageModel ?? NONE_MODEL);
@@ -3506,7 +3511,7 @@ export default function workModelsExtension(pi) {
 			return { content: [{ type: "text", text: "Saved; it will be included verbatim in the next compaction summary. Continue working." }] };
 		},
 	});
-	createImageTools(pi, { visionModel: (cwd) => visionModelSettings(cwd), imageModel: (cwd) => imageModelSettings(cwd), visionBridge, register: (tool) => registerConstrainedTool(pi, tool) });
+	createImageTools(pi, { visionModel: (cwd) => visionModelSettings(cwd), visionAltModel: (cwd) => visionAltModelSettings(cwd), imageModel: (cwd) => imageModelSettings(cwd), visionBridge, register: (tool) => registerConstrainedTool(pi, tool) });
 	pi.events?.on?.("subagent:async-complete", (event) => {
 		noteExcludedModels(event);
 		const absorbed = absorbKnowledgeDiscovererCompletion(event);
@@ -4051,7 +4056,8 @@ function workSettingsStatus(ctx) {
 		`Plan3 models: ${(settings.workOrchestrator?.plan3?.models ?? []).map((entry) => entry.model).join(", ") || "None"}`,
 		`Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label}`,
 		`Compaction LLM model: ${modelEffortSummary(compactor.model, compactor.thinking)}`,
-		`Vision model: ${visionModel === NONE_MODEL ? "None" : visionModel}`,
+		`Vision model: ${visionLabel(visionModel)}`,
+		`Alternative vision model: ${visionLabel(visionAltModelSettings(ctx.cwd, settings))}`,
 		`Image generation model: ${imageModelSettings(ctx.cwd, settings) === NONE_MODEL ? "None" : imageModelSettings(ctx.cwd, settings)}`,
 	].join("\n"), "info");
 }
@@ -4168,6 +4174,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "codingEffort") return owns(block?.plan3, "codingEffort");
 	if (item.kind === "phaseModel") return owns(block?.plan3, item.value);
 	if (item.kind === "visionModel") return owns(block, "visionModel");
+	if (item.kind === "visionAltModel") return owns(block, "visionAltModel");
 	if (item.kind === "imageModel") return owns(block, "imageModel");
 	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
 	return false;
@@ -4387,8 +4394,13 @@ async function workSettingsLoop(ctx) {
 			},
 {
 				kind: "visionModel", value: "visionModel",
-				label: `Vision model: [${visionModel === NONE_MODEL ? "None" : names.get(visionModel) ?? visionModel}] ${SUBMENU_ARROW}`,
+				label: `Vision model: [${visionLabel(visionModel, names)}] ${SUBMENU_ARROW}`,
 				description: "process_image: answers image questions (files or references) so pixels stay out of the main context; images go to this provider.",
+			},
+			{
+				kind: "visionAltModel", value: "visionAltModel",
+				label: `Alternative vision model: [${visionLabel(visionAltModelSettings(ctx.cwd, settings), names)}] ${SUBMENU_ARROW}`,
+				description: "process_image second opinion (alternative: true): uncertain text, exact positions or outlines. Retries on the vision model if it fails.",
 			},
 {
 				kind: "imageModel", value: "imageModel",
@@ -4541,27 +4553,35 @@ async function workSettingsLoop(ctx) {
 			continue;
 		}
 
-		if (pick.kind === "visionModel" || pick.kind === "imageModel") {
-			const vision = pick.kind === "visionModel";
+		if (pick.kind === "visionModel" || pick.kind === "visionAltModel" || pick.kind === "imageModel") {
+			const vision = pick.kind !== "imageModel", alt = pick.kind === "visionAltModel";
+			const current = splitLevel(alt ? visionAltModelSettings(ctx.cwd, settings) : vision ? visionModel : imageModelSettings(ctx.cwd, settings));
+			const title = alt ? "Alternative vision model" : vision ? "Vision model" : "Image generation model";
 			// Vision keeps every model (image metadata is unreliable); drawing needs a Codex model or an image model.
 			const fits = vision ? undefined : new Set((await ctx.modelRegistry.getAvailable()).map((entry) => entry.model ?? entry)
 				.filter(imageModelCanDraw).map((model) => `${model.provider}/${model.id}`));
 			let painters = [];
 			if (!vision) try { painters = await ctx.modelRegistry.getAvailableOfType?.("image") ?? []; } catch { /* No image catalog: Codex models only. */ }
-			const selected = await chooseModel(ctx, vision ? "Vision model" : "Image generation model",
-				vision ? visionModel : imageModelSettings(ctx.cwd, settings), scope === "project", scope === "project", false,
-				scope === "project" ? undefined : { label: "None", description: vision ? "No process_image tool" : "No generate_image tool" },
+			const selected = await chooseModel(ctx, title,
+				current.model, scope === "project", scope === "project", false,
+				scope === "project" ? undefined : { label: "None", description: alt ? "No second opinion; process_image uses only the vision model" : vision ? "No process_image tool" : "No generate_image tool" },
 				{
 					allow: fits && ((value) => fits.has(value)),
-					noneDescription: `No ${vision ? "process_image" : "generate_image"} tool, even when the global setting has one`,
+					noneDescription: alt ? "No alternative vision model, even when the global setting has one" : `No ${vision ? "process_image" : "generate_image"} tool, even when the global setting has one`,
 					extra: painters.map((model) => ({ value: `${model.provider}/${model.id}`, label: model.name ?? model.id, description: `${model.provider}/${model.id} · image model`, preserveCase: true })),
 				});
 			if (selected === undefined) continue;
+			let value = selected;
+			if (vision && selected !== INHERIT_MODEL && selected !== NONE_MODEL) {
+				const level = await choose(ctx, `${title}: choose effort`, THINKING_LEVELS.filter((item) => item !== "off").map((item) => ({ value: item, label: item, description: "Reasoning effort for image questions" })), current.level ?? "medium", { forceCustom: true });
+				if (level === undefined) continue;
+				value = `${selected}:${level}`;
+			}
 			settings = readScopedSettings(ctx.cwd, scope);
 			settings.workOrchestrator ??= {};
-			const key = vision ? "visionModel" : "imageModel";
+			const key = pick.kind;
 			if (selected === INHERIT_MODEL) delete settings.workOrchestrator[key];
-			else settings.workOrchestrator[key] = selected;
+			else settings.workOrchestrator[key] = value;
 			writeScopedSettings(ctx.cwd, scope, settings);
 			continue;
 		}
