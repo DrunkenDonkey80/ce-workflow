@@ -1225,6 +1225,52 @@ try {
 		}]];
 		assert.equal((await post("command", { command: "finish" })).status, 200); assert.equal(selectScript.length, 0);
 		webCtx.hasUI = false;
+		assert.equal((await readFile(bFile, "utf8")).match(/\*\*ARCH-RECONCILE\*\*/g).length, 1, "repeated finish adds architecture phase once");
+		const webPlan = async args => (await tools.get("plan3").execute("web-plan", args, undefined, undefined, webCtx)).details;
+		const c = "c3333333", cFile = path.join(plansDir, `2026-10-13-c-${c}-plan3.md`);
+		await writeFile(cFile, validPlan(c, "Normal architecture", "active", "### P1 [code] Built\n\n- [x] **C-01** Built"));
+		await webDiagram({ action: "apply", plan: c, expectedRevision: 0, operations: [{ op: "add", entity: "node", value: { id: "changed_api", label: "Changed API", kind: "service", status: "changed" } }] });
+		await assert.rejects(webPlan({ action: "status", plan: c, value: "complete" }), /ARCH-RECONCILE/);
+		assert.match(await readFile(cFile, "utf8"), /Changed plan elements: changed_api/);
+		for (const mark of ["failed", "blocked", "human", "wip"]) {
+			await webPlan({ action: "step", plan: c, id: "ARCH-RECONCILE", mark });
+			await assert.rejects(webPlan({ action: "status", plan: c, value: "complete" }), /ARCH-RECONCILE/);
+		}
+		await webPlan({ action: "step", plan: c, id: "ARCH-RECONCILE", mark: "done", summary: "No architecture change after checking actual code." });
+		await webPlan({ action: "status", plan: c, value: "complete" });
+		assert(!existsSync(cFile)); assert(existsSync(path.join(plansDir, "done", path.basename(cFile))));
+		webCtx.hasUI = true;
+		for (const [id, mode] of [["d4444444", "success"], ["e5555555", "stay"], ["f6666666", "waive"], ["a7777777", "failed"]]) {
+			const title = `Forced architecture ${mode}`, file = path.join(plansDir, `2026-10-13-force-${id}-plan3.md`);
+			await writeFile(file, validPlan(id, title, "active", "### P1 [code] Deviated\n\n- [ ] **F-01** Dropped planned slice"));
+			selectScript = [["Plans3", title], [title, "Force finish"]];
+			const before = messages.length; await commands.get("plans3").handler("", webCtx);
+			assert.equal(selectScript.length, 0); assert.equal(messages.length, before + 1); assert(existsSync(file), "force finish waits for architecture turn");
+			assert.match(messages.at(-1).message, /what was actually built/); assert.match(messages.at(-1).message, /Do not archive/);
+			assert.match(await readFile(file, "utf8"), /\[wip\] \*\*ARCH-RECONCILE/);
+			if (mode === "success") {
+				await webDiagram({ action: "apply", target: "product", expectedRevision: 1, operations: [{ op: "add", entity: "node", value: { id: "really_built", label: "Actually built", kind: "service" } }] });
+				await webPlan({ action: "step", plan: id, id: "ARCH-RECONCILE", mark: "done", summary: "Product diagram now reflects the implementation.", check: "SDK fixture applied actual built node" });
+			} else selectScript = [["Architecture update did not finish", mode === "waive" ? "Archive anyway (waive architecture update)" : "Keep open and resume later"]];
+			await hooks.get("agent_settled")({ aborted: mode === "waive" || mode === "stay" }, webCtx); assert.equal(selectScript.length, 0);
+			if (mode === "stay" || mode === "failed") {
+				assert(existsSync(file)); assert.match(await readFile(file, "utf8"), /\[wip\] \*\*ARCH-RECONCILE/);
+				if (mode === "stay") {
+					selectScript = [["Plans3", title], [title, "Force finish"]];
+					const resumed = messages.length; await commands.get("plans3").handler("", webCtx);
+					assert.equal(selectScript.length, 0); assert.equal(messages.length, resumed + 1); assert(existsSync(file));
+					assert.equal((await readFile(file, "utf8")).match(/\*\*ARCH-RECONCILE\*\*/g).length, 1);
+					await webPlan({ action: "step", plan: id, id: "ARCH-RECONCILE", mark: "done", summary: "No architecture change after resuming reconciliation." });
+					await hooks.get("agent_settled")({ aborted: false }, webCtx); assert(!existsSync(file));
+				}
+			}
+			else {
+				assert(!existsSync(file)); const archived = await readFile(path.join(plansDir, "done", path.basename(file)), "utf8");
+				assert.match(archived, /^status: complete$/m); assert.match(archived, /\[ \] \*\*F-01\*\* Dropped planned slice/, "force preserves dropped slices as unfinished");
+				if (mode === "waive") assert.match(archived, /User waived the interrupted\/failed architecture update/);
+			}
+		}
+		webCtx.hasUI = false;
 		const notify = webCtx.ui.notify;
 		webCtx.ui.notify = () => { throw new Error("broken UI"); };
 		assert.equal((await post("command", { command: "review" })).status, 500);

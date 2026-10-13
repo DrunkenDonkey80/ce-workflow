@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-13
-updated: 2026-10-13T19:57:43.040Z
+updated: 2026-10-13T20:08:45.033Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -172,15 +172,7 @@ Commands (existing; referenced by steps):
 
 - [x] **P6-01** The existing public architecture command creates/opens the product target, with shared live chat and validated product diagram edits.
 - [x] **P6-04** First plan workspace offers whole-project mapping; Yes persists an empty product and asks the live agent to map actual code, No is remembered per project, repeat opens do not duplicate prompts/turns.
-- [ ] **P6-02** Implement the standing update rule per D8 in `finish()` and every completion route, with tests in C-PLAN3.
-  - Insert the reconciliation step idempotently with a stable id; repeated Finish does not duplicate it.
-  - Completion checks that step's done mark directly; the existing open-step check covers only wip, next and waiting steps (plan3 status action).
-  - Force finish (`forceFinish()`) follows D15: with a product diagram it starts an agent turn that reconciles the diagram with the actual code and git history, then archives.
-  - The agent prompt says to describe what was built, not the plan's unfinished steps; without a product diagram Force finish behaves as today.
-  - Tests: Force finish with a product diagram does not archive until the reconciliation step is done; without one it archives at once.
-  - An aborted or failed update follows D16: dialog offers archive anyway (waiver recorded in Amendments) or stay open with the step wip.
-  - Tests: abort then archive anyway records the waiver; abort then stay open, rerun Force finish resumes the update.
-  - Tests: repeated Finish, step marked failed, blocked or human, step done with "no architecture change".
+- [x] **P6-02** Finish adds one reserved architecture phase; normal completion checks its done mark, Force finish runs actual-code reconciliation before archive, interrupted updates require resume or an explicit logged waiver.
 - [ ] **P6-03** Document the workspace, commands, storage, security model and vendored ask_user in README and CHANGELOG.
   - Check: C-VERIFY passes in full.
 
@@ -208,7 +200,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-24/30 done. P5-04/P5-06 focused browser/web/diagram checks passed; P5-05 now WIP for reload persistence, reduced-motion, visible focus and small screen_read checks. HEAD 63225c4 before chat/activity commit. User authorized one read-only oracle only; it completed with driver diagnosis: agent-browser 0.38.2 does not carry held keyboard modifiers into mouse events. Existing browser test now uses native CDP via verified get cdp-url response {cdpUrl}, explicit modifiers:2, and asserts trusted pointerdown/click on web_client without revision/move. Do not alter production guard or weaken native check. No other delegation/background verifier/push/live model CLI. LSP probe has many inferred-settings frontend DOM/null/implicit-any warnings (not clean); address before final C-LSP gate, do not claim clean. Preserve unrelated plan3.ts/test-work-plan3.mjs hunks and sidecars.
+27/30 complete; HEAD 10a3406. P6-02 WIP, no P6-02 code edits yet. Next implement D8/D15/D16 reconciliation gate in finish(), direct plan3 status complete and Force finish: idempotent final [code] reserved step, direct done-mark check across failed/blocked/human, agent turn for actual-code/git reconciliation before forced archive, aborted/failed-update waiver or resume. Read bodies: finish at 1142, forceFinish at 1480, status route ~1660, forceFinish caller ~1564; archive has only force/status callers. P6-04 implemented explicit product creation + first-plan Yes/No/repeat; C-PLAN3 passed after updating native Resolve fixture baseline for intentional generation message. Unrelated resolve follow-up changes remain unstaged in plan3.ts/test-work-plan3.mjs; preserve them with selective hunks. Phase 5 browser qualification and verify:quiet passed at 26a7ae4. Current browser source has inferred-LSP DOM/null/implicit-any warnings, NOT clean; global C-LSP remains unresolved. No delegation except completed user-authorized one-shot driver oracle, no background verifier/live Pi-model CLI/push. Two retained browser fixtures were closed. After P6-02 do P6-03 README/CHANGELOG + full verify, then request P7-01 human browser acceptance via requirement/ask_user. Keep executing runnable work; no stop at checkpoints.
 
 ## Amendments
 
@@ -230,3 +222,4 @@ Append material changes and their reasons; preserve the original request and set
 - 2026-10-13: Repaired an accidental duplicated plan prefix inside D20 caused by JavaScript replacement-string expansion; original request and D1–D18 preserved. D23's inferred exception was incorrect: repository AGENTS.md applies the .ts rule to anything under extensions/. layout source renamed to layout.ts; browser JavaScript will be served from .ts source, and installed-copy tests use jiti. No scope change.
 - 2026-10-13 (P2-03): Focused C-PLAN3 exposed a concurrent reader seeing truncated frontmatter during requirement mutation (test line 403; tool fresh-summary read at plan3.ts:1599). mutate() now writes a unique sibling temp file and atomically renames it under the existing lock. Original concurrent-requirement assertion retained; unrelated dirty resolve-flow edits remain unstaged.
 P4-06 also closes the web listener and resets chat/activity/dialog state on Pi session switches: a capability from one conversation must not silently control or read the next. Public HTTP lifecycle tests cover reopening with a new token.
+P6-02 active LSP probe (plan3.ts + test-work-plan3.mjs) reported 817 inferred-settings warnings, including missing Node type declarations and implicit-any; neither file is clean. These are not authoritative tsconfig checks. C-LSP limitation must be resolved or explicitly accepted before final completion; do not claim clean from runtime tests.

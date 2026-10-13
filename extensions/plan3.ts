@@ -24,6 +24,7 @@ const OPTIMIZE = "plan3-optimize";
 const COMPACT_MIN_TOKENS = 20_000; // D09: below this there is nothing worth compacting.
 const DUPLICATE_SIMILARITY = 0.5; // D15: Jaccard overlap of request words.
 const STATUSES = ["draft", "ready", "active", "blocked", "complete"];
+const ARCHITECTURE_STEP = "ARCH-RECONCILE";
 const MARKS = { pending: "[ ]", wip: "[wip]", done: "[x]", failed: "[f]", blocked: "[blocked]", human: "[human]" };
 // A started plan left blocked (steps waiting on the user or hardware) still executes; only an unstarted one is planning.
 const isPlanning = (plan) => plan.status === "draft" || (plan.status === "blocked" && !plan.started);
@@ -1130,6 +1131,19 @@ export default function plan3(pi) {
 		await startPlanning(ctx, { id, file }, "Draft plan:", fromChat, source?.file);
 	}
 
+	async function ensureArchitectureStep(ctx, plan) {
+		if (!loadDiagram(ctx.cwd, { kind: "product" })) return false;
+		await mutate(plan, lines => {
+			if (activeSteps(lines).some(step => step.id === ARCHITECTURE_STEP)) return { unchanged: true };
+			if (steps(lines).some(step => step.id === ARCHITECTURE_STEP)) throw new Error(`${ARCHITECTURE_STEP} is reserved for the final architecture phase, not Backlog.`);
+			const changed = loadDiagram(ctx.cwd, { kind: "plan", plan });
+			const ids = changed ? [...changed.nodes, ...changed.edges].filter(item => ["new", "changed", "removed"].includes(item.status)).map(item => item.id) : [];
+			appendToSection(lines, "Phases", `### P-ARCH [code] Product architecture\n\n- [ ] **${ARCHITECTURE_STEP}** Reconcile the product architecture diagram with this plan's actual changes.\n  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.\n  - Changed plan elements: ${ids.join(", ") || "none flagged; inspect actual implementation"}.`);
+			appendToSection(lines, "Amendments", `- ${today()}: Added final architecture reconciliation because a product diagram exists.`);
+		});
+		return true;
+	}
+	function architectureDone(lines) { return activeSteps(lines).find(step => step.id === ARCHITECTURE_STEP)?.mark === "x"; }
 	async function finish(ctx, selectedPlan?) {
 		const plan = selectedPlan ?? currentPlan(ctx, await listPlans(ctx.cwd));
 		if (!plan) return ctx.ui.notify("Plan3: no open plan to finish.", "info");
@@ -1143,6 +1157,7 @@ export default function plan3(pi) {
 			if (pick?.value?.startsWith("review")) return advise(ctx, "review", pick.value === "review-all", "", plan);
 			if (pick?.value !== "finish") return;
 		}
+		await ensureArchitectureStep(ctx, plan);
 		await mutate(plan, (lines) => {
 			setMeta(lines, "status", "ready");
 			const visual = section(lines, "Visual design");
@@ -1465,10 +1480,38 @@ export default function plan3(pi) {
 		return { ideas: saved, responses: results, reconciliation: "Only commented responses need interpretation; stale responses are preserved in Amendments, not applied, and need clarification against the changed proposal. Use action idea with id, decision and note; answered leaves approval unsettled. Never infer approval from an unclear comment. Plain accepted/rejected choices are already applied by code. Pending/answered ideas remain available via /plan3 ideas select." };
 	}
 
+	let forcingArchitecture;
 	async function forceFinish(ctx, plan) {
+		if (!await ensureArchitectureStep(ctx, plan)) return archiveForced(ctx, plan);
+		await mutate(plan, lines => markStep(lines, ARCHITECTURE_STEP, "wip"));
+		forcingArchitecture = { id: plan.id, cwd: ctx.cwd };
+		setPointer(plan, false); research(ctx, false);
+		send(`Force finish Plan3 ${JSON.stringify(plan.file)}: first reconcile docs/architecture/product.diagram.json with what was actually built, using actual code and this plan's git history, not its unfinished or dropped steps. Read/edit with plan3_diagram target product. Then mark ${ARCHITECTURE_STEP} done with a summary and check (or no architecture change). Do not archive or set status complete; code archives after this update settles. This is an architecture-documentation turn, not authorization for more product implementation.`);
+		ctx.ui.notify("Force finish: updating product architecture before archive.", "info");
+	}
+	async function afterForcedArchitecture(ctx, aborted) {
+		const pending = forcingArchitecture; forcingArchitecture = undefined;
+		if (!pending || pending.cwd !== ctx.cwd) return;
+		const plan = (await listPlans(ctx.cwd)).find(item => item.id === pending.id && isOpen(item));
+		if (!plan) return;
+		if (!aborted && architectureDone(split(await readFile(plan.file, "utf8")).lines)) {
+			ctx.ui.notify(`Plan3: force-finished → ${await archiveForced(ctx, plan)}`, "info"); return;
+		}
+		await mutate(plan, lines => markStep(lines, ARCHITECTURE_STEP, "wip"));
+		if (!ctx.hasUI) return ctx.ui.notify("Architecture update incomplete; plan remains open. Force finish again resumes it.", "warning");
+		const choice = await waitForUser("Architecture update interrupted", () => showListDialog(ctx, {
+			title: "Architecture update did not finish", purpose: "Keep the plan open to resume, or explicitly waive this update and archive anyway.",
+			items: [{ value: "stay", label: "Keep open and resume later" }, { value: "waive", label: "Archive anyway (waive architecture update)" }],
+		}));
+		if (choice?.value !== "waive") return;
+		await mutate(plan, lines => { const result = markStep(lines, ARCHITECTURE_STEP, "done", { summary: "Architecture update waived by the user after an interrupted or failed Force finish." }); appendToSection(lines, "Amendments", `- ${today()}: User waived the interrupted/failed architecture update and explicitly chose archive anyway; product diagram may be stale.`); return result; });
+		ctx.ui.notify(`Plan3: force-finished → ${await archiveForced(ctx, plan)}`, "info");
+	}
+	async function archiveForced(ctx, plan) {
 		const text = await readFile(plan.file, "utf8");
 		const open = text.split(/\r?\n/).map((line) => line.match(STEP)).filter((match) => match && !["x"].includes((match[2] ?? " ").trim())).map((match) => match[3]);
 		await mutate(plan, (lines) => {
+			if (loadDiagram(ctx.cwd, { kind: "product" }) && !architectureDone(lines)) throw new Error(`Finish ${ARCHITECTURE_STEP} before forced archive.`);
 			setMeta(lines, "status", "complete");
 			appendToSection(lines, "Amendments", `- ${today()}: Force-finished by the user${open.length ? ` with unfinished steps: ${open.join(", ")}` : ""}.${designPointer(text) ? " Explicit override, not design approval/reconciliation or test proof; visual artifacts/receipts remain unchanged." : ""}`);
 		});
@@ -1520,7 +1563,7 @@ export default function plan3(pi) {
 				...(isOpen(plan) && pickModel ? [{ value: "models", label: `Models: ${Object.entries(plan.overrides ?? {}).map(([key, value]) => `${key.replace(/[A-Z].*/, "")} ${key === "codingEffort" ? "effort " : ""}${value}`).join(" · ") || "inherit"}`, description: "Planning/coding model and coding effort for this plan only" }] : []),
 				...(isOpen(plan) ? [{ value: "optimize", label: "Optimize", description: "Compact into a current work document; history moves to the sidecar log" }] : []),
 				...(isOpen(plan) && (!design || ["reconciled", "abandoned"].includes(design.phase)) ? [{ value: "design", label: "Visual design (optional)", description: "Prepare, continue or review an opted-in OpenDesign phase" }] : []),
-				...(isOpen(plan) ? [{ value: "finish", label: "Force finish", description: "Mark complete now and archive to docs/plans/done" }] : []),
+				...(isOpen(plan) ? [{ value: "finish", label: "Force finish", description: "Reconcile existing product architecture first, then archive despite unfinished steps" }] : []),
 				{ value: "delete", label: "Delete", description: "Remove the plan file" },
 			] });
 			if (action?.value === "view") {
@@ -1549,7 +1592,7 @@ export default function plan3(pi) {
 			if (action?.value === "models") { await editOverrides(ctx, plan); continue; }
 			if (action?.value === "design") { if (idle(ctx)) await designCommand(ctx, plan); continue; }
 			if (action?.value === "resolve") return idle(ctx) && resolveQuestions(ctx, plan);
-			if (action?.value === "finish") ctx.ui.notify(`Plan3: force-finished → ${await forceFinish(ctx, plan)}`, "info");
+			if (action?.value === "finish") { const file = await forceFinish(ctx, plan); if (!file) return; ctx.ui.notify(`Plan3: force-finished → ${file}`, "info"); }
 			if (action?.value === "delete") {
 				const confirm = await showListDialog(ctx, { title: `Delete ${plan.title}?`, purpose: "The plan file is removed permanently.", items: [{ value: "no", label: "Cancel" }, { value: "yes", label: "Delete permanently" }] });
 				if (confirm?.value === "yes") { await unlink(plan.file); ctx.ui.notify(`Plan3: deleted ${plan.name}`, "info"); }
@@ -1654,6 +1697,7 @@ export default function plan3(pi) {
 					if (problems.length) throw new Error(problems.join("\n"));
 					if (localPlanDesign(ctx.cwd, plan)?.phase !== "abandoned" && localPlanDesign(ctx.cwd, plan) && !["ready", "active", "complete"].includes(plan.status)) throw new Error("Use /plan3 finish again after design reconciliation before activating/completing implementation.");
 				}
+				if (value === "complete" && await ensureArchitectureStep(ctx, plan) && !architectureDone(split(await readFile(plan.file, "utf8")).lines)) throw new Error(`Finish ${ARCHITECTURE_STEP} first, or mark it done with no architecture change.`);
 				const open = [...plan.wip, plan.next, ...plan.waiting.map((step) => step.id)].filter(Boolean);
 				if (value === "complete" && open.length) throw new Error(`Steps are still open (${open.join(", ")}…); finish or mark them first.`);
 				await mutate(plan, (lines) => {
@@ -1662,6 +1706,7 @@ export default function plan3(pi) {
 						if (problems.length) throw new Error(problems.join("\n"));
 						if (localPlanDesign(ctx.cwd, plan)?.phase !== "abandoned" && localPlanDesign(ctx.cwd, plan) && !["ready", "active", "complete"].includes(getMeta(lines, "status"))) throw new Error("Use /plan3 finish again after design reconciliation before implementation.");
 					}
+					if (value === "complete" && loadDiagram(ctx.cwd, { kind: "product" }) && !architectureDone(lines)) throw new Error(`Finish ${ARCHITECTURE_STEP} first.`);
 					setMeta(lines, "status", value);
 				});
 				if (value === "complete") result = { file: await archive(ctx.cwd, plan) };
@@ -1915,6 +1960,7 @@ export default function plan3(pi) {
 		try { await pending?.then(server => server.close()); } finally { webInstance = undefined; }
 	}
 	pi.on?.("session_switch", async () => {
+		forcingArchitecture = undefined; // Never archive from a reconciliation owned by the previous conversation.
 		dialogs.close(); dialogs = createDialogBridge(pi, publishWeb);
 		chat.reset(); activity.reset();
 		await closeWeb(); // An old browser must never control or read the next conversation.
@@ -1947,6 +1993,7 @@ export default function plan3(pi) {
 	});
 	// R25: after a planning turn, show exactly one state-aware next action.
 	pi.on?.("agent_settled", async (event, ctx) => {
+		await afterForcedArchitecture(ctx, event?.aborted).catch((error) => report(ctx, error));
 		await afterTagging(ctx, event?.aborted).catch((error) => report(ctx, error));
 	});
 	pi.on?.("agent_end", async (_event, ctx) => {
