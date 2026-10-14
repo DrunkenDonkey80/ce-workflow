@@ -284,7 +284,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",share:"Toggle browser sharing for this session",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",share:"Toggle browser sharing for this session",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -4027,6 +4027,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   const plan3={plan:"plan3",plans:"plans3",resume:"resume3"}[action];
   if(plan3) return pi.events?.emit?.("plan3:command",{ctx,name:plan3,args:rest});
   if(action==="share") return pi.events?.emit?.("plan3:share",{ctx,args:rest});
+  if(action==="reload") { await ctx.waitForIdle(); return ctx.reload(); }
   const utility=WO_UTILITY_ACTIONS[action];
   if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
   if(action==="compact") return requestMicrocompact(ctx);

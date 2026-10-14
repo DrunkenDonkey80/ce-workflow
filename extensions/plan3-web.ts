@@ -424,13 +424,15 @@ export async function stopLiveRun(ctx) {
 	return { accepted: true };
 }
 
-const terminalCommands = new Set(["settings", "model", "thinking", "scoped-models", "login", "logout", "llama", "new", "resume", "name", "session", "tree", "fork", "clone", "compact", "import", "copy", "export", "share", "bug", "trust", "reload", "hotkeys", "changelog", "quit"]);
+const terminalCommands = new Set(["settings", "model", "thinking", "scoped-models", "login", "logout", "llama", "new", "resume", "name", "session", "tree", "fork", "clone", "compact", "import", "copy", "export", "share", "bug", "trust", "hotkeys", "changelog", "quit"]);
 export function forwardDiagramChat(pi, ctx, diagram: Diagram, message: unknown, comments: unknown, publish: (event: string, value: unknown) => void) {
 	const contextual = diagramChatMessage(diagram, message, comments);
 	const prepared = contextual.mentions.length || (Array.isArray(comments) && comments.length) ? contextual : { message: (message as string).trim(), mentions: [], unknownMentions: [] };
 	const command = prepared.message.startsWith("/");
 	const name = command ? prepared.message.slice(1).split(/\s/, 1)[0] : "";
 	if (terminalCommands.has(name)) throw new WebError(400, `/${name}: terminal only.`);
+	// Built-in /reload cannot run from sendUserMessage; /wo reload calls ctx.reload() and the page reconnects.
+	if (name === "reload") prepared.message = "/wo reload";
 	const queued = !ctx.isIdle();
 	try {
 		const pending = pi.sendUserMessage(prepared.message, { expandPromptTemplates: command, ...(queued ? { deliverAs: "followUp" } : {}) });
