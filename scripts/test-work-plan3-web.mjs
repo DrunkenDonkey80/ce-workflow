@@ -388,7 +388,7 @@ const { existsSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
-const { loadShareRecord, saveSharePort, tailscaleStatus, serveAdd, serveRemove, createDeviceRegistry } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
+const { loadShareRecord, saveSharePort, tailscaleStatus, serveAdd, serveRemove, createDeviceRegistry, createSessionRecords } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
 const credentialDir = await mkdtemp(join(tmpdir(), "plan3-remote-test-"));
 let persistent, occupied, fallback;
 try {
@@ -536,6 +536,47 @@ try {
   assert(kept.filter(device => /^[ab][0-9]$/.test(device.label)).every(device => device.lastUsed > device.created), "renewals survive concurrent pairing");
   assert(!existsSync(join(directory, "devices.lock")));
  } finally { await rm(directory, { recursive: true, force: true }); }
+}
+// P3-05: session records for the switcher (D18, D21).
+{
+ const directory = await mkdtemp(join(tmpdir(), "plan3-sessions-test-"));
+ try {
+  const a = createSessionRecords({ directory }), id = "11111111-2222-3333-4444-555555555555", other = "66666666-7777-8888-9999-000000000000";
+  assert.deepEqual(a.list("dev"), [], "no folder yet");
+  a.publish({ sessionId: id, name: "Plan \u001b[31mwork", cwd: "C:/p", port: 4100, state: "working" });
+  a.publish({ sessionId: id, name: "Plan \u001b[31mwork", cwd: "C:/p", port: 4100, state: "waiting" });
+  let [row] = a.list("dev");
+  assert.deepEqual(row, { id, name: "Plan [31mwork", cwd: "C:/p", port: 4100, state: "waiting", revision: 1, unseen: true }, "a finished run raises the revision; control chars are dropped");
+  assert.equal(a.seen("dev", 99), true); assert.equal(a.list("dev")[0].unseen, false, "seen is clamped to the current revision");
+  assert.equal(a.list("other-device")[0].unseen, true, "seen is per device");
+  assert.equal(a.seen("bad id!", 1), false); assert.equal(a.seen("dev", -1), false);
+  a.publish({ sessionId: id, name: "Plan work", cwd: "C:/p", port: 4100, state: "working" }); a.publish({ sessionId: id, name: "Plan work", cwd: "C:/p", port: 4100, state: "idle" });
+  assert.deepEqual([a.list("dev")[0].revision, a.list("dev")[0].unseen], [2, true]);
+  const resumed = createSessionRecords({ directory }); resumed.publish({ sessionId: id, name: "Plan work", cwd: "C:/p", port: 4100, state: "idle" });
+  assert.deepEqual([resumed.list("dev")[0].revision, JSON.parse(await readFile(join(directory, "sessions", id + ".json"), "utf8")).seen.dev], [2, 1], "a new runtime keeps revision and seen");
+  createSessionRecords({ directory, pid: 999999999 }).publish({ sessionId: other, name: "Dead", cwd: "C:/d", port: 4200, state: "idle" });
+  await writeFile(join(directory, "sessions", "junk.json"), "{nope");
+  assert.deepEqual(a.list("dev").map(session => session.id), [id], "dead pids and invalid files are skipped");
+  assert.throws(() => a.publish({ sessionId: "../x", name: "", cwd: "", port: 1, state: "idle" }), /Invalid/);
+  resumed.remove(id); assert(!existsSync(join(directory, "sessions", id + ".json")));
+ } finally { await rm(directory, { recursive: true, force: true }); }
+ const calls = [];
+ const listToken = "c".repeat(64), listServer = await createPlan3Web({ token: listToken, snapshot: () => ({ ok: true }), remote: () => ({ host: "pc.tail.ts.net", login: "me@github" }), device: cookie => cookie === "devA.secret",
+  sessions: { list: device => { calls.push(["list", device]); return [{ id: "x" }]; }, seen: (device, revision) => { calls.push(["seen", device, revision]); return true; } } });
+ try {
+  const host = `pc.tail.ts.net:${listServer.port}`, remoteHeaders = { Host: host, Origin: `https://${host}`, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github", Cookie: "pi_remote=devA.secret", "Content-Type": "application/json" };
+  const raw = (path, headers, method = "GET", payload) => new Promise((resolve, reject) => {
+   const req = httpRequest(`${listServer.origin}${path}`, { method, headers }, res => { let text = ""; res.on("data", chunk => text += chunk); res.on("end", () => resolve({ status: res.statusCode, text })); });
+   req.on("error", reject); req.end(payload);
+  });
+  assert.deepEqual(JSON.parse((await raw("/api/sessions", remoteHeaders)).text), { sessions: [{ id: "x" }] });
+  assert.equal((await raw("/api/seen", remoteHeaders, "POST", JSON.stringify({ revision: 3 }))).status, 200);
+  for (const bad of [{ revision: -1 }, { revision: 1.5 }, { revision: "2" }, { revision: 1, extra: true }]) assert.equal((await raw("/api/seen", remoteHeaders, "POST", JSON.stringify(bad))).status, 400);
+  assert.equal((await raw("/api/sessions", { ...remoteHeaders, Cookie: "pi_remote=devB.secret" })).status, 401, "unpaired devices cannot list sessions");
+  const localHeaders = { Authorization: `Bearer ${listToken}`, Origin: listServer.origin, "Content-Type": "application/json" };
+  assert.equal((await raw("/api/seen", { ...localHeaders, Host: new URL(listServer.origin).host }, "POST", JSON.stringify({ revision: 1 }))).status, 200);
+  assert.deepEqual(calls, [["list", "devA"], ["seen", "devA", 3], ["seen", "local", 1]], "the paired id or 'local' identifies the viewer; the secret never leaves");
+ } finally { await listServer.close(); }
 }
 // P3-04: a revoked device loses access on its next request; pairing codes expire after 2 minutes.
 {

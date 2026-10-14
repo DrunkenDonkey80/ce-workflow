@@ -1320,7 +1320,15 @@ try {
 		await hooks.get("session_shutdown")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.length, 2, "reload keeps the mapping");
 		await hooks.get("session_start")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`);
 		assert.equal((await fetch(`${shareUrl.origin}/api/snapshot`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).status, 200);
+		// D18: the switcher record follows this session's state and leaves with the share.
+		const recordFile = path.join(agentDir, "ce-workflow", "remote", "sessions", `${sessionId}.json`), record = async () => JSON.parse(await readFile(recordFile, "utf8"));
+		assert.deepEqual(await record().then(({ pid, port, state, cwd }) => ({ pid, port, state, cwd })), { pid: process.pid, port: Number(shareUrl.port), state: "idle", cwd: webCwd });
+		const askId = randomUUID(); listeners.get("ask:pending")({ askId, question: "Pick" }); assert.equal((await record()).state, "waiting", "a pending ask shows red");
+		listeners.get("ask:closed")({ askId }); assert.equal((await record()).state, "idle");
+		const switcher = await (await fetch(`${shareUrl.origin}/api/sessions`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).json();
+		assert.deepEqual(switcher.sessions.map(session => [session.id, session.state]), [[sessionId, "idle"]]);
 		await share(); assert.equal(sharedStatus, undefined); assert.deepEqual(entries.at(-1).data, { shared: false });
+		assert.equal(existsSync(recordFile), false, "sharing off removes the switcher record");
 		assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "sharing off removes the mapping");
 		await share(); await hooks.get("session_shutdown")({ reason: "quit" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "quit removes the mapping");
 		await hooks.get("session_start")({ reason: "resume" }, webCtx); await share(); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`);

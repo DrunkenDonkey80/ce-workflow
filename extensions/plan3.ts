@@ -12,7 +12,7 @@ import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, design
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createPlan3Web, checkIn, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
-import { createDeviceRegistry, loadShareRecord, saveSharePort, serveAdd, serveRemove, tailscaleStatus, type ShareRecord, type Tailnet } from "./plan3-remote.ts";
+import { createDeviceRegistry, createSessionRecords, loadShareRecord, saveSharePort, serveAdd, serveRemove, tailscaleStatus, type ShareRecord, type Tailnet } from "./plan3-remote.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -711,7 +711,15 @@ export default function plan3(pi) {
 	let shareRecord: ShareRecord | undefined;
 	const tailscaleExec = (command: string, args: string[], options?: { timeout?: number }) => pi.exec(command, args, options);
 	let tailnet: Tailnet & { port?: number } = { missing: [] };
-	const devices = createDeviceRegistry();
+	const devices = createDeviceRegistry(), sessions = createSessionRecords();
+	// D18: the switcher record mirrors this shared session's state; records are advisory, so failures only warn once.
+	let sessionWarned = false;
+	function publishSession() {
+		if (!webInstance || !webCtx || !shareRecord) return;
+		const live = activity.snapshot(undefined), state = live.dialog || dialogs.snapshot().length ? "waiting" : live.working ? "working" : "idle";
+		try { sessions.publish({ sessionId: shareRecord.sessionId, name: webCtx.sessionManager?.getSessionName?.() || path.basename(webCtx.cwd), cwd: webCtx.cwd, port: webInstance.port, state }); }
+		catch (error) { if (!sessionWarned) { sessionWarned = true; report(webCtx, error); } }
+	}
 	let registryWarned = false;
 	// A corrupt or locked registry denies remote access (D21) and says why once.
 	async function pairedDevice(cookie: string, login: string) {
@@ -748,6 +756,7 @@ export default function plan3(pi) {
 	let webServer: ReturnType<typeof createPlan3Web> | undefined;
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => {
+		if (["activity", "dialog", "dialog_closed"].includes(event)) publishSession();
 		try { webInstance?.publish(event, data); }
 		catch (error) { try { webCtx?.ui.notify(`Plan3 browser update failed; terminal remains active: ${error.message}`, "warning"); } catch { console.warn("Plan3 browser update failed; terminal notification unavailable:", error.message); } }
 	};
@@ -826,7 +835,7 @@ export default function plan3(pi) {
 		if (webStopped) throw new Error("Workspace session has ended.");
 		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
-		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, snapshot: async requestedTarget => {
+		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
 			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) });
@@ -834,7 +843,7 @@ export default function plan3(pi) {
 			const previous = shareRecord.port;
 			try { await saveSharePort(shareRecord, server.port); }
 			catch (error) { await server.close(); throw error; }
-			webInstance = server;
+			webInstance = server; publishSession();
 			// Remote access is optional (D5): local sharing works and the share notice names the missing step.
 			try {
 				if (previous && previous !== server.port) await serveRemove(tailscaleExec, previous);
@@ -2052,6 +2061,7 @@ export default function plan3(pi) {
 	}
 	async function unserve() {
 		const port = tailnet.port; tailnet = { missing: [] };
+		if (shareRecord) try { sessions.remove(shareRecord.sessionId); } catch { /* dead-pid records are skipped anyway */ }
 		if (port) await serveRemove(tailscaleExec, port);
 	}
 	pi.on?.("session_shutdown", async (event) => {

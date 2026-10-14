@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T11:56:14.645Z
+updated: 2026-10-14T12:01:30.083Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -204,7 +204,7 @@ Commands (existing; referenced by steps):
 - [x] **P3-04** Forged-header C-WEB coverage is complete. Already covered: wrong or missing login, missing or unpaired cookie, token-only remote, foreign Host, local Origin on the remote host, http proto, 409, and 429. New: a device revoked through the real registry gets 401 on its next request; the 2-minute pairing expiry (mocked timers) aborts the terminal dialog and the code then 404s; D9 isolation (terminalOnly dialogs never reach a bound browser bridge, and a session without a terminal UI denies pairing).
 - [x] **P3-06** Two-process registry test: two Node processes each pair 20 devices, renew 10 and revoke 5 against one devices.json; all 30 survivors validate, all 10 revoked are rejected, renewals persist and the lock is released. The P3-03 registry already provides the pid-stamped lock, atomic rename and fail-closed corrupt state.
 - [x] **P3-07** Revocation reaches open streams. Each remote SSE client keeps its device cookie and login; an unref'd 2-second sweep re-checks them through options.device (the registry re-reads devices.json), and a revoked, expired or erroring device has its queued frames dropped and the stream destroyed. Other devices keep streaming; close clears the sweep.
-- [ ] **P3-05** Session records for the switcher (D18, D21): name, cwd, port, state and per-device seen revision; list skips dead pids; C-WEB tests.
+- [x] **P3-05** Switcher session records. createSessionRecords writes remote/sessions/<id>.json (pid, name, cwd, port, state working/waiting/idle, revision, per-device seen map) only from the owning process, atomically. A run ending raises the revision; seen is clamped and capped at 50 devices; list skips dead pids and invalid files. /api/sessions and /api/seen identify the viewer by paired device id or "local", never the secret. plan3.ts publishes on share and on activity/dialog events, and removes the record on share-off and non-reload quit.
 
 ### Phase 4: Tabbed browser workspace [code]
 

@@ -9,6 +9,7 @@ import { stripTypeScriptTypes } from "node:module";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
 import { raceRemoteAsk, remoteResponse, remoteBatch, type RemoteListPrompt } from "./ask-user/remote.ts";
 import { bindListDialogBridge, listDialogResponse } from "./work-dialogs.ts";
+import type { SessionSummary } from "./plan3-remote.ts";
 
 export type WebTarget = { kind: "product" } | { kind: "plan"; id: string };
 type Options = {
@@ -21,6 +22,8 @@ type Options = {
 	remote?: () => { host?: string; login?: string } | undefined;
 	/** D4/D21: whether a `pi_remote` cookie belongs to a paired, unexpired device of this owner. */
 	device?: (cookie: string, login: string) => boolean | Promise<boolean>;
+	/** D18: switcher list and per-device seen revision; device is the paired id, or "local" for token pages. */
+	sessions?: { list(device: string): SessionSummary[]; seen(device: string, revision: number): boolean };
 	/** D9/D22: asks the terminal to approve; resolves to the new device cookie, or undefined when declined. */
 	pair?: (request: { code: string; label: string; address: string; login: string; signal: AbortSignal }) => Promise<string | undefined>;
 };
@@ -195,6 +198,15 @@ export async function createPlan3Web(options: Options) {
 			}
 			// Cookies cross localhost ports; use an explicit token, never ambient browser credentials.
 			else if (![req.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")].some(valid)) throw new WebError(401, "Workspace token required.");
+			const viewer = device ? device.cookie.split(".")[0] : "local";
+			if (url.pathname === "/api/sessions" || url.pathname === "/api/seen") {
+				if (!options.sessions) throw new WebError(501, "Session list is not attached.");
+				if (req.method === "GET" && url.pathname === "/api/sessions") return json(res, 200, { sessions: await options.sessions.list(viewer) });
+				if (req.method !== "POST" || url.pathname !== "/api/seen") throw new WebError(405, "Method not allowed.");
+				const data = await body(req);
+				if (Object.keys(data).some(key => key !== "revision") || !Number.isSafeInteger(data.revision) || (data.revision as number) < 0) throw new WebError(400, "Invalid seen revision.");
+				return json(res, 200, { ok: await options.sessions.seen(viewer, data.revision as number) });
+			}
 			if (req.method === "GET" && url.pathname === "/api/snapshot") return json(res, 200, await options.snapshot(url.searchParams.has("target") ? webTarget(url.searchParams.get("target")) : undefined));
 			if (req.method === "GET" && url.pathname === "/api/events") {
 				if (clients.size >= 8) throw new WebError(429, "Too many workspace connections.");

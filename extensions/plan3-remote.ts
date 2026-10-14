@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { closeSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile, lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -71,6 +71,56 @@ export async function serveAdd(exec: Exec, port: number) {
 export async function serveRemove(exec: Exec, port: number) {
 	if (!Number.isInteger(port) || port < 1 || port > 65535) return false;
 	try { return (await exec("tailscale", ["serve", `--https=${port}`, "off"], { timeout: 15_000 })).code === 0; } catch { return false; }
+}
+
+export type SessionState = "working" | "waiting" | "idle";
+export type SessionSummary = { id: string; name: string; cwd: string; port: number; state: SessionState; revision: number; unseen: boolean };
+export type SessionRecord = { version: 1; sessionId: string; pid: number; name: string; cwd: string; port: number; state: SessionState; revision: number; seen: Record<string, number> };
+/** D18/D21: one record per shared session, written only by its own process; the switcher skips dead pids. */
+export function createSessionRecords({ directory = remoteDirectory(), pid = process.pid } = {}) {
+	const folder = join(directory, "sessions"), fileOf = (sessionId: string) => join(folder, `${sessionId}.json`);
+	const read = (file: string): SessionRecord | undefined => {
+		try {
+			const value = JSON.parse(readFileSync(file, "utf8"));
+			const valid = value?.version === 1 && sessionPattern.test(value.sessionId) && Number.isInteger(value.pid) && value.pid > 0 && typeof value.name === "string" && typeof value.cwd === "string"
+				&& Number.isInteger(value.port) && value.port > 0 && value.port < 65536 && ["working", "waiting", "idle"].includes(value.state) && Number.isSafeInteger(value.revision) && value.seen && typeof value.seen === "object";
+			return valid ? value : undefined;
+		} catch { return undefined; }
+	};
+	const save = (record: SessionRecord) => {
+		mkdirSync(folder, { recursive: true, mode: 0o700 });
+		const file = fileOf(record.sessionId), temporary = `${file}.${randomUUID()}.tmp`;
+		try { writeFileSync(temporary, JSON.stringify(record), { flag: "wx", mode: 0o600 }); renameSync(temporary, file); }
+		finally { rmSync(temporary, { force: true }); }
+		return record;
+	};
+	let own: SessionRecord | undefined;
+	return {
+		/** A run that ends (working → anything else) raises the revision, so devices that have not seen it show blue. */
+		publish({ sessionId, name, cwd, port, state }: Pick<SessionRecord, "sessionId" | "name" | "cwd" | "port" | "state">) {
+			if (!sessionPattern.test(sessionId)) throw new Error("Invalid shared session id.");
+			const previous = own?.sessionId === sessionId ? own : read(fileOf(sessionId));
+			const next: SessionRecord = { version: 1, sessionId, pid, name: name.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 120), cwd: cwd.slice(0, 1000), port, state,
+				revision: (previous?.revision ?? 0) + (previous?.state === "working" && state !== "working" ? 1 : 0), seen: previous?.seen ?? {} };
+			if (JSON.stringify(next) === JSON.stringify(own)) return own;
+			return own = save(next);
+		},
+		seen(deviceId: string, revision: number): boolean {
+			if (!own || !/^[A-Za-z0-9_-]{1,40}$/.test(deviceId) || !Number.isSafeInteger(revision) || revision < 0) return false;
+			const seen = { ...own.seen, [deviceId]: Math.min(revision, own.revision) };
+			// shortcut: keeps the 50 most recently written device ids; upgrade if more devices ever pair.
+			own = save({ ...own, seen: Object.fromEntries(Object.entries(seen).slice(-50)) });
+			return true;
+		},
+		remove(sessionId: string) { if (own?.sessionId === sessionId) own = undefined; if (sessionPattern.test(sessionId)) rmSync(fileOf(sessionId), { force: true }); },
+		list(deviceId: string): SessionSummary[] {
+			let names: string[] = [];
+			try { names = readdirSync(folder).filter(name => /\.json$/.test(name)); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
+			return names.map(name => read(join(folder, name))).filter(record => record && alive(record.pid))
+				.map(({ sessionId, name, cwd, port, state, revision, seen }) => ({ id: sessionId, name, cwd, port, state, revision, unseen: revision > (seen[deviceId] ?? 0) }))
+				.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+		},
+	};
 }
 
 export type Device = { id: string; hash: string; label: string; login: string; created: number; lastUsed: number; expires: number };
