@@ -246,7 +246,10 @@ $("composer").addEventListener("submit", async event => {
 });
 for (const button of $("commands").querySelectorAll("button")) button.addEventListener("click", async () => {
  if (commandSending) return; commandSending = true; renderShell();
- try { await post("command", { command: button.dataset.command }); showNotice(""); }
+ try {
+  const command = button.dataset.command === "resume" ? "/resume3" : "/plan3 " + button.dataset.command;
+  await post("message", { text: command + " " + target }); showNotice("");
+ }
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }
 });
