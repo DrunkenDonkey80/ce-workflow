@@ -26,6 +26,8 @@ try {
  const snap = await request("/api/snapshot?target=12345678", { headers: auth });
  assert.equal(snap.response.status, 200);
  assert.deepEqual(JSON.parse(snap.text).target, { kind: "plan", id: "12345678" });
+ assert.equal((await request("/api/snapshot", { headers: auth })).response.status, 200);
+ assert.equal(new URL(server.url()).searchParams.has("target"), false);
  assert.match(snap.response.headers.get("content-security-policy"), /frame-ancestors 'none'/);
  assert.equal(snap.response.headers.get("referrer-policy"), "no-referrer");
  assert.equal(snap.response.headers.get("x-content-type-options"), "nosniff");
@@ -122,6 +124,8 @@ assert.throws(() => diagramChatMessage(contextDiagram, "hello", ["missing"]), /U
 assert.throws(() => diagramChatMessage(contextDiagram, "x".repeat(20_001)), /bounded/);
 const submitted = [], deliveryErrors = [];
 const sendApi = { sendUserMessage: (message, options) => { submitted.push({ message, options }); return new Promise(() => {}); } };
+forwardDiagramChat(sendApi, { isIdle: () => true }, contextDiagram, "hello", [], () => {});
+assert.equal(submitted.at(-1).message, "hello");
 const queued = forwardDiagramChat(sendApi, { isIdle: () => false }, contextDiagram, "Edit @api", [], (event, value) => deliveryErrors.push({ event, value }));
 assert(queued.queued, "busy send returns immediately, never awaits the model run");
 assert.equal(submitted.at(-1).options.deliverAs, "followUp");
@@ -276,7 +280,7 @@ mirror.reset(); activityMirror.reset();
 assert.deepEqual(mirror.snapshot(), []); assert.deepEqual(activityMirror.snapshot().tools, []);
 assert.equal(activityMirror.snapshot().error, ""); assert.equal(activityMirror.snapshot().compacting, false);
 // Session credentials survive a new runtime without entering the conversation.
-const { mkdtemp, readFile, writeFile, stat, rm } = await import("node:fs/promises");
+const { mkdtemp, writeFile, stat, rm } = await import("node:fs/promises");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");

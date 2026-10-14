@@ -14,7 +14,7 @@ export type WebTarget = { kind: "product" } | { kind: "plan"; id: string };
 type Options = {
 	port?: number;
 	token?: string;
-	snapshot: (target: WebTarget) => unknown | Promise<unknown>;
+	snapshot: (target?: WebTarget) => unknown | Promise<unknown>;
 	post?: (endpoint: string, body: Record<string, unknown>) => unknown | Promise<unknown>;
 };
 const BODY_BYTES = 65_536, IMAGE_BYTES = 20_000_000;
@@ -108,10 +108,10 @@ export async function createPlan3Web(options: Options) {
 			if (url.origin !== origin) throw new WebError(403, "Foreign request URL rejected.");
 			// Cookies cross localhost ports; use an explicit token, never ambient browser credentials.
 			if (![req.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")].some(valid)) throw new WebError(401, "Workspace token required.");
-			if (req.method === "GET" && url.pathname === "/api/snapshot") return json(res, 200, await options.snapshot(webTarget(url.searchParams.get("target"))));
+			if (req.method === "GET" && url.pathname === "/api/snapshot") return json(res, 200, await options.snapshot(url.searchParams.has("target") ? webTarget(url.searchParams.get("target")) : undefined));
 			if (req.method === "GET" && url.pathname === "/api/events") {
 				if (clients.size >= 8) throw new WebError(429, "Too many workspace connections.");
-				const target = webTarget(url.searchParams.get("target")), fence = ++sequence;
+				const target = url.searchParams.has("target") ? webTarget(url.searchParams.get("target")) : undefined, fence = ++sequence;
 				const connection = { ready: false, frames: [] as string[], bytes: 0 };
 				clients.set(res, connection); res.on("close", () => clients.delete(res));
 				// Subscribe before an async snapshot so changes during initial load cannot disappear.
@@ -172,7 +172,7 @@ export async function createPlan3Web(options: Options) {
 		origin,
 		port: address.port,
 		portChanged,
-		url: (target: WebTarget) => `${origin}/?token=${token}&target=${target.kind === "product" ? "product" : target.id}`,
+		url: (target?: WebTarget) => `${origin}/?token=${token}${target ? `&target=${target.kind === "product" ? "product" : target.id}` : ""}`,
 		publish(event: string, value: unknown) {
 			if (closed) return;
 			if (!/^[a-z][a-z0-9_-]{0,40}$/.test(event)) throw new Error("Invalid workspace event name.");
@@ -269,7 +269,9 @@ export async function stopLiveRun(ctx) {
 }
 
 export function forwardDiagramChat(pi, ctx, diagram: Diagram, message: unknown, comments: unknown, publish: (event: string, value: unknown) => void) {
-	const prepared = diagramChatMessage(diagram, message, comments), queued = !ctx.isIdle();
+	const contextual = diagramChatMessage(diagram, message, comments);
+	const prepared = contextual.mentions.length || (Array.isArray(comments) && comments.length) ? contextual : { message: (message as string).trim(), mentions: [], unknownMentions: [] };
+	const queued = !ctx.isIdle();
 	try {
 		const pending = pi.sendUserMessage(prepared.message, { expandPromptTemplates: false, ...(queued ? { deliverAs: "followUp" } : {}) });
 		// SDK declaration says void, but live probe found a promise that settles only after the run.

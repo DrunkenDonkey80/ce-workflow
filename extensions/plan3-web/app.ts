@@ -14,7 +14,7 @@ function $(id: "search"): HTMLInputElement;
 function $(id: string): HTMLElement;
 function $(id: string): HTMLElement | SVGSVGElement { return document.getElementById(id); }
 const token = "__TOKEN__";
-const target = new URLSearchParams(location.search).get("target") ?? "product";
+let target = new URLSearchParams(location.search).get("target") ?? undefined;
 const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]>>; pinning: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
@@ -253,13 +253,14 @@ for (const button of $("commands").querySelectorAll("button")) button.addEventLi
 $("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested."); } catch (error) { showNotice(error.message); } });
 
 // Native EventSource reconnects; the server always starts a connection with a fresh full snapshot.
-const events = new EventSource("/api/events?token=" + token + "&target=" + encodeURIComponent(target));
+const events = new EventSource("/api/events?token=" + token + (target ? "&target=" + encodeURIComponent(target) : ""));
 function applyUpdate(event: MessageEvent, update) {
  try { update(JSON.parse(event.data)); }
  catch (error) { showNotice("Workspace update failed: " + error.message + ". Reopen from the Pi terminal; your message draft is kept."); }
 }
 function listen(name, update) { events.addEventListener(name, (event: MessageEvent) => applyUpdate(event, update)); }
 listen("snapshot", value => {
+ if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;
  state.connected = true; state.diagram = value.diagram; state.plan = value.plan; state.activity = value.activity ?? {};
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
  promptView.sync(value.dialogs ?? []); renderActivity(); renderChat(); renderMentions(); showNotice(""); renderShell(); diagramView.render(state.diagram);

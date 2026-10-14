@@ -1183,6 +1183,9 @@ try {
 		const snapshot = async () => { const response = await fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }); assert.equal(response.status, 200); return response.json(); };
 		assert.equal((await snapshot()).plan.id, b);
 		assert.equal((await fetch(`${url.origin}/api/snapshot?target=${b}`)).status, 401);
+		const sessionSnapshot = await fetch(`${url.origin}/api/snapshot`, { headers });
+		assert.equal(sessionSnapshot.status, 200);
+		assert((await sessionSnapshot.json()).chat, "session snapshot does not need a diagram target");
 		assert.equal((await fetch(`${url.origin}/api/command`, { method: "POST", headers: { ...headers, Origin: "https://foreign.example" }, body: JSON.stringify({ target, command: "review" }) })).status, 403);
 		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 12, y: 34 })).status, 200);
 		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 99, y: 99 })).status, 409);

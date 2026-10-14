@@ -723,6 +723,12 @@ export default function plan3(pi) {
 			if (!webStopped) publishWeb("diagram", { target, diagram: loadDiagram(event.cwd, resolved) });
 		} catch (error) { if (!webStopped) publishWeb("error", { message: error.message }); }
 	});
+	async function displayedWebTarget(value?: unknown): Promise<WebTarget> {
+		if (value !== undefined) return webTarget(value);
+		if (!webCtx) throw new WebError(409, "Workspace context expired.");
+		const plan = currentPlan(webCtx, await listPlans(webCtx.cwd));
+		return plan ? { kind: "plan", id: plan.id } : { kind: "product" };
+	}
 	async function resolveWebTarget(target: WebTarget): Promise<{ kind: "product" } | { kind: "plan"; plan: ReturnType<typeof summarize> }> {
 		if (!webCtx) throw new WebError(409, "Workspace needs a current command context; reopen /plan3 diagram.");
 		if (target.kind === "product") return { kind: "product" };
@@ -736,7 +742,7 @@ export default function plan3(pi) {
 		try { ctx.isIdle(); } catch { webCtx = null; throw new WebError(409, "Workspace context expired; reopen /plan3 diagram."); }
 		if (endpoint === "/api/stop") {
 			if (Object.keys(data).some(key => key !== "target")) throw new WebError(400, "Invalid Stop fields.");
-			await resolveWebTarget(webTarget(data.target));
+			if (data.target !== undefined) await resolveWebTarget(webTarget(data.target));
 			return stopLiveRun(ctx);
 		}
 		if (endpoint === "/api/command") {
@@ -760,20 +766,21 @@ export default function plan3(pi) {
 			return { diagram: result.diagram, changed: result.changed };
 		}
 		if (endpoint === "/api/answer") {
-			await resolveWebTarget(webTarget(data.target));
+			if (data.target !== undefined) await resolveWebTarget(webTarget(data.target));
 			if (Object.keys(data).some(key => !["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"].includes(key))) throw new WebError(400, "Invalid answer fields.");
 			return dialogs.answer(data);
 		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
 		if (Object.keys(data).some(key => !["target", "text", "comments"].includes(key))) throw new WebError(400, "Invalid message fields.");
-		const target = await resolveWebTarget(webTarget(data.target));
+		const target = await resolveWebTarget(await displayedWebTarget(data.target));
 		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target, target.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined);
 		return forwardDiagramChat(pi, webCtx, diagram, data.text, data.comments, publishWeb);
 	}
 	function getWeb(ctx) {
 		if (webStopped) throw new Error("Workspace session has ended.");
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
-		webServer ??= createPlan3Web({ post: postWeb, snapshot: async target => {
+		webServer ??= createPlan3Web({ post: postWeb, snapshot: async requestedTarget => {
+			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
 			return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined), chat: chat.snapshot(), activity: activity.snapshot(webCtx), dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) };
 		} }).then(server => { webInstance = server; return server; }).catch(error => { webServer = undefined; throw error; });
