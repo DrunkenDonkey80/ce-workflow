@@ -12,7 +12,7 @@ import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, design
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createPlan3Web, checkIn, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
-import { loadShareRecord, saveSharePort, serveAdd, serveRemove, tailscaleStatus, type ShareRecord, type Tailnet } from "./plan3-remote.ts";
+import { createDeviceRegistry, loadShareRecord, saveSharePort, serveAdd, serveRemove, tailscaleStatus, type ShareRecord, type Tailnet } from "./plan3-remote.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -711,6 +711,39 @@ export default function plan3(pi) {
 	let shareRecord: ShareRecord | undefined;
 	const tailscaleExec = (command: string, args: string[], options?: { timeout?: number }) => pi.exec(command, args, options);
 	let tailnet: Tailnet & { port?: number } = { missing: [] };
+	const devices = createDeviceRegistry();
+	let registryWarned = false;
+	// A corrupt or locked registry denies remote access (D21) and says why once.
+	async function pairedDevice(cookie: string, login: string) {
+		try { return await devices.check(cookie, login); }
+		catch (error) { if (!registryWarned) { registryWarned = true; report(webCtx, error); } return false; }
+	}
+	// D9: terminal-only approval; print/RPC modes have no terminal UI, so pairing is refused there.
+	async function approvePairing({ code, label, address, login, signal }) {
+		const ctx = webCtx;
+		if (!ctx?.hasUI) return undefined;
+		const choice = await waitForUser("Remote pairing", () => showListDialog(ctx, {
+			title: "Approve a new remote device?", purpose: `${label} at ${address} (${login}) wants access to this PC's shared Pi sessions. Approve only if it shows ${code}.`,
+			terminalOnly: true, signal, filter: false, cursorKey: "plan3-pair",
+			items: [{ value: "no", label: "No, reject" }, { value: "yes", label: `Yes, pair the device showing ${code}` }],
+		}));
+		if (choice?.value !== "yes" || signal.aborted) return undefined;
+		return devices.pair(`${label} · ${address}`, login);
+	}
+	async function manageDevices(ctx) {
+		for (;;) {
+			const list = devices.list();
+			if (!list.length) return ctx.ui.notify("No paired remote devices.", "info");
+			const pick = await waitForUser("Paired devices", () => showListDialog(ctx, {
+				title: "Paired devices", purpose: "Select a device to revoke its remote access to every shared session on this PC.", terminalOnly: true, cursorKey: "plan3-devices",
+				items: list.map(device => ({ value: device.id, label: device.label, description: `${device.login} · last used ${new Date(device.lastUsed).toLocaleString()} · expires ${new Date(device.expires).toLocaleDateString()}` })),
+			}));
+			const device = list.find(candidate => candidate.id === pick?.value);
+			if (!device) return;
+			const sure = await waitForUser("Revoke device", () => showListDialog(ctx, { title: `Revoke ${device.label}?`, purpose: "It will need terminal approval to pair again.", terminalOnly: true, filter: false, items: [{ value: "no", label: "No, keep it" }, { value: "yes", label: "Yes, revoke" }] }));
+			if (sure?.value === "yes" && await devices.revoke(device.id)) ctx.ui.notify(`Revoked ${device.label}.`, "info");
+		}
+	}
 	const sharedEntry = (ctx) => (ctx.sessionManager?.getBranch?.() ?? []).findLast(entry => entry.type === "custom" && entry.customType === "plan3-shared")?.data?.shared === true;
 	let webServer: ReturnType<typeof createPlan3Web> | undefined;
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
@@ -793,7 +826,7 @@ export default function plan3(pi) {
 		if (webStopped) throw new Error("Workspace session has ended.");
 		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
-		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, snapshot: async requestedTarget => {
+		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
 			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) });
@@ -1976,7 +2009,8 @@ export default function plan3(pi) {
 	pi.events?.on?.("plan3:command", ({ ctx, name, args = "" }) => commands[name]?.handler(args, ctx));
 	pi.events?.on?.("plan3:share", async ({ ctx, args = "" }) => {
 		try {
-			if (args.trim()) throw new Error("Use /wo share to toggle this session. Device management is not attached yet.");
+			if (args.trim() === "devices") return await manageDevices(ctx);
+			if (args.trim()) throw new Error("Use /wo share to toggle sharing, or /wo share devices to list and revoke paired devices.");
 			if (webInstance) {
 				await closeWeb(); await unserve(); pi.appendEntry("plan3-shared", { shared: false });
 				ctx.ui.notify("Session sharing off.", "info");

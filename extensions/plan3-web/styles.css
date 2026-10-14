@@ -128,6 +128,8 @@ dialog::backdrop { background: rgba(0, 0, 0, .25); }
  .topbar { gap: 10px; }
  .workspace-title { flex-basis: 100%; }
 }
+.pairing main { margin: auto; padding: 24px; max-width: 28rem; text-align: center; }
+.pair-code { font: 600 2.5rem/1.2 ui-monospace, monospace; letter-spacing: 0.08em; min-height: 1.2em; }
 @media (prefers-reduced-motion: reduce) {
  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }

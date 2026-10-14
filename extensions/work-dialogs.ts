@@ -266,7 +266,8 @@ export function progressBar(complete, total, width = 12) {
 
 export async function showListDialog(ctx, options) {
 	const bridge = listBridges.get(ctx.ui);
-	if (!bridge) return localListDialog(ctx, options);
+	// terminalOnly: approvals a remote page must never answer for itself (plan 1b421b6b D9).
+	if (!bridge || options.terminalOnly) return localListDialog(ctx, options);
 	const result = await bridge(options, signal => localListDialog(ctx, { ...options, signal, remote: true }));
 	if (result?.value) dialogCursors.set(options.cursorKey ?? options.title, result.value);
 	return result ?? undefined;

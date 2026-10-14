@@ -383,11 +383,12 @@ mirror.reset(); activityMirror.reset();
 assert.deepEqual(mirror.snapshot(), []); assert.deepEqual(activityMirror.snapshot().tools, []);
 assert.equal(activityMirror.snapshot().error, ""); assert.equal(activityMirror.snapshot().compacting, false);
 // Session credentials survive a new runtime without entering the conversation.
-const { mkdtemp, writeFile, stat, rm } = await import("node:fs/promises");
+const { mkdtemp, writeFile, readFile, stat, rm } = await import("node:fs/promises");
+const { existsSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
-const { loadShareRecord, saveSharePort, tailscaleStatus, serveAdd, serveRemove } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
+const { loadShareRecord, saveSharePort, tailscaleStatus, serveAdd, serveRemove, createDeviceRegistry } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
 const credentialDir = await mkdtemp(join(tmpdir(), "plan3-remote-test-"));
 let persistent, occupied, fallback;
 try {
@@ -447,6 +448,70 @@ try {
   const status = await new Promise((resolve, reject) => { const req = httpRequest(`${noRemote.origin}/api/snapshot`, { headers: { Host: `pc.tail.ts.net:${noRemote.port}`, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github", Cookie: "pi_remote=a.b" } }, res => { res.resume(); resolve(res.statusCode); }); req.on("error", reject); req.end(); });
   assert.equal(status, 403, "without a tailnet mapping the tailnet Host is foreign");
  } finally { await noRemote.close(); }
+}
+// P3-03: paired-device registry (D13, D21).
+{
+ const directory = await mkdtemp(join(tmpdir(), "plan3-devices-test-")); let clock = 1_000_000;
+ try {
+  const registry = createDeviceRegistry({ directory, now: () => clock });
+  const cookie = await registry.pair("Android Chrome \u0007· 100.1.2.3", "me@github"), [id, secret] = cookie.split(".");
+  assert.match(cookie, /^[A-Za-z0-9_-]{12}\.[A-Za-z0-9_-]{43}$/);
+  const stored = await readFile(join(directory, "devices.json"), "utf8");
+  assert(!stored.includes(secret), "only the secret's hash is stored"); assert(!stored.includes("\\u0007"), "labels lose control characters");
+  assert.equal(await registry.check(cookie, "me@github"), true);
+  assert.equal(await registry.check(`${id}.${"A".repeat(43)}`, "me@github"), false, "wrong secret");
+  assert.equal(await registry.check(cookie, "other@github"), false, "another owner's login");
+  assert.equal(await registry.check("nodot", "me@github"), false);
+  clock += 2 * 3_600_000; assert.equal(await registry.check(cookie, "me@github"), true);
+  assert.equal(registry.list()[0].lastUsed, clock, "use renews the expiry"); assert.equal(registry.list()[0].expires, clock + 90 * 86_400_000);
+  clock += 91 * 86_400_000; assert.equal(await registry.check(cookie, "me@github"), false, "expired"); assert.deepEqual(registry.list(), []);
+  const second = await registry.pair("iPhone Safari", "me@github"); assert.equal(registry.list().length, 1, "writes prune expired devices");
+  assert.equal(await registry.revoke(second.split(".")[0]), true); assert.equal(await registry.check(second, "me@github"), false, "revoked");
+  await writeFile(join(directory, "devices.lock"), "999999999");
+  await registry.pair("stale lock", "me@github"); assert(!existsSync(join(directory, "devices.lock")), "a dead writer's lock is stale");
+  await writeFile(join(directory, "devices.lock"), String(process.ppid));
+  const busy = Date.now(); await assert.rejects(registry.pair("held", "me@github"), /busy/); assert(Date.now() - busy < 5000);
+  await rm(join(directory, "devices.lock"));
+  await writeFile(join(directory, "devices.json"), "{broken");
+  await assert.rejects(registry.check(cookie, "me@github"), /corrupt/, "corrupt state fails closed"); await assert.rejects(registry.pair("x", "me@github"), /corrupt/);
+ } finally { await rm(directory, { recursive: true, force: true }); }
+}
+// P3-03: pairing protocol (D22): unpaired owner devices see only the pairing page; the terminal decides.
+{
+ const approvals = []; let paired = new Set();
+ const pairServer = await createPlan3Web({ snapshot: () => ({ ok: true }), remote: () => ({ host: "pc.tail.ts.net", login: "me@github" }), device: cookie => paired.has(cookie),
+  pair: request => new Promise(resolve => { approvals.push({ ...request, resolve }); request.signal.addEventListener("abort", () => resolve(undefined)); }) });
+ try {
+  const host = `pc.tail.ts.net:${pairServer.port}`, origin = `https://${host}`;
+  const raw = (path, headers = {}, method = "GET") => new Promise((resolve, reject) => {
+   const req = httpRequest(`${pairServer.origin}${path}`, { method, headers: { Host: host, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github", "User-Agent": "Mozilla/5.0 (Linux; Android 15) Chrome/140 Mobile Safari/537", "X-Forwarded-For": "100.64.0.9", ...headers } }, res => { let text = ""; res.setEncoding("utf8"); res.on("data", chunk => text += chunk); res.on("end", () => resolve({ status: res.statusCode, text, cookie: res.headers["set-cookie"], type: res.headers["content-type"] })); });
+   req.on("error", reject); req.end();
+  });
+  const page = await raw("/");
+  assert.equal(page.status, 200); assert.match(page.text, /Pair this device/); assert.doesNotMatch(page.text, /Resize chat pane/, "no workspace for unpaired devices");
+  assert.equal((await raw(`/a/${pairServer.build}/pair.js`)).status, 200); assert.equal((await raw(`/a/${pairServer.build}/styles.css`)).status, 200);
+  for (const path of [`/a/${pairServer.build}/app.js`, "/api/snapshot", "/api/events", "/pair.html"]) assert.equal((await raw(path)).status, 401, path);
+  assert.equal((await raw("/pair/start", {}, "POST")).status, 403, "pairing start needs the remote Origin");
+  assert.equal((await raw("/pair/start", { "Tailscale-User-Login": "other@github", Origin: origin }, "POST")).status, 403, "only the owner may pair");
+  const start = JSON.parse((await raw("/pair/start", { Origin: origin }, "POST")).text);
+  assert.match(start.code, /^\d{3} \d{3}$/); assert.match(start.id, /^[a-f0-9]{32}$/);
+  assert.deepEqual([approvals[0].code, approvals[0].label, approvals[0].address, approvals[0].login], [start.code, "Android Chrome", "100.64.0.9", "me@github"]);
+  assert.equal((await raw("/pair/start", { Origin: origin }, "POST")).status, 409, "one pending pairing per server");
+  assert.equal((await raw("/pair/status?id=" + "0".repeat(32))).status, 404, "unknown pairing id");
+  const waiting = raw("/pair/status?id=" + start.id);
+  approvals[0].resolve("dev123.secret");
+  const approved = await waiting;
+  assert.deepEqual(JSON.parse(approved.text), { state: "approved" });
+  assert.equal(approved.cookie?.[0], "pi_remote=dev123.secret; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=7776000");
+  assert.equal((await raw("/pair/status?id=" + start.id)).status, 404, "the cookie is delivered once");
+  paired.add("dev123.secret");
+  assert.equal((await raw("/api/snapshot", { Cookie: "pi_remote=dev123.secret" })).status, 200);
+  const declined = JSON.parse((await raw("/pair/start", { Origin: origin }, "POST")).text); approvals.at(-1).resolve(undefined);
+  assert.deepEqual(JSON.parse((await raw("/pair/status?id=" + declined.id)).text), { state: "denied" });
+  for (let i = 0; i < 3; i++) { JSON.parse((await raw("/pair/start", { Origin: origin }, "POST")).text); approvals.at(-1).resolve(undefined); await new Promise(resolve => setImmediate(resolve)); }
+  assert.equal((await raw("/pair/start", { Origin: origin }, "POST")).status, 429, "at most 5 starts per 10 minutes");
+ } finally { await pairServer.close(); }
+ assert(approvals.every(approval => approval.signal.aborted), "every approval dialog is dismissed");
 }
 // P3-01: Tailscale detection names each missing step; serve stays tailnet-only on the same port.
 {

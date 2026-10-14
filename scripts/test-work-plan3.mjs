@@ -1302,6 +1302,7 @@ try {
 		sessionId = randomUUID();
 		await hooks.get("session_start")({ reason: "new" }, webCtx);
 		const share = () => listeners.get("plan3:share")({ ctx: webCtx });
+		await listeners.get("plan3:share")({ ctx: webCtx, args: "devices" }); assert.equal(notices.at(-1).message, "No paired remote devices.");
 		await share(); assert.match(notices.at(-1).message, /Remote access off: Install/, "missing Tailscale still shares locally");
 		await share(); tailscaleCalls.length = 0;
 		tailscale = args => ({ code: 0, killed: false, stderr: "", stdout: args[0] === "status" ? JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } } }) : "" });

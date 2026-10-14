@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -21,7 +21,10 @@ type Options = {
 	remote?: () => { host?: string; login?: string } | undefined;
 	/** D4/D21: whether a `pi_remote` cookie belongs to a paired, unexpired device of this owner. */
 	device?: (cookie: string, login: string) => boolean | Promise<boolean>;
+	/** D9/D22: asks the terminal to approve; resolves to the new device cookie, or undefined when declined. */
+	pair?: (request: { code: string; label: string; address: string; login: string; signal: AbortSignal }) => Promise<string | undefined>;
 };
+type Pairing = { id: string; code: string; state: "pending" | "approved" | "denied" | "expired"; cookie?: string; abort: AbortController; waiters: Set<() => void> };
 const BODY_BYTES = 65_536, IMAGE_BYTES = 20_000_000;
 // Pasted images are checked by magic bytes, not the browser-declared type.
 const IMAGE_KINDS: [string, (b: Buffer) => boolean][] = [
@@ -95,6 +98,8 @@ export async function createPlan3Web(options: Options) {
 		["/diagram.js", ["diagram.ts", "text/javascript; charset=utf-8"]],
 		["/prompts.js", ["prompts.ts", "text/javascript; charset=utf-8"]],
 		["/stream.js", ["stream.ts", "text/javascript; charset=utf-8"]],
+		["/pair.js", ["pair.ts", "text/javascript; charset=utf-8"]],
+		["/pair.html", ["pair.html", "text/html; charset=utf-8"]],
 		["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 		["/vendor/rough.js", ["vendor/rough.ts", "text/javascript; charset=utf-8"]],
 		["/vendor/Virgil.woff2", ["vendor/Virgil.woff2", "font/woff2"]],
@@ -105,6 +110,57 @@ export async function createPlan3Web(options: Options) {
 		try { buildHash.update(readFileSync(fileURLToPath(new URL(`./plan3-web/${file}`, import.meta.url)))); } catch { /* A missing asset is reported when requested. */ }
 	}
 	const build = buildHash.digest("hex").slice(0, 12);
+	function asset(res: ServerResponse, pathname: string, remote: boolean) {
+		// /a/<build>/<file> never changes, so browsers cache it; the page itself stays no-store.
+		const fingerprinted = /^\/a\/([0-9a-f]{12})(\/.+)$/.exec(pathname);
+		if (fingerprinted && fingerprinted[1] !== build) throw new WebError(404, "Stale workspace build; reload the page.");
+		const entry = assets.get(fingerprinted?.[2] ?? pathname);
+		if (!entry) throw new WebError(404, "Unknown workspace asset.");
+		let contents: Buffer;
+		try { contents = readFileSync(fileURLToPath(new URL(`./plan3-web/${entry[0]}`, import.meta.url))); }
+		catch { throw new WebError(404, "Workspace asset is not installed."); }
+		res.writeHead(200, { "Content-Type": entry[1], ...(fingerprinted ? { "Cache-Control": "private, max-age=31536000, immutable" } : {}) });
+		res.end(entry[1].startsWith("font/") ? contents : (entry[0].endsWith(".ts") ? stripTypeScriptTypes(contents.toString("utf8")) : contents.toString("utf8")).replaceAll("__TOKEN__", remote ? "" : token).replaceAll("__BUILD__", build));
+	}
+	// D22 pairing: one pending request per server, 2-minute codes, at most 5 starts per 10 minutes.
+	let pairing: Pairing | undefined, pairStarts: number[] = [];
+	function startPairing(req: IncomingMessage, login: string) {
+		if (!options.pair) throw new WebError(501, "Pairing is not available in this session.");
+		const time = Date.now();
+		pairStarts = pairStarts.filter(start => time - start < 600_000);
+		if (pairing?.state === "pending") throw new WebError(409, "Another device is waiting for approval at the PC.");
+		if (pairStarts.length >= 5) throw new WebError(429, "Too many pairing attempts; wait a few minutes.");
+		pairStarts.push(time);
+		const digits = String(randomInt(0, 1_000_000)).padStart(6, "0"), code = `${digits.slice(0, 3)} ${digits.slice(3)}`;
+		const entry: Pairing = { id: randomBytes(16).toString("hex"), code, state: "pending", abort: new AbortController(), waiters: new Set() };
+		const settle = (state: Pairing["state"], cookie?: string) => {
+			if (entry.state !== "pending") return;
+			entry.state = state; entry.cookie = cookie; clearTimeout(timer); entry.abort.abort();
+			for (const wake of entry.waiters) wake();
+		};
+		const timer = setTimeout(() => settle("expired"), 120_000); timer.unref();
+		const clean = (value: unknown, limit: number) => String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, limit);
+		const agent = clean(req.headers["user-agent"], 300), label = ["iPhone", "iPad", "Android", "Windows", "Mac OS X", "Linux"].find(name => agent.includes(name)) ?? "Unknown device";
+		const browser = /(Edg|Firefox|Chrome|Safari)\//.exec(agent)?.[1] ?? "browser";
+		pairing = entry;
+		options.pair({ code, label: `${label} ${browser === "Edg" ? "Edge" : browser}`, address: clean(req.headers["x-forwarded-for"], 60) || "unknown address", login, signal: entry.abort.signal })
+			.then(cookie => settle(cookie && /^[A-Za-z0-9._-]{1,200}$/.test(cookie) ? "approved" : "denied", cookie), () => settle("denied"));
+		return { id: entry.id, code };
+	}
+	async function pairStatus(res: ServerResponse, id: string | null) {
+		const entry = pairing;
+		if (!entry || !id || id.length !== entry.id.length || !timingSafeEqual(Buffer.from(id), Buffer.from(entry.id))) throw new WebError(404, "Unknown or finished pairing.");
+		if (entry.state === "pending") await new Promise<void>(resolve => {
+			const done = () => { clearTimeout(timer); entry.waiters.delete(done); resolve(); };
+			const timer = setTimeout(done, 10_000); entry.waiters.add(done); res.once("close", done);
+		});
+		if (entry.state === "approved") {
+			// Delivered once; host-only, so every session port on this machine shares it (D18).
+			res.setHeader("Set-Cookie", `pi_remote=${entry.cookie}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=7776000`);
+			pairing = undefined;
+		} else if (entry.state !== "pending") pairing = undefined;
+		return json(res, 200, { state: entry.state });
+	}
 	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/command", "/api/stop"]);
 	const server = createServer((req, res) => {
 		res.setHeader("Cache-Control", "no-store");
@@ -126,7 +182,14 @@ export async function createPlan3Web(options: Options) {
 				if (req.headers["x-forwarded-proto"] !== "https" || req.headers["tailscale-user-login"] !== tailnet.login) throw new WebError(403, "Only the Tailscale owner may connect.");
 				// The token never authorizes remote requests: a leaked link must still need terminal pairing (D4).
 				const cookie = /(?:^|;\s*)pi_remote=([A-Za-z0-9._-]{1,200})(?:;|$)/.exec(req.headers.cookie ?? "")?.[1];
-				if (!cookie || !await options.device?.(cookie, tailnet.login)) throw new WebError(401, "This device is not paired.");
+				if (!cookie || !await options.device?.(cookie, tailnet.login)) {
+					// Unpaired: only the static pairing page and its two endpoints (D22).
+					if (req.method === "POST" && url.pathname === "/pair/start") return json(res, 200, startPairing(req, tailnet.login));
+					if (req.method === "GET" && url.pathname === "/pair/status") return pairStatus(res, url.searchParams.get("id"));
+					const fingerprinted = /^\/a\/[0-9a-f]{12}(\/(?:pair\.js|styles\.css))$/.exec(url.pathname);
+					if (req.method === "GET" && (url.pathname === "/" || fingerprinted)) return asset(res, url.pathname === "/" ? "/pair.html" : url.pathname, true);
+					throw new WebError(401, "This device is not paired.");
+				}
 			}
 			// Cookies cross localhost ports; use an explicit token, never ambient browser credentials.
 			else if (![req.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")].some(valid)) throw new WebError(401, "Workspace token required.");
@@ -158,16 +221,7 @@ export async function createPlan3Web(options: Options) {
 				return json(res, 200, await options.post(url.pathname, await body(req)));
 			}
 			if (req.method !== "GET") throw new WebError(405, "Method not allowed.");
-			// /a/<build>/<file> never changes, so browsers cache it; the page itself stays no-store.
-			const fingerprinted = /^\/a\/([0-9a-f]{12})(\/.+)$/.exec(url.pathname);
-			if (fingerprinted && fingerprinted[1] !== build) throw new WebError(404, "Stale workspace build; reload the page.");
-			const asset = assets.get(fingerprinted?.[2] ?? url.pathname);
-			if (!asset) throw new WebError(404, "Unknown workspace asset.");
-			let contents: Buffer;
-			try { contents = readFileSync(fileURLToPath(new URL(`./plan3-web/${asset[0]}`, import.meta.url))); }
-			catch { throw new WebError(404, "Workspace asset is not installed."); }
-			res.writeHead(200, { "Content-Type": asset[1], ...(fingerprinted ? { "Cache-Control": "private, max-age=31536000, immutable" } : {}) });
-			res.end(asset[1].startsWith("font/") ? contents : (asset[0].endsWith(".ts") ? stripTypeScriptTypes(contents.toString("utf8")) : contents.toString("utf8")).replaceAll("__TOKEN__", remote ? "" : token).replaceAll("__BUILD__", build));
+			asset(res, url.pathname, remote);
 		})().catch(error => {
 			clients.delete(res);
 			if (res.destroyed || res.writableEnded) return;
@@ -218,7 +272,7 @@ export async function createPlan3Web(options: Options) {
 		},
 		close() {
 			if (closing) return closing;
-			closed = true; clearInterval(heartbeat);
+			closed = true; clearInterval(heartbeat); pairing?.abort.abort();
 			for (const res of clients.keys()) res.end(); clients.clear();
 			closing = new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 			server.closeIdleConnections(); server.closeAllConnections();
