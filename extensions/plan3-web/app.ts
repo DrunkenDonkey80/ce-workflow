@@ -321,7 +321,9 @@ let stick = true;
 // Explicit jumps re-pin at once; the scroll event that would do it arrives a frame later.
 function toBottom() { stick = true; pinChat(); $("to-bottom").hidden = true; }
 const pinChat = () => { const list = $("messages"); if (stick) list.scrollTop = list.scrollHeight; };
-$("messages").addEventListener("scroll", () => { const list = $("messages"); stick = atBottom(list); if (stick) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
+// Only moving up unpins: a late scroll event after content grew below finds the list off the end without the reader moving.
+let lastTop = 0;
+$("messages").addEventListener("scroll", () => { const list = $("messages"); if (atBottom(list)) stick = true; else if (list.scrollTop < lastTop - 2) stick = false; lastTop = list.scrollTop; if (stick) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
 new ResizeObserver(pinChat).observe($("messages"));
 $("messages").addEventListener("load", pinChat, true);
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });

@@ -433,6 +433,19 @@ try {
  assert(await evaluate("(() => { const list = document.getElementById('messages'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4 && document.getElementById('to-bottom').hidden; })()"), "late growth does not unpin the chat");
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
+ // The queue and tool rows above the chat grow and shrink the list: a reader at the end stays at the end.
+ activity = { working: true, tools: [], queue: [], hasPendingMessages: false, error: undefined, thinking: "" }; server.publish("activity", activity);
+ await browser("wait", "--fn", "document.querySelectorAll('#activity details').length === 0");
+ await evaluate("(() => { const l = document.getElementById('messages'); l.scrollTop = l.scrollHeight; })()"); await new Promise(done => setTimeout(done, 100));
+ const listBefore = await evaluate("document.getElementById('messages').clientHeight");
+ activity = { working: true, error: undefined, thinking: "", queue: [{ id: "q1", text: "Queued follow-up", delivery: "followUp" }], tools: Array.from({ length: 6 }, (_, i) => ({ id: "grow_" + i, name: "bash", state: "running", args: "step " + i })) }; server.publish("activity", activity);
+ await browser("wait", "--fn", "document.querySelectorAll('#activity details').length >= 7"); await new Promise(done => setTimeout(done, 200));
+ assert(await evaluate("document.getElementById('messages').clientHeight") < listBefore - 48, "the queue rows really shrink the list");
+ // A scroll event arriving after content grew below (reader did not move) keeps the pin.
+ await evaluate("(() => { const l = document.getElementById('messages'); l.lastElementChild.append(Object.assign(document.createElement('div'), { style: 'height: 200px' })); l.dispatchEvent(new Event('scroll')); })()");
+ { const row = { id: "after_queue", role: "assistant", text: "Working on it", streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
+ await browser("wait", "[data-id=after_queue]");
+ assert(await evaluate("(() => { const list = document.getElementById('messages'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4; })()"), "queued message: the chat stays at the end");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
  const productSample = JSON.parse(await readFile(new URL("./fixtures/diagrams/ce-workflow.diagram.json", import.meta.url), "utf8"));
  diagram = { ...productSample, kind: "plan", plan: "12345678", revision: diagram.revision + 1 }; server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });
