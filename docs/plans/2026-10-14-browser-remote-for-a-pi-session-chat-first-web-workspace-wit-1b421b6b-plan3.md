@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T11:54:06.276Z
+updated: 2026-10-14T11:55:17.781Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -202,7 +202,7 @@ Commands (existing; referenced by steps):
 - [x] **P3-02** Request mode follows the Host (D8). 127.0.0.1:port requires the token and ignores cookies. The tailnet host:port requires X-Forwarded-Proto https, the owner Tailscale-User-Login and a pi_remote cookie accepted by options.device, never the token, with Origin https://host:port. Remote assets carry an empty token, and the page then uses same-origin credentials for fetch, POST, paste and EventSource. plan3.ts passes the serve mapping as remote; device is unset until P3-03, so remote requests fail closed with 401.
 - [x] **P3-03** Pairing works end to end. Unpaired owner devices get only pair.html/pair.js/styles.css plus /pair/start (6-digit code, 2-minute expiry, one pending, 5 per 10 minutes) and /pair/status (long-poll; sets the pi_remote HttpOnly Secure SameSite=Strict cookie once, 90 days). Approval is a terminal-only list dialog (new showListDialog terminalOnly, not bridged; needs a terminal UI). The machine-wide devices.json registry stores secret hashes, renews hourly, prunes expired devices and uses a pid-stamped cross-process lock; corrupt state fails closed with one warning. /wo share devices lists and revokes.
 - [x] **P3-04** Forged-header C-WEB coverage is complete. Already covered: wrong or missing login, missing or unpaired cookie, token-only remote, foreign Host, local Origin on the remote host, http proto, 409, and 429. New: a device revoked through the real registry gets 401 on its next request; the 2-minute pairing expiry (mocked timers) aborts the terminal dialog and the code then 404s; D9 isolation (terminalOnly dialogs never reach a bound browser bridge, and a session without a terminal UI denies pairing).
-- [ ] **P3-06** Device registry under a cross-process lock (D21); two-process tests for concurrent pairing, renewal and revoke; corrupt file fails closed.
+- [x] **P3-06** Two-process registry test: two Node processes each pair 20 devices, renew 10 and revoke 5 against one devices.json; all 30 survivors validate, all 10 revoked are rejected, renewals persist and the lock is released. The P3-03 registry already provides the pid-stamped lock, atomic rename and fail-closed corrupt state.
 - [ ] **P3-07** Revocation closes open streams within 5 s (D21); test revoking via session A while the device streams session B.
 - [ ] **P3-05** Session records for the switcher (D18, D21): name, cwd, port, state and per-device seen revision; list skips dead pids; C-WEB tests.
 
@@ -252,7 +252,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Executing. P3-02 done (host-based modes; remote device check via options.device, unset → 401). Next: P3-03 pairing page/API, terminal-only approval, devices.json registry (built with the cross-process lock now; P3-06 adds two-process tests), /wo share devices.
+Executing. P3-01..P3-04 done. Next: P3-06 two-process registry tests (registry already has the cross-process lock from P3-03), then P3-07 revocation closes streams within 5 s, P3-05 session records.
 
 ## Amendments
 

@@ -513,6 +513,30 @@ try {
  } finally { await pairServer.close(); }
  assert(approvals.every(approval => approval.signal.aborted), "every approval dialog is dismissed");
 }
+// P3-06: two processes pair, renew and revoke against one registry without losing writes.
+{
+ const directory = await mkdtemp(join(tmpdir(), "plan3-devices-race-"));
+ const { execFile } = await import("node:child_process");
+ const worker = (role) => new Promise((resolve, reject) => execFile(process.execPath, ["--input-type=module", "-e", `
+  import { createJiti } from "jiti";
+  const { createDeviceRegistry } = await createJiti(${JSON.stringify(import.meta.url)}).import("../extensions/plan3-remote.ts");
+  let clock = Date.now() + 3_600_000 * (process.argv[2] === "b" ? 2 : 1);
+  const registry = createDeviceRegistry({ directory: process.argv[1], now: () => clock++ }), cookies = [];
+  for (let i = 0; i < 20; i++) cookies.push(await registry.pair(process.argv[2] + i, "me@github"));
+  clock += 3_600_000;
+  for (const cookie of cookies.slice(0, 10)) if (!await registry.check(cookie, "me@github")) throw new Error("renew failed");
+  for (const cookie of cookies.slice(10, 15)) if (!await registry.revoke(cookie.split(".")[0])) throw new Error("revoke failed");
+  console.log(JSON.stringify(cookies));`, directory, role], { cwd: process.cwd() }, (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(JSON.parse(stdout))));
+ try {
+  const [a, b] = await Promise.all([worker("a"), worker("b")]), registry = createDeviceRegistry({ directory });
+  const kept = registry.list();
+  assert.equal(kept.length, 30, "40 paired, 10 revoked, none lost to a race");
+  for (const cookie of [...a.slice(0, 10), ...b.slice(0, 10), ...a.slice(15), ...b.slice(15)]) assert(await registry.check(cookie, "me@github"));
+  for (const cookie of [...a.slice(10, 15), ...b.slice(10, 15)]) assert.equal(await registry.check(cookie, "me@github"), false);
+  assert(kept.filter(device => /^[ab][0-9]$/.test(device.label)).every(device => device.lastUsed > device.created), "renewals survive concurrent pairing");
+  assert(!existsSync(join(directory, "devices.lock")));
+ } finally { await rm(directory, { recursive: true, force: true }); }
+}
 // P3-04: a revoked device loses access on its next request; pairing codes expire after 2 minutes.
 {
  const directory = await mkdtemp(join(tmpdir(), "plan3-revoke-test-")), registry = createDeviceRegistry({ directory });
