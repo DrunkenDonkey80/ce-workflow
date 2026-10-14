@@ -387,7 +387,7 @@ const { mkdtemp, writeFile, stat, rm } = await import("node:fs/promises");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
-const { loadShareRecord, saveSharePort } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
+const { loadShareRecord, saveSharePort, tailscaleStatus, serveAdd, serveRemove } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
 const credentialDir = await mkdtemp(join(tmpdir(), "plan3-remote-test-"));
 let persistent, occupied, fallback;
 try {
@@ -411,4 +411,22 @@ try {
  await writeFile(join(credentialDir, `${id}.json`), "{}");
  await assert.rejects(loadShareRecord(id, credentialDir), /Invalid/);
 } finally { await fallback?.close(); await occupied?.close(); await persistent?.close(); await rm(credentialDir, { recursive: true, force: true }); }
+// P3-01: Tailscale detection names each missing step; serve stays tailnet-only on the same port.
+{
+ const status = patch => JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } }, ...patch });
+ const fake = stdout => async () => ({ stdout, stderr: "", code: 0, killed: false });
+ assert.deepEqual(await tailscaleStatus(fake(status())), { host: "pc.tail.ts.net", login: "me@github", missing: [] });
+ assert.match((await tailscaleStatus(async () => { throw Object.assign(new Error("spawn tailscale ENOENT"), { code: "ENOENT" }); })).missing[0], /Install/);
+ assert.match((await tailscaleStatus(fake(status({ BackendState: "NeedsLogin" })))).missing[0], /Log in/);
+ assert.match((await tailscaleStatus(fake(status({ CertDomains: [] })))).missing[0], /HTTPS Certificates/);
+ assert.match((await tailscaleStatus(fake(status({ CurrentTailnet: { MagicDNSEnabled: false } })))).missing[0], /MagicDNS/);
+ const tagged = await tailscaleStatus(fake(status({ Self: { DNSName: "pc.tail.ts.net.", UserID: 7, Tags: ["tag:server"] } })));
+ assert.equal(tagged.login, undefined); assert.match(tagged.missing[0], /not tagged/);
+ const calls = [], exec = async (command, args) => { calls.push([command, ...args]); return { stdout: "", stderr: "handler does not exist", code: args.includes("off") ? 1 : 0, killed: false }; };
+ await serveAdd(exec, 4321); assert.deepEqual(calls[0], ["tailscale", "serve", "--bg", "--https=4321", "http://127.0.0.1:4321"]);
+ assert(!calls.flat().some(arg => /funnel/i.test(arg)), "never Funnel");
+ assert.equal(await serveRemove(exec, 4321), false, "removing an absent mapping is harmless");
+ await assert.rejects(serveAdd(async () => ({ stdout: "", stderr: "access denied", code: 1, killed: false }), 4321), /access denied/);
+ await assert.rejects(serveAdd(exec, 0), /Invalid/);
+}
 console.log("ok - plan3 web security, Stop, dialog races, bounded activity, reconnect and persisted port/token");

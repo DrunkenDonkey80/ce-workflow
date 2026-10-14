@@ -41,3 +41,33 @@ export async function saveSharePort(record: ShareRecord, port: number, directory
 		record.port = port;
 	} finally { await rm(temporary, { force: true }); }
 }
+
+type Exec = (command: string, args: string[], options?: { timeout?: number }) => Promise<{ stdout: string; stderr: string; code: number; killed: boolean }>;
+export type Tailnet = { host?: string; login?: string; missing: string[] };
+/** D8: the tailnet host and owner login, or the setup steps still missing. */
+export async function tailscaleStatus(exec: Exec): Promise<Tailnet> {
+	let status;
+	try {
+		const result = await exec("tailscale", ["status", "--json"], { timeout: 10_000 });
+		status = JSON.parse(result.stdout);
+	} catch { return { missing: ["Install and start Tailscale (https://tailscale.com/download)."] }; }
+	const missing = [], host = typeof status.Self?.DNSName === "string" ? status.Self.DNSName.replace(/\.$/, "") : "";
+	if (status.BackendState !== "Running") return { missing: ["Log in to Tailscale and connect (tailscale up)."] };
+	if (!host || !status.CurrentTailnet?.MagicDNSEnabled) missing.push("Turn on MagicDNS in the Tailscale admin console (DNS page).");
+	else if (!(status.CertDomains ?? []).includes(host)) missing.push("Turn on HTTPS Certificates in the Tailscale admin console (DNS page).");
+	// Tagged devices carry no user identity (D8), so they cannot prove the owner.
+	const login = status.User?.[String(status.Self?.UserID)]?.LoginName;
+	if (typeof login !== "string" || !login || status.Self?.Tags?.length) missing.push("This device must be logged in as a Tailscale user, not tagged.");
+	return missing.length ? { missing } : { host, login, missing };
+}
+/** D1/D7: tailnet-only HTTPS on the same port; never Funnel. Re-adding the same mapping is a no-op. */
+export async function serveAdd(exec: Exec, port: number) {
+	if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid shared session port.");
+	const result = await exec("tailscale", ["serve", "--bg", `--https=${port}`, `http://127.0.0.1:${port}`], { timeout: 15_000 });
+	if (result.code !== 0 || result.killed) throw new Error(`tailscale serve failed: ${(result.stderr || result.stdout).trim()}`);
+}
+/** Removing an absent mapping fails harmlessly; the result says whether one was removed. */
+export async function serveRemove(exec: Exec, port: number) {
+	if (!Number.isInteger(port) || port < 1 || port > 65535) return false;
+	try { return (await exec("tailscale", ["serve", `--https=${port}`, "off"], { timeout: 15_000 })).code === 0; } catch { return false; }
+}

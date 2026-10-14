@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T11:36:52.666Z
+updated: 2026-10-14T11:42:12.328Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -198,7 +198,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 3: Tailscale remote and device pairing [code]
 
-- [ ] **P3-01** Tailscale detection (installed, logged in, DNS name, owner login, certificates) and serve add or remove via pi.exec, reporting missing steps.
+- [x] **P3-01** Tailscale detection and serve mapping. plan3-remote.ts adds tailscaleStatus (installed, logged in, MagicDNS, HTTPS certificates, owner login, untagged; each missing step named), plus serveAdd/serveRemove (tailnet HTTPS on the same port, never Funnel). Sharing adds the mapping, or warns which step is missing and still shares locally; turning sharing off, quit, new and fork remove it, and reload keeps it. A changed port removes the old mapping. Remote Host stays 403 until P3-02.
 - [ ] **P3-02** Host-based request modes (D8, D21): local token, remote owner login plus cookie; migrate every fetch, asset and stream; Origin per mode.
 - [ ] **P3-03** Pairing page and API, terminal-only approval dialog (D9), machine-wide cookie per D13 and D18, `/wo share devices` to list and revoke.
 - [ ] **P3-04** C-WEB tests with forged headers: wrong login, missing cookie, revoked device, foreign Host, pairing expiry and rate limit, D9 isolation.
@@ -252,7 +252,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Executing. P2-01..P2-07 and P2-09..P2-11 done (HEAD fecd591). Next: P2-08, then P3-*. Check-in packet built by checkIn() in plan3-web.ts; page delta rule in plan3-web/stream.ts; assets under /a/<build>/. Hunk filter must use bytes mode; verify with git show HEAD after commit. Browser test has a known flaky drag-pan race (about 3 in 9 runs); rerun once.
+Executing. Phase 2 complete (P2-01..P2-11, HEAD after P2-08 commit). Next: P3-01 Tailscale detection and serve add/remove via pi.exec. Then P3-02, P3-03, P3-04, P3-06, P3-07, P3-05. Hunk filter must use bytes mode; verify with git show HEAD. Browser test has a known flaky drag-pan race; rerun once.
 
 ## Amendments
 

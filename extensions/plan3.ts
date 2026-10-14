@@ -12,7 +12,7 @@ import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, design
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createPlan3Web, checkIn, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
-import { loadShareRecord, saveSharePort, type ShareRecord } from "./plan3-remote.ts";
+import { loadShareRecord, saveSharePort, serveAdd, serveRemove, tailscaleStatus, type ShareRecord, type Tailnet } from "./plan3-remote.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -709,6 +709,8 @@ export default function plan3(pi) {
 	}
 	let webCtx = null, webStopped = false;
 	let shareRecord: ShareRecord | undefined;
+	const tailscaleExec = (command: string, args: string[], options?: { timeout?: number }) => pi.exec(command, args, options);
+	let tailnet: Tailnet & { port?: number } = { missing: [] };
 	const sharedEntry = (ctx) => (ctx.sessionManager?.getBranch?.() ?? []).findLast(entry => entry.type === "custom" && entry.customType === "plan3-shared")?.data?.shared === true;
 	let webServer: ReturnType<typeof createPlan3Web> | undefined;
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
@@ -796,9 +798,16 @@ export default function plan3(pi) {
 			const resolved = await resolveWebTarget(target);
 			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) });
 		} }).then(async server => {
+			const previous = shareRecord.port;
 			try { await saveSharePort(shareRecord, server.port); }
 			catch (error) { await server.close(); throw error; }
 			webInstance = server;
+			// Remote access is optional (D5): local sharing works and the share notice names the missing step.
+			try {
+				if (previous && previous !== server.port) await serveRemove(tailscaleExec, previous);
+				tailnet = await tailscaleStatus(tailscaleExec);
+				if (tailnet.host) { await serveAdd(tailscaleExec, server.port); tailnet.port = server.port; }
+			} catch (error) { tailnet = { missing: [(error as Error).message] }; }
 			if (server.portChanged) ctx.ui.notify(`Shared session port was taken; new link: ${server.url()}`, "warning");
 			return server;
 		}).catch(error => { webServer = undefined; throw error; });
@@ -1969,12 +1978,13 @@ export default function plan3(pi) {
 		try {
 			if (args.trim()) throw new Error("Use /wo share to toggle this session. Device management is not attached yet.");
 			if (webInstance) {
-				await closeWeb(); pi.appendEntry("plan3-shared", { shared: false });
+				await closeWeb(); await unserve(); pi.appendEntry("plan3-shared", { shared: false });
 				ctx.ui.notify("Session sharing off.", "info");
 			} else {
 				const server = await getWeb(ctx);
 				pi.appendEntry("plan3-shared", { shared: true });
 				ctx.ui.notify(`Shared locally: ${server.url()}`, "info");
+				ctx.ui.notify(tailnet.port ? `Remote (your tailnet only): https://${tailnet.host}:${tailnet.port}/` : `Remote access off: ${tailnet.missing.join(" ")}`, tailnet.port ? "info" : "warning");
 			}
 			await refresh(ctx);
 		} catch (error) { report(ctx, error); }
@@ -2006,11 +2016,16 @@ export default function plan3(pi) {
 		const pending = webServer; webServer = undefined;
 		try { await pending?.then(server => server.close()); } finally { webInstance = undefined; }
 	}
-	pi.on?.("session_shutdown", async () => {
+	async function unserve() {
+		const port = tailnet.port; tailnet = { missing: [] };
+		if (port) await serveRemove(tailscaleExec, port);
+	}
+	pi.on?.("session_shutdown", async (event) => {
 		forcingArchitecture = undefined; // Never archive from a reconciliation owned by the previous conversation.
 		chat.reset(); activity.reset();
 		night.shutdown(); dialogs.close(); disposeDiagram(); webStopped = true;
-		await Promise.all([closeWeb(), closePersistentOpenDesignClients()]);
+		// D1/D3: reload keeps the mapping for the next runtime; quit, new and fork remove it.
+		await Promise.all([closeWeb(), closePersistentOpenDesignClients(), event?.reason === "reload" ? undefined : unserve()]);
 	});
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
 	// Plans are born from the template (plan3 create), never invented: block writing a NEW plan3 file by hand.

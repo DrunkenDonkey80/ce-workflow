@@ -31,6 +31,7 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map(), shortcuts = new Map();
 const messages = [], notices = [], events = [], planEvents = [], statuses = [], execCalls = [];
 let execResult = { code: 0, stdout: "", stderr: "", killed: false };
+const tailscaleCalls = []; let tailscale = () => { throw Object.assign(new Error("spawn tailscale ENOENT"), { code: "ENOENT" }); };
 let entries = [], sessionId = randomUUID(), sharedStatus;
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
 const ctx = {
@@ -63,7 +64,7 @@ const api = {
 	setThinkingLevel: (level) => { thinking = level; },
 	setModel: async (model) => { if (model.id === "no-auth") return false; ctx.model = model; return true; },
 	getAllTools: () => askSource ? [{ name: "ask_user", sourceInfo: { path: askSource } }] : [],
-	exec: async (command, args, options) => { execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
+	exec: async (command, args, options) => { if (command === "tailscale") { tailscaleCalls.push(args.join(" ")); return tailscale(args); } execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
 	registerCommand: (name, command) => commands.set(name, command),
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
@@ -1301,9 +1302,20 @@ try {
 		sessionId = randomUUID();
 		await hooks.get("session_start")({ reason: "new" }, webCtx);
 		const share = () => listeners.get("plan3:share")({ ctx: webCtx });
-		await share(); assert.match(sharedStatus, /\[SHARED\]/); const shareUrl = new URL(notices.at(-1).message.replace("Shared locally: ", ""));
+		await share(); assert.match(notices.at(-1).message, /Remote access off: Install/, "missing Tailscale still shares locally");
+		await share(); tailscaleCalls.length = 0;
+		tailscale = args => ({ code: 0, killed: false, stderr: "", stdout: args[0] === "status" ? JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } } }) : "" });
+		await share(); assert.match(sharedStatus, /\[SHARED\]/); const shareUrl = new URL(notices.at(-2).message.replace("Shared locally: ", ""));
+		assert.equal(notices.at(-1).message, `Remote (your tailnet only): https://pc.tail.ts.net:${shareUrl.port}/`);
+		assert.deepEqual(tailscaleCalls, ["status --json", `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`]);
+		await hooks.get("session_shutdown")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.length, 2, "reload keeps the mapping");
+		await hooks.get("session_start")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`);
 		assert.equal((await fetch(`${shareUrl.origin}/api/snapshot`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).status, 200);
 		await share(); assert.equal(sharedStatus, undefined); assert.deepEqual(entries.at(-1).data, { shared: false });
+		assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "sharing off removes the mapping");
+		await share(); await hooks.get("session_shutdown")({ reason: "quit" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "quit removes the mapping");
+		await hooks.get("session_start")({ reason: "resume" }, webCtx); await share(); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`);
+		tailscale = () => { throw Object.assign(new Error("spawn tailscale ENOENT"), { code: "ENOENT" }); };
 		await assert.rejects(fetch(`${shareUrl.origin}/api/snapshot`));
 		const reopened = await open(`diagram ${b}`);
 		assert.notEqual(reopened.searchParams.get("token"), token, "a different conversation gets a fresh capability");
