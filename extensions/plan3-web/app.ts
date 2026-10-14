@@ -40,11 +40,11 @@ function renderShell() {
  $("title").textContent = title; $("title").title = title;
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
- // D19 status line. Line 1: [model: effort] [Context: n%] [🧠 bias]; line 2: the plan as a progress bar (or New plan).
+ // D19 status line. Line 1: [model: effort] [Context: n%] [💡 bias]; line 2: the plan as a progress bar (or New plan).
  const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
  $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
  $("context-button").textContent = "Context: " + (typeof status?.context === "number" ? Math.round(status.context) + "%" : "—");
- $("bias-button").textContent = "🧠 " + (BIAS_LABEL[plan?.bias ?? 0] ?? "Normal");
+ $("bias-button").textContent = "💡 " + (BIAS_LABEL[plan?.bias ?? 0] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
  $("bias-button").disabled = !state.connected || !plan;
  // The plan bar names the plan; only the title part truncates, the count stays visible.

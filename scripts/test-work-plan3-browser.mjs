@@ -372,13 +372,13 @@ try {
  assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
- assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["Fast: High", "Context: 42%", "🧠 Normal", sample.title + "2/5"]);
+ assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["Fast: High", "Context: 42%", "💡 Normal", sample.title + "2/5"]);
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - herdr tab; the plan is in its bar");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .bar')].map(bar => bar.textContent + ':' + bar.dataset.tone + ':' + bar.style.getPropertyValue('--fill'))"), ["Claude 7d 53%:text:53%", "Codex 7d 12%:error:12%"]);
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
- await browser("wait", "--fn", "document.getElementById('bias-button').textContent === '🧠 Think:Task'");
+ await browser("wait", "--fn", "document.getElementById('bias-button').textContent === '💡 Think:Task'");
  await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
  await browser("click", "#usage-button");
  // One block per provider (│), one line per item (·); bar glyphs are equal-height cells; the menu is narrow and under its button.
