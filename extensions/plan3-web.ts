@@ -100,6 +100,7 @@ export async function createPlan3Web(options: Options) {
 		["/layout.js", ["layout.ts", "text/javascript; charset=utf-8"]],
 		["/diagram.js", ["diagram.ts", "text/javascript; charset=utf-8"]],
 		["/prompts.js", ["prompts.ts", "text/javascript; charset=utf-8"]],
+		["/files.js", ["files.ts", "text/javascript; charset=utf-8"]],
 		["/stream.js", ["stream.ts", "text/javascript; charset=utf-8"]],
 		["/pair.js", ["pair.ts", "text/javascript; charset=utf-8"]],
 		["/pair.html", ["pair.html", "text/html; charset=utf-8"]],

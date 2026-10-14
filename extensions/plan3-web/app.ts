@@ -4,6 +4,8 @@ import type { createActivityMirror } from "../plan3-web.ts";
 // @ts-ignore Browser URL includes the workspace token.
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
+import { createFilesView } from "./files.js?token=__TOKEN__";
+// @ts-ignore Browser URL includes the workspace token.
 import { createPromptView } from "./prompts.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { applyText } from "./stream.js?token=__TOKEN__";
@@ -77,6 +79,7 @@ function setTab(name) {
   $(tab).setAttribute("aria-selected", String(selected)); $(tab).tabIndex = selected ? 0 : -1; $(panel).hidden = !selected;
  }
  remember("plan3-tab", name);
+ if (name === "files") filesView.shown();
  // A diagram first drawn while hidden has not been fitted yet.
  if (name === "diagram" && state.diagram) diagramView.render(state.diagram);
 }
@@ -213,6 +216,7 @@ window.addEventListener("keydown", event => { if (event.key === "Escape") { $("h
 $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
+const filesView = createFilesView($("files"), { get });
 setTab(remembered("plan3-tab", ["files", "diagram"], "diagram"));
 $("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
 $("search").addEventListener("keydown", event => {
@@ -331,6 +335,7 @@ function applyUpdate(event: MessageEvent, update) {
  catch (error) { showNotice("Workspace update failed: " + error.message + ". Reopen from the Pi terminal; your message draft is kept."); }
 }
 function listen(name, update) { handlers.push([name, update]); }
+listen("files", () => filesView.changed(!$("files").hidden));
 listen("snapshot", value => {
  if (build && value.build && value.build !== build) { location.reload(); return; }
  build ||= value.build ?? ""; retryDelay = 1000;

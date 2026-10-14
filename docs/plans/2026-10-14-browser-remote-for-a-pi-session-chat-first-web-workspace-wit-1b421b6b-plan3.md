@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:14:43.314Z
+updated: 2026-10-14T12:19:47.593Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -210,7 +210,7 @@ Commands (existing; referenced by steps):
 
 - [x] **P4-01** Desktop layout: the left panel has Files and Diagram tabs (ARIA tablist, arrow keys, Files is a placeholder until P4-03) and the chat stays on the right. R7 collapse states: full; narrow (the panel takes the chat width, the chat widens, splitter direction follows); collapsed to a >> button (the chat takes the width). Focus moves between << and >>, the state and tab persist in localStorage, and the rules apply only at ≥900 px. A diagram first drawn while hidden fits when its tab is shown.
 - [x] **P4-02** Files API in extensions/plan3-files.ts with /api/files, /api/file?path= and /api/diff?path= (403 FileRefused, capability required). The tree comes from git ls-files (honours .gitignore) with a bounded walk outside git, and jev-tools forbiddenPath hides paths. Change marks come from porcelain status (root-relative paths are mapped to cwd so subfolder sessions work). Content goes through captureSource. Diffs use git diff HEAD, which covers staged and unstaged edits, deletions and renames (the rename source is added to the pathspec). The diff text gets the secret, NUL and 256 KB checks. Untracked files and unborn repositories show content. A files SSE ping follows write, edit and bash tools. jev-tools exports forbiddenPath, secret and safePath, and object() became a type guard.
-- [ ] **P4-03** Files tab UI: tree beside viewer on desktop, tree above viewer on mobile; diff colouring per D10; keyboard navigable.
+- [x] **P4-03** Files tab UI in extensions/plan3-web/files.ts: a native details/summary folder tree (keyboard toggling, folders with changes start open, open/closed state kept across refreshes), file buttons with M/??/D/R marks coloured per D10, and a viewer beside the tree on desktop and below it under 900 px. Changed files load /api/diff and the others /api/file; diff lines are coloured (add #b2f2bb, del #ffc9c9). Everything renders through textContent. The files SSE event refreshes a visible tab or marks a hidden one stale; the selected file reloads on refresh.
 - [ ] **P4-04** Mobile layout under 900 px: tabs Chat, Files and Diagram; composer stays visible with the on-screen keyboard; image attach button.
 - [ ] **P4-08** Model and effort endpoints for D19 via pi.setModel and pi.setThinkingLevel, scoped models first; C-WEB tests incl. a command that never returns (D17).
 - [ ] **P4-05** Chat status line per D19: model and effort picker (scoped first), plan line with plan menu or New plan; expandable view.

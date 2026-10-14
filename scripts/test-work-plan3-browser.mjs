@@ -32,6 +32,7 @@ async function withPageCdp(origin, run) {
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
 const sample = JSON.parse(await readFile(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
+let projectFiles = [{ path: "docs/readme.md" }, { path: "src/app.ts", change: "M" }, { path: "top.txt" }];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
 const listeners = new Map(), answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
 const events = { on(name, run) { const rows = listeners.get(name) ?? new Set(); rows.add(run); listeners.set(name, rows); return () => rows.delete(run); }, emit(name, value) { for (const run of listeners.get(name) ?? []) run(value); } };
@@ -39,6 +40,9 @@ events.on("ask:answer", value => answers.push(value));
 const dialogs = createDialogBridge({ events }, (event, value) => server.publish(event, value));
 const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { askId, ...value }); return askId; };
 const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft" }, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
+ if (endpoint === "/api/files") return { files: projectFiles, truncated: false, git: true };
+ if (endpoint === "/api/file") return { path: params.get("path"), content: "<img src=x onerror=alert(1)>\nplain" };
+ if (endpoint === "/api/diff") return { path: params.get("path"), diff: "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-old line\n+new line" };
  if (endpoint === "/api/row") return { id: params.get("id"), role: "assistant", text: "Short excerpt. Full body loaded.", streaming: false };
  assert.equal(endpoint, "/api/diagram"); return { target: { kind: "plan", id: "12345678" }, diagram };
 }, post: (endpoint, body) => {
@@ -88,7 +92,22 @@ try {
  await browser("click", "#expand-left"); assert.equal(await width("chat"), 640);
  await browser("click", "#tab-files");
  assert.deepEqual(await evaluate("[document.getElementById(\"files\").hidden, document.getElementById(\"canvas\").hidden, document.getElementById(\"tab-files\").getAttribute(\"aria-selected\")]"), [false, true, "true"]);
- await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-diagram");
+ // R8/E4: changed files are marked, open as a coloured diff and keep folders open; content renders as text only.
+ await browser("wait", "[data-path=\"src/app.ts\"]");
+ assert.equal(await evaluate("document.querySelector(\"[data-path='src/app.ts'] .file-mark\").textContent"), "M");
+ assert.equal(await evaluate("document.querySelector(\"[data-path='src/app.ts']\").closest(\"details\").open"), true, "changed folders start open");
+ assert.equal(await evaluate("document.querySelector(\"[data-path='docs/readme.md']\").closest(\"details\").open"), false);
+ await browser("click", "[data-path=\"src/app.ts\"]"); await browser("wait", ".files-body .add");
+ assert.deepEqual(await evaluate("[document.querySelector('.files-body .add').textContent, document.querySelector('.files-body .del').textContent, getComputedStyle(document.querySelector('.files-body .add')).backgroundColor]"), ["+new line\n", "-old line\n", "rgb(178, 242, 187)"]);
+ assert.deepEqual(await evaluate("(() => { const r = [document.querySelector('.files-tree').getBoundingClientRect(), document.querySelector('.files-viewer').getBoundingClientRect()]; return [r[1].left >= r[0].right - 1, Math.abs(r[0].top - r[1].top) < 2]; })()"), [true, true], "desktop: tree beside the viewer");
+ await browser("focus", "[data-path=\"top.txt\"]"); await browser("press", "Enter"); await browser("wait", "--fn", "document.querySelector('.files-body').textContent.includes('plain')");
+ assert.equal(await evaluate("document.querySelector('.files-body img')"), null, "file content is inert text");
+ projectFiles = [...projectFiles, { path: "src/new.ts", change: "??" }]; server.publish("files", {});
+ await browser("wait", "[data-path=\"src/new.ts\"]");
+ await browser("set", "viewport", "760", "800");
+ assert(await evaluate("document.querySelector('.files-viewer').getBoundingClientRect().top >= document.querySelector('.files-tree').getBoundingClientRect().bottom - 1"), "phone: tree above the viewer");
+ await browser("set", "viewport", "1280", "800");
+ await browser("focus", "#tab-files"); await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-diagram");
  assert.equal(await evaluate("document.getElementById(\"canvas\").hidden"), false);
  await browser("set", "viewport", "760", "800");
  assert(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().top >= document.getElementById(\"canvas\").getBoundingClientRect().bottom"));

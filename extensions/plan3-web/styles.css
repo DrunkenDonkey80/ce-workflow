@@ -29,8 +29,28 @@ h2 { font-size: 15px; font-weight: 600; }
 .left-tabs [role=tab] { border-color: transparent; }
 .left-tabs [role=tab][aria-selected=true] { border-color: var(--ink); }
 #narrow-left[aria-pressed=true] { border-color: var(--focus); }
-.files { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
-.files-empty { color: #495057; font-size: 13px; }
+/* D2: tree beside the viewer on desktop, above it on phones. */
+.files { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(180px, 30%) minmax(0, 1fr); font-size: 13px; }
+.files-tree { overflow: auto; padding: 8px; border-right: 1px solid var(--line); }
+.files-tree details { padding-left: 12px; }
+.files-tree > details { padding-left: 0; }
+.files-tree summary { cursor: pointer; padding: 2px 4px; border-radius: 6px; }
+.files-tree summary.changed { font-weight: 600; }
+.files-tree details > .file { margin-left: 12px; width: calc(100% - 12px); }
+.file { display: flex; gap: 6px; width: 100%; text-align: left; border-color: transparent; padding: 2px 4px; overflow-wrap: anywhere; }
+.file[aria-current=true] { border-color: var(--ink); }
+.file-mark { margin-left: auto; padding: 0 4px; border-radius: 6px; background: var(--changed); font-size: 12px; }
+.file[data-change^="?"] .file-mark, .file[data-change^=A] .file-mark { background: var(--new); }
+.file[data-change^=D] .file-mark { background: var(--pink); }
+.files-viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; padding: 8px 12px; }
+.files-viewer h2 { font-size: 13px; padding-bottom: 6px; overflow-wrap: anywhere; }
+.files-body { margin: 0; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+.files-body.diff .add { background: var(--new); }
+.files-body.diff .del { background: var(--pink); }
+.files-body.diff .hunk { color: var(--focus); }
+.files-body.diff .meta { color: #495057; }
+.files-empty { color: #495057; font-size: 13px; padding: 4px; }
+@media (max-width: 899px) { .files { grid-template-columns: none; grid-template-rows: minmax(120px, 40%) minmax(0, 1fr); } .files-tree { border-right: 0; border-bottom: 1px solid var(--line); } }
 .expand-left { align-self: start; margin: 8px 4px; padding: 6px 8px; }
 .canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); }
 #diagram { width: 100%; height: 100%; display: block; touch-action: none; }
