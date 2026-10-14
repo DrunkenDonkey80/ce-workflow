@@ -15,14 +15,16 @@ function $(id: string): HTMLElement;
 function $(id: string): HTMLElement | SVGSVGElement { return document.getElementById(id); }
 const token = "__TOKEN__";
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
-const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]>>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
 function showNotice(text) { $("notice").textContent = text; $("notice").hidden = !text; }
 function renderShell() {
  const title = state.plan?.title ?? state.diagram?.title ?? "Architecture workspace";
- $("title").textContent = title; $("title").title = title; document.title = title + " — Plan3";
+ $("title").textContent = title; $("title").title = title;
+ // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
+ document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
  $("target-kind").textContent = target === "product" ? "Product" : "Plan";
  $("commands").hidden = target === "product";
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working" : "Idle";
@@ -85,8 +87,10 @@ async function loadDiagram() {
  catch (error) { showNotice("Diagram failed to load: " + error.message); }
 }
 // Check-in rows are excerpts; the full row loads when the reader asks for it.
+const loading = new Set();
 async function loadRow(id) {
- try { chat.set(id, await get("row?id=" + encodeURIComponent(id))); renderChat(); } catch (error) { showNotice(error.message); }
+ if (loading.has(id)) return; loading.add(id);
+ try { chat.set(id, await get("row?id=" + encodeURIComponent(id))); renderChat(); } catch (error) { showNotice(error.message); } finally { loading.delete(id); }
 }
 async function post(endpoint, body) {
  const response = await fetch("/api/" + endpoint, { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ target, ...body }) });
@@ -200,7 +204,7 @@ const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - lis
 $("messages").addEventListener("scroll", () => { if (atBottom($("messages"))) $("to-bottom").hidden = true; });
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
 // Opening a thinking/tool block of an excerpt row loads its bodies.
-$("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); if ((event.target as HTMLDetailsElement).open && chat.get(item?.dataset.id)?.excerpt) void loadRow(item.dataset.id); }, true);
+$("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); const row = chat.get(item?.dataset.id); if ((event.target as HTMLDetailsElement).open && (row?.excerpt || row?.brief)) void loadRow(item.dataset.id); }, true);
 $("earlier").addEventListener("click", async () => {
  try {
   const first = chat.keys().next().value, page = await get("rows" + (first ? "?before=" + encodeURIComponent(first) : ""));
@@ -305,7 +309,29 @@ listen("diagram", value => {
 listen("message", row => { chat.set(row.id, row); renderChat(); });
 listen("dialog", value => { promptView.pending(value); renderShell(); });
 listen("dialog_closed", value => { promptView.closed(value.askId); renderShell(); });
-listen("activity", value => { state.activity = value; renderActivity(); renderShell(); });
+listen("activity", value => { state.activity = { ...state.activity, ...value }; renderActivity(); renderShell(); });
+// Appended text per D21: apply only at the current length, ignore stale, refetch the row on a gap.
+listen("delta", delta => {
+ const row = chat.get(delta.id), current = row && !row.excerpt ? row.text : undefined;
+ if (delta.offset > 0 && (current === undefined || delta.offset > current.length)) { void loadRow(delta.id); return; }
+ if (delta.offset > 0 && delta.offset + delta.text.length < current.length) return;
+ chat.set(delta.id, { ...row, id: delta.id, role: delta.role, text: (delta.offset ? current.slice(0, delta.offset) : "") + delta.text, streaming: delta.streaming, excerpt: false, truncated: delta.truncated ?? row?.truncated, error: delta.error ?? row?.error, ...(delta.blocks ? { blocks: delta.blocks, brief: delta.blocks.length > 0 } : {}) });
+ renderChat();
+ // An open block would lose its body to the brief update; reload it.
+ if (delta.blocks?.length && $("messages").querySelector(`li[data-id="${CSS.escape(delta.id)}"] details[open]`)) void loadRow(delta.id);
+});
+listen("thinking", delta => {
+ const data = state.activity, text = data.thinking ?? "", length = data.thinkingLength ?? text.length, at = delta.offset - (length - text.length);
+ if (delta.offset > 0 && delta.offset + delta.text.length < length) return;
+ // A gap (page joined mid-thought) restarts the shown thinking from what arrived.
+ const next = delta.offset > 0 && at >= 0 && at <= text.length ? text.slice(0, at) + delta.text : delta.text;
+ state.activity = { ...data, thinking: next.slice(-64000), thinkingLength: delta.offset + delta.text.length }; renderActivity();
+});
+listen("tool", row => {
+ const tools = [...(state.activity.tools ?? [])], index = tools.findIndex(item => item.id === row.id);
+ if (index < 0) tools.push(row); else tools[index] = row;
+ state.activity = { ...state.activity, tools: tools.slice(-50) }; renderActivity();
+});
 function connect() {
  events = new EventSource("/api/events?token=" + token + (target ? "&target=" + encodeURIComponent(target) : ""));
  for (const [name, update] of handlers) events.addEventListener(name, (event: MessageEvent) => applyUpdate(event, update));

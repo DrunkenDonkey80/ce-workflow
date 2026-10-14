@@ -202,6 +202,16 @@ try {
  await browser("click", "#messages [data-id=assistant_2] .row-full");
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Full body loaded\")");
  assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2] .row-full\").hidden"), "expanded row drops the excerpt link");
+ const rowText = id => evaluate(`document.querySelector("#messages [data-id=${id}]").children[2].textContent`);
+ server.publish("delta", { id: "assistant_3", role: "assistant", offset: 0, text: "Hel", streaming: true });
+ server.publish("delta", { id: "assistant_3", role: "assistant", offset: 3, text: "lo", streaming: true });
+ server.publish("delta", { id: "assistant_3", role: "assistant", offset: 1, text: "e", streaming: true });
+ await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=assistant_3]\")?.children[2].textContent === \"Hello\"");
+ server.publish("delta", { id: "assistant_3", role: "assistant", offset: 5, text: " world", streaming: false });
+ await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=assistant_3]\")?.children[2].textContent === \"Hello world\"");
+ server.publish("delta", { id: "assistant_3", role: "assistant", offset: 99, text: "x", streaming: false });
+ await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=assistant_3]\")?.children[2].textContent.includes(\"Full body loaded\")");
+ assert.equal(await rowText("assistant_3"), "Short excerpt. Full body loaded.", "a gap refetches the row; stale deltas never duplicate text");
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
   // Search Enter centers the box, so the click point is clear of the zoom bar; Escape clears the search.
  await browser("fill", "#search", "web_client"); await browser("press", "Enter"); await browser("press", "Escape");

@@ -795,7 +795,7 @@ export default function plan3(pi) {
 			const resolved = await resolveWebTarget(target);
 			// Check-in packet (D20): recent excerpts, running tools and whole dialogs; the diagram loads separately.
 			const live = activity.snapshot(webCtx), page = chat.page();
-			const snapshot = { target, chat: page.rows, more: page.more, activity: { ...live, thinking: live.thinking.slice(-2000), tools: live.tools.filter(tool => tool.state === "running") }, dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) };
+			const snapshot = { target, chat: page.rows, more: page.more, activity: { ...live, thinking: live.thinking.slice(-2000), thinkingLength: live.thinking.length, tools: live.tools.filter(tool => tool.state === "running") }, dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) };
 			// shortcut: dialogs stay whole even past 64 KB (answering needs them); only older rows are shed.
 			while (snapshot.chat.length > 1 && Buffer.byteLength(JSON.stringify(snapshot)) > 64_000) { snapshot.chat.shift(); snapshot.more = true; }
 			return snapshot;

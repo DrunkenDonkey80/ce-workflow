@@ -211,11 +211,25 @@ export async function createPlan3Web(options: Options) {
 
 // Thinking and tool calls travel as collapsed blocks (like Pi's terminal); a tool result joins its call's block.
 type ChatBlock = { type: "thinking"; text: string } | { type: "tool"; id: string; name: string; title: string; args: string; result?: string; error?: boolean };
-type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; excerpt?: boolean; error?: string; blocks?: ChatBlock[] };
-// Check-in rows (D20): 2 KB of text, thinking/tool blocks as titles only; the page fetches the full row on expand.
+type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; excerpt?: boolean; brief?: boolean; error?: string; blocks?: ChatBlock[] };
+// Thinking/tool blocks as titles only (brief); the page fetches the full row when one opens.
+const briefBlocks = (blocks: ChatBlock[]) => blocks.map(block => block.type === "thinking" ? { ...block, text: "" } : { ...block, args: "", ...(block.result === undefined ? {} : { result: "" }) });
+// Check-in rows (D20): at most 2 KB of text (excerpt) and brief blocks.
 function excerptRow(row: ChatRow): ChatRow {
-	if (row.text.length <= 2000 && !row.blocks?.some(block => block.type === "thinking" ? block.text : block.args || block.result)) return row;
-	return { ...row, text: row.text.slice(0, 2000), excerpt: true, ...(row.blocks ? { blocks: row.blocks.map(block => block.type === "thinking" ? { ...block, text: "" } : { ...block, args: "", ...(block.result === undefined ? {} : { result: "" }) }) } : {}) };
+	return { ...row, text: row.text.slice(0, 2000), ...(row.text.length > 2000 ? { excerpt: true } : {}), ...(row.blocks?.length ? { blocks: briefBlocks(row.blocks), brief: true } : {}) };
+}
+/** Calls `flush(key)` at most every `ms` per key; `now` flushes at once (final updates). */
+function coalescer(flush: (key: string) => void, ms = 250) {
+	const timers = new Map<string, { at: number; timer?: ReturnType<typeof setTimeout> }>();
+	const run = (key: string) => { const entry = timers.get(key); clearTimeout(entry?.timer); timers.set(key, { at: Date.now() }); flush(key); };
+	return {
+		push(key: string, now = false) {
+			const entry = timers.get(key);
+			if (now || !entry || Date.now() - entry.at >= ms) return run(key);
+			entry.timer ??= setTimeout(() => run(key), ms - (Date.now() - entry.at));
+		},
+		clear() { for (const entry of timers.values()) clearTimeout(entry.timer); timers.clear(); },
+	};
 }
 const clip = (text: string, limit: number) => text.length > limit ? text.slice(0, limit) + "\n\u2026 truncated" : text;
 /** One-line tool label: the name plus its most telling argument (path, command, query or the first text). */
@@ -225,8 +239,19 @@ function toolTitle(name: string, args: Record<string, unknown>) {
 	return (name + " " + (line.length > 90 ? line.slice(0, 89) + "\u2026" : line)).trim();
 }
 export function createChatMirror(pi, publish: (event: string, data: unknown) => void) {
-	const rows: ChatRow[] = [], active = new Map<string, string>();
+	const rows: ChatRow[] = [], active = new Map<string, string>(), sent = new Map<string, { length: number; blocks: string }>();
 	let next = 0;
+	// Live stream (D20/D21): `{ id, offset, text }` appends; blocks travel brief and only when they change.
+	// shortcut: assumes streamed text only grows (a shorter text resends from offset 0); hash the prefix if rewrites appear.
+	const stream = coalescer(id => {
+		const row = rows.find(item => item.id === id);
+		if (!row) return void sent.delete(id);
+		const last = sent.get(id), offset = last && row.text.length >= last.length ? last.length : 0;
+		const blocks = row.blocks?.length ? briefBlocks(row.blocks) : [], json = JSON.stringify(blocks);
+		publish("delta", { id, role: row.role, offset, text: row.text.slice(offset), streaming: row.streaming, ...(row.truncated ? { truncated: true } : {}), ...(row.error ? { error: row.error } : {}), ...(json !== last?.blocks ? { blocks } : {}) });
+		sent.set(id, { length: row.text.length, blocks: json });
+		for (const key of sent.keys()) if (!rows.some(item => item.id === key)) sent.delete(key);
+	});
 	const put = (message, streaming: boolean, emit = true, start = false) => {
 		if (message?.role === "toolResult") {
 			const row = rows.findLast(item => item.blocks?.some(block => block.type === "tool" && block.id === message.toolCallId));
@@ -234,7 +259,7 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 			if (!block || block.type !== "tool") return;
 			block.result = clip((Array.isArray(message.content) ? message.content : []).map(part => part?.type === "text" ? part.text : part?.type === "image" ? "[image]" : "").join("\n"), 4000);
 			if (message.isError) block.error = true;
-			if (emit) publish("message", row);
+			if (emit) stream.push(row.id, true);
 			return;
 		}
 		if (!["user", "assistant"].includes(message?.role)) return;
@@ -254,7 +279,7 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 		const row: ChatRow = { id, role, text: content.slice(0, 64_000), streaming, ...(content.length > 64_000 ? { truncated: true } : {}), ...(typeof message.errorMessage === "string" ? { error: message.errorMessage.slice(0, 4000) } : {}), ...(blocks.length ? { blocks } : {}) };
 		if (index < 0) rows.push(row); else rows[index] = row;
 		while (rows.length > 100 || Buffer.byteLength(JSON.stringify(rows)) > 512_000) rows.shift();
-		if (emit) publish("message", row);
+		if (emit) stream.push(id, !streaming);
 		if (!streaming) active.delete(role);
 	};
 	pi.on("input", event => { publish("input", { text: typeof event.text === "string" ? event.text.slice(0, 64_000) : "", source: event.source, streamingBehavior: event.streamingBehavior }); });
@@ -274,7 +299,7 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 			if (!row) throw new WebError(404, "Unknown chat row.");
 			return structuredClone(row);
 		},
-		reset: () => { rows.length = 0; active.clear(); next = 0; },
+		reset: () => { rows.length = 0; active.clear(); sent.clear(); stream.clear(); next = 0; },
 		hydrate(ctx) {
 			const live = structuredClone(rows);
 			rows.length = 0;
@@ -375,7 +400,10 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		if (hasPendingMessages === false) queued.length = 0;
 		return { hasPendingMessages, working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, dialog, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
 	};
-	const emit = () => publish("activity", snapshot(undefined));
+	// Live activity (D20): state without tools/thinking; tools travel as single changed rows, thinking as deltas.
+	const emit = () => { const { tools: _tools, thinking: _thinking, ...state } = snapshot(undefined); publish("activity", state); };
+	let thinkingSent = 0;
+	const thoughts = coalescer(() => { const offset = thinking.length >= thinkingSent ? thinkingSent : 0; publish("thinking", { offset, text: thinking.slice(offset) }); thinkingSent = thinking.length; });
 	const tool = (event, patch: Partial<ToolActivity>) => {
 		if (typeof event.toolCallId !== "string" || typeof event.toolName !== "string") return;
 		const index = tools.findIndex(row => row.id === event.toolCallId);
@@ -383,12 +411,12 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		if (index < 0) tools.push(row); else tools[index] = row;
 		// shortcut: latest 50 tool rows / 512 KB, text-only snapshots; native custom renderers stay in the terminal.
 		while (tools.length > 50 || Buffer.byteLength(JSON.stringify(tools)) > 512_000) tools.shift();
-		emit();
+		publish("tool", row);
 	};
-	pi.on("agent_start", () => { working = true; interrupted = false; thinking = ""; error = ""; emit(); });
+	pi.on("agent_start", () => { working = true; interrupted = false; thinking = ""; error = ""; thoughts.push("thinking", true); emit(); });
 	pi.on("agent_settled", event => {
 		working = false; interrupted = Boolean(event.aborted); queued.length = 0;
-		for (const row of tools) if (row.state === "running") row.state = interrupted ? "interrupted" : "settled";
+		for (const row of tools) if (row.state === "running") { row.state = interrupted ? "interrupted" : "settled"; publish("tool", row); }
 		emit();
 	});
 	pi.on("message_start", event => {
@@ -402,7 +430,7 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		if (event.message?.role !== "assistant") return;
 		const content = event.message.content ?? [];
 		thinking = content.filter(part => part.type === "thinking").map(part => part.thinking ?? "[redacted thinking]").join("\n").slice(0, 64_000);
-		if (event.assistantMessageEvent?.type?.startsWith("thinking_")) emit();
+		if (event.assistantMessageEvent?.type?.startsWith("thinking_")) thoughts.push("thinking");
 	});
 	pi.on("message_end", event => { if (event.message?.errorMessage) { error = brief(event.message.errorMessage); emit(); } });
 	pi.on("input", event => {
@@ -423,5 +451,5 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 	pi.on("session_before_compact", () => { compacting = true; emit(); });
 	pi.on("session_compact", () => { compacting = false; emit(); });
 	pi.on("session_compact_failed", event => { compacting = false; error = brief(event.errorMessage ?? (event.aborted ? "Compaction cancelled" : "Compaction failed")); emit(); });
-	return { snapshot, reset: () => { tools.length = 0; queued.length = 0; working = false; compacting = false; dialog = ""; thinking = ""; error = ""; interrupted = false; sequence = 0; } };
+	return { snapshot, reset: () => { tools.length = 0; queued.length = 0; working = false; compacting = false; dialog = ""; thinking = ""; thinkingSent = 0; thoughts.clear(); error = ""; interrupted = false; sequence = 0; } };
 }
