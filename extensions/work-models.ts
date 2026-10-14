@@ -2678,6 +2678,7 @@ function latestPiGoal(ctx) {
 async function handleWorkMenuCommand(ctx, pi) {
 	const items = [
 		{ value: "work-settings", label: "Settings", description: "Configure Plan3 models, compaction, images and camera. Global and project scopes are available." },
+		{ value: "work-share", label: "Share this session", description: "Toggle the browser workspace for this session. Shared sessions show a red [SHARED] footer and reopen on resume." },
 		...(maintenanceCheckout(ctx.cwd) ? [
 			{ value: "work-context", label: "Context guard", description: "Inspect or tune proactive context compaction.", argumentTitle: "Context action", placeholder: "Blank shows status; compact / on / off / set <tokens>" },
 			{ value: "work-catch-up", label: "Catch up packages", description: "Review the Pi/plugin packages ce-workflow still uses in a Plan3 plan." },
@@ -2707,6 +2708,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 			args = await ctx.ui.input(selected.item.argumentTitle, selected.item.placeholder);
 			if (args == null) continue;
 		}
+		if (selected.value === "work-share") return pi.events?.emit?.("plan3:share", { ctx, args });
 		return executeUtilityAction(selected.value, args, ctx, pi);
 	}
 }
@@ -4009,11 +4011,11 @@ if (blockedInternalBackgroundCompletionTurn) {
 	});
 
 	pi.registerCommand("wo", {
- description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo compact or /wo fact",
+ description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo share, /wo compact or /wo fact",
  getArgumentCompletions: (prefix) => {
   const input=String(prefix ?? "").trim();
   if (/\s/.test(input)) return null;
-  const descriptions={compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})};
+  const descriptions={compact:"Compact the current context",share:"Toggle browser sharing for this session",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})};
   const items=Object.entries(descriptions).filter(([value])=>value.startsWith(input)).map(([value,description])=>({value,label:value,description}));
   return items.length?items:null;
  },
@@ -4022,6 +4024,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(!action) return handleWorkMenuCommand(ctx,pi);
   const plan3={plan:"plan3",plans:"plans3",resume:"resume3"}[action];
   if(plan3) return pi.events?.emit?.("plan3:command",{ctx,name:plan3,args:rest});
+  if(action==="share") return pi.events?.emit?.("plan3:share",{ctx,args:rest});
   const utility=WO_UTILITY_ACTIONS[action];
   if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
   if(action==="compact") return requestMicrocompact(ctx);

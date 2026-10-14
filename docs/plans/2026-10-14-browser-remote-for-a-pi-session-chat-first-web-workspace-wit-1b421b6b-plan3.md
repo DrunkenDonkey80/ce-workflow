@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T10:54:25.222Z
+updated: 2026-10-14T10:56:42.380Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -188,7 +188,7 @@ Commands (existing; referenced by steps):
 - [x] **P2-02** Session snapshot/events work without a diagram target; Stop and answers are session-wide, chat adds diagram context only for mentions/notes, and the browser follows the resolved target.
 - [x] **P2-03** Typed slash commands and plan-menu buttons dispatch through unawaited sendUserMessage with expansion enabled; documented Pi built-ins return terminal-only errors. Legacy command endpoint remains until the UI/API migration is finished.
 - [x] **P2-04** Sharing persists a boolean-only entry; reload and resume restore the saved local link using a fresh session context. Shutdown releases the server; new sessions get new credentials and the nonexistent session_switch dependency is removed.
-- [ ] **P2-05** Add `/wo share` toggle and menu row (D15) and the red `[SHARED]` footer status; /plan3 diagram and architecture share locally (D14).
+- [x] **P2-05** /wo share and the Utilities row toggle per-session sharing with persisted on/off state; while live, a red bold [SHARED] status shows; diagram/architecture opens share locally.
 - [ ] **P2-06** Page reconnect: "Pi is reloading…" banner, retry with backoff, reload the page when the build fingerprint changed.
 - [ ] **P2-07** Show "Pi is waiting for a terminal dialog: <title>" from ui_prompt_start until ui_prompt_end.
 - [ ] **P2-09** Slim check-in snapshot per D20: last 20 rows, block titles with body on expand, pending dialogs first, Show earlier paging; 64 KB budget.

@@ -19,7 +19,7 @@ try {
 		registerCommand: (name, config) => { commands[name] = config; },
 		registerShortcut: (name, config) => { shortcuts[name] = config; },
 		registerTool: tool => { tools[tool.name] = tool; },
-		events: { on: () => {}, emit: (name, args) => forwarded.push([name, args.name, args.args]) },
+		events: { on: () => {}, emit: (name, args) => forwarded.push([name, args.name, args.args].filter(value => value !== undefined)) },
 		sendUserMessage: text => sent.push(text),
 	};
 	workModelsExtension(pi);
@@ -31,9 +31,9 @@ try {
 	assert(tools.knowledge && tools.compaction_note && tools.research_note);
 	const names = commands.wo.getArgumentCompletions("").map(item => item.value);
 	for (const name of ["goal", "pause", "monitor", "resume-work", "design", "redesign", "telemetry", "usage"]) assert(!names.includes(name), name);
-	for (const name of ["plan", "plans", "resume", "settings", "compact", "fact"]) assert(names.includes(name), name);
-	for (const args of ["plan finish", "plans", "resume abc"]) await commands.wo.handler(args, ctx);
-	assert.deepEqual(forwarded, [["plan3:command", "plan3", "finish"], ["plan3:command", "plans3", ""], ["plan3:command", "resume3", "abc"]]);
+	for (const name of ["plan", "plans", "resume", "share", "settings", "compact", "fact"]) assert(names.includes(name), name);
+	for (const args of ["plan finish", "plans", "resume abc", "share"]) await commands.wo.handler(args, ctx);
+	assert.deepEqual(forwarded, [["plan3:command", "plan3", "finish"], ["plan3:command", "plans3", ""], ["plan3:command", "resume3", "abc"], ["plan3:share", ""]]);
 	for (const action of ["goal", "monitor", "telemetry", "usage", "design", "redesign", "resume-work", "pause"])
 		await commands.wo.handler(`${action} forbidden`, ctx);
 	assert.equal(sent.length, 0);

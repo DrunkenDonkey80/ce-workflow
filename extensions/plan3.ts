@@ -697,6 +697,7 @@ export default function plan3(pi) {
 
 	const shortTitle = (title) => title.length > 40 ? `${title.slice(0, 39).trimEnd()}…` : title;
 	async function refresh(ctx) {
+		ctx.ui?.setStatus?.("plan3-shared", webInstance ? "\x1b[1;31m[SHARED]\x1b[0m" : undefined);
 		try {
 			const plans = await listPlans(ctx.cwd), plan = currentPlan(ctx, plans);
 			pi.events.emit("plan3:plans-changed", { cwd: ctx.cwd, plans: plans.map(({ id, file, title, status }) => ({ id, file, title, status })) });
@@ -827,6 +828,7 @@ export default function plan3(pi) {
 		webTarget(target.kind === "product" ? "product" : target.id);
 		const server = await getWeb(ctx), url = server.url(target);
 		if (!sharedEntry(ctx)) pi.appendEntry("plan3-shared", { shared: true });
+		await refresh(ctx);
 		if (target.kind === "product") await createProductDiagram(ctx);
 		else await offerProductDiagram(ctx, target.id);
 		const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
@@ -1956,6 +1958,20 @@ export default function plan3(pi) {
 	pi.registerCommand("resume3", commands.resume3);
 	// /wo plan|plans|resume forward here.
 	pi.events?.on?.("plan3:command", ({ ctx, name, args = "" }) => commands[name]?.handler(args, ctx));
+	pi.events?.on?.("plan3:share", async ({ ctx, args = "" }) => {
+		try {
+			if (args.trim()) throw new Error("Use /wo share to toggle this session. Device management is not attached yet.");
+			if (webInstance) {
+				await closeWeb(); pi.appendEntry("plan3-shared", { shared: false });
+				ctx.ui.notify("Session sharing off.", "info");
+			} else {
+				const server = await getWeb(ctx);
+				pi.appendEntry("plan3-shared", { shared: true });
+				ctx.ui.notify(`Shared locally: ${server.url()}`, "info");
+			}
+			await refresh(ctx);
+		} catch (error) { report(ctx, error); }
+	});
 
 	// Other extensions (/wo → Catch up) hand over a generated plan file to plan or continue.
 	pi.events?.on?.("plan3:start", async ({ ctx, file }) => {

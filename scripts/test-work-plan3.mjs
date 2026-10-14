@@ -31,7 +31,7 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map(), shortcuts = new Map();
 const messages = [], notices = [], events = [], planEvents = [], statuses = [], execCalls = [];
 let execResult = { code: 0, stdout: "", stderr: "", killed: false };
-let entries = [], sessionId = randomUUID();
+let entries = [], sessionId = randomUUID(), sharedStatus;
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
 const ctx = {
 	cwd,
@@ -44,7 +44,7 @@ const ctx = {
 	sessionManager: { getBranch: () => entries, getSessionId: () => sessionId },
 	ui: {
 		notify: (message, severity) => notices.push({ message, severity }),
-		setStatus: (key, value) => key === "plan3" && statuses.push(value),
+		setStatus: (key, value) => { if (key === "plan3") statuses.push(value); if (key === "plan3-shared") sharedStatus = value; },
 		select: async (title, labels) => {
 			const step = selectScript.shift();
 			assert(step, `unexpected dialog ${title}: ${labels.join(" | ")}`);
@@ -1294,6 +1294,11 @@ try {
 		await assert.rejects(fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }));
 		sessionId = randomUUID();
 		await hooks.get("session_start")({ reason: "new" }, webCtx);
+		const share = () => listeners.get("plan3:share")({ ctx: webCtx });
+		await share(); assert.match(sharedStatus, /\[SHARED\]/); const shareUrl = new URL(notices.at(-1).message.replace("Shared locally: ", ""));
+		assert.equal((await fetch(`${shareUrl.origin}/api/snapshot`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).status, 200);
+		await share(); assert.equal(sharedStatus, undefined); assert.deepEqual(entries.at(-1).data, { shared: false });
+		await assert.rejects(fetch(`${shareUrl.origin}/api/snapshot`));
 		const reopened = await open(`diagram ${b}`);
 		assert.notEqual(reopened.searchParams.get("token"), token, "a different conversation gets a fresh capability");
 		assert.equal((await fetch(`${reopened.origin}/api/snapshot?target=${b}`, { headers: { Authorization: `Bearer ${token}` } })).status, 401);
