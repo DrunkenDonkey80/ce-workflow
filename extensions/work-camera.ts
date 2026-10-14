@@ -216,7 +216,7 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 				const pick = await showListDialog(ctx, {
 					title: "Camera: Project only",
 					purpose: "Choose the camera explicitly; enabling it is not permission to capture.",
-					cursorKey: "work-camera-settings", forceCustom: true, selectOnSpace: true,
+					cursorKey: "work-camera-settings", forceCustom: true, selectOnSpace: true, terminalOnly: true,
 					items: [
 						{ value: "enabled", label: `Camera: ${current.enabled ? "ON" : "OFF"}`, disabled: !current.device, description: current.device ? "Default OFF · disable revokes access · actual capture requires separate permission" : "Select a camera first; never defaults to a laptop webcam" },
 						{ value: "device", label: `Selected camera: ${current.device?.label ?? "None"}`, description: "Enumerate names only; selecting a device does not acquire frames" },
@@ -232,7 +232,7 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 					catch (error) { ctx.ui.notify(error instanceof Error ? error.message : "Camera enumeration failed.", "error"); continue; }
 					const selected = await showListDialog(ctx, {
 						title: "Select project camera", purpose: "Choose the exact DirectShow identity; selection does not open it.",
-						cursorKey: "work-camera-device", forceCustom: true, currentValue: device?.id,
+						cursorKey: "work-camera-device", forceCustom: true, currentValue: device?.id, terminalOnly: true,
 						items: devices.map(item => ({ value: item.id, label: item.label, description: item.id })),
 					});
 					if (!selected) continue;
@@ -278,7 +278,8 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 			const choice = await showListDialog(ctx, {
 				title: `Camera permission: ${device.label}`,
 				purpose: "Images go to the model/provider; temp cleanup cannot erase provider/session copies.",
-				subtitle: [device.id, summary], cursorKey: "work-camera-permission", forceCustom: true,
+				// Local consent only (camera plan): a remote page must never grant camera access.
+				subtitle: [device.id, summary], cursorKey: "work-camera-permission", forceCustom: true, terminalOnly: true,
 				descriptionMaxLines: 8,
 				items: [{ value: "deny", label: "Deny camera access", description: "No permission issued" }, ...choices],
 			});

@@ -665,6 +665,10 @@ try {
  const items = [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }];
  assert.equal((await showListDialog(ctx, { title: "Approve?", items, terminalOnly: true }))?.value, "no"); assert.equal(bridged, 0);
  assert.equal((await showListDialog(ctx, { title: "Other", items }))?.value, "yes"); assert.equal(bridged, 1, "ordinary dialogs still bridge");
+ // Pi loads each extension with moduleCache:false; a second copy (work-models) must see plan3's bridge.
+ const other = await createJiti(import.meta.url, { moduleCache: false }).import("../extensions/work-dialogs.ts");
+ assert.notEqual(other.showListDialog, showListDialog, "really a separate module copy");
+ assert.equal((await other.showListDialog(ctx, { title: "Compact before sending?", items }))?.value, "yes"); assert.equal(bridged, 2, "dialogs from another extension copy bridge too");
  bindListDialogBridge(ctx, undefined);
 }
 // P3-01: Tailscale detection names each missing step; serve stays tailnet-only on the same port.

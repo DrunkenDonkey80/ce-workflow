@@ -308,10 +308,10 @@ export async function createPlan3Web(options: Options) {
 }
 
 // Thinking and tool calls travel as collapsed blocks (like Pi's terminal); a tool result joins its call's block.
-type ChatBlock = { type: "thinking"; text: string } | { type: "tool"; id: string; name: string; title: string; args: string; result?: string; error?: boolean };
+type ChatBlock = { type: "thinking"; text: string } | { type: "tool"; id: string; name: string; title: string; args: string; result?: string; error?: boolean; diff?: string };
 type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; excerpt?: boolean; brief?: boolean; error?: string; blocks?: ChatBlock[] };
 // Thinking/tool blocks as titles only (brief); the page fetches the full row when one opens.
-const briefBlocks = (blocks: ChatBlock[]) => blocks.map(block => block.type === "thinking" ? { ...block, text: "" } : { ...block, args: "", ...(block.result === undefined ? {} : { result: "" }) });
+const briefBlocks = (blocks: ChatBlock[]) => blocks.map(block => block.type === "thinking" ? { ...block, text: "" } : { ...block, args: "", ...(block.result === undefined ? {} : { result: "" }), ...(block.diff === undefined ? {} : { diff: "" }) });
 // Cuts never split a surrogate pair.
 const head = (text: string, length: number) => text.length > length ? text.slice(0, length).replace(/[\ud800-\udbff]$/, "") : text;
 const tail = (text: string, length: number) => text.length > length ? text.slice(-length).replace(/^[\udc00-\udfff]/, "") : text;
@@ -360,6 +360,8 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 			if (!block || block.type !== "tool") return;
 			block.result = clip((Array.isArray(message.content) ? message.content : []).map(part => part?.type === "text" ? part.text : part?.type === "image" ? "[image]" : "").join("\n"), 4000);
 			if (message.isError) block.error = true;
+			// Pi's edit tool: "+12 line" / "-12 line" / " 12 line" rows, coloured like the terminal.
+			if (typeof message.details?.diff === "string") block.diff = clip(message.details.diff, 8000);
 			if (emit) stream.push(row.id, true);
 			return;
 		}
@@ -376,7 +378,7 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 		// shortcut: keep 100 recent rows / 512 KB; each row is capped at 64k chars, show truncation in the UI.
 		const index = rows.findIndex(item => item.id === id), results = new Map((rows[index]?.blocks ?? []).flatMap(block => block.type === "tool" && block.result !== undefined ? [[block.id, block]] : []));
 		const blocks: ChatBlock[] = (Array.isArray(message.content) ? message.content : []).flatMap(part => part?.type === "thinking" && part.thinking?.trim() ? [{ type: "thinking" as const, text: clip(part.thinking, 4000) }]
-			: part?.type === "toolCall" ? [{ type: "tool" as const, id: String(part.id), name: String(part.name), title: toolTitle(String(part.name), part.arguments), args: clip(JSON.stringify(part.arguments ?? {}, null, 1), 2000), ...(results.has(part.id) ? { result: results.get(part.id).result, ...(results.get(part.id).error ? { error: true } : {}) } : {}) }] : []);
+			: part?.type === "toolCall" ? [{ type: "tool" as const, id: String(part.id), name: String(part.name), title: toolTitle(String(part.name), part.arguments), args: clip(JSON.stringify(part.arguments ?? {}, null, 1), 2000), ...(results.has(part.id) ? { result: results.get(part.id).result, ...(results.get(part.id).error ? { error: true } : {}), ...(results.get(part.id).diff === undefined ? {} : { diff: results.get(part.id).diff }) } : {}) }] : []);
 		const row: ChatRow = { id, role, text: content.slice(0, 64_000), streaming, ...(content.length > 64_000 ? { truncated: true } : {}), ...(typeof message.errorMessage === "string" ? { error: message.errorMessage.slice(0, 4000) } : {}), ...(blocks.length ? { blocks } : {}) };
 		if (index < 0) rows.push(row); else rows[index] = row;
 		while (rows.length > 100 || Buffer.byteLength(JSON.stringify(rows)) > 512_000) rows.shift();

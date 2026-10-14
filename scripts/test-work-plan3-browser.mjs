@@ -284,6 +284,18 @@ try {
  server.publish("delta", { id: "assistant_3", role: "assistant", offset: 99, text: "x", streaming: false });
  await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=assistant_3]\")?.children[2].textContent.includes(\"Full body loaded\")");
  assert.equal(await rowText("assistant_3"), "Short excerpt. Full body loaded.", "a gap refetches the row; stale deltas never duplicate text");
+ // Pi-style colour coding: tool blocks by state, an edit's diff instead of its arguments, labels only for screen readers.
+ server.publish("message", { id: "assistant_4", role: "assistant", text: "", streaming: false, blocks: [
+  { type: "thinking", text: "hmm" },
+  { type: "tool", id: "t1", name: "edit", title: "edit a.ts", args: "{oldText}", result: "ok", diff: "-1 old\n+1 new\n 2 same" },
+  { type: "tool", id: "t2", name: "bash", title: "bash ls", args: "{}", result: "boom", error: true },
+  { type: "tool", id: "t3", name: "read", title: "read b.ts", args: "{}" }] });
+ await browser("wait", "#messages [data-id=assistant_4] .block-tool");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-ok", "block block-tool block-error", "block block-tool block-pending"]);
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] .diff span')].map(span => span.className)"), ["diff-del", "diff-add", ""]);
+ assert.equal(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] pre')].some(pre => pre.textContent === '{oldText}')"), false, "the diff replaces raw edit arguments");
+ server.publish("message", { id: "user_0", role: "user", text: "hi", streaming: false }); await browser("wait", "#messages [data-id=user_0]");
+ assert.deepEqual(await evaluate("['user_0', 'assistant_3'].flatMap(id => { const row = document.querySelector('#messages [data-id=' + id + ']'); return [row.querySelector('strong').className, getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)']; })"), ["sr-only", true, "sr-only", false], "your messages are a tinted block; the label is screen-reader only");
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
   // Search Enter centers the box, so the click point is clear of the zoom bar; Escape clears the search.
  await browser("fill", "#search", "web_client"); await browser("press", "Enter"); await browser("press", "Escape");

@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T14:42:52.905Z
+updated: 2026-10-14T15:12:58.630Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -222,6 +222,7 @@ Commands (existing; referenced by steps):
 - [x] **P5-01** README: status-line chat bullet, updated Security bullet, Files tab, and a new 'Sharing and phone access' section (/wo share, reload and resume, reconnect, Tailscale setup, pairing, revoke, switcher, security model, limits). CHANGELOG Unreleased entry.
 - [x] **P5-02** Phones get a left drawer (☰, edge swipe, backdrop tap, swipe left, Escape, or an action) holding the view tabs, model/effort and plan status, and shared sessions. The main screen is a slim bar (☰, title, connection), the chat and the composer. Desktop gets the moved parts back.
 - [x] **P5-03** The title opens the session picker. The status line shows "Model: X" (scoped models only), "Context · Think" with its own level picker, the plan, and Claude/Codex 7d % left (tap shows the coloured footer rows). [SHARED] and ⋯ are removed. The drawer's Pi commands and /wo commands popups insert the command into the composer. New /api/usage and /api/commands come from work-models via the wo:web-info event.
+- [x] **P5-04** Pi theme colours with light/dark from the system. User rows are tinted, thinking is dim italic, tool blocks are coloured by state, and edit diffs show red/green lines. In dark mode the diagram is inverted. The list-dialog bridge is now on globalThis, so work-models dialogs reach the browser. Camera dialogs are terminalOnly.
 
 ### Phase 6: Live acceptance [think]
 
@@ -272,3 +273,4 @@ Append material changes and their reasons; preserve the original request and set
 - 2026-10-14: Added final architecture reconciliation because a product diagram exists.
 - 2026-10-14: Added P5-02 after P5-01: P6-01 live phone test: only about 2 cm of chat was visible before the keyboard opened, and none once it did. The user asked for everything except chat/send to move into a swipe/click side panel.
 - 2026-10-14: Added P5-03 after P5-02: User feedback during the P6-01 live phone test.
+- 2026-10-14: Added P5-04 after P5-03: User feedback during the P6-01 live phone test.

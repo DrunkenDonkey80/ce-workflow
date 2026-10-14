@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 const dialogCursors = new Map();
-const listBridges = new WeakMap();
+// Pi loads each extension with moduleCache:false, so every extension has its own copy of this module;
+// the web bridge (bound by plan3) must be shared process-wide to reach dialogs from work-models and others.
+const listBridges: WeakMap<object, (options, run: (signal: AbortSignal) => Promise<unknown>) => Promise<any>> = (globalThis[Symbol.for("ce-workflow.listBridges")] ??= new WeakMap());
 export function bindListDialogBridge(ctx, bridge) {
 	if (bridge) listBridges.set(ctx.ui, bridge); else listBridges.delete(ctx.ui);
 }

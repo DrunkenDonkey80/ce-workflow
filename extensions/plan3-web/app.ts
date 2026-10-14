@@ -41,7 +41,8 @@ function renderShell() {
  $("plan-button").textContent = plan ? plan.title + (plan.total ? ` · ${plan.done ?? 0}/${plan.total}` : "") : "New plan";
  $("plan-button").title = plan ? "Plan actions" : "Start a new plan";
  for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
- $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working" : "Idle";
+ $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : "Idle";
+ $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting ? "working" : "idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
  for (const button of $("plan-menu").querySelectorAll<HTMLButtonElement>("button")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
@@ -58,10 +59,10 @@ function renderActivity() {
  if (data.compacting) root.append(make("p", "Compacting session history…", "activity-status"));
  if (data.interrupted) root.append(make("p", "Run interrupted.", "activity-status"));
  if (data.error) { const error = make("p", data.error, "activity-error"); error.setAttribute("role", "alert"); root.append(error); }
- if (data.thinking) section("thinking", "Thinking").append(make("pre", data.thinking));
+ if (data.thinking) { const thinking = section("thinking", "Thinking"); thinking.className = "thinking-row"; thinking.append(make("pre", data.thinking)); }
  for (const tool of data.tools ?? []) {
   const row = section(tool.id, tool.name + " · " + tool.state + (tool.durationMs === undefined ? "" : " · " + Math.round(tool.durationMs) + " ms"));
-  row.className = "tool-row" + (tool.parent ? " nested-tool" : "") + (tool.state === "error" ? " tool-error" : "");
+  row.className = "tool-row tool-" + (tool.state === "error" ? "error" : tool.state === "done" ? "ok" : "pending") + (tool.parent ? " nested-tool" : "");
   for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
  }
  if (data.queue?.length || data.hasPendingMessages) {
@@ -286,10 +287,18 @@ function renderBlocks(box: HTMLElement, row) {
  box.replaceChildren();
  (row.blocks ?? []).forEach((block, index) => {
   const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
-  item.dataset.key = key; item.open = opened.has(key); item.className = "block block-" + block.type + (block.error ? " block-error" : "");
-  summary.textContent = block.type === "thinking" ? "Thinking" : block.title + (block.result === undefined ? (row.streaming ? "" : " \u2026") : block.error ? " \u2715" : "");
+  // Pi's tool colours: grey while running, green when done, red on error.
+  item.dataset.key = key; item.open = opened.has(key); item.className = "block block-" + block.type + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
+  if (block.type === "thinking") summary.textContent = "Thinking";
+  else summary.append(Object.assign(document.createElement("b"), { textContent: block.name }), block.title.slice(block.name.length) + (block.result === undefined ? (row.streaming ? "" : " \u2026") : block.error ? " \u2715" : ""));
   item.append(summary);
-  for (const text of block.type === "thinking" ? [block.text] : [block.args, block.result].filter(value => value !== undefined)) { const pre = document.createElement("pre"); pre.textContent = text; item.append(pre); }
+  // An edit's diff replaces its raw oldText/newText arguments.
+  for (const text of block.type === "thinking" ? [block.text] : [block.diff ? undefined : block.args, block.result].filter(value => value !== undefined)) { const pre = document.createElement("pre"); pre.textContent = text; item.append(pre); }
+  if (block.diff) {
+   const pre = document.createElement("pre"); pre.className = "diff";
+   for (const line of block.diff.split("\n")) pre.append(Object.assign(document.createElement("span"), { textContent: line + "\n", className: line[0] === "+" ? "diff-add" : line[0] === "-" ? "diff-del" : "" }));
+   item.append(pre);
+  }
   box.append(item);
  });
 }
@@ -322,7 +331,8 @@ function renderChat() {
   const text = row.text.trim(), note = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming && !row.blocks?.length ? "Streaming…" : "");
   // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
   item.className = "message " + row.role + (text ? "" : " message-blocks"); item.hidden = !text && !row.blocks?.length && !note;
-  item.children[0].textContent = text ? (row.role === "user" ? "You" : "Agent") : "";
+  // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
+  item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
   renderBlocks(item.children[1] as HTMLElement, row); item.children[2].textContent = row.text; item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
  }
  $("earlier").hidden = !state.more;
