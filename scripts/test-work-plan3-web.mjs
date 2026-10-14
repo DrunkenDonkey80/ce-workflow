@@ -117,6 +117,9 @@ assert.equal(mirror.snapshot().at(-1).text, "");
 const brief = mirror.page().rows.at(-1);
 assert(brief.brief && !brief.excerpt && brief.blocks[0].text === "" && brief.blocks[1].args === "" && brief.blocks[1].result === "" && brief.blocks[1].title === "edit C:/a.ts", "check-in rows keep block titles and completion only");
 assert.equal(mirror.row(brief.id).blocks[1].result, "Edited", "full row on expand");
+{ const writeTurn = { role: "assistant", timestamp: 3.6, content: [{ type: "toolCall", id: "call_w", name: "write", arguments: { path: "b.ts", content: "one\ntwo" } }] };
+ chatHooks.get("message_start")({ message: writeTurn }); chatHooks.get("message_end")({ message: writeTurn });
+ assert.equal(mirror.snapshot().at(-1).blocks[0].diff, "+one\n+two", "a write shows its content as added lines"); }
 const long = mirror.page().rows.find(row => row.text.length === 2000); assert(long?.excerpt, "long text is a 2 KB excerpt");
 assert.throws(() => mirror.row("missing"), /Unknown chat row/);
 for (let timestamp = 4; timestamp < 110; timestamp++) chatHooks.get("message_end")({ message: { role: "user", timestamp, content: "recent" } });
@@ -561,7 +564,7 @@ try {
   clock += 3_600_000;
   for (const cookie of cookies.slice(0, 10)) if (!await registry.check(cookie, "me@github")) throw new Error("renew failed");
   for (const cookie of cookies.slice(10, 15)) if (!await registry.revoke(cookie.split(".")[0])) throw new Error("revoke failed");
-  console.log(JSON.stringify(cookies));`, directory, role], { cwd: process.cwd() }, (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(JSON.parse(stdout))));
+  console.log(JSON.stringify(cookies));`, directory, role], { cwd: process.cwd() }, (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : (() => { try { resolve(JSON.parse(stdout)); } catch (parseError) { reject(parseError); } })()));
  try {
   const [a, b] = await Promise.all([worker("a"), worker("b")]), registry = createDeviceRegistry({ directory });
   const kept = registry.list();

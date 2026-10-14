@@ -32,7 +32,9 @@ const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 0: "Normal", 1: "Thin
 function setBar(item: HTMLElement, percent: number, tone: string) {
  item.style.setProperty("--fill", Math.max(0, Math.min(100, percent)) + "%"); item.dataset.tone = tone;
 }
-function showNotice(text) { $("notice").textContent = text; $("notice").hidden = !text; }
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+// Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
+function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
 function renderShell() {
  // "<folder> - <herdr tab>", plus ": <plan>" on phones, where the plan bar sits in the drawer.
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
@@ -163,9 +165,11 @@ window.visualViewport?.addEventListener("resize", fitViewport); fitViewport();
 // The top bar sizes Think and the usage bars to the chat panel below them.
 new ResizeObserver(() => document.body.style.setProperty("--chat-px", $("chat").offsetWidth + "px")).observe($("chat"));
 const splitter = $("splitter"); let resize;
+// The chat width survives reloads and restarts.
+queueMicrotask(() => { try { const saved = Number(localStorage.getItem("plan3-chat-width")); if (saved) resizeChat(saved); } catch { /* private mode */ } });
 function resizeChat(width) {
  const value = Math.max(280, Math.min(640, width));
- $("workspace").style.setProperty("--chat-width", value + "px");
+ $("workspace").style.setProperty("--chat-width", value + "px"); remember("plan3-chat-width", String(value));
  splitter.setAttribute("aria-valuenow", String(value));
 }
 splitter.addEventListener("pointerdown", event => {
@@ -307,15 +311,16 @@ const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNot
 // Pi-like rows: text stays visible; thinking and each tool call are one collapsed line that expands on click.
 function renderBlocks(box: HTMLElement, row) {
  const opened = new Set([...box.querySelectorAll<HTMLDetailsElement>("details[open]")].map(item => item.dataset.key));
+ const known = new Set([...box.querySelectorAll<HTMLDetailsElement>("details")].map(item => item.dataset.key));
  box.replaceChildren();
  (row.blocks ?? []).forEach((block, index) => {
   const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
   // Pi's tool colours: grey while running, green when done, red on error.
-  item.dataset.key = key; item.open = opened.has(key); item.className = "block block-" + block.type + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
+  item.dataset.key = key; item.open = opened.has(key) || (!known.has(key) && block.type === "tool" && (block.name === "edit" || block.name === "write")); item.className = "block block-" + block.type + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
   if (block.type === "thinking") summary.textContent = "Thinking";
   else summary.append(Object.assign(document.createElement("b"), { textContent: block.name }), block.title.slice(block.name.length) + (block.result === undefined ? (row.streaming ? "" : " \u2026") : block.error ? " \u2715" : ""));
   item.append(summary);
-  // An edit's diff replaces its raw oldText/newText arguments.
+  // An edit's diff (or a write's content as added lines) replaces its raw arguments.
   for (const text of block.type === "thinking" ? [block.text] : [block.diff ? undefined : block.args, block.result].filter(value => value !== undefined)) { const pre = document.createElement("pre"); pre.textContent = text; item.append(pre); }
   if (block.diff) {
    const pre = document.createElement("pre"); pre.className = "diff";
@@ -413,7 +418,7 @@ async function attach(file: File) {
  try {
   const response = await fetch("/api/paste", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": file.type }, body: file });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Image paste failed.");
-  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); toBottom(); renderMentions(); showNotice("Image saved: " + value.path);
+  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); toBottom(); renderMentions(); showNotice("Image saved: " + value.path, true);
  } catch (error) { showNotice(error.message); }
 }
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
@@ -427,7 +432,7 @@ $("composer").addEventListener("submit", async event => {
  messageSending = true; renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
- try { const result = await post("message", { text }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent."); }
+ try { const result = await post("message", { text }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent.", true); }
  catch (error) { showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });
@@ -598,7 +603,7 @@ $("context-button").addEventListener("click", () => toggleMenu("context-button",
 // Compact runs /wo compact, which uses the compaction method chosen in /wo settings.
 $("compact-now").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
- try { await post("message", { text: "/wo compact" }); showNotice("Compaction requested."); } catch (error) { showNotice(error.message); }
+ try { await post("message", { text: "/wo compact" }); showNotice("Compaction requested.", true); } catch (error) { showNotice(error.message); }
 });
 $("bias-button").addEventListener("click", () => {
  const menu = $("bias-menu"), current = state.plan?.bias ?? 0;
@@ -613,7 +618,7 @@ $("bias-button").addEventListener("click", () => {
  }));
  toggleMenu("bias-button", "bias-menu");
 });
-$("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested."); } catch (error) { showNotice(error.message); } });
+$("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested.", true); } catch (error) { showNotice(error.message); } });
 
 // The server starts every connection with a fresh full snapshot. Native EventSource stops for good on an HTTP error
 // (503 while Pi reloads), so the page reconnects itself with backoff and reloads when the build changed.
