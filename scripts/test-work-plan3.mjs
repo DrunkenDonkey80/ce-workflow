@@ -1291,6 +1291,11 @@ try {
 		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
 		await hooks.get("session_start")({ reason: "resume" }, webCtx);
 		assert.equal((await fetch(`${url.origin}/api/snapshot`, { headers })).status, 200, "resume restores the saved link");
+		await hooks.get("session_shutdown")({ reason: "fork" }, webCtx);
+		const parentSession = sessionId; sessionId = randomUUID();
+		await hooks.get("session_start")({ reason: "fork" }, webCtx);
+		await assert.rejects(fetch(`${url.origin}/api/snapshot`, { headers }), undefined, "a fork copies the shared entry but never serves the parent's link");
+		sessionId = parentSession;
 		await hooks.get("session_shutdown")({ reason: "new" }, webCtx);
 		await assert.rejects(fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }));
 		sessionId = randomUUID();

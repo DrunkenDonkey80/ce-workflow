@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T11:34:46.067Z
+updated: 2026-10-14T11:36:52.666Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -194,7 +194,7 @@ Commands (existing; referenced by steps):
 - [x] **P2-09** Check-in snapshot is slim: newest 20 rows as 2 KB excerpts (block titles only), running tools, whole dialogs, capped at 64 KB; diagram via GET /api/diagram, full rows via /api/row, paging via /api/rows?before=; page loads the diagram lazily, has Show earlier and Show full message/expand-on-open.
 - [x] **P2-10** Live stream: chat rows travel as {id,offset,text} deltas coalesced to ≤4/s per row (final updates immediate, blocks brief and only when changed); activity sends state without tools/thinking, single changed tool rows and coalesced thinking deltas; page applies at current length, ignores stale, refetches on gap; tab title shows "(!) … needs an answer".
 - [x] **P2-11** C-WEB byte tests pass. checkIn() in plan3-web.ts builds the check-in packet within 64 KB: surrogate-safe excerpts, dialogs over 16 KB sent brief with the full body at /api/dialog, queue capped. The page's delta rule moved to the shared plan3-web/stream.ts. Assets are served under /a/<build>/ with immutable caching.
-- [ ] **P2-08** Run C-WEB, C-PLAN3, C-TYPES and C-LSP; test reload on the same port, resume re-share, and that new or fork sessions reject old links.
+- [x] **P2-08** Phase 2 gate green: C-WEB, C-PLAN3, C-TYPES (stream.ts added to its source list) and C-LSP pass. Lifecycle tests cover reload on the same port, resume re-share, a new session rejecting the old link, and now fork (copies the shared entry but never serves the parent's link).
 
 ### Phase 3: Tailscale remote and device pairing [code]
 
@@ -252,7 +252,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Executing. P2-01..P2-07, P2-09, P2-10 done (HEAD ac0ef3b). Next: P2-11, then P2-08, P3-*. Live events now: delta {id,role,offset,text,streaming,blocks?}, thinking {offset,text}, tool <row>, activity <state without tools/thinking>; page merges activity. Hunk filter must use bytes mode. Browser test has a known flaky drag-pan race; rerun once.
+Executing. P2-01..P2-07 and P2-09..P2-11 done (HEAD fecd591). Next: P2-08, then P3-*. Check-in packet built by checkIn() in plan3-web.ts; page delta rule in plan3-web/stream.ts; assets under /a/<build>/. Hunk filter must use bytes mode; verify with git show HEAD after commit. Browser test has a known flaky drag-pan race (about 3 in 9 runs); rerun once.
 
 ## Amendments
 
