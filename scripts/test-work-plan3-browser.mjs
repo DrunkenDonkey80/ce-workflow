@@ -136,6 +136,13 @@ try {
  await browser("click", "#wo-commands"); await browser("wait", ".command-option");
  await browser("click", ".command-option"); assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('command-picker').open, document.getElementById('drawer').dataset.open]"), ["/wo share ", false, "false"], "a picked command goes into the composer");
  await browser("fill", "#message-input", "");
+ // Typing / lists commands above the box; Enter picks, /wo then lists its subcommands.
+ await browser("focus", "#message-input"); await browser("press", "/"); await browser("wait", "#slash-menu:not([hidden]) .slash-option");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.slash-option')].map(o => o.dataset.command)"), ["/plan3"]);
+ await browser("press", "Enter"); assert.equal(await evaluate("document.getElementById('message-input').value"), "/plan3 ", "Enter picks instead of sending");
+ await browser("fill", "#message-input", ""); await browser("type", "#message-input", "/wo s"); await browser("wait", "#slash-menu:not([hidden]) [data-command='/wo share']");
+ await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('slash-menu').hidden"), true);
+ await browser("fill", "#message-input", "");
  await browser("click", "#title"); assert(await evaluate("!document.getElementById('title-menu').hidden && document.getElementById('title-menu').contains(document.getElementById('session-list'))"), "phone: the title opens the session picker");
  await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('title-menu').hidden"), true);
  await browser("click", "#drawer-toggle");

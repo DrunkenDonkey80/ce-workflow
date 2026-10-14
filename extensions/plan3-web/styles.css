@@ -189,7 +189,13 @@ h2 { font-size: 15px; font-weight: 600; }
 .feed { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
 .messages { list-style: none; margin: 0; padding: 16px 16px 0; }
 .row-full { display: block; margin-top: 4px; padding: 0; border: 0; background: none; color: var(--focus); font-size: 13px; text-decoration: underline; cursor: pointer; }
-.composer { padding: 8px 12px; border-top: 1px solid var(--line); }
+.composer { position: relative; padding: 8px 12px; border-top: 1px solid var(--line); }
+/* Typing / lists matching commands above the message box, like Pi's terminal. */
+.slash-menu { position: absolute; z-index: 5; left: 12px; right: 12px; bottom: 100%; max-height: 40vh; overflow: auto; display: grid; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px #0003; }
+.slash-menu[hidden] { display: none; }
+.slash-option { display: grid; text-align: left; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+.slash-option small { color: var(--muted); }
+.slash-option[aria-selected=true] { background: color-mix(in srgb, var(--focus) 22%, var(--panel)); border-color: var(--focus); }
 textarea { display: block; width: 100%; border: 1px solid var(--group); border-radius: 6px; background: var(--panel); padding: 8px; resize: vertical; min-height: 52px; max-height: 180px; }
 .composer-actions { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
 .composer-actions button { white-space: nowrap; }

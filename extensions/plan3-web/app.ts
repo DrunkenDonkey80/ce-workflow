@@ -421,6 +421,41 @@ async function attach(file: File) {
   const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); toBottom(); renderMentions(); showNotice("Image saved: " + value.path, true);
  } catch (error) { showNotice(error.message); }
 }
+// Typing "/name" or "/wo sub" lists matching commands; arrows move, Tab/Enter picks, Escape closes.
+let slashCommands: Promise<{ pi: { name: string; description: string }[]; wo: { value: string; description: string }[] }> | undefined, slashPick = 0;
+async function updateSlash() {
+ const input = $("message-input") as HTMLTextAreaElement, menu = $("slash-menu"), value = input.value;
+ const match = input.selectionStart === value.length ? /^\/(?:(wo) (\S*)|(\S*))$/.exec(value) : null;
+ if (!match) { menu.hidden = true; return; }
+ slashCommands ??= get("commands").catch(error => { slashCommands = undefined; throw error; });
+ let list; try { list = await slashCommands; } catch { menu.hidden = true; return; }
+ if (input.value !== value) return;
+ const rows = match[1] ? list.wo.filter(item => item.value.startsWith(match[2])).map(item => ["/wo " + item.value, item.description])
+  : list.pi.filter(item => item.name.startsWith(match[3])).map(item => ["/" + item.name, item.description]);
+ slashPick = Math.min(slashPick, Math.max(0, rows.length - 1));
+ menu.replaceChildren(...rows.map(([command, description], index) => {
+  const option = document.createElement("div"); option.className = "slash-option"; option.setAttribute("role", "option"); option.dataset.command = command; option.setAttribute("aria-selected", String(index === slashPick));
+  option.append(Object.assign(document.createElement("strong"), { textContent: command }), Object.assign(document.createElement("small"), { textContent: description }));
+  option.addEventListener("mousedown", event => { event.preventDefault(); pickSlash(command); });
+  return option;
+ }));
+ menu.hidden = !rows.length;
+}
+function pickSlash(command: string) {
+ const input = $("message-input") as HTMLTextAreaElement; input.value = command + " "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+ slashPick = 0; $("slash-menu").hidden = true; renderMentions(); void updateSlash(); // "/wo " opens its subcommands
+}
+$("message-input").addEventListener("input", () => { slashPick = 0; void updateSlash(); });
+$("message-input").addEventListener("blur", () => { $("slash-menu").hidden = true; });
+$("message-input").addEventListener("keydown", event => {
+ const menu = $("slash-menu"); if (menu.hidden) return;
+ const options = [...menu.children] as HTMLElement[], step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+ if (step) { slashPick = (slashPick + step + options.length) % options.length; options.forEach((option, index) => option.setAttribute("aria-selected", String(index === slashPick))); options[slashPick].scrollIntoView({ block: "nearest" }); }
+ else if ((event.key === "Tab" || event.key === "Enter") && !event.shiftKey) pickSlash(options[slashPick].dataset.command);
+ else if (event.key === "Escape") menu.hidden = true;
+ else return;
+ event.preventDefault(); event.stopImmediatePropagation();
+});
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
 $("message-input").addEventListener("keydown", event => {
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("composer").requestSubmit(); }
