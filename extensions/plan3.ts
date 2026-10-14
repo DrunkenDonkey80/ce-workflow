@@ -11,7 +11,7 @@ import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
-import { createPlan3Web, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
+import { createPlan3Web, checkIn, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
 import { loadShareRecord, saveSharePort, type ShareRecord } from "./plan3-remote.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
@@ -783,6 +783,7 @@ export default function plan3(pi) {
 	async function readWeb(endpoint: string, params: URLSearchParams) {
 		if (endpoint === "/api/row") return chat.row(params.get("id") ?? "");
 		if (endpoint === "/api/rows") return chat.page(params.get("before") ?? undefined);
+		if (endpoint === "/api/dialog") return dialogs.get(params.get("id") ?? "");
 		const target = await displayedWebTarget(params.get("target") ?? undefined), resolved = await resolveWebTarget(target);
 		return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined) };
 	}
@@ -793,12 +794,7 @@ export default function plan3(pi) {
 		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
-			// Check-in packet (D20): recent excerpts, running tools and whole dialogs; the diagram loads separately.
-			const live = activity.snapshot(webCtx), page = chat.page();
-			const snapshot = { target, chat: page.rows, more: page.more, activity: { ...live, thinking: live.thinking.slice(-2000), thinkingLength: live.thinking.length, tools: live.tools.filter(tool => tool.state === "running") }, dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) };
-			// shortcut: dialogs stay whole even past 64 KB (answering needs them); only older rows are shed.
-			while (snapshot.chat.length > 1 && Buffer.byteLength(JSON.stringify(snapshot)) > 64_000) { snapshot.chat.shift(); snapshot.more = true; }
-			return snapshot;
+			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) });
 		} }).then(async server => {
 			try { await saveSharePort(shareRecord, server.port); }
 			catch (error) { await server.close(); throw error; }

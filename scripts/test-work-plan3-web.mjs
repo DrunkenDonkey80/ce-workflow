@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
 import { createJiti } from "jiti";
-const { createPlan3Web, webTarget, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
+const { applyText } = await createJiti(import.meta.url).import("../extensions/plan3-web/stream.ts");
+const { createPlan3Web, checkIn, webTarget, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
 const posted = []; let stopIdle = true, aborts = 0;
 const stopCtx = { isIdle: () => stopIdle, abort: async () => { aborts++; } };
 const server = await createPlan3Web({ snapshot: target => ({ target, revision: 3, title: "Safe <text>" }), post: (endpoint, value) => { posted.push({ endpoint, value }); return endpoint === "/api/stop" ? stopLiveRun(stopCtx) : { ok: true }; } });
@@ -41,7 +42,11 @@ try {
  const shell = await request("/", { headers: auth });
  assert.equal(shell.response.status, 200); assert.match(shell.text, /aria-label="Resize chat pane"/);
  assert.match(shell.text, /data-command="resolve"/); assert(shell.text.includes(`app.js?token=${token}`));
- assert(!shell.text.includes("__TOKEN__"));
+ assert(!shell.text.includes("__TOKEN__")); assert(!shell.text.includes("__BUILD__"));
+ assert(shell.text.includes(`/a/${server.build}/app.js?token=`)); assert.equal(shell.response.headers.get("cache-control"), "no-store", "the page itself is never cached");
+ const cached = await request(`/a/${server.build}/app.js`, { headers: auth });
+ assert.equal(cached.response.status, 200); assert.match(cached.response.headers.get("cache-control"), /immutable/, "build-fingerprinted assets are cacheable");
+ assert.equal((await request("/a/000000000000/app.js", { headers: auth })).response.status, 404, "an old build URL never serves new code");
  assert.equal((await request("/app.js", { headers: auth })).response.headers.get("content-type"), "text/javascript; charset=utf-8");
  const css = await request("/styles.css", { headers: auth });
  assert.match(css.text, /--chat-width: 380px/); assert.match(css.text, /max-width: 899px/);
@@ -319,6 +324,61 @@ try {
  assert.equal(new Set([initial.id, buffered.id, fresh.id]).size, 3, "snapshot/event ids are distinct across reconnects");
  await reconnect.close();
 } finally { resyncDialogs.close(); await resyncServer.close(); }
+// C-WEB byte budgets (D21).
+{
+ const hooks = new Map(), big = createChatMirror({ on: (name, handler) => hooks.set(name, handler) }, () => {});
+ const wide = "😀界é".repeat(1200);
+ for (let t = 1; t <= 100; t++) hooks.get("message_end")({ message: { role: t % 2 ? "user" : "assistant", timestamp: 1000 + t, content: wide } });
+ const live = { working: true, thinking: "思".repeat(64_000), tools: [{ id: "t", name: "bash", state: "running", args: "x".repeat(16_000), progress: "y".repeat(16_000) }, { id: "d", name: "read", state: "done", result: "z".repeat(16_000) }], queue: Array.from({ length: 100 }, (_, i) => ({ id: "q" + i, text: "q".repeat(5000), delivery: "followUp" })) };
+ const question = { askId: "11111111-2222-4333-8444-555555555555", question: "Pick one", context: "Ω".repeat(200_000), options: [{ title: "A" }] };
+ const packet = checkIn(big, live, [question], { target: { kind: "plan", id: "12345678" } }), size = Buffer.byteLength(JSON.stringify(packet));
+ assert(size <= 64_000, `check-in snapshot is ${size} bytes`);
+ assert.equal(packet.chat.at(-1).id, big.snapshot().at(-1).id, "the newest row survives the budget"); assert(packet.more);
+ assert(packet.chat.every(row => row.excerpt && !/[\ud800-\udbff]$/.test(row.text)), "excerpts never split a surrogate pair");
+ assert(packet.dialogs[0].brief && packet.dialogs[0].title === "Pick one" && !("context" in packet.dialogs[0]), "a large question travels brief");
+ assert.deepEqual(packet.activity.tools.map(tool => tool.id), ["t"]); assert.equal(packet.activity.thinkingLength, 64_000);
+}
+{
+ const realNow = Date.now; let clock = realNow(), live, beforeCapture;
+ Date.now = () => clock;
+ const hooks = new Map(), streamMirror = createChatMirror({ on: (name, handler) => hooks.set(name, handler) }, (event, value) => live.publish(event, value));
+ live = await createPlan3Web({ snapshot: async () => { beforeCapture?.(); beforeCapture = undefined; await new Promise(resolve => setImmediate(resolve)); return checkIn(streamMirror, { thinking: "", tools: [], queue: [] }, []); } });
+ try {
+  const connect = async () => { const events = eventsFrom(await fetch(`${live.origin}/api/events${new URL(live.url()).search}`, { signal: AbortSignal.timeout(10_000) })); const first = await events.next(); assert.equal(first.event, "snapshot"); return { events, rows: first.data.chat }; };
+  const follow = async (events, text, id) => {
+   let bytes = 0, count = 0;
+   for (;;) {
+    const event = await events.next(); bytes += Buffer.byteLength(`event: ${event.event}\nid: ${event.id}\ndata: ${JSON.stringify(event.data)}\n\n`);
+    if (event.event !== "delta" || event.data.id !== id) continue;
+    count++; const next = applyText(text, event.data.offset, event.data.text); assert.notEqual(next, "gap");
+    if (next !== "stale") text = next;
+    if (!event.data.streaming) return { text, bytes, count };
+   }
+  };
+  const token = i => `word${i} ünï 😀 界 `.padEnd(40, "x"), turn = (timestamp, text) => ({ role: "assistant", timestamp, content: [{ type: "text", text }] });
+  // 500 flushed deltas cost about the text plus a small frame each, never the quadratic full-row republish.
+  hooks.get("message_start")({ message: turn(7000, "") });
+  const a = await connect(); let full = "";
+  const reading = follow(a.events, a.rows.find(row => row.id === "assistant_7000").text, "assistant_7000");
+  for (let i = 0; i < 500; i++) { clock += 250; full += token(i); hooks.get("message_update")({ message: turn(7000, full) }); }
+  hooks.get("message_end")({ message: turn(7000, full) });
+  const streamed = await reading; await a.events.close();
+  assert.equal(streamed.text, full, "500 deltas reconstruct the exact text");
+  assert(streamed.count >= 500, `only ${streamed.count} deltas were sent`); assert(streamed.bytes < 100_000, `500 deltas cost ${streamed.bytes} bytes`);
+  // Mid-stream reconnect: unsent coalesced text, a delta published while the snapshot is built, then the final flush.
+  hooks.get("message_start")({ message: turn(8000, "") }); let short = "";
+  for (let i = 0; i < 15; i++) { clock += 100; short += token(i); hooks.get("message_update")({ message: turn(8000, short) }); }
+  beforeCapture = () => { clock += 300; short += token(15); hooks.get("message_update")({ message: turn(8000, short) }); };
+  const b = await connect(), start = b.rows.find(row => row.id === "assistant_8000");
+  assert(!start.excerpt && start.text === short, "the snapshot carries the text the buffered delta also sends");
+  const resumed = follow(b.events, start.text, "assistant_8000");
+  for (let i = 16; i < 30; i++) { clock += 100; short += token(i); hooks.get("message_update")({ message: turn(8000, short) }); }
+  hooks.get("message_end")({ message: turn(8000, short) });
+  assert.equal((await resumed).text, short, "exact text after a mid-stream reconnect");
+  await b.events.close();
+ } finally { Date.now = realNow; streamMirror.reset(); await live.close(); }
+}
+assert.equal(applyText("abc", 0, "x"), "x"); assert.equal(applyText("abc", 1, "b"), "stale"); assert.equal(applyText("abc", 4, "d"), "gap"); assert.equal(applyText(undefined, 2, "c"), "gap"); assert.equal(applyText("abc", 2, "cd"), "abcd");
 mirror.reset(); activityMirror.reset();
 assert.deepEqual(mirror.snapshot(), []); assert.deepEqual(activityMirror.snapshot().tools, []);
 assert.equal(activityMirror.snapshot().error, ""); assert.equal(activityMirror.snapshot().compacting, false);

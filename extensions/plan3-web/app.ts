@@ -5,6 +5,8 @@ import type { createActivityMirror } from "../plan3-web.ts";
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { createPromptView } from "./prompts.js?token=__TOKEN__";
+// @ts-ignore Browser URL includes the workspace token.
+import { applyText } from "./stream.js?token=__TOKEN__";
 function $(id: "message-input" | "comment-text"): HTMLTextAreaElement;
 function $(id: "send" | "stop" | "comment-save"): HTMLButtonElement;
 function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
@@ -301,7 +303,9 @@ listen("snapshot", value => {
  if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;
  state.connected = true; state.plan = value.plan; state.activity = value.activity ?? {}; state.more = !!value.more;
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
- promptView.sync(value.dialogs ?? []); renderActivity(); renderChat(); showNotice(""); renderShell(); void loadDiagram();
+ // Dialogs over 16 KB arrive brief; fetch their full body.
+ promptView.sync((value.dialogs ?? []).filter(ask => !ask.brief));
+ for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell(); void loadDiagram();
 });
 listen("diagram", value => {
  if ((target === "product" && value.target.kind === "product") || value.target.id === target) { state.diagram = value.diagram; diagramView.render(state.diagram); renderShell(); }
@@ -312,10 +316,10 @@ listen("dialog_closed", value => { promptView.closed(value.askId); renderShell()
 listen("activity", value => { state.activity = { ...state.activity, ...value }; renderActivity(); renderShell(); });
 // Appended text per D21: apply only at the current length, ignore stale, refetch the row on a gap.
 listen("delta", delta => {
- const row = chat.get(delta.id), current = row && !row.excerpt ? row.text : undefined;
- if (delta.offset > 0 && (current === undefined || delta.offset > current.length)) { void loadRow(delta.id); return; }
- if (delta.offset > 0 && delta.offset + delta.text.length < current.length) return;
- chat.set(delta.id, { ...row, id: delta.id, role: delta.role, text: (delta.offset ? current.slice(0, delta.offset) : "") + delta.text, streaming: delta.streaming, excerpt: false, truncated: delta.truncated ?? row?.truncated, error: delta.error ?? row?.error, ...(delta.blocks ? { blocks: delta.blocks, brief: delta.blocks.length > 0 } : {}) });
+ const row = chat.get(delta.id), text = applyText(row && !row.excerpt ? row.text : undefined, delta.offset, delta.text);
+ if (text === "gap") { void loadRow(delta.id); return; }
+ if (text === "stale") return;
+ chat.set(delta.id, { ...row, id: delta.id, role: delta.role, text, streaming: delta.streaming, excerpt: false, truncated: delta.truncated ?? row?.truncated, error: delta.error ?? row?.error, ...(delta.blocks ? { blocks: delta.blocks, brief: delta.blocks.length > 0 } : {}) });
  renderChat();
  // An open block would lose its body to the brief update; reload it.
  if (delta.blocks?.length && $("messages").querySelector(`li[data-id="${CSS.escape(delta.id)}"] details[open]`)) void loadRow(delta.id);

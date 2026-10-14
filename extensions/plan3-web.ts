@@ -90,6 +90,7 @@ export async function createPlan3Web(options: Options) {
 		["/layout.js", ["layout.ts", "text/javascript; charset=utf-8"]],
 		["/diagram.js", ["diagram.ts", "text/javascript; charset=utf-8"]],
 		["/prompts.js", ["prompts.ts", "text/javascript; charset=utf-8"]],
+		["/stream.js", ["stream.ts", "text/javascript; charset=utf-8"]],
 		["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 		["/vendor/rough.js", ["vendor/rough.ts", "text/javascript; charset=utf-8"]],
 		["/vendor/Virgil.woff2", ["vendor/Virgil.woff2", "font/woff2"]],
@@ -132,7 +133,7 @@ export async function createPlan3Web(options: Options) {
 				connection.frames = []; connection.bytes = 0;
 				return;
 			}
-			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram"].includes(url.pathname)) {
+			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram", "/api/dialog"].includes(url.pathname)) {
 				if (!options.read) throw new WebError(501, "Session bridge is not attached.");
 				return json(res, 200, await options.read(url.pathname, url.searchParams));
 			}
@@ -143,13 +144,16 @@ export async function createPlan3Web(options: Options) {
 				return json(res, 200, await options.post(url.pathname, await body(req)));
 			}
 			if (req.method !== "GET") throw new WebError(405, "Method not allowed.");
-			const asset = assets.get(url.pathname);
+			// /a/<build>/<file> never changes, so browsers cache it; the page itself stays no-store.
+			const fingerprinted = /^\/a\/([0-9a-f]{12})(\/.+)$/.exec(url.pathname);
+			if (fingerprinted && fingerprinted[1] !== build) throw new WebError(404, "Stale workspace build; reload the page.");
+			const asset = assets.get(fingerprinted?.[2] ?? url.pathname);
 			if (!asset) throw new WebError(404, "Unknown workspace asset.");
 			let contents: Buffer;
 			try { contents = readFileSync(fileURLToPath(new URL(`./plan3-web/${asset[0]}`, import.meta.url))); }
 			catch { throw new WebError(404, "Workspace asset is not installed."); }
-			res.writeHead(200, { "Content-Type": asset[1] });
-			res.end(asset[1].startsWith("font/") ? contents : (asset[0].endsWith(".ts") ? stripTypeScriptTypes(contents.toString("utf8")) : contents.toString("utf8")).replaceAll("__TOKEN__", token));
+			res.writeHead(200, { "Content-Type": asset[1], ...(fingerprinted ? { "Cache-Control": "private, max-age=31536000, immutable" } : {}) });
+			res.end(asset[1].startsWith("font/") ? contents : (asset[0].endsWith(".ts") ? stripTypeScriptTypes(contents.toString("utf8")) : contents.toString("utf8")).replaceAll("__TOKEN__", token).replaceAll("__BUILD__", build));
 		})().catch(error => {
 			clients.delete(res);
 			if (res.destroyed || res.writableEnded) return;
@@ -214,9 +218,12 @@ type ChatBlock = { type: "thinking"; text: string } | { type: "tool"; id: string
 type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; excerpt?: boolean; brief?: boolean; error?: string; blocks?: ChatBlock[] };
 // Thinking/tool blocks as titles only (brief); the page fetches the full row when one opens.
 const briefBlocks = (blocks: ChatBlock[]) => blocks.map(block => block.type === "thinking" ? { ...block, text: "" } : { ...block, args: "", ...(block.result === undefined ? {} : { result: "" }) });
+// Cuts never split a surrogate pair.
+const head = (text: string, length: number) => text.length > length ? text.slice(0, length).replace(/[\ud800-\udbff]$/, "") : text;
+const tail = (text: string, length: number) => text.length > length ? text.slice(-length).replace(/^[\udc00-\udfff]/, "") : text;
 // Check-in rows (D20): at most 2 KB of text (excerpt) and brief blocks.
 function excerptRow(row: ChatRow): ChatRow {
-	return { ...row, text: row.text.slice(0, 2000), ...(row.text.length > 2000 ? { excerpt: true } : {}), ...(row.blocks?.length ? { blocks: briefBlocks(row.blocks), brief: true } : {}) };
+	return { ...row, text: head(row.text, 2000), ...(row.text.length > 2000 ? { excerpt: true } : {}), ...(row.blocks?.length ? { blocks: briefBlocks(row.blocks), brief: true } : {}) };
 }
 /** Calls `flush(key)` at most every `ms` per key; `now` flushes at once (final updates). */
 function coalescer(flush: (key: string) => void, ms = 250) {
@@ -340,6 +347,20 @@ export function forwardDiagramChat(pi, ctx, diagram: Diagram, message: unknown, 
 	return { queued, mentions: prepared.mentions, unknownMentions: prepared.unknownMentions };
 }
 
+/**
+ * Check-in packet (D20/D21): newest row excerpts, running tools, whole dialogs up to 16 KB (larger ones brief,
+ * fetched via /api/dialog) and a thinking tail, within 64 KB encoded. The diagram loads separately.
+ */
+export function checkIn(chat: { page: () => { rows: ChatRow[]; more: boolean } }, live, asks: Record<string, unknown>[], extra: Record<string, unknown> = {}) {
+	const page = chat.page(), bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
+	const dialogs = asks.map(ask => bytes(ask) <= 16_000 ? ask : { askId: ask.askId, kind: ask.kind, brief: true, title: head(String(ask.title ?? ask.question ?? "Answer questions"), 200) });
+	const snapshot = { ...extra, dialogs, chat: page.rows, more: page.more, activity: { ...live, thinking: tail(live.thinking, 2000), thinkingLength: live.thinking.length, queue: live.queue.slice(-20).map(item => ({ ...item, text: head(item.text, 500) })), tools: live.tools.filter(tool => tool.state === "running") } };
+	while (snapshot.chat.length > 1 && bytes(snapshot) > 64_000) { snapshot.chat.shift(); snapshot.more = true; }
+	// shortcut: only many dialogs near 16 KB can still pass 64 KB; brief them all if that ever shows up.
+	if (bytes(snapshot) > 64_000) snapshot.activity.tools = snapshot.activity.tools.map(({ args: _args, progress: _progress, ...tool }) => tool);
+	return snapshot;
+}
+
 export function createDialogBridge(pi, publish: (event: string, value: unknown) => void) {
 	const pending = new Map(), bound = new Set(), shutdown = new AbortController();
 	const disposers = [
@@ -352,6 +373,10 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 	];
 	return {
 		snapshot: () => structuredClone([...pending.values()]),
+		get(askId: string) {
+			if (!pending.has(askId)) throw new WebError(404, "Dialog is no longer open.");
+			return structuredClone(pending.get(askId));
+		},
 		answer(value: Record<string, unknown>) {
 			if (typeof value.askId !== "string" || !/^[a-f0-9-]{36}$/.test(value.askId)) throw new WebError(400, "Invalid dialog id.");
 			const ask = pending.get(value.askId);
