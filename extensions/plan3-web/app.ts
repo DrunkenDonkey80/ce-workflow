@@ -15,7 +15,7 @@ function $(id: string): HTMLElement;
 function $(id: string): HTMLElement | SVGSVGElement { return document.getElementById(id); }
 const token = "__TOKEN__";
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
-const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]>>; pinning: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]>>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
@@ -76,6 +76,18 @@ splitter.addEventListener("keydown", event => {
  event.preventDefault(); resizeChat(next);
 });
 
+async function get(endpoint) {
+ const response = await fetch("/api/" + endpoint, { credentials: "omit", headers: { Authorization: "Bearer " + token } });
+ const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Workspace request failed."); return value;
+}
+async function loadDiagram() {
+ try { const value = await get("diagram" + (target ? "?target=" + encodeURIComponent(target) : "")); state.diagram = value.diagram; diagramView.render(state.diagram); renderMentions(); renderShell(); }
+ catch (error) { showNotice("Diagram failed to load: " + error.message); }
+}
+// Check-in rows are excerpts; the full row loads when the reader asks for it.
+async function loadRow(id) {
+ try { chat.set(id, await get("row?id=" + encodeURIComponent(id))); renderChat(); } catch (error) { showNotice(error.message); }
+}
 async function post(endpoint, body) {
  const response = await fetch("/api/" + endpoint, { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ target, ...body }) });
  const value = await response.json(); if (!response.ok) { throw Object.assign(new Error(value.error ?? "Workspace request failed."), { status: response.status }); } return value;
@@ -140,9 +152,7 @@ const diagramView = createDiagramView($("diagram"), {
   catch (error) {
    showNotice(error.message + " Positions were not saved.");
    try {
-    const response = await fetch("/api/snapshot?target=" + encodeURIComponent(target), { credentials: "omit", headers: { Authorization: "Bearer " + token } });
-    const fresh = await response.json(); if (!response.ok) throw new Error(fresh.error ?? "Could not reload the diagram.");
-    state.diagram = fresh.diagram;
+    state.diagram = (await get("diagram?target=" + encodeURIComponent(target))).diagram;
    } catch (reloadError) { showNotice(error.message + " Positions were not saved. Reload failed: " + reloadError.message); }
    diagramView.render(state.diagram);
   }
@@ -188,22 +198,37 @@ function renderBlocks(box: HTMLElement, row) {
 }
 const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - list.clientHeight < 48;
 $("messages").addEventListener("scroll", () => { if (atBottom($("messages"))) $("to-bottom").hidden = true; });
+$("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
+// Opening a thinking/tool block of an excerpt row loads its bodies.
+$("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); if ((event.target as HTMLDetailsElement).open && chat.get(item?.dataset.id)?.excerpt) void loadRow(item.dataset.id); }, true);
+$("earlier").addEventListener("click", async () => {
+ try {
+  const first = chat.keys().next().value, page = await get("rows" + (first ? "?before=" + encodeURIComponent(first) : ""));
+  const rows = [...page.rows, ...chat.values()]; chat.clear(); for (const row of rows) chat.set(row.id, row);
+  state.more = page.more; const list = $("messages"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height;
+ } catch (error) { showNotice(error.message); }
+});
 $("to-bottom").addEventListener("click", () => { const list = $("messages"); list.scrollTop = list.scrollHeight; $("to-bottom").hidden = true; });
 function renderChat() {
  const list = $("messages"), follow = atBottom(list);
  const encoder = new TextEncoder();
  while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
  for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
+ let previous: HTMLLIElement | null = null;
  for (const row of chat.values()) {
   let item = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].find(item => item.dataset.id === row.id);
-  if (!item) { item = document.createElement("li"); item.dataset.id = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("div"), document.createElement("small")); list.append(item); }
+  if (!item) { item = document.createElement("li"); item.dataset.id = row.id; const full = document.createElement("button"); full.type = "button"; full.className = "row-full"; full.textContent = "Show full message"; full.dataset.full = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("div"), document.createElement("small"), full); }
+  // Keep server order, also for rows inserted above by Show earlier.
+  if (!item.isConnected || item.previousElementSibling !== previous) { if (previous) previous.after(item); else list.prepend(item); }
+  previous = item;
   const json = JSON.stringify(row); if (item.dataset.json === json) continue; item.dataset.json = json;
   const text = row.text.trim(), note = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming && !row.blocks?.length ? "Streaming…" : "");
   // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
   item.className = "message " + row.role + (text ? "" : " message-blocks"); item.hidden = !text && !row.blocks?.length && !note;
   item.children[0].textContent = text ? (row.role === "user" ? "You" : "Agent") : "";
-  renderBlocks(item.children[1] as HTMLElement, row); item.children[2].textContent = row.text; item.children[3].textContent = note;
+  renderBlocks(item.children[1] as HTMLElement, row); item.children[2].textContent = row.text; item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
  }
+ $("earlier").hidden = !state.more;
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
  if (follow) list.scrollTop = list.scrollHeight; else if (list.scrollHeight > list.clientHeight) $("to-bottom").hidden = false;
 }
@@ -270,9 +295,9 @@ listen("snapshot", value => {
  if (build && value.build && value.build !== build) { location.reload(); return; }
  build ||= value.build ?? ""; retryDelay = 1000;
  if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;
- state.connected = true; state.diagram = value.diagram; state.plan = value.plan; state.activity = value.activity ?? {};
+ state.connected = true; state.plan = value.plan; state.activity = value.activity ?? {}; state.more = !!value.more;
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
- promptView.sync(value.dialogs ?? []); renderActivity(); renderChat(); renderMentions(); showNotice(""); renderShell(); diagramView.render(state.diagram);
+ promptView.sync(value.dialogs ?? []); renderActivity(); renderChat(); showNotice(""); renderShell(); void loadDiagram();
 });
 listen("diagram", value => {
  if ((target === "product" && value.target.kind === "product") || value.target.id === target) { state.diagram = value.diagram; diagramView.render(state.diagram); renderShell(); }

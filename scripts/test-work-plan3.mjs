@@ -1192,7 +1192,8 @@ try {
 		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 12, y: 34 })).status, 200);
 		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 99, y: 99 })).status, 409);
 		assert.equal((await post("comment", { expectedRevision: 2, element: "api", text: "Keep this boundary" })).status, 200);
-		const edited = (await snapshot()).diagram;
+		const full = await snapshot(); assert.equal(full.diagram, undefined, "check-in snapshot leaves the diagram to /api/diagram");
+		const edited = (await (await fetch(`${url.origin}/api/diagram?target=${b}`, { headers })).json()).diagram;
 		assert.deepEqual([edited.nodes[0].x, edited.nodes[0].y], [12, 34]);
 		assert.equal(edited.notes[0].author, "user"); assert.equal(edited.notes[0].target, "api");
 		const sent = await post("message", { text: "Discuss @api", comments: [edited.notes[0].id] });

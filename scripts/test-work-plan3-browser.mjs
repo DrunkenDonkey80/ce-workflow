@@ -38,7 +38,10 @@ const events = { on(name, run) { const rows = listeners.get(name) ?? new Set(); 
 events.on("ask:answer", value => answers.push(value));
 const dialogs = createDialogBridge({ events }, (event, value) => server.publish(event, value));
 const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { askId, ...value }); return askId; };
-const server = await createPlan3Web({ snapshot: target => ({ target, diagram, plan: { id: "12345678", title: sample.title, status: "draft" }, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), post: (endpoint, body) => {
+const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft" }, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
+ if (endpoint === "/api/row") return { id: params.get("id"), role: "assistant", text: "Short excerpt. Full body loaded.", streaming: false };
+ assert.equal(endpoint, "/api/diagram"); return { target: { kind: "plan", id: "12345678" }, diagram };
+}, post: (endpoint, body) => {
  assert.equal(body.target, "12345678");
  if (endpoint === "/api/answer") return dialogs.answer(body);
  if (endpoint === "/api/message" && body.text.startsWith("/")) { commands.push(body.text); return { accepted: true }; }
@@ -194,6 +197,11 @@ try {
  reply.text = "Reviewing upload limits: complete."; reply.streaming = false; server.publish("message", reply);
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"complete.\")");
  assert.equal(await evaluate("document.querySelectorAll(\"#messages [data-id=assistant_1]\").length"), 1, "stream updates reuse their row");
+ server.publish("message", { id: "assistant_2", role: "assistant", text: "Short excerpt", streaming: false, excerpt: true });
+ await browser("wait", "--fn", "!document.querySelector(\"#messages [data-id=assistant_2] .row-full\")?.hidden");
+ await browser("click", "#messages [data-id=assistant_2] .row-full");
+ await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Full body loaded\")");
+ assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2] .row-full\").hidden"), "expanded row drops the excerpt link");
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
   // Search Enter centers the box, so the click point is clear of the zoom bar; Escape clears the search.
  await browser("fill", "#search", "web_client"); await browser("press", "Enter"); await browser("press", "Escape");

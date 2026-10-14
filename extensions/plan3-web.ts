@@ -16,6 +16,7 @@ type Options = {
 	token?: string;
 	snapshot: (target?: WebTarget) => unknown | Promise<unknown>;
 	post?: (endpoint: string, body: Record<string, unknown>) => unknown | Promise<unknown>;
+	read?: (endpoint: string, params: URLSearchParams) => unknown | Promise<unknown>;
 };
 const BODY_BYTES = 65_536, IMAGE_BYTES = 20_000_000;
 // Pasted images are checked by magic bytes, not the browser-declared type.
@@ -131,6 +132,10 @@ export async function createPlan3Web(options: Options) {
 				connection.frames = []; connection.bytes = 0;
 				return;
 			}
+			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram"].includes(url.pathname)) {
+				if (!options.read) throw new WebError(501, "Session bridge is not attached.");
+				return json(res, 200, await options.read(url.pathname, url.searchParams));
+			}
 			if (req.method === "POST" && url.pathname === "/api/paste") return json(res, 200, { path: await savePastedImage(await read(req, IMAGE_BYTES)) });
 			if (req.method === "POST") {
 				if (!endpoints.has(url.pathname)) throw new WebError(404, "Unknown workspace endpoint.");
@@ -206,7 +211,12 @@ export async function createPlan3Web(options: Options) {
 
 // Thinking and tool calls travel as collapsed blocks (like Pi's terminal); a tool result joins its call's block.
 type ChatBlock = { type: "thinking"; text: string } | { type: "tool"; id: string; name: string; title: string; args: string; result?: string; error?: boolean };
-type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; error?: string; blocks?: ChatBlock[] };
+type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; excerpt?: boolean; error?: string; blocks?: ChatBlock[] };
+// Check-in rows (D20): 2 KB of text, thinking/tool blocks as titles only; the page fetches the full row on expand.
+function excerptRow(row: ChatRow): ChatRow {
+	if (row.text.length <= 2000 && !row.blocks?.some(block => block.type === "thinking" ? block.text : block.args || block.result)) return row;
+	return { ...row, text: row.text.slice(0, 2000), excerpt: true, ...(row.blocks ? { blocks: row.blocks.map(block => block.type === "thinking" ? { ...block, text: "" } : { ...block, args: "", ...(block.result === undefined ? {} : { result: "" }) }) } : {}) };
+}
 const clip = (text: string, limit: number) => text.length > limit ? text.slice(0, limit) + "\n\u2026 truncated" : text;
 /** One-line tool label: the name plus its most telling argument (path, command, query or the first text). */
 function toolTitle(name: string, args: Record<string, unknown>) {
@@ -253,6 +263,17 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 	pi.on("message_end", event => put(event.message, false));
 	return {
 		snapshot: () => structuredClone(rows),
+		/** The `count` rows before `before` (default: newest) as excerpts, and whether older rows exist. */
+		page(before?: string, count = 20) {
+			const end = before ? rows.findIndex(row => row.id === before) : rows.length;
+			if (end < 0) throw new WebError(404, "Unknown chat row.");
+			return { rows: rows.slice(Math.max(0, end - count), end).map(excerptRow), more: end > count };
+		},
+		row(id: string) {
+			const row = rows.find(item => item.id === id);
+			if (!row) throw new WebError(404, "Unknown chat row.");
+			return structuredClone(row);
+		},
 		reset: () => { rows.length = 0; active.clear(); next = 0; },
 		hydrate(ctx) {
 			const live = structuredClone(rows);

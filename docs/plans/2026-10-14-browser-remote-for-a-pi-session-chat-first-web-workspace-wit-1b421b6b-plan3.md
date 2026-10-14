@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T11:07:26.529Z
+updated: 2026-10-14T11:19:45.079Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -191,7 +191,7 @@ Commands (existing; referenced by steps):
 - [x] **P2-05** /wo share and the Utilities row toggle per-session sharing with persisted on/off state; while live, a red bold [SHARED] status shows; diagram/architecture opens share locally.
 - [x] **P2-06** Snapshots carry a 12-hex build fingerprint and SSE retry 1000; the page reconnects itself with 1–15 s backoff after HTTP errors, shows "Pi is reloading… reconnecting", and reloads when the build changed.
 - [x] **P2-07** Activity mirror tracks ui_prompt_start/end as a dialog title; the page shows "Pi is waiting for a terminal dialog: <title>" unless a bridged dialog is open there.
-- [ ] **P2-09** Slim check-in snapshot per D20: last 20 rows, block titles with body on expand, pending dialogs first, Show earlier paging; 64 KB budget.
+- [x] **P2-09** Check-in snapshot is slim: newest 20 rows as 2 KB excerpts (block titles only), running tools, whole dialogs, capped at 64 KB; diagram via GET /api/diagram, full rows via /api/row, paging via /api/rows?before=; page loads the diagram lazily, has Show earlier and Show full message/expand-on-open.
 - [ ] **P2-10** Live stream per D20: chat text deltas, at most 4 updates per second per row, activity sends only changed tool rows; page title cue.
 - [ ] **P2-11** C-WEB byte tests (D21): full snapshot under 64 KB with Unicode, a 1 MB diagram and a large question; 500 deltas under 100 KB; exact text after mid-stream reconnect.
   - Also: a delta during snapshot construction and the final-row flush reconstruct the exact text; build-fingerprint asset URLs are cacheable.
@@ -253,7 +253,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Planning, draft, no open questions; 33 steps, P1-04 done. Review complete: all 9 advisor findings accepted as D21 (diff secret checks and git diff HEAD, remote cookie auth across every request, cross-process device registry lock, revocation of open streams, server-side seen state, 64 KB total snapshot with lazy diagram, offset deltas, lifecycle without session_switch). New steps P3-06 and P3-07. Execution waits for P1-01 (other session's plan3-web commits); then probes P1-02 and P1-05.
+Executing. P2-01..P2-07 done and committed (HEAD 5784683). Next: P2-09 slim check-in snapshot (D20/D21: last 20 rows, 2 KB excerpts with /api/row, dialogs first, /api/rows paging, diagram via /api/diagram not snapshot, 64 KB total). Then P2-10, P2-11, P2-08. Live browser reload-reconnect check deferred to P2-08. Browser test test-work-plan3-browser.mjs has a known flaky drag race (~2 in 6 runs); rerun before diagnosing.
 
 ## Amendments
 

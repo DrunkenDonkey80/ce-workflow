@@ -780,14 +780,25 @@ export default function plan3(pi) {
 		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target, target.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined);
 		return forwardDiagramChat(pi, webCtx, diagram, data.text, data.comments, publishWeb);
 	}
+	async function readWeb(endpoint: string, params: URLSearchParams) {
+		if (endpoint === "/api/row") return chat.row(params.get("id") ?? "");
+		if (endpoint === "/api/rows") return chat.page(params.get("before") ?? undefined);
+		const target = await displayedWebTarget(params.get("target") ?? undefined), resolved = await resolveWebTarget(target);
+		return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined) };
+	}
 	async function getWeb(ctx) {
 		if (webStopped) throw new Error("Workspace session has ended.");
 		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
-		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, snapshot: async requestedTarget => {
+		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
-			return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined), chat: chat.snapshot(), activity: activity.snapshot(webCtx), dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) };
+			// Check-in packet (D20): recent excerpts, running tools and whole dialogs; the diagram loads separately.
+			const live = activity.snapshot(webCtx), page = chat.page();
+			const snapshot = { target, chat: page.rows, more: page.more, activity: { ...live, thinking: live.thinking.slice(-2000), tools: live.tools.filter(tool => tool.state === "running") }, dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) };
+			// shortcut: dialogs stay whole even past 64 KB (answering needs them); only older rows are shed.
+			while (snapshot.chat.length > 1 && Buffer.byteLength(JSON.stringify(snapshot)) > 64_000) { snapshot.chat.shift(); snapshot.more = true; }
+			return snapshot;
 		} }).then(async server => {
 			try { await saveSharePort(shareRecord, server.port); }
 			catch (error) { await server.close(); throw error; }

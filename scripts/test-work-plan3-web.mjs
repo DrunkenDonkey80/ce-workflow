@@ -109,8 +109,16 @@ chatHooks.get("message_end")({ message: { role: "toolResult", toolCallId: "call_
 const blocks = mirror.snapshot().at(-1).blocks;
 assert.deepEqual(blocks.map(block => block.type === "tool" ? [block.title, block.result, block.error] : [block.type, block.text]), [["thinking", "Plan the edit"], ["edit C:/a.ts", "Edited", true]], "thinking and tool calls become collapsed blocks; the result joins its call");
 assert.equal(mirror.snapshot().at(-1).text, "");
+const brief = mirror.page().rows.at(-1);
+assert(brief.excerpt && brief.blocks[0].text === "" && brief.blocks[1].args === "" && brief.blocks[1].result === "" && brief.blocks[1].title === "edit C:/a.ts", "check-in rows keep block titles and completion only");
+assert.equal(mirror.row(brief.id).blocks[1].result, "Edited", "full row on expand");
+const long = mirror.page().rows.find(row => row.text.length === 2000); assert(long?.excerpt, "long text is a 2 KB excerpt");
+assert.throws(() => mirror.row("missing"), /Unknown chat row/);
 for (let timestamp = 4; timestamp < 110; timestamp++) chatHooks.get("message_end")({ message: { role: "user", timestamp, content: "recent" } });
 assert.equal(mirror.snapshot().length, 100);
+const newest = mirror.page(); assert.equal(newest.rows.length, 20); assert(newest.more);
+const older = mirror.page(newest.rows[0].id); assert.equal(older.rows.at(-1).id, mirror.snapshot()[79].id, "Show earlier pages back without overlap");
+assert.equal(mirror.page(mirror.snapshot()[10].id).more, false);
 const { emptyDiagram, applyDiagramOperations, diagramChatMessage } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
 const contextDiagram = applyDiagramOperations(emptyDiagram({ kind: "product" }), [
  { op: "add", entity: "node", value: { id: "api", label: "API", kind: "service", details: "Bounded uploads" } },
