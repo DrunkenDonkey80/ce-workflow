@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-10-14
-updated: 2026-10-14T15:12:58.630Z
+updated: 2026-10-14T21:24:32.811Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -226,7 +226,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 6: Live acceptance [think]
 
-- [wip] **P6-01** User runs E1 to E9 on the desktop and phone; record findings or explicitly accepted limitations. Needs P1-04.
+- [x] **P6-01** Live test: user confirmed E1, E2, E5, E6, E8 pass; E3, E4, E7, E9 untested live and explicitly accepted by the user (covered by automated tests only).
 ### P-ARCH [code] Product architecture
 
 - [x] **ARCH-RECONCILE** Product diagram rev 4: added plan3_remote (plan3-remote.ts), plan3_files (plan3-files.ts), the remote_state store (~/.pi/agent/ce-workflow/remote) and the Tailscale external, with edges web→remote, remote→state, remote→tailscale, tailscale→web, web→files, browser→tailscale; updated the plan3_web, browser_app and user_browser summaries.
