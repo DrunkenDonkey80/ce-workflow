@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createJiti } from "jiti";
 const { applyDiagramOperations } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
-const { createPlan3Web, createDialogBridge, WebError } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
+const { createPlan3Web, createDialogBridge, WebError, savePastedImage } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `ce-plan3-ui-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
@@ -80,6 +80,25 @@ try {
  for (let i = 0; i < 3; i++) await browser("click", "#zoom-in");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "mid");
  assert.equal(await evaluate("document.querySelectorAll(\"[data-node]\").length"), sample.nodes.length);
+ // Focus mode: cross-group edges collapse into one bundle until an end is hovered or selected.
+ const shown = id => evaluate(`getComputedStyle(document.querySelector("[data-edge=${id}]")).display !== "none"`);
+ assert(await evaluate("document.querySelectorAll(\".bundle-edge\").length > 0")); assert.equal(await shown("web_client__load_balancer"), false, "bundled edge hidden by default");
+ assert.equal(await evaluate("getComputedStyle(document.querySelector(\"[data-edge=storage__cdn] .edge-label\")).display"), "none", "mid band hides edge labels");
+ await browser("focus", "[data-node=web_client]");
+ assert.equal(await shown("web_client__load_balancer"), true, "hover reveals the node's edges");
+ assert(await evaluate("document.getElementById(\"diagram\").classList.contains(\"focusing\") && document.querySelector(\"[data-node=load_balancer]\").classList.contains(\"lit\") && !document.querySelector(\"[data-node=worker]\").classList.contains(\"lit\")"), "neighbors lit, others dim");
+ await browser("focus", "#zoom-fit");
+ assert.equal(await shown("web_client__load_balancer"), false, "leaving the node restores the calm view");
+ await browser("press", "Escape"); const lb = await evaluate("(() => { const r = document.querySelector(\"[data-node=load_balancer]\").getBoundingClientRect(); return { x: Math.round(r.x + 20), y: Math.round(r.y + 20) }; })()"); await browser("mouse", "move", String(lb.x), String(lb.y)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left"); await browser("focus", "#zoom-fit");
+ assert.equal(await shown("web_client__load_balancer"), true, "a clicked box stays in focus");
+ await browser("mouse", "move", "2", "2"); await browser("press", "Escape"); assert.equal(await shown("web_client__load_balancer"), false, "Escape clears focus");
+ await assert.rejects(savePastedImage(Buffer.from("<svg onload=alert(1)>")), /PNG, JPEG/, "non-image paste rejected by magic bytes");
+ // Clipboard image paste: saved as a temp file, path inserted into the draft.
+ await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([new Uint8Array([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,1,2,3])], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");
+ await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
+ const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
+ assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); await rm(pasted);
+ await browser("fill", "#message-input", "");
  await browser("focus", "#diagram"); await browser("press", "+"); await browser("press", "+"); await browser("press", "+");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
  assert(await evaluate("document.getElementById(\"diagram\").textContent.includes(\"POST /uploads\")"));

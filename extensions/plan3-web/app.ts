@@ -180,6 +180,16 @@ function renderMentions() {
  for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = "No matching element; sent as text."; if (entity && "label" in entity) chip.title = entity.label ?? chip.title; if (entity && "text" in entity) chip.title = entity.text; $("mentions").append(chip); }
 }
 $("message-input").addEventListener("input", renderMentions);
+// Clipboard images become temp files (like Pi's terminal paste); the chat gets their path.
+$("message-input").addEventListener("paste", async event => {
+ const file = [...(event.clipboardData?.items ?? [])].find(item => item.type.startsWith("image/"))?.getAsFile(); if (!file) return;
+ event.preventDefault(); showNotice("Saving pasted image\u2026");
+ try {
+  const response = await fetch("/api/paste", { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": file.type }, body: file });
+  const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Image paste failed.");
+  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); renderMentions(); showNotice("Image saved: " + value.path);
+ } catch (error) { showNotice(error.message); }
+});
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
 $("message-input").addEventListener("keydown", event => {
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("composer").requestSubmit(); }

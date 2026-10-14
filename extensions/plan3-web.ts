@@ -1,6 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stripTypeScriptTypes } from "node:module";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
@@ -12,7 +15,14 @@ type Options = {
 	snapshot: (target: WebTarget) => unknown | Promise<unknown>;
 	post?: (endpoint: string, body: Record<string, unknown>) => unknown | Promise<unknown>;
 };
-const BODY_BYTES = 65_536;
+const BODY_BYTES = 65_536, IMAGE_BYTES = 20_000_000;
+// Pasted images are checked by magic bytes, not the browser-declared type.
+const IMAGE_KINDS: [string, (b: Buffer) => boolean][] = [
+	["png", b => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))],
+	["jpg", b => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff],
+	["gif", b => b.subarray(0, 4).toString("latin1") === "GIF8"],
+	["webp", b => b.subarray(0, 4).toString("latin1") === "RIFF" && b.subarray(8, 12).toString("latin1") === "WEBP"],
+];
 export class WebError extends Error {
 	status: number;
 	constructor(status: number, message: string) { super(message); this.status = status; }
@@ -22,8 +32,24 @@ export function webTarget(value: unknown): WebTarget {
 	if (typeof value === "string" && /^[a-f0-9]{8}$/.test(value)) return { kind: "plan", id: value };
 	throw new WebError(400, "Name the displayed stable plan id or product target.");
 }
-function body(req: IncomingMessage): Promise<Record<string, unknown>> {
+async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
 	if (req.headers["content-type"]?.split(";")[0].trim() !== "application/json") throw new WebError(415, "JSON content type required.");
+	const raw = await read(req, BODY_BYTES);
+	try {
+		const value = JSON.parse(raw.toString("utf8"));
+		if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("not an object");
+		return value;
+	} catch { throw new WebError(400, "Invalid JSON object."); }
+}
+/** Saves a pasted clipboard image like Pi's terminal paste does and returns its path for the chat. */
+export async function savePastedImage(bytes: Buffer, dir = tmpdir()) {
+	const kind = IMAGE_KINDS.find(([, test]) => test(bytes));
+	if (!kind) throw new WebError(415, "Paste a PNG, JPEG, GIF or WebP image.");
+	const file = join(dir, `pi-clipboard-${randomUUID()}.${kind[0]}`);
+	await writeFile(file, bytes, { flag: "wx" });
+	return file;
+}
+function read(req: IncomingMessage, limit: number): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
 		const chunks: Buffer[] = [];
 		let bytes = 0;
@@ -32,17 +58,10 @@ function body(req: IncomingMessage): Promise<Record<string, unknown>> {
 		const aborted = () => fail(new WebError(400, "Request aborted."));
 		const data = (chunk: Buffer) => {
 			bytes += chunk.length;
-			if (bytes > BODY_BYTES) return fail(new WebError(413, "Request body too large."));
+			if (bytes > limit) return fail(new WebError(413, "Request body too large."));
 			chunks.push(chunk);
 		};
-		const end = () => {
-			cleanup();
-			try {
-				const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-				if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("not an object");
-				resolve(value);
-			} catch { reject(new WebError(400, "Invalid JSON object.")); }
-		};
+		const end = () => { cleanup(); resolve(Buffer.concat(chunks)); };
 		req.on("data", data); req.once("end", end); req.once("error", fail); req.once("aborted", aborted);
 	});
 }
@@ -103,6 +122,7 @@ export async function createPlan3Web(options: Options) {
 				connection.frames = []; connection.bytes = 0;
 				return;
 			}
+			if (req.method === "POST" && url.pathname === "/api/paste") return json(res, 200, { path: await savePastedImage(await read(req, IMAGE_BYTES)) });
 			if (req.method === "POST") {
 				if (!endpoints.has(url.pathname)) throw new WebError(404, "Unknown workspace endpoint.");
 				if (!options.post) throw new WebError(501, "Session bridge is not attached.");

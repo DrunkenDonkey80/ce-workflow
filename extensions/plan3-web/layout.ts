@@ -42,13 +42,17 @@ export function layout(diagram: Pick<Diagram, "nodes" | "edges">, nodeSize = (_n
 			if (!moved) break;
 		}
 		let x = 0, width = 0, height = 0;
+		const middle = new Map<string, number>();
+		// Barycenter order: a box sits near the average height of its already placed sources, which cuts crossings.
+		const center = (kid) => { const ys = all.filter((link) => link[1] === kid.id && middle.has(link[0])).map((link) => middle.get(link[0])); return ys.length ? ys.reduce((a, b) => a + b) / ys.length : Infinity; };
 		for (let r = 0; r <= Math.max(-1, ...rank.values()); r++) {
-			const column = kids.filter((kid) => rank.get(kid.id) === r);
+			const column = kids.filter((kid) => rank.get(kid.id) === r).sort((a, b) => (center(a) - center(b)) || 0);
 			if (!column.length) continue;
 			let y = 0, columnWidth = 0;
 			for (const kid of column) {
 				const { w, h } = size(kid);
 				boxes.set(kid.id, { ...boxes.get(kid.id), x: Number.isFinite(kid.x) ? kid.x : x, y: Number.isFinite(kid.y) ? kid.y : y, w, h });
+				middle.set(kid.id, boxes.get(kid.id).y + h / 2);
 				y += h + GAP.y; columnWidth = Math.max(columnWidth, w);
 			}
 			x += columnWidth + GAP.x;
