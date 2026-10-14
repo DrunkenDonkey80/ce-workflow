@@ -61,6 +61,13 @@
     <button id="tab-files" type="button" role="tab" aria-selected="false" aria-controls="files" tabindex="-1">Files</button>
     <button id="tab-diagram" type="button" role="tab" aria-selected="true" aria-controls="canvas">Diagram</button>
    </div>
+   <div id="zoom-controls" class="zoom-controls" aria-label="Diagram zoom">
+    <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+    <output id="zoom-level" aria-label="Zoom level">100%</output>
+    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+    <button id="zoom-fit" type="button">Fit</button>
+    <button id="pin-note" type="button" aria-pressed="false">Add note</button>
+   </div>
    <button id="narrow-left" type="button" aria-pressed="false" title="Narrow this panel to the chat's width">Narrow</button>
    <button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button>
   </div>
@@ -69,13 +76,6 @@
    <svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Architecture diagram" tabindex="0"></svg>
    <p id="empty-diagram" class="empty-diagram">No diagram yet. Ask in the chat, for example: draw the main components.</p>
    <div class="search-box"><input id="search" type="search" placeholder="Search (Ctrl+F)" aria-label="Search the diagram; Enter jumps to the next match"><output id="search-count" aria-live="polite"></output></div>
-   <div id="zoom-controls" class="zoom-controls" aria-label="Diagram zoom">
-    <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
-    <output id="zoom-level" aria-label="Zoom level">100%</output>
-    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
-    <button id="zoom-fit" type="button">Fit</button>
-    <button id="pin-note" type="button" aria-pressed="false">Add note</button>
-   </div>
    <div id="hover-card" class="hover-card" role="tooltip" tabindex="0" hidden></div>
   </section>
   </section>

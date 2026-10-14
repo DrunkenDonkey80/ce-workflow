@@ -40,7 +40,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .notice[hidden] { display: none; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--chat-width); flex: 1; min-height: 0; }
 .left-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.left-tabs { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.left-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .left-tabs [role=tablist] { display: flex; gap: 4px; margin-right: auto; }
 .left-tabs [role=tab] { border-color: transparent; }
 .left-tabs [role=tab][aria-selected=true] { border-color: var(--ink); }
@@ -100,7 +100,9 @@ h2 { font-size: 15px; font-weight: 600; }
 .bundle-count { font-size: 14px; fill: #868e96; paint-order: stroke; stroke: white; stroke-width: 5px; }
 .edge-hit { fill: none; stroke: transparent; stroke-width: 14px; vector-effect: non-scaling-stroke; }
 .empty-diagram { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); width: min(80%, 400px); text-align: center; color: var(--muted); pointer-events: none; }
-.zoom-controls { position: absolute; left: 16px; bottom: 16px; display: flex; align-items: center; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+/* In the tab bar, beside Narrow/<<, so it never covers the diagram. */
+.zoom-controls { display: flex; align-items: center; gap: 2px; }
+.zoom-controls[hidden] { display: none; }
 .zoom-controls button { border-color: transparent; }
 #zoom-level { width: 52px; text-align: center; }
 .hover-card { position: fixed; z-index: 5; max-height: 45vh; box-shadow: 0 4px 16px #0003; overflow: auto; background: #ffc9c9; color: #1e1e1e; padding: 12px; border: 1px solid #1e1e1e; border-radius: 6px; font-size: 13px; white-space: pre-wrap; }
@@ -251,7 +253,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .mobile-tabs [role=tab] { flex: 1; border-color: transparent; }
  .mobile-tabs [role=tab][aria-selected=true] { border-color: var(--ink); }
  .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
- .workspace[data-mobile=chat] > .left-panel, .workspace[data-mobile=panel] > .chat, .left-tabs, .splitter { display: none; }
+ .workspace[data-mobile=chat] > .left-panel, .workspace[data-mobile=panel] > .chat, .left-tabs > :not(.zoom-controls), .splitter { display: none; }
+ .left-tabs:has(> .zoom-controls[hidden]) { display: none; }
  /* Phones: only the chat and composer stay on screen; everything else lives in the drawer. */
  .topbar { padding: 4px 8px; gap: 8px; flex-wrap: nowrap; }
  .topbar h1 { font-size: 15px; }

@@ -99,6 +99,7 @@ function setTab(name) {
   const selected = panel === (name === "files" ? "files" : "canvas");
   $(tab).setAttribute("aria-selected", String(selected)); $(tab).tabIndex = selected ? 0 : -1; $(panel).hidden = !selected;
  }
+ $("zoom-controls").hidden = name === "files";
  remember("plan3-tab", name);
  if (name === "files") filesView.shown();
  // A diagram first drawn while hidden has not been fitted yet.

@@ -106,6 +106,7 @@ try {
  await browser("click", "#expand-left"); assert.equal(await width("chat"), 640);
  await browser("click", "#tab-files");
  assert.deepEqual(await evaluate("[document.getElementById(\"files\").hidden, document.getElementById(\"canvas\").hidden, document.getElementById(\"tab-files\").getAttribute(\"aria-selected\")]"), [false, true, "true"]);
+ assert.equal(await evaluate("document.getElementById('zoom-controls').hidden"), true, "zoom controls belong to the diagram tab");
  // R8/E4: changed files are marked, open as a coloured diff and keep folders open; content renders as text only.
  await browser("wait", "[data-path=\"src/app.ts\"]");
  assert.equal(await evaluate("document.querySelector(\"[data-path='src/app.ts'] .file-mark\").textContent"), "M");
@@ -124,6 +125,7 @@ try {
  await browser("set", "viewport", "1280", "800");
  await browser("focus", "#tab-files"); await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-diagram");
  assert.equal(await evaluate("document.getElementById(\"canvas\").hidden"), false);
+ assert(await evaluate("(() => { const zoom = document.getElementById('zoom-controls'), canvas = document.getElementById('canvas').getBoundingClientRect(); return !zoom.hidden && zoom.parentElement.classList.contains('left-tabs') && zoom.nextElementSibling.id === 'narrow-left' && zoom.getBoundingClientRect().bottom <= canvas.top; })()"), "zoom controls sit in the tab bar beside Narrow, not over the diagram");
  // R9/E5 at 390 px: Chat, Files and Diagram tabs; the composer and the attach button stay on screen.
  await browser("set", "viewport", "390", "844");
  await browser("click", "#drawer-toggle"); await browser("click", "#mobile-diagram");
