@@ -112,7 +112,7 @@ try {
  assert.equal(await evaluate("document.querySelector('.files-body img')"), null, "file content is inert text");
  projectFiles = [...projectFiles, { path: "src/new.ts", change: "??" }]; server.publish("files", {});
  await browser("wait", "[data-path=\"src/new.ts\"]");
- await browser("set", "viewport", "390", "844"); await browser("click", "#mobile-files");
+ await browser("set", "viewport", "390", "844"); await browser("click", "#drawer-toggle"); await browser("click", "#mobile-files");
  assert(await evaluate("document.querySelector('.files-viewer').getBoundingClientRect().top >= document.querySelector('.files-tree').getBoundingClientRect().bottom - 1"), "phone: tree above the viewer");
  assert.equal(await evaluate("document.getElementById('chat').getClientRects().length"), 0, "phone shows one view at a time");
  await browser("set", "viewport", "1280", "800");
@@ -120,15 +120,20 @@ try {
  assert.equal(await evaluate("document.getElementById(\"canvas\").hidden"), false);
  // R9/E5 at 390 px: Chat, Files and Diagram tabs; the composer and the attach button stay on screen.
  await browser("set", "viewport", "390", "844");
- await browser("click", "#mobile-diagram");
- assert.equal(await evaluate("document.getElementById('canvas').getBoundingClientRect().width"), 390);
- await browser("focus", "#mobile-diagram"); await browser("press", "ArrowRight");
- assert.equal(await evaluate("document.activeElement.id"), "mobile-chat");
+ await browser("click", "#drawer-toggle"); await browser("click", "#mobile-diagram");
+ assert.deepEqual(await evaluate("[document.getElementById('canvas').getBoundingClientRect().width, document.getElementById('drawer').dataset.open]"), [390, "false"], "picking a view closes the drawer");
+ await browser("click", "#drawer-toggle"); assert.equal(await evaluate("document.activeElement.id"), "mobile-diagram", "the drawer opens on the current view");
+ await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "mobile-chat");
+ assert(await evaluate("['model-button', 'plan-button', 'session-list'].every(id => document.getElementById('drawer').contains(document.getElementById(id)))"), "phone: status line and sessions live in the drawer");
+ await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('drawer').dataset.open, document.activeElement.id, document.getElementById('drawer-backdrop').hidden]"), ["false", "drawer-toggle", true]);
+ // E5 finding: the chat itself gets most of the screen; only a slim bar sits above it.
+ assert(await evaluate("(() => { const m = document.getElementById('messages').getBoundingClientRect(); return m.top < 60 && m.height > innerHeight * 0.6; })()"), "phone: messages fill the screen");
  assert.deepEqual(await evaluate("[document.getElementById('left-panel').getClientRects().length, document.querySelector('.left-tabs').getClientRects().length]"), [0, 0]);
  assert(await evaluate("(() => { const r = document.getElementById('composer').getBoundingClientRect(), a = document.querySelector('.attach').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top > innerHeight / 2 && a.width > 0 && a.bottom <= innerHeight; })()"), "composer and attach stay on screen");
  assert.equal(await evaluate("document.documentElement.scrollWidth"), 390, "no sideways scrolling");
  await browser("set", "viewport", "1280", "800");
  assert(await evaluate("document.getElementById('left-panel').getClientRects().length > 0 && document.getElementById('chat').getClientRects().length > 0 && document.getElementById('mobile-tabs').getClientRects().length === 0"), "desktop ignores the phone view");
+ assert(await evaluate("document.getElementById('chat').contains(document.getElementById('model-button')) && document.getElementById('switcher').contains(document.getElementById('session-list')) && document.querySelector('.chat-heading').contains(document.getElementById('connection'))"), "desktop puts the status line, sessions and connection back");
  await browser("focus", "#splitter"); await browser("press", "Home");
  await browser("click", "#zoom-fit");
  // The compact layout may fit at mid zoom; zoom out to the overview band explicitly.

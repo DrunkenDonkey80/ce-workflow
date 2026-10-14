@@ -110,12 +110,38 @@ function setMobile(view) {
  remember("plan3-mobile", view);
 }
 for (const name of mobileViews) {
- $("mobile-" + name).addEventListener("click", () => setMobile(name));
+ $("mobile-" + name).addEventListener("click", () => { setMobile(name); setDrawer(false); });
  $("mobile-" + name).addEventListener("keydown", event => {
   const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key]; if (!step) return;
   event.preventDefault(); const next = mobileViews[(mobileViews.indexOf(name) + step + 3) % 3]; setMobile(next); $("mobile-" + next).focus();
  });
 }
+// Phones: views, status line and sessions move into the drawer so the chat gets the screen; desktop puts them back.
+const phone = matchMedia("(max-width: 899px)"), drawer = $("drawer");
+const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "drawer-sessions"], ["connection", "topbar"]]
+ .map(([id, slot]) => { const node = id === "status-line" || id === "topbar" ? document.querySelector("." + id)! : $(id); return { node, slot: slot === "topbar" ? document.querySelector(".topbar")! : $(slot), parent: node.parentNode!, next: node.nextSibling }; });
+function placeForPhone() {
+ for (const home of homes) phone.matches ? home.slot.append(home.node) : home.parent.insertBefore(home.node, home.next);
+ if (!phone.matches) setDrawer(false);
+}
+function setDrawer(open: boolean) {
+ drawer.dataset.open = String(open); drawer.inert = !open; $("drawer-backdrop").hidden = !open;
+ $("drawer-toggle").setAttribute("aria-expanded", String(open)); $("drawer-toggle").setAttribute("aria-label", open ? "Close menu" : "Open menu");
+ if (open) drawer.querySelector<HTMLElement>("[aria-selected=true]")?.focus();
+}
+phone.addEventListener("change", placeForPhone); placeForPhone();
+$("drawer-toggle").addEventListener("click", () => setDrawer(drawer.dataset.open !== "true"));
+$("drawer-backdrop").addEventListener("click", () => setDrawer(false));
+drawer.addEventListener("keydown", event => { if (event.key === "Escape") { event.stopPropagation(); setDrawer(false); $("drawer-toggle").focus(); } });
+// Swipe right from the left edge opens; swipe left anywhere closes.
+let swipe: { x: number; y: number; edge: boolean } | undefined;
+document.addEventListener("touchstart", event => { const t = event.touches[0]; swipe = phone.matches && event.touches.length === 1 ? { x: t.clientX, y: t.clientY, edge: t.clientX < 24 } : undefined; }, { passive: true });
+document.addEventListener("touchend", event => {
+ const t = event.changedTouches[0]; if (!swipe || !t) return;
+ const dx = t.clientX - swipe.x, flat = Math.abs(dx) > 2 * Math.abs(t.clientY - swipe.y);
+ if (flat && dx > 60 && swipe.edge) setDrawer(true); else if (flat && dx < -60 && drawer.dataset.open === "true") setDrawer(false);
+ swipe = undefined;
+}, { passive: true });
 // iOS keeps the layout viewport under the on-screen keyboard; size the page to what is visible so the composer stays reachable.
 const fitViewport = () => document.documentElement.style.setProperty("--app-height", (window.visualViewport?.height ?? window.innerHeight) + "px");
 window.visualViewport?.addEventListener("resize", fitViewport); fitViewport();
@@ -358,12 +384,12 @@ function closeMenus(focus = false) {
 document.addEventListener("keydown", event => { if (event.key === "Escape" && (!$("model-menu").hidden || !$("plan-menu").hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
 document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line")) closeMenus(); });
 function newPlan() {
- const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+ setDrawer(false); const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
  showNotice("Describe the plan after /plan3 and send.");
 }
 $("plan-button").addEventListener("click", () => state.plan ? toggleMenu("plan-button", "plan-menu") : newPlan());
 for (const button of $("plan-menu").querySelectorAll<HTMLElement>("button")) button.addEventListener("click", async () => {
- const command = button.dataset.command; closeMenus();
+ const command = button.dataset.command; closeMenus(); setDrawer(false);
  if (command === "new") return newPlan();
  if (commandSending) return; commandSending = true; renderShell();
  try {
@@ -413,7 +439,7 @@ void loadSessions();
 $("status-more").addEventListener("click", () => { const open = $("status-extra").hidden; $("status-extra").hidden = !open; $("status-more").setAttribute("aria-expanded", String(open)); });
 // Scoped models first; the full list filters as you type.
 async function changeStatus(endpoint: "model" | "effort", body) {
- closeMenus(); $("model-button").focus();
+ closeMenus(); if (drawer.dataset.open === "true") setDrawer(false); else $("model-button").focus();
  try { state.status = { ...state.status, ...await post(endpoint, body) }; renderShell(); showNotice(""); } catch (error) { showNotice(error.message); }
 }
 $("model-button").addEventListener("click", async () => {

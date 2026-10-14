@@ -13,8 +13,15 @@
   <div id="session-list" class="session-list"></div>
  </nav>
  <header class="topbar">
+  <button id="drawer-toggle" class="drawer-toggle" type="button" aria-controls="drawer" aria-expanded="false" aria-label="Open menu">☰</button>
   <div class="workspace-title"><h1 id="title">Architecture workspace</h1><span id="target-kind" class="badge">Plan</span></div>
  </header>
+ <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+ <aside id="drawer" class="drawer" aria-label="Menu" data-open="false" inert>
+  <h2>View</h2><div id="drawer-views"></div>
+  <h2>Session</h2><div id="drawer-status"></div>
+  <h2>Shared sessions</h2><div id="drawer-sessions"></div>
+ </aside>
  <p id="notice" class="notice" role="status" hidden></p>
  <p id="waiting" class="notice" role="status" hidden></p>
  <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">

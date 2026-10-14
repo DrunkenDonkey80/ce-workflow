@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:46:30.485Z
+updated: 2026-10-14T14:21:09.293Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -220,10 +220,11 @@ Commands (existing; referenced by steps):
 ### Phase 5: Docs [code]
 
 - [x] **P5-01** README: status-line chat bullet, updated Security bullet, Files tab, and a new 'Sharing and phone access' section (/wo share, reload and resume, reconnect, Tailscale setup, pairing, revoke, switcher, security model, limits). CHANGELOG Unreleased entry.
+- [x] **P5-02** Phones get a left drawer (☰, edge swipe, backdrop tap, swipe left, Escape, or an action) holding the view tabs, model/effort and plan status, and shared sessions. The main screen is a slim bar (☰, title, connection), the chat and the composer. Desktop gets the moved parts back.
 
 ### Phase 6: Live acceptance [think]
 
-- [human] **P6-01** User runs E1 to E9 on the desktop and phone; record findings or explicitly accepted limitations. Needs P1-04.
+- [wip] **P6-01** User runs E1 to E9 on the desktop and phone; record findings or explicitly accepted limitations. Needs P1-04.
 ### P-ARCH [code] Product architecture
 
 - [x] **ARCH-RECONCILE** Product diagram rev 4: added plan3_remote (plan3-remote.ts), plan3_files (plan3-files.ts), the remote_state store (~/.pi/agent/ce-workflow/remote) and the Tailscale external, with edges web→remote, remote→state, remote→tailscale, tailscale→web, web→files, browser→tailscale; updated the plan3_web, browser_app and user_browser summaries.
@@ -248,7 +249,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-P4-01..P4-05 and P4-08 committed locally (29/34; HEAD 66a7930). Next: P4-07, the D18 session switcher UI (side stripe of shared sessions from GET /api/sessions, colours orange working / red waiting / blue unseen idle / gray seen idle, POST /api/seen), then P4-06 (C-BROWSER and C-VERIFY), P5. Stage plan3.ts and test-work-plan3.mjs with $TEMP/hunks.py; the other session's hunks stay out.
+All code, docs and architecture steps are done and committed locally (33/34; HEAD 6211fa8; nothing pushed). C-VERIFY passes. The only step left is P6-01 [human]: the user runs E1–E9 on the desktop and phone (/reload, then /wo share, pair the phone over the tailnet, status-line model/plan menus, switcher with two projects, reload and resume re-share, revoke). Not yet verified: a real phone keyboard, real pairing approval, and E6 from another Tailscale login.
 
 ## Amendments
 
@@ -268,3 +269,4 @@ Append material changes and their reasons; preserve the original request and set
   - 8 accepted: browser storage is per origin and every session has its own port, so seen state moves server-side (P3-05, P4-06).
   - 9 accepted: `session_switch` is absent from Pi 1.1.0 types; the lifecycle uses shutdown and start reasons, and the dead handler is removed (P2-04, P2-08).
 - 2026-10-14: Added final architecture reconciliation because a product diagram exists.
+- 2026-10-14: Added P5-02 after P5-01: P6-01 live phone test: only about 2 cm of chat was visible before the keyboard opened, and none once it did. The user asked for everything except chat/send to move into a swipe/click side panel.
