@@ -314,17 +314,20 @@ function renderBlocks(box: HTMLElement, row) {
  });
 }
 const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - list.clientHeight < 48;
-$("messages").addEventListener("scroll", () => { if (atBottom($("messages"))) $("to-bottom").hidden = true; });
+// Scrolling near the top loads earlier rows (no button).
+$("messages").addEventListener("scroll", () => { const list = $("messages"); if (atBottom(list)) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
 // Opening a thinking/tool block of an excerpt row loads its bodies.
 $("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); const row = chat.get(item?.dataset.id); if ((event.target as HTMLDetailsElement).open && (row?.excerpt || row?.brief)) void loadRow(item.dataset.id); }, true);
-$("earlier").addEventListener("click", async () => {
+let loadingEarlier = false;
+async function loadEarlier() {
+ if (loadingEarlier) return; loadingEarlier = true;
  try {
   const first = chat.keys().next().value, page = await get("rows" + (first ? "?before=" + encodeURIComponent(first) : ""));
   const rows = [...page.rows, ...chat.values()]; chat.clear(); for (const row of rows) chat.set(row.id, row);
   state.more = page.more; const list = $("messages"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height;
- } catch (error) { showNotice(error.message); }
-});
+ } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; }
+}
 $("to-bottom").addEventListener("click", () => { const list = $("messages"); list.scrollTop = list.scrollHeight; $("to-bottom").hidden = true; });
 function renderChat() {
  const list = $("messages"), follow = atBottom(list);
@@ -335,7 +338,7 @@ function renderChat() {
  for (const row of chat.values()) {
   let item = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].find(item => item.dataset.id === row.id);
   if (!item) { item = document.createElement("li"); item.dataset.id = row.id; const full = document.createElement("button"); full.type = "button"; full.className = "row-full"; full.textContent = "Show full message"; full.dataset.full = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("div"), document.createElement("small"), full); }
-  // Keep server order, also for rows inserted above by Show earlier.
+  // Keep server order, also for rows inserted above by loadEarlier.
   if (!item.isConnected || item.previousElementSibling !== previous) { if (previous) previous.after(item); else list.prepend(item); }
   previous = item;
   const json = JSON.stringify(row); if (item.dataset.json === json) continue; item.dataset.json = json;
@@ -352,7 +355,6 @@ function renderChat() {
    item.children[2].append(link);
   } item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
  }
- $("earlier").hidden = !state.more;
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
  if (follow) list.scrollTop = list.scrollHeight; else if (list.scrollHeight > list.clientHeight) $("to-bottom").hidden = false;
 }
