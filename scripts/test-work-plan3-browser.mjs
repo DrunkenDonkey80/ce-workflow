@@ -141,7 +141,8 @@ try {
  assert.equal(await evaluate("document.documentElement.scrollWidth"), 390, "no sideways scrolling");
  await browser("set", "viewport", "1280", "800");
  assert(await evaluate("document.getElementById('left-panel').getClientRects().length > 0 && document.getElementById('chat').getClientRects().length > 0 && document.getElementById('mobile-tabs').getClientRects().length === 0"), "desktop ignores the phone view");
- assert(await evaluate("document.getElementById('chat').contains(document.getElementById('model-button')) && document.getElementById('switcher').contains(document.getElementById('session-list')) && document.querySelector('.chat-heading').contains(document.getElementById('connection'))"), "desktop puts the status line, sessions and connection back");
+ // The media-query listener moves them back asynchronously after the resize.
+ await browser("wait", "--fn", "document.getElementById('chat').contains(document.getElementById('model-button')) && document.getElementById('switcher').contains(document.getElementById('session-list')) && document.querySelector('.chat-heading').contains(document.getElementById('connection'))");
  await browser("focus", "#splitter"); await browser("press", "Home");
  await browser("click", "#zoom-fit");
  // The compact layout may fit at mid zoom; zoom out to the overview band explicitly.
@@ -315,15 +316,23 @@ try {
  assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this draft");
  ask({ question: "Pick a colour", context: "Single choice", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
- await browser("click", "#prompt-form input[value=Blue]"); await browser("fill", "#prompt-form textarea[placeholder=\"Optional comment\"]", "Matches the boxes"); await browser("click", "#prompt-form button[type=submit]");
+ assert.equal(await evaluate("document.querySelectorAll('#prompt-form textarea').length"), 1, "one text box, like the terminal");
+ await browser("click", "#prompt-form input[value=Blue]"); await browser("fill", "#prompt-form textarea", "Matches the boxes"); await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
- assert.deepEqual(answers.at(-1).selections, ["Blue"]); assert.equal(answers.at(-1).comment, "Matches the boxes");
+ assert.deepEqual(answers.at(-1).selections, ["Blue"]); assert.equal(answers.at(-1).comment, "Matches the boxes", "with an option chosen the text is the comment");
+ ask({ question: "Pick a colour", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ await browser("click", "#prompt-form input[value=Pink]"); await browser("click", "#prompt-form input[value=Pink]");
+ assert.equal(await evaluate("document.querySelector('#prompt-form input[value=Pink]').checked"), false, "tapping the chosen radio clears it");
+ await browser("fill", "#prompt-form textarea", "Teal"); await browser("click", "#prompt-form button[type=submit]");
+ await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
+ assert.equal(answers.at(-1).text, "Teal", "with nothing chosen the text is your own answer");
  ask({ questions: [{ question: "Pick deploy targets", options: [{ title: "Alpha" }, { title: "Beta" }], allowMultiple: true, allowFreeform: false }, { question: "Name the rollout", options: [], allowMultiple: false, allowFreeform: true }], allowComment: false });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  await browser("focus", "#prompt-form input[value=Alpha]"); await browser("press", "Enter");
  assert(await evaluate("document.getElementById(\"prompt\").open"), "checklist Enter toggles instead of submitting");
  await browser("focus", "#prompt-form input[value=Beta]"); await browser("press", "Space");
- await browser("fill", "#prompt-form textarea[placeholder=\"Write a custom response\"]", "Canary"); await browser("click", "#prompt-form button[type=submit]");
+ await browser("fill", "#prompt-form textarea[placeholder=\"Write your answer\"]", "Canary"); await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary");
  const terminalId = ask({ question: "Terminal wins", options: [], allowMultiple: false, allowFreeform: true });

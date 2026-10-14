@@ -69,32 +69,31 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   for (const [index, question] of questions.entries()) {
    const section = node("fieldset", { className: "prompt-question" }); section.append(node("legend", {}, question.question));
    if (question.context) section.append(node("div", { className: "prompt-context" }, question.context));
-   const inputs = [], modeName = "mode_" + index; let customMode;
-   if (question.allowFreeform && question.options.length) {
-    const modes = node("div", { className: "prompt-modes" });
-    for (const [label, value] of [["Choose options", "options"], ["Custom response", "custom"]]) {
-     const input = node("input", { type: "radio", name: modeName, value, checked: value === "options" }); if (value === "custom") customMode = input;
-     const row = node("label"); row.append(input, label); modes.append(row);
-    } section.append(modes);
-   }
+   const inputs = [];
    for (const option of question.options) {
     const input = node("input", { type: question.allowMultiple ? "checkbox" : "radio", name: "question_" + index, value: option.title }); inputs.push(input);
     if (question.allowMultiple) input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); input.checked = !input.checked; } });
-    input.addEventListener("change", () => { const mode = section.querySelector<HTMLInputElement>(`input[name="${modeName}"][value="options"]`); if (mode) mode.checked = true; });
+    // Tapping the chosen radio again clears it, so the text box can become your own answer.
+    else input.addEventListener("click", () => { if (input.dataset.on) input.checked = false; for (const other of inputs) other.dataset.on = other.checked ? "1" : ""; });
     const row = node("label", { className: "prompt-option" }); row.append(input, node("span", {}, option.title));
     if (option.description) row.append(node("small", { className: "prompt-description" }, option.description)); section.append(row);
    }
-   const custom = node("textarea", { rows: 3, maxLength: 16000, placeholder: "Write a custom response" }); custom.setAttribute("aria-label", "Custom response: " + question.question);
-   if (question.allowFreeform) { custom.addEventListener("input", () => { if (customMode) customMode.checked = true; }); section.append(custom); }
-   const comment = node("textarea", { rows: 2, maxLength: 16000, placeholder: "Optional comment" }); comment.setAttribute("aria-label", "Optional comment: " + question.question);
-   if (ask.allowComment) section.append(comment);
+   // One box like the terminal: with an option chosen it is the comment, with none it is your own answer.
+   const freeform = question.allowFreeform || !question.options.length, commented = ask.allowComment && question.options.length > 0;
+   const placeholder = !question.options.length ? "Write your answer" : freeform && commented ? "Comment on your choice, or choose nothing and write your own answer" : freeform ? "Or choose nothing and write your own answer" : "Optional comment";
+   const text = node("textarea", { rows: 3, maxLength: 16000, placeholder }); text.setAttribute("aria-label", placeholder + ": " + question.question);
+   if (freeform || commented) section.append(text);
    const skip = node("input", { type: "checkbox" });
    if (ask.questions) { const label = node("label", { className: "prompt-option" }); label.append(skip, "Skip this question"); section.append(label); }
    readers.push(() => {
     if (skip.checked && ask.questions) return { status: "skipped" };
-    if (question.allowFreeform && (!question.options.length || customMode?.checked)) { if (!custom.value.trim()) throw new Error("Write a response to: " + question.question); return { status: "answered", response: { kind: "freeform", text: custom.value.trim() } }; }
-    const selections = inputs.filter(input => input.checked).map(input => input.value); if (!selections.length) throw new Error("Choose an answer to: " + question.question);
-    return { status: "answered", response: { kind: "selection", selections, ...(comment.value.trim() ? { comment: comment.value.trim() } : {}) } };
+    const selections = inputs.filter(input => input.checked).map(input => input.value), typed = text.value.trim();
+    if (!selections.length) {
+     if (freeform && typed) return { status: "answered", response: { kind: "freeform", text: typed } };
+     throw new Error((freeform ? "Choose an answer or write one for: " : "Choose an answer to: ") + question.question);
+    }
+    if (typed && !commented) throw new Error("Clear the choice to send your own answer, or clear the text: " + question.question);
+    return { status: "answered", response: { kind: "selection", selections, ...(typed ? { comment: typed } : {}) } };
    }); form.append(section);
   }
   const actions = node("div", { className: "dialog-actions" }); actions.append(button("Cancel", () => answer({ cancel: true })), node("button", { type: "submit" }, "Send answer")); form.append(error, actions);
