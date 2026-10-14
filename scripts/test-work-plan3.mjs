@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -30,7 +31,7 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map(), shortcuts = new Map();
 const messages = [], notices = [], events = [], planEvents = [], statuses = [], execCalls = [];
 let execResult = { code: 0, stdout: "", stderr: "", killed: false };
-let entries = [];
+let entries = [], sessionId = randomUUID();
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
 const ctx = {
 	cwd,
@@ -40,7 +41,7 @@ const ctx = {
 	modelRegistry: { getAvailable: async () => ["openai-codex/gpt-6-astra", "anthropic/claude-opus-5-5", "anthropic/claude-opus-4", "zai/glm-5.3"].map((ref) => ({ provider: ref.split("/")[0], id: ref.split("/")[1] })) },
 	getContextUsage: () => ({ tokens }),
 	compact: ({ onComplete, onError }) => { compactions++; if (compactFails) onError(new Error(compactError)); else onComplete({}); },
-	sessionManager: { getBranch: () => entries },
+	sessionManager: { getBranch: () => entries, getSessionId: () => sessionId },
 	ui: {
 		notify: (message, severity) => notices.push({ message, severity }),
 		setStatus: (key, value) => key === "plan3" && statuses.push(value),
@@ -1155,7 +1156,8 @@ try {
 		const open = async args => { await commands.get("plan3").handler(args, webCtx); return new URL(notices.at(-1).message.replace("Plan3 workspace: ", "")); };
 		const url = await open(`diagram ${b}`), token = url.searchParams.get("token");
 		assert.equal(url.searchParams.get("target"), b);
-		assert.equal(entries.at(-1).data.id, a, "opening B does not silently change the current plan");
+		assert.equal(entries.findLast(entry => entry.customType === "plan3-current").data.id, a, "opening B does not silently change the current plan");
+		assert.deepEqual(entries.findLast(entry => entry.customType === "plan3-shared").data, { shared: true }, "credentials are not stored in the conversation");
 		assert.equal((await open(`uml ${b}`)).href, url.href);
 		const settingsFile = path.join(webCwd, ".pi", "settings.json");
 		await mkdir(path.dirname(settingsFile), { recursive: true }); await writeFile(settingsFile, JSON.stringify({ preserved: true, workOrchestrator: { plan3: { codingEffort: "high" } } }));
@@ -1282,8 +1284,16 @@ try {
 		assert(messages.at(-1).message.includes(JSON.stringify(bFile))); assert.match(messages.at(-1).message, /execute\/resume/);
 		expired = true; assert.equal((await post("command", { command: "review" })).status, 409); expired = false;
 		await open(`diagram ${b}`); assert.equal((await post("command", { command: "review" })).status, 200);
-		await hooks.get("session_switch")({ reason: "new" }, webCtx);
+		await hooks.get("session_shutdown")({ reason: "reload" }, webCtx);
+		await hooks.get("session_start")({ reason: "reload" }, webCtx);
+		assert.equal((await fetch(`${url.origin}/api/snapshot`, { headers })).status, 200, "reload restores the same port and capability");
+		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
+		await hooks.get("session_start")({ reason: "resume" }, webCtx);
+		assert.equal((await fetch(`${url.origin}/api/snapshot`, { headers })).status, 200, "resume restores the saved link");
+		await hooks.get("session_shutdown")({ reason: "new" }, webCtx);
 		await assert.rejects(fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }));
+		sessionId = randomUUID();
+		await hooks.get("session_start")({ reason: "new" }, webCtx);
 		const reopened = await open(`diagram ${b}`);
 		assert.notEqual(reopened.searchParams.get("token"), token, "a different conversation gets a fresh capability");
 		assert.equal((await fetch(`${reopened.origin}/api/snapshot?target=${b}`, { headers: { Authorization: `Bearer ${token}` } })).status, 401);

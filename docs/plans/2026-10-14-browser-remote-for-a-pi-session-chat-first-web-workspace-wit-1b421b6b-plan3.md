@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T10:52:17.034Z
+updated: 2026-10-14T10:54:25.222Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -187,7 +187,7 @@ Commands (existing; referenced by steps):
 - [x] **P2-01** Added external credential records and saved-port/token binding with bounded retry and port-conflict fallback; reuse, corrupt-state, containment and Unix file-mode checks covered.
 - [x] **P2-02** Session snapshot/events work without a diagram target; Stop and answers are session-wide, chat adds diagram context only for mentions/notes, and the browser follows the resolved target.
 - [x] **P2-03** Typed slash commands and plan-menu buttons dispatch through unawaited sendUserMessage with expansion enabled; documented Pi built-ins return terminal-only errors. Legacy command endpoint remains until the UI/API migration is finished.
-- [ ] **P2-04** Lifecycle on shutdown and start reasons (D21): re-share from the entry; keep the mapping on reload, remove it otherwise; drop dead session_switch.
+- [x] **P2-04** Sharing persists a boolean-only entry; reload and resume restore the saved local link using a fresh session context. Shutdown releases the server; new sessions get new credentials and the nonexistent session_switch dependency is removed.
 - [ ] **P2-05** Add `/wo share` toggle and menu row (D15) and the red `[SHARED]` footer status; /plan3 diagram and architecture share locally (D14).
 - [ ] **P2-06** Page reconnect: "Pi is reloading…" banner, retry with backoff, reload the page when the build fingerprint changed.
 - [ ] **P2-07** Show "Pi is waiting for a terminal dialog: <title>" from ui_prompt_start until ui_prompt_end.

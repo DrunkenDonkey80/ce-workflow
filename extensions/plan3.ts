@@ -12,6 +12,7 @@ import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, design
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createPlan3Web, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
+import { loadShareRecord, saveSharePort, type ShareRecord } from "./plan3-remote.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -706,6 +707,8 @@ export default function plan3(pi) {
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
 	}
 	let webCtx = null, webStopped = false;
+	let shareRecord: ShareRecord | undefined;
+	const sharedEntry = (ctx) => (ctx.sessionManager?.getBranch?.() ?? []).findLast(entry => entry.type === "custom" && entry.customType === "plan3-shared")?.data?.shared === true;
 	let webServer: ReturnType<typeof createPlan3Web> | undefined;
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => {
@@ -776,14 +779,21 @@ export default function plan3(pi) {
 		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target, target.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined);
 		return forwardDiagramChat(pi, webCtx, diagram, data.text, data.comments, publishWeb);
 	}
-	function getWeb(ctx) {
+	async function getWeb(ctx) {
 		if (webStopped) throw new Error("Workspace session has ended.");
+		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
-		webServer ??= createPlan3Web({ post: postWeb, snapshot: async requestedTarget => {
+		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
 			return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined), chat: chat.snapshot(), activity: activity.snapshot(webCtx), dialogs: dialogs.snapshot(), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) };
-		} }).then(server => { webInstance = server; return server; }).catch(error => { webServer = undefined; throw error; });
+		} }).then(async server => {
+			try { await saveSharePort(shareRecord, server.port); }
+			catch (error) { await server.close(); throw error; }
+			webInstance = server;
+			if (server.portChanged) ctx.ui.notify(`Shared session port was taken; new link: ${server.url()}`, "warning");
+			return server;
+		}).catch(error => { webServer = undefined; throw error; });
 		return webServer;
 	}
 	async function createProductDiagram(ctx, planId?: string) {
@@ -816,6 +826,7 @@ export default function plan3(pi) {
 	async function openDiagram(ctx, target: WebTarget) {
 		webTarget(target.kind === "product" ? "product" : target.id);
 		const server = await getWeb(ctx), url = server.url(target);
+		if (!sharedEntry(ctx)) pi.appendEntry("plan3-shared", { shared: true });
 		if (target.kind === "product") await createProductDiagram(ctx);
 		else await offerProductDiagram(ctx, target.id);
 		const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
@@ -1956,7 +1967,12 @@ export default function plan3(pi) {
 			report(ctx, error);
 		}
 	});
-	pi.on?.("session_start", async (_event, ctx) => {
+	pi.on?.("session_start", async (event, ctx) => {
+		webStopped = false; shareRecord = undefined;
+		dialogs.close(); dialogs = createDialogBridge(pi, publishWeb);
+		if (sharedEntry(ctx) && event.reason !== "fork" && event.reason !== "new") {
+			try { await getWeb(ctx); } catch (error) { report(ctx, error); }
+		}
 		const plan = currentPlan(ctx, await listPlans(ctx.cwd));
 		if (plan && pointer(ctx).planning && pointer(ctx).id === plan.id && localPlanDesign(ctx.cwd, plan) && localPlanDesign(ctx.cwd, plan)?.phase !== "abandoned") activateDesign();
 		await night.restore(ctx);
@@ -1967,13 +1983,9 @@ export default function plan3(pi) {
 		const pending = webServer; webServer = undefined;
 		try { await pending?.then(server => server.close()); } finally { webInstance = undefined; }
 	}
-	pi.on?.("session_switch", async () => {
-		forcingArchitecture = undefined; // Never archive from a reconciliation owned by the previous conversation.
-		dialogs.close(); dialogs = createDialogBridge(pi, publishWeb);
-		chat.reset(); activity.reset();
-		await closeWeb(); // An old browser must never control or read the next conversation.
-	});
 	pi.on?.("session_shutdown", async () => {
+		forcingArchitecture = undefined; // Never archive from a reconciliation owned by the previous conversation.
+		chat.reset(); activity.reset();
 		night.shutdown(); dialogs.close(); disposeDiagram(); webStopped = true;
 		await Promise.all([closeWeb(), closePersistentOpenDesignClients()]);
 	});
