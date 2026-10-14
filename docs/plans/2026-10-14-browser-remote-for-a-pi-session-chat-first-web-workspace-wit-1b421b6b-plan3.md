@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:41:44.685Z
+updated: 2026-10-14T12:46:04.710Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -219,7 +219,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 5: Docs [code]
 
-- [ ] **P5-01** README: sharing, reload and resume behaviour, Tailscale setup, pairing, revoke, security model and limits; CHANGELOG entry.
+- [x] **P5-01** README: status-line chat bullet, updated Security bullet, Files tab, and a new 'Sharing and phone access' section (/wo share, reload and resume, reconnect, Tailscale setup, pairing, revoke, switcher, security model, limits). CHANGELOG Unreleased entry.
 
 ### Phase 6: Live acceptance [think]
 
