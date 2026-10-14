@@ -10,13 +10,6 @@
 <body>
  <header class="topbar">
   <div class="workspace-title"><h1 id="title">Architecture workspace</h1><span id="target-kind" class="badge">Plan</span></div>
-  <nav id="commands" aria-label="Plan actions">
-   <button type="button" data-command="resolve" disabled>Resolve questions</button>
-   <button type="button" data-command="ideas" disabled>Ideas</button>
-   <button type="button" data-command="review" disabled>Review</button>
-   <button type="button" data-command="finish" disabled>Finish planning</button>
-   <button type="button" data-command="resume" disabled>Start work</button>
-  </nav>
  </header>
  <p id="notice" class="notice" role="status" hidden></p>
  <p id="waiting" class="notice" role="status" hidden></p>
@@ -54,6 +47,24 @@
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
   <aside id="chat" class="chat" aria-label="Live Pi session">
    <header class="chat-heading"><h2>Live session</h2><span id="connection" role="status">Connecting…</span></header>
+   <section class="status-line" aria-label="Session status">
+    <div class="status-row">
+     <button id="model-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="model-menu" title="Change model and effort">Model</button>
+     <button id="status-more" type="button" aria-expanded="false" aria-controls="status-extra" aria-label="More status">⋯</button>
+    </div>
+    <button id="plan-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="plan-menu">New plan</button>
+    <p id="status-extra" class="status-extra" hidden><span class="shared">[SHARED]</span> <span id="context-use"></span></p>
+    <div id="model-menu" class="status-menu" role="group" aria-label="Model and effort" hidden></div>
+    <div id="plan-menu" class="status-menu" role="group" aria-label="Plan actions" hidden>
+     <button type="button" data-command="resolve" data-plan>Resolve questions</button>
+     <button type="button" data-command="ideas" data-plan>Ideas</button>
+     <button type="button" data-command="review" data-plan>Review</button>
+     <button type="button" data-command="finish" data-plan>Finish planning</button>
+     <button type="button" data-command="resume" data-plan>Start or continue work</button>
+     <button type="button" data-command="switch">Switch plan</button>
+     <button type="button" data-command="new">New plan</button>
+    </div>
+   </section>
    <section id="activity" class="activity" aria-label="Agent activity"></section>
    <button id="earlier" class="earlier" type="button" hidden>Show earlier</button>
    <ol id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></ol>

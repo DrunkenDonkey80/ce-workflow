@@ -107,6 +107,20 @@ h2 { font-size: 15px; font-weight: 600; }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 #connection { font-size: 13px; color: #495057; }
+.status-line { position: relative; display: grid; gap: 4px; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.status-row { display: flex; gap: 4px; }
+.status-line > button, .status-row > #model-button { text-align: left; border-color: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.status-row > #model-button { flex: 1; }
+.status-line > button:hover, .status-row > button:hover { border-color: var(--line); }
+.status-extra { display: flex; gap: 8px; align-items: center; padding: 0 10px; color: #495057; }
+/* D10: [SHARED] reads as exposure, like the camera warning. */
+.shared { color: #fff; background: #c92a2a; border-radius: 6px; padding: 0 6px; font-weight: 700; }
+.status-menu { position: absolute; z-index: 5; left: 12px; right: 12px; top: 100%; display: grid; gap: 4px; max-height: 60vh; overflow: auto; padding: 8px; background: white; border: 1px solid var(--ink); border-radius: 6px; }
+.status-menu h3 { margin: 6px 0 2px; font-size: 12px; color: #495057; font-weight: 600; }
+.status-menu button { text-align: left; border-color: transparent; }
+.status-menu button[aria-pressed=true] { border-color: var(--ink); }
+.effort-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.model-list { display: grid; gap: 2px; }
 .activity:empty { display: none; }
 .activity > * { margin: 8px 16px; }
 .activity details { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }

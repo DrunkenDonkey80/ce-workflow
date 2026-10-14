@@ -1218,7 +1218,7 @@ try {
 			const effort = await post("effort", { level: "low" });
 			assert.equal(effort.status, 200); assert.equal(thinking, "low"); assert.equal(effort.body.effort, "low");
 			assert.equal((await post("effort", { level: "turbo" })).status, 400);
-			assert.deepEqual((await snapshot()).status, { model: { provider: "anthropic", id: "claude-opus-4", name: "claude-opus-4" }, effort: "low" });
+			assert.deepEqual((await snapshot()).status, { model: { provider: "anthropic", id: "claude-opus-4", name: "claude-opus-4" }, effort: "low", context: null });
 			// D17: a command that never returns must not hold the request or the server.
 			const savedSend = api.sendUserMessage; api.sendUserMessage = () => new Promise(() => {});
 			try {

@@ -32,6 +32,7 @@ async function withPageCdp(origin, run) {
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
 const sample = JSON.parse(await readFile(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
+let status = { model: { provider: "a", id: "fast", name: "Fast" }, effort: "high", context: 41.6 };
 let projectFiles = [{ path: "docs/readme.md" }, { path: "src/app.ts", change: "M" }, { path: "top.txt" }];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
 const listeners = new Map(), answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
@@ -39,7 +40,8 @@ const events = { on(name, run) { const rows = listeners.get(name) ?? new Set(); 
 events.on("ask:answer", value => answers.push(value));
 const dialogs = createDialogBridge({ events }, (event, value) => server.publish(event, value));
 const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { askId, ...value }); return askId; };
-const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft" }, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
+const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft", done: 2, total: 5 }, status, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
+ if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "a", id: "fast", name: "Fast" }], others: [{ provider: "b", id: "deep", name: "Deep" }, { provider: "b", id: "other", name: "Other" }] };
  if (endpoint === "/api/files") return { files: projectFiles, truncated: false, git: true };
  if (endpoint === "/api/file") return { path: params.get("path"), content: "<img src=x onerror=alert(1)>\nplain" };
  if (endpoint === "/api/diff") return { path: params.get("path"), diff: "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-old line\n+new line" };
@@ -54,6 +56,8 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
   messages.push(body); const row = { id: "user_" + messages.length, role: "user", text: body.text, at: new Date().toISOString(), streaming: false };
   chatRows.set(row.id, row); server.publish("message", row); return { accepted: true, queued: activity.working };
  }
+ if (endpoint === "/api/model") { status = { ...status, model: { provider: body.provider, id: body.id, name: body.id } }; server.publish("status", status); return status; }
+ if (endpoint === "/api/effort") { status = { ...status, effort: body.level }; return status; }
  if (endpoint === "/api/stop") { activity = { working: false }; server.publish("activity", activity); return { accepted: true }; }
  assert(["/api/move", "/api/comment"].includes(endpoint));
  if (body.expectedRevision !== diagram.revision) throw new WebError(409, "Stale diagram revision");
@@ -306,8 +310,25 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open"); await browser("focus", "#prompt-form input[value=two]"); await browser("press", "Enter");
  assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
- for (const command of ["resolve", "ideas", "review", "finish", "resume"]) { await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
- assert.deepEqual(commands, ["/plan3 resolve 12345678", "/plan3 ideas 12345678", "/plan3 review 12345678", "/plan3 finish 12345678", "/resume3 12345678"]);
+ // R13/D19 status line: model · effort, plan · progress, plan menu, model and effort picker.
+ assert.deepEqual(await evaluate("[document.getElementById('model-button').textContent, document.getElementById('plan-button').textContent]"), ["Fast · high", sample.title + " · 2/5"]);
+ for (const command of ["resolve", "ideas", "review", "finish", "resume", "switch"]) { await browser("click", "#plan-button"); await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
+ assert.deepEqual(commands, ["/plan3 resolve 12345678", "/plan3 ideas 12345678", "/plan3 review 12345678", "/plan3 finish 12345678", "/resume3 12345678", "/plan3"]);
+ await browser("click", "#plan-button"); assert.equal(await evaluate("document.getElementById('plan-button').getAttribute('aria-expanded')"), "true");
+ await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('plan-menu').hidden, document.activeElement.id]"), [true, "plan-button"]);
+ await browser("click", "#plan-button"); await browser("click", "[data-command=new]");
+ assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.activeElement.id]"), ["/plan3 ", "message-input"]); await browser("fill", "#message-input", "");
+ await browser("click", "#model-button"); await browser("wait", ".model-option");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu h3')].map(h => h.textContent)"), ["Effort", "Scoped", "All models"]);
+ assert.equal(await evaluate("document.activeElement.getAttribute('aria-label')"), "Filter models");
+ await browser("keyboard", "type", "deep"); await browser("press", "Enter");
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep · high'");
+ assert.equal(await evaluate("document.getElementById('model-menu').hidden"), true);
+ await browser("click", "#model-button"); await browser("wait", ".effort-row button"); await browser("click", ".effort-row button");
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep · low'");
+ await browser("click", "#status-more"); assert.equal(await evaluate("document.getElementById('status-extra').textContent"), "[SHARED] Context 42%");
+ status = { ...status, model: { provider: "t", id: "term", name: "Terminal pick" } }; server.publish("status", status);
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick · low'");
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);

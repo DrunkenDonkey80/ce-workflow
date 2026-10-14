@@ -758,6 +758,8 @@ export default function plan3(pi) {
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => {
 		if (["activity", "dialog", "dialog_closed"].includes(event)) publishSession();
+		// Context use changes per run; refresh the status line when a run ends.
+		if (event === "activity" && data && !data.working && webCtx) try { webInstance?.publish("status", webStatus(webCtx)); } catch { /* reported below */ }
 		// D11: no file watcher; the Files tab refreshes after tools that can change files.
 		if (event === "tool" && ["write", "edit", "bash"].includes(data?.name) && data.state !== "running") try { webInstance?.publish("files", {}); } catch { /* reported below */ }
 		try { webInstance?.publish(event, data); }
@@ -788,7 +790,8 @@ export default function plan3(pi) {
 		return { kind: "plan", plan };
 	}
 	const modelRef = model => ({ provider: model.provider, id: model.id, name: model.name ?? model.id });
-	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null });
+	const contextPercent = ctx => { try { return ctx?.getContextUsage?.()?.percent ?? null; } catch { return null; } };
+	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx) });
 	async function webModels(ctx) {
 		const scoped = (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => modelRef(entry.model)), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
 		const others = ((await ctx.modelRegistry?.getAvailable?.()) ?? []).map(modelRef).filter(model => !keys.has(model.provider + "/" + model.id));

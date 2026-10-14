@@ -10,7 +10,7 @@ import { createPromptView } from "./prompts.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { applyText } from "./stream.js?token=__TOKEN__";
 function $(id: "message-input" | "comment-text"): HTMLTextAreaElement;
-function $(id: "send" | "stop" | "comment-save"): HTMLButtonElement;
+function $(id: "send" | "stop" | "comment-save" | "model-button"): HTMLButtonElement;
 function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
 function $(id: "composer" | "comment-form" | "prompt-form"): HTMLFormElement;
 function $(id: "diagram"): SVGSVGElement;
@@ -21,7 +21,8 @@ function $(id: string): HTMLElement | SVGSVGElement { return document.getElement
 const token = "__TOKEN__";
 const auth: RequestInit = token ? { credentials: "omit", headers: { Authorization: "Bearer " + token } } : { credentials: "same-origin", headers: {} };
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
-const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false, more: false };
+type Model = { provider: string; id: string; name: string };
+const state: { connected: boolean; diagram: Diagram | null; plan: { title: string; done?: number; total?: number } | null; status: { model: Model | null; effort: string | null; context?: number | null } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
@@ -32,10 +33,17 @@ function renderShell() {
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
  $("target-kind").textContent = target === "product" ? "Product" : "Plan";
- $("commands").hidden = target === "product";
+ // D19 status line: model and effort, then the plan with its menu (or New plan).
+ const status = state.status, plan = state.plan;
+ $("model-button").textContent = status?.model ? status.model.name + (status.effort ? " · " + status.effort : "") : "Model";
+ $("model-button").disabled = !state.connected;
+ $("context-use").textContent = typeof status?.context === "number" ? "Context " + Math.round(status.context) + "%" : "";
+ $("plan-button").textContent = plan ? plan.title + (plan.total ? ` · ${plan.done ?? 0}/${plan.total}` : "") : "New plan";
+ $("plan-button").title = plan ? "Plan actions" : "Start a new plan";
+ for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working" : "Idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
- for (const button of $("commands").querySelectorAll("button")) button.disabled = !state.connected || !!state.activity.working || commandSending || promptView.busy;
+ for (const button of $("plan-menu").querySelectorAll<HTMLButtonElement>("button")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
@@ -338,14 +346,58 @@ $("composer").addEventListener("submit", async event => {
  catch (error) { showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });
-for (const button of $("commands").querySelectorAll("button")) button.addEventListener("click", async () => {
+// Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
+function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
+ for (const [other, panel] of [["model-button", "model-menu"], ["plan-button", "plan-menu"]]) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
+ $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
+ if (open) ($(menu).querySelector<HTMLElement>("input, button:not([hidden]):not(:disabled)"))?.focus();
+}
+function closeMenus(focus = false) {
+ for (const [button, menu] of [["model-button", "model-menu"], ["plan-button", "plan-menu"]]) if (!$(menu).hidden) { toggleMenu(button, menu, false); if (focus) $(button).focus(); }
+}
+document.addEventListener("keydown", event => { if (event.key === "Escape" && (!$("model-menu").hidden || !$("plan-menu").hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
+document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line")) closeMenus(); });
+function newPlan() {
+ const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+ showNotice("Describe the plan after /plan3 and send.");
+}
+$("plan-button").addEventListener("click", () => state.plan ? toggleMenu("plan-button", "plan-menu") : newPlan());
+for (const button of $("plan-menu").querySelectorAll<HTMLElement>("button")) button.addEventListener("click", async () => {
+ const command = button.dataset.command; closeMenus();
+ if (command === "new") return newPlan();
  if (commandSending) return; commandSending = true; renderShell();
  try {
-  const command = button.dataset.command === "resume" ? "/resume3" : "/plan3 " + button.dataset.command;
-  await post("message", { text: command + " " + target }); showNotice("");
+  await post("message", { text: command === "switch" ? "/plan3" : (command === "resume" ? "/resume3" : "/plan3 " + command) + " " + target }); showNotice("");
  }
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }
+});
+$("status-more").addEventListener("click", () => { const open = $("status-extra").hidden; $("status-extra").hidden = !open; $("status-more").setAttribute("aria-expanded", String(open)); });
+// Scoped models first; the full list filters as you type.
+async function changeStatus(endpoint: "model" | "effort", body) {
+ closeMenus(); $("model-button").focus();
+ try { state.status = { ...state.status, ...await post(endpoint, body) }; renderShell(); showNotice(""); } catch (error) { showNotice(error.message); }
+}
+$("model-button").addEventListener("click", async () => {
+ if (!$("model-menu").hidden) return toggleMenu("model-button", "model-menu", false);
+ const menu = $("model-menu"); menu.replaceChildren("Loading models…"); toggleMenu("model-button", "model-menu", true);
+ try {
+  const value = await get("models"), current = value.model, filter = document.createElement("input");
+  filter.type = "search"; filter.placeholder = "Filter models"; filter.setAttribute("aria-label", "Filter models");
+  const option = (model: Model) => {
+   const button = document.createElement("button"); button.type = "button"; button.className = "model-option"; button.textContent = model.name; button.title = model.provider + "/" + model.id;
+   button.setAttribute("aria-pressed", String(current?.provider === model.provider && current?.id === model.id));
+   button.addEventListener("click", () => changeStatus("model", { provider: model.provider, id: model.id })); return button;
+  };
+  const section = (title: string, models: Model[]) => models.length ? [Object.assign(document.createElement("h3"), { textContent: title }), ...models.map(option)] : [];
+  const efforts = document.createElement("div"); efforts.className = "effort-row"; efforts.setAttribute("aria-label", "Effort");
+  for (const level of value.efforts) { const button = Object.assign(document.createElement("button"), { type: "button", textContent: level }); button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); efforts.append(button); }
+  const list = document.createElement("div"); list.className = "model-list";
+  list.append(...section(value.scoped.length ? "Scoped" : "Models", value.scoped.length ? value.scoped : value.others), ...(value.scoped.length ? section("All models", value.others) : []));
+  filter.addEventListener("input", () => { const text = filter.value.trim().toLowerCase(); for (const button of list.querySelectorAll<HTMLElement>(".model-option")) button.hidden = !!text && !(button.textContent + " " + button.title).toLowerCase().includes(text); });
+  filter.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); list.querySelector<HTMLElement>(".model-option:not([hidden])")?.click(); } });
+  menu.replaceChildren(Object.assign(document.createElement("h3"), { textContent: "Effort" }), efforts, filter, list); filter.focus();
+ } catch (error) { menu.replaceChildren("Models failed to load: " + error.message); }
 });
 $("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested."); } catch (error) { showNotice(error.message); } });
 
@@ -359,11 +411,12 @@ function applyUpdate(event: MessageEvent, update) {
 }
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
+listen("status", value => { state.status = value; renderShell(); });
 listen("snapshot", value => {
  if (build && value.build && value.build !== build) { location.reload(); return; }
  build ||= value.build ?? ""; retryDelay = 1000;
  if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;
- state.connected = true; state.plan = value.plan; state.activity = value.activity ?? {}; state.more = !!value.more;
+ state.connected = true; state.plan = value.plan; state.status = value.status ?? null; state.activity = value.activity ?? {}; state.more = !!value.more;
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
  // Dialogs over 16 KB arrive brief; fetch their full body.
  promptView.sync((value.dialogs ?? []).filter(ask => !ask.brief));

@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:26:02.911Z
+updated: 2026-10-14T12:32:41.434Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -213,7 +213,7 @@ Commands (existing; referenced by steps):
 - [x] **P4-03** Files tab UI in extensions/plan3-web/files.ts: a native details/summary folder tree (keyboard toggling, folders with changes start open, open/closed state kept across refreshes), file buttons with M/??/D/R marks coloured per D10, and a viewer beside the tree on desktop and below it under 900 px. Changed files load /api/diff and the others /api/file; diff lines are coloured (add #b2f2bb, del #ffc9c9). Everything renders through textContent. The files SSE event refreshes a visible tab or marks a hidden one stale; the selected file reloads on refresh.
 - [x] **P4-04** Phone layout under 900 px: a Chat/Files/Diagram tablist (arrow keys wrap, choice kept in localStorage) shows one full-height view at a time, and Files and Diagram reuse the desktop panels with the left tabs hidden. The page height follows visualViewport (--app-height) and the viewport meta sets interactive-widget=resizes-content, so the composer stays above the on-screen keyboard. An Image button (file input, accepts PNG/JPEG/GIF/WebP) uploads through the same /api/paste path as clipboard paste and resets so the same photo can be attached again. Desktop ignores the phone view.
 - [x] **P4-08** D19 endpoints: GET /api/models returns {model, effort, scoped, others, efforts}, scoped models first and the rest from modelRegistry.getAvailable. POST /api/model {provider,id} accepts only available models and gives 404/409/400. POST /api/effort {level} accepts EFFORTS levels and returns the level after clamping. Both publish a status SSE event, as do terminal model_select and thinking_level_select. The snapshot carries status {model, effort}. A hanging slash command leaves the HTTP request returning and the server serving (D17).
-- [ ] **P4-05** Chat status line per D19: model and effort picker (scoped first), plan line with plan menu or New plan; expandable view.
+- [x] **P4-05** D19 status line in the chat. Line 1 is a model · effort button that opens a picker: effort buttons, a filter input (Enter picks the first match), scoped models first, then all models. Line 2 shows plan · done/total and opens the plan menu (resolve, ideas, review, finish, resume3, switch via a bare /plan3, new plan); with no plan, New plan prefills '/plan3 ' in the composer. ⋯ expands a red [SHARED] badge and context %. Menus close on Escape (focus returns to the button) or an outside click. Status comes from the snapshot and the status SSE event, which now also refreshes when a run ends. The top-bar #commands buttons are removed.
 - [ ] **P4-07** Session switcher UI (D18): slide-out list, closed stripe of colour-coded letters, per-device seen state; mobile and desktop.
 - [ ] **P4-06** Extend C-BROWSER: collapse states, Files diff, reload reconnect, status line, switcher A to B to A seen state, 390 px mobile tabs; run C-VERIFY.
   - Remote-mode browser test through a local test proxy that sets the tailnet Host and identity headers: pair, load assets, chat, answer a dialog and upload an image, with no URL token.
