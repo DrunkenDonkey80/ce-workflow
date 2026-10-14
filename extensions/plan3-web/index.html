@@ -8,6 +8,10 @@
  <script type="module" src="/a/__BUILD__/app.js?token=__TOKEN__"></script>
 </head>
 <body>
+ <nav id="switcher" class="switcher" aria-label="Shared sessions" data-open="false" hidden>
+  <button id="switcher-toggle" type="button" aria-expanded="false" aria-controls="session-list" aria-label="Show shared sessions">☰</button>
+  <div id="session-list" class="session-list"></div>
+ </nav>
  <header class="topbar">
   <div class="workspace-title"><h1 id="title">Architecture workspace</h1><span id="target-kind" class="badge">Plan</span></div>
  </header>

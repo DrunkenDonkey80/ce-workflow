@@ -32,6 +32,10 @@ async function withPageCdp(origin, run) {
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
 const sample = JSON.parse(await readFile(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
+// D18 switcher fixtures: this page (idle, unseen until the page marks it), one working and one waiting session.
+const seenCalls = []; let ownRevisionSeen = 0, otherSessions = false;
+const sessionList = () => [{ id: "a", name: "alpha", cwd: "C:/work/alpha", port: server.port, state: "idle", revision: 3, unseen: ownRevisionSeen < 3 },
+ ...!otherSessions ? [] : [{ id: "b", name: "beta", cwd: "C:/work/beta", port: 1, state: "working", revision: 1, unseen: false }, { id: "c", name: "gamma", cwd: "/srv/gamma", port: 2, state: "waiting", revision: 0, unseen: false }]];
 let status = { model: { provider: "a", id: "fast", name: "Fast" }, effort: "high", context: 41.6 };
 let projectFiles = [{ path: "docs/readme.md" }, { path: "src/app.ts", change: "M" }, { path: "top.txt" }];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
@@ -64,7 +68,7 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
  const operation = endpoint === "/api/move" ? { op: "move", entity: body.entity, id: body.id, x: body.x, y: body.y } : { op: "add", entity: "note", value: { text: body.text, author: "user", created: new Date().toISOString(), ...(body.element ? { target: body.element } : { x: body.x, y: body.y }) } };
  (endpoint === "/api/move" ? edits : comments).push(body); diagram = applyDiagramOperations(diagram, [operation]).diagram; diagram.revision++;
  server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram }); return { diagram };
-} });
+}, sessions: { list: () => sessionList(), seen: (device, revision) => { seenCalls.push({ device, revision }); ownRevisionSeen = revision; return true; } } });
 try {
  await browser("open", server.url({ kind: "plan", id: "12345678" }));
  await browser("set", "viewport", "1280", "800");
@@ -327,6 +331,16 @@ try {
  await browser("click", "#model-button"); await browser("wait", ".effort-row button"); await browser("click", ".effort-row button");
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep · low'");
  await browser("click", "#status-more"); assert.equal(await evaluate("document.getElementById('status-extra').textContent"), "[SHARED] Context 42%");
+ // D18: stripe of colour-coded letters; this page marks its own idle run seen; the list slides out and Escape closes it.
+ assert.equal(await evaluate("document.getElementById('switcher').hidden"), true, "a lone session shows no switcher");
+ otherSessions = true; await evaluate("document.dispatchEvent(new Event('visibilitychange'))");
+ await browser("wait", "--fn", "!document.getElementById('switcher').hidden && document.querySelector('.session[data-tone=seen]')");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.session')].map(s => s.querySelector('.session-letter').textContent + ':' + s.dataset.tone + ':' + s.tagName)"), ["A:seen:SPAN", "B:working:SPAN", "G:waiting:SPAN"], "token pages never link other ports");
+ assert.deepEqual(seenCalls, [{ device: "local", revision: 3 }]);
+ assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').getAttribute('aria-label')"), "alpha in alpha, idle, this session");
+ assert.equal(await evaluate("document.querySelector('.session-label').getBoundingClientRect().width"), 1, "closed stripe shows letters only");
+ await browser("click", "#switcher-toggle"); assert(await evaluate("document.querySelector('.session-label').getBoundingClientRect().width > 100"));
+ await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('switcher').dataset.open, document.activeElement.id]"), ["false", "switcher-toggle"]);
  status = { ...status, model: { provider: "t", id: "term", name: "Terminal pick" } }; server.publish("status", status);
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick · low'");
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);

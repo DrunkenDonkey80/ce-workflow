@@ -372,6 +372,44 @@ for (const button of $("plan-menu").querySelectorAll<HTMLElement>("button")) but
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }
 });
+// D18 switcher: other shared sessions on this PC, colour-coded; links work remotely, where one paired cookie covers every port.
+type Session = { id: string; name: string; cwd: string; port: number; state: "working" | "waiting" | "idle"; revision: number; unseen: boolean };
+let sessionsTimer = 0;
+async function loadSessions() {
+ clearTimeout(sessionsTimer);
+ if (document.visibilityState !== "visible") return;
+ try {
+  const { sessions } = await get("sessions") as { sessions: Session[] }, own = sessions.find(session => session.port === Number(location.port || (location.protocol === "https:" ? 443 : 80)));
+  // Seen is per device on the server (D21): looking at an idle session marks its last run seen.
+  if (own?.unseen && own.state === "idle") {
+   const response = await fetch("/api/seen", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify({ revision: own.revision }) });
+   if (response.ok) own.unseen = false;
+  }
+  renderSessions(sessions, own);
+ } catch { $("switcher").hidden = true; document.body.classList.remove("has-switcher"); }
+ sessionsTimer = window.setTimeout(loadSessions, 5000);
+}
+function renderSessions(sessions: Session[], own: Session | undefined) {
+ const show = sessions.length > 1; $("switcher").hidden = !show; document.body.classList.toggle("has-switcher", show);
+ $("session-list").replaceChildren(...sessions.map(session => {
+  const tone = session.state === "idle" ? (session.unseen ? "unseen" : "seen") : session.state, words = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle" }[tone];
+  const folder = session.cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? session.cwd;
+  const item = document.createElement(token || session === own ? "span" : "a");
+  if (item instanceof HTMLAnchorElement) item.href = `${location.protocol}//${location.hostname}:${session.port}/`;
+  else if (session !== own) item.title = "Open it from its own terminal link; switching needs a paired remote device.";
+  item.className = "session"; item.dataset.tone = tone; item.dataset.port = String(session.port);
+  if (session === own) item.setAttribute("aria-current", "page");
+  item.append(Object.assign(document.createElement("span"), { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }),
+   Object.assign(document.createElement("span"), { className: "session-label", textContent: `${session.name} · ${folder} · ${words}` }));
+  item.setAttribute("aria-label", `${session.name} in ${folder}, ${words}${session === own ? ", this session" : ""}`);
+  return item;
+ }));
+}
+function toggleSwitcher(open: boolean) { $("switcher").dataset.open = String(open); $("switcher-toggle").setAttribute("aria-expanded", String(open)); $("switcher-toggle").setAttribute("aria-label", open ? "Hide shared sessions" : "Show shared sessions"); }
+$("switcher-toggle").addEventListener("click", () => toggleSwitcher($("switcher").dataset.open !== "true"));
+$("switcher").addEventListener("keydown", event => { if (event.key === "Escape" && $("switcher").dataset.open === "true") { event.stopPropagation(); toggleSwitcher(false); $("switcher-toggle").focus(); } });
+document.addEventListener("visibilitychange", () => void loadSessions());
+void loadSessions();
 $("status-more").addEventListener("click", () => { const open = $("status-extra").hidden; $("status-extra").hidden = !open; $("status-more").setAttribute("aria-expanded", String(open)); });
 // Scoped models first; the full list filters as you type.
 async function changeStatus(endpoint: "model" | "effort", body) {
