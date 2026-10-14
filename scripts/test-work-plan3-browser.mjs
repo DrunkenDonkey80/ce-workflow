@@ -165,6 +165,8 @@ try {
  for (let i = 0; i < 6 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "far"; i++) await browser("click", "#zoom-out");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "far");
  assert.equal(await evaluate("document.querySelectorAll(\"[data-node]\").length"), sample.nodes.filter(node => !node.parent).length);
+ // Overview boxes carry their summary, not just a title.
+ assert.ok(await evaluate("document.querySelectorAll(\".node-summary-far\").length") > 0, "overview boxes show a short description");
  for (let i = 0; i < 3; i++) await browser("click", "#zoom-in");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "mid");
  assert.equal(await evaluate("document.querySelectorAll(\"[data-node]\").length"), sample.nodes.length);

@@ -63,6 +63,8 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  const details = node => [...lines(node.summary, 212, 4), ...lines(node.tech, 212, 2), ...lines(node.details, 212, 8)];
  // Mid zoom: up to three lines of summary (or tech) in 12px body text under the header.
  const summary = node => lines(node.summary || node.tech, 176, 3, "12px system-ui");
+ // Overview: two lines of summary in 20px text so the top-level boxes say what they are.
+ const farSummary = node => lines(node.summary || node.tech, FAR.w - 24, 2, "20px system-ui");
  const head = (node, size = 1, w = 240) => (14 + Math.min(2, lines(node.label, (w - 24) / size, 2).length) * 20) * size;
  let built = { data: null, band: "" }, routes = new Map(), bundles = new Map();
  function build(data: Diagram) {
@@ -81,7 +83,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    if (first) { first.both ||= first.from !== edge.from; return false; }
    seen.set(key, edge); return true;
   });
-  boxes = layout({ nodes: far ? nodes.map(node => ({ ...node, kind: node.kind === "group" ? "service" : node.kind })) : nodes, edges }, node => near ? { w: 240, h: head(node) + 30 + details(node).length * 18 + noteSpace(data, node.id) } : far ? FAR : { w: 200, h: head(node, 1, 200) + 14 + Math.max(1, summary(node).length) * 15 }, node => 32 + (near ? details(node).length * 18 + noteSpace(data, node.id) : 0));
+  boxes = layout({ nodes: far ? nodes.map(node => ({ ...node, kind: node.kind === "group" ? "service" : node.kind })) : nodes, edges }, node => near ? { w: 240, h: head(node) + 30 + details(node).length * 18 + noteSpace(data, node.id) } : far ? { w: FAR.w, h: Math.max(FAR.h, head(node, 2, FAR.w) + 22 + farSummary(node).length * 24) } : { w: 200, h: head(node, 1, 200) + 14 + Math.max(1, summary(node).length) * 15 }, node => 32 + (near ? details(node).length * 18 + noteSpace(data, node.id) : 0));
   // Calm default: an edge that leaves a top-level group is drawn once per group pair (with a count) and
   // only appears individually while one of its ends is in focus.
   bundles = new Map();
@@ -138,8 +140,9 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    if (!frame) row.append(rc.rectangle(box.x, box.y, box.w, head(node, size, box.w), { seed: seed(node.id) + 1, roughness: .4, stroke: ink, strokeWidth: 1, fill: ink, fillStyle: "solid" }));
    label.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + 23 * size + index * 20 * size, class: "node-label" + (big ? " node-label-far" : "") + (frame ? " group-label tone-" + PALETTE.indexOf(color(node.id)) : "") }, text)));
    if (STATUS[node.status]) row.append(element("text", { x: box.x + box.w - 8, y: box.y + 14, "text-anchor": "end", class: "status-tag" + (frame ? "" : " on-head") }, STATUS[node.status]));
-   const body = near ? details(node) : !frame && !closed ? summary(node) : [];
-   body.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + head(node, size, box.w) + (near ? 22 : 18) + index * (near ? 18 : 15), class: near ? "node-detail" : "node-summary" }, text)));
+   const body = near ? details(node) : big ? farSummary(node) : !frame && !closed ? summary(node) : [];
+   const gap = near ? 18 : big ? 24 : 15;
+   body.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + head(node, size, box.w) + (near ? 22 : big ? 28 : 18) + index * gap, class: near ? "node-detail" : "node-summary" + (big ? " node-summary-far" : "") }, text)));
    if (group && !closed) row.classList.add("group-node");
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(node.id); });
    row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: node.id }); else handlers.mention(node.id); } });
