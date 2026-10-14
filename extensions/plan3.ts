@@ -907,6 +907,8 @@ export default function plan3(pi) {
 			pi.events.emit("wo:web-info", info);
 			if (endpoint === "/api/usage") return info.usage ?? { summary: [], lines: [] };
 			const own = (pi.getCommands?.() ?? []).filter(command => command.name !== "wo").map(({ name, description }) => ({ name, description: description ?? "" }));
+			// getCommands() omits built-ins; /reload is the one the web forwards (as /wo reload).
+			own.push({ name: "reload", description: "Reload extensions, skills and prompts; the page reconnects" });
 			// Argument completion: only our own commands; Pi does not expose other extensions' completers.
 			const plan3Args = ((await planCommand.getArgumentCompletions("")) ?? []).map(({ value, description }) => ({ value, description: description ?? "" }));
 			return { pi: own.sort((a, b) => a.name.localeCompare(b.name)), wo: info.wo ?? [], args: { wo: info.wo ?? [], plan3: plan3Args } };
