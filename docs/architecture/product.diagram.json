@@ -150,7 +150,7 @@
       "kind": "client",
       "parent": "workspace_group",
       "summary": "Rough.js diagram, chat with status line (model/effort/plan menus), Files tab, mobile tabs, prompts and the shared-session switcher.",
-      "tech": "extensions/plan3-web/{app,diagram,layout,prompts}.ts, vendored Rough.js and Virgil",
+      "tech": "extensions/plan3-web/{app,diagram,layout,prompts}.ts, vendored Rough.js",
       "details": "Grid-packed groups with orthogonal edge routing and calm bundled connections; semantic zoom, tinted cards, Ctrl+F search, plain-drag pan and Shift+drag persisted positions. Collapsed thinking/tool chat blocks, auto-follow with jump-to-bottom, image paste to a temporary file path, and right-click note composition. Browser commands and question dialogs share the live terminal session."
     },
     {

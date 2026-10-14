@@ -106,7 +106,6 @@ export async function createPlan3Web(options: Options) {
 		["/pair.html", ["pair.html", "text/html; charset=utf-8"]],
 		["/styles.css", ["styles.css", "text/css; charset=utf-8"]],
 		["/vendor/rough.js", ["vendor/rough.ts", "text/javascript; charset=utf-8"]],
-		["/vendor/Virgil.woff2", ["vendor/Virgil.woff2", "font/woff2"]],
 	]);
 	// Changes when any served asset or this server changes; an open page reloads itself after /reload installs new code.
 	const buildHash = createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url)));
@@ -165,7 +164,7 @@ export async function createPlan3Web(options: Options) {
 		} else if (entry.state !== "pending") pairing = undefined;
 		return json(res, 200, { state: entry.state });
 	}
-	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/command", "/api/stop", "/api/model", "/api/effort"]);
+	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/command", "/api/stop", "/api/model", "/api/effort", "/api/bias"]);
 	const server = createServer((req, res) => {
 		res.setHeader("Cache-Control", "no-store");
 		res.setHeader("X-Content-Type-Options", "nosniff");

@@ -21,7 +21,7 @@ const STATUS = { new: "new", changed: "changed", removed: "removed" };
 export function createDiagramView(svg: SVGSVGElement, handlers) {
  const rc = rough.svg(svg), view = { x: 32, y: 32, scale: 1 };
  const measure = document.createElement("canvas").getContext("2d");
- measure.font = "16px Virgil";
+ measure.font = "16px system-ui";
  let diagram, boxes = new Map(), nodes = [], edges = [], gesture, first = true, selected = null, hovered = null;
  // Focus mode: the selected or hovered element, its edges and neighbors stay lit; the rest dims.
  function applyFocus() {
@@ -45,7 +45,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   if (label) row.append(element("text", { x: at.x, y: at.y - 8, class: label.className, "text-anchor": "middle" }, label.text));
   return true;
  }
- function lines(text, width, limit, font = "16px Virgil") {
+ function lines(text, width, limit, font = "16px system-ui") {
   measure.font = font;
   const out = []; let line = "";
   for (const char of String(text ?? "").replaceAll("\r", "")) {

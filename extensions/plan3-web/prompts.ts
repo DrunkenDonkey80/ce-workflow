@@ -64,7 +64,12 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
    dialog.oncancel = event => { event.preventDefault(); try { answer(ask.multi ? collect() : { action: "back" }); } catch (failure) { error.textContent = failure.message; error.hidden = false; } };
    dialog.showModal(); filter.focus(); return;
   }
-  form.onkeydown = null;
+  // Enter sends, Shift+Enter is a new line in the text box; checklist Enter toggles (its handler prevents default first).
+  form.onkeydown = event => {
+   if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.defaultPrevented) return;
+   const field = event.target as HTMLInputElement;
+   if (field.tagName === "TEXTAREA" || field.type === "radio") { event.preventDefault(); form.requestSubmit(); }
+  };
   const questions = ask.questions ?? [ask], readers = [];
   for (const [index, question] of questions.entries()) {
    const section = node("fieldset", { className: "prompt-question" }); section.append(node("legend", {}, question.question));
@@ -96,7 +101,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
     return { status: "answered", response: { kind: "selection", selections, ...(typed ? { comment: typed } : {}) } };
    }); form.append(section);
   }
-  const actions = node("div", { className: "dialog-actions" }); actions.append(button("Cancel", () => answer({ cancel: true })), node("button", { type: "submit" }, "Send answer")); form.append(error, actions);
+  const actions = node("div", { className: "dialog-actions" }); actions.append(node("button", { type: "button", className: "danger", onclick: () => answer({ cancel: true }) }, "Cancel"), node("button", { type: "submit", className: "primary" }, "Send answer")); form.append(error, actions);
   collect = () => {
    const answers = readers.map(read => read()); if (ask.questions) return { answers };
    const response = answers[0].response; return response.kind === "freeform" ? { text: response.text } : { selections: response.selections, ...(response.comment ? { comment: response.comment } : {}) };

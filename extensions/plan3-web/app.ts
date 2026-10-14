@@ -10,7 +10,7 @@ import { createPromptView } from "./prompts.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { applyText } from "./stream.js?token=__TOKEN__";
 function $(id: "message-input" | "comment-text"): HTMLTextAreaElement;
-function $(id: "send" | "stop" | "comment-save" | "model-button"): HTMLButtonElement;
+function $(id: "send" | "stop" | "comment-save" | "model-button" | "context-button" | "bias-button"): HTMLButtonElement;
 function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
 function $(id: "composer" | "comment-form" | "prompt-form"): HTMLFormElement;
 function $(id: "diagram"): SVGSVGElement;
@@ -22,24 +22,35 @@ const token = "__TOKEN__";
 const auth: RequestInit = token ? { credentials: "omit", headers: { Authorization: "Bearer " + token } } : { credentials: "same-origin", headers: {} };
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
-const state: { connected: boolean; diagram: Diagram | null; plan: { title: string; done?: number; total?: number } | null; status: { model: Model | null; effort: string | null; context?: number | null } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; folder?: string; tab?: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
+const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 0: "Normal", 1: "Think:Task", 2: "Think:Plan" };
+// Progress-bar buttons: fill to percent, coloured by footer tone (accent, success, warning, error, dim).
+function setBar(item: HTMLElement, percent: number, tone: string) {
+ item.style.setProperty("--fill", Math.max(0, Math.min(100, percent)) + "%"); item.dataset.tone = tone;
+}
 function showNotice(text) { $("notice").textContent = text; $("notice").hidden = !text; }
 function renderShell() {
- const title = state.plan?.title ?? state.diagram?.title ?? "Architecture workspace";
+ // "<folder> - <herdr tab>: <plan>", each part only when known.
+ const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
+ const title = [head, plan?.title ?? state.diagram?.title].filter(Boolean).join(": ") || "Architecture workspace";
  $("title").textContent = title; $("title").title = title;
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
  $("target-kind").textContent = target === "product" ? "Product" : "Plan";
- // D19 status line: model and effort, then the plan with its menu (or New plan).
- const status = state.status, plan = state.plan;
- $("model-button").textContent = "Model: " + (status?.model?.name ?? "—");
- $("think-button").textContent = (typeof status?.context === "number" ? "Context: " + Math.round(status.context) + "% · " : "") + "Think: " + (status?.effort ?? "—");
- for (const id of ["model-button", "think-button"]) ($(id) as HTMLButtonElement).disabled = !state.connected;
- $("plan-button").textContent = plan ? plan.title + (plan.total ? ` · ${plan.done ?? 0}/${plan.total}` : "") : "New plan";
- $("plan-button").title = plan ? "Plan actions" : "Start a new plan";
+ // D19 status line. Line 1: [model: effort] [Context: n%] [🧠 bias]; line 2: the plan as a progress bar (or New plan).
+ const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
+ $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
+ $("context-button").textContent = "Context: " + (typeof status?.context === "number" ? Math.round(status.context) + "%" : "—");
+ $("bias-button").textContent = "🧠 " + (BIAS_LABEL[plan?.bias ?? 0] ?? "Normal");
+ for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
+ $("bias-button").disabled = !state.connected || !plan;
+ $("plan-button").textContent = plan ? [plan.focus, plan.total ? `${plan.done ?? 0}/${plan.total}` : ""].filter(Boolean).join(" · ") || "Plan" : "New plan";
+ $("plan-button").title = plan ? plan.title + " — plan actions" : "Start a new plan";
+ setBar($("plan-button"), plan?.total ? (plan.done ?? 0) / plan.total * 100 : 0, "accent");
  for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : "Idle";
  $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting ? "working" : "idle";
@@ -122,7 +133,7 @@ const phone = matchMedia("(max-width: 899px)"), drawer = $("drawer");
 const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "title-menu"], ["connection", "topbar"]]
  .map(([id, slot]) => { const node = id === "status-line" || id === "topbar" ? document.querySelector("." + id)! : $(id); return { node, slot: slot === "topbar" ? document.querySelector(".topbar")! : $(slot), parent: node.parentNode!, next: node.nextSibling }; });
 function placeForPhone() {
- for (const home of homes) phone.matches ? home.slot.append(home.node) : home.parent.insertBefore(home.node, home.next);
+ for (const home of homes) if (phone.matches) home.slot.append(home.node); else home.parent.insertBefore(home.node, home.next);
  if (!phone.matches) setDrawer(false);
 }
 function setDrawer(open: boolean) {
@@ -383,7 +394,7 @@ $("composer").addEventListener("submit", async event => {
  finally { messageSending = false; renderShell(); }
 });
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
-const menus = [["model-button", "model-menu"], ["think-button", "think-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
+const menus = [["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
@@ -458,7 +469,8 @@ async function loadUsage() {
  try {
   const value = await get("usage") as { summary: { label: string; left: number; color: string }[]; lines: Segment[][] };
   usageLines = value.lines; $("usage-button").hidden = !value.summary.length;
-  $("usage-button").replaceChildren(...value.summary.flatMap((item, index) => [...index ? [" · "] : [], ...segments([{ text: item.label + " 7d " }, { text: item.left + "%", color: item.color }])]));
+  // One bar per provider: filled to the 7d share left, coloured like the footer.
+  $("usage-button").replaceChildren(...value.summary.map(item => { const bar = Object.assign(document.createElement("span"), { className: "bar", textContent: item.label + " 7d " + item.left + "%" }); setBar(bar, item.left, item.color); return bar; }));
  } catch { $("usage-button").hidden = true; }
  usageTimer = window.setTimeout(loadUsage, 120_000);
 }
@@ -487,7 +499,7 @@ $("pi-commands").addEventListener("click", () => void pickCommand("pi"));
 $("wo-commands").addEventListener("click", () => void pickCommand("wo"));
 $("command-close").addEventListener("click", () => ($("command-picker") as HTMLDialogElement).close());
 async function changeStatus(endpoint: "model" | "effort", body) {
- closeMenus(); if (drawer.dataset.open === "true") setDrawer(false); else $(endpoint === "model" ? "model-button" : "think-button").focus();
+ closeMenus(); if (drawer.dataset.open === "true") setDrawer(false); else $("model-button").focus();
  try { state.status = { ...state.status, ...await post(endpoint, body) }; renderShell(); showNotice(""); } catch (error) { showNotice(error.message); }
 }
 $("model-button").addEventListener("click", async () => {
@@ -500,19 +512,35 @@ $("model-button").addEventListener("click", async () => {
    button.setAttribute("aria-pressed", String(current?.provider === model.provider && current?.id === model.id));
    button.addEventListener("click", () => changeStatus("model", { provider: model.provider, id: model.id })); return button;
   };
-  // Scoped models only (Pi's Ctrl+P set); all available models when nothing is scoped.
-  menu.replaceChildren(...(value.scoped.length ? value.scoped : value.others).map(option));
-  menu.querySelector<HTMLElement>("[aria-pressed=true], button")?.focus();
+  // Thinking level on one line (Low / Mid / High, plus the current one if different), then scoped models only
+  // (Pi's Ctrl+P set); all available models when nothing is scoped.
+  const efforts = Object.assign(document.createElement("div"), { className: "effort-row" });
+  efforts.append(...["low", "medium", "high", ...(["low", "medium", "high"].includes(value.effort) || !value.effort ? [] : [value.effort])].map(level => {
+   const button = Object.assign(document.createElement("button"), { type: "button", textContent: level === "medium" ? "Mid" : level[0].toUpperCase() + level.slice(1) }); button.dataset.level = level;
+   button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); return button;
+  }));
+  menu.replaceChildren(efforts, ...(value.scoped.length ? value.scoped : value.others).map(option));
+  (menu.querySelector<HTMLElement>(".model-option[aria-pressed=true]") ?? menu.querySelector<HTMLElement>(".model-option, button"))?.focus();
  } catch (error) { menu.replaceChildren("Models failed to load: " + error.message); }
 });
-$("think-button").addEventListener("click", async () => {
- if (!$("think-menu").hidden) return toggleMenu("think-button", "think-menu", false);
- const menu = $("think-menu"); menu.replaceChildren("Loading…"); toggleMenu("think-button", "think-menu", true);
- try {
-  const value = await get("models");
-  menu.replaceChildren(...value.efforts.map(level => { const button = Object.assign(document.createElement("button"), { type: "button", textContent: level }); button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); return button; }));
-  menu.querySelector<HTMLElement>("[aria-pressed=true], button")?.focus();
- } catch (error) { menu.replaceChildren("Levels failed to load: " + error.message); }
+$("context-button").addEventListener("click", () => toggleMenu("context-button", "context-menu"));
+// Compact runs /wo compact, which uses the compaction method chosen in /wo settings.
+$("compact-now").addEventListener("click", async () => {
+ closeMenus(); setDrawer(false);
+ try { await post("message", { text: "/wo compact" }); showNotice("Compaction requested."); } catch (error) { showNotice(error.message); }
+});
+$("bias-button").addEventListener("click", () => {
+ const menu = $("bias-menu"), current = state.plan?.bias ?? 0;
+ menu.replaceChildren(...[2, 1, 0, -1, -2].map(level => {
+  const button = Object.assign(document.createElement("button"), { type: "button", textContent: BIAS_LABEL[level] }); button.dataset.level = String(level);
+  button.setAttribute("aria-pressed", String(level === current));
+  button.addEventListener("click", async () => {
+   closeMenus(); setDrawer(false);
+   try { await post("bias", { level }); showNotice(""); } catch (error) { showNotice(error.message); }
+  });
+  return button;
+ }));
+ toggleMenu("bias-button", "bias-menu");
 });
 $("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested."); } catch (error) { showNotice(error.message); } });
 
@@ -527,6 +555,7 @@ function applyUpdate(event: MessageEvent, update) {
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
 listen("status", value => { state.status = value; renderShell(); });
+listen("plan", value => { if (value.id === target) { state.plan = value; renderShell(); } });
 listen("snapshot", value => {
  if (build && value.build && value.build !== build) { location.reload(); return; }
  build ||= value.build ?? ""; retryDelay = 1000;

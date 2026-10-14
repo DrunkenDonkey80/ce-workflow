@@ -15,6 +15,31 @@
  <header class="topbar">
   <button id="drawer-toggle" class="drawer-toggle" type="button" aria-controls="drawer" aria-expanded="false" aria-label="Open menu">☰</button>
   <div class="workspace-title"><h1><button id="title" class="title-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="title-menu">Architecture workspace</button></h1><span id="target-kind" class="badge">Plan</span></div>
+  <!-- Line 1: model and effort, context, Plan3 bias. Line 2: progress bars (plan, subscription usage). Desktop: one line in the top bar. -->
+  <section class="status-line" aria-label="Session status">
+   <div class="status-row">
+    <button id="model-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="model-menu" title="Change model and thinking level">Model</button>
+    <button id="context-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="context-menu" title="Context use; compact">Context</button>
+    <button id="bias-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="bias-menu" title="Plan3 bias: thinking or coding model (Alt+= / Alt+-)">🧠 Normal</button>
+   </div>
+   <div class="status-row status-bars">
+    <button id="plan-button" class="bar" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="plan-menu">New plan</button>
+    <button id="usage-button" class="bar-group" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="usage-menu" title="Subscription usage" hidden></button>
+   </div>
+   <div id="model-menu" class="status-menu" role="group" aria-label="Model and thinking level" hidden></div>
+   <div id="context-menu" class="status-menu" role="group" aria-label="Context" hidden><button type="button" id="compact-now">Compact now</button></div>
+   <div id="bias-menu" class="status-menu" role="group" aria-label="Plan3 bias" hidden></div>
+   <div id="usage-menu" class="status-menu usage-menu" role="group" aria-label="Subscription usage" hidden></div>
+   <div id="plan-menu" class="status-menu" role="group" aria-label="Plan actions" hidden>
+    <button type="button" data-command="resolve" data-plan>Resolve questions</button>
+    <button type="button" data-command="ideas" data-plan>Ideas</button>
+    <button type="button" data-command="review" data-plan>Review</button>
+    <button type="button" data-command="finish" data-plan>Finish planning</button>
+    <button type="button" data-command="resume" data-plan>Start or continue work</button>
+    <button type="button" data-command="switch">Switch plan</button>
+    <button type="button" data-command="new">New plan</button>
+   </div>
+  </section>
  </header>
  <div id="title-menu" class="status-menu title-menu" role="group" aria-label="Shared sessions" hidden></div>
  <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
@@ -59,31 +84,13 @@
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
   <aside id="chat" class="chat" aria-label="Live Pi session">
    <header class="chat-heading"><h2>Live session</h2><span id="connection" role="status">Connecting…</span></header>
-   <section class="status-line" aria-label="Session status">
-    <button id="model-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="model-menu" title="Change model">Model</button>
-    <button id="think-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="think-menu" title="Change thinking level">Think</button>
-    <button id="plan-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="plan-menu">New plan</button>
-    <button id="usage-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="usage-menu" title="Subscription usage" hidden></button>
-    <div id="model-menu" class="status-menu" role="group" aria-label="Model" hidden></div>
-    <div id="think-menu" class="status-menu" role="group" aria-label="Thinking level" hidden></div>
-    <div id="usage-menu" class="status-menu usage-menu" role="group" aria-label="Subscription usage" hidden></div>
-    <div id="plan-menu" class="status-menu" role="group" aria-label="Plan actions" hidden>
-     <button type="button" data-command="resolve" data-plan>Resolve questions</button>
-     <button type="button" data-command="ideas" data-plan>Ideas</button>
-     <button type="button" data-command="review" data-plan>Review</button>
-     <button type="button" data-command="finish" data-plan>Finish planning</button>
-     <button type="button" data-command="resume" data-plan>Start or continue work</button>
-     <button type="button" data-command="switch">Switch plan</button>
-     <button type="button" data-command="new">New plan</button>
-    </div>
-   </section>
    <section id="activity" class="activity" aria-label="Agent activity"></section>
    <button id="earlier" class="earlier" type="button" hidden>Show earlier</button>
    <ol id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></ol>
    <button id="to-bottom" class="to-bottom" type="button" aria-label="Scroll to the newest message" hidden>↓ New messages</button>
    <form id="composer" class="composer">
     <div id="mentions" class="mentions" aria-label="Mentioned elements"></div>
-    <textarea id="message-input" rows="2" maxlength="20000" placeholder="Ask about the architecture…" aria-label="Message to Pi" aria-describedby="input-help"></textarea>
+    <textarea id="message-input" rows="4" maxlength="20000" placeholder="Ask about the architecture…" aria-label="Message to Pi" aria-describedby="input-help"></textarea>
     <div class="composer-actions">
      <span id="input-help" class="input-help">Ctrl+click a box to mention it</span>
      <label class="attach button" title="Attach an image">Image<input id="attach" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></label>

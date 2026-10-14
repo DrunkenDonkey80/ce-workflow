@@ -36,7 +36,7 @@ let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], c
 const seenCalls = []; let ownRevisionSeen = 0, ownRevision = 3, otherSessions = false, beta = { state: "working", revision: 1, unseen: false };
 const sessionList = () => [{ id: "a", name: "alpha", cwd: "C:/work/alpha", port: server.port, state: "idle", revision: ownRevision, unseen: ownRevisionSeen < ownRevision },
  ...!otherSessions ? [] : [{ id: "b", name: "beta", cwd: "C:/work/beta", port: 1, ...beta }, { id: "c", name: "gamma", cwd: "/srv/gamma", port: 2, state: "waiting", revision: 0, unseen: false }]];
-let status = { model: { provider: "a", id: "fast", name: "Fast" }, effort: "high", context: 41.6 };
+let status = { model: { provider: "a", id: "fast", name: "Fast" }, effort: "high", context: 41.6, folder: "ce-workflow", tab: "1" };
 let projectFiles = [{ path: "docs/readme.md" }, { path: "src/app.ts", change: "M" }, { path: "top.txt" }];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
 const listeners = new Map(), answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
@@ -44,7 +44,7 @@ const events = { on(name, run) { const rows = listeners.get(name) ?? new Set(); 
 events.on("ask:answer", value => answers.push(value));
 const dialogs = createDialogBridge({ events }, (event, value) => server.publish(event, value));
 const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { askId, ...value }); return askId; };
-const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft", done: 2, total: 5 }, status, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
+const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft", done: 2, total: 5, focus: "S03", bias: 0 }, status, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "a", id: "fast", name: "Fast" }, { provider: "b", id: "deep", name: "Deep" }], others: [{ provider: "b", id: "other", name: "Other" }] };
  if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53%" }], [{ text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
  if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }] };
@@ -64,6 +64,7 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
  }
  if (endpoint === "/api/model") { status = { ...status, model: { provider: body.provider, id: body.id, name: body.id } }; server.publish("status", status); return status; }
  if (endpoint === "/api/effort") { status = { ...status, effort: body.level }; return status; }
+ if (endpoint === "/api/bias") { server.publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: body.level }); return { ok: true }; }
  if (endpoint === "/api/stop") { activity = { working: false }; server.publish("activity", activity); return { accepted: true }; }
  assert(["/api/move", "/api/comment"].includes(endpoint));
  if (body.expectedRevision !== diagram.revision) throw new WebError(409, "Stale diagram revision");
@@ -74,7 +75,7 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
 try {
  await browser("open", server.url({ kind: "plan", id: "12345678" }));
  await browser("set", "viewport", "1280", "800");
- await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"Upload service\"");
+ await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1: Upload service\"");
  const snapshot = await browser("snapshot", "-i"); assert(JSON.stringify(snapshot).includes("Resize chat pane"));
  assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 380);
  await browser("focus", "#splitter"); await browser("press", "ArrowLeft");
@@ -126,7 +127,7 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('canvas').getBoundingClientRect().width, document.getElementById('drawer').dataset.open]"), [390, "false"], "picking a view closes the drawer");
  await browser("click", "#drawer-toggle"); assert.equal(await evaluate("document.activeElement.id"), "mobile-diagram", "the drawer opens on the current view");
  await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "mobile-chat");
- assert(await evaluate("['model-button', 'think-button', 'plan-button', 'usage-button', 'pi-commands', 'wo-commands'].every(id => document.getElementById('drawer').contains(document.getElementById(id)))"), "phone: status line and command buttons live in the drawer");
+ assert(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button', 'pi-commands', 'wo-commands'].every(id => document.getElementById('drawer').contains(document.getElementById(id)))"), "phone: status line and command buttons live in the drawer");
  await browser("click", "#wo-commands"); await browser("wait", ".command-option");
  await browser("click", ".command-option"); assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('command-picker').open, document.getElementById('drawer').dataset.open]"), ["/wo share ", false, "false"], "a picked command goes into the composer");
  await browser("fill", "#message-input", "");
@@ -142,7 +143,7 @@ try {
  await browser("set", "viewport", "1280", "800");
  assert(await evaluate("document.getElementById('left-panel').getClientRects().length > 0 && document.getElementById('chat').getClientRects().length > 0 && document.getElementById('mobile-tabs').getClientRects().length === 0"), "desktop ignores the phone view");
  // The media-query listener moves them back asynchronously after the resize.
- await browser("wait", "--fn", "document.getElementById('chat').contains(document.getElementById('model-button')) && document.getElementById('switcher').contains(document.getElementById('session-list')) && document.querySelector('.chat-heading').contains(document.getElementById('connection'))");
+ await browser("wait", "--fn", "document.querySelector('.topbar').contains(document.getElementById('model-button')) && document.getElementById('switcher').contains(document.getElementById('session-list')) && document.querySelector('.chat-heading').contains(document.getElementById('connection'))");
  await browser("focus", "#splitter"); await browser("press", "Home");
  await browser("click", "#zoom-fit");
  // The compact layout may fit at mid zoom; zoom out to the overview band explicitly.
@@ -324,7 +325,10 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  await browser("click", "#prompt-form input[value=Pink]"); await browser("click", "#prompt-form input[value=Pink]");
  assert.equal(await evaluate("document.querySelector('#prompt-form input[value=Pink]').checked"), false, "tapping the chosen radio clears it");
- await browser("fill", "#prompt-form textarea", "Teal"); await browser("click", "#prompt-form button[type=submit]");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .dialog-actions button')].map(b => b.textContent + ':' + b.className)"), ["Cancel:danger", "Send answer:primary"]);
+ await browser("focus", "#prompt-form textarea"); await browser("press", "Shift+Enter");
+ assert(await evaluate("document.getElementById('prompt').open"), "Shift+Enter is a new line, not send");
+ await browser("fill", "#prompt-form textarea", "Teal"); await browser("press", "Enter");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.equal(answers.at(-1).text, "Teal", "with nothing chosen the text is your own answer");
  ask({ questions: [{ question: "Pick deploy targets", options: [{ title: "Alpha" }, { title: "Beta" }], allowMultiple: true, allowFreeform: false }, { question: "Name the rollout", options: [], allowMultiple: false, allowFreeform: true }], allowComment: false });
@@ -348,9 +352,15 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open"); await browser("focus", "#prompt-form input[value=two]"); await browser("press", "Enter");
  assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
- // R13/D19 status line: model · effort, plan · progress, plan menu, model and effort picker.
- assert.deepEqual(await evaluate("['model-button', 'think-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).textContent)"), ["Model: Fast", "Context: 42% · Think: high", sample.title + " · 2/5", "Claude 7d 53% · Codex 7d 12%"]);
- assert.equal(await evaluate("document.querySelector('#usage-button .tone-error').textContent"), "12%");
+ // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
+ assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["Fast: High", "Context: 42%", "🧠 Normal", "S03 · 2/5"]);
+ assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1: " + sample.title);
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .bar')].map(bar => bar.textContent + ':' + bar.dataset.tone + ':' + bar.style.getPropertyValue('--fill'))"), ["Claude 7d 53%:text:53%", "Codex 7d 12%:error:12%"]);
+ assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
+ assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
+ await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
+ await browser("wait", "--fn", "document.getElementById('bias-button').textContent === '🧠 Think:Task'");
+ await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
  await browser("click", "#usage-button"); assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-menu .usage-line')].map(line => line.textContent)"), ["Claude 7d [████░░░░] 53%", "Codex 7d 12%"]);
  await browser("press", "Escape");
  for (const command of ["resolve", "ideas", "review", "finish", "resume", "switch"]) { await browser("click", "#plan-button"); await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
@@ -362,12 +372,12 @@ try {
  await browser("click", "#model-button"); await browser("wait", ".model-option");
  assert.deepEqual(await evaluate("[[...document.querySelectorAll('#model-menu .model-option')].map(b => b.textContent), document.querySelector('#model-menu input'), document.activeElement.textContent]"), [["Fast", "Deep"], null, "Fast"], "scoped models only, no filter; focus on the current one");
  await browser("click", "[title='b/deep']");
- await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Model: deep'");
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep: High'");
  assert.equal(await evaluate("document.getElementById('model-menu').hidden"), true);
- await browser("click", "#think-button"); await browser("wait", "#think-menu button");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#think-menu button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'))"), ["low:false", "high:true"]);
- await browser("click", "#think-menu button");
- await browser("wait", "--fn", "document.getElementById('think-button').textContent === 'Context: 42% · Think: low'");
+ await browser("click", "#model-button"); await browser("wait", "#model-menu .effort-row button");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .effort-row button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'))"), ["Low:false", "Mid:false", "High:true"], "effort on one line in the model menu");
+ await browser("click", "#model-menu [data-level=low]");
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep: Low'");
  // D18: stripe of colour-coded letters; this page marks its own idle run seen; the list slides out and Escape closes it.
  assert.equal(await evaluate("document.getElementById('switcher').hidden"), true, "a lone session shows no switcher");
  otherSessions = true; await evaluate("document.dispatchEvent(new Event('visibilitychange'))");
@@ -383,7 +393,7 @@ try {
  await browser("wait", "--fn", "document.querySelector('.session[data-port=\"1\"]').dataset.tone === 'unseen'");
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').dataset.tone"), "seen"); assert.deepEqual(seenCalls.at(-1), { device: "local", revision: 4 });
  status = { ...status, model: { provider: "t", id: "term", name: "Terminal pick" } }; server.publish("status", status);
- await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Model: Terminal pick'");
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick: Low'");
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);

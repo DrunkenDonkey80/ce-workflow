@@ -705,6 +705,8 @@ export default function plan3(pi) {
 			const focus = plan?.wip[0] ?? plan?.next;
 			const design = plan && localPlanDesign(ctx.cwd, plan);
 			const bias = plan ? biasOf(ctx, plan, split(await readFile(plan.file, "utf8")).lines, availOf(plan.file)) : 0;
+			if (webInstance && plan) publishWeb("plan", webPlan(plan, bias));
+			void refreshHerdrTab();
 			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
 	}
@@ -791,7 +793,19 @@ export default function plan3(pi) {
 	}
 	const modelRef = model => ({ provider: model.provider, id: model.id, name: model.name ?? model.id });
 	const contextPercent = ctx => { try { return ctx?.getContextUsage?.()?.percent ?? null; } catch { return null; } };
-	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx) });
+	// Page title: "<folder> - <herdr tab>: <plan>"; the herdr tab label is cached, refreshed at most every 30 s.
+	let herdrTab = "", herdrAt = 0;
+	async function refreshHerdrTab() {
+		const id = process.env.HERDR_TAB_ID, bin = process.env.HERDR_BIN_PATH;
+		if (!id || !bin || Date.now() - herdrAt < 30_000) return;
+		herdrAt = Date.now();
+		try {
+			const result = await pi.exec(bin, ["tab", "get", id], { timeout: 3000 }), label = String(JSON.parse(result.stdout)?.result?.tab?.label ?? "");
+			if (label !== herdrTab) { herdrTab = label; if (webInstance && webCtx) publishStatus(webCtx); }
+		} catch { /* herdr is optional; the title falls back to folder and plan. */ }
+	}
+	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), folder: ctx?.cwd ? path.basename(ctx.cwd) : "", tab: herdrTab });
+	const webPlan = (plan, bias) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias });
 	async function webModels(ctx) {
 		const scoped = (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => modelRef(entry.model)), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
 		const others = ((await ctx.modelRegistry?.getAvailable?.()) ?? []).map(modelRef).filter(model => !keys.has(model.provider + "/" + model.id));
@@ -844,6 +858,13 @@ export default function plan3(pi) {
 			pi.setThinkingLevel(data.level);
 			return publishStatus(ctx); // the model may clamp the level
 		}
+		// alt+= / alt+- from the page: set the Plan3 bias level of the current plan directly.
+		if (endpoint === "/api/bias") {
+			if (Object.keys(data).some(key => !["target", "level"].includes(key)) || ![-2, -1, 0, 1, 2].includes(data.level)) throw new WebError(400, "Invalid bias level.");
+			if (!currentPlan(ctx, await listPlans(ctx.cwd))) throw new WebError(409, "No open plan to bias.");
+			await shiftBias(ctx, data.level, true);
+			return { ok: true };
+		}
 		if (endpoint === "/api/answer") {
 			if (data.target !== undefined) await resolveWebTarget(webTarget(data.target));
 			if (Object.keys(data).some(key => !["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"].includes(key))) throw new WebError(400, "Invalid answer fields.");
@@ -883,7 +904,9 @@ export default function plan3(pi) {
 		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
-			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, status: webStatus(webCtx), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) });
+			await refreshHerdrTab();
+			const plan = resolved.kind === "plan" ? webPlan(resolved.plan, biasOf(webCtx, resolved.plan, split(await readFile(resolved.plan.file, "utf8")).lines, availOf(resolved.plan.file))) : undefined;
+			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, status: webStatus(webCtx), ...(plan ? { plan } : {}) });
 		} }).then(async server => {
 			const previous = shareRecord.port;
 			try { await saveSharePort(shareRecord, server.port); }
@@ -1104,12 +1127,12 @@ export default function plan3(pi) {
 		return availLine(avail, defs);
 	}
 	// Bias the current plan toward the planning (thinker) or coding model; applies at once while the plan executes.
-	async function shiftBias(ctx, delta) {
+	async function shiftBias(ctx, delta, absolute = false) {
 		try {
 			const plan = currentPlan(ctx, await listPlans(ctx.cwd));
 			if (!plan) return ctx.ui?.notify?.("Plan3: no open plan to bias.", "warning");
 			const lines = split(await readFile(plan.file, "utf8")).lines, avail = availOf(plan.file);
-			const level = Math.max(-2, Math.min(2, biasOf(ctx, plan, lines, avail) + delta));
+			const level = Math.max(-2, Math.min(2, absolute ? delta : biasOf(ctx, plan, lines, avail) + delta));
 			pi.appendEntry?.(BIAS, { id: plan.id, level, phase: headingKey(stepHeading(lines, avail) ?? "") });
 			await refresh(ctx);
 			await followMode(ctx);
