@@ -33,7 +33,11 @@ h2 { font-size: 15px; font-weight: 600; }
 .workspace-title { display: flex; gap: 10px; align-items: center; min-width: 0; flex: 1; }
 .badge { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
 #commands { display: flex; gap: 6px; flex-wrap: wrap; font-size: 13px; }
-.notice { padding: 8px 16px; background: var(--changed); font-size: 13px; }
+/* Notices are small tabs floating at the top of the chat, not full-width bars. */
+.chat { position: relative; }
+.notices { position: absolute; top: 4px; left: 0; right: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+.notice { margin: 0; max-width: calc(100% - 32px); padding: 3px 10px; border-radius: 999px; background: var(--changed); font-size: 12px; box-shadow: 0 1px 4px #0003; }
+.notice[hidden] { display: none; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--chat-width); flex: 1; min-height: 0; }
 .left-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .left-tabs { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }

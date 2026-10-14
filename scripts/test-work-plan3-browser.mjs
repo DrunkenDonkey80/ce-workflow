@@ -214,9 +214,10 @@ try {
  assert.equal(edits.length, 1); assert.equal(edits[0].id, "web_client"); assert.equal(edits[0].expectedRevision, 1);
  assert(Number.isFinite(diagram.nodes.find(node => node.id === "web_client").x));
  const savedPosition = { ...diagram.nodes.find(node => node.id === "web_client") }; diagram.revision++;
- // Grab the header: the zoom controls may cover the middle of a box near the bottom edge.
- const stalePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + 12) }; })()");
- await shiftDrag(stalePoint);
+ // Fit first so the box is on screen, then grab a visible part: the zoom controls may cover part of it.
+ await browser("click", "#zoom-fit");
+ const stalePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); for (let y = r.y + 8; y < r.bottom; y += 8) for (let x = r.x + 8; x < r.right; x += 16) if (document.elementFromPoint(x, y)?.closest(\"[data-node=web_client]\")) return { x: Math.round(x), y: Math.round(y) }; })()");
+ assert(stalePoint, "part of the box is visible"); await shiftDrag(stalePoint);
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"3\"");
  assert.equal(edits.length, 1); assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition);
  assert(await evaluate("document.getElementById(\"notice\").textContent.includes(\"Positions were not saved\")"));
@@ -263,6 +264,7 @@ try {
  assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "note @web_client: ");
  const messagesBeforeNote = messages.length; await browser("keyboard", "type", "retry budget"); await browser("press", "Enter");
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"7\"");
+ await browser("mouse", "move", "2", "2"); // the pointer left on the box keeps its hover card over the chat
  assert.equal(comments.at(-1).element, "web_client"); assert.equal(comments.at(-1).text, "retry budget"); assert.equal(messages.length, messagesBeforeNote, "notes do not become chat messages");
  await withPageCdp(server.origin, send => send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] }));
  assert(await evaluate("matchMedia(\"(prefers-reduced-motion: reduce)\").matches"));

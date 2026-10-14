@@ -48,8 +48,6 @@
   <h2>Session</h2><div id="drawer-status"></div>
   <div class="drawer-commands"><button id="pi-commands" type="button" aria-haspopup="dialog">Pi commands</button><button id="wo-commands" type="button" aria-haspopup="dialog">/wo commands</button></div>
  </aside>
- <p id="notice" class="notice" role="status" hidden></p>
- <p id="waiting" class="notice" role="status" hidden></p>
  <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">
   <button id="mobile-chat" type="button" role="tab" aria-controls="chat" aria-selected="true">Chat</button>
   <button id="mobile-files" type="button" role="tab" aria-controls="files" aria-selected="false" tabindex="-1">Files</button>
@@ -84,6 +82,7 @@
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
   <aside id="chat" class="chat" aria-label="Live Pi session">
    <header class="chat-heading"><h2>Live session</h2><span id="connection" role="status">Connecting…</span></header>
+   <div class="notices"><p id="notice" class="notice" role="status" hidden></p><p id="waiting" class="notice" role="status" hidden></p></div>
    <section id="activity" class="activity" aria-label="Agent activity"></section>
    <ol id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></ol>
    <button id="to-bottom" class="to-bottom" type="button" aria-label="Scroll to the newest message" hidden>↓ New messages</button>
