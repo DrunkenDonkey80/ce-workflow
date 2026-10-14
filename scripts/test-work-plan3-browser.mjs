@@ -263,14 +263,21 @@ try {
  await browser("focus", "#diagram"); await browser("press", "Control+f"); assert.equal(await evaluate("document.activeElement.id"), "search");
  await browser("fill", "#search", "web client"); assert(await evaluate("document.getElementById(\"diagram\").classList.contains(\"searching\") && document.querySelector(\"[data-node=web_client]\").classList.contains(\"match\") && !document.querySelector(\"[data-node=worker]\").classList.contains(\"match\")"));
  await browser("press", "Enter"); await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById(\"diagram\").classList.contains(\"searching\")"), false);
- // Right-click a box: composer gets "note @id: ", Enter saves it as a pinned note instead of a chat message.
+ // Right-click a box: a centred popup adds "@id: note" as a message line; several notes plus a closing request go out as one message.
  const notePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + 12) }; })()");
  await withPageCdp(server.origin, async send => { for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { ...notePoint, type, ...(type === "mouseMoved" ? {} : { button: "right", buttons: type === "mousePressed" ? 2 : 0, clickCount: 1 }) }); });
- assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "note @web_client: ");
- const messagesBeforeNote = messages.length; await browser("keyboard", "type", "retry budget"); await browser("press", "Enter");
- await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"7\"");
+ assert(await evaluate("document.getElementById('comment-prompt').open && document.getElementById('comment-title').textContent === 'Note on @web_client'"), "right-click opens the note popup");
+ const messagesBeforeNote = messages.length, commentsBeforeNote = comments.length;
+ await browser("keyboard", "type", "retry budget"); await browser("press", "Enter");
+ assert.deepEqual(await evaluate("[document.getElementById('comment-prompt').open, document.getElementById('message-input').value]"), [false, "@web_client: retry budget\n"]);
+ await withPageCdp(server.origin, async send => { for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { ...notePoint, type, ...(type === "mouseMoved" ? {} : { button: "right", buttons: type === "mousePressed" ? 2 : 0, clickCount: 1 }) }); });
+ await browser("keyboard", "type", "and a timeout"); await browser("press", "Enter");
+ assert.equal(messages.length, messagesBeforeNote, "notes wait in the composer until sent");
  await browser("mouse", "move", "2", "2"); // the pointer left on the box keeps its hover card over the chat
- assert.equal(comments.at(-1).element, "web_client"); assert.equal(comments.at(-1).text, "retry budget"); assert.equal(messages.length, messagesBeforeNote, "notes do not become chat messages");
+ await browser("focus", "#message-input"); await browser("keyboard", "type", "Please apply these."); await browser("press", "Enter");
+ await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
+ assert.equal(messages.at(-1).text, "@web_client: retry budget\n@web_client: and a timeout\nPlease apply these.", "notes and the closing request go as one message");
+ assert.equal(comments.length, commentsBeforeNote, "right-click notes are not pinned to the diagram");
  await withPageCdp(server.origin, send => send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] }));
  assert(await evaluate("matchMedia(\"(prefers-reduced-motion: reduce)\").matches"));
  assert.equal(await evaluate("getComputedStyle(document.getElementById(\"diagram\")).animationDuration"), "0s");

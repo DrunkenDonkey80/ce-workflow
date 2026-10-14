@@ -243,14 +243,14 @@ function drawNotes(stage, boxes, view, rc, data, detailY) {
   stage.append(row);
  }
 }
-// Right-click: the composer gets "note @id: "; Enter saves the rest as a note on that element.
-const NOTE = /^note @([a-z][a-z0-9_]{0,47}):\s*([\s\S]+)$/;
-function startNote(id) { const input = $("message-input"); input.value = "note @" + id + ": "; input.focus(); input.setSelectionRange(input.value.length, input.value.length); renderMentions(); showNotice("Type the note for @" + id + " and press Enter."); }
+// Right-click: the note popup adds "@id: note" as a line of the message, so several notes and a closing request go to the agent together.
+let draftFor = "";
+function openNote(title, purpose, save) { $("comment-title").textContent = title; $("comment-purpose").textContent = purpose; $("comment-save").textContent = save; $("comment-error").hidden = true; $("comment-prompt").showModal(); $("comment-text").focus(); }
+function startNote(id) { draftFor = id; openNote("Note on @" + id, "Adds a line to your message. Add more notes, then send them together.", "Add to message"); }
 function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); renderMentions(); }
 function pin(point) {
  commentPoint = { ...point, expectedRevision: state.diagram.revision }; state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning");
- $("comment-purpose").textContent = point.element ? "Pin a comment to @" + point.element + "." : "Pin a comment at this canvas position.";
- $("comment-error").hidden = true; $("comment-prompt").showModal(); $("comment-text").focus(); showNotice("");
+ draftFor = ""; openNote("Add a note", point.element ? "Pin a comment to @" + point.element + "." : "Pin a comment at this canvas position.", "Save note"); showNotice("");
 }
 const diagramView = createDiagramView($("diagram"), {
  hover, leave, notes: drawNotes, pin, pinning: () => state.pinning,
@@ -271,8 +271,16 @@ $("pin-note").addEventListener("click", () => {
  showNotice(state.pinning ? "Click a box, arrow or empty space to pin a note. Escape cancels." : "");
 });
 $("comment-cancel").addEventListener("click", () => $("comment-prompt").close());
+$("comment-text").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("comment-form").requestSubmit(); } });
 $("comment-form").addEventListener("submit", async event => {
- event.preventDefault(); $("comment-save").disabled = true;
+ event.preventDefault();
+ if (draftFor) {
+  const input = $("message-input"), line = "@" + draftFor + ": " + $("comment-text").value.trim();
+  input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n";
+  $("comment-prompt").close(); $("comment-text").value = ""; input.focus(); input.setSelectionRange(input.value.length, input.value.length); renderMentions();
+  return;
+ }
+ $("comment-save").disabled = true;
  try { const value = await post("comment", { ...commentPoint, text: $("comment-text").value }); state.diagram = value.diagram; diagramView.render(state.diagram); renderShell(); $("comment-prompt").close(); $("comment-text").value = ""; showNotice("Note saved."); }
  catch (error) { $("comment-error").textContent = error.message + ". Your note draft is kept."; $("comment-error").hidden = false; if (error.status === 409) commentPoint.expectedRevision = state.diagram.revision; }
  finally { $("comment-save").disabled = false; }
@@ -398,14 +406,6 @@ $("message-input").addEventListener("keydown", event => {
 $("composer").addEventListener("submit", async event => {
  event.preventDefault(); if (messageSending || !state.connected) return;
  const text = $("message-input").value; if (!text.trim()) return;
- const note = text.trim().match(NOTE);
- if (note) {
-  messageSending = true; renderShell();
-  try { const value = await post("comment", { element: note[1], text: note[2].trim(), expectedRevision: state.diagram.revision }); state.diagram = value.diagram; diagramView.render(state.diagram); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice("Note saved on @" + note[1] + "."); }
-  catch (error) { showNotice(error.message + ". Your note draft is kept."); }
-  finally { messageSending = false; renderShell(); }
-  return;
- }
  messageSending = true; renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
