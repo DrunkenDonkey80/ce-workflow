@@ -506,10 +506,13 @@ try {
   approvals[0].resolve("dev123.secret");
   const approved = await waiting;
   assert.deepEqual(JSON.parse(approved.text), { state: "approved" });
-  assert.equal(approved.cookie?.[0], "pi_remote=dev123.secret; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=7776000");
+  assert.equal(approved.cookie?.[0], "pi_remote=dev123.secret; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000");
   assert.equal((await raw("/pair/status?id=" + start.id)).status, 404, "the cookie is delivered once");
   paired.add("dev123.secret");
   assert.equal((await raw("/api/snapshot", { Cookie: "pi_remote=dev123.secret" })).status, 200);
+  // A pairing page opened without the cookie, then posting with it, is told it is paired and gets a Lax cookie.
+  const again = await raw("/pair/start", { Origin: origin, Cookie: "pi_remote=dev123.secret" }, "POST");
+  assert.deepEqual([again.status, JSON.parse(again.text), again.cookie?.[0]], [200, { paired: true }, "pi_remote=dev123.secret; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000"]);
   const declined = JSON.parse((await raw("/pair/start", { Origin: origin }, "POST")).text); approvals.at(-1).resolve(undefined);
   assert.deepEqual(JSON.parse((await raw("/pair/status?id=" + declined.id)).text), { state: "denied" });
   for (let i = 0; i < 3; i++) { JSON.parse((await raw("/pair/start", { Origin: origin }, "POST")).text); approvals.at(-1).resolve(undefined); await new Promise(resolve => setImmediate(resolve)); }

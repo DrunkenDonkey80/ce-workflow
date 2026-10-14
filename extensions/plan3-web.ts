@@ -88,6 +88,8 @@ export async function readLinkedImage(path: string | null, project?: string) {
 	if (!kind) throw new WebError(415, "Not a supported image.");
 	return { bytes, type: kind[0] === "jpg" ? "image/jpeg" : "image/" + kind[0] };
 }
+// Lax: opening the link from a home-screen icon or another app must send it; POSTs still need a matching Origin.
+const deviceCookie = (value: string) => `pi_remote=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000`;
 function read(req: IncomingMessage, limit: number): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
 		const chunks: Buffer[] = [];
@@ -185,7 +187,7 @@ export async function createPlan3Web(options: Options) {
 		});
 		if (entry.state === "approved") {
 			// Delivered once; host-only, so every session port on this machine shares it (D18).
-			res.setHeader("Set-Cookie", `pi_remote=${entry.cookie}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=7776000`);
+			res.setHeader("Set-Cookie", deviceCookie(entry.cookie));
 			pairing = undefined;
 		} else if (entry.state !== "pending") pairing = undefined;
 		return json(res, 200, { state: entry.state });
@@ -221,6 +223,8 @@ export async function createPlan3Web(options: Options) {
 					throw new WebError(401, "This device is not paired.");
 				}
 				device = { cookie, login: tailnet.login };
+				// A pairing page loaded without the cookie (older Strict cookies skip cross-site opens) is already paired: renew as Lax and let it reload.
+				if (req.method === "POST" && url.pathname === "/pair/start") { res.setHeader("Set-Cookie", deviceCookie(cookie)); return json(res, 200, { paired: true }); }
 			}
 			// Cookies cross localhost ports; use an explicit token, never ambient browser credentials.
 			else if (![req.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")].some(valid)) throw new WebError(401, "Workspace token required.");

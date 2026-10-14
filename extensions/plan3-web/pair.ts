@@ -9,6 +9,7 @@ async function start() {
  retry.hidden = true; code.textContent = ""; status.textContent = "Asking the PC…";
  try {
   const pending = await call("/pair/start", { method: "POST" });
+  if (pending.paired) { status.textContent = "Already paired. Loading…"; location.reload(); return; }
   code.textContent = pending.code; status.textContent = "Approve this device at the PC if it shows the same code.";
   for (;;) {
    const result = await call("/pair/status?id=" + encodeURIComponent(pending.id));
