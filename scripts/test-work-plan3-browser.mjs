@@ -11,13 +11,14 @@ const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/nod
 const session = `ce-plan3-ui-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
  const { stdout } = await execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 });
- const result = JSON.parse(stdout); assert(result.success, JSON.stringify(result)); return result.data;
+ let result; try { result = JSON.parse(stdout); } catch { throw new Error("agent-browser returned non-JSON: " + stdout.slice(0, 500)); }
+ assert(result.success, JSON.stringify(result)); return result.data;
 }
 // agent-browser 0.38.2 drops held mouse modifiers; CDP sends trusted input with explicit bits.
 async function withPageCdp(origin, run) {
  const { cdpUrl } = await browser("get", "cdp-url"); assert(cdpUrl.startsWith("ws://127.0.0.1:"));
  const socket = new WebSocket(cdpUrl), pending = new Map(); let sequence = 0;
- socket.addEventListener("message", event => { const value = JSON.parse(event.data), request = pending.get(value.id); if (!request) return; pending.delete(value.id); clearTimeout(request.timer); if (value.error) request.reject(new Error(value.error.message)); else request.resolve(value.result); });
+ socket.addEventListener("message", event => { let value; try { value = JSON.parse(event.data); } catch { return; } const request = pending.get(value.id); if (!request) return; pending.delete(value.id); clearTimeout(request.timer); if (value.error) request.reject(new Error(value.error.message)); else request.resolve(value.result); });
  const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
   const id = ++sequence, timer = setTimeout(() => { pending.delete(id); reject(new Error("CDP timeout: " + method)); }, 10000);
   pending.set(id, { resolve, reject, timer }); socket.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
@@ -30,7 +31,8 @@ async function withPageCdp(origin, run) {
  } finally { socket.close(); for (const request of pending.values()) { clearTimeout(request.timer); request.reject(new Error("CDP connection closed")); } }
 }
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
-const sample = JSON.parse(await readFile(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
+const fixture = new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url);
+let sample; try { sample = JSON.parse(await readFile(fixture, "utf8")); } catch (error) { throw new Error("Unreadable fixture " + fixture.pathname + ": " + error.message); }
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
 // D18 switcher fixtures: this page (idle, unseen until the page marks it), one working and one waiting session.
 const seenCalls = []; let ownRevisionSeen = 0, ownRevision = 3, otherSessions = false, beta = { state: "working", revision: 1, unseen: false };
@@ -423,6 +425,12 @@ try {
  await evaluate("document.getElementById(\"messages\").scrollTop = 0");
  await browser("fill", "#message-input", "Scroll me down"); await browser("click", "#send"); await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Scroll me down\")");
  assert(await evaluate("(() => { const list = document.getElementById(\"messages\"); return list.scrollHeight - list.scrollTop - list.clientHeight < 48; })()"), "send scrolls the chat to the newest message");
+ // Content that grows after it was drawn (a thumbnail loading, a block opening) must not unpin the chat; only scrolling up does.
+ await evaluate("(() => { const l = document.getElementById('messages'); l.scrollTop = l.scrollHeight; })()"); await new Promise(done => setTimeout(done, 100));
+ await evaluate("document.querySelector('#messages > li:last-child').append(Object.assign(document.createElement('div'), { style: 'height: 200px' }))");
+ { const row = { id: "after_grow", role: "assistant", text: "Still following", streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
+ await browser("wait", "[data-id=after_grow]");
+ assert(await evaluate("(() => { const list = document.getElementById('messages'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4 && document.getElementById('to-bottom').hidden; })()"), "late growth does not unpin the chat");
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");

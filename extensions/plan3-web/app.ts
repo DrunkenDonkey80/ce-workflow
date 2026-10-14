@@ -315,7 +315,15 @@ function renderBlocks(box: HTMLElement, row) {
 }
 const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - list.clientHeight < 48;
 // Scrolling near the top loads earlier rows (no button).
-$("messages").addEventListener("scroll", () => { const list = $("messages"); if (atBottom(list)) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
+// Stay pinned to the newest output until the reader scrolls away. Only scrolling changes this: the activity rows above
+// growing, images loading or the keyboard opening shrink or grow the list without a scroll event, and must not unpin it.
+let stick = true;
+// Explicit jumps re-pin at once; the scroll event that would do it arrives a frame later.
+function toBottom() { stick = true; pinChat(); $("to-bottom").hidden = true; }
+const pinChat = () => { const list = $("messages"); if (stick) list.scrollTop = list.scrollHeight; };
+$("messages").addEventListener("scroll", () => { const list = $("messages"); stick = atBottom(list); if (stick) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
+new ResizeObserver(pinChat).observe($("messages"));
+$("messages").addEventListener("load", pinChat, true);
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
 // Opening a thinking/tool block of an excerpt row loads its bodies.
 $("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); const row = chat.get(item?.dataset.id); if ((event.target as HTMLDetailsElement).open && (row?.excerpt || row?.brief)) void loadRow(item.dataset.id); }, true);
@@ -328,9 +336,9 @@ async function loadEarlier() {
   state.more = page.more; const list = $("messages"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height;
  } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; }
 }
-$("to-bottom").addEventListener("click", () => { const list = $("messages"); list.scrollTop = list.scrollHeight; $("to-bottom").hidden = true; });
+$("to-bottom").addEventListener("click", () => toBottom());
 function renderChat() {
- const list = $("messages"), follow = atBottom(list);
+ const list = $("messages"), follow = stick;
  const encoder = new TextEncoder();
  while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
  for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
@@ -375,7 +383,7 @@ async function attach(file: File) {
  try {
   const response = await fetch("/api/paste", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": file.type }, body: file });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Image paste failed.");
-  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); const list = $("messages"); list.scrollTop = list.scrollHeight; renderMentions(); showNotice("Image saved: " + value.path);
+  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); toBottom(); renderMentions(); showNotice("Image saved: " + value.path);
  } catch (error) { showNotice(error.message); }
 }
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
@@ -396,7 +404,7 @@ $("composer").addEventListener("submit", async event => {
  }
  messageSending = true; renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
- const list = $("messages"); list.scrollTop = list.scrollHeight; $("to-bottom").hidden = true;
+ toBottom();
  try { const result = await post("message", { text }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent."); }
  catch (error) { showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
