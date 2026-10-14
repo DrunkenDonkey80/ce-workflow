@@ -513,6 +513,39 @@ try {
  } finally { await pairServer.close(); }
  assert(approvals.every(approval => approval.signal.aborted), "every approval dialog is dismissed");
 }
+// P3-04: a revoked device loses access on its next request; pairing codes expire after 2 minutes.
+{
+ const directory = await mkdtemp(join(tmpdir(), "plan3-revoke-test-")), registry = createDeviceRegistry({ directory });
+ const cookie = await registry.pair("Phone", "me@github"); let approvals = [];
+ const { mock } = await import("node:test");
+ const revokeServer = await createPlan3Web({ snapshot: () => ({ ok: true }), remote: () => ({ host: "pc.tail.ts.net", login: "me@github" }), device: (value, login) => registry.check(value, login), pair: request => new Promise(resolve => { approvals.push(request); request.signal.addEventListener("abort", () => resolve(undefined)); }) });
+ try {
+  const host = `pc.tail.ts.net:${revokeServer.port}`;
+  const raw = (path, method = "GET") => new Promise((resolve, reject) => {
+   const req = httpRequest(`${revokeServer.origin}${path}`, { method, headers: { Host: host, Origin: `https://${host}`, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github", Cookie: `pi_remote=${cookie}` } }, res => { let text = ""; res.on("data", chunk => text += chunk); res.on("end", () => resolve({ status: res.statusCode, text })); });
+   req.on("error", reject); req.end();
+  });
+  assert.equal((await raw("/api/snapshot")).status, 200);
+  await registry.revoke(cookie.split(".")[0]);
+  assert.equal((await raw("/api/snapshot")).status, 401, "revoked device");
+  mock.timers.enable({ apis: ["setTimeout"] });
+  let start;
+  try { start = JSON.parse((await raw("/pair/start", "POST")).text); mock.timers.tick(120_000); } finally { mock.timers.reset(); }
+  assert(approvals[0].signal.aborted, "expiry dismisses the terminal dialog");
+  assert.deepEqual(JSON.parse((await raw(`/pair/status?id=${start.id}`)).text), { state: "expired" });
+  assert.equal((await raw(`/pair/status?id=${start.id}`)).status, 404, "an expired code is gone");
+ } finally { await revokeServer.close(); await rm(directory, { recursive: true, force: true }); }
+}
+// D9: terminal-only list dialogs never reach a bound browser bridge.
+{
+ const { bindListDialogBridge, showListDialog } = await createJiti(import.meta.url).import("../extensions/work-dialogs.ts");
+ let bridged = 0; const ui = { select: async (_title, labels) => labels[0], notify() {} }, ctx = { ui, hasUI: true };
+ bindListDialogBridge(ctx, async () => { bridged++; return { value: "yes" }; });
+ const items = [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }];
+ assert.equal((await showListDialog(ctx, { title: "Approve?", items, terminalOnly: true }))?.value, "no"); assert.equal(bridged, 0);
+ assert.equal((await showListDialog(ctx, { title: "Other", items }))?.value, "yes"); assert.equal(bridged, 1, "ordinary dialogs still bridge");
+ bindListDialogBridge(ctx, undefined);
+}
 // P3-01: Tailscale detection names each missing step; serve stays tailnet-only on the same port.
 {
  const status = patch => JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } }, ...patch });

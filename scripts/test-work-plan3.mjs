@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
+import { createServer, request as httpRequest } from "node:http";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -1309,6 +1309,14 @@ try {
 		await share(); assert.match(sharedStatus, /\[SHARED\]/); const shareUrl = new URL(notices.at(-2).message.replace("Shared locally: ", ""));
 		assert.equal(notices.at(-1).message, `Remote (your tailnet only): https://pc.tail.ts.net:${shareUrl.port}/`);
 		assert.deepEqual(tailscaleCalls, ["status --json", `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`]);
+		// D9: without a terminal UI the pairing dialog never opens, so a remote page cannot pair itself.
+		const pairHost = `pc.tail.ts.net:${shareUrl.port}`, pairRaw = (method, route) => new Promise((resolve, reject) => {
+			const req = httpRequest(`${shareUrl.origin}${route}`, { method, headers: { Host: pairHost, Origin: `https://${pairHost}`, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github" } }, res => { let body = ""; res.on("data", chunk => body += chunk); res.on("end", () => resolve({ status: res.statusCode, body })); });
+			req.on("error", reject); req.end();
+		});
+		assert.equal(webCtx.hasUI, false); const pending = JSON.parse((await pairRaw("POST", "/pair/start")).body);
+		assert.deepEqual(JSON.parse((await pairRaw("GET", `/pair/status?id=${pending.id}`)).body), { state: "denied" });
+		assert.equal((await pairRaw("GET", "/api/snapshot")).status, 401);
 		await hooks.get("session_shutdown")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.length, 2, "reload keeps the mapping");
 		await hooks.get("session_start")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`);
 		assert.equal((await fetch(`${shareUrl.origin}/api/snapshot`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).status, 200);
