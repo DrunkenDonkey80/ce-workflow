@@ -139,7 +139,7 @@ try {
  await browser("click", "#drawer-toggle");
  await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('drawer').dataset.open, document.activeElement.id, document.getElementById('drawer-backdrop').hidden]"), ["false", "drawer-toggle", true]);
  // E5 finding: the chat itself gets most of the screen; only a slim bar sits above it.
- assert(await evaluate("(() => { const m = document.getElementById('messages').getBoundingClientRect(); return m.top < 60 && m.height > innerHeight * 0.6; })()"), "phone: messages fill the screen");
+ assert(await evaluate("(() => { const m = document.getElementById('feed').getBoundingClientRect(); return m.top < 60 && m.height > innerHeight * 0.6; })()"), "phone: messages fill the screen");
  assert.deepEqual(await evaluate("[document.getElementById('left-panel').getClientRects().length, document.querySelector('.left-tabs').getClientRects().length]"), [0, 0]);
  assert(await evaluate("(() => { const r = document.getElementById('composer').getBoundingClientRect(), a = document.querySelector('.attach').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top > innerHeight / 2 && a.width > 0 && a.bottom <= innerHeight; })()"), "composer and attach stay on screen");
  assert.equal(await evaluate("document.documentElement.scrollWidth"), 390, "no sideways scrolling");
@@ -422,30 +422,29 @@ try {
  // Sending from a scrolled-up chat jumps to the bottom and follows the echoed message.
  for (let i = 0; i < 30; i++) { const row = { id: "filler_" + i, role: "assistant", text: "Filler line " + i, streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
  await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=filler_29]\") !== null");
- await evaluate("document.getElementById(\"messages\").scrollTop = 0");
+ await evaluate("document.getElementById(\"feed\").scrollTop = 0");
  await browser("fill", "#message-input", "Scroll me down"); await browser("click", "#send"); await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Scroll me down\")");
- assert(await evaluate("(() => { const list = document.getElementById(\"messages\"); return list.scrollHeight - list.scrollTop - list.clientHeight < 48; })()"), "send scrolls the chat to the newest message");
+ assert(await evaluate("(() => { const list = document.getElementById(\"feed\"); return list.scrollHeight - list.scrollTop - list.clientHeight < 48; })()"), "send scrolls the chat to the newest message");
  // Content that grows after it was drawn (a thumbnail loading, a block opening) must not unpin the chat; only scrolling up does.
- await evaluate("(() => { const l = document.getElementById('messages'); l.scrollTop = l.scrollHeight; })()"); await new Promise(done => setTimeout(done, 100));
+ await evaluate("(() => { const l = document.getElementById('feed'); l.scrollTop = l.scrollHeight; })()"); await new Promise(done => setTimeout(done, 100));
  await evaluate("document.querySelector('#messages > li:last-child').append(Object.assign(document.createElement('div'), { style: 'height: 200px' }))");
  { const row = { id: "after_grow", role: "assistant", text: "Still following", streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
  await browser("wait", "[data-id=after_grow]");
- assert(await evaluate("(() => { const list = document.getElementById('messages'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4 && document.getElementById('to-bottom').hidden; })()"), "late growth does not unpin the chat");
+ assert(await evaluate("(() => { const list = document.getElementById('feed'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4 && document.getElementById('to-bottom').hidden; })()"), "late growth does not unpin the chat");
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
- // The queue and tool rows above the chat grow and shrink the list: a reader at the end stays at the end.
+ // Queue and tool rows below the newest message grow the one scroll area: a reader at the end stays at the end.
  activity = { working: true, tools: [], queue: [], hasPendingMessages: false, error: undefined, thinking: "" }; server.publish("activity", activity);
  await browser("wait", "--fn", "document.querySelectorAll('#activity details').length === 0");
- await evaluate("(() => { const l = document.getElementById('messages'); l.scrollTop = l.scrollHeight; })()"); await new Promise(done => setTimeout(done, 100));
- const listBefore = await evaluate("document.getElementById('messages').clientHeight");
+ await evaluate("(() => { const l = document.getElementById('feed'); l.scrollTop = l.scrollHeight; })()"); await new Promise(done => setTimeout(done, 100));
  activity = { working: true, error: undefined, thinking: "", queue: [{ id: "q1", text: "Queued follow-up", delivery: "followUp" }], tools: Array.from({ length: 6 }, (_, i) => ({ id: "grow_" + i, name: "bash", state: "running", args: "step " + i })) }; server.publish("activity", activity);
  await browser("wait", "--fn", "document.querySelectorAll('#activity details').length >= 7"); await new Promise(done => setTimeout(done, 200));
- assert(await evaluate("document.getElementById('messages').clientHeight") < listBefore - 48, "the queue rows really shrink the list");
+ assert(await evaluate("(() => { const feed = document.getElementById('feed'), activity = document.getElementById('activity'), messages = document.getElementById('messages'); return [activity, messages].every(item => item.parentElement === feed && item.scrollHeight <= item.clientHeight + 1) && messages.nextElementSibling === activity && activity.getBoundingClientRect().bottom - feed.getBoundingClientRect().bottom < 4; })()"), "one scroll area: messages, then the live activity at the end");
  // A scroll event arriving after content grew below (reader did not move) keeps the pin.
- await evaluate("(() => { const l = document.getElementById('messages'); l.lastElementChild.append(Object.assign(document.createElement('div'), { style: 'height: 200px' })); l.dispatchEvent(new Event('scroll')); })()");
+ await evaluate("(() => { document.querySelector('#messages > li:last-child').append(Object.assign(document.createElement('div'), { style: 'height: 200px' })); document.getElementById('feed').dispatchEvent(new Event('scroll')); })()");
  { const row = { id: "after_queue", role: "assistant", text: "Working on it", streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
  await browser("wait", "[data-id=after_queue]");
- assert(await evaluate("(() => { const list = document.getElementById('messages'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4; })()"), "queued message: the chat stays at the end");
+ assert(await evaluate("(() => { const list = document.getElementById('feed'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4; })()"), "queued message: the chat stays at the end");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
  const productSample = JSON.parse(await readFile(new URL("./fixtures/diagrams/ce-workflow.diagram.json", import.meta.url), "utf8"));
  diagram = { ...productSample, kind: "plan", plan: "12345678", revision: diagram.revision + 1 }; server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });

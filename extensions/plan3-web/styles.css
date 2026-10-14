@@ -175,8 +175,9 @@ h2 { font-size: 15px; font-weight: 600; }
 .activity-error, .tool-error summary { color: var(--error); }
 .activity .thinking-row pre { font-style: italic; }
 .activity-caution { color: var(--muted); }
-.activity { flex-shrink: 0; max-height: 38%; overflow: auto; }
-.messages { list-style: none; margin: 0; padding: 16px; flex: 1; min-height: 0; overflow: auto; }
+/* One scroll area: the conversation, then the live activity below the newest message. */
+.feed { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
+.messages { list-style: none; margin: 0; padding: 16px 16px 0; }
 .row-full { display: block; margin-top: 4px; padding: 0; border: 0; background: none; color: var(--focus); font-size: 13px; text-decoration: underline; cursor: pointer; }
 .composer { padding: 8px 12px; border-top: 1px solid var(--line); }
 textarea { display: block; width: 100%; border: 1px solid var(--group); border-radius: 6px; background: var(--panel); padding: 8px; resize: vertical; min-height: 52px; max-height: 180px; }
@@ -267,8 +268,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .drawer .status-row > button { flex: 1 1 auto; }
  .drawer-commands { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 16px 0; }
  .drawer-backdrop { display: block; position: fixed; z-index: 6; inset: 0; background: rgba(0, 0, 0, .25); }
- .activity { max-height: 22%; }
- .messages { padding: 10px 12px; }
+ .messages { padding: 10px 12px 0; }
  .composer { padding: 6px 8px; }
  textarea { min-height: 40px; }
  .composer-actions { justify-content: flex-end; margin-top: 4px; }

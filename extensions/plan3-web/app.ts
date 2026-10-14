@@ -82,6 +82,7 @@ function renderActivity() {
   for (const item of data.queue ?? []) queue.append(make("p", item.delivery + ": " + item.text));
  }
  if (data.tools?.length) root.append(make("p", "Text-only excerpts; custom tool renderers and images stay in Pi.", "activity-caution"));
+ pinChat();
 }
 
 // R7: full split, narrowed to the chat's width, or collapsed to >>; the choice and tab survive reloads.
@@ -320,12 +321,12 @@ const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - lis
 let stick = true;
 // Explicit jumps re-pin at once; the scroll event that would do it arrives a frame later.
 function toBottom() { stick = true; pinChat(); $("to-bottom").hidden = true; }
-const pinChat = () => { const list = $("messages"); if (stick) list.scrollTop = list.scrollHeight; };
+const pinChat = () => { const list = $("feed"); if (stick) list.scrollTop = list.scrollHeight; };
 // Only moving up unpins: a late scroll event after content grew below finds the list off the end without the reader moving.
 let lastTop = 0;
-$("messages").addEventListener("scroll", () => { const list = $("messages"); if (atBottom(list)) stick = true; else if (list.scrollTop < lastTop - 2) stick = false; lastTop = list.scrollTop; if (stick) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
-new ResizeObserver(pinChat).observe($("messages"));
-$("messages").addEventListener("load", pinChat, true);
+$("feed").addEventListener("scroll", () => { const list = $("feed"); if (atBottom(list)) stick = true; else if (list.scrollTop < lastTop - 2) stick = false; lastTop = list.scrollTop; if (stick) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
+new ResizeObserver(pinChat).observe($("feed"));
+$("feed").addEventListener("load", pinChat, true);
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
 // Opening a thinking/tool block of an excerpt row loads its bodies.
 $("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); const row = chat.get(item?.dataset.id); if ((event.target as HTMLDetailsElement).open && (row?.excerpt || row?.brief)) void loadRow(item.dataset.id); }, true);
@@ -335,12 +336,12 @@ async function loadEarlier() {
  try {
   const first = chat.keys().next().value, page = await get("rows" + (first ? "?before=" + encodeURIComponent(first) : ""));
   const rows = [...page.rows, ...chat.values()]; chat.clear(); for (const row of rows) chat.set(row.id, row);
-  state.more = page.more; const list = $("messages"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height;
+  state.more = page.more; const list = $("feed"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height;
  } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; }
 }
 $("to-bottom").addEventListener("click", () => toBottom());
 function renderChat() {
- const list = $("messages"), follow = stick;
+ const list = $("messages"), feed = $("feed"), follow = stick;
  const encoder = new TextEncoder();
  while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
  for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
@@ -366,7 +367,7 @@ function renderChat() {
   } item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
  }
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
- if (follow) list.scrollTop = list.scrollHeight; else if (list.scrollHeight > list.clientHeight) $("to-bottom").hidden = false;
+ if (follow) feed.scrollTop = feed.scrollHeight; else if (feed.scrollHeight > feed.clientHeight) $("to-bottom").hidden = false;
 }
 const mentioned = () => [...new Set([...$("message-input").value.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
 function renderMentions() {
