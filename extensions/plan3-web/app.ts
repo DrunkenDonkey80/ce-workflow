@@ -41,7 +41,7 @@ function renderActivity() {
  if (data.error) { const error = make("p", data.error, "activity-error"); error.setAttribute("role", "alert"); root.append(error); }
  if (data.thinking) section("thinking", "Thinking").append(make("pre", data.thinking));
  for (const tool of data.tools ?? []) {
-  const row = section(tool.id, tool.name + " · " + tool.state + (tool.durationMs === undefined ? "" : " · " + Math.round(tool.durationMs) + " ms"), tool.state === "running");
+  const row = section(tool.id, tool.name + " · " + tool.state + (tool.durationMs === undefined ? "" : " · " + Math.round(tool.durationMs) + " ms"));
   row.className = "tool-row" + (tool.parent ? " nested-tool" : "") + (tool.state === "error" ? " tool-error" : "");
   for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
  }
@@ -180,7 +180,11 @@ function renderMentions() {
  for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = "No matching element; sent as text."; if (entity && "label" in entity) chip.title = entity.label ?? chip.title; if (entity && "text" in entity) chip.title = entity.text; $("mentions").append(chip); }
 }
 $("message-input").addEventListener("input", renderMentions);
-$("message-input").addEventListener("keydown", event => { if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); $("composer").requestSubmit(); } });
+// Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
+$("message-input").addEventListener("keydown", event => {
+ if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("composer").requestSubmit(); }
+ if (event.key === "Escape" && !$("stop").hidden && !$("stop").disabled) { event.preventDefault(); $("stop").click(); }
+});
 $("composer").addEventListener("submit", async event => {
  event.preventDefault(); if (messageSending || !state.connected) return;
  const text = $("message-input").value; if (!text.trim()) return;

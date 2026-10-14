@@ -199,10 +199,11 @@ try {
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
  assert(await evaluate("document.getElementById(\"activity\").textContent.includes(\"May be stale\")"));
  assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
+ assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool rows start collapsed");
  await browser("click", "#activity details[data-id=tool_1] summary");
  activity.tools[0] = { ...activity.tools[0], state: "error", result: "Read failed", durationMs: 100 }; activity.compacting = false; activity.error = "A safe error"; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"activity\").textContent.includes(\"Read failed\")");
- assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool updates preserve disclosure state");
+ assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), true, "tool updates preserve disclosure state");
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
