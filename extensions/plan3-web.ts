@@ -17,6 +17,10 @@ type Options = {
 	snapshot: (target?: WebTarget) => unknown | Promise<unknown>;
 	post?: (endpoint: string, body: Record<string, unknown>) => unknown | Promise<unknown>;
 	read?: (endpoint: string, params: URLSearchParams) => unknown | Promise<unknown>;
+	/** D8: the tailnet host and owner login once Tailscale serve maps this port. */
+	remote?: () => { host?: string; login?: string } | undefined;
+	/** D4/D21: whether a `pi_remote` cookie belongs to a paired, unexpired device of this owner. */
+	device?: (cookie: string, login: string) => boolean | Promise<boolean>;
 };
 const BODY_BYTES = 65_536, IMAGE_BYTES = 20_000_000;
 // Pasted images are checked by magic bytes, not the browser-declared type.
@@ -73,7 +77,7 @@ function read(req: IncomingMessage, limit: number): Promise<Buffer> {
 export async function createPlan3Web(options: Options) {
 	const token = options.token ?? randomBytes(32).toString("hex"), clients = new Map<ServerResponse, { ready: boolean; frames: string[]; bytes: number }>();
 	if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("Invalid workspace token.");
-	let origin = "", sequence = 0, closed = false;
+	let origin = "", port = 0, sequence = 0, closed = false;
 	const valid = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value) && timingSafeEqual(Buffer.from(value), Buffer.from(token));
 	const json = (res: ServerResponse, status: number, value: unknown) => {
 		res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -109,13 +113,23 @@ export async function createPlan3Web(options: Options) {
 		res.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
 		void (async () => {
 			if (closed) throw new WebError(503, "Workspace closed.");
-			if (req.headers.host !== origin.slice("http://".length)) throw new WebError(403, "Foreign Host rejected.");
-			if (req.headers.origin !== undefined && req.headers.origin !== origin || req.method === "POST" && req.headers.origin !== origin) throw new WebError(403, "Foreign or missing Origin rejected.");
+			// D8: the Host picks the mode; local uses the token, the tailnet host the owner login plus a paired-device cookie.
+			const tailnet = options.remote?.(), remoteHost = tailnet?.host && tailnet.login ? `${tailnet.host}:${port}` : undefined;
+			const remote = req.headers.host === remoteHost;
+			if (!remote && req.headers.host !== origin.slice("http://".length)) throw new WebError(403, "Foreign Host rejected.");
+			const expected = remote ? `https://${remoteHost}` : origin;
+			if (req.headers.origin !== undefined && req.headers.origin !== expected || req.method === "POST" && req.headers.origin !== expected) throw new WebError(403, "Foreign or missing Origin rejected.");
 			if (!req.url || req.url.length > 2048) throw new WebError(414, "Request URL too long.");
-			const url = new URL(req.url, origin);
-			if (url.origin !== origin) throw new WebError(403, "Foreign request URL rejected.");
+			const url = new URL(req.url, expected);
+			if (url.origin !== expected) throw new WebError(403, "Foreign request URL rejected.");
+			if (remote) {
+				if (req.headers["x-forwarded-proto"] !== "https" || req.headers["tailscale-user-login"] !== tailnet.login) throw new WebError(403, "Only the Tailscale owner may connect.");
+				// The token never authorizes remote requests: a leaked link must still need terminal pairing (D4).
+				const cookie = /(?:^|;\s*)pi_remote=([A-Za-z0-9._-]{1,200})(?:;|$)/.exec(req.headers.cookie ?? "")?.[1];
+				if (!cookie || !await options.device?.(cookie, tailnet.login)) throw new WebError(401, "This device is not paired.");
+			}
 			// Cookies cross localhost ports; use an explicit token, never ambient browser credentials.
-			if (![req.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")].some(valid)) throw new WebError(401, "Workspace token required.");
+			else if (![req.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")].some(valid)) throw new WebError(401, "Workspace token required.");
 			if (req.method === "GET" && url.pathname === "/api/snapshot") return json(res, 200, await options.snapshot(url.searchParams.has("target") ? webTarget(url.searchParams.get("target")) : undefined));
 			if (req.method === "GET" && url.pathname === "/api/events") {
 				if (clients.size >= 8) throw new WebError(429, "Too many workspace connections.");
@@ -153,7 +167,7 @@ export async function createPlan3Web(options: Options) {
 			try { contents = readFileSync(fileURLToPath(new URL(`./plan3-web/${asset[0]}`, import.meta.url))); }
 			catch { throw new WebError(404, "Workspace asset is not installed."); }
 			res.writeHead(200, { "Content-Type": asset[1], ...(fingerprinted ? { "Cache-Control": "private, max-age=31536000, immutable" } : {}) });
-			res.end(asset[1].startsWith("font/") ? contents : (asset[0].endsWith(".ts") ? stripTypeScriptTypes(contents.toString("utf8")) : contents.toString("utf8")).replaceAll("__TOKEN__", token).replaceAll("__BUILD__", build));
+			res.end(asset[1].startsWith("font/") ? contents : (asset[0].endsWith(".ts") ? stripTypeScriptTypes(contents.toString("utf8")) : contents.toString("utf8")).replaceAll("__TOKEN__", remote ? "" : token).replaceAll("__BUILD__", build));
 		})().catch(error => {
 			clients.delete(res);
 			if (res.destroyed || res.writableEnded) return;
@@ -179,7 +193,7 @@ export async function createPlan3Web(options: Options) {
 	}
 	const address = server.address();
 	if (!address || typeof address === "string") throw new Error("Workspace did not bind a TCP port.");
-	origin = `http://127.0.0.1:${address.port}`;
+	origin = `http://127.0.0.1:${address.port}`; port = address.port;
 	const heartbeat = setInterval(() => { for (const [res, connection] of clients) if (connection.ready) send(res, ": keepalive\n\n"); }, 15_000);
 	heartbeat.unref();
 	let closing: Promise<void> | undefined;

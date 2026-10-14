@@ -15,7 +15,9 @@ function $(id: "diagram"): SVGSVGElement;
 function $(id: "search"): HTMLInputElement;
 function $(id: string): HTMLElement;
 function $(id: string): HTMLElement | SVGSVGElement { return document.getElementById(id); }
+// Empty on the tailnet host (D21): remote pages authenticate with the same-origin device cookie.
 const token = "__TOKEN__";
+const auth: RequestInit = token ? { credentials: "omit", headers: { Authorization: "Bearer " + token } } : { credentials: "same-origin", headers: {} };
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 const state: { connected: boolean; diagram: Diagram | null; plan: { title: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
@@ -81,7 +83,7 @@ splitter.addEventListener("keydown", event => {
 });
 
 async function get(endpoint) {
- const response = await fetch("/api/" + endpoint, { credentials: "omit", headers: { Authorization: "Bearer " + token } });
+ const response = await fetch("/api/" + endpoint, auth);
  const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Workspace request failed."); return value;
 }
 async function loadDiagram() {
@@ -95,7 +97,7 @@ async function loadRow(id) {
  try { chat.set(id, await get("row?id=" + encodeURIComponent(id))); renderChat(); } catch (error) { showNotice(error.message); } finally { loading.delete(id); }
 }
 async function post(endpoint, body) {
- const response = await fetch("/api/" + endpoint, { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ target, ...body }) });
+ const response = await fetch("/api/" + endpoint, { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify({ target, ...body }) });
  const value = await response.json(); if (!response.ok) { throw Object.assign(new Error(value.error ?? "Workspace request failed."), { status: response.status }); } return value;
 }
 function hover(id, _event) {
@@ -249,7 +251,7 @@ $("message-input").addEventListener("paste", async event => {
  const file = [...(event.clipboardData?.items ?? [])].find(item => item.type.startsWith("image/"))?.getAsFile(); if (!file) return;
  event.preventDefault(); showNotice("Saving pasted image\u2026");
  try {
-  const response = await fetch("/api/paste", { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": file.type }, body: file });
+  const response = await fetch("/api/paste", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": file.type }, body: file });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Image paste failed.");
   const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); const list = $("messages"); list.scrollTop = list.scrollHeight; renderMentions(); showNotice("Image saved: " + value.path);
  } catch (error) { showNotice(error.message); }
@@ -337,7 +339,8 @@ listen("tool", row => {
  state.activity = { ...state.activity, tools: tools.slice(-50) }; renderActivity();
 });
 function connect() {
- events = new EventSource("/api/events?token=" + token + (target ? "&target=" + encodeURIComponent(target) : ""));
+ const query = new URLSearchParams(); if (token) query.set("token", token); if (target) query.set("target", target);
+ events = new EventSource("/api/events?" + query);
  for (const [name, update] of handlers) events.addEventListener(name, (event: MessageEvent) => applyUpdate(event, update));
  events.addEventListener("error", event => {
   if (event instanceof MessageEvent && event.data) { applyUpdate(event, value => showNotice(value.message ?? "Workspace update failed.")); return; }

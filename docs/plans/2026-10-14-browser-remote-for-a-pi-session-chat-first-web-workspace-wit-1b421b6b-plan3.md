@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T11:42:12.328Z
+updated: 2026-10-14T11:46:18.191Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -199,7 +199,7 @@ Commands (existing; referenced by steps):
 ### Phase 3: Tailscale remote and device pairing [code]
 
 - [x] **P3-01** Tailscale detection and serve mapping. plan3-remote.ts adds tailscaleStatus (installed, logged in, MagicDNS, HTTPS certificates, owner login, untagged; each missing step named), plus serveAdd/serveRemove (tailnet HTTPS on the same port, never Funnel). Sharing adds the mapping, or warns which step is missing and still shares locally; turning sharing off, quit, new and fork remove it, and reload keeps it. A changed port removes the old mapping. Remote Host stays 403 until P3-02.
-- [ ] **P3-02** Host-based request modes (D8, D21): local token, remote owner login plus cookie; migrate every fetch, asset and stream; Origin per mode.
+- [x] **P3-02** Request mode follows the Host (D8). 127.0.0.1:port requires the token and ignores cookies. The tailnet host:port requires X-Forwarded-Proto https, the owner Tailscale-User-Login and a pi_remote cookie accepted by options.device, never the token, with Origin https://host:port. Remote assets carry an empty token, and the page then uses same-origin credentials for fetch, POST, paste and EventSource. plan3.ts passes the serve mapping as remote; device is unset until P3-03, so remote requests fail closed with 401.
 - [ ] **P3-03** Pairing page and API, terminal-only approval dialog (D9), machine-wide cookie per D13 and D18, `/wo share devices` to list and revoke.
 - [ ] **P3-04** C-WEB tests with forged headers: wrong login, missing cookie, revoked device, foreign Host, pairing expiry and rate limit, D9 isolation.
 - [ ] **P3-06** Device registry under a cross-process lock (D21); two-process tests for concurrent pairing, renewal and revoke; corrupt file fails closed.
@@ -252,7 +252,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Executing. Phase 2 complete (P2-01..P2-11, HEAD after P2-08 commit). Next: P3-01 Tailscale detection and serve add/remove via pi.exec. Then P3-02, P3-03, P3-04, P3-06, P3-07, P3-05. Hunk filter must use bytes mode; verify with git show HEAD. Browser test has a known flaky drag-pan race; rerun once.
+Executing. P3-01 done (Tailscale detection, serve add/remove). Next: P3-02 host-based request modes (local token vs remote owner login + device cookie). Remote Host is currently 403 (fail-closed). Then P3-03, P3-04, P3-06, P3-07, P3-05.
 
 ## Amendments
 

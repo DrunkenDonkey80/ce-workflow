@@ -411,6 +411,43 @@ try {
  await writeFile(join(credentialDir, `${id}.json`), "{}");
  await assert.rejects(loadShareRecord(id, credentialDir), /Invalid/);
 } finally { await fallback?.close(); await occupied?.close(); await persistent?.close(); await rm(credentialDir, { recursive: true, force: true }); }
+// P3-02: the Host picks the mode; remote needs HTTPS forwarding, the owner login and a paired-device cookie, never the token.
+{
+ let paired = false; const seen = [];
+ const remoteServer = await createPlan3Web({ snapshot: () => ({ ok: true }), post: () => ({ posted: true }), remote: () => ({ host: "pc.tail.ts.net", login: "me@github" }), device: (cookie, login) => { seen.push([cookie, login]); return paired; } });
+ try {
+  const token = new URL(remoteServer.url()).searchParams.get("token"), host = `pc.tail.ts.net:${remoteServer.port}`, origin = `https://${host}`;
+  const raw = (path, headers = {}, method = "GET", payload) => new Promise((resolve, reject) => {
+   const req = httpRequest(`${remoteServer.origin}${path}`, { method, headers: { Host: host, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github", ...headers } }, res => { let text = ""; res.setEncoding("utf8"); res.on("data", chunk => text += chunk); res.on("end", () => resolve({ status: res.statusCode, text })); });
+   req.on("error", reject); req.end(payload);
+  });
+  const cookie = { Cookie: "other=1; pi_remote=dev1.secret" };
+  assert.equal((await raw("/api/snapshot")).status, 401, "no cookie");
+  assert.equal((await raw(`/api/snapshot?token=${token}`, { Authorization: `Bearer ${token}` })).status, 401, "the token never authorizes remote requests");
+  assert.equal((await raw("/api/snapshot", cookie)).status, 401, "unpaired cookie"); assert.deepEqual(seen.at(-1), ["dev1.secret", "me@github"]);
+  paired = true;
+  assert.equal((await raw("/api/snapshot", cookie)).status, 200);
+  assert.equal((await raw("/api/snapshot", { ...cookie, "Tailscale-User-Login": "other@github" })).status, 403, "wrong login");
+  assert.equal((await raw("/api/snapshot", { ...cookie, "Tailscale-User-Login": "" })).status, 403, "missing login");
+  assert.equal((await raw("/api/snapshot", { ...cookie, "X-Forwarded-Proto": "http" })).status, 403, "not via HTTPS serve");
+  assert.equal((await raw("/api/snapshot", { ...cookie, Host: "evil.example" })).status, 403, "foreign Host");
+  assert.equal((await raw("/api/snapshot", { ...cookie, Origin: remoteServer.origin })).status, 403, "local Origin on the remote host");
+  const message = JSON.stringify({ text: "hi" }), json = { ...cookie, "Content-Type": "application/json" };
+  assert.equal((await raw("/api/message", json, "POST", message)).status, 403, "POST needs the remote Origin");
+  assert.equal((await raw("/api/message", { ...json, Origin: origin }, "POST", message)).status, 200);
+  const page = await raw("/", cookie), app = await raw(`/a/${remoteServer.build}/app.js`, cookie);
+  assert.equal(page.status, 200); assert(!page.text.includes(token) && !app.text.includes(token), "remote assets never carry the token");
+  assert.match(app.text, /const token = "";/);
+  const local = await fetch(`${remoteServer.origin}/a/${remoteServer.build}/app.js`, { headers: { Authorization: `Bearer ${token}` } });
+  assert((await local.text()).includes(token), "local assets keep the token");
+  assert.equal((await fetch(`${remoteServer.origin}/api/snapshot`, { headers: { Cookie: "pi_remote=dev1.secret" } })).status, 401, "local mode ignores the device cookie");
+ } finally { await remoteServer.close(); }
+ const noRemote = await createPlan3Web({ snapshot: () => ({}), device: () => true });
+ try {
+  const status = await new Promise((resolve, reject) => { const req = httpRequest(`${noRemote.origin}/api/snapshot`, { headers: { Host: `pc.tail.ts.net:${noRemote.port}`, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github", Cookie: "pi_remote=a.b" } }, res => { res.resume(); resolve(res.statusCode); }); req.on("error", reject); req.end(); });
+  assert.equal(status, 403, "without a tailnet mapping the tailnet Host is foreign");
+ } finally { await noRemote.close(); }
+}
 // P3-01: Tailscale detection names each missing step; serve stays tailnet-only on the same port.
 {
  const status = patch => JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } }, ...patch });
