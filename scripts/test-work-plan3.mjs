@@ -1196,6 +1196,13 @@ try {
 		const full = await snapshot(); assert.equal(full.diagram, undefined, "check-in snapshot leaves the diagram to /api/diagram"); assert(Buffer.byteLength(JSON.stringify(full)) <= 64_000);
 		const edited = (await (await fetch(`${url.origin}/api/diagram?target=${b}`, { headers })).json()).diagram;
 		assert.deepEqual([edited.nodes[0].x, edited.nodes[0].y], [12, 34]);
+		const files = await (await fetch(`${url.origin}/api/files`, { headers })).json();
+		assert(Array.isArray(files.files) && files.files.length > 0, "the Files API lists the project");
+		const planFile = files.files.find(file => file.path.endsWith("-plan3.md")).path;
+		const shown = await (await fetch(`${url.origin}/api/file?path=${encodeURIComponent(planFile)}`, { headers })).json();
+		assert(shown.content?.includes("## Decisions"), JSON.stringify(shown).slice(0, 300));
+		assert.equal((await fetch(`${url.origin}/api/file?path=.env`, { headers })).status, 403, "secret-shaped paths are refused");
+		assert.equal((await fetch(`${url.origin}/api/file?path=x`)).status, 401, "the Files API needs the capability");
 		assert.equal(edited.notes[0].author, "user"); assert.equal(edited.notes[0].target, "api");
 		const sent = await post("message", { text: "Discuss @api", comments: [edited.notes[0].id] });
 		assert.equal(sent.status, 200); assert.deepEqual(sent.body.mentions, ["api"]);

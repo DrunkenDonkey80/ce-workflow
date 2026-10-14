@@ -12,6 +12,7 @@ import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, design
 import { plan3Windows } from "./plan3-window.ts";
 import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createPlan3Web, checkIn, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
+import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./plan3-files.ts";
 import { createDeviceRegistry, createSessionRecords, loadShareRecord, saveSharePort, serveAdd, serveRemove, tailscaleStatus, type ShareRecord, type Tailnet } from "./plan3-remote.ts";
 import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
@@ -757,6 +758,8 @@ export default function plan3(pi) {
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => {
 		if (["activity", "dialog", "dialog_closed"].includes(event)) publishSession();
+		// D11: no file watcher; the Files tab refreshes after tools that can change files.
+		if (event === "tool" && ["write", "edit", "bash"].includes(data?.name) && data.state !== "running") try { webInstance?.publish("files", {}); } catch { /* reported below */ }
 		try { webInstance?.publish(event, data); }
 		catch (error) { try { webCtx?.ui.notify(`Plan3 browser update failed; terminal remains active: ${error.message}`, "warning"); } catch { console.warn("Plan3 browser update failed; terminal notification unavailable:", error.message); } }
 	};
@@ -828,6 +831,11 @@ export default function plan3(pi) {
 		if (endpoint === "/api/row") return chat.row(params.get("id") ?? "");
 		if (endpoint === "/api/rows") return chat.page(params.get("before") ?? undefined);
 		if (endpoint === "/api/dialog") return dialogs.get(params.get("id") ?? "");
+		if (endpoint === "/api/files") return listFiles(webCtx.cwd);
+		if (endpoint === "/api/file" || endpoint === "/api/diff") {
+			try { return await (endpoint === "/api/file" ? readProjectFile : readProjectDiff)(webCtx.cwd, params.get("path")); }
+			catch (error) { throw error instanceof FileRefused ? new WebError(403, error.message) : error; }
+		}
 		const target = await displayedWebTarget(params.get("target") ?? undefined), resolved = await resolveWebTarget(target);
 		return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined) };
 	}

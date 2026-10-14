@@ -513,6 +513,40 @@ try {
  } finally { await pairServer.close(); }
  assert(approvals.every(approval => approval.signal.aborted), "every approval dialog is dismissed");
 }
+// P4-02: Files API (D11, D21): hidden paths, change marks, diffs that never show secrets.
+{
+ const { listFiles, readProjectFile, readProjectDiff, FileRefused } = await createJiti(import.meta.url).import("../extensions/plan3-files.ts");
+ const { execFileSync } = await import("node:child_process"), { mkdir } = await import("node:fs/promises");
+ const repo = await mkdtemp(join(tmpdir(), "plan3-files-test-")), run = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: repo, stdio: "pipe" });
+ try {
+  const plain = await mkdtemp(join(tmpdir(), "plan3-files-plain-"));
+  await mkdir(join(plain, "src")); await mkdir(join(plain, "node_modules")); await writeFile(join(plain, "src", "a.ts"), "x"); await writeFile(join(plain, "node_modules", "b.js"), "x"); await writeFile(join(plain, ".env"), "K=1");
+  assert.deepEqual(await listFiles(plain), { files: [{ path: "src/a.ts" }], truncated: false, git: false }, "a walk outside git still hides secrets and generated folders");
+  await rm(plain, { recursive: true, force: true });
+  run("init", "-q");
+  assert.deepEqual(await readProjectDiff(repo, "x.txt").catch(error => error.constructor.name), "FileRefused", "a missing file is refused, not crashed");
+  await writeFile(join(repo, "first.txt"), "one\n"); assert.deepEqual(await readProjectDiff(repo, "first.txt"), { path: "first.txt", diff: "", content: "one\n" }, "an unborn repository shows content");
+  await writeFile(join(repo, "keep.txt"), "a\nb\n"); await writeFile(join(repo, "gone.txt"), "bye\n"); await writeFile(join(repo, "old.txt"), "same content here\n".repeat(5));
+  await writeFile(join(repo, "conf.txt"), "password = 'abcdefghijkl'\nport = 1\n"); await writeFile(join(repo, ".gitignore"), "ignored.log\n");
+  run("add", "-A"); run("commit", "-qm", "base");
+  await writeFile(join(repo, "keep.txt"), "a\nB\n"); await rm(join(repo, "gone.txt")); run("mv", "old.txt", "new.txt");
+  await writeFile(join(repo, "conf.txt"), "port = 1\n"); await writeFile(join(repo, "fresh.txt"), "new\n"); await writeFile(join(repo, "ignored.log"), "x"); await writeFile(join(repo, ".env.local"), "K=1");
+  const { files, git } = await listFiles(repo);
+  assert.equal(git, true);
+  assert.deepEqual(files, [{ path: ".gitignore" }, { path: "conf.txt", change: "M" }, { path: "first.txt" }, { path: "fresh.txt", change: "??" }, { path: "gone.txt", change: "D" }, { path: "keep.txt", change: "M" }, { path: "new.txt", change: "R" }]);
+  assert.match((await readProjectDiff(repo, "keep.txt")).diff, /^-b$[\s\S]*^\+B$/m);
+  assert.match((await readProjectDiff(repo, "gone.txt")).diff, /deleted file mode/, "a deleted file shows its diff without the file existing");
+  assert.match((await readProjectDiff(repo, "new.txt")).diff, /rename from old\.txt/, "staged renames are diffed against HEAD");
+  assert.deepEqual(await readProjectDiff(repo, "fresh.txt"), { path: "fresh.txt", diff: "", content: "new\n" }, "untracked files show content");
+  await assert.rejects(readProjectDiff(repo, "conf.txt"), /secret/, "a removed secret line is never shown");
+  for (const bad of [".env.local", "../escape.txt", "C:/Windows/win.ini", "a\u0000b", "", 5]) await assert.rejects(readProjectFile(repo, bad), FileRefused, String(bad));
+  await assert.rejects(readProjectDiff(repo, ".env.local"), FileRefused);
+  assert.deepEqual(await readProjectFile(repo, "keep.txt"), { path: "keep.txt", content: "a\nB\n" });
+  await mkdir(join(repo, "sub")); await writeFile(join(repo, "sub", "s.txt"), "line\n".repeat(9) + "s\n"); run("add", "sub/s.txt"); run("commit", "-qm", "sub"); await writeFile(join(repo, "sub", "s.txt"), "line\n".repeat(9) + "S\n"); run("mv", "sub/s.txt", "sub/t.txt");
+  assert.deepEqual((await listFiles(join(repo, "sub"))).files, [{ path: "t.txt", change: "RM" }], "a session in a subfolder sees cwd-relative marks only");
+  assert.match((await readProjectDiff(join(repo, "sub"), "t.txt")).diff, /rename from sub\/s\.txt/);
+ } finally { await rm(repo, { recursive: true, force: true }); }
+}
 // P3-06: two processes pair, renew and revoke against one registry without losing writes.
 {
  const directory = await mkdtemp(join(tmpdir(), "plan3-devices-race-"));

@@ -6,7 +6,7 @@ import { showListDialog } from "./work-dialogs.ts";
 
 export const JEV_MODEL = "openrouter/typesafe/jev-1.13";
 export const JEV_LIMITS = Object.freeze({ jobs: 32, questions: 32, concurrency: 4, requestMs: 30000, overallMs: 120000, bytes: 24000, fileBytes: 262144, outputBytes: 24000 });
-const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
 const size = value => Buffer.byteLength(JSON.stringify(value));
 const hash = value => createHash("sha256").update(value).digest("hex");
 const idOK = value => typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(value);
@@ -49,9 +49,9 @@ function validateJson(value, depth = 0) {
 		validateJson(child, depth + 1);
 	}
 }
-const forbiddenPath = /(^|\/)(?:\.git|\.pi|\.sessions|sessions|node_modules|build|dist|coverage|\.gradle|\.cache|\.idea|\.next|vendor|target)(\/|$)|(^|\/)(?:\.env[^/]*|auth\.json|settings\.json|credentials[^/]*|id_rsa[^/]*|id_ed25519[^/]*|local\.properties|google-services\.json)$|\.(?:pem|key|p12|pfx|jks|keystore|crt|cer|der)$/i;
-const secret = /-----BEGIN [^-]*(?:PRIVATE KEY|CERTIFICATE)-----|\b(?:sk-[A-Za-z0-9_-]{16,}|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,})|\b(?:api[_-]?key|access[_-]?token|password|secret)\b["']?\s*[:=]\s*["'][^"'\s]{8,}["']|\bBearer\s+[A-Za-z0-9._-]{16,}/i;
-function safePath(path) {
+export const forbiddenPath = /(^|\/)(?:\.git|\.pi|\.sessions|sessions|node_modules|build|dist|coverage|\.gradle|\.cache|\.idea|\.next|vendor|target)(\/|$)|(^|\/)(?:\.env[^/]*|auth\.json|settings\.json|credentials[^/]*|id_rsa[^/]*|id_ed25519[^/]*|local\.properties|google-services\.json)$|\.(?:pem|key|p12|pfx|jks|keystore|crt|cer|der)$/i;
+export const secret = /-----BEGIN [^-]*(?:PRIVATE KEY|CERTIFICATE)-----|\b(?:sk-[A-Za-z0-9_-]{16,}|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,})|\b(?:api[_-]?key|access[_-]?token|password|secret)\b["']?\s*[:=]\s*["'][^"'\s]{8,}["']|\bBearer\s+[A-Za-z0-9._-]{16,}/i;
+export function safePath(path) {
 	requireThat(typeof path === "string" && path.length > 0 && path.length <= 1000 && !/[\x00-\x1f]/.test(path), "Invalid source path.");
 	const normalized = path.replaceAll("\\", "/");
 	requireThat(!normalized.split("/").includes("..") && !normalized.startsWith("//") && !/[:]/.test(normalized.replace(/^[A-Za-z]:\//, "")), "Traversal/device paths are not allowed.");

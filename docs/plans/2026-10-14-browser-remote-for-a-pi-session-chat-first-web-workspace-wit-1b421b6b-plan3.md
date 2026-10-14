@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:08:51.539Z
+updated: 2026-10-14T12:14:43.314Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -209,8 +209,7 @@ Commands (existing; referenced by steps):
 ### Phase 4: Tabbed browser workspace [code]
 
 - [x] **P4-01** Desktop layout: the left panel has Files and Diagram tabs (ARIA tablist, arrow keys, Files is a placeholder until P4-03) and the chat stays on the right. R7 collapse states: full; narrow (the panel takes the chat width, the chat widens, splitter direction follows); collapsed to a >> button (the chat takes the width). Focus moves between << and >>, the state and tab persist in localStorage, and the rules apply only at ≥900 px. A diagram first drawn while hidden fits when its tab is shown.
-- [ ] **P4-02** Files API (D11, D21): tree, changed marks, content via captureSource, `git diff HEAD` with secret checks on the diff; refresh after tool runs.
-  - Tests: staged-only, unstaged, untracked, deleted, renamed, unborn repo, removed secret line, traversal and oversized diff.
+- [x] **P4-02** Files API in extensions/plan3-files.ts with /api/files, /api/file?path= and /api/diff?path= (403 FileRefused, capability required). The tree comes from git ls-files (honours .gitignore) with a bounded walk outside git, and jev-tools forbiddenPath hides paths. Change marks come from porcelain status (root-relative paths are mapped to cwd so subfolder sessions work). Content goes through captureSource. Diffs use git diff HEAD, which covers staged and unstaged edits, deletions and renames (the rename source is added to the pathspec). The diff text gets the secret, NUL and 256 KB checks. Untracked files and unborn repositories show content. A files SSE ping follows write, edit and bash tools. jev-tools exports forbiddenPath, secret and safePath, and object() became a type guard.
 - [ ] **P4-03** Files tab UI: tree beside viewer on desktop, tree above viewer on mobile; diff colouring per D10; keyboard navigable.
 - [ ] **P4-04** Mobile layout under 900 px: tabs Chat, Files and Diagram; composer stays visible with the on-screen keyboard; image attach button.
 - [ ] **P4-08** Model and effort endpoints for D19 via pi.setModel and pi.setThinkingLevel, scoped models first; C-WEB tests incl. a command that never returns (D17).
