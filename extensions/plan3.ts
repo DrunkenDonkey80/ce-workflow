@@ -861,6 +861,14 @@ export default function plan3(pi) {
 		if (endpoint === "/api/dialog") return dialogs.get(params.get("id") ?? "");
 		if (endpoint === "/api/files") return listFiles(webCtx.cwd);
 		if (endpoint === "/api/models") return { ...webStatus(webCtx), ...await webModels(webCtx), efforts: EFFORTS };
+		if (endpoint === "/api/usage" || endpoint === "/api/commands") {
+			// work-models fills these synchronously; absent (extension off) means empty lists.
+			const info: { wo?: { value: string; description: string }[]; usage?: { summary: unknown[]; lines: unknown[] } } = {};
+			pi.events.emit("wo:web-info", info);
+			if (endpoint === "/api/usage") return info.usage ?? { summary: [], lines: [] };
+			const own = (pi.getCommands?.() ?? []).filter(command => command.name !== "wo").map(({ name, description }) => ({ name, description: description ?? "" }));
+			return { pi: own.sort((a, b) => a.name.localeCompare(b.name)), wo: info.wo ?? [] };
+		}
 		if (endpoint === "/api/file" || endpoint === "/api/diff") {
 			try { return await (endpoint === "/api/file" ? readProjectFile : readProjectDiff)(webCtx.cwd, params.get("path")); }
 			catch (error) { throw error instanceof FileRefused ? new WebError(403, error.message) : error; }
@@ -1027,6 +1035,7 @@ export default function plan3(pi) {
 		return run?.id && run.id === pointer(ctx).id && !pointer(ctx).planning && tagging?.id !== run.id ? run.id : undefined;
 	};
 	let tagging = null; // { id, extra } while the tagging run is in flight.
+	let resolving = null; // { id, known } while a resolve reconcile run is in flight; known = questions already open then.
 	// The model met an external need: define it once, mark the step or phase, and let the user set it (night: off, unasked).
 	async function requirement(ctx, plan, id, text, target) {
 		if (id !== HUMAN && !/^R-[\w.-]+$/.test(id)) throw new Error("requirement must be R-<short-name> (letters, digits, . _ -) or human.");
@@ -1122,6 +1131,14 @@ export default function plan3(pi) {
 			return (work.wip[0] ?? work.next)?.id;
 		},
 	});
+	// Reconcile run settled: questions it added get the resolve dialog again instead of a typed /plan3 resolve.
+	async function afterResolve(ctx, aborted) {
+		const pending = resolving;
+		resolving = null;
+		if (!pending || aborted || !ctx.hasUI) return;
+		const plan = (await listPlans(ctx.cwd)).find((candidate) => candidate.id === pending.id);
+		if (plan && openTexts(split(await readFile(plan.file, "utf8")).lines).some(({ text }) => !pending.known.has(text))) await resolveQuestions(ctx, plan, pending.known);
+	}
 	// Tagging run settled: leave research and start execution (a user abort only clears it). Only at agent_settled
 	// does a prompt start a new run with a fresh system prompt; from agent_end it joins the tagging run, research text included.
 	async function afterTagging(ctx, aborted) {
@@ -1490,10 +1507,12 @@ export default function plan3(pi) {
 		send(advisorPrompt(kind, plan, advisors, focus));
 	}
 
-	async function resolveQuestions(ctx, plan) {
+	const openTexts = (lines) => ["Blocking", "Deferred"].flatMap(kind => questionBodies(subsection(lines, kind)).map(text => ({ kind, text })));
+	// skip: questions already offered (kept open or for discussion); a follow-up dialog asks only the new ones.
+	async function resolveQuestions(ctx, plan, skip = undefined) {
 		if (!plan) return ctx.ui.notify("Plan3: no open plan; /plan3 resolve <id> targets a specific one.", "info");
 		const lines = split(await readFile(plan.file, "utf8")).lines;
-		const questions = ["Blocking", "Deferred"].flatMap(kind => questionBodies(subsection(lines, kind)).map(text => ({ kind, text, ...questionChoices(text) })));
+		const questions = openTexts(lines).filter(({ text }) => !skip?.has(text)).map(item => ({ ...item, ...questionChoices(item.text) }));
 		if (!questions.length) return ctx.ui.notify(`Plan3: ${plan.title} has no open questions.`, "info");
 		if (!ctx.hasUI) return ctx.ui.notify("Plan3 Resolve needs the native ask_user UI; no model prompt was sent.", "warning");
 		const ask = await loadPlan3Ask(pi);
@@ -1546,6 +1565,7 @@ export default function plan3(pi) {
 		if (answers.length) {
 			const updated = summarize(plan.file, await readFile(plan.file, "utf8"), plan.folder);
 			setPointer(updated, updated.status !== "complete" && planning);
+			resolving = { id: plan.id, known: new Set(openTexts(split(await readFile(plan.file, "utf8")).lines).map(({ text }) => text)) };
 			send(resolvePrompt(updated, answers)); // Only after the popup(s), never before.
 		}
 	}
@@ -2134,6 +2154,7 @@ export default function plan3(pi) {
 	pi.on?.("agent_settled", async (event, ctx) => {
 		await afterForcedArchitecture(ctx, event?.aborted).catch((error) => report(ctx, error));
 		await afterTagging(ctx, event?.aborted).catch((error) => report(ctx, error));
+		await afterResolve(ctx, event?.aborted).catch((error) => report(ctx, error));
 	});
 	pi.on?.("agent_end", async (_event, ctx) => {
 		if (tagging) return; // agent_settled starts execution.

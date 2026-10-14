@@ -1375,6 +1375,20 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		providers: registry,
 		isInstalled: () => installed,
 		states,
+		// Browser status line: 7d left per shown provider, plus the footer rows as colour-tagged segments.
+		webUsage() {
+			if (!installed) return { summary: [], lines: [] };
+			const at = now(), theme = { fg: (color, text) => `\u0001${color}\u0002${text}\u0003`, bold: (text) => text };
+			const summary = shown().flatMap((entry) => {
+				const state = states.get(entry.id) as { snapshot?: { windows?: { id: string; usedPercent: number }[] } } | undefined;
+				const week = state?.snapshot?.windows?.find((window) => window.id === "7d");
+				return week ? [{ label: entry.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent) }] : [];
+			});
+			const lines = renderQuotaRows(shown(), states, theme, 120, at, { resetDates: setting().resetDates !== false }).map((line) =>
+				[...line.matchAll(/\u0001(\w+)\u0002([^\u0001-\u0003]*)\u0003|[^\u0001-\u0003]+/g)].map((match) => (match[1] ? { text: match[2], color: match[1] } : { text: match[0] })),
+			);
+			return { summary, lines };
+		},
 	};
 }
 

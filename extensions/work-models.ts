@@ -284,6 +284,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
+const woSubcommands = () => ({compact:"Compact the current context",share:"Toggle browser sharing for this session",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -4010,13 +4011,14 @@ if (blockedInternalBackgroundCompletionTurn) {
 		},
 	});
 
+	// Browser workspace (plan3-web): /wo subcommands for its command picker and the footer's quota rows.
+	pi.events?.on?.("wo:web-info",(info)=>{ info.wo=Object.entries(woSubcommands()).map(([value,description])=>({value,description})); info.usage=subscriptionFooterController?.webUsage?.(); });
 	pi.registerCommand("wo", {
  description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo share, /wo compact or /wo fact",
  getArgumentCompletions: (prefix) => {
   const input=String(prefix ?? "").trim();
   if (/\s/.test(input)) return null;
-  const descriptions={compact:"Compact the current context",share:"Toggle browser sharing for this session",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})};
-  const items=Object.entries(descriptions).filter(([value])=>value.startsWith(input)).map(([value,description])=>({value,label:value,description}));
+  const items=Object.entries(woSubcommands()).filter(([value])=>value.startsWith(input)).map(([value,description])=>({value,label:value,description}));
   return items.length?items:null;
  },
  handler: async(args,ctx)=>{

@@ -35,9 +35,9 @@ function renderShell() {
  $("target-kind").textContent = target === "product" ? "Product" : "Plan";
  // D19 status line: model and effort, then the plan with its menu (or New plan).
  const status = state.status, plan = state.plan;
- $("model-button").textContent = status?.model ? status.model.name + (status.effort ? " · " + status.effort : "") : "Model";
- $("model-button").disabled = !state.connected;
- $("context-use").textContent = typeof status?.context === "number" ? "Context " + Math.round(status.context) + "%" : "";
+ $("model-button").textContent = "Model: " + (status?.model?.name ?? "—");
+ $("think-button").textContent = (typeof status?.context === "number" ? "Context: " + Math.round(status.context) + "% · " : "") + "Think: " + (status?.effort ?? "—");
+ for (const id of ["model-button", "think-button"]) ($(id) as HTMLButtonElement).disabled = !state.connected;
  $("plan-button").textContent = plan ? plan.title + (plan.total ? ` · ${plan.done ?? 0}/${plan.total}` : "") : "New plan";
  $("plan-button").title = plan ? "Plan actions" : "Start a new plan";
  for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
@@ -118,7 +118,7 @@ for (const name of mobileViews) {
 }
 // Phones: views, status line and sessions move into the drawer so the chat gets the screen; desktop puts them back.
 const phone = matchMedia("(max-width: 899px)"), drawer = $("drawer");
-const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "drawer-sessions"], ["connection", "topbar"]]
+const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "title-menu"], ["connection", "topbar"]]
  .map(([id, slot]) => { const node = id === "status-line" || id === "topbar" ? document.querySelector("." + id)! : $(id); return { node, slot: slot === "topbar" ? document.querySelector(".topbar")! : $(slot), parent: node.parentNode!, next: node.nextSibling }; });
 function placeForPhone() {
  for (const home of homes) phone.matches ? home.slot.append(home.node) : home.parent.insertBefore(home.node, home.next);
@@ -127,7 +127,7 @@ function placeForPhone() {
 function setDrawer(open: boolean) {
  drawer.dataset.open = String(open); drawer.inert = !open; $("drawer-backdrop").hidden = !open;
  $("drawer-toggle").setAttribute("aria-expanded", String(open)); $("drawer-toggle").setAttribute("aria-label", open ? "Close menu" : "Open menu");
- if (open) drawer.querySelector<HTMLElement>("[aria-selected=true]")?.focus();
+ if (open) { drawer.querySelector<HTMLElement>("[aria-selected=true]")?.focus(); void loadUsage(); }
 }
 phone.addEventListener("change", placeForPhone); placeForPhone();
 $("drawer-toggle").addEventListener("click", () => setDrawer(drawer.dataset.open !== "true"));
@@ -373,16 +373,19 @@ $("composer").addEventListener("submit", async event => {
  finally { messageSending = false; renderShell(); }
 });
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
+const menus = [["model-button", "model-menu"], ["think-button", "think-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
- for (const [other, panel] of [["model-button", "model-menu"], ["plan-button", "plan-menu"]]) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
+ for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
  if (open) ($(menu).querySelector<HTMLElement>("input, button:not([hidden]):not(:disabled)"))?.focus();
 }
 function closeMenus(focus = false) {
- for (const [button, menu] of [["model-button", "model-menu"], ["plan-button", "plan-menu"]]) if (!$(menu).hidden) { toggleMenu(button, menu, false); if (focus) $(button).focus(); }
+ for (const [button, menu] of menus) if (!$(menu).hidden) { toggleMenu(button, menu, false); if (focus) $(button).focus(); }
 }
-document.addEventListener("keydown", event => { if (event.key === "Escape" && (!$("model-menu").hidden || !$("plan-menu").hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
-document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line")) closeMenus(); });
+document.addEventListener("keydown", event => { if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
+document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu")) closeMenus(); });
+// The title opens the session picker: a popup on phones, the switcher stripe on desktop.
+$("title").addEventListener("click", () => phone.matches ? toggleMenu("title", "title-menu") : !$("switcher").hidden && toggleSwitcher($("switcher").dataset.open !== "true"));
 function newPlan() {
  setDrawer(false); const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
  showNotice("Describe the plan after /plan3 and send.");
@@ -436,32 +439,70 @@ $("switcher-toggle").addEventListener("click", () => toggleSwitcher($("switcher"
 $("switcher").addEventListener("keydown", event => { if (event.key === "Escape" && $("switcher").dataset.open === "true") { event.stopPropagation(); toggleSwitcher(false); $("switcher-toggle").focus(); } });
 document.addEventListener("visibilitychange", () => void loadSessions());
 void loadSessions();
-$("status-more").addEventListener("click", () => { const open = $("status-extra").hidden; $("status-extra").hidden = !open; $("status-more").setAttribute("aria-expanded", String(open)); });
-// Scoped models first; the full list filters as you type.
+// Subscription 7d left per provider (footer data); tapping shows the footer rows in their colours.
+type Segment = { text: string; color?: string };
+let usageLines: Segment[][] = [], usageTimer = 0;
+const segments = (row: Segment[]) => row.map(part => Object.assign(document.createElement("span"), { textContent: part.text, className: part.color ? "tone-" + part.color : "" }));
+async function loadUsage() {
+ clearTimeout(usageTimer); if (document.visibilityState !== "visible") return;
+ try {
+  const value = await get("usage") as { summary: { label: string; left: number; color: string }[]; lines: Segment[][] };
+  usageLines = value.lines; $("usage-button").hidden = !value.summary.length;
+  $("usage-button").replaceChildren(...value.summary.flatMap((item, index) => [...index ? [" · "] : [], ...segments([{ text: item.label + " 7d " }, { text: item.left + "%", color: item.color }])]));
+ } catch { $("usage-button").hidden = true; }
+ usageTimer = window.setTimeout(loadUsage, 120_000);
+}
+$("usage-button").addEventListener("click", () => {
+ $("usage-menu").replaceChildren(...usageLines.map(row => { const line = document.createElement("div"); line.className = "usage-line"; line.append(...segments(row)); return line; }));
+ toggleMenu("usage-button", "usage-menu");
+});
+document.addEventListener("visibilitychange", () => void loadUsage());
+void loadUsage();
+// Pi and /wo command pickers (drawer, phones): a pick goes into the composer for review before sending.
+async function pickCommand(kind: "pi" | "wo") {
+ setDrawer(false); const dialog = $("command-picker") as HTMLDialogElement, list = $("command-list");
+ list.replaceChildren("Loading commands…"); $("command-title").textContent = kind === "pi" ? "Pi commands" : "/wo commands"; dialog.showModal();
+ try {
+  const value = await get("commands") as { pi: { name: string; description: string }[]; wo: { value: string; description: string }[] };
+  const rows = kind === "pi" ? value.pi.map(item => ["/" + item.name, item.description]) : value.wo.map(item => ["/wo " + item.value, item.description]);
+  list.replaceChildren(...rows.length ? rows.map(([command, description]) => {
+   const button = document.createElement("button"); button.type = "button"; button.className = "command-option";
+   button.append(Object.assign(document.createElement("strong"), { textContent: command }), Object.assign(document.createElement("small"), { textContent: description }));
+   button.addEventListener("click", () => { dialog.close(); const input = $("message-input"); input.value = command + " "; input.focus(); input.setSelectionRange(input.value.length, input.value.length); });
+   return button;
+  }) : ["No commands available."]);
+ } catch (error) { list.replaceChildren("Commands failed to load: " + error.message); }
+}
+$("pi-commands").addEventListener("click", () => void pickCommand("pi"));
+$("wo-commands").addEventListener("click", () => void pickCommand("wo"));
+$("command-close").addEventListener("click", () => ($("command-picker") as HTMLDialogElement).close());
 async function changeStatus(endpoint: "model" | "effort", body) {
- closeMenus(); if (drawer.dataset.open === "true") setDrawer(false); else $("model-button").focus();
+ closeMenus(); if (drawer.dataset.open === "true") setDrawer(false); else $(endpoint === "model" ? "model-button" : "think-button").focus();
  try { state.status = { ...state.status, ...await post(endpoint, body) }; renderShell(); showNotice(""); } catch (error) { showNotice(error.message); }
 }
 $("model-button").addEventListener("click", async () => {
  if (!$("model-menu").hidden) return toggleMenu("model-button", "model-menu", false);
  const menu = $("model-menu"); menu.replaceChildren("Loading models…"); toggleMenu("model-button", "model-menu", true);
  try {
-  const value = await get("models"), current = value.model, filter = document.createElement("input");
-  filter.type = "search"; filter.placeholder = "Filter models"; filter.setAttribute("aria-label", "Filter models");
+  const value = await get("models"), current = value.model;
   const option = (model: Model) => {
    const button = document.createElement("button"); button.type = "button"; button.className = "model-option"; button.textContent = model.name; button.title = model.provider + "/" + model.id;
    button.setAttribute("aria-pressed", String(current?.provider === model.provider && current?.id === model.id));
    button.addEventListener("click", () => changeStatus("model", { provider: model.provider, id: model.id })); return button;
   };
-  const section = (title: string, models: Model[]) => models.length ? [Object.assign(document.createElement("h3"), { textContent: title }), ...models.map(option)] : [];
-  const efforts = document.createElement("div"); efforts.className = "effort-row"; efforts.setAttribute("aria-label", "Effort");
-  for (const level of value.efforts) { const button = Object.assign(document.createElement("button"), { type: "button", textContent: level }); button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); efforts.append(button); }
-  const list = document.createElement("div"); list.className = "model-list";
-  list.append(...section(value.scoped.length ? "Scoped" : "Models", value.scoped.length ? value.scoped : value.others), ...(value.scoped.length ? section("All models", value.others) : []));
-  filter.addEventListener("input", () => { const text = filter.value.trim().toLowerCase(); for (const button of list.querySelectorAll<HTMLElement>(".model-option")) button.hidden = !!text && !(button.textContent + " " + button.title).toLowerCase().includes(text); });
-  filter.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); list.querySelector<HTMLElement>(".model-option:not([hidden])")?.click(); } });
-  menu.replaceChildren(Object.assign(document.createElement("h3"), { textContent: "Effort" }), efforts, filter, list); filter.focus();
+  // Scoped models only (Pi's Ctrl+P set); all available models when nothing is scoped.
+  menu.replaceChildren(...(value.scoped.length ? value.scoped : value.others).map(option));
+  menu.querySelector<HTMLElement>("[aria-pressed=true], button")?.focus();
  } catch (error) { menu.replaceChildren("Models failed to load: " + error.message); }
+});
+$("think-button").addEventListener("click", async () => {
+ if (!$("think-menu").hidden) return toggleMenu("think-button", "think-menu", false);
+ const menu = $("think-menu"); menu.replaceChildren("Loading…"); toggleMenu("think-button", "think-menu", true);
+ try {
+  const value = await get("models");
+  menu.replaceChildren(...value.efforts.map(level => { const button = Object.assign(document.createElement("button"), { type: "button", textContent: level }); button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); return button; }));
+  menu.querySelector<HTMLElement>("[aria-pressed=true], button")?.focus();
+ } catch (error) { menu.replaceChildren("Levels failed to load: " + error.message); }
 });
 $("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested."); } catch (error) { showNotice(error.message); } });
 

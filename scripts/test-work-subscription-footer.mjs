@@ -771,6 +771,12 @@ const hiddenLines = hidingComponent.render(80).map(stripAnsi).join("\n");
 assert.match(hiddenLines, /Codex[\s\S]*Claude/);
 assert.doesNotMatch(hiddenLines, /GLM/);
 assert.equal(hiddenUrls.length, 2, "hidden provider is not polled");
+// Browser status line: 7d left per shown provider and the footer rows as colour-tagged segments.
+const usage = hiding.controller.webUsage();
+assert.deepEqual(usage.summary.map((item) => item.label), ["Codex", "Claude"]);
+assert.ok(usage.summary.every((item) => Number.isInteger(item.left) && typeof item.color === "string"));
+assert.ok(usage.lines.flat().some((part) => part.color === "accent" && part.text === "Codex"), "provider labels keep their colour");
+assert.equal(usage.lines.map((row) => row.map((part) => part.text).join("")).join("\n").includes("\u0001"), false, "no colour markers leak");
 hiddenSetting = { enabled: true, hidden: [] };
 hiding.controller.apply(hiding.ctx);
 await flush();

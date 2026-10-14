@@ -225,7 +225,7 @@ export async function createPlan3Web(options: Options) {
 				connection.frames = []; connection.bytes = 0;
 				return;
 			}
-			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram", "/api/dialog", "/api/files", "/api/file", "/api/diff", "/api/models"].includes(url.pathname)) {
+			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram", "/api/dialog", "/api/files", "/api/file", "/api/diff", "/api/models", "/api/usage", "/api/commands"].includes(url.pathname)) {
 				if (!options.read) throw new WebError(501, "Session bridge is not attached.");
 				return json(res, 200, await options.read(url.pathname, url.searchParams));
 			}

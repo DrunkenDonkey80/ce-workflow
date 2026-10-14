@@ -108,13 +108,18 @@ h2 { font-size: 15px; font-weight: 600; }
 .chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 #connection { font-size: 13px; color: #495057; }
 .status-line { position: relative; display: grid; gap: 4px; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 13px; }
-.status-row { display: flex; gap: 4px; }
-.status-line > button, .status-row > #model-button { text-align: left; border-color: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.status-row > #model-button { flex: 1; }
-.status-line > button:hover, .status-row > button:hover { border-color: var(--line); }
-.status-extra { display: flex; gap: 8px; align-items: center; padding: 0 10px; color: #495057; }
-/* D10: [SHARED] reads as exposure, like the camera warning. */
-.shared { color: #fff; background: #c92a2a; border-radius: 6px; padding: 0 6px; font-weight: 700; }
+.status-line > button { text-align: left; border-color: transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.status-line > button:hover { border-color: var(--line); }
+/* Footer colours for subscription usage. */
+.tone-error { color: #c92a2a; } .tone-warning { color: #e8590c; } .tone-accent { color: var(--focus); font-weight: 600; } .tone-dim { color: #868e96; } .tone-success { color: #2f9e44; }
+.usage-line { font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.title-button { all: unset; cursor: pointer; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.title-button:focus-visible { outline: 2px solid var(--focus); }
+.title-menu { position: fixed; top: 44px; left: 8px; right: auto; width: min(340px, 92vw); }
+.title-menu .session-list { gap: 6px; }
+.command-list { display: grid; gap: 4px; max-height: 60dvh; overflow: auto; }
+.command-option { display: grid; text-align: left; border-color: transparent; }
+.command-option small { color: #495057; }
 .status-menu { position: absolute; z-index: 5; left: 12px; right: 12px; top: 100%; display: grid; gap: 4px; max-height: 60vh; overflow: auto; padding: 8px; background: white; border: 1px solid var(--ink); border-radius: 6px; }
 .status-menu h3 { margin: 6px 0 2px; font-size: 12px; color: #495057; font-weight: 600; }
 .status-menu button { text-align: left; border-color: transparent; }
@@ -208,7 +213,7 @@ body.has-switcher { padding-left: 36px; }
  .drawer > h2 { margin: 12px 16px 4px; font-size: 12px; color: #495057; }
  .drawer .mobile-tabs { border-bottom: 0; }
  .drawer .status-line { border-bottom: 0; }
- .drawer .session-list { padding: 0 12px; }
+ .drawer-commands { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 16px 0; }
  .drawer-backdrop { display: block; position: fixed; z-index: 6; inset: 0; background: rgba(0, 0, 0, .25); }
  .activity { max-height: 22%; }
  .messages { padding: 10px 12px; }

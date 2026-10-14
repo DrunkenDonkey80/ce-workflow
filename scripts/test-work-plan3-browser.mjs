@@ -45,7 +45,9 @@ events.on("ask:answer", value => answers.push(value));
 const dialogs = createDialogBridge({ events }, (event, value) => server.publish(event, value));
 const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { askId, ...value }); return askId; };
 const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft", done: 2, total: 5 }, status, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
- if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "a", id: "fast", name: "Fast" }], others: [{ provider: "b", id: "deep", name: "Deep" }, { provider: "b", id: "other", name: "Other" }] };
+ if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "a", id: "fast", name: "Fast" }, { provider: "b", id: "deep", name: "Deep" }], others: [{ provider: "b", id: "other", name: "Other" }] };
+ if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53%" }], [{ text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
+ if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }] };
  if (endpoint === "/api/files") return { files: projectFiles, truncated: false, git: true };
  if (endpoint === "/api/file") return { path: params.get("path"), content: "<img src=x onerror=alert(1)>\nplain" };
  if (endpoint === "/api/diff") return { path: params.get("path"), diff: "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-old line\n+new line" };
@@ -124,7 +126,13 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('canvas').getBoundingClientRect().width, document.getElementById('drawer').dataset.open]"), [390, "false"], "picking a view closes the drawer");
  await browser("click", "#drawer-toggle"); assert.equal(await evaluate("document.activeElement.id"), "mobile-diagram", "the drawer opens on the current view");
  await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "mobile-chat");
- assert(await evaluate("['model-button', 'plan-button', 'session-list'].every(id => document.getElementById('drawer').contains(document.getElementById(id)))"), "phone: status line and sessions live in the drawer");
+ assert(await evaluate("['model-button', 'think-button', 'plan-button', 'usage-button', 'pi-commands', 'wo-commands'].every(id => document.getElementById('drawer').contains(document.getElementById(id)))"), "phone: status line and command buttons live in the drawer");
+ await browser("click", "#wo-commands"); await browser("wait", ".command-option");
+ await browser("click", ".command-option"); assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('command-picker').open, document.getElementById('drawer').dataset.open]"), ["/wo share ", false, "false"], "a picked command goes into the composer");
+ await browser("fill", "#message-input", "");
+ await browser("click", "#title"); assert(await evaluate("!document.getElementById('title-menu').hidden && document.getElementById('title-menu').contains(document.getElementById('session-list'))"), "phone: the title opens the session picker");
+ await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('title-menu').hidden"), true);
+ await browser("click", "#drawer-toggle");
  await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('drawer').dataset.open, document.activeElement.id, document.getElementById('drawer-backdrop').hidden]"), ["false", "drawer-toggle", true]);
  // E5 finding: the chat itself gets most of the screen; only a slim bar sits above it.
  assert(await evaluate("(() => { const m = document.getElementById('messages').getBoundingClientRect(); return m.top < 60 && m.height > innerHeight * 0.6; })()"), "phone: messages fill the screen");
@@ -320,7 +328,10 @@ try {
  assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
  // R13/D19 status line: model · effort, plan · progress, plan menu, model and effort picker.
- assert.deepEqual(await evaluate("[document.getElementById('model-button').textContent, document.getElementById('plan-button').textContent]"), ["Fast · high", sample.title + " · 2/5"]);
+ assert.deepEqual(await evaluate("['model-button', 'think-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).textContent)"), ["Model: Fast", "Context: 42% · Think: high", sample.title + " · 2/5", "Claude 7d 53% · Codex 7d 12%"]);
+ assert.equal(await evaluate("document.querySelector('#usage-button .tone-error').textContent"), "12%");
+ await browser("click", "#usage-button"); assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-menu .usage-line')].map(line => line.textContent)"), ["Claude 7d [████░░░░] 53%", "Codex 7d 12%"]);
+ await browser("press", "Escape");
  for (const command of ["resolve", "ideas", "review", "finish", "resume", "switch"]) { await browser("click", "#plan-button"); await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
  assert.deepEqual(commands, ["/plan3 resolve 12345678", "/plan3 ideas 12345678", "/plan3 review 12345678", "/plan3 finish 12345678", "/resume3 12345678", "/plan3"]);
  await browser("click", "#plan-button"); assert.equal(await evaluate("document.getElementById('plan-button').getAttribute('aria-expanded')"), "true");
@@ -328,14 +339,14 @@ try {
  await browser("click", "#plan-button"); await browser("click", "[data-command=new]");
  assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.activeElement.id]"), ["/plan3 ", "message-input"]); await browser("fill", "#message-input", "");
  await browser("click", "#model-button"); await browser("wait", ".model-option");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu h3')].map(h => h.textContent)"), ["Effort", "Scoped", "All models"]);
- assert.equal(await evaluate("document.activeElement.getAttribute('aria-label')"), "Filter models");
- await browser("keyboard", "type", "deep"); await browser("press", "Enter");
- await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep · high'");
+ assert.deepEqual(await evaluate("[[...document.querySelectorAll('#model-menu .model-option')].map(b => b.textContent), document.querySelector('#model-menu input'), document.activeElement.textContent]"), [["Fast", "Deep"], null, "Fast"], "scoped models only, no filter; focus on the current one");
+ await browser("click", "[title='b/deep']");
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Model: deep'");
  assert.equal(await evaluate("document.getElementById('model-menu').hidden"), true);
- await browser("click", "#model-button"); await browser("wait", ".effort-row button"); await browser("click", ".effort-row button");
- await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep · low'");
- await browser("click", "#status-more"); assert.equal(await evaluate("document.getElementById('status-extra').textContent"), "[SHARED] Context 42%");
+ await browser("click", "#think-button"); await browser("wait", "#think-menu button");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#think-menu button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'))"), ["low:false", "high:true"]);
+ await browser("click", "#think-menu button");
+ await browser("wait", "--fn", "document.getElementById('think-button').textContent === 'Context: 42% · Think: low'");
  // D18: stripe of colour-coded letters; this page marks its own idle run seen; the list slides out and Escape closes it.
  assert.equal(await evaluate("document.getElementById('switcher').hidden"), true, "a lone session shows no switcher");
  otherSessions = true; await evaluate("document.dispatchEvent(new Event('visibilitychange'))");
@@ -351,7 +362,7 @@ try {
  await browser("wait", "--fn", "document.querySelector('.session[data-port=\"1\"]').dataset.tone === 'unseen'");
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').dataset.tone"), "seen"); assert.deepEqual(seenCalls.at(-1), { device: "local", revision: 4 });
  status = { ...status, model: { provider: "t", id: "term", name: "Terminal pick" } }; server.publish("status", status);
- await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick · low'");
+ await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Model: Terminal pick'");
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
