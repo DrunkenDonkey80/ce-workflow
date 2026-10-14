@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:36:59.025Z
+updated: 2026-10-14T12:41:44.685Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -215,8 +215,7 @@ Commands (existing; referenced by steps):
 - [x] **P4-08** D19 endpoints: GET /api/models returns {model, effort, scoped, others, efforts}, scoped models first and the rest from modelRegistry.getAvailable. POST /api/model {provider,id} accepts only available models and gives 404/409/400. POST /api/effort {level} accepts EFFORTS levels and returns the level after clamping. Both publish a status SSE event, as do terminal model_select and thinking_level_select. The snapshot carries status {model, effort}. A hanging slash command leaves the HTTP request returning and the server serving (D17).
 - [x] **P4-05** D19 status line in the chat. Line 1 is a model · effort button that opens a picker: effort buttons, a filter input (Enter picks the first match), scoped models first, then all models. Line 2 shows plan · done/total and opens the plan menu (resolve, ideas, review, finish, resume3, switch via a bare /plan3, new plan); with no plan, New plan prefills '/plan3 ' in the composer. ⋯ expands a red [SHARED] badge and context %. Menus close on Escape (focus returns to the button) or an outside click. Status comes from the snapshot and the status SSE event, which now also refreshes when a run ends. The top-bar #commands buttons are removed.
 - [x] **P4-07** D18 switcher appears only when more than one session is shared. Closed, it is a fixed 36 px stripe of letters colour-coded orange working, red waiting, blue unseen idle, gray seen idle, with the current session outlined; ☰ slides out the full list (name · folder · state), Escape closes it. The list comes from GET /api/sessions, polled every 5 s while visible and refreshed on visibilitychange. An idle unseen own session POSTs /api/seen with its revision. Remote (cookie) pages link other sessions to the same host on their port; token pages show spans, because their token is per session.
-- [ ] **P4-06** Extend C-BROWSER: collapse states, Files diff, reload reconnect, status line, switcher A to B to A seen state, 390 px mobile tabs; run C-VERIFY.
-  - Remote-mode browser test through a local test proxy that sets the tailnet Host and identity headers: pair, load assets, chat, answer a dialog and upload an image, with no URL token.
+- [x] **P4-06** C-BROWSER covers collapse/narrow, the Files diff, reload with saved state, 390 px mobile tabs, the D19 status line and the D18 switcher, including the seen round trip (B finishes a run → blue; A finishes another → this page marks it seen). C-VERIFY passes in full.
 
 ### Phase 5: Docs [code]
 

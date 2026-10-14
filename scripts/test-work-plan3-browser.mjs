@@ -33,9 +33,9 @@ async function evaluate(script) { return (await browser("eval", "-b", Buffer.fro
 const sample = JSON.parse(await readFile(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
 // D18 switcher fixtures: this page (idle, unseen until the page marks it), one working and one waiting session.
-const seenCalls = []; let ownRevisionSeen = 0, otherSessions = false;
-const sessionList = () => [{ id: "a", name: "alpha", cwd: "C:/work/alpha", port: server.port, state: "idle", revision: 3, unseen: ownRevisionSeen < 3 },
- ...!otherSessions ? [] : [{ id: "b", name: "beta", cwd: "C:/work/beta", port: 1, state: "working", revision: 1, unseen: false }, { id: "c", name: "gamma", cwd: "/srv/gamma", port: 2, state: "waiting", revision: 0, unseen: false }]];
+const seenCalls = []; let ownRevisionSeen = 0, ownRevision = 3, otherSessions = false, beta = { state: "working", revision: 1, unseen: false };
+const sessionList = () => [{ id: "a", name: "alpha", cwd: "C:/work/alpha", port: server.port, state: "idle", revision: ownRevision, unseen: ownRevisionSeen < ownRevision },
+ ...!otherSessions ? [] : [{ id: "b", name: "beta", cwd: "C:/work/beta", port: 1, ...beta }, { id: "c", name: "gamma", cwd: "/srv/gamma", port: 2, state: "waiting", revision: 0, unseen: false }]];
 let status = { model: { provider: "a", id: "fast", name: "Fast" }, effort: "high", context: 41.6 };
 let projectFiles = [{ path: "docs/readme.md" }, { path: "src/app.ts", change: "M" }, { path: "top.txt" }];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
@@ -341,6 +341,10 @@ try {
  assert.equal(await evaluate("document.querySelector('.session-label').getBoundingClientRect().width"), 1, "closed stripe shows letters only");
  await browser("click", "#switcher-toggle"); assert(await evaluate("document.querySelector('.session-label').getBoundingClientRect().width > 100"));
  await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('switcher').dataset.open, document.activeElement.id]"), ["false", "switcher-toggle"]);
+ // B finishes a run: blue until seen there. A finishes another: this page marks it seen again on return.
+ beta = { state: "idle", revision: 2, unseen: true }; ownRevision = 4; await evaluate("document.dispatchEvent(new Event('visibilitychange'))");
+ await browser("wait", "--fn", "document.querySelector('.session[data-port=\"1\"]').dataset.tone === 'unseen'");
+ assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').dataset.tone"), "seen"); assert.deepEqual(seenCalls.at(-1), { device: "local", revision: 4 });
  status = { ...status, model: { provider: "t", id: "term", name: "Terminal pick" } }; server.publish("status", status);
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick · low'");
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);
