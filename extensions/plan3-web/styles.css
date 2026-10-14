@@ -8,7 +8,7 @@
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+body { margin: 0; height: var(--app-height, 100dvh); display: flex; flex-direction: column; overflow: hidden; }
 button, textarea, input, select { font: inherit; color: inherit; }
 button { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 button:hover:not(:disabled) { border-color: var(--group); background: #f1f3f5; }
@@ -156,12 +156,17 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .mentions { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 dialog { border: 1px solid var(--group); border-radius: 6px; padding: 20px; color: var(--ink); width: min(700px, 94vw); max-height: 90dvh; }
 dialog::backdrop { background: rgba(0, 0, 0, .25); }
+.mobile-tabs { display: none; }
+.attach { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.attach:hover { border-color: var(--group); background: #f1f3f5; }
+.attach:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (max-width: 899px) {
- body { height: auto; min-height: 100dvh; overflow: auto; }
- .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(340px, 55vh) minmax(380px, 65vh); flex: none; }
- .splitter { display: none; }
- .chat { border-top: 1px solid var(--line); }
- .topbar { gap: 10px; }
+ .mobile-tabs { display: flex; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+ .mobile-tabs [role=tab] { flex: 1; border-color: transparent; }
+ .mobile-tabs [role=tab][aria-selected=true] { border-color: var(--ink); }
+ .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+ .workspace[data-mobile=chat] > .left-panel, .workspace[data-mobile=panel] > .chat, .left-tabs, .splitter { display: none; }
+ .topbar { padding: 8px 12px; gap: 10px; }
  .workspace-title { flex-basis: 100%; }
 }
 .pairing main { margin: auto; padding: 24px; max-width: 28rem; text-align: center; }

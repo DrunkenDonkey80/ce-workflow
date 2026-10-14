@@ -104,14 +104,23 @@ try {
  assert.equal(await evaluate("document.querySelector('.files-body img')"), null, "file content is inert text");
  projectFiles = [...projectFiles, { path: "src/new.ts", change: "??" }]; server.publish("files", {});
  await browser("wait", "[data-path=\"src/new.ts\"]");
- await browser("set", "viewport", "760", "800");
+ await browser("set", "viewport", "390", "844"); await browser("click", "#mobile-files");
  assert(await evaluate("document.querySelector('.files-viewer').getBoundingClientRect().top >= document.querySelector('.files-tree').getBoundingClientRect().bottom - 1"), "phone: tree above the viewer");
+ assert.equal(await evaluate("document.getElementById('chat').getClientRects().length"), 0, "phone shows one view at a time");
  await browser("set", "viewport", "1280", "800");
  await browser("focus", "#tab-files"); await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-diagram");
  assert.equal(await evaluate("document.getElementById(\"canvas\").hidden"), false);
- await browser("set", "viewport", "760", "800");
- assert(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().top >= document.getElementById(\"canvas\").getBoundingClientRect().bottom"));
+ // R9/E5 at 390 px: Chat, Files and Diagram tabs; the composer and the attach button stay on screen.
+ await browser("set", "viewport", "390", "844");
+ await browser("click", "#mobile-diagram");
+ assert.equal(await evaluate("document.getElementById('canvas').getBoundingClientRect().width"), 390);
+ await browser("focus", "#mobile-diagram"); await browser("press", "ArrowRight");
+ assert.equal(await evaluate("document.activeElement.id"), "mobile-chat");
+ assert.deepEqual(await evaluate("[document.getElementById('left-panel').getClientRects().length, document.querySelector('.left-tabs').getClientRects().length]"), [0, 0]);
+ assert(await evaluate("(() => { const r = document.getElementById('composer').getBoundingClientRect(), a = document.querySelector('.attach').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top > innerHeight / 2 && a.width > 0 && a.bottom <= innerHeight; })()"), "composer and attach stay on screen");
+ assert.equal(await evaluate("document.documentElement.scrollWidth"), 390, "no sideways scrolling");
  await browser("set", "viewport", "1280", "800");
+ assert(await evaluate("document.getElementById('left-panel').getClientRects().length > 0 && document.getElementById('chat').getClientRects().length > 0 && document.getElementById('mobile-tabs').getClientRects().length === 0"), "desktop ignores the phone view");
  await browser("focus", "#splitter"); await browser("press", "Home");
  await browser("click", "#zoom-fit");
  // The compact layout may fit at mid zoom; zoom out to the overview band explicitly.
@@ -139,6 +148,12 @@ try {
  await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); await rm(pasted);
+ // The Image button (phones have no clipboard paste) uploads the same way.
+ await browser("fill", "#message-input", "");
+ await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([new Uint8Array([0xff,0xd8,0xff,0xe0,1,2])], \"photo.jpg\", { type: \"image/jpeg\" })); const input = document.getElementById(\"attach\"); input.files = data.files; input.dispatchEvent(new Event(\"change\")); })()");
+ await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.jpg/.test(document.getElementById(\"message-input\").value)");
+ const attached = (await evaluate("document.getElementById(\"message-input\").value")).trim();
+ assert.equal(await evaluate("document.getElementById(\"attach\").value"), "", "the picker resets so the same photo can be attached again"); await rm(attached);
  await browser("fill", "#message-input", "");
  await browser("focus", "#diagram");
  // The fit scale depends on box sizes, so zoom until the near band rather than a fixed number of steps.

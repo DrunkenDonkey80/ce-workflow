@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
  <meta charset="utf-8">
- <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
  <title>Plan3 architecture workspace</title>
  <link rel="stylesheet" href="/a/__BUILD__/styles.css?token=__TOKEN__">
  <script type="module" src="/a/__BUILD__/app.js?token=__TOKEN__"></script>
@@ -20,7 +20,12 @@
  </header>
  <p id="notice" class="notice" role="status" hidden></p>
  <p id="waiting" class="notice" role="status" hidden></p>
- <main id="workspace" class="workspace" data-left="full">
+ <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">
+  <button id="mobile-chat" type="button" role="tab" aria-controls="chat" aria-selected="true">Chat</button>
+  <button id="mobile-files" type="button" role="tab" aria-controls="files" aria-selected="false" tabindex="-1">Files</button>
+  <button id="mobile-diagram" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1">Diagram</button>
+ </nav>
+ <main id="workspace" class="workspace" data-left="full" data-mobile="chat">
   <button id="expand-left" class="expand-left" type="button" aria-label="Show files and diagram" aria-controls="left-panel" aria-expanded="false" hidden>&gt;&gt;</button>
   <section id="left-panel" class="left-panel" aria-label="Project">
   <div class="left-tabs">
@@ -58,6 +63,7 @@
     <textarea id="message-input" rows="2" maxlength="20000" placeholder="Ask about the architecture…" aria-label="Message to Pi" aria-describedby="input-help"></textarea>
     <div class="composer-actions">
      <span id="input-help" class="input-help">Ctrl+click a box to mention it</span>
+     <label class="attach button" title="Attach an image">Image<input id="attach" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></label>
      <button id="stop" type="button" class="danger" hidden>Stop</button>
      <button id="send" type="submit" disabled>Send</button>
     </div>

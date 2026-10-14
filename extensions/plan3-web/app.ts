@@ -93,6 +93,24 @@ for (const id of ["tab-files", "tab-diagram"]) $(id).addEventListener("keydown",
  event.preventDefault(); const next = id === "tab-files" ? "diagram" : "files"; setTab(next); $(`tab-${next}`).focus();
 });
 setLeft(remembered("plan3-left", ["full", "narrow", "collapsed"], "full"));
+// R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
+const mobileViews = ["chat", "files", "diagram"];
+function setMobile(view) {
+ workspace.dataset.mobile = view === "chat" ? "chat" : "panel";
+ for (const name of mobileViews) { const tab = $("mobile-" + name); tab.setAttribute("aria-selected", String(name === view)); tab.tabIndex = name === view ? 0 : -1; }
+ if (view !== "chat") setTab(view);
+ remember("plan3-mobile", view);
+}
+for (const name of mobileViews) {
+ $("mobile-" + name).addEventListener("click", () => setMobile(name));
+ $("mobile-" + name).addEventListener("keydown", event => {
+  const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key]; if (!step) return;
+  event.preventDefault(); const next = mobileViews[(mobileViews.indexOf(name) + step + 3) % 3]; setMobile(next); $("mobile-" + next).focus();
+ });
+}
+// iOS keeps the layout viewport under the on-screen keyboard; size the page to what is visible so the composer stays reachable.
+const fitViewport = () => document.documentElement.style.setProperty("--app-height", (window.visualViewport?.height ?? window.innerHeight) + "px");
+window.visualViewport?.addEventListener("resize", fitViewport); fitViewport();
 
 const splitter = $("splitter"); let resize;
 function resizeChat(width) {
@@ -218,6 +236,7 @@ $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
 const filesView = createFilesView($("files"), { get });
 setTab(remembered("plan3-tab", ["files", "diagram"], "diagram"));
+setMobile(remembered("plan3-mobile", mobileViews, "chat"));
 $("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
 $("search").addEventListener("keydown", event => {
  if (event.key === "Enter") { event.preventDefault(); diagramView.search($("search").value, true); }
@@ -282,16 +301,20 @@ function renderMentions() {
  for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = "No matching element; sent as text."; if (entity && "label" in entity) chip.title = entity.label ?? chip.title; if (entity && "text" in entity) chip.title = entity.text; $("mentions").append(chip); }
 }
 $("message-input").addEventListener("input", renderMentions);
-// Clipboard images become temp files (like Pi's terminal paste); the chat gets their path.
-$("message-input").addEventListener("paste", async event => {
+// Clipboard and attached images become temp files (like Pi's terminal paste); the chat gets their path.
+$("message-input").addEventListener("paste", event => {
  const file = [...(event.clipboardData?.items ?? [])].find(item => item.type.startsWith("image/"))?.getAsFile(); if (!file) return;
- event.preventDefault(); showNotice("Saving pasted image\u2026");
+ event.preventDefault(); void attach(file);
+});
+$("attach").addEventListener("change", () => { const input = $("attach") as HTMLInputElement, file = input.files?.[0]; input.value = ""; if (file) void attach(file); });
+async function attach(file: File) {
+ showNotice("Saving image\u2026");
  try {
   const response = await fetch("/api/paste", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": file.type }, body: file });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Image paste failed.");
   const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); const list = $("messages"); list.scrollTop = list.scrollHeight; renderMentions(); showNotice("Image saved: " + value.path);
  } catch (error) { showNotice(error.message); }
-});
+}
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
 $("message-input").addEventListener("keydown", event => {
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("composer").requestSubmit(); }
