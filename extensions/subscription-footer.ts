@@ -1332,11 +1332,17 @@ export function createSubscriptionFooterController(pi, options = {}) {
 					const model = renderModelRow(ctx, theme, width, pi?.getThinkingLevel?.(), plan3);
 					// Pi's own footer draws ctx.ui.setStatus() entries; a replacement footer must too.
 					const statuses = [...entries]
+						.filter(([key]) => key !== "plan3-shared")
 						.sort(([a], [b]) => a.localeCompare(b))
 						.map(([, text]) => stripAnsi(text))
 						.join(" ");
 					const absorbed = plan3 && stripAnsi(model[0]).endsWith(` | ${stripAnsi(plan3)}`);
-					const status = statuses.trim() && !absorbed ? [theme.fg("dim", truncatePlain(statuses, width))] : [];
+					// Sharing exposes the session, so it always shows, in its own colour (red when public), even when the status row hides.
+					const share = entries.get("plan3-shared") ?? "";
+					const rest = absorbed ? "" : statuses.trim();
+					const status = share
+						? [(rest ? theme.fg("dim", truncatePlain(rest, Math.max(0, width - stripAnsi(share).length - 1))) + " " : "") + share]
+						: rest ? [theme.fg("dim", truncatePlain(rest, width))] : [];
 					return width < MIN_WIDTH
 						? [...model, ...status]
 						: [...model, ...renderQuotaRows(shown(), states, theme, width, now(), { resetDates: setting().resetDates !== false }), ...status];
