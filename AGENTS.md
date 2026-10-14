@@ -37,6 +37,11 @@ non-TUI modes.
 
 For direct commit-and-push requests, use this path: one parallel preflight (`status`, `diff --stat`, branch/remote); inspect only unexpected or sensitive untracked files and never stage credentials; run one batched LSP check plus the smallest relevant tests; stage tracked changes with `git add -u`, then commit and push `master`; finish with one status/ahead check. If status and diff disagree, use `git diff-index` once instead of repeated probes. Do not create temporary comparison files.
 
+## Test Scope Rule
+
+After each change, run only the targeted test scripts for the touched code. Run the full
+`npm run verify:quiet` once, just before a push, never after every edit.
+
 ## Version Before Push Rule
 
 Before every push, increment the package version in `package.json` (patch by default) and commit it. Keep any tracked lockfile version in sync. Retrying the same failed push does not require another increment.
