@@ -170,7 +170,12 @@ try {
  await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([new Uint8Array([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,1,2,3])], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");
  await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
- assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); await rm(pasted);
+ assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+ // A sent message with a pasted path shows a thumbnail served back by name only.
+ { const row = { id: "img_row", role: "user", text: "look " + pasted, streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
+ await browser("wait", "[data-id=img_row] .thumb img");
+ assert.deepEqual(await evaluate("(async () => { const src = document.querySelector('[data-id=img_row] .thumb img').getAttribute('src'), ok = await fetch(src), bad = await fetch(src.replace(/name=[^&]+/, 'name=..%2Fsecret.png')); return [ok.status, ok.headers.get('content-type'), bad.status]; })()"), [200, "image/png", 400]);
+ chatRows.delete("img_row"); await rm(pasted);
  // The Image button (phones have no clipboard paste) uploads the same way.
  await browser("fill", "#message-input", "");
  await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([new Uint8Array([0xff,0xd8,0xff,0xe0,1,2])], \"photo.jpg\", { type: \"image/jpeg\" })); const input = document.getElementById(\"attach\"); input.files = data.files; input.dispatchEvent(new Event(\"change\")); })()");

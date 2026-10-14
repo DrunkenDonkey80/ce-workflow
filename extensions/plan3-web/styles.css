@@ -266,3 +266,4 @@ body.has-switcher { padding-left: 36px; }
 @media (prefers-reduced-motion: reduce) {
  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+.thumb { display: block; margin-top: 6px; } .thumb img { display: block; max-width: 50%; height: auto; border: 1px solid var(--line); border-radius: 6px; }

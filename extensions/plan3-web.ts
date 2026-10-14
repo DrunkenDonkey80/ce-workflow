@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,6 +61,14 @@ export async function savePastedImage(bytes: Buffer, dir = tmpdir()) {
 	const file = join(dir, `pi-clipboard-${randomUUID()}.${kind[0]}`);
 	await writeFile(file, bytes, { flag: "wx" });
 	return file;
+}
+/** Serves a pasted image back for chat thumbnails: only Pi's own pi-clipboard-<uuid> temp names, re-checked by magic bytes. */
+export async function readPastedImage(name: string | null, dir = tmpdir()) {
+	if (!name || !/^pi-clipboard-[0-9a-f-]{36}\.(?:png|jpe?g|gif|webp)$/.test(name)) throw new WebError(400, "Not a pasted image name.");
+	const bytes = await readFile(join(dir, name)).catch(() => { throw new WebError(404, "Image no longer available."); });
+	const kind = bytes.length <= IMAGE_BYTES && IMAGE_KINDS.find(([, test]) => test(bytes));
+	if (!kind) throw new WebError(415, "Not a supported image.");
+	return { bytes, type: kind[0] === "jpg" ? "image/jpeg" : "image/" + kind[0] };
 }
 function read(req: IncomingMessage, limit: number): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
@@ -227,6 +235,10 @@ export async function createPlan3Web(options: Options) {
 			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram", "/api/dialog", "/api/files", "/api/file", "/api/diff", "/api/models", "/api/usage", "/api/commands"].includes(url.pathname)) {
 				if (!options.read) throw new WebError(501, "Session bridge is not attached.");
 				return json(res, 200, await options.read(url.pathname, url.searchParams));
+			}
+			if (req.method === "GET" && url.pathname === "/api/image") {
+				const image = await readPastedImage(url.searchParams.get("name"));
+				res.writeHead(200, { "Content-Type": image.type, "Cache-Control": "private, max-age=86400" }); return res.end(image.bytes);
 			}
 			if (req.method === "POST" && url.pathname === "/api/paste") return json(res, 200, { path: await savePastedImage(await read(req, IMAGE_BYTES)) });
 			if (req.method === "POST") {

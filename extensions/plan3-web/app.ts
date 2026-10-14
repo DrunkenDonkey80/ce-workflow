@@ -344,7 +344,13 @@ function renderChat() {
   item.className = "message " + row.role + (text ? "" : " message-blocks"); item.hidden = !text && !row.blocks?.length && !note;
   // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
   item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
-  renderBlocks(item.children[1] as HTMLElement, row); item.children[2].textContent = row.text; item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
+  renderBlocks(item.children[1] as HTMLElement, row); item.children[2].textContent = row.text;
+  // Pasted images (web or terminal Alt+V) show as thumbnails under the message; click opens full size.
+  if (row.role === "user") for (const [name] of row.text.matchAll(/pi-clipboard-[0-9a-f-]{36}\.(?:png|jpe?g|gif|webp)/gi)) {
+   const src = "/api/image?name=" + encodeURIComponent(name) + (token ? "&token=" + token : "");
+   const link = Object.assign(document.createElement("a"), { href: src, target: "_blank", rel: "noopener", className: "thumb" }); link.append(Object.assign(document.createElement("img"), { src, alt: "Pasted image", loading: "lazy" }));
+   item.children[2].append(link);
+  } item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
  }
  $("earlier").hidden = !state.more;
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
