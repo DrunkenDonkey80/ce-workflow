@@ -720,7 +720,7 @@ export default function plan3(pi) {
 	function publishSession() {
 		if (!webInstance || !webCtx || !shareRecord) return;
 		const live = activity.snapshot(undefined), state = live.dialog || dialogs.snapshot().length ? "waiting" : live.working ? "working" : "idle";
-		try { sessions.publish({ sessionId: shareRecord.sessionId, name: webCtx.sessionManager?.getSessionName?.() || path.basename(webCtx.cwd), cwd: webCtx.cwd, port: webInstance.port, state }); }
+		try { sessions.publish({ sessionId: shareRecord.sessionId, name: [path.basename(webCtx.cwd), herdrTab].filter(Boolean).join(" - ") || webCtx.sessionManager?.getSessionName?.() || "Pi", cwd: webCtx.cwd, port: webInstance.port, state }); }
 		catch (error) { if (!sessionWarned) { sessionWarned = true; report(webCtx, error); } }
 	}
 	let registryWarned = false;
@@ -801,7 +801,7 @@ export default function plan3(pi) {
 		herdrAt = Date.now();
 		try {
 			const result = await pi.exec(bin, ["tab", "get", id], { timeout: 3000 }), label = String(JSON.parse(result.stdout)?.result?.tab?.label ?? "");
-			if (label !== herdrTab) { herdrTab = label; if (webInstance && webCtx) publishStatus(webCtx); }
+			if (label !== herdrTab) { herdrTab = label; if (webInstance && webCtx) { publishStatus(webCtx); publishSession(); } }
 		} catch { /* herdr is optional; the title falls back to folder and plan. */ }
 	}
 	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), folder: ctx?.cwd ? path.basename(ctx.cwd) : "", tab: herdrTab });
@@ -881,6 +881,11 @@ export default function plan3(pi) {
 		if (endpoint === "/api/rows") return chat.page(params.get("before") ?? undefined);
 		if (endpoint === "/api/dialog") return dialogs.get(params.get("id") ?? "");
 		if (endpoint === "/api/files") return listFiles(webCtx.cwd);
+		if (endpoint === "/api/plans") {
+			// Open plans, newest first, for the web plan menu; "current" is the session's plan (terminal footer).
+			const plans = await listPlans(webCtx.cwd), current = currentPlan(webCtx, plans);
+			return { current: current?.id ?? null, plans: plans.filter(isOpen).sort((a, b) => touched(b).localeCompare(touched(a))).map(plan => ({ id: plan.id, title: plan.title, done: plan.done, total: plan.total })) };
+		}
 		if (endpoint === "/api/models") return { ...webStatus(webCtx), ...await webModels(webCtx), efforts: EFFORTS };
 		if (endpoint === "/api/usage" || endpoint === "/api/commands") {
 			// work-models fills these synchronously; absent (extension off) means empty lists.

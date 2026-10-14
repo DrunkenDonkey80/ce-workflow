@@ -34,13 +34,12 @@ function setBar(item: HTMLElement, percent: number, tone: string) {
 }
 function showNotice(text) { $("notice").textContent = text; $("notice").hidden = !text; }
 function renderShell() {
- // "<folder> - <herdr tab>: <plan>", each part only when known.
+ // "<folder> - <herdr tab>", plus ": <plan>" on phones, where the plan bar sits in the drawer.
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
- const title = [head, plan?.title ?? state.diagram?.title].filter(Boolean).join(": ") || "Architecture workspace";
+ const title = [head, matchMedia("(max-width: 899px)").matches ? plan?.title ?? state.diagram?.title : ""].filter(Boolean).join(": ") || plan?.title || "Architecture workspace";
  $("title").textContent = title; $("title").title = title;
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
- $("target-kind").textContent = target === "product" ? "Product" : "Plan";
  // D19 status line. Line 1: [model: effort] [Context: n%] [🧠 bias]; line 2: the plan as a progress bar (or New plan).
  const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
  $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
@@ -48,14 +47,15 @@ function renderShell() {
  $("bias-button").textContent = "🧠 " + (BIAS_LABEL[plan?.bias ?? 0] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
  $("bias-button").disabled = !state.connected || !plan;
- $("plan-button").textContent = plan ? [plan.focus, plan.total ? `${plan.done ?? 0}/${plan.total}` : ""].filter(Boolean).join(" · ") || "Plan" : "New plan";
+ // The plan bar names the plan; only the title part truncates, the count stays visible.
+ $("plan-button").replaceChildren(Object.assign(document.createElement("span"), { className: "bar-text", textContent: plan?.title ?? "New plan" }), ...plan?.total ? [Object.assign(document.createElement("span"), { className: "bar-count", textContent: `${plan.done ?? 0}/${plan.total}` })] : []);
  $("plan-button").title = plan ? plan.title + " — plan actions" : "Start a new plan";
  setBar($("plan-button"), plan?.total ? (plan.done ?? 0) / plan.total * 100 : 0, "accent");
  for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : "Idle";
  $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting ? "working" : "idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
- for (const button of $("plan-menu").querySelectorAll<HTMLButtonElement>("button")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset);
+ for (const button of $("plan-menu").querySelectorAll<HTMLButtonElement>("[data-command]")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
@@ -141,7 +141,7 @@ function setDrawer(open: boolean) {
  $("drawer-toggle").setAttribute("aria-expanded", String(open)); $("drawer-toggle").setAttribute("aria-label", open ? "Close menu" : "Open menu");
  if (open) { drawer.querySelector<HTMLElement>("[aria-selected=true]")?.focus(); void loadUsage(); }
 }
-phone.addEventListener("change", placeForPhone); placeForPhone();
+phone.addEventListener("change", () => { placeForPhone(); renderShell(); }); placeForPhone();
 $("drawer-toggle").addEventListener("click", () => setDrawer(drawer.dataset.open !== "true"));
 $("drawer-backdrop").addEventListener("click", () => setDrawer(false));
 drawer.addEventListener("keydown", event => { if (event.key === "Escape") { event.stopPropagation(); setDrawer(false); $("drawer-toggle").focus(); } });
@@ -419,13 +419,27 @@ function newPlan() {
  setDrawer(false); const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
  showNotice("Describe the plan after /plan3 and send.");
 }
-$("plan-button").addEventListener("click", () => state.plan ? toggleMenu("plan-button", "plan-menu") : newPlan());
-for (const button of $("plan-menu").querySelectorAll<HTMLElement>("button")) button.addEventListener("click", async () => {
+// Plan menu: open plans on top (the shown one marked, the session's current one labelled), a divider, then actions.
+$("plan-button").addEventListener("click", async () => {
+ if (!$("plan-menu").hidden) return toggleMenu("plan-button", "plan-menu", false);
+ toggleMenu("plan-button", "plan-menu", true);
+ try {
+  const { plans, current } = await get("plans") as { plans: { id: string; title: string; done?: number; total?: number }[]; current: string | null };
+  $("plan-list").replaceChildren(...plans.map(item => {
+   const pick = Object.assign(document.createElement("button"), { type: "button", className: "plan-option", textContent: item.title + (item.total ? ` · ${item.done ?? 0}/${item.total}` : "") + (item.id === current ? " (current)" : "") });
+   pick.setAttribute("aria-pressed", String(item.id === target));
+   pick.addEventListener("click", () => { if (item.id === target) return closeMenus(); const url = new URL(location.href); url.searchParams.set("target", item.id); location.assign(url); });
+   return pick;
+  }));
+  $("plan-divider").hidden = !plans.length;
+ } catch (error) { $("plan-list").replaceChildren("Plans failed to load: " + error.message); }
+});
+for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-command]")) button.addEventListener("click", async () => {
  const command = button.dataset.command; closeMenus(); setDrawer(false);
  if (command === "new") return newPlan();
  if (commandSending) return; commandSending = true; renderShell();
  try {
-  await post("message", { text: command === "switch" ? "/plan3" : (command === "resume" ? "/resume3" : "/plan3 " + command) + " " + target }); showNotice("");
+  await post("message", { text: (command === "resume" ? "/resume3" : "/plan3 " + command) + " " + target }); showNotice("");
  }
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }
@@ -448,7 +462,7 @@ async function loadSessions() {
  sessionsTimer = window.setTimeout(loadSessions, 5000);
 }
 function renderSessions(sessions: Session[], own: Session | undefined) {
- const show = sessions.length > 1; $("switcher").hidden = !show; document.body.classList.toggle("has-switcher", show);
+ const show = sessions.length > 0; $("switcher").hidden = !show; document.body.classList.toggle("has-switcher", show);
  $("session-list").replaceChildren(...sessions.map(session => {
   const tone = session.state === "idle" ? (session.unseen ? "unseen" : "seen") : session.state, words = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle" }[tone];
   const folder = session.cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? session.cwd;
@@ -458,14 +472,17 @@ function renderSessions(sessions: Session[], own: Session | undefined) {
   item.className = "session"; item.dataset.tone = tone; item.dataset.port = String(session.port);
   if (session === own) item.setAttribute("aria-current", "page");
   item.append(Object.assign(document.createElement("span"), { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }),
-   Object.assign(document.createElement("span"), { className: "session-label", textContent: `${session.name} · ${folder} · ${words}` }));
+   Object.assign(document.createElement("span"), { className: "session-label", textContent: session.name }));
+  item.title ||= `${session.name} · ${words}`;
   item.setAttribute("aria-label", `${session.name} in ${folder}, ${words}${session === own ? ", this session" : ""}`);
   return item;
  }));
 }
-function toggleSwitcher(open: boolean) { $("switcher").dataset.open = String(open); $("switcher-toggle").setAttribute("aria-expanded", String(open)); $("switcher-toggle").setAttribute("aria-label", open ? "Hide shared sessions" : "Show shared sessions"); }
+// Desktop session bar: open by default; collapsing to the letter stripe is remembered.
+function toggleSwitcher(open: boolean) { localStorage.setItem("plan3-switcher", open ? "open" : "closed"); document.body.classList.toggle("switcher-open", open); $("switcher").dataset.open = String(open); $("switcher-toggle").setAttribute("aria-expanded", String(open)); $("switcher-toggle").setAttribute("aria-label", open ? "Hide shared sessions" : "Show shared sessions"); }
 $("switcher-toggle").addEventListener("click", () => toggleSwitcher($("switcher").dataset.open !== "true"));
 $("switcher").addEventListener("keydown", event => { if (event.key === "Escape" && $("switcher").dataset.open === "true") { event.stopPropagation(); toggleSwitcher(false); $("switcher-toggle").focus(); } });
+toggleSwitcher(localStorage.getItem("plan3-switcher") !== "closed");
 document.addEventListener("visibilitychange", () => void loadSessions());
 void loadSessions();
 // Subscription 7d left per provider (footer data); tapping shows the footer rows in their colours.

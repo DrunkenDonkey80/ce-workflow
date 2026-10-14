@@ -14,7 +14,7 @@
  </nav>
  <header class="topbar">
   <button id="drawer-toggle" class="drawer-toggle" type="button" aria-controls="drawer" aria-expanded="false" aria-label="Open menu">☰</button>
-  <div class="workspace-title"><h1><button id="title" class="title-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="title-menu">Architecture workspace</button></h1><span id="target-kind" class="badge">Plan</span></div>
+  <div class="workspace-title"><h1><button id="title" class="title-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="title-menu">Architecture workspace</button></h1></div>
   <!-- Line 1: model and effort, context, Plan3 bias. Line 2: progress bars (plan, subscription usage). Desktop: one line in the top bar. -->
   <section class="status-line" aria-label="Session status">
    <div class="status-row">
@@ -30,13 +30,13 @@
    <div id="context-menu" class="status-menu" role="group" aria-label="Context" hidden><button type="button" id="compact-now">Compact now</button></div>
    <div id="bias-menu" class="status-menu" role="group" aria-label="Plan3 bias" hidden></div>
    <div id="usage-menu" class="status-menu usage-menu" role="group" aria-label="Subscription usage" hidden></div>
-   <div id="plan-menu" class="status-menu" role="group" aria-label="Plan actions" hidden>
+   <div id="plan-menu" class="status-menu" role="group" aria-label="Plans and plan actions" hidden>
+    <div id="plan-list" class="plan-list"></div><hr id="plan-divider" hidden>
     <button type="button" data-command="resolve" data-plan>Resolve questions</button>
     <button type="button" data-command="ideas" data-plan>Ideas</button>
     <button type="button" data-command="review" data-plan>Review</button>
     <button type="button" data-command="finish" data-plan>Finish planning</button>
     <button type="button" data-command="resume" data-plan>Start or continue work</button>
-    <button type="button" data-command="switch">Switch plan</button>
     <button type="button" data-command="new">New plan</button>
    </div>
   </section>

@@ -49,6 +49,7 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
  if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53%" }], [{ text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
  if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }] };
  if (endpoint === "/api/files") return { files: projectFiles, truncated: false, git: true };
+ if (endpoint === "/api/plans") return { current: "12345678", plans: [{ id: "12345678", title: sample.title, done: 2, total: 5 }, { id: "abcdef01", title: "Other plan", done: 0, total: 3 }] };
  if (endpoint === "/api/file") return { path: params.get("path"), content: "<img src=x onerror=alert(1)>\nplain" };
  if (endpoint === "/api/diff") return { path: params.get("path"), diff: "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-old line\n+new line" };
  if (endpoint === "/api/row") return { id: params.get("id"), role: "assistant", text: "Short excerpt. Full body loaded.", streaming: false };
@@ -75,7 +76,7 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
 try {
  await browser("open", server.url({ kind: "plan", id: "12345678" }));
  await browser("set", "viewport", "1280", "800");
- await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1: Upload service\"");
+ await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
  const snapshot = await browser("snapshot", "-i"); assert(JSON.stringify(snapshot).includes("Resize chat pane"));
  assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 380);
  await browser("focus", "#splitter"); await browser("press", "ArrowLeft");
@@ -91,14 +92,14 @@ try {
  // R7 collapse states: narrow gives the panel the chat's width; collapsed leaves only >>.
  const width = id => evaluate(`Math.round(document.getElementById(${JSON.stringify(id)}).getBoundingClientRect().width)`);
  await browser("click", "#narrow-left");
- assert.deepEqual([await width("left-panel"), await width("chat")], [640, 628]);
+ assert.deepEqual([await width("left-panel"), await width("chat")], [640, await width("workspace") - 652], "narrow: the chat takes the rest");
  await browser("focus", "#splitter"); await browser("press", "ArrowLeft");
  assert.equal(await width("left-panel"), 630, "in narrow mode the arrows move the splitter the way they point");
  await browser("press", "End"); await browser("click", "#narrow-left"); assert.equal(await width("chat"), 640);
  await browser("click", "#collapse-left");
  assert.equal(await evaluate("document.activeElement.id"), "expand-left");
  assert.equal(await evaluate("document.getElementById(\"left-panel\").getClientRects().length"), 0);
- assert(await width("chat") > 1200, "collapsed: chat takes the width");
+ assert(await width("chat") > await width("workspace") - 60, "collapsed: chat takes the width");
  assert.equal(await evaluate("localStorage.getItem(\"plan3-left\")"), "collapsed");
  await browser("click", "#expand-left"); assert.equal(await width("chat"), 640);
  await browser("click", "#tab-files");
@@ -195,9 +196,9 @@ try {
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
  const strokeBefore = await evaluate("document.querySelector(\"[data-node=web_client] path\").getAttribute(\"d\")");
  const panBefore = await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")");
- const canvasTop = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().top)");
- await browser("mouse", "move", "8", String(canvasTop + 8)); await browser("mouse", "down", "left");
- await browser("mouse", "move", "33", String(canvasTop + 33)); await browser("mouse", "up", "left");
+ const canvasTop = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().top)"), canvasLeft = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().left)");
+ await browser("mouse", "move", String(canvasLeft + 8), String(canvasTop + 8)); await browser("mouse", "down", "left");
+ await browser("mouse", "move", String(canvasLeft + 33), String(canvasTop + 33)); await browser("mouse", "up", "left");
  assert.notEqual(await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")"), panBefore);
  assert.equal(await evaluate("document.querySelector(\"[data-node=web_client] path\").getAttribute(\"d\")"), strokeBefore, "fixed seeds keep redraw strokes stable");
  const nodePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
@@ -232,7 +233,7 @@ try {
  await browser("press", "Escape");
  await browser("click", "#pin-note");
  const commentCanvasTop = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().top)");
- await browser("mouse", "move", "8", String(commentCanvasTop + 8)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left");
+ await browser("mouse", "move", String(canvasLeft + 8), String(commentCanvasTop + 8)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left");
  assert(await evaluate("document.getElementById(\"comment-prompt\").open"), "canvas click must open the comment dialog");
  await browser("fill", "#comment-text", "Canvas follow-up"); await browser("click", "#comment-save");
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"5\"");
@@ -360,8 +361,8 @@ try {
  assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
- assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["Fast: High", "Context: 42%", "🧠 Normal", "S03 · 2/5"]);
- assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1: " + sample.title);
+ assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["Fast: High", "Context: 42%", "🧠 Normal", sample.title + "2/5"]);
+ assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - herdr tab; the plan is in its bar");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .bar')].map(bar => bar.textContent + ':' + bar.dataset.tone + ':' + bar.style.getPropertyValue('--fill'))"), ["Claude 7d 53%:text:53%", "Codex 7d 12%:error:12%"]);
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
@@ -370,8 +371,11 @@ try {
  await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
  await browser("click", "#usage-button"); assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-menu .usage-line')].map(line => line.textContent)"), ["Claude 7d [████░░░░] 53%", "Codex 7d 12%"]);
  await browser("press", "Escape");
- for (const command of ["resolve", "ideas", "review", "finish", "resume", "switch"]) { await browser("click", "#plan-button"); await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
- assert.deepEqual(commands, ["/plan3 resolve 12345678", "/plan3 ideas 12345678", "/plan3 review 12345678", "/plan3 finish 12345678", "/resume3 12345678", "/plan3"]);
+ await browser("click", "#plan-button"); await browser("wait", ".plan-option");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#plan-menu .plan-option')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')).concat(document.getElementById('plan-divider').hidden)"), [sample.title + " · 2/5 (current):true", "Other plan · 0/3:false", false], "plans on top, the shown one marked, then a divider");
+ await browser("press", "Escape");
+ for (const command of ["resolve", "ideas", "review", "finish", "resume"]) { await browser("click", "#plan-button"); await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
+ assert.deepEqual(commands, ["/plan3 resolve 12345678", "/plan3 ideas 12345678", "/plan3 review 12345678", "/plan3 finish 12345678", "/resume3 12345678"]);
  await browser("click", "#plan-button"); assert.equal(await evaluate("document.getElementById('plan-button').getAttribute('aria-expanded')"), "true");
  await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('plan-menu').hidden, document.activeElement.id]"), [true, "plan-button"]);
  await browser("click", "#plan-button"); await browser("click", "[data-command=new]");
@@ -386,15 +390,17 @@ try {
  await browser("click", "#model-menu [data-level=low]");
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'deep: Low'");
  // D18: stripe of colour-coded letters; this page marks its own idle run seen; the list slides out and Escape closes it.
- assert.equal(await evaluate("document.getElementById('switcher').hidden"), true, "a lone session shows no switcher");
+ assert.equal(await evaluate("document.getElementById('switcher').hidden"), false, "desktop always shows the session bar");
  otherSessions = true; await evaluate("document.dispatchEvent(new Event('visibilitychange'))");
  await browser("wait", "--fn", "!document.getElementById('switcher').hidden && document.querySelector('.session[data-tone=seen]')");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('.session')].map(s => s.querySelector('.session-letter').textContent + ':' + s.dataset.tone + ':' + s.tagName)"), ["A:seen:SPAN", "B:working:SPAN", "G:waiting:SPAN"], "token pages never link other ports");
  assert.deepEqual(seenCalls, [{ device: "local", revision: 3 }]);
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').getAttribute('aria-label')"), "alpha in alpha, idle, this session");
- assert.equal(await evaluate("document.querySelector('.session-label').getBoundingClientRect().width"), 1, "closed stripe shows letters only");
- await browser("click", "#switcher-toggle"); assert(await evaluate("document.querySelector('.session-label').getBoundingClientRect().width > 100"));
- await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('switcher').dataset.open, document.activeElement.id]"), ["false", "switcher-toggle"]);
+ assert(await evaluate("document.getElementById('switcher').getBoundingClientRect().width === 200 && document.querySelector('.session-label').getBoundingClientRect().width > 20 && document.querySelector('.session-label').textContent === 'alpha'"), "open by default with the session name");
+ await browser("focus", "#switcher-toggle"); await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('switcher').dataset.open, document.activeElement.id]"), ["false", "switcher-toggle"]);
+ assert.equal(await evaluate("document.querySelector('.session-label').getBoundingClientRect().width"), 1, "collapsed stripe shows letters only");
+ assert.equal(await evaluate("localStorage.getItem('plan3-switcher')"), "closed", "collapse is remembered");
+ await browser("click", "#switcher-toggle");
  // B finishes a run: blue until seen there. A finishes another: this page marks it seen again on return.
  beta = { state: "idle", revision: 2, unseen: true }; ownRevision = 4; await evaluate("document.dispatchEvent(new Event('visibilitychange'))");
  await browser("wait", "--fn", "document.querySelector('.session[data-port=\"1\"]').dataset.tone === 'unseen'");
