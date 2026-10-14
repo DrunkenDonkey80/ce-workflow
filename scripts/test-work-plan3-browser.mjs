@@ -49,7 +49,7 @@ const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { 
 const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft", done: 2, total: 5, focus: "S03", bias: 0 }, status, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "a", id: "fast", name: "Fast" }, { provider: "b", id: "deep", name: "Deep" }], others: [{ provider: "b", id: "other", name: "Other" }] };
  if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
- if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }] };
+ if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }], args: { wo: [{ value: "share", description: "Toggle sharing" }], plan3: [{ value: "review", description: "Review" }, { value: "review all", description: "Review" }] } };
  if (endpoint === "/api/files") return { files: projectFiles, truncated: false, git: true };
  if (endpoint === "/api/plans") return { current: "12345678", plans: [{ id: "12345678", title: sample.title, done: 2, total: 5 }, { id: "abcdef01", title: "Other plan", done: 0, total: 3 }] };
  if (endpoint === "/api/file") return { path: params.get("path"), content: "<img src=x onerror=alert(1)>\nplain" };
@@ -142,6 +142,9 @@ try {
  await browser("press", "Enter"); assert.equal(await evaluate("document.getElementById('message-input').value"), "/plan3 ", "Enter picks instead of sending");
  await browser("fill", "#message-input", ""); await browser("type", "#message-input", "/wo s"); await browser("wait", "#slash-menu:not([hidden]) [data-command='/wo share']");
  await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('slash-menu').hidden"), true);
+ // Picking /plan3 lists its arguments.
+ await browser("fill", "#message-input", ""); await browser("type", "#message-input", "/plan3 rev"); await browser("wait", "#slash-menu:not([hidden]) [data-command='/plan3 review all']");
+ await browser("press", "Escape");
  await browser("fill", "#message-input", "");
  await browser("click", "#title"); assert(await evaluate("!document.getElementById('title-menu').hidden && document.getElementById('title-menu').contains(document.getElementById('session-list'))"), "phone: the title opens the session picker");
  await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('title-menu').hidden"), true);

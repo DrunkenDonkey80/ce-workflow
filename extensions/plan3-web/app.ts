@@ -422,15 +422,16 @@ async function attach(file: File) {
  } catch (error) { showNotice(error.message); }
 }
 // Typing "/name" or "/wo sub" lists matching commands; arrows move, Tab/Enter picks, Escape closes.
-let slashCommands: Promise<{ pi: { name: string; description: string }[]; wo: { value: string; description: string }[] }> | undefined, slashPick = 0;
+type SlashItem = { value: string; description: string };
+let slashCommands: Promise<{ pi: { name: string; description: string }[]; wo: SlashItem[]; args?: Record<string, SlashItem[]> }> | undefined, slashPick = 0;
 async function updateSlash() {
  const input = $("message-input") as HTMLTextAreaElement, menu = $("slash-menu"), value = input.value;
- const match = input.selectionStart === value.length ? /^\/(?:(wo) (\S*)|(\S*))$/.exec(value) : null;
+ const match = input.selectionStart === value.length ? /^\/(?:([\w-]+) (\S*(?: \S*)?)|(\S*))$/.exec(value) : null;
  if (!match) { menu.hidden = true; return; }
  slashCommands ??= get("commands").catch(error => { slashCommands = undefined; throw error; });
  let list; try { list = await slashCommands; } catch { menu.hidden = true; return; }
  if (input.value !== value) return;
- const rows = match[1] ? list.wo.filter(item => item.value.startsWith(match[2])).map(item => ["/wo " + item.value, item.description])
+ const rows = match[1] ? (list.args?.[match[1]] ?? []).filter(item => item.value.startsWith(match[2]) && item.value !== match[2]).map(item => [`/${match[1]} ${item.value}`, item.description])
   : list.pi.filter(item => item.name.startsWith(match[3])).map(item => ["/" + item.name, item.description]);
  slashPick = Math.min(slashPick, Math.max(0, rows.length - 1));
  menu.replaceChildren(...rows.map(([command, description], index) => {
@@ -443,7 +444,7 @@ async function updateSlash() {
 }
 function pickSlash(command: string) {
  const input = $("message-input") as HTMLTextAreaElement; input.value = command + " "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
- slashPick = 0; $("slash-menu").hidden = true; renderMentions(); void updateSlash(); // "/wo " opens its subcommands
+ slashPick = 0; $("slash-menu").hidden = true; renderMentions(); void updateSlash(); // "/plan3 " opens its arguments
 }
 $("message-input").addEventListener("input", () => { slashPick = 0; void updateSlash(); });
 $("message-input").addEventListener("blur", () => { $("slash-menu").hidden = true; });
