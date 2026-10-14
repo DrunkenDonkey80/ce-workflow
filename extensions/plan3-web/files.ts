@@ -9,7 +9,8 @@ export function createFilesView(root: HTMLElement, { get }: { get: (endpoint: st
  tree.setAttribute("aria-label", "Project files"); viewer.setAttribute("aria-label", "File content"); viewer.tabIndex = 0;
  const heading = Object.assign(document.createElement("h2"), { textContent: "Select a file" }), body = Object.assign(document.createElement("pre"), { className: "files-body" });
  viewer.append(heading, body); root.append(tree, viewer);
- let selected = "", loaded = false, version = 0;
+ // linked: a file opened from a chat link, kept even when the tree does not list it (absolute path).
+ let selected = "", linked = "", loaded = false, version = 0;
  const open = new Set<string>();
 
  function folder(files: ProjectFile[]) {
@@ -53,7 +54,7 @@ export function createFilesView(root: HTMLElement, { get }: { get: (endpoint: st
    if (!value.files.length) tree.append(Object.assign(document.createElement("p"), { className: "files-empty", textContent: "No visible project files." }));
    if (value.truncated) tree.append(Object.assign(document.createElement("p"), { className: "files-empty", textContent: "Only the first 5000 files are shown." }));
    const current = value.files.find(file => file.path === selected);
-   if (current) await show(current, true); else if (selected) { selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); }
+   if (current) await show(current, true); else if (selected && selected !== linked) { selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); }
   } catch (error) { if (mine === version) { tree.replaceChildren(Object.assign(document.createElement("p"), { className: "files-empty", textContent: "Files failed to load: " + error.message })); } }
  }
  async function show(file: ProjectFile, quiet = false) {
@@ -77,6 +78,7 @@ export function createFilesView(root: HTMLElement, { get }: { get: (endpoint: st
  return {
   /** First show loads; later file changes refresh only while visible, otherwise on next show. */
   shown() { if (!loaded) void refresh(); },
+  open(path: string) { linked = path; void show({ path }); },
   changed(visible: boolean) { if (visible) void refresh(); else loaded = false; },
  };
 }

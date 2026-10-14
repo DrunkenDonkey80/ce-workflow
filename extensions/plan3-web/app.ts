@@ -369,17 +369,33 @@ function renderChat() {
   item.className = "message " + row.role + (text ? "" : " message-blocks"); item.hidden = !text && !row.blocks?.length && !note;
   // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
   item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
-  renderBlocks(item.children[1] as HTMLElement, row); item.children[2].textContent = row.text;
-  // Pasted images (web or terminal Alt+V) show as thumbnails under the message; click opens full size.
-  if (row.role === "user") for (const [name] of row.text.matchAll(/pi-clipboard-[0-9a-f-]{36}\.(?:png|jpe?g|gif|webp)/gi)) {
-   const src = "/api/image?name=" + encodeURIComponent(name) + (token ? "&token=" + token : "");
-   const link = Object.assign(document.createElement("a"), { href: src, target: "_blank", rel: "noopener", className: "thumb" }); link.append(Object.assign(document.createElement("img"), { src, alt: "Pasted image", loading: "lazy" }));
-   item.children[2].append(link);
-  } item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
+  renderBlocks(item.children[1] as HTMLElement, row); renderLinks(item.children[2] as HTMLElement, row.text);
+  item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
  }
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
  if (follow) feed.scrollTop = feed.scrollHeight; else if (feed.scrollHeight > feed.clientHeight) $("to-bottom").hidden = false;
 }
+// Image and Markdown paths in chat text become links: images open full size and show as thumbnails
+// (pasted or terminal Alt+V images too); .md opens in the Files tab. The server limits images to the project and temp folder.
+// shortcut: paths with spaces are not detected; quote-aware parsing if that matters.
+const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.(?:png|jpe?g|gif|webp|md)(?![\w-])/gi;
+function renderLinks(target: HTMLElement, text: string) {
+ target.replaceChildren(); let at = 0; const images = new Set<string>();
+ for (const match of text.matchAll(LINKED_PATH)) {
+  const path = match[0], image = !/\.md$/i.test(path);
+  target.append(text.slice(at, match.index)); at = match.index + path.length;
+  const link = Object.assign(document.createElement("a"), { textContent: path, className: "chat-link", href: image ? imageSource(path) : "#" });
+  if (image) { link.target = "_blank"; link.rel = "noopener"; images.add(path); }
+  else link.addEventListener("click", event => { event.preventDefault(); setTab("files"); filesView.open(path); if (matchMedia("(max-width: 899px)").matches) setMobile("files"); });
+  target.append(link);
+ }
+ target.append(text.slice(at));
+ for (const path of [...images].slice(0, 6)) {
+  const link = Object.assign(document.createElement("a"), { href: imageSource(path), target: "_blank", rel: "noopener", className: "thumb" });
+  link.append(Object.assign(document.createElement("img"), { src: imageSource(path), alt: path, loading: "lazy" })); target.append(link);
+ }
+}
+const imageSource = (path: string) => "/api/image?path=" + encodeURIComponent(path) + (token ? "&token=" + token : "");
 const mentioned = () => [...new Set([...$("message-input").value.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
 function renderMentions() {
  const data = state.diagram, all = [...(data?.nodes ?? []), ...(data?.edges ?? []), ...(data?.notes ?? [])]; $("mentions").replaceChildren();

@@ -176,10 +176,14 @@ try {
  await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
- // A sent message with a pasted path shows a thumbnail served back by name only.
- { const row = { id: "img_row", role: "user", text: "look " + pasted, streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
+	// Image and Markdown paths in chat become links; images also show as thumbnails. Only temp-folder and project images are served.
+ { const row = { id: "img_row", role: "agent", text: `look ${pasted}, see docs/notes.md. and ${process.platform === "win32" ? "C:\\Windows\\Web\\x.png" : "/etc/x.png"}`, streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
  await browser("wait", "[data-id=img_row] .thumb img");
- assert.deepEqual(await evaluate("(async () => { const src = document.querySelector('[data-id=img_row] .thumb img').getAttribute('src'), ok = await fetch(src), bad = await fetch(src.replace(/name=[^&]+/, 'name=..%2Fsecret.png')); return [ok.status, ok.headers.get('content-type'), bad.status]; })()"), [200, "image/png", 400]);
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.textContent.split(/[\\\\/]/).pop())"), [pasted.split(/[\\/]/).pop(), "notes.md", "x.png"]);
+ assert.deepEqual(await evaluate("(async () => { const [ok, , outside] = [...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.getAttribute('href')); const a = await fetch(ok), b = await fetch(outside), c = await fetch(ok.replace(/\\.png/, '.txt')); return [a.status, a.headers.get('content-type'), b.status === 403 || b.status === 404, c.status]; })()"), [200, "image/png", true, 400]);
+ await browser("click", "[data-id=img_row] .chat-link[href='#']");
+ assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
+ await browser("click", "#tab-diagram");
  chatRows.delete("img_row"); await rm(pasted);
  // The Image button (phones have no clipboard paste) uploads the same way.
  await browser("fill", "#message-input", "");

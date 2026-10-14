@@ -1,9 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { forbiddenPath } from "./jev-tools.ts";
 import { fileURLToPath } from "node:url";
 import { stripTypeScriptTypes } from "node:module";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
@@ -28,6 +29,8 @@ type Options = {
 	pair?: (request: { code: string; label: string; address: string; login: string; signal: AbortSignal }) => Promise<string | undefined>;
 	/** Open live pages changed: one paired device id, or "local" for a token page, per connection. */
 	viewers?: (ids: string[]) => void;
+	/** Project folder: images linked in chat may come from here (minus hidden/secret paths) or the temp folder. */
+	root?: () => string | undefined;
 };
 type Pairing = { id: string; code: string; state: "pending" | "approved" | "denied" | "expired"; cookie?: string; abort: AbortController; waiters: Set<() => void> };
 const BODY_BYTES = 65_536, IMAGE_BYTES = 20_000_000;
@@ -69,6 +72,19 @@ export async function readPastedImage(name: string | null, dir = tmpdir()) {
 	if (!name || !/^pi-clipboard-[0-9a-f-]{36}\.(?:png|jpe?g|gif|webp)$/.test(name)) throw new WebError(400, "Not a pasted image name.");
 	const bytes = await readFile(join(dir, name)).catch(() => { throw new WebError(404, "Image no longer available."); });
 	const kind = bytes.length <= IMAGE_BYTES && IMAGE_KINDS.find(([, test]) => test(bytes));
+	if (!kind) throw new WebError(415, "Not a supported image.");
+	return { bytes, type: kind[0] === "jpg" ? "image/jpeg" : "image/" + kind[0] };
+}
+/** Serves an image linked in chat: a real image file inside the project (not hidden/secret paths) or the temp folder. */
+export async function readLinkedImage(path: string | null, project?: string) {
+	if (!path || path.length > 1000 || /[\x00-\x1f]/.test(path) || !/\.(?:png|jpe?g|gif|webp)$/i.test(path)) throw new WebError(400, "Not an image path.");
+	if (!project && !isAbsolute(path)) throw new WebError(404, "Image not found.");
+	const real = await realpath(resolve(project ?? "", path)).catch(() => { throw new WebError(404, "Image not found."); });
+	const inside = async (root: string): Promise<string | undefined> => { const rel = relative(await realpath(root), real); return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel.replaceAll("\\", "/") : undefined; };
+	const fromProject = project ? await inside(project).catch(() => undefined) : undefined;
+	if (!(fromProject ? !forbiddenPath.test(fromProject) : await inside(tmpdir()))) throw new WebError(403, "Only project and temp-folder images are shown.");
+	if ((await stat(real)).size > IMAGE_BYTES) throw new WebError(413, "Image too large.");
+	const bytes = await readFile(real), kind = IMAGE_KINDS.find(([, test]) => test(bytes));
 	if (!kind) throw new WebError(415, "Not a supported image.");
 	return { bytes, type: kind[0] === "jpg" ? "image/jpeg" : "image/" + kind[0] };
 }
@@ -240,7 +256,7 @@ export async function createPlan3Web(options: Options) {
 				return json(res, 200, await options.read(url.pathname, url.searchParams));
 			}
 			if (req.method === "GET" && url.pathname === "/api/image") {
-				const image = await readPastedImage(url.searchParams.get("name"));
+				const image = url.searchParams.has("path") ? await readLinkedImage(url.searchParams.get("path"), options.root?.()) : await readPastedImage(url.searchParams.get("name"));
 				res.writeHead(200, { "Content-Type": image.type, "Cache-Control": "private, max-age=86400" }); return res.end(image.bytes);
 			}
 			if (req.method === "POST" && url.pathname === "/api/paste") return json(res, 200, { path: await savePastedImage(await read(req, IMAGE_BYTES)) });

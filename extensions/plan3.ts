@@ -918,7 +918,7 @@ export default function plan3(pi) {
 		if (mode) shareMode = mode;
 		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
-		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, viewers: ids => { viewers = ids; setShareStatus(webCtx); }, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
+		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, root: () => webCtx?.cwd, viewers: ids => { viewers = ids; setShareStatus(webCtx); }, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
 			await refreshHerdrTab();
@@ -959,7 +959,8 @@ export default function plan3(pi) {
 		if (choice?.value === "yes") return createProductDiagram(ctx, planId);
 		if (choice?.value !== "no") return;
 		await withPlanDesignLock(file, async () => {
-			const settings = existsSync(file) ? JSON.parse(await readFile(file, "utf8")) : {};
+			let settings: any = {};
+			try { if (existsSync(file)) settings = JSON.parse(await readFile(file, "utf8")); } catch (error) { throw new Error(`Invalid project settings ${file}: ${(error as Error).message}`); }
 			for (const value of [settings, settings.workOrchestrator ?? {}, settings.workOrchestrator?.plan3 ?? {}]) if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid project settings; decline was not saved.");
 			settings.workOrchestrator = { ...settings.workOrchestrator, plan3: { ...settings.workOrchestrator?.plan3, productDiagram: "declined" } };
 			await mkdir(path.dirname(file), { recursive: true });
