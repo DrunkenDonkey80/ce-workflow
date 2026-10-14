@@ -1337,7 +1337,8 @@ try {
 		await listeners.get("plan3:share")({ ctx: webCtx, args: "devices" }); assert.equal(notices.at(-1).message, "No paired remote devices.");
 		await share("public"); assert.match(notices.at(-1).message, /Public access off, local only: Install/, "missing Tailscale still shares locally");
 		assert.equal(sharedStatus, "share: local");
-		await share(); assert.equal(notices.at(-1).message, "Session sharing off.", "no word toggles off"); tailscaleCalls.length = 0;
+		await share(); assert.match(notices.at(-1).message, /^Shared (local|public)\. Connected now: nobody\. This PC: http/, "no word while shared reports, never stops");
+		await share("off"); assert.equal(notices.at(-1).message, "Session sharing off."); tailscaleCalls.length = 0;
 		tailscale = args => ({ code: 0, killed: false, stderr: "", stdout: args[0] === "status" ? JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } } }) : "" });
 		await share("public"); assert.match(sharedStatus, /^\x1b\[1;31mshare: public/); const shareUrl = new URL(notices.at(-2).message.replace("Shared locally: ", ""));
 		assert.equal(notices.at(-1).message, `Public (your tailnet only): https://pc.tail.ts.net:${shareUrl.port}/`);

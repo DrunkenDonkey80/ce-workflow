@@ -717,10 +717,13 @@ export default function plan3(pi) {
 	const devices = createDeviceRegistry(), sessions = createSessionRecords();
 	// local: this PC only (127.0.0.1). public: also your tailnet via tailscale serve (never Funnel).
 	let shareMode: "local" | "public" = "local", viewers: string[] = [];
+	function viewerNames() {
+		let paired = []; try { paired = devices.list(); } catch { /* a broken registry only loses the names */ }
+		return [...new Set(viewers.map(id => id === "local" ? "this PC" : paired.find(device => device.id === id)?.label.split(" · ")[0] ?? "device"))];
+	}
 	function setShareStatus(ctx) {
 		if (!webInstance) return ctx?.ui?.setStatus?.("plan3-shared", undefined);
-		let paired = []; try { paired = devices.list(); } catch { /* a broken registry only loses the names */ }
-		const names = [...new Set(viewers.map(id => id === "local" ? "this PC" : paired.find(device => device.id === id)?.label.split(" · ")[0] ?? "device"))];
+		const names = viewerNames();
 		ctx?.ui?.setStatus?.("plan3-shared", tailnet.port ? `\x1b[1;31mshare: public${names.length ? ` [${names.join(", ")}]` : ""}\x1b[0m` : "share: local");
 	}
 	// D18: the switcher record mirrors this shared session's state; records are advisory, so failures only warn once.
@@ -2122,18 +2125,37 @@ export default function plan3(pi) {
 	pi.events?.on?.("plan3:command", ({ ctx, name, args = "" }) => commands[name]?.handler(args, ctx));
 	pi.events?.on?.("plan3:share", async ({ ctx, args = "" }) => {
 		try {
-			const word = args.trim().toLowerCase();
+			let word = args.trim().toLowerCase();
+			if (!["", "off", "local", "public", "devices"].includes(word)) throw new Error("Use /wo share [local|public|off], or /wo share devices to list and revoke paired devices.");
+			// No word while shared: a status menu (who is connected, how to connect); stopping is one of its choices, never implicit.
+			if (word === "" && webInstance) {
+				const local = webInstance.url(), phone = tailnet.port ? `https://${tailnet.host}:${tailnet.port}/` : "", names = viewerNames(), other = shareMode === "local" ? "public" : "local";
+				const summary = `Shared ${shareMode}. Connected now: ${names.join(", ") || "nobody"}.`;
+				if (!ctx.hasUI) return ctx.ui.notify(`${summary} This PC: ${local}${phone ? ` · Tailnet: ${phone}` : ""}`, "info");
+				const pick = await waitForUser("Share session", () => showListDialog(ctx, {
+					title: `Session shared ${shareMode}`, purpose: summary, filter: false, cursorKey: "plan3-shared-menu",
+					items: [
+						{ value: "open", label: "Open on this PC", description: local },
+						...(phone ? [{ value: "link", label: "Phone and other devices", description: `${phone} — open it on a device logged into your Tailscale; a new device shows a code to approve here.` }] : []),
+						{ value: other, label: other === "public" ? "Switch to public (Tailscale)" : "Switch to local only", description: other === "public" ? "Also reachable from your tailnet devices. Open pages reconnect." : "This PC only; tailnet devices disconnect." },
+						{ value: "devices", label: "Paired devices…", description: "List and revoke devices paired with this PC." },
+						{ value: "off", label: "Stop sharing", description: "Closes the link; open pages disconnect. /wo share shares again." },
+					],
+				}));
+				if (!pick) return;
+				if (pick.value === "open") return await openBrowser(ctx, local);
+				if (pick.value === "link") return ctx.ui.notify(`Tailnet link: ${phone}`, "info");
+				word = pick.value;
+			}
 			if (word === "devices") return await manageDevices(ctx);
-			if (!["", "off", "local", "public"].includes(word)) throw new Error("Use /wo share [local|public|off], or /wo share devices to list and revoke paired devices.");
-			// No word toggles: off when shared, otherwise ask local or public.
-			if (webInstance && (word === "" || word === "off" || word !== shareMode)) {
+			if (webInstance && (word === "off" || word !== shareMode)) {
 				await closeWeb(); await unserve(); pi.appendEntry("plan3-shared", { shared: false });
-				if (word === "" || word === "off") { ctx.ui.notify("Session sharing off.", "info"); return await refresh(ctx); }
+				if (word === "off") { ctx.ui.notify("Session sharing off.", "info"); return await refresh(ctx); }
 			}
 			if (word === "off") return ctx.ui.notify("Session sharing is already off.", "info");
 			if (webInstance) return ctx.ui.notify(`Already shared ${shareMode}.`, "info");
 			const mode = (word || (ctx.hasUI ? (await waitForUser("Share session", () => showListDialog(ctx, {
-				title: "Share this session in a browser", purpose: "Choose who can open it. /wo share off stops sharing.", filter: false, cursorKey: "plan3-share",
+				title: "Share this session in a browser", purpose: "Choose who can open it. /wo share again shows who is connected and can stop it.", filter: false, cursorKey: "plan3-share",
 				items: [
 					{ value: "local", label: "Local only", description: "This PC's browser only (127.0.0.1 with a secret link). Opens it now. Needs nothing else." },
 					{ value: "public", label: "Public: your devices via Tailscale", description: "Also your phone and other PCs on your tailnet (HTTPS). A new device needs approval here once. Needs Tailscale; never the open internet." },
