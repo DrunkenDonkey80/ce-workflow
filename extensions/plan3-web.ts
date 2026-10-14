@@ -26,6 +26,8 @@ type Options = {
 	sessions?: { list(device: string): SessionSummary[]; seen(device: string, revision: number): boolean };
 	/** D9/D22: asks the terminal to approve; resolves to the new device cookie, or undefined when declined. */
 	pair?: (request: { code: string; label: string; address: string; login: string; signal: AbortSignal }) => Promise<string | undefined>;
+	/** Open live pages changed: one paired device id, or "local" for a token page, per connection. */
+	viewers?: (ids: string[]) => void;
 };
 type Pairing = { id: string; code: string; state: "pending" | "approved" | "denied" | "expired"; cookie?: string; abort: AbortController; waiters: Set<() => void> };
 const BODY_BYTES = 65_536, IMAGE_BYTES = 20_000_000;
@@ -220,7 +222,8 @@ export async function createPlan3Web(options: Options) {
 				if (clients.size >= 8) throw new WebError(429, "Too many workspace connections.");
 				const target = url.searchParams.has("target") ? webTarget(url.searchParams.get("target")) : undefined, fence = ++sequence;
 				const connection = { ready: false, frames: [] as string[], bytes: 0, device };
-				clients.set(res, connection); res.on("close", () => clients.delete(res));
+				const viewers = () => options.viewers?.([...clients.values()].map(item => item.device ? item.device.cookie.split(".")[0] : "local"));
+				clients.set(res, connection); viewers(); res.on("close", () => { clients.delete(res); viewers(); });
 				// Subscribe before an async snapshot so changes during initial load cannot disappear.
 				const snapshot = await options.snapshot(target), initial = `retry: 1000\n${frame("snapshot", Object.assign({}, snapshot, { build }), fence)}`;
 				if (closed || res.destroyed) return;

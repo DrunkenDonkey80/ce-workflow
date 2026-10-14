@@ -284,7 +284,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",share:"Toggle browser sharing for this session",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",share:"Share this session in a browser: local, public or off",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -2679,7 +2679,7 @@ function latestPiGoal(ctx) {
 async function handleWorkMenuCommand(ctx, pi) {
 	const items = [
 		{ value: "work-settings", label: "Settings", description: "Configure Plan3 models, compaction, images and camera. Global and project scopes are available." },
-		{ value: "work-share", label: "Share this session", description: "Toggle the browser workspace for this session. Shared sessions show a red [SHARED] footer and reopen on resume." },
+		{ value: "work-share", label: "Share this session", description: "Share this session in a browser: local only, or public to your tailnet devices. The footer shows share: local or a red share: public; it reopens on resume." },
 		...(maintenanceCheckout(ctx.cwd) ? [
 			{ value: "work-context", label: "Context guard", description: "Inspect or tune proactive context compaction.", argumentTitle: "Context action", placeholder: "Blank shows status; compact / on / off / set <tokens>" },
 			{ value: "work-catch-up", label: "Catch up packages", description: "Review the Pi/plugin packages ce-workflow still uses in a Plan3 plan." },

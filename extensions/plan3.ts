@@ -698,7 +698,7 @@ export default function plan3(pi) {
 
 	const shortTitle = (title) => title.length > 40 ? `${title.slice(0, 39).trimEnd()}…` : title;
 	async function refresh(ctx) {
-		ctx.ui?.setStatus?.("plan3-shared", webInstance ? "\x1b[1;31m[SHARED]\x1b[0m" : undefined);
+		setShareStatus(ctx);
 		try {
 			const plans = await listPlans(ctx.cwd), plan = currentPlan(ctx, plans);
 			pi.events.emit("plan3:plans-changed", { cwd: ctx.cwd, plans: plans.map(({ id, file, title, status }) => ({ id, file, title, status })) });
@@ -715,6 +715,14 @@ export default function plan3(pi) {
 	const tailscaleExec = (command: string, args: string[], options?: { timeout?: number }) => pi.exec(command, args, options);
 	let tailnet: Tailnet & { port?: number } = { missing: [] };
 	const devices = createDeviceRegistry(), sessions = createSessionRecords();
+	// local: this PC only (127.0.0.1). public: also your tailnet via tailscale serve (never Funnel).
+	let shareMode: "local" | "public" = "local", viewers: string[] = [];
+	function setShareStatus(ctx) {
+		if (!webInstance) return ctx?.ui?.setStatus?.("plan3-shared", undefined);
+		let paired = []; try { paired = devices.list(); } catch { /* a broken registry only loses the names */ }
+		const names = [...new Set(viewers.map(id => id === "local" ? "this PC" : paired.find(device => device.id === id)?.label.split(" · ")[0] ?? "device"))];
+		ctx?.ui?.setStatus?.("plan3-shared", tailnet.port ? `\x1b[1;31mshare: public${names.length ? ` [${names.join(", ")}]` : ""}\x1b[0m` : "share: local");
+	}
 	// D18: the switcher record mirrors this shared session's state; records are advisory, so failures only warn once.
 	let sessionWarned = false;
 	function publishSession() {
@@ -755,7 +763,10 @@ export default function plan3(pi) {
 			if (sure?.value === "yes" && await devices.revoke(device.id)) ctx.ui.notify(`Revoked ${device.label}.`, "info");
 		}
 	}
-	const sharedEntry = (ctx) => (ctx.sessionManager?.getBranch?.() ?? []).findLast(entry => entry.type === "custom" && entry.customType === "plan3-shared")?.data?.shared === true;
+	const sharedData = (ctx) => (ctx.sessionManager?.getBranch?.() ?? []).findLast(entry => entry.type === "custom" && entry.customType === "plan3-shared")?.data;
+	const sharedEntry = (ctx) => sharedData(ctx)?.shared === true;
+	// Shares from before the mode existed were always offered on the tailnet.
+	const sharedMode = (ctx): "local" | "public" => sharedData(ctx)?.mode === "local" ? "local" : "public";
 	let webServer: ReturnType<typeof createPlan3Web> | undefined;
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => {
@@ -902,11 +913,12 @@ export default function plan3(pi) {
 		const target = await displayedWebTarget(params.get("target") ?? undefined), resolved = await resolveWebTarget(target);
 		return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined) };
 	}
-	async function getWeb(ctx) {
+	async function getWeb(ctx, mode?: "local" | "public") {
 		if (webStopped) throw new Error("Workspace session has ended.");
+		if (mode) shareMode = mode;
 		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
-		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
+		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, viewers: ids => { viewers = ids; setShareStatus(webCtx); }, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
 			await refreshHerdrTab();
@@ -920,6 +932,7 @@ export default function plan3(pi) {
 			// Remote access is optional (D5): local sharing works and the share notice names the missing step.
 			try {
 				if (previous && previous !== server.port) await serveRemove(tailscaleExec, previous);
+				if (shareMode !== "public") return server;
 				tailnet = await tailscaleStatus(tailscaleExec);
 				if (tailnet.host) { await serveAdd(tailscaleExec, server.port); tailnet.port = server.port; }
 			} catch (error) { tailnet = { missing: [(error as Error).message] }; }
@@ -958,17 +971,20 @@ export default function plan3(pi) {
 	async function openDiagram(ctx, target: WebTarget) {
 		webTarget(target.kind === "product" ? "product" : target.id);
 		const server = await getWeb(ctx), url = server.url(target);
-		if (!sharedEntry(ctx)) pi.appendEntry("plan3-shared", { shared: true });
+		if (!sharedEntry(ctx)) pi.appendEntry("plan3-shared", { shared: true, mode: shareMode });
 		await refresh(ctx);
 		if (target.kind === "product") await createProductDiagram(ctx);
 		else await offerProductDiagram(ctx, target.id);
+		await openBrowser(ctx, url);
+		ctx.ui.notify(`Plan3 workspace: ${url}`, "info");
+	}
+	async function openBrowser(ctx, url: string) {
 		const command = process.platform === "win32" ? "rundll32.exe" : process.platform === "darwin" ? "open" : "xdg-open";
 		const args = process.platform === "win32" ? ["url.dll,FileProtocolHandler", url] : [url];
 		try {
 			const result = await pi.exec(command, args, { timeout: 10_000 });
 			if (result.code !== 0 || result.killed) throw new Error(result.stderr || "Default browser could not be launched.");
 		} catch (error) { report(ctx, error); }
-		ctx.ui.notify(`Plan3 workspace: ${url}`, "info");
 	}
 	// R10/D12: compact before switching plans; a failed compaction sends nothing.
 	async function compactFirst(ctx, plan, force = false) {
@@ -2103,17 +2119,29 @@ export default function plan3(pi) {
 	pi.events?.on?.("plan3:command", ({ ctx, name, args = "" }) => commands[name]?.handler(args, ctx));
 	pi.events?.on?.("plan3:share", async ({ ctx, args = "" }) => {
 		try {
-			if (args.trim() === "devices") return await manageDevices(ctx);
-			if (args.trim()) throw new Error("Use /wo share to toggle sharing, or /wo share devices to list and revoke paired devices.");
-			if (webInstance) {
+			const word = args.trim().toLowerCase();
+			if (word === "devices") return await manageDevices(ctx);
+			if (!["", "off", "local", "public"].includes(word)) throw new Error("Use /wo share [local|public|off], or /wo share devices to list and revoke paired devices.");
+			// No word toggles: off when shared, otherwise ask local or public.
+			if (webInstance && (word === "" || word === "off" || word !== shareMode)) {
 				await closeWeb(); await unserve(); pi.appendEntry("plan3-shared", { shared: false });
-				ctx.ui.notify("Session sharing off.", "info");
-			} else {
-				const server = await getWeb(ctx);
-				pi.appendEntry("plan3-shared", { shared: true });
-				ctx.ui.notify(`Shared locally: ${server.url()}`, "info");
-				ctx.ui.notify(tailnet.port ? `Remote (your tailnet only): https://${tailnet.host}:${tailnet.port}/` : `Remote access off: ${tailnet.missing.join(" ")}`, tailnet.port ? "info" : "warning");
+				if (word === "" || word === "off") { ctx.ui.notify("Session sharing off.", "info"); return await refresh(ctx); }
 			}
+			if (word === "off") return ctx.ui.notify("Session sharing is already off.", "info");
+			if (webInstance) return ctx.ui.notify(`Already shared ${shareMode}.`, "info");
+			const mode = (word || (ctx.hasUI ? (await waitForUser("Share session", () => showListDialog(ctx, {
+				title: "Share this session in a browser", purpose: "Choose who can open it. /wo share off stops sharing.", filter: false, cursorKey: "plan3-share",
+				items: [
+					{ value: "local", label: "Local only", description: "This PC's browser only (127.0.0.1 with a secret link). Opens it now. Needs nothing else." },
+					{ value: "public", label: "Public: your devices via Tailscale", description: "Also your phone and other PCs on your tailnet (HTTPS). A new device needs approval here once. Needs Tailscale; never the open internet." },
+				],
+			})))?.value : "local")) as "local" | "public" | undefined;
+			if (!mode) return;
+			const server = await getWeb(ctx, mode);
+			pi.appendEntry("plan3-shared", { shared: true, mode });
+			ctx.ui.notify(`Shared locally: ${server.url()}`, "info");
+			if (mode === "public") ctx.ui.notify(tailnet.port ? `Public (your tailnet only): https://${tailnet.host}:${tailnet.port}/` : `Public access off, local only: ${tailnet.missing.join(" ")}`, tailnet.port ? "info" : "warning");
+			else await openBrowser(ctx, server.url());
 			await refresh(ctx);
 		} catch (error) { report(ctx, error); }
 	});
@@ -2132,7 +2160,7 @@ export default function plan3(pi) {
 		webStopped = false; shareRecord = undefined;
 		dialogs.close(); dialogs = createDialogBridge(pi, publishWeb);
 		if (sharedEntry(ctx) && event.reason !== "fork" && event.reason !== "new") {
-			try { await getWeb(ctx); } catch (error) { report(ctx, error); }
+			try { await getWeb(ctx, sharedMode(ctx)); } catch (error) { report(ctx, error); }
 		}
 		const plan = currentPlan(ctx, await listPlans(ctx.cwd));
 		if (plan && pointer(ctx).planning && pointer(ctx).id === plan.id && localPlanDesign(ctx.cwd, plan) && localPlanDesign(ctx.cwd, plan)?.phase !== "abandoned") activateDesign();
@@ -2140,7 +2168,7 @@ export default function plan3(pi) {
 		return refresh(ctx);
 	});
 	async function closeWeb() {
-		webCtx = null; webInstance = undefined;
+		webCtx = null; webInstance = undefined; viewers = [];
 		const pending = webServer; webServer = undefined;
 		try { await pending?.then(server => server.close()); } finally { webInstance = undefined; }
 	}

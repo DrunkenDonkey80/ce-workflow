@@ -121,6 +121,11 @@ h2 { font-size: 15px; font-weight: 600; }
  .workspace[data-left=collapsed] { grid-template-columns: auto minmax(0, 1fr); }
  .workspace[data-left=collapsed] > .left-panel, .workspace[data-left=collapsed] > .splitter { display: none; }
 }
+/* Desktop: Think and the usage bars together span the chat panel below them. */
+@media (min-width: 900px) {
+ #bias-button { flex: 0 0 calc((min(var(--chat-px, 380px), 640px) - 28px) / 3); }
+ #usage-button { flex: 0 0 calc((min(var(--chat-px, 380px), 640px) - 28px) * 2 / 3 + 6px); }
+}
 @media (max-width: 899px) { .expand-left, #narrow-left, #collapse-left { display: none; } }
 .splitter { background: var(--chat); cursor: col-resize; border-inline: 1px solid var(--line); touch-action: none; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
@@ -138,7 +143,6 @@ h2 { font-size: 15px; font-weight: 600; }
 .bar-group { flex: 0 1 auto; } .bar-group .bar { flex: 0 1 auto; }
 .workspace-title { flex: 0 1 auto !important; max-width: 22%; }
 .plan-list { display: grid; gap: 2px; max-height: 50vh; overflow: auto; }
-.plan-option[aria-pressed=true] { font-weight: 700; border-color: var(--focus); }
 #plan-menu hr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .bar { --fill: 0%; --bar: var(--accent); text-align: center; border: 1px solid var(--bar); border-radius: 6px; padding: 6px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
  background: linear-gradient(to right, color-mix(in srgb, var(--bar) 30%, var(--panel)) var(--fill), var(--panel) var(--fill)); }
@@ -152,6 +156,9 @@ h2 { font-size: 15px; font-weight: 600; }
 /* Footer colours for subscription usage. */
 .tone-error { color: var(--error); } .tone-warning { color: var(--warning); } .tone-accent { color: var(--accent); font-weight: 600; } .tone-dim { color: var(--muted); } .tone-success { color: var(--success); }
 .usage-line { font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.usage-line.provider + .usage-line.provider, .usage-line + .usage-line.provider { margin-top: 6px; } .usage-line:not(.provider) { padding-left: 1.5em; }
+/* Footer bar glyphs differ in height per font; draw them as equal cells. */
+.cell { display: inline-block; width: .6em; height: .9em; vertical-align: -.1em; background: currentColor; } .cell.off { opacity: .25; }
 .title-button { all: unset; cursor: pointer; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .title-button:focus-visible { outline: 2px solid var(--focus); }
 .title-menu { position: fixed; top: 44px; left: 8px; right: auto; width: min(340px, 92vw); }
@@ -159,10 +166,11 @@ h2 { font-size: 15px; font-weight: 600; }
 .command-list { display: grid; gap: 4px; max-height: 60dvh; overflow: auto; }
 .command-option { display: grid; text-align: left; border-color: transparent; }
 .command-option small { color: var(--muted); }
-.status-menu { position: absolute; z-index: 5; left: 12px; right: 12px; top: 100%; display: grid; gap: 4px; max-height: 60vh; overflow: auto; padding: 8px; background: var(--panel); border: 1px solid var(--ink); border-radius: 6px; }
+/* Menus open under their button, only as wide as their content. */
+.status-menu { position: absolute; z-index: 5; left: 0; top: 100%; width: max-content; min-width: 180px; max-width: min(360px, 92vw); display: grid; gap: 4px; max-height: 60vh; overflow: auto; padding: 8px; background: var(--panel); border: 1px solid var(--ink); border-radius: 6px; }
 .status-menu h3 { margin: 6px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .status-menu button { text-align: left; border-color: transparent; }
-.status-menu button[aria-pressed=true] { border-color: var(--ink); }
+.status-menu button[aria-pressed=true], .plan-option[aria-pressed=true] { background: color-mix(in srgb, var(--focus) 22%, var(--panel)); border-color: var(--focus); }
 .effort-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .model-list { display: grid; gap: 2px; }
 .activity:empty { display: none; }
@@ -235,12 +243,12 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 #switcher-toggle { padding: 4px; border-color: transparent; }
 .session-list { display: flex; flex-direction: column; gap: 4px; overflow: auto; }
 .session { display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; border-radius: 6px; font-size: 13px; }
-.session-letter { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; font-weight: 700; color: #fff; }
+.session-letter { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 700; color: #fff; }
 .session[data-tone=working] .session-letter { background: #e8590c; }
 .session[data-tone=waiting] .session-letter { background: var(--error); }
 .session[data-tone=unseen] .session-letter { background: var(--focus); }
 .session[data-tone=seen] .session-letter { background: #ced4da; color: #1e1e1e; }
-.session[aria-current=page] .session-letter { outline: 2px solid var(--ink); outline-offset: 1px; }
+.session[aria-current=page] { background: var(--hover); font-weight: 600; }
 .session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switcher[data-open=false] .session-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .mobile-tabs { display: none; }

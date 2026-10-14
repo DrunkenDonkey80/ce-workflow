@@ -121,7 +121,7 @@ Self-check: `node "scripts/test-work-plan3.mjs"`.
 
 ### Sharing and phone access
 
-- `/wo share` (or `/wo` → **Share this session**) toggles the browser workspace for this session. While shared, the footer shows a red `[SHARED]`. `/plan3 diagram` and `/plan3 architecture` share locally too.
+- `/wo share` (or `/wo` → **Share this session**) asks **Local only** (this PC's browser, opened for you) or **Public** (also your tailnet devices via Tailscale); `/wo share local|public|off` skips the menu and `/wo share` while shared turns it off. The footer shows `share: local`, or a red `share: public [connected pages]`. `/plan3 diagram` and `/plan3 architecture` share locally too.
 - **Reload and resume:** each session keeps its own port, token and link (stored under `~/.pi/agent/ce-workflow/remote/`, outside session files). `/reload` keeps the same link and the page reconnects by itself; typed in the browser chat, `/reload` runs `/wo reload`, which waits for the current run to finish and then reloads. Resuming a shared session after a full Pi restart shares it again automatically until you run `/wo share` to turn it off.
 - **Reconnecting:** a page that was closed or offline loads the recent chat and any pending question, not the whole history; older messages load on demand.
 - **Tailscale setup (once):** install Tailscale and log in on the PC and the phone with the same account; turn on MagicDNS and **HTTPS Certificates** in the Tailscale admin console (DNS page). The PC must be logged in as a user, not a tagged device. `/wo share` then runs `tailscale serve` for the session's port and prints `https://<pc>.<tailnet>.ts.net:<port>/`; it never uses Funnel, so the link works only inside your tailnet. When something is missing, the notice says exactly what.

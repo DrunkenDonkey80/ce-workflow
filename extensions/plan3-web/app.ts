@@ -160,6 +160,8 @@ document.addEventListener("touchend", event => {
 const fitViewport = () => document.documentElement.style.setProperty("--app-height", (window.visualViewport?.height ?? window.innerHeight) + "px");
 window.visualViewport?.addEventListener("resize", fitViewport); fitViewport();
 
+// The top bar sizes Think and the usage bars to the chat panel below them.
+new ResizeObserver(() => document.body.style.setProperty("--chat-px", $("chat").offsetWidth + "px")).observe($("chat"));
 const splitter = $("splitter"); let resize;
 function resizeChat(width) {
  const value = Math.max(280, Math.min(640, width));
@@ -418,6 +420,8 @@ const menus = [["model-button", "model-menu"], ["context-button", "context-menu"
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
+ // Under its button, kept inside the window.
+ if (open && $(menu).parentElement === $(button).parentElement?.closest(".status-line")) { const own = $(button).getBoundingClientRect(), line = $(menu).parentElement.getBoundingClientRect(); $(menu).style.left = Math.max(0, Math.min(own.left, innerWidth - $(menu).offsetWidth - 8) - line.left) + "px"; }
  if (open) ($(menu).querySelector<HTMLElement>("input, button:not([hidden]):not(:disabled)"))?.focus();
 }
 function closeMenus(focus = false) {
@@ -500,7 +504,21 @@ void loadSessions();
 // Subscription 7d left per provider (footer data); tapping shows the footer rows in their colours.
 type Segment = { text: string; color?: string };
 let usageLines: Segment[][] = [], usageTimer = 0;
-const segments = (row: Segment[]) => row.map(part => Object.assign(document.createElement("span"), { textContent: part.text, className: part.color ? "tone-" + part.color : "" }));
+// Footer rows become one block per provider (│) with one line per item (·); bar glyphs become equal-height cells.
+function usageBlocks(rows: Segment[][]) {
+ const lines: HTMLElement[] = []; let line: HTMLElement;
+ const start = (provider: boolean) => { line = document.createElement("div"); line.className = "usage-line" + (provider ? " provider" : ""); lines.push(line); };
+ for (const row of rows) {
+  start(true);
+  for (const part of row) for (const [index, piece] of part.text.split(/ (│|·) /).entries()) {
+   if (index % 2) { start(piece === "│"); continue; }
+   const span = Object.assign(document.createElement("span"), { className: part.color ? "tone-" + part.color : "" });
+   for (const chunk of piece.split(/([█░]+)/)) if (/^[█░]+$/.test(chunk)) span.append(...[...chunk].map(cell => Object.assign(document.createElement("span"), { className: cell === "█" ? "cell" : "cell off" }))); else if (chunk) span.append(chunk);
+   line.append(span);
+  }
+ }
+ return lines;
+}
 async function loadUsage() {
  clearTimeout(usageTimer); if (document.visibilityState !== "visible") return;
  try {
@@ -512,7 +530,7 @@ async function loadUsage() {
  usageTimer = window.setTimeout(loadUsage, 120_000);
 }
 $("usage-button").addEventListener("click", () => {
- $("usage-menu").replaceChildren(...usageLines.map(row => { const line = document.createElement("div"); line.className = "usage-line"; line.append(...segments(row)); return line; }));
+ $("usage-menu").replaceChildren(...usageBlocks(usageLines));
  toggleMenu("usage-button", "usage-menu");
 });
 document.addEventListener("visibilitychange", () => void loadUsage());

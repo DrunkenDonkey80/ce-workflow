@@ -48,7 +48,7 @@ const dialogs = createDialogBridge({ events }, (event, value) => server.publish(
 const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { askId, ...value }); return askId; };
 const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id: "12345678", title: sample.title, status: "draft", done: 2, total: 5, focus: "S03", bias: 0 }, status, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), read: (endpoint, params) => {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "a", id: "fast", name: "Fast" }, { provider: "b", id: "deep", name: "Deep" }], others: [{ provider: "b", id: "other", name: "Other" }] };
- if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53%" }], [{ text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
+ if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
  if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }] };
  if (endpoint === "/api/files") return { files: projectFiles, truncated: false, git: true };
  if (endpoint === "/api/plans") return { current: "12345678", plans: [{ id: "12345678", title: sample.title, done: 2, total: 5 }, { id: "abcdef01", title: "Other plan", done: 0, total: 3 }] };
@@ -380,7 +380,13 @@ try {
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
  await browser("wait", "--fn", "document.getElementById('bias-button').textContent === '🧠 Think:Task'");
  await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
- await browser("click", "#usage-button"); assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-menu .usage-line')].map(line => line.textContent)"), ["Claude 7d [████░░░░] 53%", "Codex 7d 12%"]);
+ await browser("click", "#usage-button");
+ // One block per provider (│), one line per item (·); bar glyphs are equal-height cells; the menu is narrow and under its button.
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-menu .usage-line')].map(line => line.className + ':' + line.textContent + ':' + line.querySelectorAll('.cell').length + '/' + line.querySelectorAll('.cell.off').length)"),
+  ["usage-line provider:Claude 7d [] 53%:8/4", "usage-line:5h 20%:0/0", "usage-line provider:Codex 7d 12%:0/0"]);
+ assert(await evaluate("(() => { const menu = document.getElementById('usage-menu').getBoundingClientRect(), button = document.getElementById('usage-button').getBoundingClientRect(); return menu.width <= 360 && menu.right <= innerWidth && Math.abs(menu.left - Math.min(button.left, innerWidth - menu.width - 8)) < 2; })()"), "usage menu: narrow, under its button");
+ // Think and the usage bars together span the chat panel width.
+ assert(await evaluate("(() => { const think = document.getElementById('bias-button').getBoundingClientRect(), usage = document.getElementById('usage-button').getBoundingClientRect(), chat = Math.min(document.getElementById('chat').offsetWidth, 640); return Math.abs(usage.right - think.left - (chat - 16)) < 4; })()"), "Think + usage span the chat width");
  await browser("press", "Escape");
  await browser("click", "#plan-button"); await browser("wait", ".plan-option");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#plan-menu .plan-option')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')).concat(document.getElementById('plan-divider').hidden)"), [sample.title + " · 2/5 (current):true", "Other plan · 0/3:false", false], "plans on top, the shown one marked, then a divider");

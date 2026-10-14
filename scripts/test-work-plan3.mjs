@@ -9,6 +9,7 @@ import { createJiti } from "jiti";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
+delete process.env.HERDR_TAB_ID; // Inside herdr the web title asks herdr for the tab name via pi.exec.
 import path from "node:path";
 import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices } from "../extensions/plan3.ts";
 // Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
@@ -1158,7 +1159,7 @@ try {
 		const url = await open(`diagram ${b}`), token = url.searchParams.get("token");
 		assert.equal(url.searchParams.get("target"), b);
 		assert.equal(entries.findLast(entry => entry.customType === "plan3-current").data.id, a, "opening B does not silently change the current plan");
-		assert.deepEqual(entries.findLast(entry => entry.customType === "plan3-shared").data, { shared: true }, "credentials are not stored in the conversation");
+		assert.deepEqual(entries.findLast(entry => entry.customType === "plan3-shared").data, { shared: true, mode: "local" }, "credentials are not stored in the conversation");
 		assert.equal((await open(`uml ${b}`)).href, url.href);
 		const settingsFile = path.join(webCwd, ".pi", "settings.json");
 		await mkdir(path.dirname(settingsFile), { recursive: true }); await writeFile(settingsFile, JSON.stringify({ preserved: true, workOrchestrator: { plan3: { codingEffort: "high" } } }));
@@ -1218,7 +1219,7 @@ try {
 			const effort = await post("effort", { level: "low" });
 			assert.equal(effort.status, 200); assert.equal(thinking, "low"); assert.equal(effort.body.effort, "low");
 			assert.equal((await post("effort", { level: "turbo" })).status, 400);
-			assert.deepEqual((await snapshot()).status, { model: { provider: "anthropic", id: "claude-opus-4", name: "claude-opus-4" }, effort: "low", context: null });
+			assert.deepEqual((await snapshot()).status, { model: { provider: "anthropic", id: "claude-opus-4", name: "claude-opus-4" }, effort: "low", context: null, folder: "web-command-unit", tab: "" });
 			// D17: a command that never returns must not hold the request or the server.
 			const savedSend = api.sendUserMessage; api.sendUserMessage = () => new Promise(() => {});
 			try {
@@ -1332,13 +1333,14 @@ try {
 		await assert.rejects(fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }));
 		sessionId = randomUUID();
 		await hooks.get("session_start")({ reason: "new" }, webCtx);
-		const share = () => listeners.get("plan3:share")({ ctx: webCtx });
+		const share = (args = "") => listeners.get("plan3:share")({ ctx: webCtx, args });
 		await listeners.get("plan3:share")({ ctx: webCtx, args: "devices" }); assert.equal(notices.at(-1).message, "No paired remote devices.");
-		await share(); assert.match(notices.at(-1).message, /Remote access off: Install/, "missing Tailscale still shares locally");
-		await share(); tailscaleCalls.length = 0;
+		await share("public"); assert.match(notices.at(-1).message, /Public access off, local only: Install/, "missing Tailscale still shares locally");
+		assert.equal(sharedStatus, "share: local");
+		await share(); assert.equal(notices.at(-1).message, "Session sharing off.", "no word toggles off"); tailscaleCalls.length = 0;
 		tailscale = args => ({ code: 0, killed: false, stderr: "", stdout: args[0] === "status" ? JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } } }) : "" });
-		await share(); assert.match(sharedStatus, /\[SHARED\]/); const shareUrl = new URL(notices.at(-2).message.replace("Shared locally: ", ""));
-		assert.equal(notices.at(-1).message, `Remote (your tailnet only): https://pc.tail.ts.net:${shareUrl.port}/`);
+		await share("public"); assert.match(sharedStatus, /^\x1b\[1;31mshare: public/); const shareUrl = new URL(notices.at(-2).message.replace("Shared locally: ", ""));
+		assert.equal(notices.at(-1).message, `Public (your tailnet only): https://pc.tail.ts.net:${shareUrl.port}/`);
 		assert.deepEqual(tailscaleCalls, ["status --json", `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`]);
 		// D9: without a terminal UI the pairing dialog never opens, so a remote page cannot pair itself.
 		const pairHost = `pc.tail.ts.net:${shareUrl.port}`, pairRaw = (method, route) => new Promise((resolve, reject) => {
@@ -1358,11 +1360,17 @@ try {
 		listeners.get("ask:closed")({ askId }); assert.equal((await record()).state, "idle");
 		const switcher = await (await fetch(`${shareUrl.origin}/api/sessions`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).json();
 		assert.deepEqual(switcher.sessions.map(session => [session.id, session.state]), [[sessionId, "idle"]]);
-		await share(); assert.equal(sharedStatus, undefined); assert.deepEqual(entries.at(-1).data, { shared: false });
+		// The status names the open pages.
+		const live = new AbortController(), stream = await fetch(`${shareUrl.origin}/api/events`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` }, signal: live.signal });
+		assert.equal(stream.status, 200); assert.match(sharedStatus, /share: public \[this PC\]/); live.abort();
+		await share("off"); assert.equal(sharedStatus, undefined); assert.deepEqual(entries.at(-1).data, { shared: false });
 		assert.equal(existsSync(recordFile), false, "sharing off removes the switcher record");
 		assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "sharing off removes the mapping");
-		await share(); await hooks.get("session_shutdown")({ reason: "quit" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "quit removes the mapping");
-		await hooks.get("session_start")({ reason: "resume" }, webCtx); await share(); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`);
+		tailscaleCalls.length = 0; await share("local"); assert.equal(sharedStatus, "share: local"); assert.deepEqual(tailscaleCalls, [], "local never touches Tailscale");
+		assert.deepEqual(entries.at(-1).data, { shared: true, mode: "local" }); await share("local"); assert.equal(notices.at(-1).message, "Already shared local.");
+		await share("public"); assert.match(sharedStatus, /share: public/, "local to public switches");
+		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "quit removes the mapping");
+		await hooks.get("session_start")({ reason: "resume" }, webCtx); assert.match(sharedStatus, /share: public/, "resume re-shares in the saved mode"); await share("off"); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`);
 		tailscale = () => { throw Object.assign(new Error("spawn tailscale ENOENT"), { code: "ENOENT" }); };
 		await assert.rejects(fetch(`${shareUrl.origin}/api/snapshot`));
 		const reopened = await open(`diagram ${b}`);
@@ -1447,6 +1455,12 @@ try {
 	const discussing = await readFile(directFile, "utf8");
 	assert(discussing.includes("Which timeout?") && discussing.includes(JSON.stringify(selected)));
 	assert(!discussing.includes('"selections":["Discuss with agent (Plan3)"]'), "discussion is not a settled decision");
+	// The reconcile run added a question: when it settles, the resolve popup returns with only the new one.
+	await writeFile(directFile, discussing.replace("### Deferred\n\n", "### Deferred\n\n- **Q-09** New from reconcile?\n\n"));
+	dialogs = [{ messages: beforeDiscussion + 1, component: "AskComponent", answer: kept, check: (_, rendered) => { assert.match(rendered, /New from reconcile/); assert.doesNotMatch(rendered, /Which timeout/); } }];
+	await hooks.get("agent_settled")({ aborted: false }, ctx);
+	assert.equal(dialogs.length, 0, "new questions reopen the resolve popup");
+	await hooks.get("agent_settled")({ aborted: false }, ctx); // Once per reconcile run; no popup.
 
 	// Cancel: no file, pointer or model change. Browser action routes to the same native popup.
 	await writeFile(directFile, directPlan);
