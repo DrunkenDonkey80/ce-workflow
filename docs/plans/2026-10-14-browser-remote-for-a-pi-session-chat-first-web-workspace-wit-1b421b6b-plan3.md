@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:46:04.710Z
+updated: 2026-10-14T12:46:30.485Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -226,9 +226,7 @@ Commands (existing; referenced by steps):
 - [human] **P6-01** User runs E1 to E9 on the desktop and phone; record findings or explicitly accepted limitations. Needs P1-04.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 4: added plan3_remote (plan3-remote.ts), plan3_files (plan3-files.ts), the remote_state store (~/.pi/agent/ce-workflow/remote) and the Tailscale external, with edges web→remote, remote→state, remote→tailscale, tailscale→web, web→files, browser→tailscale; updated the plan3_web, browser_app and user_browser summaries.
 
 
 ## Global validation

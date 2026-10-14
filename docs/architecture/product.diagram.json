@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 3,
+  "revision": 4,
   "nodes": [
     {
       "id": "pi_host",
@@ -140,7 +140,7 @@
       "label": "Local workspace server",
       "kind": "service",
       "parent": "workspace_group",
-      "summary": "127.0.0.1 HTTP + SSE with token/Origin checks; chat, activity and dialog mirrors.",
+      "summary": "127.0.0.1 HTTP + SSE per shared session (stable port/token); token, Origin and tailnet+paired-cookie checks; chat, activity, dialog, status, model/effort and files endpoints.",
       "tech": "extensions/plan3-web.ts",
       "details": "Serves browser .ts assets after stripTypeScriptTypes; command dispatch and Stop via ctx.abort. Authenticated image-paste endpoint validates image bytes and writes a temporary file; revision-checked note/move endpoints and HTTP/SSE snapshots synchronize the browser."
     },
@@ -149,7 +149,7 @@
       "label": "Workspace browser app",
       "kind": "client",
       "parent": "workspace_group",
-      "summary": "Rough.js SVG diagram with semantic zoom, notes, mentions, chat, activity and prompts.",
+      "summary": "Rough.js diagram, chat with status line (model/effort/plan menus), Files tab, mobile tabs, prompts and the shared-session switcher.",
       "tech": "extensions/plan3-web/{app,diagram,layout,prompts}.ts, vendored Rough.js and Virgil",
       "details": "Grid-packed groups with orthogonal edge routing and calm bundled connections; semantic zoom, tinted cards, Ctrl+F search, plain-drag pan and Shift+drag persisted positions. Collapsed thinking/tool chat blocks, auto-follow with jump-to-bottom, image paste to a temporary file path, and right-click note composition. Browser commands and question dialogs share the live terminal session."
     },
@@ -338,7 +338,7 @@
       "id": "user_browser",
       "label": "User's browser",
       "kind": "external",
-      "summary": "Opens the tokenized localhost workspace."
+      "summary": "Desktop localhost link with token, or a paired phone over the tailnet."
     },
     {
       "id": "opendesign_app",
@@ -363,6 +363,34 @@
       "label": "pi-intercom",
       "kind": "external",
       "summary": "Optional peer for cross-session messages."
+    },
+    {
+      "id": "plan3_remote",
+      "label": "Remote sharing",
+      "kind": "service",
+      "parent": "workspace_group",
+      "summary": "Share records, tailscale serve on/off, machine-wide paired-device registry, per-session switcher records.",
+      "tech": "extensions/plan3-remote.ts"
+    },
+    {
+      "id": "plan3_files",
+      "label": "Project files view",
+      "kind": "service",
+      "parent": "workspace_group",
+      "summary": "Read-only tree without ignored/secret files, git change marks, content and diff.",
+      "tech": "extensions/plan3-files.ts"
+    },
+    {
+      "id": "remote_state",
+      "label": "Remote state",
+      "kind": "store",
+      "summary": "~/.pi/agent/ce-workflow/remote: per-session token/port, devices.json, sessions/*.json (outside the repo)."
+    },
+    {
+      "id": "tailscale",
+      "label": "Tailscale",
+      "kind": "external",
+      "summary": "tailscale serve: tailnet-only HTTPS with verified login header; never Funnel."
     }
   ],
   "edges": [
@@ -683,6 +711,42 @@
       "to": "pi_subagents",
       "label": "oracle model",
       "id": "advisor_model__pi_subagents"
+    },
+    {
+      "from": "plan3_web",
+      "to": "plan3_remote",
+      "label": "pairing, devices, sessions",
+      "id": "plan3_web__plan3_remote"
+    },
+    {
+      "from": "plan3_remote",
+      "to": "remote_state",
+      "label": "reads/writes",
+      "id": "plan3_remote__remote_state"
+    },
+    {
+      "from": "plan3_remote",
+      "to": "tailscale",
+      "label": "serve add/remove",
+      "id": "plan3_remote__tailscale"
+    },
+    {
+      "from": "tailscale",
+      "to": "plan3_web",
+      "label": "HTTPS proxy + login header",
+      "id": "tailscale__plan3_web"
+    },
+    {
+      "from": "plan3_web",
+      "to": "plan3_files",
+      "label": "tree, content, diff",
+      "id": "plan3_web__plan3_files"
+    },
+    {
+      "from": "user_browser",
+      "to": "tailscale",
+      "label": "phone over tailnet",
+      "id": "user_browser__tailscale"
     }
   ],
   "notes": []
