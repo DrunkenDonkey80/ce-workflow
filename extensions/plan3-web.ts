@@ -340,7 +340,7 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; startedAt?: number; durationMs?: number };
 export function createActivityMirror(pi, publish: (event: string, value: unknown) => void) {
 	const tools: ToolActivity[] = [], queued: { id: string; digest: string; text: string; delivery: string }[] = [];
-	let working = false, compacting = false, thinking = "", error = "", interrupted = false, sequence = 0;
+	let working = false, compacting = false, thinking = "", error = "", interrupted = false, sequence = 0, dialog = "";
 	const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 	const textOf = message => typeof message?.content === "string" ? message.content : (message?.content ?? []).filter(part => part?.type === "text").map(part => part.text).join("\n");
 	const brief = (value: unknown) => {
@@ -352,7 +352,7 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 	const snapshot = ctx => {
 		const hasPendingMessages = ctx?.hasPendingMessages?.();
 		if (hasPendingMessages === false) queued.length = 0;
-		return { hasPendingMessages, working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
+		return { hasPendingMessages, working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, dialog, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
 	};
 	const emit = () => publish("activity", snapshot(undefined));
 	const tool = (event, patch: Partial<ToolActivity>) => {
@@ -396,8 +396,11 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		const startedAt = tools.find(row => row.id === event.toolCallId)?.startedAt;
 		tool(event, { state: event.isError ? "error" : "done", result: brief(event.result), durationMs: event.durationMs ?? (startedAt === undefined ? undefined : Date.now() - startedAt) });
 	});
+	// Any blocking terminal dialog; the page hides it while a bridged ask_user/Plan3 dialog is open there.
+	pi.on("ui_prompt_start", event => { dialog = brief(event.title || `${event.kind} prompt`).slice(0, 200); emit(); });
+	pi.on("ui_prompt_end", () => { dialog = ""; emit(); });
 	pi.on("session_before_compact", () => { compacting = true; emit(); });
 	pi.on("session_compact", () => { compacting = false; emit(); });
 	pi.on("session_compact_failed", event => { compacting = false; error = brief(event.errorMessage ?? (event.aborted ? "Compaction cancelled" : "Compaction failed")); emit(); });
-	return { snapshot, reset: () => { tools.length = 0; queued.length = 0; working = false; compacting = false; thinking = ""; error = ""; interrupted = false; sequence = 0; } };
+	return { snapshot, reset: () => { tools.length = 0; queued.length = 0; working = false; compacting = false; dialog = ""; thinking = ""; error = ""; interrupted = false; sequence = 0; } };
 }

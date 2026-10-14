@@ -30,6 +30,8 @@ function renderShell() {
  for (const button of $("commands").querySelectorAll("button")) button.disabled = !state.connected || !!state.activity.working || commandSending || promptView.busy;
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
+ const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
+ $("waiting").textContent = waiting; $("waiting").hidden = !waiting;
 }
 
 function renderActivity() {

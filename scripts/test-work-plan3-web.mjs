@@ -203,6 +203,12 @@ assert([...busListeners.values()].every(set => set.size === 0), "all remote race
 const activityHooks = new Map(), activityEvents = [];
 const activityMirror = createActivityMirror({ on: (name, handler) => activityHooks.set(name, handler) }, (event, value) => activityEvents.push({ event, value }));
 activityHooks.get("agent_start")({});
+activityHooks.get("ui_prompt_start")({ kind: "confirm", title: "Approve camera?" });
+assert.equal(activityMirror.snapshot().dialog, "Approve camera?", "terminal-only dialogs are visible remotely");
+activityHooks.get("ui_prompt_end")({ kind: "confirm" });
+assert.equal(activityMirror.snapshot().dialog, "");
+activityHooks.get("ui_prompt_start")({ kind: "select" });
+assert.equal(activityMirror.snapshot().dialog, "select prompt"); activityHooks.get("ui_prompt_end")({});
 activityHooks.get("input")({ streamingBehavior: "followUp", text: "later" });
 assert.equal(activityMirror.snapshot().queue.length, 1);
 activityHooks.get("message_start")({ message: { role: "user", content: [{ type: "text", text: "later" }] } });

@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T11:05:36.988Z
+updated: 2026-10-14T11:07:26.529Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -190,7 +190,7 @@ Commands (existing; referenced by steps):
 - [x] **P2-04** Sharing persists a boolean-only entry; reload and resume restore the saved local link using a fresh session context. Shutdown releases the server; new sessions get new credentials and the nonexistent session_switch dependency is removed.
 - [x] **P2-05** /wo share and the Utilities row toggle per-session sharing with persisted on/off state; while live, a red bold [SHARED] status shows; diagram/architecture opens share locally.
 - [x] **P2-06** Snapshots carry a 12-hex build fingerprint and SSE retry 1000; the page reconnects itself with 1–15 s backoff after HTTP errors, shows "Pi is reloading… reconnecting", and reloads when the build changed.
-- [ ] **P2-07** Show "Pi is waiting for a terminal dialog: <title>" from ui_prompt_start until ui_prompt_end.
+- [x] **P2-07** Activity mirror tracks ui_prompt_start/end as a dialog title; the page shows "Pi is waiting for a terminal dialog: <title>" unless a bridged dialog is open there.
 - [ ] **P2-09** Slim check-in snapshot per D20: last 20 rows, block titles with body on expand, pending dialogs first, Show earlier paging; 64 KB budget.
 - [ ] **P2-10** Live stream per D20: chat text deltas, at most 4 updates per second per row, activity sends only changed tool rows; page title cue.
 - [ ] **P2-11** C-WEB byte tests (D21): full snapshot under 64 KB with Unicode, a 1 MB diagram and a large question; 500 deltas under 100 KB; exact text after mid-stream reconnect.
