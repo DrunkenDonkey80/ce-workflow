@@ -560,6 +560,28 @@ try {
   assert.equal((await raw(`/pair/status?id=${start.id}`)).status, 404, "an expired code is gone");
  } finally { await revokeServer.close(); await rm(directory, { recursive: true, force: true }); }
 }
+// P3-07: revoking from session A closes the device's open stream on session B within 5 s.
+{
+ const directory = await mkdtemp(join(tmpdir(), "plan3-stream-revoke-")), sessionA = createDeviceRegistry({ directory }), sessionB = createDeviceRegistry({ directory });
+ const cookie = await sessionA.pair("Phone", "me@github"), other = await sessionA.pair("Tablet", "me@github");
+ const streamServer = await createPlan3Web({ snapshot: () => ({ ok: true }), remote: () => ({ host: "pc.tail.ts.net", login: "me@github" }), device: (value, login) => sessionB.check(value, login) });
+ try {
+  const host = `pc.tail.ts.net:${streamServer.port}`;
+  const open = value => new Promise((resolve, reject) => {
+   const req = httpRequest(`${streamServer.origin}/api/events`, { headers: { Host: host, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github", Cookie: `pi_remote=${value}` } }, res => {
+    assert.equal(res.statusCode, 200); res.setEncoding("utf8");
+    const stream = { ended: false, endedAt: 0 }; res.on("data", () => {}); res.on("close", () => { stream.ended = true; stream.endedAt = Date.now(); }); res.on("error", () => {});
+    resolve(stream);
+   });
+   req.on("error", error => error.code === "ECONNRESET" ? undefined : reject(error)); req.end();
+  });
+  const revoked = await open(cookie), kept = await open(other);
+  const at = Date.now(); await sessionA.revoke(cookie.split(".")[0]);
+  while (!revoked.ended && Date.now() - at < 6000) { streamServer.publish("ping", { n: 1 }); await new Promise(resolve => setTimeout(resolve, 100)); }
+  assert(revoked.ended && revoked.endedAt - at < 5000, `revoked stream closed after ${revoked.endedAt - at} ms`);
+  assert.equal(kept.ended, false, "other devices keep streaming");
+ } finally { await streamServer.close(); await rm(directory, { recursive: true, force: true }); }
+}
 // D9: terminal-only list dialogs never reach a bound browser bridge.
 {
  const { bindListDialogBridge, showListDialog } = await createJiti(import.meta.url).import("../extensions/work-dialogs.ts");
