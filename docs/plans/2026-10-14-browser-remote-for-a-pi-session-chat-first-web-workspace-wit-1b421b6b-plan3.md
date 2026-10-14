@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T10:46:18.373Z
+updated: 2026-10-14T10:47:26.636Z
 reviewed: 2026-10-14
 ---
 
@@ -179,8 +179,7 @@ Commands (existing; referenced by steps):
 - [x] **P1-02** SDK probe: after session.reload() the new runtime rebinds the saved port (EADDRINUSE retry), and an HTTP handler's unawaited pi.sendUserMessage("/cmd") runs the command with a full command ctx; reply in 0 ms.
 - [x] **P1-03** Session API, cacheable build-fingerprinted assets and the 6-digit pairing protocol recorded as D22; /api/command is replaced by slash text through /api/message.
 - [x] **P1-04** Tailscale HTTPS enabled (cert flexpc.tailaee9f8.ts.net); iPhone 11 joined the tailnet as the same untagged user.
-- [ ] **P1-05** Probe `tailscale serve --bg` to a test server: SSE streams live, Host and identity headers as D8; record results. Needs P1-04.
-  - note: Unblocked: P1-04 done 2026-10-14.
+- [x] **P1-05** tailscale serve --bg --https=<port> works as D8: Host and X-Forwarded-Host keep <dns>:<port>, the owner login is added and forged copies are stripped, and SSE streams unbuffered (about 40 ms); the mapping is removed with `--https=<port> off`.
 
 ### Phase 2: Session sharing that survives reload [code]
 
