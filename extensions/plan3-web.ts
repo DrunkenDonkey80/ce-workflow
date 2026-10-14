@@ -165,7 +165,7 @@ export async function createPlan3Web(options: Options) {
 		} else if (entry.state !== "pending") pairing = undefined;
 		return json(res, 200, { state: entry.state });
 	}
-	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/command", "/api/stop"]);
+	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/command", "/api/stop", "/api/model", "/api/effort"]);
 	const server = createServer((req, res) => {
 		res.setHeader("Cache-Control", "no-store");
 		res.setHeader("X-Content-Type-Options", "nosniff");
@@ -225,7 +225,7 @@ export async function createPlan3Web(options: Options) {
 				connection.frames = []; connection.bytes = 0;
 				return;
 			}
-			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram", "/api/dialog", "/api/files", "/api/file", "/api/diff"].includes(url.pathname)) {
+			if (req.method === "GET" && ["/api/row", "/api/rows", "/api/diagram", "/api/dialog", "/api/files", "/api/file", "/api/diff", "/api/models"].includes(url.pathname)) {
 				if (!options.read) throw new WebError(501, "Session bridge is not attached.");
 				return json(res, 200, await options.read(url.pathname, url.searchParams));
 			}

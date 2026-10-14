@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:22:46.360Z
+updated: 2026-10-14T12:26:02.911Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -212,7 +212,7 @@ Commands (existing; referenced by steps):
 - [x] **P4-02** Files API in extensions/plan3-files.ts with /api/files, /api/file?path= and /api/diff?path= (403 FileRefused, capability required). The tree comes from git ls-files (honours .gitignore) with a bounded walk outside git, and jev-tools forbiddenPath hides paths. Change marks come from porcelain status (root-relative paths are mapped to cwd so subfolder sessions work). Content goes through captureSource. Diffs use git diff HEAD, which covers staged and unstaged edits, deletions and renames (the rename source is added to the pathspec). The diff text gets the secret, NUL and 256 KB checks. Untracked files and unborn repositories show content. A files SSE ping follows write, edit and bash tools. jev-tools exports forbiddenPath, secret and safePath, and object() became a type guard.
 - [x] **P4-03** Files tab UI in extensions/plan3-web/files.ts: a native details/summary folder tree (keyboard toggling, folders with changes start open, open/closed state kept across refreshes), file buttons with M/??/D/R marks coloured per D10, and a viewer beside the tree on desktop and below it under 900 px. Changed files load /api/diff and the others /api/file; diff lines are coloured (add #b2f2bb, del #ffc9c9). Everything renders through textContent. The files SSE event refreshes a visible tab or marks a hidden one stale; the selected file reloads on refresh.
 - [x] **P4-04** Phone layout under 900 px: a Chat/Files/Diagram tablist (arrow keys wrap, choice kept in localStorage) shows one full-height view at a time, and Files and Diagram reuse the desktop panels with the left tabs hidden. The page height follows visualViewport (--app-height) and the viewport meta sets interactive-widget=resizes-content, so the composer stays above the on-screen keyboard. An Image button (file input, accepts PNG/JPEG/GIF/WebP) uploads through the same /api/paste path as clipboard paste and resets so the same photo can be attached again. Desktop ignores the phone view.
-- [ ] **P4-08** Model and effort endpoints for D19 via pi.setModel and pi.setThinkingLevel, scoped models first; C-WEB tests incl. a command that never returns (D17).
+- [x] **P4-08** D19 endpoints: GET /api/models returns {model, effort, scoped, others, efforts}, scoped models first and the rest from modelRegistry.getAvailable. POST /api/model {provider,id} accepts only available models and gives 404/409/400. POST /api/effort {level} accepts EFFORTS levels and returns the level after clamping. Both publish a status SSE event, as do terminal model_select and thinking_level_select. The snapshot carries status {model, effort}. A hanging slash command leaves the HTTP request returning and the server serving (D17).
 - [ ] **P4-05** Chat status line per D19: model and effort picker (scoped first), plan line with plan menu or New plan; expandable view.
 - [ ] **P4-07** Session switcher UI (D18): slide-out list, closed stripe of colour-coded letters, per-device seen state; mobile and desktop.
 - [ ] **P4-06** Extend C-BROWSER: collapse states, Files diff, reload reconnect, status line, switcher A to B to A seen state, 390 px mobile tabs; run C-VERIFY.

@@ -1203,6 +1203,30 @@ try {
 		assert(shown.content?.includes("## Decisions"), JSON.stringify(shown).slice(0, 300));
 		assert.equal((await fetch(`${url.origin}/api/file?path=.env`, { headers })).status, 403, "secret-shaped paths are refused");
 		assert.equal((await fetch(`${url.origin}/api/file?path=x`)).status, 401, "the Files API needs the capability");
+		// D19: model and effort for the same session, scoped models first.
+		const savedFind = ctx.modelRegistry.find, savedModelRef = ctx.model, savedWebModel = webCtx.model;
+		// Pi's ctx.model is a live getter; the spread copy above is not.
+		webCtx.scopedModels = [{ model: { provider: "zai", id: "glm-5.3", name: "GLM" } }]; ctx.modelRegistry.find = (provider, id) => ({ provider, id }); Object.defineProperty(webCtx, "model", { get: () => ctx.model, configurable: true });
+		try {
+			const models = await (await fetch(`${url.origin}/api/models`, { headers })).json();
+			assert.deepEqual(models.scoped, [{ provider: "zai", id: "glm-5.3", name: "GLM" }]);
+			assert(!models.others.some(model => model.id === "glm-5.3") && models.others.length === 3 && models.efforts.includes("xhigh"));
+			const switched = await post("model", { provider: "anthropic", id: "claude-opus-4" });
+			assert.equal(switched.status, 200); assert.equal(ctx.model.id, "claude-opus-4"); assert.equal(switched.body.model.id, "claude-opus-4");
+			assert.equal((await post("model", { provider: "evil", id: "x" })).status, 404, "only available models");
+			assert.equal((await post("model", { provider: "zai", id: "glm-5.3", extra: 1 })).status, 400);
+			const effort = await post("effort", { level: "low" });
+			assert.equal(effort.status, 200); assert.equal(thinking, "low"); assert.equal(effort.body.effort, "low");
+			assert.equal((await post("effort", { level: "turbo" })).status, 400);
+			assert.deepEqual((await snapshot()).status, { model: { provider: "anthropic", id: "claude-opus-4", name: "claude-opus-4" }, effort: "low" });
+			// D17: a command that never returns must not hold the request or the server.
+			const savedSend = api.sendUserMessage; api.sendUserMessage = () => new Promise(() => {});
+			try {
+				const started = Date.now(), hung = await post("message", { text: "/plan3 hang" });
+				assert.equal(hung.status, 200); assert(Date.now() - started < 2000, "the message request returns before the command settles");
+				assert.equal((await fetch(`${url.origin}/api/models`, { headers })).status, 200, "the server keeps serving");
+			} finally { api.sendUserMessage = savedSend; }
+		} finally { thinking = "high"; webCtx.scopedModels = []; ctx.modelRegistry.find = savedFind; ctx.model = savedModelRef; Object.defineProperty(webCtx, "model", { value: savedWebModel, writable: true, configurable: true }); }
 		assert.equal(edited.notes[0].author, "user"); assert.equal(edited.notes[0].target, "api");
 		const sent = await post("message", { text: "Discuss @api", comments: [edited.notes[0].id] });
 		assert.equal(sent.status, 200); assert.deepEqual(sent.body.mentions, ["api"]);

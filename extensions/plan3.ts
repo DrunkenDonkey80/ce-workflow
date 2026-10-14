@@ -787,6 +787,17 @@ export default function plan3(pi) {
 		if (!plan) throw new WebError(404, "Displayed plan no longer exists.");
 		return { kind: "plan", plan };
 	}
+	const modelRef = model => ({ provider: model.provider, id: model.id, name: model.name ?? model.id });
+	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null });
+	async function webModels(ctx) {
+		const scoped = (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => modelRef(entry.model)), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
+		const others = ((await ctx.modelRegistry?.getAvailable?.()) ?? []).map(modelRef).filter(model => !keys.has(model.provider + "/" + model.id));
+		return { scoped, others };
+	}
+	function publishStatus(ctx) { const status = webStatus(ctx); publishWeb("status", status); return status; }
+	// Terminal changes reach the page too; handlers run after Pi applied the change.
+	pi.on("model_select", (_event, ctx) => { if (webInstance) publishStatus(ctx); });
+	pi.on("thinking_level_select", (_event, ctx) => { if (webInstance) publishStatus(webCtx ?? ctx); });
 	async function postWeb(endpoint, data) {
 		if (!webCtx) throw new WebError(409, "Workspace context expired; reopen /plan3 diagram.");
 		const ctx = webCtx;
@@ -816,6 +827,20 @@ export default function plan3(pi) {
 			pi.events.emit("plan3:diagram-changed", { cwd: ctx.cwd, target, file: diagramPath(ctx.cwd, target), revision: result.diagram.revision, changed: result.changed, removed: result.removed, dependents: result.dependents });
 			return { diagram: result.diagram, changed: result.changed };
 		}
+		// D19: the same session's model and effort; scoped and authenticated models only.
+		if (endpoint === "/api/model") {
+			if (Object.keys(data).some(key => !["target", "provider", "id"].includes(key)) || typeof data.provider !== "string" || typeof data.id !== "string") throw new WebError(400, "Invalid model fields.");
+			const { scoped, others } = await webModels(ctx), wanted = [...scoped, ...others].find(model => model.provider === data.provider && model.id === data.id);
+			const model = wanted && ctx.modelRegistry?.find?.(wanted.provider, wanted.id);
+			if (!model) throw new WebError(404, "That model is not available in this session.");
+			if (!await pi.setModel(model)) throw new WebError(409, `No credentials for ${data.provider}/${data.id}.`);
+			return publishStatus(ctx);
+		}
+		if (endpoint === "/api/effort") {
+			if (Object.keys(data).some(key => !["target", "level"].includes(key)) || !EFFORTS.includes(data.level)) throw new WebError(400, "Invalid effort level.");
+			pi.setThinkingLevel(data.level);
+			return publishStatus(ctx); // the model may clamp the level
+		}
 		if (endpoint === "/api/answer") {
 			if (data.target !== undefined) await resolveWebTarget(webTarget(data.target));
 			if (Object.keys(data).some(key => !["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"].includes(key))) throw new WebError(400, "Invalid answer fields.");
@@ -832,6 +857,7 @@ export default function plan3(pi) {
 		if (endpoint === "/api/rows") return chat.page(params.get("before") ?? undefined);
 		if (endpoint === "/api/dialog") return dialogs.get(params.get("id") ?? "");
 		if (endpoint === "/api/files") return listFiles(webCtx.cwd);
+		if (endpoint === "/api/models") return { ...webStatus(webCtx), ...await webModels(webCtx), efforts: EFFORTS };
 		if (endpoint === "/api/file" || endpoint === "/api/diff") {
 			try { return await (endpoint === "/api/file" ? readProjectFile : readProjectDiff)(webCtx.cwd, params.get("path")); }
 			catch (error) { throw error instanceof FileRefused ? new WebError(403, error.message) : error; }
@@ -846,7 +872,7 @@ export default function plan3(pi) {
 		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
 			const target = requestedTarget ?? await displayedWebTarget();
 			const resolved = await resolveWebTarget(target);
-			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) });
+			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, status: webStatus(webCtx), ...(resolved.kind === "plan" ? { plan: { id: resolved.plan.id, file: resolved.plan.file, title: resolved.plan.title, status: resolved.plan.status, done: resolved.plan.done, total: resolved.plan.total, open: resolved.plan.open } } : {}) });
 		} }).then(async server => {
 			const previous = shareRecord.port;
 			try { await saveSharePort(shareRecord, server.port); }
