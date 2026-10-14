@@ -181,11 +181,29 @@ export async function createPlan3Web(options: Options) {
 	};
 }
 
-type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; error?: string };
+// Thinking and tool calls travel as collapsed blocks (like Pi's terminal); a tool result joins its call's block.
+type ChatBlock = { type: "thinking"; text: string } | { type: "tool"; id: string; name: string; title: string; args: string; result?: string; error?: boolean };
+type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; error?: string; blocks?: ChatBlock[] };
+const clip = (text: string, limit: number) => text.length > limit ? text.slice(0, limit) + "\n\u2026 truncated" : text;
+/** One-line tool label: the name plus its most telling argument (path, command, query or the first text). */
+function toolTitle(name: string, args: Record<string, unknown>) {
+	const value = ["path", "file", "command", "query", "url", "question", "action", "agent"].map(key => args?.[key]).find(item => typeof item === "string") ?? Object.values(args ?? {}).find(item => typeof item === "string");
+	const line = String(value ?? "").split("\n").find(item => item.trim())?.trim() ?? "";
+	return (name + " " + (line.length > 90 ? line.slice(0, 89) + "\u2026" : line)).trim();
+}
 export function createChatMirror(pi, publish: (event: string, data: unknown) => void) {
 	const rows: ChatRow[] = [], active = new Map<string, string>();
 	let next = 0;
 	const put = (message, streaming: boolean, emit = true, start = false) => {
+		if (message?.role === "toolResult") {
+			const row = rows.findLast(item => item.blocks?.some(block => block.type === "tool" && block.id === message.toolCallId));
+			const block = row?.blocks.find(item => item.type === "tool" && item.id === message.toolCallId);
+			if (!block || block.type !== "tool") return;
+			block.result = clip((Array.isArray(message.content) ? message.content : []).map(part => part?.type === "text" ? part.text : part?.type === "image" ? "[image]" : "").join("\n"), 4000);
+			if (message.isError) block.error = true;
+			if (emit) publish("message", row);
+			return;
+		}
 		if (!["user", "assistant"].includes(message?.role)) return;
 		const role = message.role;
 		const base = typeof message.timestamp === "number" ? `${role}_${message.timestamp}` : `${role}_${++next}`;
@@ -195,10 +213,12 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 			for (let suffix = 2; rows.some(row => row.id === id); suffix++) id = `${base}_${suffix}`;
 		}
 		active.set(role, id);
-		const content = typeof message.content === "string" ? message.content : (Array.isArray(message.content) ? message.content.map(part => part?.type === "text" && typeof part.text === "string" ? part.text : part?.type === "image" ? "[image]" : "").join("\n") : "");
+		const content = typeof message.content === "string" ? message.content : (Array.isArray(message.content) ? message.content.map(part => part?.type === "text" && typeof part.text === "string" ? part.text : part?.type === "image" ? "[image]" : "").filter(Boolean).join("\n") : "");
 		// shortcut: keep 100 recent rows / 512 KB; each row is capped at 64k chars, show truncation in the UI.
-		const row: ChatRow = { id, role, text: content.slice(0, 64_000), streaming, ...(content.length > 64_000 ? { truncated: true } : {}), ...(typeof message.errorMessage === "string" ? { error: message.errorMessage.slice(0, 4000) } : {}) };
-		const index = rows.findIndex(item => item.id === id);
+		const index = rows.findIndex(item => item.id === id), results = new Map((rows[index]?.blocks ?? []).flatMap(block => block.type === "tool" && block.result !== undefined ? [[block.id, block]] : []));
+		const blocks: ChatBlock[] = (Array.isArray(message.content) ? message.content : []).flatMap(part => part?.type === "thinking" && part.thinking?.trim() ? [{ type: "thinking" as const, text: clip(part.thinking, 4000) }]
+			: part?.type === "toolCall" ? [{ type: "tool" as const, id: String(part.id), name: String(part.name), title: toolTitle(String(part.name), part.arguments), args: clip(JSON.stringify(part.arguments ?? {}, null, 1), 2000), ...(results.has(part.id) ? { result: results.get(part.id).result, ...(results.get(part.id).error ? { error: true } : {}) } : {}) }] : []);
+		const row: ChatRow = { id, role, text: content.slice(0, 64_000), streaming, ...(content.length > 64_000 ? { truncated: true } : {}), ...(typeof message.errorMessage === "string" ? { error: message.errorMessage.slice(0, 4000) } : {}), ...(blocks.length ? { blocks } : {}) };
 		if (index < 0) rows.push(row); else rows[index] = row;
 		while (rows.length > 100 || Buffer.byteLength(JSON.stringify(rows)) > 512_000) rows.shift();
 		if (emit) publish("message", row);

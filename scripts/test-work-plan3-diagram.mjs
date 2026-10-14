@@ -7,7 +7,7 @@ import { createJiti } from "jiti";
 const { layout } = await createJiti(import.meta.url).import("../extensions/plan3-web/layout.ts");
 
 // Layout (D10) on the two hand-written samples: children inside their group, no unrelated boxes overlap,
-// a cycle does not push its first node right, and manual positions win.
+// a cycle does not push its first node right, and a manual position pins its box to the nearest grid cell.
 for (const name of ["upload-service", "ce-workflow"]) {
 	const diagram = JSON.parse(readFileSync(new URL(`./fixtures/diagrams/${name}.diagram.json`, import.meta.url), "utf8"));
 	const boxes = layout(diagram), byId = new Map(diagram.nodes.map((node) => [node.id, node]));
@@ -22,8 +22,11 @@ for (const name of ["upload-service", "ce-workflow"]) {
 }
 const upload = JSON.parse(readFileSync(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
 assert.equal(layout(upload).get("web_client").x, 0, "cycle web_client -> ... -> cdn -> web_client keeps web_client first");
-upload.nodes.find((node) => node.id === "cdn").x = 5000;
-assert.equal(layout(upload).get("cdn").x, 5000, "manual position wins");
+Object.assign(upload.nodes.find((node) => node.id === "cdn"), { x: 5000, y: 0 });
+const pinned = layout(upload), cdn = pinned.get("cdn");
+assert.equal(cdn.y, Math.min(...[...pinned.values()].map((box) => box.y)), "pinned box stays in the top row");
+assert.equal(cdn.x + cdn.w, Math.max(...[...pinned.values()].map((box) => box.x + box.w)), "pinned box snaps to the rightmost column");
+for (const [id, box] of pinned) if (id !== "cdn") assert(!(box.x < cdn.x + cdn.w && cdn.x < box.x + box.w && box.y < cdn.y + cdn.h && cdn.y < box.y + box.h), `pinned cdn overlaps ${id}`);
 
 const { validateDiagram, diagramPath, loadDiagram, emptyDiagram, saveDiagram, applyDiagramOperations, applyDiagram, diagramDependents, DIAGRAM_BYTES } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
 const { movePlanWithDiagram } = await createJiti(import.meta.url).import("../extensions/plan3-design.ts");

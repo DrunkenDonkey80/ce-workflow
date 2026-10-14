@@ -10,6 +10,7 @@ function $(id: "send" | "stop" | "comment-save"): HTMLButtonElement;
 function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
 function $(id: "composer" | "comment-form" | "prompt-form"): HTMLFormElement;
 function $(id: "diagram"): SVGSVGElement;
+function $(id: "search"): HTMLInputElement;
 function $(id: string): HTMLElement;
 function $(id: string): HTMLElement | SVGSVGElement { return document.getElementById(id); }
 const token = "__TOKEN__";
@@ -27,7 +28,7 @@ function renderShell() {
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working" : "Idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
  for (const button of $("commands").querySelectorAll("button")) button.disabled = !state.connected || !!state.activity.working || commandSending || promptView.busy;
- $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue follow-up" : "Send";
+ $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
 }
 
@@ -77,7 +78,7 @@ async function post(endpoint, body) {
  const response = await fetch("/api/" + endpoint, { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ target, ...body }) });
  const value = await response.json(); if (!response.ok) { throw Object.assign(new Error(value.error ?? "Workspace request failed."), { status: response.status }); } return value;
 }
-function hover(id, event) {
+function hover(id, _event) {
  if (state.pinning) return;
  clearTimeout(hoverTimer);
  const data = state.diagram, targets = new Set([id]), node = data.nodes.find(node => node.id === id), edge = data.edges.find(edge => edge.id === id);
@@ -88,14 +89,13 @@ function hover(id, event) {
  const notes = data.notes.filter(note => note.id === id || targets.has(note.target));
  const info = [...(node ? [node.label, node.summary, node.tech, node.details] : edge ? [edge.label || edge.id] : []), ...notes.map(note => (note.author === "user" ? "Your note" : "Agent note") + "\n" + note.text)].filter(Boolean).join("\n\n");
  if (!info) return;
- const card = $("hover-card"), canvas = $("canvas").getBoundingClientRect(), at = event.currentTarget.getBoundingClientRect();
+ // Shown in a fixed spot over the top of the chat pane, so it never covers the diagram under the pointer.
+ const card = $("hover-card"), chat = $("chat").getBoundingClientRect();
  card.textContent = info; card.scrollTop = 0; card.dataset.notes = String(!!notes.length); card.hidden = false;
-  const x = (event.clientX ?? at.x + at.width / 2) - canvas.left, y = (event.clientY ?? at.y + at.height / 2) - canvas.top;
- card.style.left = Math.max(8, x + card.offsetWidth + 12 < canvas.width ? x + 12 : x - card.offsetWidth - 12) + "px";
- card.style.top = Math.max(8, y + card.offsetHeight + 12 < canvas.height ? y + 12 : y - card.offsetHeight - 12) + "px";
+ card.style.left = chat.left + 8 + "px"; card.style.top = chat.top + 8 + "px"; card.style.width = chat.width - 16 + "px";
 }
 $("diagram").addEventListener("pointerdown", () => { clearTimeout(hoverTimer); $("hover-card").hidden = true; });
-function leave() { hoverTimer = setTimeout(() => { $("hover-card").hidden = true; }, 150); }
+function leave() { clearTimeout(hoverTimer); $("hover-card").hidden = true; }
 function drawNotes(stage, boxes, view, rc, data, detailY) {
  const indexes = new Map();
  const visibleBox = id => { let node = data.nodes.find(node => node.id === id); while (node && !boxes.has(node.id)) node = data.nodes.find(parent => parent.id === node.parent); return node ? boxes.get(node.id) : undefined; };
@@ -121,6 +121,9 @@ function drawNotes(stage, boxes, view, rc, data, detailY) {
   stage.append(row);
  }
 }
+// Right-click: the composer gets "note @id: "; Enter saves the rest as a note on that element.
+const NOTE = /^note @([a-z][a-z0-9_]{0,47}):\s*([\s\S]+)$/;
+function startNote(id) { const input = $("message-input"); input.value = "note @" + id + ": "; input.focus(); input.setSelectionRange(input.value.length, input.value.length); renderMentions(); showNotice("Type the note for @" + id + " and press Enter."); }
 function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); renderMentions(); }
 function pin(point) {
  commentPoint = { ...point, expectedRevision: state.diagram.revision }; state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning");
@@ -129,7 +132,7 @@ function pin(point) {
 }
 const diagramView = createDiagramView($("diagram"), {
  hover, leave, notes: drawNotes, pin, pinning: () => state.pinning,
- mention: insertMention,
+ mention: insertMention, note: startNote,
  async move(body) {
   try { const value = await post("move", body); state.diagram = value.diagram; diagramView.render(state.diagram); showNotice(""); }
   catch (error) {
@@ -159,20 +162,48 @@ window.addEventListener("keydown", event => { if (event.key === "Escape") { $("h
 $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
+$("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
+$("search").addEventListener("keydown", event => {
+ if (event.key === "Enter") { event.preventDefault(); diagramView.search($("search").value, true); }
+ if (event.key === "Escape") { $("search").value = ""; diagramView.search(""); $("search-count").textContent = ""; $("diagram").focus(); }
+});
+// Ctrl+F searches the diagram instead of the page.
+window.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); $("search").focus(); $("search").select(); } });
 
 const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice);
+// Pi-like rows: text stays visible; thinking and each tool call are one collapsed line that expands on click.
+function renderBlocks(box: HTMLElement, row) {
+ const opened = new Set([...box.querySelectorAll<HTMLDetailsElement>("details[open]")].map(item => item.dataset.key));
+ box.replaceChildren();
+ (row.blocks ?? []).forEach((block, index) => {
+  const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
+  item.dataset.key = key; item.open = opened.has(key); item.className = "block block-" + block.type + (block.error ? " block-error" : "");
+  summary.textContent = block.type === "thinking" ? "Thinking" : block.title + (block.result === undefined ? (row.streaming ? "" : " \u2026") : block.error ? " \u2715" : "");
+  item.append(summary);
+  for (const text of block.type === "thinking" ? [block.text] : [block.args, block.result].filter(value => value !== undefined)) { const pre = document.createElement("pre"); pre.textContent = text; item.append(pre); }
+  box.append(item);
+ });
+}
+const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+$("messages").addEventListener("scroll", () => { if (atBottom($("messages"))) $("to-bottom").hidden = true; });
+$("to-bottom").addEventListener("click", () => { const list = $("messages"); list.scrollTop = list.scrollHeight; $("to-bottom").hidden = true; });
 function renderChat() {
- const list = $("messages"), follow = list.scrollHeight - list.scrollTop - list.clientHeight < 48;
+ const list = $("messages"), follow = atBottom(list);
  const encoder = new TextEncoder();
  while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
  for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
  for (const row of chat.values()) {
   let item = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].find(item => item.dataset.id === row.id);
-  if (!item) { item = document.createElement("li"); item.dataset.id = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("small")); list.append(item); }
-  item.className = "message " + row.role; item.children[0].textContent = row.role === "user" ? "You" : "Agent";
-  item.children[1].textContent = row.text; item.children[2].textContent = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming ? "Streaming…" : "");
+  if (!item) { item = document.createElement("li"); item.dataset.id = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("div"), document.createElement("small")); list.append(item); }
+  const json = JSON.stringify(row); if (item.dataset.json === json) continue; item.dataset.json = json;
+  const text = row.text.trim(), note = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming && !row.blocks?.length ? "Streaming…" : "");
+  // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
+  item.className = "message " + row.role + (text ? "" : " message-blocks"); item.hidden = !text && !row.blocks?.length && !note;
+  item.children[0].textContent = text ? (row.role === "user" ? "You" : "Agent") : "";
+  renderBlocks(item.children[1] as HTMLElement, row); item.children[2].textContent = row.text; item.children[3].textContent = note;
  }
- if (follow) list.scrollTop = list.scrollHeight;
+ // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
+ if (follow) list.scrollTop = list.scrollHeight; else if (list.scrollHeight > list.clientHeight) $("to-bottom").hidden = false;
 }
 const mentioned = () => [...new Set([...$("message-input").value.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
 function renderMentions() {
@@ -187,7 +218,7 @@ $("message-input").addEventListener("paste", async event => {
  try {
   const response = await fetch("/api/paste", { method: "POST", credentials: "omit", headers: { Authorization: "Bearer " + token, "Content-Type": file.type }, body: file });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Image paste failed.");
-  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); renderMentions(); showNotice("Image saved: " + value.path);
+  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); const list = $("messages"); list.scrollTop = list.scrollHeight; renderMentions(); showNotice("Image saved: " + value.path);
  } catch (error) { showNotice(error.message); }
 });
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
@@ -198,7 +229,17 @@ $("message-input").addEventListener("keydown", event => {
 $("composer").addEventListener("submit", async event => {
  event.preventDefault(); if (messageSending || !state.connected) return;
  const text = $("message-input").value; if (!text.trim()) return;
+ const note = text.trim().match(NOTE);
+ if (note) {
+  messageSending = true; renderShell();
+  try { const value = await post("comment", { element: note[1], text: note[2].trim(), expectedRevision: state.diagram.revision }); state.diagram = value.diagram; diagramView.render(state.diagram); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice("Note saved on @" + note[1] + "."); }
+  catch (error) { showNotice(error.message + ". Your note draft is kept."); }
+  finally { messageSending = false; renderShell(); }
+  return;
+ }
  messageSending = true; renderShell();
+ // Sending jumps to the newest message; later rows keep following from the bottom.
+ const list = $("messages"); list.scrollTop = list.scrollHeight; $("to-bottom").hidden = true;
  try { const result = await post("message", { text }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent."); }
  catch (error) { showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }

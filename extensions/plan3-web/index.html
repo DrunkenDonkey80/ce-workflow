@@ -23,6 +23,7 @@
   <section id="canvas" class="canvas" aria-label="Diagram workspace">
    <svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Architecture diagram" tabindex="0"></svg>
    <p id="empty-diagram" class="empty-diagram">No diagram yet. Ask in the chat, for example: draw the main components.</p>
+   <div class="search-box"><input id="search" type="search" placeholder="Search (Ctrl+F)" aria-label="Search the diagram; Enter jumps to the next match"><output id="search-count" aria-live="polite"></output></div>
    <div id="zoom-controls" class="zoom-controls" aria-label="Diagram zoom">
     <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
     <output id="zoom-level" aria-label="Zoom level">100%</output>
@@ -37,12 +38,12 @@
    <header class="chat-heading"><h2>Live session</h2><span id="connection" role="status">Connecting…</span></header>
    <section id="activity" class="activity" aria-label="Agent activity"></section>
    <ol id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></ol>
+   <button id="to-bottom" class="to-bottom" type="button" aria-label="Scroll to the newest message" hidden>↓ New messages</button>
    <form id="composer" class="composer">
     <div id="mentions" class="mentions" aria-label="Mentioned elements"></div>
-    <label for="message-input">Message to Pi</label>
-    <textarea id="message-input" rows="3" maxlength="20000" placeholder="Ask about the architecture…"></textarea>
+    <textarea id="message-input" rows="2" maxlength="20000" placeholder="Ask about the architecture…" aria-label="Message to Pi" aria-describedby="input-help"></textarea>
     <div class="composer-actions">
-     <span class="input-help">Enter sends · Shift+Enter new line · Esc stops · Ctrl+click a box to mention it</span>
+     <span id="input-help" class="input-help">Ctrl+click a box to mention it</span>
      <button id="stop" type="button" class="danger" hidden>Stop</button>
      <button id="send" type="submit" disabled>Send</button>
     </div>

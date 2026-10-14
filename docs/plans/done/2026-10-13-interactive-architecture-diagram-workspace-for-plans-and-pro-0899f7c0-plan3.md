@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-10-13
-updated: 2026-10-13T20:54:45.924Z
+updated: 2026-10-14T10:06:30.712Z
 reviewed: 2026-10-13
 started: 2026-10-13T13:40:36.371Z
 ---
@@ -178,9 +178,11 @@ Commands (existing; referenced by steps):
 
 ### Phase 7: Live acceptance [think]
 
-- [human] **P7-01** User runs a real planning session from the browser through the four acceptance examples; record findings.
-  - Needs the user at their desktop with a real browser; headless checks cannot judge feel and readability.
-  - note: Needs the user present with a real browser.
+- [x] **P7-01** User waived further acceptance gating and requested finishing the plan; future browser feedback will be handled in separate prompts.
+### P-ARCH [code] Product architecture
+
+- [x] **ARCH-RECONCILE** Product diagram already reflects implemented module connections; updated browser/server details for the actual layout, chat, search, notes and clipboard implementation (revision 3).
+
 
 ## Global validation
 
@@ -200,7 +202,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-30/31 complete. P6-05 done: configured TypeScript 5.9.3/NodeNext/DOM and exact dev types/SDK dependencies; 15 authored workspace sources now pass a reproducible compiler assertion in scripts/test-work-plan3-types.mjs with source coverage checked. Active LSP probed all 15: no primary TypeScript errors/warnings; one push-only clean result was inconclusive, covered by the compiler assertion. Suggestion hints, auxiliary analyzer findings and unrelated legacy typing debt remain, not called clean. Browser .ts assets are stripped to JavaScript using Node stripTypeScriptTypes (supported by SDK's >=22.19 Node floor; experimental warning remains). Full npm run verify:quiet passed after final code/provenance edits (190s), including browser/native/dialog tests; git diff --check passed. Next selectively commit P6-05-owned hunks only, leaving unrelated resolve-follow-up edits in extensions/plan3.ts/scripts/test-work-plan3.mjs and unrelated log sidecars untouched. Then user runs /reload and real-browser P7-01 acceptance (already agreed): semantic zoom/hover comments, Ctrl+click/live chat/dependent changes, Resolve→Finish→Start work with browser answers, archive plan plus diagram. Do not finish the plan until human findings or explicit limitations are recorded. No push, delegation, or new model CLI authorization.
+Finished at the user's explicit request. P7-01 acceptance gating was waived, not verified; future UX feedback will be separate prompts. Final node scripts/verify-package.mjs passed all package checks. Product diagram reconciled to actual implementation (revision 3), existing connections unchanged. No commit or push performed.
 
 ## Amendments
 
@@ -224,3 +226,4 @@ Append material changes and their reasons; preserve the original request and set
 P4-06 also closes the web listener and resets chat/activity/dialog state on Pi session switches: a capability from one conversation must not silently control or read the next. Public HTTP lifecycle tests cover reopening with a new token.
 P6-02 active LSP probe (plan3.ts + test-work-plan3.mjs) reported 817 inferred-settings warnings, including missing Node type declarations and implicit-any; neither file is clean. These are not authoritative tsconfig checks. C-LSP limitation must be resolved or explicitly accepted before final completion; do not claim clean from runtime tests.
 - 2026-10-13: Added P6-05 after P6-03: User explicitly requested fixing C-LSP rather than accepting the inferred-settings limitation; user is available for P7-01 after the final build is ready.
+- 2026-10-14: Added final architecture reconciliation because a product diagram exists.

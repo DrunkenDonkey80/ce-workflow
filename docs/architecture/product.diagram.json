@@ -1,0 +1,689 @@
+{
+  "version": 1,
+  "kind": "product",
+  "title": "Product architecture",
+  "revision": 3,
+  "nodes": [
+    {
+      "id": "pi_host",
+      "label": "Pi coding agent host",
+      "kind": "external",
+      "summary": "Loads the package extensions; provides events, sessions, tools, TUI and models.",
+      "tech": "@earendil-works/pi-coding-agent 1.1.0",
+      "details": "package.json pi.extensions: work-models, plan3, screen-read, enter-runs, advisor-model, ask-user/index."
+    },
+    {
+      "id": "plan3_group",
+      "label": "Plan3 planning and execution",
+      "kind": "group",
+      "summary": "Plan lifecycle: create, resolve, finish, resume, archive."
+    },
+    {
+      "id": "plan3",
+      "label": "Plan3 extension",
+      "kind": "service",
+      "parent": "plan3_group",
+      "summary": "/plan3, /plans3, /resume3 commands plus plan3, plan3_diagram, plan3_design tools.",
+      "tech": "extensions/plan3.ts",
+      "details": "Owns plan Markdown parsing, step marks, research mode, model phases, architecture reconciliation gate (D8/D15) and the browser workspace lifecycle."
+    },
+    {
+      "id": "plan3_ideas",
+      "label": "Ideas review",
+      "kind": "service",
+      "parent": "plan3_group",
+      "summary": "Saves proposals and reviews them through ask_user.",
+      "tech": "extensions/plan3-ideas.ts"
+    },
+    {
+      "id": "plan3_needs",
+      "label": "Requirements and availability",
+      "kind": "service",
+      "parent": "plan3_group",
+      "summary": "R-* requirements and day/night on/off sidecar.",
+      "tech": "extensions/plan3-needs.ts"
+    },
+    {
+      "id": "plan3_night",
+      "label": "Night mode",
+      "kind": "service",
+      "parent": "plan3_group",
+      "summary": "Unattended execution continuing at settle boundaries.",
+      "tech": "extensions/plan3-night.ts"
+    },
+    {
+      "id": "plan3_stats",
+      "label": "Execution stats",
+      "kind": "service",
+      "parent": "plan3_group",
+      "summary": "Per-plan telemetry in logs/<id>.stats.json.",
+      "tech": "extensions/plan3-stats.ts"
+    },
+    {
+      "id": "plan3_catch_up",
+      "label": "Catch-up",
+      "kind": "service",
+      "parent": "plan3_group",
+      "summary": "Upstream package catch-up plans, including the vendored ask_user.",
+      "tech": "extensions/plan3-catch-up.ts"
+    },
+    {
+      "id": "plan3_ask",
+      "label": "Command ask adapter",
+      "kind": "service",
+      "parent": "plan3_group",
+      "summary": "Instantiates the loaded ask_user tool for command popups via jiti.",
+      "tech": "extensions/plan3-ask.ts"
+    },
+    {
+      "id": "design_group",
+      "label": "Visual design",
+      "kind": "group",
+      "summary": "Optional OpenDesign-backed design phase for plans."
+    },
+    {
+      "id": "plan3_design",
+      "label": "Plan design state",
+      "kind": "service",
+      "parent": "design_group",
+      "summary": "Design phases, approval, locks, atomic writes, plan/diagram moves.",
+      "tech": "extensions/plan3-design.ts"
+    },
+    {
+      "id": "work_design",
+      "label": "Design handoff schema",
+      "kind": "service",
+      "parent": "design_group",
+      "summary": "Handoff validation, prompts and confined artifacts.",
+      "tech": "extensions/work-design.ts"
+    },
+    {
+      "id": "opendesign_client",
+      "label": "OpenDesign client",
+      "kind": "service",
+      "parent": "design_group",
+      "summary": "MCP/daemon client for OpenDesign runs.",
+      "tech": "extensions/opendesign-client.ts"
+    },
+    {
+      "id": "native_export",
+      "label": "Native export",
+      "kind": "service",
+      "parent": "design_group",
+      "summary": "Collects saved native HTML/PNG exports.",
+      "tech": "extensions/plan3-native-export.ts"
+    },
+    {
+      "id": "plan3_window",
+      "label": "Window capture",
+      "kind": "service",
+      "parent": "design_group",
+      "summary": "PrintWindow capture of a chosen app window (Windows).",
+      "tech": "extensions/plan3-window.ts"
+    },
+    {
+      "id": "workspace_group",
+      "label": "Architecture workspace",
+      "kind": "group",
+      "summary": "Plan 0899f7c0: browser diagram + live chat workspace."
+    },
+    {
+      "id": "plan3_diagram",
+      "label": "Diagram model",
+      "kind": "service",
+      "parent": "workspace_group",
+      "summary": "Schema v1 validation, revisioned atomic saves, operations and dependents, mentions.",
+      "tech": "extensions/plan3-diagram.ts"
+    },
+    {
+      "id": "plan3_web",
+      "label": "Local workspace server",
+      "kind": "service",
+      "parent": "workspace_group",
+      "summary": "127.0.0.1 HTTP + SSE with token/Origin checks; chat, activity and dialog mirrors.",
+      "tech": "extensions/plan3-web.ts",
+      "details": "Serves browser .ts assets after stripTypeScriptTypes; command dispatch and Stop via ctx.abort. Authenticated image-paste endpoint validates image bytes and writes a temporary file; revision-checked note/move endpoints and HTTP/SSE snapshots synchronize the browser."
+    },
+    {
+      "id": "browser_app",
+      "label": "Workspace browser app",
+      "kind": "client",
+      "parent": "workspace_group",
+      "summary": "Rough.js SVG diagram with semantic zoom, notes, mentions, chat, activity and prompts.",
+      "tech": "extensions/plan3-web/{app,diagram,layout,prompts}.ts, vendored Rough.js and Virgil",
+      "details": "Grid-packed groups with orthogonal edge routing and calm bundled connections; semantic zoom, tinted cards, Ctrl+F search, plain-drag pan and Shift+drag persisted positions. Collapsed thinking/tool chat blocks, auto-follow with jump-to-bottom, image paste to a temporary file path, and right-click note composition. Browser commands and question dialogs share the live terminal session."
+    },
+    {
+      "id": "ask_group",
+      "label": "ask_user (vendored)",
+      "kind": "group",
+      "summary": "Fork of pi-ask-user 0.16.0 (D3)."
+    },
+    {
+      "id": "ask_user",
+      "label": "ask_user tool",
+      "kind": "service",
+      "parent": "ask_group",
+      "summary": "Terminal single/batch question popups.",
+      "tech": "extensions/ask-user/index.ts, single-select-layout.ts",
+      "details": "Skips registration and warns once if external pi-ask-user is loaded (D12)."
+    },
+    {
+      "id": "ask_remote",
+      "label": "Remote answer race",
+      "kind": "service",
+      "parent": "ask_group",
+      "summary": "ask:pending/ask:answer/ask:closed; first answer wins.",
+      "tech": "extensions/ask-user/remote.ts"
+    },
+    {
+      "id": "work_ask_remote",
+      "label": "Intercom answer bridge",
+      "kind": "service",
+      "parent": "ask_group",
+      "summary": "Opt-in forwarding of pending asks over pi-intercom.",
+      "tech": "extensions/work-ask-remote.ts"
+    },
+    {
+      "id": "workflow_group",
+      "label": "Workflow hub",
+      "kind": "group",
+      "summary": "/wo settings, models, compaction and utility tools."
+    },
+    {
+      "id": "work_models",
+      "label": "Workflow hub extension",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "/wo menus, model phases, compaction profiles, knowledge, images, camera, footer, scout.",
+      "tech": "extensions/work-models.ts"
+    },
+    {
+      "id": "work_dialogs",
+      "label": "Shared dialogs",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "Overlay list/checklist dialogs, model picker, browser list bridge.",
+      "tech": "extensions/work-dialogs.ts"
+    },
+    {
+      "id": "compaction",
+      "label": "Compaction",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "Compaction profiles, summaries and session memory.",
+      "tech": "extensions/work-compaction.ts, work-compaction-memory.ts"
+    },
+    {
+      "id": "knowledge",
+      "label": "Durable knowledge",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "Record/search reusable facts.",
+      "tech": "extensions/work-knowledge.ts"
+    },
+    {
+      "id": "jev_tools",
+      "label": "Jev classifier tools",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "jev_triage and jev_evidence.",
+      "tech": "extensions/jev-tools.ts"
+    },
+    {
+      "id": "vision_images",
+      "label": "Vision and images",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "process_image and generate_image routing.",
+      "tech": "extensions/work-vision.ts, work-images.ts"
+    },
+    {
+      "id": "camera",
+      "label": "Camera tools",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "Consent-gated capture/watch via ffmpeg worker.",
+      "tech": "extensions/work-camera*.ts"
+    },
+    {
+      "id": "subscription_footer",
+      "label": "Subscription footer",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "Provider quota footer.",
+      "tech": "extensions/subscription-footer.ts"
+    },
+    {
+      "id": "extension_scout",
+      "label": "Extension scout",
+      "kind": "service",
+      "parent": "workflow_group",
+      "summary": "Scans extension catalogs; installs nothing.",
+      "tech": "extensions/work-extension-scout.ts, work-compound-source.ts"
+    },
+    {
+      "id": "standalone_group",
+      "label": "Standalone extensions",
+      "kind": "group",
+      "summary": "Small independently loaded extensions."
+    },
+    {
+      "id": "screen_read",
+      "label": "screen_read",
+      "kind": "service",
+      "parent": "standalone_group",
+      "summary": "Window/browser/Android captures for visual testing.",
+      "tech": "extensions/screen-read.ts"
+    },
+    {
+      "id": "enter_runs",
+      "label": "Enter runs completions",
+      "kind": "service",
+      "parent": "standalone_group",
+      "summary": "Makes argument completions run on Enter.",
+      "tech": "extensions/enter-runs.ts"
+    },
+    {
+      "id": "advisor_model",
+      "label": "Advisor model",
+      "kind": "service",
+      "parent": "standalone_group",
+      "summary": "Sets oracle/advisor subagent models from Plan3 advisors.",
+      "tech": "extensions/advisor-model.ts"
+    },
+    {
+      "id": "storage_group",
+      "label": "Project files",
+      "kind": "group",
+      "summary": "Repository-local persisted state."
+    },
+    {
+      "id": "plan_files",
+      "label": "Plan files",
+      "kind": "store",
+      "parent": "storage_group",
+      "summary": "docs/plans/*-plan3.md, logs/ sidecars, done/ archive."
+    },
+    {
+      "id": "diagram_files",
+      "label": "Diagram files",
+      "kind": "store",
+      "parent": "storage_group",
+      "summary": "<plan>.diagram.json siblings and docs/architecture/product.diagram.json."
+    },
+    {
+      "id": "design_files",
+      "label": "Design artifacts",
+      "kind": "store",
+      "parent": "storage_group",
+      "summary": "Per-plan design directory: brief, handoff, approval, history."
+    },
+    {
+      "id": "settings_files",
+      "label": "Settings",
+      "kind": "store",
+      "parent": "storage_group",
+      "summary": ".pi/settings.json workOrchestrator section."
+    },
+    {
+      "id": "legacy_store",
+      "label": "Legacy work store",
+      "kind": "store",
+      "parent": "storage_group",
+      "summary": ".ce-workflow/work-items.json; read-only conversion source.",
+      "tech": "extensions/work-store.ts"
+    },
+    {
+      "id": "user_browser",
+      "label": "User's browser",
+      "kind": "external",
+      "summary": "Opens the tokenized localhost workspace."
+    },
+    {
+      "id": "opendesign_app",
+      "label": "OpenDesign app",
+      "kind": "external",
+      "summary": "External design generation app."
+    },
+    {
+      "id": "openrouter",
+      "label": "OpenRouter / model providers",
+      "kind": "external",
+      "summary": "Jev classifier and image/vision models."
+    },
+    {
+      "id": "pi_subagents",
+      "label": "pi-subagents",
+      "kind": "external",
+      "summary": "Peer package for delegation; uses utility-agents/."
+    },
+    {
+      "id": "pi_intercom",
+      "label": "pi-intercom",
+      "kind": "external",
+      "summary": "Optional peer for cross-session messages."
+    }
+  ],
+  "edges": [
+    {
+      "from": "pi_host",
+      "to": "plan3",
+      "label": "loads",
+      "id": "pi_host__plan3"
+    },
+    {
+      "from": "pi_host",
+      "to": "work_models",
+      "label": "loads",
+      "id": "pi_host__work_models"
+    },
+    {
+      "from": "pi_host",
+      "to": "ask_user",
+      "label": "loads",
+      "id": "pi_host__ask_user"
+    },
+    {
+      "from": "pi_host",
+      "to": "screen_read",
+      "label": "loads",
+      "id": "pi_host__screen_read"
+    },
+    {
+      "from": "pi_host",
+      "to": "enter_runs",
+      "label": "loads",
+      "id": "pi_host__enter_runs"
+    },
+    {
+      "from": "pi_host",
+      "to": "advisor_model",
+      "label": "loads",
+      "id": "pi_host__advisor_model"
+    },
+    {
+      "from": "plan3",
+      "to": "plan_files",
+      "label": "reads/writes",
+      "id": "plan3__plan_files"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_ideas",
+      "label": "ideas",
+      "id": "plan3__plan3_ideas"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_needs",
+      "label": "requirements",
+      "id": "plan3__plan3_needs"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_night",
+      "label": "night mode",
+      "id": "plan3__plan3_night"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_stats",
+      "label": "telemetry",
+      "id": "plan3__plan3_stats"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_ask",
+      "label": "command popups",
+      "id": "plan3__plan3_ask"
+    },
+    {
+      "from": "plan3_ask",
+      "to": "ask_user",
+      "label": "instantiates",
+      "id": "plan3_ask__ask_user"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_design",
+      "label": "design phase",
+      "id": "plan3__plan3_design"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_window",
+      "label": "captures",
+      "id": "plan3__plan3_window"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_diagram",
+      "label": "plan3_diagram tool",
+      "id": "plan3__plan3_diagram"
+    },
+    {
+      "from": "plan3",
+      "to": "plan3_web",
+      "label": "starts/stops",
+      "id": "plan3__plan3_web"
+    },
+    {
+      "from": "plan3",
+      "to": "work_dialogs",
+      "label": "menus",
+      "id": "plan3__work_dialogs"
+    },
+    {
+      "from": "plan3",
+      "to": "legacy_store",
+      "label": "converts",
+      "id": "plan3__legacy_store"
+    },
+    {
+      "from": "plan3",
+      "to": "settings_files",
+      "label": "phase models, product offer",
+      "id": "plan3__settings_files"
+    },
+    {
+      "from": "plan3_design",
+      "to": "work_design",
+      "label": "validates",
+      "id": "plan3_design__work_design"
+    },
+    {
+      "from": "plan3_design",
+      "to": "opendesign_client",
+      "label": "runs",
+      "id": "plan3_design__opendesign_client"
+    },
+    {
+      "from": "plan3_design",
+      "to": "native_export",
+      "label": "collects",
+      "id": "plan3_design__native_export"
+    },
+    {
+      "from": "plan3_design",
+      "to": "design_files",
+      "label": "atomic writes",
+      "id": "plan3_design__design_files"
+    },
+    {
+      "from": "opendesign_client",
+      "to": "opendesign_app",
+      "label": "MCP",
+      "id": "opendesign_client__opendesign_app"
+    },
+    {
+      "from": "native_export",
+      "to": "opendesign_app",
+      "label": "exports",
+      "id": "native_export__opendesign_app"
+    },
+    {
+      "from": "plan3_diagram",
+      "to": "plan3_design",
+      "label": "locks/atomic writes",
+      "id": "plan3_diagram__plan3_design"
+    },
+    {
+      "from": "plan3_diagram",
+      "to": "diagram_files",
+      "label": "revisioned saves",
+      "id": "plan3_diagram__diagram_files"
+    },
+    {
+      "from": "plan3_web",
+      "to": "plan3_diagram",
+      "label": "chat context",
+      "id": "plan3_web__plan3_diagram"
+    },
+    {
+      "from": "plan3_web",
+      "to": "ask_remote",
+      "label": "answer race",
+      "id": "plan3_web__ask_remote"
+    },
+    {
+      "from": "plan3_web",
+      "to": "work_dialogs",
+      "label": "list bridge",
+      "id": "plan3_web__work_dialogs"
+    },
+    {
+      "from": "plan3_web",
+      "to": "pi_host",
+      "label": "sendUserMessage, abort, events",
+      "id": "plan3_web__pi_host"
+    },
+    {
+      "from": "user_browser",
+      "to": "browser_app",
+      "label": "runs",
+      "id": "user_browser__browser_app"
+    },
+    {
+      "from": "browser_app",
+      "to": "plan3_web",
+      "label": "HTTP + SSE",
+      "id": "browser_app__plan3_web"
+    },
+    {
+      "from": "ask_user",
+      "to": "ask_remote",
+      "label": "wraps prompts",
+      "id": "ask_user__ask_remote"
+    },
+    {
+      "from": "work_ask_remote",
+      "to": "ask_remote",
+      "label": "forwards",
+      "id": "work_ask_remote__ask_remote"
+    },
+    {
+      "from": "work_ask_remote",
+      "to": "pi_intercom",
+      "label": "messages",
+      "id": "work_ask_remote__pi_intercom"
+    },
+    {
+      "from": "work_models",
+      "to": "work_dialogs",
+      "label": "menus",
+      "id": "work_models__work_dialogs"
+    },
+    {
+      "from": "work_models",
+      "to": "compaction",
+      "label": "compacts",
+      "id": "work_models__compaction"
+    },
+    {
+      "from": "work_models",
+      "to": "knowledge",
+      "label": "knowledge tool",
+      "id": "work_models__knowledge"
+    },
+    {
+      "from": "work_models",
+      "to": "jev_tools",
+      "label": "registers",
+      "id": "work_models__jev_tools"
+    },
+    {
+      "from": "work_models",
+      "to": "vision_images",
+      "label": "registers",
+      "id": "work_models__vision_images"
+    },
+    {
+      "from": "work_models",
+      "to": "camera",
+      "label": "registers",
+      "id": "work_models__camera"
+    },
+    {
+      "from": "work_models",
+      "to": "subscription_footer",
+      "label": "footer",
+      "id": "work_models__subscription_footer"
+    },
+    {
+      "from": "work_models",
+      "to": "extension_scout",
+      "label": "scout",
+      "id": "work_models__extension_scout"
+    },
+    {
+      "from": "work_models",
+      "to": "work_ask_remote",
+      "label": "registers",
+      "id": "work_models__work_ask_remote"
+    },
+    {
+      "from": "work_models",
+      "to": "plan3_catch_up",
+      "label": "catch-up plans",
+      "id": "work_models__plan3_catch_up"
+    },
+    {
+      "from": "work_models",
+      "to": "plan3",
+      "label": "plan list, model picker",
+      "id": "work_models__plan3"
+    },
+    {
+      "from": "work_models",
+      "to": "settings_files",
+      "label": "settings",
+      "id": "work_models__settings_files"
+    },
+    {
+      "from": "jev_tools",
+      "to": "openrouter",
+      "label": "classifies",
+      "id": "jev_tools__openrouter"
+    },
+    {
+      "from": "vision_images",
+      "to": "openrouter",
+      "label": "models",
+      "id": "vision_images__openrouter"
+    },
+    {
+      "from": "advisor_model",
+      "to": "plan3",
+      "label": "chooseAdvisors",
+      "id": "advisor_model__plan3"
+    },
+    {
+      "from": "advisor_model",
+      "to": "pi_subagents",
+      "label": "oracle model",
+      "id": "advisor_model__pi_subagents"
+    }
+  ],
+  "notes": []
+}

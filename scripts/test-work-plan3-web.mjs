@@ -99,6 +99,12 @@ assert.equal(mirror.snapshot().length, 4, "same-millisecond messages keep indepe
 assert.equal(mirror.snapshot().at(-1).text, "Same-millisecond second reply");
 chatHooks.get("message_end")({ message: { role: "assistant", timestamp: 3, content: [{ type: "text", text: "x".repeat(70_000) }] } });
 assert(mirror.snapshot().at(-1).truncated);
+const toolTurn = { role: "assistant", timestamp: 3.5, content: [{ type: "thinking", thinking: "Plan the edit" }, { type: "toolCall", id: "call_1", name: "edit", arguments: { path: "C:/a.ts", edits: [] } }] };
+chatHooks.get("message_start")({ message: toolTurn }); chatHooks.get("message_end")({ message: toolTurn });
+chatHooks.get("message_end")({ message: { role: "toolResult", toolCallId: "call_1", toolName: "edit", content: [{ type: "text", text: "Edited" }], isError: true } });
+const blocks = mirror.snapshot().at(-1).blocks;
+assert.deepEqual(blocks.map(block => block.type === "tool" ? [block.title, block.result, block.error] : [block.type, block.text]), [["thinking", "Plan the edit"], ["edit C:/a.ts", "Edited", true]], "thinking and tool calls become collapsed blocks; the result joins its call");
+assert.equal(mirror.snapshot().at(-1).text, "");
 for (let timestamp = 4; timestamp < 110; timestamp++) chatHooks.get("message_end")({ message: { role: "user", timestamp, content: "recent" } });
 assert.equal(mirror.snapshot().length, 100);
 const { emptyDiagram, applyDiagramOperations, diagramChatMessage } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");

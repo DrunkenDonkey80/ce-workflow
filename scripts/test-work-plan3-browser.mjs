@@ -75,6 +75,8 @@ try {
  await browser("set", "viewport", "1280", "800");
  await browser("focus", "#splitter"); await browser("press", "Home");
  await browser("click", "#zoom-fit");
+ // The compact layout may fit at mid zoom; zoom out to the overview band explicitly.
+ for (let i = 0; i < 6 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "far"; i++) await browser("click", "#zoom-out");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "far");
  assert.equal(await evaluate("document.querySelectorAll(\"[data-node]\").length"), sample.nodes.filter(node => !node.parent).length);
  for (let i = 0; i < 3; i++) await browser("click", "#zoom-in");
@@ -99,7 +101,9 @@ try {
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); await rm(pasted);
  await browser("fill", "#message-input", "");
- await browser("focus", "#diagram"); await browser("press", "+"); await browser("press", "+"); await browser("press", "+");
+ await browser("focus", "#diagram");
+ // The fit scale depends on box sizes, so zoom until the near band rather than a fixed number of steps.
+ for (let i = 0; i < 8 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "near"; i++) await browser("press", "+");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
  assert(await evaluate("document.getElementById(\"diagram\").textContent.includes(\"POST /uploads\")"));
  const beforePan = await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")");
@@ -116,25 +120,31 @@ try {
  assert.equal(await evaluate("document.querySelector(\"[data-node=web_client] path\").getAttribute(\"d\")"), strokeBefore, "fixed seeds keep redraw strokes stable");
  const nodePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
  assert.equal(await evaluate(`document.elementFromPoint(${nodePoint.x}, ${nodePoint.y})?.closest("[data-node]")?.getAttribute("data-node")`), "web_client", "drag must hit the actual visible node");
- await browser("mouse", "move", String(nodePoint.x), String(nodePoint.y)); await browser("mouse", "down", "left");
- await browser("mouse", "move", String(nodePoint.x + 30), String(nodePoint.y + 20)); await browser("mouse", "up", "left");
+ // A plain drag on a box pans; only Shift+drag (CDP modifier 8, agent-browser has no held keys) moves it.
+ const shiftDrag = (from, modifiers = 8) => withPageCdp(server.origin, async send => { for (const [type, at, buttons] of [["mouseMoved", from, 0], ["mousePressed", from, 1], ["mouseMoved", { x: from.x + 15, y: from.y - 10 }, 1], ["mouseMoved", { x: from.x + 30, y: from.y - 20 }, 1], ["mouseReleased", { x: from.x + 30, y: from.y - 20 }, 0]]) await send("Input.dispatchMouseEvent", { ...at, type, modifiers, buttons, ...(type === "mouseMoved" ? {} : { button: "left", clickCount: 1 }) }); });
+ const panBox = await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")");
+ // Settle first: the agent-browser drag just above and this fresh CDP input connection can race (seen 1 in ~10 runs).
+ await new Promise(done => setTimeout(done, 300)); await shiftDrag(nodePoint, 0); await new Promise(done => setTimeout(done, 300));
+ assert.equal(edits.length, 0, "plain drag never moves a box"); assert.notEqual(await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")"), panBox, "plain drag on a box pans");
+ const movePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
+ await shiftDrag(movePoint);
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"2\"");
  assert.equal(edits.length, 1); assert.equal(edits[0].id, "web_client"); assert.equal(edits[0].expectedRevision, 1);
  assert(Number.isFinite(diagram.nodes.find(node => node.id === "web_client").x));
  const savedPosition = { ...diagram.nodes.find(node => node.id === "web_client") }; diagram.revision++;
- const stalePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
- await browser("mouse", "move", String(stalePoint.x), String(stalePoint.y)); await browser("mouse", "down", "left");
- await browser("mouse", "move", String(stalePoint.x + 30), String(stalePoint.y + 20)); await browser("mouse", "up", "left");
+ // Grab the header: the zoom controls may cover the middle of a box near the bottom edge.
+ const stalePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + 12) }; })()");
+ await shiftDrag(stalePoint);
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"3\"");
  assert.equal(edits.length, 1); assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition);
  assert(await evaluate("document.getElementById(\"notice\").textContent.includes(\"Positions were not saved\")"));
  await browser("press", "Escape");
- await browser("click", "#pin-note"); await browser("click", "[data-node=web_client]");
+ await browser("click", "#pin-note"); await browser("focus", "[data-node=web_client]"); await browser("press", "Enter"); // keyboard pin: the box may sit under the zoom bar after the drags
  assert(await evaluate("document.getElementById(\"comment-prompt\").open"));
  await browser("fill", "#comment-text", "Check <img src=x onerror=alert(1)> upload limits"); await browser("click", "#comment-save");
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"4\"");
  assert.equal(comments[0].element, "web_client"); assert.equal(diagram.notes.at(-1).target, "web_client");
- await browser("hover", "[data-note=note_4]");
+ await browser("focus", "[data-note=note_4]"); // focus shows the same card; the note may sit under the zoom bar
  assert(await evaluate("document.getElementById(\"hover-card\").textContent.includes(\"upload limits\")"));
  await browser("press", "Escape");
  await browser("click", "#pin-note");
@@ -148,7 +158,9 @@ try {
  await browser("fill", "#comment-text", "Check CDN invalidation"); await browser("click", "#comment-save");
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"6\"");
  assert.equal(comments[2].element, "cdn__web_client"); assert.equal(diagram.notes.at(-1).target, "cdn__web_client");
- await browser("click", "#zoom-fit"); await browser("hover", "[data-node=backend]");
+ await browser("click", "#zoom-fit");
+ for (let i = 0; i < 6 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "far"; i++) await browser("click", "#zoom-out");
+ await browser("hover", "[data-node=backend]");
  assert(await evaluate("document.getElementById(\"hover-card\").textContent.includes(\"Multipart above 100 MB\")"), "collapsed groups reveal descendant comments");
  await browser("press", "Escape");
  for (let i = 0; i < 6; i++) await browser("click", "#zoom-in");
@@ -158,6 +170,18 @@ try {
  await browser("reload"); await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"6\"");
  assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition, "saved drag survives the full snapshot after reload");
  assert.equal(await evaluate("document.querySelectorAll(\"[data-note]\").length"), 6, "saved notes survive reload");
+ await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
+ // Search: Ctrl+F focuses it, matches stay lit, Enter centers the next match (brings the box out from under the zoom bar).
+ await browser("focus", "#diagram"); await browser("press", "Control+f"); assert.equal(await evaluate("document.activeElement.id"), "search");
+ await browser("fill", "#search", "web client"); assert(await evaluate("document.getElementById(\"diagram\").classList.contains(\"searching\") && document.querySelector(\"[data-node=web_client]\").classList.contains(\"match\") && !document.querySelector(\"[data-node=worker]\").classList.contains(\"match\")"));
+ await browser("press", "Enter"); await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById(\"diagram\").classList.contains(\"searching\")"), false);
+ // Right-click a box: composer gets "note @id: ", Enter saves it as a pinned note instead of a chat message.
+ const notePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + 12) }; })()");
+ await withPageCdp(server.origin, async send => { for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { ...notePoint, type, ...(type === "mouseMoved" ? {} : { button: "right", buttons: type === "mousePressed" ? 2 : 0, clickCount: 1 }) }); });
+ assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "note @web_client: ");
+ const messagesBeforeNote = messages.length; await browser("keyboard", "type", "retry budget"); await browser("press", "Enter");
+ await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"7\"");
+ assert.equal(comments.at(-1).element, "web_client"); assert.equal(comments.at(-1).text, "retry budget"); assert.equal(messages.length, messagesBeforeNote, "notes do not become chat messages");
  await withPageCdp(server.origin, send => send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] }));
  assert(await evaluate("matchMedia(\"(prefers-reduced-motion: reduce)\").matches"));
  assert.equal(await evaluate("getComputedStyle(document.getElementById(\"diagram\")).animationDuration"), "0s");
@@ -171,6 +195,8 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"complete.\")");
  assert.equal(await evaluate("document.querySelectorAll(\"#messages [data-id=assistant_1]\").length"), 1, "stream updates reuse their row");
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
+  // Search Enter centers the box, so the click point is clear of the zoom bar; Escape clears the search.
+ await browser("fill", "#search", "web_client"); await browser("press", "Enter"); await browser("press", "Escape");
  const mentionPoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
  await evaluate("window.mentionEvents = []; for (const name of [\"pointerdown\", \"click\"]) document.addEventListener(name, event => window.mentionEvents.push({ name, trusted: event.isTrusted, ctrl: event.ctrlKey, node: event.target.closest(\"[data-node]\")?.dataset.node }), true)");
  const revisionBeforeMention = diagram.revision, movesBeforeMention = edits.length;
@@ -223,6 +249,12 @@ try {
  activity.tools[0] = { ...activity.tools[0], state: "error", result: "Read failed", durationMs: 100 }; activity.compacting = false; activity.error = "A safe error"; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"activity\").textContent.includes(\"Read failed\")");
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), true, "tool updates preserve disclosure state");
+ // Sending from a scrolled-up chat jumps to the bottom and follows the echoed message.
+ for (let i = 0; i < 30; i++) { const row = { id: "filler_" + i, role: "assistant", text: "Filler line " + i, streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
+ await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=filler_29]\") !== null");
+ await evaluate("document.getElementById(\"messages\").scrollTop = 0");
+ await browser("fill", "#message-input", "Scroll me down"); await browser("click", "#send"); await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Scroll me down\")");
+ assert(await evaluate("(() => { const list = document.getElementById(\"messages\"); return list.scrollHeight - list.scrollTop - list.clientHeight < 48; })()"), "send scrolls the chat to the newest message");
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
