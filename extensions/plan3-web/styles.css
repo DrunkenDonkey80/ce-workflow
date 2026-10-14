@@ -23,7 +23,16 @@ h2 { font-size: 15px; font-weight: 600; }
 #commands { display: flex; gap: 6px; flex-wrap: wrap; font-size: 13px; }
 .notice { padding: 8px 16px; background: var(--changed); font-size: 13px; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--chat-width); flex: 1; min-height: 0; }
-.canvas { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); }
+.left-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.left-tabs { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.left-tabs [role=tablist] { display: flex; gap: 4px; margin-right: auto; }
+.left-tabs [role=tab] { border-color: transparent; }
+.left-tabs [role=tab][aria-selected=true] { border-color: var(--ink); }
+#narrow-left[aria-pressed=true] { border-color: var(--focus); }
+.files { flex: 1; min-height: 0; overflow: auto; padding: 12px 16px; }
+.files-empty { color: #495057; font-size: 13px; }
+.expand-left { align-self: start; margin: 8px 4px; padding: 6px 8px; }
+.canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); }
 #diagram { width: 100%; height: 100%; display: block; touch-action: none; }
 #diagram text { font-family: Virgil, "Segoe Print", cursive; fill: var(--ink); }
 .node-label { font-size: 16px; }
@@ -66,6 +75,13 @@ h2 { font-size: 15px; font-weight: 600; }
 .dialog-purpose { color: #495057; font-size: 13px; margin: 6px 0 16px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 #comment-error { margin-top: 8px; color: #c92a2a; font-size: 13px; }
+@media (min-width: 900px) {
+ /* R7: narrow gives the panel the chat's width so the chat widens; collapsed leaves only the >> button. */
+ .workspace[data-left=narrow] { grid-template-columns: var(--chat-width) 12px minmax(0, 1fr); }
+ .workspace[data-left=collapsed] { grid-template-columns: auto minmax(0, 1fr); }
+ .workspace[data-left=collapsed] > .left-panel, .workspace[data-left=collapsed] > .splitter { display: none; }
+}
+@media (max-width: 899px) { .expand-left, #narrow-left, #collapse-left { display: none; } }
 .splitter { background: var(--chat); cursor: col-resize; border-inline: 1px solid var(--line); touch-action: none; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }

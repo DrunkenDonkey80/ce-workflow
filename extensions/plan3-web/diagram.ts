@@ -272,5 +272,5 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  return { search, render(data) {
   // A same-revision echo (save response, then the SSE broadcast) must not cancel a drag in progress.
   if (gesture && data.revision === diagram?.revision) { diagram = data; return; }
-  gesture = null; diagram = data; draw(); if (first && data.nodes.length) { first = false; fit(); } }, fit, zoom };
+  gesture = null; diagram = data; draw(); if (first && data.nodes.length && svg.clientWidth) { first = false; fit(); } }, fit, zoom };
 }

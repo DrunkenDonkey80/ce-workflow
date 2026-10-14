@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T12:01:30.083Z
+updated: 2026-10-14T12:08:51.539Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -208,7 +208,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 4: Tabbed browser workspace [code]
 
-- [ ] **P4-01** Desktop layout: chat right; left tabs Files and Diagram; collapse states full, narrowed to chat width, and `>>` (R7).
+- [x] **P4-01** Desktop layout: the left panel has Files and Diagram tabs (ARIA tablist, arrow keys, Files is a placeholder until P4-03) and the chat stays on the right. R7 collapse states: full; narrow (the panel takes the chat width, the chat widens, splitter direction follows); collapsed to a >> button (the chat takes the width). Focus moves between << and >>, the state and tab persist in localStorage, and the rules apply only at ≥900 px. A diagram first drawn while hidden fits when its tab is shown.
 - [ ] **P4-02** Files API (D11, D21): tree, changed marks, content via captureSource, `git diff HEAD` with secret checks on the diff; refresh after tool runs.
   - Tests: staged-only, unstaged, untracked, deleted, renamed, unborn repo, removed secret line, traversal and oversized diff.
 - [ ] **P4-03** Files tab UI: tree beside viewer on desktop, tree above viewer on mobile; diff colouring per D10; keyboard navigable.
@@ -252,7 +252,7 @@ Commands (existing; referenced by steps):
 
 ## Resume context
 
-Executing. P3-01..P3-04 done. Next: P3-06 two-process registry tests (registry already has the cross-process lock from P3-03), then P3-07 revocation closes streams within 5 s, P3-05 session records.
+Executing. Phase 3 (remote access) complete: P3-01..P3-07 committed locally. Next: P4-01. Keep the bytes-mode hunk filter for plan3.ts/test-work-plan3.mjs (other session's hunks). The test harness keeps one handler per pi.on event (last wins), so drive state through pi.events (ask:pending/closed) in test-work-plan3.mjs.
 
 ## Amendments
 

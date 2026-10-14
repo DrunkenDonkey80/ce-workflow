@@ -20,8 +20,19 @@
  </header>
  <p id="notice" class="notice" role="status" hidden></p>
  <p id="waiting" class="notice" role="status" hidden></p>
- <main id="workspace" class="workspace">
-  <section id="canvas" class="canvas" aria-label="Diagram workspace">
+ <main id="workspace" class="workspace" data-left="full">
+  <button id="expand-left" class="expand-left" type="button" aria-label="Show files and diagram" aria-controls="left-panel" aria-expanded="false" hidden>&gt;&gt;</button>
+  <section id="left-panel" class="left-panel" aria-label="Project">
+  <div class="left-tabs">
+   <div role="tablist" aria-label="Project views">
+    <button id="tab-files" type="button" role="tab" aria-selected="false" aria-controls="files" tabindex="-1">Files</button>
+    <button id="tab-diagram" type="button" role="tab" aria-selected="true" aria-controls="canvas">Diagram</button>
+   </div>
+   <button id="narrow-left" type="button" aria-pressed="false" title="Narrow this panel to the chat's width">Narrow</button>
+   <button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button>
+  </div>
+  <section id="files" class="files" role="tabpanel" aria-labelledby="tab-files" hidden><p class="files-empty">Project files appear here.</p></section>
+  <section id="canvas" class="canvas" role="tabpanel" aria-labelledby="tab-diagram" aria-label="Diagram workspace">
    <svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Architecture diagram" tabindex="0"></svg>
    <p id="empty-diagram" class="empty-diagram">No diagram yet. Ask in the chat, for example: draw the main components.</p>
    <div class="search-box"><input id="search" type="search" placeholder="Search (Ctrl+F)" aria-label="Search the diagram; Enter jumps to the next match"><output id="search-count" aria-live="polite"></output></div>
@@ -33,6 +44,7 @@
     <button id="pin-note" type="button" aria-pressed="false">Add note</button>
    </div>
    <div id="hover-card" class="hover-card" role="tooltip" tabindex="0" hidden></div>
+  </section>
   </section>
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
   <aside id="chat" class="chat" aria-label="Live Pi session">

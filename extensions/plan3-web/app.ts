@@ -62,6 +62,35 @@ function renderActivity() {
  if (data.tools?.length) root.append(make("p", "Text-only excerpts; custom tool renderers and images stay in Pi.", "activity-caution"));
 }
 
+// R7: full split, narrowed to the chat's width, or collapsed to >>; the choice and tab survive reloads.
+const workspace = $("workspace"), remembered = (key, values, fallback) => { try { const value = localStorage.getItem(key); return values.includes(value) ? value : fallback; } catch { return fallback; } };
+const remember = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
+function setLeft(mode) {
+ workspace.dataset.left = mode; remember("plan3-left", mode);
+ $("expand-left").hidden = mode !== "collapsed";
+ $("narrow-left").setAttribute("aria-pressed", String(mode === "narrow")); $("narrow-left").textContent = mode === "narrow" ? "Widen" : "Narrow";
+ for (const id of ["expand-left", "collapse-left"]) $(id).setAttribute("aria-expanded", String(mode !== "collapsed"));
+}
+function setTab(name) {
+ for (const [tab, panel] of [["tab-files", "files"], ["tab-diagram", "canvas"]]) {
+  const selected = panel === (name === "files" ? "files" : "canvas");
+  $(tab).setAttribute("aria-selected", String(selected)); $(tab).tabIndex = selected ? 0 : -1; $(panel).hidden = !selected;
+ }
+ remember("plan3-tab", name);
+ // A diagram first drawn while hidden has not been fitted yet.
+ if (name === "diagram" && state.diagram) diagramView.render(state.diagram);
+}
+$("narrow-left").addEventListener("click", () => setLeft(workspace.dataset.left === "narrow" ? "full" : "narrow"));
+$("collapse-left").addEventListener("click", () => { setLeft("collapsed"); $("expand-left").focus(); });
+$("expand-left").addEventListener("click", () => { setLeft("full"); $("collapse-left").focus(); });
+$("tab-files").addEventListener("click", () => setTab("files"));
+$("tab-diagram").addEventListener("click", () => setTab("diagram"));
+for (const id of ["tab-files", "tab-diagram"]) $(id).addEventListener("keydown", event => {
+ if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+ event.preventDefault(); const next = id === "tab-files" ? "diagram" : "files"; setTab(next); $(`tab-${next}`).focus();
+});
+setLeft(remembered("plan3-left", ["full", "narrow", "collapsed"], "full"));
+
 const splitter = $("splitter"); let resize;
 function resizeChat(width) {
  const value = Math.max(280, Math.min(640, width));
@@ -73,11 +102,13 @@ splitter.addEventListener("pointerdown", event => {
  resize = { x: event.clientX, width: Number(splitter.getAttribute("aria-valuenow")) };
  splitter.setPointerCapture(event.pointerId); event.preventDefault();
 });
-splitter.addEventListener("pointermove", event => { if (resize) resizeChat(resize.width + resize.x - event.clientX); });
+// In the narrow state the shared width belongs to the left panel, so dragging runs the other way.
+const direction = () => workspace.dataset.left === "narrow" ? -1 : 1;
+splitter.addEventListener("pointermove", event => { if (resize) resizeChat(resize.width + (resize.x - event.clientX) * direction()); });
 for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) splitter.addEventListener(name, () => { resize = null; });
 splitter.addEventListener("keydown", event => {
  const value = Number(splitter.getAttribute("aria-valuenow"));
- const next = { ArrowLeft: value + 10, ArrowRight: value - 10, Home: 280, End: 640 }[event.key];
+ const next = { ArrowLeft: value + 10 * direction(), ArrowRight: value - 10 * direction(), Home: 280, End: 640 }[event.key];
  if (next === undefined) return;
  event.preventDefault(); resizeChat(next);
 });
@@ -182,6 +213,7 @@ window.addEventListener("keydown", event => { if (event.key === "Escape") { $("h
 $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
+setTab(remembered("plan3-tab", ["files", "diagram"], "diagram"));
 $("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
 $("search").addEventListener("keydown", event => {
  if (event.key === "Enter") { event.preventDefault(); diagramView.search($("search").value, true); }

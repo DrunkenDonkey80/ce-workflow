@@ -73,6 +73,23 @@ try {
  assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 280);
  await browser("press", "End");
  assert.equal(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().width"), 640);
+ // R7 collapse states: narrow gives the panel the chat's width; collapsed leaves only >>.
+ const width = id => evaluate(`Math.round(document.getElementById(${JSON.stringify(id)}).getBoundingClientRect().width)`);
+ await browser("click", "#narrow-left");
+ assert.deepEqual([await width("left-panel"), await width("chat")], [640, 628]);
+ await browser("focus", "#splitter"); await browser("press", "ArrowLeft");
+ assert.equal(await width("left-panel"), 630, "in narrow mode the arrows move the splitter the way they point");
+ await browser("press", "End"); await browser("click", "#narrow-left"); assert.equal(await width("chat"), 640);
+ await browser("click", "#collapse-left");
+ assert.equal(await evaluate("document.activeElement.id"), "expand-left");
+ assert.equal(await evaluate("document.getElementById(\"left-panel\").getClientRects().length"), 0);
+ assert(await width("chat") > 1200, "collapsed: chat takes the width");
+ assert.equal(await evaluate("localStorage.getItem(\"plan3-left\")"), "collapsed");
+ await browser("click", "#expand-left"); assert.equal(await width("chat"), 640);
+ await browser("click", "#tab-files");
+ assert.deepEqual(await evaluate("[document.getElementById(\"files\").hidden, document.getElementById(\"canvas\").hidden, document.getElementById(\"tab-files\").getAttribute(\"aria-selected\")]"), [false, true, "true"]);
+ await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-diagram");
+ assert.equal(await evaluate("document.getElementById(\"canvas\").hidden"), false);
  await browser("set", "viewport", "760", "800");
  assert(await evaluate("document.getElementById(\"chat\").getBoundingClientRect().top >= document.getElementById(\"canvas\").getBoundingClientRect().bottom"));
  await browser("set", "viewport", "1280", "800");
@@ -166,7 +183,7 @@ try {
  await browser("hover", "[data-node=backend]");
  assert(await evaluate("document.getElementById(\"hover-card\").textContent.includes(\"Multipart above 100 MB\")"), "collapsed groups reveal descendant comments");
  await browser("press", "Escape");
- for (let i = 0; i < 6; i++) await browser("click", "#zoom-in");
+ for (let i = 0; i < 10 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "near"; i++) await browser("click", "#zoom-in");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
  assert(await evaluate("document.querySelectorAll(\"foreignObject .note-text\").length >= 6"));
  assert.equal(await evaluate("document.querySelector(\"foreignObject img\")"), null, "note markup stays inert text");
