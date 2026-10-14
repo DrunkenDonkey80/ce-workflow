@@ -275,4 +275,33 @@ try {
 mirror.reset(); activityMirror.reset();
 assert.deepEqual(mirror.snapshot(), []); assert.deepEqual(activityMirror.snapshot().tools, []);
 assert.equal(activityMirror.snapshot().error, ""); assert.equal(activityMirror.snapshot().compacting, false);
-console.log("ok - plan3 web security, Stop, dialog races, bounded activity and reconnect resync");
+// Session credentials survive a new runtime without entering the conversation.
+const { mkdtemp, readFile, writeFile, stat, rm } = await import("node:fs/promises");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { randomUUID } = await import("node:crypto");
+const { loadShareRecord, saveSharePort } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
+const credentialDir = await mkdtemp(join(tmpdir(), "plan3-remote-test-"));
+let persistent, occupied, fallback;
+try {
+ const id = randomUUID(), record = await loadShareRecord(id, credentialDir);
+ assert.equal(record.port, 0);
+ await assert.rejects(loadShareRecord("../../escape", credentialDir));
+ assert.deepEqual(await loadShareRecord(id, credentialDir), record);
+ if (process.platform !== "win32") assert.equal((await stat(join(credentialDir, `${id}.json`))).mode & 0o077, 0);
+ persistent = await createPlan3Web({ token: record.token, snapshot: () => ({}) });
+ await saveSharePort(record, persistent.port, credentialDir);
+ const saved = await loadShareRecord(id, credentialDir);
+ assert.equal(saved.port, persistent.port);
+ await persistent.close();
+ persistent = await createPlan3Web({ token: saved.token, port: saved.port, snapshot: () => ({}) });
+ assert.equal(persistent.port, saved.port);
+ assert.equal(persistent.portChanged, false);
+ assert(new URL(persistent.url({ kind: "product" })).searchParams.get("token") === record.token);
+ occupied = persistent;
+ fallback = await createPlan3Web({ token: saved.token, port: saved.port, snapshot: () => ({}) });
+ assert.notEqual(fallback.port, saved.port); assert.equal(fallback.portChanged, true);
+ await writeFile(join(credentialDir, `${id}.json`), "{}");
+ await assert.rejects(loadShareRecord(id, credentialDir), /Invalid/);
+} finally { await fallback?.close(); await occupied?.close(); await persistent?.close(); await rm(credentialDir, { recursive: true, force: true }); }
+console.log("ok - plan3 web security, Stop, dialog races, bounded activity, reconnect and persisted port/token");

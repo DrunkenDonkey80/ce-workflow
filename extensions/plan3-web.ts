@@ -12,6 +12,8 @@ import { bindListDialogBridge, listDialogResponse } from "./work-dialogs.ts";
 
 export type WebTarget = { kind: "product" } | { kind: "plan"; id: string };
 type Options = {
+	port?: number;
+	token?: string;
 	snapshot: (target: WebTarget) => unknown | Promise<unknown>;
 	post?: (endpoint: string, body: Record<string, unknown>) => unknown | Promise<unknown>;
 };
@@ -68,7 +70,8 @@ function read(req: IncomingMessage, limit: number): Promise<Buffer> {
 
 /** One instance per Pi session; the command owner reuses it and closes it on session_shutdown. */
 export async function createPlan3Web(options: Options) {
-	const token = randomBytes(32).toString("hex"), clients = new Map<ServerResponse, { ready: boolean; frames: string[]; bytes: number }>();
+	const token = options.token ?? randomBytes(32).toString("hex"), clients = new Map<ServerResponse, { ready: boolean; frames: string[]; bytes: number }>();
+	if (!/^[a-f0-9]{64}$/.test(token)) throw new Error("Invalid workspace token.");
 	let origin = "", sequence = 0, closed = false;
 	const valid = (value: unknown) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value) && timingSafeEqual(Buffer.from(value), Buffer.from(token));
 	const json = (res: ServerResponse, status: number, value: unknown) => {
@@ -144,10 +147,21 @@ export async function createPlan3Web(options: Options) {
 		});
 	});
 	server.requestTimeout = 15_000; server.headersTimeout = 10_000;
-	await new Promise<void>((resolve, reject) => {
-		server.once("error", reject);
-		server.listen(0, "127.0.0.1", () => { server.off("error", reject); resolve(); });
+	const listen = (port: number) => new Promise<void>((resolve, reject) => {
+		const ready = () => { server.off("error", failed); resolve(); };
+		const failed = (error: Error) => { server.off("listening", ready); reject(error); };
+		server.once("error", failed); server.once("listening", ready);
+		server.listen(port, "127.0.0.1");
 	});
+	let portChanged = false;
+	for (let attempt = 0; ; attempt++) {
+		try { await listen(options.port ?? 0); break; }
+		catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE" || !options.port) throw error;
+			if (attempt >= 10) { await listen(0); portChanged = true; break; }
+			await new Promise(done => setTimeout(done, 50));
+		}
+	}
 	const address = server.address();
 	if (!address || typeof address === "string") throw new Error("Workspace did not bind a TCP port.");
 	origin = `http://127.0.0.1:${address.port}`;
@@ -156,6 +170,8 @@ export async function createPlan3Web(options: Options) {
 	let closing: Promise<void> | undefined;
 	return {
 		origin,
+		port: address.port,
+		portChanged,
 		url: (target: WebTarget) => `${origin}/?token=${token}&target=${target.kind === "product" ? "product" : target.id}`,
 		publish(event: string, value: unknown) {
 			if (closed) return;

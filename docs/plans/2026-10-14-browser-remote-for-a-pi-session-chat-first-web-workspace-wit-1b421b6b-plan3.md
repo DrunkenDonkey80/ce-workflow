@@ -2,8 +2,9 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T10:47:26.636Z
+updated: 2026-10-14T10:48:54.350Z
 reviewed: 2026-10-14
+started: 2026-10-14T10:47:38.068Z
 ---
 
 # Browser remote for a Pi session: chat-first web workspace with diagram panel and Tailscale access
@@ -183,7 +184,7 @@ Commands (existing; referenced by steps):
 
 ### Phase 2: Session sharing that survives reload [code]
 
-- [ ] **P2-01** Add plan3-remote.ts share record (D6) and port policy (D7) with C-WEB tests for create, reuse, taken port and file permissions.
+- [x] **P2-01** Added external credential records and saved-port/token binding with bounded retry and port-conflict fallback; reuse, corrupt-state, containment and Unix file-mode checks covered.
 - [ ] **P2-02** Make the server session-wide: snapshot and events without required target, plain chat, diagram context only with mentions or notes.
 - [ ] **P2-03** Run browser slash commands through sendUserMessage with expandPromptTemplates per D17, never awaited; built-ins report "terminal only".
 - [ ] **P2-04** Lifecycle on shutdown and start reasons (D21): re-share from the entry; keep the mapping on reload, remove it otherwise; drop dead session_switch.
