@@ -93,6 +93,12 @@ export async function createPlan3Web(options: Options) {
 		["/vendor/rough.js", ["vendor/rough.ts", "text/javascript; charset=utf-8"]],
 		["/vendor/Virgil.woff2", ["vendor/Virgil.woff2", "font/woff2"]],
 	]);
+	// Changes when any served asset or this server changes; an open page reloads itself after /reload installs new code.
+	const buildHash = createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url)));
+	for (const file of new Set(Array.from(assets.values(), ([file]) => file))) {
+		try { buildHash.update(readFileSync(fileURLToPath(new URL(`./plan3-web/${file}`, import.meta.url)))); } catch { /* A missing asset is reported when requested. */ }
+	}
+	const build = buildHash.digest("hex").slice(0, 12);
 	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/command", "/api/stop"]);
 	const server = createServer((req, res) => {
 		res.setHeader("Cache-Control", "no-store");
@@ -115,7 +121,7 @@ export async function createPlan3Web(options: Options) {
 				const connection = { ready: false, frames: [] as string[], bytes: 0 };
 				clients.set(res, connection); res.on("close", () => clients.delete(res));
 				// Subscribe before an async snapshot so changes during initial load cannot disappear.
-				const snapshot = await options.snapshot(target), initial = frame("snapshot", snapshot, fence);
+				const snapshot = await options.snapshot(target), initial = `retry: 1000\n${frame("snapshot", Object.assign({}, snapshot, { build }), fence)}`;
 				if (closed || res.destroyed) return;
 				if (Buffer.byteLength(initial) > 4_000_000) throw new WebError(413, "Workspace snapshot too large.");
 				res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive", "X-Accel-Buffering": "no" });
@@ -172,6 +178,7 @@ export async function createPlan3Web(options: Options) {
 		origin,
 		port: address.port,
 		portChanged,
+		build,
 		url: (target?: WebTarget) => `${origin}/?token=${token}${target ? `&target=${target.kind === "product" ? "product" : target.id}` : ""}`,
 		publish(event: string, value: unknown) {
 			if (closed) return;

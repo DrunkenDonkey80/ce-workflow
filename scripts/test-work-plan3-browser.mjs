@@ -41,7 +41,7 @@ const ask = value => { const askId = randomUUID(); events.emit("ask:pending", { 
 const server = await createPlan3Web({ snapshot: target => ({ target, diagram, plan: { id: "12345678", title: sample.title, status: "draft" }, activity, chat: [...chatRows.values()], dialogs: dialogs.snapshot() }), post: (endpoint, body) => {
  assert.equal(body.target, "12345678");
  if (endpoint === "/api/answer") return dialogs.answer(body);
- if (endpoint === "/api/command") { commands.push(body.command); return { accepted: true }; }
+ if (endpoint === "/api/message" && body.text.startsWith("/")) { commands.push(body.text); return { accepted: true }; }
  if (endpoint === "/api/message") {
   if (rejectMessage) { rejectMessage = false; throw new WebError(503, "Session temporarily unavailable"); }
   messages.push(body); const row = { id: "user_" + messages.length, role: "user", text: body.text, at: new Date().toISOString(), streaming: false };
@@ -238,7 +238,7 @@ try {
  assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
  for (const command of ["resolve", "ideas", "review", "finish", "resume"]) { await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
- assert.deepEqual(commands, ["resolve", "ideas", "review", "finish", "resume"]);
+ assert.deepEqual(commands, ["/plan3 resolve 12345678", "/plan3 ideas 12345678", "/plan3 review 12345678", "/plan3 finish 12345678", "/resume3 12345678"]);
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);

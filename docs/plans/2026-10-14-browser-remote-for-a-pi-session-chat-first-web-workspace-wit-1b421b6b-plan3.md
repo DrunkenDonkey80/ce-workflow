@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-14
-updated: 2026-10-14T10:56:42.380Z
+updated: 2026-10-14T11:05:36.988Z
 reviewed: 2026-10-14
 started: 2026-10-14T10:47:38.068Z
 ---
@@ -189,7 +189,7 @@ Commands (existing; referenced by steps):
 - [x] **P2-03** Typed slash commands and plan-menu buttons dispatch through unawaited sendUserMessage with expansion enabled; documented Pi built-ins return terminal-only errors. Legacy command endpoint remains until the UI/API migration is finished.
 - [x] **P2-04** Sharing persists a boolean-only entry; reload and resume restore the saved local link using a fresh session context. Shutdown releases the server; new sessions get new credentials and the nonexistent session_switch dependency is removed.
 - [x] **P2-05** /wo share and the Utilities row toggle per-session sharing with persisted on/off state; while live, a red bold [SHARED] status shows; diagram/architecture opens share locally.
-- [ ] **P2-06** Page reconnect: "Pi is reloading…" banner, retry with backoff, reload the page when the build fingerprint changed.
+- [x] **P2-06** Snapshots carry a 12-hex build fingerprint and SSE retry 1000; the page reconnects itself with 1–15 s backoff after HTTP errors, shows "Pi is reloading… reconnecting", and reloads when the build changed.
 - [ ] **P2-07** Show "Pi is waiting for a terminal dialog: <title>" from ui_prompt_start until ui_prompt_end.
 - [ ] **P2-09** Slim check-in snapshot per D20: last 20 rows, block titles with body on expand, pending dialogs first, Show earlier paging; 64 KB budget.
 - [ ] **P2-10** Live stream per D20: chat text deltas, at most 4 updates per second per row, activity sends only changed tool rows; page title cue.

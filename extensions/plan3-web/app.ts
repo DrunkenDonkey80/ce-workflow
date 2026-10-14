@@ -255,14 +255,18 @@ for (const button of $("commands").querySelectorAll("button")) button.addEventLi
 });
 $("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested."); } catch (error) { showNotice(error.message); } });
 
-// Native EventSource reconnects; the server always starts a connection with a fresh full snapshot.
-const events = new EventSource("/api/events?token=" + token + (target ? "&target=" + encodeURIComponent(target) : ""));
+// The server starts every connection with a fresh full snapshot. Native EventSource stops for good on an HTTP error
+// (503 while Pi reloads), so the page reconnects itself with backoff and reloads when the build changed.
+let events: EventSource, build = "", retryDelay = 1000, retryTimer = 0;
+const handlers: [string, (value) => void][] = [];
 function applyUpdate(event: MessageEvent, update) {
  try { update(JSON.parse(event.data)); }
  catch (error) { showNotice("Workspace update failed: " + error.message + ". Reopen from the Pi terminal; your message draft is kept."); }
 }
-function listen(name, update) { events.addEventListener(name, (event: MessageEvent) => applyUpdate(event, update)); }
+function listen(name, update) { handlers.push([name, update]); }
 listen("snapshot", value => {
+ if (build && value.build && value.build !== build) { location.reload(); return; }
+ build ||= value.build ?? ""; retryDelay = 1000;
  if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;
  state.connected = true; state.diagram = value.diagram; state.plan = value.plan; state.activity = value.activity ?? {};
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
@@ -275,9 +279,16 @@ listen("message", row => { chat.set(row.id, row); renderChat(); });
 listen("dialog", value => { promptView.pending(value); renderShell(); });
 listen("dialog_closed", value => { promptView.closed(value.askId); renderShell(); });
 listen("activity", value => { state.activity = value; renderActivity(); renderShell(); });
-events.addEventListener("error", event => {
- if (event instanceof MessageEvent && event.data) { applyUpdate(event, value => showNotice(value.message ?? "Workspace update failed.")); return; }
- state.connected = false; renderShell();
- showNotice("Connection lost. Return to the Pi terminal and reopen the workspace. Your unsent message is still here.");
-});
-window.addEventListener("pagehide", () => events.close());
+function connect() {
+ events = new EventSource("/api/events?token=" + token + (target ? "&target=" + encodeURIComponent(target) : ""));
+ for (const [name, update] of handlers) events.addEventListener(name, (event: MessageEvent) => applyUpdate(event, update));
+ events.addEventListener("error", event => {
+  if (event instanceof MessageEvent && event.data) { applyUpdate(event, value => showNotice(value.message ?? "Workspace update failed.")); return; }
+  state.connected = false; renderShell();
+  showNotice("Pi is reloading… reconnecting. Your unsent message is still here.");
+  if (events.readyState !== EventSource.CLOSED) return;
+  clearTimeout(retryTimer); retryTimer = window.setTimeout(connect, retryDelay); retryDelay = Math.min(retryDelay * 2, 15_000);
+ });
+}
+connect();
+window.addEventListener("pagehide", () => { clearTimeout(retryTimer); events.close(); });

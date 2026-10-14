@@ -67,6 +67,8 @@ try {
  const decoder = new TextDecoder();
  const initial = decoder.decode((await reader.read()).value);
  assert.match(initial, /event: snapshot/);
+ assert.match(initial, /^retry: 1000\n/, "browser retries quickly while Pi reloads");
+ assert.match(server.build, /^[a-f0-9]{12}$/); assert(initial.includes(`"build":"${server.build}"`), "page learns the build to reload on change");
  assert.match(initial, /"revision":3/);
  server.publish("diagram", { revision: 4 });
  const next = decoder.decode((await reader.read()).value);
