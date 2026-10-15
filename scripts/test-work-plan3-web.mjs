@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { request as httpRequest } from "node:http";
 import { createJiti } from "jiti";
 const { applyText } = await createJiti(import.meta.url).import("../extensions/plan3-web/stream.ts");
-const { createPlan3Web, checkIn, webTarget, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
+const { createPlan3Web, checkIn, webTarget, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, readLinkedImage } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
 const posted = []; let stopIdle = true, aborts = 0;
 const stopCtx = { isIdle: () => stopIdle, abort: async () => { aborts++; } };
 const server = await createPlan3Web({ snapshot: target => ({ target, revision: 3, title: "Safe <text>" }), post: (endpoint, value) => { posted.push({ endpoint, value }); return endpoint === "/api/stop" ? stopLiveRun(stopCtx) : { ok: true }; } });
@@ -737,3 +737,14 @@ try {
  await assert.rejects(serveAdd(exec, 0), /Invalid/);
 }
 console.log("ok - plan3 web security, Stop, dialog races, bounded activity, reconnect and persisted port/token");
+
+{
+ // Images anywhere on this PC are served (another project's render), except under hidden dot-folders.
+ const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises"), { tmpdir } = await import("node:os"), { join } = await import("node:path");
+ const root = await mkdtemp(join(tmpdir(), "plan3-image-")), png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+ await mkdir(join(root, "other", ".secret"), { recursive: true }); await writeFile(join(root, "other", "front.png"), png); await writeFile(join(root, "other", ".secret", "x.png"), png);
+ assert.equal((await readLinkedImage(join(root, "other", "front.png"), join(root, "project"))).type, "image/png");
+ await assert.rejects(readLinkedImage(join(root, "other", ".secret", "x.png"), join(root, "project")), error => error.status === 403);
+ await rm(root, { recursive: true });
+ console.log("ok - linked images outside the project, hidden folders refused");
+}

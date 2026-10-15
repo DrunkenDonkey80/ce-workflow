@@ -287,6 +287,7 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .mentions { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 dialog { border: 1px solid var(--group); border-radius: 6px; padding: 20px; color: var(--ink); background: var(--chat); width: min(700px, 94vw); max-height: 90dvh; }
 dialog::backdrop { background: rgba(0, 0, 0, .25); }
+#viewer { width: auto; max-width: 96vw; max-height: 96dvh; padding: 4px; cursor: zoom-out; } #viewer img { display: block; max-width: calc(96vw - 10px); max-height: calc(96dvh - 10px); }
 /* D18: a thin stripe of letters when closed; a slide-out list when open. */
 .switcher { position: fixed; z-index: 6; left: 0; top: 0; bottom: 0; width: 36px; display: flex; flex-direction: column; gap: 4px; padding: 6px 4px; background: var(--chat); border-right: 1px solid var(--line); }
 .switcher[data-open=true] { width: 200px; }

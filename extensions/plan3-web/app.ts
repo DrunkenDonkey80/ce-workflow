@@ -442,7 +442,13 @@ $("search").addEventListener("keydown", event => {
 // Ctrl+F searches the diagram instead of the page.
 window.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); $("search").focus(); $("search").select(); } });
 
-const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice, attachTo);
+const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice, attachTo, renderLinks);
+// Image links and thumbnails open full size in the page (a new tab on a home-screen app may lack the pairing cookie).
+document.addEventListener("click", event => {
+ const link = (event.target as HTMLElement).closest?.<HTMLAnchorElement>("a.thumb, a.chat-link"); if (!link || !link.href.includes("/api/image?")) return;
+ event.preventDefault(); const viewer = document.getElementById("viewer") as HTMLDialogElement; (viewer.querySelector("img") as HTMLImageElement).src = link.href; viewer.showModal();
+});
+document.getElementById("viewer").addEventListener("click", () => (document.getElementById("viewer") as HTMLDialogElement).close());
 // Pi-like rows: text stays visible; thinking and each tool call are one collapsed line that expands on click.
 function renderBlocks(box: HTMLElement, row) {
  const opened = new Set([...box.querySelectorAll<HTMLDetailsElement>("details[open]")].map(item => item.dataset.key));
@@ -518,7 +524,7 @@ function renderChat() {
  if (follow) feed.scrollTop = feed.scrollHeight; else if (feed.scrollHeight > feed.clientHeight) $("to-bottom").hidden = false;
 }
 // Image and Markdown paths in chat text become links: images open full size and show as thumbnails
-// (pasted or terminal Alt+V images too); .md opens in the Files tab. The server limits images to the project and temp folder.
+// (pasted or terminal Alt+V images too); .md opens in the Files tab. The server shows any image on this PC outside hidden folders.
 // shortcut: paths with spaces are not detected; quote-aware parsing if that matters.
 const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.(?:png|jpe?g|gif|webp|md)(?![\w-])/gi;
 function renderLinks(target: HTMLElement, text: string) {

@@ -1,6 +1,6 @@
 // Browser-only shared prompt renderer; the server/terminal race owns acceptance.
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, properties = {}, text = undefined) { const item = document.createElement(tag); Object.assign(item, properties); if (text !== undefined) item.textContent = text; return item; }
-export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElement, post, notice, attachTo: (text: HTMLTextAreaElement) => void) {
+export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElement, post, notice, attachTo: (text: HTMLTextAreaElement) => void, links: (target: HTMLElement, text: string) => void) {
  const pending = new Map(), cursors = new Map(); let active, sending = false;
  function remove(id) { pending.delete(id); if (active?.askId === id) { active = null; dialog.close(); } show(); }
  async function answer(payload) {
@@ -73,7 +73,8 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   const questions = ask.questions ?? [ask], readers = [];
   for (const [index, question] of questions.entries()) {
    const section = node("fieldset", { className: "prompt-question" }); section.append(node("legend", {}, question.question));
-   if (question.context) section.append(node("div", { className: "prompt-context" }, question.context));
+   // Image paths in the context or options become links with thumbnails; click opens full size.
+   if (question.context) { const context = node("div", { className: "prompt-context" }); links(context, question.context); section.append(context); }
    const inputs = [];
    for (const option of question.options) {
     const input = node("input", { type: question.allowMultiple ? "checkbox" : "radio", name: "question_" + index, value: option.title }); inputs.push(input);
@@ -81,7 +82,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
     // Tapping the chosen radio again clears it, so the text box can become your own answer.
     else input.addEventListener("click", () => { if (input.dataset.on) input.checked = false; for (const other of inputs) other.dataset.on = other.checked ? "1" : ""; });
     const row = node("label", { className: "prompt-option" }); row.append(input, node("span", {}, option.title));
-    if (option.description) row.append(node("small", { className: "prompt-description" }, option.description)); section.append(row);
+    if (option.description) { const description = node("small", { className: "prompt-description" }); links(description, option.description); row.append(description); } section.append(row);
    }
    // One box like the terminal: with an option chosen it is the comment, with none it is your own answer.
    const freeform = question.allowFreeform || !question.options.length, commented = ask.allowComment && question.options.length > 0;

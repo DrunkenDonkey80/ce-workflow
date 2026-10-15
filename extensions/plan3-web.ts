@@ -82,7 +82,8 @@ export async function readLinkedImage(path: string | null, project?: string) {
 	const real = await realpath(resolve(project ?? "", path)).catch(() => { throw new WebError(404, "Image not found."); });
 	const inside = async (root: string): Promise<string | undefined> => { const rel = relative(await realpath(root), real); return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel.replaceAll("\\", "/") : undefined; };
 	const fromProject = project ? await inside(project).catch(() => undefined) : undefined;
-	if (!(fromProject ? !forbiddenPath.test(fromProject) : await inside(tmpdir()))) throw new WebError(403, "Only project and temp-folder images are shown.");
+	// Any image on this PC (other projects' renders too) for the paired owner; hidden dot-folders (.ssh, .pi) stay closed.
+	if (fromProject ? forbiddenPath.test(fromProject) : /[\\/]\.[^\\/]/.test(real)) throw new WebError(403, "Images in hidden or generated folders are not shown.");
 	if ((await stat(real)).size > IMAGE_BYTES) throw new WebError(413, "Image too large.");
 	const bytes = await readFile(real), kind = IMAGE_KINDS.find(([, test]) => test(bytes));
 	if (!kind) throw new WebError(415, "Not a supported image.");

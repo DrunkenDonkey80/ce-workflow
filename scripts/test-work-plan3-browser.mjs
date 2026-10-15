@@ -653,6 +653,10 @@ try {
   await browser("wait", "#prompt-form .prompt-thumbs .thumb img");
   const promptImage = (await evaluate("document.querySelector('#prompt-form textarea').value")).match(/\S*pi-clipboard-[0-9a-f-]+\.png/)?.[0]; assert(promptImage, "the pasted image path is in the answer");
   assert.equal(await evaluate("document.querySelector('#prompt-form .prompt-thumbs img').naturalWidth"), 1); await rm(promptImage);
+  // Clicking a thumbnail opens the full-size viewer in the page.
+  await evaluate("document.querySelector('#prompt-form .prompt-thumbs .thumb').click()");
+  assert(await evaluate("document.getElementById('viewer').open && document.querySelector('#viewer img').src.includes('/api/image?')"), "thumbnail opens the in-page viewer");
+  await evaluate("document.getElementById('viewer').click()"); assert.equal(await evaluate("document.getElementById('viewer').open"), false);
   events.emit("ask:closed", { askId: generateAsk }); await browser("wait", "--fn", "!document.getElementById('prompt').open");
   await browser("set", "viewport", "390", "800");
   assert.equal(await evaluate("document.getElementById('edit-bar').getClientRects().length"), 0, "no editing bar on the phone");
