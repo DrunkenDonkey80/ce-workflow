@@ -126,6 +126,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .swatch-0 { background: #4c6ef5; } .swatch-1 { background: #2f9e44; } .swatch-2 { background: #e8590c; } .swatch-3 { background: #7048e8; }
 .swatch-4 { background: #1098ad; } .swatch-5 { background: #d6336c; } .swatch-6 { background: #5c940d; } .swatch-7 { background: #868e96; }
 .canvas.editing, .canvas.editing #diagram [data-node], .canvas.editing #diagram [data-edge] { cursor: crosshair; }
+#diagram .resize-handle { fill: var(--focus); stroke: #fff; stroke-width: 1.5px; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
 #diagram .connect-from > g > path { stroke: var(--focus); stroke-width: 3px; }
 #diagram [data-note]:focus-visible > g > path { stroke: var(--focus); stroke-width: 2px; }
 .dialog-purpose { color: var(--muted); font-size: 13px; margin: 6px 0 16px; }

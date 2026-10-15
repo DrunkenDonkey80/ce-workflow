@@ -143,7 +143,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
     if (node.edit === "remove") row.append(cross(box.x, box.y, box.w, box.h));
    }
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(node.id); });
-   row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: node.id }); else handlers.mention(node.id); } });
+   row.addEventListener("keydown", event => { if (event.key === "F2") { event.preventDefault(); handlers.rename?.(node.id); } if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: node.id }); else handlers.mention(node.id); } });
    // Open groups cover most of the canvas, so only a click (not hover) focuses them.
    const hoverable = !group, preview = () => { if (hoverable) { hovered = node.id; applyFocus(); } };
    row.addEventListener("pointerenter", event => { preview(); handlers.hover?.(node.id, event); });
@@ -164,14 +164,14 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    const options = { seed: seed(edge.id), stroke: edge.edit ? "#e03131" : "#1e1e1e", strokeWidth: edge.edit ? 2 : 1.4, roughness: .7, strokeLineDash: edge.status === "removed" || edge.edit === "add" || edge.edit === "change" ? [5, 4] : undefined, cross: edge.edit === "remove" };
    if (!arrow(row, routes.get(edge.id), options, edge.label && { text: edge.label, className: "edge-label" })) continue;
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(edge.id); });
-   row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: edge.id }); else handlers.mention(edge.id); } });
+   row.addEventListener("keydown", event => { if (event.key === "F2") { event.preventDefault(); handlers.rename?.(edge.id); } if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: edge.id }); else handlers.mention(edge.id); } });
    row.addEventListener("pointerenter", event => { hovered = edge.id; applyFocus(); handlers.hover?.(edge.id, event); }); row.addEventListener("focus", event => { hovered = edge.id; applyFocus(); handlers.hover?.(edge.id, event); }); row.setAttribute("aria-describedby", "hover-card");
    for (const name of ["pointerleave", "blur"]) row.addEventListener(name, () => { hovered = null; applyFocus(); handlers.leave?.(); });
    stage.append(row);
   }
   nodes.filter(node => node.kind !== "group").forEach(drawNode);
   handlers.notes?.(stage, boxes, view, rc, data, node => head(node) + 22 + details(node).length * 18);
-  svg.replaceChildren(stage); hovered = null; applyFocus(); applySearch(); svg.dataset.selected = selected ?? ""; svg.dataset.revision = String(data.revision); svg.dataset.band = near ? "near" : "mid";
+  svg.replaceChildren(stage); placeHandle(); hovered = null; applyFocus(); applySearch(); svg.dataset.selected = selected ?? ""; svg.dataset.revision = String(data.revision); svg.dataset.band = near ? "near" : "mid";
   document.getElementById("zoom-level").textContent = Math.round(view.scale * 100) + "%";
   if (focused) svg.querySelector<SVGElement>(`[data-node="${focused}"]`)?.focus();
  }
@@ -208,9 +208,14 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  svg.addEventListener("pointerdown", event => {
   if (event.button !== 0 || event.ctrlKey || event.metaKey || !diagram || handlers.pinning?.()) return;
   if (!(event.target instanceof Element)) return;
+  if (event.target.matches(".resize-handle")) {
+   const box = boxes.get(selected);
+   gesture = { pointer: event.pointerId, x: event.clientX, y: event.clientY, scale: view.scale, diagram, resize: selected, w: box.w, h: box.h, boxes, moved: false };
+   svg.setPointerCapture(event.pointerId); event.preventDefault(); return;
+  }
   const id = event.target.closest("[data-node]")?.getAttribute("data-node"), hit = diagram.nodes.find(node => node.id === id), box = boxes.get(id);
-  // A plain drag pans the view; only Shift+drag moves a box.
-  const node = event.shiftKey ? hit : undefined;
+  // E-04: a plain drag on a box moves it; on empty canvas or an open group it pans (Shift+drag also moves groups).
+  const node = event.shiftKey || hit?.kind !== "group" ? hit : undefined;
   const parent = boxes.get(node?.parent);
   gesture = { pointer: event.pointerId, x: event.clientX, y: event.clientY, vx: view.x, vy: view.y, scale: view.scale, diagram, node, hit, boxes, rx: box ? box.x - (parent ? parent.x + 24 : 0) : 0, ry: box ? box.y - (parent ? parent.y + 56 + (view.scale > 1.6 ? details(diagram.nodes.find(item => item.id === node.parent)).length * 18 + noteSpace(diagram, node.parent) : 0) : 0) : 0, moved: false };
   svg.setPointerCapture(event.pointerId); event.preventDefault();
@@ -218,7 +223,11 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  svg.addEventListener("pointermove", event => {
   if (!gesture || event.pointerId !== gesture.pointer) return;
   const dx = event.clientX - gesture.x, dy = event.clientY - gesture.y; gesture.moved ||= Math.hypot(dx, dy) > 3;
-  if (gesture.node) {
+  if (gesture.resize) {
+   // Same bounds as the schema (D8); the preview reroutes arrows like a move.
+   gesture.size = { w: Math.round(Math.min(1200, Math.max(120, gesture.w + dx / gesture.scale))), h: Math.round(Math.min(1200, Math.max(60, gesture.h + dy / gesture.scale))) };
+   boxes = new Map([...gesture.boxes].map(([at, box]) => [at, at === gesture.resize ? { ...box, ...gesture.size } : box])); route(); draw();
+  } else if (gesture.node) {
    gesture.position = { x: gesture.rx + dx / gesture.scale, y: gesture.ry + dy / gesture.scale };
    // One reroute per frame keeps the drag responsive on large diagrams.
    gesture.delta = [dx / gesture.scale, dy / gesture.scale];
@@ -227,10 +236,11 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  });
  svg.addEventListener("pointerup", event => {
   if (!gesture || event.pointerId !== gesture.pointer) return;
-  const done = gesture; gesture = null; if (done.frame) cancelAnimationFrame(done.frame); if (done.node) built.data = null; // drop the drag preview's shifted boxes
-  if (done.node && done.moved && done.position) handlers.move({ entity: "node", id: done.node.id, expectedRevision: done.diagram.revision, ...done.position });
-  else if (done.node) draw();
-  else if (!done.moved) { selected = done.hit && selected !== done.hit.id ? done.hit.id : null; svg.dataset.selected = selected ?? ""; applyFocus(); }
+  const done = gesture; gesture = null; if (done.frame) cancelAnimationFrame(done.frame); if (done.node || done.resize) built.data = null; // drop the drag preview's shifted boxes
+  if (done.resize) { if (done.moved && done.size) handlers.resize?.({ id: done.resize, expectedRevision: done.diagram.revision, ...done.size }); else draw(); }
+  else if (done.node && done.moved && done.position) handlers.move({ entity: "node", id: done.node.id, expectedRevision: done.diagram.revision, ...done.position });
+  else if (done.moved && done.node) draw();
+  else if (!done.moved) { selected = done.hit && selected !== done.hit.id ? done.hit.id : null; svg.dataset.selected = selected ?? ""; placeHandle(); applyFocus(); }
  });
  for (const name of ["pointercancel", "lostpointercapture"]) svg.addEventListener(name, () => { if (gesture) { gesture = null; built.data = null; draw(); } });
  svg.addEventListener("click", event => {
@@ -239,6 +249,22 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   const id = event.target.closest("[data-node], [data-edge]"), rect = svg.getBoundingClientRect();
   handlers.pin(id ? { element: id.getAttribute("data-node") ?? id.getAttribute("data-edge") } : { x: (event.clientX - rect.left - view.x) / view.scale, y: (event.clientY - rect.top - view.y) / view.scale });
  });
+ // Double-click renames a box or arrow; an open group only by its title, since it covers the canvas.
+ svg.addEventListener("dblclick", event => {
+  // Pointer capture (from the drag gesture) retargets the event to the svg, so hit-test the point instead.
+  const target = document.elementFromPoint(event.clientX, event.clientY);
+  if (!target || handlers.pinning?.()) return;
+  const row = target.closest("[data-node], [data-edge]"), id = row?.getAttribute("data-node") ?? row?.getAttribute("data-edge");
+  if (!id || row.classList.contains("group-node") && !target.closest(".node-label")) return;
+  event.preventDefault(); handlers.rename?.(id);
+ });
+ // The selected box gets a resize handle at its lower-right corner (D8; groups size to their content).
+ function placeHandle() {
+  svg.querySelector(".resize-handle")?.remove();
+  const node = diagram?.nodes.find(node => node.id === selected), box = boxes.get(selected), stage = svg.firstElementChild;
+  if (!handlers.resize || !node || node.kind === "group" || !box || !stage) return;
+  stage.append(element("rect", { x: box.x + box.w - 7, y: box.y + box.h - 7, width: 14, height: 14, class: "resize-handle", "aria-hidden": "true" }));
+ }
  window.addEventListener("keydown", event => { if (event.key === "Escape" && selected) { selected = null; svg.dataset.selected = ""; applyFocus(); } });
  // Right-click on a box, arrow or note starts a note on it in the chat composer.
  svg.addEventListener("contextmenu", event => {
@@ -269,7 +295,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   view.x = svg.clientWidth / 2 - (box.x + box.w / 2) * view.scale; view.y = svg.clientHeight / 2 - (box.y + box.h / 2) * view.scale; move();
   return found.length;
  }
- return { search, render(data) {
+ return { search, selected: () => selected, render(data) {
   // A same-revision echo (save response, then the SSE broadcast) must not cancel a drag in progress.
   if (gesture && data.revision === diagram?.revision) { diagram = data; return; }
   gesture = null; diagram = data; draw(); if (first && data.nodes.length && svg.clientWidth) { first = false; fit(); } }, fit, zoom };

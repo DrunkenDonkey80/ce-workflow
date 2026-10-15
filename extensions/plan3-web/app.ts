@@ -330,6 +330,9 @@ function editAt(point) {
 for (const button of document.querySelectorAll("#edit-bar [data-tool]")) button.addEventListener("click", () => setTool(button.getAttribute("data-tool")));
 for (const swatch of document.querySelectorAll("#edit-bar [data-color]")) swatch.addEventListener("click", () => {
  groupColor = Number(swatch.getAttribute("data-color"));
+ // With Select and a group selected, a swatch recolors that group.
+ const picked = state.diagram?.nodes.find(node => node.id === diagramView.selected());
+ if (tool === "select" && picked?.kind === "group") void applyEdit({ kind: "recolor", id: picked.id, color: groupColor });
  for (const other of document.querySelectorAll("#edit-bar [data-color]")) other.setAttribute("aria-pressed", String(other === swatch));
 });
 function pin(point) {
@@ -340,6 +343,13 @@ function pin(point) {
 const diagramView = createDiagramView($("diagram"), {
  hover, leave, notes: drawNotes, pin, pinning: () => state.pinning || tool !== "select",
  mention: insertMention, note: startNote,
+ // E-04: rename opens the label dialog pre-filled; resize is layout only (no chat line).
+ rename(id) {
+  const item = [...state.diagram.nodes, ...state.diagram.edges].find(item => item.id === id); if (!item) return;
+  labelFor = { kind: "rename", id }; draftFor = ""; $("comment-label").textContent = "Label";
+  openNote("Rename @" + id, "Changes the label; the agent sees it as a pending edit.", "Rename"); $("comment-text").value = item.label ?? ""; $("comment-text").select();
+ },
+ resize(body) { void applyEdit({ kind: "resize", id: body.id, w: body.w, h: body.h }); },
  async move(body) {
   const tab = diagramTab, id = diagramTarget();
   try { const value = await post("move", { ...body, target: id }); setDiagram(tab, value.diagram); showNotice(""); }

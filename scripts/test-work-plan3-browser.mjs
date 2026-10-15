@@ -256,15 +256,13 @@ try {
  assert.equal(await evaluate("document.querySelector(\"[data-node=web_client] path\").getAttribute(\"d\")"), strokeBefore, "fixed seeds keep redraw strokes stable");
  const nodePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
  assert.equal(await evaluate(`document.elementFromPoint(${nodePoint.x}, ${nodePoint.y})?.closest("[data-node]")?.getAttribute("data-node")`), "web_client", "drag must hit the actual visible node");
- // A plain drag on a box pans; only Shift+drag (CDP modifier 8, agent-browser has no held keys) moves it.
+ // E-04: a plain drag on a box moves it (Shift+drag, CDP modifier 8, still moves too; agent-browser has no held keys).
  const shiftDrag = (from, modifiers = 8) => withPageCdp(server.origin, async send => { for (const [type, at, buttons] of [["mouseMoved", from, 0], ["mousePressed", from, 1], ["mouseMoved", { x: from.x + 15, y: from.y - 10 }, 1], ["mouseMoved", { x: from.x + 30, y: from.y - 20 }, 1], ["mouseReleased", { x: from.x + 30, y: from.y - 20 }, 0]]) await send("Input.dispatchMouseEvent", { ...at, type, modifiers, buttons, ...(type === "mouseMoved" ? {} : { button: "left", clickCount: 1 }) }); });
  const panBox = await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")");
  // Settle first: the agent-browser drag just above and this fresh CDP input connection can race (seen 1 in ~10 runs).
- await new Promise(done => setTimeout(done, 1000)); await shiftDrag(nodePoint, 0); await new Promise(done => setTimeout(done, 300));
- assert.equal(edits.length, 0, "plain drag never moves a box"); assert.notEqual(await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")"), panBox, "plain drag on a box pans");
- const movePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
- await shiftDrag(movePoint);
+ await new Promise(done => setTimeout(done, 1000)); await shiftDrag(nodePoint, 0);
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"2\"");
+ assert.equal(await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")"), panBox, "plain drag on a box moves it, not the view");
  assert.equal(edits.length, 1); assert.equal(edits[0].id, "web_client"); assert.equal(edits[0].expectedRevision, 1);
  assert(Number.isFinite(diagram.nodes.find(node => node.id === "web_client").x));
  const savedPosition = { ...diagram.nodes.find(node => node.id === "web_client") }; diagram.revision++;
@@ -553,6 +551,20 @@ try {
   assert.equal(await evaluate("document.querySelector('[data-edge=web_client__redis]')"), null, "deleting a pending connection removes it");
   assert.deepEqual((await evaluate("document.getElementById('message-input').value")).trim().split(/\r?\n/), ['Add group "Cache tier" (@cache_tier) (orange)', 'Add box "Redis" (@redis) in "Cache tier" (@cache_tier)', 'Connect "Web client" (@web_client) → "Redis" (@redis)', 'Delete connection "Web client" (@web_client) → "Redis" (@redis)']);
   await browser("press", "Escape"); assert.equal(await evaluate("document.querySelector('[data-tool=select]').getAttribute('aria-pressed')"), "true", "Escape returns to Select");
+  // E-04: double-click renames, a swatch recolors the selected group, the handle resizes the selected box without a chat line.
+  await browser("dblclick", "[data-node=redis]"); await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
+  assert.equal(await evaluate("document.getElementById('comment-text').value"), "Redis"); await browser("fill", "#comment-text", "Redis cache"); await browser("click", "#comment-save");
+  await browser("wait", "--fn", "document.getElementById('message-input').value.includes('Rename')");
+  const corner = selector => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.round(r.x + 6), y: Math.round(r.y + 6) }; })()`), tap = async at => { await browser("mouse", "move", String(at.x), String(at.y)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left"); };
+  await tap(await corner("[data-node=cache_tier]")); assert.equal(await evaluate("document.getElementById('diagram').dataset.selected"), "cache_tier");
+  await browser("click", "[data-color='4']"); await browser("wait", "--fn", "document.getElementById('message-input').value.includes('Recolor')");
+  const redis = await evaluate("(() => { const r = document.querySelector('[data-node=redis]').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
+  await tap(redis); const handle = await evaluate("(() => { const r = document.querySelector('.resize-handle').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
+  const resized = await revision(); await browser("mouse", "move", String(handle.x), String(handle.y)); await browser("mouse", "down", "left");
+  await browser("mouse", "move", String(handle.x + 30), String(handle.y + 20)); await browser("mouse", "move", String(handle.x + 60), String(handle.y + 40)); await browser("mouse", "up", "left");
+  await browser("wait", "--fn", `Number(document.getElementById('diagram').dataset.revision) > ${resized}`);
+  assert.equal(toolbarEdits.at(-1).kind, "resize"); assert(diagram.nodes.find(node => node.id === "redis").w > 200, "resize saves a wider box");
+  assert.deepEqual((await evaluate("document.getElementById('message-input').value")).trim().split(/\r?\n/).slice(4), ['Rename "Redis" (@redis) to "Redis cache"', 'Recolor "Cache tier" (@cache_tier) cyan'], "resize adds no chat line");
   await browser("set", "viewport", "390", "800");
   assert.equal(await evaluate("document.getElementById('edit-bar').getClientRects().length"), 0, "no editing bar on the phone");
   await browser("set", "viewport", "1280", "800"); await browser("fill", "#message-input", "");

@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:45:52.436Z
+updated: 2026-10-15T09:49:26.166Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -152,10 +152,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 ### Phase 5: Editing bar interactions [code]
 
 - [x] **E-03** Editing bar (Select, Box, Group + 8 color swatches, Connect, Delete) in the left tab bar, desktop only and hidden on the Files tab; tools act through the diagram click/Enter hook, labels reuse the note dialog, each edit posts /api/edit and appends its chat line; Escape returns to Select.
-- [ ] **E-04** Add rename (double-click a label), resize handles on the selected box, and plain-drag move under the Select tool.
-  - Pending chat lines for rename and recolor; none for move and resize.
-  - Update the browser test "plain drag on a box pans" to the new rule: plain drag on empty canvas pans, on a box moves it.
-  - Check: C3.
+- [x] **E-04** Rename by double-click (open groups only by their title) or F2 via the pre-filled label dialog; a swatch recolors the selected group; the selected box gets a resize handle (bounded 120–1200 × 60–1200, no chat line); a plain drag on a box moves it, while empty canvas or an open group pans.
 - [ ] **E-05** Keep the chat lines in step with edits: append on each edit, keep the user's own typing intact.
   - Deleting a pending add drops every toolbar line about each id the delete removed (the returned cascade: children, connections, notes), including earlier rename and recolor lines.
   - Lines remember their diagram (A2); switching tabs before Send keeps them and their context.
