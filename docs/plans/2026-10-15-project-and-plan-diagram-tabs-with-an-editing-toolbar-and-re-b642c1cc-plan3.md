@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:31:35.916Z
+updated: 2026-10-15T09:33:36.750Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -142,8 +142,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 - [x] **T-01** Files | Project | Plan tabs (desktop and phone drawer) share one canvas with a diagram per tab; both load at start, SSE diagram events route by target, old "diagram" tab value maps to Plan, product links open Project; moves/notes/messages carry the shown diagram's target; README updated.
 - [x] **T-02** Removed the far overview band (FAR, farSummary, lifted/merged edges, collapsed groups, -far CSS); fit is one mid-layout pass at any scale; README zoom line updated.
-- [ ] **T-03** Desktop message box: 6 rows from 900 px up; the phone stays at its current rows.
-  - Check: C3 (computed rows or height at a desktop and a phone viewport).
+- [x] **T-03** Message box has 6 rows from 900 px up and keeps 4 on phones, set where the layout switches between phone and desktop.
 
 ### Phase 4: Editing endpoint and pending rendering [code]
 

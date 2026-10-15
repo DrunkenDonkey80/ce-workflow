@@ -176,6 +176,7 @@ const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"]
 function placeForPhone() {
  for (const home of homes) if (phone.matches) home.slot.append(home.node); else home.parent.insertBefore(home.node, home.next);
  if (!phone.matches) setDrawer(false);
+ ($("message-input") as HTMLTextAreaElement).rows = phone.matches ? 4 : 6;
 }
 function setDrawer(open: boolean) {
  drawer.dataset.open = String(open); drawer.inert = !open; $("drawer-backdrop").hidden = !open;

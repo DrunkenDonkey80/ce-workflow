@@ -165,7 +165,11 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('left-panel').getClientRects().length, document.querySelector('.left-tabs').getClientRects().length]"), [0, 0]);
  assert(await evaluate("(() => { const r = document.getElementById('composer').getBoundingClientRect(), a = document.querySelector('.attach').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top > innerHeight / 2 && a.width > 0 && a.bottom <= innerHeight; })()"), "composer and attach stay on screen");
  assert.equal(await evaluate("document.documentElement.scrollWidth"), 390, "no sideways scrolling");
+ const phoneBox = await evaluate("[document.getElementById('message-input').rows, document.getElementById('message-input').clientHeight]");
  await browser("set", "viewport", "1280", "800");
+ await browser("wait", "--fn", "document.getElementById('message-input').rows === 6");
+ assert.equal(phoneBox[0], 4, "the phone keeps its 4-row box");
+ assert(await evaluate("document.getElementById('message-input').clientHeight") > phoneBox[1], "T-03: the desktop box is taller");
  assert(await evaluate("document.getElementById('left-panel').getClientRects().length > 0 && document.getElementById('chat').getClientRects().length > 0 && document.getElementById('mobile-tabs').getClientRects().length === 0"), "desktop ignores the phone view");
  // The media-query listener moves them back asynchronously after the resize.
  await browser("wait", "--fn", "document.querySelector('.topbar').contains(document.getElementById('model-button')) && document.getElementById('switcher').contains(document.getElementById('session-list')) && document.querySelector('.chat-heading').contains(document.getElementById('connection'))");
