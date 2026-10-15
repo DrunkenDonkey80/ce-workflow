@@ -36,9 +36,9 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
 function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
 function renderShell() {
- // "<folder> - <herdr tab>", plus ": <plan>" on phones, where the plan bar sits in the drawer.
+ // "<folder> - <herdr tab>" like the desktop; on phones the title menu lists the sessions and plans.
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
- const title = [head, matchMedia("(max-width: 899px)").matches ? plan?.title ?? state.diagram?.title : ""].filter(Boolean).join(": ") || plan?.title || "Architecture workspace";
+ const title = head || plan?.title || "Architecture workspace";
  $("title").textContent = title; $("title").title = title;
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
@@ -673,7 +673,7 @@ function closeMenus(focus = false) {
 document.addEventListener("keydown", event => { if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
 document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions")) closeMenus(); });
 // The title opens the session picker: a popup on phones, the switcher stripe on desktop.
-$("title").addEventListener("click", () => phone.matches ? toggleMenu("title", "title-menu") : !$("switcher").hidden && toggleSwitcher($("switcher").dataset.open !== "true"));
+$("title").addEventListener("click", () => phone.matches ? (toggleMenu("title", "title-menu"), !$("title-menu").hidden && void loadPlans($("title-plans"))) : !$("switcher").hidden && toggleSwitcher($("switcher").dataset.open !== "true"));
 function newPlan() {
  setDrawer(false); const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
  showNotice("Describe the plan after /plan3 and send.");
@@ -681,18 +681,21 @@ function newPlan() {
 // Plan menu: open plans on top (the shown one marked, the session's current one labelled), a divider, then actions.
 $("plan-button").addEventListener("click", async () => {
  if (!$("plan-menu").hidden) return toggleMenu("plan-button", "plan-menu", false);
- toggleMenu("plan-button", "plan-menu", true);
+ toggleMenu("plan-button", "plan-menu", true); await loadPlans($("plan-list"));
+ $("plan-divider").hidden = !$("plan-list").querySelector(".plan-option");
+});
+// The open plans, the shown one pressed and the session's current one labelled; picking one shows its diagram.
+async function loadPlans(list: HTMLElement) {
  try {
   const { plans, current } = await get("plans") as { plans: { id: string; title: string; done?: number; total?: number }[]; current: string | null };
-  $("plan-list").replaceChildren(...plans.map(item => {
+  list.replaceChildren(...plans.map(item => {
    const pick = Object.assign(document.createElement("button"), { type: "button", className: "plan-option", textContent: item.title + (item.total ? ` · ${item.done ?? 0}/${item.total}` : "") + (item.id === current ? " (current)" : "") });
    pick.setAttribute("aria-pressed", String(item.id === target));
    pick.addEventListener("click", () => { if (item.id === target) return closeMenus(); const url = new URL(location.href); url.searchParams.set("target", item.id); location.assign(url); });
    return pick;
   }));
-  $("plan-divider").hidden = !plans.length;
- } catch (error) { $("plan-list").replaceChildren("Plans failed to load: " + error.message); }
-});
+ } catch (error) { list.replaceChildren("Plans failed to load: " + error.message); }
+}
 $("review-button").addEventListener("click", () => toggleMenu("review-button", "review-menu"));
 // Plan commands go through /api/command with the shown plan (a typed "/plan3 review <id>" would not name the plan).
 for (const button of document.querySelectorAll<HTMLElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.addEventListener("click", async () => {
