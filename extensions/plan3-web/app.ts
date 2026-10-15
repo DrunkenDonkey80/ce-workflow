@@ -35,6 +35,7 @@ function setBar(item: HTMLElement, percent: number, tone: string) {
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
 function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
+let sessionStates: ("working" | "waiting" | "idle")[] = [], iconKey = "";
 function renderShell() {
  // "<folder> - <herdr tab>" like the desktop; on phones the title menu lists the sessions and plans.
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
@@ -42,6 +43,7 @@ function renderShell() {
  $("title").textContent = title; $("title").title = title;
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
+ renderIcon();
  // D19 status line. Line 1: [model: effort] [Context: n%] [💡 bias]; line 2: the plan as a progress bar (or New plan).
  const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
  $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
@@ -750,19 +752,31 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // D18 switcher: other shared sessions on this PC, colour-coded; links work remotely, where one paired cookie covers every port.
 type Session = { id: string; name: string; cwd: string; port: number; state: "working" | "waiting" | "idle"; revision: number; unseen: boolean };
 let sessionsTimer = 0;
+// Tab icon over every shared session: red when any asks something, blue while any works, a shovel laid down when all rest.
+function renderIcon() {
+ const waiting = promptView.busy || !!state.activity.dialog || sessionStates.includes("waiting");
+ const working = !!state.activity.working || !!state.activity.subagents?.length || sessionStates.includes("working");
+ const key = waiting ? "waiting" : working ? "working" : "idle";
+ if (key === iconKey) return; iconKey = key;
+ const back = { waiting: "#e03131", working: "#1c7ed6", idle: "" }[key], handle = back ? "#ffd8a8" : "#c4893f", blade = back ? "#fff" : "#495057";
+ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${back ? `<rect width="32" height="32" rx="7" fill="${back}"/>` : ""}<g transform="${back ? "translate(0 1) scale(.9) translate(1.8 0) rotate(40 16 16)" : "translate(0 6) rotate(90 16 16)"}"><rect x="14.5" y="3" width="3" height="16" rx="1.5" fill="${handle}"/><rect x="10.5" y="1.5" width="11" height="3.5" rx="1.75" fill="${handle}"/><path d="M9.5 18.5h13v5.5a6.5 6.5 0 0 1-13 0z" fill="${blade}"/></g></svg>`;
+ document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(svg);
+}
 async function loadSessions() {
  clearTimeout(sessionsTimer);
- if (document.visibilityState !== "visible") return;
+ // A background tab keeps polling, slower, so its icon still shows other sessions; only a visible tab marks runs seen.
+ const visible = document.visibilityState === "visible";
  try {
   const { sessions } = await get("sessions") as { sessions: Session[] }, own = sessions.find(session => session.port === Number(location.port || (location.protocol === "https:" ? 443 : 80)));
   // Seen is per device on the server (D21): looking at an idle session marks its last run seen.
-  if (own?.unseen && own.state === "idle") {
+  sessionStates = sessions.map(session => session.state); renderIcon();
+  if (visible && own?.unseen && own.state === "idle") {
    const response = await fetch("/api/seen", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify({ revision: own.revision }) });
    if (response.ok) own.unseen = false;
   }
   renderSessions(sessions, own);
  } catch { $("switcher").hidden = true; document.body.classList.remove("has-switcher"); }
- sessionsTimer = window.setTimeout(loadSessions, 5000);
+ sessionsTimer = window.setTimeout(loadSessions, visible ? 5000 : 15000);
 }
 function renderSessions(sessions: Session[], own: Session | undefined) {
  const show = sessions.length > 0; $("switcher").hidden = !show; document.body.classList.toggle("has-switcher", show);
