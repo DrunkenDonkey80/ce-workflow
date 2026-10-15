@@ -209,6 +209,17 @@ const fitViewport = () => {
 window.visualViewport?.addEventListener("resize", fitViewport); window.visualViewport?.addEventListener("scroll", fitViewport); window.addEventListener("resize", fitViewport);
 // Some keyboards report their final size only after closing; measure again once it has gone.
 document.addEventListener("focusout", () => setTimeout(fitViewport, 350)); fitViewport();
+// iOS pans the whole page when a drag starts on something that cannot scroll (beside the chat box) and leaves it there.
+// On phones only lists, text boxes and the diagram may take a drag; everything else is held still.
+const scrolls = (item: Element | null) => {
+ for (; item && item !== document.body; item = item.parentElement) {
+  if (item.matches("textarea, input, svg, .canvas")) return true;
+  const style = getComputedStyle(item);
+  if ((/(auto|scroll)/.test(style.overflowY) && item.scrollHeight > item.clientHeight) || (/(auto|scroll)/.test(style.overflowX) && item.scrollWidth > item.clientWidth)) return true;
+ }
+ return false;
+};
+document.addEventListener("touchmove", event => { if (phone.matches && event.touches.length === 1 && !scrolls(event.target as Element)) event.preventDefault(); }, { passive: false });
 
 // The top bar sizes Think and the usage bars to the chat panel below them.
 new ResizeObserver(() => document.body.style.setProperty("--chat-px", $("chat").offsetWidth + "px")).observe($("chat"));
