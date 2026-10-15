@@ -173,7 +173,7 @@ for (const name of mobileViews) {
 }
 // Phones: views, status line and sessions move into the drawer so the chat gets the screen; desktop puts them back.
 const phone = matchMedia("(max-width: 899px)"), drawer = $("drawer");
-const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "title-menu"], ["connection", "topbar"]]
+const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "drawer-sessions"], ["plan-menu", "title-menu"], ["connection", "topbar"]]
  .map(([id, slot]) => { const node = id === "status-line" || id === "topbar" ? document.querySelector("." + id)! : $(id); return { node, slot: slot === "topbar" ? document.querySelector(".topbar")! : $(slot), parent: node.parentNode!, next: node.nextSibling }; });
 function placeForPhone() {
  for (const home of homes) if (phone.matches) home.slot.append(home.node); else home.parent.insertBefore(home.node, home.next);
@@ -673,13 +673,19 @@ function closeMenus(focus = false) {
 document.addEventListener("keydown", event => { if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
 document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions")) closeMenus(); });
 // The title opens the session picker: a popup on phones, the switcher stripe on desktop.
-$("title").addEventListener("click", () => phone.matches ? (toggleMenu("title", "title-menu"), !$("title-menu").hidden && void loadPlans($("title-plans"))) : !$("switcher").hidden && toggleSwitcher($("switcher").dataset.open !== "true"));
+// Phones: the title opens the plans with their commands (the plan menu moves under it); sessions live in the drawer.
+async function openTitlePlans() {
+ toggleMenu("title", "title-menu"); if ($("title-menu").hidden) return;
+ $("plan-menu").hidden = false; await loadPlans($("plan-list")); $("plan-divider").hidden = !$("plan-list").querySelector(".plan-option");
+}
+$("title").addEventListener("click", () => phone.matches ? void openTitlePlans() : !$("switcher").hidden && toggleSwitcher($("switcher").dataset.open !== "true"));
 function newPlan() {
  setDrawer(false); const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
  showNotice("Describe the plan after /plan3 and send.");
 }
 // Plan menu: open plans on top (the shown one marked, the session's current one labelled), a divider, then actions.
 $("plan-button").addEventListener("click", async () => {
+ if (phone.matches) { setDrawer(false); if ($("title-menu").hidden) await openTitlePlans(); return; }
  if (!$("plan-menu").hidden) return toggleMenu("plan-button", "plan-menu", false);
  toggleMenu("plan-button", "plan-menu", true); await loadPlans($("plan-list"));
  $("plan-divider").hidden = !$("plan-list").querySelector(".plan-option");

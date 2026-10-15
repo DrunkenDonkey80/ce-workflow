@@ -210,9 +210,9 @@ h2 { font-size: 15px; font-weight: 600; }
 .title-button:focus-visible { outline: 2px solid var(--focus); }
 /* After .status-menu in specificity: the phone session picker drops from the title, not below the page. */
 .status-menu.title-menu { position: fixed; z-index: 8; top: 44px; left: 8px; right: auto; width: min(340px, 92vw); }
-.title-menu .session-list { gap: 6px; }
-/* The phone picker names each state next to its colour; the desktop bar keeps colour only. */
-.session-state { display: none; } .title-menu .session-state { display: inline; margin-left: auto; padding-left: 8px; color: var(--muted); font-size: 12px; }
+.title-menu > .status-menu { position: static; border: 0; padding: 0; box-shadow: none; max-height: none; width: auto; max-width: none; background: none; }
+/* The drawer's session list names each state next to its colour; the desktop bar keeps colour only. */
+.session-state { display: none; } #drawer-sessions .session-list { display: grid; gap: 6px; padding: 0 12px; } #drawer-sessions .session-state { display: inline; margin-left: auto; padding-left: 8px; color: var(--muted); font-size: 12px; }
 .command-list { display: grid; gap: 4px; max-height: 60dvh; overflow: auto; }
 .command-option { display: grid; text-align: left; border-color: transparent; }
 .command-option small { color: var(--muted); }
