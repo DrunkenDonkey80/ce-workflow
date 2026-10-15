@@ -199,12 +199,15 @@ document.addEventListener("touchend", event => {
  swipe = undefined;
 }, { passive: true });
 // iOS keeps the layout viewport under the on-screen keyboard; size the page to what is visible so the composer stays reachable.
-// iOS (every iPhone browser is WebKit) also pans the page up to show the focused box. Following that pan with the page
-// made iOS pan again until it ran off screen, so the page stays at the top, sized to the visible part, and the pan is undone.
+// iOS (every iPhone browser is WebKit) pans the visible area down over the page to show the focused box and ignores
+// scrollTo while the keyboard is up, so the page follows the visible area; a leftover scroll is undone once it is gone.
+// Add #debug to the address to see the numbers on screen.
+const debugViewport = location.hash.includes("debug") ? document.body.appendChild(Object.assign(document.createElement("output"), { style: "position:fixed;z-index:99;right:4px;top:30%;font:11px monospace;background:#ff0c;color:#000;padding:2px 4px;white-space:pre;pointer-events:none" })) : undefined;
 const fitViewport = () => {
- const view = window.visualViewport;
- document.documentElement.style.setProperty("--app-height", (view?.height ?? window.innerHeight) + "px");
- if (window.scrollY || window.scrollX || view?.offsetTop) window.scrollTo(0, 0);
+ const view = window.visualViewport, root = document.documentElement.style, height = view?.height ?? window.innerHeight, top = view?.offsetTop ?? 0;
+ root.setProperty("--app-height", height + "px"); root.setProperty("--app-top", top + "px");
+ if (!top && (window.scrollY || window.scrollX)) window.scrollTo(0, 0);
+ if (debugViewport) debugViewport.textContent = `vv ${Math.round(height)} top ${Math.round(top)}\ninner ${innerHeight} scrollY ${Math.round(scrollY)}\nbody ${Math.round(document.body.getBoundingClientRect().top)}/${Math.round(document.body.getBoundingClientRect().height)}`;
 };
 window.visualViewport?.addEventListener("resize", fitViewport); window.visualViewport?.addEventListener("scroll", fitViewport); window.addEventListener("resize", fitViewport);
 // Some keyboards report their final size only after closing; measure again once it has gone.
