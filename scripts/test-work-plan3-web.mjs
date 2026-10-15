@@ -156,6 +156,13 @@ assert.deepEqual(prepared.unknownMentions, ["missing"]);
 assert.match(prepared.message, /Bounded uploads/);
 assert.match(prepared.message, /Why no retries/);
 assert.match(prepared.message, /untrusted user data/);
+assert.doesNotMatch(prepared.message, /settle/, "no pending hint without red edits");
+{ // Pending edits are listed so the agent knows what to settle.
+ const marked = applyDiagramOperations(contextDiagram, [{ op: "add", entity: "node", value: { id: "cache", label: "Cache", kind: "store", edit: "add" } }, { op: "add", entity: "edge", value: { from: "api", to: "cache", edit: "remove" } }]).diagram;
+ const hinted = diagramChatMessage(marked, "Add @cache");
+ assert.match(hinted.message, /settle exactly those you addressed/);
+ assert.match(hinted.message, /"pendingEdits":\[\{"entity":"node","id":"cache","edit":"add"\},\{"entity":"edge","id":"api__cache","edit":"remove"\}\]/);
+}
 assert.throws(() => diagramChatMessage(contextDiagram, "hello", ["missing"]), /Unknown diagram comment/);
 assert.throws(() => diagramChatMessage(contextDiagram, "x".repeat(20_001)), /bounded/);
 const submitted = [], deliveryErrors = [];

@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:20:57.857Z
+updated: 2026-10-15T09:21:46.155Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -132,10 +132,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 - [x] **M-01** Schema/validator accept edit marks, group color 0–7, box w/h, bounded directions; apply ops share the field lists.
 - [x] **M-02** settle op (clears edit; settled removal cascades); plan diagrams start empty; product param removed at every caller.
-- [ ] **M-03** Update plan3_diagram schema, description and guidelines; add a pending-edits hint to `diagramChatMessage`.
-  - Guideline: after taking the user's red edits into the plan (or updating the project diagram), settle each one; never settle edits you did not address.
-  - The chat context lists pending ids and their kind, so the agent knows what to settle.
-  - Check: C1, C2, C5.
+- [x] **M-03** plan3_diagram documents edit/color/w/h and settle with a settle-only-what-you-addressed guideline; chat context lists pendingEdits plus a hint.
 
 ### Phase 2: Pre-filled text in ask_user [code]
 
