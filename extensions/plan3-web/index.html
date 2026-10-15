@@ -52,7 +52,8 @@
  <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">
   <button id="mobile-chat" type="button" role="tab" aria-controls="chat" aria-selected="true">Chat</button>
   <button id="mobile-files" type="button" role="tab" aria-controls="files" aria-selected="false" tabindex="-1">Files</button>
-  <button id="mobile-diagram" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1">Diagram</button>
+  <button id="mobile-project" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1">Project</button>
+  <button id="mobile-plan" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1">Plan</button>
  </nav>
  <main id="workspace" class="workspace" data-left="full" data-mobile="chat">
   <button id="expand-left" class="expand-left" type="button" aria-label="Show files and diagram" aria-controls="left-panel" aria-expanded="false" hidden>&gt;&gt;</button>
@@ -60,7 +61,8 @@
   <div class="left-tabs">
    <div role="tablist" aria-label="Project views">
     <button id="tab-files" type="button" role="tab" aria-selected="false" aria-controls="files" tabindex="-1">Files</button>
-    <button id="tab-diagram" type="button" role="tab" aria-selected="true" aria-controls="canvas">Diagram</button>
+    <button id="tab-project" type="button" role="tab" aria-selected="false" aria-controls="canvas" tabindex="-1" title="The whole product's architecture">Project</button>
+    <button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="canvas" title="The displayed plan's own diagram">Plan</button>
    </div>
    <div id="zoom-controls" class="zoom-controls" aria-label="Diagram zoom">
     <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
@@ -73,9 +75,9 @@
    <button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button>
   </div>
   <section id="files" class="files" role="tabpanel" aria-labelledby="tab-files" hidden></section>
-  <section id="canvas" class="canvas" role="tabpanel" aria-labelledby="tab-diagram" aria-label="Diagram workspace">
+  <section id="canvas" class="canvas" role="tabpanel" aria-labelledby="tab-plan">
    <svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Architecture diagram" tabindex="0"></svg>
-   <p id="empty-diagram" class="empty-diagram">No diagram yet. Ask in the chat, for example: draw the main components.</p>
+   <p id="empty-diagram" class="empty-diagram"></p>
    <div class="search-box"><input id="search" type="search" placeholder="Search (Ctrl+F)" aria-label="Search the diagram; Enter jumps to the next match"><output id="search-count" aria-live="polite"></output></div>
    <div id="hover-card" class="hover-card" role="tooltip" tabindex="0" hidden></div>
   </section>

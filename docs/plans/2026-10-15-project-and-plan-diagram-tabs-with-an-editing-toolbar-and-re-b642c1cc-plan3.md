@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:24:15.048Z
+updated: 2026-10-15T09:29:39.833Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -140,10 +140,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 ### Phase 3: Tabs, overview removal and composer height [code]
 
-- [ ] **T-01** Replace the Diagram tab with Project and Plan tabs on desktop and in the phone drawer views; keep a diagram state per tab.
-  - Both diagrams load at start; SSE `diagram` events update the matching tab; the remembered tab key accepts old values (`diagram` maps to Plan).
-  - Empty Plan tab text: "This plan has no diagram yet. Draw one with the bar above, or Generate."
-  - Check: C3 (tab switch, per-tab render, event routing), C2.
+- [x] **T-01** Files | Project | Plan tabs (desktop and phone drawer) share one canvas with a diagram per tab; both load at start, SSE diagram events route by target, old "diagram" tab value maps to Plan, product links open Project; moves/notes/messages carry the shown diagram's target; README updated.
 - [ ] **T-02** Remove the far zoom band and its code (`FAR`, `farSummary`, lifted edges, collapsed groups, `.node-summary-far`, `.node-label-far`).
   - Fit may scale below 0.6; the mid view then just renders smaller.
   - Update the browser test's far-band assertions to assert there is no overview band.

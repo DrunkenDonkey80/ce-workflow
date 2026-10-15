@@ -70,7 +70,6 @@ function renderShell() {
  const helpers = state.activity.subagents?.length ?? 0;
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : helpers ? "Subagents\u2026" : "Idle";
  $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting || helpers ? "working" : "idle";
- $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
  // Row buttons are also gated by the plan state (no Resume while the plan is still being planned).
  const blocked = { resolve: !plan?.open, finish: !plan?.finishable, resume: !!plan?.planning };
  for (const button of document.querySelectorAll<HTMLButtonElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset) || (button.parentElement?.id === "plan-actions" && !!blocked[button.dataset.command]);
@@ -115,29 +114,48 @@ function setLeft(mode) {
  $("narrow-left").setAttribute("aria-pressed", String(mode === "narrow")); $("narrow-left").textContent = mode === "narrow" ? "Widen" : "Narrow";
  for (const id of ["expand-left", "collapse-left"]) $(id).setAttribute("aria-expanded", String(mode !== "collapsed"));
 }
+// Project and Plan tabs share one canvas; each keeps its own diagram (T-01). state.diagram is the shown one.
+type DiagramTab = "project" | "plan";
+let diagramTab: DiagramTab = "plan";
+const diagrams: Record<DiagramTab, Diagram | null> = { project: null, plan: null };
+const planTarget = () => target && target !== "product" ? target : undefined;
+const diagramTarget = () => diagramTab === "project" ? "product" : planTarget();
+const LEFT_TABS = ["files", "project", "plan"];
+function renderDiagram(refit = false) {
+ state.diagram = diagrams[diagramTab];
+ diagramView.render(state.diagram ?? { nodes: [], edges: [], notes: [], revision: 0 } as unknown as Diagram);
+ if (refit && $("diagram").clientWidth) diagramView.fit();
+ $("empty-diagram").textContent = diagramTab === "project" ? "No project diagram yet." : planTarget() ? "This plan has no diagram yet. Draw one with the bar above, or Generate." : "No plan is open.";
+ $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
+}
+function setDiagram(tab: DiagramTab, value: Diagram | null, refit = false) {
+ diagrams[tab] = value;
+ if (tab === diagramTab) { renderDiagram(refit); renderMentions(); renderShell(); }
+}
 function setTab(name) {
- for (const [tab, panel] of [["tab-files", "files"], ["tab-diagram", "canvas"]]) {
-  const selected = panel === (name === "files" ? "files" : "canvas");
-  $(tab).setAttribute("aria-selected", String(selected)); $(tab).tabIndex = selected ? 0 : -1; $(panel).hidden = !selected;
- }
+ if (name === "diagram") name = "plan"; // remembered from before the Project/Plan split
+ for (const view of LEFT_TABS) { const selected = view === name; $("tab-" + view).setAttribute("aria-selected", String(selected)); $("tab-" + view).tabIndex = selected ? 0 : -1; }
+ $("files").hidden = name !== "files"; $("canvas").hidden = name === "files"; $("canvas").setAttribute("aria-labelledby", "tab-" + name);
  $("zoom-controls").hidden = name === "files";
  remember("plan3-tab", name);
- if (name === "files") filesView.shown();
- // A diagram first drawn while hidden has not been fitted yet.
- if (name === "diagram" && state.diagram) diagramView.render(state.diagram);
+ if (name === "files") { filesView.shown(); return; }
+ diagramTab = name; renderDiagram(true);
+ // Before the first snapshot the chat helpers are not ready; the snapshot renders them.
+ if (state.connected) { renderMentions(); renderShell(); }
 }
 $("narrow-left").addEventListener("click", () => setLeft(workspace.dataset.left === "narrow" ? "full" : "narrow"));
 $("collapse-left").addEventListener("click", () => { setLeft("collapsed"); $("expand-left").focus(); });
 $("expand-left").addEventListener("click", () => { setLeft("full"); $("collapse-left").focus(); });
-$("tab-files").addEventListener("click", () => setTab("files"));
-$("tab-diagram").addEventListener("click", () => setTab("diagram"));
-for (const id of ["tab-files", "tab-diagram"]) $(id).addEventListener("keydown", event => {
- if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
- event.preventDefault(); const next = id === "tab-files" ? "diagram" : "files"; setTab(next); $(`tab-${next}`).focus();
-});
+for (const [index, view] of LEFT_TABS.entries()) {
+ $("tab-" + view).addEventListener("click", () => setTab(view));
+ $("tab-" + view).addEventListener("keydown", event => {
+  const next = { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: LEFT_TABS.length - 1 }[event.key]; if (next === undefined) return;
+  event.preventDefault(); const name = LEFT_TABS[(next + LEFT_TABS.length) % LEFT_TABS.length]; setTab(name); $("tab-" + name).focus();
+ });
+}
 setLeft(remembered("plan3-left", ["full", "narrow", "collapsed"], "full"));
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
-const mobileViews = ["chat", "files", "diagram"];
+const mobileViews = ["chat", "files", "project", "plan"];
 function setMobile(view) {
  workspace.dataset.mobile = view === "chat" ? "chat" : "panel";
  for (const name of mobileViews) { const tab = $("mobile-" + name); tab.setAttribute("aria-selected", String(name === view)); tab.tabIndex = name === view ? 0 : -1; }
@@ -148,7 +166,7 @@ for (const name of mobileViews) {
  $("mobile-" + name).addEventListener("click", () => { setMobile(name); setDrawer(false); });
  $("mobile-" + name).addEventListener("keydown", event => {
   const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key]; if (!step) return;
-  event.preventDefault(); const next = mobileViews[(mobileViews.indexOf(name) + step + 3) % 3]; setMobile(next); $("mobile-" + next).focus();
+  event.preventDefault(); const next = mobileViews[(mobileViews.indexOf(name) + step + mobileViews.length) % mobileViews.length]; setMobile(next); $("mobile-" + next).focus();
  });
 }
 // Phones: views, status line and sessions move into the drawer so the chat gets the screen; desktop puts them back.
@@ -211,8 +229,10 @@ async function get(endpoint) {
  const response = await fetch("/api/" + endpoint, auth);
  const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Workspace request failed."); return value;
 }
-async function loadDiagram() {
- try { const value = await get("diagram" + (target ? "?target=" + encodeURIComponent(target) : "")); state.diagram = value.diagram; diagramView.render(state.diagram); renderMentions(); renderShell(); }
+async function loadDiagram(tab: DiagramTab, refit = false) {
+ const id = tab === "project" ? "product" : planTarget();
+ if (!id) { setDiagram(tab, null); return; }
+ try { const value = await get("diagram?target=" + encodeURIComponent(id)); if (id === (tab === "project" ? "product" : planTarget())) setDiagram(tab, value.diagram, refit); }
  catch (error) { showNotice("Diagram failed to load: " + error.message); }
 }
 // Check-in rows are excerpts; the full row loads when the reader asks for it.
@@ -274,20 +294,20 @@ function openNote(title, purpose, save) { $("comment-title").textContent = title
 function startNote(id) { draftFor = id; openNote("Note on @" + id, "Adds a line to your message. Add more notes, then send them together.", "Add to message"); }
 function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); renderMentions(); }
 function pin(point) {
- commentPoint = { ...point, expectedRevision: state.diagram.revision }; state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning");
+ commentPoint = { ...point, target: diagramTarget(), expectedRevision: state.diagram.revision }; state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning");
  draftFor = ""; openNote("Add a note", point.element ? "Pin a comment to @" + point.element + "." : "Pin a comment at this canvas position.", "Save note"); showNotice("");
 }
 const diagramView = createDiagramView($("diagram"), {
  hover, leave, notes: drawNotes, pin, pinning: () => state.pinning,
  mention: insertMention, note: startNote,
  async move(body) {
-  try { const value = await post("move", body); state.diagram = value.diagram; diagramView.render(state.diagram); showNotice(""); }
+  const tab = diagramTab, id = diagramTarget();
+  try { const value = await post("move", { ...body, target: id }); setDiagram(tab, value.diagram); showNotice(""); }
   catch (error) {
    showNotice(error.message + " Positions were not saved.");
    try {
-    state.diagram = (await get("diagram?target=" + encodeURIComponent(target))).diagram;
-   } catch (reloadError) { showNotice(error.message + " Positions were not saved. Reload failed: " + reloadError.message); }
-   diagramView.render(state.diagram);
+    setDiagram(tab, (await get("diagram?target=" + encodeURIComponent(id))).diagram);
+   } catch (reloadError) { showNotice(error.message + " Positions were not saved. Reload failed: " + reloadError.message); diagramView.render(state.diagram); }
   }
  },
 });
@@ -306,7 +326,7 @@ $("comment-form").addEventListener("submit", async event => {
   return;
  }
  $("comment-save").disabled = true;
- try { const value = await post("comment", { ...commentPoint, text: $("comment-text").value }); state.diagram = value.diagram; diagramView.render(state.diagram); renderShell(); $("comment-prompt").close(); $("comment-text").value = ""; showNotice("Note saved."); }
+ try { const value = await post("comment", { ...commentPoint, text: $("comment-text").value }); setDiagram(commentPoint.target === "product" ? "project" : "plan", value.diagram); $("comment-prompt").close(); $("comment-text").value = ""; showNotice("Note saved."); }
  catch (error) { $("comment-error").textContent = error.message + ". Your note draft is kept."; $("comment-error").hidden = false; if (error.status === 409) commentPoint.expectedRevision = state.diagram.revision; }
  finally { $("comment-save").disabled = false; }
 });
@@ -316,8 +336,9 @@ $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
 const filesView = createFilesView($("files"), { get });
-setTab(remembered("plan3-tab", ["files", "diagram"], "diagram"));
-setMobile(remembered("plan3-mobile", mobileViews, "chat"));
+// /plan3 architecture links open on the Project tab.
+setTab(target === "product" ? "project" : remembered("plan3-tab", [...LEFT_TABS, "diagram"], "plan"));
+{ const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view); }
 $("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
 $("search").addEventListener("keydown", event => {
  if (event.key === "Enter") { event.preventDefault(); diagramView.search($("search").value, true); }
@@ -487,7 +508,7 @@ $("composer").addEventListener("submit", async event => {
  messageSending = true; renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
- try { const result = await post("message", { text }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent.", true); }
+ try { const result = await post("message", { text, target: diagramTarget() ?? target }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent.", true); }
  catch (error) { showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });
@@ -702,7 +723,7 @@ listen("plan", value => {
  if (value.id !== target && value.id !== currentPlan) {
   target = value.id;
   const query = new URLSearchParams(location.search); if (query.has("target")) { query.set("target", value.id); history.replaceState(null, "", "?" + query + location.hash); }
-  void loadDiagram();
+  void loadDiagram("plan", true);
  }
  currentPlan = value.id;
  if (value.id === target) { state.plan = value; renderShell(); }
@@ -716,10 +737,11 @@ listen("snapshot", value => {
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
  // Dialogs over 16 KB arrive brief; fetch their full body.
  promptView.sync((value.dialogs ?? []).filter(ask => !ask.brief));
- for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell(); void loadDiagram();
+ for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell(); void loadDiagram("project"); void loadDiagram("plan");
 });
 listen("diagram", value => {
- if ((target === "product" && value.target.kind === "product") || value.target.id === target) { state.diagram = value.diagram; diagramView.render(state.diagram); renderShell(); }
+ const tab = value.target.kind === "product" ? "project" : value.target.id === planTarget() ? "plan" : null;
+ if (tab) setDiagram(tab, value.diagram);
 });
 listen("message", row => { chat.set(row.id, row); renderChat(); });
 listen("dialog", value => { promptView.pending(value); renderShell(); });

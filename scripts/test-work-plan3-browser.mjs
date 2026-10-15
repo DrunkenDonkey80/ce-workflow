@@ -34,6 +34,7 @@ async function evaluate(script) { return (await browser("eval", "-b", Buffer.fro
 const fixture = new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url);
 let sample; try { sample = JSON.parse(await readFile(fixture, "utf8")); } catch (error) { throw new Error("Unreadable fixture " + fixture.pathname + ": " + error.message); }
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
+let product = { version: 1, kind: "product", title: "Product", revision: 0, nodes: [], edges: [], notes: [] };
 // D18 switcher fixtures: this page (idle, unseen until the page marks it), one working and one waiting session.
 const seenCalls = []; let ownRevisionSeen = 0, ownRevision = 3, otherSessions = false, beta = { state: "working", revision: 1, unseen: false };
 const sessionList = () => [{ id: "a", name: "alpha", cwd: "C:/work/alpha", port: server.port, state: "idle", revision: ownRevision, unseen: ownRevisionSeen < ownRevision },
@@ -55,7 +56,7 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
  if (endpoint === "/api/file") return { path: params.get("path"), content: "<img src=x onerror=alert(1)>\nplain" };
  if (endpoint === "/api/diff") return { path: params.get("path"), diff: "diff --git a/src/app.ts b/src/app.ts\n--- a/src/app.ts\n+++ b/src/app.ts\n@@ -1 +1 @@\n-old line\n+new line" };
  if (endpoint === "/api/row") return { id: params.get("id"), role: "assistant", text: "Short excerpt. Full body loaded.", streaming: false };
- assert.equal(endpoint, "/api/diagram"); return { target: { kind: "plan", id: "12345678" }, diagram };
+ assert.equal(endpoint, "/api/diagram"); return params.get("target") === "product" ? { target: { kind: "product" }, diagram: product } : { target: { kind: "plan", id: "12345678" }, diagram };
 }, post: (endpoint, body) => {
  assert.equal(body.target, "12345678");
  if (endpoint === "/api/answer") return dialogs.answer(body);
@@ -124,14 +125,22 @@ try {
  assert(await evaluate("document.querySelector('.files-viewer').getBoundingClientRect().top >= document.querySelector('.files-tree').getBoundingClientRect().bottom - 1"), "phone: tree above the viewer");
  assert.equal(await evaluate("document.getElementById('chat').getClientRects().length"), 0, "phone shows one view at a time");
  await browser("set", "viewport", "1280", "800");
- await browser("focus", "#tab-files"); await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-diagram");
+ // T-01: Project and Plan tabs share the canvas, each with its own diagram; events update only their tab.
+ await browser("focus", "#tab-files"); await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-project");
+ assert.deepEqual(await evaluate("[document.getElementById('canvas').hidden, document.getElementById('empty-diagram').hidden, document.getElementById('empty-diagram').textContent, !!document.querySelector('[data-node=mobile_client]')]"), [false, false, "No project diagram yet.", false]);
+ product = { ...product, revision: 1, nodes: [{ id: "core", label: "Core service", kind: "service" }] }; server.publish("diagram", { target: { kind: "product" }, diagram: product });
+ server.publish("diagram", { target: { kind: "plan", id: "abcdef01" }, diagram: { ...product, nodes: [{ id: "stray", label: "Stray", kind: "service" }] } });
+ await browser("wait", "[data-node=core]");
+ assert.deepEqual(await evaluate("[document.getElementById('empty-diagram').hidden, !!document.querySelector('[data-node=stray]')]"), [true, false], "another plan's diagram event is ignored");
+ await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-plan");
+ assert.deepEqual(await evaluate("[!!document.querySelector('[data-node=mobile_client]'), !!document.querySelector('[data-node=core]'), localStorage.getItem('plan3-tab')]"), [true, false, "plan"]);
  assert.equal(await evaluate("document.getElementById(\"canvas\").hidden"), false);
  assert(await evaluate("(() => { const zoom = document.getElementById('zoom-controls'), canvas = document.getElementById('canvas').getBoundingClientRect(); return !zoom.hidden && zoom.parentElement.classList.contains('left-tabs') && zoom.nextElementSibling.id === 'narrow-left' && zoom.getBoundingClientRect().bottom <= canvas.top; })()"), "zoom controls sit in the tab bar beside Narrow, not over the diagram");
  // R9/E5 at 390 px: Chat, Files and Diagram tabs; the composer and the attach button stay on screen.
  await browser("set", "viewport", "390", "844");
- await browser("click", "#drawer-toggle"); await browser("click", "#mobile-diagram");
+ await browser("click", "#drawer-toggle"); await browser("click", "#mobile-plan");
  assert.deepEqual(await evaluate("[document.getElementById('canvas').getBoundingClientRect().width, document.getElementById('drawer').dataset.open]"), [390, "false"], "picking a view closes the drawer");
- await browser("click", "#drawer-toggle"); assert.equal(await evaluate("document.activeElement.id"), "mobile-diagram", "the drawer opens on the current view");
+ await browser("click", "#drawer-toggle"); assert.equal(await evaluate("document.activeElement.id"), "mobile-plan", "the drawer opens on the current view");
  await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "mobile-chat");
  assert(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button', 'pi-commands', 'wo-commands'].every(id => document.getElementById('drawer').contains(document.getElementById(id)))"), "phone: status line and command buttons live in the drawer");
  await browser("click", "#wo-commands"); await browser("wait", ".command-option");
@@ -196,7 +205,7 @@ try {
  assert.deepEqual(await evaluate("(async () => { const [ok, , outside] = [...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.getAttribute('href')); const a = await fetch(ok), b = await fetch(outside), c = await fetch(ok.replace(/\\.png/, '.txt')); return [a.status, a.headers.get('content-type'), b.status === 403 || b.status === 404, c.status]; })()"), [200, "image/png", true, 400]);
  await browser("click", "[data-id=img_row] .chat-link[href='#']");
  assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
- await browser("click", "#tab-diagram");
+ await browser("click", "#tab-plan");
  chatRows.delete("img_row"); await rm(pasted);
  // The Image button (phones have no clipboard paste) uploads the same way.
  await browser("fill", "#message-input", "");
