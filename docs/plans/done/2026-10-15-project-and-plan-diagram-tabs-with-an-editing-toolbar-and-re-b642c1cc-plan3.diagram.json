@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "kind": "plan",
+  "plan": "b642c1cc",
+  "title": "Project and plan diagram tabs with an editing toolbar and remembered generate directions",
+  "revision": 16,
+  "nodes": [
+    {
+      "id": "new_group",
+      "label": "New group",
+      "kind": "group",
+      "color": 0,
+      "x": 174.99994405110678,
+      "y": 54.66667175292969,
+      "w": 566,
+      "h": 482
+    },
+    {
+      "id": "new_box",
+      "label": "Ke pasa",
+      "kind": "service",
+      "parent": "new_group",
+      "x": 74,
+      "y": 91
+    },
+    {
+      "id": "new_box_2",
+      "label": "New box",
+      "kind": "service",
+      "parent": "new_group",
+      "x": 212,
+      "y": 162
+    },
+    {
+      "id": "new_box_2_2",
+      "label": "New box 2",
+      "kind": "service",
+      "x": 384.8876176800644,
+      "y": -39.62807591756184
+    }
+  ],
+  "edges": [
+    {
+      "id": "new_box_2__new_box",
+      "from": "new_box_2",
+      "to": "new_box",
+      "label": "connection"
+    }
+  ],
+  "notes": []
+}
