@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { closeSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { mkdir, readFile, rename, rm, writeFile, lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -45,11 +45,14 @@ export async function saveSharePort(record: ShareRecord, port: number, directory
 
 type Exec = (command: string, args: string[], options?: { timeout?: number }) => Promise<{ stdout: string; stderr: string; code: number; killed: boolean }>;
 export type Tailnet = { host?: string; login?: string; missing: string[] };
+// The Windows and macOS installers often leave tailscale off PATH; use their standard location when it exists.
+const installed = process.platform === "win32" ? join(process.env.ProgramFiles || "C:\\Program Files", "Tailscale", "tailscale.exe") : process.platform === "darwin" ? "/Applications/Tailscale.app/Contents/MacOS/Tailscale" : "";
+export const tailscaleCommand = () => installed && existsSync(installed) ? installed : "tailscale";
 /** D8: the tailnet host and owner login, or the setup steps still missing. */
 export async function tailscaleStatus(exec: Exec): Promise<Tailnet> {
 	let status;
 	try {
-		const result = await exec("tailscale", ["status", "--json"], { timeout: 10_000 });
+		const result = await exec(tailscaleCommand(), ["status", "--json"], { timeout: 10_000 });
 		status = JSON.parse(result.stdout);
 	} catch { return { missing: ["Install and start Tailscale (https://tailscale.com/download)."] }; }
 	const missing = [], host = typeof status.Self?.DNSName === "string" ? status.Self.DNSName.replace(/\.$/, "") : "";
@@ -64,13 +67,13 @@ export async function tailscaleStatus(exec: Exec): Promise<Tailnet> {
 /** D1/D7: tailnet-only HTTPS on the same port; never Funnel. Re-adding the same mapping is a no-op. */
 export async function serveAdd(exec: Exec, port: number) {
 	if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("Invalid shared session port.");
-	const result = await exec("tailscale", ["serve", "--bg", `--https=${port}`, `http://127.0.0.1:${port}`], { timeout: 15_000 });
+	const result = await exec(tailscaleCommand(), ["serve", "--bg", `--https=${port}`, `http://127.0.0.1:${port}`], { timeout: 15_000 });
 	if (result.code !== 0 || result.killed) throw new Error(`tailscale serve failed: ${(result.stderr || result.stdout).trim()}`);
 }
 /** Removing an absent mapping fails harmlessly; the result says whether one was removed. */
 export async function serveRemove(exec: Exec, port: number) {
 	if (!Number.isInteger(port) || port < 1 || port > 65535) return false;
-	try { return (await exec("tailscale", ["serve", `--https=${port}`, "off"], { timeout: 15_000 })).code === 0; } catch { return false; }
+	try { return (await exec(tailscaleCommand(), ["serve", `--https=${port}`, "off"], { timeout: 15_000 })).code === 0; } catch { return false; }
 }
 
 export type SessionState = "working" | "waiting" | "idle";

@@ -432,7 +432,7 @@ const { existsSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
-const { loadShareRecord, saveSharePort, tailscaleStatus, serveAdd, serveRemove, createDeviceRegistry, createSessionRecords } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
+const { loadShareRecord, saveSharePort, tailscaleStatus, tailscaleCommand, serveAdd, serveRemove, createDeviceRegistry, createSessionRecords } = await createJiti(import.meta.url).import("../extensions/plan3-remote.ts");
 const credentialDir = await mkdtemp(join(tmpdir(), "plan3-remote-test-"));
 let persistent, occupied, fallback;
 try {
@@ -730,7 +730,7 @@ try {
  const tagged = await tailscaleStatus(fake(status({ Self: { DNSName: "pc.tail.ts.net.", UserID: 7, Tags: ["tag:server"] } })));
  assert.equal(tagged.login, undefined); assert.match(tagged.missing[0], /not tagged/);
  const calls = [], exec = async (command, args) => { calls.push([command, ...args]); return { stdout: "", stderr: "handler does not exist", code: args.includes("off") ? 1 : 0, killed: false }; };
- await serveAdd(exec, 4321); assert.deepEqual(calls[0], ["tailscale", "serve", "--bg", "--https=4321", "http://127.0.0.1:4321"]);
+ await serveAdd(exec, 4321); assert.deepEqual(calls[0], [tailscaleCommand(), "serve", "--bg", "--https=4321", "http://127.0.0.1:4321"]);
  assert(!calls.flat().some(arg => /funnel/i.test(arg)), "never Funnel");
  assert.equal(await serveRemove(exec, 4321), false, "removing an absent mapping is harmless");
  await assert.rejects(serveAdd(async () => ({ stdout: "", stderr: "access denied", code: 1, killed: false }), 4321), /access denied/);
