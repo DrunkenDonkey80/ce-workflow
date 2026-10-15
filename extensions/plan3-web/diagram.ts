@@ -13,7 +13,6 @@ export function element<K extends keyof SVGElementTagNameMap>(tag: K, attributes
  return node;
 }
 export function seed(id) { let value = 0; for (const char of id) value = Math.imul(value, 31) + char.charCodeAt(0); return (value & 0x7fffffff) || 1; }
-const FAR = { w: 380, h: 130 };
 // One color per top-level block: [header/stroke, pale tint]; keep in sync with .tone-N in styles.css (CSP blocks inline styles). Boxes inherit their block's color; status is a small tag.
 const PALETTE = [["#4c6ef5", "#edf2ff"], ["#2f9e44", "#ebfbee"], ["#e8590c", "#fff4e6"], ["#7048e8", "#f3f0ff"], ["#1098ad", "#e3fafc"], ["#d6336c", "#fff0f6"], ["#5c940d", "#f4fce3"], ["#495057", "#f1f3f5"]];
 const STATUS = { new: "new", changed: "changed", removed: "removed" };
@@ -63,31 +62,21 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  const details = node => [...lines(node.summary, 212, 4), ...lines(node.tech, 212, 2), ...lines(node.details, 212, 8)];
  // Mid zoom: up to three lines of summary (or tech) in 12px body text under the header.
  const summary = node => lines(node.summary || node.tech, 176, 3, "12px system-ui");
- // Overview: two lines of summary in 20px text so the top-level boxes say what they are.
- const farSummary = node => lines(node.summary || node.tech, FAR.w - 24, 2, "20px system-ui");
  const head = (node, size = 1, w = 240) => (14 + Math.min(2, lines(node.label, (w - 24) / size, 2).length) * 20) * size;
  let built = { data: null, band: "" }, routes = new Map(), bundles = new Map();
  function build(data: Diagram) {
-  const far = view.scale < .6, near = view.scale > 1.6, band = far ? "far" : near ? "near" : "mid";
+  const near = view.scale > 1.6, band = near ? "near" : "mid";
   // Layout and routing depend only on the data and zoom band; panning and hovering reuse them.
   if (built.data === data && built.band === band) return; built = { data, band };
   const byId = new Map(data.nodes.map(node => [node.id, node]));
   const root = id => { let node = byId.get(id); while (node?.parent) node = byId.get(node.parent); return node?.id; };
-  nodes = far ? data.nodes.filter(node => !node.parent) : data.nodes;
-  // The overview lifts edges to top-level boxes and merges each pair into one arrow (double-headed when mutual).
-  const seen = new Map();
-  edges = data.edges.map(edge => far ? { ...edge, from: root(edge.from), to: root(edge.to) } : edge).filter(edge => {
-   if (edge.from === edge.to) return false;
-   if (!far) return true;
-   const key = [edge.from, edge.to].sort().join(":"), first = seen.get(key);
-   if (first) { first.both ||= first.from !== edge.from; return false; }
-   seen.set(key, edge); return true;
-  });
-  boxes = layout({ nodes: far ? nodes.map(node => ({ ...node, kind: node.kind === "group" ? "service" : node.kind })) : nodes, edges }, node => near ? { w: 240, h: head(node) + 30 + details(node).length * 18 + noteSpace(data, node.id) } : far ? { w: FAR.w, h: Math.max(FAR.h, head(node, 2, FAR.w) + 22 + farSummary(node).length * 24) } : { w: 200, h: head(node, 1, 200) + 14 + Math.max(1, summary(node).length) * 15 }, node => 32 + (near ? details(node).length * 18 + noteSpace(data, node.id) : 0));
+  nodes = data.nodes;
+  edges = data.edges.filter(edge => edge.from !== edge.to);
+  boxes = layout({ nodes, edges }, node => near ? { w: 240, h: head(node) + 30 + details(node).length * 18 + noteSpace(data, node.id) } : { w: 200, h: head(node, 1, 200) + 14 + Math.max(1, summary(node).length) * 15 }, node => 32 + (near ? details(node).length * 18 + noteSpace(data, node.id) : 0));
   // Calm default: an edge that leaves a top-level group is drawn once per group pair (with a count) and
   // only appears individually while one of its ends is in focus.
   bundles = new Map();
-  for (const edge of far ? [] : edges) {
+  for (const edge of edges) {
    const from = root(edge.from), to = root(edge.to);
    if (from === to || from === edge.from && to === edge.to) continue;
    const key = [from, to].sort().join(" "), bundle = bundles.get(key) ?? { from, to, count: 0, both: false };
@@ -96,8 +85,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   route();
  }
  function route() {
-  const far = view.scale < .6;
-  routes = routeEdges(boxes, edges, nodes.filter(node => far || node.kind !== "group").map(node => node.id));
+  routes = routeEdges(boxes, edges, nodes.filter(node => node.kind !== "group").map(node => node.id));
   for (const [id, points] of routeEdges(boxes, [...bundles].map(([id, bundle]) => ({ id, ...bundle })), nodes.filter(node => !node.parent).map(node => node.id))) bundles.get(id).points = points;
  }
  // Drag preview: the box and its children follow the pointer and only the arrows are rerouted; the drop
@@ -110,7 +98,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  }
  // Pan and in-band zoom only move the stage; a full redraw (Rough.js strokes for every shape) happens only
  // when the data, zoom band or drag preview changes.
- const band = () => view.scale < .6 ? "far" : view.scale > 1.6 ? "near" : "mid";
+ const band = () => view.scale > 1.6 ? "near" : "mid";
  let painted = { data: null, band: "" };
  function move() {
   const stage = svg.firstElementChild;
@@ -129,25 +117,22 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   const stage = element("g", { transform: `translate(${view.x} ${view.y}) scale(${view.scale})` });
   const near = view.scale > 1.6;
   function drawNode(node) {
-   const box = boxes.get(node.id), group = node.kind === "group", closed = view.scale < .6;
+   const box = boxes.get(node.id), group = node.kind === "group";
    const row = element("g", { "data-node": node.id, tabindex: 0, role: "button", "aria-label": node.label + ", " + node.kind + ". Enter to mention; right-click to add a note; Shift+drag to move." });
-   const [ink, tint] = color(node.id), frame = group && !closed, removed = node.status === "removed";
+   const [ink, tint] = color(node.id), frame = group, removed = node.status === "removed";
    // Open blocks are pale tinted panels; boxes are cards with a colored header and smaller body text.
    row.append(rc.rectangle(box.x, box.y, box.w, box.h, { seed: seed(node.id), roughness: .6, stroke: ink, strokeWidth: frame ? 1.2 : 1.5, strokeLineDash: frame && node.parent ? [8, 5] : undefined, fill: frame ? (node.parent ? "#ffffffaa" : tint) : removed ? "#ced4da" : "#ffffff", fillStyle: removed ? "hachure" : "solid" }));
-   // Overview labels are drawn larger so they stay legible at the small fit scale.
-   const big = closed && !node.parent, size = big ? 2 : 1; // must match .node-label(-far) font sizes, which lines() measures at 16px
-   const label = lines(node.label, (box.w - 24) / size, 2);
-   if (!frame) row.append(rc.rectangle(box.x, box.y, box.w, head(node, size, box.w), { seed: seed(node.id) + 1, roughness: .4, stroke: ink, strokeWidth: 1, fill: ink, fillStyle: "solid" }));
-   label.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + 23 * size + index * 20 * size, class: "node-label" + (big ? " node-label-far" : "") + (frame ? " group-label tone-" + PALETTE.indexOf(color(node.id)) : "") }, text)));
+   const label = lines(node.label, box.w - 24, 2);
+   if (!frame) row.append(rc.rectangle(box.x, box.y, box.w, head(node, 1, box.w), { seed: seed(node.id) + 1, roughness: .4, stroke: ink, strokeWidth: 1, fill: ink, fillStyle: "solid" }));
+   label.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + 23 + index * 20, class: "node-label" + (frame ? " group-label tone-" + PALETTE.indexOf(color(node.id)) : "") }, text)));
    if (STATUS[node.status]) row.append(element("text", { x: box.x + box.w - 8, y: box.y + 14, "text-anchor": "end", class: "status-tag" + (frame ? "" : " on-head") }, STATUS[node.status]));
-   const body = near ? details(node) : big ? farSummary(node) : !frame && !closed ? summary(node) : [];
-   const gap = near ? 18 : big ? 24 : 15;
-   body.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + head(node, size, box.w) + (near ? 22 : big ? 28 : 18) + index * gap, class: near ? "node-detail" : "node-summary" + (big ? " node-summary-far" : "") }, text)));
-   if (group && !closed) row.classList.add("group-node");
+   const body = near ? details(node) : !frame ? summary(node) : [];
+   body.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + head(node, 1, box.w) + (near ? 22 : 18) + index * (near ? 18 : 15), class: near ? "node-detail" : "node-summary" }, text)));
+   if (group) row.classList.add("group-node");
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(node.id); });
    row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: node.id }); else handlers.mention(node.id); } });
    // Open groups cover most of the canvas, so only a click (not hover) focuses them.
-   const hoverable = !group || closed, preview = () => { if (hoverable) { hovered = node.id; applyFocus(); } };
+   const hoverable = !group, preview = () => { if (hoverable) { hovered = node.id; applyFocus(); } };
    row.addEventListener("pointerenter", event => { preview(); handlers.hover?.(node.id, event); });
    row.addEventListener("focus", event => { preview(); handlers.hover?.(node.id, event); }); row.setAttribute("aria-describedby", "hover-card");
    for (const name of ["pointerleave", "blur"]) row.addEventListener(name, () => { if (hoverable) { hovered = null; applyFocus(); } handlers.leave?.(); });
@@ -163,7 +148,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    const row = element("g", { "data-edge": edge.id, tabindex: 0, role: "button", "aria-label": (edge.label || edge.id) + ". Enter to mention." });
    if (bundled) row.classList.add("detail-edge");
    const options = { seed: seed(edge.id), stroke: "#1e1e1e", strokeWidth: 1.4, roughness: .7, strokeLineDash: edge.status === "removed" ? [5, 4] : undefined };
-   if (!arrow(row, routes.get(edge.id), options, view.scale >= .6 && edge.label && { text: edge.label, className: "edge-label" }, edge.both)) continue;
+   if (!arrow(row, routes.get(edge.id), options, edge.label && { text: edge.label, className: "edge-label" })) continue;
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(edge.id); });
    row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: edge.id }); else handlers.mention(edge.id); } });
    row.addEventListener("pointerenter", event => { hovered = edge.id; applyFocus(); handlers.hover?.(edge.id, event); }); row.addEventListener("focus", event => { hovered = edge.id; applyFocus(); handlers.hover?.(edge.id, event); }); row.setAttribute("aria-describedby", "hover-card");
@@ -172,13 +157,13 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   }
   nodes.filter(node => node.kind !== "group").forEach(drawNode);
   handlers.notes?.(stage, boxes, view, rc, data, node => head(node) + 22 + details(node).length * 18);
-  svg.replaceChildren(stage); hovered = null; applyFocus(); applySearch(); svg.dataset.selected = selected ?? ""; svg.dataset.revision = String(data.revision); svg.dataset.band = view.scale < .6 ? "far" : near ? "near" : "mid";
+  svg.replaceChildren(stage); hovered = null; applyFocus(); applySearch(); svg.dataset.selected = selected ?? ""; svg.dataset.revision = String(data.revision); svg.dataset.band = near ? "near" : "mid";
   document.getElementById("zoom-level").textContent = Math.round(view.scale * 100) + "%";
   if (focused) svg.querySelector<SVGElement>(`[data-node="${focused}"]`)?.focus();
  }
  function zoom(factor, x = svg.clientWidth / 2, y = svg.clientHeight / 2) {
   if (gesture) return;
-  const old = view.scale, px = (x - view.x) / old, py = (y - view.y) / old, band = scale => scale < .6 ? 0 : scale > 1.6 ? 2 : 1;
+  const old = view.scale, px = (x - view.x) / old, py = (y - view.y) / old, band = scale => scale > 1.6 ? 1 : 0;
   view.scale = Math.max(.01, Math.min(4, old * factor));
   view.x = x - px * view.scale; view.y = y - py * view.scale;
   // Crossing a zoom band swaps in another layout; keep the top-level box under the pointer (or nearest) where it was.
@@ -192,14 +177,12 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
  }
  function fit() {
   if (!diagram?.nodes.length) return;
-  view.scale = 1;
-  for (let pass = 0; pass < 2; pass++) {
-   build(diagram); const all = [...boxes.values()];
-   const left = Math.min(...all.map(box => box.x)), top = Math.min(...all.map(box => box.y));
-   const w = Math.max(...all.map(box => box.x + box.w)) - left, h = Math.max(...all.map(box => box.y + box.h)) - top;
-   view.scale = Math.max(.01, Math.min(pass === 1 && view.scale < .6 ? .59 : 1.2, (svg.clientWidth - 80) / w, (svg.clientHeight - 100) / h));
-   view.x = (svg.clientWidth - w * view.scale) / 2 - left * view.scale; view.y = (svg.clientHeight - h * view.scale) / 2 - top * view.scale;
-  }
+  // Fit stays below the near band, so one mid layout measures it at any scale.
+  view.scale = 1; build(diagram); const all = [...boxes.values()];
+  const left = Math.min(...all.map(box => box.x)), top = Math.min(...all.map(box => box.y));
+  const w = Math.max(...all.map(box => box.x + box.w)) - left, h = Math.max(...all.map(box => box.y + box.h)) - top;
+  view.scale = Math.max(.01, Math.min(1.2, (svg.clientWidth - 80) / w, (svg.clientHeight - 100) / h));
+  view.x = (svg.clientWidth - w * view.scale) / 2 - left * view.scale; view.y = (svg.clientHeight - h * view.scale) / 2 - top * view.scale;
   draw();
  }
  svg.addEventListener("wheel", event => { event.preventDefault(); const r = svg.getBoundingClientRect(); zoom(Math.exp(-event.deltaY * .0015), event.clientX - r.left, event.clientY - r.top); }, { passive: false });

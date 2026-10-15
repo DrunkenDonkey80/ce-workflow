@@ -85,8 +85,6 @@ h2 { font-size: 15px; font-weight: 600; }
 #diagram .match { filter: drop-shadow(0 0 6px #fab005) drop-shadow(0 0 2px #fab005); }
 .search-box { position: absolute; right: 16px; top: 12px; display: flex; align-items: center; gap: 6px; font-size: 13px; }
 #search { width: 180px; font: inherit; padding: 3px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
-.node-label-far { font-size: 32px; }
-#diagram .node-summary-far { font-size: 20px; }
 .node-detail { font-size: 16px; }
 .edge-label { font-size: 15px; paint-order: stroke; stroke: white; stroke-width: 5px; stroke-linejoin: round; }
 #diagram path { vector-effect: non-scaling-stroke; }

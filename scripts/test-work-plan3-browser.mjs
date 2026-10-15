@@ -171,13 +171,11 @@ try {
  await browser("wait", "--fn", "document.querySelector('.topbar').contains(document.getElementById('model-button')) && document.getElementById('switcher').contains(document.getElementById('session-list')) && document.querySelector('.chat-heading').contains(document.getElementById('connection'))");
  await browser("focus", "#splitter"); await browser("press", "Home");
  await browser("click", "#zoom-fit");
- // The compact layout may fit at mid zoom; zoom out to the overview band explicitly.
- for (let i = 0; i < 6 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "far"; i++) await browser("click", "#zoom-out");
- assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "far");
- assert.equal(await evaluate("document.querySelectorAll(\"[data-node]\").length"), sample.nodes.filter(node => !node.parent).length);
- // Overview boxes carry their summary, not just a title.
- assert.ok(await evaluate("document.querySelectorAll(\".node-summary-far\").length") > 0, "overview boxes show a short description");
- for (let i = 0; i < 3; i++) await browser("click", "#zoom-in");
+ // T-02: no overview band; zoomed far out the mid layout just renders smaller, with every box.
+ for (let i = 0; i < 6; i++) await browser("click", "#zoom-out");
+ assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "mid", "no overview band");
+ assert.equal(await evaluate("document.querySelectorAll(\"[data-node]\").length"), sample.nodes.length);
+ await browser("click", "#zoom-fit");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "mid");
  assert.equal(await evaluate("document.querySelectorAll(\"[data-node]\").length"), sample.nodes.length);
  // Focus mode: cross-group edges collapse into one bundle until an end is hovered or selected.
@@ -273,9 +271,8 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"6\"");
  assert.equal(comments[2].element, "cdn__web_client"); assert.equal(diagram.notes.at(-1).target, "cdn__web_client");
  await browser("click", "#zoom-fit");
- for (let i = 0; i < 6 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "far"; i++) await browser("click", "#zoom-out");
- await browser("hover", "[data-node=backend]");
- assert(await evaluate("document.getElementById(\"hover-card\").textContent.includes(\"Multipart above 100 MB\")"), "collapsed groups reveal descendant comments");
+ await browser("focus", "[data-node=backend]");
+ assert(await evaluate("document.getElementById(\"hover-card\").textContent.includes(\"Multipart above 100 MB\")"), "a group's card shows descendant comments");
  await browser("press", "Escape");
  for (let i = 0; i < 10 && await evaluate("document.getElementById(\"diagram\").dataset.band") !== "near"; i++) await browser("click", "#zoom-in");
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
