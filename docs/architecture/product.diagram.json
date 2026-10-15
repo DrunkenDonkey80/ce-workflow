@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 4,
+  "revision": 5,
   "nodes": [
     {
       "id": "pi_host",
@@ -25,7 +25,7 @@
       "parent": "plan3_group",
       "summary": "/plan3, /plans3, /resume3 commands plus plan3, plan3_diagram, plan3_design tools.",
       "tech": "extensions/plan3.ts",
-      "details": "Owns plan Markdown parsing, step marks, research mode, model phases, architecture reconciliation gate (D8/D15) and the browser workspace lifecycle."
+      "details": "Owns plan Markdown parsing, step marks, research mode, model phases, architecture reconciliation gate (D8/D15), the browser workspace lifecycle and the Generate directions prompt (no automatic product-diagram offer)."
     },
     {
       "id": "plan3_ideas",
@@ -132,7 +132,7 @@
       "label": "Diagram model",
       "kind": "service",
       "parent": "workspace_group",
-      "summary": "Schema v1 validation, revisioned atomic saves, operations and dependents, mentions.",
+      "summary": "Schema v1 validation, revisioned atomic saves, operations and dependents, mentions; toolbar edits as red pending marks the agent settles, saved Generate directions, per-diagram chat context.",
       "tech": "extensions/plan3-diagram.ts"
     },
     {
@@ -140,7 +140,7 @@
       "label": "Local workspace server",
       "kind": "service",
       "parent": "workspace_group",
-      "summary": "127.0.0.1 HTTP + SSE per shared session (stable port/token); token, Origin and tailnet+paired-cookie checks; chat, activity, dialog, status, model/effort and files endpoints.",
+      "summary": "127.0.0.1 HTTP + SSE per shared session (stable port/token); token, Origin and tailnet+paired-cookie checks; chat, activity, dialog, status, model/effort, files, diagram edit and Generate endpoints.",
       "tech": "extensions/plan3-web.ts",
       "details": "Serves browser .ts assets after stripTypeScriptTypes; command dispatch and Stop via ctx.abort. Authenticated image-paste endpoint validates image bytes and writes a temporary file; revision-checked note/move endpoints and HTTP/SSE snapshots synchronize the browser."
     },
@@ -149,9 +149,9 @@
       "label": "Workspace browser app",
       "kind": "client",
       "parent": "workspace_group",
-      "summary": "Rough.js diagram, chat with status line (model/effort/plan menus), Files tab, mobile tabs, prompts and the shared-session switcher.",
+      "summary": "Rough.js diagram with Project/Plan tabs and a desktop editing bar, chat with status line (model/effort/plan menus), Files tab, mobile tabs, prompts and the shared-session switcher.",
       "tech": "extensions/plan3-web/{app,diagram,layout,prompts}.ts, vendored Rough.js",
-      "details": "Grid-packed groups with orthogonal edge routing and calm bundled connections; semantic zoom, tinted cards, Ctrl+F search, plain-drag pan and Shift+drag persisted positions. Collapsed thinking/tool chat blocks, auto-follow with jump-to-bottom, image paste to a temporary file path, and right-click note composition. Browser commands and question dialogs share the live terminal session."
+      "details": "Grid-packed groups with orthogonal edge routing and calm bundled connections; semantic zoom, tinted cards, Ctrl+F search. Drag a box to move it (persisted), drag empty canvas to pan. The editing bar adds boxes/groups, connects, deletes, renames, recolors and resizes as red pending edits; each adds a chat line tied to its diagram, and undoing an unsent add drops its lines. Generate asks for remembered directions. Collapsed thinking/tool chat blocks, auto-follow with jump-to-bottom, image paste to a temporary file path, and right-click note composition. Browser commands and question dialogs share the live terminal session."
     },
     {
       "id": "ask_group",
@@ -511,7 +511,7 @@
     {
       "from": "plan3",
       "to": "settings_files",
-      "label": "phase models, product offer",
+      "label": "phase models",
       "id": "plan3__settings_files"
     },
     {

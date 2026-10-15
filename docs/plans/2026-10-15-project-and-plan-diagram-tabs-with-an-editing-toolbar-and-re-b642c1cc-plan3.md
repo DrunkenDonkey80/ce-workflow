@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T10:02:03.369Z
+updated: 2026-10-15T10:03:01.658Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -172,9 +172,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
   - Covers acceptance examples X1–X6 below; on the phone only viewing and notes (Q-01).
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 5: plan3_diagram (pending marks, directions), plan3_web (edit/Generate endpoints), browser_app (Project/Plan tabs, editing bar, drag-moves-box), plan3 (Generate prompt, no product offer), plan3→settings edge relabeled "phase models". No nodes or edges added or removed; dependents unaffected.
 
 
 ## Global validation
