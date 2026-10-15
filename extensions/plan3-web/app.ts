@@ -199,8 +199,16 @@ document.addEventListener("touchend", event => {
  swipe = undefined;
 }, { passive: true });
 // iOS keeps the layout viewport under the on-screen keyboard; size the page to what is visible so the composer stays reachable.
-const fitViewport = () => document.documentElement.style.setProperty("--app-height", (window.visualViewport?.height ?? window.innerHeight) + "px");
-window.visualViewport?.addEventListener("resize", fitViewport); fitViewport();
+// The browser also scrolls the page to show the focused box and may leave it scrolled (empty space under the form) after
+// the keyboard closes: pin the page to the visible area and undo that scroll on every viewport change.
+const fitViewport = () => {
+ const view = window.visualViewport, root = document.documentElement.style;
+ root.setProperty("--app-height", (view?.height ?? window.innerHeight) + "px"); root.setProperty("--app-top", (view?.offsetTop ?? 0) + "px");
+ if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
+};
+window.visualViewport?.addEventListener("resize", fitViewport); window.visualViewport?.addEventListener("scroll", fitViewport); window.addEventListener("resize", fitViewport);
+// Some keyboards report their final size only after closing; measure again once it has gone.
+document.addEventListener("focusout", () => setTimeout(fitViewport, 350)); fitViewport();
 
 // The top bar sizes Think and the usage bars to the chat panel below them.
 new ResizeObserver(() => document.body.style.setProperty("--chat-px", $("chat").offsetWidth + "px")).observe($("chat"));
