@@ -7,6 +7,7 @@ export interface RemoteQuestion {
 	options: { title: string; description?: string }[];
 	allowMultiple: boolean;
 	allowFreeform: boolean;
+	initialText?: string;
 }
 export type RemoteResponse = { kind: "selection"; selections: string[]; comment?: string } | { kind: "freeform"; text: string };
 export type RemoteBatchAnswer = { status: "skipped" } | { status: "answered"; response: RemoteResponse };

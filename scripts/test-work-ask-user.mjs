@@ -42,6 +42,35 @@ assert.equal(batch.details.cancelled, false);
 assert.deepEqual(batch.details.answers, [{ status: "answered", response: { kind: "selection", selections: ["Ship"] } }, { status: "skipped" }]);
 assert.equal(bus.listenerCount("ask:answer"), 0);
 
+// initialText (D9): the editor opens with the text, the browser receives it, the answer is the edited text.
+{
+ const ask = { question: "Directions?", initialText: "Draw the modules" };
+ let rendered = "";
+ const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: text => text, italic: text => text, underline: text => text, strikethrough: text => text, inverse: text => text };
+ const custom = async factory => {
+  let result; const component = factory({ requestRender() {}, terminal: { rows: 40, columns: 100 } }, theme, { matches: () => false, getKeys: () => [] }, value => { result = value; });
+  rendered = component.render(100).join("\n");
+  return result ?? { kind: "freeform", text: "Draw the modules and their links" };
+ };
+ bus.once("ask:pending", event => assert.equal(event.initialText, "Draw the modules", "the browser gets the pre-filled text"));
+ const edited = await tool.execute("prefill", ask, undefined, undefined, { hasUI: true, ui: { custom, input: () => assert.fail("one-line input cannot pre-fill") } });
+ assert.match(rendered, /Draw the modules/, "the terminal editor opens holding the text");
+ assert.deepEqual(edited.details.response, { kind: "freeform", text: "Draw the modules and their links" });
+ const fallback = await tool.execute("prefill-fallback", ask, undefined, undefined, { hasUI: true, ui: { custom: async () => undefined, editor: async (_title, prefill) => prefill + " too" } });
+ assert.deepEqual(fallback.details.response, { kind: "freeform", text: "Draw the modules too" }, "without the custom UI the editor dialog is pre-filled");
+ bus.once("ask:pending", event => bus.emit("ask:answer", { askId: event.askId, text: "From the browser" }));
+ const browser = await tool.execute("prefill-remote", ask, undefined, undefined, { hasUI: true, ui: { custom: () => new Promise(() => {}) } });
+ assert.deepEqual(browser.details.response, { kind: "freeform", text: "From the browser" });
+ await assert.rejects(tool.execute("prefill-options", { ...question, initialText: "x" }, undefined, undefined, ctx), /without options/);
+ await assert.rejects(tool.execute("prefill-long", { question: "Long?", initialText: "x".repeat(16_001) }, undefined, undefined, ctx), /at most/);
+ bus.once("ask:pending", event => {
+  assert.equal(event.questions[1].initialText, "Saved");
+  bus.emit("ask:answer", { askId: event.askId, answers: [{ status: "skipped" }, { status: "answered", response: { kind: "freeform", text: "Saved, edited" } }] });
+ });
+ const prefilledBatch = await tool.execute("prefill-batch", { questions: [question, { question: "Notes?", initialText: "Saved" }] }, undefined, undefined, { hasUI: true, ui: { custom: () => new Promise(() => {}) } });
+ assert.deepEqual(prefilledBatch.details.answers[1], { status: "answered", response: { kind: "freeform", text: "Saved, edited" } });
+}
+
 for (const external of [false, true]) {
  let start, registrations = 0, warnings = 0;
  factory({ on: (name, fn) => { assert.equal(name, "session_start"); start = fn; },

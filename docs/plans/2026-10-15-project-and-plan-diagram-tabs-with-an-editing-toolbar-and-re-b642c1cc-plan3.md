@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:21:46.155Z
+updated: 2026-10-15T09:24:15.048Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -136,12 +136,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 ### Phase 2: Pre-filled text in ask_user [code]
 
-- [ ] **A-01** Add per-question `initialText` to ask_user: terminal editor opens with the text; browser textarea holds it (D9).
-  - A single question without options uses `ctx.ui.input` today (`extensions/ask-user/index.ts` around line 2997), which cannot pre-fill; with `initialText` it uses `ctx.ui.editor(prompt, initialText)` instead. Batch questions pre-fill the existing editor (`showFreeformMode`).
-  - External pi-ask-user 0.16.x (still allowed by `loadPlan3Ask` in `extensions/plan3-ask.ts`) has no `initialText`: ce-workflow's pre-filled prompts then fall back to `ctx.ui.editor` in the terminal only, and the page says the prompt waits in the terminal. Resolve keeps its current path.
-  - Single and batch questions; answer is the edited text; empty submission behaves like today's empty freeform.
-  - Record the divergence in `extensions/ask-user/UPSTREAM.md`.
-  - Check: C4, C7.
+- [x] **A-01** ask_user initialText (single and batch, no options, ≤16k): terminal editor and dialog fallbacks pre-filled, browser textarea holds it; loadPlan3Ask reports prefills; UPSTREAM.md divergence.
 
 ### Phase 3: Tabs, overview removal and composer height [code]
 

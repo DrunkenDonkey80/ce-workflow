@@ -15,6 +15,7 @@ Files: index.ts and single-select-layout.ts. Keep the terminal UI and result con
 - Result rendering handles missing details before narrowing batch versus single results, preserving cancellation output while passing TypeScript checking.
 - remote.ts adds validated single/batch answer decoding and an abortable first-answer-wins race, always emitting ask:pending and correlated ask:closed. index.ts wraps each native prompt with it; upstream answer summaries, cancellation and batch skipped states stay unchanged. Browser answers are not environment-gated. The same race carries typed list menus and browser cancellation; work-dialogs.ts aborts losing overlays/selectors. Intercom forwarding remains opt-in in work-ask-remote.ts and skips list menus.
 
+- `initialText` (single question or batch entry, no options, at most 16,000 characters) pre-fills the answer: the AskComponent opens in its multi-line editor holding the text (a single pre-filled question skips the one-line `ui.input`, which cannot pre-fill), dialog fallbacks use `ui.editor(title, text)`, and the browser prompt shows it in its textarea. Used by Plan3 Generate for remembered directions; `loadPlan3Ask` reports `prefills: false` for an external pi-ask-user so callers fall back to the terminal editor.
 - Factory registration waits for session_start, after all extensions load; if another ask_user exists it skips ours and warns once (D12). registerAskUser is exported so the Plan3 command adapter can instantiate the same tool without lifecycle hooks.
 
 ## Updating

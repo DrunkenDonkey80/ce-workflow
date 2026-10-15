@@ -86,7 +86,9 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
    // One box like the terminal: with an option chosen it is the comment, with none it is your own answer.
    const freeform = question.allowFreeform || !question.options.length, commented = ask.allowComment && question.options.length > 0;
    const placeholder = !question.options.length ? "Write your answer" : freeform && commented ? "Comment on your choice, or choose nothing and write your own answer" : freeform ? "Or choose nothing and write your own answer" : "Optional comment";
-   const text = node("textarea", { rows: 3, maxLength: 16000, placeholder }); text.setAttribute("aria-label", placeholder + ": " + question.question);
+   // A pre-filled answer (ask_user initialText) opens ready to edit, with room for it.
+   const prefilled = typeof question.initialText === "string" && !question.options.length;
+   const text = node("textarea", { rows: prefilled ? 10 : 3, maxLength: 16000, placeholder, value: prefilled ? question.initialText : "" }); text.setAttribute("aria-label", placeholder + ": " + question.question);
    if (freeform || commented) section.append(text);
    const skip = node("input", { type: "checkbox" });
    if (ask.questions) { const label = node("label", { className: "prompt-option" }); label.append(skip, "Skip this question"); section.append(label); }

@@ -133,12 +133,14 @@ interface BatchQuestionInput {
    options?: AskOptionInput[];
    allowMultiple?: boolean;
    allowFreeform?: boolean;
+   initialText?: string;
 }
 
 interface AskParams {
    question?: string;
    questions?: BatchQuestionInput[];
    context?: string;
+   initialText?: string;
    options?: AskOptionInput[];
    allowMultiple?: boolean;
    allowFreeform?: boolean;
@@ -177,6 +179,7 @@ interface BatchQuestion {
    options: QuestionOption[];
    allowMultiple: boolean;
    allowFreeform: boolean;
+   initialText?: string;
 }
 
 type BatchAnswer = { status: "answered"; response: AskResponse } | { status: "skipped" };
@@ -197,7 +200,16 @@ function isBatchDetails(details: AskToolDetails | AskBatchDetails): details is A
 const BATCH_MIN_QUESTIONS = 2;
 const BATCH_MAX_QUESTIONS = 4;
 // Single-question fields that a batch sets per entry instead of at the top level.
-const BATCH_ENTRY_FIELDS = ["context", "options", "allowMultiple", "allowFreeform"] as const;
+const BATCH_ENTRY_FIELDS = ["context", "options", "allowMultiple", "allowFreeform", "initialText"] as const;
+const INITIAL_TEXT_MAX = 16_000;
+
+// ce-workflow divergence (UPSTREAM.md): a pre-filled answer only applies to a question without options.
+function initialTextFor(value: unknown, options: QuestionOption[], label: string): string | undefined {
+   if (value === undefined || value === null) return undefined;
+   if (typeof value !== "string" || value.length > INITIAL_TEXT_MAX) throw new Error(`${label} must be a string of at most ${INITIAL_TEXT_MAX} characters.`);
+   if (options.length > 0) throw new Error(`${label} pre-fills a text answer, so it needs a question without options.`);
+   return value;
+}
 
 type AskUIResult = AskResponse;
 
@@ -1226,9 +1238,11 @@ class AskComponent extends Container {
       keybindings: KeybindingsManager,
       shortcuts: ResolvedAskShortcuts,
       onDone: (result: AskUIResult | null) => void,
+      initialText = "",
    ) {
       super();
 
+      this.freeformDraft = initialText;
       this.question = question;
       this.context = context;
       this.options = options;
@@ -2078,6 +2092,7 @@ class BatchAskComponent implements Component {
          keybindings,
          settings.shortcuts,
          (result) => this.handlePageDone(index, result),
+         entry.initialText,
       ));
       this.updateChrome();
    }
@@ -2375,7 +2390,7 @@ async function askViaDialogs(
  * shares one deadline.
  */
 async function askBatchViaDialogs(
-   ui: { select: Function; input: Function },
+   ui: { select: Function; input: Function; editor?: Function },
    questions: BatchQuestion[],
    allowComment: boolean,
    signal: AbortSignal | undefined,
@@ -2392,7 +2407,8 @@ async function askBatchViaDialogs(
          const prompt = entry.context ? `${title}\n\nContext:\n${entry.context}` : title;
          const answerOpts = dialogStageOptions(dialogOpts, deadline);
          if (answerOpts === null) return null;
-         const answer = await ui.input(prompt, "Type your answer...", answerOpts) as string | undefined;
+         // The editor dialog takes no signal; only pre-filled questions need it.
+         const answer = await (entry.initialText !== undefined && ui.editor ? ui.editor(prompt, entry.initialText) : ui.input(prompt, "Type your answer...", answerOpts)) as string | undefined;
          response = signal?.aborted ? null : createFreeformResponse(answer);
       } else {
          response = await askViaDialogs(
@@ -2618,6 +2634,7 @@ function normalizeBatchQuestions(params: AskParams): BatchQuestion[] {
          options,
          allowMultiple: entry.allowMultiple ?? false,
          allowFreeform: entry.allowFreeform ?? true,
+         initialText: initialTextFor(entry.initialText, options, `${label}.initialText`),
       };
    });
 }
@@ -2876,6 +2893,9 @@ export function registerAskUser(pi: ExtensionAPI) {
                   allowFreeform: Type.Optional(
                      Type.Boolean({ description: "Add a freeform text option. Default: true" }),
                   ),
+                  initialText: Type.Optional(
+                     Type.String({ description: "Pre-filled answer text the user edits; only for an entry without options" }),
+                  ),
                }),
                {
                   minItems: BATCH_MIN_QUESTIONS,
@@ -2897,6 +2917,9 @@ export function registerAskUser(pi: ExtensionAPI) {
          ),
          allowFreeform: Type.Optional(
             Type.Boolean({ description: "Add a freeform text option. Default: true" }),
+         ),
+         initialText: Type.Optional(
+            Type.String({ description: "Pre-filled answer text the user edits and submits (for example saved directions); only for a question without options" }),
          ),
          allowComment: Type.Optional(
             Type.Boolean({ description: "Collect an optional comment after selecting one or more options. Default: PI_ASK_USER_ALLOW_COMMENT env var if set, otherwise false." }),
@@ -2968,13 +2991,14 @@ export function registerAskUser(pi: ExtensionAPI) {
          const settings = resolvePromptSettings(params as AskParams);
          const { allowComment } = settings;
          const options = rawOptions.map(coerceOption).filter((option): option is QuestionOption => option !== null);
+         const initialText = initialTextFor((params as AskParams).initialText, options, "initialText");
          const normalizedContext = context?.trim() || undefined;
          const dialogOpts = signal
             ? (timeout ? { signal, timeout } : { signal })
             : (timeout ? { timeout } : undefined);
          const events = createAskEventEmitter(pi);
          const subject: AskEventSubject = { question, context: normalizedContext, options };
-         const remoteSubject = { ...subject, allowMultiple, allowFreeform, allowComment };
+         const remoteSubject = { ...subject, allowMultiple, allowFreeform, allowComment, ...(initialText !== undefined ? { initialText } : {}) };
 
          if (rawOptions.length > 0 && options.length === 0) {
             throw new Error(
@@ -2994,7 +3018,8 @@ export function registerAskUser(pi: ExtensionAPI) {
             );
          }
 
-         if (options.length === 0) {
+         // A pre-filled answer needs the multi-line editor, so it takes the custom prompt path below.
+         if (options.length === 0 && initialText === undefined) {
             const prompt = normalizedContext ? `${question}\n\nContext:\n${normalizedContext}` : question;
             const response = await whileBlocked(pi, () => raceRemoteAsk(pi, remoteSubject, signal, timeout,
                payload => remoteResponse(payload, remoteSubject, allowComment), async localSignal => {
@@ -3043,8 +3068,14 @@ export function registerAskUser(pi: ExtensionAPI) {
                keybindings,
                settings.shortcuts,
                complete,
+               initialText,
             ),
-            fallback: () => askViaDialogs(
+            fallback: async () => initialText !== undefined
+               ? createFreeformResponse(await ctx.ui.editor(normalizedContext ? `${question}
+
+Context:
+${normalizedContext}` : question, initialText))
+               : askViaDialogs(
                ctx.ui,
                question,
                normalizedContext,

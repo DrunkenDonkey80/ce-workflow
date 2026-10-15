@@ -33,5 +33,6 @@ export async function loadPlan3Ask(pi: ExtensionAPI) {
 	if (typeof factory !== "function") throw new Error("pi-ask-user does not export an extension factory.");
 	await factory({ events: pi.events, registerTool: (tool: ToolDefinition) => { if (tool.name === "ask_user") ask = tool; } });
 	if (typeof ask?.execute !== "function") throw new Error("pi-ask-user did not register a compatible ask_user tool.");
-	return ask;
+	// External pi-ask-user 0.16.x has no initialText; callers then pre-fill ctx.ui.editor in the terminal only.
+	return Object.assign(ask, { prefills: vendored });
 }
