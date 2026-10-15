@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T15:05:50.181Z
+updated: 2026-10-15T15:10:09.882Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -187,7 +187,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 ### Phase 8: Live acceptance [human] [code]
 
-- [human] **H-01** User tries the flow on the desktop and records findings: new plan, empty Plan tab, draw, send, red marks clear.
+- [wip] **H-01** User tries the flow on the desktop and records findings: new plan, empty Plan tab, draw, send, red marks clear.
   - Covers acceptance examples X1–X6 below; on the phone only viewing and notes (Q-01).
 ### P-ARCH [code] Product architecture
 
