@@ -65,6 +65,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		const label = !night ? undefined : night.complete ? "NIGHT COMPLETE · Alt+N to clear" : night.paused ? `NIGHT PAUSED: ${night.paused} · Alt+N to turn off` : "NIGHT MODE · Alt+N to stop";
 		if (ctx.mode === "tui") ctx.ui?.setWidget?.(ENTRY, label ? [ctx.ui.theme?.fg?.(night.paused || night.complete ? "warning" : "accent", `━━ ${label} ━━`) ?? `━━ ${label} ━━`] : undefined);
 		else if (label) ctx.ui?.notify?.(label, "info");
+		pi.events?.emit?.("wo:modes-changed", {});
 	}
 	function stop(ctx, reason, complete = false) {
 		night = { ...night, paused: complete ? undefined : reason, complete };
@@ -185,5 +186,6 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 			banner(ctx);
 		},
 		shutdown: release,
+		mode: () => !night ? "off" : night.complete ? "complete" : night.paused ? "paused" : "on",
 	};
 }

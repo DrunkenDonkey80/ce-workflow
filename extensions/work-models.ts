@@ -1393,6 +1393,7 @@ function showResearchContext(ctx) {
 		? "RESEARCH STOPPING… · waiting for work to finish · Alt+R to keep on"
 		: "RESEARCH MODE · explore, don't implement · Alt+R to exit";
 	ctx.ui?.setStatus?.("work-research-context", researchContext ? label : undefined);
+	workExtensionPi?.events?.emit?.("wo:modes-changed", {}); // the shared web page shows the mode too
 	ctx.ui?.setWidget?.("work-research-context", researchContext && ctx.mode === "tui"
 		? [ctx.ui.theme?.fg?.(researchContext.stopping ? "warning" : "accent", `━━ ${label} ━━`) ?? label,
 			"Temporary notes in system temp · /research notes for path"]
@@ -4012,7 +4013,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 	});
 
 	// Browser workspace (plan3-web): /wo subcommands for its command picker and the footer's quota rows.
-	pi.events?.on?.("wo:web-info",(info)=>{ info.wo=Object.entries(woSubcommands()).map(([value,description])=>({value,description})); info.usage=subscriptionFooterController?.webUsage?.(); });
+	pi.events?.on?.("wo:web-info",(info)=>{ info.wo=Object.entries(woSubcommands()).map(([value,description])=>({value,description})); info.usage=subscriptionFooterController?.webUsage?.(); info.research=researchContext?(researchContext.stopping?"stopping":"on"):"off"; });
 	pi.registerCommand("wo", {
  description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo share, /wo compact or /wo fact",
  getArgumentCompletions: (prefix) => {

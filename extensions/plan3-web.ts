@@ -552,6 +552,10 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 			return text.length > 16_000 ? text.slice(0, 16_000) + "\n… truncated" : text;
 		} catch { return "[Unserializable tool data]"; }
 	};
+	// Tool results are { content: [{ type: "text", text }] }: show their text, not escaped JSON.
+	const resultText = (value: unknown) => Array.isArray((value as { content?: unknown })?.content)
+		? brief((value as { content: { type?: string; text?: string }[] }).content.map(part => part?.type === "text" ? part.text ?? "" : part?.type === "image" ? "[image]" : "").filter(Boolean).join("\n"))
+		: brief(value);
 	const snapshot = ctx => {
 		const hasPendingMessages = ctx?.hasPendingMessages?.();
 		if (hasPendingMessages === false) queued.length = 0;
@@ -570,7 +574,8 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		while (tools.length > 50 || Buffer.byteLength(JSON.stringify(tools)) > 512_000) tools.shift();
 		publish("tool", row);
 	};
-	pi.on("agent_start", () => { working = true; interrupted = false; thinking = ""; error = ""; thoughts.push("thinking", true); emit(); });
+	// Each run starts a fresh tool list; finished calls stay in the chat rows.
+	pi.on("agent_start", () => { tools.length = 0; working = true; interrupted = false; thinking = ""; error = ""; thoughts.push("thinking", true); emit(); });
 	pi.on("agent_settled", event => {
 		working = false; interrupted = Boolean(event.aborted); queued.length = 0;
 		for (const row of tools) if (row.state === "running") { row.state = interrupted ? "interrupted" : "settled"; publish("tool", row); }
@@ -597,10 +602,10 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		emit();
 	});
 	pi.on("tool_execution_start", event => tool(event, { state: "running", startedAt: Date.now(), args: brief(event.args) }));
-	pi.on("tool_execution_update", event => tool(event, { progress: brief(event.partialResult) }));
+	pi.on("tool_execution_update", event => tool(event, { progress: resultText(event.partialResult) }));
 	pi.on("tool_execution_end", event => {
 		const startedAt = tools.find(row => row.id === event.toolCallId)?.startedAt;
-		tool(event, { state: event.isError ? "error" : "done", result: brief(event.result), durationMs: event.durationMs ?? (startedAt === undefined ? undefined : Date.now() - startedAt) });
+		tool(event, { state: event.isError ? "error" : "done", result: resultText(event.result), durationMs: event.durationMs ?? (startedAt === undefined ? undefined : Date.now() - startedAt) });
 	});
 	// Any blocking terminal dialog; the page hides it while a bridged ask_user/Plan3 dialog is open there.
 	pi.on("ui_prompt_start", event => { dialog = brief(event.title || `${event.kind} prompt`).slice(0, 200); emit(); });

@@ -133,6 +133,14 @@ h2 { font-size: 15px; font-weight: 600; }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 #connection { font-size: 13px; color: var(--muted); }
+.modes { display: flex; gap: 6px; margin-left: auto; }
+.mode-chip { font: inherit; font-size: 12px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
+#mode-research[aria-pressed=true] { border-color: var(--error); background: var(--error); color: #fff; }
+#mode-night[aria-pressed=true] { border-color: var(--accent); background: var(--accent); color: #fff; }
+/* The chat panel takes the active mode's colour, like the terminal's research/night banners. */
+.chat[data-mode=research] { box-shadow: inset 4px 0 0 var(--error); background: color-mix(in srgb, var(--error) 7%, var(--chat)); }
+.chat[data-mode=research-stopping] { box-shadow: inset 4px 0 0 color-mix(in srgb, var(--error) 50%, transparent); }
+.chat[data-mode=night] { box-shadow: inset 4px 0 0 var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--chat)); }
 /* Desktop: one line in the top bar. Phones (drawer): line 1 buttons, line 2 full-width progress bars. */
 .status-line { position: relative; display: flex; align-items: center; gap: 6px; flex: 2 1 0; min-width: 0; font-size: 13px; }
 .status-row { display: contents; }

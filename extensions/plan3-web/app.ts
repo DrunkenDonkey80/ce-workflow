@@ -54,6 +54,12 @@ function renderShell() {
  $("plan-button").title = plan ? plan.title + " — plan actions" : "Start a new plan";
  setBar($("plan-button"), plan?.total ? (plan.done ?? 0) / plan.total * 100 : 0, "accent");
  for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
+ // Session modes: chips toggle them; the chat panel takes the mode's colour.
+ const modes = (status as { modes?: { research?: string; night?: string } })?.modes ?? {}, research = modes.research ?? "off", night = modes.night ?? "off";
+ $("mode-research").setAttribute("aria-pressed", String(research === "on")); $("mode-research").textContent = research === "stopping" ? "Research: stopping" : "Research";
+ $("mode-night").setAttribute("aria-pressed", String(night !== "off")); $("mode-night").textContent = night === "paused" ? "Night: paused" : night === "complete" ? "Night: done" : "Night";
+ for (const id of ["mode-research", "mode-night"] as const) ($(id) as HTMLButtonElement).disabled = !state.connected || messageSending;
+ $("chat").dataset.mode = research !== "off" ? (research === "stopping" ? "research-stopping" : "research") : night !== "off" ? "night" : "";
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : "Idle";
  $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting ? "working" : "idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
@@ -73,7 +79,9 @@ function renderActivity() {
  if (data.interrupted) root.append(make("p", "Run interrupted.", "activity-status"));
  if (data.error) { const error = make("p", data.error, "activity-error"); error.setAttribute("role", "alert"); root.append(error); }
  if (data.thinking) { const thinking = section("thinking", "Thinking"); thinking.className = "thinking-row"; thinking.append(make("pre", data.thinking)); }
- for (const tool of data.tools ?? []) {
+ // Only the running run's calls show here; finished calls stay inside the chat rows, so the reply is the last thing shown.
+ const tools = data.working ? data.tools ?? [] : [];
+ for (const tool of tools) {
   const row = section(tool.id, tool.name + " · " + tool.state + (tool.durationMs === undefined ? "" : " · " + Math.round(tool.durationMs) + " ms"));
   row.className = "tool-row tool-" + (tool.state === "error" ? "error" : tool.state === "done" ? "ok" : "pending") + (tool.parent ? " nested-tool" : "");
   for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
@@ -83,7 +91,7 @@ function renderActivity() {
   queue.append(make("p", "May be stale; edit or cancel the real queue in Pi.", "activity-caution"));
   for (const item of data.queue ?? []) queue.append(make("p", item.delivery + ": " + item.text));
  }
- if (data.tools?.length) root.append(make("p", "Text-only excerpts; custom tool renderers and images stay in Pi.", "activity-caution"));
+ if (tools.length) root.append(make("p", "Text-only excerpts; custom tool renderers and images stay in Pi.", "activity-caution"));
  pinChat();
 }
 
@@ -517,6 +525,13 @@ for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-command
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }
 });
+// Mode chips run the same commands as the terminal; the next status event redraws them.
+async function toggleMode(text: string) {
+ if (messageSending) return; messageSending = true; renderShell();
+ try { await post("message", { text }); } catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
+}
+$("mode-research").addEventListener("click", () => void toggleMode("/research " + ($("mode-research").getAttribute("aria-pressed") === "true" ? "off" : "on")));
+$("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("mode-night").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 // D18 switcher: other shared sessions on this PC, colour-coded; links work remotely, where one paired cookie covers every port.
 type Session = { id: string; name: string; cwd: string; port: number; state: "working" | "waiting" | "idle"; revision: number; unseen: boolean };
 let sessionsTimer = 0;
@@ -667,11 +682,23 @@ function applyUpdate(event: MessageEvent, update) {
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
 listen("status", value => { state.status = value; renderShell(); });
-listen("plan", value => { if (value.id === target) { state.plan = value; renderShell(); } });
+// Plan events always describe Pi's current plan. When Pi switches plans, the page follows it,
+// unless the reader picked another plan in the menu: that view stays until Pi switches again.
+let currentPlan: string | null = null;
+listen("plan", value => {
+ if (value.id !== target && value.id !== currentPlan) {
+  target = value.id;
+  const query = new URLSearchParams(location.search); if (query.has("target")) { query.set("target", value.id); history.replaceState(null, "", "?" + query + location.hash); }
+  void loadDiagram();
+ }
+ currentPlan = value.id;
+ if (value.id === target) { state.plan = value; renderShell(); }
+});
 listen("snapshot", value => {
  if (build && value.build && value.build !== build) { location.reload(); return; }
  build ||= value.build ?? ""; retryDelay = 1000;
  if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;
+ currentPlan = value.current ?? null;
  state.connected = true; state.plan = value.plan; state.status = value.status ?? null; state.activity = value.activity ?? {}; state.more = !!value.more;
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
  // Dialogs over 16 KB arrive brief; fetch their full body.
@@ -684,7 +711,8 @@ listen("diagram", value => {
 listen("message", row => { chat.set(row.id, row); renderChat(); });
 listen("dialog", value => { promptView.pending(value); renderShell(); });
 listen("dialog_closed", value => { promptView.closed(value.askId); renderShell(); });
-listen("activity", value => { state.activity = { ...state.activity, ...value }; renderActivity(); renderShell(); });
+// A new run starts with an empty tool list (the server clears its own at agent_start).
+listen("activity", value => { state.activity = { ...state.activity, ...value, ...(value.working && !state.activity.working && !value.tools ? { tools: [] } : {}) }; renderActivity(); renderShell(); });
 // Appended text per D21: apply only at the current length, ignore stale, refetch the row on a gap.
 listen("delta", delta => {
  const row = chat.get(delta.id), text = applyText(row && !row.excerpt ? row.text : undefined, delta.offset, delta.text);

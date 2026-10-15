@@ -255,6 +255,7 @@ activityHooks.get("tool_execution_end")({ toolCallId: "tool1", toolName: "read",
 assert.equal(activityMirror.snapshot().thinking, "Reasoning");
 assert.equal(activityMirror.snapshot().tools[0].state, "done");
 assert.equal(activityMirror.snapshot().tools[0].durationMs, 12);
+assert.deepEqual([activityMirror.snapshot().tools[0].progress, activityMirror.snapshot().tools[0].result], ["half", "[image]\nresult"], "tool results show their text, not JSON");
 activityHooks.get("tool_execution_start")({ toolCallId: "tool2", toolName: "bash" });
 activityHooks.get("tool_execution_end")({ toolCallId: "tool2", toolName: "bash", result: "ok" });
 assert(Number.isFinite(activityMirror.snapshot().tools[1].durationMs));
@@ -383,6 +384,8 @@ try {
  } finally { Date.now = realNow; streamMirror.reset(); await live.close(); }
 }
 assert.equal(applyText("abc", 0, "x"), "x"); assert.equal(applyText("abc", 1, "b"), "stale"); assert.equal(applyText("abc", 4, "d"), "gap"); assert.equal(applyText(undefined, 2, "c"), "gap"); assert.equal(applyText("abc", 2, "cd"), "abcd");
+assert(activityMirror.snapshot().tools.length > 0); activityHooks.get("agent_start")({});
+assert.equal(activityMirror.snapshot().tools.length, 0, "a new run starts with an empty tool list");
 mirror.reset(); activityMirror.reset();
 assert.deepEqual(mirror.snapshot(), []); assert.deepEqual(activityMirror.snapshot().tools, []);
 assert.equal(activityMirror.snapshot().error, ""); assert.equal(activityMirror.snapshot().compacting, false);

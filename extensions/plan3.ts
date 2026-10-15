@@ -818,7 +818,10 @@ export default function plan3(pi) {
 			if (label !== herdrTab) { herdrTab = label; if (webInstance && webCtx) { publishStatus(webCtx); publishSession(); } }
 		} catch { /* herdr is optional; the title falls back to folder and plan. */ }
 	}
-	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), folder: ctx?.cwd ? path.basename(ctx.cwd) : "", tab: herdrTab });
+	// Session modes for the page: research comes from work-models (absent when that extension is off), night from Plan3.
+	const webModes = () => { const info: { research?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode() }; };
+	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), folder: ctx?.cwd ? path.basename(ctx.cwd) : "", tab: herdrTab, modes: webModes() });
+	pi.events?.on?.("wo:modes-changed", () => { if (webInstance && webCtx) publishStatus(webCtx); });
 	const webPlan = (plan, bias) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias });
 	async function webModels(ctx) {
 		const scoped = (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => modelRef(entry.model)), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
@@ -926,11 +929,11 @@ export default function plan3(pi) {
 		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
 		webServer ??= createPlan3Web({ port: shareRecord.port, token: shareRecord.token, post: postWeb, read: readWeb, remote: () => tailnet.port ? tailnet : undefined, device: pairedDevice, pair: approvePairing, root: () => webCtx?.cwd, viewers: ids => { viewers = ids; setShareStatus(webCtx); }, sessions: { list: device => sessions.list(device), seen: (device, revision) => sessions.seen(device, revision) }, snapshot: async requestedTarget => {
-			const target = requestedTarget ?? await displayedWebTarget();
+			const current = await displayedWebTarget(), target = requestedTarget ?? current;
 			const resolved = await resolveWebTarget(target);
 			await refreshHerdrTab();
 			const plan = resolved.kind === "plan" ? webPlan(resolved.plan, biasOf(webCtx, resolved.plan, split(await readFile(resolved.plan.file, "utf8")).lines, availOf(resolved.plan.file))) : undefined;
-			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, status: webStatus(webCtx), ...(plan ? { plan } : {}) });
+			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, current: current.kind === "plan" ? current.id : null, status: webStatus(webCtx), ...(plan ? { plan } : {}) });
 		} }).then(async server => {
 			const previous = shareRecord.port;
 			try { await saveSharePort(shareRecord, server.port); }

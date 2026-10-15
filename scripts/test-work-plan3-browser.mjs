@@ -441,6 +441,19 @@ try {
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').dataset.tone"), "seen"); assert.deepEqual(seenCalls.at(-1), { device: "local", revision: 4 });
  status = { ...status, model: { provider: "t", id: "term", name: "Terminal pick" } }; server.publish("status", status);
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick: Low'");
+ // Session modes: chips mirror research/night, tint the chat and send the toggle command.
+ server.publish("status", { ...status, modes: { research: "on", night: "off" } });
+ await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === 'research' && document.getElementById('mode-research').getAttribute('aria-pressed') === 'true'");
+ await browser("click", "#mode-research"); await browser("wait", "--fn", "!document.getElementById('mode-research').disabled");
+ assert.equal(commands.at(-1), "/research off");
+ server.publish("status", { ...status, modes: { research: "off", night: "on" } });
+ await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === 'night' && document.getElementById('mode-night').getAttribute('aria-pressed') === 'true'");
+ server.publish("status", status); await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === ''");
+ // Pi switching its current plan moves the page to it (and back).
+ server.publish("plan", { id: "87654321", title: "Newer plan", done: 0, total: 16, bias: 0 });
+ await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('Newer plan')");
+ server.publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: 0 });
+ await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('0/16') === false && !document.getElementById('plan-button').textContent.includes('Newer plan')");
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
@@ -451,6 +464,9 @@ try {
  activity.tools[0] = { ...activity.tools[0], state: "error", result: "Read failed", durationMs: 100 }; activity.compacting = false; activity.error = "A safe error"; server.publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"activity\").textContent.includes(\"Read failed\")");
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), true, "tool updates preserve disclosure state");
+ // A settled run hides its tool list, so the final reply is the last thing shown.
+ server.publish("activity", { ...activity, working: false }); await browser("wait", "--fn", "document.querySelector('#activity details[data-id=tool_1]') === null");
+ server.publish("activity", activity); await browser("wait", "#activity details[data-id=tool_1]");
  // Sending from a scrolled-up chat jumps to the bottom and follows the echoed message.
  for (let i = 0; i < 30; i++) { const row = { id: "filler_" + i, role: "assistant", text: "Filler line " + i, streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
  await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=filler_29]\") !== null");
