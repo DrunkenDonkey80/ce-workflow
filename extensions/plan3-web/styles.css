@@ -68,7 +68,6 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-body.diff .meta { color: var(--muted); }
 .files-empty { color: var(--muted); font-size: 13px; padding: 4px; }
 @media (max-width: 899px) { .files { grid-template-columns: none; grid-template-rows: minmax(120px, 40%) minmax(0, 1fr); } .files-tree { border-right: 0; border-bottom: 1px solid var(--line); } }
-.expand-left { align-self: start; margin: 8px 4px; padding: 6px 8px; }
 .canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: #ffffff; }
 /* The diagram stays a light sketch, inverted like Excalidraw's dark mode. */
 @media (prefers-color-scheme: dark) { .canvas { background: #121212; } #diagram { filter: invert(93%) hue-rotate(180deg); } }
@@ -141,6 +140,7 @@ h2 { font-size: 15px; font-weight: 600; }
 /* U-03: an "A+" cursor over labels says a click edits the text. */
 #diagram .node-label { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18'%3E%3Ctext x='1' y='15' font-family='Arial' font-size='15' font-weight='bold' fill='%23fff' stroke='%23000' stroke-width='3' paint-order='stroke'%3EA+%3C/text%3E%3C/svg%3E") 6 9, text; }
 #diagram .draw-preview { fill: none; stroke-width: 2px; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+#diagram .connect-target { filter: drop-shadow(0 0 6px var(--focus)) drop-shadow(0 0 2px var(--focus)); }
 #diagram .connect-preview { stroke: var(--focus); stroke-width: 2px; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 #diagram .drop-target { filter: drop-shadow(0 0 6px var(--focus)); }
 #comment-delete { margin-right: auto; color: #e03131; border-color: #e03131; }
@@ -151,7 +151,7 @@ h2 { font-size: 15px; font-weight: 600; }
 @media (min-width: 900px) {
  /* R7: narrow gives the panel the chat's width so the chat widens; collapsed leaves only the >> button. */
  .workspace[data-left=narrow] { grid-template-columns: var(--chat-width) 12px minmax(0, 1fr); }
- .workspace[data-left=collapsed] { grid-template-columns: auto minmax(0, 1fr); }
+ .workspace[data-left=collapsed] { grid-template-columns: minmax(0, 1fr); }
  .workspace[data-left=collapsed] > .left-panel, .workspace[data-left=collapsed] > .splitter { display: none; }
 }
 /* Desktop: Think and the usage bars together span the chat panel below them. */

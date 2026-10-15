@@ -257,6 +257,9 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    } else {
     gesture.preview ??= stage.appendChild(element("line", { class: "connect-preview", x1: gesture.at.x, y1: gesture.at.y }));
     gesture.preview.setAttribute("x2", String(at.x)); gesture.preview.setAttribute("y2", String(at.y));
+    // Light up the box or group the connection would attach to on release (same rule as pointerup).
+    const to = connectTarget(event, gesture.connect);
+    if (to !== gesture.target) { svg.querySelector(".connect-target")?.classList.remove("connect-target"); if (to) svg.querySelector(`[data-node="${to}"]`)?.classList.add("connect-target"); gesture.target = to; }
    }
   } else if (gesture.resize) {
    // Same bounds as the schema (D8); the preview reroutes arrows like a move.
@@ -269,6 +272,11 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    gesture.frame ??= requestAnimationFrame(() => { if (!gesture?.delta) return; gesture.frame = null; dragTo(gesture.node.id, gesture.delta[0], gesture.delta[1]); });
   } else { view.x = gesture.vx + dx; view.y = gesture.vy + dy; move(); }
  });
+ // Pointer capture retargets events to the svg, so hit-test the point; itself or a duplicate is no target.
+ const connectTarget = (event, from) => {
+  const to = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-node]")?.getAttribute("data-node");
+  return to && to !== from && !diagram.edges.some(edge => edge.from === from && edge.to === to) ? to : undefined;
+ };
  svg.addEventListener("pointerup", event => {
   if (!gesture || event.pointerId !== gesture.pointer) return;
   const done = gesture; gesture = null; if (done.frame) cancelAnimationFrame(done.frame); if (done.node || done.resize) built.data = null; // drop the drag preview's shifted boxes
@@ -280,9 +288,9 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    const adopt = drawn && done.draw === "group" ? diagram.nodes.filter(node => { const box = boxes.get(node.id); return node.kind !== "group" && box && box.x + box.w / 2 > r.x && box.x + box.w / 2 < r.x + r.w && box.y + box.h / 2 > r.y && box.y + box.h / 2 < r.y + r.h; }).map(node => node.id) : [];
    handlers.create({ kind: done.draw, parent: done.parent, x: Math.round(at.x - from.x), y: Math.round(at.y - from.y), ...(drawn ? { w: Math.round(Math.min(1200, r.w)), h: Math.round(Math.min(1200, r.h)) } : {}), adopt });
   } else if (done.connect) {
-   // Pointer capture retargets the event to the svg, so hit-test the release point; itself or a duplicate adds nothing.
-   const to = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-node]")?.getAttribute("data-node");
-   if (done.moved && to && to !== done.connect && !diagram.edges.some(edge => edge.from === done.connect && edge.to === to)) handlers.connect({ from: done.connect, to });
+   svg.querySelector(".connect-target")?.classList.remove("connect-target");
+   const to = connectTarget(event, done.connect);
+   if (done.moved && to) handlers.connect({ from: done.connect, to });
   } else if (done.resize) { if (done.moved && done.size) handlers.resize?.({ id: done.resize, expectedRevision: done.diagram.revision, ...done.size }); else draw(); }
   else if (done.node && done.moved && done.position) {
    // D11: a different drop group (or the bare canvas) is a reparent; inside the same parent it only pins the position.
