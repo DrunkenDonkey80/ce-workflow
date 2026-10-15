@@ -1166,25 +1166,14 @@ try {
 		assert.equal(entries.findLast(entry => entry.customType === "plan3-current").data.id, a, "opening B does not silently change the current plan");
 		assert.deepEqual(entries.findLast(entry => entry.customType === "plan3-shared").data, { shared: true, mode: "local" }, "credentials are not stored in the conversation");
 		assert.equal((await open(`uml ${b}`)).href, url.href);
-		const settingsFile = path.join(webCwd, ".pi", "settings.json");
-		await mkdir(path.dirname(settingsFile), { recursive: true }); await writeFile(settingsFile, JSON.stringify({ preserved: true, workOrchestrator: { plan3: { codingEffort: "high" } } }));
-		webCtx.hasUI = true;
-		selectScript = [["Create a product diagram?", "No, do not offer again"]];
-		await open(`diagram ${b}`); assert.equal(selectScript.length, 0);
-		const remembered = JSON.parse(await readFile(settingsFile, "utf8"));
-		assert.equal(remembered.workOrchestrator.plan3.productDiagram, "declined"); assert.equal(remembered.preserved, true); assert.equal(remembered.workOrchestrator.plan3.codingEffort, "high");
-		await open(`diagram ${b}`); assert.equal(selectScript.length, 0, "decline is not offered again");
-		await unlink(settingsFile); // Reset this isolated project to exercise its first-open Yes path.
-		const beforeProduct = messages.length;
-		selectScript = [["Create a product diagram?", "Yes, map the whole project"]];
-		await open(`diagram ${b}`); assert.equal(selectScript.length, 0);
-		const productFile = path.join(webCwd, "docs", "architecture", "product.diagram.json");
-		assert.equal(JSON.parse(await readFile(productFile, "utf8")).kind, "product"); assert.equal(messages.length, beforeProduct + 1);
-		assert.match(messages.at(-1).message, /actual code and module connections/); assert.match(messages.at(-1).message, /target product/);
-		await open(`diagram ${b}`); assert.equal(messages.length, beforeProduct + 1, "existing product does not start another generation turn");
+		// G-02: opening a workspace only opens it; Generate (G-01) is the one way to request a diagram.
+		webCtx.hasUI = true; const beforeOpen = messages.length;
+		await open(`diagram ${b}`); await open("architecture");
+		assert.equal(messages.length, beforeOpen, "opening a diagram sends no generate prompt");
+		assert(!existsSync(path.join(webCwd, "docs", "architecture", "product.diagram.json")), "opening never creates the product diagram");
+		await webDiagram({ action: "apply", target: "product", expectedRevision: 0, operations: [{ op: "add", entity: "node", value: { id: "core", label: "Core", kind: "service" } }] }); // the product diagram Finish reconciles below
 		webCtx.hasUI = false;
 		const productUrl = await open("architecture");
-		assert.equal(messages.length, beforeProduct + 1, "explicit architecture reopens the existing product");
 		assert.equal(productUrl.origin, url.origin); assert.equal(productUrl.searchParams.get("token"), token);
 		assert.equal(productUrl.searchParams.get("target"), "product");
 		const headers = { Authorization: `Bearer ${token}`, Origin: url.origin, "Content-Type": "application/json" };
@@ -1413,7 +1402,7 @@ try {
 		entries = savedEntries; messages.length = savedMessages; tokens = savedTokens;
 	}
 	await run("plan3", "architecture"); // Refresh the same runtime to the main fixture's command context.
-	directMessages = messages.length; // Product generation is requested before the native Resolve fixture starts.
+	directMessages = messages.length;
 	askSource = fileURLToPath(new URL("../extensions/ask-user/index.ts", import.meta.url));
 	assert(existsSync(askSource), "native popup selfcheck needs vendored ask_user");
 	let dialogs = [], popupCount = 0;

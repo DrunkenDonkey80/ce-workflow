@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T10:00:18.781Z
+updated: 2026-10-15T10:02:03.369Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -158,10 +158,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 ### Phase 6: Generate with remembered directions [code]
 
 - [x] **G-01** Generate button (in the diagram controls, on both tabs and the phone) → POST /api/generate. Opens ask_user pre-filled with the unsaved draft, the saved directions or a per-target default. Cancel saves nothing. Saves `directions` with a revision check and one retry on a stale revision; on failure the text is kept for the next Generate and nothing is sent. Then sends the in-place update prompt (keep ids, positions, notes and pending marks; "start over" allows a rebuild; report changes).
-- [ ] **G-02** Remove `createProductDiagram` and `offerProductDiagram` (Q-03); `/plan3 architecture` and `/plan3 diagram` only open the workspace.
-  - The empty Project tab shows "No project diagram yet" with Generate; an existing `workOrchestrator.plan3.productDiagram: "declined"` setting is ignored, not rewritten.
-  - Drop the README line about the offer (around line 116) and the `test-work-plan3.mjs` block that drives "Create a product diagram?" (around lines 1166–1180); assert instead that opening a diagram sends no generate prompt.
-  - Check: C5, C2.
+- [x] **G-02** Removed createProductDiagram/offerProductDiagram; /plan3 diagram and architecture only open the workspace; empty Project tab says "No project diagram yet. Generate one, or draw with the bar above."; README offer line dropped; the old declined setting is simply ignored.
 
 ### Phase 7: Agent behavior trial [think]
 

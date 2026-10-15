@@ -1014,41 +1014,11 @@ export default function plan3(pi) {
 			return { ok: true, diagram };
 		} finally { generating = false; }
 	}
-	async function createProductDiagram(ctx, planId?: string) {
-		const target = { kind: "product" as const };
-		if (loadDiagram(ctx.cwd, target)) return;
-		const diagram = await saveDiagram(ctx.cwd, target, emptyDiagram(target), 0);
-		publishWeb("diagram", { target, diagram });
-		send(`Create the whole-product architecture diagram for ${JSON.stringify(ctx.cwd)} from the actual code and module connections${planId ? `, also considering Plan3 plan ${planId}` : ""}. Use plan3_diagram get/apply with target product; explain assumptions and ask before materially changing scope. This is documentation, not permission to implement product changes.`);
-	}
-	async function offerProductDiagram(ctx, planId: string) {
-		if (!ctx.hasUI || loadDiagram(ctx.cwd, { kind: "product" })) return;
-		const file = path.join(ctx.cwd, ".pi", "settings.json");
-		if (readJson(file).workOrchestrator?.plan3?.productDiagram === "declined") return;
-		const choice = await waitForUser("Product architecture", () => showListDialog(ctx, {
-			title: "Create a product diagram?", purpose: "Also map the whole project; choosing No remembers it for this project.",
-			items: [{ value: "yes", label: "Yes, map the whole project" }, { value: "no", label: "No, do not offer again" }],
-		}));
-		if (choice?.value === "yes") return createProductDiagram(ctx, planId);
-		if (choice?.value !== "no") return;
-		await withPlanDesignLock(file, async () => {
-			let settings: any = {};
-			try { if (existsSync(file)) settings = JSON.parse(await readFile(file, "utf8")); } catch (error) { throw new Error(`Invalid project settings ${file}: ${(error as Error).message}`); }
-			for (const value of [settings, settings.workOrchestrator ?? {}, settings.workOrchestrator?.plan3 ?? {}]) if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid project settings; decline was not saved.");
-			settings.workOrchestrator = { ...settings.workOrchestrator, plan3: { ...settings.workOrchestrator?.plan3, productDiagram: "declined" } };
-			await mkdir(path.dirname(file), { recursive: true });
-			const temporary = file + "." + randomUUID() + ".tmp";
-			try { await writeFile(temporary, JSON.stringify(settings, null, 2) + "\n", { flag: "wx" }); await rename(temporary, file); }
-			finally { await unlink(temporary).catch(error => { if (error.code !== "ENOENT") throw error; }); }
-		});
-	}
 	async function openDiagram(ctx, target: WebTarget) {
 		webTarget(target.kind === "product" ? "product" : target.id);
 		const server = await getWeb(ctx), url = server.url(target);
 		if (!sharedEntry(ctx)) pi.appendEntry("plan3-shared", { shared: true, mode: shareMode });
 		await refresh(ctx);
-		if (target.kind === "product") await createProductDiagram(ctx);
-		else await offerProductDiagram(ctx, target.id);
 		await openBrowser(ctx, url);
 		ctx.ui.notify(`Plan3 workspace: ${url}`, "info");
 	}

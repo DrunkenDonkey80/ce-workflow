@@ -125,7 +125,7 @@ function renderDiagram(refit = false) {
  state.diagram = diagrams[diagramTab];
  diagramView.render(state.diagram ?? { nodes: [], edges: [], notes: [], revision: 0 } as unknown as Diagram);
  if (refit && $("diagram").clientWidth) diagramView.fit();
- $("empty-diagram").textContent = diagramTab === "project" ? "No project diagram yet." : planTarget() ? "This plan has no diagram yet. Draw one with the bar above, or Generate." : "No plan is open.";
+ $("empty-diagram").textContent = diagramTab === "project" ? "No project diagram yet. Generate one, or draw with the bar above." : planTarget() ? "This plan has no diagram yet. Draw one with the bar above, or Generate." : "No plan is open.";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
 }
 function setDiagram(tab: DiagramTab, value: Diagram | null, refit = false) {
