@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T11:57:40.681Z
+updated: 2026-10-15T12:37:49.115Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -173,32 +173,13 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 ### Phase 6b: Direct manipulation on the canvas [code]
 
 - [x] **U-01** Tabs read "UML Project"/"UML Plan" (desktop and phone) with an inline SVG diagram icon; Select, Box and Group carry pointer, card and dashed-group icons; the chosen swatch is larger with a focus-colored ring.
-- [ ] **U-02** Box and Group tools draw by press-drag with a live outline in the chosen color; release creates the element at that place and size, a plain click uses the default size.
-  - The outline previews the group color from the selected swatch (boxes: their parent's tone). Minimum drawn size is the existing bound (120 × 60); smaller drags count as a click.
-  - A drawn size is stored as `w` and `h` (D8 amended by D10); a group drawn around boxes adopts those whose center is inside (D13).
-  - Check: C3 (drag preview element present during the drag, created element has the drawn size), C2.
-- [ ] **U-03** Creating opens no dialog: the element gets a default label; over a box or group label the cursor becomes an "A+" text cursor, and clicking opens the label dialog.
-  - Default labels "New box" and "New group" (numbered when taken); the chat line is added at creation and replaced by the rename line's label when renamed before Send (one line per element).
-  - "A+" cursor is a data: SVG in styles.css (CSP img-src allows data:), falling back to `text`.
-  - Check: C3 (no dialog on create; label click opens the pre-filled dialog).
-- [ ] **U-04** Groups: the title band shows a grab cursor and dragging it moves the group with its content; corner handles resize it (left button), never smaller than its content.
-  - Moving a group is layout (pins its position, no mark, no chat line, D3). Group resize stores `w` and `h` as a minimum size (D10); layout uses the larger of that and the content.
-  - Check: C1 (group w/h validated and honored by layout), C3 (grab cursor on the title band, corner handle resizes).
-- [ ] **U-05** Boxes are grabbed by their title: dropping on a group moves them inside, dropping on empty canvas moves them out; the group re-arranges and grows to fit.
-  - Changing the parent is a meaning edit: `change` mark and one chat line ("Move @cache into @backend" or "Move @cache out of @backend"). Moving inside the same parent only pins it (layout).
-  - A dropped box loses its pin and the grid places it; groups never drop into themselves or their descendants (server rejects cycles).
-  - Groups can be dropped into groups the same way by their title band.
-  - Check: C1 (reparent op, cycle rejected), C2 (endpoint), C3 (drop into, drop out, group grows).
-- [ ] **U-06** Side midpoints of a hovered box or group show connect handles (pointer cursor); drag to another element connects them, release elsewhere cancels.
-  - Handles show on the hovered element only; a live line follows the pointer. Connecting to itself or duplicating an existing edge adds nothing.
-  - Check: C3 (handle cursor, drag creates one pending edge and one chat line).
-- [ ] **U-07** Clicking a connection opens a dialog for its label with a Delete button; the box and group label dialog also has Delete; every Delete asks for confirmation.
-  - The edge dialog reuses the label dialog with the edge label pre-filled; saving renames the edge (new toolbar edit, `change` mark and a chat line).
-  - Confirmation names the element and, for groups, how many children go with it. Undo of a pending add (D5) still confirms.
-  - Remove the Connect and Delete tools (D12).
-  - Check: C2, C3.
-- [ ] **U-08** Update C3 browser asserts and C1 and C2 for the new edits; README editing-bar line matches the new gestures.
-  - Check: C1, C2, C3, C6.
+- [x] **U-02** Box/Group press-drag draws with a live .draw-preview in the chosen color; release creates at drawn w/h (≥120×60, else click = default size); drawn groups adopt enclosed boxes (D13).
+- [x] **U-03** Creation opens no dialog (server default labels New box/New group N, tool returns to Select); A+ cursor on .node-label, click opens the pre-filled label dialog; renaming a pending add rewrites its own chat line.
+- [x] **U-04** Group title band has grab cursor and moves the group; corner .resize-handle on groups and boxes resizes (layout, no chat line); groups keep min w/h (D10).
+- [x] **U-05** Dragging a box onto a group (lit .drop-target) reparents it in; onto empty canvas moves it out; one Move line each (D11).
+- [x] **U-06** Hover shows side-midpoint .connect-handle (pointer); drag with live .connect-preview onto another element connects; self/duplicate add nothing.
+- [x] **U-07** Edge click opens its label dialog; label and edge dialogs have #comment-delete, which arms to 'Confirm: delete <what>' (incl. 'and N inside') before deleting; undoing a drawn group rescues adopted settled boxes.
+- [x] **U-08** C3 rewritten for Phase 6b gestures (visible-point helper avoids handles/overlays), C1 rescue assert, README Editing (desktop) line.
 
 ### Phase 7: Agent behavior trial [think]
 
@@ -230,7 +211,7 @@ Checks: C1–C7 pass for touched code; C8 once before any push.
 
 ## Resume context
 
-15/25; HEAD 931b025 (not pushed). NEXT U-01 (Phase 6b direct manipulation, D10–D13 settled: groups get min w/h, reparent is a change edit, bar = Select/Box/Group+swatches, drawn groups adopt enclosed boxes). Then J-01 with scratch plan 7f809491 (docs/plans/...7f809491-plan3.md, no diagram file; archive after), then H-01. Never push; bump 0.1.41→0.1.42 only before push. Leave other-session dirty files unstaged.
+23/25; Phase 6b (U-01..U-08) done and committed locally (not pushed). NEXT J-01 live check with scratch plan 7f809491 (archive after), then H-01. Never push; bump 0.1.41→0.1.42 only before push. Leave other-session dirty files unstaged (work-images.ts, test-work-compaction-notifications.mjs, logs sidecars, scratch plan).
 
 ## Backlog
 

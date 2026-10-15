@@ -1217,7 +1217,23 @@ try {
 			assert.equal((await edit({ kind: "delete", id: "legacy" })).status, 400);
 			const dropped = await edit({ kind: "delete", id: "backend" });
 			assert.equal(dropped.body.line, 'Delete group "Backend" (@backend)'); assert.deepEqual(dropped.body.removed.sort(), ["api__cache", "backend", "cache"], "deleting a pending add removes it with its cascade");
-			await webDiagram({ action: "apply", plan: b, expectedRevision: revision, operations: [{ op: "settle", entity: "node", id: "legacy" }, { op: "remove", entity: "node", id: "cache_2" }] });
+			await webDiagram({ action: "apply", plan: b, expectedRevision: revision, operations: [{ op: "settle", entity: "node", id: "legacy" }, { op: "remove", entity: "node", id: "cache_2" }] }); revision++;
+			// Phase 6b: drawn sizes, default labels, rename of a pending add rewrites its line, reparent (D11), group resize (D10), no duplicate connections.
+			const drawn = await edit({ kind: "group", color: 3, x: 10, y: 20, w: 400, h: 300 });
+			assert.equal(drawn.body.line, 'Add group "New group" (@new_group) (violet)'); assert.deepEqual([find(drawn, "new_group").w, find(drawn, "new_group").h], [400, 300]);
+			assert.equal(find(await edit({ kind: "box" }), "new_box").label, "New box"); assert.equal(find(await edit({ kind: "box" }), "new_box_2").label, "New box 2", "default labels are numbered");
+			assert.equal((await edit({ kind: "rename", id: "new_box", label: "Queue" })).body.line, 'Add box "Queue" (@new_box)', "renaming a pending add rewrites its add line");
+			const into = await edit({ kind: "reparent", id: "api", parent: "new_group" }); assert.equal(into.status, 200, JSON.stringify(into.body));
+			assert.equal(into.body.line, 'Move "B API" (@api) into "New group" (@new_group)'); assert.deepEqual([find(into, "api").parent, find(into, "api").edit], ["new_group", "change"]);
+			assert.equal((await edit({ kind: "reparent", id: "new_group", parent: "new_group" })).status, 400, "a group never drops into itself");
+			assert.equal((await edit({ kind: "reparent", id: "api" })).body.line, 'Move "B API" (@api) out of "New group" (@new_group)');
+			assert.equal(find(await edit({ kind: "resize", id: "new_group", w: 500, h: 360 }), "new_group").w, 500, "groups resize too");
+			assert.equal((await edit({ kind: "connect", from: "api", to: "new_box" })).status, 200);
+			assert.equal((await edit({ kind: "connect", from: "api", to: "new_box" })).status, 400, "no duplicate connection");
+			const zone = (await edit({ kind: "group", color: 0 })).body.diagram.nodes.at(-1).id; await edit({ kind: "reparent", id: "api", parent: zone });
+			const undone = await edit({ kind: "delete", id: zone });
+			assert.deepEqual(undone.body.removed, [zone], "undoing a drawn group keeps the settled box it adopted (D13)"); assert.equal(find(undone, "api").parent, undefined);
+			await webDiagram({ action: "apply", plan: b, expectedRevision: revision, operations: [...["new_group", "new_box", "new_box_2"].map(id => ({ op: "remove", entity: "node", id })), { op: "settle", entity: "node", id: "api" }] });
 		}
 		const files = await (await fetch(`${url.origin}/api/files`, { headers })).json();
 		assert(Array.isArray(files.files) && files.files.length > 0, "the Files API lists the project");

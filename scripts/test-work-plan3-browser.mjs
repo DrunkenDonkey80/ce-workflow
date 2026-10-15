@@ -543,64 +543,103 @@ try {
  await browser("wait", "[data-id=after_queue]");
  assert(await evaluate("(() => { const list = document.getElementById('feed'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4; })()"), "queued message: the chat stays at the end");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
- // E-03: the editing bar adds a group and a box in it, connects and deletes; each edit adds one chat line.
+ // E-03 + Phase 6b: direct manipulation. Box and Group draw, labels open the dialog, handles connect and resize, drops reparent.
  {
   await browser("click", "#tab-plan"); await browser("fill", "#message-input", "");
-  const revision = () => evaluate("Number(document.getElementById('diagram').dataset.revision)"), label = async text => { await browser("wait", "--fn", "document.getElementById('comment-prompt').open"); await browser("fill", "#comment-text", text); await browser("click", "#comment-save"); };
-  // U-01: named, iconed tabs and tools; the chosen swatch carries a ring.
+  diagram = { ...diagram, revision: diagram.revision + 1, nodes: [{ id: "web_client", label: "Web client", kind: "client" }], edges: [], notes: [] };
+  server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });
+  await browser("wait", "--fn", `document.getElementById('diagram').dataset.revision === '${diagram.revision}'`); await browser("click", "#zoom-fit");
+  const revision = () => evaluate("Number(document.getElementById('diagram').dataset.revision)"), composer = () => evaluate("document.getElementById('message-input').value"), rows = async () => (await composer()).trim().split(/\r?\n/);
+  const rect = selector => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom }; })()`);
+  // The visible point of an element nearest the preferred spot (HTML overlays such as the zoom controls may cover part of it).
+  const point = (selector, fx = .5, fy = .5) => evaluate(`(() => { const item = document.querySelector(${JSON.stringify(selector)}), r = item.getBoundingClientRect(), px = r.x + r.width * ${fx}, py = r.y + r.height * ${fy}, spots = [];
+   for (let y = r.y + 2; y < r.bottom - 1; y += 4) for (let x = r.x + 2; x < r.right - 1; x += 4) spots.push([Math.hypot(x - px, y - py), Math.round(x), Math.round(y)]);
+   for (const [, x, y] of spots.sort((a, b) => a[0] - b[0])) { const hit = document.elementFromPoint(x, y); if (hit && (hit === item || item.contains(hit))) return { x, y }; }
+   throw new Error("no visible point on ${selector.replaceAll('"', "'")}"); })()`);
+  const drag = async (from, to, during) => {
+   await browser("mouse", "move", String(from.x), String(from.y)); await browser("mouse", "down", "left");
+   await browser("mouse", "move", String(Math.round((from.x + to.x) / 2)), String(Math.round((from.y + to.y) / 2))); await browser("mouse", "move", String(to.x), String(to.y));
+   if (during) await during(); await browser("mouse", "up", "left");
+  };
+  const tap = at => drag(at, at), after = before => browser("wait", "--fn", `Number(document.getElementById('diagram').dataset.revision) > ${before}`);
+  const settled = async count => { const before = await revision(); return async () => { await browser("wait", "--fn", `Number(document.getElementById('diagram').dataset.revision) >= ${before + count}`); }; };
+  // Empty canvas: a w x h screen area whose corners and center hit the bare svg.
+  const emptyAt = (w, h) => evaluate(`(() => { const svg = document.getElementById('diagram'), r = svg.getBoundingClientRect(), free = (x, y) => document.elementFromPoint(x, y) === svg; for (let y = r.top + 80; y + ${h} < r.bottom - 20; y += 20) for (let x = r.left + 20; x + ${w} < r.right - 20; x += 20) if ([[0, 0], [${w}, 0], [0, ${h}], [${w}, ${h}], [${w} / 2, ${h} / 2]].every(([dx, dy]) => free(x + dx, y + dy))) return { x: Math.round(x), y: Math.round(y) }; return null; })()`);
+  const edgeAt = id => evaluate(`(() => { const line = document.querySelector('[data-edge=${id}] .edge-hit'), p = line.getPointAtLength(line.getTotalLength() / 2), m = line.getScreenCTM(); return { x: Math.round(p.x * m.a + p.y * m.c + m.e), y: Math.round(p.x * m.b + p.y * m.d + m.f) }; })()`);
+  const node = id => diagram.nodes.find(item => item.id === id), dialogOpen = () => evaluate("document.getElementById('comment-prompt').open");
+  // U-01: named, iconed tabs and tools; the chosen swatch carries a ring; D12: no Connect or Delete tool.
   assert.deepEqual(await evaluate("['tab-project', 'tab-plan'].map(id => document.getElementById(id).textContent.trim())"), ["UML Project", "UML Plan"]);
   assert.equal(await evaluate("['tab-project', 'tab-plan', 'mobile-project', 'mobile-plan'].every(id => document.querySelector('#' + id + ' svg.icon')) && [...document.querySelectorAll('[data-tool=select], [data-tool=box], [data-tool=group]')].every(button => button.querySelector('svg.icon'))"), true, "tabs and tools have icons");
+  assert.equal(await evaluate("document.querySelectorAll('#edit-bar [data-tool]').length"), 3, "the bar is Select, Box and Group");
   await browser("click", "[data-tool=group]"); await browser("click", "[data-color='2']");
-  await evaluate("document.getElementById('diagram').dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 5, clientY: 5 }))");
   assert.notEqual(await evaluate("getComputedStyle(document.querySelector('.swatch-2')).boxShadow"), "none", "the chosen color shows a ring");
-  await label("Cache tier"); await browser("wait", "[data-node=cache_tier]");
-  await browser("click", "[data-tool=box]"); await browser("focus", "[data-node=cache_tier]"); await browser("press", "Enter");
-  await label("Redis"); await browser("wait", "[data-node=redis]");
-  assert.deepEqual(toolbarEdits.slice(0, 2).map(edit => [edit.kind, edit.parent, edit.color]), [["group", undefined, 2], ["box", "cache_tier", undefined]]);
-  await browser("click", "[data-tool=connect]"); await browser("focus", "[data-node=web_client]"); await browser("press", "Enter"); await browser("focus", "[data-node=redis]"); await browser("press", "Enter");
-  await browser("wait", "[data-edge=web_client__redis]");
-  const before = await revision(); await browser("click", "[data-tool=delete]"); await browser("focus", "[data-edge=web_client__redis]"); await browser("press", "Enter");
-  await browser("wait", "--fn", `Number(document.getElementById('diagram').dataset.revision) > ${before}`);
-  assert.equal(await evaluate("document.querySelector('[data-edge=web_client__redis]')"), null, "deleting a pending connection removes it");
-  assert.deepEqual((await evaluate("document.getElementById('message-input').value")).trim().split(/\r?\n/), ['Add group "Cache tier" (@cache_tier) (orange)', 'Add box "Redis" (@redis) in "Cache tier" (@cache_tier)'], "deleting a pending connection drops its Connect line (E-05)");
-  await browser("press", "Escape"); assert.equal(await evaluate("document.querySelector('[data-tool=select]').getAttribute('aria-pressed')"), "true", "Escape returns to Select");
-  // E-04: double-click renames, a swatch recolors the selected group, the handle resizes the selected box without a chat line.
-  await browser("dblclick", "[data-node=redis]"); await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
-  assert.equal(await evaluate("document.getElementById('comment-text').value"), "Redis"); await browser("fill", "#comment-text", "Redis cache"); await browser("click", "#comment-save");
-  await browser("wait", "--fn", "document.getElementById('message-input').value.includes('Rename')");
-  const corner = selector => evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.round(r.x + 6), y: Math.round(r.y + 6) }; })()`), tap = async at => { await browser("mouse", "move", String(at.x), String(at.y)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left"); };
-  await tap(await corner("[data-node=cache_tier]")); assert.equal(await evaluate("document.getElementById('diagram').dataset.selected"), "cache_tier");
+  // U-02 + D13: dragging a group around Web client previews it in the chosen color, creates it at the drawn size and adopts the box; U-03: no dialog.
+  const client = await rect("[data-node=web_client]"), grouped = await settled(2);
+  await drag({ x: Math.round(client.x - 40), y: Math.round(client.y - 70) }, { x: Math.round(client.right + 40), y: Math.round(client.bottom + 40) }, async () => assert.equal(await evaluate("document.querySelector('.draw-preview')?.getAttribute('stroke')"), "#e8590c", "the outline previews the chosen color"));
+  await grouped();
+  assert.equal(await dialogOpen(), false, "creating opens no dialog");
+  assert.deepEqual([node("new_group").color, node("new_group").edit, node("new_group").w >= 120, node("new_group").h >= 60, node("web_client").parent], [2, "add", true, true, "new_group"]);
+  assert.deepEqual(await rows(), ['Add group "New group" (@new_group) (orange)', 'Move "Web client" (@web_client) into "New group" (@new_group)']);
+  assert.equal(await evaluate("document.querySelector('[data-tool=select]').getAttribute('aria-pressed')"), "true", "the tool returns to Select");
+  // A plain click with Box on the group's title band adds a default-size box inside it.
+  await browser("click", "[data-tool=box]"); let before = await revision(); await tap(await point("[data-node=new_group] > .title-band", .92)); await after(before);
+  assert.deepEqual([node("new_box").parent, node("new_box").w], ["new_group", undefined]); assert.equal((await rows()).at(-1), 'Add box "New box" (@new_box) in "New group" (@new_group)');
+  // A drag on empty canvas draws a box at that size.
+  const spot = await emptyAt(260, 140); assert(spot, "empty canvas for a drawn box");
+  await browser("click", "[data-tool=box]"); before = await revision(); await drag(spot, { x: spot.x + 260, y: spot.y + 140 }); await after(before);
+  assert(node("new_box_2").w >= 120 && node("new_box_2").h >= 60 && node("new_box_2").parent === undefined, JSON.stringify(node("new_box_2")));
+  // U-03: an A+ cursor over labels; a label click opens the pre-filled dialog; renaming a pending add rewrites its line.
+  assert.match(await evaluate("getComputedStyle(document.querySelector('[data-node=new_box] .node-label')).cursor"), /url\(/);
+  await tap(await point("[data-node=new_box] .node-label")); await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
+  assert.equal(await evaluate("document.getElementById('comment-text').value"), "New box"); await browser("fill", "#comment-text", "Redis"); await browser("click", "#comment-save");
+  await browser("wait", "--fn", "document.getElementById('message-input').value.includes('\"Redis\"')");
+  assert.deepEqual((await rows()).slice(2), ['Add box "Redis" (@new_box) in "New group" (@new_group)', 'Add box "New box 2" (@new_box_2)'], "one line per element");
+  // U-06: a side handle drags a connection (live line), once; itself or a duplicate adds nothing.
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-node=web_client] .connect-handle')).cursor"), "pointer");
+  const handle = () => point("[data-node=web_client] .connect-handle:nth-of-type(2)"), target = () => point("[data-node=new_box_2]");
+  before = await revision(); await drag(await handle(), await target(), async () => assert(await evaluate("!!document.querySelector('.connect-preview')"), "a live line follows the pointer")); await after(before);
+  assert.equal(diagram.edges.find(edge => edge.id === "web_client__new_box_2")?.edit, "add"); assert.equal((await rows()).at(-1), 'Connect "Web client" (@web_client) → "New box 2" (@new_box_2)');
+  const count = toolbarEdits.length; await drag(await handle(), await target()); await drag(await handle(), await point("[data-node=web_client]", .3, .7));
+  assert.equal(toolbarEdits.length, count, "duplicate and self connections add nothing");
+  // U-07: clicking a connection opens its label dialog with Delete; Delete asks once more, then undoes the pending add and its line.
+  await tap(await edgeAt("web_client__new_box_2")); await browser("wait", "--fn", "document.getElementById('comment-prompt').open && !document.getElementById('comment-delete').hidden");
+  await browser("fill", "#comment-text", "reads"); await browser("click", "#comment-save"); await browser("wait", "--fn", "document.getElementById('message-input').value.includes('(\"reads\")')");
+  assert.equal((await rows()).at(-1), 'Connect "Web client" (@web_client) → "New box 2" (@new_box_2) ("reads")', "renaming a pending connection rewrites its line");
+  await tap(await edgeAt("web_client__new_box_2")); await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
+  await browser("click", "#comment-delete"); assert.equal(await evaluate("document.getElementById('comment-delete').textContent"), "Confirm: delete connection @web_client__new_box_2");
+  assert(diagram.edges.some(edge => edge.id === "web_client__new_box_2"), "the first click only asks"); before = await revision(); await browser("click", "#comment-delete"); await after(before);
+  assert.equal(await evaluate("document.querySelector('[data-edge=web_client__new_box_2]')"), null); assert.equal((await rows()).length, 4, "the Connect line went with it");
+  // U-04: the group's title band grabs and moves it (layout: no chat line); its corner handle resizes it.
+  assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-node=new_group] > .title-band')).cursor"), "grab");
+  const band = await point("[data-node=new_group] > .title-band", .92); const moves = edits.length; before = await revision();
+  await drag(band, { x: band.x + 30, y: band.y + 20 }); await after(before); assert.equal(edits.length, moves + 1); assert.equal(edits.at(-1).id, "new_group");
+  const width = node("new_group").w, corner = await point("[data-node=new_group] > .resize-handle"); before = await revision();
+  await drag(corner, { x: corner.x + 80, y: corner.y + 40 }); await after(before);
+  assert.equal(toolbarEdits.at(-1).kind, "resize"); assert(node("new_group").w > width, "the corner handle widens the group"); assert.equal((await rows()).length, 4, "resize adds no chat line");
+  // U-05: a box dropped on the group moves inside (drop target lit); dropped on bare canvas it moves out.
+  const inside = await point("[data-node=new_group]", .5, .6); before = await revision();
+  await drag(await point("[data-node=new_box_2]", .25, .25), inside, async () => assert(await evaluate("!!document.querySelector('[data-node=new_group].drop-target')"), "the drop group lights up")); await after(before);
+  assert.equal(node("new_box_2").parent, "new_group"); assert.equal((await rows()).at(-1), 'Move "New box 2" (@new_box_2) into "New group" (@new_group)');
+  const out = await emptyAt(40, 40); before = await revision(); await drag(await point("[data-node=web_client]", .25, .25), out); await after(before);
+  assert.equal(node("web_client").parent, undefined); assert.equal((await rows()).at(-1), 'Move "Web client" (@web_client) out of "New group" (@new_group)');
+  // E-04: a tap on the title band selects the group; a swatch recolors it.
+  await tap(await point("[data-node=new_group] > .title-band", .92)); assert.equal(await evaluate("document.getElementById('diagram').dataset.selected"), "new_group");
   await browser("click", "[data-color='4']"); await browser("wait", "--fn", "document.getElementById('message-input').value.includes('Recolor')");
-  const redis = await evaluate("(() => { const r = document.querySelector('[data-node=redis]').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
-  await tap(redis); const handle = await evaluate("(() => { const r = document.querySelector('.resize-handle').getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
-  const resized = await revision(); await browser("mouse", "move", String(handle.x), String(handle.y)); await browser("mouse", "down", "left");
-  await browser("mouse", "move", String(handle.x + 30), String(handle.y + 20)); await browser("mouse", "move", String(handle.x + 60), String(handle.y + 40)); await browser("mouse", "up", "left");
-  await browser("wait", "--fn", `Number(document.getElementById('diagram').dataset.revision) > ${resized}`);
-  assert.equal(toolbarEdits.at(-1).kind, "resize"); assert(diagram.nodes.find(node => node.id === "redis").w > 200, "resize saves a wider box");
-  assert.deepEqual((await evaluate("document.getElementById('message-input').value")).trim().split(/\r?\n/).slice(2), ['Rename "Redis" (@redis) to "Redis cache"', 'Recolor "Cache tier" (@cache_tier) cyan'], "resize adds no chat line");
-  // E-05: undoing a pending add drops exactly its toolbar lines (with the cascade), leaving the user's typing.
-  const composer = () => evaluate("document.getElementById('message-input').value"), canvasClick = () => evaluate("document.getElementById('diagram').dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 5, clientY: 5 }))");
-  await browser("fill", "#message-input", "my note");
-  await browser("click", "[data-tool=box]"); await canvasClick(); await label("Temp"); await browser("wait", "[data-node=temp]");
-  assert.match(await composer(), /Add box "Temp"/);
-  await browser("click", "[data-tool=delete]"); await browser("focus", "[data-node=temp]"); await browser("press", "Enter");
-  await browser("wait", "--fn", "!document.querySelector('[data-node=temp]')"); assert.equal((await composer()).trim(), "my note", "add then delete leaves the composer as before");
-  await browser("click", "[data-tool=group]"); await canvasClick(); await label("Zone"); await browser("wait", "[data-node=zone]");
-  await browser("click", "[data-tool=box]"); await browser("focus", "[data-node=zone]"); await browser("press", "Enter"); await label("Inner"); await browser("wait", "[data-node=inner]");
-  await browser("click", "[data-tool=connect]"); await browser("focus", "[data-node=web_client]"); await browser("press", "Enter"); await browser("focus", "[data-node=inner]"); await browser("press", "Enter");
-  await browser("wait", "[data-edge=web_client__inner]"); await browser("press", "Escape");
-  await browser("focus", "[data-node=inner]"); await browser("press", "F2"); await label("Inner two");
-  await browser("wait", "--fn", "document.getElementById('message-input').value.includes('to \"Inner two\"')"); assert.equal((await composer()).trim().split(/\r?\n/).length, 5);
-  await browser("click", "[data-tool=delete]"); await browser("focus", "[data-node=zone]"); await browser("press", "Enter");
-  await browser("wait", "--fn", "!document.querySelector('[data-node=zone]')"); assert.equal((await composer()).trim(), "my note", "deleting the group drops every line of its cascade");
+  await browser("click", "[data-tool=box]"); await browser("press", "Escape"); assert.equal(await evaluate("document.querySelector('[data-tool=select]').getAttribute('aria-pressed')"), "true", "Escape returns to Select");
+  // U-07 + E-05: deleting the pending group names what goes with it, removes its cascade and drops exactly those lines, keeping the user's typing.
+  await browser("fill", "#message-input", "my note\n" + await composer());
+  await tap(await point("[data-node=new_group] .node-label")); await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
+  await browser("click", "#comment-delete"); assert.equal(await evaluate("document.getElementById('comment-delete').textContent"), 'Confirm: delete group "New group" and 2 inside');
+  before = await revision(); await browser("click", "#comment-delete"); await after(before);
+  assert.deepEqual(["new_group", "new_box", "new_box_2"].map(id => node(id)), [undefined, undefined, undefined]); assert(node("web_client"), "the box moved out stays");
   // A2: a Project edit keeps its context after switching to Plan, even with the same id in both diagrams.
   await browser("fill", "#message-input", ""); await browser("click", "#tab-project");
-  await browser("click", "[data-tool=box]"); await canvasClick(); await label("Shared"); await browser("wait", "[data-node=shared]");
+  await browser("click", "[data-tool=box]"); await tap(await emptyAt(40, 40)); await browser("wait", "[data-node=new_box]");
   await browser("click", "#tab-plan"); await browser("wait", "[data-node=web_client]");
-  await browser("click", "[data-tool=box]"); await canvasClick(); await label("Shared"); await browser("wait", "[data-node=shared]");
+  await browser("click", "[data-tool=box]"); await tap(await emptyAt(40, 40)); await browser("wait", "[data-node=new_box]");
   await browser("press", "Escape"); const sentBefore = messages.length; await browser("click", "#send");
   await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
-  assert.equal(messages.length, sentBefore + 1); assert.deepEqual(messages.at(-1).diagrams, [{ target: "product", ids: ["shared"] }, { target: "12345678", ids: ["shared"] }], "Send carries each line's diagram");
+  assert.equal(messages.length, sentBefore + 1); assert.deepEqual(messages.at(-1).diagrams, [{ target: "product", ids: ["new_box"] }, { target: "12345678", ids: ["new_box"] }], "Send carries each line's diagram");
   await browser("click", "#generate"); await browser("wait", "--fn", "document.getElementById('prompt').open");
   assert.equal(await evaluate("document.querySelector('#prompt-form textarea').value"), "Saved directions", "Generate opens a pre-filled prompt");
   events.emit("ask:closed", { askId: generateAsk }); await browser("wait", "--fn", "!document.getElementById('prompt').open");

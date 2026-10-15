@@ -56,7 +56,7 @@ export function validateDiagram(value: unknown): Diagram {
 		for (const field of ["summary", "tech", "details"]) if (node[field] !== undefined) text(node[field], field);
 		if (node.parent !== undefined && (typeof node.parent !== "string" || !ID.test(node.parent))) throw new Error("Invalid parent id.");
 		coordinate(node.x); coordinate(node.y); status(node);
-		if (node.kind === "group" ? node.w !== undefined || node.h !== undefined : node.color !== undefined) throw new Error("Color is for groups; size is for boxes.");
+		if (node.kind !== "group" && node.color !== undefined) throw new Error("Color is for groups.");
 		bounded(node.color, 0, 7, "group color"); bounded(node.w, 120, 1200, "box width"); bounded(node.h, 60, 1200, "box height");
 		// SAFETY: every declared node field is checked above; hierarchy references are checked below.
 		nodes.set(node.id as string, node as unknown as DiagramNode);
@@ -209,6 +209,7 @@ const COLORS = ["blue", "green", "orange", "violet", "cyan", "pink", "olive", "g
 // One editing-bar action -> diagram operations plus the chat line describing it (E-01, D3, D5).
 export function toolbarEdit(before: Diagram, edit: unknown) {
 	object(edit, ["kind", "id", "label", "parent", "from", "to", "color", "w", "h", "x", "y"], "toolbar edit");
+	bounded(edit.w, 120, 1200, "width"); bounded(edit.h, 60, 1200, "height");
 	const nodes = new Map(before.nodes.map(node => [node.id, node])), edges = new Map(before.edges.map(item => [item.id, item]));
 	const taken = new Set([...nodes.keys(), ...edges.keys(), ...before.notes.map(note => note.id)]);
 	const fresh = (base: string) => {
@@ -224,27 +225,43 @@ export function toolbarEdit(before: Diagram, edit: unknown) {
 	const changeMark = (item: DiagramNode | DiagramEdge) => item.edit === "add" ? {} : { edit: "change" };
 	const color = (value: unknown) => { bounded(value, 0, 7, "group color"); if (value === undefined) throw new Error("A group needs a color."); return value as number; };
 	const position = edit.x !== undefined || edit.y !== undefined ? { x: edit.x, y: edit.y } : {};
+	// The chat line for a pending add; renaming it before Send rewrites this one line (U-03).
+	const added = (item: DiagramNode | DiagramEdge) => "from" in item ? `Connect ${ref(item.from)} → ${ref(item.to)}${item.label ? ` ("${item.label}")` : ""}` : `Add ${item.kind === "group" ? "group" : "box"} ${ref(item.id)}${item.kind === "group" ? ` (${COLORS[item.color ?? 0]})` : ""}${where(item.parent)}`;
+	const inside = (id: string, ancestor: string) => { for (let at = nodes.get(id); at; at = at.parent === undefined ? undefined : nodes.get(at.parent)) if (at.id === ancestor) return true; return false; };
 	switch (edit.kind) {
 		case "box": case "group": {
+			const group = edit.kind === "group";
+			// U-03: no dialog on create; "New box", "New box 2", ... until renamed.
+			if (edit.label === undefined) { const base = group ? "New group" : "New box", labels = new Set([...nodes.values()].map(item => item.label)); edit.label = base; for (let n = 2; labels.has(edit.label); n++) edit.label = `${base} ${n}`; }
 			text(edit.label, "label", 300);
 			if (edit.parent !== undefined && node(edit.parent).kind !== "group") throw new Error("Boxes and groups go inside a group.");
-			const group = edit.kind === "group", id = fresh(slug(edit.label, group ? "group" : "box"));
-			const value = { id, label: edit.label.trim(), kind: group ? "group" : "service", ...(edit.parent !== undefined ? { parent: edit.parent } : {}), ...(group ? { color: color(edit.color) } : {}), ...position, edit: "add" };
+			const id = fresh(slug(edit.label, group ? "group" : "box"));
+			const value = { id, label: edit.label.trim(), kind: group ? "group" : "service", ...(edit.parent !== undefined ? { parent: edit.parent } : {}), ...(group ? { color: color(edit.color) } : {}), ...position, ...(edit.w !== undefined ? { w: edit.w } : {}), ...(edit.h !== undefined ? { h: edit.h } : {}), edit: "add" };
 			nodes.set(id, value as DiagramNode);
-			return { operations: [{ op: "add", entity: "node", value }], line: `Add ${edit.kind} ${ref(id)}${group ? ` (${COLORS[edit.color as number]})` : ""}${where(edit.parent)}` };
+			return { operations: [{ op: "add", entity: "node", value }], line: added(value as DiagramNode) };
 		}
 		case "connect": {
 			const from = node(edit.from), to = node(edit.to);
 			if (from.id === to.id) throw new Error("Connect two different elements.");
+			if ([...edges.values()].some(item => item.from === from.id && item.to === to.id)) throw new Error("Already connected.");
 			if (edit.label !== undefined) text(edit.label, "label", 300);
 			const value = { id: fresh(`${from.id}__${to.id}`), from: from.id, to: to.id, ...(typeof edit.label === "string" ? { label: edit.label.trim() } : {}), edit: "add" };
-			return { operations: [{ op: "add", entity: "edge", value }], line: `Connect ${ref(from.id)} → ${ref(to.id)}${value.label ? ` ("${value.label}")` : ""}` };
+			return { operations: [{ op: "add", entity: "edge", value }], line: added(value as DiagramEdge) };
 		}
 		case "rename": {
 			text(edit.label, "label", 300);
-			const edge = typeof edit.id === "string" ? edges.get(edit.id) : undefined, item = edge ?? node(edit.id);
-			const line = `Rename ${edge ? edgeRef(edge) : ref(item.id)} to "${edit.label.trim()}"`;
-			return { operations: [{ op: "update", entity: edge ? "edge" : "node", id: item.id, value: { label: edit.label.trim(), ...changeMark(item) } }], line };
+			const edge = typeof edit.id === "string" ? edges.get(edit.id) : undefined, item = edge ?? node(edit.id), label = edit.label.trim();
+			if (!edge && item.edit === "add") nodes.set(item.id, { ...item, label } as DiagramNode);
+			const line = item.edit === "add" ? added({ ...item, label } as DiagramNode | DiagramEdge) : `Rename ${edge ? edgeRef(edge) : ref(item.id)} to "${label}"`;
+			return { operations: [{ op: "update", entity: edge ? "edge" : "node", id: item.id, value: { label, ...changeMark(item) } }], line };
+		}
+		// D11: a new parent is a meaning edit; the box drops its pin so the new group's grid places it.
+		case "reparent": {
+			const item = node(edit.id), old = item.parent;
+			if (edit.parent !== undefined && (node(edit.parent).kind !== "group" || inside(edit.parent as string, item.id))) throw new Error("Drop into a group outside the moved element.");
+			if (edit.parent === old) throw new Error(`${item.id} is already there.`);
+			const line = edit.parent === undefined ? `Move ${ref(item.id)} out of ${ref(old as string)}` : `Move ${ref(item.id)} into ${ref(edit.parent as string)}`;
+			return { operations: [{ op: "update", entity: "node", id: item.id, value: { parent: edit.parent, x: undefined, y: undefined, ...changeMark(item) } }], line };
 		}
 		case "recolor": {
 			const group = node(edit.id);
@@ -259,7 +276,9 @@ export function toolbarEdit(before: Diagram, edit: unknown) {
 			if (item.edit === "remove") throw new Error(`${item.id} is already pending removal.`);
 			const line = `Delete ${edge ? edgeRef(edge) : `${(item as DiagramNode).kind === "group" ? "group" : "box"} ${ref(item.id)}`}`;
 			// D5: an unsent add is simply undone (with its cascade); anything else waits for the agent.
-			return item.edit === "add" ? { operations: [{ op: "remove", entity, id: item.id }], line } : { operations: [{ op: "update", entity, id: item.id, value: { edit: "remove" } }], line };
+			// Undoing a drawn group gives back the settled boxes it adopted (D13) instead of cascading them away.
+			const rescue = edge ? [] : [...nodes.values()].filter(child => child.parent === item.id && child.edit !== "add").map(child => ({ op: "update", entity: "node", id: child.id, value: { parent: (item as DiagramNode).parent } }));
+			return item.edit === "add" ? { operations: [...rescue, { op: "remove", entity, id: item.id }], line } : { operations: [{ op: "update", entity, id: item.id, value: { edit: "remove" } }], line };
 		}
 		default: throw new Error("Unknown toolbar edit.");
 	}

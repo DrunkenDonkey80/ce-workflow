@@ -123,7 +123,8 @@ export function layout(diagram: Pick<Diagram, "nodes" | "edges">, measure = (_no
 		if (chosen) for (const [id, box] of grid(kids, chosen.at, chosen.cols, chosen.colW, chosen.rowH)) boxes.set(id, { ...boxes.get(id), ...box });
 		let width = 0, height = 0;
 		for (const kid of kids) { const box = boxes.get(kid.id); width = Math.max(width, box.x + box.w); height = Math.max(height, box.y + box.h); }
-		if (container) boxes.set(container, { w: Math.max(nodeSize(byId.get(container)).w, width) + 2 * PAD, h: height + 2 * PAD + groupTitle(byId.get(container)) });
+		// D10: a group's stored w, h is a minimum; content still grows it.
+		if (container) { const group = byId.get(container); boxes.set(container, { w: Math.max(group.w ?? 0, Math.max(nodeSize(group).w, width) + 2 * PAD), h: Math.max(group.h ?? 0, height + 2 * PAD + groupTitle(group)) }); }
 	}
 	place("");
 	// Relative to absolute: a child's origin is its parent's corner plus padding and title.

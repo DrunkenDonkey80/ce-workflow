@@ -292,16 +292,16 @@ function drawNotes(stage, boxes, view, rc, data, detailY) {
 }
 // Right-click: the note popup adds "@id: note" as a line of the message, so several notes and a closing request go to the agent together.
 let draftFor = "";
-function openNote(title, purpose, save) { $("comment-title").textContent = title; $("comment-purpose").textContent = purpose; $("comment-save").textContent = save; $("comment-error").hidden = true; $("comment-prompt").showModal(); $("comment-text").focus(); }
+function openNote(title, purpose, save) { $("comment-delete").hidden = true; $("comment-title").textContent = title; $("comment-purpose").textContent = purpose; $("comment-save").textContent = save; $("comment-error").hidden = true; $("comment-prompt").showModal(); $("comment-text").focus(); }
 function startNote(id) { draftFor = id; labelFor = null; $("comment-label").textContent = "Note"; openNote("Note on @" + id, "Adds a line to your message. Add more notes, then send them together.", "Add to message"); }
 function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); renderMentions(); }
-// E-03 editing bar: a non-Select tool turns diagram clicks into edits (through the same click hook notes use).
-let tool = "select", groupColor = 0, connectFrom = "", labelFor = null;
+// E-03 editing bar: Box and Group draw on the canvas (U-02); Select moves, resizes, connects and edits labels.
+let tool = "select", groupColor = 0, labelFor = null;
 function setTool(name) {
- tool = name; connectFrom = ""; document.querySelector(".connect-from")?.classList.remove("connect-from");
+ tool = name;
  for (const button of document.querySelectorAll("#edit-bar [data-tool]")) button.setAttribute("aria-pressed", String(button.getAttribute("data-tool") === name));
  $("canvas").classList.toggle("editing", name !== "select");
- showNotice({ box: "Click empty space or a group to add a box.", group: "Click empty space or a group to add a group.", connect: "Click the box the connection starts from.", delete: "Click a box, group or connection to delete it." }[name] ?? "");
+ showNotice({ box: "Drag to draw a box, or click to add one; inside a group it goes in the group.", group: "Drag to draw a group; boxes inside the outline move into it." }[name] ?? "");
 }
 // Toolbar chat lines join the message like note lines; the user sends them together (R7). Each remembers its
 // diagram and the ids it touches (A2), so undoing a pending add drops exactly its lines and Send scopes their context.
@@ -310,7 +310,7 @@ const lineIds = line => [...line.matchAll(/\(@([a-z][a-z0-9_]*)\)/g)].map(match 
 function addEditLine(line, target, added) {
  const input = $("message-input");
  input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n"; renderMentions();
- editLines.push({ line, target, ids: [...new Set([...lineIds(line), ...added])] });
+ editLines.push({ line, target, added, ids: [...new Set([...lineIds(line), ...added])] });
 }
 // Drops the lines about removed ids, leaving the user's own typing (and identical hand-typed lines past the first) alone.
 function dropEditLines(target, removed) {
@@ -328,24 +328,22 @@ async function applyEdit(edit) {
   const value = await post("edit", { target: id, expectedRevision: state.diagram?.revision ?? 0, edit }); setDiagram(tab, value.diagram);
   // D5: deleting an unsent add undoes it, so its lines go too instead of a Delete line.
   if (value.removed?.length) dropEditLines(id, value.removed);
-  else if (value.line) addEditLine(value.line, id, [...itemIds(value.diagram)].filter(item => !before.has(item)));
+  else if (value.line) {
+   // U-03: renaming a pending add rewrites its own line instead of adding one.
+   const own = value.line.startsWith("Add ") || value.line.startsWith("Connect ") ? editLines.find(item => item.target === id && edit.kind === "rename" && item.added.includes(edit.id)) : undefined;
+   if (own) { const input = $("message-input"), rows = input.value.split("\n"), at = rows.indexOf(own.line); if (at >= 0) rows[at] = value.line; input.value = rows.join("\n"); own.line = value.line; renderMentions(); }
+   else addEditLine(value.line, id, [...itemIds(value.diagram)].filter(item => !before.has(item)));
+  }
   return true;
  }
  catch (error) { showNotice(error.message); if (error.status === 409) try { setDiagram(tab, (await get("diagram?target=" + encodeURIComponent(id))).diagram); } catch { /* the notice already explains */ } return false; }
 }
-function editAt(point) {
- const node = state.diagram?.nodes.find(node => node.id === point.element);
- if (tool === "box" || tool === "group") {
-  if (point.element && !node) return showNotice("Click empty space or a group.");
-  const parent = node ? (node.kind === "group" ? node.id : node.parent) : undefined;
-  labelFor = { kind: tool, ...(parent ? { parent } : {}), ...(tool === "group" ? { color: groupColor } : {}), ...(point.element ? {} : { x: Math.round(point.x), y: Math.round(point.y) }) };
-  draftFor = ""; $("comment-label").textContent = "Label";
-  openNote(tool === "box" ? "New box" : "New group", parent ? "Inside @" + parent + "." : "On the canvas.", tool === "box" ? "Add box" : "Add group");
- } else if (tool === "connect") {
-  if (!node) return showNotice("Connections join boxes or groups; click one.");
-  if (!connectFrom) { connectFrom = node.id; $("diagram").querySelector(`[data-node="${node.id}"]`)?.classList.add("connect-from"); return showNotice("Now click the box to connect @" + node.id + " to."); }
-  const from = connectFrom; connectFrom = ""; void applyEdit({ kind: "connect", from, to: node.id }).then(() => showNotice("Click the box the next connection starts from."));
- } else if (tool === "delete" && point.element) void applyEdit({ kind: "delete", id: point.element });
+// U-03: creating opens no dialog (the server picks "New box", "New group 2", ...); the tool returns to Select.
+async function createAt({ adopt = [], ...spec }) {
+ const before = itemIds(state.diagram); setTool("select");
+ if (!await applyEdit({ ...spec, ...(spec.kind === "group" ? { color: groupColor } : {}) })) return;
+ const id = state.diagram.nodes.find(node => !before.has(node.id))?.id;
+ for (const box of adopt) if (!await applyEdit({ kind: "reparent", id: box, parent: id })) break;
 }
 for (const button of document.querySelectorAll("#edit-bar [data-tool]")) button.addEventListener("click", () => setTool(button.getAttribute("data-tool")));
 // G-01: the directions prompt arrives through the shared dialog race; this request settles once it is answered.
@@ -363,18 +361,23 @@ for (const swatch of document.querySelectorAll("#edit-bar [data-color]")) swatch
  for (const other of document.querySelectorAll("#edit-bar [data-color]")) other.setAttribute("aria-pressed", String(other === swatch));
 });
 function pin(point) {
- if (tool !== "select") return editAt(point);
  commentPoint = { ...point, target: diagramTarget(), expectedRevision: state.diagram.revision }; state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning");
  draftFor = ""; labelFor = null; $("comment-label").textContent = "Note"; openNote("Add a note", point.element ? "Pin a comment to @" + point.element + "." : "Pin a comment at this canvas position.", "Save note"); showNotice("");
 }
 const diagramView = createDiagramView($("diagram"), {
- hover, leave, notes: drawNotes, pin, pinning: () => state.pinning || tool !== "select",
+ hover, leave, notes: drawNotes, pin, pinning: () => state.pinning, tool: () => tool, groupColor: () => groupColor, create: spec => void createAt(spec),
+ connect(body) { void applyEdit({ kind: "connect", ...body }); },
+ async reparent(body) { if (!await applyEdit({ kind: "reparent", id: body.id, ...(body.parent ? { parent: body.parent } : {}) })) diagramView.render(state.diagram); },
  mention: insertMention, note: startNote,
  // E-04: rename opens the label dialog pre-filled; resize is layout only (no chat line).
  rename(id) {
   const item = [...state.diagram.nodes, ...state.diagram.edges].find(item => item.id === id); if (!item) return;
   labelFor = { kind: "rename", id }; draftFor = ""; $("comment-label").textContent = "Label";
   openNote("Rename @" + id, "Changes the label; the agent sees it as a pending edit.", "Rename"); $("comment-text").value = item.label ?? ""; $("comment-text").select();
+  // U-07: the label dialog also deletes; the first click only arms it and names what goes.
+  const kids = node => state.diagram.nodes.filter(child => child.parent === node).reduce((count, child) => count + 1 + kids(child.id), 0);
+  const what = "from" in item ? "connection @" + id : item.kind === "group" ? `group "${item.label}"` + (kids(id) ? ` and ${kids(id)} inside` : "") : `box "${item.label}"`;
+  Object.assign($("comment-delete"), { hidden: false, textContent: "Delete" }); $("comment-delete").dataset.what = what; delete $("comment-delete").dataset.armed;
  },
  resize(body) { void applyEdit({ kind: "resize", id: body.id, w: body.w, h: body.h }); },
  async move(body) {
@@ -393,6 +396,13 @@ $("pin-note").addEventListener("click", () => {
  showNotice(state.pinning ? "Click a box, arrow or empty space to pin a note. Escape cancels." : "");
 });
 $("comment-cancel").addEventListener("click", () => $("comment-prompt").close());
+$("comment-delete").addEventListener("click", async () => {
+ const button = $("comment-delete");
+ if (!button.dataset.armed) { button.dataset.armed = "1"; button.textContent = "Confirm: delete " + button.dataset.what; return; }
+ button.disabled = true;
+ try { if (await applyEdit({ kind: "delete", id: labelFor.id })) { $("comment-prompt").close(); $("comment-text").value = ""; labelFor = null; } }
+ finally { button.disabled = false; }
+});
 $("comment-text").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("comment-form").requestSubmit(); } });
 $("comment-form").addEventListener("submit", async event => {
  event.preventDefault();
