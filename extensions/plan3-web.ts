@@ -541,9 +541,24 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 }
 
 type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; startedAt?: number; durationMs?: number };
+type SubagentActivity = { id: string; label: string; state: string; turns?: number; tools?: number; tool?: string };
+// pi-subagents' public status RPC; undefined when it is not loaded or does not answer.
+function subagentRuns(pi): Promise<any[] | undefined> {
+	if (!pi.events?.on || !pi.events?.emit) return Promise.resolve(undefined);
+	return new Promise(resolve => {
+		const requestId = randomUUID();
+		let off;
+		const done = (runs?: any[]) => { clearTimeout(timer); off?.(); resolve(runs); };
+		const timer = setTimeout(() => done(), 2000);
+		off = pi.events.on(`subagents:rpc:v1:reply:${requestId}`, reply => done(reply?.success && Array.isArray(reply.data?.asyncSnapshot?.runs) ? reply.data.asyncSnapshot.runs : undefined));
+		pi.events.emit("subagents:rpc:v1:request", { version: 1, requestId, method: "status", params: {} });
+	});
+}
 export function createActivityMirror(pi, publish: (event: string, value: unknown) => void) {
 	const tools: ToolActivity[] = [], queued: { id: string; digest: string; text: string; delivery: string }[] = [];
 	let working = false, compacting = false, thinking = "", error = "", interrupted = false, sequence = 0, dialog = "";
+	// Background subagents outlive the parent's run, so the page stays busy until they finish too.
+	let subagents: SubagentActivity[] = [], subagentTimer: ReturnType<typeof setTimeout> | undefined, polling = false;
 	const digest = (text: string) => createHash("sha256").update(text).digest("hex");
 	const textOf = message => typeof message?.content === "string" ? message.content : (message?.content ?? []).filter(part => part?.type === "text").map(part => part.text).join("\n");
 	const brief = (value: unknown) => {
@@ -559,7 +574,7 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 	const snapshot = ctx => {
 		const hasPendingMessages = ctx?.hasPendingMessages?.();
 		if (hasPendingMessages === false) queued.length = 0;
-		return { hasPendingMessages, working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, dialog, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
+		return { hasPendingMessages, working: ctx?.isIdle ? !ctx.isIdle() : working, compacting, subagents: structuredClone(subagents), dialog, thinking, error, interrupted, queueExact: false, queue: queued.map(({ id, text, delivery }) => ({ id, text, delivery })), tools: structuredClone(tools) };
 	};
 	// Live activity (D20): state without tools/thinking; tools travel as single changed rows, thinking as deltas.
 	const emit = () => { const { tools: _tools, thinking: _thinking, ...state } = snapshot(undefined); publish("activity", state); };
@@ -613,5 +628,24 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 	pi.on("session_before_compact", () => { compacting = true; emit(); });
 	pi.on("session_compact", () => { compacting = false; emit(); });
 	pi.on("session_compact_failed", event => { compacting = false; error = brief(event.errorMessage ?? (event.aborted ? "Compaction cancelled" : "Compaction failed")); emit(); });
-	return { snapshot, reset: () => { tools.length = 0; queued.length = 0; working = false; compacting = false; dialog = ""; thinking = ""; thinkingSent = 0; thoughts.clear(); error = ""; interrupted = false; sequence = 0; } };
+	const offs = [pi.events?.on?.("wo:compacting", event => { compacting = Boolean(event?.active); emit(); })];
+	// Poll pi-subagents only while its runs are active; lifecycle events and session start (re)arm it.
+	const pollSubagents = async () => {
+		if (polling) return;
+		polling = true; clearTimeout(subagentTimer); subagentTimer = undefined;
+		try {
+			const runs = await subagentRuns(pi);
+			if (runs) {
+				const next = runs.filter(run => run?.state === "running" || run?.state === "queued").map(run => ({ id: String(run.id), label: String(run.label ?? "subagent"), state: run.state, turns: run.activity?.turnCount, tools: run.activity?.toolCount, tool: run.activity?.currentTool }));
+				if (JSON.stringify(next) !== JSON.stringify(subagents)) { subagents = next; emit(); }
+			}
+		} finally { polling = false; }
+		if (subagents.length) { subagentTimer = setTimeout(pollSubagents, 3000); subagentTimer.unref?.(); }
+	};
+	// The started event can precede pi-subagents registering the job, so look a moment later.
+	const soon = () => { clearTimeout(subagentTimer); subagentTimer = setTimeout(pollSubagents, 300); subagentTimer.unref?.(); };
+	for (const name of ["subagent:async-started", "subagent:async-complete", "subagent:child-status"]) offs.push(pi.events?.on?.(name, soon));
+	pi.on("session_start", soon);
+	return { snapshot, dispose: () => { clearTimeout(subagentTimer); for (const off of offs) off?.(); }, reset: () => {
+		subagents = []; soon(); tools.length = 0; queued.length = 0; working = false; compacting = false; dialog = ""; thinking = ""; thinkingSent = 0; thoughts.clear(); error = ""; interrupted = false; sequence = 0; } };
 }

@@ -66,8 +66,10 @@ function renderShell() {
   $("plan-actions").querySelector("[data-command=resolve]").textContent = plan.open ? "Resolve (" + plan.open + ")" : "Resolve";
   ($("review-button") as HTMLButtonElement).disabled = !state.connected || commandSending || promptView.busy || !!state.activity.working;
  }
- $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : "Idle";
- $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting ? "working" : "idle";
+ // Background subagents keep the session busy after the main run settles.
+ const helpers = state.activity.subagents?.length ?? 0;
+ $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : helpers ? "Subagents\u2026" : "Idle";
+ $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting || helpers ? "working" : "idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
  // Row buttons are also gated by the plan state (no Resume while the plan is still being planned).
  const blocked = { resolve: !plan?.open, finish: !plan?.finishable, resume: !!plan?.planning };
@@ -85,6 +87,7 @@ function renderActivity() {
  root.replaceChildren();
  if (data.compacting) root.append(make("p", "Compacting session history…", "activity-status"));
  if (data.interrupted) root.append(make("p", "Run interrupted.", "activity-status"));
+ for (const run of data.subagents ?? []) root.append(make("p", ["Subagent " + run.label, run.state, run.turns === undefined ? "" : run.turns + " turns", run.tools === undefined ? "" : run.tools + " tools", run.tool ?? ""].filter(Boolean).join(" \u00b7 "), "activity-status"));
  if (data.error) { const error = make("p", data.error, "activity-error"); error.setAttribute("role", "alert"); root.append(error); }
  if (data.thinking) { const thinking = section("thinking", "Thinking"); thinking.className = "thinking-row"; thinking.append(make("pre", data.thinking)); }
  // Only the running run's calls show here; finished calls stay inside the chat rows, so the reply is the last thing shown.

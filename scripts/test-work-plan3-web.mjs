@@ -273,6 +273,24 @@ activityHooks.get("session_before_compact")({});
 activityHooks.get("session_compact_failed")({ errorMessage: "failed", aborted: false });
 assert.equal(activityMirror.snapshot().compacting, false);
 assert.equal(activityMirror.snapshot().error, "failed");
+{ // Boundary compaction and background subagents reach the page through pi.events.
+ const bus = new Map(), hooks = new Map(), seen = [];
+ let runs = [{ id: "run1", label: "plan3-advisor", state: "running", activity: { turnCount: 3, toolCount: 7, currentTool: "read" } }, { id: "old", label: "x", state: "complete" }];
+ const events = { on: (name, handler) => { bus.set(name, handler); return () => bus.delete(name); }, emit: (name, value) => {
+  if (name === "subagents:rpc:v1:request") queueMicrotask(() => bus.get("subagents:rpc:v1:reply:" + value.requestId)?.({ success: true, data: { asyncSnapshot: { runs } } }));
+  else bus.get(name)?.(value);
+ } };
+ const mirror = createActivityMirror({ on: (name, handler) => hooks.set(name, handler), events }, (event, value) => seen.push({ event, value }));
+ events.emit("wo:compacting", { active: true }); assert(mirror.snapshot().compacting, "boundary compaction shows");
+ events.emit("wo:compacting", { active: false }); assert.equal(mirror.snapshot().compacting, false);
+ events.emit("subagent:async-started", {}); await new Promise(resolve => setTimeout(resolve, 400));
+ assert.deepEqual(mirror.snapshot().subagents, [{ id: "run1", label: "plan3-advisor", state: "running", turns: 3, tools: 7, tool: "read" }], "only active runs are listed");
+ runs = [{ id: "run1", label: "plan3-advisor", state: "complete" }];
+ events.emit("subagent:async-complete", {}); await new Promise(resolve => setTimeout(resolve, 400));
+ assert.deepEqual(mirror.snapshot().subagents, [], "finished runs leave the list");
+ assert(seen.some(item => item.event === "activity" && item.value.subagents.length === 1));
+ mirror.dispose(); assert.equal(bus.size, 0, "dispose releases the event listeners");
+}
 activityHooks.get("input")({ streamingBehavior: "steer", text: "cancelled in terminal" });
 assert.equal(activityMirror.snapshot({ isIdle: () => false, hasPendingMessages: () => false }).queue.length, 0);
 assert.equal(activityMirror.snapshot().queueExact, false, "SDK input events do not prove exact queue edits/cancellations");

@@ -474,6 +474,10 @@ try {
  // A settled run hides its tool list, so the final reply is the last thing shown.
  server.publish("activity", { ...activity, working: false }); await browser("wait", "--fn", "document.querySelector('#activity details[data-id=tool_1]') === null");
  server.publish("activity", activity); await browser("wait", "#activity details[data-id=tool_1]");
+ // Background subagents keep the page busy after the main run settles.
+ server.publish("activity", { ...activity, working: false, subagents: [{ id: "run1", label: "plan3-advisor", state: "running", turns: 3, tools: 7 }] });
+ await browser("wait", "--fn", "document.getElementById('connection').textContent === 'Subagents\u2026' && document.getElementById('connection').dataset.state === 'working' && document.getElementById('activity').textContent.includes('Subagent plan3-advisor')");
+ server.publish("activity", { ...activity, subagents: [] });
  // Sending from a scrolled-up chat jumps to the bottom and follows the echoed message.
  for (let i = 0; i < 30; i++) { const row = { id: "filler_" + i, role: "assistant", text: "Filler line " + i, streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
  await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=filler_29]\") !== null");

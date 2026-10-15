@@ -3908,6 +3908,8 @@ if (blockedInternalBackgroundCompletionTurn) {
 		boundaryCompactionRequested = false;
 		const generation = beginContextCompaction();
 		ctx.ui.setStatus?.("work-compaction", `Compacting (${COMPACTION_MODES.find(item => item.value === mode).label})…`);
+		// Boundary compaction fires no session_before_compact; tell the web mirror directly.
+		pi.events?.emit?.("wo:compacting", { active: true });
 		try {
 			const entry = await buildBoundaryCompaction(event, ctx, mode);
 			return entry ? { entries: [entry] } : undefined;
@@ -3916,6 +3918,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 		} finally {
 			finishContextCompaction(generation);
 			ctx.ui.setStatus?.("work-compaction", undefined);
+			pi.events?.emit?.("wo:compacting", { active: false });
 		}
 	});
 

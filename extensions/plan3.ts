@@ -730,7 +730,7 @@ export default function plan3(pi) {
 	let sessionWarned = false;
 	function publishSession() {
 		if (!webInstance || !webCtx || !shareRecord) return;
-		const live = activity.snapshot(undefined), state = live.dialog || dialogs.snapshot().length ? "waiting" : live.working ? "working" : "idle";
+		const live = activity.snapshot(undefined), state = live.dialog || dialogs.snapshot().length ? "waiting" : live.working || live.compacting || live.subagents.length ? "working" : "idle";
 		try { sessions.publish({ sessionId: shareRecord.sessionId, name: [path.basename(webCtx.cwd), herdrTab].filter(Boolean).join(" - ") || webCtx.sessionManager?.getSessionName?.() || "Pi", cwd: webCtx.cwd, port: webInstance.port, state }); }
 		catch (error) { if (!sessionWarned) { sessionWarned = true; report(webCtx, error); } }
 	}
@@ -2213,7 +2213,7 @@ export default function plan3(pi) {
 	pi.on?.("session_shutdown", async (event) => {
 		forcingArchitecture = undefined; // Never archive from a reconciliation owned by the previous conversation.
 		chat.reset(); activity.reset();
-		night.shutdown(); dialogs.close(); disposeDiagram(); webStopped = true;
+		night.shutdown(); dialogs.close(); disposeDiagram(); activity.dispose(); webStopped = true;
 		// D1/D3: reload keeps the mapping for the next runtime; quit, new and fork remove it.
 		await Promise.all([closeWeb(), closePersistentOpenDesignClients(), event?.reason === "reload" ? undefined : unserve()]);
 	});
