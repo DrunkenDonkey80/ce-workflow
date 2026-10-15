@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:33:36.750Z
+updated: 2026-10-15T09:36:48.124Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -146,11 +146,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 ### Phase 4: Editing endpoint and pending rendering [code]
 
-- [ ] **E-01** Add a toolbar edit endpoint that applies one edit with server-side marking (D2, D3, D5).
-  - Accepts add box, add group (with color), connect, rename, recolor, resize, move, delete; generates ids from labels; requires `expectedRevision` and returns 409 on stale.
-  - Marks: add gets `add`; rename and recolor get `change` unless already `add`; delete of an `add` element removes it, otherwise marks `remove`; move and resize add no mark.
-  - Returns the new diagram, the chat line for the edit and the ids removed by a cascade.
-  - Check: C5 in the real-session web harness of `scripts/test-work-plan3.mjs` (around lines 1145–1270: each edit kind, marking rules, stale revision); C2 only for routing, the new endpoint's allow-list and foreign Origin rejection, because C2 stubs `post`.
+- [x] **E-01** POST /api/edit applies one toolbar edit (box, group+color, connect, rename, recolor, resize, move, delete) via toolbarEdit() in plan3-diagram.ts, with server-side add/change/remove marks, D5 undo of pending adds, label-derived unique ids, 409 on stale; returns diagram, chat line and cascade-removed ids.
 - [ ] **E-02** Draw pending marks: red dashed outline for added and changed elements, red line with an X at the midpoint for removed edges, red outline with X for removed boxes.
   - Group colors from `color` with nearest-ancestor inheritance; layout honors `w` and `h`.
   - Pending edges are never folded into cross-group bundles (`diagram.ts` bundling around line 89) and stay visible without focus (today `.detail-edge:not(.lit)` hides them, `styles.css` around line 98).

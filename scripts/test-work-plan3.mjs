@@ -1202,6 +1202,34 @@ try {
 		const full = await snapshot(); assert.equal(full.diagram, undefined, "check-in snapshot leaves the diagram to /api/diagram"); assert(Buffer.byteLength(JSON.stringify(full)) <= 64_000);
 		const edited = (await (await fetch(`${url.origin}/api/diagram?target=${b}`, { headers })).json()).diagram;
 		assert.deepEqual([edited.nodes[0].x, edited.nodes[0].y], [12, 34]);
+		// E-01: toolbar edits are saved at once with server-side pending marks and one chat line each.
+		{
+			let revision = 3;
+			const edit = async (value, at = revision) => { const result = await post("edit", { expectedRevision: at, edit: value }); if (result.status === 200) revision = result.body.diagram.revision; return result; };
+			const find = (result, id) => [...result.body.diagram.nodes, ...result.body.diagram.edges].find(item => item.id === id);
+			const group = await edit({ kind: "group", label: "Backend", color: 1 });
+			assert.equal(group.status, 200, JSON.stringify(group.body)); assert.equal(group.body.line, 'Add group "Backend" (@backend) (green)'); assert.deepEqual([find(group, "backend").color, find(group, "backend").edit], [1, "add"]);
+			const box = await edit({ kind: "box", label: "Cache", parent: "backend" });
+			assert.equal(box.body.line, 'Add box "Cache" (@cache) in "Backend" (@backend)'); assert.equal(find(box, "cache").parent, "backend");
+			assert.equal((await edit({ kind: "box", label: "Cache" })).body.diagram.nodes.at(-1).id, "cache_2", "ids are generated and unique");
+			const connect = await edit({ kind: "connect", from: "api", to: "cache" });
+			assert.equal(connect.body.line, 'Connect "B API" (@api) → "Cache" (@cache)'); assert.equal(find(connect, "api__cache").edit, "add");
+			assert.equal(find(await edit({ kind: "rename", id: "cache", label: "Hot cache" }), "cache").edit, "add", "renaming a pending add keeps add");
+			assert.equal(find(await edit({ kind: "recolor", id: "backend", color: 2 }), "backend").edit, "add");
+			const resized = await edit({ kind: "resize", id: "cache", w: 300, h: 120 });
+			assert.equal(resized.body.line, undefined, "layout edits add no chat line"); assert.deepEqual([find(resized, "cache").w, find(resized, "cache").edit], [300, "add"]);
+			assert.equal((await edit({ kind: "box", label: "Late" }, revision - 1)).status, 409, "stale revision");
+			assert.equal((await edit({ kind: "recolor", id: "cache", color: 1 })).status, 400, "only groups have a color");
+			assert.equal((await post("edit", { expectedRevision: revision, edit: { kind: "box", label: "X" }, extra: 1 })).status, 400);
+			await webDiagram({ action: "apply", plan: b, expectedRevision: revision, operations: [{ op: "add", entity: "node", value: { id: "legacy", label: "Legacy", kind: "store" } }] }); revision++;
+			const renamed = await edit({ kind: "rename", id: "legacy", label: "Old store" });
+			assert.equal(renamed.body.line, 'Rename "Legacy" (@legacy) to "Old store"'); assert.equal(find(renamed, "legacy").edit, "change");
+			assert.equal(find(await edit({ kind: "delete", id: "legacy" }), "legacy").edit, "remove", "deleting a settled element marks it");
+			assert.equal((await edit({ kind: "delete", id: "legacy" })).status, 400);
+			const dropped = await edit({ kind: "delete", id: "backend" });
+			assert.equal(dropped.body.line, 'Delete group "Backend" (@backend)'); assert.deepEqual(dropped.body.removed.sort(), ["api__cache", "backend", "cache"], "deleting a pending add removes it with its cascade");
+			await webDiagram({ action: "apply", plan: b, expectedRevision: revision, operations: [{ op: "settle", entity: "node", id: "legacy" }, { op: "remove", entity: "node", id: "cache_2" }] });
+		}
 		const files = await (await fetch(`${url.origin}/api/files`, { headers })).json();
 		assert(Array.isArray(files.files) && files.files.length > 0, "the Files API lists the project");
 		const planFile = files.files.find(file => file.path.endsWith("-plan3.md")).path;

@@ -10,7 +10,7 @@ import { decideIdea, ideaBlock, ideaOptions, ideaPopupContext, ideaResponse, ide
 import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
 import { plan3Windows } from "./plan3-window.ts";
-import { applyDiagram, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
+import { applyDiagram, toolbarEdit, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createPlan3Web, checkIn, createChatMirror, createDialogBridge, createActivityMirror, forwardDiagramChat, stopLiveRun, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
 import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./plan3-files.ts";
 import { createDeviceRegistry, createSessionRecords, loadShareRecord, saveSharePort, serveAdd, serveRemove, tailscaleStatus, type ShareRecord, type Tailnet } from "./plan3-remote.ts";
@@ -850,6 +850,19 @@ export default function plan3(pi) {
 			if (data.command === "resume") await commands.resume3.handler(target.plan.id, ctx, target.plan);
 			else await planCommand.handler(data.command, ctx, target.plan);
 			return { ok: true };
+		}
+		if (endpoint === "/api/edit") {
+			if (Object.keys(data).some(key => !["target", "expectedRevision", "edit"].includes(key)) || !Number.isInteger(data.expectedRevision) || data.expectedRevision < 0) throw new WebError(400, "Invalid diagram edit fields/revision.");
+			const target = await resolveWebTarget(webTarget(data.target));
+			let result, line;
+			try {
+				const before = loadDiagram(ctx.cwd, target) ?? emptyDiagram(target);
+				if (before.revision !== data.expectedRevision) throw new Error("Stale diagram revision; reload before editing.");
+				const planned = toolbarEdit(before, data.edit); line = planned.line;
+				result = await applyDiagram(ctx.cwd, target, planned.operations, data.expectedRevision);
+			} catch (error) { if (error.code) throw error; throw new WebError(/Stale diagram revision/.test(error.message) ? 409 : 400, error.message); }
+			pi.events.emit("plan3:diagram-changed", { cwd: ctx.cwd, target, file: diagramPath(ctx.cwd, target), revision: result.diagram.revision, changed: result.changed, removed: result.removed, dependents: result.dependents });
+			return { diagram: result.diagram, line, removed: result.removed };
 		}
 		if (endpoint === "/api/comment" || endpoint === "/api/move") {
 			const fields = endpoint === "/api/move" ? ["target", "expectedRevision", "entity", "id", "x", "y"] : ["target", "expectedRevision", "element", "text", "x", "y"];

@@ -204,6 +204,67 @@ export function applyDiagramOperations(before: Diagram, operations: unknown) {
 	return { diagram, changed: [...allChanges], removed: [...removed], dependents };
 }
 
+// Names for the 8 web PALETTE colors (D7), used in toolbar chat lines.
+const COLORS = ["blue", "green", "orange", "violet", "cyan", "pink", "olive", "gray"];
+// One editing-bar action -> diagram operations plus the chat line describing it (E-01, D3, D5).
+export function toolbarEdit(before: Diagram, edit: unknown) {
+	object(edit, ["kind", "id", "label", "parent", "from", "to", "color", "w", "h", "x", "y"], "toolbar edit");
+	const nodes = new Map(before.nodes.map(node => [node.id, node])), edges = new Map(before.edges.map(item => [item.id, item]));
+	const taken = new Set([...nodes.keys(), ...edges.keys(), ...before.notes.map(note => note.id)]);
+	const fresh = (base: string) => {
+		let id = base.slice(0, 48);
+		for (let suffix = 2; taken.has(id); suffix++) id = `${base.slice(0, 47 - String(suffix).length)}_${suffix}`;
+		return id;
+	};
+	const slug = (label: string, fallback: string) => { const base = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40); return /^[a-z]/.test(base) ? base : base ? `${fallback}_${base}`.slice(0, 40) : fallback; };
+	const ref = (id: string) => { const label = nodes.get(id)?.label ?? edges.get(id)?.label; return label && label !== id ? `"${label}" (@${id})` : `@${id}`; };
+	const edgeRef = (edge: DiagramEdge) => `connection ${ref(edge.from)} → ${ref(edge.to)}`;
+	const node = (id: unknown) => { const found = typeof id === "string" ? nodes.get(id) : undefined; if (!found) throw new Error(`Unknown box or group: ${String(id)}`); return found; };
+	const where = (parent: unknown) => parent === undefined ? "" : ` in ${ref(parent as string)}`;
+	const changeMark = (item: DiagramNode | DiagramEdge) => item.edit === "add" ? {} : { edit: "change" };
+	const color = (value: unknown) => { bounded(value, 0, 7, "group color"); if (value === undefined) throw new Error("A group needs a color."); return value as number; };
+	const position = edit.x !== undefined || edit.y !== undefined ? { x: edit.x, y: edit.y } : {};
+	switch (edit.kind) {
+		case "box": case "group": {
+			text(edit.label, "label", 300);
+			if (edit.parent !== undefined && node(edit.parent).kind !== "group") throw new Error("Boxes and groups go inside a group.");
+			const group = edit.kind === "group", id = fresh(slug(edit.label, group ? "group" : "box"));
+			const value = { id, label: edit.label.trim(), kind: group ? "group" : "service", ...(edit.parent !== undefined ? { parent: edit.parent } : {}), ...(group ? { color: color(edit.color) } : {}), ...position, edit: "add" };
+			nodes.set(id, value as DiagramNode);
+			return { operations: [{ op: "add", entity: "node", value }], line: `Add ${edit.kind} ${ref(id)}${group ? ` (${COLORS[edit.color as number]})` : ""}${where(edit.parent)}` };
+		}
+		case "connect": {
+			const from = node(edit.from), to = node(edit.to);
+			if (from.id === to.id) throw new Error("Connect two different elements.");
+			if (edit.label !== undefined) text(edit.label, "label", 300);
+			const value = { id: fresh(`${from.id}__${to.id}`), from: from.id, to: to.id, ...(typeof edit.label === "string" ? { label: edit.label.trim() } : {}), edit: "add" };
+			return { operations: [{ op: "add", entity: "edge", value }], line: `Connect ${ref(from.id)} → ${ref(to.id)}${value.label ? ` ("${value.label}")` : ""}` };
+		}
+		case "rename": {
+			text(edit.label, "label", 300);
+			const edge = typeof edit.id === "string" ? edges.get(edit.id) : undefined, item = edge ?? node(edit.id);
+			const line = `Rename ${edge ? edgeRef(edge) : ref(item.id)} to "${edit.label.trim()}"`;
+			return { operations: [{ op: "update", entity: edge ? "edge" : "node", id: item.id, value: { label: edit.label.trim(), ...changeMark(item) } }], line };
+		}
+		case "recolor": {
+			const group = node(edit.id);
+			if (group.kind !== "group") throw new Error("Only groups have a color.");
+			return { operations: [{ op: "update", entity: "node", id: group.id, value: { color: color(edit.color), ...changeMark(group) } }], line: `Recolor ${ref(group.id)} ${COLORS[edit.color as number]}` };
+		}
+		// Layout only: no mark and no chat line (D3).
+		case "resize": return { operations: [{ op: "update", entity: "node", id: node(edit.id).id, value: { w: edit.w, h: edit.h } }] };
+		case "move": return { operations: [{ op: "move", entity: "node", id: node(edit.id).id, x: edit.x, y: edit.y }] };
+		case "delete": {
+			const edge = typeof edit.id === "string" ? edges.get(edit.id) : undefined, item = edge ?? node(edit.id), entity = edge ? "edge" : "node";
+			if (item.edit === "remove") throw new Error(`${item.id} is already pending removal.`);
+			const line = `Delete ${edge ? edgeRef(edge) : `${(item as DiagramNode).kind === "group" ? "group" : "box"} ${ref(item.id)}`}`;
+			// D5: an unsent add is simply undone (with its cascade); anything else waits for the agent.
+			return item.edit === "add" ? { operations: [{ op: "remove", entity, id: item.id }], line } : { operations: [{ op: "update", entity, id: item.id, value: { edit: "remove" } }], line };
+		}
+		default: throw new Error("Unknown toolbar edit.");
+	}
+}
+
 export async function applyDiagram(cwd: string, target: DiagramTarget, operations: unknown, expectedRevision: number) {
 	const before = loadDiagram(cwd, target) ?? emptyDiagram(target);
 	if (before.revision !== expectedRevision) throw new Error("Stale diagram revision; reload before editing.");

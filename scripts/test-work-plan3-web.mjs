@@ -59,6 +59,10 @@ try {
  assert.equal((await request("/api/message", { ...post, headers: { ...post.headers, "Content-Type": "text/plain" } })).response.status, 415);
  assert.equal((await request("/api/unknown", post)).response.status, 404);
  assert.equal((await request("/api/message", post)).response.status, 200);
+ // E-01: the toolbar edit endpoint is routed and same-origin only.
+ const editPost = { ...post, body: JSON.stringify({ target: "12345678", expectedRevision: 3, edit: { kind: "box", label: "Cache" } }) };
+ assert.equal((await request("/api/edit", { ...editPost, headers: { ...post.headers, Origin: "https://evil.example" } })).response.status, 403);
+ assert.equal((await request("/api/edit", editPost)).response.status, 200); assert.equal(posted.pop().value.edit.label, "Cache");
  assert.deepEqual(posted, [{ endpoint: "/api/message", value: { target: "12345678", text: "hello" } }]);
  const stopPost = { ...post, body: JSON.stringify({ target: "12345678" }) };
  assert.equal((await request("/api/stop", { ...stopPost, headers: { Origin: server.origin, "Content-Type": "application/json" } })).response.status, 401);
