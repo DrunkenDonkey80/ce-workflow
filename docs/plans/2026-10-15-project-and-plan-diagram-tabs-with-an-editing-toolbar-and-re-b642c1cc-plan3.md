@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T12:37:49.115Z
+updated: 2026-10-15T15:05:50.181Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -183,10 +183,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 ### Phase 7: Agent behavior trial [think]
 
-- [ ] **J-01** Run one live session: sketch three edits, send, and judge whether the agent takes them into the plan and settles exactly those marks.
-  - Tune the plan3_diagram guidelines and the chat hint wording if it settles too early, too late or not at all; keep the change to prompt text.
-  - Check: the plan file and diagram JSON after the run (marks cleared only for addressed edits); C1 and C5 after any wording change.
-  - note: Paused at start: user feedback added Phase 6b (U-01 to U-08); rerun with scratch plan 7f809491 after it.
+- [x] **J-01** Live run on scratch plan 7f809491: three toolbar edits via the live server + Send; the agent added D2 and step S-02, then settled exactly the four pending marks (incl. the earlier unsent Sync API add, listed in pendingEdits); no wording change needed. Caveat: the receiving agent was this session, so the judgment of how well edits were taken in is biased — H-01 is the unbiased check.
 
 ### Phase 8: Live acceptance [human] [code]
 
