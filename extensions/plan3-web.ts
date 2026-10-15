@@ -541,16 +541,16 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 }
 
 type ToolActivity = { id: string; name: string; state: string; parent?: string; args?: string; progress?: string; result?: string; startedAt?: number; durationMs?: number };
-type SubagentActivity = { id: string; label: string; state: string; turns?: number; tools?: number; tool?: string };
+type SubagentActivity = { id: string; label: string; model?: string; state: string; turns?: number; tools?: number; tool?: string };
 // pi-subagents' public status RPC; undefined when it is not loaded or does not answer.
-function subagentRuns(pi): Promise<any[] | undefined> {
+function subagentRuns(pi): Promise<{ runs: any[]; fleet: any[] } | undefined> {
 	if (!pi.events?.on || !pi.events?.emit) return Promise.resolve(undefined);
 	return new Promise(resolve => {
 		const requestId = randomUUID();
 		let off;
-		const done = (runs?: any[]) => { clearTimeout(timer); off?.(); resolve(runs); };
+		const done = (value?: { runs: any[]; fleet: any[] }) => { clearTimeout(timer); off?.(); resolve(value); };
 		const timer = setTimeout(() => done(), 2000);
-		off = pi.events.on(`subagents:rpc:v1:reply:${requestId}`, reply => done(reply?.success && Array.isArray(reply.data?.asyncSnapshot?.runs) ? reply.data.asyncSnapshot.runs : undefined));
+		off = pi.events.on(`subagents:rpc:v1:reply:${requestId}`, reply => done(reply?.success && Array.isArray(reply.data?.asyncSnapshot?.runs) ? { runs: reply.data.asyncSnapshot.runs, fleet: Array.isArray(reply.data.fleet?.entries) ? reply.data.fleet.entries : [] } : undefined));
 		pi.events.emit("subagents:rpc:v1:request", { version: 1, requestId, method: "status", params: {} });
 	});
 }
@@ -634,9 +634,11 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		if (polling) return;
 		polling = true; clearTimeout(subagentTimer); subagentTimer = undefined;
 		try {
-			const runs = await subagentRuns(pi);
-			if (runs) {
-				const next = runs.filter(run => run?.state === "running" || run?.state === "queued").map(run => ({ id: String(run.id), label: String(run.label ?? "subagent"), state: run.state, turns: run.activity?.turnCount, tools: run.activity?.toolCount, tool: run.activity?.currentTool }));
+			const status = await subagentRuns(pi);
+			if (status) {
+				// The async snapshot has no model; the fleet rows do, keyed by agent name.
+				const modelOf = (label: string) => { const agents = label.split(", "), ids = [...new Set(status.fleet.filter(entry => agents.includes(entry?.agent) && typeof entry.model === "string").map(entry => entry.model.replace(/:[a-z]+$/, "")))]; return ids.length ? ids.map(id => modelNames.get(id) ?? id.split("/").pop()).join(", ") : undefined; };
+				const next = status.runs.filter(run => run?.state === "running" || run?.state === "queued").map(run => { const label = String(run.label ?? "subagent"), model = modelOf(label); return { id: String(run.id), label, ...(model ? { model } : {}), state: run.state, turns: run.activity?.turnCount, tools: run.activity?.toolCount, tool: run.activity?.currentTool }; });
 				if (JSON.stringify(next) !== JSON.stringify(subagents)) { subagents = next; emit(); }
 			}
 		} finally { polling = false; }
@@ -645,7 +647,9 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 	// The started event can precede pi-subagents registering the job, so look a moment later.
 	const soon = () => { clearTimeout(subagentTimer); subagentTimer = setTimeout(pollSubagents, 300); subagentTimer.unref?.(); };
 	for (const name of ["subagent:async-started", "subagent:async-complete", "subagent:child-status"]) offs.push(pi.events?.on?.(name, soon));
-	pi.on("session_start", soon);
+	// Friendly model names ("GPT-6 Astra") from the session's registry.
+	let modelNames = new Map<string, string>();
+	pi.on("session_start", (_event, ctx) => { soon(); Promise.resolve(ctx?.modelRegistry?.getAvailable?.()).then(list => { if (Array.isArray(list)) modelNames = new Map(list.map(model => [`${model.provider}/${model.id}`, model.name ?? model.id])); }).catch(() => {}); });
 	return { snapshot, dispose: () => { clearTimeout(subagentTimer); for (const off of offs) off?.(); }, reset: () => {
 		subagents = []; soon(); tools.length = 0; queued.length = 0; working = false; compacting = false; dialog = ""; thinking = ""; thinkingSent = 0; thoughts.clear(); error = ""; interrupted = false; sequence = 0; } };
 }

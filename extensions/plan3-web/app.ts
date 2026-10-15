@@ -86,7 +86,7 @@ function renderActivity() {
  root.replaceChildren();
  if (data.compacting) root.append(make("p", "Compacting session history…", "activity-status"));
  if (data.interrupted) root.append(make("p", "Run interrupted.", "activity-status"));
- for (const run of data.subagents ?? []) root.append(make("p", ["Subagent " + run.label, run.state, run.turns === undefined ? "" : run.turns + " turns", run.tools === undefined ? "" : run.tools + " tools", run.tool ?? ""].filter(Boolean).join(" \u00b7 "), "activity-status"));
+ for (const run of data.subagents ?? []) root.append(make("p", ["Subagent " + (run.model ? "(" + run.model + ") " : "") + run.label, run.state, run.turns === undefined ? "" : run.turns + " turns", run.tools === undefined ? "" : run.tools + " tools", run.tool ?? ""].filter(Boolean).join(" \u00b7 "), "activity-status"));
  if (data.error) { const error = make("p", data.error, "activity-error"); error.setAttribute("role", "alert"); root.append(error); }
  if (data.thinking) { const thinking = section("thinking", "Thinking"); thinking.className = "thinking-row"; thinking.append(make("pre", data.thinking)); }
  // Only the running run's calls show here; finished calls stay inside the chat rows, so the reply is the last thing shown.

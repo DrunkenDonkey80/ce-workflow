@@ -295,14 +295,15 @@ assert.equal(activityMirror.snapshot().error, "failed");
  const bus = new Map(), hooks = new Map(), seen = [];
  let runs = [{ id: "run1", label: "plan3-advisor", state: "running", activity: { turnCount: 3, toolCount: 7, currentTool: "read" } }, { id: "old", label: "x", state: "complete" }];
  const events = { on: (name, handler) => { bus.set(name, handler); return () => bus.delete(name); }, emit: (name, value) => {
-  if (name === "subagents:rpc:v1:request") queueMicrotask(() => bus.get("subagents:rpc:v1:reply:" + value.requestId)?.({ success: true, data: { asyncSnapshot: { runs } } }));
+  if (name === "subagents:rpc:v1:request") queueMicrotask(() => bus.get("subagents:rpc:v1:reply:" + value.requestId)?.({ success: true, data: { asyncSnapshot: { runs }, fleet: { entries: [{ key: "fleet-1", agent: "plan3-advisor", model: "openai-codex/gpt-6-astra:high" }] } } }));
   else bus.get(name)?.(value);
  } };
  const mirror = createActivityMirror({ on: (name, handler) => hooks.set(name, handler), events }, (event, value) => seen.push({ event, value }));
+ hooks.get("session_start")({}, { modelRegistry: { getAvailable: async () => [{ provider: "openai-codex", id: "gpt-6-astra", name: "GPT-6 Astra" }] } }); await new Promise(resolve => setTimeout(resolve, 10));
  events.emit("wo:compacting", { active: true }); assert(mirror.snapshot().compacting, "boundary compaction shows");
  events.emit("wo:compacting", { active: false }); assert.equal(mirror.snapshot().compacting, false);
  events.emit("subagent:async-started", {}); await new Promise(resolve => setTimeout(resolve, 400));
- assert.deepEqual(mirror.snapshot().subagents, [{ id: "run1", label: "plan3-advisor", state: "running", turns: 3, tools: 7, tool: "read" }], "only active runs are listed");
+ assert.deepEqual(mirror.snapshot().subagents, [{ id: "run1", label: "plan3-advisor", model: "GPT-6 Astra", state: "running", turns: 3, tools: 7, tool: "read" }], "only active runs are listed, with their model's friendly name");
  runs = [{ id: "run1", label: "plan3-advisor", state: "complete" }];
  events.emit("subagent:async-complete", {}); await new Promise(resolve => setTimeout(resolve, 400));
  assert.deepEqual(mirror.snapshot().subagents, [], "finished runs leave the list");
