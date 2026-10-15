@@ -22,7 +22,7 @@ const token = "__TOKEN__";
 const auth: RequestInit = token ? { credentials: "omit", headers: { Authorization: "Bearer " + token } } : { credentials: "same-origin", headers: {} };
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
-type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number };
+type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
 const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; folder?: string; tab?: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
@@ -56,14 +56,22 @@ function renderShell() {
  for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
  // Session modes: chips toggle them; the chat panel takes the mode's colour.
  const modes = (status as { modes?: { research?: string; night?: string } })?.modes ?? {}, research = modes.research ?? "off", night = modes.night ?? "off";
- $("mode-research").setAttribute("aria-pressed", String(research === "on")); $("mode-research").textContent = research === "stopping" ? "Research: stopping" : "Research";
- $("mode-night").setAttribute("aria-pressed", String(night !== "off")); $("mode-night").textContent = night === "paused" ? "Night: paused" : night === "complete" ? "Night: done" : "Night";
+ $("mode-research").setAttribute("aria-pressed", String(research !== "off")); $("mode-research").textContent = research === "stopping" ? "Research: stopping" : "Research"; $("mode-research").dataset.tone = research === "stopping" ? "warning" : "";
+ $("mode-night").setAttribute("aria-pressed", String(night !== "off")); $("mode-night").textContent = night === "paused" ? "Night: paused" : night === "complete" ? "Night: done" : "Night"; $("mode-night").dataset.tone = night === "paused" || night === "complete" ? "warning" : "";
  for (const id of ["mode-research", "mode-night"] as const) ($(id) as HTMLButtonElement).disabled = !state.connected || messageSending;
- $("chat").dataset.mode = research !== "off" ? (research === "stopping" ? "research-stopping" : "research") : night !== "off" ? "night" : "";
+ $("chat").dataset.mode = research === "stopping" || (research === "off" && ["paused", "complete"].includes(night)) ? "warning" : research !== "off" || night !== "off" ? "accent" : "";
+ // Research mode: Resolve (n) / Review / Finish / Resume, each enabled only when the plan allows it (the /plans3 menu gates).
+ $("plan-actions").hidden = research === "off" || !plan;
+ if (plan) {
+  $("plan-actions").querySelector("[data-command=resolve]").textContent = plan.open ? "Resolve (" + plan.open + ")" : "Resolve";
+  ($("review-button") as HTMLButtonElement).disabled = !state.connected || commandSending || promptView.busy || !!state.activity.working;
+ }
  $("connection").textContent = !state.connected ? "Disconnected" : state.activity.compacting ? "Compacting" : state.activity.working ? "Working\u2026" : "Idle";
  $("connection").dataset.state = !state.connected ? "off" : state.activity.working || state.activity.compacting ? "working" : "idle";
  $("empty-diagram").hidden = !!(state.diagram?.nodes?.length || state.diagram?.notes?.length);
- for (const button of $("plan-menu").querySelectorAll<HTMLButtonElement>("[data-command]")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset);
+ // Row buttons are also gated by the plan state (no Resume while the plan is still being planned).
+ const blocked = { resolve: !plan?.open, finish: !plan?.finishable, resume: !!plan?.planning };
+ for (const button of document.querySelectorAll<HTMLButtonElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset) || (button.parentElement?.id === "plan-actions" && !!blocked[button.dataset.command]);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
@@ -481,7 +489,7 @@ $("composer").addEventListener("submit", async event => {
  finally { messageSending = false; renderShell(); }
 });
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
-const menus = [["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
+const menus = [["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
@@ -493,7 +501,7 @@ function closeMenus(focus = false) {
  for (const [button, menu] of menus) if (!$(menu).hidden) { toggleMenu(button, menu, false); if (focus) $(button).focus(); }
 }
 document.addEventListener("keydown", event => { if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
-document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu")) closeMenus(); });
+document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions")) closeMenus(); });
 // The title opens the session picker: a popup on phones, the switcher stripe on desktop.
 $("title").addEventListener("click", () => phone.matches ? toggleMenu("title", "title-menu") : !$("switcher").hidden && toggleSwitcher($("switcher").dataset.open !== "true"));
 function newPlan() {
@@ -515,12 +523,14 @@ $("plan-button").addEventListener("click", async () => {
   $("plan-divider").hidden = !plans.length;
  } catch (error) { $("plan-list").replaceChildren("Plans failed to load: " + error.message); }
 });
-for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-command]")) button.addEventListener("click", async () => {
+$("review-button").addEventListener("click", () => toggleMenu("review-button", "review-menu"));
+// Plan commands go through /api/command with the shown plan (a typed "/plan3 review <id>" would not name the plan).
+for (const button of document.querySelectorAll<HTMLElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.addEventListener("click", async () => {
  const command = button.dataset.command; closeMenus(); setDrawer(false);
  if (command === "new") return newPlan();
  if (commandSending) return; commandSending = true; renderShell();
  try {
-  await post("message", { text: (command === "resume" ? "/resume3" : "/plan3 " + command) + " " + target }); showNotice("");
+  await post("command", { command }); showNotice("");
  }
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }

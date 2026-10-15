@@ -59,6 +59,7 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
 }, post: (endpoint, body) => {
  assert.equal(body.target, "12345678");
  if (endpoint === "/api/answer") return dialogs.answer(body);
+ if (endpoint === "/api/command") { commands.push(body.command); return { ok: true }; }
  if (endpoint === "/api/message" && body.text.startsWith("/")) { commands.push(body.text); return { accepted: true }; }
  if (endpoint === "/api/message") {
   if (rejectMessage) { rejectMessage = false; throw new WebError(503, "Session temporarily unavailable"); }
@@ -227,7 +228,7 @@ try {
  const shiftDrag = (from, modifiers = 8) => withPageCdp(server.origin, async send => { for (const [type, at, buttons] of [["mouseMoved", from, 0], ["mousePressed", from, 1], ["mouseMoved", { x: from.x + 15, y: from.y - 10 }, 1], ["mouseMoved", { x: from.x + 30, y: from.y - 20 }, 1], ["mouseReleased", { x: from.x + 30, y: from.y - 20 }, 0]]) await send("Input.dispatchMouseEvent", { ...at, type, modifiers, buttons, ...(type === "mouseMoved" ? {} : { button: "left", clickCount: 1 }) }); });
  const panBox = await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")");
  // Settle first: the agent-browser drag just above and this fresh CDP input connection can race (seen 1 in ~10 runs).
- await new Promise(done => setTimeout(done, 300)); await shiftDrag(nodePoint, 0); await new Promise(done => setTimeout(done, 300));
+ await new Promise(done => setTimeout(done, 1000)); await shiftDrag(nodePoint, 0); await new Promise(done => setTimeout(done, 300));
  assert.equal(edits.length, 0, "plain drag never moves a box"); assert.notEqual(await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")"), panBox, "plain drag on a box pans");
  const movePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
  await shiftDrag(movePoint);
@@ -409,7 +410,7 @@ try {
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#plan-menu .plan-option')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')).concat(document.getElementById('plan-divider').hidden)"), [sample.title + " · 2/5 (current):true", "Other plan · 0/3:false", false], "plans on top, the shown one marked, then a divider");
  await browser("press", "Escape");
  for (const command of ["resolve", "ideas", "review", "finish", "resume"]) { await browser("click", "#plan-button"); await browser("click", "[data-command=" + command + "]"); await browser("wait", "--fn", "!document.querySelector(\"[data-command=" + command + "]\").disabled"); }
- assert.deepEqual(commands, ["/plan3 resolve 12345678", "/plan3 ideas 12345678", "/plan3 review 12345678", "/plan3 finish 12345678", "/resume3 12345678"]);
+ assert.deepEqual(commands, ["resolve", "ideas", "review", "finish", "resume"]);
  await browser("click", "#plan-button"); assert.equal(await evaluate("document.getElementById('plan-button').getAttribute('aria-expanded')"), "true");
  await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('plan-menu').hidden, document.activeElement.id]"), [true, "plan-button"]);
  await browser("click", "#plan-button"); await browser("click", "[data-command=new]");
@@ -443,11 +444,17 @@ try {
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick: Low'");
  // Session modes: chips mirror research/night, tint the chat and send the toggle command.
  server.publish("status", { ...status, modes: { research: "on", night: "off" } });
- await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === 'research' && document.getElementById('mode-research').getAttribute('aria-pressed') === 'true'");
+ await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === 'accent' && document.getElementById('mode-research').getAttribute('aria-pressed') === 'true'");
  await browser("click", "#mode-research"); await browser("wait", "--fn", "!document.getElementById('mode-research').disabled");
  assert.equal(commands.at(-1), "/research off");
+ // Research mode puts Resolve/Review/Finish/Resume above the chat, enabled only when the plan allows them.
+ server.publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, open: 2, planning: true, finishable: false, bias: 0 });
+ await browser("wait", "--fn", "!document.getElementById('plan-actions').hidden && document.querySelector('#plan-actions [data-command=resolve]').textContent === 'Resolve (2)'");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#plan-actions > button')].map(b => b.textContent + ':' + b.disabled)"), ["Resolve (2):false", "Review:false", "Finish:true", "Resume:true"]);
+ await browser("click", "#review-button"); await browser("click", "#review-menu [data-command='review all']"); await browser("wait", "--fn", "!document.getElementById('review-button').disabled");
+ assert.equal(commands.at(-1), "review all");
  server.publish("status", { ...status, modes: { research: "off", night: "on" } });
- await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === 'night' && document.getElementById('mode-night').getAttribute('aria-pressed') === 'true'");
+ await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === 'accent' && document.getElementById('plan-actions').hidden && document.getElementById('mode-night').getAttribute('aria-pressed') === 'true'");
  server.publish("status", status); await browser("wait", "--fn", "document.getElementById('chat').dataset.mode === ''");
  // Pi switching its current plan moves the page to it (and back).
  server.publish("plan", { id: "87654321", title: "Newer plan", done: 0, total: 16, bias: 0 });

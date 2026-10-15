@@ -704,8 +704,8 @@ export default function plan3(pi) {
 			pi.events.emit("plan3:plans-changed", { cwd: ctx.cwd, plans: plans.map(({ id, file, title, status }) => ({ id, file, title, status })) });
 			const focus = plan?.wip[0] ?? plan?.next;
 			const design = plan && localPlanDesign(ctx.cwd, plan);
-			const bias = plan ? biasOf(ctx, plan, split(await readFile(plan.file, "utf8")).lines, availOf(plan.file)) : 0;
-			if (webInstance && plan) publishWeb("plan", webPlan(plan, bias));
+			const text = plan ? await readFile(plan.file, "utf8") : "", bias = plan ? biasOf(ctx, plan, split(text).lines, availOf(plan.file)) : 0;
+			if (webInstance && plan) publishWeb("plan", webPlan(plan, bias, text, ctx.cwd));
 			void refreshHerdrTab();
 			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
@@ -822,7 +822,9 @@ export default function plan3(pi) {
 	const webModes = () => { const info: { research?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode() }; };
 	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), folder: ctx?.cwd ? path.basename(ctx.cwd) : "", tab: herdrTab, modes: webModes() });
 	pi.events?.on?.("wo:modes-changed", () => { if (webInstance && webCtx) publishStatus(webCtx); });
-	const webPlan = (plan, bias) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias });
+	// planning/finishable drive the page's Resolve/Review/Finish/Resume row, with the same gates as the /plans3 menu.
+	const webPlan = (plan, bias, text, cwd) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias,
+		planning: isPlanning(plan), finishable: isPlanning(plan) && !plan.open && !finishProblems(text).length && !planDesignGate(cwd, plan).length });
 	async function webModels(ctx) {
 		const scoped = (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => modelRef(entry.model)), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
 		const others = ((await ctx.modelRegistry?.getAvailable?.()) ?? []).map(modelRef).filter(model => !keys.has(model.provider + "/" + model.id));
@@ -932,7 +934,8 @@ export default function plan3(pi) {
 			const current = await displayedWebTarget(), target = requestedTarget ?? current;
 			const resolved = await resolveWebTarget(target);
 			await refreshHerdrTab();
-			const plan = resolved.kind === "plan" ? webPlan(resolved.plan, biasOf(webCtx, resolved.plan, split(await readFile(resolved.plan.file, "utf8")).lines, availOf(resolved.plan.file))) : undefined;
+			const text = resolved.kind === "plan" ? await readFile(resolved.plan.file, "utf8") : "";
+			const plan = resolved.kind === "plan" ? webPlan(resolved.plan, biasOf(webCtx, resolved.plan, split(text).lines, availOf(resolved.plan.file)), text, webCtx.cwd) : undefined;
 			return checkIn(chat, activity.snapshot(webCtx), dialogs.snapshot(), { target, current: current.kind === "plan" ? current.id : null, status: webStatus(webCtx), ...(plan ? { plan } : {}) });
 		} }).then(async server => {
 			const previous = shareRecord.port;
