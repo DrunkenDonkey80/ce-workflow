@@ -168,7 +168,7 @@ try {
  await browser("fill", "#message-input", ""); await browser("type", "#message-input", "/plan3 rev"); await browser("wait", "#slash-menu:not([hidden]) [data-command='/plan3 review all']");
  await browser("press", "Escape");
  await browser("fill", "#message-input", "");
- await browser("click", "#title"); assert(await evaluate("!document.getElementById('title-menu').hidden && document.getElementById('title-menu').contains(document.getElementById('session-list'))"), "phone: the title opens the session picker");
+ await browser("click", "#title"); assert(await evaluate("!document.getElementById('title-menu').hidden && document.getElementById('title-menu').contains(document.getElementById('plan-menu')) && !document.getElementById('plan-menu').hidden && document.getElementById('drawer-sessions').contains(document.getElementById('session-list'))"), "phone: the title opens plans and commands; sessions sit in the drawer");
  await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('title-menu').hidden"), true);
  await browser("click", "#drawer-toggle");
  await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('drawer').dataset.open, document.activeElement.id, document.getElementById('drawer-backdrop').hidden]"), ["false", "drawer-toggle", true]);
