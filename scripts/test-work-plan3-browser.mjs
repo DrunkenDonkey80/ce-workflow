@@ -42,7 +42,7 @@ const sessionList = () => [{ id: "a", name: "alpha", cwd: "C:/work/alpha", port:
 let status = { model: { provider: "a", id: "fast", name: "Fast" }, effort: "high", context: 41.6, folder: "ce-workflow", tab: "1" };
 let projectFiles = [{ path: "docs/readme.md" }, { path: "src/app.ts", change: "M" }, { path: "top.txt" }];
 diagram.nodes.find(node => node.id === "backend").summary = "Manages upload writes.";
-const listeners = new Map(), answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
+const listeners = new Map(), answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false }, generateAsk;
 const events = { on(name, run) { const rows = listeners.get(name) ?? new Set(); rows.add(run); listeners.set(name, rows); return () => rows.delete(run); }, emit(name, value) { for (const run of listeners.get(name) ?? []) run(value); } };
 events.on("ask:answer", value => answers.push(value));
 const dialogs = createDialogBridge({ events }, (event, value) => server.publish(event, value));
@@ -76,6 +76,8 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
  if (endpoint === "/api/effort") { status = { ...status, effort: body.level }; return status; }
  if (endpoint === "/api/bias") { server.publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: body.level }); return { ok: true }; }
  if (endpoint === "/api/stop") { activity = { working: false }; server.publish("activity", activity); return { accepted: true }; }
+ // G-01: the real endpoint opens ask_user pre-filled with the saved directions and settles on the answer.
+ if (endpoint === "/api/generate") { generateAsk = ask({ question: "Directions for plan 12345678's diagram", options: [], allowMultiple: false, allowFreeform: true, initialText: "Saved directions" }); return { cancelled: true }; }
  assert(["/api/move", "/api/comment", "/api/edit"].includes(endpoint));
  if (body.expectedRevision !== diagram.revision) throw new WebError(409, "Stale diagram revision");
  if (endpoint === "/api/edit") {
@@ -593,6 +595,9 @@ try {
   await browser("press", "Escape"); const sentBefore = messages.length; await browser("click", "#send");
   await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
   assert.equal(messages.length, sentBefore + 1); assert.deepEqual(messages.at(-1).diagrams, [{ target: "product", ids: ["shared"] }, { target: "12345678", ids: ["shared"] }], "Send carries each line's diagram");
+  await browser("click", "#generate"); await browser("wait", "--fn", "document.getElementById('prompt').open");
+  assert.equal(await evaluate("document.querySelector('#prompt-form textarea').value"), "Saved directions", "Generate opens a pre-filled prompt");
+  events.emit("ask:closed", { askId: generateAsk }); await browser("wait", "--fn", "!document.getElementById('prompt').open");
   await browser("set", "viewport", "390", "800");
   assert.equal(await evaluate("document.getElementById('edit-bar').getClientRects().length"), 0, "no editing bar on the phone");
   await browser("set", "viewport", "1280", "800"); await browser("fill", "#message-input", "");

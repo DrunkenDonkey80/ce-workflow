@@ -10,7 +10,7 @@ import { createPromptView } from "./prompts.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { applyText } from "./stream.js?token=__TOKEN__";
 function $(id: "message-input" | "comment-text"): HTMLTextAreaElement;
-function $(id: "send" | "stop" | "comment-save" | "model-button" | "context-button" | "bias-button"): HTMLButtonElement;
+function $(id: "send" | "stop" | "comment-save" | "model-button" | "context-button" | "bias-button" | "generate"): HTMLButtonElement;
 function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
 function $(id: "composer" | "comment-form" | "prompt-form"): HTMLFormElement;
 function $(id: "diagram"): SVGSVGElement;
@@ -348,6 +348,13 @@ function editAt(point) {
  } else if (tool === "delete" && point.element) void applyEdit({ kind: "delete", id: point.element });
 }
 for (const button of document.querySelectorAll("#edit-bar [data-tool]")) button.addEventListener("click", () => setTool(button.getAttribute("data-tool")));
+// G-01: the directions prompt arrives through the shared dialog race; this request settles once it is answered.
+$("generate").addEventListener("click", async () => {
+ const button = $("generate"); button.disabled = true;
+ try { const result = await post("generate", { target: diagramTarget() }); showNotice(result.cancelled ? "Generate cancelled; nothing saved." : "Directions saved; the agent is updating the diagram.", true); }
+ catch (error) { showNotice(error.message); }
+ finally { button.disabled = false; }
+});
 for (const swatch of document.querySelectorAll("#edit-bar [data-color]")) swatch.addEventListener("click", () => {
  groupColor = Number(swatch.getAttribute("data-color"));
  // With Select and a group selected, a swatch recolors that group.

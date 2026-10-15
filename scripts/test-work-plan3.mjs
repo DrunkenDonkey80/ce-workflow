@@ -1556,6 +1556,27 @@ try {
 	assert.match(await readFile(directFile, "utf8"), /^status: complete$/m);
 	assert.match(messages.at(-1).message, /Do not reopen this complete plan/);
 	await writeFile(directFile, directPlan);
+	{ // G-01: Generate pre-fills directions, saves them (even before a diagram file exists), keeps edits made while the prompt is open, then asks the agent.
+		const live = new URL(notices.findLast(notice => notice.message.startsWith("Plan3 workspace: ")).message.replace("Plan3 workspace: ", ""));
+		const generate = async () => { const response = await fetch(`${live.origin}/api/generate`, { method: "POST", headers: { Authorization: `Bearer ${live.searchParams.get("token")}`, Origin: live.origin, "Content-Type": "application/json" }, body: JSON.stringify({ target: "55555555" }) }); return { status: response.status, body: await response.json() }; };
+		const saved = async () => (await diagram({ action: "get", plan: "55555555" })).diagram;
+		let before = messages.length;
+		dialogs = [{ messages: before, component: "AskComponent", answer: { kind: "freeform", text: "Show only the API" }, check: component => assert.match(component.freeformDraft, /^Show what plan 55555555 \(Direct answers\) changes/) }];
+		assert.deepEqual((await generate()).status, 200); assert.equal(dialogs.length, 0);
+		assert.equal((await saved()).directions, "Show only the API", "directions saved on a missing diagram file");
+		assert.equal(messages.length, before + 1); assert.match(messages.at(-1).message, /plan3_diagram[\s\S]*keep existing ids, positions, notes and pending edit marks[\s\S]*start over[\s\S]*Directions:\nShow only the API$/);
+		before = messages.length;
+		dialogs = [{ messages: before, component: "AskComponent", answer: { kind: "freeform", text: "Show the API and its store" }, check: async component => {
+			assert.equal(component.freeformDraft, "Show only the API", "saved directions pre-fill the prompt");
+			const current = await saved(); await diagram({ action: "apply", plan: "55555555", expectedRevision: current.revision, operations: [{ op: "add", entity: "node", value: { id: "api", label: "API", kind: "service" } }] });
+		} }];
+		assert.equal((await generate()).status, 200);
+		const after = await saved(); assert.equal(after.directions, "Show the API and its store"); assert.deepEqual(after.nodes.map(node => node.id), ["api"], "an edit made while the prompt was open survives");
+		before = messages.length; const revision = after.revision;
+		dialogs = [{ messages: before, component: "AskComponent", answer: null }];
+		assert.deepEqual((await generate()).body, { cancelled: true }); assert.equal(messages.length, before, "cancel sends nothing");
+		assert.equal((await saved()).revision, revision, "cancel saves nothing");
+	}
 	// Full-detail ideas use single native popups; code saves each choice before the next.
 	const beforeIdeasEntries = [...entries];
 	const proposal = title => ({ title, about: "Explain the concrete behavior in detail.\nFor example, keep consumer compatibility.", benefits: "Users avoid migration and retain existing data.", drawbacks: "Maintaining two paths costs effort; no performance claim is verified.", approach: "Change the parser and existing fixtures, keeping validation.", cost: "Small, one parser and its fixture.", recommendation: title === "second" ? "Reject: not needed for this plan." : "Accept only if compatibility is required.", sources: "[you] and [advisor]; both recommend compatibility.", requirement: `Requirement for ${title}`, steps: [`Implement ${title}`, `Verify ${title}`] });

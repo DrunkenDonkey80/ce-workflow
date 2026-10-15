@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:54:59.030Z
+updated: 2026-10-15T10:00:18.781Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -157,13 +157,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 ### Phase 6: Generate with remembered directions [code]
 
-- [ ] **G-01** Add the Generate button per diagram tab and its endpoint: open ask_user with `initialText` (saved directions or default), save `directions`, then send the generate prompt.
-  - The dialog reaches terminal and browser through the existing prompt race; cancel saves nothing.
-  - Default text names the target (whole project from the code, or this plan's changes) and invites edits.
-  - Update in place (Q-02): the prompt tells the agent to keep ids, positions, notes and existing pending marks, add and remove only what the directions require, and report what changed; writing "start over" in the directions allows a rebuild.
-  - The default Project directions reuse the wording of today's `createProductDiagram` prompt (actual code and module connections), which G-02 removes.
-  - After the answer, reload the diagram and save only `directions` with a revision check, retrying once on a stale revision; if saving still fails, show the error, keep the entered text for a retry and send nothing.
-  - Check: C5 real-session harness (directions saved on a missing diagram file, prompt text sent, cancel path, a diagram edit made while the prompt is open survives); C3 (button opens a pre-filled prompt).
+- [x] **G-01** Generate button (in the diagram controls, on both tabs and the phone) → POST /api/generate. Opens ask_user pre-filled with the unsaved draft, the saved directions or a per-target default. Cancel saves nothing. Saves `directions` with a revision check and one retry on a stale revision; on failure the text is kept for the next Generate and nothing is sent. Then sends the in-place update prompt (keep ids, positions, notes and pending marks; "start over" allows a rebuild; report changes).
 - [ ] **G-02** Remove `createProductDiagram` and `offerProductDiagram` (Q-03); `/plan3 architecture` and `/plan3 diagram` only open the workspace.
   - The empty Project tab shows "No project diagram yet" with Generate; an existing `workOrchestrator.plan3.productDiagram: "declined"` setting is ignored, not rewritten.
   - Drop the README line about the offer (around line 116) and the `test-work-plan3.mjs` block that drives "Create a product diagram?" (around lines 1166–1180); assert instead that opening a diagram sends no generate prompt.

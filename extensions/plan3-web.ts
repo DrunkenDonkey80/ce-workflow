@@ -192,7 +192,7 @@ export async function createPlan3Web(options: Options) {
 		} else if (entry.state !== "pending") pairing = undefined;
 		return json(res, 200, { state: entry.state });
 	}
-	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/edit", "/api/command", "/api/stop", "/api/model", "/api/effort", "/api/bias"]);
+	const endpoints = new Set(["/api/message", "/api/answer", "/api/comment", "/api/move", "/api/edit", "/api/generate", "/api/command", "/api/stop", "/api/model", "/api/effort", "/api/bias"]);
 	const server = createServer((req, res) => {
 		res.setHeader("Cache-Control", "no-store");
 		res.setHeader("X-Content-Type-Options", "nosniff");
