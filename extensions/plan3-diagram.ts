@@ -3,16 +3,23 @@ import { existsSync } from "node:fs";
 import { confined, read, atomic, withPlanDesignLock } from "./plan3-design.ts";
 
 export type DiagramStatus = "new" | "changed" | "removed" | "existing";
+// User edits not yet taken in by the agent (D3); separate from the plan-only status.
+type DiagramEdit = "add" | "change" | "remove";
 export interface DiagramNode {
 	id: string; label: string; kind: "group" | "client" | "service" | "store" | "external";
-	parent?: string; summary?: string; tech?: string; details?: string; status?: DiagramStatus; x?: number; y?: number;
+	parent?: string; summary?: string; tech?: string; details?: string; status?: DiagramStatus; edit?: DiagramEdit; color?: number; w?: number; h?: number; x?: number; y?: number;
 }
-export interface DiagramEdge { id: string; from: string; to: string; label?: string; status?: DiagramStatus }
+export interface DiagramEdge { id: string; from: string; to: string; label?: string; status?: DiagramStatus; edit?: DiagramEdit }
 export interface DiagramNote { id: string; target?: string; text: string; author: "user" | "agent"; created: string; x?: number; y?: number }
-export interface Diagram { version: 1; kind: "plan" | "product"; plan?: string; title: string; revision: number; nodes: DiagramNode[]; edges: DiagramEdge[]; notes: DiagramNote[] }
+export interface Diagram { version: 1; kind: "plan" | "product"; plan?: string; title: string; revision: number; directions?: string; nodes: DiagramNode[]; edges: DiagramEdge[]; notes: DiagramNote[] }
 export type DiagramTarget = { kind: "product" } | { kind: "plan"; plan: { id: string; file: string; title: string } };
 export const DIAGRAM_BYTES = 1_000_000;
 const ID = /^[a-z][a-z0-9_]{0,47}$/;
+const NODE_FIELDS = ["id", "label", "kind", "parent", "summary", "tech", "details", "status", "edit", "color", "w", "h", "x", "y"];
+const EDGE_FIELDS = ["id", "from", "to", "label", "status", "edit"];
+function bounded(value: unknown, min: number, max: number, label: string) {
+	if (value !== undefined && (!Number.isInteger(value) || Number(value) < min || Number(value) > max)) throw new Error(`Invalid ${label}.`);
+}
 
 function object(value: unknown, fields: string[], label: string): asserts value is Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !fields.includes(key))) throw new Error(`Invalid ${label} fields.`);
@@ -25,10 +32,11 @@ function coordinate(value: unknown) {
 }
 
 export function validateDiagram(value: unknown): Diagram {
-	object(value, ["version", "kind", "plan", "title", "revision", "nodes", "edges", "notes"], "diagram");
+	object(value, ["version", "kind", "plan", "title", "revision", "directions", "nodes", "edges", "notes"], "diagram");
 	if (value.version !== 1 || !["plan", "product"].some(kind => kind === value.kind) || !Number.isSafeInteger(value.revision) || Number(value.revision) < 0) throw new Error("Invalid diagram version/kind/revision.");
 	if (value.kind === "plan" ? typeof value.plan !== "string" || !/^[a-f0-9]{8}$/.test(value.plan) : value.plan !== undefined) throw new Error("Invalid diagram plan identity.");
 	text(value.title, "title", 300);
+	if (value.directions !== undefined) text(value.directions, "directions", 8000);
 	for (const [field, max] of [["nodes", 1000], ["edges", 3000], ["notes", 1000]] as const) {
 		if (!Array.isArray(value[field]) || value[field].length > max) throw new Error(`Invalid diagram ${field} count.`);
 	}
@@ -39,14 +47,17 @@ export function validateDiagram(value: unknown): Diagram {
 	};
 	const status = (entry: Record<string, unknown>) => {
 		if (entry.status !== undefined && (value.kind !== "plan" || !["new", "changed", "removed", "existing"].some(status => status === entry.status))) throw new Error("Invalid diagram status.");
+		if (entry.edit !== undefined && !["add", "change", "remove"].some(edit => edit === entry.edit)) throw new Error("Invalid diagram edit mark.");
 	};
 	for (const node of value.nodes as unknown[]) {
-		object(node, ["id", "label", "kind", "parent", "summary", "tech", "details", "status", "x", "y"], "node");
+		object(node, NODE_FIELDS, "node");
 		unique(node.id); text(node.label, "node label", 300);
 		if (!["group", "client", "service", "store", "external"].some(kind => kind === node.kind)) throw new Error("Invalid node kind.");
 		for (const field of ["summary", "tech", "details"]) if (node[field] !== undefined) text(node[field], field);
 		if (node.parent !== undefined && (typeof node.parent !== "string" || !ID.test(node.parent))) throw new Error("Invalid parent id.");
 		coordinate(node.x); coordinate(node.y); status(node);
+		if (node.kind === "group" ? node.w !== undefined || node.h !== undefined : node.color !== undefined) throw new Error("Color is for groups; size is for boxes.");
+		bounded(node.color, 0, 7, "group color"); bounded(node.w, 120, 1200, "box width"); bounded(node.h, 60, 1200, "box height");
 		// SAFETY: every declared node field is checked above; hierarchy references are checked below.
 		nodes.set(node.id as string, node as unknown as DiagramNode);
 	}
@@ -59,7 +70,7 @@ export function validateDiagram(value: unknown): Diagram {
 		}
 	}
 	for (const edge of value.edges as unknown[]) {
-		object(edge, ["id", "from", "to", "label", "status"], "edge"); unique(edge.id);
+		object(edge, EDGE_FIELDS, "edge"); unique(edge.id);
 		if (typeof edge.from !== "string" || typeof edge.to !== "string" || !nodes.has(edge.from) || !nodes.has(edge.to)) throw new Error("Dangling edge.");
 		if (edge.label !== undefined) text(edge.label, "edge label", 300);
 		status(edge); edges.add(edge.id as string);
@@ -141,7 +152,7 @@ export function applyDiagramOperations(before: Diagram, operations: unknown) {
 		object(operation, ["op", "entity", "id", "value", "x", "y"], "operation");
 		if (!["add", "update", "move", "remove"].some(op => op === operation.op) || !["node", "edge", "note"].some(entity => entity === operation.entity)) throw new Error("Unknown diagram operation/entity.");
 		const list: (DiagramNode | DiagramEdge | DiagramNote)[] = operation.entity === "node" ? diagram.nodes : operation.entity === "edge" ? diagram.edges : diagram.notes;
-		const fields = operation.entity === "node" ? ["id", "label", "kind", "parent", "summary", "tech", "details", "status", "x", "y"] : operation.entity === "edge" ? ["id", "from", "to", "label", "status"] : ["id", "target", "text", "author", "created", "x", "y"];
+		const fields = operation.entity === "node" ? NODE_FIELDS : operation.entity === "edge" ? EDGE_FIELDS : ["id", "target", "text", "author", "created", "x", "y"];
 		if (operation.op === "add") {
 			object(operation.value, fields, "add value");
 			const value = { ...operation.value };

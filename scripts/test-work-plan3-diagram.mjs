@@ -47,7 +47,16 @@ for (const bad of [
  { ...base, notes: [{ id: "note_1", text: "Why?", author: "user", created: "2026-10-13", target: "missing" }] },
  { ...base, notes: [{ id: "note_1", text: "Why?", author: "user", created: "2026-10-13" }] },
  { ...base, nodes: Array.from({ length: 1001 }, (_, i) => ({ ...node, id: `node_${i}` })) },
+ // Editing fields: edit marks, group colors, box sizes, directions.
+ { ...base, nodes: [{ ...node, edit: "pending" }] }, { ...base, nodes: [{ ...node, color: 2 }] },
+ { ...base, nodes: [{ id: "g", label: "G", kind: "group", color: 8 }] }, { ...base, nodes: [{ id: "g", label: "G", kind: "group", color: 1.5 }] },
+ { ...base, nodes: [{ id: "g", label: "G", kind: "group", w: 200 }] }, { ...base, nodes: [{ ...node, w: 119 }] }, { ...base, nodes: [{ ...node, h: 1201 }] },
+ { ...base, directions: "" }, { ...base, directions: "x".repeat(8001) },
 ]) assert.throws(() => validateDiagram(bad));
+for (const good of [
+ { ...base, directions: "Draw the modules" },
+ { ...base, nodes: [{ id: "g", label: "G", kind: "group", color: 7, edit: "add" }, { ...node, parent: "g", w: 120, h: 1200, edit: "change" }], edges: [{ id: "e", from: "g", to: "api", edit: "remove" }] },
+]) assert.equal(validateDiagram(good), good);
 const built = applyDiagramOperations(base, [
  { op: "add", entity: "node", value: { id: "backend", label: "Backend", kind: "group" } },
  { op: "add", entity: "node", value: { ...node, parent: "backend" } },
