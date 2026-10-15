@@ -892,7 +892,7 @@ export default function plan3(pi) {
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
 		if (Object.keys(data).some(key => !["target", "text", "comments"].includes(key))) throw new WebError(400, "Invalid message fields.");
 		const target = await resolveWebTarget(await displayedWebTarget(data.target));
-		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target, target.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined);
+		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target);
 		return forwardDiagramChat(pi, webCtx, diagram, data.text, data.comments, publishWeb);
 	}
 	async function readWeb(endpoint: string, params: URLSearchParams) {
@@ -923,7 +923,7 @@ export default function plan3(pi) {
 			catch (error) { throw error instanceof FileRefused ? new WebError(403, error.message) : error; }
 		}
 		const target = await displayedWebTarget(params.get("target") ?? undefined), resolved = await resolveWebTarget(target);
-		return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved, resolved.kind === "plan" ? loadDiagram(webCtx.cwd, { kind: "product" }) : undefined) };
+		return { target, diagram: loadDiagram(webCtx.cwd, resolved) ?? emptyDiagram(resolved) };
 	}
 	async function getWeb(ctx, mode?: "local" | "public") {
 		if (webStopped) throw new Error("Workspace session has ended.");
@@ -2001,7 +2001,7 @@ export default function plan3(pi) {
 			}
 			const file = diagramPath(ctx.cwd, target);
 			let result;
-			if (args.action === "get") result = { diagram: loadDiagram(ctx.cwd, target) ?? emptyDiagram(target, target.kind === "plan" ? loadDiagram(ctx.cwd, { kind: "product" }) : undefined) };
+			if (args.action === "get") result = { diagram: loadDiagram(ctx.cwd, target) ?? emptyDiagram(target) };
 			else {
 				result = await applyDiagram(ctx.cwd, target, args.operations, args.expectedRevision);
 				pi.events.emit("plan3:diagram-changed", { cwd: ctx.cwd, target, file, revision: result.diagram.revision, changed: result.changed, removed: result.removed, dependents: result.dependents });

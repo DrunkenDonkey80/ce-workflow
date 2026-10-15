@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:19:35.125Z
+updated: 2026-10-15T09:20:57.857Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -131,10 +131,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 ### Phase 1: Diagram model and agent contract [code]
 
 - [x] **M-01** Schema/validator accept edit marks, group color 0–7, box w/h, bounded directions; apply ops share the field lists.
-- [ ] **M-02** Add the `settle` operation and stop seeding plan diagrams from the product (R2, D4).
-  - `settle` clears `edit`; on `edit: "remove"` it deletes with the existing cascade; settling an unmarked element is an error.
-  - `emptyDiagram` for a plan returns no elements; the `product` parameter goes away at every caller (`plan3-diagram.ts` `applyDiagramOperations` around line 192, and `plan3.ts` web snapshot, diagram GET and plan3_diagram get).
-  - Check: C1 (settle add, change, remove, cascade, unknown id); C5.
+- [x] **M-02** settle op (clears edit; settled removal cascades); plan diagrams start empty; product param removed at every caller.
 - [ ] **M-03** Update plan3_diagram schema, description and guidelines; add a pending-edits hint to `diagramChatMessage`.
   - Guideline: after taking the user's red edits into the plan (or updating the project diagram), settle each one; never settle edits you did not address.
   - The chat context lists pending ids and their kind, so the agent knows what to settle.

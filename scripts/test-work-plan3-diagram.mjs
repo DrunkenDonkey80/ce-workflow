@@ -87,6 +87,24 @@ for (const operations of [
  [{ op: "remove", entity: "node", id: "missing" }],
  [{ op: "add", entity: "node", value: node }],
 ]) assert.throws(() => applyDiagramOperations(built, operations));
+{ // D4: settle clears a user edit; a settled removal deletes with the remove cascade.
+ const marked = applyDiagramOperations(base, [
+  { op: "add", entity: "node", value: { id: "grp", label: "Grp", kind: "group", edit: "remove" } },
+  { op: "add", entity: "node", value: { id: "inner", label: "Inner", kind: "service", parent: "grp", edit: "add" } },
+  { op: "add", entity: "node", value: { id: "other", label: "Other", kind: "store", edit: "change" } },
+  { op: "add", entity: "edge", value: { from: "inner", to: "other" } },
+  { op: "add", entity: "edge", value: { id: "gone", from: "other", to: "other", edit: "remove" } },
+ ]).diagram;
+ const settled = applyDiagramOperations(marked, [{ op: "settle", entity: "node", id: "other" }, { op: "settle", entity: "edge", id: "gone" }]);
+ assert.equal(settled.diagram.nodes.find(item => item.id === "other").edit, undefined, "settle change clears the mark");
+ assert(!settled.diagram.edges.some(item => item.id === "gone"), "settled removal deletes the edge");
+ const cascade = applyDiagramOperations(marked, [{ op: "settle", entity: "node", id: "inner" }, { op: "settle", entity: "node", id: "grp" }]);
+ assert.deepEqual(cascade.diagram.nodes.map(item => item.id), ["other"], "settled group removal cascades to children");
+ assert.deepEqual(cascade.diagram.edges.map(item => item.id), ["gone"], "and to their connections");
+ assert.throws(() => applyDiagramOperations(settled.diagram, [{ op: "settle", entity: "node", id: "other" }]), /Nothing to settle/);
+ assert.throws(() => applyDiagramOperations(marked, [{ op: "settle", entity: "node", id: "missing" }]), /Unknown/);
+ assert.throws(() => applyDiagramOperations(marked, [{ op: "settle", entity: "note", id: "inner" }]));
+}
 const dir = await mkdtemp(path.join(os.tmpdir(), "plan3-diagram-test-"));
 try {
  const planFile = path.join(dir, "docs", "plans", "sample-12345678-plan3.md");
@@ -95,8 +113,9 @@ try {
  const target = { kind: "plan", plan: { id: "12345678", file: planFile, title: "Sample" } };
  assert.equal(diagramPath(dir, target), planFile.replace(/\.md$/, ".diagram.json"));
  assert.equal(loadDiagram(dir, target), undefined);
- const seeded = emptyDiagram(target, { ...base, nodes: [node] });
- assert.equal(seeded.nodes[0].status, "existing");
+ const seeded = emptyDiagram(target);
+ assert.deepEqual([seeded.nodes, seeded.edges, seeded.notes], [[], [], []], "a plan diagram starts empty (R2)");
+ seeded.nodes.push({ ...node, status: "existing" });
  seeded.notes.push({ id: "note_1", target: "api", text: "Keep this note", author: "user", created: "2026-10-13", x: 20, y: 30 });
  const saved = await saveDiagram(dir, target, seeded, 0);
  assert.equal(saved.revision, 1);

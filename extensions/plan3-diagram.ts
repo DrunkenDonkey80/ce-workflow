@@ -110,13 +110,11 @@ export function loadDiagram(cwd: string, target: DiagramTarget): Diagram | undef
 		throw new Error(`Cannot load diagram ${file}: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
 	}
 }
-export function emptyDiagram(target: DiagramTarget, product?: Diagram): Diagram {
+// A plan diagram starts empty (R2); it holds only what is drawn or generated for that plan.
+export function emptyDiagram(target: DiagramTarget): Diagram {
 	return {
 		version: 1, kind: target.kind, ...(target.kind === "plan" ? { plan: target.plan.id } : {}),
-		title: target.kind === "plan" ? target.plan.title : "Product architecture", revision: 0,
-		nodes: target.kind === "plan" && product ? product.nodes.map(node => ({ ...node, status: "existing" })) : [],
-		edges: target.kind === "plan" && product ? product.edges.map(edge => ({ ...edge, status: "existing" })) : [],
-		notes: target.kind === "plan" && product ? structuredClone(product.notes) : [],
+		title: target.kind === "plan" ? target.plan.title : "Product architecture", revision: 0, nodes: [], edges: [], notes: [],
 	};
 }
 export async function saveDiagram(cwd: string, target: DiagramTarget, value: unknown, expectedRevision: number): Promise<Diagram> {
@@ -148,9 +146,21 @@ export function applyDiagramOperations(before: Diagram, operations: unknown) {
 	validateDiagram(before);
 	if (!Array.isArray(operations) || !operations.length || operations.length > 256) throw new Error("Apply needs 1–256 diagram operations.");
 	const diagram = structuredClone(before), changed = new Set<string>(), removed = new Set<string>();
+	function removeCascade(entity: unknown, id: string) {
+		removed.add(id);
+		if (entity === "node") {
+			let added = true;
+			while (added) { added = false; for (const node of diagram.nodes) if (node.parent && removed.has(node.parent) && !removed.has(node.id)) { removed.add(node.id); added = true; } }
+			for (const edge of diagram.edges) if (removed.has(edge.from) || removed.has(edge.to)) removed.add(edge.id);
+		}
+		for (const note of diagram.notes) if (note.target && removed.has(note.target)) removed.add(note.id);
+		diagram.nodes = diagram.nodes.filter(item => !removed.has(item.id));
+		diagram.edges = diagram.edges.filter(item => !removed.has(item.id));
+		diagram.notes = diagram.notes.filter(item => !removed.has(item.id));
+	}
 	for (const operation of operations) {
 		object(operation, ["op", "entity", "id", "value", "x", "y"], "operation");
-		if (!["add", "update", "move", "remove"].some(op => op === operation.op) || !["node", "edge", "note"].some(entity => entity === operation.entity)) throw new Error("Unknown diagram operation/entity.");
+		if (!["add", "update", "move", "remove", "settle"].some(op => op === operation.op) || !["node", "edge", "note"].some(entity => entity === operation.entity)) throw new Error("Unknown diagram operation/entity.");
 		const list: (DiagramNode | DiagramEdge | DiagramNote)[] = operation.entity === "node" ? diagram.nodes : operation.entity === "edge" ? diagram.edges : diagram.notes;
 		const fields = operation.entity === "node" ? NODE_FIELDS : operation.entity === "edge" ? EDGE_FIELDS : ["id", "target", "text", "author", "created", "x", "y"];
 		if (operation.op === "add") {
@@ -177,21 +187,16 @@ export function applyDiagramOperations(before: Diagram, operations: unknown) {
 			object(operation.value, fields, "update value");
 			if ("id" in operation.value && operation.value.id !== operation.id) throw new Error("Element ids cannot be changed; add a new element instead.");
 			Object.assign(list[index], operation.value);
+		} else if (operation.op === "settle") {
+			// D4: the agent took this user edit in; a settled removal deletes like remove.
+			if (operation.entity === "note" || !("edit" in list[index])) throw new Error(`Nothing to settle on ${operation.id}.`);
+			const settled = list[index] as DiagramNode | DiagramEdge;
+			if (settled.edit === "remove") removeCascade(operation.entity, operation.id);
+			else delete settled.edit;
 		} else if (operation.op === "move") {
 			if (operation.entity === "edge" || typeof operation.x !== "number" || typeof operation.y !== "number") throw new Error("Move needs a node/note and numeric x,y.");
 			Object.assign(list[index], { x: operation.x, y: operation.y });
-		} else {
-			removed.add(operation.id);
-			if (operation.entity === "node") {
-				let added = true;
-				while (added) { added = false; for (const node of diagram.nodes) if (node.parent && removed.has(node.parent) && !removed.has(node.id)) { removed.add(node.id); added = true; } }
-				for (const edge of diagram.edges) if (removed.has(edge.from) || removed.has(edge.to)) removed.add(edge.id);
-			}
-			for (const note of diagram.notes) if (note.target && removed.has(note.target)) removed.add(note.id);
-			diagram.nodes = diagram.nodes.filter(item => !removed.has(item.id));
-			diagram.edges = diagram.edges.filter(item => !removed.has(item.id));
-			diagram.notes = diagram.notes.filter(item => !removed.has(item.id));
-		}
+		} else removeCascade(operation.entity, operation.id);
 	}
 	validateDiagram(diagram);
 	const allChanges = new Set([...changed, ...removed]);
@@ -200,7 +205,7 @@ export function applyDiagramOperations(before: Diagram, operations: unknown) {
 }
 
 export async function applyDiagram(cwd: string, target: DiagramTarget, operations: unknown, expectedRevision: number) {
-	const before = loadDiagram(cwd, target) ?? emptyDiagram(target, target.kind === "plan" ? loadDiagram(cwd, { kind: "product" }) : undefined);
+	const before = loadDiagram(cwd, target) ?? emptyDiagram(target);
 	if (before.revision !== expectedRevision) throw new Error("Stale diagram revision; reload before editing.");
 	const result = applyDiagramOperations(before, operations);
 	return { ...result, diagram: await saveDiagram(cwd, target, result.diagram, expectedRevision) };

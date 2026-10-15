@@ -109,11 +109,16 @@ try {
 	] });
 	assert.equal(savedProduct.diagram.revision, 1);
 	const seedPlan = await diagramTool({ action: "get", plan: designPlan.id });
-	assert(seedPlan.diagram.nodes.every(node => node.status === "existing"));
-	const savedDiagram = await diagramTool({ action: "apply", plan: designPlan.id, expectedRevision: 0, operations: [{ op: "update", entity: "node", id: "api", value: { summary: "Now stores images", status: "changed" } }] });
+	assert.deepEqual(seedPlan.diagram.nodes, [], "a plan diagram no longer copies the product (R2)");
+	await diagramTool({ action: "apply", plan: designPlan.id, expectedRevision: 0, operations: [
+		{ op: "add", entity: "node", value: { id: "api", label: "API", kind: "service", status: "existing" } },
+		{ op: "add", entity: "node", value: { id: "db", label: "DB", kind: "store", status: "existing" } },
+		{ op: "add", entity: "edge", value: { from: "api", to: "db", status: "existing" } },
+	] });
+	const savedDiagram = await diagramTool({ action: "apply", plan: designPlan.id, expectedRevision: 1, operations: [{ op: "update", entity: "node", id: "api", value: { summary: "Now stores images", status: "changed" } }] });
 	assert.deepEqual(savedDiagram.dependents, ["db"]);
 	assert.match(savedDiagram.hint, /wait for the user's answer/);
-	assert.equal((await diagramTool({ action: "get", plan: designPlan.id })).diagram.revision, 1);
+	assert.equal((await diagramTool({ action: "get", plan: designPlan.id })).diagram.revision, 2);
 	assert.equal((await diagramTool({ action: "get", target: "product" })).diagram.nodes[0].summary, undefined);
 	assert(events.some(event => event.name === "plan3:diagram-changed"));
 	await assert.rejects(diagramTool({ action: "apply", plan: designPlan.id, expectedRevision: 0, operations: [{ op: "remove", entity: "node", id: "api" }] }), /Stale/);
