@@ -22,6 +22,7 @@ import {
    decodeKittyPrintable,
    Editor,
    type EditorTheme,
+   getNativeClipboard,
    fuzzyFilter,
    isKeyRelease,
    isKeyRepeat,
@@ -41,6 +42,27 @@ import {
 } from "@earendil-works/pi-tui";
 import { renderSingleSelectRows, type QuestionOption } from "./single-select-layout.ts";
 import { raceRemoteAsk, remoteResponse, remoteBatch } from "./remote.ts";
+import { randomUUID } from "node:crypto";
+import { writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+// ce-workflow: Alt+V in the answer editor pastes a clipboard image as a temp-file path, like Pi's chat editor.
+// shortcut: native clipboard only (Pi also tries wl-paste/xclip on Linux and converts BMP); widen if Linux users need it.
+const IMAGE_SIGNATURES: [string, (bytes: Uint8Array) => boolean][] = [
+   ["png", (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47],
+   ["jpg", (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff],
+   ["gif", (b) => b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46],
+   ["webp", (b) => b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50],
+];
+export async function pasteClipboardImage(read = () => getNativeClipboard()?.getImage(), dir = tmpdir()): Promise<string | undefined> {
+   const bytes = await read();
+   const kind = bytes?.length ? IMAGE_SIGNATURES.find(([, test]) => test(bytes)) : undefined;
+   if (!bytes || !kind) return undefined;
+   const file = join(dir, `pi-clipboard-${randomUUID()}.${kind[0]}`);
+   await writeFile(file, bytes, { flag: "wx" });
+   return file;
+}
 
 const ASK_USER_VERSION = "0.16.0";
 
@@ -2016,6 +2038,17 @@ class AskComponent extends Container {
 
          if (this.keybindings.matches(data, "tui.select.cancel")) {
             this.onDone(null);
+            return;
+         }
+
+         if (matchesKey(data, "alt+v")) {
+            const editor = this.ensureEditor();
+            void pasteClipboardImage().then((file) => {
+               if (!file) return;
+               const cursor = editor.getCursor(), before = editor.getText().split("\n")[cursor.line]?.[cursor.col - 1] ?? "";
+               editor.insertTextAtCursor((before && !/\s/.test(before) ? " " : "") + file + " ");
+               this.tui.requestRender();
+            }, () => undefined);
             return;
          }
 

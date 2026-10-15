@@ -341,4 +341,5 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 @media (prefers-reduced-motion: reduce) {
  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+.prompt-thumbs .thumb { display: inline-block; margin: 6px 6px 0 0; } .prompt-thumbs .thumb img { max-width: 120px; max-height: 90px; }
 .thumb { display: block; margin-top: 6px; } .thumb img { display: block; max-width: 50%; height: auto; border: 1px solid var(--line); border-radius: 6px; }

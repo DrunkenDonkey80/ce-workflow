@@ -1,6 +1,6 @@
 // Browser-only shared prompt renderer; the server/terminal race owns acceptance.
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, properties = {}, text = undefined) { const item = document.createElement(tag); Object.assign(item, properties); if (text !== undefined) item.textContent = text; return item; }
-export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElement, post, notice) {
+export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElement, post, notice, attachTo: (text: HTMLTextAreaElement) => void) {
  const pending = new Map(), cursors = new Map(); let active, sending = false;
  function remove(id) { pending.delete(id); if (active?.askId === id) { active = null; dialog.close(); } show(); }
  async function answer(payload) {
@@ -89,7 +89,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
    // A pre-filled answer (ask_user initialText) opens ready to edit, with room for it.
    const prefilled = typeof question.initialText === "string" && !question.options.length;
    const text = node("textarea", { rows: prefilled ? 10 : 3, maxLength: 16000, placeholder, value: prefilled ? question.initialText : "" }); text.setAttribute("aria-label", placeholder + ": " + question.question);
-   if (freeform || commented) section.append(text);
+   if (freeform || commented) { section.append(text); attachTo(text); }
    const skip = node("input", { type: "checkbox" });
    if (ask.questions) { const label = node("label", { className: "prompt-option" }); label.append(skip, "Skip this question"); section.append(label); }
    readers.push(() => {

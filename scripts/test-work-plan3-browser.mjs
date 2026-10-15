@@ -647,6 +647,12 @@ try {
   assert.equal(messages.length, sentBefore + 1); assert.deepEqual(messages.at(-1).diagrams, [{ target: "product", ids: ["new_box"] }, { target: "12345678", ids: ["new_box"] }], "Send carries each line's diagram");
   await browser("click", "#generate"); await browser("wait", "--fn", "document.getElementById('prompt').open");
   assert.equal(await evaluate("document.querySelector('#prompt-form textarea').value"), "Saved directions", "Generate opens a pre-filled prompt");
+  // A prompt's answer box takes a pasted (or picked) image: its path is inserted and a small thumbnail shows below.
+  assert(await evaluate("!!document.querySelector('#prompt-form .attach input[type=file]')"), "prompts offer an Image picker");
+  await evaluate(`(() => { const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), c => c.charCodeAt(0))], "p.png", { type: "image/png" })); document.querySelector("#prompt-form textarea").dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true })); })()`);
+  await browser("wait", "#prompt-form .prompt-thumbs .thumb img");
+  const promptImage = (await evaluate("document.querySelector('#prompt-form textarea').value")).match(/\S*pi-clipboard-[0-9a-f-]+\.png/)?.[0]; assert(promptImage, "the pasted image path is in the answer");
+  assert.equal(await evaluate("document.querySelector('#prompt-form .prompt-thumbs img').naturalWidth"), 1); await rm(promptImage);
   events.emit("ask:closed", { askId: generateAsk }); await browser("wait", "--fn", "!document.getElementById('prompt').open");
   await browser("set", "viewport", "390", "800");
   assert.equal(await evaluate("document.getElementById('edit-bar').getClientRects().length"), 0, "no editing bar on the phone");

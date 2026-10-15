@@ -442,7 +442,7 @@ $("search").addEventListener("keydown", event => {
 // Ctrl+F searches the diagram instead of the page.
 window.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); $("search").focus(); $("search").select(); } });
 
-const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice);
+const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice, attachTo);
 // Pi-like rows: text stays visible; thinking and each tool call are one collapsed line that expands on click.
 function renderBlocks(box: HTMLElement, row) {
  const opened = new Set([...box.querySelectorAll<HTMLDetailsElement>("details[open]")].map(item => item.dataset.key));
@@ -543,6 +543,14 @@ function appendThumbs(target: HTMLElement, images: Set<string>) {
   img.addEventListener("error", () => link.remove()); link.append(img); target.append(link);
  }
 }
+// Prompt answer boxes: paste or pick an image (on a phone: library or camera); its path goes in the text, a small thumbnail below.
+function attachTo(text: HTMLTextAreaElement) {
+ const picker = Object.assign(document.createElement("input"), { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp", hidden: true }), button = Object.assign(document.createElement("label"), { className: "attach button", title: "Attach an image", textContent: "Image" }), thumbs = Object.assign(document.createElement("div"), { className: "prompt-thumbs" });
+ button.append(picker); picker.addEventListener("change", () => { const file = picker.files?.[0]; picker.value = ""; if (file) void attach(file, text); });
+ text.addEventListener("paste", event => { const file = [...(event.clipboardData?.items ?? [])].find(item => item.type.startsWith("image/"))?.getAsFile(); if (file) { event.preventDefault(); void attach(file, text); } });
+ text.addEventListener("input", () => { thumbs.replaceChildren(); appendThumbs(thumbs, new Set([...text.value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => !/\.md$/i.test(path)))); });
+ text.after(button, thumbs);
+}
 const imageSource = (path: string) => "/api/image?path=" + encodeURIComponent(path) + (token ? "&token=" + token : "");
 const mentioned = () => [...new Set([...$("message-input").value.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
 function renderMentions() {
@@ -553,15 +561,17 @@ $("message-input").addEventListener("input", renderMentions);
 // Clipboard and attached images become temp files (like Pi's terminal paste); the chat gets their path.
 $("message-input").addEventListener("paste", event => {
  const file = [...(event.clipboardData?.items ?? [])].find(item => item.type.startsWith("image/"))?.getAsFile(); if (!file) return;
- event.preventDefault(); void attach(file);
+ event.preventDefault(); void attach(file, $("message-input"));
 });
-$("attach").addEventListener("change", () => { const input = $("attach") as HTMLInputElement, file = input.files?.[0]; input.value = ""; if (file) void attach(file); });
-async function attach(file: File) {
+$("attach").addEventListener("change", () => { const input = $("attach") as HTMLInputElement, file = input.files?.[0]; input.value = ""; if (file) void attach(file, $("message-input")); });
+// Saves the image like a terminal paste and inserts its path at the cursor of `input` (chat box or a prompt's answer box).
+async function attach(file: File, input: HTMLTextAreaElement) {
  showNotice("Saving image\u2026");
  try {
   const response = await fetch("/api/paste", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": file.type }, body: file });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Image paste failed.");
-  const input = $("message-input"), at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); toBottom(); renderMentions(); showNotice("Image saved: " + value.path, true);
+  const at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); input.dispatchEvent(new Event("input"));
+  if (input === $("message-input")) toBottom(); showNotice("Image saved: " + value.path, true);
  } catch (error) { showNotice(error.message); }
 }
 // Typing "/name" or "/wo sub" lists matching commands; arrows move, Tab/Enter picks, Escape closes.

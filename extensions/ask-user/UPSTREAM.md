@@ -17,6 +17,7 @@ Files: index.ts and single-select-layout.ts. Keep the terminal UI and result con
 
 - `initialText` (single question or batch entry, no options, at most 16,000 characters) pre-fills the answer: the AskComponent opens in its multi-line editor holding the text (a single pre-filled question skips the one-line `ui.input`, which cannot pre-fill), dialog fallbacks use `ui.editor(title, text)`, and the browser prompt shows it in its textarea. Used by Plan3 Generate for remembered directions; `loadPlan3Ask` reports `prefills: false` for an external pi-ask-user so callers fall back to the terminal editor.
 - Factory registration waits for session_start, after all extensions load; if another ask_user exists it skips ours and warns once (D12). registerAskUser is exported so the Plan3 command adapter can instantiate the same tool without lifecycle hooks.
+- Alt+V in the answer/comment editor pastes a clipboard image (native clipboard; PNG, JPEG, GIF or WebP) as a `pi-clipboard-<uuid>` temp-file path, like Pi's chat editor (`pasteClipboardImage`).
 
 ## Updating
 

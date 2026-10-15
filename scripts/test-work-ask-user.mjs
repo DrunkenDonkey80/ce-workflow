@@ -13,7 +13,7 @@ try { sdkRoots.push(path.dirname(path.dirname(createRequire(import.meta.url).res
 const sdkRoot = sdkRoots.find(root => existsSync(path.join(root, "dist", "core", "extensions", "virtual-modules.js")));
 assert(sdkRoot, "vendored popup selfcheck needs an installed Pi SDK");
 const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
-const { default: factory, registerAskUser } = await createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES }).import("../extensions/ask-user/index.ts");
+const { default: factory, registerAskUser, pasteClipboardImage } = await createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES }).import("../extensions/ask-user/index.ts");
 const bus = new EventEmitter();
 let tool;
 registerAskUser({ registerTool: (registered) => { tool = registered; }, events: { on: (name, fn) => { bus.on(name, fn); return () => bus.off(name, fn); }, emit: (name, event) => bus.emit(name, event) } });
@@ -81,5 +81,14 @@ for (const external of [false, true]) {
  start({}, { ui: { notify: () => warnings++ } });
  assert.equal(registrations, external ? 0 : 1);
  assert.equal(warnings, external ? 1 : 0);
+}
+{
+ // Alt+V: a clipboard PNG becomes a pi-clipboard temp file; no image or a non-image does nothing.
+ const { mkdtempSync, readFileSync, rmSync } = await import("node:fs"), { tmpdir } = await import("node:os");
+ const dir = mkdtempSync(path.join(tmpdir(), "ask-paste-")), png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
+ const file = await pasteClipboardImage(async () => png, dir);
+ assert.match(path.basename(file), /^pi-clipboard-[0-9a-f-]{36}\.png$/); assert.deepEqual([...readFileSync(file)], [...png]);
+ assert.equal(await pasteClipboardImage(async () => undefined, dir), undefined); assert.equal(await pasteClipboardImage(async () => Uint8Array.from([1, 2, 3]), dir), undefined);
+ rmSync(dir, { recursive: true });
 }
 console.log("ok - vendored ask_user single/batch races and coexistence");
