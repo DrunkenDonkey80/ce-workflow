@@ -190,6 +190,22 @@ try {
  assert.equal(await shown("web_client__load_balancer"), true, "hover reveals the node's edges");
  assert(await evaluate("document.getElementById(\"diagram\").classList.contains(\"focusing\") && document.querySelector(\"[data-node=load_balancer]\").classList.contains(\"lit\") && !document.querySelector(\"[data-node=worker]\").classList.contains(\"lit\")"), "neighbors lit, others dim");
  await browser("focus", "#zoom-fit");
+ // E-02: pending marks are drawn red, removed edges get an X, group colors inherit, pending edges are never bundled.
+ {
+  const saved = diagram, marked = structuredClone(diagram), mark = (list, id, value) => Object.assign(marked[list].find(item => item.id === id), value);
+  mark("nodes", "worker", { edit: "add" }); mark("nodes", "metadata_db", { edit: "remove" }); mark("nodes", "processing", { color: 4 });
+  mark("edges", "web_client__load_balancer", { edit: "remove" }); marked.revision = saved.revision + 100;
+  diagram = marked; server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });
+  await browser("wait", "--fn", `document.getElementById("diagram").dataset.revision === "${marked.revision}"`);
+  assert(await evaluate("!!document.querySelector('[data-node=worker].pending-add .pending-outline') && !!document.querySelector('[data-node=metadata_db].pending-remove .pending-x')"), "pending boxes outlined, removed box crossed");
+  assert(await evaluate("!!document.querySelector('[data-edge=web_client__load_balancer].pending-remove .pending-x')"), "removed edge has an X");
+  assert.equal(await evaluate("document.querySelector('[data-node=processing] .group-label').classList.contains('tone-4') && [...document.querySelectorAll('[data-node=queue] path')].some(path => path.getAttribute('stroke') === '#1098ad')"), true, "a group's color reaches its boxes");
+  await browser("focus", "[data-node=storage]");
+  assert.equal(await shown("web_client__load_balancer"), true, "a pending cross-group edge stays visible with focus elsewhere");
+  diagram = saved; server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });
+  await browser("wait", "--fn", `document.getElementById("diagram").dataset.revision === "${diagram.revision}"`);
+  await browser("focus", "#zoom-fit");
+ }
  assert.equal(await shown("web_client__load_balancer"), false, "leaving the node restores the calm view");
  await browser("press", "Escape"); const lb = await evaluate("(() => { const r = document.querySelector(\"[data-node=load_balancer]\").getBoundingClientRect(); return { x: Math.round(r.x + 20), y: Math.round(r.y + 20) }; })()"); await browser("mouse", "move", String(lb.x), String(lb.y)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left"); await browser("focus", "#zoom-fit");
  assert.equal(await shown("web_client__load_balancer"), true, "a clicked box stays in focus");

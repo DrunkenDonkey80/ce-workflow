@@ -94,6 +94,11 @@ h2 { font-size: 15px; font-weight: 600; }
 #diagram[data-band=mid] .edge-label { display: none; }
 #diagram .lit .edge-label { display: inline; }
 #diagram .detail-edge:not(.lit) { display: none; }
+/* E-02: user edits the agent has not taken in yet. */
+#diagram .pending-outline { fill: none; stroke: #e03131; stroke-width: 2px; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+#diagram .pending-remove > .pending-outline { stroke-dasharray: none; }
+#diagram .pending-x line { stroke: #e03131; stroke-width: 2.5px; vector-effect: non-scaling-stroke; pointer-events: none; }
+#diagram.focusing .pending:not(.lit) { opacity: .6; }
 #diagram [data-node], #diagram [data-edge], #diagram .bundle-edge { transition: opacity .12s; }
 #diagram.focusing [data-node]:not(.lit), #diagram.focusing [data-edge]:not(.lit), #diagram.focusing .bundle-edge { opacity: .15; }
 .bundle-count { font-size: 14px; fill: #868e96; paint-order: stroke; stroke: white; stroke-width: 5px; }

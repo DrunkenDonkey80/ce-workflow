@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:36:48.124Z
+updated: 2026-10-15T09:39:40.233Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -147,10 +147,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 ### Phase 4: Editing endpoint and pending rendering [code]
 
 - [x] **E-01** POST /api/edit applies one toolbar edit (box, group+color, connect, rename, recolor, resize, move, delete) via toolbarEdit() in plan3-diagram.ts, with server-side add/change/remove marks, D5 undo of pending adds, label-derived unique ids, 409 on stale; returns diagram, chat line and cascade-removed ids.
-- [ ] **E-02** Draw pending marks: red dashed outline for added and changed elements, red line with an X at the midpoint for removed edges, red outline with X for removed boxes.
-  - Group colors from `color` with nearest-ancestor inheritance; layout honors `w` and `h`.
-  - Pending edges are never folded into cross-group bundles (`diagram.ts` bundling around line 89) and stay visible without focus (today `.detail-edge:not(.lit)` hides them, `styles.css` around line 98).
-  - Check: C1 (layout uses `w`, `h`), C3 (pending classes present, X drawn for a removed edge, colors per group, a removed cross-group edge stays visible with focus elsewhere and below 0.6 zoom).
+- [x] **E-02** Pending marks drawn: red dashed outline for add/change boxes, solid outline + X for removals, red edges (dashed for add/change, X at midpoint for remove); pending edges never bundled; group color inherits from the nearest colored group; layout honors box w/h (never shorter than content).
 
 ### Phase 5: Editing bar interactions [code]
 

@@ -12,6 +12,8 @@ export function element<K extends keyof SVGElementTagNameMap>(tag: K, attributes
  if (text !== undefined) node.textContent = text;
  return node;
 }
+// Pending-removal X: two plain SVG lines, styled red by .pending-x.
+const cross = (x, y, w, h) => { const mark = element("g", { class: "pending-x" }); mark.append(element("line", { x1: x, y1: y, x2: x + w, y2: y + h }), element("line", { x1: x + w, y1: y, x2: x, y2: y + h })); return mark; };
 export function seed(id) { let value = 0; for (const char of id) value = Math.imul(value, 31) + char.charCodeAt(0); return (value & 0x7fffffff) || 1; }
 // One color per top-level block: [header/stroke, pale tint]; keep in sync with .tone-N in styles.css (CSP blocks inline styles). Boxes inherit their block's color; status is a small tag.
 const PALETTE = [["#4c6ef5", "#edf2ff"], ["#2f9e44", "#ebfbee"], ["#e8590c", "#fff4e6"], ["#7048e8", "#f3f0ff"], ["#1098ad", "#e3fafc"], ["#d6336c", "#fff0f6"], ["#5c940d", "#f4fce3"], ["#495057", "#f1f3f5"]];
@@ -39,9 +41,10 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   row.append(rc.linearPath(points, options), head(points.at(-1), points.at(-2)));
   if (both) row.append(head(points[0], points[1]));
   row.append(element("polyline", { points: points.join(" "), class: "edge-hit" }));
-  // Label on the longest straight run, where it has the most room.
+  // Label (and a pending-removal X) on the longest straight run, where it has the most room.
   const at = points.slice(1).reduce((best, point, k) => { const length = Math.abs(point[0] - points[k][0]) + Math.abs(point[1] - points[k][1]); return length > best.length ? { length, x: (point[0] + points[k][0]) / 2, y: (point[1] + points[k][1]) / 2 } : best; }, { length: -1, x: 0, y: 0 });
   if (label) row.append(element("text", { x: at.x, y: at.y - 8, class: label.className, "text-anchor": "middle" }, label.text));
+  if (options.cross) row.append(cross(at.x - 8, at.y - 8, 16, 16));
   return true;
  }
  function lines(text, width, limit, font = "16px system-ui") {
@@ -77,6 +80,7 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   // only appears individually while one of its ends is in focus.
   bundles = new Map();
   for (const edge of edges) {
+   if (edge.edit) continue; // Pending edits always draw on their own (E-02).
    const from = root(edge.from), to = root(edge.to);
    if (from === to || from === edge.from && to === edge.to) continue;
    const key = [from, to].sort().join(" "), bundle = bundles.get(key) ?? { from, to, count: 0, both: false };
@@ -113,7 +117,11 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
   build(data);
   const byId = new Map<string, any>(data.nodes.map(node => [node.id, node]));
   const top = id => { let node = byId.get(id); while (byId.has(node?.parent)) node = byId.get(node.parent); return node?.id; };
-  const tops = data.nodes.filter(node => !node.parent).map(node => node.id), color = id => PALETTE[Math.max(0, tops.indexOf(top(id))) % PALETTE.length];
+  // D7: the nearest group with a stored color wins, else the top-level block's color.
+  const tops = data.nodes.filter(node => !node.parent).map(node => node.id), color = id => {
+   for (let node = byId.get(id); node; node = byId.get(node.parent)) if (node.kind === "group" && Number.isInteger(node.color)) return PALETTE[node.color];
+   return PALETTE[Math.max(0, tops.indexOf(top(id))) % PALETTE.length];
+  };
   const stage = element("g", { transform: `translate(${view.x} ${view.y}) scale(${view.scale})` });
   const near = view.scale > 1.6;
   function drawNode(node) {
@@ -129,6 +137,11 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    const body = near ? details(node) : !frame ? summary(node) : [];
    body.forEach((text, index) => row.append(element("text", { x: box.x + 12, y: box.y + head(node, 1, box.w) + (near ? 22 : 18) + index * (near ? 18 : 15), class: near ? "node-detail" : "node-summary" }, text)));
    if (group) row.classList.add("group-node");
+   if (node.edit) {
+    row.classList.add("pending", "pending-" + node.edit);
+    row.append(element("rect", { x: box.x - 5, y: box.y - 5, width: box.w + 10, height: box.h + 10, rx: 6, class: "pending-outline" }));
+    if (node.edit === "remove") row.append(cross(box.x, box.y, box.w, box.h));
+   }
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(node.id); });
    row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: node.id }); else handlers.mention(node.id); } });
    // Open groups cover most of the canvas, so only a click (not hover) focuses them.
@@ -144,10 +157,11 @@ export function createDiagramView(svg: SVGSVGElement, handlers) {
    if (arrow(row, bundle.points, { seed: seed(key), stroke: "#868e96", strokeWidth: 1.6, roughness: .7 }, bundle.count > 1 && { text: "\u00d7" + bundle.count, className: "bundle-count" }, bundle.both)) stage.append(row);
   }
   for (const edge of edges) {
-   const bundled = bundles.has([top(edge.from), top(edge.to)].sort().join(" ")) && top(edge.from) !== top(edge.to);
+   const bundled = !edge.edit && bundles.has([top(edge.from), top(edge.to)].sort().join(" ")) && top(edge.from) !== top(edge.to);
    const row = element("g", { "data-edge": edge.id, tabindex: 0, role: "button", "aria-label": (edge.label || edge.id) + ". Enter to mention." });
    if (bundled) row.classList.add("detail-edge");
-   const options = { seed: seed(edge.id), stroke: "#1e1e1e", strokeWidth: 1.4, roughness: .7, strokeLineDash: edge.status === "removed" ? [5, 4] : undefined };
+   if (edge.edit) row.classList.add("pending", "pending-" + edge.edit);
+   const options = { seed: seed(edge.id), stroke: edge.edit ? "#e03131" : "#1e1e1e", strokeWidth: edge.edit ? 2 : 1.4, roughness: .7, strokeLineDash: edge.status === "removed" || edge.edit === "add" || edge.edit === "change" ? [5, 4] : undefined, cross: edge.edit === "remove" };
    if (!arrow(row, routes.get(edge.id), options, edge.label && { text: edge.label, className: "edge-label" })) continue;
    row.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) handlers.mention(edge.id); });
    row.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); if (handlers.pinning?.()) handlers.pin({ element: edge.id }); else handlers.mention(edge.id); } });

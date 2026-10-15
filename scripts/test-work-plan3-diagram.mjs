@@ -27,6 +27,13 @@ const pinned = layout(upload), cdn = pinned.get("cdn");
 assert.equal(cdn.y, Math.min(...[...pinned.values()].map((box) => box.y)), "pinned box stays in the top row");
 assert.equal(cdn.x + cdn.w, Math.max(...[...pinned.values()].map((box) => box.x + box.w)), "pinned box snaps to the rightmost column");
 for (const [id, box] of pinned) if (id !== "cdn") assert(!(box.x < cdn.x + cdn.w && cdn.x < box.x + box.w && box.y < cdn.y + cdn.h && cdn.y < box.y + box.h), `pinned cdn overlaps ${id}`);
+// D8: a resized box keeps its width and is never shorter than its content; groups ignore w/h.
+{
+	const sized = structuredClone(upload); Object.assign(sized.nodes.find((node) => node.id === "worker"), { w: 360, h: 30 });
+	const box = layout(sized).get("worker");
+	assert.equal(box.w, 360); assert.equal(box.h, layout(upload).get("worker").h, "height never below content");
+	Object.assign(sized.nodes.find((node) => node.id === "worker"), { h: 400 }); assert.equal(layout(sized).get("worker").h, 400);
+}
 
 const { validateDiagram, diagramPath, loadDiagram, emptyDiagram, saveDiagram, applyDiagramOperations, applyDiagram, diagramDependents, DIAGRAM_BYTES } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
 const { movePlanWithDiagram } = await createJiti(import.meta.url).import("../extensions/plan3-design.ts");

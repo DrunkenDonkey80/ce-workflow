@@ -53,7 +53,9 @@ function arrange(n: number, cols: number, links: [number, number, number][], ord
 	return { at, cost: best };
 }
 
-export function layout(diagram: Pick<Diagram, "nodes" | "edges">, nodeSize = (_node: DiagramNode) => NODE, groupTitle = (_node: DiagramNode) => TITLE) {
+export function layout(diagram: Pick<Diagram, "nodes" | "edges">, measure = (_node: DiagramNode) => NODE, groupTitle = (_node: DiagramNode) => TITLE) {
+	// D8: a resized box keeps its stored width and is never shorter than its content.
+	const nodeSize = (node: DiagramNode) => { const size = measure(node); return node.kind === "group" ? size : { w: node.w ?? size.w, h: Math.max(node.h ?? 0, size.h) }; };
 	const nodes = diagram.nodes ?? [], byId = new Map(nodes.map((node) => [node.id, node]));
 	const children = new Map<string, DiagramNode[]>();
 	for (const node of nodes) {
