@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T10:03:01.658Z
+updated: 2026-10-15T10:34:07.791Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -30,6 +30,12 @@ Requirements:
 - R7 Every edit is saved at once. Meaning edits (add, connect, rename, recolor, delete) are drawn red as pending; layout edits (move, resize) are not marked and add no chat line (D3). A removed connection or box stays visible as a red line or outline with an X until settled. Each edit also adds one line to the chat box saying what changed where; the user sends once.
 - R8 A pending mark clears when the agent has taken the edit into the plan (D1). For the Project tab, done means the agent updated the project diagram to match. Clearing a removal deletes the element.
 - R9 The desktop message box gets two more lines (4 to 6 rows); the phone keeps its current height.
+- R10 (2026-10-15, user feedback at J-01) Tabs "UML Project" and "UML Plan" with icons; Select, Box and Group tools with icons; the selected color visibly marked.
+- R11 Groups and boxes are drawn by dragging, with a live outline in the selected color.
+- R12 Group title band: grab cursor, drag moves the group; corners resize it (left button).
+- R13 Boxes are grabbed by their title and dropped into a group (they travel with it, the group arranges them and grows to fit) or dragged out.
+- R14 Creating opens no dialog; an "A+" cursor over a label means click to edit it.
+- R15 Side midpoints of a box or group are connect handles. Clicking a connection lets you label or delete it; boxes and groups get Delete in their label dialog; deleting asks for confirmation.
 
 Non-goals:
 - No free-form drawing (arrows to nowhere, text, freehand). Elements stay typed boxes, groups, edges and notes.
@@ -48,10 +54,15 @@ Non-goals:
 - **D7 Group colors are the existing 8-color `PALETTE` (stored as `color: 0..7` on groups).** A box takes the color of its nearest colored ancestor group, else today's top-level color. CSP blocks inline styles, so styles stay `.tone-N` classes. Source: `extensions/plan3-web/diagram.ts`, `styles.css`.
 - **D8 Box size is stored as optional `w` and `h` on boxes (not groups).** Layout uses them as the box size, never smaller than the label needs; groups keep sizing to their content. Source: `nodeSize` in `layout.ts`.
 - **D9 ask_user pre-fill is a per-question `initialText` string.** A question with no options and `initialText` opens straight in the editor (terminal) or a textarea (browser) holding that text; the answer is the edited text. Divergence is recorded in `extensions/ask-user/UPSTREAM.md`. Source: request R4; existing no-options editor path in `extensions/ask-user/index.ts` (around line 1292) and `showAskDialog` in `extensions/work-dialogs.ts`.
+- **D10 Groups also take optional `w` and `h`, as a minimum size** (amends D8). Layout uses the larger of that and the content, so dropping boxes in still grows the group (R12, R13). Source: user feedback 2026-10-15.
+- **D11 Changing a box's or group's parent is a meaning edit** (`change` mark and a chat line); moving within the same parent stays layout (D3). Rationale: structure changes what the plan builds, position does not.
+- **D12 The bar is Select, Box, Group and the color swatches; Connect and Delete tools are removed** (Q-04). Side handles connect (U-06) and dialogs delete (U-07). Source: user via ask_user, 2026-10-15.
+- **D13 A group drawn around boxes adopts every box whose center is inside it**, one move line per box (Q-05). Source: user via ask_user, 2026-10-15.
 
 Labelled assumptions (over 95% from evidence):
 - A1 The Plan tab shows the plan the page is displaying today (URL `target`, else the current plan); the existing plan picker in the plan menu switches it.
 - A2 Chat context follows the diagram each line came from, not the active tab: toolbar chat lines remember their diagram (Project or this plan), and Send attaches context for every diagram whose lines or mentions are in the message, so the same id in both diagrams is never confused. Typed @mentions without a toolbar line use the active diagram tab (the last one when only Files is open). The displayed plan identity stays separate from the active diagram target.
+- A3 Box and Group share the drag-to-draw gesture; a click places the default size. The request names it for groups; one gesture for both is simpler to learn.
 - **Q-01** Should the diagram editing bar appear on the phone?
   - Context: The phone shows one view at a time with a small screen; drawing and connecting with touch needs bigger targets and a pan or edit mode switch. Notes and viewing already work there.
   - Recommendation: Desktop and tablet widths only (900 px and up) for the first version; the phone views diagrams and adds notes. Add touch editing later if wanted.
@@ -159,12 +170,44 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 - [x] **G-01** Generate button (in the diagram controls, on both tabs and the phone) → POST /api/generate. Opens ask_user pre-filled with the unsaved draft, the saved directions or a per-target default. Cancel saves nothing. Saves `directions` with a revision check and one retry on a stale revision; on failure the text is kept for the next Generate and nothing is sent. Then sends the in-place update prompt (keep ids, positions, notes and pending marks; "start over" allows a rebuild; report changes).
 - [x] **G-02** Removed createProductDiagram/offerProductDiagram; /plan3 diagram and architecture only open the workspace; empty Project tab says "No project diagram yet. Generate one, or draw with the bar above."; README offer line dropped; the old declined setting is simply ignored.
+### Phase 6b: Direct manipulation on the canvas [code]
+
+- [ ] **U-01** Tabs read "UML Project" and "UML Plan" with icons; Select (pointer), Box and Group get icons beside their labels; the chosen swatch shows a clear selected ring.
+  - Desktop tabs and the phone drawer use the same names; icons are inline SVG in index.html (no new asset, CSP allows only self).
+  - Check: C3.
+- [ ] **U-02** Box and Group tools draw by press-drag with a live outline in the chosen color; release creates the element at that place and size, a plain click uses the default size.
+  - The outline previews the group color from the selected swatch (boxes: their parent's tone). Minimum drawn size is the existing bound (120 × 60); smaller drags count as a click.
+  - A drawn size is stored as `w` and `h` (D8 amended by D10); a group drawn around boxes adopts those whose center is inside (D13).
+  - Check: C3 (drag preview element present during the drag, created element has the drawn size), C2.
+- [ ] **U-03** Creating opens no dialog: the element gets a default label; over a box or group label the cursor becomes an "A+" text cursor, and clicking opens the label dialog.
+  - Default labels "New box" and "New group" (numbered when taken); the chat line is added at creation and replaced by the rename line's label when renamed before Send (one line per element).
+  - "A+" cursor is a data: SVG in styles.css (CSP img-src allows data:), falling back to `text`.
+  - Check: C3 (no dialog on create; label click opens the pre-filled dialog).
+- [ ] **U-04** Groups: the title band shows a grab cursor and dragging it moves the group with its content; corner handles resize it (left button), never smaller than its content.
+  - Moving a group is layout (pins its position, no mark, no chat line, D3). Group resize stores `w` and `h` as a minimum size (D10); layout uses the larger of that and the content.
+  - Check: C1 (group w/h validated and honored by layout), C3 (grab cursor on the title band, corner handle resizes).
+- [ ] **U-05** Boxes are grabbed by their title: dropping on a group moves them inside, dropping on empty canvas moves them out; the group re-arranges and grows to fit.
+  - Changing the parent is a meaning edit: `change` mark and one chat line ("Move @cache into @backend" or "Move @cache out of @backend"). Moving inside the same parent only pins it (layout).
+  - A dropped box loses its pin and the grid places it; groups never drop into themselves or their descendants (server rejects cycles).
+  - Groups can be dropped into groups the same way by their title band.
+  - Check: C1 (reparent op, cycle rejected), C2 (endpoint), C3 (drop into, drop out, group grows).
+- [ ] **U-06** Side midpoints of a hovered box or group show connect handles (pointer cursor); drag to another element connects them, release elsewhere cancels.
+  - Handles show on the hovered element only; a live line follows the pointer. Connecting to itself or duplicating an existing edge adds nothing.
+  - Check: C3 (handle cursor, drag creates one pending edge and one chat line).
+- [ ] **U-07** Clicking a connection opens a dialog for its label with a Delete button; the box and group label dialog also has Delete; every Delete asks for confirmation.
+  - The edge dialog reuses the label dialog with the edge label pre-filled; saving renames the edge (new toolbar edit, `change` mark and a chat line).
+  - Confirmation names the element and, for groups, how many children go with it. Undo of a pending add (D5) still confirms.
+  - Remove the Connect and Delete tools (D12).
+  - Check: C2, C3.
+- [ ] **U-08** Update C3 browser asserts and C1 and C2 for the new edits; README editing-bar line matches the new gestures.
+  - Check: C1, C2, C3, C6.
 
 ### Phase 7: Agent behavior trial [think]
 
 - [ ] **J-01** Run one live session: sketch three edits, send, and judge whether the agent takes them into the plan and settles exactly those marks.
   - Tune the plan3_diagram guidelines and the chat hint wording if it settles too early, too late or not at all; keep the change to prompt text.
   - Check: the plan file and diagram JSON after the run (marks cleared only for addressed edits); C1 and C5 after any wording change.
+  - note: Paused at start: user feedback added Phase 6b (U-01 to U-08); rerun with scratch plan 7f809491 after it.
 
 ### Phase 8: Live acceptance [human] [code]
 
@@ -189,7 +232,7 @@ Checks: C1–C7 pass for touched code; C8 once before any push.
 
 ## Resume context
 
-Plan active 9/17; HEAD 8dc6824 (E-02 done). NEXT E-03: editing bar (Select, Box, Group+swatches, Connect, Delete) in the left-panel top bar, ≥900px only; posts to POST /api/edit {target, expectedRevision, edit:{kind,...}} (toolbarEdit in extensions/plan3-diagram.ts; returns {diagram, line, removed}); browser test stub post() in scripts/test-work-plan3-browser.mjs ~L74 only allows /api/move,/api/comment — extend it to apply toolbarEdit. Never push; bump 0.1.41→0.1.42 only before push. Leave other-session dirty files unstaged.
+15/25; HEAD 931b025 (not pushed). NEXT U-01 (Phase 6b direct manipulation, D10–D13 settled: groups get min w/h, reparent is a change edit, bar = Select/Box/Group+swatches, drawn groups adopt enclosed boxes). Then J-01 with scratch plan 7f809491 (docs/plans/...7f809491-plan3.md, no diagram file; archive after), then H-01. Never push; bump 0.1.41→0.1.42 only before push. Leave other-session dirty files unstaged.
 
 ## Backlog
 
@@ -214,3 +257,4 @@ Append material changes and their reasons; preserve the original request and set
   - Own check accepted: `emptyDiagram` is also called in `plan3-diagram.ts`; M-02 names every caller.
 - 2026-10-15: Q-01 to Q-03 answered (desktop-only bar, Generate updates in place, remove automatic product-diagram creation and offer). E-03, G-01, G-02 and H-01 now state the chosen behavior; G-02 also names the README line and the test block to drop.
 - 2026-10-15: Added final architecture reconciliation because a product diagram exists.
+- 2026-10-15: Added U-01 to U-08 (Phase 6b) after G-02: User feedback at the start of J-01 (2026-10-15): the bar should work by direct manipulation (drag to draw, grab to move or resize, side handles to connect, click a label to edit or delete) instead of tool-then-dialog. J-01 waits for it.
