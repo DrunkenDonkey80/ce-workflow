@@ -844,9 +844,13 @@ export default function plan3(pi) {
 			return stopLiveRun(ctx);
 		}
 		if (endpoint === "/api/command") {
-			if (Object.keys(data).some(key => !["target", "command"].includes(key)) || !["resolve", "ideas", "ideas all", "ideas select", "review", "review all", "finish", "resume"].includes(data.command)) throw new WebError(400, "Invalid workspace command.");
+			if (Object.keys(data).some(key => !["target", "command"].includes(key)) || !["resolve", "ideas", "ideas all", "ideas select", "review", "review all", "finish", "resume", "delete"].includes(data.command)) throw new WebError(400, "Invalid workspace command.");
 			const target = await resolveWebTarget(webTarget(data.target));
 			if (target.kind !== "plan") throw new WebError(400, "This command needs a displayed plan.");
+			if (data.command === "delete") {
+				if (!isOpen(target.plan)) throw new WebError(400, "Finished plans are archived; delete them from the terminal plan list.");
+				await deletePlan(ctx.cwd, target.plan); await refresh(ctx); return { ok: true };
+			}
 			if (data.command === "resume") await commands.resume3.handler(target.plan.id, ctx, target.plan);
 			else await planCommand.handler(data.command, ctx, target.plan);
 			return { ok: true };
@@ -1819,12 +1823,18 @@ export default function plan3(pi) {
 			if (action?.value === "finish") { const file = await forceFinish(ctx, plan); if (!file) return; ctx.ui.notify(`Plan3: force-finished → ${file}`, "info"); }
 			if (action?.value === "delete") {
 				const confirm = await showListDialog(ctx, { title: `Delete ${plan.title}?`, purpose: "The plan file is removed permanently.", items: [{ value: "no", label: "Cancel" }, { value: "yes", label: "Delete permanently" }] });
-				if (confirm?.value === "yes") { await unlink(plan.file); ctx.ui.notify(`Plan3: deleted ${plan.name}`, "info"); }
+				if (confirm?.value === "yes") { await deletePlan(ctx.cwd, plan); ctx.ui.notify(`Plan3: deleted ${plan.name}`, "info"); }
 			}
 			await refresh(ctx);
 		}
 	}
 
+	// The plan file and its diagram; the sidecar log stays as history.
+	async function deletePlan(cwd, plan) {
+		let diagram; try { diagram = diagramPath(cwd, { kind: "plan", plan }); } catch { /* not a diagram owner */ }
+		await unlink(plan.file);
+		if (diagram) await unlink(diagram).catch(() => undefined);
+	}
 	// Rows show the plan's override or what it inherits; "inherit" removes the front-matter key.
 	async function editOverrides(ctx, plan) {
 		let cursor;

@@ -1272,6 +1272,11 @@ try {
 		assert(messages.at(-1).message.includes(`Architecture workspace (${b})`)); assert(messages.at(-1).message.includes("Keep this boundary"));
 		idle = false; assert.equal((await post("message", { text: "Follow up" })).body.queued, true); assert.equal(messages.at(-1).options.deliverAs, "followUp"); idle = true;
 		assert.equal((await post("move", { expectedRevision: 3, entity: "edge", id: "api", x: 0, y: 0 })).status, 400);
+		// The web Delete removes an open plan and its diagram.
+		const dFile = path.join(plansDir, "2026-10-13-d-d4444444-plan3.md"), dDiagram = dFile.replace(/\.md$/, ".diagram.json");
+		await writeFile(dFile, body("d4444444", "D")); await writeFile(dDiagram, "{}");
+		const removed = await post("command", { target: "d4444444", command: "delete" });
+		assert.equal(removed.status, 200, JSON.stringify(removed.body)); assert(!existsSync(dFile) && !existsSync(dDiagram), "plan and diagram deleted");
 		assert.equal((await post("command", { command: "convert /private.md" })).status, 400);
 		assert.equal((await post("command", { target: "product", command: "finish" })).status, 400);
 		assert.equal((await post("command", { command: "review" })).status, 200);

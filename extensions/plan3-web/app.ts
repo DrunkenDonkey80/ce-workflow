@@ -730,9 +730,12 @@ $("review-button").addEventListener("click", () => toggleMenu("review-button", "
 for (const button of document.querySelectorAll<HTMLElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.addEventListener("click", async () => {
  const command = button.dataset.command; closeMenus(); setDrawer(false);
  if (command === "new") return newPlan();
+ if (command === "delete" && !confirm(`Delete the plan "${state.plan?.title ?? "shown here"}" and its diagram permanently?`)) return;
  if (commandSending) return; commandSending = true; renderShell();
  try {
   await post("command", { command }); showNotice("");
+  // The deleted plan can't be shown any more; fall back to the session's current plan or the project diagram.
+  if (command === "delete") { const url = new URL(location.href); url.searchParams.delete("target"); location.assign(url); }
  }
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }
