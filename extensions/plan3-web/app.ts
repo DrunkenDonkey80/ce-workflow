@@ -716,7 +716,7 @@ function renderSessions(sessions: Session[], own: Session | undefined) {
   item.className = "session"; item.dataset.tone = tone; item.dataset.port = String(session.port);
   if (session === own) item.setAttribute("aria-current", "page");
   item.append(Object.assign(document.createElement("span"), { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }),
-   Object.assign(document.createElement("span"), { className: "session-label", textContent: session.name }));
+   Object.assign(document.createElement("span"), { className: "session-label", textContent: session.name }), Object.assign(document.createElement("small"), { className: "session-state", textContent: words }));
   item.title ||= `${session.name} · ${words}`;
   item.setAttribute("aria-label", `${session.name} in ${folder}, ${words}${session === own ? ", this session" : ""}`);
   return item;
