@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:49:26.166Z
+updated: 2026-10-15T09:54:59.030Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -153,10 +153,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 - [x] **E-03** Editing bar (Select, Box, Group + 8 color swatches, Connect, Delete) in the left tab bar, desktop only and hidden on the Files tab; tools act through the diagram click/Enter hook, labels reuse the note dialog, each edit posts /api/edit and appends its chat line; Escape returns to Select.
 - [x] **E-04** Rename by double-click (open groups only by their title) or F2 via the pre-filled label dialog; a swatch recolors the selected group; the selected box gets a resize handle (bounded 120–1200 × 60–1200, no chat line); a plain drag on a box moves it, while empty canvas or an open group pans.
-- [ ] **E-05** Keep the chat lines in step with edits: append on each edit, keep the user's own typing intact.
-  - Deleting a pending add drops every toolbar line about each id the delete removed (the returned cascade: children, connections, notes), including earlier rename and recolor lines.
-  - Lines remember their diagram (A2); switching tabs before Send keeps them and their context.
-  - Check: C3 (add then delete a box leaves the composer as before; add group, add box inside, connect, rename, delete the group leaves no toolbar lines; edit Project, switch to Plan, Send carries Project context with the same id present in both diagrams).
+- [x] **E-05** Toolbar lines are tracked with their diagram and touched ids. Undoing a pending add drops every line in its cascade instead of adding a Delete line, and leaves the user's typing alone. Send groups the remaining lines per diagram (`diagrams: [{target, ids}]`), and the server builds one context block per diagram. The displayed diagram also owns any mention no other diagram claims.
 
 ### Phase 6: Generate with remembered directions [code]
 

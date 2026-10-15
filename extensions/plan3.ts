@@ -903,10 +903,22 @@ export default function plan3(pi) {
 			return dialogs.answer(data);
 		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
-		if (Object.keys(data).some(key => !["target", "text", "comments"].includes(key))) throw new WebError(400, "Invalid message fields.");
+		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams"].includes(key))) throw new WebError(400, "Invalid message fields.");
 		const target = await resolveWebTarget(await displayedWebTarget(data.target));
 		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target);
-		return forwardDiagramChat(pi, webCtx, diagram, data.text, data.comments, publishWeb);
+		if (data.diagrams === undefined) return forwardDiagramChat(pi, webCtx, diagram, data.text, data.comments, publishWeb);
+		// A2: toolbar lines from another diagram tab bring that diagram's context, scoped to their ids.
+		if (!Array.isArray(data.diagrams) || data.diagrams.length > 4 || data.diagrams.some(part => !part || typeof part !== "object" || Object.keys(part).some(key => !["target", "ids"].includes(key)) || !Array.isArray(part.ids))) throw new WebError(400, "Invalid message diagrams.");
+		const parts = [];
+		for (const part of data.diagrams) {
+			const other = await resolveWebTarget(webTarget(part.target));
+			const same = other.kind === target.kind && (other.kind === "product" || other.plan.id === (target as typeof other).plan.id);
+			if (!same) parts.push({ diagram: loadDiagram(webCtx.cwd, other) ?? emptyDiagram(other), ids: part.ids });
+			else parts.unshift({ diagram, ids: part.ids });
+		}
+		if (!parts.length || parts[0].diagram !== diagram) parts.unshift({ diagram, ids: [] });
+		try { return forwardDiagramChat(pi, webCtx, parts, data.text, data.comments, publishWeb); }
+		catch (error) { if (error.code) throw error; throw new WebError(400, error.message); }
 	}
 	async function readWeb(endpoint: string, params: URLSearchParams) {
 		if (endpoint === "/api/row") return chat.row(params.get("id") ?? "");

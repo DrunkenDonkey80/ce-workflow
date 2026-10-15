@@ -303,14 +303,34 @@ function setTool(name) {
  $("canvas").classList.toggle("editing", name !== "select");
  showNotice({ box: "Click empty space or a group to add a box.", group: "Click empty space or a group to add a group.", connect: "Click the box the connection starts from.", delete: "Click a box, group or connection to delete it." }[name] ?? "");
 }
-// Toolbar chat lines join the message like note lines; the user sends them together (R7).
-function addEditLine(line) {
+// Toolbar chat lines join the message like note lines; the user sends them together (R7). Each remembers its
+// diagram and the ids it touches (A2), so undoing a pending add drops exactly its lines and Send scopes their context.
+let editLines = [];
+const lineIds = line => [...line.matchAll(/\(@([a-z][a-z0-9_]*)\)/g)].map(match => match[1]);
+function addEditLine(line, target, added) {
  const input = $("message-input");
  input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n"; renderMentions();
+ editLines.push({ line, target, ids: [...new Set([...lineIds(line), ...added])] });
 }
+// Drops the lines about removed ids, leaving the user's own typing (and identical hand-typed lines past the first) alone.
+function dropEditLines(target, removed) {
+ const input = $("message-input"), gone = editLines.filter(item => item.target === target && item.ids.some(id => removed.includes(id)));
+ if (!gone.length) return;
+ const rows = input.value.split("\n");
+ for (const item of gone) { const at = rows.indexOf(item.line); if (at >= 0) rows.splice(at, 1); }
+ editLines = editLines.filter(item => !gone.includes(item));
+ input.value = rows.join("\n").replace(/^\n+/, ""); if (input.value.trim() === "") input.value = ""; renderMentions();
+}
+const itemIds = data => new Set(data ? [...data.nodes, ...data.edges, ...data.notes].map(item => item.id) : []);
 async function applyEdit(edit) {
- const tab = diagramTab, id = diagramTarget();
- try { const value = await post("edit", { target: id, expectedRevision: state.diagram?.revision ?? 0, edit }); setDiagram(tab, value.diagram); if (value.line) addEditLine(value.line); return true; }
+ const tab = diagramTab, id = diagramTarget(), before = itemIds(state.diagram);
+ try {
+  const value = await post("edit", { target: id, expectedRevision: state.diagram?.revision ?? 0, edit }); setDiagram(tab, value.diagram);
+  // D5: deleting an unsent add undoes it, so its lines go too instead of a Delete line.
+  if (value.removed?.length) dropEditLines(id, value.removed);
+  else if (value.line) addEditLine(value.line, id, [...itemIds(value.diagram)].filter(item => !before.has(item)));
+  return true;
+ }
  catch (error) { showNotice(error.message); if (error.status === 409) try { setDiagram(tab, (await get("diagram?target=" + encodeURIComponent(id))).diagram); } catch { /* the notice already explains */ } return false; }
 }
 function editAt(point) {
@@ -562,10 +582,13 @@ $("message-input").addEventListener("keydown", event => {
 $("composer").addEventListener("submit", async event => {
  event.preventDefault(); if (messageSending || !state.connected) return;
  const text = $("message-input").value; if (!text.trim()) return;
+ // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
+ const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
+ for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
  messageSending = true; renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
- try { const result = await post("message", { text, target: diagramTarget() ?? target }); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent.", true); }
+ try { const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent.", true); }
  catch (error) { showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });

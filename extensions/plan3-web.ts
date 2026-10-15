@@ -459,7 +459,7 @@ export async function stopLiveRun(ctx) {
 }
 
 const terminalCommands = new Set(["settings", "model", "thinking", "scoped-models", "login", "logout", "llama", "new", "resume", "name", "session", "tree", "fork", "clone", "compact", "import", "copy", "export", "share", "bug", "trust", "hotkeys", "changelog", "quit"]);
-export function forwardDiagramChat(pi, ctx, diagram: Diagram, message: unknown, comments: unknown, publish: (event: string, value: unknown) => void) {
+export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagram; ids?: string[] }[], message: unknown, comments: unknown, publish: (event: string, value: unknown) => void) {
 	const contextual = diagramChatMessage(diagram, message, comments);
 	const prepared = contextual.mentions.length || (Array.isArray(comments) && comments.length) ? contextual : { message: (message as string).trim(), mentions: [], unknownMentions: [] };
 	const command = prepared.message.startsWith("/");

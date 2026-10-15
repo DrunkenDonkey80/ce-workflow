@@ -167,6 +167,13 @@ assert.doesNotMatch(prepared.message, /settle/, "no pending hint without red edi
  assert.match(hinted.message, /settle exactly those you addressed/);
  assert.match(hinted.message, /"pendingEdits":\[\{"entity":"node","id":"cache","edit":"add"\},\{"entity":"edge","id":"api__cache","edit":"remove"\}\]/);
 }
+{ // A2: each part resolves only its own ids; the displayed part takes the unclaimed rest.
+ const plan = applyDiagramOperations(emptyDiagram({ kind: "plan", plan: "12345678" }), [{ op: "add", entity: "node", value: { id: "api", label: "Plan API", kind: "service" } }, { op: "add", entity: "node", value: { id: "worker", label: "Worker", kind: "service" } }]).diagram;
+ const both = diagramChatMessage([{ diagram: plan, ids: [] }, { diagram: contextDiagram, ids: ["api"] }], "Add @api and @worker");
+ const blocks = both.message.split("Diagram context").slice(1);
+ assert.equal(blocks.length, 2); assert.match(blocks[0], /Worker/); assert.doesNotMatch(blocks[0], /Plan API/); assert.match(blocks[1], /Bounded uploads/);
+ assert.deepEqual(both.unknownMentions, []);
+}
 assert.throws(() => diagramChatMessage(contextDiagram, "hello", ["missing"]), /Unknown diagram comment/);
 assert.throws(() => diagramChatMessage(contextDiagram, "x".repeat(20_001)), /bounded/);
 const submitted = [], deliveryErrors = [];
