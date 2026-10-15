@@ -21,7 +21,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { overscroll-behavior: none; }
-body { margin: 0; position: fixed; left: 0; right: 0; top: var(--app-top, 0px); height: var(--app-height, 100dvh); display: flex; flex-direction: column; overflow: hidden; }
+body { margin: 0; position: fixed; left: 0; right: 0; top: 0; height: var(--app-height, 100dvh); display: flex; flex-direction: column; overflow: hidden; }
 button, textarea, input, select { font: inherit; color: inherit; }
 button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 button:hover:not(:disabled) { border-color: var(--group); background: var(--hover); }

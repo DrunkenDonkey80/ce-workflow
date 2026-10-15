@@ -199,16 +199,18 @@ document.addEventListener("touchend", event => {
  swipe = undefined;
 }, { passive: true });
 // iOS keeps the layout viewport under the on-screen keyboard; size the page to what is visible so the composer stays reachable.
-// The browser also scrolls the page to show the focused box and may leave it scrolled (empty space under the form) after
-// the keyboard closes: pin the page to the visible area and undo that scroll on every viewport change.
+// iOS (every iPhone browser is WebKit) also pans the page up to show the focused box. Following that pan with the page
+// made iOS pan again until it ran off screen, so the page stays at the top, sized to the visible part, and the pan is undone.
 const fitViewport = () => {
- const view = window.visualViewport, root = document.documentElement.style;
- root.setProperty("--app-height", (view?.height ?? window.innerHeight) + "px"); root.setProperty("--app-top", (view?.offsetTop ?? 0) + "px");
- if (window.scrollY || window.scrollX) window.scrollTo(0, 0);
+ const view = window.visualViewport;
+ document.documentElement.style.setProperty("--app-height", (view?.height ?? window.innerHeight) + "px");
+ if (window.scrollY || window.scrollX || view?.offsetTop) window.scrollTo(0, 0);
 };
 window.visualViewport?.addEventListener("resize", fitViewport); window.visualViewport?.addEventListener("scroll", fitViewport); window.addEventListener("resize", fitViewport);
 // Some keyboards report their final size only after closing; measure again once it has gone.
-document.addEventListener("focusout", () => setTimeout(fitViewport, 350)); fitViewport();
+// The keyboard animates in or out over ~300 ms and iOS pans at its end; check again after it settles.
+for (const type of ["focusin", "focusout"]) document.addEventListener(type, () => { setTimeout(fitViewport, 100); setTimeout(fitViewport, 400); });
+fitViewport();
 // iOS pans the whole page when a drag starts on something that cannot scroll (beside the chat box) and leaves it there.
 // On phones only lists, text boxes and the diagram may take a drag; everything else is held still.
 const scrolls = (item: Element | null) => {
