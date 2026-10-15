@@ -588,6 +588,29 @@ function renderMentions() {
  for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = "No matching element; sent as text."; if (entity && "label" in entity) chip.title = entity.label ?? chip.title; if (entity && "text" in entity) chip.title = entity.text; $("mentions").append(chip); }
 }
 $("message-input").addEventListener("input", renderMentions);
+// Push to talk: the browser's own speech recognition (Chrome and Safari send the audio to Google/Apple). Hold the button,
+// the recognised words appear live in the box without focusing it (no phone keyboard); release to stop. EN or BG.
+const TALK_LANGS = { "en-US": "EN", "bg-BG": "BG" };
+let talkLang = localStorage.getItem("plan3-talk-lang") in TALK_LANGS ? localStorage.getItem("plan3-talk-lang") : "en-US", talking;
+$("talk-lang").textContent = TALK_LANGS[talkLang];
+$("talk-lang").addEventListener("click", () => { talkLang = talkLang === "en-US" ? "bg-BG" : "en-US"; localStorage.setItem("plan3-talk-lang", talkLang); $("talk-lang").textContent = TALK_LANGS[talkLang]; });
+function startTalk() {
+ const Speech = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+ if (!Speech) return showNotice("This browser has no speech recognition (Brave and Firefox lack it); try Chrome, Edge or Safari.");
+ if (talking) return;
+ const input = $("message-input"), base = input.value && !/\s$/.test(input.value) ? input.value + " " : input.value, recognition = new Speech();
+ talking = recognition; recognition.lang = talkLang; recognition.interimResults = true; recognition.continuous = true;
+ recognition.onresult = event => { input.value = base + [...event.results].map(result => result[0].transcript).join(""); input.scrollTop = input.scrollHeight; input.dispatchEvent(new Event("input")); };
+ recognition.onerror = event => { if (event.error !== "aborted" && event.error !== "no-speech") showNotice(event.error === "not-allowed" ? "Microphone blocked: allow it for this site in the browser settings." : "Speech recognition failed: " + event.error); };
+ recognition.onend = () => { if (talking === recognition) talking = undefined; $("talk").classList.remove("live"); };
+ $("talk").classList.add("live"); recognition.start();
+}
+const stopTalk = () => talking?.stop();
+$("talk").addEventListener("pointerdown", event => { event.preventDefault(); $("talk").setPointerCapture(event.pointerId); startTalk(); });
+for (const type of ["pointerup", "pointercancel"]) $("talk").addEventListener(type, stopTalk);
+$("talk").addEventListener("contextmenu", event => event.preventDefault());
+$("talk").addEventListener("keydown", event => { if ((event.key === " " || event.key === "Enter") && !event.repeat) { event.preventDefault(); startTalk(); } });
+$("talk").addEventListener("keyup", event => { if (event.key === " " || event.key === "Enter") stopTalk(); });
 // Clipboard and attached images become temp files (like Pi's terminal paste); the chat gets their path.
 $("message-input").addEventListener("paste", event => {
  const file = [...(event.clipboardData?.items ?? [])].find(item => item.type.startsWith("image/"))?.getAsFile(); if (!file) return;

@@ -162,6 +162,13 @@ try {
  await browser("focus", "#message-input"); await browser("press", "/"); await browser("wait", "#slash-menu:not([hidden]) .slash-option");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('.slash-option')].map(o => o.dataset.command)"), ["/plan3"]);
  await browser("press", "Enter"); assert.equal(await evaluate("document.getElementById('message-input').value"), "/plan3 ", "Enter picks instead of sending");
+ // Push to talk: holding the button streams recognised words into the box, in the chosen language; release stops.
+ await evaluate(`(() => { window.webkitSpeechRecognition = window.SpeechRecognition = class { start() { window.heard = this; } stop() { window.stopped = true; this.onend(); } }; document.getElementById("message-input").value = "Hi"; })()`);
+ await browser("click", "#talk-lang"); await evaluate(`document.getElementById("talk").dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, bubbles: true }))`);
+ await evaluate(`window.heard.onresult({ results: [[{ transcript: "здравей" }], [{ transcript: " свят" }]] })`);
+ assert.deepEqual(await evaluate(`[document.getElementById("message-input").value, window.heard.lang, document.getElementById("talk").classList.contains("live")]`), ["Hi здравей свят", "bg-BG", true]);
+ await evaluate(`document.getElementById("talk").dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, bubbles: true }))`);
+ assert.deepEqual(await evaluate(`[window.stopped, document.getElementById("talk").classList.contains("live")]`), [true, false]); await browser("click", "#talk-lang");
  await browser("fill", "#message-input", ""); await browser("type", "#message-input", "/wo s"); await browser("wait", "#slash-menu:not([hidden]) [data-command='/wo share']");
  await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('slash-menu').hidden"), true);
  // Picking /plan3 lists its arguments.

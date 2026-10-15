@@ -247,7 +247,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .slash-option small { color: var(--muted); }
 .slash-option[aria-selected=true] { background: color-mix(in srgb, var(--focus) 22%, var(--panel)); border-color: var(--focus); }
 textarea { display: block; width: 100%; border: 1px solid var(--group); border-radius: 6px; background: var(--panel); padding: 8px; resize: vertical; min-height: 52px; max-height: 180px; }
-.composer-actions { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
+.composer-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; align-items: center; margin-top: 6px; }
 .composer-actions button { white-space: nowrap; }
 .input-help { font-size: 12px; color: var(--muted); margin-right: auto; }
 .danger { color: var(--error); border-color: var(--error); }
@@ -312,6 +312,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .drawer-toggle, .drawer, .drawer-backdrop { display: none; }
 .attach { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 .attach:hover { border-color: var(--group); background: var(--hover); }
+.talk { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; } .talk.live { background: #e03131; border-color: #e03131; color: #fff; }
 .attach:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 @media (max-width: 899px) {
  .mobile-tabs { display: flex; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
