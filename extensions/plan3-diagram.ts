@@ -232,7 +232,7 @@ export function toolbarEdit(before: Diagram, edit: unknown) {
 		case "box": case "group": {
 			const group = edit.kind === "group";
 			// U-03: no dialog on create; "New box", "New box 2", ... until renamed.
-			if (edit.label === undefined) { const base = group ? "New group" : "New box", labels = new Set([...nodes.values()].map(item => item.label)); edit.label = base; for (let n = 2; labels.has(edit.label); n++) edit.label = `${base} ${n}`; }
+			if (edit.label === undefined) { const base = group ? "New group" : "New box", labels = new Set<unknown>([...nodes.values()].map(item => item.label)); edit.label = base; for (let n = 2; labels.has(edit.label); n++) edit.label = `${base} ${n}`; }
 			text(edit.label, "label", 300);
 			if (edit.parent !== undefined && node(edit.parent).kind !== "group") throw new Error("Boxes and groups go inside a group.");
 			const id = fresh(slug(edit.label, group ? "group" : "box"));

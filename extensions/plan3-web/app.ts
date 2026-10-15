@@ -397,7 +397,7 @@ $("pin-note").addEventListener("click", () => {
 });
 $("comment-cancel").addEventListener("click", () => $("comment-prompt").close());
 $("comment-delete").addEventListener("click", async () => {
- const button = $("comment-delete");
+ const button = $("comment-delete") as HTMLButtonElement;
  if (!button.dataset.armed) { button.dataset.armed = "1"; button.textContent = "Confirm: delete " + button.dataset.what; return; }
  button.disabled = true;
  try { if (await applyEdit({ kind: "delete", id: labelFor.id })) { $("comment-prompt").close(); $("comment-text").value = ""; labelFor = null; } }

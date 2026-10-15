@@ -1760,6 +1760,20 @@ try {
 	assert.deepEqual(tools.process_image.parameters.required, ["image", "question"], "no optional fields for strict providers to null out");
 	await assert.rejects(tools.process_image.execute("call", { image: "", question: "What?" }, undefined, null, visionCtx), /Pass image/);
 	await assert.rejects(tools.process_image.execute("call", { image: "notes.txt", question: "What?" }, undefined, null, visionCtx), /not a supported image/);
+	await assert.rejects(tools.process_image.execute("call", { image: "later.png", question: "What?" }, undefined, null, { ...visionCtx, cwd }), /does not exist, and no tool call running alongside/);
+	{
+		// A screenshot batched alongside (or in the same codemode script): wait for its file only while it runs.
+		const { createImageTools } = await import("../extensions/work-images.ts");
+		const on = {}, own = {};
+		createImageTools({ on: (name, handler) => { on[name] = handler; } }, { visionModel: () => "test/vision", imageModel: () => "__none_model__", register: (tool) => { own[tool.name] = tool; },
+			visionBridge: { remember: () => "img-0000000000000000", inspect: async () => ({ text: "Seen." }) } });
+		on.tool_execution_start({ toolCallId: "script", toolName: "codemode" });
+		on.tool_execution_start({ toolCallId: "vision", toolName: "process_image", parentToolCallId: "script" });
+		await assert.rejects(own.process_image.execute("vision", { image: "late.png", question: "What?" }, undefined, null, { cwd }), /does not exist/, "its own codemode parent is not a producer");
+		on.tool_execution_start({ toolCallId: "shot", toolName: "screen_read", parentToolCallId: "script" });
+		setTimeout(() => { writeFileSync(path.join(cwd, "late.png"), Buffer.from(pixels, "base64")); on.tool_execution_end({ toolCallId: "shot" }); }, 500);
+		assert.match(JSON.stringify(await own.process_image.execute("vision", { image: "late.png", question: "What?" }, undefined, null, { cwd })), /Seen\./, "waits for the sibling's file");
+	}
 	// Several images go in one request, numbered in order.
 	let visionParts;
 	const many = await tools.process_image.execute("call", { image: [imageId, "shot.png"], question: "Which differs?" }, undefined, null,

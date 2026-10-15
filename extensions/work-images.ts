@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, extname, resolve } from "node:path";
 
 // Image tools driven by two settings: the vision model answers questions about images, the image model draws them.
@@ -19,7 +19,12 @@ try {
 export function readImageFile(path) {
 	const mimeType = MIME[extname(path).toLowerCase()];
 	if (!mimeType) throw new Error(`${path} is not a supported image (${Object.keys(MIME).join(", ")}).`);
-	return { type: "image", data: readFileSync(path).toString("base64"), mimeType };
+	try {
+		return { type: "image", data: readFileSync(path).toString("base64"), mimeType };
+	} catch (error) {
+		if (error?.code === "ENOENT") throw new Error(`${path} does not exist, and no tool call running alongside this one created it. Check the path, or call this after the call that creates it returns.`);
+		throw error;
+	}
 }
 
 const split = (value) => { const slash = value.indexOf("/"); return slash > 0 ? [value.slice(0, slash), value.slice(slash + 1)] : []; };
@@ -128,7 +133,23 @@ export function imageModelCanDraw(model) {
 }
 
 // Registers process_image and generate_image, shown only while their model is set (like the Jev tools).
-export function createImageTools(pi, { visionModel: configured, visionAltModel = () => NONE, imageModel, visionBridge, register }) {
+export function createImageTools(pi, { visionModel: configured, visionAltModel = (_cwd) => NONE, imageModel, visionBridge, register }) {
+	// Agents batch "take screenshot" + "process it" (parallel tool calls or codemode Promise.all), so the file may not exist yet.
+	// Wait for it only while another call (not this one, its codemode parent or another process_image) is still running.
+	const running = new Map();
+	pi.on("tool_execution_start", (event) => { running.set(event.toolCallId, { name: event.toolName, parent: event.parentToolCallId }); });
+	pi.on("tool_execution_end", (event) => { running.delete(event.toolCallId); });
+	pi.on("agent_end", () => { running.clear(); });
+	async function appeared(file, id, signal) {
+		const mine = new Set();
+		for (let at = id; at && !mine.has(at); at = running.get(at)?.parent) mine.add(at);
+		const producing = () => [...running].some(([other, call]) => !mine.has(other) && call.name !== "process_image");
+		// The first pause also lets sibling start events land before deciding nothing is producing the file.
+		while (!existsSync(file) && !signal?.aborted) {
+			await new Promise((done) => setTimeout(done, 200));
+			if (!producing()) return;
+		}
+	}
 	let signature;
 	// No vision model set: a one-shot call to the current image-capable model still keeps pixels out of the main context.
 	const visionModel = (cwd, model) => {
@@ -167,7 +188,9 @@ export function createImageTools(pi, { visionModel: configured, visionAltModel =
 			const notes = [];
 			const ids = await Promise.all(sources.map(async (value, index) => {
 				if (/^img-[a-f0-9]{16}$/.test(value)) return value;
-				const { image, note } = await shrinkImage(readImageFile(resolve(ctx.cwd, value)), budget);
+				const file = resolve(ctx.cwd, value);
+				await appeared(file, _id, signal);
+				const { image, note } = await shrinkImage(readImageFile(file), budget);
 				if (note) notes.push(`${sources.length > 1 ? `Image ${index + 1} ` : ""}${note}`);
 				return visionBridge.remember(image);
 			}));
