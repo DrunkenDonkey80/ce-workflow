@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T15:10:09.882Z
+updated: 2026-10-15T19:00:35.284Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -87,6 +87,8 @@ Labelled assumptions (over 95% from evidence):
   - Independent: yes
   - Answer: {"kind":"selection","selections":["Remove both"]}
   - Source: user via ask_user /plan3 resolve; not independently verified.
+- **D10 amended (H-01, user choice):** on the open canvas, a dragged box or group stays exactly where it is dropped; boxes never dragged are still grid-placed; inside groups the grid still auto-arranges and pins only pick a cell. Overlaps on the canvas are accepted.
+
 
 
 
@@ -189,6 +191,9 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 - [wip] **H-01** User tries the flow on the desktop and records findings: new plan, empty Plan tab, draw, send, red marks clear.
   - Covers acceptance examples X1–X6 below; on the phone only viewing and notes (Q-01).
+  - note: User sketch on the real Plan tab (rev 5): group "New group" (blue) with boxes "Ke pasa" and "New box" inside; one Send produced three @mention chat lines with diagram context. Agent treated them as test placeholders (no plan content), settled exactly those three; red cleared. Not yet exercised: connection drawing, connection label/delete.
+  - note: Second sketch (rev 8): side-handle connection "New box" → "Ke pasa" inside the group, plus a top-level box "New box 2"; one Send gave two chat lines; agent settled exactly those two (edge + node). Connection label/delete via the edge dialog not yet exercised; no user feedback on feel yet.
+  - note: Third sketch (rev 13): edge label "connection" via the connection dialog worked; settled. FINDING: top-level "New box 2" snaps back on drag. Reproduced with layout(): drops at (608,-37),(204,-77),(1200,-37),(-400,0) all render at 654,209 — the D10 grid collapses empty cells, so a pin only orders boxes, and a pin colliding with the group's cell is pushed to the nearest free cell. Awaiting user decision: free placement at top level vs keep grid.
 ### P-ARCH [code] Product architecture
 
 - [x] **ARCH-RECONCILE** Product diagram rev 5: plan3_diagram (pending marks, directions), plan3_web (edit/Generate endpoints), browser_app (Project/Plan tabs, editing bar, drag-moves-box), plan3 (Generate prompt, no product offer), plan3→settings edge relabeled "phase models". No nodes or edges added or removed; dependents unaffected.

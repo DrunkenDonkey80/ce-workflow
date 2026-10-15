@@ -23,9 +23,11 @@ for (const name of ["upload-service", "ce-workflow"]) {
 const upload = JSON.parse(readFileSync(new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url), "utf8"));
 assert.equal(layout(upload).get("web_client").x, 0, "cycle web_client -> ... -> cdn -> web_client keeps web_client first");
 Object.assign(upload.nodes.find((node) => node.id === "cdn"), { x: 5000, y: 0 });
-const pinned = layout(upload), cdn = pinned.get("cdn");
-assert.equal(cdn.y, Math.min(...[...pinned.values()].map((box) => box.y)), "pinned box stays in the top row");
-assert.equal(cdn.x + cdn.w, Math.max(...[...pinned.values()].map((box) => box.x + box.w)), "pinned box snaps to the rightmost column");
+// H-01: on the open canvas a dragged box stays exactly where it was dropped; inside a group a pin only picks a grid cell.
+Object.assign(upload.nodes.find((node) => node.id === "upload_api"), { x: 5000, y: 0 });
+const pinned = layout(upload), cdn = pinned.get("cdn"), api = pinned.get("upload_api"), backend = pinned.get("backend");
+assert.deepEqual([cdn.x, cdn.y], [5000, 0], "top-level pin is exact");
+assert(api.x + api.w <= backend.x + backend.w && api.y >= backend.y, "a pin inside a group snaps into the group");
 for (const [id, box] of pinned) if (id !== "cdn") assert(!(box.x < cdn.x + cdn.w && cdn.x < box.x + box.w && box.y < cdn.y + cdn.h && cdn.y < box.y + box.h), `pinned cdn overlaps ${id}`);
 // D8: a resized box keeps its width and is never shorter than its content. D10: a group's w/h is a minimum size.
 {

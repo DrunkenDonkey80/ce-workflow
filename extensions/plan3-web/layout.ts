@@ -121,6 +121,8 @@ export function layout(diagram: Pick<Diagram, "nodes" | "edges">, measure = (_no
 			if (!chosen || score < chosen.score - 1e-9) chosen = { score, at, cols, colW, rowH };
 		}
 		if (chosen) for (const [id, box] of grid(kids, chosen.at, chosen.cols, chosen.colW, chosen.rowH)) boxes.set(id, { ...boxes.get(id), ...box });
+		// H-01: on the open canvas a dragged box or group stays exactly where it was dropped; inside groups pins only pick a cell.
+		if (!container) for (const kid of kids) if (Number.isFinite(kid.x) && Number.isFinite(kid.y)) boxes.set(kid.id, { ...boxes.get(kid.id), x: kid.x, y: kid.y });
 		let width = 0, height = 0;
 		for (const kid of kids) { const box = boxes.get(kid.id); width = Math.max(width, box.x + box.w); height = Math.max(height, box.y + box.h); }
 		// D10: a group's stored w, h is a minimum; content still grows it.
