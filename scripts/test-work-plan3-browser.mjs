@@ -139,7 +139,7 @@ try {
  await browser("set", "viewport", "1280", "800");
  // T-01: Project and Plan tabs share the canvas, each with its own diagram; events update only their tab.
  await browser("focus", "#tab-files"); await browser("press", "ArrowRight"); assert.equal(await evaluate("document.activeElement.id"), "tab-project");
- assert.deepEqual(await evaluate("[document.getElementById('canvas').hidden, document.getElementById('empty-diagram').hidden, document.getElementById('empty-diagram').textContent, !!document.querySelector('[data-node=mobile_client]')]"), [false, false, "No project diagram yet.", false]);
+ assert.deepEqual(await evaluate("[document.getElementById('canvas').hidden, document.getElementById('empty-diagram').hidden, document.getElementById('empty-diagram').textContent, !!document.querySelector('[data-node=mobile_client]')]"), [false, false, "No project diagram yet. Generate one, or draw with the bar above.", false]);
  product = { ...product, revision: 1, nodes: [{ id: "core", label: "Core service", kind: "service" }] }; server.publish("diagram", { target: { kind: "product" }, diagram: product });
  server.publish("diagram", { target: { kind: "plan", id: "abcdef01" }, diagram: { ...product, nodes: [{ id: "stray", label: "Stray", kind: "service" }] } });
  await browser("wait", "[data-node=core]");
@@ -257,8 +257,10 @@ try {
  const strokeBefore = await evaluate("document.querySelector(\"[data-node=web_client] path\").getAttribute(\"d\")");
  const panBefore = await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")");
  const canvasTop = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().top)"), canvasLeft = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().left)");
- await browser("mouse", "move", String(canvasLeft + 8), String(canvasTop + 8)); await browser("mouse", "down", "left");
- await browser("mouse", "move", String(canvasLeft + 33), String(canvasTop + 33)); await browser("mouse", "up", "left");
+ // Start the pan on a point no box covers (the tab bar height moves what fit puts at the corner).
+ const [panX, panY] = await evaluate("(() => { const r = document.getElementById('diagram').getBoundingClientRect(); for (let y = r.top + 8; y < r.bottom; y += 12) for (let x = r.left + 8; x < r.right; x += 12) { const hit = document.elementFromPoint(x, y); if (hit?.closest('#diagram') && !hit.closest('[data-node]:not(.group-node), [data-edge], [data-note]')) return [Math.round(x), Math.round(y)]; } })()");
+ await browser("mouse", "move", String(panX), String(panY)); await browser("mouse", "down", "left");
+ await browser("mouse", "move", String(panX + 25), String(panY + 25)); await browser("mouse", "up", "left");
  assert.notEqual(await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")"), panBefore);
  assert.equal(await evaluate("document.querySelector(\"[data-node=web_client] path\").getAttribute(\"d\")"), strokeBefore, "fixed seeds keep redraw strokes stable");
  const nodePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()");
@@ -545,8 +547,12 @@ try {
  {
   await browser("click", "#tab-plan"); await browser("fill", "#message-input", "");
   const revision = () => evaluate("Number(document.getElementById('diagram').dataset.revision)"), label = async text => { await browser("wait", "--fn", "document.getElementById('comment-prompt').open"); await browser("fill", "#comment-text", text); await browser("click", "#comment-save"); };
+  // U-01: named, iconed tabs and tools; the chosen swatch carries a ring.
+  assert.deepEqual(await evaluate("['tab-project', 'tab-plan'].map(id => document.getElementById(id).textContent.trim())"), ["UML Project", "UML Plan"]);
+  assert.equal(await evaluate("['tab-project', 'tab-plan', 'mobile-project', 'mobile-plan'].every(id => document.querySelector('#' + id + ' svg.icon')) && [...document.querySelectorAll('[data-tool=select], [data-tool=box], [data-tool=group]')].every(button => button.querySelector('svg.icon'))"), true, "tabs and tools have icons");
   await browser("click", "[data-tool=group]"); await browser("click", "[data-color='2']");
   await evaluate("document.getElementById('diagram').dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 5, clientY: 5 }))");
+  assert.notEqual(await evaluate("getComputedStyle(document.querySelector('.swatch-2')).boxShadow"), "none", "the chosen color shows a ring");
   await label("Cache tier"); await browser("wait", "[data-node=cache_tier]");
   await browser("click", "[data-tool=box]"); await browser("focus", "[data-node=cache_tier]"); await browser("press", "Enter");
   await label("Redis"); await browser("wait", "[data-node=redis]");

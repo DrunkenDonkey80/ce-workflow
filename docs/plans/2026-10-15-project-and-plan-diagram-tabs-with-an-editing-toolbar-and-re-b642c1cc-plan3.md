@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T10:34:07.791Z
+updated: 2026-10-15T11:57:40.681Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -172,9 +172,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 - [x] **G-02** Removed createProductDiagram/offerProductDiagram; /plan3 diagram and architecture only open the workspace; empty Project tab says "No project diagram yet. Generate one, or draw with the bar above."; README offer line dropped; the old declined setting is simply ignored.
 ### Phase 6b: Direct manipulation on the canvas [code]
 
-- [ ] **U-01** Tabs read "UML Project" and "UML Plan" with icons; Select (pointer), Box and Group get icons beside their labels; the chosen swatch shows a clear selected ring.
-  - Desktop tabs and the phone drawer use the same names; icons are inline SVG in index.html (no new asset, CSP allows only self).
-  - Check: C3.
+- [x] **U-01** Tabs read "UML Project"/"UML Plan" (desktop and phone) with an inline SVG diagram icon; Select, Box and Group carry pointer, card and dashed-group icons; the chosen swatch is larger with a focus-colored ring.
 - [ ] **U-02** Box and Group tools draw by press-drag with a live outline in the chosen color; release creates the element at that place and size, a plain click uses the default size.
   - The outline previews the group color from the selected swatch (boxes: their parent's tone). Minimum drawn size is the existing bound (120 × 60); smaller drags count as a click.
   - A drawn size is stored as `w` and `h` (D8 amended by D10); a group drawn around boxes adopts those whose center is inside (D13).

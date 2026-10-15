@@ -52,8 +52,8 @@
  <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">
   <button id="mobile-chat" type="button" role="tab" aria-controls="chat" aria-selected="true">Chat</button>
   <button id="mobile-files" type="button" role="tab" aria-controls="files" aria-selected="false" tabindex="-1">Files</button>
-  <button id="mobile-project" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1">Project</button>
-  <button id="mobile-plan" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1">Plan</button>
+  <button id="mobile-project" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5" height="4"/><rect x="9.5" y="10.5" width="5" height="4"/><path d="M4 5.5v7h5.5"/></svg>UML Project</button>
+  <button id="mobile-plan" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5" height="4"/><rect x="9.5" y="10.5" width="5" height="4"/><path d="M4 5.5v7h5.5"/></svg>UML Plan</button>
  </nav>
  <main id="workspace" class="workspace" data-left="full" data-mobile="chat">
   <button id="expand-left" class="expand-left" type="button" aria-label="Show files and diagram" aria-controls="left-panel" aria-expanded="false" hidden>&gt;&gt;</button>
@@ -61,13 +61,13 @@
   <div class="left-tabs">
    <div role="tablist" aria-label="Project views">
     <button id="tab-files" type="button" role="tab" aria-selected="false" aria-controls="files" tabindex="-1">Files</button>
-    <button id="tab-project" type="button" role="tab" aria-selected="false" aria-controls="canvas" tabindex="-1" title="The whole product's architecture">Project</button>
-    <button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="canvas" title="The displayed plan's own diagram">Plan</button>
+    <button id="tab-project" type="button" role="tab" aria-selected="false" aria-controls="canvas" tabindex="-1" title="The whole product's architecture"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5" height="4"/><rect x="9.5" y="10.5" width="5" height="4"/><path d="M4 5.5v7h5.5"/></svg>UML Project</button>
+    <button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="canvas" title="The displayed plan's own diagram"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5" height="4"/><rect x="9.5" y="10.5" width="5" height="4"/><path d="M4 5.5v7h5.5"/></svg>UML Plan</button>
    </div>
    <div id="edit-bar" class="edit-bar" role="toolbar" aria-label="Edit diagram (desktop)">
-    <button type="button" data-tool="select" aria-pressed="true" title="Select and move (Escape)">Select</button>
-    <button type="button" data-tool="box" aria-pressed="false" title="Click empty space or a group to add a box">Box</button>
-    <button type="button" data-tool="group" aria-pressed="false" title="Click empty space or a group to add a group in the chosen color">Group</button>
+    <button type="button" data-tool="select" aria-pressed="true" title="Select and move (Escape)"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.5v11l3-2.6 2 4.4 2-.9-2-4.3 4-.4z"/></svg>Select</button>
+    <button type="button" data-tool="box" aria-pressed="false" title="Click empty space or a group to add a box"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3.5" width="12" height="9" rx="1"/><path d="M2 6.5h12"/></svg>Box</button>
+    <button type="button" data-tool="group" aria-pressed="false" title="Click empty space or a group to add a group in the chosen color"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="1" stroke-dasharray="2.5 1.5"/><rect x="5" y="6" width="6" height="5"/></svg>Group</button>
     <span class="swatches" role="group" aria-label="Group color"><button type="button" class="swatch swatch-0" data-color="0" aria-label="Blue" aria-pressed="true"></button><button type="button" class="swatch swatch-1" data-color="1" aria-label="Green" aria-pressed="false"></button><button type="button" class="swatch swatch-2" data-color="2" aria-label="Orange" aria-pressed="false"></button><button type="button" class="swatch swatch-3" data-color="3" aria-label="Violet" aria-pressed="false"></button><button type="button" class="swatch swatch-4" data-color="4" aria-label="Cyan" aria-pressed="false"></button><button type="button" class="swatch swatch-5" data-color="5" aria-label="Pink" aria-pressed="false"></button><button type="button" class="swatch swatch-6" data-color="6" aria-label="Olive" aria-pressed="false"></button><button type="button" class="swatch swatch-7" data-color="7" aria-label="Gray" aria-pressed="false"></button></span>
     <button type="button" data-tool="connect" aria-pressed="false" title="Click two boxes to connect them">Connect</button>
     <button type="button" data-tool="delete" aria-pressed="false" title="Click a box, group or connection to delete it">Delete</button>
