@@ -136,7 +136,8 @@ function setTab(name) {
  if (name === "diagram") name = "plan"; // remembered from before the Project/Plan split
  for (const view of LEFT_TABS) { const selected = view === name; $("tab-" + view).setAttribute("aria-selected", String(selected)); $("tab-" + view).tabIndex = selected ? 0 : -1; }
  $("files").hidden = name !== "files"; $("canvas").hidden = name === "files"; $("canvas").setAttribute("aria-labelledby", "tab-" + name);
- $("zoom-controls").hidden = name === "files";
+ $("zoom-controls").hidden = $("edit-bar").hidden = name === "files";
+ if (name === "files") setTool("select");
  remember("plan3-tab", name);
  if (name === "files") { filesView.shown(); return; }
  diagramTab = name; renderDiagram(true);
@@ -292,14 +293,52 @@ function drawNotes(stage, boxes, view, rc, data, detailY) {
 // Right-click: the note popup adds "@id: note" as a line of the message, so several notes and a closing request go to the agent together.
 let draftFor = "";
 function openNote(title, purpose, save) { $("comment-title").textContent = title; $("comment-purpose").textContent = purpose; $("comment-save").textContent = save; $("comment-error").hidden = true; $("comment-prompt").showModal(); $("comment-text").focus(); }
-function startNote(id) { draftFor = id; openNote("Note on @" + id, "Adds a line to your message. Add more notes, then send them together.", "Add to message"); }
+function startNote(id) { draftFor = id; labelFor = null; $("comment-label").textContent = "Note"; openNote("Note on @" + id, "Adds a line to your message. Add more notes, then send them together.", "Add to message"); }
 function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); renderMentions(); }
+// E-03 editing bar: a non-Select tool turns diagram clicks into edits (through the same click hook notes use).
+let tool = "select", groupColor = 0, connectFrom = "", labelFor = null;
+function setTool(name) {
+ tool = name; connectFrom = ""; document.querySelector(".connect-from")?.classList.remove("connect-from");
+ for (const button of document.querySelectorAll("#edit-bar [data-tool]")) button.setAttribute("aria-pressed", String(button.getAttribute("data-tool") === name));
+ $("canvas").classList.toggle("editing", name !== "select");
+ showNotice({ box: "Click empty space or a group to add a box.", group: "Click empty space or a group to add a group.", connect: "Click the box the connection starts from.", delete: "Click a box, group or connection to delete it." }[name] ?? "");
+}
+// Toolbar chat lines join the message like note lines; the user sends them together (R7).
+function addEditLine(line) {
+ const input = $("message-input");
+ input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n"; renderMentions();
+}
+async function applyEdit(edit) {
+ const tab = diagramTab, id = diagramTarget();
+ try { const value = await post("edit", { target: id, expectedRevision: state.diagram?.revision ?? 0, edit }); setDiagram(tab, value.diagram); if (value.line) addEditLine(value.line); return true; }
+ catch (error) { showNotice(error.message); if (error.status === 409) try { setDiagram(tab, (await get("diagram?target=" + encodeURIComponent(id))).diagram); } catch { /* the notice already explains */ } return false; }
+}
+function editAt(point) {
+ const node = state.diagram?.nodes.find(node => node.id === point.element);
+ if (tool === "box" || tool === "group") {
+  if (point.element && !node) return showNotice("Click empty space or a group.");
+  const parent = node ? (node.kind === "group" ? node.id : node.parent) : undefined;
+  labelFor = { kind: tool, ...(parent ? { parent } : {}), ...(tool === "group" ? { color: groupColor } : {}), ...(point.element ? {} : { x: Math.round(point.x), y: Math.round(point.y) }) };
+  draftFor = ""; $("comment-label").textContent = "Label";
+  openNote(tool === "box" ? "New box" : "New group", parent ? "Inside @" + parent + "." : "On the canvas.", tool === "box" ? "Add box" : "Add group");
+ } else if (tool === "connect") {
+  if (!node) return showNotice("Connections join boxes or groups; click one.");
+  if (!connectFrom) { connectFrom = node.id; $("diagram").querySelector(`[data-node="${node.id}"]`)?.classList.add("connect-from"); return showNotice("Now click the box to connect @" + node.id + " to."); }
+  const from = connectFrom; connectFrom = ""; void applyEdit({ kind: "connect", from, to: node.id }).then(() => showNotice("Click the box the next connection starts from."));
+ } else if (tool === "delete" && point.element) void applyEdit({ kind: "delete", id: point.element });
+}
+for (const button of document.querySelectorAll("#edit-bar [data-tool]")) button.addEventListener("click", () => setTool(button.getAttribute("data-tool")));
+for (const swatch of document.querySelectorAll("#edit-bar [data-color]")) swatch.addEventListener("click", () => {
+ groupColor = Number(swatch.getAttribute("data-color"));
+ for (const other of document.querySelectorAll("#edit-bar [data-color]")) other.setAttribute("aria-pressed", String(other === swatch));
+});
 function pin(point) {
+ if (tool !== "select") return editAt(point);
  commentPoint = { ...point, target: diagramTarget(), expectedRevision: state.diagram.revision }; state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning");
- draftFor = ""; openNote("Add a note", point.element ? "Pin a comment to @" + point.element + "." : "Pin a comment at this canvas position.", "Save note"); showNotice("");
+ draftFor = ""; labelFor = null; $("comment-label").textContent = "Note"; openNote("Add a note", point.element ? "Pin a comment to @" + point.element + "." : "Pin a comment at this canvas position.", "Save note"); showNotice("");
 }
 const diagramView = createDiagramView($("diagram"), {
- hover, leave, notes: drawNotes, pin, pinning: () => state.pinning,
+ hover, leave, notes: drawNotes, pin, pinning: () => state.pinning || tool !== "select",
  mention: insertMention, note: startNote,
  async move(body) {
   const tab = diagramTab, id = diagramTarget();
@@ -320,6 +359,13 @@ $("comment-cancel").addEventListener("click", () => $("comment-prompt").close())
 $("comment-text").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("comment-form").requestSubmit(); } });
 $("comment-form").addEventListener("submit", async event => {
  event.preventDefault();
+ if (labelFor) {
+  const label = $("comment-text").value.trim(); if (!label) return;
+  $("comment-save").disabled = true;
+  try { if (await applyEdit({ ...labelFor, label })) { $("comment-prompt").close(); $("comment-text").value = ""; labelFor = null; } }
+  finally { $("comment-save").disabled = false; }
+  return;
+ }
  if (draftFor) {
   const input = $("message-input"), line = "@" + draftFor + ": " + $("comment-text").value.trim();
   input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n";
@@ -332,7 +378,7 @@ $("comment-form").addEventListener("submit", async event => {
  finally { $("comment-save").disabled = false; }
 });
 $("hover-card").addEventListener("pointerenter", () => clearTimeout(hoverTimer)); $("hover-card").addEventListener("pointerleave", leave);
-window.addEventListener("keydown", event => { if (event.key === "Escape") { $("hover-card").hidden = true; if (state.pinning) { state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning"); showNotice(""); } } });
+window.addEventListener("keydown", event => { if (event.key === "Escape") { $("hover-card").hidden = true; if (tool !== "select" && !$("comment-prompt").open) setTool("select"); if (state.pinning) { state.pinning = false; $("pin-note").setAttribute("aria-pressed", "false"); $("canvas").classList.remove("pinning"); showNotice(""); } } });
 $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());

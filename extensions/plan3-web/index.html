@@ -64,6 +64,14 @@
     <button id="tab-project" type="button" role="tab" aria-selected="false" aria-controls="canvas" tabindex="-1" title="The whole product's architecture">Project</button>
     <button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="canvas" title="The displayed plan's own diagram">Plan</button>
    </div>
+   <div id="edit-bar" class="edit-bar" role="toolbar" aria-label="Edit diagram (desktop)">
+    <button type="button" data-tool="select" aria-pressed="true" title="Select and move (Escape)">Select</button>
+    <button type="button" data-tool="box" aria-pressed="false" title="Click empty space or a group to add a box">Box</button>
+    <button type="button" data-tool="group" aria-pressed="false" title="Click empty space or a group to add a group in the chosen color">Group</button>
+    <span class="swatches" role="group" aria-label="Group color"><button type="button" class="swatch swatch-0" data-color="0" aria-label="Blue" aria-pressed="true"></button><button type="button" class="swatch swatch-1" data-color="1" aria-label="Green" aria-pressed="false"></button><button type="button" class="swatch swatch-2" data-color="2" aria-label="Orange" aria-pressed="false"></button><button type="button" class="swatch swatch-3" data-color="3" aria-label="Violet" aria-pressed="false"></button><button type="button" class="swatch swatch-4" data-color="4" aria-label="Cyan" aria-pressed="false"></button><button type="button" class="swatch swatch-5" data-color="5" aria-label="Pink" aria-pressed="false"></button><button type="button" class="swatch swatch-6" data-color="6" aria-label="Olive" aria-pressed="false"></button><button type="button" class="swatch swatch-7" data-color="7" aria-label="Gray" aria-pressed="false"></button></span>
+    <button type="button" data-tool="connect" aria-pressed="false" title="Click two boxes to connect them">Connect</button>
+    <button type="button" data-tool="delete" aria-pressed="false" title="Click a box, group or connection to delete it">Delete</button>
+   </div>
    <div id="zoom-controls" class="zoom-controls" aria-label="Diagram zoom">
     <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
     <output id="zoom-level" aria-label="Zoom level">100%</output>
@@ -109,7 +117,7 @@
   <form id="comment-form">
    <h2 id="comment-title">Add a note</h2>
    <p id="comment-purpose" class="dialog-purpose">Pin a comment to the displayed architecture.</p>
-   <label for="comment-text">Note</label><textarea id="comment-text" required maxlength="8000" rows="5"></textarea>
+   <label id="comment-label" for="comment-text">Note</label><textarea id="comment-text" required maxlength="8000" rows="5"></textarea>
    <p id="comment-error" role="alert" hidden></p>
    <div class="dialog-actions"><button id="comment-cancel" type="button">Cancel</button><button id="comment-save" type="submit">Save note</button></div>
   </form>

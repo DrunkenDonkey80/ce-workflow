@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-15
-updated: 2026-10-15T09:39:40.233Z
+updated: 2026-10-15T09:45:52.436Z
 reviewed: 2026-10-15
 started: 2026-10-15T09:18:46.375Z
 ---
@@ -151,10 +151,7 @@ Chat lines (R7) use @mentions so `diagramChatMessage` attaches context, for exam
 
 ### Phase 5: Editing bar interactions [code]
 
-- [ ] **E-03** Add the editing bar (Select, Box, Group with color swatches, Connect, Delete) in the left-panel top bar, desktop widths.
-  - Desktop widths only, 900 px and up (Q-01); below that the bar is hidden and the phone keeps viewing and notes.
-  - Label input reuses the note dialog style; Escape returns to Select; keyboard: each tool reachable by Tab with visible focus.
-  - Check: C3 (create a box in a group, connect two boxes, delete a connection, each producing one chat line; the bar is hidden at a phone viewport).
+- [x] **E-03** Editing bar (Select, Box, Group + 8 color swatches, Connect, Delete) in the left tab bar, desktop only and hidden on the Files tab; tools act through the diagram click/Enter hook, labels reuse the note dialog, each edit posts /api/edit and appends its chat line; Escape returns to Select.
 - [ ] **E-04** Add rename (double-click a label), resize handles on the selected box, and plain-drag move under the Select tool.
   - Pending chat lines for rename and recolor; none for move and resize.
   - Update the browser test "plain drag on a box pans" to the new rule: plain drag on empty canvas pans, on a box moves it.
@@ -209,7 +206,7 @@ Checks: C1–C7 pass for touched code; C8 once before any push.
 
 ## Resume context
 
-Planning draft; all questions answered (D1, Q-01..Q-03). Review by Astra done: 7 findings plus 2 own checks accepted and folded into R7, A2, M-02, A-01, E-01, E-02, E-05, G-01 (see Amendments). Nothing open or blocking. Next: finish the plan. No product code changed for this plan. Note: commit 76a61bd added overview-band summaries that T-02 removes.
+Plan active 9/17; HEAD 8dc6824 (E-02 done). NEXT E-03: editing bar (Select, Box, Group+swatches, Connect, Delete) in the left-panel top bar, ≥900px only; posts to POST /api/edit {target, expectedRevision, edit:{kind,...}} (toolbarEdit in extensions/plan3-diagram.ts; returns {diagram, line, removed}); browser test stub post() in scripts/test-work-plan3-browser.mjs ~L74 only allows /api/move,/api/comment — extend it to apply toolbarEdit. Never push; bump 0.1.41→0.1.42 only before push. Leave other-session dirty files unstaged.
 
 ## Backlog
 

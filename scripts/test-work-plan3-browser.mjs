@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createJiti } from "jiti";
-const { applyDiagramOperations } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
+const { applyDiagramOperations, toolbarEdit } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
 const { createPlan3Web, createDialogBridge, WebError, savePastedImage } = await createJiti(import.meta.url).import("../extensions/plan3-web.ts");
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `ce-plan3-ui-${process.pid}`, execute = promisify(execFile);
@@ -33,7 +33,7 @@ async function withPageCdp(origin, run) {
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
 const fixture = new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url);
 let sample; try { sample = JSON.parse(await readFile(fixture, "utf8")); } catch (error) { throw new Error("Unreadable fixture " + fixture.pathname + ": " + error.message); }
-let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [];
+let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [], toolbarEdits = [];
 let product = { version: 1, kind: "product", title: "Product", revision: 0, nodes: [], edges: [], notes: [] };
 // D18 switcher fixtures: this page (idle, unseen until the page marks it), one working and one waiting session.
 const seenCalls = []; let ownRevisionSeen = 0, ownRevision = 3, otherSessions = false, beta = { state: "working", revision: 1, unseen: false };
@@ -71,8 +71,13 @@ const server = await createPlan3Web({ snapshot: target => ({ target, plan: { id:
  if (endpoint === "/api/effort") { status = { ...status, effort: body.level }; return status; }
  if (endpoint === "/api/bias") { server.publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: body.level }); return { ok: true }; }
  if (endpoint === "/api/stop") { activity = { working: false }; server.publish("activity", activity); return { accepted: true }; }
- assert(["/api/move", "/api/comment"].includes(endpoint));
+ assert(["/api/move", "/api/comment", "/api/edit"].includes(endpoint));
  if (body.expectedRevision !== diagram.revision) throw new WebError(409, "Stale diagram revision");
+ if (endpoint === "/api/edit") {
+  const planned = toolbarEdit(diagram, body.edit), result = applyDiagramOperations(diagram, planned.operations); toolbarEdits.push(body.edit);
+  diagram = { ...result.diagram, revision: diagram.revision + 1 }; server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });
+  return { diagram, line: planned.line, removed: result.removed };
+ }
  const operation = endpoint === "/api/move" ? { op: "move", entity: body.entity, id: body.id, x: body.x, y: body.y } : { op: "add", entity: "note", value: { text: body.text, author: "user", created: new Date().toISOString(), ...(body.element ? { target: body.element } : { x: body.x, y: body.y }) } };
  (endpoint === "/api/move" ? edits : comments).push(body); diagram = applyDiagramOperations(diagram, [operation]).diagram; diagram.revision++;
  server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram }); return { diagram };
@@ -531,6 +536,27 @@ try {
  await browser("wait", "[data-id=after_queue]");
  assert(await evaluate("(() => { const list = document.getElementById('feed'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4; })()"), "queued message: the chat stays at the end");
  await browser("click", "#stop"); await browser("wait", "--fn", "document.getElementById(\"stop\").hidden");
+ // E-03: the editing bar adds a group and a box in it, connects and deletes; each edit adds one chat line.
+ {
+  await browser("click", "#tab-plan"); await browser("fill", "#message-input", "");
+  const revision = () => evaluate("Number(document.getElementById('diagram').dataset.revision)"), label = async text => { await browser("wait", "--fn", "document.getElementById('comment-prompt').open"); await browser("fill", "#comment-text", text); await browser("click", "#comment-save"); };
+  await browser("click", "[data-tool=group]"); await browser("click", "[data-color='2']");
+  await evaluate("document.getElementById('diagram').dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 5, clientY: 5 }))");
+  await label("Cache tier"); await browser("wait", "[data-node=cache_tier]");
+  await browser("click", "[data-tool=box]"); await browser("focus", "[data-node=cache_tier]"); await browser("press", "Enter");
+  await label("Redis"); await browser("wait", "[data-node=redis]");
+  assert.deepEqual(toolbarEdits.slice(0, 2).map(edit => [edit.kind, edit.parent, edit.color]), [["group", undefined, 2], ["box", "cache_tier", undefined]]);
+  await browser("click", "[data-tool=connect]"); await browser("focus", "[data-node=web_client]"); await browser("press", "Enter"); await browser("focus", "[data-node=redis]"); await browser("press", "Enter");
+  await browser("wait", "[data-edge=web_client__redis]");
+  const before = await revision(); await browser("click", "[data-tool=delete]"); await browser("focus", "[data-edge=web_client__redis]"); await browser("press", "Enter");
+  await browser("wait", "--fn", `Number(document.getElementById('diagram').dataset.revision) > ${before}`);
+  assert.equal(await evaluate("document.querySelector('[data-edge=web_client__redis]')"), null, "deleting a pending connection removes it");
+  assert.deepEqual((await evaluate("document.getElementById('message-input').value")).trim().split(/\r?\n/), ['Add group "Cache tier" (@cache_tier) (orange)', 'Add box "Redis" (@redis) in "Cache tier" (@cache_tier)', 'Connect "Web client" (@web_client) → "Redis" (@redis)', 'Delete connection "Web client" (@web_client) → "Redis" (@redis)']);
+  await browser("press", "Escape"); assert.equal(await evaluate("document.querySelector('[data-tool=select]').getAttribute('aria-pressed')"), "true", "Escape returns to Select");
+  await browser("set", "viewport", "390", "800");
+  assert.equal(await evaluate("document.getElementById('edit-bar').getClientRects().length"), 0, "no editing bar on the phone");
+  await browser("set", "viewport", "1280", "800"); await browser("fill", "#message-input", "");
+ }
  const productSample = JSON.parse(await readFile(new URL("./fixtures/diagrams/ce-workflow.diagram.json", import.meta.url), "utf8"));
  diagram = { ...productSample, kind: "plan", plan: "12345678", revision: diagram.revision + 1 }; server.publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram });
  await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === " + JSON.stringify(String(diagram.revision)));

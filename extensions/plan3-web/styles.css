@@ -115,6 +115,18 @@ h2 { font-size: 15px; font-weight: 600; }
 .note-pin { font-size: 16px; }
 .canvas.pinning, .canvas.pinning #diagram [data-node], .canvas.pinning #diagram [data-edge] { cursor: crosshair; }
 #pin-note[aria-pressed="true"] { background: var(--pink); border-color: var(--ink); }
+/* E-03 editing bar; the phone layout hides every .left-tabs child but the zoom controls. */
+.edit-bar { display: flex; align-items: center; gap: 2px; }
+.edit-bar[hidden] { display: none; }
+.edit-bar button { border-color: transparent; }
+.edit-bar [data-tool][aria-pressed="true"] { background: var(--pink); border-color: var(--ink); }
+.swatches { display: flex; gap: 2px; padding: 0 4px; }
+.edit-bar .swatch { width: 16px; height: 16px; min-width: 0; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+.edit-bar .swatch[aria-pressed="true"] { border-color: var(--ink); }
+.swatch-0 { background: #4c6ef5; } .swatch-1 { background: #2f9e44; } .swatch-2 { background: #e8590c; } .swatch-3 { background: #7048e8; }
+.swatch-4 { background: #1098ad; } .swatch-5 { background: #d6336c; } .swatch-6 { background: #5c940d; } .swatch-7 { background: #868e96; }
+.canvas.editing, .canvas.editing #diagram [data-node], .canvas.editing #diagram [data-edge] { cursor: crosshair; }
+#diagram .connect-from > g > path { stroke: var(--focus); stroke-width: 3px; }
 #diagram [data-note]:focus-visible > g > path { stroke: var(--focus); stroke-width: 2px; }
 .dialog-purpose { color: var(--muted); font-size: 13px; margin: 6px 0 16px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
