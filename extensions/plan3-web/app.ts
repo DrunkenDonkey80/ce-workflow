@@ -123,6 +123,7 @@ const diagramTarget = () => diagramTab === "project" ? "product" : planTarget();
 const LEFT_TABS = ["files", "project", "plan"];
 function renderDiagram(refit = false) {
  state.diagram = diagrams[diagramTab];
+ // SAFETY: render only reads nodes, edges, notes and revision, which this empty stand-in provides.
  diagramView.render(state.diagram ?? { nodes: [], edges: [], notes: [], revision: 0 } as unknown as Diagram);
  if (refit && $("diagram").clientWidth) diagramView.fit();
  $("empty-diagram").textContent = diagramTab === "project" ? "No project diagram yet. Generate one, or draw with the bar above." : planTarget() ? "This plan has no diagram yet. Draw one with the bar above, or Generate." : "No plan is open.";
@@ -446,7 +447,7 @@ const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNot
 function renderBlocks(box: HTMLElement, row) {
  const opened = new Set([...box.querySelectorAll<HTMLDetailsElement>("details[open]")].map(item => item.dataset.key));
  const known = new Set([...box.querySelectorAll<HTMLDetailsElement>("details")].map(item => item.dataset.key));
- box.replaceChildren();
+ box.replaceChildren(); const images = new Set<string>();
  (row.blocks ?? []).forEach((block, index) => {
   const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
   // Pi's tool colours: grey while running, green when done, red on error.
@@ -455,13 +456,15 @@ function renderBlocks(box: HTMLElement, row) {
   else summary.append(Object.assign(document.createElement("b"), { textContent: block.name }), block.title.slice(block.name.length) + (block.result === undefined ? (row.streaming ? "" : " \u2026") : block.error ? " \u2715" : ""));
   item.append(summary);
   // An edit's diff (or a write's content as added lines) replaces its raw arguments.
-  for (const text of block.type === "thinking" ? [block.text] : [block.diff ? undefined : block.args, block.result].filter(value => value !== undefined)) { const pre = document.createElement("pre"); pre.textContent = text; item.append(pre); }
+  for (const text of block.type === "thinking" ? [block.text] : [block.diff ? undefined : block.args, block.result].filter(value => value !== undefined)) { const pre = document.createElement("pre"); if (block.type === "thinking") pre.textContent = text; else linkPaths(pre, text, images); item.append(pre); }
   if (block.diff) {
    const pre = document.createElement("pre"); pre.className = "diff";
    for (const line of block.diff.split("\n")) pre.append(Object.assign(document.createElement("span"), { textContent: line + "\n", className: line[0] === "+" ? "diff-add" : line[0] === "-" ? "diff-del" : "" }));
    item.append(pre);
   }
   box.append(item);
+  // Tool output images (screenshots, renders) show under the block, visible while it is collapsed.
+  appendThumbs(box, images); images.clear();
  });
 }
 const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - list.clientHeight < 48;
@@ -519,7 +522,10 @@ function renderChat() {
 // shortcut: paths with spaces are not detected; quote-aware parsing if that matters.
 const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.(?:png|jpe?g|gif|webp|md)(?![\w-])/gi;
 function renderLinks(target: HTMLElement, text: string) {
- target.replaceChildren(); let at = 0; const images = new Set<string>();
+ target.replaceChildren(); const images = new Set<string>(); linkPaths(target, text, images); appendThumbs(target, images);
+}
+function linkPaths(target: HTMLElement, text: string, images: Set<string>) {
+ let at = 0;
  for (const match of text.matchAll(LINKED_PATH)) {
   const path = match[0], image = !/\.md$/i.test(path);
   target.append(text.slice(at, match.index)); at = match.index + path.length;
@@ -529,9 +535,12 @@ function renderLinks(target: HTMLElement, text: string) {
   target.append(link);
  }
  target.append(text.slice(at));
+}
+function appendThumbs(target: HTMLElement, images: Set<string>) {
  for (const path of [...images].slice(0, 6)) {
-  const link = Object.assign(document.createElement("a"), { href: imageSource(path), target: "_blank", rel: "noopener", className: "thumb" });
-  link.append(Object.assign(document.createElement("img"), { src: imageSource(path), alt: path, loading: "lazy" })); target.append(link);
+  const link = Object.assign(document.createElement("a"), { href: imageSource(path), target: "_blank", rel: "noopener", className: "thumb" }), img = Object.assign(document.createElement("img"), { src: imageSource(path), alt: path, loading: "lazy" });
+  // Bare names from listings (look-*.png) or moved files cannot be served; drop the broken thumbnail, keep the text.
+  img.addEventListener("error", () => link.remove()); link.append(img); target.append(link);
  }
 }
 const imageSource = (path: string) => "/api/image?path=" + encodeURIComponent(path) + (token ? "&token=" + token : "");

@@ -224,7 +224,7 @@ try {
  await browser("mouse", "move", "2", "2"); await browser("press", "Escape"); assert.equal(await shown("web_client__load_balancer"), false, "Escape clears focus");
  await assert.rejects(savePastedImage(Buffer.from("<svg onload=alert(1)>")), /PNG, JPEG/, "non-image paste rejected by magic bytes");
  // Clipboard image paste: saved as a temp file, path inserted into the draft.
- await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([new Uint8Array([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,1,2,3])], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");
+ await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob(\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"), c => c.charCodeAt(0))], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");
  await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -235,8 +235,13 @@ try {
  assert.deepEqual(await evaluate("(async () => { const [ok, , outside] = [...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.getAttribute('href')); const a = await fetch(ok), b = await fetch(outside), c = await fetch(ok.replace(/\\.png/, '.txt')); return [a.status, a.headers.get('content-type'), b.status === 403 || b.status === 404, c.status]; })()"), [200, "image/png", true, 400]);
  await browser("click", "[data-id=img_row] .chat-link[href='#']");
  assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
+ // Tool output paths link too; their thumbnails sit under the collapsed block, and an unservable one is dropped.
+ { const row = { id: "tool_img_row", role: "assistant", text: "", streaming: false, blocks: [{ type: "tool", id: "t1", name: "screen_read", title: "screen_read", args: "{}", result: `Saved ${pasted}\nlisted look-missing.png` }] }; chatRows.set(row.id, row); server.publish("message", row); }
+ await browser("wait", "[data-id=tool_img_row] .thumb img");
+ await browser("wait", "--fn", "document.querySelectorAll('[data-id=tool_img_row] .thumb').length === 1");
+ assert.deepEqual(await evaluate("[document.querySelector('[data-id=tool_img_row] details').open, [...document.querySelectorAll('[data-id=tool_img_row] pre .chat-link')].map(a => a.textContent.split(/[\\\\/]/).pop())]"), [false, [pasted.split(/[\\/]/).pop(), "look-missing.png"]], "tool output paths are links, thumbnails visible while collapsed");
  await browser("click", "#tab-plan");
- chatRows.delete("img_row"); await rm(pasted);
+ chatRows.delete("img_row"); chatRows.delete("tool_img_row"); await rm(pasted);
  // The Image button (phones have no clipboard paste) uploads the same way.
  await browser("fill", "#message-input", "");
  await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([new Uint8Array([0xff,0xd8,0xff,0xe0,1,2])], \"photo.jpg\", { type: \"image/jpeg\" })); const input = document.getElementById(\"attach\"); input.files = data.files; input.dispatchEvent(new Event(\"change\")); })()");
