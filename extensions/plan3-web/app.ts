@@ -110,7 +110,7 @@ const workspace = $("workspace"), remembered = (key, values, fallback) => { try 
 const remember = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
 function setLeft(mode) {
  workspace.dataset.left = mode; remember("plan3-left", mode);
- $("expand-left").hidden = mode !== "collapsed";
+ $("expand-left").hidden = mode !== "collapsed"; $("collapse-left").hidden = mode === "collapsed";
  $("narrow-left").setAttribute("aria-pressed", String(mode === "narrow")); $("narrow-left").textContent = mode === "narrow" ? "Widen" : "Narrow";
  for (const id of ["expand-left", "collapse-left"]) $(id).setAttribute("aria-expanded", String(mode !== "collapsed"));
 }

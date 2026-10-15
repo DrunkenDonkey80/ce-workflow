@@ -163,6 +163,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .splitter { background: var(--chat); cursor: col-resize; border-inline: 1px solid var(--line); touch-action: none; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.chat-heading h2 { margin-right: auto; }
 .chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 #connection { font-size: 13px; color: var(--muted); }
 .modes { display: flex; gap: 6px; margin-left: auto; }

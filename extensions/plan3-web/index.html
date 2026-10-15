@@ -80,7 +80,6 @@
     <button id="generate" type="button" title="Ask the agent to draw or update this diagram from your saved directions">Generate</button>
    </div>
    <button id="narrow-left" type="button" aria-pressed="false" title="Narrow this panel to the chat's width">Narrow</button>
-   <button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button>
   </div>
   <section id="files" class="files" role="tabpanel" aria-labelledby="tab-files" hidden></section>
   <section id="canvas" class="canvas" role="tabpanel" aria-labelledby="tab-plan">
@@ -92,7 +91,7 @@
   </section>
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
   <aside id="chat" class="chat" aria-label="Live Pi session">
-   <header class="chat-heading"><h2>Live session</h2><span class="modes"><button id="mode-research" class="mode-chip" type="button" aria-pressed="false" title="Research mode: explore, don't implement (/research)">Research</button><button id="mode-night" class="mode-chip" type="button" aria-pressed="false" title="Night mode: work unattended until the plan is done (/night)">Night</button></span><span id="connection" role="status">Connecting…</span></header>
+   <header class="chat-heading"><button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button><h2>Live session</h2><span class="modes"><button id="mode-research" class="mode-chip" type="button" aria-pressed="false" title="Research mode: explore, don't implement (/research)">Research</button><button id="mode-night" class="mode-chip" type="button" aria-pressed="false" title="Night mode: work unattended until the plan is done (/night)">Night</button></span><span id="connection" role="status">Connecting…</span></header>
    <div id="plan-actions" class="plan-actions" role="group" aria-label="Plan actions" hidden><button type="button" data-command="resolve" data-plan>Resolve</button><button id="review-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="review-menu">Review</button><button type="button" data-command="finish" data-plan>Finish</button><button type="button" data-command="resume" data-plan>Resume</button><div id="review-menu" class="status-menu" role="group" aria-label="Review" hidden><button type="button" data-command="review" data-plan>Review (normal)</button><button type="button" data-command="review all" data-plan>Review (all advisors)</button></div></div>
    <div class="notices"><p id="notice" class="notice" role="status" hidden></p><p id="waiting" class="notice" role="status" hidden></p></div>
    <div id="feed" class="feed">
