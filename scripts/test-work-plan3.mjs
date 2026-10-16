@@ -65,7 +65,7 @@ const api = {
 	setThinkingLevel: (level) => { thinking = level; },
 	setModel: async (model) => { if (model.id === "no-auth") return false; ctx.model = model; return true; },
 	getAllTools: () => askSource ? [{ name: "ask_user", sourceInfo: { path: askSource } }] : [],
-	exec: async (command, args, options) => { if (command === "tailscale") { tailscaleCalls.push(args.join(" ")); return tailscale(args); } execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
+	exec: async (command, args, options) => { if (/(^|[\\/])tailscale(\.exe)?$/i.test(command)) { tailscaleCalls.push(args.join(" ")); return tailscale(args); } execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
 	registerCommand: (name, command) => commands.set(name, command),
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
