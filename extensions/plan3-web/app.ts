@@ -554,7 +554,37 @@ function renderChat() {
 // shortcut: paths with spaces are not detected; quote-aware parsing if that matters.
 const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.(?:png|jpe?g|gif|webp|md)(?![\w-])/gi;
 function renderLinks(target: HTMLElement, text: string) {
- target.replaceChildren(); const images = new Set<string>(); linkPaths(target, text, images); appendThumbs(target, images);
+ target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images);
+}
+// Chat Markdown subset, built as DOM (never innerHTML): ``` code, | tables |, # headings, **bold** and `code`; lists stay as text.
+const TABLE_ROW = /^\s*\|.*\|\s*$/, TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) {
+ const lines = text.split("\n"); let prose: string[] = [];
+ const flush = () => { const body = prose.join("\n").replace(/^\n+|\n+$/g, ""); prose = []; if (body) { const div = document.createElement("div"); inline(div, body, images); target.append(div); } };
+ for (let i = 0; i < lines.length; i++) {
+  const line = lines[i];
+  if (/^\s*```/.test(line)) {
+   flush(); const code: string[] = []; while (++i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i]);
+   const pre = Object.assign(document.createElement("pre"), { className: "md-code" }); linkPaths(pre, code.join("\n"), images); target.append(pre);
+  } else if (TABLE_ROW.test(line) && TABLE_RULE.test(lines[i + 1] ?? "")) {
+   flush(); const table = Object.assign(document.createElement("table"), { className: "md-table" }), cells = (row: string) => row.trim().replace(/^\||\|$/g, "").split("|");
+   const head = table.createTHead().insertRow(); for (const cell of cells(line)) inline(head.appendChild(document.createElement("th")), cell.trim(), images);
+   const body = table.createTBody(); i++;
+   while (TABLE_ROW.test(lines[i + 1] ?? "")) { const row = body.insertRow(); for (const cell of cells(lines[++i])) inline(row.insertCell(), cell.trim(), images); }
+   target.append(table);
+  } else if (/^#{1,6}\s/.test(line)) {
+   flush(); const h = Object.assign(document.createElement("div"), { className: "md-heading" }); inline(h, line.replace(/^#+\s+/, ""), images); target.append(h);
+  } else prose.push(line);
+ }
+ flush();
+}
+function inline(target: HTMLElement, text: string, images: Set<string>) {
+ let at = 0;
+ for (const match of text.matchAll(/`([^`\n]+)`|\*\*([^*\n]+?)\*\*/g)) {
+  linkPaths(target, text.slice(at, match.index), images); at = match.index + match[0].length;
+  const element = document.createElement(match[1] !== undefined ? "code" : "b"); linkPaths(element, match[1] ?? match[2], images); target.append(element);
+ }
+ linkPaths(target, text.slice(at), images);
 }
 // Web addresses open in a new tab; trailing Markdown or sentence punctuation is not part of them.
 const LINKED = new RegExp("(https?://[^\\s\"'\\x60<>]+)|" + LINKED_PATH.source, "gi");

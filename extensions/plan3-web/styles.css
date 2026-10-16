@@ -258,6 +258,13 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
    tool calls are grey (running), green (done) or red (failed); diff lines are green/red. */
 .message { margin-bottom: 14px; overflow-wrap: anywhere; }
 .message > div { white-space: pre-wrap; }
+.message > div > div { white-space: pre-wrap; }
+.md-heading { font-weight: 700; margin: 8px 0 2px; }
+.message code, .md-code { font: 12.5px/1.4 ui-monospace, Consolas, monospace; background: var(--tool-pending); border-radius: 3px; padding: 0 3px; }
+.md-code { display: block; padding: 6px 8px; margin: 4px 0; white-space: pre-wrap; overflow-x: auto; }
+.md-table { display: block; overflow-x: auto; border-collapse: collapse; white-space: normal; margin: 6px 0; font-size: 13px; }
+.md-table th, .md-table td { border: 1px solid var(--line); padding: 3px 8px; text-align: left; vertical-align: top; }
+.md-table th { background: var(--tool-pending); }
 .message > small { font-size: 13px; color: var(--muted); }
 .message.user { background: var(--user-bg); padding: 8px 12px; border-radius: 6px; }
 .message-blocks { margin-bottom: 4px; }

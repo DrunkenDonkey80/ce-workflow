@@ -244,6 +244,10 @@ try {
  { const row = { id: "url_row", role: "agent", text: "Here's the link: **http://127.0.0.1:8768/index.html** (it's running now).", streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
  await browser("wait", "[data-id=url_row] a.chat-link");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=url_row] a.chat-link')].map(a => [a.getAttribute('href'), a.target])"), [["http://127.0.0.1:8768/index.html", "_blank"]]);
+ // Markdown subset: bold, inline code and tables render as elements, not raw ** and pipes.
+ { const row = { id: "md_row", role: "agent", text: "**Load:** use `Thread.Yield`\n\n| Setup | echo |\n|---|---|\n| RF | **5 ms** |\n\nafter", streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
+ await browser("wait", "[data-id=md_row] table");
+ assert.deepEqual(await evaluate("(() => { const m = document.querySelector('[data-id=md_row]'); return [m.querySelector('b').textContent, m.querySelector('code').textContent, [...m.querySelectorAll('th,td')].map(c => c.textContent), m.textContent.includes('**') || m.textContent.includes('|')]; })()"), ["Load:", "Thread.Yield", ["Setup", "echo", "RF", "5 ms"], false]);
  await browser("click", "[data-id=img_row] .chat-link[href='#']");
  assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
  // Tool output paths link too; their thumbnails sit under the collapsed block, and an unservable one is dropped.
