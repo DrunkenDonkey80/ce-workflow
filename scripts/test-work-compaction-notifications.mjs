@@ -1470,6 +1470,15 @@ try {
 	assert.match(readFileSync(pendingNotebook, "utf8"), /Finding while stopping/);
 	await hooks.agent_settled({}, researchCtx);
 	assert.equal(exitCompactions, 0, "repeated settled notifications never request exit compaction");
+	// The agent may leave research Plan3 started, mid-run, but never research the user started.
+	listeners.get("plan3:research")({ ctx: researchCtx, enabled: true });
+	assert.match((await hooks.before_agent_start({ prompt: "Fix it" }, researchCtx)).systemPrompt, /call research_exit first/);
+	await tools.research_exit.execute("exit", {}, undefined, undefined, busyCtx);
+	assert.equal(researchEntries.at(-1).data.mode, "off", "research_exit leaves Plan3 research at once");
+	await commands.research.handler("on", researchCtx);
+	await assert.rejects(async () => tools.research_exit.execute("exit", {}, undefined, undefined, researchCtx), /only they can turn it off/);
+	assert.equal(researchEntries.at(-1).data.source, "user");
+	await commands.research.handler("off", researchCtx);
 	const taskPrompts = [];
 	const taskSettingsPath = path.join(cwd, ".pi", "settings.json");
 	const taskSettings = JSON.parse(readFileSync(taskSettingsPath, "utf8"));

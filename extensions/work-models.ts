@@ -1413,11 +1413,12 @@ function persistResearchContext(ctx) {
 	showResearchContext(ctx);
 }
 
-function setResearchContext(ctx, enabled, force = false) {
+// source: "user" (/research, Alt+R) only the user may end; "plan" (Plan3 planning) the agent may leave with research_exit.
+function setResearchContext(ctx, enabled, force = false, source = "user") {
 	if (enabled && contextCompactState.inFlight)
 		throw new Error("Wait for the current compaction to finish, then start research mode.");
 	if (enabled && researchContext?.stopping) {
-		researchContext = { mode: "research", notes: researchContext.notes };
+		researchContext = { mode: "research", notes: researchContext.notes, source };
 		persistResearchContext(ctx);
 		return;
 	}
@@ -1429,7 +1430,7 @@ function setResearchContext(ctx, enabled, force = false) {
 	}
 	if (enabled) {
 		const dir = mkdtempSync(join(tmpdir(), "pi-research-"));
-		researchContext = { mode: "research", notes: join(dir, "findings.md") };
+		researchContext = { mode: "research", notes: join(dir, "findings.md"), source };
 		researchNotes = researchContext.notes;
 		writeFileSync(researchContext.notes, "# Research findings\n\n");
 	} else {
@@ -1447,7 +1448,7 @@ function restoreResearchContext(ctx) {
 		dirname(dirname(saved.notes)) === tmpdir() &&
 		basename(dirname(saved.notes)).startsWith("pi-research-") ? saved.notes : null;
 	researchContext = saved?.mode === "research" && researchNotes
-		? { mode: "research", notes: researchNotes, ...(saved.stopping ? { stopping: true } : {}) } : null;
+		? { mode: "research", notes: researchNotes, source: saved.source === "user" ? "user" : "plan", ...(saved.stopping ? { stopping: true } : {}) } : null;
 	if (researchContext && !existsSync(researchContext.notes)) {
 		mkdirSync(dirname(researchContext.notes), { recursive: true });
 		writeFileSync(researchContext.notes, "# Research findings\n\n");
@@ -3501,6 +3502,19 @@ export default function workModelsExtension(pi) {
 		},
 	});
 	registerConstrainedTool(pi, {
+		name: "research_exit",
+		label: "Exit Research",
+		description: "Leave research mode that Plan3 turned on, when the user asks for work outside planning (fixes, edits, commits). Refused when the user turned research on; then ask them to use /research or Alt+R.",
+		parameters: { type: "object", additionalProperties: false, properties: {} },
+		execute(_id, _args, _signal, _onUpdate, ctx) {
+			if (!researchContext) return { content: [{ type: "text", text: "Research mode is already off." }], details: {} };
+			if (researchContext.source === "user") throw new Error("The user turned research mode on; only they can turn it off (/research or Alt+R). Ask them.");
+			setResearchContext(ctx, false, true);
+			notifyResearchContext(ctx);
+			return { content: [{ type: "text", text: "Research mode is off. Its instructions no longer apply: implement and commit normally. Plan3 turns it back on when planning resumes." }], details: {} };
+		},
+	});
+	registerConstrainedTool(pi, {
 		name: COMPACTION_NOTE_TOOL,
 		label: "Compaction Note",
 		description: `Leave a note to your future self that is copied verbatim into the next context compaction summary. Call once when told compaction is near. Put the exact next action FIRST, then only what exists nowhere else: boundaries, plan path, HEAD, current step, environment and tool gotchas. Never copy step text, decisions or finished-work details already in the plan, its sidecar log or git. At most ${COMPACTION_NOTE_MAX} characters with normal spacing; longer notes are rejected. A newer note replaces the older one.`,
@@ -3636,7 +3650,7 @@ export default function workModelsExtension(pi) {
 	pi.on("tool_call", (event, ctx) => {
 if (researchContext && ["bash", "hypa_shell"].includes(event.toolName) &&
 			researchGitPublicationCommand(event.input?.command))
-			return { block: true, reason: "Research mode blocks Git commit and push; shell exploration is allowed. Exit research mode before committing; pushing still requires explicit user authorization." };
+			return { block: true, reason: `Research mode blocks Git commit and push; shell exploration is allowed. ${researchContext.source === "user" ? "Ask the user to exit research mode (/research or Alt+R)" : "Call research_exit"} before committing; pushing still requires explicit user authorization.` };
 try {
 			maybeCompact(ctx, readEffectiveSettings(ctx.cwd));
 		} catch {
@@ -3707,7 +3721,8 @@ showResearchContext(ctx);
  pendingInternalBackgroundCompletionPrompt = null;
  pendingPromptBackedAgentStart = true;
  const systemPrompt=String(event.systemPrompt ?? "");
- return {systemPrompt:researchContext?`${systemPrompt}\n\n${RESEARCH_INSTRUCTIONS}\nTemporary notebook: ${researchContext.notes}`:systemPrompt};
+ const exit=researchContext?.source==="user"?"The user turned research mode on; only they can turn it off (/research or Alt+R).":"Plan3 turned research mode on for planning. When the user asks for work outside planning (fixes, edits, commits), call research_exit first, then do it.";
+ return {systemPrompt:researchContext?`${systemPrompt}\n\n${RESEARCH_INSTRUCTIONS}\n${exit}\nTemporary notebook: ${researchContext.notes}`:systemPrompt};
 });
 
 	pi.on("agent_start", (event,ctx)=>{
@@ -4000,7 +4015,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 	pi.events?.on?.("plan3:research", ({ ctx, enabled, force }) => {
 		if (!ctx || (Boolean(researchContext && !researchContext.stopping) === Boolean(enabled) && !(force && researchContext?.stopping))) return;
 		try {
-			setResearchContext(ctx, Boolean(enabled), force);
+			setResearchContext(ctx, Boolean(enabled), force, "plan");
 			notifyResearchContext(ctx);
 		} catch (error) {
 			notify(ctx, `Plan3 could not switch research mode: ${formatError(error)}`, "warning");
