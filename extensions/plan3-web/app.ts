@@ -556,7 +556,7 @@ const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\
 function renderLinks(target: HTMLElement, text: string) {
  target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images);
 }
-// Chat Markdown subset, built as DOM (never innerHTML): ``` code, | tables |, # headings, **bold** and `code`; lists stay as text.
+// Chat Markdown subset, built as DOM (never innerHTML): ``` code, | tables |, # headings, **bold**, *italic*, [links](url) and `code`; lists stay as text.
 const TABLE_ROW = /^\s*\|.*\|\s*$/, TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) {
  const lines = text.split("\n"); let prose: string[] = [];
@@ -578,11 +578,19 @@ function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) 
  }
  flush();
 }
+// Italic markers need text right inside them, and _x_ word boundaries, so "* item" and snake_case stay as they are.
+const INLINE = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+?)\*\*|(?<![*\w])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![*\w])|(?<!\w)_(?=\S)([^_\n]+?)(?<=\S)_(?!\w)/g;
 function inline(target: HTMLElement, text: string, images: Set<string>) {
  let at = 0;
- for (const match of text.matchAll(/`([^`\n]+)`|\*\*([^*\n]+?)\*\*/g)) {
+ for (const match of text.matchAll(INLINE)) {
   linkPaths(target, text.slice(at, match.index), images); at = match.index + match[0].length;
-  const element = document.createElement(match[1] !== undefined ? "code" : "b"); linkPaths(element, match[1] ?? match[2], images); target.append(element);
+  if (match[2] !== undefined) {
+   // Only targets linkPaths would link (http(s), images, .md) become links, labelled with the link text; others show the label.
+   const probe = document.createElement("span"); linkPaths(probe, match[3], images);
+   const link = probe.querySelector("a"); if (link && link.textContent === probe.textContent) { link.textContent = match[2]; target.append(link); } else target.append(match[2]);
+   continue;
+  }
+  const element = document.createElement(match[1] !== undefined ? "code" : match[4] !== undefined ? "b" : "i"); linkPaths(element, match[1] ?? match[4] ?? match[5] ?? match[6], images); target.append(element);
  }
  linkPaths(target, text.slice(at), images);
 }
