@@ -556,9 +556,17 @@ const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\
 function renderLinks(target: HTMLElement, text: string) {
  target.replaceChildren(); const images = new Set<string>(); linkPaths(target, text, images); appendThumbs(target, images);
 }
+// Web addresses open in a new tab; trailing Markdown or sentence punctuation is not part of them.
+const LINKED = new RegExp("(https?://[^\\s\"'\\x60<>]+)|" + LINKED_PATH.source, "gi");
 function linkPaths(target: HTMLElement, text: string, images: Set<string>) {
  let at = 0;
- for (const match of text.matchAll(LINKED_PATH)) {
+ for (const match of text.matchAll(LINKED)) {
+  if (match[1]) {
+   const url = match[1].replace(/[*_.,;:!?)\]]+$/, "");
+   target.append(text.slice(at, match.index)); at = match.index + url.length;
+   target.append(Object.assign(document.createElement("a"), { textContent: url, href: url, target: "_blank", rel: "noopener", className: "chat-link" }));
+   continue;
+  }
   const path = match[0], image = !/\.md$/i.test(path);
   target.append(text.slice(at, match.index)); at = match.index + path.length;
   const link = Object.assign(document.createElement("a"), { textContent: path, className: "chat-link", href: image ? imageSource(path) : "#" });

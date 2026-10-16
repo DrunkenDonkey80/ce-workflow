@@ -240,6 +240,10 @@ try {
  await browser("wait", "[data-id=img_row] .thumb img");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.textContent.split(/[\\\\/]/).pop())"), [pasted.split(/[\\/]/).pop(), "notes.md", "x.png"]);
  assert.deepEqual(await evaluate("(async () => { const [ok, , outside] = [...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.getAttribute('href')); const a = await fetch(ok), b = await fetch(outside), c = await fetch(ok.replace(/\\.png/, '.txt')); return [a.status, a.headers.get('content-type'), b.status === 403 || b.status === 404, c.status]; })()"), [200, "image/png", true, 400]);
+ // Web addresses link too, without the Markdown bold around them.
+ { const row = { id: "url_row", role: "agent", text: "Here's the link: **http://127.0.0.1:8768/index.html** (it's running now).", streaming: false }; chatRows.set(row.id, row); server.publish("message", row); }
+ await browser("wait", "[data-id=url_row] a.chat-link");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=url_row] a.chat-link')].map(a => [a.getAttribute('href'), a.target])"), [["http://127.0.0.1:8768/index.html", "_blank"]]);
  await browser("click", "[data-id=img_row] .chat-link[href='#']");
  assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
  // Tool output paths link too; their thumbnails sit under the collapsed block, and an unservable one is dropped.
