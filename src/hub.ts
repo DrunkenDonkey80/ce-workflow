@@ -1,12 +1,13 @@
 // The hub process (H2-05): one per user, HTTP on 127.0.0.1 at a port fixed at first start (D11).
 // Phase 5 adds the web app; this serves the local JSON API that the CLI and tests use.
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import crypto from "node:crypto";
 import http from "node:http";
 import { stripTypeScriptTypes } from "node:module";
 import path from "node:path";
 import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
+import { SessionView } from "./view.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number };
@@ -45,13 +46,30 @@ function webFile(file: string, key: string) {
 
 export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.parse(process.env.PI_HUB_PI_COMMAND) : undefined } = {}) {
 	const dataDir = hubDataDir();
+	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
 	const lock = acquireLock(path.join(dataDir, "hub"), "pi-control-hub");
 	const saved = readConfig();
 	const config: HubConfig = saved ?? { version: 1, port: 0, localKey: crypto.randomBytes(32).toString("hex"), idleParkMinutes: 60 };
 	const registry = new Registry(dataDir);
-	const host = new SessionHost({ registry, command, idleParkMinutes: config.idleParkMinutes });
+	const views = new Map<string, SessionView>();
+	const host = new SessionHost({ registry, command, idleParkMinutes: config.idleParkMinutes, viewers: id => views.get(id)?.clients.size ?? 0 });
 	let closing: Promise<void> | undefined;
+	/** A session's view, created by its first browser request and kept while the hub runs (parked sessions show their file). */
+	async function view(id: string) {
+		let value = views.get(id);
+		if (!value) views.set(id, value = new SessionView({
+			file: () => registry.get(id)?.sessionFile,
+			idle: () => !host.live.get(id)?.running,
+			viewers: count => { const live = host.live.get(id); if (live) live.viewers = count; },
+		}));
+		const live = host.live.get(id);
+		if (!value.hydrated) await value.hydrate(live ? (await live.rpc.send({ type: "get_messages" })).data?.messages : undefined);
+		return value;
+	}
+	host.on("event", (id: string, event) => views.get(id)?.feed(event));
+	// A child that ends mid-run never sends agent_settled; settle the page's activity so it stops showing work.
+	host.on("exit", (id: string) => views.get(id)?.feed({ type: "agent_settled", aborted: true }));
 
 	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id), state: host.live.get(record.id)?.published.state }));
 	const routes: Record<string, (data: any, match: RegExpMatchArray) => Promise<unknown> | unknown> = {
@@ -92,6 +110,15 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 					return response.end(webFile(ASSETS[asset[2]][0], config.localKey));
 				}
 				if (asset) return send(404, { error: asset[1] === BUILD ? "Unknown asset." : "Stale build; reload the page." });
+				// H5-02: the session view.
+				const api = /^\/api\/(events|snapshot|rows|row)$/.exec(page[2]);
+				if (api) {
+					const sessionView = await view(page[1]);
+					if (api[1] === "events") return sessionView.attach(response);
+					if (api[1] === "snapshot") return send(200, sessionView.snapshot());
+					if (api[1] === "rows") return send(200, await sessionView.page(url.searchParams.get("before") ?? undefined));
+					return send(200, await sessionView.row(url.searchParams.get("id") ?? ""));
+				}
 			}
 			for (const [route, handler] of Object.entries(routes)) {
 				const [method, pattern] = route.split(" ");
@@ -116,6 +143,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	async function stop() {
 		return closing ??= (async () => {
 			clearInterval(timer);
+			for (const value of views.values()) value.close();
 			await host.shutdown();
 			await new Promise(resolve => server.close(resolve));
 			if (existsSync(markerPath())) rmSync(markerPath(), { force: true });

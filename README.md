@@ -10,4 +10,5 @@ folder its session runs in):
 
 Nothing depends on herdr: "Open in terminal" opens a plain window.
 
-Development: Node 24, `npm test` runs `scripts/test-*.mjs`; `scripts/fake-pi.mjs` stands in for `pi --mode rpc`.
+Development: Node 24 and ce-workflow checked out next to this folder (`../ce-workflow`; the hub imports its
+Pi-free modules through a `file:` dependency), then `npm install`. `npm test` runs `scripts/test-*.mjs`; `scripts/fake-pi.mjs` stands in for `pi --mode rpc`.

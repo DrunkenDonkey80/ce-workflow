@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Minimal stand-in for `pi --mode rpc` used by hub tests. Speaks LF-delimited JSONL on stdin/stdout.
-// Behaviour switches come from FAKE_PI (comma list): "crash-on-prompt", "slow-command", "split-output".
+// Behaviour switches come from FAKE_PI (comma list): "crash-on-prompt", "slow-command", "split-output", "no-hub",
+// "compacted" (get_messages returns only the last 3 messages, like after a compaction, F3).
 import crypto from "node:crypto";
 import fs from "node:fs";
 const flags = new Set((process.env.FAKE_PI ?? "").split(",").filter(Boolean));
@@ -26,7 +27,7 @@ async function handle(cmd) {
 	const reply = (data, extra = {}) => out({ id: cmd.id, type: "response", command: cmd.type, success: true, ...(data === undefined ? {} : { data }), ...extra });
 	switch (cmd.type) {
 		case "get_state": return reply({ model, thinkingLevel, isStreaming: streaming, isCompacting: false, sessionFile, sessionName, messageCount: messages.length, pendingMessageCount: 0 });
-		case "get_messages": return reply({ messages });
+		case "get_messages": return reply({ messages: flags.has("compacted") ? messages.slice(-3) : messages });
 		case "get_commands": return reply({ commands: flags.has("no-hub") ? [] : [{ name: "pi-hub", source: "extension" }] });
 		case "set_model": model = { provider: cmd.provider, id: cmd.modelId }; return reply(model);
 		case "set_thinking_level": thinkingLevel = cmd.level; out({ type: "thinking_level_changed", level: cmd.level }); return reply();
@@ -64,9 +65,16 @@ async function handle(cmd) {
 			streaming = true;
 			out({ type: "agent_start" });
 			if (cmd.message === "hold") return; // stays working until abort
-			save({ role: "user", content: [{ type: "text", text: cmd.message }], timestamp: Date.now() });
+			const user = { role: "user", content: [{ type: "text", text: cmd.message }], timestamp: Date.now() };
+			out({ type: "message_start", message: user });
+			out({ type: "message_end", message: user });
+			save(user);
+			const system = { role: "system", content: "SYSTEM PROMPT ".repeat(100), timestamp: Date.now() }; // F4: real Pi sends this too
+			out({ type: "message_start", message: system });
+			out({ type: "message_end", message: system });
 			const answer = { role: "assistant", content: [{ type: "text", text: `echo: ${cmd.message}` }], timestamp: Date.now() };
-			out({ type: "message_start", message: answer });
+			out({ type: "message_start", message: { ...answer, content: [{ type: "text", text: "echo" }] } });
+			out({ type: "message_update", message: { ...answer, content: [{ type: "text", text: "echo" }] }, assistantMessageEvent: { type: "text_delta" } });
 			out({ type: "message_end", message: answer });
 			save(answer);
 			streaming = false;

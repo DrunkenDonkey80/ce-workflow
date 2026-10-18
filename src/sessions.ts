@@ -6,7 +6,7 @@ import { RpcChild, type RpcRecord } from "./rpc-client.ts";
 import { acquireLock, releaseLock, type LockInfo } from "./session-lock.ts";
 import type { Registry, SessionRecord } from "./registry.ts";
 
-export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number };
+export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number; viewers?: (id: string) => number };
 export type Live = {
 	id: string;
 	rpc: RpcChild;
@@ -58,7 +58,7 @@ export class SessionHost extends EventEmitter {
 
 	private spawn(record: SessionRecord, args: string[]): Live {
 		const rpc = new RpcChild({ cwd: record.folder, args, command: this.options.command, env: { ...this.options.env, PI_HUB: "1" } });
-		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: 0, lastActivity: Date.now(), stopping: false };
+		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: this.options.viewers?.(record.id) ?? 0, lastActivity: Date.now(), stopping: false };
 		rpc.on("event", (event: RpcRecord) => {
 			live.lastActivity = Date.now();
 			if (event.type === "agent_start") live.running = true;

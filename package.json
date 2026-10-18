@@ -9,5 +9,8 @@
   "bin": { "pi-hub": "src/cli.ts" },
   "scripts": {
     "test": "node --test \"scripts/test-*.mjs\""
+  },
+  "dependencies": {
+    "pi-work-orchestrator": "file:../ce-workflow"
   }
 }
