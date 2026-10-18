@@ -5,7 +5,7 @@ import { execFileSync, spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hubDataDir } from "./registry.ts";
-import { configPath, markerPath, readConfig, type HubMarker } from "./hub.ts";
+import { configPath, markerPath, openInBrowser, readConfig, type HubMarker } from "./hub.ts";
 import { writeJsonAtomic } from "./registry.ts";
 import { pidAlive } from "./session-lock.ts";
 
@@ -90,8 +90,7 @@ try {
 		if (!running) throw new Error("The hub is not running; run pi-hub start.");
 		// The bare address opens a session page; the local key is the page's sign-in.
 		const url = `http://127.0.0.1:${running.port}/?token=${readConfig()!.localKey}`;
-		const opener = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
-		spawn(opener[0] as string, opener[1] as string[], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+		openInBrowser(url);
 		console.log(`http://127.0.0.1:${running.port}/`);
 	} else if (verb === "new") {
 		// A folder's first session starts its group; later ones can be added on the page with +.

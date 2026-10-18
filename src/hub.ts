@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import crypto from "node:crypto";
 import http from "node:http";
+import { spawn } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
 import path from "node:path";
 import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
@@ -60,10 +61,17 @@ function webFile(file: string, key: string) {
 	return (file.endsWith(".ts") ? stripTypeScriptTypes(text) : text).replaceAll("__TOKEN__", key).replaceAll("__BUILD__", BUILD);
 }
 
-export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.parse(process.env.PI_HUB_PI_COMMAND) : undefined, run = exec as Exec } = {}) {
+/** Opens a URL in the user's default browser (detached). */
+export function openInBrowser(url: string) {
+	const opener = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
+	spawn(opener[0] as string, opener[1] as string[], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+}
+
+export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.parse(process.env.PI_HUB_PI_COMMAND) : undefined, run = exec as Exec, openUrl = (_url: string) => {} } = {}) {
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
+	let lastLocalPoll = 0;
 	const lock = acquireLock(path.join(dataDir, "hub"), "pi-control-hub");
 	const saved = readConfig();
 	const config: HubConfig = saved ?? { version: 1, port: 0, localKey: crypto.randomBytes(32).toString("hex"), idleParkMinutes: 60 };
@@ -106,7 +114,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	const routes: Record<string, (data: any, match: RegExpMatchArray) => Promise<unknown> | unknown> = {
 		"GET /api/status": () => ({ pid: process.pid, port: config.port, remote: remoteStatus(), sessions: summary() }),
 		"POST /api/remote": async data => { config.remote = data.on === true; writeJsonAtomic(configPath(), config); await applyRemote(); return remoteStatus(); },
-		"GET /api/pairing": () => ({ pending: pairing.pending() }),
+		"GET /api/pairing": () => { lastLocalPoll = Date.now(); return { pending: pairing.pending() }; },
 		"POST /api/pairing": data => pairing.decide(data.approve === true),
 		"GET /api/devices": () => ({ devices: devices.list() }),
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },
@@ -158,7 +166,12 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 				// The local key never authorizes remote requests: a leaked link still needs pairing.
 				const cookie = cookieOf(request.headers.cookie);
 				if (!cookie || !await devices.check(cookie, tailnet!.login!)) {
-					if (request.method === "POST" && url.pathname === "/pair/start") return send(200, pairing.start(request.headers, tailnet!.login!));
+					if (request.method === "POST" && url.pathname === "/pair/start") {
+						const started = pairing.start(request.headers, tailnet!.login!);
+						// Approval lives on the local page; open it unless one is already polling (visible pages poll every 5 s, hidden 15 s).
+						if (Date.now() - lastLocalPoll > 20_000) { lastLocalPoll = Date.now(); openUrl(`http://127.0.0.1:${config.port}/?token=${config.localKey}`); }
+						return send(200, started);
+					}
 					if (request.method === "GET" && url.pathname === "/pair/status") {
 						const result = await pairing.status(url.searchParams.get("id"), new Promise(done => response.once("close", done)));
 						if (result.cookie) response.setHeader("set-cookie", deviceCookie(result.cookie));
@@ -261,7 +274,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 }
 
 if (import.meta.main) {
-	const hub = await startHub();
+	const hub = await startHub({ openUrl: openInBrowser });
 	console.log(`pi-control-hub ${process.pid} on http://127.0.0.1:${hub.config.port} (restored ${hub.restored.length})`);
 	const remote = hub.remote();
 	if (hub.imported) console.log(`imported ${hub.imported} paired device(s) from ce-workflow`);

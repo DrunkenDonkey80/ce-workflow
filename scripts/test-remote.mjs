@@ -28,7 +28,8 @@ const run = async (command, args) => {
 		: { BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CurrentTailnet: { MagicDNSEnabled: true }, CertDomains: [], User: { 7: { LoginName: "me@example.com" } } }) };
 	return { code: 0, killed: false, stderr: "", stdout: "" };
 };
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], run });
+const opened = [];
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], run, openUrl: url => opened.push(url) });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {
 	const response = await fetch(`http://127.0.0.1:${port}${route}`, { method: body ? "POST" : "GET", headers: { "x-hub-key": localKey, "content-type": "application/json" }, body: body && JSON.stringify(body) });
@@ -85,6 +86,8 @@ try {
 	// Pairing: the local hub sees the device and code; the code page gets the cookie once after approval.
 	const stale = (await remote("/pair/start", { method: "POST" })).json();
 	const started = (await remote("/pair/start", { method: "POST" })).json();
+	assert.equal(opened.length, 1, "a pairing request opens the local approval page once while none is polling");
+	assert.match(opened[0], /^http:\/\/127\.0\.0\.1:\d+\/\?token=/);
 	assert.match(started.code, /^\d{3} \d{3}$/);
 	assert.equal((await remote(`/pair/status?id=${stale.id}`)).status, 404, "a reloaded pairing page replaces its older request");
 	assert.deepEqual((await local("/api/pairing")).body.pending, { code: started.code, label: "iPhone Safari", address: "unknown address", login: "me@example.com" });
