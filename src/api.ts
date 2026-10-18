@@ -2,6 +2,7 @@
 // Plans, diagrams, files and images are read here with ce-workflow's Pi-free modules, so they also work while parked;
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
+import { statSync } from "node:fs";
 import path from "node:path";
 import { emptyDiagram, loadDiagram } from "pi-work-orchestrator/extensions/plan3-diagram.ts";
 import { webTarget } from "pi-work-orchestrator/extensions/plan3-web.ts";
@@ -94,9 +95,11 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 		const known = () => { if (!registry.get(id)) throw fail(404, "Unknown session."); return id; };
 		switch (data.action) {
 			case "new": {
-				// Only folders that already have a group; a new folder is started from the CLI.
-				const folder = registry.groups().find(group => group.folder === data.folder)?.folder;
-				if (!folder) throw fail(404, "Unknown folder.");
+				// A known group, or (New folder) an existing absolute folder, which starts its group.
+				const typed = typeof data.folder === "string" ? data.folder.trim().replace(/^"(.*)"$/, "$1") : "";
+				const folder = !typed ? undefined : registry.groups().find(group => group.folder.toLowerCase() === path.resolve(typed).toLowerCase())?.folder
+					?? (path.isAbsolute(typed) && statSync(typed, { throwIfNoEntry: false })?.isDirectory() ? path.resolve(typed) : undefined);
+				if (!folder) throw fail(404, "No such folder; enter the full path of an existing folder.");
 				return host.create(folder, name || nextName(folder));
 			}
 			case "rename": if (!name) throw fail(400, "Name required."); return host.rename(known(), name);

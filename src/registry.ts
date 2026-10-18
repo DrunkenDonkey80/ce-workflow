@@ -14,6 +14,7 @@ export type SessionRecord = {
 	sessionFile?: string; // unset until a new session's Pi reports its file
 	state: SessionState;
 	wasRunning?: boolean; // D17: running when the hub last stopped
+	lastActivity?: number; // its idle clock then, kept across the restart
 	createdAt: number;
 };
 export type Recent = { file: string; cwd: string; sessionId: string; name?: string; modified: number };

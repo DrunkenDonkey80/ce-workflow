@@ -167,7 +167,8 @@ try {
 	assert.equal((await tones())["1"], "seen", "opening the page marks it seen");
 	const created = (await post(id, "session", { action: "new", folder })).body;
 	assert.equal(created.name, "2", "new sessions take the next free number");
-	assert.equal((await post(id, "session", { action: "new", folder: root })).status, 404, "only folders that have a group");
+	assert.equal((await post(id, "session", { action: "new", folder: path.join(root, "missing") })).status, 404, "only existing folders");
+	assert.equal((await post(id, "session", { action: "new", folder: "relative" })).status, 404, "only absolute paths");
 	assert.equal((await post(id, "session", { action: "rename", id: created.id, name: "Docs" })).status, 200);
 	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);
 	assert.equal((await tones()).Docs, "parked");

@@ -111,6 +111,9 @@ try {
 	host.live.get(a.id).viewers = 1;
 	assert.deepEqual(await host.autoPark(Date.now() + 61 * 60_000), []);
 	host.live.get(a.id).viewers = 0;
+	const idle = host.live.get(a.id), clock = idle.lastActivity - 1;
+	idle.lastActivity = clock; idle.rpc.emit("ui", { type: "extension_ui_request", id: "s1", method: "setStatus", statusKey: "x", statusText: "y" });
+	assert.equal(idle.lastActivity, clock, "status repaints are not activity");
 	assert.deepEqual(await host.autoPark(Date.now() + 30 * 60_000), []);
 	assert.deepEqual(await host.autoPark(Date.now() + 61 * 60_000), [a.id]);
 	host.idleParkMinutes = 0;
@@ -143,10 +146,12 @@ try {
 	await host.resume(a.id);
 	const b = await host.create(folder, "2");
 	await host.park(b.id);
+	const clockA = host.live.get(a.id).lastActivity -= 5000;
 	await host.shutdown();
 	assert.equal(host.live.size, 0);
 	const again = new SessionHost({ registry: new Registry(path.join(root, "data")), command: [process.execPath, fake] });
 	assert.deepEqual((await again.restoreRunning()).map(r => r.id), [a.id]);
+	assert.equal(again.live.get(a.id).lastActivity, clockA, "a restart keeps the idle clock");
 	await again.shutdown();
 	// A Pi without ce-workflow's /pi-hub never gets the call as a model prompt.
 	const bare = new SessionHost({ registry: new Registry(path.join(root, "bare")), command: [process.execPath, fake], env: { FAKE_PI: "no-hub" } });

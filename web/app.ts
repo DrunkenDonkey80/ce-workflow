@@ -907,11 +907,14 @@ function renderSessions(groups: Group[], recents: Recent[]) {
   starButton.addEventListener("click", () => { const as = prompt(`Name for this session in ${item.label} (empty = next number):`, ""); if (as !== null) void sessionAction({ action: "star", file: item.file, name: as }); });
   // Two lines: folder (and name) above, the time below.
   const text = html("span", { className: "session-label recent-text", title: item.file });
-  text.append(html("span", { textContent: item.name ? `${item.label} · ${item.name}` : item.label }), html("small", { className: "session-state", textContent: whenText(item.modified) }));
+  text.append(html("span", { textContent: item.name ? `${item.label} · ${item.name}` : item.label }), html("small", { className: "recent-when", textContent: whenText(item.modified) }));
   row.append(text, starButton);
   return row;
  }));
- $("session-list").replaceChildren(...rows, recent);
+ // Inside the list, so the phone drawer gets it too.
+ const newFolder = html("button", { type: "button", className: "session-devices", textContent: "New folder" });
+ newFolder.addEventListener("click", () => { const folder = prompt("Full path of the folder to start a Pi session in:"); if (folder?.trim()) void newSession(folder.trim()); });
+ $("session-list").replaceChildren(...rows, recent, newFolder);
 }
 function sessionRow(session: HubSession, folder: string) {
  const row = html("div", { className: "session" }); row.dataset.tone = session.tone;

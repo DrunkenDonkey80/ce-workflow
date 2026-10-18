@@ -81,8 +81,8 @@ export class SessionHost extends EventEmitter {
 			this.emit("event", record.id, event);
 		});
 		rpc.on("ui", (request: RpcRecord) => {
-			live.lastActivity = Date.now();
-			if (DIALOGS.has(request.method)) live.dialogs.set(request.id!, request);
+			// Only a dialog is activity: extensions repaint statuses and widgets on timers, which kept idle sessions from parking.
+			if (DIALOGS.has(request.method)) { live.lastActivity = Date.now(); live.dialogs.set(request.id!, request); }
 			// ce-workflow hub-channel.ts: an ask that ended another way (timeout, abort, intercom) is closed by its channel id.
 			if (request.method === "setStatus" && request.statusKey === "pi-hub:state") {
 				const state = parseJson(request.statusText);
@@ -276,7 +276,7 @@ export class SessionHost extends EventEmitter {
 
 	/** Hub shutdown: remember what was running (D17), then stop every child. */
 	async shutdown(): Promise<void> {
-		for (const record of this.registry.list()) this.registry.update(record.id, { wasRunning: this.live.has(record.id) });
+		for (const record of this.registry.list()) this.registry.update(record.id, { wasRunning: this.live.has(record.id), lastActivity: this.live.get(record.id)?.lastActivity });
 		await Promise.all([...this.live.keys()].map(id => this.park(id, { force: true }).catch(() => {})));
 	}
 
@@ -284,7 +284,13 @@ export class SessionHost extends EventEmitter {
 	async restoreRunning(): Promise<{ id: string; error?: string }[]> {
 		const results = [];
 		for (const record of this.registry.list().filter(r => r.wasRunning)) {
-			try { await this.resume(record.id); results.push({ id: record.id }); }
+			try {
+				await this.resume(record.id);
+				// A hub restart keeps the idle clock, so frequent restarts do not keep idle sessions from parking (D16).
+				const live = this.live.get(record.id);
+				if (live && record.lastActivity) live.lastActivity = Math.min(live.lastActivity, record.lastActivity);
+				results.push({ id: record.id });
+			}
 			catch (error) { results.push({ id: record.id, error: (error as Error).message }); }
 		}
 		return results;
