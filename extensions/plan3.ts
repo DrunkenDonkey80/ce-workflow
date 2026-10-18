@@ -18,6 +18,7 @@ import { createNight } from "./plan3-night.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
 import { closePersistentOpenDesignClients } from "./opendesign-client.ts";
+import { hubActive, publish as hubPublish } from "./hub-channel.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 
 const POINTER = "plan3-current";
@@ -705,7 +706,9 @@ export default function plan3(pi) {
 			const focus = plan?.wip[0] ?? plan?.next;
 			const design = plan && localPlanDesign(ctx.cwd, plan);
 			const text = plan ? await readFile(plan.file, "utf8") : "", bias = plan ? biasOf(ctx, plan, split(text).lines, availOf(plan.file)) : 0;
-			if (webInstance && plan) publishWeb("plan", webPlan(plan, bias, text, ctx.cwd));
+			if ((webInstance || hubActive()) && plan) { const info = webPlan(plan, bias, text, ctx.cwd); if (webInstance) publishWeb("plan", info); hubPlan = info; }
+			else hubPlan = null;
+			hubCtx = ctx; publishHub();
 			void refreshHerdrTab();
 			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
@@ -774,6 +777,7 @@ export default function plan3(pi) {
 	let webInstance: Awaited<ReturnType<typeof createPlan3Web>> | undefined;
 	const publishWeb = (event, data) => {
 		if (["activity", "dialog", "dialog_closed"].includes(event)) publishSession();
+		if (event === "activity") publishHub();
 		// Context use changes per run; refresh the status line when a run ends.
 		if (event === "activity" && data && !data.working && webCtx) try { webInstance?.publish("status", webStatus(webCtx)); } catch { /* reported below */ }
 		// D11: no file watcher; the Files tab refreshes after tools that can change files.
@@ -821,7 +825,16 @@ export default function plan3(pi) {
 	// Session modes for the page: research comes from work-models (absent when that extension is off), night from Plan3.
 	const webModes = () => { const info: { research?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode() }; };
 	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), folder: ctx?.cwd ? path.basename(ctx.cwd) : "", tab: herdrTab, modes: webModes() });
-	pi.events?.on?.("wo:modes-changed", () => { if (webInstance && webCtx) publishStatus(webCtx); });
+	pi.events?.on?.("wo:modes-changed", () => { publishHub(); if (webInstance && webCtx) publishStatus(webCtx); });
+	// H3-04: under pi-control-hub, publish what only Pi knows; sent only when it changed, the hub keeps the latest.
+	let hubCtx = null, hubPlan = null, hubSent = "";
+	function publishHub() {
+		if (!hubActive() || !hubCtx) return;
+		const live = activity.snapshot(undefined), state = { plan: hubPlan, modes: webModes(), compacting: live.compacting, subagents: live.subagents };
+		const json = JSON.stringify(state);
+		if (json === hubSent) return;
+		try { hubPublish(hubCtx.ui, "state", state); hubSent = json; } catch { hubCtx = null; } // a stale context after /new or reload; the next refresh rebinds
+	}
 	// planning/finishable drive the page's Resolve/Review/Finish/Resume row, with the same gates as the /plans3 menu.
 	const webPlan = (plan, bias, text, cwd) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias,
 		planning: isPlanning(plan), finishable: isPlanning(plan) && !plan.open && !finishProblems(text).length && !planDesignGate(cwd, plan).length });

@@ -322,6 +322,19 @@ try {
 	state = await tool({ action: "next", summary: "Parser", check: "node --test parser.test.mjs: 4 passed" });
 	assert.deepEqual([state.completed, state.started, state.done], ["CSV-01", "CSV-02", 1]);
 	assert.equal(statuses.at(-1), "🛠️ Plan (CSV import) [███░░░░░] 1/3 · CSV-02");
+	// H3-04: under pi-control-hub the plan and modes go to the hub as pi-hub:state, and only when they change.
+	{
+		const hubStates = [], setStatus = ctx.ui.setStatus;
+		ctx.ui.setStatus = (key, value) => { if (key === "pi-hub:state") hubStates.push(JSON.parse(value)); else setStatus(key, value); };
+		process.env.PI_HUB = "1";
+		try {
+			await tool({ action: "get", view: "resume" });
+			await tool({ action: "get", view: "resume" });
+			assert.equal(hubStates.length, 1, "unchanged state is not resent");
+			assert.deepEqual([hubStates[0].plan.title, hubStates[0].plan.done, hubStates[0].plan.focus, hubStates[0].compacting, hubStates[0].subagents], ["CSV import", 1, "CSV-02", false, []]);
+			assert.equal(typeof hubStates[0].modes.night, "string");
+		} finally { delete process.env.PI_HUB; ctx.ui.setStatus = setStatus; }
+	}
 	await tool({ action: "step", id: "CSV-02", mark: "blocked", note: "needs RFC 4180 decision" });
 	await tool({ action: "section", name: "Decisions", text: "- D1 Use RFC 4180." });
 	state = await tool({ action: "add", after: "CSV-02", steps: ["Escapes", "Multiline"], reason: "split quoting" });
