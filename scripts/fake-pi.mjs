@@ -48,6 +48,8 @@ async function handle(cmd) {
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:closed", statusText: JSON.stringify({ id: askId }) });
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "notify", message: `answer:${value ?? "<cancelled>"}` });
 				}
+				// Mirrors ce-workflow plan3.ts publishHub(): `/state <json>` publishes pi-hub:state.
+				if (cmd.message.startsWith("/state ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:state", statusText: cmd.message.slice(7) });
 				if (flags.has("slow-command")) await new Promise(r => setTimeout(r, 300));
 				return reply({ disposition: "handled" });
 			}

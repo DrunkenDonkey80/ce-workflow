@@ -38,7 +38,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	const host = new SessionHost({ registry, command, idleParkMinutes: config.idleParkMinutes });
 	let closing: Promise<void> | undefined;
 
-	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id) }));
+	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id), state: host.live.get(record.id)?.published.state }));
 	const routes: Record<string, (data: any, match: RegExpMatchArray) => Promise<unknown> | unknown> = {
 		"GET /api/status": () => ({ pid: process.pid, port: config.port, sessions: summary() }),
 		"POST /api/sessions": data => host.create(String(data.folder ?? ""), String(data.name ?? "")),

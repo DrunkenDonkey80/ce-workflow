@@ -53,6 +53,16 @@ try {
 	await command;
 	assert.deepEqual(host.busyReasons(a.id), []);
 
+	// Published state (H3-04): the latest is kept; running subagents keep the session busy so it is not parked.
+	await host.prompt(a.id, `/state ${JSON.stringify({ plan: { id: "p1" }, modes: { research: "on", night: "off" }, compacting: false, subagents: [{ id: "s" }] })}`);
+	assert.equal(host.live.get(a.id).published.state.plan.id, "p1");
+	assert.deepEqual(host.busyReasons(a.id), ["subagents running"]);
+	await assert.rejects(host.park(a.id), /Cannot park while subagents running/);
+	await host.prompt(a.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: true, subagents: [] })}`);
+	assert.deepEqual(host.busyReasons(a.id), ["compacting"]);
+	await host.prompt(a.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: false, subagents: [] })}`);
+	assert.deepEqual(host.busyReasons(a.id), []);
+
 	// Channel asks (H3-01): a reconnecting browser sees the open form again; answering works once.
 	const notified = () => new Promise(r => { const l = (sid, req) => { if (req.method === "notify") { host.off("ui", l); r(req.message); } }; host.on("ui", l); });
 	let asked = new Promise(r => host.once("ui", (sid, req) => r(req)));

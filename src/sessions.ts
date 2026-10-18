@@ -16,6 +16,7 @@ export type Live = {
 	command: number; // extension commands still waiting for their response (F6)
 	dialogs: Map<string, RpcRecord>; // open select/confirm/input/editor requests
 	busyExtra: Set<string>; // reasons reported by ce-workflow through the hub channel, e.g. "subagents"
+	published: Record<string, unknown>; // latest `pi-hub:<kind>` update per kind (ce-workflow H3-04: state = plan, modes, compacting, subagents)
 	viewers: number;
 	lastActivity: number;
 	stopping: boolean;
@@ -55,7 +56,7 @@ export class SessionHost extends EventEmitter {
 
 	private spawn(record: SessionRecord, args: string[]): Live {
 		const rpc = new RpcChild({ cwd: record.folder, args, command: this.options.command, env: { ...this.options.env, PI_HUB: "1" } });
-		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), viewers: 0, lastActivity: Date.now(), stopping: false };
+		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: 0, lastActivity: Date.now(), stopping: false };
 		rpc.on("event", (event: RpcRecord) => {
 			live.lastActivity = Date.now();
 			if (event.type === "agent_start") live.running = true;
@@ -68,6 +69,13 @@ export class SessionHost extends EventEmitter {
 			live.lastActivity = Date.now();
 			if (DIALOGS.has(request.method)) live.dialogs.set(request.id!, request);
 			// ce-workflow hub-channel.ts: an ask that ended another way (timeout, abort, intercom) is closed by its channel id.
+			if (request.method === "setStatus" && request.statusKey === "pi-hub:state") {
+				const state = parseJson(request.statusText);
+				live.published.state = state;
+				live.busyExtra.clear();
+				if (Array.isArray(state?.subagents) && state.subagents.length) live.busyExtra.add("subagents running");
+				if (state?.compacting && !live.compacting) live.busyExtra.add("compacting");
+			}
 			if (request.method === "setStatus" && request.statusKey === "pi-hub:closed") {
 				const askId = parseJson(request.statusText)?.id;
 				for (const [requestId, dialog] of live.dialogs) if (askId && channelId(dialog) === askId) { live.dialogs.delete(requestId); this.emit("closed", record.id, requestId); }
