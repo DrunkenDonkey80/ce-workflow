@@ -166,6 +166,39 @@ try {
 	assert.equal(isOn(avail, "R-reboot"), false, "the night set is remembered");
 	assert.equal(isOn(setMode(avail, "day"), "R-reboot"), true, "the day set is untouched");
 	assert.equal(isOn(setMode(avail, "day"), "R-unset"), false, "unset requirements are off");
+	// Hub restart (H3-10): a restored, active night starts the next turn once; a saved error backoff is kept; paused/complete/terminal do nothing.
+	{
+		const hubEntries = [], hubSent = [];
+		const hubPi = { registerCommand() {}, registerShortcut() {}, on() {}, appendEntry: (customType, data) => hubEntries.push({ type: "custom", customType, data }), sendMessage: (message, options) => hubSent.push({ content: message.content, options }) };
+		const hubNight = createNight(hubPi, { listPlans: async () => [plan], currentPlan: (_ctx, plans) => plans[0], resume: async () => {}, research() {} });
+		const hubCtx = { cwd, hasUI: false, isIdle: () => true, ui: { notify() {} }, sessionManager: { getBranch: () => hubEntries } };
+		const restart = async (saved, hub = true) => {
+			hubEntries.length = 0; hubSent.length = 0; hubEntries.push({ type: "custom", customType: "plan3-night", data: saved });
+			if (hub) process.env.PI_HUB = "1";
+			try { await hubNight.restore(hubCtx); } finally { delete process.env.PI_HUB; }
+			await new Promise(resolve => setTimeout(resolve, 30));
+			return hubSent.map(item => item.options);
+		};
+		assert.deepEqual(await restart({ plan: "p1", rules: "" }), [{ triggerTurn: true }], "one turn after the restart");
+		assert.equal(hubSent[0].content, nightMessage(""));
+		assert.deepEqual(await restart({ plan: "p1", rules: "" }, false), [], "a terminal restart or /reload does not start a turn");
+		assert.deepEqual(await restart({ plan: "p1", rules: "", paused: "cancelled" }), []);
+		assert.deepEqual(await restart({ plan: "p1", rules: "", complete: true }), []);
+		assert.deepEqual(await restart({ off: true }), []);
+		assert.deepEqual(await restart({ plan: "p1", rules: "", retryAt: Date.now() + 60_000 }), [], "backoff kept: no turn before retryAt");
+		assert.deepEqual(await restart({ plan: "p1", rules: "", retryAt: Date.now() - 1 }), [{ triggerTurn: true }], "an expired backoff retries at once");
+		hubNight.shutdown();
+		// The error path saves retryAt; the next good settle clears it.
+		const saveHooks = new Map(), saved = [];
+		const saveNight = createNight({ registerCommand: (name, command) => saveHooks.set(`/${name}`, command), registerShortcut() {}, on: (name, handler) => saveHooks.set(name, handler), appendEntry: (_type, data) => saved.push(data), sendMessage() {} }, { listPlans: async () => [plan], currentPlan: (_ctx, plans) => plans[0], resume: async () => {}, research() {} });
+		await saveHooks.get("/night").handler("on", { ...hubCtx, isIdle: () => false });
+		await saveHooks.get("agent_before_settle")({ outcome: "error" }, hubCtx);
+		assert(saved.at(-1).retryAt > Date.now() + 29 * 60_000);
+		await writeFile(file, "v6");
+		await saveHooks.get("agent_before_settle")({ outcome: "completed" }, hubCtx);
+		assert.equal(saved.at(-1).retryAt, undefined);
+		saveNight.shutdown();
+	}
 	console.log("ok - plan3 night mode");
 } finally {
 	await rm(cwd, { recursive: true, force: true });

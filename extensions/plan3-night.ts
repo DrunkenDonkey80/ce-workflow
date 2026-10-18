@@ -4,6 +4,7 @@ import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { askText, showListDialog } from "./ask-user/menu.ts";
+import { hubActive } from "./hub-channel.ts";
 
 // Night mode: unattended Plan3 execution. Continues at Pi's settle boundary until the plan is done,
 // nothing is runnable, two continues change nothing, or the user cancels.
@@ -54,12 +55,17 @@ export const stopCheckMessage = (plan) => !plan.wip.length && !plan.next
 	: `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
 
 export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging, switchNeeds = undefined }) {
-	let night = null; // { plan, rules, fp, stalls, paused?, complete? }
+	let night = null; // { plan, rules, fp, stalls, paused?, complete?, retryAt? }
 	let baseline; // Outside night mode: fingerprint when the /resume3 run started or was last nudged.
 	let awake, retry;
 	const rulesFile = (cwd) => path.join(cwd, ".pi", "night.md");
 	const readRules = (cwd) => readFile(rulesFile(cwd), "utf8").then((text) => text.trim(), () => "");
-	const persist = () => pi.appendEntry?.(ENTRY, night ? { plan: night.plan, rules: night.rules, paused: night.paused, complete: night.complete } : { off: true });
+	const persist = () => pi.appendEntry?.(ENTRY, night ? { plan: night.plan, rules: night.rules, paused: night.paused, complete: night.complete, ...(night.retryAt ? { retryAt: night.retryAt } : {}) } : { off: true });
+	const retryLater = (delay) => {
+		clearTimeout(retry);
+		retry = setTimeout(() => night && !night.paused && !night.complete && message(nightMessage(night.rules), { triggerTurn: true }), delay);
+		retry.unref?.();
+	};
 	const release = () => { awake?.kill(); awake = undefined; clearTimeout(retry); retry = undefined; };
 	function banner(ctx) {
 		const label = !night ? undefined : night.complete ? "NIGHT COMPLETE · Alt+N to clear" : night.paused ? `NIGHT PAUSED: ${night.paused} · Alt+N to turn off` : "NIGHT MODE · Alt+N to stop";
@@ -162,11 +168,13 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		if (event.outcome === "aborted") return stop(ctx, "cancelled");
 		if (event.outcome === "error") {
 			// Pi already retried; quota and outages recover later, so try again without counting a stall.
-			clearTimeout(retry);
-			retry = setTimeout(() => night && !night.paused && message(nightMessage(night.rules), { triggerTurn: true }), RETRY_AFTER_MS);
-			retry.unref?.();
+			// The deadline is saved so a hub restart keeps the backoff instead of retrying at once (H3-10).
+			night.retryAt = Date.now() + RETRY_AFTER_MS;
+			persist();
+			retryLater(RETRY_AFTER_MS);
 			return;
 		}
+		if (night.retryAt) { night.retryAt = undefined; persist(); }
 		const plan = (await listPlans(ctx.cwd)).find((candidate) => candidate.id === night.plan);
 		if (!plan || plan.status === "complete" || (plan.total && plan.done === plan.total)) return stop(ctx, "", true);
 		if (!plan.next && !plan.wip.length) return stop(ctx, "every remaining step is blocked or needs you");
@@ -181,9 +189,11 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 		async restore(ctx) {
 			const saved = ctx.sessionManager?.getBranch?.().findLast((entry) => entry.type === "custom" && entry.customType === ENTRY)?.data;
 			release();
-			night = saved?.plan ? { plan: saved.plan, rules: saved.rules ?? "", paused: saved.paused, complete: saved.complete, stalls: 0, fp: "" } : null;
+			night = saved?.plan ? { plan: saved.plan, rules: saved.rules ?? "", paused: saved.paused, complete: saved.complete, retryAt: saved.retryAt, stalls: 0, fp: "" } : null;
 			if (night && !night.paused && !night.complete) awake = keepAwake();
 			banner(ctx);
+			// A hub restart (H3-10) ends the run that would have continued at its settle: start the next turn once, after any pending backoff.
+			if (hubActive() && night && !night.paused && !night.complete && ctx.isIdle?.() !== false) retryLater(Math.max(0, (night.retryAt ?? 0) - Date.now()));
 		},
 		shutdown: release,
 		mode: () => !night ? "off" : night.complete ? "complete" : night.paused ? "paused" : "on",
