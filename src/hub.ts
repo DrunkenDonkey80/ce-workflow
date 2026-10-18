@@ -114,6 +114,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		"POST /api/sessions/([0-9a-f-]{36})/resume": (_d, m) => host.resume(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/park": (_d, m) => host.park(m[1]).then(() => ({ ok: true })),
 		"POST /api/sessions/([0-9a-f-]{36})/restart": (_d, m) => host.restart(m[1]),
+		"POST /api/sessions/([0-9a-f-]{36})/terminal": (_d, m) => host.openTerminal(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/rename": (data, m) => host.rename(m[1], String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/prompt": (data, m) => host.prompt(m[1], String(data.message ?? "")),
 		"POST /api/stop": data => {
@@ -239,8 +240,9 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	if (!saved) writeJsonAtomic(configPath(), config); // the port stays fixed from now on (D11)
 	writeJsonAtomic(markerPath(), { pid: process.pid, port: config.port, startedAt: Date.now() } satisfies HubMarker);
 	if (config.remote) await applyRemote().catch(error => { remoteError = (error as Error).message; });
+	host.checkTerminals(); // a terminal closed while the hub was down
 	const restored = await host.restoreRunning(); // D17
-	const timer = setInterval(() => void host.autoPark(), 60_000);
+	const timer = setInterval(() => { host.checkTerminals(); void host.autoPark(); }, 60_000);
 	timer.unref();
 
 	async function stop() {

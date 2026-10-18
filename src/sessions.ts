@@ -2,11 +2,20 @@
 // The hub never deletes or rewrites a session file; only the Pi child writes it.
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { RpcChild, type RpcRecord } from "./rpc-client.ts";
-import { acquireLock, releaseLock, type LockInfo } from "./session-lock.ts";
+import { spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { defaultCommand, RpcChild, type RpcRecord } from "./rpc-client.ts";
+import { acquireLock, lockPath, pidAlive, readLock, releaseLock, type LockInfo } from "./session-lock.ts";
 import type { Registry, SessionRecord } from "./registry.ts";
 
-export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number; viewers?: (id: string) => number };
+export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number; viewers?: (id: string) => number; terminal?: (args: string[], cwd: string, env: Record<string, string>) => { pid?: number; once(event: "exit", listener: () => void): unknown } };
+/** H7-01 (D20): interactive Pi in its own console window (Windows Terminal hosts it when it is the default terminal). */
+const openWindow = (command: string[]) => (args: string[], cwd: string, env: Record<string, string>) => {
+	const [file, ...prefix] = command;
+	const child = spawn(file, [...prefix, ...args], { cwd, env: { ...process.env, ...env }, detached: true, stdio: "ignore" });
+	child.unref();
+	return child;
+};
 export type Live = {
 	id: string;
 	rpc: RpcChild;
@@ -160,6 +169,41 @@ export class SessionHost extends EventEmitter {
 	async restart(id: string): Promise<SessionRecord> {
 		await this.park(id);
 		return this.resume(id);
+	}
+
+	/**
+	 * H7-01 (D9, D20): park, then open the session file in a terminal Pi. The lock stays held for it, under the terminal's
+	 * process id, so it outlives a hub restart; ce-workflow lets that one Pi through by the lock's start time
+	 * (PI_HUB_TERMINAL_LOCK). The session is "terminal" until the lock ends (checkTerminals).
+	 */
+	async openTerminal(id: string): Promise<SessionRecord> {
+		const record = this.registry.get(id);
+		if (!record) throw new Error("Unknown session.");
+		if (!record.sessionFile) throw new Error("This session has no file yet.");
+		if (record.state === "terminal") throw new Error("This session is already open in a terminal.");
+		await this.park(id);
+		const file = record.sessionFile, info = acquireLock(file, "pi-control-hub terminal");
+		let child;
+		try {
+			child = (this.options.terminal ?? openWindow(this.options.command ?? defaultCommand()))(["--session", file], record.folder, { PI_HUB_TERMINAL_LOCK: String(info.startedAt) });
+			if (!child.pid) throw new Error("The terminal did not start.");
+		} catch (error) { releaseLock(file, info); throw error; }
+		// Same start time, the terminal's pid: written before Pi can read it (its extensions load seconds later).
+		writeFileSync(lockPath(file), JSON.stringify({ ...info, pid: child.pid }));
+		child.once("exit", () => { releaseLock(file, { ...info, pid: child.pid! }); this.checkTerminals(); });
+		return this.registry.update(id, { state: "terminal" });
+	}
+
+	/** Sessions whose terminal lock has ended (closed window, or a hub restart lost the exit event) go back to parked. */
+	checkTerminals(): string[] {
+		const back = [];
+		for (const record of this.registry.list().filter(r => r.state === "terminal")) {
+			const holder = record.sessionFile ? readLock(record.sessionFile) : undefined;
+			if (holder?.owner === "pi-control-hub terminal" && pidAlive(holder.pid)) continue;
+			this.registry.update(record.id, { state: "parked" }); back.push(record.id);
+		}
+		if (back.length) this.emit("terminals", back);
+		return back;
 	}
 
 	/** D16: park sessions idle for idleParkMinutes with no dialog and no viewer; 0 disables. */

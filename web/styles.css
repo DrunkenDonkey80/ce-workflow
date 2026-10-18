@@ -324,7 +324,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switcher[data-open=false] .session-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 /* H5-05: folder groups with a + for New, a ⋯ per row, Recents closed by default. */
-.session[data-tone=parked] .session-letter { background: transparent; border: 1px dashed var(--muted); color: var(--muted); }
+.session:is([data-tone=parked], [data-tone=terminal]) .session-letter { background: transparent; border: 1px dashed var(--muted); color: var(--muted); }
 .session-link { display: flex; gap: 8px; align-items: center; min-width: 0; flex: 1; color: inherit; text-decoration: none; }
 .session-more, .session-add { flex: none; padding: 0 6px; border-color: transparent; background: none; color: var(--muted); }
 .session-group { display: flex; align-items: center; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }

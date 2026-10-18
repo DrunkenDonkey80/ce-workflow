@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -156,6 +157,37 @@ try {
 	assert.equal(prompts.length, 0);
 	await bare.shutdown();
 	assert.deepEqual(fs.readdirSync(folder).filter(f => f.endsWith(".lock")), []);
+	// H7-01: Open in terminal parks, then hands the lock to the terminal's process; closing it brings the session back.
+	const t = await host.create(folder, "term");
+	let launched;
+	host.options.terminal = (args, cwd, env) => {
+		const child = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+		launched = { args, cwd, env, child, lockBefore: readLock(t.sessionFile) };
+		return child;
+	};
+	const opened = await host.openTerminal(t.id);
+	assert.equal(opened.state, "terminal");
+	assert.equal(host.live.has(t.id), false, "parked first");
+	assert.deepEqual([launched.args, launched.cwd], [["--session", t.sessionFile], folder]);
+	assert.equal(launched.lockBefore.owner, "pi-control-hub terminal", "locked before the terminal starts");
+	const termLock = readLock(t.sessionFile);
+	assert.deepEqual([termLock.pid, String(termLock.startedAt)], [launched.child.pid, launched.env.PI_HUB_TERMINAL_LOCK], "the terminal's pid, the start time it is told");
+	await assert.rejects(host.resume(t.id), /open in a terminal/);
+	await assert.rejects(host.openTerminal(t.id), /already open in a terminal/);
+	assert.throws(() => acquireLock(t.sessionFile, "other"), /pi-control-hub terminal/);
+	assert.deepEqual(host.checkTerminals(), [], "still open");
+	const back = new Promise(resolve => host.once("terminals", resolve));
+	launched.child.kill();
+	assert.deepEqual(await back, [t.id]);
+	assert.equal(host.options.registry.get(t.id).state, "parked");
+	assert.equal(fs.existsSync(lockPath(t.sessionFile)), false);
+	// A hub restart loses the exit event; a dead lock holder is found by the periodic check instead.
+	await host.openTerminal(t.id);
+	fs.writeFileSync(lockPath(t.sessionFile), JSON.stringify({ ...readLock(t.sessionFile), pid: 2 ** 31 - 2 }));
+	assert.deepEqual(host.checkTerminals(), [t.id]);
+	launched.child.kill();
+	await host.resume(t.id);
+	await host.park(t.id);
 	console.log("sessions ok");
 } finally {
 	await host.shutdown().catch(() => {});

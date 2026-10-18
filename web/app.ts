@@ -814,7 +814,7 @@ $("mode-research").addEventListener("click", () => void toggleMode("/research " 
 $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("mode-night").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 // H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
-type Tone = "working" | "waiting" | "unseen" | "seen" | "parked";
+type Tone = "working" | "waiting" | "unseen" | "seen" | "parked" | "terminal";
 type HubSession = { id: string; name: string; tone: Tone };
 type Group = { folder: string; label: string; sessions: HubSession[] };
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
@@ -879,7 +879,7 @@ async function showDevices() {
 }
 $("devices-button").addEventListener("click", () => void showDevices().catch(error => showNotice("Devices: " + error.message)));
 $("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
-const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle", parked: "parked" };
+const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle", parked: "parked", terminal: "open in a terminal" };
 function html<K extends keyof HTMLElementTagNameMap>(tag: K, properties: Partial<HTMLElementTagNameMap[K]> = {}) { return Object.assign(document.createElement(tag), properties); }
 function renderSessions(groups: Group[], recents: Recent[]) {
  $("switcher").hidden = false; document.body.classList.add("has-switcher");
@@ -921,8 +921,11 @@ const sessionMenu = html("div", { className: "status-menu session-menu", hidden:
 function openSessionMenu(anchor: HTMLElement, session: HubSession) {
  const parked = session.tone === "parked";
  const item = (text: string, run: () => void) => { const button = html("button", { type: "button", textContent: text }); button.setAttribute("role", "menuitem"); button.addEventListener("click", () => { sessionMenu.hidden = true; run(); }); return button; };
+ // H7-01: a session open in a terminal window comes back by itself when that window closes.
+ if (session.tone === "terminal") return showNotice(`"${session.name}" is open in a terminal on the PC; it returns here when that Pi exits.`);
  sessionMenu.replaceChildren(
   item("Rename…", () => { const name = prompt("New name:", session.name); if (name?.trim()) void sessionAction({ action: "rename", id: session.id, name }); }),
+  item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
   ...(parked ? [item("Unstar (keep the file)", () => { if (confirm(`Remove "${session.name}" from its group? The session file stays in Recents.`)) void sessionAction({ action: "unstar", id: session.id }); })] : [item("Reload", () => void sessionAction({ action: "reload", id: session.id }))]),
  );

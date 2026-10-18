@@ -74,6 +74,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 	const unseen = new Set<string>();
 	const seen = (id: string) => unseen.delete(id);
 	function tone(id: string) {
+		if (registry.get(id)?.state === "terminal") return "terminal";
 		if (!host.live.has(id)) return "parked";
 		if (forms(id).length) return "waiting";
 		if (host.busyReasons(id).length) return "working";
@@ -101,6 +102,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 			case "park": await host.park(known()); return { ok: true };
 			case "resume": await host.resume(known()); return { ok: true };
 			case "reload": await host.restart(known()); return { ok: true };
+			case "terminal": await host.openTerminal(known()); return { ok: true };
 			case "star": {
 				const recent = (await scanRecents(registry)).find(item => item.file === data.file);
 				if (!recent) throw fail(404, "That session is no longer recent.");
