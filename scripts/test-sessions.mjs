@@ -1,0 +1,109 @@
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Registry } from "../src/registry.ts";
+import { SessionHost } from "../src/sessions.ts";
+import { acquireLock, lockPath, readLock, releaseLock } from "../src/session-lock.ts";
+
+const fake = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-sessions-"));
+const folder = path.join(root, "proj");
+fs.mkdirSync(folder);
+const host = new SessionHost({ registry: new Registry(path.join(root, "data")), command: [process.execPath, fake], stopGraceMs: 5000 });
+const settled = id => new Promise(r => { const l = (sid, e) => { if (sid === id && e.type === "agent_settled") { host.off("event", l); r(e); } }; host.on("event", l); });
+
+try {
+	// New: Pi reports its file, the hub holds its lock while running.
+	const a = await host.create(folder, "1");
+	assert.equal(a.state, "running");
+	assert.ok(a.sessionFile.startsWith(folder));
+	assert.equal(readLock(a.sessionFile).pid, process.pid);
+	const done = settled(a.id);
+	await host.prompt(a.id, "hello");
+	await done;
+	const before = fs.readFileSync(a.sessionFile, "utf8");
+
+	// Park keeps the file and releases the lock only after exit; resume uses the same file.
+	await host.park(a.id);
+	const parked = host.options.registry.get(a.id);
+	assert.equal(parked.state, "parked");
+	assert.equal(fs.existsSync(lockPath(a.sessionFile)), false);
+	assert.equal(fs.readFileSync(a.sessionFile, "utf8"), before, "the hub never rewrites the session file");
+	const resumed = await host.resume(a.id);
+	assert.equal(resumed.sessionFile, a.sessionFile);
+	assert.equal((await host.live.get(a.id).rpc.send({ type: "get_messages" })).data.messages.length, 2);
+
+	// Busy sessions refuse park (D15); restart (D12) also refuses while busy.
+	await host.prompt(a.id, "hold");
+	assert.deepEqual(host.busyReasons(a.id), ["working"]);
+	await assert.rejects(host.park(a.id), /Cannot park while working/);
+	await assert.rejects(host.restart(a.id), /Cannot park/);
+	await host.live.get(a.id).rpc.send({ type: "abort" });
+	await new Promise(r => setTimeout(r, 50));
+	assert.deepEqual(host.busyReasons(a.id), []);
+
+	// Open dialogs count as busy until answered.
+	const ui = new Promise(r => host.once("ui", (id, req) => req.method === "input" && r(req)));
+	const command = host.prompt(a.id, "/ask q");
+	const request = await ui;
+	assert.deepEqual(host.busyReasons(a.id), ["running a command", "waiting for an answer"]);
+	assert.equal(host.respond(a.id, request.id, { value: "v" }), true);
+	await command;
+	assert.deepEqual(host.busyReasons(a.id), []);
+
+	// Rename reaches Pi; restart keeps the file.
+	await host.rename(a.id, "Roof");
+	assert.equal((await host.live.get(a.id).rpc.send({ type: "get_state" })).data.sessionName, "Roof");
+	const restarted = await host.restart(a.id);
+	assert.equal(restarted.sessionFile, a.sessionFile);
+
+	// Automatic parking: idle past the limit, but not while a browser is viewing (D16).
+	host.idleParkMinutes = 60;
+	host.live.get(a.id).viewers = 1;
+	assert.deepEqual(await host.autoPark(Date.now() + 61 * 60_000), []);
+	host.live.get(a.id).viewers = 0;
+	assert.deepEqual(await host.autoPark(Date.now() + 30 * 60_000), []);
+	assert.deepEqual(await host.autoPark(Date.now() + 61 * 60_000), [a.id]);
+	host.idleParkMinutes = 0;
+
+	// A file locked by another live process cannot be resumed; a dead pid's lock is taken over.
+	fs.writeFileSync(lockPath(a.sessionFile), JSON.stringify({ pid: process.ppid, owner: "a terminal", startedAt: 1 }));
+	await assert.rejects(host.resume(a.id), /open in a terminal \(pid/);
+	assert.equal(host.options.registry.get(a.id).state, "parked", "a failed start stays retryable");
+	fs.writeFileSync(lockPath(a.sessionFile), JSON.stringify({ pid: 999999, owner: "dead", startedAt: 1 }));
+	await host.resume(a.id);
+	assert.equal(readLock(a.sessionFile).pid, process.pid);
+
+	// Two simultaneous starts on one file: exactly one wins.
+	await host.park(a.id);
+	const results = await Promise.allSettled([host.resume(a.id), host.resume(a.id)]);
+	assert.equal(host.live.size, 1);
+	assert.ok(results.some(r => r.status === "fulfilled"));
+	const tries = [0, 1, 2, 3].map(() => { try { return acquireLock(path.join(root, "x.jsonl"), "t", process.pid); } catch { return null; } });
+	assert.equal(tries.filter(Boolean).length, 1, "only one lock acquisition succeeds");
+	releaseLock(path.join(root, "x.jsonl"), tries.find(Boolean));
+
+	// Crash: the lock is released and the session is parked, retryable.
+	const crashed = new Promise(r => host.once("exit", (id, exit) => r(exit)));
+	host.live.get(a.id).rpc.process.kill();
+	assert.equal((await crashed).unexpected, true);
+	assert.equal(fs.existsSync(lockPath(a.sessionFile)), false);
+	assert.equal(host.options.registry.get(a.id).state, "parked");
+
+	// Hub shutdown remembers running sessions; restore starts them again (D17).
+	await host.resume(a.id);
+	const b = await host.create(folder, "2");
+	await host.park(b.id);
+	await host.shutdown();
+	assert.equal(host.live.size, 0);
+	const again = new SessionHost({ registry: new Registry(path.join(root, "data")), command: [process.execPath, fake] });
+	assert.deepEqual((await again.restoreRunning()).map(r => r.id), [a.id]);
+	await again.shutdown();
+	assert.deepEqual(fs.readdirSync(folder).filter(f => f.endsWith(".lock")), []);
+	console.log("sessions ok");
+} finally {
+	await host.shutdown().catch(() => {});
+	fs.rmSync(root, { recursive: true, force: true });
+}

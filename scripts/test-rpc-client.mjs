@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { RpcChild, stripAnsi } from "../src/rpc-client.ts";
 const fake = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
-const start = (flags = "") => new RpcChild({ cwd: process.cwd(), command: [process.execPath, fake], env: { FAKE_PI: flags } }).start();
+const start = (flags = "") => new RpcChild({ cwd: os.tmpdir(), command: [process.execPath, fake], env: { FAKE_PI: flags } }).start();
 
 // Split records, U+2028 and multi-byte text survive framing; ANSI is stripped from status text.
 {

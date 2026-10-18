@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import os from "node:os";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 const fake = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
-const child = spawn(process.execPath, [fake, "--mode", "rpc"], { stdio: "pipe" });
+const child = spawn(process.execPath, [fake, "--mode", "rpc"], { stdio: "pipe", cwd: os.tmpdir() });
 const lines = [];
 child.stdout.on("data", d => lines.push(...d.toString().split("\n").filter(Boolean).map(l => JSON.parse(l))));
 child.stdin.write(JSON.stringify({ id: "1", type: "prompt", message: "hi" }) + "\n");
