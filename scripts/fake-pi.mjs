@@ -29,7 +29,9 @@ async function handle(cmd) {
 		case "get_state": return reply({ model, thinkingLevel, isStreaming: streaming, isCompacting: false, sessionFile, sessionName, messageCount: messages.length, pendingMessageCount: 0 });
 		case "get_messages": return reply({ messages: flags.has("compacted") ? messages.slice(-3) : messages });
 		case "get_commands": return reply({ commands: flags.has("no-hub") ? [] : [{ name: "pi-hub", source: "extension" }] });
-		case "set_model": model = { provider: cmd.provider, id: cmd.modelId }; return reply(model);
+		case "get_available_models": return reply({ models: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }] });
+		case "get_session_stats": return reply({ sessionFile, contextUsage: { percent: 42 } });
+		case "set_model": model = { provider: cmd.provider, id: cmd.modelId, name: cmd.modelId }; return reply(model);
 		case "set_thinking_level": thinkingLevel = cmd.level; out({ type: "thinking_level_changed", level: cmd.level }); return reply();
 		case "abort": if (streaming) { streaming = false; out({ type: "agent_settled", aborted: true }); } return reply();
 		case "set_session_name": sessionName = cmd.name; return reply();
@@ -57,6 +59,8 @@ async function handle(cmd) {
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:result", statusText: JSON.stringify({ id: call.id, ...result }) });
 				}
 				// Mirrors ce-workflow plan3.ts publishHub(): `/state <json>` publishes pi-hub:state.
+				// Mirrors plan3.ts plan3:diagram-changed under the hub: `/diagram <json>` publishes pi-hub:diagram.
+				if (cmd.message.startsWith("/diagram ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:diagram", statusText: cmd.message.slice(9) });
 				if (cmd.message.startsWith("/state ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:state", statusText: cmd.message.slice(7) });
 				if (flags.has("slow-command")) await new Promise(r => setTimeout(r, 300));
 				return reply({ disposition: "handled" });

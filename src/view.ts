@@ -50,7 +50,9 @@ export class SessionView {
 		this.activity = createActivityMirror(pi, this.publish);
 	}
 
-	private readonly publish = (event: string, value: unknown) => {
+	readonly publish = (event: string, value: any) => {
+		// D11: no file watcher; the Files tab refreshes after tools that can change files.
+		if (event === "tool" && ["write", "edit", "bash"].includes(value?.name) && value.state !== "running") this.publish("files", {});
 		const frame = `id: ${++this.sequence}\nevent: ${event}\ndata: ${JSON.stringify(value)}\n\n`;
 		for (const client of this.clients) {
 			client.write(frame);

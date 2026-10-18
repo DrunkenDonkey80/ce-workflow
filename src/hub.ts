@@ -8,6 +8,7 @@ import path from "node:path";
 import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
+import { createPageApi } from "./api.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number };
@@ -19,15 +20,28 @@ export function readConfig(): HubConfig | undefined {
 	try { return JSON.parse(readFileSync(configPath(), "utf8")); } catch { return undefined; }
 }
 
-const MAX_BODY = 1_000_000;
-function body(request: http.IncomingMessage): Promise<any> {
+// CLI 1 MB; page JSON 64 KB and pasted images 20 MB, as ce-workflow's plan3-web.
+const MAX_BODY = 1_000_000, PAGE_BODY = 65_536, IMAGE_BODY = 20_000_000;
+function raw(request: http.IncomingMessage, limit: number): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
 		let size = 0; const chunks: Buffer[] = [];
-		request.on("data", (chunk: Buffer) => { size += chunk.length; if (size > MAX_BODY) { reject(Object.assign(new Error("Request too large."), { status: 413 })); request.destroy(); } else chunks.push(chunk); });
-		request.on("end", () => { try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {}); } catch { reject(Object.assign(new Error("Invalid JSON."), { status: 400 })); } });
+		const collect = (chunk: Buffer) => {
+			size += chunk.length;
+			if (size <= limit) return void chunks.push(chunk);
+			// Drain instead of destroying the socket, so the client still receives the 413.
+			request.off("data", collect); request.resume(); chunks.length = 0;
+			reject(Object.assign(new Error("Request too large."), { status: 413 }));
+		};
+		request.on("data", collect);
+		request.on("end", () => resolve(Buffer.concat(chunks)));
 		request.on("error", reject);
 	});
 }
+async function body(request: http.IncomingMessage, limit = MAX_BODY): Promise<any> {
+	const bytes = await raw(request, limit);
+	try { return bytes.length ? JSON.parse(bytes.toString("utf8")) : {}; } catch { throw Object.assign(new Error("Invalid JSON."), { status: 400 }); }
+}
+const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 const sameKey = (a: unknown, b: string) => typeof a === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 // H5-01: the browser app (copied from ce-workflow extensions/plan3-web) under /s/<session>/, all URLs relative to it.
@@ -89,14 +103,39 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		},
 	};
 
+	const pageApi = createPageApi({ host, registry, views });
 	const server = http.createServer(async (request, response) => {
-		const send = (status: number, value: unknown) => { response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); response.end(JSON.stringify(value ?? { ok: true })); };
+		const send = (status: number, value: unknown) => {
+			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection
+			response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); response.end(JSON.stringify(value ?? { ok: true }));
+		};
+		response.setHeader("X-Content-Type-Options", "nosniff");
+		response.setHeader("Referrer-Policy", "no-referrer");
+		response.setHeader("Content-Security-Policy", CSP);
 		try {
-			const url = new URL(request.url ?? "/", "http://127.0.0.1");
+			// Request checks kept from ce-workflow plan3-web (H5-03): the Host stops DNS rebinding, the Origin cross-site posts.
+			if ((request.url ?? "").length > 2048) return send(414, { error: "Request URL too long." });
+			const hostName = request.headers.host ?? "";
+			if (![`127.0.0.1:${config.port}`, `localhost:${config.port}`].includes(hostName)) return send(403, { error: "Foreign Host rejected." });
+			const origin = request.headers.origin;
+			if (origin !== undefined && origin !== `http://${hostName}`) return send(403, { error: "Foreign Origin rejected." });
+			const url = new URL(request.url ?? "/", `http://${hostName}`);
 			// The CLI sends x-hub-key; the browser app sends the same key as a Bearer token or ?token= (its page carries it).
 			const keys = [request.headers["x-hub-key"], request.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")];
 			if (!keys.some(key => sameKey(key, config.localKey))) return send(401, { error: "Missing or wrong hub key." });
+			// Browsers always send an Origin on POST; only the CLI posts without one, and it sends x-hub-key.
+			if (request.method === "POST" && origin === undefined && !sameKey(request.headers["x-hub-key"], config.localKey)) return send(403, { error: "Missing Origin rejected." });
 			const page = /^\/s\/([0-9a-f-]{36})(\/.*)?$/.exec(url.pathname);
+			const endpoint = page && /^\/api\/([a-z]+)$/.exec(page[2] ?? "")?.[1];
+			if (page && endpoint && request.method === "POST") {
+				if (!registry.get(page[1])) return send(404, { error: "Unknown session." });
+				if (endpoint === "paste") return send(200, { path: await pageApi.saveImage(await raw(request, IMAGE_BODY)) });
+				// A JSON content type needs a CORS preflight, which this server never grants.
+				if (request.headers["content-type"]?.split(";")[0].trim() !== "application/json") return send(415, { error: "JSON content type required." });
+				const data = await body(request, PAGE_BODY);
+				if (!data || typeof data !== "object" || Array.isArray(data)) return send(400, { error: "Expected a JSON object." });
+				return send(200, await pageApi.post(page[1], endpoint, data));
+			}
 			if (page && request.method === "GET") {
 				if (!registry.get(page[1])) return send(404, { error: "Unknown session." });
 				if (!page[2]) { response.writeHead(301, { location: `/s/${page[1]}/${url.search}` }); return response.end(); }
@@ -111,14 +150,15 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 				}
 				if (asset) return send(404, { error: asset[1] === BUILD ? "Unknown asset." : "Stale build; reload the page." });
 				// H5-02: the session view.
-				const api = /^\/api\/(events|snapshot|rows|row)$/.exec(page[2]);
-				if (api) {
+				if (["events", "snapshot", "rows", "row"].includes(endpoint ?? "")) {
 					const sessionView = await view(page[1]);
-					if (api[1] === "events") return sessionView.attach(response);
-					if (api[1] === "snapshot") return send(200, sessionView.snapshot());
-					if (api[1] === "rows") return send(200, await sessionView.page(url.searchParams.get("before") ?? undefined));
-					return send(200, await sessionView.row(url.searchParams.get("id") ?? ""));
+					if (endpoint === "rows") return send(200, await sessionView.page(url.searchParams.get("before") ?? undefined));
+					if (endpoint === "row") return send(200, await sessionView.row(url.searchParams.get("id") ?? ""));
+					const extras = { ...await pageApi.extras(page[1], url.searchParams.get("target")), build: BUILD };
+					return endpoint === "events" ? sessionView.attach(response, extras) : send(200, sessionView.snapshot(extras));
 				}
+				// H5-03: the rest of the page API.
+				if (endpoint) { const value = await pageApi.get(page[1], endpoint, url.searchParams, response); return value === undefined ? undefined : send(200, value); }
 			}
 			for (const [route, handler] of Object.entries(routes)) {
 				const [method, pattern] = route.split(" ");

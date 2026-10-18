@@ -68,6 +68,8 @@ try {
 	assert.deepEqual(await host.call(a.id, "/api/fail", {}), { ok: false, status: 404, error: "Displayed plan no longer exists." });
 	const both = await Promise.all([host.call(a.id, "/api/bias", { level: 1 }), host.call(a.id, "/api/bias", { level: 2 })]);
 	assert.deepEqual(both.map(result => result.value.data.level), [1, 2], "concurrent calls are matched by id");
+	// A call resolves on its pi-hub:result; the command's own response (which ends "command running") may trail it.
+	for (let i = 0; i < 100 && host.busyReasons(a.id).length; i++) await new Promise(r => setTimeout(r, 10));
 	assert.deepEqual(host.busyReasons(a.id), []);
 	await assert.rejects(host.call("00000000-0000-0000-0000-000000000000", "/api/bias", {}), /parked/);
 
