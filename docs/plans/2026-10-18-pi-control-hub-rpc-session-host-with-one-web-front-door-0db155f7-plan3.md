@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-18
-updated: 2026-10-18T18:47:44.697Z
+updated: 2026-10-18T19:01:30.668Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -154,14 +154,14 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 
 ### Phase 6: Remote access [code]
 
-- [wip] **H6-01** Move devices, pairing and `tailscale serve` into the hub: one port, Tailscale login check, never Funnel.
-- [ ] **H6-02** Import existing paired devices from `<agent dir>/ce-workflow/remote/devices.json` so the phone stays paired.
-- [ ] **H6-03** Device approval on the local hub page (D19), and revoking devices from the hub page.
-- [ ] **H6-04** Start the hub at Windows logon (scheduled task or Startup entry), hidden, with a log file.
+- [x] **H6-01** Hub src/remote.ts (devices, pairing, tailscale serve); hub.ts remote mode by Host (owner login + pi_remote cookie, local key never remote, session pages only), local /api/remote|pairing|devices, `pi-hub remote on|off`; hub 'H6-01' commit.
+- [x] **H6-02** At start the hub adopts unexpired devices from <agent dir>/ce-workflow/remote/devices.json once (only while its own devices.json is missing; corrupt old file is skipped and reported); hub 23586b0.
+- [x] **H6-03** Local session pages poll the hub's pairing and show an Approve/Reject dialog with the device and code (Escape rejects); a Devices button in the session bar lists paired devices, the remote address, and Revoke; `pi-hub open` opens with the key; hub 5bf259c.
+- [x] **H6-04** `pi-hub autostart on|off|status` writes the per-user Run value `conhost.exe --headless node cli.ts start` (no admin; detached hub with windowsHide, log in <data>/hub.log); hub 1be0110. Real logon not exercised.
 
 ### Phase 7: Open in terminal [code]
 
-- [ ] **H7-01** "Open in terminal": park, open `pi --session <file>` in a plain window (D20), mark the session as in terminal, take it back when that Pi exits.
+- [wip] **H7-01** "Open in terminal": park, open `pi --session <file>` in a plain window (D20), mark the session as in terminal, take it back when that Pi exits.
   - The hub keeps the session lock during the handoff (D9) and watches the Pi process itself, not the window launcher.
 
 ### Phase 8: Live acceptance [think]
