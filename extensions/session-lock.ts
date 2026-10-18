@@ -15,9 +15,9 @@ function readLock(file: string): LockInfo | undefined {
 }
 
 /** Take the lock, or return the live holder. A lock whose pid is dead is taken over. */
-export function takeSessionLock(sessionFile: string): { info?: LockInfo; holder?: LockInfo } {
+export function takeSessionLock(sessionFile: string, owner = "pi terminal"): { info?: LockInfo; holder?: LockInfo } {
 	const file = lockPath(sessionFile);
-	const info = { pid: process.pid, owner: "pi terminal", startedAt: Date.now() };
+	const info = { pid: process.pid, owner, startedAt: Date.now() };
 	for (let attempt = 0; attempt < 3; attempt++) {
 		try { writeFileSync(file, JSON.stringify(info), { flag: "wx" }); return { info }; }
 		catch (error: any) { if (error?.code !== "EEXIST") throw error; }

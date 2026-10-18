@@ -7,14 +7,28 @@ import { isIP } from "node:net";
 import { canonicalDesignJson, hashDesignValue, inspectUserDesignReference, validateDesignHandoff, writeConfinedDesignArtifact, renderOpenDesignGenerationPrompt, renderDesignRepairPrompt, renderDesignRevisionPrompt, normalizeRemoteFingerprint } from "./work-design.ts";
 import { callOpenDesignTool, normalizeOpenDesignCommandSpec, reconcileCreatedProject, openDesignPayloadDigest, validateStartRecovery, redactOpenDesignText, normalizeOpenDesignUrl, validateOpenDesignToolCall } from "./opendesign-client.ts";
 import { nativeExportClient, nativeFileName, nativeFileHash, inspectNativeExport } from "./plan3-native-export.ts";
+import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 
 type Plan = { id: string; file: string; title?: string };
 const queues = new Map<string, Promise<unknown>>();
 export async function withPlanDesignLock<T>(file: string, change: () => T | Promise<T>): Promise<T> {
 	const key = path.resolve(file).toLowerCase();
-	const next = (queues.get(key) ?? Promise.resolve()).catch(() => {}).then(change);
+	const next = (queues.get(key) ?? Promise.resolve()).catch(() => {}).then(() => acrossProcesses(key, change));
 	queues.set(key, next);
 	try { return await next; } finally { if (queues.get(key) === next) queues.delete(key); }
+}
+// pi-control-hub and Pi sessions save the same plans and diagrams: the in-memory queue covers one process, a lock file in temp covers the rest.
+async function acrossProcesses<T>(key: string, change: () => T | Promise<T>): Promise<T> {
+	const dir = path.join(os.tmpdir(), "plan3-locks");
+	fs.mkdirSync(dir, { recursive: true });
+	const base = path.join(dir, crypto.createHash("sha256").update(key).digest("hex").slice(0, 32));
+	const deadline = Date.now() + 10_000;
+	let lock;
+	while (!(lock = takeSessionLock(base, "plan3").info)) {
+		if (Date.now() > deadline) throw new Error("The plan or diagram is being saved by another process; try again.");
+		await new Promise(resolve => setTimeout(resolve, 20));
+	}
+	try { return await change(); } finally { releaseSessionLock(base, lock); }
 }
 const transitions = {
 	brief: ["pending", "abandoned"], pending: ["clarification", "review", "failed", "abandoned"],
