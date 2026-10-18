@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-18
-updated: 2026-10-18T16:42:58.218Z
+updated: 2026-10-18T16:52:30.330Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -120,18 +120,11 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 
 ### Phase 2: Hub core [code]
 
-- [ ] **H2-01** Set up the hub package: `package.json` (type module, Node 24), `npm test` running `scripts/test-*.mjs`, and a fake Pi that speaks RPC.
-- [ ] **H2-02** RPC client: spawn, LF-only JSONL, request ids, events, extension UI requests, stderr capture, exit and crash handling.
-  - Spawn per F1; never wait on extension command responses in order (F6); cache the model list (F5); strip ANSI from status text (F9).
-  - Test with the fake Pi: split records, U+2028 inside strings, out-of-order responses, child crash mid-request.
-- [ ] **H2-03** Session registry: id, name, folder, session file, starred, state (running, parked, in terminal); atomic saves in the hub data folder.
-  - Recents per D18: Pi session files from the last 30 days that are not in a group; read only each file's first line and name entries.
-  - Star moves a session into its folder group with a name; unstar removes it from the group.
-- [ ] **H2-04** Lifecycle: new, resume, park (D15), rename, restart (D12), automatic parking (D16), session lock files (D9).
-  - Test two simultaneous starts on one file (exactly one wins), a stale lock from a dead pid, and a lock released only after exit.
-  - Test: park and resume keep the same file; a failed start stays retryable; no session file is ever deleted or rewritten by the hub.
-- [ ] **H2-05** Hub entry and command line: start in the background, stop, status, open the local page; one running hub only.
-  - Hub restart behaviour per D17.
+- [x] **H2-01** Hub package (type module, Node ≥24, `npm test` = node --test scripts/test-*.mjs) with scripts/fake-pi.mjs speaking RPC; committed d-hub H2-01.
+- [x] **H2-02** src/rpc-client.ts RpcChild: node+launcher spawn, byte-level LF framing, id-correlated sends, ui/event emitters, ANSI-stripped status, cached model list, crash rejects pending, stdin-close stop with kill fallback.
+- [x] **H2-03** src/registry.ts: atomic sessions.json registry (membership = star per D18, no separate field), folder groups, Recents scan (30 days, top-level files, header + latest session_info via byte search, cached), star/unstar keeps files.
+- [x] **H2-04** src/sessions.ts SessionHost (create/resume/park/rename/restart/autoPark/shutdown/restoreRunning, busy reasons) and src/session-lock.ts (atomic wx lock, stale-pid takeover with move-aside, release only by owner after child exit).
+- [x] **H2-05** src/hub.ts (single hub via hub.lock, fixed saved port + local key, key-guarded JSON API, busy-refused stop, D17 restore, auto-park timer) and src/cli.ts pi-hub start (detached, log to hub.log)/stop [--force]/restart/status/open.
 
 ### Phase 3: Hub channel in ce-workflow [think]
 
@@ -240,7 +233,7 @@ Phase 1 (2026-10-18, Pi 1.2.0, Node 24.14; scratch scripts in `%TEMP%\pi-hub-h1\
 
 ## Resume context
 
-Draft, nothing implemented. Questions resolved as D14 to D21. Review by plan3-advisor (GPT-6 Astra) is done: all 6 findings were accepted and applied (session lock files in D9, a cross-process diagram lock, editor cancellation, hub-to-Pi calls H3-09, all prompt call sites in H3-08, night recovery H3-10). The hub repo has a README pointing to this plan (uncommitted) at commit 6e1d4a6. Next: H1-01, a scratch RPC script in the research temp folder. The user runs /plan3 finish to make the plan ready.
+Active, 9/36. Phase 2 (H2-01..05) done in pi-control-hub HEAD a9dd0c9: rpc-client, registry, session-lock, sessions (SessionHost), hub.ts (local API on fixed port, x-hub-key), cli.ts. npm test = 5 files pass. Next: H3-01. Real hub data dir ~/.pi/agent/pi-control-hub was removed after the smoke test, so the next start picks a new port. No blockers.
 
 ## Amendments
 
