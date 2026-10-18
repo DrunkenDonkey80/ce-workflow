@@ -923,6 +923,14 @@ try {
 			assert.deepEqual([results.at(-1).id, results.at(-1).ok, results.at(-1).status], ["c2", false, 404]);
 			await run("pi-hub", JSON.stringify({ id: "c3", endpoint: "/api/answer", data: {} }));
 			assert.deepEqual(results.at(-1), { id: "c3", ok: false, status: 400, error: "Unknown hub call." }, "only the fixed list");
+			// H5-03: reads only Pi can answer, and chat messages for the browser's plan.
+			await run("pi-hub", JSON.stringify({ id: "c4", endpoint: "/api/usage", data: {} }));
+			assert.deepEqual([results.at(-1).ok, Array.isArray(results.at(-1).value.summary)], [true, true]);
+			await run("pi-hub", JSON.stringify({ id: "c5", endpoint: "/api/commands", data: {} }));
+			assert(results.at(-1).ok && JSON.stringify(results.at(-1).value).includes("reload"));
+			await run("pi-hub", JSON.stringify({ id: "c6", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "hello from the hub" } }));
+			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
+			assert(JSON.stringify(messages.at(-1)).includes("hello from the hub"));
 			const count = results.length;
 			await run("pi-hub", "not json");
 			assert.equal(results.length, count, "no id, no reply");

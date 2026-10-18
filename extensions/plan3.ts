@@ -790,6 +790,8 @@ export default function plan3(pi) {
 	let dialogs = createDialogBridge(pi, publishWeb);
 	const activity = createActivityMirror(pi, publishWeb);
 	const disposeDiagram = pi.events.on("plan3:diagram-changed", async event => {
+		// H5-03: the hub reads the diagram file itself; it only needs to know which one changed.
+		if (hubCtx && event.cwd === hubCtx.cwd) try { hubPublish(hubCtx.ui, "diagram", { target: event.target.kind === "product" ? "product" : event.target.plan.id, revision: event.revision }); } catch { hubCtx = null; }
 		if (!webCtx || event.cwd !== webCtx.cwd) return;
 		try {
 			const target: WebTarget = event.target.kind === "product" ? { kind: "product" } : { kind: "plan", id: event.target.plan.id };
@@ -2185,7 +2187,9 @@ export default function plan3(pi) {
 	pi.registerCommand("plans3", commands.plans3);
 	pi.registerCommand("resume3", commands.resume3);
 	// H3-09: the hub calls the page's plan operations with the browser's chosen plan; the result comes back by id as pi-hub:result.
-	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move"]);
+	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move", "/api/message"]);
+	// H5-03: what only this Pi knows (scoped models, work-models usage and command lists).
+	const HUB_READS = new Set(["/api/models", "/api/usage", "/api/commands"]);
 	if (hubActive()) pi.registerCommand("pi-hub", {
 		description: "Internal: pi-control-hub calls (only present when the hub started this Pi)",
 		handler: async (args, ctx) => {
@@ -2193,9 +2197,9 @@ export default function plan3(pi) {
 			try { call = JSON.parse(args); } catch { call = undefined; }
 			if (typeof call?.id !== "string" || !call.id) return; // nobody to answer
 			const reply = (result) => hubPublish(ctx.ui, "result", { id: call.id, ...result });
-			if (!HUB_CALLS.has(call.endpoint) || !call.data || typeof call.data !== "object" || Array.isArray(call.data)) return reply({ ok: false, status: 400, error: "Unknown hub call." });
+			if (!HUB_CALLS.has(call.endpoint) && !HUB_READS.has(call.endpoint) || !call.data || typeof call.data !== "object" || Array.isArray(call.data)) return reply({ ok: false, status: 400, error: "Unknown hub call." });
 			webCtx = ctx; // the hub has no web server; postWeb and resolveWebTarget read this session's context
-			try { reply({ ok: true, value: await postWeb(call.endpoint, call.data) }); }
+			try { reply({ ok: true, value: HUB_READS.has(call.endpoint) ? await readWeb(call.endpoint, new URLSearchParams()) : await postWeb(call.endpoint, call.data) }); }
 			catch (error) { reply({ ok: false, status: error.status ?? 500, error: error.message }); }
 		},
 	});
