@@ -1289,7 +1289,7 @@ try {
 		const sent = await post("message", { text: "Discuss @api", comments: [edited.notes[0].id] });
 		assert.equal(sent.status, 200); assert.deepEqual(sent.body.mentions, ["api"]);
 		assert(messages.at(-1).message.includes(`Architecture workspace (${b})`)); assert(messages.at(-1).message.includes("Keep this boundary"));
-		idle = false; assert.equal((await post("message", { text: "Follow up" })).body.queued, true); assert.equal(messages.at(-1).options.deliverAs, "followUp"); idle = true;
+		idle = false; assert.equal((await post("message", { text: "Follow up" })).body.queued, true); assert.equal(messages.at(-1).options.deliverAs, "steer"); idle = true;
 		assert.equal((await post("move", { expectedRevision: 3, entity: "edge", id: "api", x: 0, y: 0 })).status, 400);
 		// The web Delete removes an open plan and its diagram.
 		const dFile = path.join(plansDir, "2026-10-13-d-d4444444-plan3.md"), dDiagram = dFile.replace(/\.md$/, ".diagram.json");

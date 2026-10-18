@@ -38,7 +38,8 @@ export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagra
 	if (name === "reload") prepared.message = "/wo reload";
 	const queued = !ctx.isIdle();
 	try {
-		const pending = pi.sendUserMessage(prepared.message, { expandPromptTemplates: command, ...(queued ? { deliverAs: "followUp" } : {}) });
+		// Like Enter in the terminal: a message sent while the agent works steers it (delivered after the current tool calls).
+		const pending = pi.sendUserMessage(prepared.message, { expandPromptTemplates: command, ...(queued ? { deliverAs: "steer" } : {}) });
 		// SDK declaration says void, but live probe found a promise that settles only after the run.
 		void Promise.resolve(pending).catch(error => publish("error", { message: `Message not delivered: ${error instanceof Error ? error.message : String(error)}` }));
 	} catch (error) {

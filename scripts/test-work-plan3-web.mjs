@@ -44,7 +44,7 @@ assert.equal(submitted.at(-1).message, "/wo reload", "web /reload runs the exten
 assert.throws(() => forwardDiagramChat(sendApi, { isIdle: () => true }, contextDiagram, "/model other", [], () => {}), /terminal only/);
 const queued = forwardDiagramChat(sendApi, { isIdle: () => false }, contextDiagram, "Edit @api", [], (event, value) => deliveryErrors.push({ event, value }));
 assert(queued.queued, "busy send returns immediately, never awaits the model run");
-assert.equal(submitted.at(-1).options.deliverAs, "followUp");
+assert.equal(submitted.at(-1).options.deliverAs, "steer");
 assert.equal(submitted.at(-1).options.expandPromptTemplates, false);
 forwardDiagramChat(sendApi, { isIdle: () => true }, contextDiagram, "Edit @api", [], () => {});
 assert.equal(submitted.at(-1).options.deliverAs, undefined);
