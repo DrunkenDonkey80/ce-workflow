@@ -2,6 +2,8 @@
 // Minimal stand-in for `pi --mode rpc` used by hub tests. Speaks LF-delimited JSONL on stdin/stdout.
 // Behaviour switches come from FAKE_PI (comma list): "crash-on-prompt", "slow-command", "split-output", "no-hub",
 // "compacted" (get_messages returns only the last 3 messages, like after a compaction, F3).
+// FAKE_PI_HUB_URL: /pi-hub calls are POSTed there as {endpoint, data} and its {ok, value | status, error} is the answer.
+// `/hubask [ms] [json]`: a channel ask with that ask_user data (default {q:"?"}).
 import crypto from "node:crypto";
 import fs from "node:fs";
 const flags = new Set((process.env.FAKE_PI ?? "").split(",").filter(Boolean));
@@ -42,11 +44,12 @@ async function handle(cmd) {
 				if (cmd.message.startsWith("/ask")) { const value = await ui("input", { title: "pi-hub:ask", placeholder: cmd.message.slice(5) }); out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "notify", message: `answer:${value ?? "<cancelled>"}` }); }
 				if (cmd.message.startsWith("/hubask")) {
 					// Mirrors ce-workflow hub-channel.ts ask(): marker input, JSON placeholder, Pi-side timeout, then `closed`.
-					const askId = crypto.randomUUID(), ms = Number(cmd.message.slice(8)) || 0;
+					const [, delay, json] = /^\/hubask ?(\d*) ?(.*)$/s.exec(cmd.message);
+					const askId = crypto.randomUUID(), ms = Number(delay) || 0, data = json ? JSON.parse(json) : { q: "?" };
 					const requestId = crypto.randomUUID();
 					const value = await new Promise(resolve => {
 						pendingUi.set(requestId, resolve);
-						out({ type: "extension_ui_request", id: requestId, method: "input", title: "pi-hub:ask", placeholder: JSON.stringify({ id: askId, data: { q: "?" } }), timeout: ms || undefined });
+						out({ type: "extension_ui_request", id: requestId, method: "input", title: "pi-hub:ask", placeholder: JSON.stringify({ id: askId, data }), timeout: ms || undefined });
 						if (ms) setTimeout(() => { pendingUi.delete(requestId); resolve(undefined); }, ms);
 					});
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:closed", statusText: JSON.stringify({ id: askId }) });
@@ -55,7 +58,8 @@ async function handle(cmd) {
 				// Mirrors ce-workflow plan3.ts /pi-hub: answers by id; "/api/fail" errors, anything else echoes.
 				if (cmd.message.startsWith("/pi-hub ")) {
 					const call = JSON.parse(cmd.message.slice(8));
-					const result = call.endpoint === "/api/fail" ? { ok: false, status: 404, error: "Displayed plan no longer exists." } : { ok: true, value: { endpoint: call.endpoint, data: call.data } };
+					const result = process.env.FAKE_PI_HUB_URL ? await (await fetch(process.env.FAKE_PI_HUB_URL, { method: "POST", body: JSON.stringify({ endpoint: call.endpoint, data: call.data }) })).json()
+						: call.endpoint === "/api/fail" ? { ok: false, status: 404, error: "Displayed plan no longer exists." } : { ok: true, value: { endpoint: call.endpoint, data: call.data } };
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:result", statusText: JSON.stringify({ id: call.id, ...result }) });
 				}
 				// Mirrors ce-workflow plan3.ts publishHub(): `/state <json>` publishes pi-hub:state.
