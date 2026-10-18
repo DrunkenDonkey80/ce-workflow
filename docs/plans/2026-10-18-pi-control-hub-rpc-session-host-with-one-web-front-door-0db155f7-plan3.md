@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-18
-updated: 2026-10-18T16:55:21.555Z
+updated: 2026-10-18T18:05:46.201Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -129,40 +129,26 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 ### Phase 3: Hub channel in ce-workflow [think]
 
 - [x] **H3-01** ce-workflow extensions/hub-channel.ts (ask via marker input + JSON placeholder, always publishes `closed`; publish via pi-hub:<kind> setStatus; inert without PI_HUB). Hub sessions.ts drops forms on `closed` and lists pendingDialogs for reconnects.
-- [ ] **H3-06** Extend ask_user for menus: search box for long lists, current item marked, submenus where Esc goes back, checklists that toggle in place.
-  - Also a multi-line text answer with pre-filled text (night mode rules), and the model picker's Tab switch between scoped and all models.
-- [ ] **H3-07** Add ask_user's compact view for simple prompts with only a few actions and nothing else to say: one line in the terminal, a small card in the web.
-- [ ] **H3-08** Move every work-dialogs.ts menu and confirm onto ask_user, delete the separate overlay, and point the AGENTS.md Dialog UX Rule at ask_user.
-  - Every ce-workflow prompt, not only `work-dialogs.ts` users: direct `ctx.ui` calls in `plan3-night.ts:96` (editor), `work-models.ts:1014`, `:2711`, `:4301`, `:4513` and `jev-tools.ts:555` (confirm, input, editor). Re-check with a search before deleting.
-  - Update `scripts/test-work-dialogs.mjs`, `scripts/test-work-ask-user.mjs`, `scripts/test-work-ask-remote.mjs` and the source list in `scripts/test-work-plan3-types.mjs` in this step, before the module goes.
-- [ ] **H3-02** ask_user sends its full `ask:pending` payload through the channel and applies the answer; without the hub nothing changes.
-  - Include several questions, comments, recommended options and image paths. The intercom path in `work-ask-remote.ts` stays.
-- [ ] **H3-03** Every ask_user prompt, menus included (D21), goes through the channel; answers and Esc-back come back the same way.
-  - Include TUI-only offers that should also reach hub sessions: "Compact before sending?" returns early outside the terminal today (`work-models.ts:offerColdCacheCompact`).
-- [ ] **H3-04** Publish what only Pi knows: subagent runs, current plan and phase bias, research and night mode, compaction.
-- [ ] **H3-09** Hub-to-Pi calls: a hidden `/pi-hub <json>` command (only with PI_HUB) runs plan commands on a chosen plan, bias and Generate; results come back by id.
-  - Today `/api/command` passes the browser's selected plan separately (`plan3.ts` around line 845); a typed `/plan3 review` would use the session's current plan instead. Bias and Generate call internal functions.
-  - Inputs validated against a fixed list of operations; no model turn unless the operation itself starts one. Test: plan B chosen in the browser while the session's current plan is A, and an error coming back to the browser.
-- [ ] **H3-10** Night mode after a hub restart: a restarted session with night mode on and not paused or complete starts its next turn once, keeping retry backoff.
-  - `night.restore()` only restores flags, banner and keep-awake (`plan3-night.ts` around line 181), and the retry timer dies with the process. The hub marks restarts with `PI_HUB_RESTARTED=1`.
-  - Test: restart after an interrupted turn and during retry backoff; paused and complete night sessions stay quiet; no double continuation.
-- [ ] **H3-05** With `PI_HUB=1`, ce-workflow starts no web server and no automatic re-share; every Pi takes the session lock at start (D9).
-  - Check: `node scripts/test-work-plan3-web.mjs` and `node scripts/test-work-plan3-types.mjs`, plus a channel test with a stubbed UI.
+- [x] **H3-06** ask_user now owns its menu view: the list dialog moved verbatim into extensions/ask-user/menu.ts. Search, current item, Esc back with remembered cursor, checklists that toggle in place and the Tab scope switch already existed, in both the terminal view and the web form for the `list` payload. The multi-line pre-filled answer already exists as ask_user initialText. work-dialogs.ts re-exports the view until H3-08.
+- [x] **H3-07** ask_user compact view: `compact: true` list prompts render as one terminal line ([ Yes ]  No, ←/→/Tab, Enter, Esc, unique letter hotkeys; long text wraps above the actions) and as a small web card (dialog.compact); askConfirm() helper for H3-08; `compact` carried in the list payload.
+- [x] **H3-08** work-dialogs.ts is deleted. Every importer now uses extensions/ask-user/menu.ts, which also holds showAskDialog. The tree workspace dialog was deleted rather than ported, because nothing has used it since 272a42e. Every direct ctx.ui.confirm/input/editor call (work-models ×6, jev-tools, plan3-night, plan3 ×2) now goes through askConfirm (compact Yes/No) or askText (an ask_user free-text answer; it falls back to Pi's own editor when ask_user isn't loaded). The AGENTS.md Dialog UX Rule now points at ask_user.
+- [x] **H3-02** raceRemoteAsk takes an optional hub ui. Under PI_HUB the local run becomes a hub-channel ask carrying the full ask:pending payload (questions/batches, context, options, comments, initialText, same askId), and the answer is decoded by the same remoteResponse/remoteBatch validators. ask:pending still fires, so intercom and the web still race, and the hub form is withdrawn when they win. Without PI_HUB nothing changes.
+- [x] **H3-03** Under PI_HUB, showListDialog (and so askConfirm and every /wo and night menu) sends listSubject(options), the same `list` payload the web form draws, through the hub channel and decodes the answer with listDialogResponse: select, Esc-back, checklist values and tab. terminalOnly approvals (camera consent, pairing) are refused and never reach the hub. Free-text prompts already go through ask_user (H3-02). No direct ctx.ui select/confirm/input/editor calls remain outside ask-user/.
+- [x] **H3-04** Under PI_HUB, plan3.ts publishHub() sends pi-hub:state { plan (webPlan: title, progress, focus, bias, planning/finishable), modes (research/night), compacting, subagents } whenever it changes: on plan refresh, activity and mode changes. The hub keeps the latest per session in live.published, shows it as `state` in /api/status, and counts running subagents or extension compaction as busy, so the session is not parked.
+- [x] **H3-09** ce-workflow registers a hidden /pi-hub <json> command only when PI_HUB=1. It runs the page's own postWeb for a fixed list of operations (command, bias, generate, edit, comment, move) on the browser's chosen plan and answers {id, ok, value | status, error} as pi-hub:result. Unknown ids are now 404 (the fix also applies to the page). The hub's host.call() sends it, resolves by call id without waiting for the command's own response (F6), and refuses Pis without /pi-hub (get_commands check, cached), so a call never becomes a model prompt.
+- [x] **H3-10** plan3-night.ts: an error settle now saves retryAt (the 30-minute backoff deadline) in the night entry, and the next good settle clears it. restore() under PI_HUB, for an active night (not paused or complete) with the session idle, starts the next turn once after the remaining backoff (at once if none or expired). Terminal restarts and /reload are unchanged.
+- [x] **H3-05** Under PI_HUB, getWeb refuses ("pi-control-hub serves this session's workspace"), so /wo share and /plan3 diagram start no server, and session_start skips the automatic re-share. A terminal Pi (no PI_HUB) takes the D9 lock `<session file>.lock` in session_start, using the hub's format via the new extensions/session-lock.ts (keeps its own lock across /reload, takes over dead holders). If a live holder has it, the Pi shows who holds it and shuts down. The lock is released at session_shutdown. Child Pis under the hub take no lock, because the hub holds it.
 
 ### Phase 4: Shared modules [code]
 
-- [ ] **H4-01** Make the code the hub reuses importable without Pi, per D14: plan reading out of `plan3.ts`, diagram model, project files, usage reader.
-  - No behaviour change in ce-workflow; its existing tests must pass unchanged.
-  - Diagram saves must lock across processes: `withPlanDesignLock` (`plan3-design.ts`) is only an in-memory queue, so the hub and a Pi could both accept the same revision. Wrap the revision check and write in a lock file; test two processes saving at once.
+- [x] **H4-01** No code had to move: plan3.ts (listPlans, currentPlan), plan3-diagram.ts, plan3-design.ts and plan3-files.ts already import with plain Node and resolve no Pi package, and a guard test now enforces that. withPlanDesignLock adds a cross-process lock file (%TEMP%/plan3-locks/<sha>, D9 format through session-lock.ts, 10 s timeout, dead-holder takeover) under the in-memory queue. Usage stays Pi-side: it is live quota state, reached through wo:web-info, and goes to the hub through a /pi-hub read in H5-03.
 
 ### Phase 5: Hub web server and app [code]
 
-- [ ] **H5-01** Move the browser app into `web/` and serve it from the hub under `/s/<session>/` with relative URLs.
-- [ ] **H5-02** Session view: chat history from the hub's buffer and `get_messages`, live SSE from RPC events, paging and reconnect as today.
-  - Older chat than the last compaction comes from the session JSONL, read-only (F3); never forward the stored system message (F4).
-- [ ] **H5-03** Map every endpoint in the inventory to RPC commands, the hub channel or the shared modules; keep the request checks and size limits.
-  - Write the mapping as a table in Findings first: each endpoint, what serves it (RPC command, hub call from H3-09, shared module or hub-only), and its test.
-- [ ] **H5-04** One form for every prompt (D21): draw ask_user data, including menus and the compact view; convert plain RPC dialogs into it.
+- [x] **H5-01** The browser app is copied into pi-control-hub web/ (see Amendments: ce-workflow's copy stays frozen until H9-01). Every request is now relative (api/…, a/<build>/…). hub.ts serves /s/<session>/ (301 from a URL without the trailing slash, 404 for an unknown session) and a/<build>/<file> assets: TypeScript stripped, __TOKEN__/__BUILD__ filled, immutable cache, a stale build gets 404. Auth accepts x-hub-key, a Bearer token or ?token= with the local key. The API under /s/<id>/api/ (H5-03) and the port-based session switcher (H5-05) are not done yet.
+- [x] **H5-02** The new hub src/view.ts runs ce-workflow's own createChatMirror and createActivityMirror, reached through the `file:../ce-workflow` dependency (D14), on RPC events. compaction_start/end are mapped to the compact hooks and queue_update to input events. /s/<id>/api/events sends a snapshot frame (checkIn) and then live delta/tool/activity/thinking frames; a reconnect gets a fresh snapshot. Chat history: get_messages for a live session, the JSONL branch for a parked one, which is not resumed. rows?before= pages the buffer and then the file's current branch (F3); row?id= also finds rows that are only in the file. A system message never reaches a page (F4). Open pages count as viewers for D16. Also: startHub now creates its own data folder. Dialogs in the snapshot (H5-04) and plan/status extras (H5-03) are not included yet.
+- [x] **H5-03** Page API in hub src/api.ts: plans/diagram/files/image read from the folder (work parked), paste, dialog+answer for channel asks, model/effort/stop via RPC, /reload = restart, the rest as /pi-hub calls/reads; plan3-web request checks (Host, Origin, JSON, size, URL length, CSP/nosniff/no-referrer) in hub.ts. Hub 163674f, ce-workflow f9d2673.
+- [wip] **H5-04** One form for every prompt (D21): draw ask_user data, including menus and the compact view; convert plain RPC dialogs into it.
   - Move `prompts.ts` logic; keep image paste, comments and the first-answer-wins rule.
 - [ ] **H5-05** Session list grouped by folder with state colours, New, Rename, Park, Resume, Reload, and keyboard shortcuts in the web (D5).
   - Recents group closed by default, with Star and Unstar (D18). Page title: folder, session name and current plan (no herdr tab name).
@@ -228,10 +214,36 @@ Phase 1 (2026-10-18, Pi 1.2.0, Node 24.14; scratch scripts in `%TEMP%\pi-hub-h1\
 - F8 `input`, `select` and `confirm` accept a signal and timeout and remove their pending request inside Pi on abort; `editor` cannot (`rpc-mode.js` `createDialogPromise`). A late hub answer to an aborted request is ignored without error. Pi does not tell the hub that a request was dropped.
 - F9 ce-workflow in RPC: `/plan3`, `/wo` and `/research` run. `/wo` arrives as one `select` whose options are strings like "● Settings — description", so structure is lost (fixed by D21 and H3-03). ask_user arrives as `select` followed by an "Optional comment" `input`, and cancelling that input cancels the whole answer. Status texts can carry ANSI colour codes (ponytail). Start-up sends 53 `setStatus`, 18 `setWidget` and 6 `notify`.
 - F10 D7 stands: the hub's own JSONL client was about 40 lines in the scratch scripts and must answer `extension_ui_request` itself.
+### H5-03 endpoint map
+
+All under `/s/<session>/api/`. "Hub call" = `host.call` → ce-workflow `/pi-hub` → `postWeb`/`readWeb` (H3-09); live session only. Shared modules are read in the hub against the session folder, so they also work for parked sessions.
+
+| Endpoint | Served by | Test |
+|---|---|---|
+| GET events, snapshot, rows, row | hub `SessionView` (H5-02); snapshot extras target/current/status/plan from shared `listPlans`/`currentPlan`, RPC `get_state` + `get_session_stats`, published `pi-hub:state` | test-view |
+| GET plans | shared `listPlans` + `currentPlan`; current = published plan, else newest open plan | test-api |
+| GET diagram | shared `loadDiagram`/`emptyDiagram` + `listPlans` | test-api |
+| GET files, file, diff | shared `plan3-files` (403 on `FileRefused`) | test-api |
+| GET image, POST paste | shared `readLinkedImage`/`readPastedImage`/`savePastedImage` (magic bytes, 20 MB) | test-api |
+| GET models | hub call `/api/models` (readWeb: status, scoped models, efforts); 409 while parked | test-api (fake), real Pi in H5-06 |
+| GET usage, commands | hub call (`readWeb`, work-models data) | test-api (fake) |
+| GET dialog | hub's pending channel asks by askId | test-api |
+| POST answer | channel ask → `extension_ui_response` with the answer as JSON (plain RPC dialogs: H5-04) | test-api |
+| POST message | hub call `/api/message` (diagram context, followUp when busy, typed /commands); `/reload` → hub restart (D12); a parked session resumes first | test-api |
+| POST command, bias, generate, edit, comment, move | hub call (H3-09); parked resumes first | test-sessions, test-api |
+| POST stop | RPC `abort` | test-api |
+| POST model, effort | RPC `set_model` (only from `get_available_models`) / `set_thinking_level`, then a `status` frame | test-api |
+| GET sessions, POST seen | hub registry (H5-05) | H5-05 |
+| /pair/* | hub remote (H6-01) | H6 |
+
+Live frames besides the mirrors: `status` (after model/effort change and each settled run), `plan` (published plan changed), `diagram` (ce-workflow publishes `pi-hub:diagram` with the target; the hub reads the file), `files` (write/edit/bash finished).
+
+Request checks kept from plan3-web: Host must be this hub's 127.0.0.1/localhost port (DNS rebinding); an Origin, when sent, must match; a POST without Origin needs `x-hub-key` (CLI); page POSTs need `application/json` (except paste); bodies ≤ 64 KB (paste 20 MB, CLI 1 MB); URL ≤ 2048; nosniff, no-referrer, CSP and no-store headers on every page response.
+
 
 ## Resume context
 
-Active, 10/36. Phase 2 is done and H3-01 is done. Hub HEAD 4870c41, npm test 5 pass. ce-workflow e54de1e adds extensions/hub-channel.ts plus test-work-hub-channel.mjs; nothing is wired yet. Next: H3-06, ask_user menu features (search box, current item marked, submenus with Esc back, checklists that toggle in place) in extensions/ask-user/. After that H3-07 adds the compact view and H3-08 moves work-dialogs onto ask_user, which needs the user's live terminal check. No blockers.
+Active, 20/36. Phases 3 and 4 are done. ce-workflow HEAD cef63d4 and hub HEAD f34e642, both local only, never pushed. test-work-plan3.mjs still stops at the old OpenDesign reference step (~1899), which predates this plan. verify:quiet has not been run, and there has been no real hub run yet (H8-01). Next: H5-01, moving the browser app (extensions/plan3-web/) into the hub's web/ and serving it under /s/<session>/ with relative URLs. The usage, models and commands reads must reach Pi through new /pi-hub read calls (H5-03).
 
 ## Amendments
 
@@ -248,3 +260,4 @@ Active, 10/36. Phase 2 is done and H3-01 is done. Hub HEAD 4870c41, npm test 5 p
   - Finding 5, prompts outside work-dialogs: accepted. Direct `ctx.ui` calls exist in `plan3-night.ts`, `work-models.ts` and `jev-tools.ts`. H3-08 lists them and the tests to update; H3-06 adds multi-line text and the model picker's scope switch.
   - Finding 6, night mode after restart: accepted. `night.restore()` does not start a turn. Added H3-10 and a restart case in H8-01.
 - 2026-10-18: Added final architecture reconciliation because a product diagram exists.
+- 2026-10-19 H5-01: the browser app is copied, not moved, into pi-control-hub `web/` (from ce-workflow `extensions/plan3-web` at 1f8b3b5). ce-workflow keeps its copy, frozen, so `/wo share` keeps working until H9-01 deletes it; app changes from now on go only into the hub's copy. Type-only imports point at `../../ce-workflow/extensions/`.
