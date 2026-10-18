@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import crypto from "node:crypto";
 import http from "node:http";
+import { stripTypeScriptTypes } from "node:module";
 import path from "node:path";
 import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
@@ -27,6 +28,20 @@ function body(request: http.IncomingMessage): Promise<any> {
 	});
 }
 const sameKey = (a: unknown, b: string) => typeof a === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+
+// H5-01: the browser app (copied from ce-workflow extensions/plan3-web) under /s/<session>/, all URLs relative to it.
+const WEB = new URL("../web/", import.meta.url);
+const JS = "text/javascript; charset=utf-8";
+const ASSETS: Record<string, [string, string]> = {
+	"app.js": ["app.ts", JS], "layout.js": ["layout.ts", JS], "diagram.js": ["diagram.ts", JS], "prompts.js": ["prompts.ts", JS],
+	"files.js": ["files.ts", JS], "stream.js": ["stream.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
+};
+// Changes whenever a served file changes; an open page reloads itself when the build differs.
+const BUILD = crypto.createHash("sha256").update(["index.html", ...Object.values(ASSETS).map(([file]) => file)].map(file => readFileSync(new URL(file, WEB))).join("\0")).digest("hex").slice(0, 12);
+function webFile(file: string, key: string) {
+	const text = readFileSync(new URL(file, WEB), "utf8");
+	return (file.endsWith(".ts") ? stripTypeScriptTypes(text) : text).replaceAll("__TOKEN__", key).replaceAll("__BUILD__", BUILD);
+}
 
 export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.parse(process.env.PI_HUB_PI_COMMAND) : undefined } = {}) {
 	const dataDir = hubDataDir();
@@ -59,8 +74,25 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => { response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); response.end(JSON.stringify(value ?? { ok: true })); };
 		try {
-			if (!sameKey(request.headers["x-hub-key"], config.localKey)) return send(401, { error: "Missing or wrong hub key." });
 			const url = new URL(request.url ?? "/", "http://127.0.0.1");
+			// The CLI sends x-hub-key; the browser app sends the same key as a Bearer token or ?token= (its page carries it).
+			const keys = [request.headers["x-hub-key"], request.headers.authorization?.replace(/^Bearer /, ""), url.searchParams.get("token")];
+			if (!keys.some(key => sameKey(key, config.localKey))) return send(401, { error: "Missing or wrong hub key." });
+			const page = /^\/s\/([0-9a-f-]{36})(\/.*)?$/.exec(url.pathname);
+			if (page && request.method === "GET") {
+				if (!registry.get(page[1])) return send(404, { error: "Unknown session." });
+				if (!page[2]) { response.writeHead(301, { location: `/s/${page[1]}/${url.search}` }); return response.end(); }
+				const asset = /^\/a\/([0-9a-f]{12})\/(.+)$/.exec(page[2]);
+				if (page[2] === "/") {
+					response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+					return response.end(webFile("index.html", config.localKey));
+				}
+				if (asset && asset[1] === BUILD && ASSETS[asset[2]]) {
+					response.writeHead(200, { "content-type": ASSETS[asset[2]][1], "cache-control": "private, max-age=31536000, immutable" });
+					return response.end(webFile(ASSETS[asset[2]][0], config.localKey));
+				}
+				if (asset) return send(404, { error: asset[1] === BUILD ? "Unknown asset." : "Stale build; reload the page." });
+			}
 			for (const [route, handler] of Object.entries(routes)) {
 				const [method, pattern] = route.split(" ");
 				const match = method === request.method ? url.pathname.match(new RegExp(`^${pattern}$`)) : null;

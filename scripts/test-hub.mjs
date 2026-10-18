@@ -36,6 +36,27 @@ try {
 	const id = created.body.id;
 	assert.match(cli("status").out, /idle {2}1 {2}/);
 
+	// H5-01: the browser app under /s/<session>/ with relative URLs and build-fingerprinted assets.
+	{
+		const { localKey } = JSON.parse(fs.readFileSync(path.join(data, "config.json"), "utf8"));
+		const get = (url, headers = {}) => fetch(url, { redirect: "manual", headers: { connection: "close", ...headers } });
+		const base = `http://127.0.0.1:${port}/s/${id}`;
+		assert.equal((await get(`${base}/`)).status, 401, "the page needs the key");
+		const moved = await get(`${base}?token=${localKey}`);
+		assert.deepEqual([moved.status, moved.headers.get("location")], [301, `/s/${id}/?token=${localKey}`]);
+		assert.equal((await get(`http://127.0.0.1:${port}/s/00000000-0000-0000-0000-000000000000/?token=${localKey}`)).status, 404);
+		const html = await (await get(`${base}/?token=${localKey}`)).text();
+		const [, build] = /src="a\/([0-9a-f]{12})\/app\.js\?token=([0-9a-f]+)"/.exec(html) ?? [];
+		assert(build && html.includes(`?token=${localKey}`), "relative asset URLs carrying the key");
+		const app = await get(`${base}/a/${build}/app.js`, { authorization: `Bearer ${localKey}` });
+		assert.equal(app.headers.get("cache-control"), "private, max-age=31536000, immutable");
+		const js = await app.text();
+		assert(!/import type|__TOKEN__|__BUILD__/.test(js) && js.includes(`const token = "${localKey}"`), "types stripped, placeholders filled");
+		assert(!/fetch\("\/|EventSource\("\//.test(js), "no root-absolute requests: every call stays under /s/<session>/");
+		for (const file of ["layout.js", "diagram.js", "prompts.js", "files.js", "stream.js", "vendor/rough.js", "styles.css"]) assert.equal((await get(`${base}/a/${build}/${file}?token=${localKey}`)).status, 200, file);
+		assert.equal((await get(`${base}/a/000000000000/app.js?token=${localKey}`)).status, 404, "a stale build is refused");
+	}
+
 	// A busy session refuses a normal stop/restart (D17); --force stops anyway.
 	await api(`/api/sessions/${id}/prompt`, { message: "hold" });
 	const refused = cli("restart");

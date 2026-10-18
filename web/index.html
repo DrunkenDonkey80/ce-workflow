@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+ <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+ <title>Plan3 architecture workspace</title>
+ <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg transform='rotate(40 16 16)'%3E%3Crect x='14.5' y='3' width='3' height='16' rx='1.5' fill='%23c4893f'/%3E%3Crect x='10.5' y='1.5' width='11' height='3.5' rx='1.75' fill='%23c4893f'/%3E%3Cpath d='M9.5 18.5h13v5.5a6.5 6.5 0 0 1-13 0z' fill='%23495057'/%3E%3C/g%3E%3C/svg%3E">
+ <link rel="stylesheet" href="a/__BUILD__/styles.css?token=__TOKEN__">
+ <script type="module" src="a/__BUILD__/app.js?token=__TOKEN__"></script>
+</head>
+<body>
+ <nav id="switcher" class="switcher" aria-label="Shared sessions" data-open="false" hidden>
+  <button id="switcher-toggle" type="button" aria-expanded="false" aria-controls="session-list" aria-label="Show shared sessions">☰</button>
+  <div id="session-list" class="session-list"></div>
+ </nav>
+ <header class="topbar">
+  <button id="drawer-toggle" class="drawer-toggle" type="button" aria-controls="drawer" aria-expanded="false" aria-label="Open menu">☰</button>
+  <div class="workspace-title"><h1><button id="title" class="title-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="title-menu">Architecture workspace</button></h1></div>
+  <!-- Line 1: model and effort, context, Plan3 bias. Line 2: progress bars (plan, subscription usage). Desktop: one line in the top bar. -->
+  <section class="status-line" aria-label="Session status">
+   <div class="status-row">
+    <button id="model-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="model-menu" title="Change model and thinking level">Model</button>
+    <button id="context-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="context-menu" title="Context use; compact">Context</button>
+    <button id="bias-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="bias-menu" title="Plan3 bias: thinking or coding model (Alt+= / Alt+-)">💡 Normal</button>
+   </div>
+   <div class="status-row status-bars">
+    <button id="plan-button" class="bar" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="plan-menu">New plan</button>
+    <button id="usage-button" class="bar-group" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="usage-menu" title="Subscription usage" hidden></button>
+   </div>
+   <div id="model-menu" class="status-menu" role="group" aria-label="Model and thinking level" hidden></div>
+   <div id="context-menu" class="status-menu" role="group" aria-label="Context" hidden><button type="button" id="compact-now">Compact now</button></div>
+   <div id="bias-menu" class="status-menu" role="group" aria-label="Plan3 bias" hidden></div>
+   <div id="usage-menu" class="status-menu usage-menu" role="group" aria-label="Subscription usage" hidden></div>
+   <div id="plan-menu" class="status-menu" role="group" aria-label="Plans and plan actions" hidden>
+    <div id="plan-list" class="plan-list"></div><hr id="plan-divider" hidden>
+    <button type="button" data-command="resolve" data-plan>Resolve questions</button>
+    <button type="button" data-command="ideas" data-plan>Ideas</button>
+    <button type="button" data-command="review" data-plan>Review</button>
+    <button type="button" data-command="finish" data-plan>Finish planning</button>
+    <button type="button" data-command="resume" data-plan>Start or continue work</button>
+    <button type="button" data-command="new">New plan</button>
+    <button type="button" data-command="delete" data-plan class="danger">Delete plan</button>
+   </div>
+  </section>
+ </header>
+ <div id="title-menu" class="status-menu title-menu" role="group" aria-label="Plans and plan actions" hidden></div>
+ <div id="drawer-backdrop" class="drawer-backdrop" hidden></div>
+ <aside id="drawer" class="drawer" aria-label="Menu" data-open="false" inert>
+  <h2>View</h2><div id="drawer-views"></div>
+  <h2>Session</h2><div id="drawer-status"></div>
+  <h2>Sessions</h2><div id="drawer-sessions"></div>
+  <div class="drawer-commands"><button id="chat-compact-m" type="button" aria-pressed="false" title="Compact chat: hide thinking and tool blocks, keep the final replies">▤ Compact chat</button></div>
+  <div class="drawer-commands"><button id="pi-commands" type="button" aria-haspopup="dialog">Pi commands</button><button id="wo-commands" type="button" aria-haspopup="dialog">/wo commands</button></div>
+ </aside>
+ <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">
+  <button id="mobile-chat" type="button" role="tab" aria-controls="chat" aria-selected="true">Chat</button>
+  <button id="mobile-files" type="button" role="tab" aria-controls="files" aria-selected="false" tabindex="-1">Files</button>
+  <button id="mobile-project" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4.5h6M4 6.5v4M12 6.5v4" stroke="#868e96" stroke-width="1.4" fill="none"/><rect x="1" y="1.5" width="6" height="5" rx="1.5" fill="#4c6ef5"/><rect x="9" y="1.5" width="6" height="5" rx="1.5" fill="#2f9e44"/><rect x="5" y="10" width="6" height="5" rx="1.5" fill="#e8590c"/></svg>UML Project</button>
+  <button id="mobile-plan" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="13.5" rx="2" fill="#fff4e6" stroke="#e8590c" stroke-width="1.2"/><rect x="5" y=".8" width="6" height="2.6" rx="1" fill="#e8590c"/><rect x="4" y="5.5" width="3.5" height="3" rx=".8" fill="#7048e8"/><rect x="8.5" y="10.5" width="3.5" height="3" rx=".8" fill="#1098ad"/><path d="M5.8 8.5v3.5h2.7" stroke="#495057" stroke-width="1.1" fill="none"/></svg>UML Plan</button>
+ </nav>
+ <main id="workspace" class="workspace" data-left="full" data-mobile="chat">
+  <section id="left-panel" class="left-panel" aria-label="Project">
+  <div class="left-tabs">
+   <div role="tablist" aria-label="Project views">
+    <button id="tab-files" type="button" role="tab" aria-selected="false" aria-controls="files" tabindex="-1">Files</button>
+    <button id="tab-project" type="button" role="tab" aria-selected="false" aria-controls="canvas" tabindex="-1" title="The whole product's architecture"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4.5h6M4 6.5v4M12 6.5v4" stroke="#868e96" stroke-width="1.4" fill="none"/><rect x="1" y="1.5" width="6" height="5" rx="1.5" fill="#4c6ef5"/><rect x="9" y="1.5" width="6" height="5" rx="1.5" fill="#2f9e44"/><rect x="5" y="10" width="6" height="5" rx="1.5" fill="#e8590c"/></svg>UML Project</button>
+    <button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="canvas" title="The displayed plan's own diagram"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="13.5" rx="2" fill="#fff4e6" stroke="#e8590c" stroke-width="1.2"/><rect x="5" y=".8" width="6" height="2.6" rx="1" fill="#e8590c"/><rect x="4" y="5.5" width="3.5" height="3" rx=".8" fill="#7048e8"/><rect x="8.5" y="10.5" width="3.5" height="3" rx=".8" fill="#1098ad"/><path d="M5.8 8.5v3.5h2.7" stroke="#495057" stroke-width="1.1" fill="none"/></svg>UML Plan</button>
+   </div>
+   <div id="edit-bar" class="edit-bar" role="toolbar" aria-label="Edit diagram (desktop)">
+    <button type="button" data-tool="select" aria-pressed="true" title="Select and move (Escape)"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 1.2v12.3l3.2-3 2.2 4.6 2.2-1-2.2-4.5 4.4-.3z" fill="#4c6ef5" stroke="#1c2e8a" stroke-width="1" stroke-linejoin="round"/></svg>Select</button>
+    <button type="button" data-tool="box" aria-pressed="false" title="Drag to draw a box, or click to add one"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10.5" rx="1.8" fill="#fff" stroke="#e8590c" stroke-width="1.2"/><path d="M1.5 4.8a1.8 1.8 0 0 1 1.8-1.8h9.4a1.8 1.8 0 0 1 1.8 1.8v1.7h-13z" fill="#e8590c"/><path d="M4 9h8M4 11.2h5" stroke="#adb5bd" stroke-width="1.1"/></svg>Box</button>
+    <button type="button" data-tool="group" aria-pressed="false" title="Drag to draw a group in the chosen color; boxes inside it move in"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="14" height="14" rx="2" fill="#ebfbee" stroke="#2f9e44" stroke-width="1.2" stroke-dasharray="2.4 1.4"/><rect x="3.5" y="6" width="4" height="3.5" rx=".8" fill="#4c6ef5"/><rect x="8.5" y="9.5" width="4" height="3.5" rx=".8" fill="#e8590c"/><path d="M3.5 3.6h5" stroke="#2f9e44" stroke-width="1.4"/></svg>Group</button>
+    <span class="swatches" role="group" aria-label="Group color"><button type="button" class="swatch swatch-0" data-color="0" aria-label="Blue" aria-pressed="true"></button><button type="button" class="swatch swatch-1" data-color="1" aria-label="Green" aria-pressed="false"></button><button type="button" class="swatch swatch-2" data-color="2" aria-label="Orange" aria-pressed="false"></button><button type="button" class="swatch swatch-3" data-color="3" aria-label="Violet" aria-pressed="false"></button><button type="button" class="swatch swatch-4" data-color="4" aria-label="Cyan" aria-pressed="false"></button><button type="button" class="swatch swatch-5" data-color="5" aria-label="Pink" aria-pressed="false"></button><button type="button" class="swatch swatch-6" data-color="6" aria-label="Olive" aria-pressed="false"></button><button type="button" class="swatch swatch-7" data-color="7" aria-label="Gray" aria-pressed="false"></button></span>
+   </div>
+   <div id="zoom-controls" class="zoom-controls" aria-label="Diagram zoom">
+    <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+    <output id="zoom-level" aria-label="Zoom level">100%</output>
+    <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+    <button id="zoom-fit" type="button">Fit</button>
+    <button id="pin-note" type="button" aria-pressed="false">Add note</button>
+    <button id="generate" type="button" title="Ask the agent to draw or update this diagram from your saved directions">Generate</button>
+   </div>
+   <button id="narrow-left" type="button" aria-pressed="false" title="Narrow this panel to the chat's width">Narrow</button>
+  </div>
+  <section id="files" class="files" role="tabpanel" aria-labelledby="tab-files" hidden></section>
+  <section id="canvas" class="canvas" role="tabpanel" aria-labelledby="tab-plan">
+   <svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Architecture diagram" tabindex="0"></svg>
+   <p id="empty-diagram" class="empty-diagram"></p>
+   <div class="search-box"><input id="search" type="search" placeholder="Search (Ctrl+F)" aria-label="Search the diagram; Enter jumps to the next match"><output id="search-count" aria-live="polite"></output></div>
+   <div id="hover-card" class="hover-card" role="tooltip" tabindex="0" hidden></div>
+  </section>
+  </section>
+  <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
+  <aside id="chat" class="chat" aria-label="Live Pi session">
+   <header class="chat-heading"><button id="expand-left" class="expand-left" type="button" aria-label="Show files and diagram" aria-controls="left-panel" aria-expanded="false" hidden>&gt;&gt;</button><button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button><h2>Live session</h2><span class="modes"><button id="chat-compact" class="mode-chip" type="button" aria-pressed="false" title="Compact chat: hide thinking and tool blocks, keep the final replies">Compact</button><button id="mode-research" class="mode-chip" type="button" aria-pressed="false" title="Research mode: explore, don't implement (/research)">Research</button><button id="mode-night" class="mode-chip" type="button" aria-pressed="false" title="Night mode: work unattended until the plan is done (/night)">Night</button></span><span id="connection" role="status">Connecting…</span></header>
+   <div id="plan-actions" class="plan-actions" role="group" aria-label="Plan actions" hidden><button type="button" data-command="resolve" data-plan>Resolve</button><button id="review-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="review-menu">Review</button><button type="button" data-command="finish" data-plan>Finish</button><button type="button" data-command="resume" data-plan>Resume</button><div id="review-menu" class="status-menu" role="group" aria-label="Review" hidden><button type="button" data-command="review" data-plan>Review (normal)</button><button type="button" data-command="review all" data-plan>Review (all advisors)</button></div></div>
+   <div class="notices"><p id="notice" class="notice" role="status" hidden></p><p id="waiting" class="notice" role="status" hidden></p></div>
+   <div id="feed" class="feed">
+    <ol id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></ol>
+    <section id="activity" class="activity" aria-label="Agent activity"></section>
+   </div>
+   <button id="to-bottom" class="to-bottom" type="button" aria-label="Scroll to the newest message" hidden>↓ New messages</button>
+   <form id="composer" class="composer">
+    <div id="mentions" class="mentions" aria-label="Mentioned elements"></div>
+    <div id="slash-menu" class="slash-menu" role="listbox" aria-label="Commands" hidden></div>
+    <textarea id="message-input" rows="4" maxlength="20000" placeholder="Ask about the architecture…" aria-label="Message to Pi" aria-describedby="input-help"></textarea>
+    <div class="composer-actions">
+     <span id="input-help" class="input-help">Ctrl+click a box to mention it</span>
+     <label class="attach button" title="Attach an image">Image<input id="attach" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden></label>
+     <button id="talk" type="button" class="talk" title="Hold to talk; the words appear in the box" aria-label="Hold to talk">🎤</button>
+     <button id="talk-lang" type="button" title="Speech language (tap to switch)">EN</button>
+     <button id="stop" type="button" class="danger" hidden>Stop</button>
+     <button id="send" type="submit" disabled>Send</button>
+    </div>
+   </form>
+  </aside>
+ </main>
+ <dialog id="comment-prompt" aria-labelledby="comment-title">
+  <form id="comment-form">
+   <h2 id="comment-title">Add a note</h2>
+   <p id="comment-purpose" class="dialog-purpose">Pin a comment to the displayed architecture.</p>
+   <label id="comment-label" for="comment-text">Note</label><textarea id="comment-text" required maxlength="8000" rows="5"></textarea>
+   <p id="comment-error" role="alert" hidden></p>
+   <div class="dialog-actions"><button id="comment-delete" type="button" hidden>Delete</button><button id="comment-cancel" type="button">Cancel</button><button id="comment-save" type="submit">Save note</button></div>
+  </form>
+ </dialog>
+ <dialog id="command-picker" aria-labelledby="command-title"><h2 id="command-title">Commands</h2><p class="dialog-purpose">Pick one to put it in the message box.</p><div id="command-list" class="command-list"></div><div class="dialog-actions"><button id="command-close" type="button">Close</button></div></dialog>
+ <dialog id="prompt" aria-labelledby="prompt-title"><form id="prompt-form"></form></dialog>
+ <dialog id="viewer" aria-label="Image, tap to close"><img alt=""></dialog>
+</body>
+</html>
