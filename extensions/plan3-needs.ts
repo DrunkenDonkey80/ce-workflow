@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { showListDialog } from "./work-dialogs.ts";
+import { showListDialog } from "./ask-user/menu.ts";
 
 // Plan3 requirements: external things steps need (the user, a VM, a printer, a reboot). The plan defines them;
 // the user owns their on/off state, kept in a sidecar so plan rewrites (optimize, convert) never flip a switch.

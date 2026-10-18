@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { stripTypeScriptTypes } from "node:module";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
 import { raceRemoteAsk, remoteResponse, remoteBatch, type RemoteListPrompt } from "./ask-user/remote.ts";
-import { bindListDialogBridge, listDialogResponse } from "./work-dialogs.ts";
+import { bindListDialogBridge, listDialogResponse } from "./ask-user/menu.ts";
 import type { SessionSummary } from "./plan3-remote.ts";
 
 export type WebTarget = { kind: "product" } | { kind: "plan"; id: string };

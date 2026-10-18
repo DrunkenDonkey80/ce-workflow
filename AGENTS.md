@@ -23,8 +23,11 @@ Never retain or describe a workflow optimization as successful from focused test
 
 ## Dialog UX Rule
 
-Use the shared `extensions/work-dialogs.ts` overlay system for every
-ce-workflow selection or checklist menu. Every dialog shows one muted purpose
+Every ce-workflow prompt goes through ask_user (`extensions/ask-user/`), so
+the terminal, the web and the hub draw one form: menus and checklists use
+`showListDialog()`, Yes/No uses `askConfirm()`, free text uses `askText()`, and
+few-action prompts pass `compact: true` (all in `extensions/ask-user/menu.ts`);
+never call `ctx.ui.confirm/input/editor` directly. Every dialog shows one muted purpose
 line directly below its title. Escape goes to the parent and closes only at the
 root; Enter and Space toggle checklist rows without moving the cursor; parent
 cursors survive submenu round trips; every model list supports keyboard

@@ -5,7 +5,7 @@ import { appendFile, mkdir, readdir, readFile, realpath, rename, stat, unlink, w
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { progressBar, showAskDialog, showListDialog } from "./work-dialogs.ts";
+import { askText, progressBar, showAskDialog, showListDialog } from "./ask-user/menu.ts";
 import { decideIdea, ideaBlock, ideaOptions, ideaPopupContext, ideaResponse, ideaSchema, storedIdeas } from "./plan3-ideas.ts";
 import { loadPlan3Ask } from "./plan3-ask.ts";
 import { enterPlanDesign, runPlanDesign, localPlanDesign, planDesignGate, designExecutionGuidance, withPlanDesignLock, addPlanDesignImage, planDesignCapturePath, planDesignReview, humanPlanDesignDecision, humanPlanDesignRun, recordPlanDesignAnswer, designPointer, finishNativePlanDesign, planDesignNext, reconcileApprovedPlanDesign, movePlanWithDiagram, stablePlanId } from "./plan3-design.ts";
@@ -1548,7 +1548,7 @@ export default function plan3(pi) {
 				let source = { kind: "user-image" };
 				try {
 					if (pick.value === "image") {
-						file = (await ctx.ui.input?.("Explicit reference image path", "PNG/JPEG/WebP, up to 700 KB (MCP transport); inspiration only"))?.trim().replace(/^"([\s\S]+)"$/, "$1");
+						file = (await askText(ctx, pi, "Explicit reference image path", { placeholder: "PNG/JPEG/WebP, up to 700 KB (MCP transport); inspiration only" }))?.trim().replace(/^"([\s\S]+)"$/, "$1");
 						if (!file) continue;
 					} else {
 						const windows = await plan3Windows(pi.exec.bind(pi));
@@ -1560,7 +1560,7 @@ export default function plan3(pi) {
 								if (!region) break;
 								let crop: number[] | undefined;
 								if (region.value === "crop") {
-									const input = await ctx.ui.input?.("Crop x,y,width,height", "Physical pixels relative to the selected window");
+									const input = await askText(ctx, pi, "Crop x,y,width,height", { placeholder: "Physical pixels relative to the selected window" });
 									if (!input) continue;
 									crop = input.split(",").map(value => /^\d+$/.test(value.trim()) ? Number(value.trim()) : NaN);
 								}

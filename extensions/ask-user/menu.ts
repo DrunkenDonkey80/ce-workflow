@@ -1,7 +1,9 @@
 // ask_user's menu view (plan 0db155f7 D21): lists with filter, current item, Esc back, checklists and Tab.
 // The same `list` payload is drawn by the web form (plan3-web/prompts.ts) and answered through ask:pending.
+import { randomUUID } from "node:crypto";
+import { loadPlan3Ask } from "../plan3-ask.ts";
 
-export const dialogCursors = new Map();
+const dialogCursors = new Map();
 // Pi loads each extension with moduleCache:false, so every extension has its own copy of this module;
 // the web bridge (bound by plan3) must be shared process-wide to reach dialogs from work-models and others.
 const listBridges: WeakMap<object, (options, run: (signal: AbortSignal) => Promise<unknown>) => Promise<any>> = (globalThis[Symbol.for("ce-workflow.listBridges")] ??= new WeakMap());
@@ -33,7 +35,7 @@ function sentenceCase(value) {
 	return String(value).replace(/^([a-z])/, (letter) => letter.toUpperCase());
 }
 
-export function plainLabel(value) {
+function plainLabel(value) {
 	const raw = String(value);
 	const label = raw
 		.replace(/\p{Extended_Pictographic}/gu, (symbol) =>
@@ -68,11 +70,11 @@ function indicatedLabel(item, options = {}) {
 		.join(" ");
 }
 
-export function keyMatches(keybindings, data, id, ...fallbacks) {
+function keyMatches(keybindings, data, id, ...fallbacks) {
 	return Boolean(keybindings?.matches?.(data, id) || fallbacks.includes(data));
 }
 
-export function stripAnsi(value) {
+function stripAnsi(value) {
 	return String(value).replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
@@ -104,7 +106,7 @@ function visibleWidth(value) {
 	return width;
 }
 
-export function truncate(value, width) {
+function truncate(value, width) {
 	const text = String(value ?? "");
 	const safeWidth = Math.max(1, width);
 	if (visibleWidth(text) <= safeWidth) return text;
@@ -119,7 +121,7 @@ export function truncate(value, width) {
 	return `${result}…`;
 }
 
-export function wrapText(value, width, maxLines) {
+function wrapText(value, width, maxLines) {
 	const words = stripAnsi(value).trim().split(/\s+/).filter(Boolean);
 	const lines = [];
 	let line = "";
@@ -140,7 +142,7 @@ export function wrapText(value, width, maxLines) {
 	return lines;
 }
 
-export function sectionLine(theme, title, width) {
+function sectionLine(theme, title, width) {
 	const label = `-- ${title} `;
 	return theme.fg(
 		"border",
@@ -158,7 +160,7 @@ function initialIndex(items, { cursorKey, currentValue, selectedIndex = undefine
 	return Math.max(0, rememberedIndex);
 }
 
-export async function nativeListDialog(ctx, options) {
+async function nativeListDialog(ctx, options) {
 	const { title, items, currentValue, multi, cursorKey, tabAction } = options;
 	if (multi) {
 		const enabled = new Set(multi.selected ?? []);
@@ -630,4 +632,39 @@ async function localListDialog(ctx, options) {
 
 export function resetDialogStateForTest() {
 	dialogCursors.clear();
+}
+
+// Reuse ask_user's scrollable editor for Plan3 decisions rather than a second UI.
+export function showAskDialog(ctx, ask, params, signal?: AbortSignal, ideaLayout = false) {
+	let askContext = ctx;
+	if (ideaLayout && typeof ctx.ui.custom === "function") {
+		askContext = { ...ctx, ui: { ...ctx.ui, custom: (factory, options) => ctx.ui.custom((tui, ...args) => {
+			const component = factory(tui, ...args);
+			// ponytail: pi-ask-user 0.16 has no layout options; use native options when added.
+			if (typeof component.buildFullContextLines !== "function" || typeof component.getOverlayMaxRenderLines !== "function") throw new Error("The installed ask_user does not support compact Plan3 idea popups.");
+			const contextLines = component.buildFullContextLines.bind(component);
+			component.buildFullContextLines = width => {
+				const lines = contextLines(width).slice();
+				if (stripAnsi(lines[0] ?? "").trim() === "Context:") {
+					lines.shift();
+					while (lines.length && !stripAnsi(lines[0]).trim()) lines.shift();
+				}
+				return lines;
+			};
+			component.getOverlayMaxRenderLines = () => Math.max(1, (Number.isFinite(tui.terminal.rows) ? Math.floor(tui.terminal.rows) : 24) - 2);
+			return component;
+		}, { ...options, overlayOptions: { ...options?.overlayOptions, width: "98%", maxHeight: "100%", margin: 1 } }) } };
+	}
+	return ask.execute(randomUUID(), { allowComment: true, ...params, displayMode: "overlay" }, signal, undefined, askContext);
+}
+
+/** Free-text prompt through ask_user (terminal, web share and hub alike); undefined when cancelled.
+ * Without a loaded ask_user (minimal installs, unit fakes) it falls back to Pi's own editor/input. */
+export async function askText(ctx, pi, title: string, { initialText = "", placeholder = "", multiline = false } = {}) {
+	if (!pi?.getAllTools?.().some(tool => tool.name === "ask_user"))
+		return multiline && typeof ctx.ui.editor === "function" ? ctx.ui.editor(title, initialText) : ctx.ui.input?.(title, placeholder || initialText);
+	const result = await showAskDialog(ctx, await loadPlan3Ask(pi), { question: title, ...(placeholder ? { context: placeholder } : {}), ...(initialText ? { initialText } : {}), allowFreeform: true, allowComment: false });
+	const response = result.details?.response;
+	if (result.details?.cancelled || response?.kind !== "freeform" || typeof response.text !== "string") return;
+	return response.text;
 }

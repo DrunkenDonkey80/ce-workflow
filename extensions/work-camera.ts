@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { showListDialog } from "./work-dialogs.ts";
+import { showListDialog } from "./ask-user/menu.ts";
 import { cameraProject, cameraRequestKey, createCameraState } from "./work-camera-state.ts";
 import { createCameraImages } from "./work-camera-images.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";

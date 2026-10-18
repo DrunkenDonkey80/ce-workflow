@@ -229,7 +229,7 @@ assert(!dialogBridge.answer({ askId: nativeId, text: "late" }).accepted);
 const canceled = raceRemoteAsk(askApi, question, undefined, undefined, payload => remoteResponse(payload, question, true), () => new Promise(() => {}));
 dialogBridge.answer({ askId: dialogBridge.snapshot()[0].askId, cancel: true });
 assert.equal(await canceled, null, "browser cancel matches native Escape");
-const { showListDialog, listDialogResponse } = await createJiti(import.meta.url).import("../extensions/work-dialogs.ts");
+const { showListDialog, listDialogResponse } = await createJiti(import.meta.url).import("../extensions/ask-user/menu.ts");
 let nativeDone, nativeDisposed = false;
 const listCtx = { mode: "tui", ui: { custom: factory => new Promise(resolve => {
  const component = factory({ requestRender() {} }, { fg: (_color, value) => value, bold: value => value }, {}, value => { nativeDone = undefined; component.dispose?.(); nativeDisposed = true; resolve(value); });
@@ -706,14 +706,14 @@ try {
 }
 // D9: terminal-only list dialogs never reach a bound browser bridge.
 {
- const { bindListDialogBridge, showListDialog } = await createJiti(import.meta.url).import("../extensions/work-dialogs.ts");
+ const { bindListDialogBridge, showListDialog } = await createJiti(import.meta.url).import("../extensions/ask-user/menu.ts");
  let bridged = 0; const ui = { select: async (_title, labels) => labels[0], notify() {} }, ctx = { ui, hasUI: true };
  bindListDialogBridge(ctx, async () => { bridged++; return { value: "yes" }; });
  const items = [{ value: "no", label: "No" }, { value: "yes", label: "Yes" }];
  assert.equal((await showListDialog(ctx, { title: "Approve?", items, terminalOnly: true }))?.value, "no"); assert.equal(bridged, 0);
  assert.equal((await showListDialog(ctx, { title: "Other", items }))?.value, "yes"); assert.equal(bridged, 1, "ordinary dialogs still bridge");
  // Pi loads each extension with moduleCache:false; a second copy (work-models) must see plan3's bridge.
- const other = await createJiti(import.meta.url, { moduleCache: false }).import("../extensions/work-dialogs.ts");
+ const other = await createJiti(import.meta.url, { moduleCache: false }).import("../extensions/ask-user/menu.ts");
  assert.notEqual(other.showListDialog, showListDialog, "really a separate module copy");
  assert.equal((await other.showListDialog(ctx, { title: "Compact before sending?", items }))?.value, "yes"); assert.equal(bridged, 2, "dialogs from another extension copy bridge too");
  bindListDialogBridge(ctx, undefined);

@@ -120,6 +120,12 @@ try {
 					closed = true;
 				},
 			);
+			// Yes/No prompts use ask_user's compact view; answer them with the scripted confirm.
+			const first = component.render(140);
+			if (first.at(-1)?.includes("[ Yes ]")) {
+				component.handleInput((await (options.confirm ?? (async () => true))()) ? "enter" : "escape");
+				return result;
+			}
 			const action = actions.shift();
 			assert(action, "unexpected settings render");
 			let lines = component.render(140);
@@ -129,7 +135,7 @@ try {
 						(line) =>
 							line.includes("[accent]") && line.includes(action.expectInitial),
 					),
-					`cursor did not stay on ${action.expectInitial}`,
+					`cursor did not stay on ${action.expectInitial}\n${lines.join("\n")}`,
 				);
 			if (action.expectText)
 				assert(

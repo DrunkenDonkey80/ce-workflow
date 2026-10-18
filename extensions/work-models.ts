@@ -6,7 +6,7 @@ import { homedir, tmpdir } from "node:os";
 
 import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { showListDialog } from "./work-dialogs.ts";
+import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
@@ -1010,8 +1010,7 @@ async function showKnowledgeViewer(ctx) {
 		const record = records.find((item) => item.id === selected.item.value);
 		if (!record) continue;
 		if (
-			typeof ctx.ui.confirm === "function" &&
-			!(await ctx.ui.confirm("Forget knowledge?", record.claim))
+			!(await askConfirm(ctx, "Forget knowledge?", record.claim))
 		)
 			continue;
 		rejectKnowledge(ctx.cwd, record.id, "Deleted from knowledge viewer");
@@ -2708,7 +2707,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		selectedIndex = selected.index;
 		let args = "";
 		if (selected.item.argumentTitle) {
-			args = await ctx.ui.input(selected.item.argumentTitle, selected.item.placeholder);
+			args = await askText(ctx, pi, selected.item.argumentTitle, { placeholder: selected.item.placeholder });
 			if (args == null) continue;
 		}
 		if (selected.value === "work-share") return pi.events?.emit?.("plan3:share", { ctx, args });
@@ -3444,7 +3443,7 @@ async function executeUtilityAction(command, args, ctx, pi, options = {}) {
 	const text = String(args ?? "");
 	if (name === "work-menu") return handleWorkMenuCommand(ctx, pi);
 	if (name === "work-settings")
-		return text.trim() === "status" ? workSettingsStatus(ctx) : workSettingsLoop(ctx);
+		return text.trim() === "status" ? workSettingsStatus(ctx) : workSettingsLoop(ctx, pi);
 	if (name === "work-context") return handleWorkContextCommand(text, ctx);
 	if (name === "work-catch-up") return startPlan3CatchUp(text, pi, ctx);
 	if (name !== "work-extension-scout" || !extensionScoutEnabled()) return false;
@@ -4159,7 +4158,8 @@ async function editSubscriptionFooterSettings(ctx) {
 			!current.enabled &&
 			!current.ownershipNoticeAcknowledged
 		) {
-			const confirmed = await ctx.ui.confirm?.(
+			const confirmed = await askConfirm(
+				ctx,
 				"Enable subscription footer?",
 				"This replaces any other custom footer. Disabling restores Pi's built-in footer; use /reload for another footer extension to reclaim ownership.",
 			);
@@ -4294,12 +4294,10 @@ function parseImportedSettings(content) {
 	return settings;
 }
 
-export async function importSettings(ctx, scope) {
+export async function importSettings(ctx, scope, pi = undefined) {
 	const file = resolve(scope === "global" ? globalSettingsPath() : settingsPath(ctx.cwd));
 	const title = `Import ${scope} settings: paste a file path or JSON`;
-	const input = typeof ctx.ui.editor === "function"
-		? await ctx.ui.editor(title, "")
-		: await ctx.ui.input?.(title);
+	const input = await askText(ctx, pi, title, { multiline: true });
 	if (!input?.trim()) return;
 	let backup;
 	try {
@@ -4356,7 +4354,7 @@ export async function importSettings(ctx, scope) {
 	}
 }
 
-async function workSettingsLoop(ctx) {
+async function workSettingsLoop(ctx, pi = undefined) {
 	let selectedIndex = 0;
 	let scope = "global";
 	for (;;) {
@@ -4496,7 +4494,7 @@ async function workSettingsLoop(ctx) {
 			continue;
 		}
 		if (pick.kind === "import") {
-			await importSettings(ctx, scope);
+			await importSettings(ctx, scope, pi);
 			continue;
 		}
 		if (selected.action === "clear") {
@@ -4509,8 +4507,8 @@ async function workSettingsLoop(ctx) {
 		if (pick.kind === "reset") {
 			if (
 				scope === "global" &&
-				typeof ctx.ui.confirm === "function" &&
-				!(await ctx.ui.confirm(
+				!(await askConfirm(
+					ctx,
 					"Reset global work settings?",
 					"Every project without overrides will use the built-in defaults.",
 				))
@@ -4670,10 +4668,9 @@ async function workSettingsLoop(ctx) {
 			if (mode === "auto") {
 				setOpenDesignCommandSetting(settings, null);
 			} else {
-				const input = await ctx.ui.input?.(
-					"OpenDesign command spec JSON",
-					'{"command":"od","args":["mcp"]}',
-				);
+				const input = await askText(ctx, pi, "OpenDesign command spec JSON", {
+					placeholder: '{"command":"od","args":["mcp"]}',
+				});
 				if (!input) continue;
 				try {
 					setOpenDesignCommandSetting(settings, JSON.parse(input));

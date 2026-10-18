@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { open, realpath, stat } from "node:fs/promises";
 import { isAbsolute, matchesGlob, relative, resolve } from "node:path";
-import { showListDialog } from "./work-dialogs.ts";
+import { askConfirm, showListDialog } from "./ask-user/menu.ts";
 
 export const JEV_MODEL = "openrouter/typesafe/jev-1.13";
 export const JEV_LIMITS = Object.freeze({ jobs: 32, questions: 32, concurrency: 4, requestMs: 30000, overallMs: 120000, bytes: 24000, fileBytes: 262144, outputBytes: 24000 });
@@ -552,7 +552,7 @@ export function createJevTools(pi, readProject, register = tool => pi.registerTo
 			cursor = selected.value;
 			if (cursor === "login") { ctx.ui.notify("Use /login → OpenRouter for credentials.", "info"); continue; }
 			const next = !status[cursor]; // flip what is in effect here, stored in this scope
-			if (next && !(await ctx.ui.confirm?.(cursor === "enabled" ? `Enable Jev ${where}?` : `Enable the Jev compaction note ${where}?`,
+			if (next && !(await askConfirm(ctx, cursor === "enabled" ? `Enable Jev ${where}?` : `Enable the Jev compaction note ${where}?`,
 				cursor === "enabled" ? "Selected source ranges/JSON will be uploaded to OpenRouter/TypeSafe. Secret filters are not a guarantee. No automatic calls."
 					: "Above 50% context, recent user requests and the last assistant turn are uploaded to OpenRouter/TypeSafe each turn. It only shows a note; it never compacts."))) continue;
 			const settings = readScope(ctx.cwd); settings.workOrchestrator ??= {};

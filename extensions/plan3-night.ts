@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { showListDialog } from "./work-dialogs.ts";
+import { askText, showListDialog } from "./ask-user/menu.ts";
 
 // Night mode: unattended Plan3 execution. Continues at Pi's settle boundary until the plan is done,
 // nothing is runnable, two continues change nothing, or the user cancels.
@@ -93,7 +93,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 			if (!pick) return;
 			if (pick.value === "bare") rules = "";
 			if (pick.value !== "edit") break;
-			const edited = await ctx.ui.editor("Night mode rules for this project", rules);
+			const edited = await askText(ctx, pi, "Night mode rules for this project", { initialText: rules, multiline: true });
 			if (edited === undefined) continue;
 			rules = edited.trim();
 			if (rules) await mkdir(path.dirname(rulesFile(ctx.cwd)), { recursive: true }).then(() => writeFile(rulesFile(ctx.cwd), `${rules}\n`));
