@@ -14,7 +14,7 @@ const sources = new Set([
  "ask-user/index.ts", "ask-user/remote.ts", "ask-user/single-select-layout.ts",
  "plan3.ts", "plan3-ask.ts", "plan3-catch-up.ts", "plan3-design.ts", "plan3-diagram.ts", "plan3-remote.ts", "plan3-files.ts", "plan3-web.ts",
  "plan3-web/app.ts", "plan3-web/diagram.ts", "plan3-web/layout.ts", "plan3-web/prompts.ts", "plan3-web/files.ts", "plan3-web/stream.ts", "plan3-web/pair.ts",
- "work-ask-remote.ts", "work-dialogs.ts",
+ "work-ask-remote.ts", "work-dialogs.ts", "hub-channel.ts",
 ].map(file => path.resolve(root, "extensions", file)));
 for (const file of sources) assert(program.getSourceFile(file), `Source missing from TypeScript program: ${file}`);
 const diagnostics = [...parsed.errors, ...ts.getPreEmitDiagnostics(program)].filter(diagnostic =>
