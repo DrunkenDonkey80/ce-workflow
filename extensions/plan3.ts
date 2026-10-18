@@ -19,6 +19,7 @@ import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
 import { closePersistentOpenDesignClients } from "./opendesign-client.ts";
 import { hubActive, publish as hubPublish } from "./hub-channel.ts";
+import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 
 const POINTER = "plan3-current";
@@ -713,7 +714,7 @@ export default function plan3(pi) {
 			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
 	}
-	let webCtx = null, webStopped = false;
+	let webCtx = null, webStopped = false, sessionLock;
 	let shareRecord: ShareRecord | undefined;
 	const tailscaleExec = (command: string, args: string[], options?: { timeout?: number }) => pi.exec(command, args, options);
 	let tailnet: Tailnet & { port?: number } = { missing: [] };
@@ -973,6 +974,7 @@ export default function plan3(pi) {
 	}
 	async function getWeb(ctx, mode?: "local" | "public") {
 		if (webStopped) throw new Error("Workspace session has ended.");
+		if (hubActive()) throw new Error("pi-control-hub serves this session's workspace; open it from the hub page."); // H3-05
 		if (mode) shareMode = mode;
 		shareRecord ??= await loadShareRecord(ctx.sessionManager.getSessionId());
 		webCtx = ctx; chat.hydrate(ctx); dialogs.bind(ctx);
@@ -2260,7 +2262,19 @@ export default function plan3(pi) {
 	pi.on?.("session_start", async (event, ctx) => {
 		webStopped = false; shareRecord = undefined;
 		dialogs.close(); dialogs = createDialogBridge(pi, publishWeb);
-		if (sharedEntry(ctx) && event.reason !== "fork" && event.reason !== "new") {
+		// D9: a terminal Pi owns its session file through the lock; under the hub, the hub already holds it.
+		if (sessionLock) releaseSessionLock(sessionLock.file, sessionLock.info);
+		sessionLock = undefined;
+		const sessionFile = !hubActive() && ctx.sessionManager?.getSessionFile?.();
+		if (sessionFile) {
+			const { info, holder } = takeSessionLock(sessionFile);
+			if (holder) {
+				ctx.ui?.notify?.(`This session is open in ${holder.owner} (pid ${holder.pid}). Close it there or park it in the hub, then open it again.`, "error");
+				return ctx.shutdown?.();
+			}
+			sessionLock = { file: sessionFile, info };
+		}
+		if (!hubActive() && sharedEntry(ctx) && event.reason !== "fork" && event.reason !== "new") {
 			try { await getWeb(ctx, sharedMode(ctx)); } catch (error) { report(ctx, error); }
 		}
 		const plan = currentPlan(ctx, await listPlans(ctx.cwd));
@@ -2282,6 +2296,7 @@ export default function plan3(pi) {
 		forcingArchitecture = undefined; // Never archive from a reconciliation owned by the previous conversation.
 		chat.reset(); activity.reset();
 		night.shutdown(); dialogs.close(); disposeDiagram(); activity.dispose(); webStopped = true;
+		if (sessionLock) { releaseSessionLock(sessionLock.file, sessionLock.info); sessionLock = undefined; }
 		// D1/D3: reload keeps the mapping for the next runtime; quit, new and fork remove it.
 		await Promise.all([closeWeb(), closePersistentOpenDesignClients(), event?.reason === "reload" ? undefined : unserve()]);
 	});

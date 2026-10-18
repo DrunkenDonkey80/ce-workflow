@@ -1402,6 +1402,31 @@ try {
 		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
 		await hooks.get("session_start")({ reason: "resume" }, webCtx);
 		assert.equal((await fetch(`${url.origin}/api/snapshot`, { headers })).status, 200, "resume restores the saved link");
+		// H3-05: under the hub, a resume never re-shares and the workspace server refuses to start.
+		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
+		process.env.PI_HUB = "1";
+		try {
+			await hooks.get("session_start")({ reason: "resume" }, webCtx);
+			await assert.rejects(fetch(`${url.origin}/api/snapshot`, { headers }), undefined, "no automatic re-share under the hub");
+			await listeners.get("plan3:share")({ ctx: webCtx, args: "local" });
+			assert.match(notices.at(-1).message, /pi-control-hub serves this session's workspace/);
+			await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
+		} finally { delete process.env.PI_HUB; }
+		// D9: a terminal Pi takes the session lock; a live holder (the hub) makes it refuse and shut down.
+		{
+			const sessionFile = path.join(cwd, "locked-session.jsonl"), lockFile = `${sessionFile}.lock`, shutdowns = [];
+			webCtx.sessionManager.getSessionFile = () => sessionFile; webCtx.shutdown = () => shutdowns.push(1);
+			await writeFile(lockFile, JSON.stringify({ pid: process.ppid, owner: "pi-control-hub", startedAt: 1 }));
+			await hooks.get("session_start")({ reason: "resume" }, webCtx);
+			assert.equal(shutdowns.length, 1); assert.match(notices.at(-1).message, /open in pi-control-hub \(pid \d+\)/);
+			await rm(lockFile);
+			await hooks.get("session_start")({ reason: "resume" }, webCtx);
+			assert.equal(JSON.parse(await readFile(lockFile, "utf8")).pid, process.pid, "the terminal Pi owns the lock");
+			await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
+			assert(!existsSync(lockFile), "released at shutdown");
+			delete webCtx.sessionManager.getSessionFile; delete webCtx.shutdown;
+		}
+		await hooks.get("session_start")({ reason: "resume" }, webCtx);
 		await hooks.get("session_shutdown")({ reason: "fork" }, webCtx);
 		const parentSession = sessionId; sessionId = randomUUID();
 		await hooks.get("session_start")({ reason: "fork" }, webCtx);
