@@ -10,7 +10,7 @@ async function start() {
  try {
   const pending = await call("/pair/start", { method: "POST" });
   if (pending.paired) { status.textContent = "Already paired. Loading…"; location.reload(); return; }
-  code.textContent = pending.code; status.textContent = "On the PC, open the hub (pi-hub open) and approve this device if it shows the same code.";
+  code.textContent = pending.code; status.textContent = "On the PC, run pi-hub open (the local hub page) and approve this device if it shows the same code. The tailnet page cannot approve.";
   for (;;) {
    const result = await call("/pair/status?id=" + encodeURIComponent(pending.id));
    if (result.state === "approved") { status.textContent = "Paired. Loading…"; location.reload(); return; }

@@ -83,9 +83,10 @@ try {
 	assert.equal((await remote("/pair/start", { method: "POST", origin: null })).status, 403, "a remote POST needs its Origin");
 
 	// Pairing: the local hub sees the device and code; the code page gets the cookie once after approval.
+	const stale = (await remote("/pair/start", { method: "POST" })).json();
 	const started = (await remote("/pair/start", { method: "POST" })).json();
 	assert.match(started.code, /^\d{3} \d{3}$/);
-	assert.equal((await remote("/pair/start", { method: "POST" })).status, 409, "one pending device at a time");
+	assert.equal((await remote(`/pair/status?id=${stale.id}`)).status, 404, "a reloaded pairing page replaces its older request");
 	assert.deepEqual((await local("/api/pairing")).body.pending, { code: started.code, label: "iPhone Safari", address: "unknown address", login: "me@example.com" });
 	const waiting = remote(`/pair/status?id=${started.id}`);
 	await new Promise(done => setTimeout(done, 100));

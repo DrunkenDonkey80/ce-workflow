@@ -116,7 +116,7 @@ export const deviceCookie = (value: string) => `pi_remote=${value}; HttpOnly; Se
 export const cookieOf = (header: string | undefined) => /(?:^|;\s*)pi_remote=([A-Za-z0-9._-]{1,200})(?:;|$)/.exec(header ?? "")?.[1];
 
 type Pairing = { id: string; code: string; label: string; address: string; login: string; state: "pending" | "approved" | "denied" | "expired"; cookie?: string; waiters: Set<() => void> };
-/** One pending request at a time, 2-minute codes, at most 5 starts per 10 minutes; the local hub approves or rejects it. */
+/** One pending request at a time (the newest wins), 2-minute codes, at most 5 starts per 10 minutes; the local hub approves or rejects it. */
 export function createPairing(devices: ReturnType<typeof createDeviceRegistry>) {
 	let pairing: Pairing | undefined, starts: number[] = [], timer: NodeJS.Timeout | undefined;
 	const settle = (entry: Pairing, state: Pairing["state"], cookie?: string) => {
@@ -129,7 +129,8 @@ export function createPairing(devices: ReturnType<typeof createDeviceRegistry>) 
 		start(headers: Record<string, string | string[] | undefined>, login: string) {
 			const time = Date.now();
 			starts = starts.filter(start => time - start < 600_000);
-			if (pairing?.state === "pending") throw fail(409, "Another device is waiting for approval at the PC.");
+			// A newer request replaces a pending one: a reloaded or retried pairing page must not lock itself out for 2 minutes.
+			if (pairing?.state === "pending") settle(pairing, "expired");
 			if (starts.length >= 5) throw fail(429, "Too many pairing attempts; wait a few minutes.");
 			starts.push(time);
 			const clean = (value: unknown, limit: number) => String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").slice(0, limit);
