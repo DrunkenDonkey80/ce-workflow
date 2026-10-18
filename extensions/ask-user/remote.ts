@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { ask as hubAsk, hubActive } from "../hub-channel.ts";
 
 export interface RemoteQuestion {
 	question: string;
@@ -51,9 +52,11 @@ export interface RemoteListPrompt {
 
 // The native popup and authenticated local browser race; remote answers close the losing UI by aborting its signal.
 export async function raceRemoteAsk<T>(pi: ExtensionAPI, subject: RemoteQuestion & { allowComment: boolean } | { questions: RemoteQuestion[]; allowComment: boolean } | RemoteListPrompt, signal: AbortSignal | undefined, timeout: number | undefined,
-	decode: (payload: unknown) => T | undefined, run: (signal: AbortSignal) => Promise<T | null>): Promise<T | null> {
+	decode: (payload: unknown) => T | undefined, run: (signal: AbortSignal) => Promise<T | null>, hubUi?: Parameters<typeof hubAsk>[0]): Promise<T | null> {
 	if (signal?.aborted) return null;
 	const askId = randomUUID(), local = new AbortController();
+	// Under pi-control-hub the hub draws the full form (D4); RPC's flattened select/input fallback is never shown.
+	if (hubUi && hubActive()) run = async hubSignal => decode(await hubAsk(hubUi, "ask", { ...subject, askId }, { signal: hubSignal })) ?? null;
 	let settled = false, resolve!: (value: T | null) => void, reject!: (reason: unknown) => void;
 	const result = new Promise<T | null>((yes, no) => { resolve = yes; reject = no; });
 	const finish = (value: T | null) => { if (settled) return; settled = true; resolve(value); local.abort(); };

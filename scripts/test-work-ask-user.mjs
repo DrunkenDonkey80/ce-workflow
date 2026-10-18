@@ -91,4 +91,41 @@ for (const external of [false, true]) {
  assert.equal(await pasteClipboardImage(async () => undefined, dir), undefined); assert.equal(await pasteClipboardImage(async () => Uint8Array.from([1, 2, 3]), dir), undefined);
  rmSync(dir, { recursive: true });
 }
+
+// Under pi-control-hub (H3-02): the full ask goes through the hub channel, never RPC's flattened select/input.
+{
+ process.env.PI_HUB = "1";
+ const sent = [], closed = [];
+ const parse = text => { try { return JSON.parse(text); } catch { assert.fail(`channel sent non-JSON: ${text}`); } };
+ const hubUi = answer => ({
+  custom: () => assert.fail("no local popup under the hub"), select: () => assert.fail("no flattened select"), editor: () => assert.fail("no editor"),
+  setStatus: (key, text) => key === "pi-hub:closed" && closed.push(parse(text).id),
+  input: async (title, placeholder) => { sent.push({ title, ...parse(placeholder) }); return answer && JSON.stringify(answer); },
+ });
+ const pending = [];
+ bus.on("ask:pending", event => pending.push(event.askId));
+ const single = await tool.execute("hub", { ...question, context: "Why", allowComment: true }, undefined, undefined, { hasUI: true, ui: hubUi({ selections: ["Ship"], comment: "now" }) });
+ assert.deepEqual(single.details.response, { kind: "selection", selections: ["Ship"], comment: "now" });
+ assert.equal(sent[0].title, "pi-hub:ask");
+ assert.equal(sent[0].data.question, "Ship?");
+ assert.equal(sent[0].data.context, "Why");
+ assert.deepEqual(sent[0].data.options.map(option => option.title), ["Ship", "Hold"]);
+ assert.equal(sent[0].data.askId, pending[0], "the hub gets the same askId as intercom and the web");
+ assert.deepEqual(closed, [sent[0].id]);
+ const many = await tool.execute("hub-batch", { questions: [question, { ...question, question: "Deploy?" }] }, undefined, undefined, { hasUI: true, ui: hubUi({ answers: [{ status: "skipped" }, { status: "answered", response: { kind: "selection", selections: ["Hold"] } }] }) });
+ assert.equal(sent[1].data.questions.length, 2);
+ assert.deepEqual(many.details.answers, [{ status: "skipped" }, { status: "answered", response: { kind: "selection", selections: ["Hold"] } }]);
+ const cancelled = await tool.execute("hub-cancel", question, undefined, undefined, { hasUI: true, ui: hubUi(undefined) });
+ assert.equal(cancelled.details.cancelled, true, "hub cancel cancels");
+ const invalid = await tool.execute("hub-bad", question, undefined, undefined, { hasUI: true, ui: hubUi({ selections: ["Nope"] }) });
+ assert.equal(invalid.details.cancelled, true, "an answer that fits no option counts as cancelled");
+ // Intercom/web still race: an ask:answer wins and aborts the hub form.
+ let aborted = false;
+ bus.once("ask:pending", event => setImmediate(() => bus.emit("ask:answer", { askId: event.askId, text: "Hold" })));
+ const raced = await tool.execute("hub-race", question, undefined, undefined, { hasUI: true, ui: { ...hubUi(), input: (_t, _p, { signal }) => new Promise(resolve => signal.addEventListener("abort", () => { aborted = true; resolve(undefined); })) } });
+ assert.deepEqual(raced.details.response, { kind: "selection", selections: ["Hold"] });
+ assert(aborted, "the hub form is withdrawn when another answer wins");
+ bus.removeAllListeners("ask:pending");
+ delete process.env.PI_HUB;
+}
 console.log("ok - vendored ask_user single/batch races and coexistence");

@@ -2785,7 +2785,7 @@ async function executeBatch(
          createComponent: (tui, theme, keybindings, complete) =>
             new BatchAskComponent(questions, settings, tui, theme, keybindings, complete),
          fallback: () => askBatchViaDialogs(ctx.ui, questions, settings.allowComment, localSignal, deadline),
-      })));
+      }), ctx.ui));
    } finally {
       if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
       signal?.removeEventListener("abort", forwardAbort);
@@ -3058,7 +3058,7 @@ export function registerAskUser(pi: ExtensionAPI) {
                payload => remoteResponse(payload, remoteSubject, allowComment), async localSignal => {
                   const answer = await ctx.ui.input(prompt, "Type your answer...", { ...dialogOpts, signal: localSignal });
                   return localSignal.aborted ? null : createFreeformResponse(answer);
-               }));
+               }, ctx.ui));
 
             if (!response) {
                events.cancelled(subject);
@@ -3118,7 +3118,7 @@ ${normalizedContext}` : question, initialText))
                allowComment,
                { ...dialogOpts, signal: localSignal },
             ),
-         })));
+         }), ctx.ui));
 
          if (signal?.aborted || result === null) {
             events.cancelled(subject);
