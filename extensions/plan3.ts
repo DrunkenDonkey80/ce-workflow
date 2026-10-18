@@ -805,7 +805,7 @@ export default function plan3(pi) {
 	async function resolveWebTarget(target: WebTarget): Promise<{ kind: "product" } | { kind: "plan"; plan: ReturnType<typeof summarize> }> {
 		if (!webCtx) throw new WebError(409, "Workspace needs a current command context; reopen /plan3 diagram.");
 		if (target.kind === "product") return { kind: "product" };
-		const plan = await resolvePlan(webCtx.cwd, target.id, await listPlans(webCtx.cwd));
+		const plan = await resolvePlan(webCtx.cwd, target.id, await listPlans(webCtx.cwd)).catch(() => undefined); // resolvePlan throws on unknown ids
 		if (!plan) throw new WebError(404, "Displayed plan no longer exists.");
 		return { kind: "plan", plan };
 	}
@@ -2182,6 +2182,21 @@ export default function plan3(pi) {
 	} };
 	pi.registerCommand("plans3", commands.plans3);
 	pi.registerCommand("resume3", commands.resume3);
+	// H3-09: the hub calls the page's plan operations with the browser's chosen plan; the result comes back by id as pi-hub:result.
+	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move"]);
+	if (hubActive()) pi.registerCommand("pi-hub", {
+		description: "Internal: pi-control-hub calls (only present when the hub started this Pi)",
+		handler: async (args, ctx) => {
+			let call;
+			try { call = JSON.parse(args); } catch { call = undefined; }
+			if (typeof call?.id !== "string" || !call.id) return; // nobody to answer
+			const reply = (result) => hubPublish(ctx.ui, "result", { id: call.id, ...result });
+			if (!HUB_CALLS.has(call.endpoint) || !call.data || typeof call.data !== "object" || Array.isArray(call.data)) return reply({ ok: false, status: 400, error: "Unknown hub call." });
+			webCtx = ctx; // the hub has no web server; postWeb and resolveWebTarget read this session's context
+			try { reply({ ok: true, value: await postWeb(call.endpoint, call.data) }); }
+			catch (error) { reply({ ok: false, status: error.status ?? 500, error: error.message }); }
+		},
+	});
 	// /wo plan|plans|resume forward here.
 	pi.events?.on?.("plan3:command", ({ ctx, name, args = "" }) => commands[name]?.handler(args, ctx));
 	pi.events?.on?.("plan3:share", async ({ ctx, args = "" }) => {

@@ -74,7 +74,9 @@ const api = {
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
 };
+process.env.PI_HUB = "1"; // registers the hidden /pi-hub command (H3-09); every other hub path checks PI_HUB at call time
 plan3(api);
+delete process.env.PI_HUB;
 const run = (name, args = "") => commands.get(name).handler(args, ctx);
 const tool = async (args) => (await tools.get("plan3").execute("call", args, undefined, undefined, ctx)).details;
 const diagram = async args => (await tools.get("plan3_diagram").execute("diagram-call", args, undefined, undefined, ctx)).details;
@@ -87,7 +89,7 @@ const validPlan = (_id, title, status, stepsText, extra = "") => `---\nplan3: tr
 try {
 	const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 	assert(manifest.pi.extensions.includes("extensions/plan3.ts"));
-	assert.deepEqual([...commands.keys()], ["night", "plan3", "plans3", "resume3"]);
+	assert.deepEqual([...commands.keys()], ["night", "plan3", "plans3", "resume3", "pi-hub"]);
 	assert(tools.has("plan3") && tools.get("plan3").promptSnippet);
 	assert.deepEqual(commands.get("plan3").getArgumentCompletions("re").map((item) => item.value), ["resolve", "review", "review all"]);
 
@@ -906,6 +908,26 @@ try {
 	await run("plan3", "review");
 	assert.match(messages.at(-1).message, /agent: "plan3-advisor", model: "openai-codex\/gpt-6-astra:high", context: "fresh", async: true/);
 	assert(messages.at(-1).message.includes(JSON.stringify(csvFile)) && /authorized this delegation by running \/plan3 review/.test(messages.at(-1).message));
+	// H3-09: the hub runs a plan command on the browser's plan B while the session's current plan is A; results come back by id.
+	{
+		const results = [], setStatus = ctx.ui.setStatus;
+		ctx.ui.setStatus = (key, value) => { if (key === "pi-hub:result") results.push(JSON.parse(value)); else setStatus(key, value); };
+		const bFile = path.join(directory, "2026-10-09-plan-b-b0b0b0b0-plan3.md");
+		await writeFile(bFile, validPlan("b0b0b0b0", "Plan B", "ready", "- [ ] **B-01** Do"));
+		process.env.PI_HUB = "1";
+		try {
+			await run("pi-hub", JSON.stringify({ id: "c1", endpoint: "/api/command", data: { target: "b0b0b0b0", command: "review" } }));
+			assert.deepEqual(results.at(-1), { id: "c1", ok: true, value: { ok: true } });
+			assert(messages.at(-1).message.includes(JSON.stringify(bFile)), "the browser's plan, not the current one");
+			await run("pi-hub", JSON.stringify({ id: "c2", endpoint: "/api/command", data: { target: "ffffffff", command: "review" } }));
+			assert.deepEqual([results.at(-1).id, results.at(-1).ok, results.at(-1).status], ["c2", false, 404]);
+			await run("pi-hub", JSON.stringify({ id: "c3", endpoint: "/api/answer", data: {} }));
+			assert.deepEqual(results.at(-1), { id: "c3", ok: false, status: 400, error: "Unknown hub call." }, "only the fixed list");
+			const count = results.length;
+			await run("pi-hub", "not json");
+			assert.equal(results.length, count, "no id, no reply");
+		} finally { delete process.env.PI_HUB; ctx.ui.setStatus = setStatus; await rm(bFile); entries.push({ type: "custom", customType: "plan3-current", data: { id: firstId, planning: false } }); }
+	}
 	ctx.model = { provider: "openai-codex", id: "gpt-6-astra" };
 	await run("plan3", "ideas for caching");
 	assert.match(messages.at(-1).message, /model: "anthropic\/claude-opus-5-5:high"/);
