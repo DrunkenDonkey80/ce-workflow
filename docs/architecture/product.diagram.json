@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 5,
+  "revision": 7,
   "nodes": [
     {
       "id": "pi_host",
@@ -25,7 +25,7 @@
       "parent": "plan3_group",
       "summary": "/plan3, /plans3, /resume3 commands plus plan3, plan3_diagram, plan3_design tools.",
       "tech": "extensions/plan3.ts",
-      "details": "Owns plan Markdown parsing, step marks, research mode, model phases, architecture reconciliation gate (D8/D15), the browser workspace lifecycle and the Generate directions prompt (no automatic product-diagram offer)."
+      "details": "Owns plan Markdown parsing, step marks, research mode, model phases, architecture reconciliation gate (D8/D15), the Generate directions prompt and the hidden /pi-hub command answering hub page calls."
     },
     {
       "id": "plan3_ideas",
@@ -123,9 +123,9 @@
     },
     {
       "id": "workspace_group",
-      "label": "Architecture workspace",
+      "label": "Diagrams and hub link",
       "kind": "group",
-      "summary": "Plan 0899f7c0: browser diagram + live chat workspace."
+      "summary": "Plan 0db155f7: pi-control-hub serves the web; ce-workflow keeps the diagram model and hub calls."
     },
     {
       "id": "plan3_diagram",
@@ -137,21 +137,12 @@
     },
     {
       "id": "plan3_web",
-      "label": "Local workspace server",
+      "label": "Hub page helpers",
       "kind": "service",
       "parent": "workspace_group",
-      "summary": "127.0.0.1 HTTP + SSE per shared session (stable port/token); token, Origin and tailnet+paired-cookie checks; chat, activity, dialog, status, model/effort, files, diagram edit and Generate endpoints.",
+      "summary": "Plan targets, diagram chat forwarding and the activity mirror the hub reads; no server.",
       "tech": "extensions/plan3-web.ts",
-      "details": "Serves browser .ts assets after stripTypeScriptTypes; command dispatch and Stop via ctx.abort. Authenticated image-paste endpoint validates image bytes and writes a temporary file; revision-checked note/move endpoints and HTTP/SSE snapshots synchronize the browser."
-    },
-    {
-      "id": "browser_app",
-      "label": "Workspace browser app",
-      "kind": "client",
-      "parent": "workspace_group",
-      "summary": "Rough.js diagram with Project/Plan tabs and a desktop editing bar, chat with status line (model/effort/plan menus), Files tab, mobile tabs, prompts and the shared-session switcher.",
-      "tech": "extensions/plan3-web/{app,diagram,layout,prompts}.ts, vendored Rough.js",
-      "details": "Grid-packed groups with orthogonal edge routing and calm bundled connections; semantic zoom, tinted cards, Ctrl+F search. Drag a box to move it (persisted), drag empty canvas to pan. The editing bar adds boxes/groups, connects, deletes, renames, recolors and resizes as red pending edits; each adds a chat line tied to its diagram, and undoing an unsent add drops its lines. Generate asks for remembered directions. Collapsed thinking/tool chat blocks, auto-follow with jump-to-bottom, image paste to a temporary file path, and right-click note composition. Browser commands and question dialogs share the live terminal session."
+      "details": "WebError, webTarget, forwardDiagramChat, createActivityMirror. The hub calls plan operations through the hidden /pi-hub command in plan3.ts."
     },
     {
       "id": "ask_group",
@@ -197,14 +188,6 @@
       "parent": "workflow_group",
       "summary": "/wo menus, model phases, compaction profiles, knowledge, images, camera, footer, scout.",
       "tech": "extensions/work-models.ts"
-    },
-    {
-      "id": "work_dialogs",
-      "label": "Shared dialogs",
-      "kind": "service",
-      "parent": "workflow_group",
-      "summary": "Overlay list/checklist dialogs, model picker, browser list bridge.",
-      "tech": "extensions/work-dialogs.ts"
     },
     {
       "id": "compaction",
@@ -335,12 +318,6 @@
       "tech": "extensions/work-store.ts"
     },
     {
-      "id": "user_browser",
-      "label": "User's browser",
-      "kind": "external",
-      "summary": "Desktop localhost link with token, or a paired phone over the tailnet."
-    },
-    {
       "id": "opendesign_app",
       "label": "OpenDesign app",
       "kind": "external",
@@ -365,32 +342,18 @@
       "summary": "Optional peer for cross-session messages."
     },
     {
-      "id": "plan3_remote",
-      "label": "Remote sharing",
+      "id": "hub_channel",
+      "label": "Hub channel",
       "kind": "service",
       "parent": "workspace_group",
-      "summary": "Share records, tailscale serve on/off, machine-wide paired-device registry, per-session switcher records.",
-      "tech": "extensions/plan3-remote.ts"
+      "summary": "RPC side channel to pi-control-hub: ask via a marked input dialog, publish via setStatus keys; session lock.",
+      "tech": "extensions/hub-channel.ts, session-lock.ts"
     },
     {
-      "id": "plan3_files",
-      "label": "Project files view",
-      "kind": "service",
-      "parent": "workspace_group",
-      "summary": "Read-only tree without ignored/secret files, git change marks, content and diff.",
-      "tech": "extensions/plan3-files.ts"
-    },
-    {
-      "id": "remote_state",
-      "label": "Remote state",
-      "kind": "store",
-      "summary": "~/.pi/agent/ce-workflow/remote: per-session token/port, devices.json, sessions/*.json (outside the repo)."
-    },
-    {
-      "id": "tailscale",
-      "label": "Tailscale",
+      "id": "pi_control_hub",
+      "label": "pi-control-hub",
       "kind": "external",
-      "summary": "tailscale serve: tailnet-only HTTPS with verified login header; never Funnel."
+      "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms."
     }
   ],
   "edges": [
@@ -493,14 +456,8 @@
     {
       "from": "plan3",
       "to": "plan3_web",
-      "label": "starts/stops",
+      "label": "page operations",
       "id": "plan3__plan3_web"
-    },
-    {
-      "from": "plan3",
-      "to": "work_dialogs",
-      "label": "menus",
-      "id": "plan3__work_dialogs"
     },
     {
       "from": "plan3",
@@ -570,33 +527,9 @@
     },
     {
       "from": "plan3_web",
-      "to": "ask_remote",
-      "label": "answer race",
-      "id": "plan3_web__ask_remote"
-    },
-    {
-      "from": "plan3_web",
-      "to": "work_dialogs",
-      "label": "list bridge",
-      "id": "plan3_web__work_dialogs"
-    },
-    {
-      "from": "plan3_web",
       "to": "pi_host",
-      "label": "sendUserMessage, abort, events",
+      "label": "sendUserMessage, events",
       "id": "plan3_web__pi_host"
-    },
-    {
-      "from": "user_browser",
-      "to": "browser_app",
-      "label": "runs",
-      "id": "user_browser__browser_app"
-    },
-    {
-      "from": "browser_app",
-      "to": "plan3_web",
-      "label": "HTTP + SSE",
-      "id": "browser_app__plan3_web"
     },
     {
       "from": "ask_user",
@@ -615,12 +548,6 @@
       "to": "pi_intercom",
       "label": "messages",
       "id": "work_ask_remote__pi_intercom"
-    },
-    {
-      "from": "work_models",
-      "to": "work_dialogs",
-      "label": "menus",
-      "id": "work_models__work_dialogs"
     },
     {
       "from": "work_models",
@@ -713,40 +640,34 @@
       "id": "advisor_model__pi_subagents"
     },
     {
-      "from": "plan3_web",
-      "to": "plan3_remote",
-      "label": "pairing, devices, sessions",
-      "id": "plan3_web__plan3_remote"
+      "from": "pi_control_hub",
+      "to": "plan3",
+      "label": "/pi-hub calls",
+      "id": "pi_control_hub__plan3"
     },
     {
-      "from": "plan3_remote",
-      "to": "remote_state",
-      "label": "reads/writes",
-      "id": "plan3_remote__remote_state"
+      "from": "plan3",
+      "to": "hub_channel",
+      "label": "publishes state, results",
+      "id": "plan3__hub_channel"
     },
     {
-      "from": "plan3_remote",
-      "to": "tailscale",
-      "label": "serve add/remove",
-      "id": "plan3_remote__tailscale"
+      "from": "ask_remote",
+      "to": "hub_channel",
+      "label": "hub forms",
+      "id": "ask_remote__hub_channel"
     },
     {
-      "from": "tailscale",
-      "to": "plan3_web",
-      "label": "HTTPS proxy + login header",
-      "id": "tailscale__plan3_web"
+      "from": "hub_channel",
+      "to": "pi_control_hub",
+      "label": "RPC",
+      "id": "hub_channel__pi_control_hub"
     },
     {
-      "from": "plan3_web",
-      "to": "plan3_files",
-      "label": "tree, content, diff",
-      "id": "plan3_web__plan3_files"
-    },
-    {
-      "from": "user_browser",
-      "to": "tailscale",
-      "label": "phone over tailnet",
-      "id": "user_browser__tailscale"
+      "from": "plan3",
+      "to": "ask_user",
+      "label": "menus",
+      "id": "plan3__ask_user"
     }
   ],
   "notes": []

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { createServer, request as httpRequest } from "node:http";
+import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -32,8 +32,7 @@ process.env.PI_CODING_AGENT_DIR = agentDir;
 const commands = new Map(), tools = new Map(), hooks = new Map(), listeners = new Map(), shortcuts = new Map();
 const messages = [], notices = [], events = [], planEvents = [], statuses = [], execCalls = [];
 let execResult = { code: 0, stdout: "", stderr: "", killed: false };
-const tailscaleCalls = []; let tailscale = () => { throw Object.assign(new Error("spawn tailscale ENOENT"), { code: "ENOENT" }); };
-let entries = [], sessionId = randomUUID(), sharedStatus;
+let entries = [], sessionId = randomUUID();
 let idle = true, tokens = 0, compactions = 0, compactFails = false, compactError = "boom", selectScript = [];
 const ctx = {
 	cwd,
@@ -46,7 +45,7 @@ const ctx = {
 	sessionManager: { getBranch: () => entries, getSessionId: () => sessionId },
 	ui: {
 		notify: (message, severity) => notices.push({ message, severity }),
-		setStatus: (key, value) => { if (key === "plan3") statuses.push(value); if (key === "plan3-shared") sharedStatus = value; },
+		setStatus: (key, value) => { if (key === "plan3") statuses.push(value); },
 		select: async (title, labels) => {
 			const step = selectScript.shift();
 			assert(step, `unexpected dialog ${title}: ${labels.join(" | ")}`);
@@ -65,7 +64,7 @@ const api = {
 	setThinkingLevel: (level) => { thinking = level; },
 	setModel: async (model) => { if (model.id === "no-auth") return false; ctx.model = model; return true; },
 	getAllTools: () => askSource ? [{ name: "ask_user", sourceInfo: { path: askSource } }] : [],
-	exec: async (command, args, options) => { if (/(^|[\\/])tailscale(\.exe)?$/i.test(command)) { tailscaleCalls.push(args.join(" ")); return tailscale(args); } execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
+	exec: async (command, args, options) => { execCalls.push({ command, args, options }); if (execResult instanceof Error) throw execResult; return execResult; },
 	registerCommand: (name, command) => commands.set(name, command),
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
@@ -1188,8 +1187,17 @@ try {
 	const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
 	const nativePlan3 = await createJiti(import.meta.url, { moduleCache: false, virtualModules: VIRTUAL_MODULES }).import("../extensions/plan3.ts", { default: true });
 	await hooks.get("session_shutdown")(); // Dispose the first runtime before testing the SDK loader's fresh runtime.
-	nativePlan3(api);
-	// Public workspace commands reuse one listener/token and pin B even while A is current.
+	process.env.PI_HUB = "1"; nativePlan3(api); delete process.env.PI_HUB; // registers this runtime's /pi-hub
+	// One hub page call (H3-09) answered by id; calls may nest, as Finish waits on compaction while others run.
+	const hubPage = async (endpoint, data, context = ctx) => {
+		const id = randomUUID(), had = process.env.PI_HUB, setStatus = context.ui.setStatus; let result;
+		context.ui.setStatus = (key, value) => { if (key === "pi-hub:result" && JSON.parse(value).id === id) result = JSON.parse(value); else setStatus(key, value); };
+		process.env.PI_HUB = "1";
+		try { await commands.get("pi-hub").handler(JSON.stringify({ id, endpoint, data }), context); }
+		finally { context.ui.setStatus = setStatus; if (had === undefined) delete process.env.PI_HUB; }
+		return result.ok ? { status: 200, body: result.value } : { status: result.status, body: { error: result.error } };
+	};
+	// Hub page calls (H3-09) on plan B while A is current; ce-workflow itself serves no page (H9-01).
 	{
 		const savedEntries = entries, savedMessages = messages.length, savedTokens = tokens;
 		const webCwd = path.join(cwd, "web-command-unit"), plansDir = path.join(webCwd, "docs", "plans");
@@ -1203,36 +1211,21 @@ try {
 		const webCtx = { ...ctx, cwd: webCwd, hasUI: false, isIdle: () => { if (expired) throw new Error("retired context"); return idle; } };
 		const webDiagram = async args => (await tools.get("plan3_diagram").execute("web-diagram", args, undefined, undefined, webCtx)).details;
 		await webDiagram({ action: "apply", plan: b, expectedRevision: 0, operations: [{ op: "add", entity: "node", value: { id: "api", label: "B API", kind: "service" } }] });
-		const open = async args => { await commands.get("plan3").handler(args, webCtx); return new URL(notices.at(-1).message.replace("Plan3 workspace: ", "")); };
-		const url = await open(`diagram ${b}`), token = url.searchParams.get("token");
-		assert.equal(url.searchParams.get("target"), b);
-		assert.equal(entries.findLast(entry => entry.customType === "plan3-current").data.id, a, "opening B does not silently change the current plan");
-		assert.deepEqual(entries.findLast(entry => entry.customType === "plan3-shared").data, { shared: true, mode: "local" }, "credentials are not stored in the conversation");
-		assert.equal((await open(`uml ${b}`)).href, url.href);
-		// G-02: opening a workspace only opens it; Generate (G-01) is the one way to request a diagram.
+		const hubCall = (endpoint, data) => hubPage(endpoint, data, webCtx);
+		const post = (endpoint, value) => hubCall(`/api/${endpoint}`, { target, ...value });
+		// G-02: /plan3 diagram only points at pi-control-hub; it sends nothing and creates nothing.
 		webCtx.hasUI = true; const beforeOpen = messages.length;
-		await open(`diagram ${b}`); await open("architecture");
+		await commands.get("plan3").handler(`diagram ${b}`, webCtx); assert.match(notices.at(-1).message, /pi-control-hub/);
+		await commands.get("plan3").handler("architecture", webCtx);
 		assert.equal(messages.length, beforeOpen, "opening a diagram sends no generate prompt");
 		assert(!existsSync(path.join(webCwd, "docs", "architecture", "product.diagram.json")), "opening never creates the product diagram");
+		assert.equal(entries.findLast(entry => entry.customType === "plan3-current").data.id, a, "opening B does not change the current plan");
 		await webDiagram({ action: "apply", target: "product", expectedRevision: 0, operations: [{ op: "add", entity: "node", value: { id: "core", label: "Core", kind: "service" } }] }); // the product diagram Finish reconciles below
 		webCtx.hasUI = false;
-		const productUrl = await open("architecture");
-		assert.equal(productUrl.origin, url.origin); assert.equal(productUrl.searchParams.get("token"), token);
-		assert.equal(productUrl.searchParams.get("target"), "product");
-		const headers = { Authorization: `Bearer ${token}`, Origin: url.origin, "Content-Type": "application/json" };
-		const post = async (endpoint, value) => { const response = await fetch(`${url.origin}/api/${endpoint}`, { method: "POST", headers, body: JSON.stringify({ target, ...value }) }); return { status: response.status, body: await response.json() }; };
-		const snapshot = async () => { const response = await fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }); assert.equal(response.status, 200); return response.json(); };
-		assert.equal((await snapshot()).plan.id, b);
-		assert.equal((await fetch(`${url.origin}/api/snapshot?target=${b}`)).status, 401);
-		const sessionSnapshot = await fetch(`${url.origin}/api/snapshot`, { headers });
-		assert.equal(sessionSnapshot.status, 200);
-		assert((await sessionSnapshot.json()).chat, "session snapshot does not need a diagram target");
-		assert.equal((await fetch(`${url.origin}/api/command`, { method: "POST", headers: { ...headers, Origin: "https://foreign.example" }, body: JSON.stringify({ target, command: "review" }) })).status, 403);
 		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 12, y: 34 })).status, 200);
 		assert.equal((await post("move", { expectedRevision: 1, id: "api", x: 99, y: 99 })).status, 409);
 		assert.equal((await post("comment", { expectedRevision: 2, element: "api", text: "Keep this boundary" })).status, 200);
-		const full = await snapshot(); assert.equal(full.diagram, undefined, "check-in snapshot leaves the diagram to /api/diagram"); assert(Buffer.byteLength(JSON.stringify(full)) <= 64_000);
-		const edited = (await (await fetch(`${url.origin}/api/diagram?target=${b}`, { headers })).json()).diagram;
+		const edited = (await webDiagram({ action: "get", plan: b })).diagram;
 		assert.deepEqual([edited.nodes[0].x, edited.nodes[0].y], [12, 34]);
 		// E-01: toolbar edits are saved at once with server-side pending marks and one chat line each.
 		{
@@ -1278,37 +1271,20 @@ try {
 			assert.deepEqual(undone.body.removed, [zone], "undoing a drawn group keeps the settled box it adopted (D13)"); assert.equal(find(undone, "api").parent, undefined);
 			await webDiagram({ action: "apply", plan: b, expectedRevision: revision, operations: [...["new_group", "new_box", "new_box_2"].map(id => ({ op: "remove", entity: "node", id })), { op: "settle", entity: "node", id: "api" }] });
 		}
-		const files = await (await fetch(`${url.origin}/api/files`, { headers })).json();
-		assert(Array.isArray(files.files) && files.files.length > 0, "the Files API lists the project");
-		const planFile = files.files.find(file => file.path.endsWith("-plan3.md")).path;
-		const shown = await (await fetch(`${url.origin}/api/file?path=${encodeURIComponent(planFile)}`, { headers })).json();
-		assert(shown.content?.includes("## Decisions"), JSON.stringify(shown).slice(0, 300));
-		assert.equal((await fetch(`${url.origin}/api/file?path=.env`, { headers })).status, 403, "secret-shaped paths are refused");
-		assert.equal((await fetch(`${url.origin}/api/file?path=x`)).status, 401, "the Files API needs the capability");
-		// D19: model and effort for the same session, scoped models first.
-		const savedFind = ctx.modelRegistry.find, savedModelRef = ctx.model, savedWebModel = webCtx.model;
-		// Pi's ctx.model is a live getter; the spread copy above is not.
-		webCtx.scopedModels = [{ model: { provider: "zai", id: "glm-5.3", name: "GLM" } }]; ctx.modelRegistry.find = (provider, id) => ({ provider, id }); Object.defineProperty(webCtx, "model", { get: () => ctx.model, configurable: true });
+		// D19: the hub reads this session's scoped and available models.
+		const savedFind = ctx.modelRegistry.find;
+		webCtx.scopedModels = [{ model: { provider: "zai", id: "glm-5.3", name: "GLM" } }]; ctx.modelRegistry.find = (provider, id) => ({ provider, id });
 		try {
-			const models = await (await fetch(`${url.origin}/api/models`, { headers })).json();
+			const models = (await hubCall("/api/models", {})).body;
 			assert.deepEqual(models.scoped, [{ provider: "zai", id: "glm-5.3", name: "GLM" }]);
 			assert(!models.others.some(model => model.id === "glm-5.3") && models.others.length === 3 && models.efforts.includes("xhigh"));
-			const switched = await post("model", { provider: "anthropic", id: "claude-opus-4" });
-			assert.equal(switched.status, 200); assert.equal(ctx.model.id, "claude-opus-4"); assert.equal(switched.body.model.id, "claude-opus-4");
-			assert.equal((await post("model", { provider: "evil", id: "x" })).status, 404, "only available models");
-			assert.equal((await post("model", { provider: "zai", id: "glm-5.3", extra: 1 })).status, 400);
-			const effort = await post("effort", { level: "low" });
-			assert.equal(effort.status, 200); assert.equal(thinking, "low"); assert.equal(effort.body.effort, "low");
-			assert.equal((await post("effort", { level: "turbo" })).status, 400);
-			assert.deepEqual((await snapshot()).status, { model: { provider: "anthropic", id: "claude-opus-4", name: "claude-opus-4" }, effort: "low", context: null, folder: "web-command-unit", tab: "", modes: { research: "off", night: "off" } });
-			// D17: a command that never returns must not hold the request or the server.
 			const savedSend = api.sendUserMessage; api.sendUserMessage = () => new Promise(() => {});
 			try {
 				const started = Date.now(), hung = await post("message", { text: "/plan3 hang" });
 				assert.equal(hung.status, 200); assert(Date.now() - started < 2000, "the message request returns before the command settles");
-				assert.equal((await fetch(`${url.origin}/api/models`, { headers })).status, 200, "the server keeps serving");
+				assert.equal((await hubCall("/api/models", {})).status, 200, "the session keeps answering");
 			} finally { api.sendUserMessage = savedSend; }
-		} finally { thinking = "high"; webCtx.scopedModels = []; ctx.modelRegistry.find = savedFind; ctx.model = savedModelRef; Object.defineProperty(webCtx, "model", { value: savedWebModel, writable: true, configurable: true }); }
+		} finally { webCtx.scopedModels = []; ctx.modelRegistry.find = savedFind; }
 		assert.equal(edited.notes[0].author, "user"); assert.equal(edited.notes[0].target, "api");
 		const sent = await post("message", { text: "Discuss @api", comments: [edited.notes[0].id] });
 		assert.equal(sent.status, 200); assert.deepEqual(sent.body.mentions, ["api"]);
@@ -1325,10 +1301,6 @@ try {
 		assert.equal((await post("command", { command: "review" })).status, 200);
 		assert(messages.at(-1).message.includes(JSON.stringify(bFile))); assert(!messages.at(-1).message.includes(JSON.stringify(aFile)));
 		idle = false; assert.equal((await post("command", { command: "review" })).status, 409); idle = true;
-		let aborts = 0; webCtx.abort = async () => { aborts++; idle = true; };
-		assert.equal((await post("stop", {})).status, 409); assert.equal(aborts, 0);
-		idle = false; assert.equal((await post("stop", { extra: true })).status, 400);
-		assert.equal((await post("stop", {})).status, 200); assert.equal(aborts, 1);
 		let finishCallbacks, entered;
 		const compactEntered = new Promise(resolve => { entered = resolve; });
 		tokens = 25_000; webCtx.compact = callbacks => { finishCallbacks = callbacks; entered(); };
@@ -1340,16 +1312,7 @@ try {
 		finishCallbacks.onComplete({}); const finished = await finishRequest; assert.equal(finished.status, 200, JSON.stringify(finished.body));
 		assert.match(await readFile(bFile, "utf8"), /^status: ready$/m); assert.match(await readFile(aFile, "utf8"), /^status: draft$/m);
 		webCtx.compact = ctx.compact; tokens = 0;
-		// The SDK jiti runtime also shares the list bridge; browser cancellation releases the command guard.
-		webCtx.hasUI = true;
-		selectScript = [["Plan ready", null, async () => {
-			const pending = (await snapshot()).dialogs;
-			assert.equal(pending.length, 1); assert.equal(pending[0].kind, "list");
-			assert.equal((await post("command", { command: "finish" })).status, 409);
-			assert.equal((await post("answer", { askId: pending[0].askId, cancel: true })).body.accepted, true);
-		}]];
-		assert.equal((await post("command", { command: "finish" })).status, 200); assert.equal(selectScript.length, 0);
-		webCtx.hasUI = false;
+		assert.equal((await post("command", { command: "finish" })).status, 200);
 		assert.equal((await readFile(bFile, "utf8")).match(/\*\*ARCH-RECONCILE\*\*/g).length, 1, "repeated finish adds architecture phase once");
 		const webPlan = async args => (await tools.get("plan3").execute("web-plan", args, undefined, undefined, webCtx)).details;
 		const c = "c3333333", cFile = path.join(plansDir, `2026-10-13-c-${c}-plan3.md`);
@@ -1403,23 +1366,7 @@ try {
 		assert.equal((await post("command", { command: "resume" })).status, 200);
 		assert(messages.at(-1).message.includes(JSON.stringify(bFile))); assert.match(messages.at(-1).message, /execute\/resume/);
 		expired = true; assert.equal((await post("command", { command: "review" })).status, 409); expired = false;
-		await open(`diagram ${b}`); assert.equal((await post("command", { command: "review" })).status, 200);
-		await hooks.get("session_shutdown")({ reason: "reload" }, webCtx);
-		await hooks.get("session_start")({ reason: "reload" }, webCtx);
-		assert.equal((await fetch(`${url.origin}/api/snapshot`, { headers })).status, 200, "reload restores the same port and capability");
-		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
-		await hooks.get("session_start")({ reason: "resume" }, webCtx);
-		assert.equal((await fetch(`${url.origin}/api/snapshot`, { headers })).status, 200, "resume restores the saved link");
-		// H3-05: under the hub, a resume never re-shares and the workspace server refuses to start.
-		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
-		process.env.PI_HUB = "1";
-		try {
-			await hooks.get("session_start")({ reason: "resume" }, webCtx);
-			await assert.rejects(fetch(`${url.origin}/api/snapshot`, { headers }), undefined, "no automatic re-share under the hub");
-			await listeners.get("plan3:share")({ ctx: webCtx, args: "local" });
-			assert.match(notices.at(-1).message, /pi-control-hub serves this session's workspace/);
-			await hooks.get("session_shutdown")({ reason: "quit" }, webCtx);
-		} finally { delete process.env.PI_HUB; }
+		assert.equal((await post("command", { command: "review" })).status, 200);
 		// D9: a terminal Pi takes the session lock; a live holder (the hub) makes it refuse and shut down.
 		{
 			const sessionFile = path.join(cwd, "locked-session.jsonl"), lockFile = `${sessionFile}.lock`, shutdowns = [];
@@ -1434,60 +1381,6 @@ try {
 			assert(!existsSync(lockFile), "released at shutdown");
 			delete webCtx.sessionManager.getSessionFile; delete webCtx.shutdown;
 		}
-		await hooks.get("session_start")({ reason: "resume" }, webCtx);
-		await hooks.get("session_shutdown")({ reason: "fork" }, webCtx);
-		const parentSession = sessionId; sessionId = randomUUID();
-		await hooks.get("session_start")({ reason: "fork" }, webCtx);
-		await assert.rejects(fetch(`${url.origin}/api/snapshot`, { headers }), undefined, "a fork copies the shared entry but never serves the parent's link");
-		sessionId = parentSession;
-		await hooks.get("session_shutdown")({ reason: "new" }, webCtx);
-		await assert.rejects(fetch(`${url.origin}/api/snapshot?target=${b}`, { headers }));
-		sessionId = randomUUID();
-		await hooks.get("session_start")({ reason: "new" }, webCtx);
-		const share = (args = "") => listeners.get("plan3:share")({ ctx: webCtx, args });
-		await listeners.get("plan3:share")({ ctx: webCtx, args: "devices" }); assert.equal(notices.at(-1).message, "No paired remote devices.");
-		await share("public"); assert.match(notices.at(-1).message, /Public access off, local only: Install/, "missing Tailscale still shares locally");
-		assert.equal(sharedStatus, "share: local");
-		await share(); assert.match(notices.at(-1).message, /^Shared (local|public)\. Connected now: nobody\. This PC: http/, "no word while shared reports, never stops");
-		await share("off"); assert.equal(notices.at(-1).message, "Session sharing off."); tailscaleCalls.length = 0;
-		tailscale = args => ({ code: 0, killed: false, stderr: "", stdout: args[0] === "status" ? JSON.stringify({ BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CertDomains: ["pc.tail.ts.net"], CurrentTailnet: { MagicDNSEnabled: true }, User: { 7: { LoginName: "me@github" } } }) : "" });
-		await share("public"); assert.match(sharedStatus, /^\x1b\[1;31mshare: public/); const shareUrl = new URL(notices.at(-2).message.replace("Shared locally: ", ""));
-		assert.equal(notices.at(-1).message, `Public (your tailnet only): https://pc.tail.ts.net:${shareUrl.port}/`);
-		assert.deepEqual(tailscaleCalls, ["status --json", `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`]);
-		// D9: without a terminal UI the pairing dialog never opens, so a remote page cannot pair itself.
-		const pairHost = `pc.tail.ts.net:${shareUrl.port}`, pairRaw = (method, route) => new Promise((resolve, reject) => {
-			const req = httpRequest(`${shareUrl.origin}${route}`, { method, headers: { Host: pairHost, Origin: `https://${pairHost}`, "X-Forwarded-Proto": "https", "Tailscale-User-Login": "me@github" } }, res => { let body = ""; res.on("data", chunk => body += chunk); res.on("end", () => resolve({ status: res.statusCode, body })); });
-			req.on("error", reject); req.end();
-		});
-		assert.equal(webCtx.hasUI, false); const pending = JSON.parse((await pairRaw("POST", "/pair/start")).body);
-		assert.deepEqual(JSON.parse((await pairRaw("GET", `/pair/status?id=${pending.id}`)).body), { state: "denied" });
-		assert.equal((await pairRaw("GET", "/api/snapshot")).status, 401);
-		await hooks.get("session_shutdown")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.length, 2, "reload keeps the mapping");
-		await hooks.get("session_start")({ reason: "reload" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --bg --https=${shareUrl.port} http://127.0.0.1:${shareUrl.port}`);
-		assert.equal((await fetch(`${shareUrl.origin}/api/snapshot`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).status, 200);
-		// D18: the switcher record follows this session's state and leaves with the share.
-		const recordFile = path.join(agentDir, "ce-workflow", "remote", "sessions", `${sessionId}.json`), record = async () => JSON.parse(await readFile(recordFile, "utf8"));
-		assert.deepEqual(await record().then(({ pid, port, state, cwd }) => ({ pid, port, state, cwd })), { pid: process.pid, port: Number(shareUrl.port), state: "idle", cwd: webCwd });
-		const askId = randomUUID(); listeners.get("ask:pending")({ askId, question: "Pick" }); assert.equal((await record()).state, "waiting", "a pending ask shows red");
-		listeners.get("ask:closed")({ askId }); assert.equal((await record()).state, "idle");
-		const switcher = await (await fetch(`${shareUrl.origin}/api/sessions`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` } })).json();
-		assert.deepEqual(switcher.sessions.map(session => [session.id, session.state]), [[sessionId, "idle"]]);
-		// The status names the open pages.
-		const live = new AbortController(), stream = await fetch(`${shareUrl.origin}/api/events`, { headers: { Authorization: `Bearer ${shareUrl.searchParams.get("token")}` }, signal: live.signal });
-		assert.equal(stream.status, 200); assert.match(sharedStatus, /share: public \[this PC\]/); live.abort();
-		await share("off"); assert.equal(sharedStatus, undefined); assert.deepEqual(entries.at(-1).data, { shared: false });
-		assert.equal(existsSync(recordFile), false, "sharing off removes the switcher record");
-		assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "sharing off removes the mapping");
-		tailscaleCalls.length = 0; await share("local"); assert.equal(sharedStatus, "share: local"); assert.deepEqual(tailscaleCalls, [], "local never touches Tailscale");
-		assert.deepEqual(entries.at(-1).data, { shared: true, mode: "local" }); await share("local"); assert.equal(notices.at(-1).message, "Already shared local.");
-		await share("public"); assert.match(sharedStatus, /share: public/, "local to public switches");
-		await hooks.get("session_shutdown")({ reason: "quit" }, webCtx); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`, "quit removes the mapping");
-		await hooks.get("session_start")({ reason: "resume" }, webCtx); assert.match(sharedStatus, /share: public/, "resume re-shares in the saved mode"); await share("off"); assert.equal(tailscaleCalls.at(-1), `serve --https=${shareUrl.port} off`);
-		tailscale = () => { throw Object.assign(new Error("spawn tailscale ENOENT"), { code: "ENOENT" }); };
-		await assert.rejects(fetch(`${shareUrl.origin}/api/snapshot`));
-		const reopened = await open(`diagram ${b}`);
-		assert.notEqual(reopened.searchParams.get("token"), token, "a different conversation gets a fresh capability");
-		assert.equal((await fetch(`${reopened.origin}/api/snapshot?target=${b}`, { headers: { Authorization: `Bearer ${token}` } })).status, 401);
 		entries = savedEntries; messages.length = savedMessages; tokens = savedTokens;
 	}
 	await run("plan3", "architecture"); // Refresh the same runtime to the main fixture's command context.
@@ -1522,8 +1415,7 @@ try {
 	const custom = { kind: "freeform", text: "1000 ms\n## not a plan heading" };
 	const answered = response => ({ status: "answered", response });
 	dialogs = [{ answer: [answered(selected), answered(custom), answered(kept), { status: "skipped" }], check: async (component, rendered) => {
-		const live = new URL(notices.findLast(notice => notice.message.startsWith("Plan3 workspace: ")).message.replace("Plan3 workspace: ", ""));
-		const duplicate = await fetch(`${live.origin}/api/command`, { method: "POST", headers: { Authorization: `Bearer ${live.searchParams.get("token")}`, Origin: live.origin, "Content-Type": "application/json" }, body: JSON.stringify({ target: "55555555", command: "resolve" }) });
+		const duplicate = await hubPage("/api/command", { target: "55555555", command: "resolve" });
 		assert.equal(duplicate.status, 409, "browser Resolve cannot duplicate the terminal's pending Resolve");
 		assert.match(rendered, /Existing consumers read CSV/);
 		assert.match(rendered, /Keep CSV/);
@@ -1635,25 +1527,29 @@ try {
 	assert.match(messages.at(-1).message, /Do not reopen this complete plan/);
 	await writeFile(directFile, directPlan);
 	{ // G-01: Generate pre-fills directions, saves them (even before a diagram file exists), keeps edits made while the prompt is open, then asks the agent.
-		const live = new URL(notices.findLast(notice => notice.message.startsWith("Plan3 workspace: ")).message.replace("Plan3 workspace: ", ""));
-		const generate = async () => { const response = await fetch(`${live.origin}/api/generate`, { method: "POST", headers: { Authorization: `Bearer ${live.searchParams.get("token")}`, Origin: live.origin, "Content-Type": "application/json" }, body: JSON.stringify({ target: "55555555" }) }); return { status: response.status, body: await response.json() }; };
+		// Under the hub the directions prompt is a hub form: ctx.ui.input carries the subject and returns the hub's answer.
+		const generate = () => hubPage("/api/generate", { target: "55555555" });
 		const saved = async () => (await diagram({ action: "get", plan: "55555555" })).diagram;
+		let prompt;
+		const answer = reply => { ctx.ui.input = async (title, placeholder) => { assert.equal(title, "pi-hub:ask"); const subject = JSON.parse(placeholder).data; await prompt?.(subject); return reply === undefined ? undefined : JSON.stringify(reply); }; };
 		let before = messages.length;
-		dialogs = [{ messages: before, component: "AskComponent", answer: { kind: "freeform", text: "Show only the API" }, check: component => assert.match(component.freeformDraft, /^Show what plan 55555555 \(Direct answers\) changes/) }];
-		assert.deepEqual((await generate()).status, 200); assert.equal(dialogs.length, 0);
+		prompt = subject => assert.match(subject.initialText, /^Show what plan 55555555 \(Direct answers\) changes/); answer({ text: "Show only the API" });
+		assert.deepEqual((await generate()).status, 200);
 		assert.equal((await saved()).directions, "Show only the API", "directions saved on a missing diagram file");
 		assert.equal(messages.length, before + 1); assert.match(messages.at(-1).message, /plan3_diagram[\s\S]*keep existing ids, positions, notes and pending edit marks[\s\S]*start over[\s\S]*Directions:\nShow only the API$/);
 		before = messages.length;
-		dialogs = [{ messages: before, component: "AskComponent", answer: { kind: "freeform", text: "Show the API and its store" }, check: async component => {
-			assert.equal(component.freeformDraft, "Show only the API", "saved directions pre-fill the prompt");
+		prompt = async subject => {
+			assert.equal(subject.initialText, "Show only the API", "saved directions pre-fill the prompt");
 			const current = await saved(); await diagram({ action: "apply", plan: "55555555", expectedRevision: current.revision, operations: [{ op: "add", entity: "node", value: { id: "api", label: "API", kind: "service" } }] });
-		} }];
+		};
+		answer({ text: "Show the API and its store" });
 		assert.equal((await generate()).status, 200);
 		const after = await saved(); assert.equal(after.directions, "Show the API and its store"); assert.deepEqual(after.nodes.map(node => node.id), ["api"], "an edit made while the prompt was open survives");
 		before = messages.length; const revision = after.revision;
-		dialogs = [{ messages: before, component: "AskComponent", answer: null }];
+		prompt = undefined; answer(undefined);
 		assert.deepEqual((await generate()).body, { cancelled: true }); assert.equal(messages.length, before, "cancel sends nothing");
 		assert.equal((await saved()).revision, revision, "cancel saves nothing");
+		delete ctx.ui.input;
 	}
 	// Full-detail ideas use single native popups; code saves each choice before the next.
 	const beforeIdeasEntries = [...entries];

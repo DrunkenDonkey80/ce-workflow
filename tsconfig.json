@@ -9,6 +9,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["extensions/**/*.ts"],
-  "exclude": ["extensions/plan3-web/vendor/**"]
+  "include": ["extensions/**/*.ts"]
 }

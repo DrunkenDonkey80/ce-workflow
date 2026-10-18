@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { askConfirm, bindListDialogBridge, resetDialogStateForTest, showListDialog } from "../extensions/ask-user/menu.ts";
+import { askConfirm, resetDialogStateForTest, showListDialog } from "../extensions/ask-user/menu.ts";
 
 const theme = { fg: (_color, text) => text, bold: text => text };
 const keybindings = { matches: (data, id) => ({ "tui.select.up": "up", "tui.select.down": "down", "tui.select.confirm": "enter", "tui.select.cancel": "escape" })[id] === data };
@@ -43,14 +43,6 @@ assert.equal(run.result.value, "c", "remembers the last choice");
 // Without a TUI it falls back to a plain select.
 assert.equal(await askConfirm({ mode: "rpc", ui: { select: async (_title, labels) => labels.find(label => label.includes("Yes")) } }, "Ok?"), true);
 
-// The web bridge receives a compact list subject.
-const ui = { custom: () => new Promise(() => {}) };
-let subject;
-bindListDialogBridge({ ui }, async options => { subject = options; return { action: "select", value: "no" }; });
-assert.equal(await askConfirm({ mode: "tui", ui }, "Ship?", "now"), false);
-assert.equal(subject.compact, true);
-assert.equal(subject.purpose, "now");
-bindListDialogBridge({ ui }, undefined);
 // Under pi-control-hub (H3-03): menus go through the channel as the `list` payload; Esc-back and answers come back the same way.
 {
 	process.env.PI_HUB = "1";

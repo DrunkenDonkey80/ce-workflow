@@ -755,9 +755,6 @@ assert.equal(withStatus.at(-1), "LSP Active last");
 const withPlan3 = subset.component(new Map([["zz", "last"], ["plan3", "\u{1f6e0}\ufe0f Plan 1/3 \u00b7 CSV-02"]])).render(120).map(stripAnsi);
 assert.match(withPlan3[0], /\/272k \| Plan 1\/3 \u00b7 CSV-02$/);
 assert.ok(!withPlan3.some((line) => line.includes("last")), "the status row is gone while Plan3 shows in the first row");
-// Sharing still shows, coloured, as the last line.
-const shared = subset.component(new Map([["zz", "last"], ["plan3-shared", "\x1b[1;31mshare: public [Pixel]\x1b[0m"], ["plan3", "Plan 1/3 \u00b7 CSV-02"]])).render(120);
-assert.equal(shared.at(-1), "\x1b[1;31mshare: public [Pixel]\x1b[0m", "share stays visible and red while Plan3 hides the status row");
 const narrowPlan3 = subset.component(new Map([["zz", "last"], ["plan3", "Plan 1/3 \u00b7 CSV-02 \u00b7 design: review (approve the exported revision)"]])).render(60).map(stripAnsi);
 assert.match(narrowPlan3.at(-1), /^Plan 1\/3 \u00b7 CSV-02 \u00b7 design/, "too narrow: the status row stays");
 assert.doesNotMatch(narrowPlan3[0], /Plan /);

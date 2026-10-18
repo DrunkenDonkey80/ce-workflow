@@ -1,17 +1,11 @@
 // ask_user's menu view (plan 0db155f7 D21): lists with filter, current item, Esc back, checklists and Tab.
-// The same `list` payload is drawn by the web form (plan3-web/prompts.ts) and answered through ask:pending.
+// Under pi-control-hub the same `list` payload is drawn by the hub's form (listSubject/listDialogResponse).
 import { ask as hubAsk, hubActive } from "../hub-channel.ts";
 import type { RemoteListPrompt } from "./remote.ts";
 import { randomUUID } from "node:crypto";
 import { loadPlan3Ask } from "../plan3-ask.ts";
 
 const dialogCursors = new Map();
-// Pi loads each extension with moduleCache:false, so every extension has its own copy of this module;
-// the web bridge (bound by plan3) must be shared process-wide to reach dialogs from work-models and others.
-const listBridges: WeakMap<object, (options, run: (signal: AbortSignal) => Promise<unknown>) => Promise<any>> = (globalThis[Symbol.for("ce-workflow.listBridges")] ??= new WeakMap());
-export function bindListDialogBridge(ctx, bridge) {
-	if (bridge) listBridges.set(ctx.ui, bridge); else listBridges.delete(ctx.ui);
-}
 export function listDialogResponse(payload: unknown, options) {
 	if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
 	const value = payload as Record<string, unknown>;
@@ -332,12 +326,7 @@ export async function showListDialog(ctx, options) {
 		if (result?.value) dialogCursors.set(options.cursorKey ?? options.title, result.value);
 		return result ?? undefined;
 	}
-	const bridge = listBridges.get(ctx.ui);
-	// terminalOnly: approvals a remote page must never answer for itself (plan 1b421b6b D9).
-	if (!bridge || options.terminalOnly) return localListDialog(ctx, options);
-	const result = await bridge(options, signal => localListDialog(ctx, { ...options, signal, remote: true }));
-	if (result?.value) dialogCursors.set(options.cursorKey ?? options.title, result.value);
-	return result ?? undefined;
+	return localListDialog(ctx, options);
 }
 async function localListDialog(ctx, options) {
 	if (options.signal?.aborted) return;
@@ -527,7 +516,6 @@ async function localListDialog(ctx, options) {
 					tabAction &&
 					keyMatches(keybindings, data, "tui.input.tab", "tab", "\t")
 				) {
-					if (options.remote) return close({ action: "tab" });
 					const next = tabAction.toggle?.();
 					if (!next) return close({ action: "tab" });
 					source = [...next.items];

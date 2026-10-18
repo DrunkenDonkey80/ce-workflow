@@ -284,7 +284,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",share:"Share this session in a browser: local, public or off",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -1392,7 +1392,7 @@ function showResearchContext(ctx) {
 		? "RESEARCH STOPPING… · waiting for work to finish · Alt+R to keep on"
 		: "RESEARCH MODE · explore, don't implement · Alt+R to exit";
 	ctx.ui?.setStatus?.("work-research-context", researchContext ? label : undefined);
-	workExtensionPi?.events?.emit?.("wo:modes-changed", {}); // the shared web page shows the mode too
+	workExtensionPi?.events?.emit?.("wo:modes-changed", {}); // pi-control-hub's page shows the mode too
 	ctx.ui?.setWidget?.("work-research-context", researchContext && ctx.mode === "tui"
 		? [ctx.ui.theme?.fg?.(researchContext.stopping ? "warning" : "accent", `━━ ${label} ━━`) ?? label,
 			"Temporary notes in system temp · /research notes for path"]
@@ -2680,7 +2680,6 @@ function latestPiGoal(ctx) {
 async function handleWorkMenuCommand(ctx, pi) {
 	const items = [
 		{ value: "work-settings", label: "Settings", description: "Configure Plan3 models, compaction, images and camera. Global and project scopes are available." },
-		{ value: "work-share", label: "Share this session", description: "Share this session in a browser: local only, or public to your tailnet devices. The footer shows share: local or a red share: public; it reopens on resume." },
 		...(maintenanceCheckout(ctx.cwd) ? [
 			{ value: "work-context", label: "Context guard", description: "Inspect or tune proactive context compaction.", argumentTitle: "Context action", placeholder: "Blank shows status; compact / on / off / set <tokens>" },
 			{ value: "work-catch-up", label: "Catch up packages", description: "Review the Pi/plugin packages ce-workflow still uses in a Plan3 plan." },
@@ -2710,7 +2709,6 @@ async function handleWorkMenuCommand(ctx, pi) {
 			args = await askText(ctx, pi, selected.item.argumentTitle, { placeholder: selected.item.placeholder });
 			if (args == null) continue;
 		}
-		if (selected.value === "work-share") return pi.events?.emit?.("plan3:share", { ctx, args });
 		return executeUtilityAction(selected.value, args, ctx, pi);
 	}
 }
@@ -4029,10 +4027,10 @@ if (blockedInternalBackgroundCompletionTurn) {
 		},
 	});
 
-	// Browser workspace (plan3-web): /wo subcommands for its command picker and the footer's quota rows.
+	// pi-control-hub's page: /wo subcommands for its command picker and the footer's quota rows.
 	pi.events?.on?.("wo:web-info",(info)=>{ info.wo=Object.entries(woSubcommands()).map(([value,description])=>({value,description})); info.usage=subscriptionFooterController?.webUsage?.(); info.research=researchContext?(researchContext.stopping?"stopping":"on"):"off"; });
 	pi.registerCommand("wo", {
- description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo share, /wo compact or /wo fact",
+ description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo compact or /wo fact",
  getArgumentCompletions: (prefix) => {
   const input=String(prefix ?? "").trim();
   if (/\s/.test(input)) return null;
@@ -4044,7 +4042,6 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(!action) return handleWorkMenuCommand(ctx,pi);
   const plan3={plan:"plan3",plans:"plans3",resume:"resume3"}[action];
   if(plan3) return pi.events?.emit?.("plan3:command",{ctx,name:plan3,args:rest});
-  if(action==="share") return pi.events?.emit?.("plan3:share",{ctx,args:rest});
   if(action==="reload") { await ctx.waitForIdle(); return ctx.reload(); }
   const utility=WO_UTILITY_ACTIONS[action];
   if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
