@@ -8,4 +8,6 @@ Status: design. The plan is tracked in ce-workflow (the Plan3 tool only follows 
 folder its session runs in):
 `C:\SOFT\git\ce-workflow\docs\plans\2026-10-18-pi-control-hub-rpc-session-host-with-one-web-front-door-0db155f7-plan3.md`
 
-herdr is only used to open a session in a terminal on request.
+Nothing depends on herdr: "Open in terminal" opens a plain window.
+
+Development: Node 24, `npm test` runs `scripts/test-*.mjs`; `scripts/fake-pi.mjs` stands in for `pi --mode rpc`.

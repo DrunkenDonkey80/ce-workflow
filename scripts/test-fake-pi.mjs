@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+const fake = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
+const child = spawn(process.execPath, [fake, "--mode", "rpc"], { stdio: "pipe" });
+const lines = [];
+child.stdout.on("data", d => lines.push(...d.toString().split("\n").filter(Boolean).map(l => JSON.parse(l))));
+child.stdin.write(JSON.stringify({ id: "1", type: "prompt", message: "hi" }) + "\n");
+child.stdin.end();
+const code = await new Promise(r => child.on("exit", r));
+assert.equal(code, 0);
+assert.ok(lines.some(l => l.type === "response" && l.id === "1" && l.data.disposition === "started"));
+assert.ok(lines.some(l => l.type === "agent_end" && l.messages[0].content[0].text === "echo: hi"));
+console.log("fake pi ok");

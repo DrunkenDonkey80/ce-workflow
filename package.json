@@ -1,0 +1,13 @@
+{
+  "name": "pi-control-hub",
+  "version": "0.0.1",
+  "description": "One always-running host for Pi sessions: starts them over RPC, groups, parks and resumes them, and serves one web front door.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "bin": { "pi-hub": "src/cli.ts" },
+  "scripts": {
+    "test": "node --test \"scripts/test-*.mjs\""
+  }
+}
