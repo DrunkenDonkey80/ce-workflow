@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// pi-hub start | stop [--force] | restart | status | open
+// pi-hub start | stop [--force] | restart | status | open | remote on|off
 import { mkdirSync, openSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hubDataDir } from "./registry.ts";
-import { markerPath, readConfig, type HubMarker } from "./hub.ts";
+import { configPath, markerPath, readConfig, type HubMarker } from "./hub.ts";
+import { writeJsonAtomic } from "./registry.ts";
 import { pidAlive } from "./session-lock.ts";
 
 const marker = (): HubMarker | undefined => {
@@ -24,6 +25,9 @@ async function call(route: string, data?: unknown) {
 	if (!response.ok) throw new Error(value.error ?? `HTTP ${response.status}`);
 	return value;
 }
+
+const remoteLine = (remote: { on: boolean; url?: string; missing?: string[]; error?: string }) =>
+	!remote.on ? "Remote off." : remote.url ? `Remote: ${remote.url} (paired devices with your Tailscale login)` : `Remote on but not served: ${remote.error ?? remote.missing?.join(" ")}`;
 
 const waitFor = async (check: () => boolean, ms: number) => {
 	for (const end = Date.now() + ms; Date.now() < end; await new Promise(r => setTimeout(r, 100))) if (check()) return true;
@@ -60,6 +64,7 @@ try {
 		else {
 			const status = await call("/api/status");
 			console.log(`Running: pid ${status.pid}, http://127.0.0.1:${status.port}`);
+			if (status.remote.on) console.log(remoteLine(status.remote));
 			for (const s of status.sessions) console.log(`  ${s.live ? (s.busy.length ? s.busy.join(", ") : "idle") : s.state.padEnd(7)}  ${s.name}  ${s.folder}`);
 		}
 	} else if (verb === "open") {
@@ -70,8 +75,17 @@ try {
 		const opener = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
 		spawn(opener[0] as string, opener[1] as string[], { detached: true, stdio: "ignore", windowsHide: true }).unref();
 		console.log(url);
+	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
+		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
+		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));
+		else {
+			const config = readConfig();
+			if (!config) throw new Error("Start the hub once first: pi-hub start.");
+			writeJsonAtomic(configPath(), { ...config, remote: rest[0] === "on" });
+			console.log(`Remote ${rest[0]}; applies when the hub starts.`);
+		}
 	} else {
-		console.log("Usage: pi-hub start | stop [--force] | restart | status | open");
+		console.log("Usage: pi-hub start | stop [--force] | restart | status | open | remote on|off");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {
