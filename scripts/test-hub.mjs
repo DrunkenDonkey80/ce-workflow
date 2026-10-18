@@ -80,8 +80,20 @@ try {
 	await new Promise(r => setTimeout(r, 300));
 	assert.match(cli("start").out, /Started/);
 	assert.match(cli("stop").out, /Stopped/);
+
+	// H6-04: logon start through a Run value (a scratch key here), hidden by conhost --headless.
+	if (process.platform === "win32") {
+		env.PI_HUB_RUN_KEY = `HKCU\\Software\\pi-control-hub-test-${process.pid}`;
+		assert.match(cli("autostart").out, /Autostart off/);
+		assert.match(cli("autostart", "on").out, /Autostart on.*hub\.log/);
+		const value = cli("autostart", "status").out;
+		assert.match(value, /^Autostart on: conhost\.exe --headless ".*node(\.exe)?" ".*cli\.ts" start\r?\n$/i);
+		assert.match(cli("autostart", "off").out, /Autostart off/);
+		assert.match(cli("autostart", "status").out, /Autostart off/);
+	}
 	console.log("hub ok");
 } finally {
 	cli("stop", "--force");
+	if (env.PI_HUB_RUN_KEY) try { execFileSync("reg", ["delete", env.PI_HUB_RUN_KEY, "/f"], { stdio: "pipe" }); } catch { /* already gone */ }
 	fs.rmSync(root, { recursive: true, force: true });
 }

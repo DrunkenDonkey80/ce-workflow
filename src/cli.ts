@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// pi-hub start | stop [--force] | restart | status | open | remote on|off
+// pi-hub start | stop [--force] | restart | status | open | remote on|off | autostart on|off|status
 import { mkdirSync, openSync, readFileSync } from "node:fs";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hubDataDir } from "./registry.ts";
@@ -28,6 +28,24 @@ async function call(route: string, data?: unknown) {
 
 const remoteLine = (remote: { on: boolean; url?: string; missing?: string[]; error?: string }) =>
 	!remote.on ? "Remote off." : remote.url ? `Remote: ${remote.url} (paired devices with your Tailscale login)` : `Remote on but not served: ${remote.error ?? remote.missing?.join(" ")}`;
+
+// H6-04: start at Windows logon through the per-user Run key (no admin rights); conhost --headless hides the console
+// window, and `start` logs to <data>/hub.log. PI_HUB_RUN_KEY only redirects the key for tests.
+const RUN_KEY = process.env.PI_HUB_RUN_KEY || "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+function autostart(action: string) {
+	if (process.platform !== "win32") throw new Error("autostart is Windows only for now; add pi-hub start to your login items.");
+	const reg = (...args: string[]) => execFileSync("reg", args, { encoding: "utf8", stdio: "pipe", windowsHide: true });
+	if (action === "on") {
+		const command = `conhost.exe --headless "${process.execPath}" "${fileURLToPath(new URL("./cli.ts", import.meta.url))}" start`;
+		reg("add", RUN_KEY, "/v", "pi-control-hub", "/t", "REG_SZ", "/d", command, "/f");
+		return `Autostart on: the hub starts hidden at logon. Log: ${path.join(hubDataDir(), "hub.log")}`;
+	}
+	let current: string | undefined;
+	try { current = /REG_SZ\s+(.+)/.exec(reg("query", RUN_KEY, "/v", "pi-control-hub"))?.[1].trim(); } catch { /* no value */ }
+	if (action === "status") return current ? `Autostart on: ${current}` : "Autostart off.";
+	if (current) reg("delete", RUN_KEY, "/v", "pi-control-hub", "/f");
+	return "Autostart off.";
+}
 
 const waitFor = async (check: () => boolean, ms: number) => {
 	for (const end = Date.now() + ms; Date.now() < end; await new Promise(r => setTimeout(r, 100))) if (check()) return true;
@@ -84,8 +102,9 @@ try {
 			writeJsonAtomic(configPath(), { ...config, remote: rest[0] === "on" });
 			console.log(`Remote ${rest[0]}; applies when the hub starts.`);
 		}
-	} else {
-		console.log("Usage: pi-hub start | stop [--force] | restart | status | open | remote on|off");
+	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
+	else {
+		console.log("Usage: pi-hub start | stop [--force] | restart | status | open | remote on|off | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {
