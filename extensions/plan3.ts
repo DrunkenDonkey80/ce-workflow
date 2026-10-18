@@ -2272,11 +2272,12 @@ export default function plan3(pi) {
 		const sessionFile = !hubActive() && ctx.sessionManager?.getSessionFile?.();
 		if (sessionFile) {
 			const { info, holder } = takeSessionLock(sessionFile);
-			if (holder) {
+			// The hub's "Open in terminal" holds the lock for this Pi (pi-control-hub H7-01) and releases it when Pi exits.
+			if (holder && !(holder.owner === "pi-control-hub terminal" && String(holder.startedAt) === process.env.PI_HUB_TERMINAL_LOCK)) {
 				ctx.ui?.notify?.(`This session is open in ${holder.owner} (pid ${holder.pid}). Close it there or park it in the hub, then open it again.`, "error");
 				return ctx.shutdown?.();
 			}
-			sessionLock = { file: sessionFile, info };
+			if (info) sessionLock = { file: sessionFile, info };
 		}
 		if (!hubActive() && sharedEntry(ctx) && event.reason !== "fork" && event.reason !== "new") {
 			try { await getWeb(ctx, sharedMode(ctx)); } catch (error) { report(ctx, error); }
