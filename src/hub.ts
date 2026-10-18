@@ -10,6 +10,7 @@ import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
 import { createPageApi } from "./api.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
+import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean };
@@ -72,7 +73,9 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	let closing: Promise<void> | undefined;
 	// H6-01 remote access: the tailnet while serving, paired devices and their open streams (dropped on revoke).
 	const devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), streams = new Map<string, Set<http.ServerResponse>>();
-	let tailnet: Tailnet | undefined, serving = false, remoteError: string | undefined;
+	let tailnet: Tailnet | undefined, serving = false, remoteError: string | undefined, importError: string | undefined;
+	// H6-02: a corrupt or busy old registry is skipped (nothing imported) and retried at the next start.
+	const imported = await devices.importFrom(path.join(agentDir(), "ce-workflow", "remote", "devices.json")).catch(error => { importError = `Paired devices not imported: ${(error as Error).message}`; return 0; });
 	async function applyRemote() {
 		remoteError = undefined;
 		if (!config.remote) { tailnet = undefined; if (serving) await serveRemove(run, config.port); serving = false; return; }
@@ -80,7 +83,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		if (tailnet.missing.length) return;
 		try { await serveAdd(run, config.port); serving = true; } catch (error) { remoteError = (error as Error).message; tailnet = undefined; }
 	}
-	const remoteStatus = () => ({ on: !!config.remote, url: serving && tailnet?.host ? `https://${tailnet.host}:${config.port}/` : undefined, missing: tailnet?.missing.length ? tailnet.missing : undefined, error: remoteError });
+	const remoteStatus = () => ({ on: !!config.remote, url: serving && tailnet?.host ? `https://${tailnet.host}:${config.port}/` : undefined, missing: tailnet?.missing.length ? tailnet.missing : undefined, error: remoteError, importError });
 	const dropDevice = (id: string) => { for (const response of streams.get(id) ?? []) response.destroy(); streams.delete(id); };
 	/** A session's view, created by its first browser request and kept while the hub runs (parked sessions show their file). */
 	async function view(id: string) {
@@ -252,13 +255,15 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 			releaseLock(path.join(dataDir, "hub"), lock);
 		})();
 	}
-	return { config, host, registry, views, server, restored, devices, remote: remoteStatus, stop };
+	return { config, host, registry, views, server, restored, devices, imported, remote: remoteStatus, stop };
 }
 
 if (import.meta.main) {
 	const hub = await startHub();
 	console.log(`pi-control-hub ${process.pid} on http://127.0.0.1:${hub.config.port} (restored ${hub.restored.length})`);
 	const remote = hub.remote();
+	if (hub.imported) console.log(`imported ${hub.imported} paired device(s) from ce-workflow`);
+	if (remote.importError) console.error(remote.importError);
 	if (remote.on) console.log(remote.url ? `remote: ${remote.url}` : `remote off: ${remote.error ?? remote.missing?.join(" ")}`);
 	for (const failure of hub.restored.filter(r => r.error)) console.error(`restore ${failure.id}: ${failure.error}`);
 	const quit = () => void hub.stop().then(() => process.exit(0));

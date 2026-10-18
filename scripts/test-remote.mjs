@@ -10,8 +10,13 @@ import { fileURLToPath } from "node:url";
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-remote-"));
 process.env.PI_CODING_AGENT_DIR = root;
 const { startHub } = await import("../src/hub.ts");
+const { createDeviceRegistry } = await import("../src/remote.ts");
 const folder = path.join(root, "proj");
 fs.mkdirSync(folder);
+// H6-02: a phone paired with ce-workflow's /wo share, plus one expired device that is not carried over.
+const oldDir = path.join(root, "ce-workflow", "remote");
+const oldCookie = await createDeviceRegistry(oldDir).pair("Old phone", "me@example.com");
+await createDeviceRegistry(oldDir, () => Date.now() - 100 * 86_400_000).pair("Expired", "me@example.com");
 
 // Fake tailscale: status JSON for a ready tailnet; every call is recorded.
 const calls = [];
@@ -55,6 +60,13 @@ try {
 	assert.equal(JSON.parse(fs.readFileSync(path.join(root, "pi-control-hub", "config.json"), "utf8")).remote, true, "the choice is saved");
 
 	const id = (await local("/api/sessions", { folder, name: "1" })).body.id;
+
+	// H6-02: the old phone's cookie works without pairing again; the expired one was dropped.
+	assert.equal(hub.imported, 1);
+	assert.deepEqual((await local("/api/devices")).body.devices.map(device => device.label), ["Old phone"]);
+	assert.equal((await remote(`/s/${id}/api/snapshot`, { cookie: oldCookie })).status, 200);
+	assert.equal(await hub.devices.importFrom(path.join(oldDir, "devices.json")), 0, "imported once: the hub's own file wins");
+	await local(`/api/devices/${oldCookie.split(".")[0]}/revoke`, {});
 
 	// Only the Tailscale owner over HTTPS; the local key never works remotely.
 	assert.equal((await remote("/", { login: "other@example.com" })).status, 403);

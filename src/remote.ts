@@ -49,14 +49,14 @@ const sha = (secret: string) => createHash("sha256").update(secret).digest("hex"
 /** Paired devices in `<dir>/devices.json`; writes hold a lock file, corrupt state fails closed. */
 export function createDeviceRegistry(directory: string, now = Date.now) {
 	const file = path.join(directory, "devices.json"), lock = path.join(directory, "devices.lock");
-	function load(): Device[] {
+	function load(from = file): Device[] {
 		let text: string;
-		try { text = readFileSync(file, "utf8"); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
+		try { text = readFileSync(from, "utf8"); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
 		try {
 			const value = JSON.parse(text);
 			if (value?.version !== 1 || !Array.isArray(value.devices) || !value.devices.every((d: Device) => /^[A-Za-z0-9_-]{12}$/.test(d?.id) && /^[a-f0-9]{64}$/.test(d.hash) && typeof d.label === "string" && typeof d.login === "string" && [d.created, d.lastUsed, d.expires].every(Number.isFinite))) throw new Error("shape");
 			return value.devices;
-		} catch { throw new Error(`Paired-device registry is corrupt; remote access is off until ${file} is fixed or deleted.`); }
+		} catch { throw new Error(`Paired-device registry is corrupt; remote access is off until ${from} is fixed or deleted.`); }
 	}
 	async function write<T>(change: (devices: Device[], time: number) => T): Promise<T> {
 		mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -101,6 +101,12 @@ export function createDeviceRegistry(directory: string, now = Date.now) {
 			if (time - device.lastUsed >= RENEW_MS) await write((devices, at) => { const current = devices.find(candidate => candidate.id === id); if (current) { current.lastUsed = at; current.expires = at + DEVICE_MS; } });
 			return true;
 		},
+		/** H6-02: adopt ce-workflow's paired devices (same format) once, while the hub has none, so phones stay paired. */
+		importFrom: (old: string) => existsSync(file) ? Promise.resolve(0) : write((devices, time) => {
+			const adopted = load(old).filter(device => device.expires > time).slice(0, MAX_DEVICES);
+			devices.push(...adopted);
+			return adopted.length;
+		}),
 		list: () => load().filter(device => device.expires > now()).map(visible),
 		revoke: (id: string) => write(devices => { const index = devices.findIndex(device => device.id === id); if (index >= 0) devices.splice(index, 1); return index >= 0; }),
 	};
