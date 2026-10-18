@@ -840,8 +840,45 @@ async function loadSessions() {
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
+ void checkPairing();
  sessionsTimer = window.setTimeout(loadSessions, visible ? 5000 : 15000);
 }
+// H6-03 (D19): new devices are approved, and paired ones revoked, on local hub pages only: remote pages carry no key.
+async function hub(route: string, data?: unknown) {
+ const response = await fetch("../../api/" + route, data === undefined ? auth : { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify(data) });
+ const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "HTTP " + response.status); return value;
+}
+const pairDialog = () => $("pair-approve") as HTMLDialogElement;
+async function checkPairing() {
+ if (!token) return;
+ $("devices-button").hidden = false;
+ let pending; try { ({ pending } = await hub("pairing")); } catch { return; }
+ if (!pending) { if (pairDialog().open) pairDialog().close(); return; }
+ $("pair-device").textContent = `${pending.label} · ${pending.login} · ${pending.address}`; $("pair-approve-code").textContent = pending.code;
+ if (!pairDialog().open) { pairDialog().showModal(); $("pair-reject").focus(); }
+}
+async function decidePairing(approve: boolean) {
+ if (pairDialog().open) pairDialog().close();
+ try { await hub("pairing", { approve }); showNotice(approve ? "Device paired." : "Device rejected."); } catch (error) { showNotice("Pairing: " + error.message); }
+}
+$("pair-accept").addEventListener("click", () => void decidePairing(true));
+$("pair-reject").addEventListener("click", () => void decidePairing(false));
+// Escape means no: an unanswered request would reopen with every poll.
+pairDialog().addEventListener("cancel", event => { event.preventDefault(); void decidePairing(false); });
+async function showDevices() {
+ const [{ devices }, { remote }] = await Promise.all([hub("devices"), hub("status")]);
+ $("devices-remote").textContent = !remote.on ? "Remote access is off (pi-hub remote on)." : remote.url ? "Remote address: " + remote.url : "Remote access is on but not served: " + (remote.error ?? remote.missing?.join(" "));
+ $("device-list").replaceChildren(...(devices.length ? devices.map(device => {
+  const row = html("li"), revoke = html("button", { type: "button", className: "danger", textContent: "Revoke" });
+  revoke.setAttribute("aria-label", "Revoke " + device.label);
+  revoke.addEventListener("click", () => void hub(`devices/${device.id}/revoke`, {}).then(showDevices, error => showNotice("Revoke: " + error.message)));
+  row.append(html("span", { textContent: `${device.label} · ${device.login} · last used ${new Date(device.lastUsed).toLocaleString()}` }), revoke);
+  return row;
+ }) : [html("li", { textContent: "No paired devices." })]));
+ const dialog = $("devices") as HTMLDialogElement; if (!dialog.open) dialog.showModal();
+}
+$("devices-button").addEventListener("click", () => void showDevices().catch(error => showNotice("Devices: " + error.message)));
+$("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
 const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle", parked: "parked" };
 function html<K extends keyof HTMLElementTagNameMap>(tag: K, properties: Partial<HTMLElementTagNameMap[K]> = {}) { return Object.assign(document.createElement(tag), properties); }
 function renderSessions(groups: Group[], recents: Recent[]) {

@@ -255,7 +255,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 			releaseLock(path.join(dataDir, "hub"), lock);
 		})();
 	}
-	return { config, host, registry, views, server, restored, devices, imported, remote: remoteStatus, stop };
+	return { config, host, registry, views, server, restored, devices, pairing, imported, remote: remoteStatus, stop };
 }
 
 if (import.meta.main) {

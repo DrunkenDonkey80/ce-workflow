@@ -70,11 +70,11 @@ try {
 	} else if (verb === "open") {
 		const running = marker();
 		if (!running) throw new Error("The hub is not running; run pi-hub start.");
-		const url = `http://127.0.0.1:${running.port}/`;
-		// shortcut: opens the bare address; the page's sign-in arrives with the web app (Phase 5).
+		// The bare address opens a session page; the local key is the page's sign-in.
+		const url = `http://127.0.0.1:${running.port}/?token=${readConfig()!.localKey}`;
 		const opener = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
 		spawn(opener[0] as string, opener[1] as string[], { detached: true, stdio: "ignore", windowsHide: true }).unref();
-		console.log(url);
+		console.log(`http://127.0.0.1:${running.port}/`);
 	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
 		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
 		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));

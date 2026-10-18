@@ -531,6 +531,19 @@ try {
  await hub.host.live.get(third.id).rpc.send({ type: "abort" });
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:unseen"`);
  await hub.host.park(third.id);
+ // H6-03 (D19): a phone asks to pair; this local page shows its code, approves it, then lists and revokes it.
+ const pairCode = hub.pairing.start({ "user-agent": "Mozilla/5.0 (iPhone) Safari/1" }, "me@example.com").code;
+ await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "document.getElementById('pair-approve').open");
+ assert.deepEqual(await evaluate("[document.getElementById('pair-approve-code').textContent, document.getElementById('pair-device').textContent, document.activeElement.id]"), [pairCode, "iPhone Safari \u00b7 me@example.com \u00b7 unknown address", "pair-reject"], "focus starts on Reject");
+ await browser("click", "#pair-accept"); await browser("wait", "--fn", "!document.getElementById('pair-approve').open");
+ assert.deepEqual(hub.devices.list().map(device => device.label), ["iPhone Safari"]);
+ await browser("click", "#devices-button"); await browser("wait", "--fn", "document.getElementById('devices').open && document.querySelector('#device-list button')");
+ assert.equal(await evaluate("document.getElementById('devices-remote').textContent"), "Remote access is off (pi-hub remote on).");
+ await browser("click", "#device-list button"); await browser("wait", "--fn", "document.querySelector('#device-list li').textContent === 'No paired devices.'");
+ assert.deepEqual(hub.devices.list(), []); await browser("click", "#devices-close"); await browser("hover", "#message-input"); // leave the session bar, whose hover card covers the chips
+ hub.pairing.start({}, "me@example.com"); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "document.getElementById('pair-approve').open");
+ await browser("press", "Escape"); await browser("wait", "--fn", "!document.getElementById('pair-approve').open");
+ assert.equal(hub.pairing.pending(), null, "Escape rejects"); assert.deepEqual(hub.devices.list(), []);
  status = { ...(await api("snapshot")).status, model: { provider: "t", id: "term", name: "Terminal pick" } }; publish("status", status);
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'Terminal pick: High'");
  // Session modes: chips mirror research/night, tint the chat and send the toggle command.

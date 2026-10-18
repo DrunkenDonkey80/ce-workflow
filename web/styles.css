@@ -331,7 +331,9 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session-group-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-recents summary { cursor: pointer; margin-top: 8px; font-size: 12px; color: var(--muted); }
 .session.recent .session-label { flex: 1; font-size: 12px; }
-.switcher[data-open=false] :is(.session-more, .session-group, .session-recents) { display: none; }
+.switcher[data-open=false] :is(.session-more, .session-group, .session-recents, .session-devices) { display: none; }
+.session-devices { margin: 8px 6px; font-size: 12px; }
+.device-list { list-style: none; padding: 0; display: grid; gap: 6px; } .device-list li { display: flex; gap: 8px; align-items: center; } .device-list span { flex: 1; }
 .mobile-tabs { display: none; }
 .drawer-toggle, .drawer, .drawer-backdrop { display: none; }
 .attach { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
