@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-10-18
-updated: 2026-10-18T20:51:20.359Z
+updated: 2026-10-18T21:14:34.333Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -165,7 +165,7 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 ### Phase 8: Live acceptance [think]
 
 - [x] **H8-01** Real hub run on this PC passed. It ran 4 sessions in 3 folders. The browser answered an ask_user. Open in terminal opened a real console, and the session was parked and its lock released on /quit. Night mode survived a forced hub restart mid-step and finished N-01..N-04 with no duplicate. Remote on: the phone went straight in using the imported devices. Fixes: `pi-hub new` verb, status crash on parked sessions, terminal console via start /wait, prompt purpose text.
-- [human] **H8-02** User tries it on the phone and desktop: pairing, New, Rename, Park, Resume, forms, menus, Open in terminal.
+- [x] **H8-02** User tried the hub on phone and desktop: New, Rename, Park/Resume, ask_user form, /wo menu and Open in terminal work. New-device pairing is covered by tests only (user accepted). Fixes are in hub 17bad47 and 80bdcbb.
 
 ### Phase 9: Remove the remote code from ce-workflow [code]
 
