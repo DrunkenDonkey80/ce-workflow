@@ -8,7 +8,7 @@ import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "pi-wor
 import { readLinkedImage, readPastedImage, savePastedImage, webTarget } from "pi-work-orchestrator/extensions/plan3-web.ts";
 import { currentPlan, listPlans } from "pi-work-orchestrator/extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
-import type { Registry } from "./registry.ts";
+import { type Registry, scanRecents, star } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
@@ -52,6 +52,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 
 	/** Snapshot extras, as ce-workflow's snapshot: target, current, status and (for Pi's own plan) its action state. */
 	async function extras(id: string, wanted?: string | null) {
+		seen(id); // a page opened (or reconnected to) this session
 		const { target, now } = await resolve(id, wanted);
 		const plan = published(id)?.plan; // shortcut: only Pi's current plan carries bias/finishable; another displayed plan shows without its action row until Pi switches to it.
 		return { target, current: now?.id ?? null, status: await status(id), ...(plan && target.kind === "plan" && plan.id === target.id ? { plan } : {}) };
@@ -68,6 +69,49 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 	/** Open forms for the snapshot (H5-04): every dialog Pi has open, as page forms. */
 	const forms = (id: string) => host.pendingDialogs(id).flatMap(dialog => toForm(dialog) ?? []);
 	const openDialog = (id: string, askId: unknown) => host.pendingDialogs(id).find(dialog => dialog.id === askId && toForm(dialog));
+
+	// H5-05: the session bar. A run that ends with no page watching stays "unseen" until a page opens the session.
+	const unseen = new Set<string>();
+	const seen = (id: string) => unseen.delete(id);
+	function tone(id: string) {
+		if (!host.live.has(id)) return "parked";
+		if (forms(id).length) return "waiting";
+		if (host.busyReasons(id).length) return "working";
+		return unseen.has(id) ? "unseen" : "seen";
+	}
+	async function sessions() {
+		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id) })) }));
+		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
+		return { groups, recents };
+	}
+	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
+	const nextName = (folder: string) => { const taken = new Set(registry.list().filter(r => r.folder.toLowerCase() === folder.toLowerCase()).map(r => r.name)); let n = 1; while (taken.has(String(n))) n++; return String(n); };
+	async function session(data: Record<string, unknown>) {
+		only(data, ["target", "action", "id", "name", "folder", "file"], "Invalid session fields.");
+		const id = typeof data.id === "string" ? data.id : "", name = typeof data.name === "string" ? data.name.trim() : "";
+		const known = () => { if (!registry.get(id)) throw fail(404, "Unknown session."); return id; };
+		switch (data.action) {
+			case "new": {
+				// Only folders that already have a group; a new folder is started from the CLI.
+				const folder = registry.groups().find(group => group.folder === data.folder)?.folder;
+				if (!folder) throw fail(404, "Unknown folder.");
+				return host.create(folder, name || nextName(folder));
+			}
+			case "rename": if (!name) throw fail(400, "Name required."); return host.rename(known(), name);
+			case "park": await host.park(known()); return { ok: true };
+			case "resume": await host.resume(known()); return { ok: true };
+			case "reload": await host.restart(known()); return { ok: true };
+			case "star": {
+				const recent = (await scanRecents(registry)).find(item => item.file === data.file);
+				if (!recent) throw fail(404, "That session is no longer recent.");
+				return star(registry, recent, name || nextName(recent.cwd));
+			}
+			case "unstar":
+				if (host.live.has(known())) throw fail(409, "Park the session first.");
+				registry.remove(id); unseen.delete(id); return { ok: true }; // the session file stays (D18)
+		}
+		throw fail(400, "Unknown session action.");
+	}
 
 	async function get(id: string, endpoint: string, params: URLSearchParams, response: http.ServerResponse): Promise<unknown> {
 		switch (endpoint) {
@@ -91,6 +135,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 				return undefined;
 			}
 			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
+			case "sessions": return sessions();
 			case "models": case "usage": case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
@@ -98,6 +143,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 
 	async function post(id: string, endpoint: string, data: Record<string, unknown>): Promise<unknown> {
 		switch (endpoint) {
+			case "session": return session(data);
 			case "message":
 				// RPC has no reload; D12: Reload is park + resume (idle only).
 				if (typeof data.text === "string" && /^\/(wo )?reload$/.test(data.text.trim())) { await host.restart(id); return { ok: true }; }
@@ -139,7 +185,11 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 	}
 
 	// Live frames ce-workflow's own server sent: status after runs and mode changes, Pi's plan, changed diagrams.
-	host.on("event", (id: string, event: RpcRecord) => { if (event.type === "agent_settled" && views.has(id)) void publishStatus(id).catch(() => {}); });
+	host.on("event", (id: string, event: RpcRecord) => {
+		if (event.type !== "agent_settled") return;
+		if (!views.get(id)?.clients.size) unseen.add(id);
+		if (views.has(id)) void publishStatus(id).catch(() => {});
+	});
 	host.on("closed", (id: string, requestId: string) => views.get(id)?.publish("dialog_closed", { askId: requestId }));
 	host.on("ui", (id: string, request: RpcRecord) => {
 		const view = views.get(id), form = view && toForm(request);

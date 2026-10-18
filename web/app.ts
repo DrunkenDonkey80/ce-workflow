@@ -35,14 +35,14 @@ function setBar(item: HTMLElement, percent: number, tone: string) {
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
 function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
-let sessionStates: ("working" | "waiting" | "idle")[] = [], iconKey = "";
+let sessionStates: string[] = [], iconKey = "";
 function renderShell() {
- // "<folder> - <herdr tab>" like the desktop; on phones the title menu lists the sessions and plans.
+ // "<folder> - <session name>"; the tab title adds the current plan (H5-05).
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
- const title = head || plan?.title || "Architecture workspace";
- $("title").textContent = title; $("title").title = title;
+ const title = head || plan?.title || "Architecture workspace", full = head && plan?.title ? `${head}: ${plan.title}` : title;
+ $("title").textContent = title; $("title").title = full;
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
- document.title = promptView.busy || state.activity.dialog ? "(!) " + title + " needs an answer" : title + " — Plan3";
+ document.title = promptView.busy || state.activity.dialog ? "(!) " + full + " needs an answer" : full;
  renderIcon();
  // D19 status line. Line 1: [model: effort] [Context: n%] [💡 bias]; line 2: the plan as a progress bar (or New plan).
  const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
@@ -812,9 +812,15 @@ async function toggleMode(text: string) {
 }
 $("mode-research").addEventListener("click", () => void toggleMode("/research " + ($("mode-research").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("mode-night").getAttribute("aria-pressed") === "true" ? "off" : "on")));
-// D18 switcher: other shared sessions on this PC, colour-coded; links work remotely, where one paired cookie covers every port.
-type Session = { id: string; name: string; cwd: string; port: number; state: "working" | "waiting" | "idle"; revision: number; unseen: boolean };
-let sessionsTimer = 0;
+// H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,
+// grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
+type Tone = "working" | "waiting" | "unseen" | "seen" | "parked";
+type HubSession = { id: string; name: string; tone: Tone };
+type Group = { folder: string; label: string; sessions: HubSession[] };
+type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
+const sessionId = location.pathname.split("/")[2] ?? "";
+const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
+let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, blue while any works, a shovel laid down when all rest.
 function renderIcon() {
  const waiting = promptView.busy || !!state.activity.dialog || sessionStates.includes("waiting");
@@ -827,37 +833,85 @@ function renderIcon() {
 }
 async function loadSessions() {
  clearTimeout(sessionsTimer);
- // A background tab keeps polling, slower, so its icon still shows other sessions; only a visible tab marks runs seen.
+ // A background tab keeps polling, slower, so its icon still shows the other sessions.
  const visible = document.visibilityState === "visible";
  try {
-  const { sessions } = await get("sessions") as { sessions: Session[] }, own = sessions.find(session => session.port === Number(location.port || (location.protocol === "https:" ? 443 : 80)));
-  // Seen is per device on the server (D21): looking at an idle session marks its last run seen.
-  sessionStates = sessions.map(session => session.state); renderIcon();
-  if (visible && own?.unseen && own.state === "idle") {
-   const response = await fetch("api/seen", { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify({ revision: own.revision }) });
-   if (response.ok) own.unseen = false;
-  }
-  renderSessions(sessions, own);
- } catch { $("switcher").hidden = true; document.body.classList.remove("has-switcher"); }
+  const { groups, recents } = await get("sessions") as { groups: Group[]; recents: Recent[] };
+  sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
+  renderSessions(groups, recents);
+ } catch (error) { showNotice("Sessions failed to load: " + error.message); }
  sessionsTimer = window.setTimeout(loadSessions, visible ? 5000 : 15000);
 }
-function renderSessions(sessions: Session[], own: Session | undefined) {
- const show = sessions.length > 0; $("switcher").hidden = !show; document.body.classList.toggle("has-switcher", show);
- $("session-list").replaceChildren(...sessions.map(session => {
-  const tone = session.state === "idle" ? (session.unseen ? "unseen" : "seen") : session.state, words = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle" }[tone];
-  const folder = session.cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? session.cwd;
-  const item = document.createElement(token || session === own ? "span" : "a");
-  if (item instanceof HTMLAnchorElement) item.href = `${location.protocol}//${location.hostname}:${session.port}/`;
-  else if (session !== own) item.title = "Open it from its own terminal link; switching needs a paired remote device.";
-  item.className = "session"; item.dataset.tone = tone; item.dataset.port = String(session.port);
-  if (session === own) item.setAttribute("aria-current", "page");
-  item.append(Object.assign(document.createElement("span"), { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }),
-   Object.assign(document.createElement("span"), { className: "session-label", textContent: session.name }), Object.assign(document.createElement("small"), { className: "session-state", textContent: words }));
-  item.title ||= `${session.name} · ${words}`;
-  item.setAttribute("aria-label", `${session.name} in ${folder}, ${words}${session === own ? ", this session" : ""}`);
-  return item;
+const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle", parked: "parked" };
+function html<K extends keyof HTMLElementTagNameMap>(tag: K, properties: Partial<HTMLElementTagNameMap[K]> = {}) { return Object.assign(document.createElement(tag), properties); }
+function renderSessions(groups: Group[], recents: Recent[]) {
+ $("switcher").hidden = false; document.body.classList.add("has-switcher");
+ sessionOrder = groups.flatMap(group => group.sessions.map(session => session.id));
+ ownFolder = groups.find(group => group.sessions.some(session => session.id === sessionId))?.folder ?? "";
+ const open = $("session-list").querySelector<HTMLDetailsElement>(".session-recents")?.open ?? false;
+ const rows = groups.flatMap(group => {
+  const head = html("div", { className: "session-group" });
+  const add = html("button", { type: "button", className: "session-add", textContent: "+", title: `New session in ${group.label} (Alt+N)` });
+  add.setAttribute("aria-label", `New session in ${group.label}`); add.addEventListener("click", () => void newSession(group.folder));
+  head.append(html("span", { className: "session-group-label", textContent: group.label, title: group.folder }), add);
+  return [head, ...group.sessions.map(session => sessionRow(session, group.label))];
+ });
+ const recent = html("details", { className: "session-recents", open });
+ recent.append(html("summary", { textContent: `Recents (${recents.length})` }), ...recents.map(item => {
+  const row = html("div", { className: "session recent" }), name = item.name ?? new Date(item.modified).toLocaleString();
+  const starButton = html("button", { type: "button", className: "session-more", textContent: "☆", title: "Star: add it to its folder group" });
+  starButton.setAttribute("aria-label", `Star ${item.label} · ${name}`);
+  starButton.addEventListener("click", () => { const as = prompt(`Name for this session in ${item.label} (empty = next number):`, ""); if (as !== null) void sessionAction({ action: "star", file: item.file, name: as }); });
+  row.append(html("span", { className: "session-label", textContent: `${item.label} · ${name}`, title: item.file }), starButton);
+  return row;
  }));
+ $("session-list").replaceChildren(...rows, recent);
 }
+function sessionRow(session: HubSession, folder: string) {
+ const row = html("div", { className: "session" }); row.dataset.tone = session.tone;
+ const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}` });
+ link.setAttribute("aria-label", `${session.name} in ${folder}, ${words[session.tone]}${session.id === sessionId ? ", this session" : ""}`);
+ if (session.id === sessionId) row.setAttribute("aria-current", "page");
+ link.append(html("span", { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }), html("span", { className: "session-label", textContent: session.name }), html("small", { className: "session-state", textContent: words[session.tone] }));
+ const more = html("button", { type: "button", className: "session-more", textContent: "⋯", title: "Session actions" });
+ more.setAttribute("aria-haspopup", "true"); more.setAttribute("aria-label", `Actions for ${session.name}`);
+ more.addEventListener("click", event => { event.stopPropagation(); openSessionMenu(more, session); });
+ row.append(link, more);
+ return row;
+}
+// One popup for the row actions; Park/Resume follow the session's state.
+const sessionMenu = html("div", { className: "status-menu session-menu", hidden: true }); sessionMenu.setAttribute("role", "menu"); document.body.append(sessionMenu);
+function openSessionMenu(anchor: HTMLElement, session: HubSession) {
+ const parked = session.tone === "parked";
+ const item = (text: string, run: () => void) => { const button = html("button", { type: "button", textContent: text }); button.setAttribute("role", "menuitem"); button.addEventListener("click", () => { sessionMenu.hidden = true; run(); }); return button; };
+ sessionMenu.replaceChildren(
+  item("Rename…", () => { const name = prompt("New name:", session.name); if (name?.trim()) void sessionAction({ action: "rename", id: session.id, name }); }),
+  parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
+  ...(parked ? [item("Unstar (keep the file)", () => { if (confirm(`Remove "${session.name}" from its group? The session file stays in Recents.`)) void sessionAction({ action: "unstar", id: session.id }); })] : [item("Reload", () => void sessionAction({ action: "reload", id: session.id }))]),
+ );
+ const box = anchor.getBoundingClientRect(); sessionMenu.hidden = false;
+ sessionMenu.style.position = "fixed"; sessionMenu.style.top = Math.max(8, Math.min(box.bottom, innerHeight - sessionMenu.offsetHeight - 8)) + "px"; sessionMenu.style.left = Math.max(8, Math.min(box.left, innerWidth - sessionMenu.offsetWidth - 8)) + "px";
+ sessionMenu.querySelector("button")?.focus();
+}
+document.addEventListener("pointerdown", event => { if (!sessionMenu.contains(event.target as Node)) sessionMenu.hidden = true; });
+sessionMenu.addEventListener("keydown", event => { if (event.key === "Escape") { event.stopPropagation(); sessionMenu.hidden = true; } });
+async function sessionAction(data: Record<string, unknown>) {
+ try { const value = await post("session", data); await loadSessions(); return value; }
+ catch (error) { showNotice(error.message); }
+}
+async function newSession(folder: string) {
+ const created = await sessionAction({ action: "new", folder }) as { id?: string } | undefined;
+ if (created?.id) location.assign(sessionUrl(created.id));
+}
+// D5 keyboard shortcuts: Alt+↑/↓ previous or next session, Alt+N new session in this folder (Esc in the chat box stops a run).
+window.addEventListener("keydown", event => {
+ if (!event.altKey || event.ctrlKey || event.metaKey) return;
+ if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+  const at = sessionOrder.indexOf(sessionId), next = sessionOrder[at + (event.key === "ArrowDown" ? 1 : -1)];
+  if (at >= 0 && next) { event.preventDefault(); location.assign(sessionUrl(next)); }
+ }
+ if (event.key.toLowerCase() === "n" && ownFolder) { event.preventDefault(); void newSession(ownFolder); }
+});
 // Desktop session bar: open by default; collapsing to the letter stripe is remembered.
 function toggleSwitcher(open: boolean) { localStorage.setItem("plan3-switcher", open ? "open" : "closed"); document.body.classList.toggle("switcher-open", open); $("switcher").dataset.open = String(open); $("switcher-toggle").setAttribute("aria-expanded", String(open)); $("switcher-toggle").setAttribute("aria-label", open ? "Hide shared sessions" : "Show shared sessions"); }
 $("switcher-toggle").addEventListener("click", () => toggleSwitcher($("switcher").dataset.open !== "true"));

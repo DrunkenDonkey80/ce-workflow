@@ -323,6 +323,15 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session[aria-current=page] { background: var(--hover); font-weight: 600; }
 .session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switcher[data-open=false] .session-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+/* H5-05: folder groups with a + for New, a ⋯ per row, Recents closed by default. */
+.session[data-tone=parked] .session-letter { background: transparent; border: 1px dashed var(--muted); color: var(--muted); }
+.session-link { display: flex; gap: 8px; align-items: center; min-width: 0; flex: 1; color: inherit; text-decoration: none; }
+.session-more, .session-add { flex: none; padding: 0 6px; border-color: transparent; background: none; color: var(--muted); }
+.session-group { display: flex; align-items: center; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+.session-group-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-recents summary { cursor: pointer; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.session.recent .session-label { flex: 1; font-size: 12px; }
+.switcher[data-open=false] :is(.session-more, .session-group, .session-recents) { display: none; }
 .mobile-tabs { display: none; }
 .drawer-toggle, .drawer, .drawer-backdrop { display: none; }
 .attach { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }

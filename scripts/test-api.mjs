@@ -158,6 +158,36 @@ try {
 	assert.equal((await post(id, "stop", {})).status, 200);
 	await until(() => !hub.host.live.get(id).running);
 
+	// H5-05 session bar: folder groups with state tones, actions, Recents with Star/Unstar (D18).
+	const tones = async () => Object.fromEntries((await get(id, "sessions")).body.groups.flatMap(group => group.sessions.map(session => [session.name, session.tone])));
+	await get(id, "snapshot"); assert.equal((await tones())["1"], "seen");
+	await hub.host.prompt(id, "hi");
+	assert.equal((await until(async () => (await tones())["1"] === "unseen" && "ok")), "ok", "a run that ends with no page open is unseen");
+	await get(id, "snapshot");
+	assert.equal((await tones())["1"], "seen", "opening the page marks it seen");
+	const created = (await post(id, "session", { action: "new", folder })).body;
+	assert.equal(created.name, "2", "new sessions take the next free number");
+	assert.equal((await post(id, "session", { action: "new", folder: root })).status, 404, "only folders that have a group");
+	assert.equal((await post(id, "session", { action: "rename", id: created.id, name: "Docs" })).status, 200);
+	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);
+	assert.equal((await tones()).Docs, "parked");
+	assert.equal((await post(id, "session", { action: "unstar", id })).status, 409, "a live session is parked before unstarring");
+	assert.equal((await post(id, "session", { action: "bogus", id })).status, 400);
+	assert.equal((await post(id, "session", { action: "park", id: "00000000-0000-0000-0000-000000000000" })).status, 404);
+	const other = path.join(root, "other"), recentDir = path.join(root, "sessions", "--other--"), recentFile = path.join(recentDir, "r.jsonl");
+	fs.mkdirSync(other); fs.mkdirSync(recentDir, { recursive: true });
+	fs.writeFileSync(recentFile, JSON.stringify({ type: "session", version: 3, id: "r1", timestamp: "2026-10-18T00:00:00Z", cwd: other }) + "\n");
+	const listed = (await get(id, "sessions")).body;
+	assert.deepEqual(listed.recents.map(item => [item.file, item.label]), [[recentFile, "other"]]);
+	const starred = (await post(id, "session", { action: "star", file: recentFile, name: "" })).body;
+	assert.equal(starred.name, "1");
+	const after = (await get(id, "sessions")).body;
+	assert.deepEqual([after.recents.length, after.groups.map(group => group.label)], [0, ["other", "proj"]], "starring moves it into its folder's group");
+	assert.equal((await post(id, "session", { action: "star", file: recentFile })).status, 404, "already starred");
+	assert.equal((await post(id, "session", { action: "unstar", id: starred.id })).status, 200);
+	assert(fs.existsSync(recentFile), "unstar keeps the file");
+	assert.equal((await get(id, "sessions")).body.recents.length, 1, "back in Recents");
+
 	// Request checks.
 	assert.equal(await rawGet(`/s/${id}/api/plans?token=${localKey}`, { host: `evil.example:${port}` }), 403, "foreign Host (DNS rebinding)");
 	assert.equal(await rawGet(`/s/${id}/api/plans?token=${localKey}`, { host: `localhost:${port}` }), 200);
