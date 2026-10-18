@@ -35,6 +35,8 @@ try {
 	assert.equal(created.status, 200, JSON.stringify(created.body));
 	const id = created.body.id;
 	assert.match(cli("status").out, /idle {2}1 {2}/);
+	// `pi-hub new` takes the next free number in the folder's group.
+	assert.match(cli("new", folder).out, /^New session 2 in .*: http:\/\/127\.0\.0\.1:\d+\/s\/[0-9a-f-]{36}\/\r?\n$/);
 
 	// H5-01: the browser app under /s/<session>/ with relative URLs and build-fingerprinted assets.
 	{

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub start | stop [--force] | restart | status | open | remote on|off | autostart on|off|status
+// pi-hub start | stop [--force] | restart | status | open | new [folder] [name] | remote on|off | autostart on|off|status
 import { mkdirSync, openSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import path from "node:path";
@@ -93,6 +93,13 @@ try {
 		const opener = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
 		spawn(opener[0] as string, opener[1] as string[], { detached: true, stdio: "ignore", windowsHide: true }).unref();
 		console.log(`http://127.0.0.1:${running.port}/`);
+	} else if (verb === "new") {
+		// A folder's first session starts its group; later ones can be added on the page with +.
+		const folder = path.resolve(rest[0] ?? "."), sessions = (await call("/api/status")).sessions as { name: string; folder: string }[];
+		const taken = new Set(sessions.filter(s => s.folder.toLowerCase() === folder.toLowerCase()).map(s => s.name));
+		let n = 1; while (taken.has(String(n))) n++;
+		const record = await call("/api/sessions", { folder, name: rest[1] ?? String(n) });
+		console.log(`New session ${record.name} in ${record.folder}: http://127.0.0.1:${marker()!.port}/s/${record.id}/`);
 	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
 		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
 		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));
@@ -104,7 +111,7 @@ try {
 		}
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub start | stop [--force] | restart | status | open | remote on|off | autostart on|off|status");
+		console.log("Usage: pi-hub start | stop [--force] | restart | status | open | new [folder] [name] | remote on|off | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {
