@@ -18,6 +18,17 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   form.replaceChildren(node("h2", { id: "prompt-title" }, ask.title ?? (ask.questions ? "Answer questions" : ask.question)), node("p", { className: "dialog-purpose" }, ask.purpose ?? "Answer here or in Pi; first answer wins."));
   const error = node("p", { className: "prompt-error", hidden: true }); error.setAttribute("role", "alert");
   let collect;
+  if (ask.kind === "list" && ask.compact) {
+   // Compact card (H3-07): a few actions in one row, no filter or descriptions.
+   dialog.classList.add("compact");
+   const actions = node("div", { className: "dialog-actions" });
+   for (const item of ask.items.filter(item => !item.heading)) { const pick = button(item.label, () => answer({ action: "select", value: item.value })); pick.disabled = !!item.disabled; if (ask.currentValue === item.value) pick.classList.add("current"); actions.append(pick); }
+   form.append(error, actions);
+   form.onkeydown = null;
+   dialog.oncancel = event => { event.preventDefault(); answer({ action: "back" }); };
+   dialog.showModal(); (actions.querySelector<HTMLButtonElement>(".current:not(:disabled)") ?? actions.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus(); return;
+  }
+  dialog.classList.remove("compact");
   if (ask.kind === "list") {
    const filter = node("input", { type: "search", placeholder: "Filter options", className: "prompt-filter", value: cursors.get(ask.title)?.filter ?? "" }); filter.setAttribute("aria-label", "Filter options");
    const rows = node("div", { className: "prompt-options" }), checks = new Map(), buttons = [];

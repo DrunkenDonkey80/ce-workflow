@@ -528,6 +528,7 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 					items: options.items.map(item => ({ value: item.value, label: item.label, description: item.description, heading: item.heading, disabled: item.disabled, enabled: item.enabled, rowAction: item.rowAction })),
 					currentValue: options.currentValue, ...(options.multi ? { multi: { selected: [...(options.multi.selected ?? [])], requireOne: options.multi.requireOne } } : {}),
 					spaceAction: Boolean(options.spaceAction), rowAction: Boolean(options.rowAction), tabAction: Boolean(options.tabAction),
+					...(options.compact ? { compact: true } : {}),
 				};
 				const signal = options.signal ? AbortSignal.any([options.signal, shutdown.signal]) : shutdown.signal;
 				return raceRemoteAsk(pi, subject, signal, undefined, payload => listDialogResponse(payload, options), run);

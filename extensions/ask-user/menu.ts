@@ -236,6 +236,72 @@ export async function nativeListDialog(ctx, options) {
 	}
 }
 
+// Compact view (H3-07): a few actions and nothing else to say. One line when it fits; otherwise the text wraps above the actions.
+function compactDialog(ctx, options) {
+	const { title, purpose, items, currentValue, cursorKey } = options;
+	const actions = items.filter(item => !item.heading);
+	return ctx.ui.custom((tui, theme, keybindings, done) => {
+		let index = Math.max(0, actions.findIndex(item => item.value === (currentValue ?? dialogCursors.get(cursorKey))));
+		let finished = false;
+		const close = result => {
+			if (finished) return;
+			finished = true;
+			options.signal?.removeEventListener("abort", cancel);
+			done(result);
+		};
+		const cancel = () => close(undefined);
+		const choose = item => {
+			if (item.disabled === true) {
+				ctx.ui.notify?.(item.disabledReason ?? item.description ?? "This option is unavailable.", "warning");
+				return;
+			}
+			dialogCursors.set(cursorKey, item.value);
+			close({ action: "select", value: item.value, item, index: items.indexOf(item) });
+		};
+		const component = {
+			render(width) {
+				const safeWidth = Math.max(1, width - 2);
+				const buttons = actions.map((item, row) => row === index
+					? theme.fg("accent", theme.bold(`[ ${itemLabel(item)} ]`))
+					: theme.fg(item.disabled === true ? "dim" : "text", `  ${itemLabel(item)}  `)).join(" ");
+				const controls = `${buttons}  ${theme.fg("dim", "\u2190/\u2192 Enter \u00b7 Esc")}`;
+				const text = `${title}${purpose ? ` ${purpose}` : ""}`;
+				const line = `${theme.fg("accent", theme.bold(title))}${purpose ? ` ${theme.fg("text", purpose)}` : ""}  ${controls}`;
+				if (visibleWidth(line) <= safeWidth) return [line];
+				return [...wrapText(text, safeWidth, 6).map(part => theme.fg("text", part)), truncate(controls, safeWidth)];
+			},
+			handleInput(data) {
+				if (keyMatches(keybindings, data, "tui.select.cancel", "escape", "\x1b")) return cancel();
+				if (keyMatches(keybindings, data, "tui.select.confirm", "enter", "return", "\r", "\n")) return choose(actions[index]);
+				if (keyMatches(keybindings, data, "tui.select.up", "up", "\x1b[A") || data === "\x1b[D") index = (index - 1 + actions.length) % actions.length;
+				else if (keyMatches(keybindings, data, "tui.select.down", "down", "\x1b[B") || data === "\x1b[C" || data === "\t") index = (index + 1) % actions.length;
+				else {
+					// A letter picks the action it uniquely starts, e.g. y/n.
+					const matches = data.length === 1 ? actions.filter(item => itemLabel(item).toLowerCase().startsWith(data.toLowerCase())) : [];
+					if (matches.length === 1) choose(matches[0]);
+					return;
+				}
+				tui.requestRender();
+			},
+			invalidate() {},
+			dispose() { options.signal?.removeEventListener("abort", cancel); },
+		};
+		options.signal?.addEventListener("abort", cancel, { once: true });
+		if (options.signal?.aborted) cancel();
+		return component;
+	});
+}
+
+/** Yes/No in the compact view; Esc or a closed prompt counts as No. */
+export async function askConfirm(ctx, title: string, message?: string, options: { signal?: AbortSignal; terminalOnly?: boolean; cursorKey?: string } = {}) {
+	const result = await showListDialog(ctx, {
+		title, purpose: message, compact: true, filter: false, cursorKey: options.cursorKey ?? `confirm:${title}`,
+		items: [{ value: "yes", label: "Yes" }, { value: "no", label: "No" }],
+		signal: options.signal, terminalOnly: options.terminalOnly,
+	});
+	return result?.value === "yes";
+}
+
 export function progressBar(complete, total, width = 12) {
 	const safeTotal = Math.max(0, Number(total) || 0);
 	const safeComplete = Math.max(0, Math.min(safeTotal, Number(complete) || 0));
@@ -281,6 +347,7 @@ async function localListDialog(ctx, options) {
 		(ctx.mode === "tui" || (forceCustom && !ctx.mode));
 	if (ctx.ui.workDialogsNative === true || !canUseCustom)
 		return nativeListDialog(ctx, { ...options, cursorKey });
+	if (options.compact && !multi) return compactDialog(ctx, { ...options, cursorKey });
 	const subtitleLines = (Array.isArray(subtitle) ? subtitle : [subtitle]).filter(
 		Boolean,
 	);

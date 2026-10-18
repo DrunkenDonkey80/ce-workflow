@@ -46,6 +46,7 @@ export interface RemoteListPrompt {
 	items: { value: string; label: string; description?: string; heading?: boolean; disabled?: boolean; enabled?: boolean; rowAction?: boolean }[];
 	currentValue?: string; multi?: { selected: string[]; requireOne?: boolean };
 	spaceAction?: boolean; rowAction?: boolean; tabAction?: boolean;
+	compact?: boolean; // a few actions and nothing else: one terminal line, a small web card (H3-07)
 }
 
 // The native popup and authenticated local browser race; remote answers close the losing UI by aborting its signal.
