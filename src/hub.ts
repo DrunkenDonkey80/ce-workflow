@@ -76,6 +76,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 			file: () => registry.get(id)?.sessionFile,
 			idle: () => !host.live.get(id)?.running,
 			viewers: count => { const live = host.live.get(id); if (live) live.viewers = count; },
+			forms: () => pageApi.forms(id),
 		}));
 		const live = host.live.get(id);
 		if (!value.hydrated) await value.hydrate(live ? (await live.rpc.send({ type: "get_messages" })).data?.messages : undefined);
@@ -190,7 +191,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 			releaseLock(path.join(dataDir, "hub"), lock);
 		})();
 	}
-	return { config, host, registry, server, restored, stop };
+	return { config, host, registry, views, server, restored, stop };
 }
 
 if (import.meta.main) {

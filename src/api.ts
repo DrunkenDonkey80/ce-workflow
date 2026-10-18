@@ -7,6 +7,7 @@ import { emptyDiagram, loadDiagram } from "pi-work-orchestrator/extensions/plan3
 import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "pi-work-orchestrator/extensions/plan3-files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage, webTarget } from "pi-work-orchestrator/extensions/plan3-web.ts";
 import { currentPlan, listPlans } from "pi-work-orchestrator/extensions/plan3.ts";
+import { toForm, toResponse } from "./forms.ts";
 import type { Registry } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
 import type { SessionHost } from "./sessions.ts";
@@ -64,14 +65,9 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 		return result.value;
 	}
 
-	/** The open channel ask with this askId (ce-workflow hub-channel.ts: input titled pi-hub:ask, JSON placeholder). */
-	function channelAsk(id: string, askId: unknown) {
-		for (const dialog of host.pendingDialogs(id)) {
-			const data = dialog.method === "input" && dialog.title === "pi-hub:ask" ? parse(dialog.placeholder)?.data : undefined;
-			if (data && typeof askId === "string" && data.askId === askId) return { requestId: dialog.id as string, data };
-		}
-		throw fail(404, "That question is no longer open.");
-	}
+	/** Open forms for the snapshot (H5-04): every dialog Pi has open, as page forms. */
+	const forms = (id: string) => host.pendingDialogs(id).flatMap(dialog => toForm(dialog) ?? []);
+	const openDialog = (id: string, askId: unknown) => host.pendingDialogs(id).find(dialog => dialog.id === askId && toForm(dialog));
 
 	async function get(id: string, endpoint: string, params: URLSearchParams, response: http.ServerResponse): Promise<unknown> {
 		switch (endpoint) {
@@ -94,7 +90,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 				response.end(image.bytes);
 				return undefined;
 			}
-			case "dialog": return channelAsk(id, params.get("id")).data;
+			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "models": case "usage": case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
@@ -132,10 +128,11 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 			}
 			case "answer": {
 				only(data, ANSWER_FIELDS, "Invalid answer fields.");
-				const { requestId } = channelAsk(id, data.askId);
-				const { target: _target, ...answer } = data;
-				host.respond(id, requestId, data.cancel === true ? { cancelled: true } : { value: JSON.stringify(answer) });
-				return { ok: true };
+				// First answer wins: a second tab (or a closed ask) gets accepted: false, as ce-workflow's dialogs.answer.
+				const dialog = openDialog(id, data.askId);
+				if (!dialog || !host.respond(id, dialog.id as string, toResponse(dialog, data))) return { accepted: false };
+				views.get(id)?.publish("dialog_closed", { askId: dialog.id });
+				return { accepted: true };
 			}
 		}
 		throw fail(404, "Unknown workspace endpoint.");
@@ -143,8 +140,10 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 
 	// Live frames ce-workflow's own server sent: status after runs and mode changes, Pi's plan, changed diagrams.
 	host.on("event", (id: string, event: RpcRecord) => { if (event.type === "agent_settled" && views.has(id)) void publishStatus(id).catch(() => {}); });
+	host.on("closed", (id: string, requestId: string) => views.get(id)?.publish("dialog_closed", { askId: requestId }));
 	host.on("ui", (id: string, request: RpcRecord) => {
-		const view = views.get(id);
+		const view = views.get(id), form = view && toForm(request);
+		if (form) view.publish("dialog", form);
 		if (!view || request.method !== "setStatus") return;
 		if (request.statusKey === "pi-hub:state") {
 			const state = parse(request.statusText);
@@ -157,5 +156,5 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 		})().catch(() => {}); // a plan deleted meanwhile: nothing to show
 	});
 
-	return { get, post, extras, saveImage: savePastedImage };
+	return { get, post, extras, forms, saveImage: savePastedImage };
 }

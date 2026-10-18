@@ -41,7 +41,7 @@ export class SessionView {
 	private queue: Record<"steering" | "followUp", string[]> = { steering: [], followUp: [] };
 	private sequence = 0;
 	hydrated = false;
-	private readonly session: { file: () => string | undefined; idle: () => boolean; viewers?: (count: number) => void };
+	private readonly session: { file: () => string | undefined; idle: () => boolean; viewers?: (count: number) => void; forms?: () => Record<string, unknown>[] };
 
 	constructor(session: SessionView["session"]) {
 		this.session = session;
@@ -101,7 +101,7 @@ export class SessionView {
 	}
 
 	snapshot(extra: Record<string, unknown> = {}) {
-		const value = checkIn(this.chat, this.activity.snapshot(this.ctx), [], extra);
+		const value = checkIn(this.chat, this.activity.snapshot(this.ctx), this.session.forms?.() ?? [], extra);
 		return { ...value, more: value.more || this.olderInFile };
 	}
 

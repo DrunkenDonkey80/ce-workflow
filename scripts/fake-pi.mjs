@@ -60,6 +60,13 @@ async function handle(cmd) {
 				}
 				// Mirrors ce-workflow plan3.ts publishHub(): `/state <json>` publishes pi-hub:state.
 				// Mirrors plan3.ts plan3:diagram-changed under the hub: `/diagram <json>` publishes pi-hub:diagram.
+				// `/dialog <method> <json fields>`: a plain RPC dialog as other extensions raise; the notify carries the raw response.
+				if (cmd.message.startsWith("/dialog ")) {
+					const [, method, fields] = /^\/dialog (\w+) (.*)$/.exec(cmd.message);
+					const response = await new Promise(resolve => { const id = crypto.randomUUID(); resolve.raw = true; pendingUi.set(id, resolve); out({ type: "extension_ui_request", id, method, ...JSON.parse(fields) }); });
+					const { type: _t, id: _i, ...rest } = response;
+					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "notify", message: `dialog:${JSON.stringify(rest)}` });
+				}
 				if (cmd.message.startsWith("/diagram ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:diagram", statusText: cmd.message.slice(9) });
 				if (cmd.message.startsWith("/state ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:state", statusText: cmd.message.slice(7) });
 				if (flags.has("slow-command")) await new Promise(r => setTimeout(r, 300));
@@ -99,7 +106,7 @@ process.stdin.on("data", chunk => {
 		const line = buffer.slice(0, index); buffer = buffer.slice(index + 1);
 		if (!line.trim()) continue;
 		const cmd = JSON.parse(line);
-		if (cmd.type === "extension_ui_response") { pendingUi.get(cmd.id)?.(cmd.cancelled ? undefined : cmd.value); pendingUi.delete(cmd.id); continue; }
+		if (cmd.type === "extension_ui_response") { const resolve = pendingUi.get(cmd.id); pendingUi.delete(cmd.id); resolve?.(resolve.raw ? cmd : cmd.cancelled ? undefined : cmd.value); continue; }
 		void handle(cmd);
 	}
 });

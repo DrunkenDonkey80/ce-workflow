@@ -101,16 +101,56 @@ try {
 	assert.equal(hub.host.live.has(id), true, "reload resumes");
 	if (pid) assert.notEqual(hub.host.live.get(id).rpc.process?.pid, pid, "reload is a new Pi");
 
-	// Channel asks: dialog by askId, answered once with the page's fields as JSON.
-	const answered = new Promise(r => { const l = (sid, req) => { if (sid === id && req.method === "notify") { hub.host.off("ui", l); r(req.message); } }; hub.host.on("ui", l); });
-	void hub.host.prompt(id, "/hubask");
-	const ask = await until(() => hub.host.pendingDialogs(id).find(d => d.title === "pi-hub:ask"));
-	const askId = "ask-1"; ask.placeholder = JSON.stringify({ id: "c", data: { askId, question: "Pick?" } }); // the fake's data has no askId
-	assert.deepEqual((await get(id, `dialog?id=${askId}`)).body, { askId, question: "Pick?" });
-	assert.equal((await post(id, "answer", { askId, text: "x", bogus: 1 })).status, 400);
-	assert.equal((await post(id, "answer", { askId, text: "yes", target: "aaaaaaaa" })).status, 200);
-	assert.equal(await answered, `answer:${JSON.stringify({ askId, text: "yes" })}`);
-	assert.equal((await post(id, "answer", { askId, text: "again" })).status, 404, "answered once");
+	// H5-04 forms: every open dialog is a page form keyed by its request id; snapshot, dialog and dialog_closed frames carry it.
+	const notified = prefix => new Promise(r => { const l = (sid, req) => { if (sid === id && req.method === "notify" && req.message.startsWith(prefix)) { hub.host.off("ui", l); r(req.message.slice(prefix.length)); } }; hub.host.on("ui", l); });
+	const frames = [], view = hub.views.get(id), publish = view.publish;
+	view.publish = (event, value) => { if (event.startsWith("dialog")) frames.push([event, value]); publish(event, value); };
+	const open = async (command, prefix) => {
+		const before = new Set(hub.host.pendingDialogs(id).map(d => d.id)), result = notified(prefix);
+		void hub.host.prompt(id, command);
+		const dialog = await until(() => hub.host.pendingDialogs(id).find(d => !before.has(d.id)));
+		return { askId: dialog.id, result };
+	};
+
+	// Channel ask: ask_user data as is, plus ce-workflow's own askId sent back with the answer.
+	const channel = await open(`/ask ${JSON.stringify({ id: "c", data: { askId: "own-1", question: "Pick?", options: [{ title: "A" }] } })}`, "answer:");
+	assert.deepEqual((await get(id, `dialog?id=${channel.askId}`)).body, { askId: channel.askId, question: "Pick?", options: [{ title: "A" }] });
+	assert.deepEqual((await get(id, "snapshot")).body.dialogs.map(form => form.askId), [channel.askId], "a reconnecting page sees the open form");
+	assert.deepEqual(frames.at(-1), ["dialog", { askId: channel.askId, question: "Pick?", options: [{ title: "A" }] }]);
+	assert.equal((await post(id, "answer", { askId: channel.askId, text: "x", bogus: 1 })).status, 400);
+	assert.deepEqual((await post(id, "answer", { askId: channel.askId, selections: ["A"], comment: "ok", target: "aaaaaaaa" })).body, { accepted: true });
+	assert.deepEqual(JSON.parse(await channel.result), { selections: ["A"], comment: "ok", askId: "own-1" });
+	assert.deepEqual(frames.at(-1), ["dialog_closed", { askId: channel.askId }]);
+	assert.deepEqual((await post(id, "answer", { askId: channel.askId, text: "again" })).body, { accepted: false }, "first answer wins");
+	assert.equal((await get(id, `dialog?id=${channel.askId}`)).status, 404);
+
+	// Plain RPC dialogs from other extensions or Pi itself, converted both ways.
+	const select = await open(`/dialog select ${JSON.stringify({ title: "Pick a mode", options: ["Fast", "Slow"] })}`, "dialog:");
+	assert.deepEqual((await get(id, `dialog?id=${select.askId}`)).body, { askId: select.askId, kind: "list", title: "Pick a mode", purpose: "Choose an option to continue.", items: [{ value: "Fast", label: "Fast" }, { value: "Slow", label: "Slow" }] });
+	assert.equal((await post(id, "answer", { askId: select.askId, action: "select", value: "Other" })).status, 400);
+	await post(id, "answer", { askId: select.askId, action: "select", value: "Slow" });
+	assert.deepEqual(JSON.parse(await select.result), { value: "Slow" });
+	const back = await open(`/dialog select ${JSON.stringify({ title: "Pick", options: ["A"] })}`, "dialog:");
+	await post(id, "answer", { askId: back.askId, action: "back" });
+	assert.deepEqual(JSON.parse(await back.result), { cancelled: true });
+	const confirm = await open(`/dialog confirm ${JSON.stringify({ title: "Allow dangerous command?", message: "rm -rf build" })}`, "dialog:");
+	const card = (await get(id, `dialog?id=${confirm.askId}`)).body;
+	assert.deepEqual([card.kind, card.compact, card.purpose, card.items.map(item => item.label)], ["list", true, "rm -rf build", ["Yes", "No"]]);
+	await post(id, "answer", { askId: confirm.askId, action: "select", value: "yes" });
+	assert.deepEqual(JSON.parse(await confirm.result), { confirmed: true });
+	const refuse = await open(`/dialog confirm ${JSON.stringify({ title: "Sure?", message: "" })}`, "dialog:");
+	await post(id, "answer", { askId: refuse.askId, action: "back" });
+	assert.deepEqual(JSON.parse(await refuse.result), { confirmed: false }, "Esc on a confirm is No");
+	const input = await open(`/dialog input ${JSON.stringify({ title: "Name?", placeholder: "e.g. Bob" })}`, "dialog:");
+	assert.deepEqual((await get(id, `dialog?id=${input.askId}`)).body, { askId: input.askId, question: "Name?", context: "e.g. Bob", options: [], allowFreeform: true });
+	await post(id, "answer", { askId: input.askId, text: "Ann" });
+	assert.deepEqual(JSON.parse(await input.result), { value: "Ann" });
+	const editor = await open(`/dialog editor ${JSON.stringify({ title: "Rules", prefill: "line 1" })}`, "dialog:");
+	assert.equal((await get(id, `dialog?id=${editor.askId}`)).body.initialText, "line 1");
+	await post(id, "answer", { askId: editor.askId, cancel: true });
+	assert.deepEqual(JSON.parse(await editor.result), { cancelled: true });
+	assert.deepEqual((await get(id, "snapshot")).body.dialogs, []);
+	view.publish = publish;
 
 	// Stop aborts the run.
 	void hub.host.prompt(id, "hold");
