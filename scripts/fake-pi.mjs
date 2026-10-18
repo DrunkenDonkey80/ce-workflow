@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Minimal stand-in for `pi --mode rpc` used by hub tests. Speaks LF-delimited JSONL on stdin/stdout.
-// Behaviour switches come from FAKE_PI (comma list): "crash-on-prompt", "slow-command".
+// Behaviour switches come from FAKE_PI (comma list): "crash-on-prompt", "slow-command", "split-output".
 import fs from "node:fs";
 import crypto from "node:crypto";
 const flags = new Set((process.env.FAKE_PI ?? "").split(",").filter(Boolean));
@@ -12,7 +12,12 @@ const messages = sessionFile && fs.existsSync(sessionFile)
 	? fs.readFileSync(sessionFile, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)).filter(e => e.type === "message").map(e => e.message)
 	: [];
 const pendingUi = new Map();
-const out = value => process.stdout.write(JSON.stringify(value) + "\n");
+const out = value => {
+	const line = Buffer.from(JSON.stringify(value) + "\n");
+	if (!flags.has("split-output")) return process.stdout.write(line);
+	// Split mid-record and inside multi-byte characters to test the reader's framing.
+	for (let i = 0; i < line.length; i += 3) process.stdout.write(line.subarray(i, i + 3));
+};
 const save = message => { messages.push(message); if (sessionFile) fs.appendFileSync(sessionFile, JSON.stringify({ type: "message", message }) + "\n"); };
 const ui = (method, fields) => new Promise(resolve => { const id = crypto.randomUUID(); pendingUi.set(id, resolve); out({ type: "extension_ui_request", id, method, ...fields }); });
 
