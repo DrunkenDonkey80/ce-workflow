@@ -303,6 +303,12 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .mentions { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 dialog { border: 1px solid var(--group); border-radius: 6px; padding: 20px; color: var(--ink); background: var(--chat); width: min(700px, 94vw); max-height: 90dvh; }
 dialog::backdrop { background: rgba(0, 0, 0, .25); }
+/* Prompts float without blocking the page (other sessions stay selectable), framed and raised. */
+#prompt:not(:modal) { position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 5; }
+#prompt { box-shadow: 0 10px 30px #0004, 0 2px 6px #0003; border-color: var(--ink); }
+.prompt-question { border: 1px solid var(--group); border-radius: 6px; padding: 0 12px 12px; margin: 0 0 12px; background: var(--chat); box-shadow: 0 1px 3px #0002; }
+.prompt-question > legend { float: left; box-sizing: border-box; width: calc(100% + 24px); margin: 0 -12px 10px; padding: 10px 12px; font-weight: 600; background: var(--hover); border-bottom: 1px solid var(--line); border-radius: 6px 6px 0 0; }
+.prompt-question > legend + * { clear: both; }
 dialog.compact { width: min(420px, 94vw); padding: 14px 16px; }
 dialog.compact .dialog-purpose { margin-bottom: 4px; }
 dialog.compact .dialog-actions { margin-top: 10px; }
@@ -324,6 +330,11 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switcher[data-open=false] .session-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 /* H5-05: folder groups with a + for New, a ⋯ per row, Recents closed by default. */
+.session-menu { z-index: 9; }
+.session[data-tone=parked] :is(.session-label, .session-state) { color: var(--muted); font-style: italic; }
+.session[data-tone=parked] .session-label::after { content: " Zz"; font-size: 10px; font-weight: 700; letter-spacing: -1px; }
+.session[data-tone=parked] .session-letter { position: relative; }
+.switcher[data-open=false] .session[data-tone=parked] .session-letter::after { content: "z"; position: absolute; top: -5px; right: -3px; font-size: 10px; font-weight: 700; color: var(--muted); }
 .session:is([data-tone=parked], [data-tone=terminal]) .session-letter { background: transparent; border: 1px dashed var(--muted); color: var(--muted); }
 .session-link { display: flex; gap: 8px; align-items: center; min-width: 0; flex: 1; color: inherit; text-decoration: none; }
 .session-more, .session-add { flex: none; padding: 0 6px; border-color: transparent; background: none; color: var(--muted); }

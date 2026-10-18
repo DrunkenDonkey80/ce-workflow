@@ -10,12 +10,16 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   catch (error) { const message = form.querySelector<HTMLParagraphElement>(".prompt-error"); if (message && active?.askId === id) { message.textContent = error.message + ". Your answer draft is kept."; message.hidden = false; } }
   finally { sending = false; }
  }
+ // Non-modal, so the session bar stays usable while a session waits; Escape still cancels like a modal dialog.
+ dialog.addEventListener("keydown", event => { if (event.key === "Escape" && !event.defaultPrevented) { event.preventDefault(); dialog.dispatchEvent(new Event("cancel", { cancelable: true })); } });
  function button(text, run) { const value = node("button", { type: "button" }, text); value.addEventListener("click", run); return value; }
  function show() {
   if (active || !pending.size) return;
   active = pending.values().next().value; const ask = active;
   form.onsubmit = event => event.preventDefault();
-  form.replaceChildren(node("h2", { id: "prompt-title" }, ask.title ?? (ask.questions ? "Answer questions" : ask.question)), node("p", { className: "dialog-purpose" }, ask.purpose ?? "Answer here or on another device; first answer wins."));
+  // Menus keep their title and purpose line; a single question's own header is its title (no repeated lines).
+  const heading = ask.kind === "list" || ask.questions ? [node("h2", { id: "prompt-title" }, ask.title ?? "Answer questions")] : [];
+  form.replaceChildren(...heading, ...(ask.purpose && heading.length ? [node("p", { className: "dialog-purpose" }, ask.purpose)] : []));
   const error = node("p", { className: "prompt-error", hidden: true }); error.setAttribute("role", "alert");
   let collect;
   if (ask.kind === "list" && ask.compact) {
@@ -26,7 +30,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
    form.append(error, actions);
    form.onkeydown = null;
    dialog.oncancel = event => { event.preventDefault(); answer({ action: "back" }); };
-   dialog.showModal(); (actions.querySelector<HTMLButtonElement>(".current:not(:disabled)") ?? actions.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus(); return;
+   dialog.show(); (actions.querySelector<HTMLButtonElement>(".current:not(:disabled)") ?? actions.querySelector<HTMLButtonElement>("button:not(:disabled)"))?.focus(); return;
   }
   dialog.classList.remove("compact");
   if (ask.kind === "list") {
@@ -73,7 +77,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
     }
    };
    dialog.oncancel = event => { event.preventDefault(); try { answer(ask.multi ? collect() : { action: "back" }); } catch (failure) { error.textContent = failure.message; error.hidden = false; } };
-   dialog.showModal(); filter.focus(); return;
+   dialog.show(); filter.focus(); return;
   }
   // Enter sends, Shift+Enter is a new line in the text box; checklist Enter toggles (its handler prevents default first).
   form.onkeydown = event => {
@@ -83,7 +87,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   };
   const questions = ask.questions ?? [ask], readers = [];
   for (const [index, question] of questions.entries()) {
-   const section = node("fieldset", { className: "prompt-question" }); section.append(node("legend", {}, question.question));
+   const section = node("fieldset", { className: "prompt-question" }); section.append(node("legend", ask.questions ? {} : { id: "prompt-title" }, question.question));
    // Image paths in the context or options become links with thumbnails; click opens full size.
    if (question.context) { const context = node("div", { className: "prompt-context" }); links(context, question.context); section.append(context); }
    const inputs = [];
@@ -122,7 +126,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   };
   form.onsubmit = event => { event.preventDefault(); try { answer(collect()); } catch (failure) { error.textContent = failure.message; error.hidden = false; } };
   dialog.oncancel = event => { event.preventDefault(); answer({ cancel: true }); };
-  dialog.showModal(); form.querySelector<HTMLElement>("input,textarea,button")?.focus();
+  dialog.show(); form.querySelector<HTMLElement>("input,textarea,button")?.focus();
  }
  return {
   sync(asks) { for (const id of pending.keys()) if (!asks.some(ask => ask.askId === id)) pending.delete(id); for (const ask of asks) pending.set(ask.askId, ask); if (active && !pending.has(active.askId)) { active = null; dialog.close(); } show(); },
