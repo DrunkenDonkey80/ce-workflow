@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-18
-updated: 2026-10-18T16:52:30.330Z
+updated: 2026-10-18T16:55:21.555Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -128,9 +128,7 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 
 ### Phase 3: Hub channel in ce-workflow [think]
 
-- [ ] **H3-01** Add `extensions/hub-channel.ts`: active only with `PI_HUB=1`; `ask(kind, data)` through a marker `input` prompt (D22), `publish(kind, data)` through `setStatus`.
-  - RPC `editor` has no timeout or cancel and stays pending until answered (`dist/modes/rpc/rpc-mode.js` `editor`). When an ask ends another way (timeout, abort, intercom answer), the channel publishes `closed` with its id; the hub removes the form and sends a cancelled response to drain the request.
-  - Test: timeout, intercom answering first, abort, an answer arriving late, and the browser reconnecting mid-ask.
+- [x] **H3-01** ce-workflow extensions/hub-channel.ts (ask via marker input + JSON placeholder, always publishes `closed`; publish via pi-hub:<kind> setStatus; inert without PI_HUB). Hub sessions.ts drops forms on `closed` and lists pendingDialogs for reconnects.
 - [ ] **H3-06** Extend ask_user for menus: search box for long lists, current item marked, submenus where Esc goes back, checklists that toggle in place.
   - Also a multi-line text answer with pre-filled text (night mode rules), and the model picker's Tab switch between scoped and all models.
 - [ ] **H3-07** Add ask_user's compact view for simple prompts with only a few actions and nothing else to say: one line in the terminal, a small card in the web.
@@ -233,7 +231,7 @@ Phase 1 (2026-10-18, Pi 1.2.0, Node 24.14; scratch scripts in `%TEMP%\pi-hub-h1\
 
 ## Resume context
 
-Active, 9/36. Phase 2 (H2-01..05) done in pi-control-hub HEAD a9dd0c9: rpc-client, registry, session-lock, sessions (SessionHost), hub.ts (local API on fixed port, x-hub-key), cli.ts. npm test = 5 files pass. Next: H3-01. Real hub data dir ~/.pi/agent/pi-control-hub was removed after the smoke test, so the next start picks a new port. No blockers.
+Active, 10/36. Phase 2 is done and H3-01 is done. Hub HEAD 4870c41, npm test 5 pass. ce-workflow e54de1e adds extensions/hub-channel.ts plus test-work-hub-channel.mjs; nothing is wired yet. Next: H3-06, ask_user menu features (search box, current item marked, submenus with Esc back, checklists that toggle in place) in extensions/ask-user/. After that H3-07 adds the compact view and H3-08 moves work-dialogs onto ask_user, which needs the user's live terminal check. No blockers.
 
 ## Amendments
 
