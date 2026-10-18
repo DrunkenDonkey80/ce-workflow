@@ -36,6 +36,18 @@ async function handle(cmd) {
 			if (cmd.message.startsWith("/")) {
 				// Extension commands answer only after the handler finishes (F6).
 				if (cmd.message.startsWith("/ask")) { const value = await ui("input", { title: "pi-hub:ask", placeholder: cmd.message.slice(5) }); out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "notify", message: `answer:${value ?? "<cancelled>"}` }); }
+				if (cmd.message.startsWith("/hubask")) {
+					// Mirrors ce-workflow hub-channel.ts ask(): marker input, JSON placeholder, Pi-side timeout, then `closed`.
+					const askId = crypto.randomUUID(), ms = Number(cmd.message.slice(8)) || 0;
+					const requestId = crypto.randomUUID();
+					const value = await new Promise(resolve => {
+						pendingUi.set(requestId, resolve);
+						out({ type: "extension_ui_request", id: requestId, method: "input", title: "pi-hub:ask", placeholder: JSON.stringify({ id: askId, data: { q: "?" } }), timeout: ms || undefined });
+						if (ms) setTimeout(() => { pendingUi.delete(requestId); resolve(undefined); }, ms);
+					});
+					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:closed", statusText: JSON.stringify({ id: askId }) });
+					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "notify", message: `answer:${value ?? "<cancelled>"}` });
+				}
 				if (flags.has("slow-command")) await new Promise(r => setTimeout(r, 300));
 				return reply({ disposition: "handled" });
 			}

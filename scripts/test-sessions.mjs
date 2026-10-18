@@ -53,6 +53,32 @@ try {
 	await command;
 	assert.deepEqual(host.busyReasons(a.id), []);
 
+	// Channel asks (H3-01): a reconnecting browser sees the open form again; answering works once.
+	const notified = () => new Promise(r => { const l = (sid, req) => { if (req.method === "notify") { host.off("ui", l); r(req.message); } }; host.on("ui", l); });
+	let asked = new Promise(r => host.once("ui", (sid, req) => r(req)));
+	let note = notified();
+	let ask = host.prompt(a.id, "/hubask");
+	const form = await asked;
+	assert.deepEqual(host.pendingDialogs(a.id).map(d => d.id), [form.id], "reconnect: still pending");
+	assert.deepEqual(host.pendingDialogs(a.id).map(d => d.id), [form.id], "reconnect twice: same form");
+	assert.equal(host.respond(a.id, form.id, { value: "{\"ok\":1}" }), true);
+	assert.equal(await note, "answer:{\"ok\":1}");
+	assert.equal(host.respond(a.id, form.id, { value: "again" }), false, "second answer refused");
+	await ask;
+
+	// Timeout inside Pi: `closed` removes the form; a late answer is refused.
+	asked = new Promise(r => host.once("ui", (sid, req) => r(req)));
+	const closedForm = new Promise(r => host.once("closed", (sid, requestId) => r(requestId)));
+	note = notified();
+	ask = host.prompt(a.id, "/hubask 50");
+	const timed = await asked;
+	assert.equal(await closedForm, timed.id);
+	assert.equal(await note, "answer:<cancelled>");
+	assert.deepEqual(host.pendingDialogs(a.id), []);
+	assert.equal(host.respond(a.id, timed.id, { value: "{}" }), false, "late answer refused");
+	await ask;
+	assert.deepEqual(host.busyReasons(a.id), []);
+
 	// Rename reaches Pi; restart keeps the file.
 	await host.rename(a.id, "Roof");
 	assert.equal((await host.live.get(a.id).rpc.send({ type: "get_state" })).data.sessionName, "Roof");

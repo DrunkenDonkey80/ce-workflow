@@ -22,6 +22,10 @@ export type Live = {
 };
 
 const DIALOGS = new Set(["select", "confirm", "input", "editor"]);
+const parseJson = (text: unknown) => { try { return typeof text === "string" ? JSON.parse(text) : undefined; } catch { return undefined; } };
+/** The channel id of a marker ask (`pi-hub:<kind>` input with JSON placeholder), if it is one. */
+export const channelId = (request: RpcRecord): string | undefined =>
+	request.method === "input" && String(request.title ?? "").startsWith("pi-hub:") ? parseJson(request.placeholder)?.id : undefined;
 
 export class SessionHost extends EventEmitter {
 	readonly options: HostOptions;
@@ -63,6 +67,11 @@ export class SessionHost extends EventEmitter {
 		rpc.on("ui", (request: RpcRecord) => {
 			live.lastActivity = Date.now();
 			if (DIALOGS.has(request.method)) live.dialogs.set(request.id!, request);
+			// ce-workflow hub-channel.ts: an ask that ended another way (timeout, abort, intercom) is closed by its channel id.
+			if (request.method === "setStatus" && request.statusKey === "pi-hub:closed") {
+				const askId = parseJson(request.statusText)?.id;
+				for (const [requestId, dialog] of live.dialogs) if (askId && channelId(dialog) === askId) { live.dialogs.delete(requestId); this.emit("closed", record.id, requestId); }
+			}
 			this.emit("ui", record.id, request);
 		});
 		rpc.on("exit", exit => {
@@ -153,6 +162,9 @@ export class SessionHost extends EventEmitter {
 		}
 		return parked;
 	}
+
+	/** Open dialogs, oldest first, so a browser that reconnects mid-ask can show them again. */
+	pendingDialogs(id: string): RpcRecord[] { return [...(this.live.get(id)?.dialogs.values() ?? [])]; }
 
 	/** Answer a dialog the hub showed; the dialog stops counting as busy. */
 	respond(id: string, requestId: string, response: { value?: string; confirmed?: boolean; cancelled?: boolean }) {
