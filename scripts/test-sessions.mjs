@@ -63,6 +63,14 @@ try {
 	await host.prompt(a.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: false, subagents: [] })}`);
 	assert.deepEqual(host.busyReasons(a.id), []);
 
+	// Hub-to-Pi calls (H3-09): answered by id, errors come back as results, parked sessions refuse.
+	assert.deepEqual(await host.call(a.id, "/api/command", { target: "b0b0b0b0", command: "review" }), { ok: true, value: { endpoint: "/api/command", data: { target: "b0b0b0b0", command: "review" } } });
+	assert.deepEqual(await host.call(a.id, "/api/fail", {}), { ok: false, status: 404, error: "Displayed plan no longer exists." });
+	const both = await Promise.all([host.call(a.id, "/api/bias", { level: 1 }), host.call(a.id, "/api/bias", { level: 2 })]);
+	assert.deepEqual(both.map(result => result.value.data.level), [1, 2], "concurrent calls are matched by id");
+	assert.deepEqual(host.busyReasons(a.id), []);
+	await assert.rejects(host.call("00000000-0000-0000-0000-000000000000", "/api/bias", {}), /parked/);
+
 	// Channel asks (H3-01): a reconnecting browser sees the open form again; answering works once.
 	const notified = () => new Promise(r => { const l = (sid, req) => { if (req.method === "notify") { host.off("ui", l); r(req.message); } }; host.on("ui", l); });
 	let asked = new Promise(r => host.once("ui", (sid, req) => r(req)));
@@ -137,6 +145,14 @@ try {
 	const again = new SessionHost({ registry: new Registry(path.join(root, "data")), command: [process.execPath, fake] });
 	assert.deepEqual((await again.restoreRunning()).map(r => r.id), [a.id]);
 	await again.shutdown();
+	// A Pi without ce-workflow's /pi-hub never gets the call as a model prompt.
+	const bare = new SessionHost({ registry: new Registry(path.join(root, "bare")), command: [process.execPath, fake], env: { FAKE_PI: "no-hub" } });
+	const lone = await bare.create(folder, "bare");
+	const prompts = [];
+	bare.live.get(lone.id).rpc.on("event", event => event.type === "agent_start" && prompts.push(event));
+	await assert.rejects(bare.call(lone.id, "/api/bias", { level: 1 }), /no ce-workflow hub support/);
+	assert.equal(prompts.length, 0);
+	await bare.shutdown();
 	assert.deepEqual(fs.readdirSync(folder).filter(f => f.endsWith(".lock")), []);
 	console.log("sessions ok");
 } finally {

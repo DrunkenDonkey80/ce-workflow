@@ -27,6 +27,7 @@ async function handle(cmd) {
 	switch (cmd.type) {
 		case "get_state": return reply({ model, thinkingLevel, isStreaming: streaming, isCompacting: false, sessionFile, sessionName, messageCount: messages.length, pendingMessageCount: 0 });
 		case "get_messages": return reply({ messages });
+		case "get_commands": return reply({ commands: flags.has("no-hub") ? [] : [{ name: "pi-hub", source: "extension" }] });
 		case "set_model": model = { provider: cmd.provider, id: cmd.modelId }; return reply(model);
 		case "set_thinking_level": thinkingLevel = cmd.level; out({ type: "thinking_level_changed", level: cmd.level }); return reply();
 		case "abort": if (streaming) { streaming = false; out({ type: "agent_settled", aborted: true }); } return reply();
@@ -47,6 +48,12 @@ async function handle(cmd) {
 					});
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:closed", statusText: JSON.stringify({ id: askId }) });
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "notify", message: `answer:${value ?? "<cancelled>"}` });
+				}
+				// Mirrors ce-workflow plan3.ts /pi-hub: answers by id; "/api/fail" errors, anything else echoes.
+				if (cmd.message.startsWith("/pi-hub ")) {
+					const call = JSON.parse(cmd.message.slice(8));
+					const result = call.endpoint === "/api/fail" ? { ok: false, status: 404, error: "Displayed plan no longer exists." } : { ok: true, value: { endpoint: call.endpoint, data: call.data } };
+					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:result", statusText: JSON.stringify({ id: call.id, ...result }) });
 				}
 				// Mirrors ce-workflow plan3.ts publishHub(): `/state <json>` publishes pi-hub:state.
 				if (cmd.message.startsWith("/state ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:state", statusText: cmd.message.slice(7) });

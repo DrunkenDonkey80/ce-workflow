@@ -1,5 +1,6 @@
 // Session lifecycle (H2-04): new, resume, park, rename, restart, automatic parking, session locks.
 // The hub never deletes or rewrites a session file; only the Pi child writes it.
+import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { RpcChild, type RpcRecord } from "./rpc-client.ts";
 import { acquireLock, releaseLock, type LockInfo } from "./session-lock.ts";
@@ -16,7 +17,8 @@ export type Live = {
 	command: number; // extension commands still waiting for their response (F6)
 	dialogs: Map<string, RpcRecord>; // open select/confirm/input/editor requests
 	busyExtra: Set<string>; // reasons reported by ce-workflow through the hub channel, e.g. "subagents"
-	published: Record<string, unknown>; // latest `pi-hub:<kind>` update per kind (ce-workflow H3-04: state = plan, modes, compacting, subagents)
+	published: Record<string, unknown>;
+	hubCommand?: boolean; // ce-workflow's /pi-hub is registered (checked once per child) // latest `pi-hub:<kind>` update per kind (ce-workflow H3-04: state = plan, modes, compacting, subagents)
 	viewers: number;
 	lastActivity: number;
 	stopping: boolean;
@@ -184,6 +186,31 @@ export class SessionHost extends EventEmitter {
 	}
 
 	/** Send a prompt; extension commands are counted as busy until Pi answers (F6). */
+	/**
+	 * Call one of ce-workflow's plan operations (H3-09: /api/command, /api/bias, /api/generate, /api/edit, /api/comment, /api/move).
+	 * The answer is its `pi-hub:result` by call id. Never waits on the command's own response (F6), which can trail by minutes.
+	 */
+	async call(id: string, endpoint: string, data: Record<string, unknown>): Promise<{ ok: boolean; value?: unknown; status?: number; error?: string }> {
+		const live = this.live.get(id);
+		if (!live) throw new Error("Session is parked.");
+		// Without ce-workflow's /pi-hub, Pi would send the call to the model as an ordinary prompt.
+		live.hubCommand ??= (await live.rpc.send({ type: "get_commands" })).data?.commands?.some((command: { name?: string }) => command.name === "pi-hub") ?? false;
+		if (!live.hubCommand) throw new Error("This session has no ce-workflow hub support.");
+		const callId = randomUUID();
+		return new Promise((resolve, reject) => {
+			const done = () => { this.off("ui", onUi); this.off("exit", onExit); };
+			const onUi = (sid: string, request: RpcRecord) => {
+				if (sid !== id || request.method !== "setStatus" || request.statusKey !== "pi-hub:result") return;
+				const result = parseJson(request.statusText);
+				if (result?.id !== callId) return;
+				done(); const { id: _id, ...rest } = result; resolve(rest);
+			};
+			const onExit = (sid: string) => { if (sid === id) { done(); reject(new Error("The session ended before answering.")); } };
+			this.on("ui", onUi); this.on("exit", onExit);
+			this.prompt(id, `/pi-hub ${JSON.stringify({ id: callId, endpoint, data })}`).catch(error => { done(); reject(error); });
+		});
+	}
+
 	async prompt(id: string, message: string, extra: Record<string, unknown> = {}): Promise<RpcRecord> {
 		const live = this.live.get(id);
 		if (!live) throw new Error("Session is parked.");
