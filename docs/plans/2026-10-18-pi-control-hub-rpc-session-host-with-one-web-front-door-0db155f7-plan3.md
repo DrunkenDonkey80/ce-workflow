@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-18
-updated: 2026-10-18T18:15:16.996Z
+updated: 2026-10-18T18:47:44.697Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -150,11 +150,11 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 - [x] **H5-03** Page API in hub src/api.ts: plans/diagram/files/image read from the folder (work parked), paste, dialog+answer for channel asks, model/effort/stop via RPC, /reload = restart, the rest as /pi-hub calls/reads; plan3-web request checks (Host, Origin, JSON, size, URL length, CSP/nosniff/no-referrer) in hub.ts. Hub 163674f, ce-workflow f9d2673.
 - [x] **H5-04** Hub src/forms.ts turns every open dialog into one page form keyed by RPC request id: channel asks pass through with ask_user's own askId returned; plain select→list, confirm→compact Yes/No (Esc=No), input/editor→text question (prefill kept). Snapshot/dialog/dialog_closed frames; first answer wins ({accepted}). prompts.ts (moved in H5-01) draws them unchanged with paste and comments. Hub 1870040.
 - [x] **H5-05** Session bar: folder groups (+ New with next free number), rows tone-coloured (orange working, red waiting, blue unseen, grey seen, dashed parked), ⋯ menu Rename/Park/Resume/Reload/Unstar, Recents closed by default with Star; Alt+↑/↓ switch sessions, Alt+N new, Esc stops; title "folder - name", tab title adds the plan. GET sessions / POST session in src/api.ts. Hub 65e7f0e.
-- [wip] **H5-06** Port the browser test to the hub against the fake Pi; it covers every inventory feature, not only the new ones.
+- [x] **H5-06** Browser test ported to pi-control-hub/scripts/test-browser.mjs (real startHub + fake-pi, /pi-hub relayed to an in-test stub, H5-05 grouped session bar tones); hub 84d164e.
 
 ### Phase 6: Remote access [code]
 
-- [ ] **H6-01** Move devices, pairing and `tailscale serve` into the hub: one port, Tailscale login check, never Funnel.
+- [wip] **H6-01** Move devices, pairing and `tailscale serve` into the hub: one port, Tailscale login check, never Funnel.
 - [ ] **H6-02** Import existing paired devices from `<agent dir>/ce-workflow/remote/devices.json` so the phone stays paired.
 - [ ] **H6-03** Device approval on the local hub page (D19), and revoking devices from the hub page.
 - [ ] **H6-04** Start the hub at Windows logon (scheduled task or Startup entry), hidden, with a log file.
