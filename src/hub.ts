@@ -102,7 +102,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	// A child that ends mid-run never sends agent_settled; settle the page's activity so it stops showing work.
 	host.on("exit", (id: string) => views.get(id)?.feed({ type: "agent_settled", aborted: true }));
 
-	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id), state: host.live.get(record.id)?.published.state }));
+	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id), published: host.live.get(record.id)?.published.state }));
 	const routes: Record<string, (data: any, match: RegExpMatchArray) => Promise<unknown> | unknown> = {
 		"GET /api/status": () => ({ pid: process.pid, port: config.port, remote: remoteStatus(), sessions: summary() }),
 		"POST /api/remote": async data => { config.remote = data.on === true; writeJsonAtomic(configPath(), config); await applyRemote(); return remoteStatus(); },

@@ -36,7 +36,10 @@ try {
 	const id = created.body.id;
 	assert.match(cli("status").out, /idle {2}1 {2}/);
 	// `pi-hub new` takes the next free number in the folder's group.
-	assert.match(cli("new", folder).out, /^New session 2 in .*: http:\/\/127\.0\.0\.1:\d+\/s\/[0-9a-f-]{36}\/\r?\n$/);
+	const second = /\/s\/([0-9a-f-]{36})\//.exec(cli("new", folder).out)?.[1];
+	assert(second, "`pi-hub new` prints the session page");
+	assert.equal((await api(`/api/sessions/${second}/park`, {})).status, 200);
+	assert.match(cli("status").out, /idle {2}1 {2}.*\n {2}parked +2 {2}/s, "parked sessions list with their state");
 
 	// H5-01: the browser app under /s/<session>/ with relative URLs and build-fingerprinted assets.
 	{

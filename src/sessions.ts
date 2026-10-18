@@ -10,9 +10,13 @@ import type { Registry, SessionRecord } from "./registry.ts";
 
 export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number; viewers?: (id: string) => number; terminal?: (args: string[], cwd: string, env: Record<string, string>) => { pid?: number; once(event: "exit", listener: () => void): unknown } };
 /** H7-01 (D20): interactive Pi in its own console window (Windows Terminal hosts it when it is the default terminal). */
+// `start /wait` gives Pi the new console's own handles (spawn's stdio would hand it NUL, and the TUI would exit);
+// the hidden cmd lives exactly as long as that Pi.
 const openWindow = (command: string[]) => (args: string[], cwd: string, env: Record<string, string>) => {
-	const [file, ...prefix] = command;
-	const child = spawn(file, [...prefix, ...args], { cwd, env: { ...process.env, ...env }, detached: true, stdio: "ignore" });
+	if (process.platform !== "win32") throw new Error("Open in terminal is Windows only for now.");
+	// start's first quoted argument is the window title. shortcut: a '%' or '"' in a path breaks cmd quoting; none occur in Pi session paths.
+	const line = ["/c", "start", '"Pi"', "/wait", ...[...command, ...args].map(arg => `"${arg}"`)].join(" ");
+	const child = spawn("cmd.exe", [line], { cwd, env: { ...process.env, ...env }, detached: true, stdio: "ignore", windowsHide: true, windowsVerbatimArguments: true });
 	child.unref();
 	return child;
 };

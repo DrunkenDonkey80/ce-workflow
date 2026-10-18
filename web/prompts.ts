@@ -15,7 +15,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   if (active || !pending.size) return;
   active = pending.values().next().value; const ask = active;
   form.onsubmit = event => event.preventDefault();
-  form.replaceChildren(node("h2", { id: "prompt-title" }, ask.title ?? (ask.questions ? "Answer questions" : ask.question)), node("p", { className: "dialog-purpose" }, ask.purpose ?? "Answer here or in Pi; first answer wins."));
+  form.replaceChildren(node("h2", { id: "prompt-title" }, ask.title ?? (ask.questions ? "Answer questions" : ask.question)), node("p", { className: "dialog-purpose" }, ask.purpose ?? "Answer here or on another device; first answer wins."));
   const error = node("p", { className: "prompt-error", hidden: true }); error.setAttribute("role", "alert");
   let collect;
   if (ask.kind === "list" && ask.compact) {
