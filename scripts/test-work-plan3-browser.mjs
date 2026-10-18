@@ -366,10 +366,16 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"complete.\")");
  assert.equal(await evaluate("document.querySelectorAll(\"#messages [data-id=assistant_1]\").length"), 1, "stream updates reuse their row");
  server.publish("message", { id: "assistant_2", role: "assistant", text: "Short excerpt", streaming: false, excerpt: true });
- await browser("wait", "--fn", "!document.querySelector(\"#messages [data-id=assistant_2] .row-full\")?.hidden");
- await browser("click", "#messages [data-id=assistant_2] .row-full");
+ // The turn's final reply loads in full by itself and stands out; the earlier agent text is no longer final.
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Full body loaded\")");
  assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2] .row-full\").hidden"), "expanded row drops the excerpt link");
+ assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2]\").classList.contains(\"final\") && !document.querySelector(\"#messages [data-id=assistant_1]\").classList.contains(\"final\")"), "only the last reply is final");
+ // Compact chat hides in-between agent text but keeps the final reply; the choice is remembered.
+ await browser("click", "#chat-compact");
+ assert.equal(await evaluate("getComputedStyle(document.querySelector(\"#messages [data-id=assistant_1]\")).display"), "none", "compact hides in-between agent text");
+ assert.notEqual(await evaluate("getComputedStyle(document.querySelector(\"#messages [data-id=assistant_2]\")).display"), "none", "compact keeps the final reply");
+ assert.equal(await evaluate("localStorage.getItem(\"plan3-chat\")"), "compact");
+ await browser("click", "#chat-compact");
  const rowText = id => evaluate(`document.querySelector("#messages [data-id=${id}]").children[2].textContent`);
  server.publish("delta", { id: "assistant_3", role: "assistant", offset: 0, text: "Hel", streaming: true });
  server.publish("delta", { id: "assistant_3", role: "assistant", offset: 3, text: "lo", streaming: true });
@@ -392,7 +398,7 @@ try {
  assert.equal(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] pre')].some(pre => pre.textContent === '{oldText}')"), false, "the diff replaces raw edit arguments");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.open)"), [false, true, false, false], "only file changes start open");
  server.publish("message", { id: "user_0", role: "user", text: "hi", streaming: false }); await browser("wait", "#messages [data-id=user_0]");
- assert.deepEqual(await evaluate("['user_0', 'assistant_3'].flatMap(id => { const row = document.querySelector('#messages [data-id=' + id + ']'); return [row.querySelector('strong').className, getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)']; })"), ["sr-only", true, "sr-only", false], "your messages are a tinted block; the label is screen-reader only");
+ assert.deepEqual(await evaluate("['user_0', 'assistant_1'].flatMap(id => { const row = document.querySelector('#messages [data-id=' + id + ']'); return [row.querySelector('strong').className, getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)']; })"), ["sr-only", true, "sr-only", false], "your messages are a tinted block; the label is screen-reader only");
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
   // Search Enter centers the box, so the click point is clear of the zoom bar; Escape clears the search.
  await browser("fill", "#search", "web_client"); await browser("press", "Enter"); await browser("press", "Escape");

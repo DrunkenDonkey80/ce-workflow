@@ -9,6 +9,7 @@ import {
 	createSubscriptionFooterController,
 	renderModelRow,
 	renderQuotaRows,
+	poolAccountLines,
 	resetMoment,
 	SUBSCRIPTION_FOOTER_DEFAULTS,
 	stripAnsi,
@@ -317,6 +318,15 @@ assert.deepEqual(
 	"pool: weekly room averaged over live accounts (passed resets count empty), running refill totals, active, dead count beside the size, login alert",
 );
 assert.equal(pool[0].usedPercent, 40, "the main bar is coloured by pool usage");
+assert.deepEqual(
+	poolAccountLines(),
+	[
+		{ text: "\u2192 a 10% 2h 0m", color: "error" },
+		{ text: "b 70% 2d 0h", color: "text" },
+		{ text: "c 100%", color: "text" },
+	],
+	"browser popup lists live accounts by soonest weekly reset; a passed reset reads full with no countdown",
+);
 const [row] = renderQuotaRows(
 	[{ id: "claude", label: "Claude" }],
 	new Map([["claude", { authenticated: true, snapshot: { windows: pool }, lastSuccessAt: T }]]),
@@ -780,6 +790,10 @@ assert.deepEqual(usage.summary.map((item) => item.label), ["Codex", "Claude"]);
 assert.ok(usage.summary.every((item) => Number.isInteger(item.left) && typeof item.color === "string"));
 assert.ok(usage.lines.flat().some((part) => part.color === "accent" && part.text === "Codex"), "provider labels keep their colour");
 assert.equal(usage.lines.map((row) => row.map((part) => part.text).join("")).join("\n").includes("\u0001"), false, "no colour markers leak");
+const rowText = (rows) => rows.map((row) => row.map((part) => part.text).join("")).join("\n");
+assert.match(rowText(usage.lines), /5h/, "fixture has 5h windows");
+assert.doesNotMatch(rowText(usage.phoneLines), /5h/, "phone popup drops 5h windows");
+assert.match(rowText(usage.phoneLines), /7d/, "phone popup keeps 7d windows");
 hiddenSetting = { enabled: true, hidden: [] };
 hiding.controller.apply(hiding.ctx);
 await flush();

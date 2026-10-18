@@ -3,6 +3,7 @@
 <head>
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+ <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
  <title>Plan3 architecture workspace</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cg transform='rotate(40 16 16)'%3E%3Crect x='14.5' y='3' width='3' height='16' rx='1.5' fill='%23c4893f'/%3E%3Crect x='10.5' y='1.5' width='11' height='3.5' rx='1.75' fill='%23c4893f'/%3E%3Cpath d='M9.5 18.5h13v5.5a6.5 6.5 0 0 1-13 0z' fill='%23495057'/%3E%3C/g%3E%3C/svg%3E">
  <link rel="stylesheet" href="/a/__BUILD__/styles.css?token=__TOKEN__">
@@ -49,6 +50,7 @@
   <h2>View</h2><div id="drawer-views"></div>
   <h2>Session</h2><div id="drawer-status"></div>
   <h2>Sessions</h2><div id="drawer-sessions"></div>
+  <div class="drawer-commands"><button id="chat-compact-m" type="button" aria-pressed="false" title="Compact chat: hide thinking and tool blocks, keep the final replies">▤ Compact chat</button></div>
   <div class="drawer-commands"><button id="pi-commands" type="button" aria-haspopup="dialog">Pi commands</button><button id="wo-commands" type="button" aria-haspopup="dialog">/wo commands</button></div>
  </aside>
  <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">
@@ -91,7 +93,7 @@
   </section>
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
   <aside id="chat" class="chat" aria-label="Live Pi session">
-   <header class="chat-heading"><button id="expand-left" class="expand-left" type="button" aria-label="Show files and diagram" aria-controls="left-panel" aria-expanded="false" hidden>&gt;&gt;</button><button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button><h2>Live session</h2><span class="modes"><button id="mode-research" class="mode-chip" type="button" aria-pressed="false" title="Research mode: explore, don't implement (/research)">Research</button><button id="mode-night" class="mode-chip" type="button" aria-pressed="false" title="Night mode: work unattended until the plan is done (/night)">Night</button></span><span id="connection" role="status">Connecting…</span></header>
+   <header class="chat-heading"><button id="expand-left" class="expand-left" type="button" aria-label="Show files and diagram" aria-controls="left-panel" aria-expanded="false" hidden>&gt;&gt;</button><button id="collapse-left" type="button" aria-label="Collapse files and diagram" aria-controls="left-panel" aria-expanded="true">&lt;&lt;</button><h2>Live session</h2><span class="modes"><button id="chat-compact" class="mode-chip" type="button" aria-pressed="false" title="Compact chat: hide thinking and tool blocks, keep the final replies">Compact</button><button id="mode-research" class="mode-chip" type="button" aria-pressed="false" title="Research mode: explore, don't implement (/research)">Research</button><button id="mode-night" class="mode-chip" type="button" aria-pressed="false" title="Night mode: work unattended until the plan is done (/night)">Night</button></span><span id="connection" role="status">Connecting…</span></header>
    <div id="plan-actions" class="plan-actions" role="group" aria-label="Plan actions" hidden><button type="button" data-command="resolve" data-plan>Resolve</button><button id="review-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="review-menu">Review</button><button type="button" data-command="finish" data-plan>Finish</button><button type="button" data-command="resume" data-plan>Resume</button><div id="review-menu" class="status-menu" role="group" aria-label="Review" hidden><button type="button" data-command="review" data-plan>Review (normal)</button><button type="button" data-command="review all" data-plan>Review (all advisors)</button></div></div>
    <div class="notices"><p id="notice" class="notice" role="status" hidden></p><p id="waiting" class="notice" role="status" hidden></p></div>
    <div id="feed" class="feed">

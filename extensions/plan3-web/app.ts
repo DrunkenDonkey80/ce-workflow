@@ -158,6 +158,14 @@ for (const [index, view] of LEFT_TABS.entries()) {
  });
 }
 setLeft(remembered("plan3-left", ["full", "narrow", "collapsed"], "full"));
+// Compact chat hides thinking/tool blocks and in-between agent text, leaving prompts and final replies.
+function setCompact(on: boolean) {
+ document.documentElement.classList.toggle("chat-compact", on);
+ for (const id of ["chat-compact", "chat-compact-m"]) $(id).setAttribute("aria-pressed", String(on));
+ try { localStorage.setItem("plan3-chat", on ? "compact" : "expanded"); } catch {}
+}
+for (const id of ["chat-compact", "chat-compact-m"]) $(id).addEventListener("click", () => { setCompact(!document.documentElement.classList.contains("chat-compact")); pinChat(); });
+setCompact(remembered("plan3-chat", ["compact", "expanded"], "expanded") === "compact");
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
 const mobileViews = ["chat", "files", "project", "plan"];
 function setMobile(view) {
@@ -525,11 +533,16 @@ async function loadEarlier() {
  } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; }
 }
 $("to-bottom").addEventListener("click", () => toBottom());
+// Final replies fetched in full once each (a failed fetch is not retried on every render).
+const finalLoads = new Set<string>();
 function renderChat() {
  const list = $("messages"), feed = $("feed"), follow = stick;
  const encoder = new TextEncoder();
  while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
  for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
+ // The final reply of a turn: the last agent row with text before the next prompt; it shows in full and stands out.
+ const rows = [...chat.values()], finals = new Set<string>();
+ rows.forEach((row, index) => { if (row.role !== "assistant" || !row.text.trim()) return; const next = rows.slice(index + 1).find(other => other.role === "user" || (other.role === "assistant" && other.text.trim())); if (!next || next.role === "user") finals.add(row.id); });
  let previous: HTMLLIElement | null = null;
  for (const row of chat.values()) {
   let item = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].find(item => item.dataset.id === row.id);
@@ -537,10 +550,12 @@ function renderChat() {
   // Keep server order, also for rows inserted above by loadEarlier.
   if (!item.isConnected || item.previousElementSibling !== previous) { if (previous) previous.after(item); else list.prepend(item); }
   previous = item;
+  item.classList.toggle("final", finals.has(row.id));
+  if (finals.has(row.id) && row.excerpt && !row.streaming && !finalLoads.has(row.id)) { finalLoads.add(row.id); void loadRow(row.id); }
   const json = JSON.stringify(row); if (item.dataset.json === json) continue; item.dataset.json = json;
   const text = row.text.trim(), note = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming && !row.blocks?.length ? "Streaming…" : "");
   // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
-  item.className = "message " + row.role + (text ? "" : " message-blocks"); item.hidden = !text && !row.blocks?.length && !note;
+  item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : ""); item.hidden = !text && !row.blocks?.length && !note;
   // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
   item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
   renderBlocks(item.children[1] as HTMLElement, row); renderLinks(item.children[2] as HTMLElement, row.text);
@@ -712,8 +727,10 @@ $("message-input").addEventListener("keydown", event => {
  event.preventDefault(); event.stopImmediatePropagation();
 });
 // Terminal parity: Enter sends, Shift+Enter adds a line, Escape stops a running agent.
+// Touch keyboards have no Shift+Enter, so there Enter adds a line and only Send sends.
+const touchKeyboard = matchMedia("(pointer: coarse)");
 $("message-input").addEventListener("keydown", event => {
- if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); $("composer").requestSubmit(); }
+ if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); $("composer").requestSubmit(); }
  if (event.key === "Escape" && !$("stop").hidden && !$("stop").disabled) { event.preventDefault(); $("stop").click(); }
 });
 $("composer").addEventListener("submit", async event => {
@@ -850,7 +867,7 @@ document.addEventListener("visibilitychange", () => void loadSessions());
 void loadSessions();
 // Subscription 7d left per provider (footer data); tapping shows the footer rows in their colours.
 type Segment = { text: string; color?: string };
-let usageLines: Segment[][] = [], usageTimer = 0;
+let usageLines: Segment[][] = [], usagePhoneLines: Segment[][] = [], usageAccounts: Segment[] = [], usageTimer = 0;
 // Footer rows become one block per provider (│) with one line per item (·); bar glyphs become equal-height cells.
 function usageBlocks(rows: Segment[][]) {
  const lines: HTMLElement[] = []; let line: HTMLElement;
@@ -869,15 +886,16 @@ function usageBlocks(rows: Segment[][]) {
 async function loadUsage() {
  clearTimeout(usageTimer); if (document.visibilityState !== "visible") return;
  try {
-  const value = await get("usage") as { summary: { label: string; left: number; color: string }[]; lines: Segment[][] };
-  usageLines = value.lines; $("usage-button").hidden = !value.summary.length;
+  const value = await get("usage") as { summary: { label: string; left: number; color: string }[]; lines: Segment[][]; phoneLines?: Segment[][]; accounts?: Segment[] };
+  usageLines = value.lines; usagePhoneLines = value.phoneLines ?? value.lines; usageAccounts = value.accounts ?? []; $("usage-button").hidden = !value.summary.length;
   // One bar per provider: filled to the 7d share left, coloured like the footer.
   $("usage-button").replaceChildren(...value.summary.map(item => { const bar = Object.assign(document.createElement("span"), { className: "bar", textContent: item.label + " 7d " + item.left + "%" }); setBar(bar, item.left, item.color); return bar; }));
  } catch { $("usage-button").hidden = true; }
  usageTimer = window.setTimeout(loadUsage, 120_000);
 }
 $("usage-button").addEventListener("click", () => {
- $("usage-menu").replaceChildren(...usageBlocks(usageLines));
+ const accounts = usageAccounts.length ? [Object.assign(document.createElement("div"), { className: "usage-line provider", textContent: "Claude accounts · 7d left · resets in" }), ...usageAccounts.map(part => Object.assign(document.createElement("div"), { className: "usage-line tone-" + part.color + (part.text.startsWith("→") ? " current" : ""), textContent: part.text }))] : [];
+ $("usage-menu").replaceChildren(...usageBlocks(phone.matches ? usagePhoneLines : usageLines), ...accounts);
  toggleMenu("usage-button", "usage-menu");
 });
 document.addEventListener("visibilitychange", () => void loadUsage());

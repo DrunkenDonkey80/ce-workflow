@@ -27,6 +27,8 @@ const POOL_MAX_AGE_MS = 900_000;
 const DEFAULT_AGENT_DIR =
 	process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
 let poolServed = false;
+// Per-account 7d rows for the browser usage popup, refreshed with each pool read.
+let poolAccounts: { label: string; left: number; resetsIn?: number; color: string; active: boolean }[] = [];
 const ANSI_PATTERN = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
@@ -361,6 +363,14 @@ function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
 			const pct = finite(table(w).pct) ? table(w).pct : undefined;
 			return at !== undefined && at <= t ? { pct: 0 } : { pct, at };
 		};
+		const short = (label) => String(label).replace(/^.*:/, "").replace(/@.*$/, "");
+		poolAccounts = entries
+			.map((e) => {
+				const week = used(e.seven_day);
+				const pct = week.pct ?? 100;
+				return { label: short(e.label), left: Math.round(100 - pct), resetsIn: week.at === undefined ? undefined : week.at - t, color: quotaColor(pct), active: e.label === store.active };
+			})
+			.sort((a, b) => (a.resetsIn ?? Infinity) - (b.resetsIn ?? Infinity));
 		windows = complete(
 			accounts.length > 1
 				? poolWindows(store, accounts, entries, used, t)
@@ -375,6 +385,7 @@ function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
 		windows = undefined;
 	}
 	poolServed = Boolean(windows);
+	if (!poolServed) poolAccounts = [];
 	return windows;
 }
 
@@ -725,6 +736,11 @@ function storedAuth(result) {
 		resolvedToken(result)
 		? result
 		: undefined;
+}
+
+// Claude pool accounts, soonest weekly reset first: "→ flex2 81% 4d 18h".
+export function poolAccountLines() {
+	return poolAccounts.map((a) => ({ text: `${a.active ? "→ " : ""}${a.label} ${a.left}%${a.resetsIn === undefined ? "" : ` ${formatDuration(a.resetsIn)}`}`, color: a.color }));
 }
 
 function formatDuration(ms) {
@@ -1390,10 +1406,13 @@ export function createSubscriptionFooterController(pi, options = {}) {
 				const week = state?.snapshot?.windows?.find((window) => window.id === "7d");
 				return week ? [{ label: entry.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent) }] : [];
 			});
-			const lines = renderQuotaRows(shown(), states, theme, 120, at, { resetDates: setting().resetDates !== false }).map((line) =>
+			const segments = (rows) => rows.map((line) =>
 				[...line.matchAll(/\u0001(\w+)\u0002([^\u0001-\u0003]*)\u0003|[^\u0001-\u0003]+/g)].map((match) => (match[1] ? { text: match[2], color: match[1] } : { text: match[0] })),
 			);
-			return { summary, lines };
+			const rows = (source) => segments(renderQuotaRows(shown(), source, theme, 120, at, { resetDates: setting().resetDates !== false }));
+			// Phone popup drops every 5h window: no room, and the 7d accounts list says what matters.
+			const weekOnly = new Map([...states].map(([id, state]) => [id, (state as { snapshot?: { windows?: { id: string }[] } })?.snapshot?.windows ? { ...state, snapshot: { ...(state as { snapshot: object }).snapshot, windows: (state as { snapshot: { windows: { id: string }[] } }).snapshot.windows.filter((w) => !w.id.startsWith("5h")) } } : state]));
+			return { summary, lines: rows(states), phoneLines: rows(weekOnly), accounts: poolAccountLines() };
 		},
 	};
 }
