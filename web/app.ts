@@ -742,7 +742,7 @@ $("composer").addEventListener("submit", async event => {
  messageSending = true; renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
- try { const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Message queued as a follow-up." : "Message sent.", true); }
+ try { const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
  catch (error) { showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });
@@ -881,6 +881,12 @@ $("devices-button").addEventListener("click", () => void showDevices().catch(err
 $("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
 const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle", parked: "parked", terminal: "open in a terminal" };
 function html<K extends keyof HTMLElementTagNameMap>(tag: K, properties: Partial<HTMLElementTagNameMap[K]> = {}) { return Object.assign(document.createElement(tag), properties); }
+// EU style: Today 14:05, Yesterday 09:12, else 18/10/2026 14:05.
+function whenText(time: number) {
+ const date = new Date(time), pad = (n: number) => String(n).padStart(2, "0"), clock = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+ const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(time).setHours(0, 0, 0, 0)) / 86_400_000);
+ return `${days === 0 ? "Today" : days === 1 ? "Yesterday" : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`} ${clock}`;
+}
 function renderSessions(groups: Group[], recents: Recent[]) {
  $("switcher").hidden = false; document.body.classList.add("has-switcher");
  sessionOrder = groups.flatMap(group => group.sessions.map(session => session.id));
@@ -895,11 +901,14 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  });
  const recent = html("details", { className: "session-recents", open });
  recent.append(html("summary", { textContent: `Recents (${recents.length})` }), ...recents.map(item => {
-  const row = html("div", { className: "session recent" }), name = item.name ?? new Date(item.modified).toLocaleString();
+  const row = html("div", { className: "session recent" }), name = item.name ?? whenText(item.modified);
   const starButton = html("button", { type: "button", className: "session-more", textContent: "☆", title: "Star: add it to its folder group" });
   starButton.setAttribute("aria-label", `Star ${item.label} · ${name}`);
   starButton.addEventListener("click", () => { const as = prompt(`Name for this session in ${item.label} (empty = next number):`, ""); if (as !== null) void sessionAction({ action: "star", file: item.file, name: as }); });
-  row.append(html("span", { className: "session-label", textContent: `${item.label} · ${name}`, title: item.file }), starButton);
+  // Two lines: folder (and name) above, the time below.
+  const text = html("span", { className: "session-label recent-text", title: item.file });
+  text.append(html("span", { textContent: item.name ? `${item.label} · ${item.name}` : item.label }), html("small", { className: "session-state", textContent: whenText(item.modified) }));
+  row.append(text, starButton);
   return row;
  }));
  $("session-list").replaceChildren(...rows, recent);

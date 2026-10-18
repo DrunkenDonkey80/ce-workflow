@@ -595,7 +595,7 @@ try {
  await browser("wait", "[data-id=after_grow]");
  assert(await evaluate("(() => { const list = document.getElementById('feed'); return list.scrollHeight - list.scrollTop - list.clientHeight < 4 && document.getElementById('to-bottom').hidden; })()"), "late growth does not unpin the chat");
  await browser("fill", "#message-input", "Queued follow-up"); await browser("click", "#send");
- await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"queued\")");
+ await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"steers\")");
  // Queue and tool rows below the newest message grow the one scroll area: a reader at the end stays at the end.
  activity = { working: true, tools: [], queue: [], hasPendingMessages: false, error: undefined, thinking: "" }; publish("activity", activity);
  await browser("wait", "--fn", "document.querySelectorAll('#activity details').length === 0");
