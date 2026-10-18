@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-18
-updated: 2026-10-18T20:20:08.563Z
+updated: 2026-10-18T20:51:20.359Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -103,11 +103,10 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 
 ## Commands
 
-- ce-workflow web server: `node scripts/test-work-plan3-web.mjs`
-- ce-workflow browser app: `node scripts/test-work-plan3-browser.mjs`
+- ce-workflow hub page helpers: `node scripts/test-work-plan3-web.mjs`
 - ce-workflow record types: `node scripts/test-work-plan3-types.mjs`
 - ce-workflow full suite, once before a push: `npm run verify:quiet`
-- Hub tests: `npm test` in `C:\SOFT\git\pi-control-hub`, created in H2-01 (does not exist yet).
+- Hub tests (including the browser app, chat mirror, files and images): `npm test` in `C:\SOFT\git\pi-control-hub`.
 
 ## Phases
 
@@ -170,15 +169,11 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 
 ### Phase 9: Remove the remote code from ce-workflow [code]
 
-- [ ] **H9-01** Delete ce-workflow's web server and app, `/wo share`, pairing, devices, Tailscale, share status, chat mirror and web dialog relay.
-  - Also the herdr tab lookup used only for the web title (`plan3.ts:refreshHerdrTab`).
-  - First list every import, command, test, fixture and README section; keep the hub channel, the session lock and intercom ask.
-- [ ] **H9-02** Update both READMEs, bump the ce-workflow version, and run `npm run verify:quiet` and the hub's `npm test`.
+- [x] **H9-01** Removed ce-workflow's web server/app, /wo share, pairing, devices, Tailscale, share footer and web dialog relay; hub calls kept via /pi-hub (994e21f).
+- [x] **H9-02** Both READMEs updated, ce-workflow bumped to 0.1.47; the hub now owns chat mirror/files/images (+tests) that H9-01 deleted (hub c83556f).
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 7: web app, remote, files, Tailscale and work_dialogs nodes removed; hub_channel and pi_control_hub added; plan3_web is now the hub page helpers.
 
 
 ## Backlog
@@ -238,7 +233,7 @@ Request checks kept from plan3-web: Host must be this hub's 127.0.0.1/localhost 
 
 ## Resume context
 
-Active, 20/36. Phases 3 and 4 are done. ce-workflow HEAD cef63d4 and hub HEAD f34e642, both local only, never pushed. test-work-plan3.mjs still stops at the old OpenDesign reference step (~1899), which predates this plan. verify:quiet has not been run, and there has been no real hub run yet (H8-01). Next: H5-01, moving the browser app (extensions/plan3-web/) into the hub's web/ and serving it under /s/<session>/ with relative URLs. The usage, models and commands reads must reach Pi through new /pi-hub read calls (H5-03).
+35/36. Only H8-02 is left: the user tries the hub on phone and desktop (pairing, New, Rename, Park, Resume, forms, menus, Open in terminal). Everything is committed locally and never pushed. ce-workflow is at 0.1.47; the hub HEAD is c83556f. ce-workflow no longer has /wo share or its own web server. The running hub (port 52227) loaded the old ce-workflow modules, so restart it (`pi-hub restart`) before H8-02. verify:quiet has 3 failures, none caused by this plan: test-jev-tools.mjs:233, which also fails at 1668124; test-work-plan3.mjs, from the pi-codemode MCP_TYPESCRIPT_PREAMBLE dependency mismatch; and test-work-screen-read.mjs, where the android CLI crashed on the attached device. They block a push until fixed or accepted.
 
 ## Amendments
 
