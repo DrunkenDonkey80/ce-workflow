@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-10-18
-updated: 2026-10-18T19:01:30.668Z
+updated: 2026-10-18T20:20:08.563Z
 reviewed: 2026-10-18
 tagsChecked: 6990795e
 started: 2026-10-18T16:38:35.082Z
@@ -161,13 +161,11 @@ Pi facts used (Pi 1.2.0, `C:\Users\Flex\.pi\agent\install\releases\1.2.0\node_mo
 
 ### Phase 7: Open in terminal [code]
 
-- [wip] **H7-01** "Open in terminal": park, open `pi --session <file>` in a plain window (D20), mark the session as in terminal, take it back when that Pi exits.
-  - The hub keeps the session lock during the handoff (D9) and watches the Pi process itself, not the window launcher.
+- [x] **H7-01** host.openTerminal parks, locks, opens `pi --session <file>` in a detached console window, rewrites the lock to the window's pid (survives hub restart), state "terminal" until the lock ends (exit event or checkTerminals at start and every minute); session menu "Open in terminal"; ce-workflow lets that Pi through via PI_HUB_TERMINAL_LOCK. Hub 30d79c9, ce-workflow 69582c3.
 
 ### Phase 8: Live acceptance [think]
 
-- [ ] **H8-01** Run the hub for real on this PC with three folders and several sessions; fix what fails, including the night mode case.
-  - Include a hub restart with a night mode session working (H3-10).
+- [x] **H8-01** Real hub run on this PC passed. It ran 4 sessions in 3 folders. The browser answered an ask_user. Open in terminal opened a real console, and the session was parked and its lock released on /quit. Night mode survived a forced hub restart mid-step and finished N-01..N-04 with no duplicate. Remote on: the phone went straight in using the imported devices. Fixes: `pi-hub new` verb, status crash on parked sessions, terminal console via start /wait, prompt purpose text.
 - [human] **H8-02** User tries it on the phone and desktop: pairing, New, Rename, Park, Resume, forms, menus, Open in terminal.
 
 ### Phase 9: Remove the remote code from ce-workflow [code]
