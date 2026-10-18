@@ -8,8 +8,8 @@ import { forbiddenPath } from "./jev-tools.ts";
 import { fileURLToPath } from "node:url";
 import { stripTypeScriptTypes } from "node:module";
 import { diagramChatMessage, type Diagram } from "./plan3-diagram.ts";
-import { raceRemoteAsk, remoteResponse, remoteBatch, type RemoteListPrompt } from "./ask-user/remote.ts";
-import { bindListDialogBridge, listDialogResponse } from "./ask-user/menu.ts";
+import { raceRemoteAsk, remoteResponse, remoteBatch } from "./ask-user/remote.ts";
+import { bindListDialogBridge, listDialogResponse, listSubject } from "./ask-user/menu.ts";
 import type { SessionSummary } from "./plan3-remote.ts";
 
 export type WebTarget = { kind: "product" } | { kind: "plan"; id: string };
@@ -523,13 +523,7 @@ export function createDialogBridge(pi, publish: (event: string, value: unknown) 
 		bind(ctx) {
 			bound.add(ctx.ui);
 			bindListDialogBridge(ctx, (options, run) => {
-				const subject: RemoteListPrompt = {
-					kind: "list", title: options.title, purpose: options.purpose ?? (options.multi ? "Choose one or more options." : "Choose an option to continue."),
-					items: options.items.map(item => ({ value: item.value, label: item.label, description: item.description, heading: item.heading, disabled: item.disabled, enabled: item.enabled, rowAction: item.rowAction })),
-					currentValue: options.currentValue, ...(options.multi ? { multi: { selected: [...(options.multi.selected ?? [])], requireOne: options.multi.requireOne } } : {}),
-					spaceAction: Boolean(options.spaceAction), rowAction: Boolean(options.rowAction), tabAction: Boolean(options.tabAction),
-					...(options.compact ? { compact: true } : {}),
-				};
+				const subject = listSubject(options);
 				const signal = options.signal ? AbortSignal.any([options.signal, shutdown.signal]) : shutdown.signal;
 				return raceRemoteAsk(pi, subject, signal, undefined, payload => listDialogResponse(payload, options), run);
 			});

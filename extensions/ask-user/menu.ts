@@ -1,5 +1,7 @@
 // ask_user's menu view (plan 0db155f7 D21): lists with filter, current item, Esc back, checklists and Tab.
 // The same `list` payload is drawn by the web form (plan3-web/prompts.ts) and answered through ask:pending.
+import { ask as hubAsk, hubActive } from "../hub-channel.ts";
+import type { RemoteListPrompt } from "./remote.ts";
 import { randomUUID } from "node:crypto";
 import { loadPlan3Ask } from "../plan3-ask.ts";
 
@@ -311,7 +313,25 @@ export function progressBar(complete, total, width = 12) {
 	return `[${"█".repeat(filled)}${"░".repeat(width - filled)}]`;
 }
 
+/** The `list` payload the web form and the hub draw (RemoteListPrompt). */
+export function listSubject(options): RemoteListPrompt {
+	return {
+		kind: "list", title: options.title, purpose: options.purpose ?? (options.multi ? "Choose one or more options." : "Choose an option to continue."),
+		items: options.items.map(item => ({ value: item.value, label: item.label, description: item.description, heading: item.heading, disabled: item.disabled, enabled: item.enabled, rowAction: item.rowAction })),
+		currentValue: options.currentValue, ...(options.multi ? { multi: { selected: [...(options.multi.selected ?? [])], requireOne: options.multi.requireOne } } : {}),
+		spaceAction: Boolean(options.spaceAction), rowAction: Boolean(options.rowAction), tabAction: Boolean(options.tabAction),
+		...(options.compact ? { compact: true } : {}),
+	};
+}
+
 export async function showListDialog(ctx, options) {
+	if (hubActive()) {
+		// Under pi-control-hub there is no terminal: terminal-only approvals are refused, everything else is drawn by the hub (D21).
+		if (options.terminalOnly || options.signal?.aborted) return;
+		const result = listDialogResponse(await hubAsk(ctx.ui, "ask", listSubject(options), { signal: options.signal }), options);
+		if (result?.value) dialogCursors.set(options.cursorKey ?? options.title, result.value);
+		return result ?? undefined;
+	}
 	const bridge = listBridges.get(ctx.ui);
 	// terminalOnly: approvals a remote page must never answer for itself (plan 1b421b6b D9).
 	if (!bridge || options.terminalOnly) return localListDialog(ctx, options);

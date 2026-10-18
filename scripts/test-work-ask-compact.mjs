@@ -51,4 +51,31 @@ assert.equal(await askConfirm({ mode: "tui", ui }, "Ship?", "now"), false);
 assert.equal(subject.compact, true);
 assert.equal(subject.purpose, "now");
 bindListDialogBridge({ ui }, undefined);
+// Under pi-control-hub (H3-03): menus go through the channel as the `list` payload; Esc-back and answers come back the same way.
+{
+	process.env.PI_HUB = "1";
+	const sent = [];
+	const parse = text => { try { return JSON.parse(text); } catch { assert.fail(`channel sent non-JSON: ${text}`); } };
+	const hubCtx = answer => ({ mode: "rpc", ui: {
+		select: () => assert.fail("no flattened select under the hub"), custom: () => assert.fail("no terminal view"), setStatus() {},
+		input: async (title, placeholder) => { sent.push({ title, ...parse(placeholder) }); return answer === undefined ? undefined : JSON.stringify(answer); },
+	} });
+	const menu = { title: "Night mode", purpose: "Work unattended", currentValue: "on", items: [{ value: "on", label: "Turn on", description: "plan x" }, { value: "edit", label: "Add rules" }] };
+	let result = await showListDialog(hubCtx({ action: "select", value: "edit" }), menu);
+	assert.equal(result.value, "edit");
+	assert.equal(sent[0].title, "pi-hub:ask");
+	assert.deepEqual(sent[0].data, { kind: "list", title: "Night mode", purpose: "Work unattended", currentValue: "on", spaceAction: false, rowAction: false, tabAction: false,
+		items: [{ value: "on", label: "Turn on", description: "plan x" }, { value: "edit", label: "Add rules" }] });
+	assert.equal(await showListDialog(hubCtx({ action: "back" }), menu), undefined, "Esc-back");
+	assert.equal(await showListDialog(hubCtx(undefined), menu), undefined, "cancel");
+	assert.equal(await showListDialog(hubCtx({ action: "select", value: "nope" }), menu), undefined, "unknown value refused");
+	result = await showListDialog(hubCtx({ action: "back", values: ["b"] }), { title: "Pick", multi: { selected: ["a"] }, items: [{ value: "a", label: "A" }, { value: "b", label: "B" }] });
+	assert.deepEqual(result, { action: "back", values: ["b"] }, "checklist answer");
+	assert.equal(await askConfirm(hubCtx({ action: "select", value: "yes" }), "Ship?"), true);
+	assert.equal(sent.at(-1).data.compact, true);
+	const before = sent.length;
+	assert.equal(await showListDialog(hubCtx({ action: "select", value: "on" }), { ...menu, terminalOnly: true }), undefined, "terminal-only approvals are refused under the hub");
+	assert.equal(sent.length, before, "and never reach the hub");
+	delete process.env.PI_HUB;
+}
 console.log("ok - compact ask view");
