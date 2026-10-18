@@ -4,8 +4,9 @@
 import type http from "node:http";
 import path from "node:path";
 import { emptyDiagram, loadDiagram } from "pi-work-orchestrator/extensions/plan3-diagram.ts";
-import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "pi-work-orchestrator/extensions/plan3-files.ts";
-import { readLinkedImage, readPastedImage, savePastedImage, webTarget } from "pi-work-orchestrator/extensions/plan3-web.ts";
+import { webTarget } from "pi-work-orchestrator/extensions/plan3-web.ts";
+import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
+import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { currentPlan, listPlans } from "pi-work-orchestrator/extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { type Registry, scanRecents, star } from "./registry.ts";

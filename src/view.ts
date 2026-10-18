@@ -2,7 +2,8 @@
 // instead of extension hooks. History comes from get_messages; chat older than the last compaction from the JSONL (F3).
 import { readFile } from "node:fs/promises";
 import type { ServerResponse } from "node:http";
-import { checkIn, createActivityMirror, createChatMirror } from "pi-work-orchestrator/extensions/plan3-web.ts";
+import { createActivityMirror } from "pi-work-orchestrator/extensions/plan3-web.ts";
+import { checkIn, createChatMirror } from "./chat.ts";
 import type { RpcRecord } from "./rpc-client.ts";
 
 type Row = { id: string; role: string; text: string };
@@ -10,7 +11,7 @@ type Page = { rows: Row[]; more: boolean };
 const PAGE = 20;
 const MAX_CLIENTS = 8;
 
-/** A row id is `<role>_<message timestamp>[_n]` (ce-workflow createChatMirror); 0 when it carries no timestamp. */
+/** A row id is `<role>_<message timestamp>[_n]` (createChatMirror in chat.ts); 0 when it carries no timestamp. */
 const stamp = (id: string) => { const value = Number(/^[a-z]+_(\d+)(?:_\d+)?$/.exec(id)?.[1]); return value > 1e11 ? value : 0; };
 
 /** Message entries of the session's current branch, oldest first. Read-only; the hub never writes a session file. */
