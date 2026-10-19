@@ -247,6 +247,8 @@ document.addEventListener("touchmove", event => { if (phone.matches && event.tou
 
 // The top bar sizes Think and the usage bars to the chat panel below them.
 new ResizeObserver(() => document.body.style.setProperty("--chat-px", $("chat").offsetWidth + "px")).observe($("chat"));
+// The session sidebar starts below the full-width top bar.
+new ResizeObserver(() => document.body.style.setProperty("--topbar-h", document.querySelector<HTMLElement>(".topbar")!.offsetHeight + "px")).observe(document.querySelector(".topbar")!);
 const splitter = $("splitter"); let resize;
 // The chat width survives reloads and restarts.
 queueMicrotask(() => { try { const saved = Number(localStorage.getItem("plan3-chat-width")); if (saved) resizeChat(saved); } catch { /* private mode */ } });
@@ -854,7 +856,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "unseen" | "seen" | "parked" | "terminal";
-type HubSession = { id: string; name: string; tone: Tone };
+type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number } };
 type Group = { folder: string; label: string; sessions: HubSession[] };
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
@@ -940,7 +942,12 @@ function renderSessions(groups: Group[], recents: Recent[]) {
   const add = html("button", { type: "button", className: "session-add", textContent: "+", title: `New session in ${group.label} (Alt+N)` });
   add.setAttribute("aria-label", `New session in ${group.label}`); add.addEventListener("click", () => void newSession(group.folder));
   head.append(html("span", { className: "session-group-label", textContent: group.label, title: group.folder }), add);
-  return [head, ...group.sessions.map(session => sessionRow(session, group.label))];
+  // One framed box per folder: red while one waits for an answer, orange while one works, light blue for the open session's folder.
+  const box = html("div", { className: "session-folder" }), tones = group.sessions.map(session => session.tone);
+  const tone = tones.includes("waiting") ? "waiting" : tones.includes("working") ? "working" : group.sessions.some(session => session.id === sessionId) ? "current" : "";
+  if (tone) box.dataset.tone = tone;
+  box.append(head, ...group.sessions.map(session => sessionRow(session, group.label)));
+  return [box];
  });
  const recent = html("details", { className: "session-recents", open });
  recent.append(html("summary", { textContent: `Recents (${recents.length})` }), ...recents.map(item => {
@@ -969,6 +976,13 @@ function sessionRow(session: HubSession, folder: string) {
  more.setAttribute("aria-haspopup", "true"); more.setAttribute("aria-label", `Actions for ${session.name}`);
  more.addEventListener("click", event => { event.stopPropagation(); openSessionMenu(more, session); });
  row.append(link, more);
+ // A plan in progress: steps done/total, then a line filled left to right.
+ if (session.plan) {
+  const line = html("span", { className: "session-progress", title: `Plan: ${session.plan.done}/${session.plan.total} steps` });
+  line.style.setProperty("--fill", Math.round(session.plan.done / session.plan.total * 100) + "%");
+  line.append(html("small", { textContent: `${session.plan.done}/${session.plan.total}` }), html("i"));
+  row.append(line);
+ }
  return row;
 }
 // One popup for the row actions; Park/Resume follow the session's state.
@@ -1035,10 +1049,11 @@ function usageBlocks(rows: Segment[][]) {
 async function loadUsage() {
  clearTimeout(usageTimer); if (document.visibilityState !== "visible") return;
  try {
-  const value = await get("usage") as { summary: { label: string; left: number; color: string }[]; lines: Segment[][]; phoneLines?: Segment[][]; accounts?: Segment[] };
+  const value = await get("usage") as { summary: { label: string; left: number; color: string; resets?: string }[]; lines: Segment[][]; phoneLines?: Segment[][]; accounts?: Segment[] };
   usageLines = value.lines; usagePhoneLines = value.phoneLines ?? value.lines; usageAccounts = value.accounts ?? []; $("usage-button").hidden = !value.summary.length;
-  // One bar per provider: filled to the 7d share left, coloured like the footer.
-  $("usage-button").replaceChildren(...value.summary.map(item => { const bar = Object.assign(document.createElement("span"), { className: "bar", textContent: item.label + " 7d " + item.left + "%" }); setBar(bar, item.left, item.color); return bar; }));
+  // Short: 7d left per provider, coloured like the footer ("Codex: 25% 1d 14h | Claude: 15%"); hover shows the full rows.
+  $("usage-button").replaceChildren(...value.summary.flatMap((item, index) => [...index ? [" | "] : [], Object.assign(document.createElement("span"), { className: "usage-item tone-" + item.color, textContent: `${item.label}: ${item.left}%${item.resets ? " " + item.resets : ""}` })]));
+  $("usage-button").title = usageLines.map(line => line.map(part => part.text).join("")).join("\n") || "Subscription usage";
  } catch { $("usage-button").hidden = true; }
  usageTimer = window.setTimeout(loadUsage, 120_000);
 }

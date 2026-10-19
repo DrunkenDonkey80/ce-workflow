@@ -60,7 +60,7 @@ const answers = [], messages = [], commands = [], chatRows = new Map(); let reje
 const fail = (status, error) => Object.assign(new Error(error), { status });
 function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
- if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
+ if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error", resets: "1d 14h" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
  if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }], args: { wo: [{ value: "share", description: "Toggle sharing" }], plan3: [{ value: "review", description: "Review" }, { value: "review all", description: "Review" }] } };
  if (endpoint === "/api/edit" && body.target === "product") { // E-05: Project-tab edits
   const planned = toolbarEdit(product, body.edit), result = applyDiagramOperations(product, planned.operations); toolbarEdits.push(body.edit);
@@ -499,7 +499,9 @@ try {
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
  assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["fake-1: Low", "Context: 84k/200k", "💡 Normal", sample.title + "2/5"]);
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - herdr tab; the plan is in its bar");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .bar')].map(bar => bar.textContent + ':' + bar.dataset.tone + ':' + bar.style.getPropertyValue('--fill'))"), ["Claude 7d 53%:text:53%", "Codex 7d 12%:error:12%"]);
+ assert.equal(await evaluate("document.getElementById('usage-button').textContent"), "Claude: 53% | Codex: 12% 1d 14h", "usage: short 7d text");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .usage-item')].map(item => item.className)"), ["usage-item tone-text", "usage-item tone-error"]);
+ assert.match(await evaluate("document.getElementById('usage-button').title"), /5h 20%/, "hover shows the full usage rows");
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
@@ -511,7 +513,8 @@ try {
   ["usage-line provider:Claude 7d [] 53%:8/4", "usage-line:5h 20%:0/0", "usage-line provider:Codex 7d 12%:0/0"]);
  assert(await evaluate("(() => { const menu = document.getElementById('usage-menu').getBoundingClientRect(), button = document.getElementById('usage-button').getBoundingClientRect(); return menu.width <= 360 && menu.right <= innerWidth && Math.abs(menu.left - Math.min(button.left, innerWidth - menu.width - 8)) < 2; })()"), "usage menu: narrow, under its button");
  // Think and the usage bars together span the chat panel width.
- assert(await evaluate("(() => { const think = document.getElementById('bias-button').getBoundingClientRect(), usage = document.getElementById('usage-button').getBoundingClientRect(), chat = Math.min(document.getElementById('chat').offsetWidth, 640); return Math.abs(usage.right - think.left - (chat - 16)) < 4; })()"), "Think + usage span the chat width");
+ assert.deepEqual(await evaluate("['plan-button', 'model-button', 'context-button', 'usage-button', 'bias-button', 'settings-button'].map(id => document.getElementById(id).getBoundingClientRect().left).every((left, index, all) => !index || left > all[index - 1])"), true, "desktop order: plan, model, context, usage, think, gear");
+ assert(await evaluate("(() => { const bar = document.querySelector('.topbar').getBoundingClientRect(), side = document.getElementById('switcher').getBoundingClientRect(); return bar.left === 0 && (document.getElementById('switcher').hidden || side.top >= bar.bottom - 1); })()"), "the top bar spans the width above the sidebar: " + await evaluate("JSON.stringify([document.querySelector('.topbar').getBoundingClientRect(), document.getElementById('switcher').getBoundingClientRect(), getComputedStyle(document.body).paddingLeft])"));
  await browser("press", "Escape");
  await browser("click", "#plan-button"); await browser("wait", ".plan-option");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#plan-menu .plan-option')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed')).concat(document.getElementById('plan-divider').hidden)"), [sample.title + " · 2/5 (current):true", "Other plan · 0/3:false", false], "plans on top, the shown one marked, then a divider");
@@ -539,6 +542,7 @@ try {
  const tones = "[...document.querySelectorAll('.session:not(.recent)')].map(s => s.querySelector('.session-letter').textContent + ':' + s.dataset.tone).join()";
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:working"`);
  assert.equal(await evaluate("document.querySelector('.session-group-label').textContent"), "ce-workflow");
+ assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').closest('.session-folder').dataset.tone"), "working", "the open session's folder is boxed; working (orange) beats current (blue)");
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page] .session-link').getAttribute('aria-label')"), "1 in ce-workflow, idle, this session");
  assert(await evaluate("document.getElementById('switcher').getBoundingClientRect().width === 200 && document.querySelector('.session-label').getBoundingClientRect().width > 4 && document.querySelector('.session-label').textContent === '1'"), "open by default with the session name");
  await browser("focus", "#switcher-toggle"); await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('switcher').dataset.open, document.activeElement.id]"), ["false", "switcher-toggle"]);

@@ -1398,8 +1398,10 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			const at = now(), theme = { fg: (color, text) => `\u0001${color}\u0002${text}\u0003`, bold: (text) => text };
 			const summary = shown().flatMap((entry) => {
 				const state = states.get(entry.id) as { snapshot?: { windows?: { id: string; usedPercent: number }[] } } | undefined;
-				const week = state?.snapshot?.windows?.find((window) => window.id === "7d");
-				return week ? [{ label: entry.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent) }] : [];
+				const week = state?.snapshot?.windows?.find((window) => window.id === "7d") as { usedPercent: number; resetsAt?: number } | undefined;
+				// A served Claude pool rotates accounts, so its 7d has no single reset time.
+				const resets = week?.resetsAt && !(entry.id === "claude" && poolAccounts.length) ? formatDuration(week.resetsAt - at) : undefined;
+				return week ? [{ label: entry.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets }] : [];
 			});
 			const segments = (rows) => rows.map((line) =>
 				[...line.matchAll(/\u0001(\w+)\u0002([^\u0001-\u0003]*)\u0003|[^\u0001-\u0003]+/g)].map((match) => (match[1] ? { text: match[2], color: match[1] } : { text: match[0] })),
