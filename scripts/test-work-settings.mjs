@@ -198,6 +198,7 @@ try {
 		]),
 	});
 	assert(visionChoices.includes("Vision Test") && visionChoices.includes("Text Only"), "vision picker trusts the selected model");
+	assert(/Current model/.test(visionChoices) && /None/.test(visionChoices), "vision picker offers None (images in context) and Current model");
 	assert(mod.visionModelSettings(cwd) === "test/vision:xhigh", "selected vision model and effort persist");
 	assert(mod.visionAltModelSettings(cwd) === "__none_model__", "escaping the effort step saves nothing");
 	// Return to default so subsequent settings assertions remain independent.

@@ -1712,7 +1712,12 @@ try {
 			},
 		},
 	};
+	// Vision model None: no intervention, images stay in the context and reads load them.
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "__none_model__" } }));
+	assert.equal(await hooks.context({ messages: [imageMessage] }, visionCtx), undefined, "None keeps images in the context");
+	assert.equal((await Promise.all(toolCallHooks.map(hook => hook({ toolName: "read", input: { path: "shot.PNG" } }, { ...visionCtx, model: { provider: "test", id: "seeing", input: ["text", "image"] } })))).find(result => result?.block), undefined, "None: image reads load pixels");
+	// Unset means Current model: references in context, process_image asks the session's model.
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({}));
 	const projected = await hooks.context({ messages: [imageMessage] }, visionCtx);
 	assert.equal(imageMessage.content[1].data, pixels, "saved image remains untouched");
 	assert.equal(projected.messages[0].content.some(part => part.type === "image"), false);

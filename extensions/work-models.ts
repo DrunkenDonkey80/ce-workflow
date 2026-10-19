@@ -70,6 +70,9 @@ const CONFIG_DIR_NAME = ".pi";
 const UTILITY_SHORTCUT_STATUS = "/wo Utilities · F8 compact";
 const INHERIT_MODEL = "__inherit_model__";
 const NONE_MODEL = "__none_model__";
+// Vision model value: process_image asks the session's current model (the default when unset).
+const CURRENT_MODEL = "__current_model__";
+const CURRENT_DESCRIPTION = "process_image asks the session's current model in a separate call; pixels stay out of the main context";
 const CHATGPT_WEB_SOURCE = "chatgpt-web";
 
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
@@ -642,10 +645,11 @@ async function chooseModel(
 	projectScope = false,
 	includeChatgptWeb = false,
 	inherit = undefined,
-	{ allow, extra = [], noneDescription } = {},
+	{ allow, extra = [], noneDescription, lead = [] } = {},
 ) {
-	// allow: optional predicate on "provider/id" (special values always stay); extra: items only the all-models view lists.
-	const shape = (items) => items
+	// allow: optional predicate on "provider/id" (special values always stay); extra: items only the all-models view lists;
+	// lead: special items both views list first.
+	const shape = (items) => [...lead, ...items]
 		.filter((item) => !allow || [NONE_MODEL, INHERIT_MODEL, CHATGPT_WEB_SOURCE].includes(item.value) || allow(item.value))
 		.map((item) => item.value === NONE_MODEL && noneDescription ? { ...item, description: noneDescription } : item);
 	const allItems = shape([...await modelItems(
@@ -1095,14 +1099,15 @@ async function handleKnowledgeCommand(args, ctx) {
 	}
 }
 
+// None keeps images in the main context (no process_image); Current model (default) or a named model answers through process_image.
 export function visionModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
-	return String(settings.workOrchestrator?.visionModel ?? NONE_MODEL);
+	return String(settings.workOrchestrator?.visionModel ?? CURRENT_MODEL);
 }
 export function visionAltModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	return String(settings.workOrchestrator?.visionAltModel ?? NONE_MODEL);
 }
 // "provider/id:level" shown as "Name: Level".
-const visionLabel = (ref, names) => { if (ref === NONE_MODEL) return "None"; const { model, level } = splitLevel(ref); return level ? modelEffortSummary(model, level, names) : names?.get(model) ?? model; };
+const visionLabel = (ref, names) => { if (ref === NONE_MODEL) return "None"; if (ref === CURRENT_MODEL) return "Current model"; const { model, level } = splitLevel(ref); return level ? modelEffortSummary(model, level, names) : names?.get(model) ?? model; };
 
 export function imageModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	return String(settings.workOrchestrator?.imageModel ?? NONE_MODEL);
@@ -3772,8 +3777,8 @@ if (blockedInternalBackgroundCompletionTurn) {
 		return event.payload;
 	});
 
-	// Every model gets img- references: pixels replayed each turn cost more than a process_image call.
-	pi.on("context", (event) => visionBridge.project(event.messages));
+	// Every model gets img- references: pixels replayed each turn cost more than a process_image call. Vision model None opts out.
+	pi.on("context", (event, ctx) => ctx?.cwd && visionModelSettings(ctx.cwd) === NONE_MODEL ? undefined : visionBridge.project(event.messages));
 	pi.on("context", (event, ctx) => filteredContext(event, ctx));
 	pi.on("context", (event, ctx) => compactionNoteNudge(event, ctx));
 	pi.on("agent_end", () => { activePromptBackedAgent = false; });
@@ -4417,7 +4422,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 {
 				kind: "visionModel", value: "visionModel",
 				label: `Vision model: [${visionLabel(visionModel, names)}] ${SUBMENU_ARROW}`,
-				description: "process_image: answers image questions (files or references) so pixels stay out of the main context; images go to this provider.",
+				description: "None: images stay in the main context. Current model or a chosen model: process_image answers image questions so pixels stay out of the main context; images go to that provider.",
 			},
 			{
 				kind: "visionAltModel", value: "visionAltModel",
@@ -4585,16 +4590,17 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			let painters = [];
 			if (!vision) try { painters = await ctx.modelRegistry.getAvailableOfType?.("image") ?? []; } catch { /* No image catalog: Codex models only. */ }
 			const selected = await chooseModel(ctx, title,
-				current.model, scope === "project", scope === "project", false,
-				scope === "project" ? undefined : { label: "None", description: alt ? "No second opinion; process_image uses only the vision model" : vision ? "No process_image tool" : "No generate_image tool" },
+				current.model, vision && !alt ? true : scope === "project", scope === "project", false,
+				scope === "project" ? undefined : vision && !alt ? { label: "Current model", description: CURRENT_DESCRIPTION } : { label: "None", description: alt ? "No second opinion; process_image uses only the vision model" : "No generate_image tool" },
 				{
 					allow: fits && ((value) => fits.has(value)),
-					noneDescription: alt ? "No alternative vision model, even when the global setting has one" : `No ${vision ? "process_image" : "generate_image"} tool, even when the global setting has one`,
+					lead: vision && !alt && scope === "project" ? [{ value: CURRENT_MODEL, label: "Current model", description: CURRENT_DESCRIPTION }] : [],
+					noneDescription: vision && !alt ? "No process_image: images stay in the main context, like Pi without ce-workflow" : alt ? "No alternative vision model, even when the global setting has one" : "No generate_image tool, even when the global setting has one",
 					extra: painters.map((model) => ({ value: `${model.provider}/${model.id}`, label: model.name ?? model.id, description: `${model.provider}/${model.id} · image model`, preserveCase: true })),
 				});
 			if (selected === undefined) continue;
 			let value = selected;
-			if (vision && selected !== INHERIT_MODEL && selected !== NONE_MODEL) {
+			if (vision && ![INHERIT_MODEL, NONE_MODEL, CURRENT_MODEL].includes(selected)) {
 				const level = await choose(ctx, `${title}: choose effort`, THINKING_LEVELS.filter((item) => item !== "off").map((item) => ({ value: item, label: item, description: "Reasoning effort for image questions" })), current.level ?? "medium", { forceCustom: true });
 				if (level === undefined) continue;
 				value = `${selected}:${level}`;

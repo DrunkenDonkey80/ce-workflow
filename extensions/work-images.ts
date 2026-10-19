@@ -151,10 +151,12 @@ export function createImageTools(pi, { visionModel: configured, visionAltModel =
 		}
 	}
 	let signature;
-	// No vision model set: a one-shot call to the current image-capable model still keeps pixels out of the main context.
+	// Current model (the default): a one-shot call to the session's image-capable model keeps pixels out of the main
+	// context. None: no process_image, images stay in context.
 	const visionModel = (cwd, model) => {
 		const set = configured(cwd);
-		return set === NONE && model?.input?.includes("image") ? `${model.provider}/${model.id}` : set;
+		if (set !== "__current_model__") return set;
+		return model?.input?.includes("image") ? `${model.provider}/${model.id}` : NONE;
 	};
 	// The alternative is a second opinion, named neutrally so agents do not pick it by reflex.
 	const ALT = " Set alternative: true only as a second opinion when a default answer marked text with '?', contradicts other evidence or looks wrong, or from the start for exact positions, outlines, bounding boxes or which side of an object a photo shows. The alternative is 2-3x slower and not more trustworthy; when the two disagree, report both answers.";
