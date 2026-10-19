@@ -241,7 +241,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .activity details { border-radius: 4px; padding: 4px 8px; background: var(--tool-pending); }
 .activity .tool-ok { background: var(--tool-ok); } .activity .tool-error { background: var(--tool-error); }
 .activity .thinking-row { background: none; color: var(--thinking); font-style: italic; }
-.activity summary { cursor: pointer; font-size: 13px; }
+.activity summary { cursor: pointer; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .activity pre, .activity p { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.4 system-ui; }
 .activity strong { display: block; font-size: 13px; margin-top: 8px; }
 .activity .nested-tool { margin-left: 28px; }
@@ -297,6 +297,11 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .message .block-tool b { color: var(--ink); }
 .message .block pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; margin: 4px 0 2px; padding: 0; color: var(--muted); font-style: normal; }
 .message .block-thinking pre { color: var(--thinking); font-style: italic; margin-left: 14px; }
+/* Thinking view shows the thinking text itself; consecutive thinking-only rows join into one block. */
+.thinking-text { display: none; }
+.chat-thinking .thinking-text { display: block; white-space: pre-wrap; color: var(--thinking); font-style: italic; font-size: 13px; padding: 4px 10px; border-left: 3px solid var(--thinking); }
+.chat-thinking .message .block-thinking { display: none; }
+.chat-thinking .message-blocks { margin: 0; } .chat-thinking .message-blocks + .message-blocks .thinking-text { padding-top: 0; }
 .diff .diff-add { color: var(--success); } .diff .diff-del { color: var(--error); }
 #connection[data-state=working] { color: var(--accent); font-weight: 600; }
 .to-bottom { position: relative; align-self: center; margin: -44px 0 8px; z-index: 1; border-radius: 999px; box-shadow: 0 1px 4px #0003; }

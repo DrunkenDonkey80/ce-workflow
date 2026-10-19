@@ -92,11 +92,11 @@ function renderActivity() {
  if (data.interrupted) root.append(make("p", "Run interrupted.", "activity-status"));
  for (const run of data.subagents ?? []) root.append(make("p", ["Subagent " + (run.model ? "(" + run.model + ") " : "") + run.label, run.state, run.turns === undefined ? "" : run.turns + " turns", run.tools === undefined ? "" : run.tools + " tools", run.tool ?? ""].filter(Boolean).join(" \u00b7 "), "activity-status"));
  if (data.error) { const error = make("p", data.error, "activity-error"); error.setAttribute("role", "alert"); root.append(error); }
- if (data.thinking) { const thinking = section("thinking", "Thinking"); thinking.className = "thinking-row"; thinking.append(make("pre", data.thinking)); }
+ if (data.thinking) { const thinking = section("thinking", "Thinking", chatView() === "thinking"); thinking.className = "thinking-row"; thinking.append(make("pre", data.thinking)); }
  // Only the running run's calls show here; finished calls stay inside the chat rows, so the reply is the last thing shown.
  const tools = data.working ? data.tools ?? [] : [];
  for (const tool of tools) {
-  const row = section(tool.id, tool.name + " · " + tool.state + (tool.durationMs === undefined ? "" : " · " + Math.round(tool.durationMs) + " ms"));
+  const row = section(tool.id, [tool.name + toolArg(tool.args), tool.state, tool.durationMs === undefined ? "" : Math.round(tool.durationMs) + " ms"].filter(Boolean).join(" · "));
   row.className = "tool-row tool-" + (tool.state === "error" ? "error" : tool.state === "done" ? "ok" : "pending") + (tool.parent ? " nested-tool" : "");
   for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
  }
@@ -492,12 +492,26 @@ document.addEventListener("click", event => {
  event.preventDefault(); const viewer = document.getElementById("viewer") as HTMLDialogElement; (viewer.querySelector("img") as HTMLImageElement).src = link.href; viewer.showModal();
 });
 document.getElementById("viewer").addEventListener("click", () => (document.getElementById("viewer") as HTMLDialogElement).close());
+// The live tool line names what it works on, like the chat rows' titles (hub/src/chat.ts toolTitle); CSS cuts it at the box width.
+function toolArg(args?: string) {
+ let value: unknown; try { value = JSON.parse(args ?? ""); } catch { return ""; }
+ const record = (value ?? {}) as Record<string, unknown>, keys = ["path", "file", "command", "query", "url", "question", "action", "agent"];
+ const text = keys.map(key => record[key]).find(item => typeof item === "string") ?? Object.values(record).find(item => typeof item === "string");
+ const line = String(text ?? "").split("\n").find(item => item.trim())?.trim() ?? "";
+ return line ? " " + line : "";
+}
 // Pi-like rows: text stays visible; thinking and each tool call are one collapsed line that expands on click.
 function renderBlocks(box: HTMLElement, row) {
  const opened = new Set([...box.querySelectorAll<HTMLDetailsElement>("details[open]")].map(item => item.dataset.key));
  const known = new Set([...box.querySelectorAll<HTMLDetailsElement>("details")].map(item => item.dataset.key));
  box.replaceChildren(); const images = new Set<string>();
+ // Thinking view: one open text block per run of thinking, joined across the (hidden) tool calls between them.
+ let run: HTMLElement | null = null;
  (row.blocks ?? []).forEach((block, index) => {
+  if (block.type === "thinking" && block.text?.trim()) {
+   if (run) run.textContent += "\n\n" + block.text.trim();
+   else { run = Object.assign(document.createElement("div"), { className: "thinking-text", textContent: block.text.trim() }); box.append(run); }
+  }
   const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
   // Pi's tool colours: grey while running, green when done, red on error.
   item.dataset.key = key; item.open = opened.has(key) || (!known.has(key) && block.type === "tool" && (block.name === "edit" || block.name === "write")); item.className = "block block-" + block.type + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");

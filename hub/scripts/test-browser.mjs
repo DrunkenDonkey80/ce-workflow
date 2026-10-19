@@ -420,12 +420,13 @@ try {
   { type: "thinking", text: "hmm" },
   { type: "tool", id: "t1", name: "edit", title: "edit a.ts", args: "{oldText}", result: "ok", diff: "-1 old\n+1 new\n 2 same" },
   { type: "tool", id: "t2", name: "bash", title: "bash ls", args: "{}", result: "boom", error: true },
+  { type: "thinking", text: "more" },
   { type: "tool", id: "t3", name: "read", title: "read b.ts", args: "{}" }] });
  await browser("wait", "#messages [data-id=assistant_4] .block-tool");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-ok", "block block-tool block-error", "block block-tool block-pending"]);
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-ok", "block block-tool block-error", "block block-thinking", "block block-tool block-pending"]);
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] .diff span')].map(span => span.className)"), ["diff-del", "diff-add", ""]);
  assert.equal(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] pre')].some(pre => pre.textContent === '{oldText}')"), false, "the diff replaces raw edit arguments");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.open)"), [false, true, false, false], "only file changes start open");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.open)"), [false, true, false, false, false], "only file changes start open");
  publish("message", { id: "user_0", role: "user", text: "hi", streaming: false }); await browser("wait", "#messages [data-id=user_0]");
  assert.deepEqual(await evaluate("['user_0', 'assistant_1'].flatMap(id => { const row = document.querySelector('#messages [data-id=' + id + ']'); return [row.querySelector('strong').className, getComputedStyle(row).backgroundColor !== 'rgba(0, 0, 0, 0)']; })"), ["sr-only", true, "sr-only", false], "your messages are a tinted block; the label is screen-reader only");
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
@@ -581,15 +582,17 @@ try {
  await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('Newer plan')");
  publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: 0 });
  await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('0/16') === false && !document.getElementById('plan-button').textContent.includes('Newer plan')");
- activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: "app.ts", progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
+ activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: JSON.stringify({ path: "src/app.ts", limit: 9 }), progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
  assert(await evaluate("document.getElementById(\"activity\").textContent.includes(\"May be stale\")"));
  assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool rows start collapsed");
+ assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1] summary\").textContent"), "read src/app.ts · running", "the live tool line names its target");
  // While working, Thinking and Compact keep the live thinking and only the latest tool call; Compact drops thinking once settled.
  const activityShown = () => evaluate("['#activity [data-id=tool_1]', '#activity [data-id=tool_2]', '#activity .thinking-row'].map(sel => !!document.querySelector(sel) && getComputedStyle(document.querySelector(sel)).display !== 'none')");
  await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Thinking view while working");
+ assert.deepEqual(await evaluate("(() => { const text = document.querySelector('#messages [data-id=assistant_4] .thinking-text'); return [text.textContent, getComputedStyle(text).display, getComputedStyle(document.querySelector('#messages [data-id=assistant_4] .block-thinking')).display]; })()"), ["hmm\n\nmore", "block", "none"], "Thinking view shows the thinking text, joined across tool calls");
  await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Compact view while working");
  publish("activity", { ...activity, working: false }); await browser("wait", "--fn", "!document.getElementById('activity').classList.contains('working')");
  assert.deepEqual(await activityShown(), [false, false, false], "Compact after the run: only the final reply");
