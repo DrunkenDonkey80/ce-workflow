@@ -70,11 +70,7 @@ function webFile(file: string, key: string) {
 	return (file.endsWith(".ts") ? stripTypeScriptTypes(text) : text).replaceAll("__TOKEN__", key).replaceAll("__BUILD__", currentBuild());
 }
 
-/** Opens a URL in the user's default browser (detached). */
-export function openInBrowser(url: string) {
-	const opener = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
-	spawn(opener[0] as string, opener[1] as string[], { detached: true, stdio: "ignore", windowsHide: true }).unref();
-}
+export { openInBrowser } from "./platform.ts";
 
 export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.parse(process.env.PI_HUB_PI_COMMAND) : undefined, run = exec as Exec, openUrl = (_url: string) => {} } = {}) {
 	const dataDir = hubDataDir();
@@ -295,6 +291,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 }
 
 if (import.meta.main) {
+	const { openInBrowser } = await import("./platform.ts");
 	const hub = await startHub({ openUrl: openInBrowser });
 	console.log(`pi-control-hub ${process.pid} on http://127.0.0.1:${hub.config.port} (restored ${hub.restored.length})`);
 	const remote = hub.remote();

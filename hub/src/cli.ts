@@ -12,6 +12,7 @@ import { holderAlive, pidAlive } from "./session-lock.ts";
 import { defaultCommand } from "./rpc-client.ts";
 import { listProcesses, outsidePis } from "./update.ts";
 import { createInterface } from "node:readline/promises";
+import { findCommand, isWsl, wslSystemd } from "./platform.ts";
 
 // A marker left by a hub that died with the PC names a pid the OS may have reused; holderAlive checks start times.
 const marker = (): HubMarker | undefined => {
@@ -40,7 +41,34 @@ const RUN_KEY = process.env.PI_HUB_RUN_KEY || "HKCU\\Software\\Microsoft\\Window
 const CLI = fileURLToPath(new URL("./cli.ts", import.meta.url));
 // shortcut: XDG autostart runs only with a desktop login; a headless Linux box needs a systemd user unit instead.
 const DESKTOP_FILE = path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "autostart", "pi-control-hub.desktop");
+// WSL has no desktop login; with systemd on, a user unit runs the hub (in the foreground) whenever the distro starts for this user.
+const UNIT_FILE = path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "systemd", "user", "pi-control-hub.service");
 function autostart(action: string) {
+	if (process.platform === "linux" && isWsl()) {
+		const systemctl = (...args: string[]) => execFileSync("systemctl", ["--user", ...args], { stdio: "pipe" });
+		if (action === "status") return existsSync(UNIT_FILE) ? `Autostart on: ${UNIT_FILE}` : "Autostart off.";
+		if (action === "on") {
+			if (!wslSystemd()) throw new Error("WSL has no login start without systemd: add [boot] systemd=true to /etc/wsl.conf and run wsl --shutdown, or run pi-hub start after opening WSL.");
+			const log = path.join(hubDataDir(), "hub.log");
+			mkdirSync(path.dirname(UNIT_FILE), { recursive: true }); mkdirSync(hubDataDir(), { recursive: true });
+			writeFileSync(UNIT_FILE, `[Unit]
+Description=Pi control hub
+
+[Service]
+ExecStart="${process.execPath}" "${fileURLToPath(new URL("./hub.ts", import.meta.url))}"
+Restart=on-failure
+StandardOutput=append:${log}
+StandardError=append:${log}
+
+[Install]
+WantedBy=default.target
+`);
+			systemctl("daemon-reload"); systemctl("enable", "pi-control-hub.service");
+			return `Autostart on: systemd starts the hub when WSL starts for you (${UNIT_FILE}). Log: ${log}`;
+		}
+		if (existsSync(UNIT_FILE)) { try { systemctl("disable", "pi-control-hub.service"); } catch { /* systemd gone */ } rmSync(UNIT_FILE, { force: true }); }
+		return "Autostart off.";
+	}
 	if (process.platform === "linux") {
 		if (action === "on") {
 			mkdirSync(path.dirname(DESKTOP_FILE), { recursive: true });
@@ -116,7 +144,7 @@ async function update(yes: boolean) {
 	finally { if (running) await start(); }
 }
 
-const onPath = (command = "pi-hub") => { try { execFileSync(process.platform === "win32" ? "where" : "which", [command], { stdio: "pipe", windowsHide: true }); return true; } catch { return false; } };
+const onPath = (command = "pi-hub") => !!findCommand(command);
 
 /** What /wo hub shows: running or not, addresses, logon start and whether the pi-hub command exists. */
 async function statusJson() {
@@ -165,10 +193,10 @@ try {
 			openInBrowser(remote.url);
 			console.log(remote.url);
 		} else {
-			// The bare address opens a session page; the local key is the page's sign-in.
+			// The bare address opens a session page; the local key is the page's sign-in. Printed signed, in case no browser opened.
 			const url = `http://127.0.0.1:${running.port}/?token=${readConfig()!.localKey}`;
 			openInBrowser(url);
-			console.log(`http://127.0.0.1:${running.port}/`);
+			console.log(url);
 		}
 	} else if (verb === "new") {
 		// A folder's first session starts its group; later ones can be added on the page with +.
@@ -176,7 +204,7 @@ try {
 		const taken = new Set(sessions.filter(s => s.folder.toLowerCase() === folder.toLowerCase()).map(s => s.name));
 		let n = 1; while (taken.has(String(n))) n++;
 		const record = await call("/api/sessions", { folder, name: rest[1] ?? String(n) });
-		console.log(`New session ${record.name} in ${record.folder}: http://127.0.0.1:${marker()!.port}/s/${record.id}/`);
+		console.log(`New session ${record.name} in ${record.folder}: http://127.0.0.1:${marker()!.port}/s/${record.id}/?token=${readConfig()!.localKey}`);
 	} else if (verb === "import" && rest[0] === "herdr") {
 		// Every Pi herdr shows with a session file joins its folder's group, named after its herdr tab; known files stay as they are.
 		const herdr = (...args: string[]) => {
