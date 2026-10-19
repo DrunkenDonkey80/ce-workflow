@@ -177,7 +177,8 @@ h2 { font-size: 15px; font-weight: 600; }
 .chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); }
 .chat-heading > button { padding: 2px 10px; line-height: 1.4; }
 /* Working (or compacting, or subagents busy): the heading turns orange like the working session letter. */
-.chat-heading:has(#connection[data-state=working]) { background: color-mix(in srgb, #fab005 30%, var(--chat)); }
+.chat-heading:has(#connection[data-state=working]), .topbar:has(> #connection[data-state=working]) { background: color-mix(in srgb, #fab005 30%, var(--chat)); }
+/* Phones: the heading is hidden and #connection moves into the top bar, which turns orange instead. */
 #connection { font-size: 13px; color: var(--muted); }
 .modes { display: flex; gap: 6px; margin-left: auto; }
 .mode-chip { font: inherit; font-size: 12px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
@@ -421,6 +422,10 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .drawer .status-line { display: grid; gap: 6px; padding: 6px 16px; }
  .drawer .status-row { display: flex; gap: 6px; min-width: 0; }
  .drawer .status-row > button { flex: 1 1 auto; }
+ /* Phone: model and context fill line 1; think, load and the gear wrap to line 2. The usage text wraps instead of clipping. */
+ .drawer .status-row { flex-wrap: wrap; }
+ .drawer #model-button, .drawer #context-button { flex: 1 1 calc(50% - 3px); min-width: 0; }
+ .drawer #usage-button { white-space: normal; text-align: left; }
  .drawer-commands { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 16px 0; }
  .drawer-backdrop { display: block; position: fixed; z-index: 6; inset: 0; background: rgba(0, 0, 0, .25); }
  .messages { padding: 10px 12px 0; }
