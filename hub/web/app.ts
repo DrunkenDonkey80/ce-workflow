@@ -98,6 +98,8 @@ function renderActivity() {
   row.className = "tool-row tool-" + (tool.state === "error" ? "error" : tool.state === "done" ? "ok" : "pending") + (tool.parent ? " nested-tool" : "");
   for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
  }
+ [...root.querySelectorAll(".tool-row")].at(-1)?.classList.add("latest");
+ root.classList.toggle("working", !!data.working);
  if (data.queue?.length || data.hasPendingMessages) {
   const queue = section("queue", "Observed queued messages", true);
   queue.append(make("p", "May be stale; edit or cancel the real queue in Pi.", "activity-caution"));
@@ -158,14 +160,17 @@ for (const [index, view] of LEFT_TABS.entries()) {
  });
 }
 setLeft(remembered("plan3-left", ["full", "narrow", "collapsed"], "full"));
-// Compact chat hides thinking/tool blocks and in-between agent text, leaving prompts and final replies.
-function setCompact(on: boolean) {
- document.documentElement.classList.toggle("chat-compact", on);
- for (const id of ["chat-compact", "chat-compact-m"]) $(id).setAttribute("aria-pressed", String(on));
- try { localStorage.setItem("plan3-chat", on ? "compact" : "expanded"); } catch {}
+// Chat detail, cycled by one button: Full; Thinking hides tool blocks; Compact hides thinking, tools and in-between agent
+// text, leaving prompts and final replies. While a run works, both keep its latest thinking and latest tool call visible.
+const CHAT_VIEWS = ["expanded", "thinking", "compact"], CHAT_LABEL = { expanded: "Full", thinking: "Thinking", compact: "Compact" };
+function setChatView(view: string) {
+ for (const name of CHAT_VIEWS.slice(1)) document.documentElement.classList.toggle("chat-" + name, view === name);
+ for (const id of ["chat-compact", "chat-compact-m"]) { $(id).setAttribute("aria-pressed", String(view !== "expanded")); $(id).textContent = (id === "chat-compact-m" ? "▤ Chat: " : "") + CHAT_LABEL[view]; }
+ try { localStorage.setItem("plan3-chat", view); } catch {}
 }
-for (const id of ["chat-compact", "chat-compact-m"]) $(id).addEventListener("click", () => { setCompact(!document.documentElement.classList.contains("chat-compact")); pinChat(); fillChat(); });
-setCompact(remembered("plan3-chat", ["compact", "expanded"], "expanded") === "compact");
+const chatView = () => CHAT_VIEWS.find(name => document.documentElement.classList.contains("chat-" + name)) ?? "expanded";
+for (const id of ["chat-compact", "chat-compact-m"]) $(id).addEventListener("click", () => { setChatView(CHAT_VIEWS[(CHAT_VIEWS.indexOf(chatView()) + 1) % CHAT_VIEWS.length]); pinChat(); fillChat(); });
+setChatView(remembered("plan3-chat", CHAT_VIEWS, "expanded"));
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
 const mobileViews = ["chat", "files", "project", "plan"];
 function setMobile(view) {
@@ -546,7 +551,7 @@ function renderChat() {
  // Keep the newest 100 shown rows (compact: prompts and final replies) and 512 KB of their text. Only while following the
  // end: rows the reader loaded by scrolling up stay. Trimmed rows load again on scroll.
  if (stick) {
-  const compact = document.documentElement.classList.contains("chat-compact"), encoder = new TextEncoder();
+  const compact = chatView() === "compact", encoder = new TextEncoder();
   let shown = 0, bytes = 0, keep = rows.length;
   for (; keep > 0; keep--) {
    const row = rows[keep - 1];

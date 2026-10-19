@@ -395,12 +395,13 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Full body loaded\")");
  assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2] .row-full\").hidden"), "expanded row drops the excerpt link");
  assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2]\").classList.contains(\"final\") && !document.querySelector(\"#messages [data-id=assistant_1]\").classList.contains(\"final\")"), "only the last reply is final");
- // Compact chat hides in-between agent text but keeps the final reply; the choice is remembered.
- await browser("click", "#chat-compact");
+ // Compact chat hides in-between agent text but keeps the final reply; the choice is remembered. Full → Thinking → Compact.
+ await browser("click", "#chat-compact"); await browser("click", "#chat-compact");
  assert.equal(await evaluate("getComputedStyle(document.querySelector(\"#messages [data-id=assistant_1]\")).display"), "none", "compact hides in-between agent text");
  assert.notEqual(await evaluate("getComputedStyle(document.querySelector(\"#messages [data-id=assistant_2]\")).display"), "none", "compact keeps the final reply");
  assert.equal(await evaluate("localStorage.getItem(\"plan3-chat\")"), "compact");
  await browser("click", "#chat-compact");
+ assert.equal(await evaluate("document.getElementById(\"chat-compact\").textContent"), "Full", "the third click returns to Full");
  const rowText = id => evaluate(`document.querySelector("#messages [data-id=${id}]").children[2].textContent`);
  publish("delta", { id: "assistant_3", role: "assistant", offset: 0, text: "Hel", streaming: true });
  publish("delta", { id: "assistant_3", role: "assistant", offset: 3, text: "lo", streaming: true });
@@ -580,6 +581,14 @@ try {
  assert(await evaluate("document.getElementById(\"activity\").textContent.includes(\"May be stale\")"));
  assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool rows start collapsed");
+ // While working, Thinking and Compact keep the live thinking and only the latest tool call; Compact drops thinking once settled.
+ const activityShown = () => evaluate("['#activity [data-id=tool_1]', '#activity [data-id=tool_2]', '#activity .thinking-row'].map(sel => !!document.querySelector(sel) && getComputedStyle(document.querySelector(sel)).display !== 'none')");
+ await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Thinking view while working");
+ await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Compact view while working");
+ publish("activity", { ...activity, working: false }); await browser("wait", "--fn", "!document.getElementById('activity').classList.contains('working')");
+ assert.deepEqual(await activityShown(), [false, false, false], "Compact after the run: only the final reply");
+ publish("activity", activity); await browser("wait", "#activity.working");
+ await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [true, true, true], "Full shows every row");
  await browser("click", "#activity details[data-id=tool_1] summary");
  activity.tools[0] = { ...activity.tools[0], state: "error", result: "Read failed", durationMs: 100 }; activity.compacting = false; activity.error = "A safe error"; publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"activity\").textContent.includes(\"Read failed\")");

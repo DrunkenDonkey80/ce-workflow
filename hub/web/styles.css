@@ -272,7 +272,10 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .message-blocks { margin-bottom: 4px; }
 .message.final { background: var(--final-bg); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 6px; }
 .message.final > .row-full { display: none; }
-.chat-compact .message .block, .chat-compact .message-blocks, .chat-compact .message.assistant:not(.final), .chat-compact #activity .thinking-row, .chat-compact #activity .tool-row { display: none; }
+/* Compact keeps prompts and final replies; Thinking drops only tool blocks. While working both keep the latest tool call
+   (and Compact the live thinking) so the run is visibly moving. */
+.chat-compact .message .block, .chat-compact .message-blocks, .chat-compact .message.assistant:not(.final), .chat-compact #activity:not(.working) .thinking-row, .chat-compact #activity .tool-row:not(.latest),
+.chat-thinking .message .block-tool, .chat-thinking .message-blocks:not(:has(.block-thinking)), .chat-thinking #activity .tool-row:not(.latest) { display: none; }
 #chat-compact-m[aria-pressed=true] { border-color: var(--accent); background: var(--accent); color: var(--panel); }
 .message .block { font: 12px/1.4 ui-monospace, Consolas, monospace; color: var(--muted); margin: 3px 0; border-radius: 4px; }
 .message .block summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
