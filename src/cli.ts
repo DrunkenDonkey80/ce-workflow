@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-// pi-hub start | stop [--force] | restart | status | open | new [folder] [name] | remote on|off | autostart on|off|status
+// pi-hub start | stop [--force] | restart | update [--yes] | status | open | new [folder] [name] | remote on|off | autostart on|off|status
 import { mkdirSync, openSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { hubDataDir } from "./registry.ts";
+import { hubDataDir, readSessionSummary } from "./registry.ts";
 import { configPath, markerPath, openInBrowser, readConfig, type HubMarker } from "./hub.ts";
 import { writeJsonAtomic } from "./registry.ts";
 import { pidAlive } from "./session-lock.ts";
+import { defaultCommand } from "./rpc-client.ts";
+import { listProcesses, outsidePis } from "./update.ts";
+import { createInterface } from "node:readline/promises";
 
 const marker = (): HubMarker | undefined => {
 	try { const value = JSON.parse(readFileSync(markerPath(), "utf8")); return pidAlive(value.pid) ? value : undefined; } catch { return undefined; }
@@ -71,11 +74,39 @@ async function stop(force: boolean) {
 	console.log("Stopped.");
 }
 
+/** Stop the hub, `pi update --all` (Pi and extensions), start it again; the running sessions come back (D17). */
+async function update(yes: boolean) {
+	const running = marker();
+	if (running) {
+		const busy = ((await call("/api/status")).sessions as { name: string; folder: string; busy: string[] }[]).filter(s => s.busy.length);
+		if (busy.length) throw new Error(`Not updated: busy sessions are never interrupted. Stop them, then retry:\n${busy.map(s => `  ${s.busy.join(", ")}  ${s.name}  ${s.folder}`).join("\n")}`);
+	}
+	const outside = outsidePis(listProcesses(), running?.pid);
+	if (outside.length) {
+		console.log(`${outside.length} Pi outside the hub keep the old version until restarted, and can lock extension files so the update fails:`);
+		for (const p of outside) {
+			const file = /--session\s+("[^"]+"|\S+)/.exec(p.args)?.[1].replace(/"/g, ""), summary = file ? await readSessionSummary(file).catch(() => null) : null;
+			console.log(`  pid ${p.pid}  ${summary ? `${summary.cwd}${summary.name ? ` · ${summary.name}` : ""}` : p.args.replace(/^.*pi-launcher\.js"?\s*/, "") || "(no arguments)"}`);
+		}
+		if (!yes) {
+			if (!process.stdin.isTTY) return console.log("Not updated; close them, or rerun with --yes.");
+			const rl = createInterface({ input: process.stdin, output: process.stdout });
+			const answer = await rl.question("Update anyway? [y/N] "); rl.close();
+			if (!/^y/i.test(answer.trim())) return console.log("Not updated.");
+		}
+	}
+	if (running) await stop(false); // refuses if a session turned busy meanwhile
+	const [node, launcher] = defaultCommand();
+	try { execFileSync(node, [launcher, "update", "--all"], { stdio: "inherit" }); }
+	finally { if (running) await start(); }
+}
+
 const [verb = "status", ...rest] = process.argv.slice(2);
 try {
 	if (verb === "start") await start();
 	else if (verb === "stop") await stop(rest.includes("--force"));
 	else if (verb === "restart") { await stop(false); await start(); }
+	else if (verb === "update") await update(rest.includes("--yes"));
 	else if (verb === "status") {
 		const running = marker();
 		if (!running) console.log(`Not running. Data: ${hubDataDir()}`);
@@ -110,7 +141,7 @@ try {
 		}
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub start | stop [--force] | restart | status | open | new [folder] [name] | remote on|off | autostart on|off|status");
+		console.log("Usage: pi-hub start | stop [--force] | restart | update [--yes] | status | open | new [folder] [name] | remote on|off | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {
