@@ -1,6 +1,6 @@
 // The hub process (H2-05): one per user, HTTP on 127.0.0.1 at a port fixed at first start (D11).
 // It serves the local JSON API (CLI, tests), the web app under /s/<session>/, and remote access through Tailscale (H6-01).
-import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import crypto from "node:crypto";
 import http from "node:http";
 import { spawn } from "node:child_process";
@@ -54,11 +54,18 @@ const ASSETS: Record<string, [string, string]> = {
 	"app.js": ["app.ts", JS], "layout.js": ["layout.ts", JS], "diagram.js": ["diagram.ts", JS], "prompts.js": ["prompts.ts", JS],
 	"files.js": ["files.ts", JS], "stream.js": ["stream.ts", JS], "pair.js": ["pair.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
 };
-// Changes whenever a served file changes; an open page reloads itself when the build differs.
-const BUILD = crypto.createHash("sha256").update(["index.html", "pair.html", ...Object.values(ASSETS).map(([file]) => file)].map(file => readFileSync(new URL(file, WEB))).join("\0")).digest("hex").slice(0, 12);
+// Changes whenever a served file changes, checked per request, so web/ edits go live without restarting the hub
+// (and with it every session); an open page reloads itself when the build differs.
+const WEB_FILES = ["index.html", "pair.html", ...Object.values(ASSETS).map(([file]) => file)];
+let built = { stamp: "", build: "" };
+function currentBuild() {
+	const stamp = WEB_FILES.map(file => statSync(new URL(file, WEB)).mtimeMs).join();
+	if (stamp !== built.stamp) built = { stamp, build: crypto.createHash("sha256").update(WEB_FILES.map(file => readFileSync(new URL(file, WEB))).join("\0")).digest("hex").slice(0, 12) };
+	return built.build;
+}
 function webFile(file: string, key: string) {
 	const text = readFileSync(new URL(file, WEB), "utf8");
-	return (file.endsWith(".ts") ? stripTypeScriptTypes(text) : text).replaceAll("__TOKEN__", key).replaceAll("__BUILD__", BUILD);
+	return (file.endsWith(".ts") ? stripTypeScriptTypes(text) : text).replaceAll("__TOKEN__", key).replaceAll("__BUILD__", currentBuild());
 }
 
 /** Opens a URL in the user's default browser (detached). */
@@ -155,7 +162,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 			const url = new URL(request.url ?? "/", expected);
 			const rootAsset = request.method === "GET" && /^\/a\/([0-9a-f]{12})\/(pair\.js|styles\.css)$/.exec(url.pathname);
 			const serveAsset = (build: string, name: string) => {
-				if (build !== BUILD) return send(404, { error: "Stale build; reload the page." });
+				if (build !== currentBuild()) return send(404, { error: "Stale build; reload the page." });
 				response.writeHead(200, { "content-type": ASSETS[name][1], "cache-control": "private, max-age=31536000, immutable" });
 				response.end(webFile(ASSETS[name][0], remote ? "" : config.localKey));
 			};
@@ -218,14 +225,14 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 					response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
 					return response.end(webFile("index.html", remote ? "" : config.localKey));
 				}
-				if (asset && (ASSETS[asset[2]] || asset[1] !== BUILD)) return serveAsset(asset[1], asset[2]);
+				if (asset && (ASSETS[asset[2]] || asset[1] !== currentBuild())) return serveAsset(asset[1], asset[2]);
 				if (asset) return send(404, { error: "Unknown asset." });
 				// H5-02: the session view.
 				if (["events", "snapshot", "rows", "row"].includes(endpoint ?? "")) {
 					const sessionView = await view(page[1]);
 					if (endpoint === "rows") return send(200, await sessionView.page(url.searchParams.get("before") ?? undefined));
 					if (endpoint === "row") return send(200, await sessionView.row(url.searchParams.get("id") ?? ""));
-					const extras = { ...await pageApi.extras(page[1], url.searchParams.get("target")), build: BUILD };
+					const extras = { ...await pageApi.extras(page[1], url.searchParams.get("target")), build: currentBuild() };
 					if (endpoint !== "events") return send(200, sessionView.snapshot(extras));
 					if (device) {
 						const open = streams.get(device) ?? new Set(); streams.set(device, open.add(response));

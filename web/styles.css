@@ -305,9 +305,15 @@ dialog { border: 1px solid var(--group); border-radius: 6px; padding: 20px; colo
 dialog::backdrop { background: rgba(0, 0, 0, .25); }
 /* Prompts float without blocking the page (other sessions stay selectable), framed and raised. */
 #prompt:not(:modal) { position: fixed; inset: 0; margin: auto; height: fit-content; z-index: 5; }
-#prompt { box-shadow: 0 10px 30px #0004, 0 2px 6px #0003; border-color: var(--ink); }
+/* Long forms scroll inside the frame; the title stays on top and the buttons at the bottom. */
+#prompt { --prompt-head: color-mix(in srgb, var(--focus) 16%, var(--panel)); box-shadow: 0 10px 30px #0004, 0 2px 6px #0003; border-color: var(--ink); overflow: auto; padding-top: 0; padding-bottom: 0; }
+#prompt h2#prompt-title { position: sticky; top: 0; z-index: 1; margin: 0 -20px; padding: 14px 20px 10px; background: var(--prompt-head); border-bottom: 1px solid var(--line); }
+#prompt h2#prompt-title + * { margin-top: 12px; }
+#prompt:not(.compact) form > :first-child:not(h2) { margin-top: 20px; }
+#prompt.compact { padding: 14px 16px; }
+#prompt:not(.compact) .dialog-actions { position: sticky; bottom: 0; z-index: 1; margin: 16px -20px 0; padding: 12px 20px; background: var(--chat); border-top: 1px solid var(--line); }
 .prompt-question { border: 1px solid var(--group); border-radius: 6px; padding: 0 12px 12px; margin: 0 0 12px; background: var(--chat); box-shadow: 0 1px 3px #0002; }
-.prompt-question > legend { float: left; box-sizing: border-box; width: calc(100% + 24px); margin: 0 -12px 10px; padding: 10px 12px; font-weight: 600; background: var(--hover); border-bottom: 1px solid var(--line); border-radius: 6px 6px 0 0; }
+.prompt-question > legend { float: left; box-sizing: border-box; width: calc(100% + 24px); margin: 0 -12px 10px; padding: 10px 12px; font-weight: 600; background: var(--prompt-head, var(--hover)); border-bottom: 1px solid var(--line); border-radius: 6px 6px 0 0; }
 .prompt-question > legend + * { clear: both; }
 dialog.compact { width: min(420px, 94vw); padding: 14px 16px; }
 dialog.compact .dialog-purpose { margin-bottom: 4px; }

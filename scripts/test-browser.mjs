@@ -465,6 +465,13 @@ try {
  await browser("fill", "#prompt-form textarea[placeholder=\"Write your answer\"]", "Canary"); await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary");
+ // A form taller than the window scrolls inside its frame, with the title and buttons kept in view.
+ const long = { question: "Long one", context: "Line\n".repeat(30), options: [{ title: "A" }, { title: "B" }], allowMultiple: false, allowFreeform: true };
+ ask({ questions: [long, long, long], allowComment: true });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ assert(await evaluate(`(() => { const d = document.getElementById("prompt"), r = d.getBoundingClientRect(), b = d.querySelector(".dialog-actions").getBoundingClientRect(), t = document.getElementById("prompt-title").getBoundingClientRect();
+  return d.scrollHeight > d.clientHeight && r.bottom <= innerHeight && b.bottom <= r.bottom + 1 && t.top >= r.top - 1; })()`), "long form scrolls inside the frame with title and buttons visible");
+ await browser("click", "#prompt-form button.danger"); await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  // An ask that ends in Pi (here its timeout) closes the page form.
  ask({ question: "Terminal wins", options: [], allowMultiple: false, allowFreeform: true }, 3000);
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
