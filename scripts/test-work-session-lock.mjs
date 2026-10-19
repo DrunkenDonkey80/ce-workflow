@@ -16,8 +16,17 @@ try {
 	releaseSessionLock(file, info);
 	assert(!existsSync(lock));
 
-	writeFileSync(lock, JSON.stringify({ pid: holder.pid, owner: "pi-control-hub", startedAt: 1 }));
-	assert.deepEqual(takeSessionLock(file), { holder: { pid: holder.pid, owner: "pi-control-hub", startedAt: 1 } }, "a live holder refuses");
+	// A live pid that started after the lock was written (reused pid, e.g. after a reboot) is not the holder.
+	for (const startedAt of [1, Date.now() - 60_000]) {
+		writeFileSync(lock, JSON.stringify({ pid: holder.pid, owner: "pi-control-hub", startedAt }));
+		const stale = takeSessionLock(file).info;
+		assert.equal(stale?.pid, process.pid, `a reused pid's lock is taken over (startedAt ${startedAt})`);
+		releaseSessionLock(file, stale);
+	}
+
+	const startedAt = Date.now();
+	writeFileSync(lock, JSON.stringify({ pid: holder.pid, owner: "pi-control-hub", startedAt }));
+	assert.deepEqual(takeSessionLock(file), { holder: { pid: holder.pid, owner: "pi-control-hub", startedAt } }, "a live holder refuses");
 	releaseSessionLock(file, info);
 	assert(existsSync(lock), "never removes someone else's lock");
 

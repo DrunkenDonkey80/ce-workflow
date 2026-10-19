@@ -119,7 +119,7 @@ try {
 	host.idleParkMinutes = 0;
 
 	// A file locked by another live process cannot be resumed; a dead pid's lock is taken over.
-	fs.writeFileSync(lockPath(a.sessionFile), JSON.stringify({ pid: process.ppid, owner: "a terminal", startedAt: 1 }));
+	fs.writeFileSync(lockPath(a.sessionFile), JSON.stringify({ pid: process.ppid, owner: "a terminal", startedAt: Date.now() }));
 	await assert.rejects(host.resume(a.id), /open in a terminal \(pid/);
 	assert.equal(host.options.registry.get(a.id).state, "parked", "a failed start stays retryable");
 	fs.writeFileSync(lockPath(a.sessionFile), JSON.stringify({ pid: 999999, owner: "dead", startedAt: 1 }));

@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { defaultCommand, RpcChild, type RpcRecord } from "./rpc-client.ts";
-import { acquireLock, lockPath, pidAlive, readLock, releaseLock, type LockInfo } from "./session-lock.ts";
+import { acquireLock, holderAlive, lockPath, readLock, releaseLock, type LockInfo } from "./session-lock.ts";
 import type { Registry, SessionRecord } from "./registry.ts";
 
 export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number; viewers?: (id: string) => number; terminal?: (args: string[], cwd: string, env: Record<string, string>) => { pid?: number; once(event: "exit", listener: () => void): unknown } };
@@ -203,7 +203,7 @@ export class SessionHost extends EventEmitter {
 		const back = [];
 		for (const record of this.registry.list().filter(r => r.state === "terminal")) {
 			const holder = record.sessionFile ? readLock(record.sessionFile) : undefined;
-			if (holder?.owner === "pi-control-hub terminal" && pidAlive(holder.pid)) continue;
+			if (holder?.owner === "pi-control-hub terminal" && holderAlive(holder)) continue;
 			this.registry.update(record.id, { state: "parked" }); back.push(record.id);
 		}
 		if (back.length) this.emit("terminals", back);
@@ -216,7 +216,7 @@ export class SessionHost extends EventEmitter {
 		const parked = [];
 		for (const live of [...this.live.values()]) {
 			if (live.viewers || this.busyReasons(live.id).length || now - live.lastActivity < this.idleParkMinutes * 60_000) continue;
-			try { await this.park(live.id); parked.push(live.id); } catch {}
+			try { await this.park(live.id); parked.push(live.id); } catch { /* turned busy meanwhile; retried next minute */ }
 		}
 		return parked;
 	}

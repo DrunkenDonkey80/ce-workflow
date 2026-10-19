@@ -8,13 +8,14 @@ import { fileURLToPath } from "node:url";
 import { hubDataDir, readSessionSummary } from "./registry.ts";
 import { configPath, markerPath, openInBrowser, readConfig, type HubMarker } from "./hub.ts";
 import { writeJsonAtomic } from "./registry.ts";
-import { pidAlive } from "./session-lock.ts";
+import { holderAlive, pidAlive } from "./session-lock.ts";
 import { defaultCommand } from "./rpc-client.ts";
 import { listProcesses, outsidePis } from "./update.ts";
 import { createInterface } from "node:readline/promises";
 
+// A marker left by a hub that died with the PC names a pid the OS may have reused; holderAlive checks start times.
 const marker = (): HubMarker | undefined => {
-	try { const value = JSON.parse(readFileSync(markerPath(), "utf8")); return pidAlive(value.pid) ? value : undefined; } catch { return undefined; }
+	try { const value = JSON.parse(readFileSync(markerPath(), "utf8")); return holderAlive(value) ? value : undefined; } catch { return undefined; }
 };
 
 async function call(route: string, data?: unknown) {

@@ -187,7 +187,8 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 						if (result.cookie) response.setHeader("set-cookie", deviceCookie(result.cookie));
 						return send(200, { state: result.state });
 					}
-					if (request.method === "GET" && url.pathname === "/") { response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); return response.end(webFile("pair.html", "")); }
+					// A saved session link pairs too; the pairing page then reloads that link.
+					if (request.method === "GET" && /^\/(?:s\/[0-9a-f-]{36}\/?)?$/.test(url.pathname)) { response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); return response.end(webFile("pair.html", "")); }
 					if (rootAsset) return serveAsset(rootAsset[1], rootAsset[2]);
 					return send(401, { error: "This device is not paired." });
 				}

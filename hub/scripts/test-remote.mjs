@@ -72,12 +72,14 @@ try {
 	// Only the Tailscale owner over HTTPS; the local key never works remotely.
 	assert.equal((await remote("/", { login: "other@example.com" })).status, 403);
 	assert.equal((await remote("/", { proto: "http" })).status, 403);
-	assert.equal((await remote(`/s/${id}/?token=${localKey}`)).status, 401, "a leaked local link still needs pairing");
+	// A leaked local link (or a saved session link) gets the pairing page, never the session or the key.
+	const leaked = await remote(`/s/${id}/?token=${localKey}`);
+	assert.equal(leaked.status, 200); assert.match(leaked.text, /pair-code/); assert(!leaked.text.includes(localKey));
 	assert.equal((await remote(`/s/${id}/api/snapshot`)).status, 401);
 	// Unpaired: the pairing page and its assets only, with no key inside.
 	const pairPage = await remote("/");
 	assert.equal(pairPage.status, 200); assert.match(pairPage.text, /pair-code/); assert(!pairPage.text.includes(localKey));
-	const pairScript = /src="a\/([0-9a-f]{12})\/pair\.js"/.exec(pairPage.text);
+	const pairScript = /src="\/a\/([0-9a-f]{12})\/pair\.js"/.exec(pairPage.text);
 	assert.equal((await remote(`/a/${pairScript[1]}/pair.js`)).status, 200);
 	assert.equal((await remote(`/a/${pairScript[1]}/app.js`)).status, 401, "the app itself waits for pairing");
 	assert.equal((await remote("/pair/start", { method: "POST", origin: "https://evil.example" })).status, 403);

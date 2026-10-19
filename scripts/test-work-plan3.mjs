@@ -1382,7 +1382,7 @@ try {
 		{
 			const sessionFile = path.join(cwd, "locked-session.jsonl"), lockFile = `${sessionFile}.lock`, shutdowns = [];
 			webCtx.sessionManager.getSessionFile = () => sessionFile; webCtx.shutdown = () => shutdowns.push(1);
-			await writeFile(lockFile, JSON.stringify({ pid: process.ppid, owner: "pi-control-hub", startedAt: 1 }));
+			await writeFile(lockFile, JSON.stringify({ pid: process.ppid, owner: "pi-control-hub", startedAt: Date.now() }));
 			await hooks.get("session_start")({ reason: "resume" }, webCtx);
 			assert.equal(shutdowns.length, 1); assert.match(notices.at(-1).message, /open in pi-control-hub \(pid \d+\)/);
 			await rm(lockFile);
