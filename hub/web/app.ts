@@ -992,6 +992,7 @@ function sessionRow(session: HubSession, folder: string) {
   const line = html("span", { className: "session-progress", title: `Plan: ${session.plan.done}/${session.plan.total} steps` });
   line.style.setProperty("--fill", Math.round(session.plan.done / session.plan.total * 100) + "%");
   line.append(html("small", { textContent: `${session.plan.done}/${session.plan.total}` }), html("i"));
+  line.addEventListener("click", () => link.click()); // the whole row selects the session
   row.append(line);
  }
  return row;
