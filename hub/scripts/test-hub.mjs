@@ -31,6 +31,11 @@ try {
 	// The key is required.
 	assert.equal((await fetch(`http://127.0.0.1:${port}/api/status`)).status, 401);
 
+	// A new hub's bare address starts a first session (home folder) instead of a dead end.
+	const key = JSON.parse(fs.readFileSync(path.join(data, "config.json"), "utf8")).localKey;
+	const bare = await fetch(`http://127.0.0.1:${port}/?token=${key}`, { redirect: "manual" });
+	assert.equal(bare.status, 302); assert.match(bare.headers.get("location"), /^\/s\/[0-9a-f-]{36}\//);
+	const home = (await api("/api/status")).body.sessions; assert.equal(home.length, 1); await api(`/api/sessions/${home[0].id}/park`, {});
 	const created = await api("/api/sessions", { folder, name: "1" });
 	assert.equal(created.status, 200, JSON.stringify(created.body));
 	const id = created.body.id;
@@ -74,10 +79,10 @@ try {
 	// Restart restores the session that was running, on the same port (D11, D17).
 	assert.match(cli("start").out, new RegExp(`127\.0\.0\.1:${port}`));
 	const status = await api("/api/status");
-	assert.equal(status.body.sessions[0].live, true, "running session restored");
+	assert.equal(status.body.sessions.find(s => s.id === id).live, true, "running session restored");
 	await api(`/api/sessions/${id}/park`, {});
 	assert.match(cli("restart").out, /Stopped\.[\s\S]*Started/);
-	assert.equal((await api("/api/status")).body.sessions[0].live, false, "parked session stays parked");
+	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).live, false, "parked session stays parked");
 
 	// A crashed hub leaves a dead-pid lock; the next start takes it over.
 	const { pid } = JSON.parse(fs.readFileSync(path.join(data, "hub.json"), "utf8"));

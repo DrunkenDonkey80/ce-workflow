@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 import { spawn } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import { Registry, hubDataDir, importSessions, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
@@ -203,8 +204,8 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 			if (rootAsset) return serveAsset(rootAsset[1], rootAsset[2]);
 			// The bare address opens a session page: a live one first.
 			if (request.method === "GET" && url.pathname === "/") {
-				const first = registry.list().find(record => host.live.has(record.id)) ?? registry.list()[0];
-				if (!first) return send(404, { error: "No sessions yet; start one with pi-hub." });
+				// A new hub has no sessions; start one in the home folder so the page (pairing approval, New folder) has somewhere to open.
+				const first = registry.list().find(record => host.live.has(record.id)) ?? registry.list()[0] ?? await host.create(os.homedir(), "1");
 				response.writeHead(302, { location: `/s/${first.id}/${remote ? "" : url.search}` }); return response.end();
 			}
 			const page = /^\/s\/([0-9a-f-]{36})(\/.*)?$/.exec(url.pathname);

@@ -15,7 +15,7 @@ export function hubCli(args: string[], timeout = 180_000): Promise<{ ok: boolean
 		resolve({ ok: !error, text: [stdout, stderr].map(s => String(s).trim()).filter(Boolean).join("\n") || (error ? error.message : "Done.") })));
 }
 
-export type HubStatus = { running: boolean; autostart: boolean; command: boolean; local?: string; remote: { on: boolean; url?: string; error?: string; missing?: string[] }; sessions?: number; live?: number; busy?: number };
+export type HubStatus = { pairing?: { code: string; label?: string; login?: string } | null; running: boolean; autostart: boolean; command: boolean; local?: string; remote: { on: boolean; url?: string; error?: string; missing?: string[] }; sessions?: number; live?: number; busy?: number };
 
 export async function handleHubCommand(args: string, ctx) {
 	const notify = (text: string, ok = true) => ctx.ui?.notify?.(text, ok ? "info" : "warning");
@@ -41,6 +41,9 @@ export function hubMenu(status: HubStatus, cwd: string) {
 			: item("install", "Install (Recommended)", "Adds the pi-hub terminal command, starts the hub at login and starts it now. Then shows its address."),
 		...(installed ? [item("install", "Reinstall", "Re-adds the pi-hub command and login start, then starts the hub.")] : []),
 	] : [
+		// A phone waiting on the pairing page: approve it here, no browser needed.
+		...(status.pairing ? [item("pair approve", `Approve device ${status.pairing.code}`, `${status.pairing.label ?? "A device"}${status.pairing.login ? ` (${status.pairing.login})` : ""} shows this code; approve only if it matches.`),
+			item("pair reject", "Reject that device", "It stays unpaired.")] : []),
 		item("open", "Open local page", `${status.local} in this PC's browser.`),
 		...(status.remote.url ? [item("open remote", "Open remote page", `${status.remote.url}, the address your phone uses.`)] : []),
 		item("new", "New session in this folder", `Starts a hub session in ${cwd}; it shows on the page.`),
@@ -50,7 +53,7 @@ export function hubMenu(status: HubStatus, cwd: string) {
 	];
 	items.push(item(`autostart ${status.autostart ? "off" : "on"}`, status.autostart ? "Don't start at login" : "Start at login", status.autostart ? "Removes the login start." : "Starts the hub hidden when you log in."));
 	const summary = status.running
-		? `Running · ${status.sessions} sessions (${status.live} live${status.busy ? `, ${status.busy} busy` : ""}) · ${status.local} · ${remote}`
+		? `${status.pairing ? `Device waiting, code ${status.pairing.code} · ` : ""}Running · ${status.sessions} sessions (${status.live} live${status.busy ? `, ${status.busy} busy` : ""}) · ${status.local} · ${remote}`
 		: installed ? `Stopped · ${remote}` : "Not installed";
 	return { summary, items };
 }

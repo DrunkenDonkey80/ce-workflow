@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | pair approve|reject | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import os from "node:os";
@@ -124,7 +124,8 @@ async function statusJson() {
 	const base = { running: !!running, data: hubDataDir(), autostart: autostartOn, command: onPath() };
 	if (!running) return { ...base, remote: { on: config?.remote === true } };
 	const status = await call("/api/status");
-	return { ...base, pid: status.pid, local: `http://127.0.0.1:${status.port}/`, remote: status.remote, sessions: status.sessions.length, live: status.sessions.filter((s: { live: boolean }) => s.live).length, busy: status.sessions.filter((s: { busy: string[] }) => s.busy.length).length };
+	const { pending } = await call("/api/pairing");
+	return { ...base, pid: status.pid, pairing: pending, local: `http://127.0.0.1:${status.port}/`, remote: status.remote, sessions: status.sessions.length, live: status.sessions.filter((s: { live: boolean }) => s.live).length, busy: status.sessions.filter((s: { busy: string[] }) => s.busy.length).length };
 }
 
 /** One step for a new PC: the pi-hub command (best effort), start at logon, start now. */
@@ -196,9 +197,14 @@ try {
 			writeJsonAtomic(configPath(), { ...config, remote: rest[0] === "on" });
 			console.log(`Remote ${rest[0]}; applies when the hub starts.`);
 		}
+	} else if (verb === "pair" && ["approve", "reject"].includes(rest[0])) {
+		// A device waiting on the pairing page; approve here when no browser page is open (no sessions yet, another PC).
+		if (!marker()) throw new Error("The hub is not running.");
+		await call("/api/pairing", { approve: rest[0] === "approve" });
+		console.log(rest[0] === "approve" ? "Device paired." : "Device rejected.");
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | pair approve|reject | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {
