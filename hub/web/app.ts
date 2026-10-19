@@ -49,7 +49,7 @@ function renderShell() {
  $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
  // 120k/1m like Pi's footer; tokens are null right after compaction until the next reply.
  const short = n => n >= 1e6 ? +(n / 1e6).toFixed(1) + "m" : Math.round(n / 1e3) + "k";
- $("context-button").textContent = "Context: " + (status?.window ? (typeof status.tokens === "number" ? short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—");
+ $("context-button").replaceChildren(html("span", { className: "context-label", textContent: "Context: " }), (status?.window ? (typeof status.tokens === "number" ? short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—")); // the phone drawer hides the label
  $("bias-button").textContent = "💡 " + (BIAS_LABEL[plan?.bias ?? 0] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
  $("bias-button").disabled = !state.connected || !plan;
@@ -192,7 +192,7 @@ for (const name of mobileViews) {
 }
 // Phones: views, status line and sessions move into the drawer so the chat gets the screen; desktop puts them back.
 const phone = matchMedia("(max-width: 899px)"), drawer = $("drawer");
-const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "drawer-sessions"], ["plan-menu", "title-menu"], ["connection", "topbar"]]
+const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "drawer-sessions"], ["plan-menu", "title-menu"], ["connection", "topbar"], ["settings-button", "drawer-gear"], ["settings-menu", "drawer-gear"]]
  .map(([id, slot]) => { const node = id === "status-line" || id === "topbar" ? document.querySelector("." + id)! : $(id); return { node, slot: slot === "topbar" ? document.querySelector(".topbar")! : $(slot), parent: node.parentNode!, next: node.nextSibling }; });
 function placeForPhone() {
  for (const home of homes) if (phone.matches) home.slot.append(home.node); else home.parent.insertBefore(home.node, home.next);

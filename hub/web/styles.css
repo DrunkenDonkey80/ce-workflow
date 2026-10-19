@@ -424,6 +424,10 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .drawer .status-row > button { flex: 1 1 auto; }
  /* Phone: model and context fill line 1; think, load and the gear wrap to line 2. The usage text wraps instead of clipping. */
  .drawer .status-row { flex-wrap: wrap; }
+ .drawer .context-label { display: none; }
+ .drawer .status-bars { order: -1; } /* the plan right below the Session label */
+ .drawer-head { display: flex; align-items: center; gap: 8px; margin: 8px 16px 4px; } .drawer-head > h2 { margin: 0; font-size: 12px; color: var(--muted); }
+ #drawer-gear { position: relative; } #drawer-gear .status-menu { left: 0; }
  .drawer #model-button, .drawer #context-button { flex: 1 1 calc(50% - 3px); min-width: 0; }
  .drawer #usage-button { white-space: normal; text-align: left; }
  .drawer-commands { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 16px 0; }
