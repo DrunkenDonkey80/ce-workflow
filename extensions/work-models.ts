@@ -3703,7 +3703,8 @@ showResearchContext(ctx);
 	pi.on("before_agent_start", (event) => {
  blockedInternalBackgroundCompletionTurn = Boolean(pendingInternalBackgroundCompletionPrompt && contentText(event.prompt).trim() === pendingInternalBackgroundCompletionPrompt);
  pendingInternalBackgroundCompletionPrompt = null;
- pendingPromptBackedAgentStart = true;
+ // Pi 1.2+ also fires this for sendMessage(triggerTurn) runs (messageType "custom"); only prompts are user work.
+ pendingPromptBackedAgentStart = event.messageType !== "custom";
  const systemPrompt=String(event.systemPrompt ?? "");
  const exit=researchContext?.source==="user"?"The user turned research mode on; only they can turn it off (/research or Alt+R).":"Plan3 turned research mode on for planning. When the user asks for work outside planning (fixes, edits, commits), call research_exit first, then do it.";
  return {systemPrompt:researchContext?`${systemPrompt}\n\n${RESEARCH_INSTRUCTIONS}\n${exit}\nTemporary notebook: ${researchContext.notes}`:systemPrompt};

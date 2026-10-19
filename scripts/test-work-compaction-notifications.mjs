@@ -214,6 +214,17 @@ try {
 			`${message.customType}: internal notice cannot re-enter model context`,
 		);
 	}
+	// Pi 1.2+ order: a sendMessage(triggerTurn) run emits before_agent_start with messageType "custom" first.
+	for (const message of notices) {
+		await hooks.before_agent_start({ prompt: "", systemPrompt: "base", messageType: "custom", message }, ctx);
+		await hooks.agent_start({}, ctx);
+		await hooks.message_start({ message }, ctx);
+		await hooks.message_end({ message }, ctx);
+		const before = aborts;
+		await hooks.before_provider_request({ payload: {} }, ctx);
+		assert.equal(aborts, before + 1, `${message.customType}: custom run in Pi 1.2 order must abort before provider`);
+		await hooks.agent_settled({}, ctx);
+	}
 	absorbKnowledgeDiscovererCompletion({ runId, success: false });
 	assert(
 		notices.every(isKnowledgeDiscovererCompletionMessage),
