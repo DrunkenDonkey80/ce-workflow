@@ -1192,7 +1192,9 @@ listen("snapshot", value => {
  build ||= value.build ?? ""; retryDelay = 1000;
  if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;
  currentPlan = value.current ?? null;
- state.connected = true; state.plan = value.plan; state.status = value.status ?? null; state.activity = value.activity ?? {}; state.more = !!value.more;
+ state.connected = true; state.plan = value.plan; state.status = value.status ?? null;
+ // A plan picked in the menu that isn't Pi's current one: the plan bar names the shown plan, not "New plan".
+ if (target && target !== "product" && value.plan?.id !== target) void get("plans").then(({ plans }) => { const shown = plans.find(item => item.id === target); if (shown) { state.plan = shown; renderShell(); } }, () => {}); state.activity = value.activity ?? {}; state.more = !!value.more;
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
  // Dialogs over 16 KB arrive brief; fetch their full body.
  promptView.sync((value.dialogs ?? []).filter(ask => !ask.brief));
