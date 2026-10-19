@@ -798,6 +798,19 @@ assert.equal(hiding.controller.states.get("glm").authenticated, true, "re-enable
 assert.equal(hiddenUrls.length, 2, "toggling makes no network request");
 hiding.controller.shutdown(hiding.ctx);
 
+// A hub session (RPC) draws no footer but still polls, so the hub page's usage button has data.
+const rpc = harness({
+	providers: PRODUCTION_PROVIDERS,
+	settings: () => ({ enabled: true, hidden: ["glm"] }),
+	auth: (id) => ["openai-codex", "anthropic"].includes(id) ? stored(`${id}-token`) : undefined,
+	fetchImpl: async (url) => jsonResponse(payloads[Object.keys(payloads).find((part) => url.includes(part))]),
+});
+assert.equal(rpc.controller.start({ ...rpc.ctx, mode: "rpc" }), true);
+await flush();
+assert.equal(rpc.factories.length, 0, "RPC installs no footer");
+assert.deepEqual(rpc.controller.webUsage().summary.map((item) => item.label), ["Codex", "Claude"], "RPC still reports usage");
+rpc.controller.shutdown({ ...rpc.ctx, mode: "rpc" });
+
 const ambient = harness({
 	providers: [PRODUCTION_PROVIDERS[0]],
 	auth: () => ({ source: "OPENAI_API_KEY", auth: { apiKey: "ambient" } }),

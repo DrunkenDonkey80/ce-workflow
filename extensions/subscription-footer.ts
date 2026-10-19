@@ -1321,7 +1321,7 @@ export function createSubscriptionFooterController(pi, options = {}) {
 		ticker = undefined;
 		const ctx = activeCtx;
 		activeCtx = undefined;
-		if (installed && restore) ctx?.ui?.setFooter?.(undefined);
+		if (installed && restore && ctx?.mode === "tui") ctx?.ui?.setFooter?.(undefined);
 		installed = false;
 		if (notify)
 			ctx?.ui?.notify?.(
@@ -1331,13 +1331,15 @@ export function createSubscriptionFooterController(pi, options = {}) {
 	}
 
 	function install(ctx) {
-		if (ctx?.mode !== "tui" || ctx.hasUI === false || !setting().enabled)
+		// A hub session (RPC) has no footer to draw, but still polls so the hub page can show usage (webUsage).
+		const headless = ctx?.mode === "rpc";
+		if ((ctx?.mode !== "tui" && !headless) || (!headless && ctx.hasUI === false) || !setting().enabled)
 			return false;
 		stop({ restore: false });
 		activeCtx = ctx;
 		installed = true;
 		const gen = generation;
-		ctx.ui.setFooter((tui, theme, footerData) => {
+		if (!headless) ctx.ui.setFooter((tui, theme, footerData) => {
 			requestRender = () => tui?.requestRender?.();
 			return {
 				invalidate() {},
