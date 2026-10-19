@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "kind": "product",
+  "title": "Upload service",
+  "revision": 1,
+  "nodes": [
+    { "id": "web_client", "label": "Web client", "kind": "client", "summary": "Browser app that picks files and shows progress.", "tech": "React" },
+    { "id": "mobile_client", "label": "Mobile client", "kind": "client", "summary": "Uploads photos in the background.", "tech": "Swift, Kotlin" },
+    { "id": "cdn", "label": "CDN", "kind": "external", "summary": "Serves processed files.", "tech": "CloudFront" },
+    { "id": "backend", "label": "Backend", "kind": "group" },
+    { "id": "load_balancer", "label": "Load balancer", "kind": "service", "parent": "backend", "tech": "ALB" },
+    { "id": "upload_api", "label": "UploadAPI", "kind": "service", "parent": "backend", "summary": "Issues presigned URLs and records uploads.", "tech": "Node", "details": "POST /uploads returns a presigned PUT URL; completion webhook writes metadata." },
+    { "id": "metadata_service", "label": "Metadata service", "kind": "service", "parent": "backend", "summary": "Owns file records." },
+    { "id": "processing", "label": "Processing", "kind": "group", "parent": "backend" },
+    { "id": "queue", "label": "Queue", "kind": "store", "parent": "processing", "tech": "SQS" },
+    { "id": "worker", "label": "Worker", "kind": "service", "parent": "processing", "summary": "Thumbnails and virus scan." },
+    { "id": "storage", "label": "Storage", "kind": "store", "summary": "Original and processed files.", "tech": "S3" },
+    { "id": "metadata_db", "label": "Metadata DB", "kind": "store", "tech": "Postgres" }
+  ],
+  "edges": [
+    { "id": "web_client__load_balancer", "from": "web_client", "to": "load_balancer", "label": "HTTPS" },
+    { "id": "mobile_client__load_balancer", "from": "mobile_client", "to": "load_balancer", "label": "HTTPS" },
+    { "id": "load_balancer__upload_api", "from": "load_balancer", "to": "upload_api" },
+    { "id": "upload_api__storage", "from": "upload_api", "to": "storage", "label": "presigned PUT" },
+    { "id": "upload_api__metadata_service", "from": "upload_api", "to": "metadata_service" },
+    { "id": "metadata_service__metadata_db", "from": "metadata_service", "to": "metadata_db" },
+    { "id": "upload_api__queue", "from": "upload_api", "to": "queue", "label": "upload done" },
+    { "id": "queue__worker", "from": "queue", "to": "worker" },
+    { "id": "worker__storage", "from": "worker", "to": "storage", "label": "write thumbs" },
+    { "id": "storage__cdn", "from": "storage", "to": "cdn", "label": "origin" },
+    { "id": "cdn__web_client", "from": "cdn", "to": "web_client" }
+  ],
+  "notes": [
+    { "id": "note_1", "target": "upload_api", "text": "How large can a single upload be? Multipart above 100 MB?", "author": "user", "created": "2026-10-13T12:00:00Z" },
+    { "id": "note_2", "target": "storage", "text": "Lifecycle rules for originals?", "author": "user", "created": "2026-10-13T12:01:00Z" },
+    { "id": "note_3", "x": 40, "y": 520, "text": "Do we need resumable uploads on mobile?", "author": "user", "created": "2026-10-13T12:02:00Z" }
+  ]
+}

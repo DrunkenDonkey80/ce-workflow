@@ -1,0 +1,216 @@
+// H5-03: the page API under /s/<session>/api/. The endpoint map is in plan 0db155f7 Findings ("H5-03 endpoint map").
+// Plans, diagrams, files and images are read here with ce-workflow's Pi-free modules, so they also work while parked;
+// what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
+import type http from "node:http";
+import { statSync } from "node:fs";
+import path from "node:path";
+import { emptyDiagram, loadDiagram } from "pi-work-orchestrator/extensions/plan3-diagram.ts";
+import { webTarget } from "pi-work-orchestrator/extensions/plan3-web.ts";
+import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
+import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
+import { currentPlan, listPlans } from "pi-work-orchestrator/extensions/plan3.ts";
+import { toForm, toResponse } from "./forms.ts";
+import { type Registry, scanRecents, star } from "./registry.ts";
+import type { RpcRecord } from "./rpc-client.ts";
+import type { SessionHost } from "./sessions.ts";
+import type { SessionView } from "./view.ts";
+
+const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
+const ANSWER_FIELDS = ["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"];
+const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
+const parse = (text: unknown) => { try { return JSON.parse(String(text)); } catch { return undefined; } };
+const only = (data: Record<string, unknown>, fields: string[], message: string) => { if (Object.keys(data).some(key => !fields.includes(key))) throw fail(400, message); };
+type Target = { kind: "product" } | { kind: "plan"; id: string };
+type Plan = Awaited<ReturnType<typeof listPlans>>[number];
+
+export function createPageApi({ host, registry, views }: { host: SessionHost; registry: Registry; views: Map<string, SessionView> }) {
+	const folder = (id: string) => registry.get(id)!.folder;
+	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
+
+	/** The session's plan: the one Pi published, else the newest open plan (what Pi would pick, ce-workflow R6). */
+	function current(id: string, plans: Plan[]) {
+		const pick = plans.find(plan => plan.id === published(id)?.plan?.id && plan.status !== "complete");
+		return pick ?? currentPlan({}, plans);
+	}
+	async function resolve(id: string, wanted?: string | null) {
+		const plans = await listPlans(folder(id)), now = current(id, plans);
+		const target: Target = wanted ? webTarget(wanted) : now ? { kind: "plan", id: now.id } : { kind: "product" };
+		if (target.kind === "product") return { target, plans, now, resolved: { kind: "product" as const } };
+		const plan = plans.find(item => item.id === target.id);
+		if (!plan) throw fail(404, "Displayed plan no longer exists.");
+		return { target, plans, now, resolved: { kind: "plan" as const, plan } };
+	}
+
+	/** ce-workflow webStatus; model, effort and context need a running Pi. */
+	async function status(id: string) {
+		const record = registry.get(id)!, live = host.live.get(id);
+		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? { research: "off", night: "off" } };
+		if (!live) return { ...base, model: null, effort: null, context: null };
+		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
+		const model = state.data?.model;
+		return { ...base, model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, effort: state.data?.thinkingLevel ?? null, context: stats.data?.contextUsage?.percent ?? null };
+	}
+	const publishStatus = async (id: string) => { const value = await status(id); views.get(id)?.publish("status", value); return value; };
+
+	/** Snapshot extras, as ce-workflow's snapshot: target, current, status and (for Pi's own plan) its action state. */
+	async function extras(id: string, wanted?: string | null) {
+		seen(id); // a page opened (or reconnected to) this session
+		const { target, now } = await resolve(id, wanted);
+		const plan = published(id)?.plan; // shortcut: only Pi's current plan carries bias/finishable; another displayed plan shows without its action row until Pi switches to it.
+		return { target, current: now?.id ?? null, status: await status(id), ...(plan && target.kind === "plan" && plan.id === target.id ? { plan } : {}) };
+	}
+
+	/** A hub call needs a running Pi; writes start a parked session, reads do not. */
+	async function call(id: string, endpoint: string, data: Record<string, unknown>, { start = true } = {}) {
+		if (!host.live.has(id)) { if (!start) throw fail(409, "Session is parked; resume it first."); await host.resume(id); }
+		const result = await host.call(id, endpoint, data);
+		if (!result.ok) throw fail(result.status ?? 500, result.error ?? "Hub call failed.");
+		return result.value;
+	}
+
+	/** Open forms for the snapshot (H5-04): every dialog Pi has open, as page forms. */
+	const forms = (id: string) => host.pendingDialogs(id).flatMap(dialog => toForm(dialog) ?? []);
+	const openDialog = (id: string, askId: unknown) => host.pendingDialogs(id).find(dialog => dialog.id === askId && toForm(dialog));
+
+	// H5-05: the session bar. A run that ends with no page watching stays "unseen" until a page opens the session.
+	const unseen = new Set<string>();
+	const seen = (id: string) => unseen.delete(id);
+	function tone(id: string) {
+		if (registry.get(id)?.state === "terminal") return "terminal";
+		if (!host.live.has(id)) return "parked";
+		if (forms(id).length) return "waiting";
+		if (host.busyReasons(id).length) return "working";
+		return unseen.has(id) ? "unseen" : "seen";
+	}
+	async function sessions() {
+		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id) })) }));
+		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
+		return { groups, recents };
+	}
+	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
+	const nextName = (folder: string) => { const taken = new Set(registry.list().filter(r => r.folder.toLowerCase() === folder.toLowerCase()).map(r => r.name)); let n = 1; while (taken.has(String(n))) n++; return String(n); };
+	async function session(data: Record<string, unknown>) {
+		only(data, ["target", "action", "id", "name", "folder", "file"], "Invalid session fields.");
+		const id = typeof data.id === "string" ? data.id : "", name = typeof data.name === "string" ? data.name.trim() : "";
+		const known = () => { if (!registry.get(id)) throw fail(404, "Unknown session."); return id; };
+		switch (data.action) {
+			case "new": {
+				// A known group, or (New folder) an existing absolute folder, which starts its group.
+				const typed = typeof data.folder === "string" ? data.folder.trim().replace(/^"(.*)"$/, "$1") : "";
+				const folder = !typed ? undefined : registry.groups().find(group => group.folder.toLowerCase() === path.resolve(typed).toLowerCase())?.folder
+					?? (path.isAbsolute(typed) && statSync(typed, { throwIfNoEntry: false })?.isDirectory() ? path.resolve(typed) : undefined);
+				if (!folder) throw fail(404, "No such folder; enter the full path of an existing folder.");
+				return host.create(folder, name || nextName(folder));
+			}
+			case "rename": if (!name) throw fail(400, "Name required."); return host.rename(known(), name);
+			case "park": await host.park(known()); return { ok: true };
+			case "resume": await host.resume(known()); return { ok: true };
+			case "reload": await host.restart(known()); return { ok: true };
+			case "terminal": await host.openTerminal(known()); return { ok: true };
+			case "star": {
+				const recent = (await scanRecents(registry)).find(item => item.file === data.file);
+				if (!recent) throw fail(404, "That session is no longer recent.");
+				return star(registry, recent, name || nextName(recent.cwd));
+			}
+			case "unstar":
+				if (host.live.has(known())) throw fail(409, "Park the session first.");
+				registry.remove(id); unseen.delete(id); return { ok: true }; // the session file stays (D18)
+		}
+		throw fail(400, "Unknown session action.");
+	}
+
+	async function get(id: string, endpoint: string, params: URLSearchParams, response: http.ServerResponse): Promise<unknown> {
+		switch (endpoint) {
+			case "plans": {
+				const plans = await listPlans(folder(id)), now = current(id, plans);
+				const open = plans.filter(plan => plan.status !== "complete").sort((a, b) => String(b.updated ?? b.created ?? "").localeCompare(String(a.updated ?? a.created ?? "")));
+				return { current: now?.id ?? null, plans: open.map(plan => ({ id: plan.id, title: plan.title, done: plan.done, total: plan.total })) };
+			}
+			case "diagram": {
+				const { target, resolved } = await resolve(id, params.get("target"));
+				return { target, diagram: loadDiagram(folder(id), resolved) ?? emptyDiagram(resolved) };
+			}
+			case "files": return listFiles(folder(id));
+			case "file": case "diff":
+				try { return await (endpoint === "file" ? readProjectFile : readProjectDiff)(folder(id), params.get("path")); }
+				catch (error) { throw error instanceof FileRefused ? fail(403, error.message) : error; }
+			case "image": {
+				const image = params.has("path") ? await readLinkedImage(params.get("path"), folder(id)) : await readPastedImage(params.get("name"));
+				response.writeHead(200, { "content-type": image.type, "cache-control": "private, max-age=86400" });
+				response.end(image.bytes);
+				return undefined;
+			}
+			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
+			case "sessions": return sessions();
+			case "models": case "usage": case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
+		}
+		throw fail(404, "Unknown workspace endpoint.");
+	}
+
+	async function post(id: string, endpoint: string, data: Record<string, unknown>): Promise<unknown> {
+		switch (endpoint) {
+			case "session": return session(data);
+			case "message":
+				// RPC has no reload; D12: Reload is park + resume (idle only).
+				if (typeof data.text === "string" && /^\/(wo )?reload$/.test(data.text.trim())) { await host.restart(id); return { ok: true }; }
+				return call(id, "/api/message", data);
+			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
+			case "stop": {
+				only(data, ["target"], "Invalid Stop fields.");
+				await host.live.get(id)?.rpc.send({ type: "abort" });
+				return { ok: true };
+			}
+			case "model": {
+				only(data, ["target", "provider", "id"], "Invalid model fields.");
+				const live = host.live.get(id);
+				if (!live) throw fail(409, "Session is parked; resume it first.");
+				const models: { provider: string; id: string }[] = (await live.rpc.send({ type: "get_available_models" })).data?.models ?? [];
+				if (!models.some(model => model.provider === data.provider && model.id === data.id)) throw fail(404, "That model is not available in this session.");
+				const set = await live.rpc.send({ type: "set_model", provider: data.provider, modelId: data.id });
+				if (!set.success) throw fail(409, set.error ?? `No credentials for ${data.provider}/${data.id}.`);
+				return publishStatus(id);
+			}
+			case "effort": {
+				only(data, ["target", "level"], "Invalid effort level.");
+				if (!EFFORTS.includes(data.level as string)) throw fail(400, "Invalid effort level.");
+				const live = host.live.get(id);
+				if (!live) throw fail(409, "Session is parked; resume it first.");
+				await live.rpc.send({ type: "set_thinking_level", level: data.level });
+				return publishStatus(id); // the model may clamp the level
+			}
+			case "answer": {
+				only(data, ANSWER_FIELDS, "Invalid answer fields.");
+				// First answer wins: a second tab (or a closed ask) gets accepted: false, as ce-workflow's dialogs.answer.
+				const dialog = openDialog(id, data.askId);
+				if (!dialog || !host.respond(id, dialog.id as string, toResponse(dialog, data))) return { accepted: false };
+				views.get(id)?.publish("dialog_closed", { askId: dialog.id });
+				return { accepted: true };
+			}
+		}
+		throw fail(404, "Unknown workspace endpoint.");
+	}
+
+	// Live frames ce-workflow's own server sent: status after runs and mode changes, Pi's plan, changed diagrams.
+	host.on("event", (id: string, event: RpcRecord) => {
+		if (event.type !== "agent_settled") return;
+		if (!views.get(id)?.clients.size) unseen.add(id);
+		if (views.has(id)) void publishStatus(id).catch(() => {});
+	});
+	host.on("closed", (id: string, requestId: string) => views.get(id)?.publish("dialog_closed", { askId: requestId }));
+	host.on("ui", (id: string, request: RpcRecord) => {
+		const view = views.get(id), form = view && toForm(request);
+		if (form) view.publish("dialog", form);
+		if (!view || request.method !== "setStatus") return;
+		if (request.statusKey === "pi-hub:state") {
+			const state = parse(request.statusText);
+			if (state?.plan) view.publish("plan", state.plan);
+			void publishStatus(id).catch(() => {});
+		}
+		if (request.statusKey === "pi-hub:diagram") void (async () => {
+			const { target, resolved } = await resolve(id, parse(request.statusText)?.target);
+			view.publish("diagram", { target, diagram: loadDiagram(folder(id), resolved) ?? emptyDiagram(resolved) });
+		})().catch(() => {}); // a plan deleted meanwhile: nothing to show
+	});
+
+	return { get, post, extras, forms, saveImage: savePastedImage };
+}
