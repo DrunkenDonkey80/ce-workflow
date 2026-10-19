@@ -446,9 +446,14 @@ function messagesFrom(preparation) {
 	return [...summarized, ...prefix];
 }
 
-// pi-subagents 0.76.1 / pi-intercom 0.16.1 wake an idle session with these user prompts.
+// Idle-wake user prompts: pi-subagents 0.76.1, its 0.77+ PARENT_WAKE_TEXT (old sessions keep the old one), pi-intercom 0.16+.
+const WAKE_PROMPTS = [
+	"Subagent updates above.",
+	"Inspect subagent updates above. Answer pending supervisor requests within your authority. For completed work, read saved results and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization.",
+	"New intercom message above.",
+];
 export const syntheticWakePrompt = (value) =>
-	["Subagent updates above.", "New intercom message above."].includes(
+	WAKE_PROMPTS.includes(
 		String(value ?? "").trim(),
 	);
 

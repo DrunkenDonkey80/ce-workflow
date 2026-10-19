@@ -336,6 +336,8 @@ for (let generation = 0; generation < 5; generation += 1) {
 	);
 }
 
+// pi-subagents 0.77+ PARENT_WAKE_TEXT (src/shared/parent-wake.js).
+const SUBAGENT_WAKE_0_77 = "Inspect subagent updates above. Answer pending supervisor requests within your authority. For completed work, read saved results and resume the already-authorized parent task, or report completion. If approval is required, explicitly ask the user. Do not silently yield, rerun completed work, or infer new authorization.";
 const machineFiltered = formatCompactionSummary({
 
 	preparation: {
@@ -352,6 +354,7 @@ const machineFiltered = formatCompactionSummary({
 				role: "user",
 				content: "New intercom message above.",
 			},
+			{ role: "user", content: SUBAGENT_WAKE_0_77 },
 			{ role: "user", content: "Compaction is complete. Resume the parent task now" },
 			{
 				role: "custom",
@@ -368,7 +371,7 @@ assert.match(
 );
 assert.doesNotMatch(
 	machineFiltered,
-	/Subagent updates above|New intercom message above|Compaction is complete|STALE-KNOWLEDGE-MUST-NOT-RECUR/,
+	/Subagent updates above|Inspect subagent updates|New intercom message above|Compaction is complete|STALE-KNOWLEDGE-MUST-NOT-RECUR/,
 );
 
 let pinnedHuman = "";
@@ -620,6 +623,7 @@ assert.equal(calls, beforeCancel + 1, "user cancellation must not retry on the c
 const wakeRequests = gather([
 	{ role: "user", content: "Subagent updates above." },
 	{ role: "user", content: [{ type: "text", text: " New intercom message above.\n" }] },
+	{ role: "user", content: SUBAGENT_WAKE_0_77 },
 	{ role: "user", content: "Fix the parser." },
 	{ role: "user", content: "Subagent updates above. Summarize them for me." },
 ], [], "wake").filter(r => r.kind === "user-request").map(r => r.text);
