@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Live guard test: small task completes, then a microcompact must do the
-// compaction and NOTHING more. Reproduces the real replay path — pi-subagents
-// emits its resume message with pi.sendMessage(..., {triggerTurn:true}), which
-// calls _runAgentPrompt directly and never emits before_agent_start.
+// compaction and NOTHING more. pi-subagents' own post-compaction resume is not
+// replayed: it owns that wake (plan ffd99fd1, D1).
 // Delayed discovery notices use a synthetic owned run: production auto-discovery
 // is retired. The single module instance below exercises its dormant ownership
 // guard through real host events, with positive and unknown-child controls.
@@ -60,7 +59,7 @@ writeFileSync(
 		workKnowledge: { discoverer: { model: "__inherit_model__", thinking: "low" } },
 	}),
 );
-// Replay both the immediate resume and delayed internal failure/control notices.
+// Replay delayed internal failure/control notices.
 // The RPC stub records a discoverer identity without launching any child/model.
 writeFileSync(
 	path.join(cwd, "resume-stub.js"),
@@ -92,14 +91,6 @@ export default function resumeStub(pi) {
 		// the real launcher and local RPC stub; no child or provider is launched.
 		await launchKnowledgeDiscoverer(pi, ctx, [{ role: "user", content: "Synthetic fixture evidence for delayed notices." }]);
 		writeFileSync(${JSON.stringify(path.join(cwd, "stub-fired"))}, "1");
-		pi.sendMessage(
-			{
-				customType: "subagent-compaction-resume",
-				content: "Compaction is complete. Resume the parent task now; background subagent results will arrive separately when ready.",
-				display: false,
-			},
-			{ triggerTurn: true },
-		);
 		const failure = "Subagent failed: delegate\\nRun: " + runId + " step 1\\nSignal: delegate completed without making edits for an implementation task";
 		const messages = [
 			{ customType: "subagent_control_notice", content: failure, details: { event: { runId, reason: "completion_guard" } } },
@@ -233,8 +224,8 @@ try {
 	for (let index = 0; index < 3; index++)
 		if (!existsSync(path.join(cwd, `notice-fired-${index}`)))
 			fail(`delayed internal notice ${index} was not delivered`);
-	// The guard aborts the resume turn before the provider request, so an empty
-	// aborted assistant message is fine; any streamed text or tool call is not.
+	// The guard aborts internal-notice turns before the provider request, so an
+	// empty aborted assistant message is fine; any streamed text or tool call is not.
 	const after = events.slice(
 		events.findIndex((event) => event.type === "compaction_end"),
 	);

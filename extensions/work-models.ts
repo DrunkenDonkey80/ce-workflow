@@ -271,12 +271,10 @@ let forcedUltracompact = false;
 let pendingPromptBackedAgentStart = false;
 let activePromptBackedAgent = false;
 let hideKnowledgeCompletionAbort = false;
-let hideCompactionResumeAbort = false;
 
 let sessionCwd; // Completions get no ctx; session_start records the project for checkout-only /wo entries.
 const maintenanceCheckout = (cwd = sessionCwd ?? process.cwd()) => sameCheckout(cwd, WORKFLOW_REPO_DIR);
 
-let blockedCompactionResumeTurn = false;
 let blockedInternalBackgroundCompletionTurn = false;
 let internalBackgroundWakeEligible = false;
 let pendingInternalBackgroundCompletionPrompt = null;
@@ -2259,15 +2257,6 @@ function maybeCompact(ctx, settings) {
 		: runNativeMicrocompact(ctx);
 }
 
-function isCompactionResumePrompt(value) {
-	// Multiline: the resume line can arrive on its own line after a compaction
-	// summary. Anchoring to the start of the whole prompt missed those and let
-	// an idle microcompact spend a full model turn.
-	return /^Compaction is complete\. Resume the parent task now\b/m.test(
-		contentText(value).trim(),
-	);
-}
-
 function requestMicrocompact(ctx) {
 	if (contextCompactState.inFlight || boundaryCompactionRequested) {
 		ctx.ui.notify("Microcompaction is already in progress", "info");
@@ -3705,13 +3694,6 @@ showResearchContext(ctx);
 });
 
 	pi.on("input", async (event, ctx) => {
-
-		if (
-			isCompactionResumePrompt(event.text)
-		) {
-			ctx.ui.notify("Compaction completed", "info");
-			return { action: "handled" };
-		}
 		const coldCache = await offerColdCacheCompact(event, ctx, pi);
 		if (coldCache) return coldCache;
 		return;
@@ -3719,7 +3701,6 @@ showResearchContext(ctx);
 	});
 
 	pi.on("before_agent_start", (event) => {
- blockedCompactionResumeTurn = isCompactionResumePrompt(event.prompt);
  blockedInternalBackgroundCompletionTurn = Boolean(pendingInternalBackgroundCompletionPrompt && contentText(event.prompt).trim() === pendingInternalBackgroundCompletionPrompt);
  pendingInternalBackgroundCompletionPrompt = null;
  pendingPromptBackedAgentStart = true;
@@ -3741,10 +3722,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 		}
 });
 
-	// pi-subagents sends its compaction-resume message with
-	// pi.sendMessage(..., { triggerTurn: true }), which calls _runAgentPrompt
-	// directly and never emits before_agent_start. Arm the same guard here so an
-	// idle microcompact cannot spend a model turn.
+	// An internal knowledge notice delivered to an idle session must not start a model turn.
 	pi.on("message_start", (event) => {
 		const role = event?.message?.role;
 		if (role !== "custom" && role !== "user") return;
@@ -3755,9 +3733,6 @@ if (blockedInternalBackgroundCompletionTurn) {
 		} else if (internalBackgroundWakeEligible) {
 			blockedInternalBackgroundCompletionTurn = true;
 		}
-		if (blockedCompactionResumeTurn) return;
-		if (!isCompactionResumePrompt(event.message.content)) return;
-		blockedCompactionResumeTurn = true;
 	});
 
 	pi.on("before_provider_request", async (event, ctx) => {
@@ -3769,11 +3744,6 @@ if (blockedInternalBackgroundCompletionTurn) {
 			ctx.abort();
 			return event.payload;
 		}
-		if (!blockedCompactionResumeTurn) return event.payload;
-		blockedCompactionResumeTurn = false;
-		hideCompactionResumeAbort = true;
-		ctx.ui.notify("Compaction completed; no work resumed", "info");
-		ctx.abort();
 		return event.payload;
 	});
 
@@ -3890,11 +3860,9 @@ if (blockedInternalBackgroundCompletionTurn) {
 	pi.on("agent_settled", async (_event, ctx) => {
 
 		activePromptBackedAgent = false;
-		blockedCompactionResumeTurn = false;
 		blockedInternalBackgroundCompletionTurn = false;
 		pendingInternalBackgroundCompletionPrompt = null;
 		hideKnowledgeCompletionAbort = false;
-		hideCompactionResumeAbort = false;
 		if (researchContext?.stopping && ctx.isIdle?.() !== false &&
 			!ctx.hasPendingMessages?.() && !contextCompactState.inFlight) {
 			setResearchContext(ctx, false);
@@ -3953,17 +3921,12 @@ if (blockedInternalBackgroundCompletionTurn) {
 			contextCompactState.inFlight &&
 			contextCompactState.owner === "ce-workflow" &&
 			isEmptyAbort;
-		const hideCompactionResumeAbortMessage =
-			hideCompactionResumeAbort && isEmptyAbort;
 		if (
-			(hideKnowledgeCompletionAbort ||
-				hideCompactionAbort ||
-				hideCompactionResumeAbortMessage) &&
+			(hideKnowledgeCompletionAbort || hideCompactionAbort) &&
 			event.message?.role === "assistant" &&
 			event.message.stopReason === "aborted"
 		) {
 			if (hideKnowledgeCompletionAbort) hideKnowledgeCompletionAbort = false;
-			if (hideCompactionResumeAbortMessage) hideCompactionResumeAbort = false;
 			const { errorMessage: _errorMessage, ...message } = event.message;
 			const replacement = { ...message, stopReason: "stop" };
 

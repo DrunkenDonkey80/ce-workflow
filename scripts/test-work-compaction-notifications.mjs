@@ -295,6 +295,18 @@ try {
 		busyBefore,
 		"internal guard cannot leak into a later user request",
 	);
+	// D1: pi-subagents owns the post-compaction resume; ce-workflow neither handles, aborts nor hides it.
+	await hooks.agent_settled({}, ctx);
+	const resumeText = "Compaction is complete. Resume the parent task now from the summary above.";
+	const resumeInput = await hooks.input({ text: resumeText, source: "extension" }, ctx);
+	assert.notEqual(resumeInput?.action, "handled", "the input hook leaves the compaction resume alone");
+	const resumeBefore = aborts;
+	await hooks.message_start({ message: { role: "custom", customType: "subagent-compaction-resume", content: resumeText } }, ctx);
+	await hooks.before_provider_request({ payload: {} }, ctx);
+	assert.equal(aborts, resumeBefore, "a post-compaction resume turn is not aborted");
+	const abortedResume = { role: "assistant", content: [], stopReason: "aborted", errorMessage: "This operation was aborted" };
+	assert.equal((await hooks.message_end({ message: abortedResume }, ctx))?.message, undefined, "an aborted resume reply is not rewritten to stop");
+	await hooks.agent_settled({}, ctx);
 	assert.equal(
 		launch.agent,
 		"context-knowledge-discoverer",
