@@ -164,7 +164,7 @@ function setCompact(on: boolean) {
  for (const id of ["chat-compact", "chat-compact-m"]) $(id).setAttribute("aria-pressed", String(on));
  try { localStorage.setItem("plan3-chat", on ? "compact" : "expanded"); } catch {}
 }
-for (const id of ["chat-compact", "chat-compact-m"]) $(id).addEventListener("click", () => { setCompact(!document.documentElement.classList.contains("chat-compact")); pinChat(); });
+for (const id of ["chat-compact", "chat-compact-m"]) $(id).addEventListener("click", () => { setCompact(!document.documentElement.classList.contains("chat-compact")); pinChat(); fillChat(); });
 setCompact(remembered("plan3-chat", ["compact", "expanded"], "expanded") === "compact");
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
 const mobileViews = ["chat", "files", "project", "plan"];
@@ -518,31 +518,45 @@ const pinChat = () => { const list = $("feed"); if (stick) list.scrollTop = list
 // Only moving up unpins: a late scroll event after content grew below finds the list off the end without the reader moving.
 let lastTop = 0;
 $("feed").addEventListener("scroll", () => { const list = $("feed"); if (atBottom(list)) stick = true; else if (list.scrollTop < lastTop - 2) stick = false; lastTop = list.scrollTop; if (stick) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
-new ResizeObserver(pinChat).observe($("feed"));
+new ResizeObserver(() => { pinChat(); fillChat(); }).observe($("feed"));
 $("feed").addEventListener("load", pinChat, true);
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
 // Opening a thinking/tool block of an excerpt row loads its bodies.
 $("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); const row = chat.get(item?.dataset.id); if ((event.target as HTMLDetailsElement).open && (row?.excerpt || row?.brief)) void loadRow(item.dataset.id); }, true);
 let loadingEarlier = false;
+// Load earlier rows until the chat fills its view: compact mode can hide every row of a page, leaving nothing to scroll.
+// shortcut: a turn with hundreds of tool rows costs one 20-row request each; a server-side compact page if that drags.
+const fillChat = () => { const feed = $("feed"); if (state.more && !loadingEarlier && feed.clientHeight && feed.scrollHeight <= feed.clientHeight + 48) void loadEarlier(); };
 async function loadEarlier() {
- if (loadingEarlier) return; loadingEarlier = true;
+ if (loadingEarlier) return; loadingEarlier = true; let loaded = false;
  try {
   const first = chat.keys().next().value, page = await get("rows" + (first ? "?before=" + encodeURIComponent(first) : ""));
   const rows = [...page.rows, ...chat.values()]; chat.clear(); for (const row of rows) chat.set(row.id, row);
-  state.more = page.more; const list = $("feed"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height;
- } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; }
+  state.more = page.more; const list = $("feed"), height = list.scrollHeight; renderChat(); list.scrollTop += list.scrollHeight - height; loaded = true;
+ } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; if (loaded) fillChat(); }
 }
 $("to-bottom").addEventListener("click", () => toBottom());
 // Final replies fetched in full once each (a failed fetch is not retried on every render).
 const finalLoads = new Set<string>();
 function renderChat() {
  const list = $("messages"), feed = $("feed"), follow = stick;
- const encoder = new TextEncoder();
- while (chat.size > 100 || [...chat.values()].reduce((bytes, row) => bytes + encoder.encode(row.text).length, 0) > 512000) chat.delete(chat.keys().next().value);
- for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
  // The final reply of a turn: the last agent row with text before the next prompt; it shows in full and stands out.
  const rows = [...chat.values()], finals = new Set<string>();
  rows.forEach((row, index) => { if (row.role !== "assistant" || !row.text.trim()) return; const next = rows.slice(index + 1).find(other => other.role === "user" || (other.role === "assistant" && other.text.trim())); if (!next || next.role === "user") finals.add(row.id); });
+ // Keep the newest 100 shown rows (compact: prompts and final replies) and 512 KB of their text. Only while following the
+ // end: rows the reader loaded by scrolling up stay. Trimmed rows load again on scroll.
+ if (stick) {
+  const compact = document.documentElement.classList.contains("chat-compact"), encoder = new TextEncoder();
+  let shown = 0, bytes = 0, keep = rows.length;
+  for (; keep > 0; keep--) {
+   const row = rows[keep - 1];
+   if (!compact || row.role === "user" || finals.has(row.id)) { shown++; bytes += encoder.encode(row.text).length; }
+   if (shown > 100 || bytes > 512000 || rows.length - keep >= 3000) break;
+  }
+  for (const row of rows.splice(0, keep)) chat.delete(row.id);
+  if (keep) state.more = true;
+ }
+ for (const item of list.querySelectorAll<HTMLLIElement>(":scope > li")) if (!chat.has(item.dataset.id)) item.remove();
  let previous: HTMLLIElement | null = null;
  for (const row of chat.values()) {
   let item = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].find(item => item.dataset.id === row.id);
@@ -563,6 +577,7 @@ function renderChat() {
  }
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
  if (follow) feed.scrollTop = feed.scrollHeight; else if (feed.scrollHeight > feed.clientHeight) $("to-bottom").hidden = false;
+ fillChat();
 }
 // Image and Markdown paths in chat text become links: images open full size and show as thumbnails
 // (pasted or terminal Alt+V images too); .md opens in the Files tab. The server shows any image on this PC outside hidden folders.

@@ -741,6 +741,17 @@ try {
  await browser("click", "#zoom-fit");
  assert(await evaluate("document.querySelectorAll(\"[data-node]\").length > 0"), "whole-product sample renders");
  const errors = await browser("errors"); assert.deepEqual(errors.errors ?? [], [], "browser JavaScript must run under the strict CSP");
+ // A long tool-only turn fills the first 20-row page with hidden rows; compact keeps loading until the earlier prompt shows.
+ // Pi-shaped events go through the hub's chat mirror, so the reloaded page gets them as pages.
+ await evaluate("localStorage.setItem(\"plan3-chat\", \"compact\")");
+ const view = hub.views.get(id), t0 = Date.now();
+ view.emit("message_end", { message: { role: "user", timestamp: t0, content: [{ type: "text", text: "Earlier question" }] } });
+ for (let n = 1; n <= 25; n++) view.emit("message_end", { message: { role: "assistant", timestamp: t0 + n, content: [{ type: "toolCall", id: "tl" + n, name: "bash", arguments: {} }] } });
+ view.emit("message_end", { message: { role: "assistant", timestamp: t0 + 30, content: [{ type: "text", text: "Long turn done" }] } });
+ await browser("reload");
+ await browser("wait", "--fn", "document.documentElement.classList.contains(\"chat-compact\")");
+ await browser("wait", "--fn", "[...document.querySelectorAll(\"#messages li\")].some(item => item.textContent.includes(\"Earlier question\") && item.offsetParent)");
+ await evaluate("localStorage.setItem(\"plan3-chat\", \"expanded\")");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});
