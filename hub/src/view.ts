@@ -2,7 +2,7 @@
 // instead of extension hooks. History comes from get_messages; chat older than the last compaction from the JSONL (F3).
 import { readFile } from "node:fs/promises";
 import type { ServerResponse } from "node:http";
-import { createActivityMirror } from "pi-work-orchestrator/extensions/plan3-web.ts";
+import { createActivityMirror } from "../../extensions/plan3-web.ts";
 import { checkIn, createChatMirror } from "./chat.ts";
 import type { RpcRecord } from "./rpc-client.ts";
 

@@ -2,7 +2,7 @@
 import { execFile } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { captureSource, forbiddenPath, safePath, secret } from "pi-work-orchestrator/extensions/jev-tools.ts";
+import { captureSource, forbiddenPath, safePath, secret } from "../../extensions/jev-tools.ts";
 
 // D11/D21: read-only project files for the browser Files tab. Hidden paths, secrets and binaries never leave.
 const MAX_FILES = 5000, DIFF_BYTES = 262_144;

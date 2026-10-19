@@ -4,7 +4,7 @@ import rough from "./vendor/rough.js?token=__TOKEN__";
 // @ts-ignore Browser-only module URL.
 import { layout, routeEdges } from "./layout.js?token=__TOKEN__";
 
-import type { Diagram } from "../../ce-workflow/extensions/plan3-diagram.ts";
+import type { Diagram } from "../../extensions/plan3-diagram.ts";
 const NS = "http://www.w3.org/2000/svg";
 export function element<K extends keyof SVGElementTagNameMap>(tag: K, attributes = {}, text = undefined) {
  const node = document.createElementNS(NS, tag);

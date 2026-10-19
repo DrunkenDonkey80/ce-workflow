@@ -4,7 +4,7 @@
 // drag reorders the grid instead of dropping a box on top of others. Edges are routed orthogonally
 // around boxes by A* over a sparse grid of box-side coordinates, with ports spread along each side.
 // Browser asset (D23); node tests import it directly.
-import type { Diagram, DiagramNode } from "../../ce-workflow/extensions/plan3-diagram.ts";
+import type { Diagram, DiagramNode } from "../../extensions/plan3-diagram.ts";
 export type Box = { x: number; y: number; w: number; h: number };
 export type Point = [number, number];
 export const NODE = { w: 168, h: 64 };

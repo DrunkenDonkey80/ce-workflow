@@ -10,7 +10,7 @@ import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyDiagramOperations, toolbarEdit } from "pi-work-orchestrator/extensions/plan3-diagram.ts";
+import { applyDiagramOperations, toolbarEdit } from "../../extensions/plan3-diagram.ts";
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `hub-ui-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
@@ -91,8 +91,8 @@ function stub(endpoint, body) {
 }
 const relay = http.createServer((request, response) => {
  let text = ""; request.on("data", chunk => text += chunk); request.on("end", () => {
-  const { endpoint, data } = JSON.parse(text); let result;
-  try { result = { ok: true, value: stub(endpoint, data) }; } catch (error) { result = { ok: false, status: error.status ?? 500, error: error.message }; }
+  let result;
+  try { const { endpoint, data } = JSON.parse(text); result = { ok: true, value: stub(endpoint, data) }; } catch (error) { result = { ok: false, status: error.status ?? 500, error: error.message }; }
   response.end(JSON.stringify(result));
  });
 });
@@ -106,7 +106,7 @@ const own = await hub.host.create(folder, "1"), id = own.id, rpc = () => hub.hos
 const publish = (event, value) => hub.views.get(id)?.publish(event, value);
 const api = async route => (await fetch(`${origin}/s/${id}/api/${route}`, { headers: { authorization: `Bearer ${hub.config.localKey}` } })).json();
 // Fake Pi's ask answers come back as notify "answer:<value>".
-hub.host.on("ui", (sessionId, request) => { if (sessionId === id && request.method === "notify" && String(request.message).startsWith("answer:")) { const value = request.message.slice(7); answers.push(value === "<cancelled>" ? { cancelled: true } : JSON.parse(value)); } });
+hub.host.on("ui", (sessionId, request) => { if (sessionId === id && request.method === "notify" && String(request.message).startsWith("answer:")) { const value = request.message.slice(7); try { answers.push(value === "<cancelled>" ? { cancelled: true } : JSON.parse(value)); } catch { answers.push({ invalid: value }); } } });
 const ask = (value, ms = 0) => { void rpc().send({ type: "prompt", message: `/hubask ${ms} ${JSON.stringify(value)}` }).catch(() => {}); };
 await rpc().send({ type: "prompt", message: "/state " + JSON.stringify({ plan: { id: "12345678", title: sample.title, status: "draft", done: 2, total: 5, focus: "S03", bias: 0 }, modes: { research: "off", night: "off" } }) });
 let status = (await api("snapshot")).status;

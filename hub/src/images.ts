@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { forbiddenPath } from "pi-work-orchestrator/extensions/jev-tools.ts";
+import { forbiddenPath } from "../../extensions/jev-tools.ts";
 
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 const IMAGE_BYTES = 20_000_000;

@@ -131,6 +131,14 @@ for (const script of tests) {
 	}
 }
 
+// The hub (hub/) imports ce-workflow's modules, so its suite runs with the package's.
+try {
+	execFileSync(process.execPath, ["--test", "scripts/test-*.mjs"], { cwd: path.join(root, "hub"), stdio: quiet ? "pipe" : "inherit" });
+	check("hub tests pass", true);
+} catch (error) {
+	check("hub tests pass", false, error instanceof Error ? error.message : String(error));
+}
+
 if (failures.length) {
 	process.stderr.write(`\n${failures.length} verification check(s) failed:\n`);
 	for (const failure of failures) process.stderr.write(`- ${failure}\n`);

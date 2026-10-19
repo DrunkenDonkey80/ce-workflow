@@ -16,6 +16,7 @@
     "extensions/",
     "scripts/",
     "skills/",
+    "hub/",
     "README.md"
   ],
   "scripts": {

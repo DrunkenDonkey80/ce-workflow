@@ -5,7 +5,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { saveDiagram } from "pi-work-orchestrator/extensions/plan3-diagram.ts";
+import { saveDiagram } from "../../extensions/plan3-diagram.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-api-"));
 process.env.PI_CODING_AGENT_DIR = root;

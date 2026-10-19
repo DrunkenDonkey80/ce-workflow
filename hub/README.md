@@ -11,18 +11,20 @@ session runs in):
 
 ## Use
 
-Install the `pi-hub` command once from this folder with `npm link`.
+In Pi, `/wo hub` shows the hub's status and addresses with Install, Start, Open, Restart and remote/login options
+(Windows and Linux; Node 24+). `/wo hub <command>` runs any command below. From a terminal: `node hub/src/cli.ts install`.
 
-`pi-hub start | stop [--force] | restart | update [--yes] | status | open | new [folder] [name] | remote on|off | autostart on|off|status`
+`pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | remote on|off | autostart on|off|status`
+
+- `install` adds the `pi-hub` command (`npm link`, best effort), starts the hub at login and starts it now.
 
 - `update` stops the hub, runs `pi update --all` (Pi and extensions) and starts it again with the sessions that were running. It refuses while a session is busy (never interrupts) and warns about Pi windows outside the hub, which keep the old version and can lock extension files.
 - The ⚙ button on the page has Restart hub (same busy rule as `restart`), so the phone can do it too.
 - `start` runs the hub; `open` opens its page on this PC; `new` adds a folder's first session (later ones from the page).
 - `remote on` adds a tailnet-only `tailscale serve` on the hub's port (never Funnel); new devices pair with a code approved on the hub page → Devices.
-- `autostart on` starts the hub at Windows logon (per-user Run key, no admin rights).
+- `autostart on` starts the hub at login: Windows per-user Run key (no admin rights), Linux `~/.config/autostart` (desktop logins).
 - The hub shows only sessions it started. "Open in terminal" parks a session and hands it to a plain console Pi; the hub takes it back when that Pi exits. Nothing depends on herdr.
 
 ## Development
 
-Node 24 and ce-workflow checked out next to this folder (`../ce-workflow`; the hub imports its
-Pi-free modules through a `file:` dependency), then `npm install`. `npm test` runs `scripts/test-*.mjs`; `scripts/fake-pi.mjs` stands in for `pi --mode rpc`.
+Node 24; no install step of its own (ce-workflow's `npm install` covers the imported modules). `npm test` runs `scripts/test-*.mjs`; `scripts/fake-pi.mjs` stands in for `pi --mode rpc`.

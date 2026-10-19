@@ -1,6 +1,6 @@
 // Browser-only source; the server strips erasable types without a build step.
-import type { Diagram } from "../../ce-workflow/extensions/plan3-diagram.ts";
-import type { createActivityMirror } from "../../ce-workflow/extensions/plan3-web.ts";
+import type { Diagram } from "../../extensions/plan3-diagram.ts";
+import type { createActivityMirror } from "../../extensions/plan3-web.ts";
 // @ts-ignore Browser URL includes the workspace token.
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// pi-hub start | stop [--force] | restart | update [--yes] | status | open | new [folder] [name] | remote on|off | autostart on|off|status
-import { mkdirSync, openSync, readFileSync } from "node:fs";
-import { execFileSync, spawn } from "node:child_process";
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | remote on|off | autostart on|off|status
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, execSync, spawn } from "node:child_process";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hubDataDir, readSessionSummary } from "./registry.ts";
@@ -35,11 +36,24 @@ const remoteLine = (remote: { on: boolean; url?: string; missing?: string[]; err
 // H6-04: start at Windows logon through the per-user Run key (no admin rights); conhost --headless hides the console
 // window, and `start` logs to <data>/hub.log. PI_HUB_RUN_KEY only redirects the key for tests.
 const RUN_KEY = process.env.PI_HUB_RUN_KEY || "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const CLI = fileURLToPath(new URL("./cli.ts", import.meta.url));
+// shortcut: XDG autostart runs only with a desktop login; a headless Linux box needs a systemd user unit instead.
+const DESKTOP_FILE = path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "autostart", "pi-control-hub.desktop");
 function autostart(action: string) {
-	if (process.platform !== "win32") throw new Error("autostart is Windows only for now; add pi-hub start to your login items.");
+	if (process.platform === "linux") {
+		if (action === "on") {
+			mkdirSync(path.dirname(DESKTOP_FILE), { recursive: true });
+			writeFileSync(DESKTOP_FILE, `[Desktop Entry]\nType=Application\nName=Pi control hub\nExec="${process.execPath}" "${CLI}" start\nNoDisplay=true\nX-GNOME-Autostart-enabled=true\n`);
+			return `Autostart on: the hub starts at desktop login (${DESKTOP_FILE}). Log: ${path.join(hubDataDir(), "hub.log")}`;
+		}
+		if (action === "status") return existsSync(DESKTOP_FILE) ? `Autostart on: ${DESKTOP_FILE}` : "Autostart off.";
+		rmSync(DESKTOP_FILE, { force: true });
+		return "Autostart off.";
+	}
+	if (process.platform !== "win32") throw new Error("autostart is Windows and Linux only; add pi-hub start to your login items.");
 	const reg = (...args: string[]) => execFileSync("reg", args, { encoding: "utf8", stdio: "pipe", windowsHide: true });
 	if (action === "on") {
-		const command = `conhost.exe --headless "${process.execPath}" "${fileURLToPath(new URL("./cli.ts", import.meta.url))}" start`;
+		const command = `conhost.exe --headless "${process.execPath}" "${CLI}" start`;
 		reg("add", RUN_KEY, "/v", "pi-control-hub", "/t", "REG_SZ", "/d", command, "/f");
 		return `Autostart on: the hub starts hidden at logon. Log: ${path.join(hubDataDir(), "hub.log")}`;
 	}
@@ -96,14 +110,38 @@ async function update(yes: boolean) {
 		}
 	}
 	if (running) await stop(false); // refuses if a session turned busy meanwhile
-	const [node, launcher] = defaultCommand();
-	try { execFileSync(node, [launcher, "update", "--all"], { stdio: "inherit" }); }
+	const [command, ...prefix] = defaultCommand();
+	try { execFileSync(command, [...prefix, "update", "--all"], { stdio: "inherit", shell: command === "pi" && process.platform === "win32" }); }
 	finally { if (running) await start(); }
+}
+
+const onPath = () => { try { execFileSync(process.platform === "win32" ? "where" : "which", ["pi-hub"], { stdio: "pipe", windowsHide: true }); return true; } catch { return false; } };
+
+/** What /wo hub shows: running or not, addresses, logon start and whether the pi-hub command exists. */
+async function statusJson() {
+	const running = marker(), config = readConfig();
+	let autostartOn = false; try { autostartOn = /^Autostart on/.test(autostart("status")); } catch { /* unsupported OS */ }
+	const base = { running: !!running, data: hubDataDir(), autostart: autostartOn, command: onPath() };
+	if (!running) return { ...base, remote: { on: config?.remote === true } };
+	const status = await call("/api/status");
+	return { ...base, pid: status.pid, local: `http://127.0.0.1:${status.port}/`, remote: status.remote, sessions: status.sessions.length, live: status.sessions.filter((s: { live: boolean }) => s.live).length, busy: status.sessions.filter((s: { busy: string[] }) => s.busy.length).length };
+}
+
+/** One step for a new PC: the pi-hub command (best effort), start at logon, start now. */
+async function install() {
+	try { execSync("npm link", { cwd: fileURLToPath(new URL("..", import.meta.url)), stdio: "pipe", windowsHide: true }); console.log("Command: pi-hub (works in new terminals)."); }
+	catch (error) { console.log(`pi-hub command not added (npm link failed: ${String((error as { stderr?: Buffer }).stderr ?? error).trim().split("\n").at(-1)}); /wo hub and node "${CLI}" still work.`); }
+	try { console.log(autostart("on")); } catch (error) { console.log((error as Error).message); }
+	await start();
+	const remote = (await call("/api/status")).remote;
+	console.log(remote.on ? remoteLine(remote) : "Remote access is off; turn it on for your phone (needs Tailscale).");
 }
 
 const [verb = "status", ...rest] = process.argv.slice(2);
 try {
-	if (verb === "start") await start();
+	if (verb === "install") await install();
+	else if (verb === "status" && rest.includes("--json")) console.log(JSON.stringify(await statusJson()));
+	else if (verb === "start") await start();
 	else if (verb === "stop") await stop(rest.includes("--force"));
 	else if (verb === "restart") { await stop(false); await start(); }
 	else if (verb === "update") await update(rest.includes("--yes"));
@@ -119,10 +157,17 @@ try {
 	} else if (verb === "open") {
 		const running = marker();
 		if (!running) throw new Error("The hub is not running; run pi-hub start.");
-		// The bare address opens a session page; the local key is the page's sign-in.
-		const url = `http://127.0.0.1:${running.port}/?token=${readConfig()!.localKey}`;
-		openInBrowser(url);
-		console.log(`http://127.0.0.1:${running.port}/`);
+		if (rest[0] === "remote") {
+			const remote = (await call("/api/status")).remote;
+			if (!remote.url) throw new Error(remoteLine(remote));
+			openInBrowser(remote.url);
+			console.log(remote.url);
+		} else {
+			// The bare address opens a session page; the local key is the page's sign-in.
+			const url = `http://127.0.0.1:${running.port}/?token=${readConfig()!.localKey}`;
+			openInBrowser(url);
+			console.log(`http://127.0.0.1:${running.port}/`);
+		}
 	} else if (verb === "new") {
 		// A folder's first session starts its group; later ones can be added on the page with +.
 		const folder = path.resolve(rest[0] ?? "."), sessions = (await call("/api/status")).sessions as { name: string; folder: string }[];
@@ -141,7 +186,7 @@ try {
 		}
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub start | stop [--force] | restart | update [--yes] | status | open | new [folder] [name] | remote on|off | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | remote on|off | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {
