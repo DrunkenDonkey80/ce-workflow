@@ -229,7 +229,7 @@ try {
 	const picks = [];
 	const panelCtx = { cwd, modelRegistry: registry, ui: { select: async (_title, labels) => { const want = picks.shift(); return want && labels.find(l => l.includes(want)); }, confirm: async () => true, notify() {} } };
 	const panel = scope => panelTools.panel(panelCtx, scope, () => structuredClone(scoped[scope]), (_cwd, next) => { scoped[scope] = next; });
-	picks.push("Jev tools"); await panel("global");
+	picks.push("Jev tools", "Yes"); await panel("global"); // enabling asks through askConfirm (a Yes/No list)
 	assert.equal(scoped.global.workOrchestrator.jev.enabled, true, "global toggle writes the global scope");
 	assert.deepEqual(scoped.project, {}, "project untouched");
 	assert.equal(jevStatus(effective(), registry).status, "Ready", "global on applies to a silent project");

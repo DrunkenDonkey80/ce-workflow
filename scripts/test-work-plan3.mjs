@@ -1792,12 +1792,13 @@ try {
 	const currentAudit = { preserve: ["Keyboard behavior and calculation flow"], reconsider: ["Spacing and navigation"], remove: ["Decorative chrome"], evidence: ["Fixture source inspection: src/ui/Dialog.tsx and tokens.css; not a real screenshot"] };
 	await designTool({ action: "prepare", brief: "Bright calculator. Preserve calculation behavior, keyboard focus, responsive layouts and reduced motion.", targets, components: productionMap, audit: currentAudit });
 	await assert.rejects(designTool({ action: "reference", referenceId: "unprovided", sourcePath: screenshot, reviewed: true, borrow: "shape", avoid: "branding" }), /Unknown reference/);
-	const oldImageInput = ctx.ui.input;
+	const oldImageInput = ctx.ui.input, oldAskSource = askSource;
 	ctx.ui.input = async () => screenshot;
+	askSource = undefined; // askText falls back to ui.input without a loaded ask_user
 	ctx.hasUI = true; ctx.mode = "rpc";
 	selectScript = [["Plan3 design", "Add supplied reference image"]];
 	await run("plan3", `design ${visualId}`);
-	ctx.ui.input = oldImageInput;
+	ctx.ui.input = oldImageInput; askSource = oldAskSource;
 	const referenceInputFile = path.join(cwd, ...designPointer(await readFile(visualFile, "utf8")).split("/"), "DESIGN-INPUT.json");
 	const reference = JSON.parse(await readFile(referenceInputFile, "utf8")).references[0];
 	assert.equal(reference.use, "inspiration-only; not a licensed production asset");
@@ -1808,12 +1809,12 @@ try {
 	if (process.platform === "win32") {
 		const beforeWindowEscape = execResult;
 		execResult = { code: 0, stdout: JSON.stringify([{ handle: 17, pid: 11, title: "Fixture app", width: 400, height: 300, visible: true, minimized: false }]) };
-		ctx.ui.input = async () => undefined;
+		ctx.ui.input = async () => undefined; askSource = undefined;
 		selectScript = [["Plan3 design", "Capture selected app window"], ["Select application window", "Fixture app"], ["Window capture region", "Window-relative crop"], ["Window capture region", null], ["Select application window", null], ["Plan3 design", null]];
 		await run("plan3", `design ${visualId}`);
 		assert.equal(selectScript.length, 0, "Escape from crop input/region/window returns to each immediate parent, not straight to root");
 		assert.equal(JSON.parse(await readFile(referenceInputFile, "utf8")).references.length, 1, "canceling capture creates no reference");
-		ctx.ui.input = oldImageInput;
+		ctx.ui.input = oldImageInput; askSource = oldAskSource;
 		execResult = beforeWindowEscape;
 	}
 	const copiedImage = path.join(path.dirname(referenceInputFile), ...reference.path.split("/"));
