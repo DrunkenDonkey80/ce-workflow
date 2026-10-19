@@ -1094,6 +1094,11 @@ $("hub-restart").addEventListener("click", async () => {
  if (!confirm("Restart the hub? Every session stops and starts again; nothing is lost.")) return;
  try { await post("hub", { action: "restart" }); showNotice("Hub restarting; the page reconnects by itself.", true); } catch (error) { showNotice(error.message); }
 });
+$("hub-update").addEventListener("click", async () => {
+ closeMenus(); setDrawer(false);
+ if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (herdr, terminals) keeps the old version until restarted.")) return;
+ try { await post("hub", { action: "update" }); showNotice("Updating Pi and extensions; the page reconnects when the hub is back (a minute or two).", true); } catch (error) { showNotice(error.message); }
+});
 $("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested.", true); } catch (error) { showNotice(error.message); } });
 
 // The server starts every connection with a fresh full snapshot. Native EventSource stops for good on an HTTP error

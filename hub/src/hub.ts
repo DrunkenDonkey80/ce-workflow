@@ -218,12 +218,13 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 				const data = await body(request, PAGE_BODY);
 				if (!data || typeof data !== "object" || Array.isArray(data)) return send(400, { error: "Expected a JSON object." });
 				if (endpoint === "hub") {
-					// A process cannot restart itself: a detached `pi-hub restart` stops this hub (D17 busy rule) and starts a new one.
-					if (data.action !== "restart") return send(400, { error: "Unknown hub action." });
+					// A process cannot restart itself: a detached `pi-hub restart|update` stops this hub (D17 busy rule) and starts a new one.
+					// update: --yes because the page asked already; Pi outside the hub keeps its old version (the log lists them).
+					if (data.action !== "restart" && data.action !== "update") return send(400, { error: "Unknown hub action." });
 					const busy = summary().filter(s => s.busy.length);
-					if (busy.length) return send(409, { error: `Not restarted; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
+					if (busy.length) return send(409, { error: `Not ${data.action === "update" ? "updated" : "restarted"}; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
 					const log = openSync(path.join(dataDir, "hub.log"), "a");
-					spawn(process.execPath, [fileURLToPath(new URL("./cli.ts", import.meta.url)), "restart"], { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
+					spawn(process.execPath, [fileURLToPath(new URL("./cli.ts", import.meta.url)), ...(data.action === "update" ? ["update", "--yes"] : ["restart"])], { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
 					return send(200, { ok: true });
 				}
 				return send(200, await pageApi.post(page[1], endpoint, data));
