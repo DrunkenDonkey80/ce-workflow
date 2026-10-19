@@ -233,6 +233,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .title-button { all: unset; cursor: pointer; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .title-button:focus-visible { outline: 2px solid var(--focus); }
 /* After .status-menu in specificity: the phone session picker drops from the title, not below the page. */
+.title-plan { display: none; }
 .status-menu.title-menu { position: fixed; z-index: 8; top: 44px; left: 8px; right: auto; width: min(340px, 92vw); }
 .title-menu > .status-menu { position: static; border: 0; padding: 0; box-shadow: none; max-height: none; width: auto; max-width: none; background: none; }
 /* The drawer's session list names each state next to its colour; the desktop bar keeps colour only. */
@@ -413,6 +414,10 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 
  .topbar #target-kind, .chat-heading, .switcher, .input-help { display: none; }
  .topbar #connection { flex: none; font-size: 12px; white-space: nowrap; }
+ /* With a plan the bar wraps: session name and state on top, plan name and steps below. */
+ .topbar:has(> .title-plan:not([hidden])) { flex-wrap: wrap; row-gap: 0; padding-top: 2px; padding-bottom: 2px; }
+ .title-plan:not([hidden]) { order: 9; flex: 1 0 100%; display: flex; justify-content: space-between; gap: 8px; padding: 0 2px 2px; border: 0; background: none; font-size: 12px; color: var(--muted); text-align: left; }
+ .title-plan span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .title-plan span:last-child { flex: none; font-weight: 600; }
  body.has-switcher, body.has-switcher.switcher-open { padding-left: 0; }
  .drawer-toggle { display: block; padding: 4px 10px; }
  .drawer { display: block; position: fixed; z-index: 7; left: 0; top: 0; bottom: 0; width: min(320px, 85vw); overflow: auto; padding: 8px 0 16px; background: var(--chat); border-right: 1px solid var(--line); box-shadow: 4px 0 16px #0003; transform: translateX(-105%); transition: transform .18s; }

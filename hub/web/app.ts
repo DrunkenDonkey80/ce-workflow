@@ -41,6 +41,9 @@ function renderShell() {
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
  const title = head || plan?.title || "Architecture workspace", full = head && plan?.title ? `${head}: ${plan.title}` : title;
  $("title").textContent = title; $("title").title = full;
+ // Phones: a second top-bar line with the plan name left and its steps right.
+ $("title-plan").hidden = !plan?.title; $("title-plan").title = plan?.title ?? "";
+ if (plan?.title) { const [name, steps] = $("title-plan").children; name.textContent = plan.title; steps.textContent = plan.total ? `${plan.done ?? 0}/${plan.total}` : ""; }
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  document.title = promptView.busy || state.activity.dialog ? "(!) " + full + " needs an answer" : full;
  renderIcon();
@@ -806,6 +809,7 @@ async function openTitlePlans() {
  toggleMenu("title", "title-menu"); if ($("title-menu").hidden) return;
  $("plan-menu").hidden = false; await loadPlans($("plan-list")); $("plan-divider").hidden = !$("plan-list").querySelector(".plan-option");
 }
+$("title-plan").addEventListener("click", () => void openTitlePlans());
 $("title").addEventListener("click", () => phone.matches ? void openTitlePlans() : !$("switcher").hidden && toggleSwitcher($("switcher").dataset.open !== "true"));
 function newPlan() {
  setDrawer(false); const input = $("message-input"); input.value = "/plan3 "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
