@@ -11,9 +11,12 @@ session runs in):
 
 ## Use
 
+Install the `pi-hub` command once from this folder with `npm link`.
+
 `pi-hub start | stop [--force] | restart | update [--yes] | status | open | new [folder] [name] | remote on|off | autostart on|off|status`
 
 - `update` stops the hub, runs `pi update --all` (Pi and extensions) and starts it again with the sessions that were running. It refuses while a session is busy (never interrupts) and warns about Pi windows outside the hub, which keep the old version and can lock extension files.
+- The ⚙ button on the page has Restart hub (same busy rule as `restart`), so the phone can do it too.
 - `start` runs the hub; `open` opens its page on this PC; `new` adds a folder's first session (later ones from the page).
 - `remote on` adds a tailnet-only `tailscale serve` on the hub's port (never Funnel); new devices pair with a code approved on the hub page → Devices.
 - `autostart on` starts the hub at Windows logon (per-user Run key, no admin rights).

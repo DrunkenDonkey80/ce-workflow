@@ -185,6 +185,8 @@ h2 { font-size: 15px; font-weight: 600; }
 .status-row { display: contents; }
 .status-line button { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: none; }
 .status-bars > .bar, .bar-group { flex: 1 1 8em; }
+/* Hub settings: top-right on desktop (last in the one-line bar), next to Think in the phone drawer. */
+#settings-button { flex: 0 0 auto; order: 1; }
 /* Desktop: the plan bar leads the status line, next to the title; the other buttons keep their full text. */
 #plan-button { order: -1; flex: 1 1 14em; display: flex; gap: 6px; justify-content: center; }
 .bar-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; } .bar-count { flex: none; }

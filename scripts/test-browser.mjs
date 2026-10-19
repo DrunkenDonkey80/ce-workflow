@@ -465,6 +465,8 @@ try {
  await browser("fill", "#prompt-form textarea[placeholder=\"Write your answer\"]", "Canary"); await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary");
+ await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart')"), "gear opens the hub settings menu");
+ await browser("press", "Escape");
  // A form taller than the window scrolls inside its frame, with the title and buttons kept in view.
  const long = { question: "Long one", context: "Line\n".repeat(30), options: [{ title: "A" }, { title: "B" }], allowMultiple: false, allowFreeform: true };
  ask({ questions: [long, long, long], allowComment: true });

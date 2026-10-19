@@ -1,6 +1,7 @@
 // The hub process (H2-05): one per user, HTTP on 127.0.0.1 at a port fixed at first start (D11).
 // It serves the local JSON API (CLI, tests), the web app under /s/<session>/, and remote access through Tailscale (H6-01).
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import http from "node:http";
 import { spawn } from "node:child_process";
@@ -215,6 +216,15 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 				if (request.headers["content-type"]?.split(";")[0].trim() !== "application/json") return send(415, { error: "JSON content type required." });
 				const data = await body(request, PAGE_BODY);
 				if (!data || typeof data !== "object" || Array.isArray(data)) return send(400, { error: "Expected a JSON object." });
+				if (endpoint === "hub") {
+					// A process cannot restart itself: a detached `pi-hub restart` stops this hub (D17 busy rule) and starts a new one.
+					if (data.action !== "restart") return send(400, { error: "Unknown hub action." });
+					const busy = summary().filter(s => s.busy.length);
+					if (busy.length) return send(409, { error: `Not restarted; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
+					const log = openSync(path.join(dataDir, "hub.log"), "a");
+					spawn(process.execPath, [fileURLToPath(new URL("./cli.ts", import.meta.url)), "restart"], { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
+					return send(200, { ok: true });
+				}
 				return send(200, await pageApi.post(page[1], endpoint, data));
 			}
 			if (page && request.method === "GET") {

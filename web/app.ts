@@ -747,7 +747,7 @@ $("composer").addEventListener("submit", async event => {
  finally { messageSending = false; renderShell(); }
 });
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
-const menus = [["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
+const menus = [["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
@@ -1067,6 +1067,12 @@ $("bias-button").addEventListener("click", () => {
   return button;
  }));
  toggleMenu("bias-button", "bias-menu");
+});
+$("settings-button").addEventListener("click", () => toggleMenu("settings-button", "settings-menu"));
+$("hub-restart").addEventListener("click", async () => {
+ closeMenus(); setDrawer(false);
+ if (!confirm("Restart the hub? Every session stops and starts again; nothing is lost.")) return;
+ try { await post("hub", { action: "restart" }); showNotice("Hub restarting; the page reconnects by itself.", true); } catch (error) { showNotice(error.message); }
 });
 $("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested.", true); } catch (error) { showNotice(error.message); } });
 
