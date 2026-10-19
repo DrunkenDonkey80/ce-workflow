@@ -816,11 +816,12 @@ for (const button of document.querySelectorAll<HTMLElement>("#plan-menu [data-co
  const command = button.dataset.command; closeMenus(); setDrawer(false);
  if (command === "new") return newPlan();
  if (command === "delete" && !confirm(`Delete the plan "${state.plan?.title ?? "shown here"}" and its diagram permanently?`)) return;
+ if (command === "force finish" && !confirm(`Force finish "${state.plan?.title ?? "this plan"}"? It is archived as complete; its unfinished steps are listed in the plan.`)) return;
  if (commandSending) return; commandSending = true; renderShell();
  try {
   await post("command", { command }); showNotice("");
   // The deleted plan can't be shown any more; fall back to the session's current plan or the project diagram.
-  if (command === "delete") { const url = new URL(location.href); url.searchParams.delete("target"); location.assign(url); }
+  if (command === "delete" || command === "force finish") { const url = new URL(location.href); url.searchParams.delete("target"); location.assign(url); }
  }
  catch (error) { showNotice(error.message); }
  finally { commandSending = false; renderShell(); }

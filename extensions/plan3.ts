@@ -759,12 +759,17 @@ export default function plan3(pi) {
 		const ctx = webCtx;
 		try { ctx.isIdle(); } catch { webCtx = null; throw new WebError(409, "Workspace context expired; reopen /plan3 diagram."); }
 		if (endpoint === "/api/command") {
-			if (Object.keys(data).some(key => !["target", "command"].includes(key)) || !["resolve", "ideas", "ideas all", "ideas select", "review", "review all", "finish", "resume", "delete"].includes(data.command)) throw new WebError(400, "Invalid workspace command.");
+			if (Object.keys(data).some(key => !["target", "command"].includes(key)) || !["resolve", "ideas", "ideas all", "ideas select", "review", "review all", "finish", "force finish", "resume", "delete"].includes(data.command)) throw new WebError(400, "Invalid workspace command.");
 			const target = await resolveWebTarget(webTarget(data.target));
 			if (target.kind !== "plan") throw new WebError(400, "This command needs a displayed plan.");
 			if (data.command === "delete") {
 				if (!isOpen(target.plan)) throw new WebError(400, "Finished plans are archived; delete them from the terminal plan list.");
 				await deletePlan(ctx.cwd, target.plan); await refresh(ctx); return { ok: true };
+			}
+			if (data.command === "force finish") {
+				if (!isOpen(target.plan)) throw new WebError(400, "This plan is already finished.");
+				// Archives now, or first asks the agent to update the product architecture and archives when that turn ends.
+				const file = await forceFinish(ctx, target.plan); await refresh(ctx); return { ok: true, archived: !!file };
 			}
 			if (data.command === "resume") await commands.resume3.handler(target.plan.id, ctx, target.plan);
 			else await planCommand.handler(data.command, ctx, target.plan);

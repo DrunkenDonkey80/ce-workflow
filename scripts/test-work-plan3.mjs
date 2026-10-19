@@ -1296,6 +1296,17 @@ try {
 		await writeFile(dFile, body("d4444444", "D")); await writeFile(dDiagram, "{}");
 		const removed = await post("command", { target: "d4444444", command: "delete" });
 		assert.equal(removed.status, 200, JSON.stringify(removed.body)); assert(!existsSync(dFile) && !existsSync(dDiagram), "plan and diagram deleted");
+		// Web Force finish: with a product diagram it first sends the agent the architecture update; archiving waits for that turn.
+		const eFile = path.join(plansDir, "2026-10-13-e-e5555555-plan3.md");
+		await writeFile(eFile, body("e5555555", "E"));
+		const forced = await post("command", { target: "e5555555", command: "force finish" });
+		assert.equal(forced.status, 200, JSON.stringify(forced.body)); assert.equal(forced.body.archived, false);
+		assert.match(messages.at(-1).message, /^Force finish Plan3 .*e5555555/); assert(existsSync(eFile), "kept open until the architecture turn ends");
+		await (await tools.get("plan3").execute("web-plan", { action: "step", plan: "e5555555", id: "ARCH-RECONCILE", mark: "done", summary: "No architecture change." }, undefined, undefined, webCtx));
+		await hooks.get("agent_settled")({ aborted: false }, webCtx);
+		const eDone = path.join(plansDir, "done", path.basename(eFile));
+		assert(!existsSync(eFile) && existsSync(eDone), "archived once the architecture turn ends");
+		assert.match(await readFile(eDone, "utf8"), /Force-finished by the user/);
 		assert.equal((await post("command", { command: "convert /private.md" })).status, 400);
 		assert.equal((await post("command", { target: "product", command: "finish" })).status, 400);
 		assert.equal((await post("command", { command: "review" })).status, 200);
