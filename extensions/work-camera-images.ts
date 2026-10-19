@@ -64,7 +64,8 @@ export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-cam
 		prepare(cwd: string) { locked(cwd, sweep); },
 		cleanup(cwd: string) { outside(cwd); if (existsSync(root)) locked(cwd, sweep, true); },
 		start(cwd: string, onError: (error: unknown) => void) {
-			store.cleanup(cwd);
+			// Pi started in a folder holding the temp dir (e.g. the home folder): no background sweep; captures there still refuse.
+			try { store.cleanup(cwd); } catch (error) { if (/outside the project/.test((error as Error).message)) return; throw error; }
 			if (!timer && existsSync(root)) { timer = setInterval(() => { try { store.cleanup(cwd); } catch (error) { onError(error); } }, 60000); timer.unref(); }
 		},
 		stop() { clearInterval(timer); timer = undefined; },

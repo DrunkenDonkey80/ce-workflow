@@ -292,6 +292,8 @@ assert.throws(() => images.cleanup(projectDir), /Corrupt/);
 assert.equal(existsSync(join(imageDirectory, `camera-${corrupt.id}.jpg`)), true, "corrupt metadata never authorizes deletion");
 const inside = createCameraImages({ directory: join(projectDir, "bad-images") });
 assert.throws(() => inside.save(projectDir, Buffer.from("x"), "jpg"), /outside/);
+inside.start(projectDir, assert.fail); // session start in such a folder must not error
+
 assert.equal(existsSync(join(projectDir, "bad-images")), false);
 const redirect = join(sandbox, "redirect");
 symlinkSync(projectDir, redirect, process.platform === "win32" ? "junction" : "dir");
