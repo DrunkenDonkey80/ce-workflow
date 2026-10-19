@@ -107,8 +107,10 @@ const tests = [
 	...listed("scripts").filter((name) => /^test-work-.*\.mjs$/.test(name)),
 ];
 const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
+// A hub-hosted Pi sets PI_HUB=1, which switches dialogs to the hub channel; tests expect a plain session.
+const { PI_HUB: _hub, ...parentEnvironment } = process.env;
 const testEnvironment = {
-	...process.env,
+	...parentEnvironment,
 	GIT_CONFIG_COUNT: String(gitConfigCount + 1),
 	[`GIT_CONFIG_KEY_${gitConfigCount}`]: "core.autocrlf",
 	[`GIT_CONFIG_VALUE_${gitConfigCount}`]: "false",
@@ -133,7 +135,7 @@ for (const script of tests) {
 
 // The hub (hub/) imports ce-workflow's modules, so its suite runs with the package's.
 try {
-	execFileSync(process.execPath, ["--test", "scripts/test-*.mjs"], { cwd: path.join(root, "hub"), stdio: quiet ? "pipe" : "inherit" });
+	execFileSync(process.execPath, ["--test", "scripts/test-*.mjs"], { cwd: path.join(root, "hub"), stdio: quiet ? "pipe" : "inherit", env: parentEnvironment });
 	check("hub tests pass", true);
 } catch (error) {
 	check("hub tests pass", false, error instanceof Error ? error.message : String(error));
