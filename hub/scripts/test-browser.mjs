@@ -355,7 +355,10 @@ try {
  assert.equal(await evaluate("document.getElementById(\"diagram\").dataset.band"), "near");
  assert(await evaluate("document.querySelectorAll(\"foreignObject .note-text\").length >= 6"));
  assert.equal(await evaluate("document.querySelector(\"foreignObject img\")"), null, "note markup stays inert text");
+ await browser("fill", "#message-input", "half-written draft");
  await browser("reload"); await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"6\"");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), "half-written draft", "unsent draft survives leaving the page");
+ await browser("fill", "#message-input", "");
  assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition, "saved drag survives the full snapshot after reload");
  assert.equal(await evaluate("document.querySelectorAll(\"[data-note]\").length"), 6, "saved notes survive reload");
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");

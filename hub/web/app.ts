@@ -844,6 +844,10 @@ type HubSession = { id: string; name: string; tone: Tone };
 type Group = { folder: string; label: string; sessions: HubSession[] };
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
+// The unsent message survives switching sessions and reloads, per session; pagehide also catches programmatic edits (send clears it).
+const draftKey = "plan3-draft:" + sessionId, saveDraft = () => { try { const value = $("message-input").value; if (value) localStorage.setItem(draftKey, value); else localStorage.removeItem(draftKey); } catch { /* private mode */ } };
+try { if (!$("message-input").value) $("message-input").value = localStorage.getItem(draftKey) ?? ""; } catch { /* private mode */ }
+$("message-input").addEventListener("input", saveDraft); addEventListener("pagehide", saveDraft);
 const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, blue while any works, a shovel laid down when all rest.
