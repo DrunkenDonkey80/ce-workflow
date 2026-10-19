@@ -589,13 +589,13 @@ try {
  await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('Newer plan')");
  publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: 0 });
  await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('0/16') === false && !document.getElementById('plan-button').textContent.includes('Newer plan')");
- activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", args: JSON.stringify({ path: "src/app.ts", limit: 9 }), progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
+ activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", startedAt: Date.now() - 65_000, args: JSON.stringify({ path: "src/app.ts", limit: 9 }), progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
  assert(await evaluate("document.getElementById(\"activity\").textContent.includes(\"May be stale\")"));
  assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool rows start collapsed");
- assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1] summary\").textContent"), "read src/app.ts · running", "the live tool line names its target");
+ assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1] summary\").textContent"), "read src/app.ts · running · 1:05", "the live tool line names its target and counts its running time");
  // While working, Thinking and Compact keep the live thinking and only the latest tool call; Compact drops thinking once settled.
  const activityShown = () => evaluate("['#activity [data-id=tool_1]', '#activity [data-id=tool_2]', '#activity .thinking-row'].map(sel => !!document.querySelector(sel) && getComputedStyle(document.querySelector(sel)).display !== 'none')");
  await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Thinking view while working");
