@@ -4054,7 +4054,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(action==="compact") return requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
   if(action==="hub") return handleHubCommand(rest,ctx);
-  if(action==="herdr") return /^import/.test(rest.trim())?handleHubCommand("import herdr",ctx):ctx.ui?.notify?.("Usage: /wo herdr import","warning");
+  if(action==="herdr") return !rest.trim()||/^import\b/.test(rest.trim())?handleHubCommand("import herdr",ctx):ctx.ui?.notify?.("Usage: /wo herdr import","warning");
   if(action==="context-fill") {
    const tokens=Math.max(0,100_000-(ctx.getContextUsage?.()?.tokens??0));
    for(let remaining=tokens;remaining>0;remaining-=10_000) pi.sendMessage({customType:"work-context-fill",content:" the".repeat(Math.min(remaining,10_000)),display:false});

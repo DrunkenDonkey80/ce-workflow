@@ -15,7 +15,7 @@ export function hubCli(args: string[], timeout = 180_000): Promise<{ ok: boolean
 		resolve({ ok: !error, text: [stdout, stderr].map(s => String(s).trim()).filter(Boolean).join("\n") || (error ? error.message : "Done.") })));
 }
 
-export type HubStatus = { pairing?: { code: string; label?: string; login?: string } | null; running: boolean; autostart: boolean; command: boolean; local?: string; remote: { on: boolean; url?: string; error?: string; missing?: string[] }; sessions?: number; live?: number; busy?: number };
+export type HubStatus = { pairing?: { code: string; label?: string; login?: string } | null; running: boolean; autostart: boolean; command: boolean; herdr?: boolean; local?: string; remote: { on: boolean; url?: string; error?: string; missing?: string[] }; sessions?: number; live?: number; busy?: number };
 
 export async function handleHubCommand(args: string, ctx) {
 	const notify = (text: string, ok = true) => ctx.ui?.notify?.(text, ok ? "info" : "warning");
@@ -47,6 +47,7 @@ export function hubMenu(status: HubStatus, cwd: string) {
 		item("open", "Open local page", `${status.local} in this PC's browser.`),
 		...(status.remote.url ? [item("open remote", "Open remote page", `${status.remote.url}, the address your phone uses.`)] : []),
 		item("new", "New session in this folder", `Starts a hub session in ${cwd}; it shows on the page.`),
+		...(status.herdr ? [item("import herdr", "Import herdr sessions", "Adds every Pi session open in herdr to the hub, parked and named after its herdr tab; sessions already there stay as they are.")] : []),
 		item("restart", "Restart", "Stops every hub session and starts them again; refused while one is busy."),
 		item("stop", "Stop", "Stops the hub and its sessions; refused while one is busy."),
 		item(`remote ${status.remote.on ? "off" : "on"}`, status.remote.on ? "Turn remote access off" : "Turn remote access on", status.remote.on ? "Removes the tailnet address." : "Serves the hub on your tailnet (Tailscale with HTTPS certificates) for the phone; never public."),

@@ -115,13 +115,13 @@ async function update(yes: boolean) {
 	finally { if (running) await start(); }
 }
 
-const onPath = () => { try { execFileSync(process.platform === "win32" ? "where" : "which", ["pi-hub"], { stdio: "pipe", windowsHide: true }); return true; } catch { return false; } };
+const onPath = (command = "pi-hub") => { try { execFileSync(process.platform === "win32" ? "where" : "which", [command], { stdio: "pipe", windowsHide: true }); return true; } catch { return false; } };
 
 /** What /wo hub shows: running or not, addresses, logon start and whether the pi-hub command exists. */
 async function statusJson() {
 	const running = marker(), config = readConfig();
 	let autostartOn = false; try { autostartOn = /^Autostart on/.test(autostart("status")); } catch { /* unsupported OS */ }
-	const base = { running: !!running, data: hubDataDir(), autostart: autostartOn, command: onPath() };
+	const base = { running: !!running, data: hubDataDir(), autostart: autostartOn, command: onPath(), herdr: onPath("herdr") };
 	if (!running) return { ...base, remote: { on: config?.remote === true } };
 	const status = await call("/api/status");
 	const { pending } = await call("/api/pairing");
