@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-10-08T05:55:26.885Z",
+  "capturedAt": "2026-10-19T21:33:16.702Z",
   "verification": {
     "command": "npm run verify:quiet",
     "fullRuns": 1,
@@ -15,108 +15,74 @@
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "1.1.0",
-      "reviewedAt": "2026-10-08T05:55:26.885Z",
-      "reviewedVersion": "1.1.0",
+      "version": "1.3.0",
+      "reviewedAt": "2026-10-19T21:33:16.702Z",
+      "reviewedVersion": "1.3.0",
       "decisions": [
         {
-          "title": "agent_settled.aborted: fail cancelled RPC benchmark samples",
+          "title": "before_agent_start also fires for sendMessage triggerTurn runs (messageType union)",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "1.1.0 adds a boolean identifying cancellation at final, notification-only settlement. runRpcSample currently advances options.prompts or requests final stats for every agent_settled (R1:1237–1262); cancellation without an assistant error can therefore become completed. Use event.aborted === true to return the existing fail('aborted', 'RPC sample aborted') before either success branch; preserve absent/false compatibility. Source: S1, S2:34–38/6279–6285, S3 docs/json.md, R1:1082–1085. CU-92/CU-93 implement the shared guard and fixture coverage.",
-          "verification": "node \"scripts/test-workflow-evaluation-rpc.mjs\" — exit 0, ok - workflow evaluation RPC fixtures (5.3s); the same new cancellation assertion failed before the guard with completed vs failed. Covers true final/intermediate cancellation, explicit false and existing absent-flag success, retries and external abort.",
-          "version": "1.1.0"
+          "rationale": "1.2.0: runs started by pi.sendMessage(..., { triggerTurn: true }) now emit before_agent_start with messageType \"custom\" and the starting message, before that message's message_start (agent-session.js _prepareRun). work-models.ts:3721-3725 marks every before_agent_start as a user prompt (pendingPromptBackedAgentStart = true). A custom run is therefore treated as user work, and the internal background-notice guard (work-models.ts:3732-3760) never aborts it. The unit test in test-work-compaction-notifications.mjs (around line 197) still passes only because it replays the pre-1.2 order without before_agent_start. Today the guard covers only the retired knowledge discoverer (launchKnowledgeDiscoverer has no production caller), so the fix stays minimal: a custom run is not marked as prompt-backed, plus one 1.2-ordered unit case. Research-mode prompt sections now also reach custom runs, which is intended. advisor-model.ts, jev-tools.ts:511 and work-images.ts:267 work for both kinds. CU-03.",
+          "verification": "node scripts/test-work-compaction-notifications.mjs: Pi 1.2-ordered custom-run case fails before the fix, passes after (commit 84a45f3).",
+          "version": "1.3.0"
         },
         {
-          "title": "+name/-name CLI and SDK tool selection",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "1.1.0 can modify startup defaults instead of replacing them; plain names still form an allowlist, and mixing names/modifiers or modifier globs now fails validation. Keep benchmark-image-strip-live.mjs, benchmark-reasoning-strip-live.mjs and R1:959 explicit tool allowlists: inherited defaults would change controlled experiments or broaden read-only scopes. No existing modifier call needs migration. Source: S1, S2:154–202/4511–4630, S3 docs/cli.md.",
-          "version": "1.1.0"
+          "title": "Pin the devDependency types to the runtime 1.3.0",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "package.json devDependencies pins @earendil-works/pi-coding-agent 1.1.0 for editor and LSP types, while the runtime is 1.3.0. CU-03 reads event.messageType, which 1.1.0 types lack. The catch-up tool also reads this pin as 'Installed'. Bump it to 1.3.0 exactly and keep package-lock.json in sync. Dev-only; nothing ships at runtime. CU-04.",
+          "verification": "npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.3.0: package.json and package-lock at 1.3.0; C2 passes after updating the assistant fixture for 1.3.0 estimateTokens (commits 1808861, bfee8bb).",
+          "version": "1.3.0"
         },
         {
-          "title": "Native durationMs on tool events/render context and persistent Took",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "1.1.0 exposes execute-only monotonic milliseconds (absent when a tool did not run), and fixes built-in shell Took after reload. R3:2474–2485 still computes an event-to-event wall duration, but its sole caller at 31530 records activeWorkAgent, created for pendingWorkPrompt at 31371. Changing legacy workflow telemetry and historical comparability is not needed for the Plan3 path; retain it rather than turn this review into telemetry work. Built-in display fixes arrive automatically. Source: S1, S2:6260–6295, R3.",
-          "version": "1.1.0"
-        },
-        {
-          "title": "outputPad in tool render context and wider transcript padding coverage",
+          "title": "Session counts as busy while a run starts; sendUserMessage needs deliverAs then; sendMessage queues into the starting run",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.1.0 passes horizontal transcript padding to renderers and applies it to tools, shell output, summaries and custom entries; self-shell renderers must apply it themselves. Repository extension search found no renderCall/renderResult/registerToolRenderer or outputPad consumers. Existing work-dialogs.ts overlays are separate UI components, not transcript tool renderers. No padding shim or dialog redesign. Source: S1, S2:4669–4737, S3 docs/tui.md and dist/core/extensions/types.d.ts.",
-          "version": "1.1.0"
+          "rationale": "1.2.0: ctx.isIdle() is false during start and before_agent_start. A triggerTurn sendMessage in that window joins the starting run instead of failing with 'Agent is already processing'. plan3-web.ts:39-42 already sends steer when !ctx.isIdle(). work-models.ts:2730-2738 and plan3.ts:697 pass deliverAs. work-models.ts:2244 sends after compaction completes, from an idle session. Our triggerTurn wakes (work-camera-watch.ts:44, plan3-night.ts:66) gain the queueing fix with no change.",
+          "version": "1.3.0"
         },
         {
-          "title": "OSC 7501 program status reporting",
+          "title": "Codemode: input-constraint tags, elapsed time, @options must be the first line, two-worker admission, node --watch bridge, quadratic text() join",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.1.0 reports working, blocked on UI/login, done, error or idle to supporting terminals after capability negotiation; PI_PROGRAM_STATUS overrides detection. Pi owns the terminal and observes extension UI prompts. ce-workflow supplies dialogs, not an OSC dashboard, so do not emit a duplicate reporter or force a host setting. Real terminal support is unverified. Source: S1, S3 docs/terminal-setup.md#program-status.",
-          "version": "1.1.0"
+          "rationale": "1.2.0 and 1.3.0 change how Pi declares and runs codemode scripts. ce-workflow never generates codemode scripts. Its tools (jev_*, process_image, generate_image) are called from scripts, and Pi generates their declarations from the existing schemas. Nothing to change.",
+          "version": "1.3.0"
         },
         {
-          "title": "Claude Haiku 5.5 with adaptive effort and Bedrock caching",
+          "title": "reachesTools and namespace aliases on tool definitions",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.1.0 adds an authenticated chat-model catalog entry and supported effort levels. Plan3 chooseAdvisors reads registry availability then filters the already-configured scope (R4:218–224); work-models.ts also uses the registry. Catalog availability is inherited, not a reason to change current model, saved role selections or benchmark defaults. Source: S1, S3 docs/models.md, R3/R4.",
-          "version": "1.1.0"
+          "rationale": "1.2.0: a tool that calls other tools may declare which ones a call can reach. The MCP extension uses this to wait for servers and to decide whether a replacement codemode or tool_search reaches MCP tools (docs/extensions.md). jev-tools.ts:469 runs only bash through ctx.executeTool and never MCP tools, so declaring it changes nothing.",
+          "version": "1.3.0"
         },
         {
-          "title": "GPT-6 Luna Decisions API and image classifier contexts",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "1.1.0 offers typed classification via OpenAI and optional image blocks. Jev tools deliberately accept JSON/files and resolve only configured OpenRouter classifier IDs (R5:7/22–28); work-vision.ts already handles model vision separately. Adding providers, image inputs or screenshot adjudication would enlarge the requested scope without an acceptance use case. Luna uses API-key authentication, not ChatGPT login, so a provider swap is not drop-in. Source: S1, S3 docs/models.md#use-classifier-models and docs/codemode.md#classify, R5.",
-          "version": "1.1.0"
-        },
-        {
-          "title": "Native llama.cpp decision models through /v1/systemone",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "1.1.0 recognizes decision-model GGUF metadata on llama.cpp >=0.6.0, lists Julia-1/Laya/Kev/lev/OpenJev only as classifiers, and calls their native typed-decision endpoint; ordinary chat models can still classify via next-token probabilities. Pi supplies that discovery. Jev tools remain OpenRouter-only; no local backend, downloads or new configuration are needed. Plan3 chat availability comes from the existing registry, not a hand-maintained local-model list. Local hardware/server behavior is unverified. Source: S1, S3 docs/llama-cpp.md#classification, R4/R5.",
-          "version": "1.1.0"
-        },
-        {
-          "title": "Codemode async discovery documentation and output boundaries",
+          "title": "Model switching drops thinking from other models; serializeConversation omits thinking",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.1.0 marks searchTools/describeTool/describeNamespace as async and separates text outputs with ==> text N/M <== plus one console_output block. This fixes the model-visible built-in contract; ce-workflow does not implement those helpers or parse those presentation delimiters. benchmark-jev-live.mjs aggregates structured calls/usage, not these headings. No prompt-copy or parser workaround. Source: S1, S2:3080–3198/4738–4761, S3 docs/codemode.md, R6.",
-          "version": "1.1.0"
+          "rationale": "1.3.0 drops earlier models' thinking blocks on a model switch. 1.2.0 drops thinking from compaction and branch-summary serialization. The STRIP_THINKING filter (work-models.ts:1757, 1988) is a separate opt-in context experiment. Plan3 advisors run in fresh child sessions. No duplicate logic to delete, nothing to add.",
+          "version": "1.3.0"
         },
         {
-          "title": "MCP manager responsiveness, whole-login timeout, cancellation and shutdown fixes",
+          "title": "ctx.ui.custom overlay done() closes its own overlay",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.1.0 opens /mcp before every server connects and bounds the entire OAuth sign-in, aborts it on Esc/shutdown, caps each authorization request at 15s, and avoids refreshing tokens just to close. ce-workflow has no MCP login/manager implementation; controlled RPC invocation R1:943–955 disables discovered/built-in extensions and explicitly loads dependencies. Keep Pi-owned behavior; no extra OAuth or timeout layer. Source: S1, S3 docs/cli.md, R1.",
-          "version": "1.1.0"
+          "rationale": "1.3.0 fix: done() used to close the topmost overlay, which could leave another extension's dialog unresolved. The vendored ask_user overlays (extensions/ask-user/index.ts:543, 557) get the fix automatically. The repo has no workaround to remove.",
+          "version": "1.3.0"
         },
         {
-          "title": "Managed release retention and standalone launch-directory environment loading",
+          "title": "Resumed sessions keep their active tools",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.1.0 pi update retains the new release and its immediate predecessor, and fixes standalone binaries loading .env/.env.local/.env.development from the launch directory. ce-workflow does not ship a standalone Pi binary; piReleaseRoots and Plan3 self-checks already search retained releases newest-first, not a fixed older directory. No installer/rollback automation or environment-file reliance is introduced. Runtime upgrades are outside this plan; review remains pinned to 1.1.0. Source: S1, R3:22850–22883, R2 scripts/test-work-plan3.mjs:539–545, package.json.",
-          "version": "1.1.0"
+          "rationale": "1.3.0 restores tools activated during the session on resume. The only setActiveTools caller, plan3.ts:1270 (adds plan3_design), now survives a resume as intended.",
+          "version": "1.3.0"
         },
         {
-          "title": "Image-resize worker, ANSI chunk handling, dim shell headers and transcript selection fixes",
+          "title": "Provider, catalog, retry, MCP, OpenRouter, Kimi, Nix, config-schema, clipboard, /share, --model ambiguity, tool-argument parsing and print-mode fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.1.0 ignores Node worker housekeeping messages while resizing images under node --watch, fixes split ANSI codes in !/RPC bash output, preserves !! header dimming and clears fullscreen selection on transcript rebuilds. Pi owns those workers, shell components and transcript selection; work-vision.ts and payload stripping consume normal image/message blocks. No duplicate worker or ANSI parser. Current Node is 24.14.0; affected watch versions (24.19+/26.x) were not exercised. Source: S1, S2:72–131/3223–3313, R3.",
-          "version": "1.1.0"
-        },
-        {
-          "title": "Provider thinking/headers, retryable errors, context estimation and tiered session costs",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "1.1.0 honors OpenAI-on-Bedrock effort and Codex header overrides, retries server_busy/servers are currently busy and Mistral finish_reason:error, estimates input at 3.5 instead of 4 characters/token, filters disabled Radius models, and corrects prompt-length-tier costs across providers. ce-workflow delegates provider calls to the registry and aggregates supplied usage; the RPC runner waits for agent_settled across retries. Retain existing error/usage gates and context budgets. Historical reported costs may not be comparable; this is not evidence of a performance improvement. Source: S1, S3 docs/extensions.md, R1/R3 and scripts/test-work-usage.mjs.",
-          "version": "1.1.0"
-        },
-        {
-          "title": "Anthropic free-loopback-port login, Herdr links and Termux clipboard fixes",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "1.1.0 falls back from reserved port 53692 during Anthropic browser login (useful on Hyper-V/WSL Windows), fixes clickable Markdown links in Herdr, and repairs Termux paste/API hints. ce-workflow neither owns OAuth callback listeners nor terminal clipboard/link handling. Benefit is inherited from Pi; no UI redesign or platform workaround. These live integrations were not tested. Source: S1, S3 docs/terminal-setup.md.",
-          "version": "1.1.0"
+          "rationale": "1.2.0 and 1.3.0 provider and runtime fixes and features owned by Pi. ce-workflow ships no themes or theme $schema, does not parse `pi mcp list`, and its scripts pass provider-qualified --model ids and use RPC mode, not -p. Benefits arrive automatically.",
+          "version": "1.3.0"
         }
       ]
     },
@@ -141,52 +107,68 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.76.1",
-      "reviewedAt": "2026-10-06T12:43:35.629Z",
-      "reviewedVersion": "0.76.1",
+      "version": "0.79.1",
+      "reviewedAt": "2026-10-19T21:33:16.702Z",
+      "reviewedVersion": "0.79.1",
       "decisions": [
         {
-          "title": "Idle-parent wake now sends a user prompt 'Subagent updates above.'",
+          "title": "Idle-parent wake prompt text changed to 'Inspect subagent updates above. …'",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "0.76.1 (PARENT_WAKE_TEXT): a subagent result/supervisor notice that wakes an idle parent is followed by a real user message so Pi runs the normal prompt lifecycle (before_agent_start, prompt sections, cache). ce-workflow's compaction collectors treat every role:user message as a user request: work-compaction.ts latestUserRequests (filter syntheticUserRequest) and work-compaction-memory.ts gather (kind user-request = protected record). Wake prompts would crowd out real protected requests in summaries. Adopt: treat this exact text as synthetic in both collectors. Legacy workflow (switch ON) before_agent_start goal-turn matching may also misclassify these turns; user chose no-action for legacy (see Decisions).",
-          "verification": "node scripts/test-work-compaction.mjs -> ok (exit 0); wake-prompt assertion fails without the fix",
-          "version": "0.76.1"
+          "rationale": "0.77.0 rewrote PARENT_WAKE_TEXT (installed src/shared/parent-wake.js:1) to a longer instruction. work-compaction.ts:449-453 syntheticWakePrompt matches only the 0.76.1 text 'Subagent updates above.'. New wake prompts are therefore kept as protected user requests in compaction summaries and memory (work-compaction-memory.ts:62), which is the problem the 0.76.1 adoption fixed. Match the old and new exact texts, since old sessions still hold the old one. CU-01.",
+          "verification": "node scripts/test-work-compaction.mjs: both the old and new wake texts are classified as synthetic (commit 9fda699).",
+          "version": "0.79.1"
         },
         {
-          "title": "/reload after a pi-subagents update now errors with 'restart Pi'",
+          "title": "Post-compaction resume now goes through the shared parent wake",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "0.77 and 0.78: when background runs are active and the parent is idle, pi-subagents appends the hidden 'Compaction is complete. Resume the parent task now…' message without a trigger, then wakes with PARENT_WAKE_TEXT as a user prompt (src/extension/index.js around line 1040). work-models.ts blocks the resume by its text. before_agent_start resets the block for the wake prompt (work-models.ts:3722), so the guard no longer works. The user decided to let pi-subagents resume: the guard existed for the removed ce-workflow goal loop (Decisions D1). Delete the compaction-resume guard and keep the summary-hygiene regex in work-compaction.ts. CU-02.",
+          "verification": "node scripts/test-work-compaction-notifications.mjs: the input-hook regression case passes; live C5 with Pi 1.3.0 and openai-codex/gpt-6-luna passes (commit a1f357b).",
+          "version": "0.79.1"
+        },
+        {
+          "title": "subagent schema moves rare fields into options; launch by name with did-you-mean errors",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "0.77.0: the tool description now says to launch by name with an exact provider/id. Unknown agents or models fail with suggestions, so list and models are needed only on demand. Top-level management fields still work: subagent-options.js flattens them and schemas.js:44 allows extra properties. The launches in plan3.ts:563 and work-models.ts:1236 (context: \"fresh\") and the model:thinking suffix that advisor-model.ts sets need no change. The research advisor prompt (work-models.ts:491) still tells the model to call action:list capabilities:true and action:models first. Per Decisions D2, drop that clause and claim no savings. CU-05.",
+          "verification": "node scripts/test-work-compaction-notifications.mjs asserts that the advisor prompt has no action:list or action:models (commit bfee8bb).",
+          "version": "0.79.1"
+        },
+        {
+          "title": "bg_wait and subagent_supervisor are declared only after delegation",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.76.1: Node cannot re-import an already-loaded ESM module, so pi-subagents refuses a mixed reload. ce-workflow avoids the same problem by loading .ts through jiti (AGENTS.md Extension File Rule); nothing to change.",
-          "version": "0.76.1"
+          "rationale": "0.79.1 leaves these tools undeclared until subagent is enabled or other background work registers. Plan3 ideas, review and the research advisors call subagent (after subagents_enable) before any wait, which turns them on. No ce-workflow code calls or lists them.",
+          "version": "0.79.1"
         },
         {
-          "title": "Child system prompt now starts with Pi's base prompt (append mode)",
+          "title": "Forks reuse the parent prompt cache, get <subagent_instructions> and see parent context",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.76.1: affects systemPromptMode: append children only. All ce-workflow agents, including agents/plan3-advisor.md, use systemPromptMode: replace.",
-          "version": "0.76.1"
+          "rationale": "0.78.0 and 0.79.0 change only context: \"fork\" children. Every ce-workflow launch uses context: \"fresh\" (plan3.ts:563, work-models.ts:491, 1236).",
+          "version": "0.79.1"
         },
         {
-          "title": "Partial output on child timeout/crash; outputSchema result saved to output file",
+          "title": "Built-in reviewer, oracle and evidence-auditor skip the acceptance report unless acceptance is passed",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.76.0: failed children return text labeled 'Partial output before ...' with outputPartial:true, and structured results land in the output file. Plan3 advisors read the child's returned text and do not use outputSchema/output files; the legacy workflow is off. The outputSchema in extensions/jev-tools.ts is a Pi tool schema, not a subagent option.",
-          "version": "0.76.1"
+          "rationale": "0.78.0. Research advisors use oracle for read-only critique and read its reply text. plan3-advisor is ce-workflow's own agent. Neither wants an acceptance report.",
+          "version": "0.79.1"
         },
         {
-          "title": "Settings write-lock (settings.json.write-lock) for concurrent settings saves",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "0.76.0: pi-subagents locks its own read-modify-write of settings.json. ce-workflow writes workOrchestrator settings from interactive toggles only; honoring the lock would add locking code for a race requiring a simultaneous subagent settings save. Revisit if a lost setting is ever observed.",
-          "version": "0.76.1"
-        },
-        {
-          "title": "Daily/weekly schedules, worktree.cleanup apply, headless result delivery, capacity release, MCP name aliases, plain js workflow blocks, multiline descriptions, watchdog, Herdr pane color, doctor/stop fixes",
+          "title": "Shared idle wake with pi-intercom; Esc keeps the parent stopped",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.76.0/0.76.1 features and fixes inside pi-subagents. ce-workflow (workflow off) uses subagents only for Plan3 advisors (ideas/review), which need none of these; benefits arrive automatically.",
-          "version": "0.76.1"
+          "rationale": "0.77 and 0.78: one wake reservation per session (Symbol.for(\"pi.idle-wake.v1\")), and completions after Esc no longer restart the parent. ce-workflow's own wakes use sendMessage triggerTurn, which Pi 1.2 queues into a starting run. Joining the reservation contract would add coupling to a private symbol for no observed problem.",
+          "version": "0.79.1"
+        },
+        {
+          "title": "Handoff ownership, reuseFrom, finished-child resume, RPC snapshot fields, launcher sandboxes, program status, tmux inspector, parallel workflow, pinToolDeclarations, activeRunsPrompt, PI_SUBAGENTS_COMPONENT_UI, run-history removal, watchdog and runner fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "0.77.0 to 0.79.1 features and fixes inside pi-subagents. The hub runs Pi as `--mode rpc` (hub/src/rpc-client.ts:33) and renders ask_user forms, not custom TUI components, so PI_SUBAGENTS_COMPONENT_UI does not apply. Plan3 uses only fresh async advisors. The benefits arrive automatically.",
+          "version": "0.79.1"
         }
       ]
     },
@@ -218,24 +200,23 @@
     },
     {
       "name": "pi-intercom",
-      "version": "0.16.1",
-      "reviewedAt": "2026-10-06T12:43:35.629Z",
-      "reviewedVersion": "0.16.1",
+      "version": "0.17.1",
+      "reviewedAt": "2026-10-19T21:33:16.702Z",
+      "reviewedVersion": "0.17.1",
       "decisions": [
         {
-          "title": "Idle wake now sends a user prompt 'New intercom message above.'",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "0.16.1 index.ts: an inbound message that should trigger a turn on an idle session is followed by pi.sendUserMessage('New intercom message above.') because Pi skips before_agent_start for sendMessage({triggerTurn}) turns (pi#5581). Same compaction-memory pollution as the pi-subagents wake; covered by the same Phase 1 change.",
-          "verification": "node scripts/test-work-compaction.mjs -> ok (exit 0); wake-prompt assertion fails without the fix",
-          "version": "0.16.1"
-        },
-        {
-          "title": "intercom send/ask renderCall shows the full message when expanded",
+          "title": "Shared idle-wake reservation (idle-wake.ts); wake text unchanged",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.16.1 UI-only rendering change in pi-intercom's tool call display; ce-workflow does not render intercom calls.",
-          "version": "0.16.1"
+          "rationale": "0.17 moves the wake into a reservation shared with pi-subagents. The prompt is still 'New intercom message above.' (installed index.ts:1312), which work-compaction.ts already treats as synthetic. Nothing to change.",
+          "version": "0.17.1"
+        },
+        {
+          "title": "Delivery receipts, E_SESSION_HELD, /intercom-pool, broker liveness drop, bare-reply targeting, Windows fsync fix",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "0.17.x broker and protocol changes. ce-workflow's only integration, work-ask-remote.ts, emits intercom:outbox-request and reads intercom_message details.from.id and bodyText. Neither changed in the diff, and it does not read delivery results. No stableId or PI_INTERCOM_* use in the repo.",
+          "version": "0.17.1"
         }
       ]
     },
@@ -256,17 +237,16 @@
     },
     {
       "name": "pi-lens",
-      "version": "4.3.0",
-      "reviewedAt": "2026-10-04T08:48:06.970Z",
-      "reviewedVersion": "4.3.0",
+      "version": "4.4.4",
+      "reviewedAt": "2026-10-19T21:33:16.702Z",
+      "reviewedVersion": "4.4.4",
       "decisions": [
         {
-          "version": "4.3.0",
-          "title": "Inherit configuration, diagnostics and bounded analysis without a local shim",
+          "title": "4.4.0 to 4.4.4: Pi 1.2 and 1.3 support, unavailable or disabled LSP reported as unconfirmed, read-guard, cascade and performance fixes; tool surface unchanged",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Grade: Not-our-problem. Tier 1 package rollback. Keep global agent-dir config discovery, diagnostic save/freshness/dispositions, scanner retirement, Windows paths and bounded spawning package-owned. Verified project fit: ce-workflow consumes lens_diagnostics source=lsp and module_report, not config paths or analyzer internals; immutable verifier contracts remain checkpoint-bound. Upstream: complete 4.3 changelog, docs/agent-tools.md and captured tool/config diffs; public parameter contract unchanged, explicit too-large outcome now documents 5000-line/2MiB limits. Benefit: better diagnostics with no local adapter. Cost/risk: work-models.ts exceeds LSP bound; do not misreport it clean. Confidence: high. Recommendation: no local shim or verifier capability expansion.",
-          "diagnosticEvidence": "Active LSP batch: 4 files confirmed clean, 5 inconclusive, extensions/work-models.ts (33416 lines) and scripts/test-work-goal.mjs (6054 lines) too_large. Empty diagnostics are not treated as proof of clean for unconfirmed paths."
+          "rationale": "Reviewed from the installed CHANGELOG.md because the diff artifact timed out. ce-workflow only names lens tools (read_symbol, read_enclosing, module_report, lens_diagnostics) for compaction classification (work-compaction.ts:237, 291-306; work-models.ts:1822). Those names and parameters are unchanged. Reporting a file no server answered for as unconfirmed matches the 4.3.0 decision not to treat inconclusive LSP results as clean. No local shim.",
+          "version": "4.4.4"
         }
       ]
     }
