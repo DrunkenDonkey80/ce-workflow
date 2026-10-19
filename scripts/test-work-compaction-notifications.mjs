@@ -992,7 +992,7 @@ try {
 	);
 	resetContextFilter();
 	const oversizedRequest = [{ role: "user", content: "x".repeat(130_000) },
-		{ role: "assistant", content: "y".repeat(130_000) }];
+		{ role: "assistant", content: [{ type: "text", text: "y".repeat(130_000) }] }];
 	const activeCtx = { ...ctx, model: { contextWindow: 200_000 } };
 	requestContextFilter(activeCtx);
 	const protectedContext = await hooks.context({ messages: oversizedRequest }, activeCtx);
@@ -1518,6 +1518,7 @@ try {
 	const selectedTaskModels = () => JSON.parse(taskPrompts.at(-1).match(/Slots: (\[[^\n]+?\])\. Wait/)?.[1] ?? "[]").map(slot => slot.model);
 	assert.deepEqual(selectedTaskModels(), ["test/astra", "test/opus"], "Wide on GLM calls Astra and Opus, not GLM");
 	assert.doesNotMatch(taskPrompts.at(-1), /ask_user/, "explicit Wide does not ask again");
+	assert.doesNotMatch(taskPrompts.at(-1), /action:list|action:models/, "advisors launch by name; no pre-launch list or models call (D2)");
 	await commands.research.handler("wide compare alternatives", { ...taskCtx, model: { provider: "test", id: "sol" } });
 	assert.deepEqual(selectedTaskModels(), ["test/astra", "test/opus", "test/glm"], "Wide on another model calls all three advisors");
 	await commands.research.handler("narrow compare options", { ...taskCtx, model: { provider: "test", id: "astra" } });
