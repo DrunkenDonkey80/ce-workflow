@@ -32,7 +32,7 @@ async function handle(cmd) {
 		case "get_messages": return reply({ messages: flags.has("compacted") ? messages.slice(-3) : messages });
 		case "get_commands": return reply({ commands: flags.has("no-hub") ? [] : [{ name: "pi-hub", source: "extension" }] });
 		case "get_available_models": return reply({ models: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }] });
-		case "get_session_stats": return reply({ sessionFile, contextUsage: { percent: 42 } });
+		case "get_session_stats": return reply({ sessionFile, contextUsage: { percent: 42, tokens: 84000, contextWindow: 200000 } });
 		case "set_model": model = { provider: cmd.provider, id: cmd.modelId, name: cmd.modelId }; return reply(model);
 		case "set_thinking_level": thinkingLevel = cmd.level; out({ type: "thinking_level_changed", level: cmd.level }); return reply();
 		case "abort": if (streaming) { streaming = false; out({ type: "agent_settled", aborted: true }); } return reply();

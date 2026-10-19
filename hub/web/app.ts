@@ -47,7 +47,9 @@ function renderShell() {
  // D19 status line. Line 1: [model: effort] [Context: n%] [💡 bias]; line 2: the plan as a progress bar (or New plan).
  const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
  $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
- $("context-button").textContent = "Context: " + (typeof status?.context === "number" ? Math.round(status.context) + "%" : "—");
+ // 120k/1m like Pi's footer; tokens are null right after compaction until the next reply.
+ const short = n => n >= 1e6 ? +(n / 1e6).toFixed(1) + "m" : Math.round(n / 1e3) + "k";
+ $("context-button").textContent = "Context: " + (status?.window ? (typeof status.tokens === "number" ? short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—");
  $("bias-button").textContent = "💡 " + (BIAS_LABEL[plan?.bias ?? 0] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
  $("bias-button").disabled = !state.connected || !plan;
@@ -159,7 +161,9 @@ for (const [index, view] of LEFT_TABS.entries()) {
   event.preventDefault(); const name = LEFT_TABS[(next + LEFT_TABS.length) % LEFT_TABS.length]; setTab(name); $("tab-" + name).focus();
  });
 }
-setLeft(remembered("plan3-left", ["full", "narrow", "collapsed"], "full"));
+const leftChoice = remembered("plan3-left", ["full", "narrow", "collapsed"], "full");
+let firstSnapshot = true;
+setLeft(leftChoice);
 // Chat detail, cycled by one button: Full; Thinking hides tool blocks; Compact hides thinking, tools and in-between agent
 // text, leaving prompts and final replies. While a run works, both keep its latest thinking and latest tool call visible.
 const CHAT_VIEWS = ["expanded", "thinking", "compact"], CHAT_LABEL = { expanded: "Full", thinking: "Thinking", compact: "Compact" };
@@ -1134,7 +1138,12 @@ listen("snapshot", value => {
  chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
  // Dialogs over 16 KB arrive brief; fetch their full body.
  promptView.sync((value.dialogs ?? []).filter(ask => !ask.brief));
- for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell(); void loadDiagram("project"); void loadDiagram("plan");
+ for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell();
+ void Promise.all([loadDiagram("project"), loadDiagram("plan")]).then(() => {
+  // A session with no diagrams opens with the chat expanded; not remembered, so sessions with diagrams keep the reader's layout.
+  if (firstSnapshot && !Object.values(diagrams).some(item => item?.nodes?.length || item?.notes?.length)) { setLeft("collapsed"); remember("plan3-left", leftChoice); }
+  firstSnapshot = false;
+ });
 });
 listen("diagram", value => {
  const tab = value.target.kind === "product" ? "project" : value.target.id === planTarget() ? "plan" : null;
