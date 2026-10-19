@@ -250,7 +250,7 @@ try {
   await browser("focus", "#zoom-fit");
  }
  assert.equal(await shown("web_client__load_balancer"), false, "leaving the node restores the calm view");
- await browser("press", "Escape"); const lb = await evaluate("(() => { const r = document.querySelector(\"[data-node=load_balancer]\").getBoundingClientRect(); return { x: Math.round(r.x + 20), y: Math.round(r.y + 20) }; })()"); await browser("mouse", "move", String(lb.x), String(lb.y)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left"); await browser("focus", "#zoom-fit");
+ await browser("press", "Escape"); const lb = await evaluate("(() => { const r = document.querySelector(\"[data-node=load_balancer]\").getBoundingClientRect(); return { x: Math.round(r.x + 6), y: Math.round(r.bottom - 6) }; })()"); await browser("mouse", "move", String(lb.x), String(lb.y)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left"); await browser("focus", "#zoom-fit");
  assert.equal(await shown("web_client__load_balancer"), true, "a clicked box stays in focus");
  await browser("mouse", "move", "2", "2"); await browser("press", "Escape"); assert.equal(await shown("web_client__load_balancer"), false, "Escape clears focus");
  { const r = await fetch(`${origin}/s/${id}/api/paste`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin }, body: "<svg onload=alert(1)>" }); assert.match((await r.json()).error, /PNG, JPEG/, "non-image paste rejected by magic bytes"); }
@@ -471,8 +471,9 @@ try {
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary");
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
  await browser("press", "Escape");
- await browser("wait", "--fn", "document.getElementById('load-cpu').getAttribute('points')");
- assert.match(await evaluate("document.getElementById('load').getAttribute('aria-label')"), /^CPU \d+% · Memory \d+%$/, "PC load graph left of the gear");
+ await browser("wait", "--fn", "document.querySelector('#load-cpu polyline').getAttribute('points')");
+ assert.match(await evaluate("['load-cpu', 'load-memory'].map(id => document.getElementById(id).getAttribute('aria-label')).join(' · ')"), /^CPU \d+% · Memory \d+%$/, "PC load boxes left of the gear");
+ assert.deepEqual(await evaluate("['load-cpu', 'load-memory', 'settings-button'].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })"), [[34, 34], [34, 34], [34, 34]], "same-size squares");
  // A form taller than the window scrolls inside its frame, with the title and buttons kept in view.
  const long = { question: "Long one", context: "Line\n".repeat(30), options: [{ title: "A" }, { title: "B" }], allowMultiple: false, allowFreeform: true };
  ask({ questions: [long, long, long], allowComment: true });

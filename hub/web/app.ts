@@ -1109,10 +1109,12 @@ async function pollLoad() {
  if (document.hidden) return;
  try { loadSamples.push(await get("system")); } catch { return; }
  if (loadSamples.length > 24) loadSamples.shift();
- const line = (key: "cpu" | "memory") => loadSamples.map((sample, index) => `${index * 2 + 48 - loadSamples.length * 2},${(20 - sample[key] / 5).toFixed(1)}`).join(" ");
- $("load-cpu").setAttribute("points", line("cpu")); $("load-memory").setAttribute("points", line("memory"));
- const last = loadSamples.at(-1)!, text = `CPU ${last.cpu}% · Memory ${last.memory}%`;
- $("load").setAttribute("aria-label", text); $("load").querySelector("title")!.textContent = text + " (last 2 minutes)";
+ for (const [key, name] of [["cpu", "CPU"], ["memory", "Memory"]] as const) {
+  const box = $("load-" + key), value = loadSamples.at(-1)![key];
+  box.querySelector("polyline")!.setAttribute("points", loadSamples.map((sample, index) => `${index * 2 + 48 - loadSamples.length * 2},${(20 - sample[key] / 5).toFixed(1)}`).join(" "));
+  box.querySelector("span")!.textContent = String(value);
+  box.setAttribute("aria-label", `${name} ${value}%`); box.title = `${name} ${value}% (graph: last 2 minutes)`;
+ }
 }
 void pollLoad(); setInterval(pollLoad, 5000);
 $("hub-update").addEventListener("click", async () => {
