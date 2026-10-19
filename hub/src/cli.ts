@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | remote on|off | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import os from "node:os";
@@ -175,6 +175,18 @@ try {
 		let n = 1; while (taken.has(String(n))) n++;
 		const record = await call("/api/sessions", { folder, name: rest[1] ?? String(n) });
 		console.log(`New session ${record.name} in ${record.folder}: http://127.0.0.1:${marker()!.port}/s/${record.id}/`);
+	} else if (verb === "import" && rest[0] === "herdr") {
+		// Every Pi herdr shows with a session file joins its folder's group, named after its herdr tab; known files stay as they are.
+		const herdr = (...args: string[]) => {
+			try { return JSON.parse(execFileSync("herdr", args, { encoding: "utf8", stdio: "pipe", windowsHide: true })).result; }
+			catch (error) { throw new Error(`herdr ${args.join(" ")} failed (is herdr running and on PATH?): ${(error as Error).message.split(/\r?\n/)[0]}`); }
+		};
+		const labels = new Map<string, string>(herdr("tab", "list").tabs.map((t: { tab_id: string; label: string }) => [t.tab_id, t.label]));
+		const sessions = (herdr("agent", "list").agents as { agent: string; tab_id: string; agent_session?: { kind: string; value: string } }[])
+			.filter(a => a.agent === "pi" && a.agent_session?.kind === "path").map(a => ({ file: a.agent_session!.value, name: labels.get(a.tab_id) }));
+		const { added, skipped } = await call("/api/import", { sessions });
+		for (const r of added) console.log(`  + ${r.name}  ${r.folder}`);
+		console.log(`Imported ${added.length} of ${sessions.length} herdr Pi sessions (parked)${skipped.length ? `; ${skipped.length} already in the hub or unreadable` : ""}. A session still open in herdr resumes in the hub once you quit it there.`);
 	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
 		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
 		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));
@@ -186,7 +198,7 @@ try {
 		}
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | remote on|off | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {

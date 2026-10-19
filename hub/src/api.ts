@@ -10,7 +10,7 @@ import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./file
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
-import { type Registry, scanRecents, star } from "./registry.ts";
+import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
@@ -88,7 +88,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 		return { groups, recents };
 	}
 	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
-	const nextName = (folder: string) => { const taken = new Set(registry.list().filter(r => r.folder.toLowerCase() === folder.toLowerCase()).map(r => r.name)); let n = 1; while (taken.has(String(n))) n++; return String(n); };
+	const nextName = (folder: string) => nextFreeName(registry, folder);
 	async function session(data: Record<string, unknown>) {
 		only(data, ["target", "action", "id", "name", "folder", "file"], "Invalid session fields.");
 		const id = typeof data.id === "string" ? data.id : "", name = typeof data.name === "string" ? data.name.trim() : "";

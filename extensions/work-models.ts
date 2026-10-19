@@ -288,7 +288,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart","herdr import":"Pi control hub: add herdr's Pi sessions, named by tab",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -4054,6 +4054,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(action==="compact") return requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
   if(action==="hub") return handleHubCommand(rest,ctx);
+  if(action==="herdr") return /^import/.test(rest.trim())?handleHubCommand("import herdr",ctx):ctx.ui?.notify?.("Usage: /wo herdr import","warning");
   if(action==="context-fill") {
    const tokens=Math.max(0,100_000-(ctx.getContextUsage?.()?.tokens??0));
    for(let remaining=tokens;remaining>0;remaining-=10_000) pi.sendMessage({customType:"work-context-fill",content:" the".repeat(Math.min(remaining,10_000)),display:false});

@@ -7,7 +7,7 @@ import http from "node:http";
 import { spawn } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
 import path from "node:path";
-import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
+import { Registry, hubDataDir, importSessions, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
 import { createPageApi } from "./api.ts";
@@ -126,6 +126,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		"POST /api/pairing": data => pairing.decide(data.approve === true),
 		"GET /api/devices": () => ({ devices: devices.list() }),
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },
+		"POST /api/import": data => importSessions(registry, Array.isArray(data.sessions) ? data.sessions : []),
 		"POST /api/sessions": data => host.create(String(data.folder ?? ""), String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/resume": (_d, m) => host.resume(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/park": (_d, m) => host.park(m[1]).then(() => ({ ok: true })),
