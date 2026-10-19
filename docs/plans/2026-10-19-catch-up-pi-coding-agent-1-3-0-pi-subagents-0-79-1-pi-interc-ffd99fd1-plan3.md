@@ -4,7 +4,7 @@ status: ready
 created: 2026-10-19
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.3.0","pi-subagents":"0.79.1","pi-intercom":"0.17.1","pi-lens":"4.4.4"}
-updated: 2026-10-19T21:32:52.789Z
+updated: 2026-10-19T21:33:36.068Z
 reviewed: 2026-10-19
 tagsChecked: 51893b22
 ---
@@ -225,14 +225,10 @@ None.
 
 - [x] **CU-89** Live C5 passed against Pi 1.3.0 with openai-codex/gpt-6-luna.
 - [x] **CU-90** verify:quiet green except one environment-only live check: test-work-screen-read's attached-device branch fails on the non-phone device ingenic-serial (android CLI cannot screencap it); screen-read code untouched by this plan.
-- [ ] **CU-91** Record the reviewed versions with C7 (`node scripts/work-catch-up-record.mjs <this plan's id>`).
-  - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json` and refuses missing, unexplained or unverified decisions.
-  - Before running it, add each adopted entry's "verification" (command and result) to the JSON above.
+- [x] **CU-91** Catch-up baseline recorded for pi-coding-agent 1.3.0, pi-subagents 0.79.1, pi-intercom 0.17.1 and pi-lens 4.4.4; the adopted decisions now carry verification.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** No architecture change: the plan edited guard logic, prompt text, test fixtures and a devDependency pin only; no components or connections were added or removed.
 
 
 ## Acceptance
