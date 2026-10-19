@@ -22,10 +22,21 @@ export type Recent = { file: string; cwd: string; sessionId: string; name?: stri
 export const hubDataDir = () => path.join(agentDir(), "pi-control-hub");
 const sameFile = (a?: string, b?: string) => !!a && !!b && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 
+/** Windows refuses a rename over a file another process briefly holds (antivirus, indexer, a reader): EPERM/EACCES/EBUSY. Retry for about 2 s, like graceful-fs. */
+function renameOver(from: string, to: string) {
+	for (let attempt = 0; ; attempt++) {
+		try { return renameSync(from, to); }
+		catch (error) {
+			if (attempt >= 20 || !["EPERM", "EACCES", "EBUSY"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10 * (attempt + 1)); // short synchronous back-off
+		}
+	}
+}
+
 export function writeJsonAtomic(file: string, value: unknown) {
 	mkdirSync(path.dirname(file), { recursive: true });
 	const temporary = `${file}.${process.pid}.${crypto.randomBytes(4).toString("hex")}.tmp`;
-	try { writeFileSync(temporary, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 }); renameSync(temporary, file); }
+	try { writeFileSync(temporary, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 }); renameOver(temporary, file); }
 	finally { rmSync(temporary, { force: true }); }
 }
 
