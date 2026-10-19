@@ -789,8 +789,10 @@ assert.ok(usage.lines.flat().some((part) => part.color === "accent" && part.text
 assert.equal(usage.lines.map((row) => row.map((part) => part.text).join("")).join("\n").includes("\u0001"), false, "no colour markers leak");
 const rowText = (rows) => rows.map((row) => row.map((part) => part.text).join("")).join("\n");
 assert.match(rowText(usage.lines), /5h/, "fixture has 5h windows");
-assert.doesNotMatch(rowText(usage.phoneLines), /5h/, "phone popup drops 5h windows");
-assert.match(rowText(usage.phoneLines), /7d/, "phone popup keeps 7d windows");
+const codexUsage = usage.summary.find((item) => item.id === "codex");
+assert.deepEqual(codexUsage.bars.map((bar) => bar.label), ["5h", "7d"], "the usage window gets one bar per quota window");
+assert.ok(codexUsage.bars.every((bar) => Number.isInteger(bar.left) && typeof bar.resets === "string"), "bars carry left % and reset time");
+assert.ok(Array.isArray(codexUsage.warnings) && Array.isArray(codexUsage.notes));
 hiddenSetting = { enabled: true, hidden: [] };
 hiding.controller.apply(hiding.ctx);
 await flush();

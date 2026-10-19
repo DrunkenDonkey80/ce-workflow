@@ -149,7 +149,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
 			case "system": return systemLoad();
-			case "models": case "usage": case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
+			case "models": case "usage": case "commands": case "pool": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
 	}
@@ -161,7 +161,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 				// RPC has no reload; D12: Reload is park + resume (idle only).
 				if (typeof data.text === "string" && /^\/(wo )?reload$/.test(data.text.trim())) { await host.restart(id); return { ok: true }; }
 				return call(id, "/api/message", data);
-			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
+			case "command": case "bias": case "generate": case "edit": case "comment": case "move": case "pool": return call(id, `/api/${endpoint}`, data);
 			case "stop": {
 				only(data, ["target"], "Invalid Stop fields.");
 				await host.live.get(id)?.rpc.send({ type: "abort" });

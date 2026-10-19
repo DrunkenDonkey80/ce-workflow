@@ -797,7 +797,7 @@ $("composer").addEventListener("submit", async event => {
  finally { messageSending = false; renderShell(); }
 });
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
-const menus = [["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["usage-button", "usage-menu"], ["title", "title-menu"]];
+const menus = [["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
@@ -1040,40 +1040,85 @@ $("switcher").addEventListener("keydown", event => { if (event.key === "Escape" 
 toggleSwitcher(localStorage.getItem("plan3-switcher") !== "closed");
 document.addEventListener("visibilitychange", () => void loadSessions());
 void loadSessions();
-// Subscription 7d left per provider (footer data); tapping shows the footer rows in their colours.
+// Subscription usage: one bar per provider (7d left, coloured like the footer, warnings in their colour);
+// tapping one opens its window: every quota window as a bar, the pool's notes and, for Claude, the account pool.
 type Segment = { text: string; color?: string };
-let usageLines: Segment[][] = [], usagePhoneLines: Segment[][] = [], usageAccounts: Segment[] = [], usageTimer = 0;
-// Footer rows become one block per provider (│) with one line per item (·); bar glyphs become equal-height cells.
-function usageBlocks(rows: Segment[][]) {
- const lines: HTMLElement[] = []; let line: HTMLElement;
- const start = (provider: boolean) => { line = document.createElement("div"); line.className = "usage-line" + (provider ? " provider" : ""); lines.push(line); };
- for (const row of rows) {
-  start(true);
-  for (const part of row) for (const [index, piece] of part.text.split(/ (│|·) /).entries()) {
-   if (index % 2) { start(piece === "│"); continue; }
-   const span = Object.assign(document.createElement("span"), { className: part.color ? "tone-" + part.color : "" });
-   for (const chunk of piece.split(/([█░]+)/)) if (/^[█░]+$/.test(chunk)) span.append(...[...chunk].map(cell => Object.assign(document.createElement("span"), { className: cell === "█" ? "cell" : "cell off" }))); else if (chunk) span.append(chunk);
-   line.append(span);
-  }
- }
- return lines;
-}
+type UsageBar = { label: string; left: number; color: string; resets?: string; at?: string };
+type Usage = { id: string; label: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[] };
+let usage: Usage[] = [], usageLines: Segment[][] = [], usageAccounts: Segment[] = [], usageTimer = 0, usageShown = "";
+const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
+const tone = (color?: string) => color === "error" || color === "warning" || color === "success" ? color : "accent";
 async function loadUsage() {
  clearTimeout(usageTimer); if (document.visibilityState !== "visible") return;
  try {
-  const value = await get("usage") as { summary: { label: string; left: number; color: string; resets?: string }[]; lines: Segment[][]; phoneLines?: Segment[][]; accounts?: Segment[] };
-  usageLines = value.lines; usagePhoneLines = value.phoneLines ?? value.lines; usageAccounts = value.accounts ?? []; $("usage-button").hidden = !value.summary.length;
-  // Short: 7d left per provider, coloured like the footer ("Codex: 25% 1d 14h | Claude: 15%"); hover shows the full rows.
-  $("usage-button").replaceChildren(...value.summary.flatMap((item, index) => [...index ? [" | "] : [], Object.assign(document.createElement("span"), { className: "usage-item tone-" + item.color, textContent: `${item.label}: ${item.left}%${item.resets ? " " + item.resets : ""}` })]));
-  $("usage-button").title = usageLines.map(line => line.map(part => part.text).join("")).join("\n") || "Subscription usage";
+  const value = await get("usage") as { summary: Usage[]; lines: Segment[][]; accounts?: Segment[] };
+  usage = value.summary; usageLines = value.lines; usageAccounts = value.accounts ?? [];
+  $("usage-button").hidden = !usage.length;
+  $("usage-button").replaceChildren(...usage.map(item => {
+   const button = el("button", "bar usage-bar"); button.type = "button"; button.dataset.provider = item.id;
+   button.append(el("span", "usage-item", `${item.label}: ${item.left}%${item.resets ? " " + item.resets : ""}`), ...(item.warnings ?? []).map(w => el("span", "usage-warning tone-" + w.color, " · " + w.text)));
+   // A warning outranks the quota colour: the expiring week is the thing to act on.
+   setBar(button, item.left, tone(item.warnings?.find(w => w.color === "error")?.color ?? item.warnings?.[0]?.color ?? item.color));
+   button.title = (usageLines.find(line => line[0]?.text === item.label) ?? []).map(part => part.text).join("") || item.label;
+   button.addEventListener("click", () => void openUsage(item.id));
+   return button;
+  }));
+  if (usageShown && ($("usage-window") as HTMLDialogElement).open) void openUsage(usageShown, false);
  } catch { $("usage-button").hidden = true; }
  usageTimer = window.setTimeout(loadUsage, 120_000);
 }
-$("usage-button").addEventListener("click", () => {
- const accounts = usageAccounts.length ? [Object.assign(document.createElement("div"), { className: "usage-line provider", textContent: "Claude accounts · 7d left · resets in" }), ...usageAccounts.map(part => Object.assign(document.createElement("div"), { className: "usage-line tone-" + part.color + (part.text.startsWith("→") ? " current" : ""), textContent: part.text }))] : [];
- $("usage-menu").replaceChildren(...usageBlocks(phone.matches ? usagePhoneLines : usageLines), ...accounts);
- toggleMenu("usage-button", "usage-menu");
-});
+// The Claude pool's own row text carries ANSI colours (it is the /claude-pool menu line).
+function ansi(text: string) {
+ const line = el("div", "pool-line"); let color = "";
+ for (const [index, piece] of text.split(/\x1b\[(\d+)m/).entries()) {
+  if (index % 2) { color = ({ 31: "error", 32: "success", 33: "warning", 34: "accent" })[piece] ?? ""; continue; }
+  if (piece) line.append(color ? el("span", "tone-" + color, piece) : piece);
+ }
+ return line;
+}
+type PoolRow = { label: string; line: string; active: boolean; favorite: boolean; weekend: boolean; disabled: boolean; dead: boolean };
+async function poolAct(act: string, label = "") {
+ if (act === "remove" && !confirm(`Remove "${label}" from the Claude pool?`)) return;
+ try { const result = await post("pool", { act, label }) as { message?: string }; if (result.message) showNotice(result.message); }
+ catch (error) { showNotice(error.message); }
+ void loadUsage();
+}
+async function openUsage(id: string, open = true) {
+ const item = usage.find(entry => entry.id === id), dialog = $("usage-window") as HTMLDialogElement;
+ if (!item) return;
+ usageShown = id; $("usage-title").textContent = item.label + " usage";
+ const body: HTMLElement[] = (item.bars ?? []).map(bar => {
+  const row = el("div", "bar usage-window-bar");
+  row.append(el("b", "", bar.label), ` ${bar.left}% left${bar.resets ? " · resets in " + bar.resets : ""}${bar.at ? " (" + bar.at + ")" : ""}`);
+  setBar(row, bar.left, tone(bar.color)); return row;
+ });
+ body.push(...(item.warnings ?? []).map(w => el("p", "usage-alert tone-" + w.color, "⚠ " + w.text)), ...(item.notes ?? []).map(note => el("p", "dialog-purpose", note)));
+ if (id === "claude") {
+  let pool: { title: string; drain7d: boolean; rows: PoolRow[] } | null = null;
+  try { pool = await get("pool"); } catch { pool = null; }
+  if (pool?.rows.length) {
+   const tools = el("div", "pool-tools");
+   const refresh = el("button", "", "↻ Refresh usage"), drain = el("button", pool.drain7d ? "on" : "", pool.drain7d ? "Drain 7d: on" : "Drain 7d: off");
+   refresh.title = "Fetch every account's usage now"; drain.title = "Drain 7d: serve the soonest-expiring week first, ignoring 5h";
+   refresh.addEventListener("click", () => void poolAct("refresh")); drain.addEventListener("click", () => void poolAct("mode"));
+   tools.append(el("h3", "", pool.title), refresh, drain);
+   body.push(tools, ...pool.rows.map(row => {
+    const box = el("div", "pool-row" + (row.active ? " active" : "") + (row.disabled || row.dead ? " off" : ""));
+    const actions = el("div", "pool-actions");
+    const action = (act: string, text: string, title: string, on = false) => { const b = el("button", on ? "on" : "", text); b.type = "button"; b.title = title; b.addEventListener("click", () => void poolAct(act, row.label)); actions.append(b); };
+    action("switch", "Use", "Switch to this account now (held until it runs out)", row.active);
+    action("favorite", "★", "Favourite", row.favorite); action("weekend", "Wknd", "Weekend account", row.weekend);
+    action("up", "↑", "Raise priority"); action("down", "↓", "Lower priority");
+    action("toggle", row.disabled ? "Enable" : "Disable", row.disabled ? "Put back in rotation" : "Take out of rotation");
+    action("remove", "✕", "Remove from the pool");
+    box.append(ansi(row.line), actions); return box;
+   }));
+  } else if (usageAccounts.length) body.push(el("h3", "", "Accounts · 7d left · resets in"), ...usageAccounts.map(part => el("div", "usage-line tone-" + part.color + (part.text.startsWith("→") ? " current" : ""), part.text)));
+ }
+ $("usage-body").replaceChildren(...body);
+ if (open && !dialog.open) dialog.showModal();
+}
+$("usage-close").addEventListener("click", () => { usageShown = ""; ($("usage-window") as HTMLDialogElement).close(); });
 document.addEventListener("visibilitychange", () => void loadUsage());
 void loadUsage();
 // Pi and /wo command pickers (drawer, phones): a pick goes into the composer for review before sending.

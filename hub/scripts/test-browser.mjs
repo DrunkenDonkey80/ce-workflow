@@ -56,11 +56,12 @@ const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.e
 git("init", "-q"); git("add", "-A"); git("commit", "-qm", "init"); write("src/app.ts", "new line\n");
 
 // What ce-workflow answers through /pi-hub, as the old in-process stub did; fake Pi relays each call here.
-const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
+const pool = { acts: [] }; const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
 const fail = (status, error) => Object.assign(new Error(error), { status });
 function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
- if (endpoint === "/api/usage") return { summary: [{ label: "Claude", left: 53, color: "text" }, { label: "Codex", left: 12, color: "error", resets: "1d 14h" }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
+ if (endpoint === "/api/usage") return { summary: [{ id: "claude", label: "Claude", left: 53, color: "text", bars: [{ label: "7d", left: 53, color: "text" }], warnings: [{ text: "expiring in 4h 12m (40% unused)", color: "error" }], notes: ["70% in 2h 0m"] }, { id: "codex", label: "Codex", left: 12, color: "error", resets: "1d 14h", bars: [{ label: "5h", left: 80, color: "text", resets: "2h 3m" }, { label: "7d", left: 12, color: "error", resets: "1d 14h", at: "Tue 10:00" }], warnings: [], notes: [] }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
+ if (endpoint === "/api/pool") { if (body.act) { pool.acts.push(body.act + ":" + body.label); return { message: "done " + body.act }; } return { title: "Claude accounts", drain7d: false, rows: [{ label: "flex1", line: "[32m▸ 1. ★[0m 5h 20% 7d 53%", active: true, favorite: true, weekend: false, disabled: false, dead: false }, { label: "flex2", line: "  2.    5h 0% 7d 90%", active: false, favorite: false, weekend: false, disabled: true, dead: false }] }; }
  if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }], args: { wo: [{ value: "share", description: "Toggle sharing" }], plan3: [{ value: "review", description: "Review" }, { value: "review all", description: "Review" }] } };
  if (endpoint === "/api/edit" && body.target === "product") { // E-05: Project-tab edits
   const planned = toolbarEdit(product, body.edit), result = applyDiagramOperations(product, planned.operations); toolbarEdits.push(body.edit);
@@ -502,19 +503,27 @@ try {
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
  assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["fake-1: Low", "Context: 84k/200k", "💡 Normal", sample.title + "2/5"]);
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - herdr tab; the plan is in its bar");
- assert.equal(await evaluate("document.getElementById('usage-button').textContent"), "Claude: 53% | Codex: 12% 1d 14h", "usage: short 7d text");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .usage-item')].map(item => item.className)"), ["usage-item tone-text", "usage-item tone-error"]);
- assert.match(await evaluate("document.getElementById('usage-button').title"), /5h 20%/, "hover shows the full usage rows");
+ // Usage: one bar per provider, filled to 7d left; a warning shows in the button and colours it.
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))"), ["Claude: 53% · expiring in 4h 12m (40% unused)|error|53%", "Codex: 12% 1d 14h|error|12%"], "usage: one bar per provider with its warning");
+ assert.match(await evaluate("document.querySelector('#usage-button .usage-bar').title"), /5h 20%/, "hover shows the provider's footer row");
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
  await browser("wait", "--fn", "document.getElementById('bias-button').textContent === '💡 Think:Task'");
  await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
- await browser("click", "#usage-button");
- // One block per provider (│), one line per item (·); bar glyphs are equal-height cells; the menu is narrow and under its button.
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-menu .usage-line')].map(line => line.className + ':' + line.textContent + ':' + line.querySelectorAll('.cell').length + '/' + line.querySelectorAll('.cell.off').length)"),
-  ["usage-line provider:Claude 7d [] 53%:8/4", "usage-line:5h 20%:0/0", "usage-line provider:Codex 7d 12%:0/0"]);
- assert(await evaluate("(() => { const menu = document.getElementById('usage-menu').getBoundingClientRect(), button = document.getElementById('usage-button').getBoundingClientRect(); return menu.width <= 360 && menu.right <= innerWidth && Math.abs(menu.left - Math.min(button.left, innerWidth - menu.width - 8)) < 2; })()"), "usage menu: narrow, under its button");
+ // Clicking a provider opens its window: every quota window as a bar; Claude adds the account pool with its actions.
+ await browser("click", "#usage-button [data-provider=codex]"); await browser("wait", "--fn", "document.getElementById('usage-window').open");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-window-bar')].map(b => b.textContent)"), ["5h 80% left · resets in 2h 3m", "7d 12% left · resets in 1d 14h (Tue 10:00)"], "codex window: 5h and 7d bars");
+ await browser("click", "#usage-close");
+ await browser("click", "#usage-button [data-provider=claude]"); await browser("wait", ".pool-row");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-alert, #usage-body .pool-row')].map(e => e.className + ':' + (e.querySelector('.pool-line')?.textContent ?? e.textContent))"), ["usage-alert tone-error:⚠ expiring in 4h 12m (40% unused)", "pool-row active:▸ 1. ★ 5h 20% 7d 53%", "pool-row off:  2.    5h 0% 7d 90%"], "claude window: warning, then the pool rows");
+ assert.equal(await evaluate("document.querySelector('.pool-row .pool-line .tone-success')?.textContent"), "▸ 1. ★", "the pool's ANSI colours become tones");
+ await browser("click", ".pool-row.off .pool-actions button:first-child"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done switch')");
+ await browser("click", ".pool-tools button:nth-of-type(2)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done mode')");
+ assert.deepEqual(pool.acts, ["switch:flex2", "mode:"], "pool actions reach the session");
+ await browser("click", "#usage-close");
+ // The plan bar lines up with the sidebar's folder boxes below it.
+ assert(await evaluate("(() => { const plan = document.getElementById('plan-button').getBoundingClientRect().left, box = document.querySelector('.session-folder')?.getBoundingClientRect().left; return box === undefined || Math.abs(plan - box) < 2; })()"), "plan bar aligns with the sidebar: " + await evaluate("JSON.stringify([document.getElementById('plan-button').getBoundingClientRect().left, document.querySelector('.session-folder')?.getBoundingClientRect().left])"));
  // Think and the usage bars together span the chat panel width.
  assert.deepEqual(await evaluate("['plan-button', 'model-button', 'context-button', 'usage-button', 'bias-button', 'settings-button'].map(id => document.getElementById(id).getBoundingClientRect().left).every((left, index, all) => !index || left > all[index - 1])"), true, "desktop order: plan, model, context, usage, think, gear");
  assert(await evaluate("(() => { const bar = document.querySelector('.topbar').getBoundingClientRect(), side = document.getElementById('switcher').getBoundingClientRect(); return bar.left === 0 && (document.getElementById('switcher').hidden || side.top >= bar.bottom - 1); })()"), "the top bar spans the width above the sidebar: " + await evaluate("JSON.stringify([document.querySelector('.topbar').getBoundingClientRect(), document.getElementById('switcher').getBoundingClientRect(), getComputedStyle(document.body).paddingLeft])"));

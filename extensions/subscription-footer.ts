@@ -1399,19 +1399,30 @@ export function createSubscriptionFooterController(pi, options = {}) {
 			if (!installed) return { summary: [], lines: [] };
 			const at = now(), theme = { fg: (color, text) => `\u0001${color}\u0002${text}\u0003`, bold: (text) => text };
 			const summary = shown().flatMap((entry) => {
-				const state = states.get(entry.id) as { snapshot?: { windows?: { id: string; usedPercent: number }[] } } | undefined;
-				const week = state?.snapshot?.windows?.find((window) => window.id === "7d") as { usedPercent: number; resetsAt?: number } | undefined;
+				const state = states.get(entry.id) as { snapshot?: { windows?: { id: string; label: string; usedPercent: number; resetsAt?: number; text?: string; color?: string }[] } } | undefined;
+				const windows = state?.snapshot?.windows ?? [];
+				const week = windows.find((window) => window.id === "7d");
 				// A served Claude pool rotates accounts, so its 7d has no single reset time.
 				const resets = week?.resetsAt && !(entry.id === "claude" && poolAccounts.length) ? formatDuration(week.resetsAt - at) : undefined;
-				return week ? [{ label: entry.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets }] : [];
+				// The page's usage window: one bar per quota window, the pool's refill notes, and its warnings in words.
+				const bars = windows.filter((w) => w.text === undefined || w.id === "7d").map((w) => ({
+					label: w.label, left: Math.round(100 - w.usedPercent), color: quotaColor(w.usedPercent),
+					resets: w.resetsAt ? formatDuration(w.resetsAt - at) : undefined,
+					at: w.resetsAt && w.label !== "5h" ? resetMoment(w.resetsAt, at) : undefined,
+				}));
+				const words = (w) => w.id === "drain" ? w.text.replace(/^7d: (.*) \((\d+%)\)$/, "expiring in $1 ($2 unused)")
+					: w.id === "login" ? w.text.replace(/^ER:expired/, "login expired").replace(/^ER:/, "login ends in ")
+					: w.id === "5h-full" ? w.text.replace(/^5h full (.+)$/, "5h full, frees in $1") : w.text;
+				const text = windows.filter((w) => w.text !== undefined && w.id !== "7d");
+				const warnings = text.filter((w) => w.color).map((w) => ({ text: words(w), color: w.color }));
+				const notes = text.filter((w) => !w.color).map((w) => w.text);
+				return week ? [{ id: entry.id, label: entry.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets, bars, warnings, notes }] : [];
 			});
 			const segments = (rows) => rows.map((line) =>
 				[...line.matchAll(/\u0001(\w+)\u0002([^\u0001-\u0003]*)\u0003|[^\u0001-\u0003]+/g)].map((match) => (match[1] ? { text: match[2], color: match[1] } : { text: match[0] })),
 			);
 			const rows = (source) => segments(renderQuotaRows(shown(), source, theme, 120, at, { resetDates: setting().resetDates !== false }));
-			// Phone popup drops every 5h window: no room, and the 7d accounts list says what matters.
-			const weekOnly = new Map([...states].map(([id, state]) => [id, (state as { snapshot?: { windows?: { id: string }[] } })?.snapshot?.windows ? { ...state, snapshot: { ...(state as { snapshot: object }).snapshot, windows: (state as { snapshot: { windows: { id: string }[] } }).snapshot.windows.filter((w) => !w.id.startsWith("5h")) } } : state]));
-			return { summary, lines: rows(states), phoneLines: rows(weekOnly), accounts: poolAccountLines() };
+			return { summary, lines: rows(states), accounts: poolAccountLines() };
 		},
 	};
 }

@@ -164,10 +164,21 @@ h2 { font-size: 15px; font-weight: 600; }
  body.has-switcher, body.has-switcher.switcher-open { padding-left: 0 !important; }
  body.has-switcher .workspace { margin-left: 36px; } body.has-switcher.switcher-open .workspace { margin-left: 200px; }
  body > .switcher { top: calc(var(--app-top, 0px) + var(--topbar-h, 0px)); }
- .topbar { position: relative; z-index: 7; } /* its menus open over the sidebar below it */
+ .topbar { position: relative; z-index: 7; padding-left: 4px; } /* its menus open over the sidebar below it; the plan bar lines up with the folder boxes */
 }
 #usage-button { white-space: nowrap; }
-@media (min-width: 900px) { #usage-button { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; } #usage-button:hover { background: var(--hover); } } .usage-item { font-weight: 600; } .usage-item.tone-text { color: var(--text); }
+.usage-item { font-weight: 600; } .usage-warning { font-weight: 700; } .usage-warning.tone-error { color: var(--error); } .usage-warning.tone-warning { color: var(--warning); }
+#usage-button .usage-bar { flex: 0 1 auto; }
+.usage-window { width: min(760px, 94vw); } .usage-window h2 { margin-top: 0; }
+.usage-window-bar { display: block; text-align: left; margin: 6px 0; padding: 8px 12px; font-variant-numeric: tabular-nums; }
+.usage-alert { margin: 8px 0; padding: 6px 10px; border-radius: 6px; font-weight: 600; background: color-mix(in srgb, currentColor 10%, transparent); }
+.usage-alert.tone-error { color: var(--error); } .usage-alert.tone-warning { color: var(--warning); }
+.pool-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0 6px; } .pool-tools h3 { margin: 0 auto 0 0; font-size: 1em; }
+.pool-row { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 4px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+.pool-row.active { border-color: var(--focus); background: color-mix(in srgb, var(--focus) 8%, transparent); } .pool-row.off { opacity: .6; }
+.pool-line { font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; flex: 1 1 22em; }
+.pool-actions { display: flex; gap: 4px; flex-wrap: wrap; } .pool-actions button, .pool-tools button { padding: 3px 8px; font-size: 12px; }
+.pool-actions button.on, .pool-tools button.on { border-color: var(--focus); background: color-mix(in srgb, var(--focus) 18%, transparent); }
 @media (max-width: 899px) { .expand-left, #narrow-left, #collapse-left { display: none; } }
 .splitter { background: var(--chat); cursor: col-resize; border-inline: 1px solid var(--line); touch-action: none; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
