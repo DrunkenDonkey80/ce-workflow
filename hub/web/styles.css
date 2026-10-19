@@ -187,6 +187,9 @@ h2 { font-size: 15px; font-weight: 600; }
 .status-bars > .bar, .bar-group { flex: 1 1 8em; }
 /* Hub settings: top-right on desktop (last in the one-line bar), next to Think in the phone drawer. */
 #settings-button { flex: 0 0 auto; order: 1; }
+/* PC load graph left of the gear: CPU in the accent colour, memory in the warning colour, last 2 minutes. */
+.load { order: 1; flex: none; width: 56px; height: 24px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+#load-cpu { stroke: var(--accent); stroke-width: 1.5; vector-effect: non-scaling-stroke; } #load-memory { stroke: var(--warning); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 /* Desktop: the plan bar leads the status line, next to the title; the other buttons keep their full text. */
 #plan-button { order: -1; flex: 1 1 14em; display: flex; gap: 6px; justify-content: center; }
 .bar-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; } .bar-count { flex: none; }

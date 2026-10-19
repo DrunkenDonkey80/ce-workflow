@@ -1103,6 +1103,18 @@ $("hub-restart").addEventListener("click", async () => {
  if (!confirm("Restart the hub? Every session stops and starts again; nothing is lost.")) return;
  try { await post("hub", { action: "restart" }); showNotice("Hub restarting; the page reconnects by itself.", true); } catch (error) { showNotice(error.message); }
 });
+// PC load every 5 s while the page is visible; 24 samples = the last 2 minutes.
+const loadSamples: { cpu: number; memory: number }[] = [];
+async function pollLoad() {
+ if (document.hidden) return;
+ try { loadSamples.push(await get("system")); } catch { return; }
+ if (loadSamples.length > 24) loadSamples.shift();
+ const line = (key: "cpu" | "memory") => loadSamples.map((sample, index) => `${index * 2 + 48 - loadSamples.length * 2},${(20 - sample[key] / 5).toFixed(1)}`).join(" ");
+ $("load-cpu").setAttribute("points", line("cpu")); $("load-memory").setAttribute("points", line("memory"));
+ const last = loadSamples.at(-1)!, text = `CPU ${last.cpu}% · Memory ${last.memory}%`;
+ $("load").setAttribute("aria-label", text); $("load").querySelector("title")!.textContent = text + " (last 2 minutes)";
+}
+void pollLoad(); setInterval(pollLoad, 5000);
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
  if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (herdr, terminals) keeps the old version until restarted.")) return;

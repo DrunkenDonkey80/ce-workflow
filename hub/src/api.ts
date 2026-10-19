@@ -3,6 +3,7 @@
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
 import { statSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { emptyDiagram, loadDiagram } from "../../extensions/plan3-diagram.ts";
 import { webTarget } from "../../extensions/plan3-web.ts";
@@ -142,6 +143,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 			}
 			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
+			case "system": return systemLoad();
 			case "models": case "usage": case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
@@ -213,4 +215,12 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 	});
 
 	return { get, post, extras, forms, saveImage: savePastedImage };
+}
+
+// PC load for the page's CPU/memory graph: CPU is the busy share of all cores since the previous call.
+const cpuTimes = () => os.cpus().reduce((sum, { times }) => ({ idle: sum.idle + times.idle, total: sum.total + times.user + times.nice + times.sys + times.irq + times.idle }), { idle: 0, total: 0 });
+let lastCpu = cpuTimes();
+export function systemLoad() {
+	const now = cpuTimes(), total = now.total - lastCpu.total, idle = now.idle - lastCpu.idle; lastCpu = now;
+	return { cpu: total > 0 ? Math.round(100 * (1 - idle / total)) : 0, memory: Math.round(100 * (1 - os.freemem() / os.totalmem())) };
 }

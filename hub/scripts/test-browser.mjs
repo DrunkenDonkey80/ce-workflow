@@ -471,6 +471,8 @@ try {
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary");
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
  await browser("press", "Escape");
+ await browser("wait", "--fn", "document.getElementById('load-cpu').getAttribute('points')");
+ assert.match(await evaluate("document.getElementById('load').getAttribute('aria-label')"), /^CPU \d+% · Memory \d+%$/, "PC load graph left of the gear");
  // A form taller than the window scrolls inside its frame, with the title and buttons kept in view.
  const long = { question: "Long one", context: "Line\n".repeat(30), options: [{ title: "A" }, { title: "B" }], allowMultiple: false, allowFreeform: true };
  ask({ questions: [long, long, long], allowComment: true });
