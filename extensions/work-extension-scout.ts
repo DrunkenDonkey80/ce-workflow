@@ -54,7 +54,7 @@ export async function collectRecentExtensionPage(page = 1, fetchFn = fetch, sign
 	return { page, html, hasNext: new RegExp(`[?&]page=${page + 1}(?:[&"'#]|$)`).test(links) };
 }
 
-export async function collectRecentExtensionPages(since, fetchFn = fetch, options = {}) {
+export async function collectRecentExtensionPages(since, fetchFn = fetch, options: any = {}) {
 	if (!Number.isFinite(Date.parse(since))) throw new Error("extension catalog cursor is invalid");
 	return [(await collectRecentExtensionPage(options.page ?? 1, fetchFn, options.signal)).html];
 }
@@ -126,7 +126,7 @@ function decisionRecord(status, reason, rationale, reviewedAt, sourceRevision) {
 	};
 }
 
-export async function reviewInspectedExtensions(cwd, options = {}) {
+export async function reviewInspectedExtensions(cwd, options: any = {}) {
 	if (typeof options.review !== "function" || typeof options.decide !== "function") throw new Error("extension reviewer and guided decision are required");
 	options.signal?.throwIfAborted?.();
 	const candidates = (options.candidates ?? readExtensionScoutLedger(cwd).finalists).slice(0, SCOUT_LIMIT);
@@ -245,7 +245,7 @@ function inspectionFiles(root, git = defaultGit) {
 	});
 }
 
-export async function inspectQueuedExtensions(cwd, options = {}) {
+export async function inspectQueuedExtensions(cwd, options: any = {}) {
 	if (typeof options.inspect !== "function") throw new Error("extension source inspector is required");
 	options.signal?.throwIfAborted?.();
 	const candidates = readExtensionScoutLedger(cwd).currentRun.slice(0, SCOUT_LIMIT);
@@ -293,7 +293,7 @@ export async function inspectQueuedExtensions(cwd, options = {}) {
 	return { inspected: results, ledger: readExtensionScoutLedger(cwd) };
 }
 
-export async function runExtensionScout(cwd, options = {}) {
+export async function runExtensionScout(cwd, options: any = {}) {
 	const now = new Date(options.now ?? Date.now());
 	const ledger = readExtensionScoutLedger(cwd);
 	const since = ledger.cursor ?? new Date(now.getTime() - 30 * DAY_MS).toISOString();

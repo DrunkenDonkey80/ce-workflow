@@ -16,7 +16,8 @@ const STATUSES = new Set([
 ]);
 
 export class WorkStoreError extends Error {
-	constructor(category, message, details = {}) {
+	[key: string]: any; // untyped JS-style fields
+	constructor(category, message, details: any = {}) {
 		super(message);
 		this.name = "WorkStoreError";
 		this.category = category;
@@ -37,7 +38,7 @@ function recoveryPath(cwd) {
 
 
 
-function error(category, message, details) {
+function error(category, message, details = undefined) {
 	return new WorkStoreError(category, message, details);
 }
 
@@ -105,7 +106,7 @@ function stringArray(value, field, file) {
 function plainObject(value) {
 	return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
-function hierarchyError(message, file, details = {}) {
+function hierarchyError(message, file, details: any = {}) {
 	return error("corrupt", `${message} in ${file}`, {
 		repair:
 			"Repair the parent graph or initiative metadata before retrying mutation.",
@@ -446,7 +447,7 @@ export function validateStore(store, file = "work store") {
 
 
 
-export function listWorkItems(store, filter = {}) {
+export function listWorkItems(store, filter: any = {}) {
 	validateStore(store);
 	return Object.values(store.items)
 		.filter((item) =>

@@ -60,7 +60,7 @@ function itemIndicator(item, { checked, currentValue, multi }: { checked?: boole
 	return "";
 }
 
-function indicatedLabel(item, options = {}) {
+function indicatedLabel(item, options: any = {}) {
 	return [itemIndicator(item, options), itemLabel(item)]
 		.filter(Boolean)
 		.join(" ");

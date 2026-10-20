@@ -185,7 +185,7 @@ export async function compactMemory({ messages, previousSummary = '', prefix = '
   const attempts = [];
   for (const candidate of new Set([model, currentModel].filter(Boolean))) {
     if (signal?.aborted) throw new Error('Compaction cancelled');
-    const attempt = { model: candidate };
+    const attempt: { model: string; usage?: unknown; error?: string } = { model: candidate };
     attempts.push(attempt);
     try {
       const split = candidate.indexOf('/');

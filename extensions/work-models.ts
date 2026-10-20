@@ -542,7 +542,7 @@ function modelDisplayName(model, names = new Map()) {
 	return names.get(model) ?? model;
 }
 
-function modelEffortSummary(model, thinking, names) {
+function modelEffortSummary(model, thinking, names = undefined) {
 	return `${modelDisplayName(model, names)}: ${titleCase(thinking)}`;
 }
 
@@ -563,7 +563,7 @@ function currentModelId(ctx) {
 	return ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "";
 }
 
-async function choose(ctx, title, items, currentValue, options = {}) {
+async function choose(ctx, title, items, currentValue = undefined, options: any = {}) {
 	const selected = await showListDialog(ctx, {
 		title: String(title),
 		items,
@@ -643,7 +643,7 @@ async function chooseModel(
 	projectScope = false,
 	includeChatgptWeb = false,
 	inherit = undefined,
-	{ allow, extra = [], noneDescription, lead = [] } = {},
+	{ allow, extra = [], noneDescription, lead = [] }: any = {},
 ) {
 	// allow: optional predicate on "provider/id" (special values always stay); extra: items only the all-models view lists;
 	// lead: special items both views list first.
@@ -870,7 +870,7 @@ function captureCompactionState(ctx) {
 
 function knowledgeBlockForContext(
 	cwd,
-	{ messages = [], state = {}, files = {} } = {},
+	{ messages = [], state = {}, files = {} }: any = {},
 ) {
 	try {
 		const query = buildKnowledgeQuery({
@@ -887,7 +887,7 @@ function knowledgeBlockForContext(
 	}
 }
 
-export function knowledgeContextMessage(cwd, input = {}) {
+export function knowledgeContextMessage(cwd, input: any = {}) {
 	const content = knowledgeBlockForContext(cwd, input);
 	return content
 		? {
@@ -916,7 +916,7 @@ function knowledgeSource(ctx) {
 }
 
 function modelKnowledgeSource(ctx, writeBucket) {
-	const source = knowledgeSource(ctx) ?? {};
+	const source: any = knowledgeSource(ctx) ?? {};
 	source.writeBucket = writeBucket;
 	return source;
 }
@@ -926,7 +926,7 @@ export function knowledgeWriteBucketKey({
 	goalId,
 	sessionId,
 	cwd,
-} = {}) {
+}: any = {}) {
 	const workItem = String(workItemId ?? "").trim();
 	if (workItem) return `work-item:${workItem}`;
 	const goal = String(goalId ?? "").trim();
@@ -944,7 +944,7 @@ export function currentKnowledgeWriteBucketKey(ctx) {
 
 function parseKnowledgeRecordArgs(value) {
 	let rest = String(value ?? "").trim();
-	const input = { kind: "fact", scope: "project", authority: "human" };
+	const input: Record<string, string> = { kind: "fact", scope: "project", authority: "human" };
 	for (;;) {
 		const scope = rest.match(/^--(user|project)\s*/);
 		if (scope) {
@@ -1105,7 +1105,7 @@ export function visionAltModelSettings(cwd, settings = readEffectiveSettings(cwd
 	return String(settings.workOrchestrator?.visionAltModel ?? NONE_MODEL);
 }
 // "provider/id:level" shown as "Name: Level".
-const visionLabel = (ref, names) => { if (ref === NONE_MODEL) return "None"; if (ref === CURRENT_MODEL) return "Current model"; const { model, level } = splitLevel(ref); return level ? modelEffortSummary(model, level, names) : names?.get(model) ?? model; };
+const visionLabel = (ref, names = undefined) => { if (ref === NONE_MODEL) return "None"; if (ref === CURRENT_MODEL) return "Current model"; const { model, level } = splitLevel(ref); return level ? modelEffortSummary(model, level, names) : names?.get(model) ?? model; };
 
 export function imageModelSettings(cwd, settings = readEffectiveSettings(cwd)) {
 	return String(settings.workOrchestrator?.imageModel ?? NONE_MODEL);
@@ -1590,7 +1590,7 @@ function nativeSummaryFits(messages, previousSummary, model) {
 }
 
 export async function summarizeNativeContext(messages, ctx, { reserveTokens = 16_384, previousSummary, customInstructions,
-	signal = ctx.signal, retry, summarize = generateNativeSummary } = {}) {
+	signal = ctx.signal, retry, summarize = generateNativeSummary }: any = {}) {
 	if (!summarize || !ctx.modelRegistry?.streamSimple || !ctx.model) throw new Error("Pi's native summary generator is unavailable");
 	const stream = ctx.modelRegistry.streamSimple.bind(ctx.modelRegistry);
 	const run = async (current, previous) => {
@@ -1898,7 +1898,7 @@ export function stripProcessedPayloads(
 		fromIndex = 0,
 		imageBeforeTimestamp = 0,
 		cwd = process.cwd(),
-	} = {},
+	}: any = {},
 ) {
 	let lastAssistant = -1;
 	let secondLastAssistant = -1;
@@ -2174,7 +2174,7 @@ function resetContextCompaction() {
 	forcedUltracompact = false;
 }
 
-function runNativeMicrocompact(ctx, customInstructions, force = false) {
+function runNativeMicrocompact(ctx, customInstructions = undefined, force = false) {
 	const mode = currentCompactionMode(ctx);
 	if (!force && (researchContext || (!usesUltraSummary(mode) &&
 		(mode !== "native-200k" || (ctx.getContextUsage?.()?.tokens ?? 0) < nativeCompactionTrigger(ctx))))) return false;
@@ -2186,7 +2186,7 @@ function runNativeMicrocompact(ctx, customInstructions, force = false) {
 		return false;
 	forcedUltracompact = force && usesUltraSummary(mode);
 	const generation = beginContextCompaction();
-	const finish = (error) => {
+	const finish = (error = undefined) => {
 		if (!finishContextCompaction(generation)) return;
 		forcedUltracompact = false;
 		if (error)
@@ -2963,7 +2963,7 @@ async function reviewExtensionFinalist(source, ctx, signal) {
 		.replace(/\s*```$/, "");
 }
 
-function extensionScoutProgressLines(progress = {}) {
+function extensionScoutProgressLines(progress: any = {}) {
 	const reached = progress.dateReached?.slice?.(0, 10) ?? "—";
 	const lines = [
 		`Extension scout · ${progress.status ?? "idle"} · ${progress.phase ?? "waiting"}`,
@@ -2983,7 +2983,7 @@ function extensionScoutProgressLines(progress = {}) {
 	return lines;
 }
 
-function showExtensionScoutProgress(ctx, progress, runtime) {
+function showExtensionScoutProgress(ctx, progress, runtime = undefined) {
 	if (!extensionScoutEnabled()) {
 		ctx.ui?.setStatus?.("work-extension-scout", undefined);
 		ctx.ui?.setWidget?.("work-extension-scout", undefined);
@@ -3007,7 +3007,7 @@ function recordExtensionScoutProgress(ctx, patch, runtime) {
 	return progress;
 }
 
-async function handleWorkExtensionScout(ctx, options = {}) {
+async function handleWorkExtensionScout(ctx, options: any = {}) {
 	const signal = options.signal;
 	const runtime = options.runtime;
 	const prior = readExtensionScoutLedger(ctx.cwd).progress;
@@ -3255,7 +3255,7 @@ async function handleWorkExtensionScout(ctx, options = {}) {
 
 function extensionScoutDecisionCounts(ledger) {
 	const decisions = Object.values(ledger.packages)
-		.map((item) => item.decision?.status)
+		.map((item: any) => item.decision?.status)
 		.filter(Boolean);
 	return {
 		accepted: decisions.filter((status) => status === "proceed").length,
@@ -3264,13 +3264,13 @@ function extensionScoutDecisionCounts(ledger) {
 	};
 }
 
-async function handleCachedExtensionScoutReview(ctx, options = {}) {
+async function handleCachedExtensionScoutReview(ctx, options: any = {}) {
 	const signal = options.signal;
 	const runtime = options.runtime;
 	const initial = readExtensionScoutLedger(ctx.cwd);
 	const requested = new Set(options.candidates ?? []);
 	const candidates = Object.values(initial.packages).filter(
-		(item) =>
+		(item: any) =>
 			item.inspection?.ok &&
 			(requested.size
 				? requested.has(item.name)
@@ -3398,7 +3398,7 @@ function stopExtensionScout(ctx) {
 	return { ok: true, stopping: true };
 }
 
-function startExtensionScout(ctx, options = {}) {
+function startExtensionScout(ctx, options: any = {}) {
 	const run = options.reviewOnly
 		? handleCachedExtensionScoutReview
 		: handleWorkExtensionScout;
@@ -3431,7 +3431,7 @@ function startExtensionScout(ctx, options = {}) {
 	return { ok: true, background: true };
 }
 
-async function executeUtilityAction(command, args, ctx, pi, options = {}) {
+async function executeUtilityAction(command, args, ctx, pi, options: any = {}) {
 	const name = String(command ?? "").replace(/^\//, "");
 	const text = String(args ?? "");
 	if (name === "work-menu") return handleWorkMenuCommand(ctx, pi);
@@ -4348,7 +4348,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 		const names = await modelDisplayNames(ctx);
 		const camera = cameraSettings(projectSettings);
 		const openDesignCommand = settings.workOrchestrator?.openDesignCommand;
-		const items = [
+		const items: any[] = [
 {
 				kind: "planModels",
 				value: "planModels",

@@ -145,7 +145,7 @@ function validateBinding(binding, cwd) {
 	return { path: path.replaceAll("\\", "/"), sha256 };
 }
 
-export function knowledgePaths(cwd, options = {}) {
+export function knowledgePaths(cwd, options: any = {}) {
 	const userRoot =
 		options.userRoot ??
 		process.env.PI_CODING_AGENT_DIR ??
@@ -361,7 +361,7 @@ function fileFingerprint(path) {
 	return `${stat.size}:${stat.mtimeMs}`;
 }
 
-export function knowledgeFingerprint(cwd, options = {}) {
+export function knowledgeFingerprint(cwd, options: any = {}) {
 	const paths = knowledgePaths(cwd, options);
 	return createHash("sha256")
 		.update(`${fileFingerprint(paths.project)}|${fileFingerprint(paths.user)}`)
@@ -369,7 +369,7 @@ export function knowledgeFingerprint(cwd, options = {}) {
 		.slice(0, 16);
 }
 
-export function knowledgeWriteCount(cwd, writeBucket, options = {}) {
+export function knowledgeWriteCount(cwd, writeBucket, options: any = {}) {
 	const bucket = normalizeText(writeBucket);
 	if (!bucket) return 0;
 	const paths = knowledgePaths(cwd, options);
@@ -438,7 +438,7 @@ function bindingStatus(record, cwd) {
 	}
 }
 
-export function resolveKnowledge(cwd, options = {}) {
+export function resolveKnowledge(cwd, options: any = {}) {
 	const paths = knowledgePaths(cwd, options);
 	const rows = [
 		...readRows(paths.user, "user"),
@@ -502,7 +502,7 @@ function targetPath(cwd, scope, options) {
 	return knowledgePaths(cwd, options)[scope];
 }
 
-export function recordKnowledge(cwd, input, options = {}) {
+export function recordKnowledge(cwd, input, options: any = {}) {
 	if (hasSecret(JSON.stringify(input ?? {})))
 		throw new Error("Knowledge input looks like a secret and was not stored.");
 	const kind = input.kind ?? "fact";
@@ -581,7 +581,7 @@ export function recordKnowledge(cwd, input, options = {}) {
 	return { record: duplicate ?? record, deduplicated: !appended };
 }
 
-export function correctKnowledge(cwd, id, input, options = {}) {
+export function correctKnowledge(cwd, id, input, options: any = {}) {
 	const changes = Object.fromEntries(
 		Object.entries(input ?? {}).filter(([, value]) => value !== undefined),
 	);
@@ -613,7 +613,7 @@ export function correctKnowledge(cwd, id, input, options = {}) {
 	);
 }
 
-export function rejectKnowledge(cwd, id, reason = "", options = {}) {
+export function rejectKnowledge(cwd, id, reason = "", options: any = {}) {
 	const target = resolveKnowledge(cwd, options).find((item) => item.id === id);
 	if (!target) throw new Error(`Knowledge claim ${id} was not found.`);
 	if (
@@ -689,7 +689,7 @@ function authorityRank(value) {
 	return { human: 4, verified: 3, observed: 2, inferred: 1 }[value] ?? 0;
 }
 
-export function searchKnowledge(cwd, query, options = {}) {
+export function searchKnowledge(cwd, query, options: any = {}) {
 	const normalized = normalizedQuery(query);
 	const records = resolveKnowledge(cwd, options);
 	const candidates = options.includeInactive
@@ -760,7 +760,7 @@ export function searchKnowledge(cwd, query, options = {}) {
 		.slice(0, Math.min(5, Math.max(1, Number(options.limit ?? 3))));
 }
 
-export function renderKnowledge(results, options = {}) {
+export function renderKnowledge(results, options: any = {}) {
 	const maxChars = Math.min(
 		1_200,
 		Math.max(200, Number(options.maxChars ?? 1_200)),
@@ -792,7 +792,7 @@ export function renderKnowledge(results, options = {}) {
 		: "";
 }
 
-export function queryKnowledge(cwd, query, options = {}) {
+export function queryKnowledge(cwd, query, options: any = {}) {
 	const normalized = normalizedQuery(query);
 	const fingerprint = knowledgeFingerprint(cwd, options);
 	const key = createHash("sha256")
@@ -834,7 +834,7 @@ export function buildKnowledgeQuery({
 	target,
 	files,
 	explicit = "",
-} = {}) {
+}: any = {}) {
 	const actualUser = messages
 		.filter((message) => String(message?.role ?? "").toLowerCase() === "user")
 		.map((message) =>

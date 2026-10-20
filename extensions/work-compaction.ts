@@ -14,7 +14,7 @@ function finiteNumber(value, fallback) {
 }
 
 // Leave room for provider/proxy output reservation, prompts, and token-estimation drift.
-export function compactionInputBytes(model = {}) {
+export function compactionInputBytes(model: any = {}) {
 	// One byte per token of window: English/JSON/code runs ~3–4 bytes per token, so this lands near 25–35% of the window.
 	// ponytail: assumes text-like input; halve again if dense non-Latin transcripts start overflowing.
 	return Math.max(1, Math.floor(Number(model.contextWindow ?? model.context_window) || 200_000));
@@ -70,7 +70,7 @@ function valuesFrom(value) {
 	return typeof value[Symbol.iterator] === "function" ? [...value] : [];
 }
 
-export function filesFromOps(fileOps = {}) {
+export function filesFromOps(fileOps: any = {}) {
 	if (!fileOps || typeof fileOps !== "object") fileOps = {};
 	const read = [...valuesFrom(fileOps.readFiles), ...valuesFrom(fileOps.read)];
 	const modified = [
@@ -127,7 +127,7 @@ export function compactionThreshold({
 	contextWindow,
 	keepRecentTokens,
 	maxSummaryChars,
-} = {}) {
+}: any = {}) {
 	const configured = Math.max(
 		MIN_TRIGGER_TOKENS,
 		Math.round(finiteNumber(compactAtTokens, 150_000)),
@@ -609,7 +609,7 @@ export function formatCompactionSummary({
 	goal,
 	knowledge = "",
 	maxSummaryChars = DEFAULT_MAX_SUMMARY_CHARS,
-} = {}) {
+}: any = {}) {
 	const selectedProfile = Object.values(COMPACTION_PROFILES).includes(profile)
 		? profile
 		: COMPACTION_PROFILES.FREEFORM;

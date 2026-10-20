@@ -113,7 +113,7 @@ export function hashDesignValue(value) {
 
 
 
-function stringList(value, field, options = {}) {
+function stringList(value, field, options: any = {}) {
 	const result = array(value, field, options).map((item, index) =>
 		string(item, `${field}[${index}]`),
 	);
@@ -153,7 +153,7 @@ export function directionSelectionIsCurrent(selection, current) {
 	].every((key) => selection[key] === current[key]);
 }
 
-export function validateDesignHandoff(raw, options = {}) {
+export function validateDesignHandoff(raw, options: any = {}) {
 	const handoff = object(raw, "handoff");
 	boundedJson(handoff, "handoff");
 	if (![1, DESIGN_HANDOFF_VERSION].includes(handoff.version))
@@ -465,7 +465,7 @@ export function normalizeRemoteFingerprint(files) {
 	return hashDesignValue(normalized);
 }
 
-export function validateDesignArtifactRelativePath(relativePath, options = {}) {
+export function validateDesignArtifactRelativePath(relativePath, options: any = {}) {
 	const value = string(relativePath, "artifact path", 300).replaceAll("\\", "/");
 	if (
 		value.startsWith("/") ||
@@ -491,7 +491,7 @@ export function validateDesignArtifactRelativePath(relativePath, options = {}) {
 	return value;
 }
 
-export function resolveDesignArtifactPath(root, relativePath, options = {}) {
+export function resolveDesignArtifactPath(root, relativePath, options: any = {}) {
 	const relative = validateDesignArtifactRelativePath(relativePath, options);
 	const base = path.resolve(root);
 	const target = path.resolve(base, relative);
@@ -656,7 +656,7 @@ export function renderOpenDesignGenerationPrompt(
 
 
 
-export function renderDesignRepairPrompt(errors = [], contract = {}) {
+export function renderDesignRepairPrompt(errors = [], contract: any = {}) {
 	const list = array(errors, "repair errors", { min: 1, max: 20 })
 		.map((entry) => string(String(entry), "repair error", 500))
 		.sort();

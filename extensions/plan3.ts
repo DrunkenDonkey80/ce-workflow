@@ -388,12 +388,12 @@ const PACKET_OMIT = /^(?:phases|amendments|ideas|backlog|imported plan|relevant 
 const clipLine = (line) => line.length <= 200 ? line : `${line.slice(0, 200).replace(/\s+\S*$/, "")} \u2026`;
 // Execution mode of the step work continues with: its ### phase heading tagged [think], else coding.
 const THINK = /\[think\]/i;
-function stepHeading(lines, avail = {}) {
+function stepHeading(lines, avail: any = {}) {
 	const work = workState(lines, avail);
 	const step = work.wip[0] ?? work.next;
 	return step && lines.slice(0, step.index).findLast((line) => /^#{2,3} /.test(line));
 }
-function stepMode(lines, avail = {}) {
+function stepMode(lines, avail: any = {}) {
 	const heading = stepHeading(lines, avail);
 	return heading?.startsWith("### ") && THINK.test(heading) ? "think" : "coding";
 }
@@ -401,7 +401,7 @@ function stepMode(lines, avail = {}) {
 const BIAS = "plan3-bias";
 const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 1: "Think:Task", 2: "Think:Plan" };
 const BIAS_COLOR = { "-2": "31", "-1": "38;5;210", 1: "38;5;151", 2: "32" };
-function biasOf(ctx, plan, lines, avail = {}) {
+function biasOf(ctx, plan, lines, avail: any = {}) {
 	const data = (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === BIAS)?.data;
 	if (!data || data.id !== plan.id) return 0;
 	return Math.abs(data.level) === 1 && data.phase !== headingKey(stepHeading(lines, avail) ?? "") ? 0 : data.level;
@@ -429,7 +429,7 @@ function judgmentPhases(lines) {
 }
 const tagPrompt = `Plan3: before executing, tag phases. Some unfinished phases have no [think]/[code] tag. Edit only those ### phase headings. ${THINK_RULE} Change nothing else in the plan and do not start executing; when this turn ends, code leaves research mode and starts execution on the right model.`;
 
-function resumePacket(text, avail = {}) {
+function resumePacket(text, avail: any = {}) {
 	const { lines } = split(text);
 	const all = activeSteps(lines);
 	const work = workState(lines, avail);

@@ -171,7 +171,8 @@ export function renderModelRow(ctx, theme, width, thinkingLevel, extra = "") {
 }
 
 class QuotaError extends Error {
-	constructor(category, retryAfterMs) {
+	[key: string]: any; // untyped JS-style fields
+	constructor(category, retryAfterMs = undefined) {
 		super(category);
 		this.category = category;
 		this.retryAfterMs = retryAfterMs;
@@ -183,7 +184,7 @@ const table = (value) =>
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const percent = (value) =>
 	finite(value) ? Math.max(0, Math.min(100, value)) : undefined;
-const resetTime = (value) => {
+const resetTime = (value, _now = undefined) => {
 	if (finite(value) && value > 0) return value > 1e12 ? value : value * 1000;
 	if (typeof value === "string" && value) {
 		const parsed = Date.parse(value);
@@ -204,7 +205,7 @@ function resolvedToken(result) {
 		: undefined;
 }
 
-function authHeaders(result, extras = {}, raw = false) {
+function authHeaders(result, extras: any = {}, raw = false) {
 	const token = resolvedToken(result);
 	if (!token) throw new QuotaError("auth rejected");
 	return { ...extras, authorization: raw ? token : `Bearer ${token}` };
@@ -411,7 +412,7 @@ function upcomingNightMs(from, to) {
 // waking time with over 15% unspent, shown as % left (red: drain it); ER = soonest login end
 // within 3 days (yellow).
 function poolWindows(store, accounts, entries, used, t) {
-	const text = (id, value, color) => ({ id, label: id, usedPercent: 0, text: value, color });
+	const text = (id, value, color = undefined) => ({ id, label: id, usedPercent: 0, text: value, color });
 	const week = entries.map((e) => used(e.seven_day)).filter((w) => w.pct !== undefined);
 	if (!week.length) throw new QuotaError("unavailable");
 	const usedAvg = week.reduce((sum, w) => sum + w.pct, 0) / week.length;
@@ -1009,7 +1010,7 @@ async function acquirePollingOwnership(lockFile, fsImpl) {
 	}
 }
 
-export function createSubscriptionFooterController(pi, options = {}) {
+export function createSubscriptionFooterController(pi, options: any = {}) {
 	const {
 		readGlobalSettings,
 		providers = PRODUCTION_PROVIDERS,

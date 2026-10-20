@@ -202,7 +202,7 @@ export async function runTriage({ jobs, cwd, registry, model, signal, guard = ()
 }
 
 // rg runs without a shell; stdout/stderr are bounded and never exposed on failure.
-async function rg(args, cwd, signal, input) {
+async function rg(args, cwd, signal, input = undefined) {
 	return new Promise(resolveResult => {
 		const child = spawn("rg", args, { cwd, shell: false, windowsHide: true, signal });
 		const chunks = []; let bytes = 0, capped = false, failed = false;

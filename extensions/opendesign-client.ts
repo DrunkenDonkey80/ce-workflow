@@ -28,7 +28,8 @@ const registeredDaemonUrls = new Map();
 let persistentCleanupRegistered = false;
 
 export class OpenDesignError extends Error {
-	constructor(category, message, details = {}) {
+	[key: string]: any; // untyped JS-style fields
+	constructor(category, message, details: any = {}) {
 		super(message);
 		this.name = "OpenDesignError";
 		this.category = category;
@@ -36,7 +37,7 @@ export class OpenDesignError extends Error {
 	}
 }
 
-function error(category, message, details) {
+function error(category, message, details = undefined) {
 	return new OpenDesignError(category, message, details);
 }
 
@@ -81,7 +82,7 @@ function assertNoCredentials(value, field = "arguments") {
 		throw error("credentials-forbidden", `${field} must not contain credentials`);
 }
 
-function traceOpenDesign(event, details = {}, env = process.env) {
+function traceOpenDesign(event, details: any = {}, env = process.env) {
 	const traceFile = env.WORK_ORCH_OPENDESIGN_TRACE_FILE;
 	if (!traceFile || !path.isAbsolute(traceFile)) return;
 	try {
@@ -204,7 +205,7 @@ function explicitDaemonArgs(command, daemonUrl) {
 	return [...args, "--daemon-url", daemonUrl];
 }
 
-export function validateOpenDesignToolCall(name, args = {}) {
+export function validateOpenDesignToolCall(name, args: any = {}) {
 	if (![...READ_TOOLS, ...WRITE_TOOLS].includes(name))
 		throw error("tool-forbidden", `OpenDesign tool is not allowlisted: ${name}`);
 	if (!plainObject(args))
@@ -415,7 +416,7 @@ export function normalizeOpenDesignCommandSpec(spec) {
 	return normalizeCommandSpec(spec, "commandSpec");
 }
 
-export function resolveOpenDesignCommand(options = {}) {
+export function resolveOpenDesignCommand(options: any = {}) {
 	const env = options.env ?? process.env;
 	const platform = options.platform ?? process.platform;
 	let spec;
@@ -496,7 +497,7 @@ export function openDesignPayloadDigest(value) {
 		.digest("hex");
 }
 
-export function validateStartRecovery(original, recovery, options = {}) {
+export function validateStartRecovery(original, recovery, options: any = {}) {
 	if (!plainObject(original) || !plainObject(recovery))
 		throw error("invalid-input", "start payloads must be objects");
 	assertNoCredentials(original, "start payload");
@@ -540,6 +541,7 @@ function decodeToolResult(result) {
 }
 
 class FrameDecoder {
+	[key: string]: any; // untyped JS-style fields
 	constructor(onMessage, maxBytes = MAX_MESSAGE_BYTES) {
 		this.buffer = Buffer.alloc(0);
 		this.onMessage = onMessage;
@@ -576,7 +578,8 @@ class FrameDecoder {
 }
 
 export class OpenDesignClient {
-	constructor(command, options = {}) {
+	[key: string]: any; // untyped JS-style fields
+	constructor(command, options: any = {}) {
 		this.command = command;
 		this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 		this.maxMessageBytes = options.maxMessageBytes ?? MAX_MESSAGE_BYTES;
@@ -795,7 +798,7 @@ export class OpenDesignClient {
 		);
 	}
 
-	async callTool(name, args = {}) {
+	async callTool(name, args: any = {}) {
 		if (!this.tools.has(name))
 			throw error("tool-missing", `OpenDesign tool is unavailable: ${name}`);
 		validateOpenDesignToolCall(name, args);
