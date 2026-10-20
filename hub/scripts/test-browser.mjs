@@ -257,6 +257,10 @@ try {
  await browser("press", "Escape"); const lb = await evaluate("(() => { const r = document.querySelector(\"[data-node=load_balancer]\").getBoundingClientRect(); return { x: Math.round(r.x + 6), y: Math.round(r.bottom - 6) }; })()"); await browser("mouse", "move", String(lb.x), String(lb.y)); await browser("mouse", "down", "left"); await browser("mouse", "up", "left"); await browser("focus", "#zoom-fit");
  assert.equal(await shown("web_client__load_balancer"), true, "a clicked box stays in focus");
  await browser("mouse", "move", "2", "2"); await browser("press", "Escape"); assert.equal(await shown("web_client__load_balancer"), false, "Escape clears focus");
+ { const hub_ = (body) => fetch(`${origin}/s/${id}/api/hub`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ action: "settings", ...body }) });
+  assert.deepEqual(await (await hub_({ idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44" })).json(), { idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44" }, "gear settings save");
+  assert.equal((await hub_({ iconColor: "red" })).status, 400, "colours are #rrggbb only"); assert.equal((await hub_({ idleParkMinutes: -1 })).status, 400);
+  await hub_({ idleParkMinutes: 0, icon: "", iconColor: "" }); }
  { const r = await fetch(`${origin}/s/${id}/api/paste`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin }, body: "<svg onload=alert(1)>" }); assert.match((await r.json()).error, /PNG, JPEG/, "non-image paste rejected by magic bytes"); }
  // Clipboard image paste: saved as a temp file, path inserted into the draft.
  await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob(\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"), c => c.charCodeAt(0))], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");

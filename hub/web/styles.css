@@ -470,3 +470,11 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .prompt-thumbs .thumb { display: inline-block; margin: 6px 6px 0 0; } .prompt-thumbs .thumb img { max-width: 120px; max-height: 90px; }
 .thumb { display: block; margin-top: 6px; } .thumb img { display: block; max-width: 50%; height: auto; border: 1px solid var(--line); border-radius: 6px; }
 #chat-compact-m { grid-column: 1 / -1; }
+/* Gear menu field and the tab icon picker. */
+.menu-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
+.icon-grid { display: grid; grid-template-columns: repeat(5, 48px); gap: 8px; margin: 8px 0; }
+.icon-colors { display: flex; gap: 8px; margin: 4px 0 8px; }
+.icon-choice { width: 48px; height: 48px; padding: 4px; border: 2px solid transparent; border-radius: 10px; background: none; }
+.icon-choice svg { width: 100%; height: 100%; display: block; }
+.icon-choice.color-choice { width: 36px; height: 36px; border-radius: 50%; }
+.icon-choice[aria-checked="true"] { border-color: var(--focus); background: var(--hover); }

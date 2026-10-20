@@ -106,11 +106,9 @@ try {
 	const restarted = await host.restart(a.id);
 	assert.equal(restarted.sessionFile, a.sessionFile);
 
-	// Automatic parking: idle past the limit, but not while a browser is viewing (D16).
+	// Automatic parking: idle past the limit, even while a browser is viewing (D16).
 	host.idleParkMinutes = 60;
 	host.live.get(a.id).viewers = 1;
-	assert.deepEqual(await host.autoPark(Date.now() + 61 * 60_000), []);
-	host.live.get(a.id).viewers = 0;
 	const idle = host.live.get(a.id), clock = idle.lastActivity - 1;
 	idle.lastActivity = clock; idle.rpc.emit("ui", { type: "extension_ui_request", id: "s1", method: "setStatus", statusKey: "x", statusText: "y" });
 	assert.equal(idle.lastActivity, clock, "status repaints are not activity");

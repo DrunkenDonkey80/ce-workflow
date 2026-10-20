@@ -16,7 +16,7 @@ import { acquireLock, releaseLock } from "./session-lock.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
-export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean };
+export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; iconColor?: string };
 export type HubMarker = { pid: number; port: number; startedAt: number };
 export const configPath = () => path.join(hubDataDir(), "config.json");
 export const markerPath = () => path.join(hubDataDir(), "hub.json");
@@ -54,7 +54,7 @@ const WEB = new URL("../web/", import.meta.url);
 const JS = "text/javascript; charset=utf-8";
 const ASSETS: Record<string, [string, string]> = {
 	"app.js": ["app.ts", JS], "layout.js": ["layout.ts", JS], "diagram.js": ["diagram.ts", JS], "prompts.js": ["prompts.ts", JS],
-	"files.js": ["files.ts", JS], "stream.js": ["stream.ts", JS], "pair.js": ["pair.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
+	"files.js": ["files.ts", JS], "stream.js": ["stream.ts", JS], "pair.js": ["pair.ts", JS], "icons.js": ["icons.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
 };
 // Changes whenever a served file changes, checked per request, so web/ edits go live without restarting the hub
 // (and with it every session); an open page reloads itself when the build differs.
@@ -79,7 +79,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	let lastLocalPoll = 0;
 	const lock = acquireLock(path.join(dataDir, "hub"), "pi-control-hub");
 	const saved = readConfig();
-	const config: HubConfig = saved ?? { version: 1, port: 0, localKey: crypto.randomBytes(32).toString("hex"), idleParkMinutes: 60 };
+	const config: HubConfig = saved ?? { version: 1, port: 0, localKey: crypto.randomBytes(32).toString("hex"), idleParkMinutes: 10 };
 	const registry = new Registry(dataDir);
 	const views = new Map<string, SessionView>();
 	const host = new SessionHost({ registry, command, idleParkMinutes: config.idleParkMinutes, viewers: id => views.get(id)?.clients.size ?? 0 });
@@ -140,7 +140,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		},
 	};
 
-	const pageApi = createPageApi({ host, registry, views });
+	const pageApi = createPageApi({ host, registry, views, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "" }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection
@@ -215,6 +215,18 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 				if (request.headers["content-type"]?.split(";")[0].trim() !== "application/json") return send(415, { error: "JSON content type required." });
 				const data = await body(request, PAGE_BODY);
 				if (!data || typeof data !== "object" || Array.isArray(data)) return send(400, { error: "Expected a JSON object." });
+				if (endpoint === "hub" && data.action === "settings") {
+					// Per-hub (per-PC) settings from the gear menu: auto-park minutes and the tab icon.
+					const minutes = data.idleParkMinutes, icon = data.icon, color = data.iconColor;
+					if (minutes !== undefined && !(Number.isInteger(minutes) && minutes >= 0 && minutes <= 1440)) return send(400, { error: "Auto-park minutes must be 0 to 1440." });
+					if (icon !== undefined && !(typeof icon === "string" && /^[a-z-]{0,40}$/.test(icon))) return send(400, { error: "Unknown icon." });
+					if (color !== undefined && !(typeof color === "string" && /^(#[0-9a-f]{6})?$/i.test(color))) return send(400, { error: "Colour must be #rrggbb." });
+					if (minutes !== undefined) host.idleParkMinutes = config.idleParkMinutes = minutes as number;
+					if (icon !== undefined) config.icon = icon as string;
+					if (color !== undefined) config.iconColor = color as string;
+					writeJsonAtomic(configPath(), config);
+					return send(200, pageApi.settings());
+				}
 				if (endpoint === "hub") {
 					// A process cannot restart itself: a detached `pi-hub restart|update` stops this hub (D17 busy rule) and starts a new one.
 					// update: --yes because the page asked already; Pi outside the hub keeps its old version (the log lists them).

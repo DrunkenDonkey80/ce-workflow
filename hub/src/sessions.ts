@@ -51,7 +51,7 @@ export class SessionHost extends EventEmitter {
 	constructor(options: HostOptions) {
 		super();
 		this.options = options;
-		this.idleParkMinutes = options.idleParkMinutes ?? 60; // D16
+		this.idleParkMinutes = options.idleParkMinutes ?? 10; // D16
 	}
 
 	private get registry() { return this.options.registry; }
@@ -210,12 +210,12 @@ export class SessionHost extends EventEmitter {
 		return back;
 	}
 
-	/** D16: park sessions idle for idleParkMinutes with no dialog and no viewer; 0 disables. */
+	/** D16: park sessions idle for idleParkMinutes with no dialog, even with a page open (posting resumes them); 0 disables. */
 	async autoPark(now = Date.now()): Promise<string[]> {
 		if (!this.idleParkMinutes) return [];
 		const parked = [];
 		for (const live of [...this.live.values()]) {
-			if (live.viewers || this.busyReasons(live.id).length || now - live.lastActivity < this.idleParkMinutes * 60_000) continue;
+			if (this.busyReasons(live.id).length || now - live.lastActivity < this.idleParkMinutes * 60_000) continue;
 			try { await this.park(live.id); parked.push(live.id); } catch { /* turned busy meanwhile; retried next minute */ }
 		}
 		return parked;

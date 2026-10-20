@@ -24,7 +24,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views }: { host: SessionHost; registry: Registry; views: Map<string, SessionView> }) {
+export function createPageApi({ host, registry, views, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -83,11 +83,10 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 		if (host.busyReasons(id).length) return "working";
 		return unseen.has(id) ? "unseen" : "seen";
 	}
-	// Why an idle live session has not auto-parked yet: an open page keeps it, otherwise the minutes left (D16).
+	// When an idle live session auto-parks (D16).
 	function parkNote(id: string) {
 		const live = host.live.get(id);
 		if (!live || !host.idleParkMinutes || host.busyReasons(id).length) return undefined;
-		if (live.viewers) return "kept while open in a browser";
 		return `parks in ${Math.max(1, Math.ceil((live.lastActivity + host.idleParkMinutes * 60_000 - Date.now()) / 60_000))} min`;
 	}
 	// The sidebar's plan line: steps done of total for a live session working on a plan.
@@ -98,7 +97,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 	async function sessions() {
 		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id), park: parkNote(record.id) })) }));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
-		return { groups, recents };
+		return { groups, recents, settings: settings() };
 	}
 	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
 	const nextName = (folder: string) => nextFreeName(registry, folder);
@@ -227,7 +226,7 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 		})().catch(() => {}); // a plan deleted meanwhile: nothing to show
 	});
 
-	return { get, post, extras, forms, saveImage: savePastedImage };
+	return { get, post, extras, forms, settings, saveImage: savePastedImage };
 }
 
 // PC load for the page's CPU/memory graph: CPU is the busy share of all cores since the previous call.

@@ -3,6 +3,7 @@ import type { Diagram } from "../../extensions/plan3-diagram.ts";
 import type { createActivityMirror } from "../../extensions/plan3-web.ts";
 // @ts-ignore Browser URL includes the workspace token.
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
+import { ICONS } from "./icons.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
@@ -905,13 +906,24 @@ try { if (!$("message-input").value) $("message-input").value = localStorage.get
 $("message-input").addEventListener("input", saveDraft); addEventListener("pagehide", saveDraft);
 const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
-// Tab icon over every shared session: red when any asks something, blue while any works, a shovel laid down when all rest.
+// Tab icon over every shared session: red when any asks something, yellow while any works.
+// The hub's own icon (gear → Tab icon) sits on its colour when idle and is drawn in that colour on yellow;
+// without one, a shovel laid down when all rest.
+type HubSettings = { idleParkMinutes?: number; icon?: string; iconColor?: string };
+let hubSettings: HubSettings = {};
+const ICON_COLORS = ["#343a40", "#1971c2", "#0c8599", "#2f9e44", "#7048e8", "#868e96"];
+function iconSvg(name: string, color: string, key: string) {
+ const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 22 / Math.max(w, h);
+ const back = key === "waiting" ? "#e03131" : key === "working" ? "#fab005" : color, ink = key === "working" ? color : "#fff";
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="${back}"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ink}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/></svg>`;
+}
 function renderIcon() {
  const waiting = promptView.busy || !!state.activity.dialog || sessionStates.includes("waiting");
  const working = !!state.activity.working || !!state.activity.subagents?.length || sessionStates.includes("working");
- const key = waiting ? "waiting" : working ? "working" : "idle";
- if (key === iconKey) return; iconKey = key;
- const back = { waiting: "#e03131", working: "#1c7ed6", idle: "" }[key], handle = back ? "#ffd8a8" : "#c4893f", blade = back ? "#fff" : "#495057";
+ const key = waiting ? "waiting" : working ? "working" : "idle", icon = ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : "", color = hubSettings.iconColor || ICON_COLORS[0];
+ if (key + icon + color === iconKey) return; iconKey = key + icon + color;
+ if (icon) { document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(iconSvg(icon, color, key)); return; }
+ const back = { waiting: "#e03131", working: "#fab005", idle: "" }[key], handle = back ? "#ffd8a8" : "#c4893f", blade = back ? "#fff" : "#495057";
  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${back ? `<rect width="32" height="32" rx="7" fill="${back}"/>` : ""}<g transform="${back ? "translate(0 1) scale(.9) translate(1.8 0) rotate(40 16 16)" : "translate(0 6) rotate(90 16 16)"}"><rect x="14.5" y="3" width="3" height="16" rx="1.5" fill="${handle}"/><rect x="10.5" y="1.5" width="11" height="3.5" rx="1.75" fill="${handle}"/><path d="M9.5 18.5h13v5.5a6.5 6.5 0 0 1-13 0z" fill="${blade}"/></g></svg>`;
  document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(svg);
 }
@@ -920,7 +932,8 @@ async function loadSessions() {
  // A background tab keeps polling, slower, so its icon still shows the other sessions.
  const visible = document.visibilityState === "visible";
  try {
-  const { groups, recents } = await get("sessions") as { groups: Group[]; recents: Recent[] };
+  const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
+  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10);
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
@@ -1231,6 +1244,24 @@ async function pollLoad() {
  }
 }
 void pollLoad(); setInterval(pollLoad, 5000);
+async function saveHubSettings(change: HubSettings) {
+ try { hubSettings = await post("hub", { action: "settings", ...change }) as HubSettings; renderIcon(); if (($("hub-icon") as HTMLDialogElement).open) renderIconPicker(); }
+ catch (error) { showNotice(error.message); }
+}
+$("hub-park").addEventListener("change", () => void saveHubSettings({ idleParkMinutes: Number(($("hub-park") as HTMLSelectElement).value) }));
+// The picker: every icon previewed idle in the chosen colour, then the colours (no names: the pictures say it).
+function renderIconPicker() {
+ const color = hubSettings.iconColor || ICON_COLORS[0], current = ICONS[hubSettings.icon ?? ""] ? hubSettings.icon : "";
+ const choice = (label: string, picked: boolean, svg: string, pick: () => void) => {
+  const button = html("button", { type: "button", className: "icon-choice", title: label }); button.setAttribute("role", "radio"); button.setAttribute("aria-checked", String(picked)); button.setAttribute("aria-label", label);
+  button.innerHTML = svg; button.addEventListener("click", pick); return button;
+ };
+ const shovel = `<svg viewBox="0 0 32 32"><g transform="translate(0 6) rotate(90 16 16)"><rect x="14.5" y="3" width="3" height="16" rx="1.5" fill="#c4893f"/><rect x="10.5" y="1.5" width="11" height="3.5" rx="1.75" fill="#c4893f"/><path d="M9.5 18.5h13v5.5a6.5 6.5 0 0 1-13 0z" fill="#495057"/></g></svg>`;
+ $("icon-grid").replaceChildren(choice("Shovel (default)", !current, shovel, () => void saveHubSettings({ icon: "" })), ...Object.keys(ICONS).map(name => choice(name.replaceAll("-", " "), name === current, iconSvg(name, color, "idle"), () => void saveHubSettings({ icon: name }))));
+ $("icon-colors").replaceChildren(...ICON_COLORS.map(value => { const button = choice(value, value === color, `<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="16" fill="${value}"/></svg>`, () => void saveHubSettings({ iconColor: value })); button.classList.add("color-choice"); return button; }));
+}
+$("hub-icon-button").addEventListener("click", () => { closeMenus(); setDrawer(false); renderIconPicker(); ($("hub-icon") as HTMLDialogElement).showModal(); });
+$("hub-icon-close").addEventListener("click", () => ($("hub-icon") as HTMLDialogElement).close());
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
  if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (herdr, terminals) keeps the old version until restarted.")) return;
