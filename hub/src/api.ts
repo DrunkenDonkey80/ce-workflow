@@ -83,13 +83,20 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 		if (host.busyReasons(id).length) return "working";
 		return unseen.has(id) ? "unseen" : "seen";
 	}
+	// Why an idle live session has not auto-parked yet: an open page keeps it, otherwise the minutes left (D16).
+	function parkNote(id: string) {
+		const live = host.live.get(id);
+		if (!live || !host.idleParkMinutes || host.busyReasons(id).length) return undefined;
+		if (live.viewers) return "kept while open in a browser";
+		return `parks in ${Math.max(1, Math.ceil((live.lastActivity + host.idleParkMinutes * 60_000 - Date.now()) / 60_000))} min`;
+	}
 	// The sidebar's plan line: steps done of total for a live session working on a plan.
 	function planProgress(id: string) {
 		const plan = (host.live.get(id)?.published.state as { plan?: { done?: number; total?: number } } | undefined)?.plan;
 		return plan?.total ? { done: plan.done ?? 0, total: plan.total } : undefined;
 	}
 	async function sessions() {
-		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id) })) }));
+		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id), park: parkNote(record.id) })) }));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents };
 	}

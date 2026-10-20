@@ -895,7 +895,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "unseen" | "seen" | "parked" | "terminal";
-type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number } };
+type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number }; park?: string };
 type Group = { folder: string; label: string; sessions: HubSession[] };
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
@@ -1007,10 +1007,10 @@ function renderSessions(groups: Group[], recents: Recent[]) {
 }
 function sessionRow(session: HubSession, folder: string) {
  const row = html("div", { className: "session" }); row.dataset.tone = session.tone;
- const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}` });
+ const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}${session.park ? " · " + session.park : ""}` });
  link.setAttribute("aria-label", `${session.name} in ${folder}, ${words[session.tone]}${session.id === sessionId ? ", this session" : ""}`);
  if (session.id === sessionId) row.setAttribute("aria-current", "page");
- link.append(html("span", { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }), html("span", { className: "session-label", textContent: session.name }), html("small", { className: "session-state", textContent: words[session.tone] }));
+ link.append(html("span", { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }), html("span", { className: "session-label", textContent: session.name }), html("small", { className: "session-state", textContent: words[session.tone] + (session.park ? " · " + session.park : "") }));
  const more = html("button", { type: "button", className: "session-more", textContent: "⋯", title: "Session actions" });
  more.setAttribute("aria-haspopup", "true"); more.setAttribute("aria-label", `Actions for ${session.name}`);
  more.addEventListener("click", event => { event.stopPropagation(); openSessionMenu(more, session); });

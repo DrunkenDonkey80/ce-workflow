@@ -272,7 +272,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	if (config.remote) await applyRemote().catch(error => { remoteError = (error as Error).message; });
 	host.checkTerminals(); // a terminal closed while the hub was down
 	const restored = await host.restoreRunning(); // D17
-	const timer = setInterval(() => { host.checkTerminals(); void host.autoPark(); }, 60_000);
+	const timer = setInterval(() => { host.checkTerminals(); void host.autoPark().then(ids => { if (ids.length) console.log(`${new Date().toISOString()} auto-parked ${ids.map(id => registry.get(id)?.name ?? id).join(", ")}`); }); }, 60_000);
 	timer.unref();
 
 	async function stop() {
