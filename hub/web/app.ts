@@ -1006,7 +1006,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
   const box = html("div", { className: "session-folder" }), tones = group.sessions.map(session => session.tone);
   const tone = tones.includes("waiting") ? "waiting" : tones.includes("working") ? "working" : group.sessions.some(session => session.id === sessionId) ? "current" : "";
   if (tone) box.dataset.tone = tone;
-  box.append(head, ...group.sessions.map(session => sessionRow(session, group.label)));
+  box.append(head, ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
   return [box];
  });
  const recent = html("details", { className: "session-recents", open });
@@ -1026,7 +1026,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  newFolder.addEventListener("click", () => { const folder = prompt("Full path of the folder to start a Pi session in:"); if (folder?.trim()) void newSession(folder.trim()); });
  $("session-list").replaceChildren(...rows, recent, newFolder);
 }
-function sessionRow(session: HubSession, folder: string) {
+function sessionRow(session: HubSession, folder: string, path: string) {
  const row = html("div", { className: "session" }); row.dataset.tone = session.tone;
  const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}${session.park ? " · " + session.park : ""}` });
  link.setAttribute("aria-label", `${session.name} in ${folder}, ${words[session.tone]}${session.id === sessionId ? ", this session" : ""}`);
@@ -1034,7 +1034,13 @@ function sessionRow(session: HubSession, folder: string) {
  link.append(html("span", { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }), html("span", { className: "session-label", textContent: session.name }), html("small", { className: "session-state", textContent: words[session.tone] + (session.park ? " · " + session.park : "") }));
  const more = html("button", { type: "button", className: "session-more", textContent: "⋯", title: "Session actions" });
  more.setAttribute("aria-haspopup", "true"); more.setAttribute("aria-label", `Actions for ${session.name}`);
- more.addEventListener("click", event => { event.stopPropagation(); openSessionMenu(more, session); });
+ more.addEventListener("click", event => { event.stopPropagation(); openSessionMenu(more, session, path); });
+ // Right-click, or a long press on touch (iOS never fires contextmenu), opens the same menu at the row.
+ row.addEventListener("contextmenu", event => { event.preventDefault(); openSessionMenu(row, session, path); });
+ let press = 0, pressed = false;
+ row.addEventListener("pointerdown", event => { pressed = false; if (event.pointerType === "touch") press = window.setTimeout(() => { pressed = true; openSessionMenu(row, session, path); }, 500); });
+ for (const end of ["pointerup", "pointercancel", "pointermove"]) row.addEventListener(end, () => clearTimeout(press));
+ row.addEventListener("click", event => { if (pressed) { event.preventDefault(); pressed = false; } }, true); // the long press must not also open the session
  row.append(link, more);
  // A plan in progress: steps done/total, then a line filled left to right.
  if (session.plan) {
@@ -1048,22 +1054,27 @@ function sessionRow(session: HubSession, folder: string) {
 }
 // One popup for the row actions; Park/Resume follow the session's state.
 const sessionMenu = html("div", { className: "status-menu session-menu", hidden: true }); sessionMenu.setAttribute("role", "menu"); document.body.append(sessionMenu);
-function openSessionMenu(anchor: HTMLElement, session: HubSession) {
+function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string) {
  const parked = session.tone === "parked";
  const item = (text: string, run: () => void) => { const button = html("button", { type: "button", textContent: text }); button.setAttribute("role", "menuitem"); button.addEventListener("click", () => { sessionMenu.hidden = true; run(); }); return button; };
  // H7-01: a session open in a terminal window comes back by itself when that window closes.
- if (session.tone === "terminal") return showNotice(`"${session.name}" is open in a terminal on the PC; it returns here when that Pi exits.`);
- sessionMenu.replaceChildren(
+ if (session.tone === "terminal") showNotice(`"${session.name}" is open in a terminal on the PC; it returns here when that Pi exits.`);
+ sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path))] : [
   item("Rename…", () => { const name = prompt("New name:", session.name); if (name?.trim()) void sessionAction({ action: "rename", id: session.id, name }); }),
+  item("Copy folder path", () => void copyPath(path)),
   item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
   ...(parked ? [item("Unstar (keep the file)", () => { if (confirm(`Remove "${session.name}" from its group? The session file stays in Recents.`)) void sessionAction({ action: "unstar", id: session.id }); })] : [item("Reload", () => void sessionAction({ action: "reload", id: session.id }))]),
- );
+ ]);
  const box = anchor.getBoundingClientRect(); sessionMenu.hidden = false;
  sessionMenu.style.position = "fixed"; sessionMenu.style.top = Math.max(8, Math.min(box.bottom, innerHeight - sessionMenu.offsetHeight - 8)) + "px"; sessionMenu.style.left = Math.max(8, Math.min(box.left, innerWidth - sessionMenu.offsetWidth - 8)) + "px";
  sessionMenu.querySelector("button")?.focus();
 }
 document.addEventListener("pointerdown", event => { if (!sessionMenu.contains(event.target as Node)) sessionMenu.hidden = true; });
+// The clipboard needs a secure page (localhost or the tailnet https link); otherwise show the path to copy by hand.
+async function copyPath(path: string) {
+ try { await navigator.clipboard.writeText(path); showNotice(`Copied ${path}`); } catch { prompt("Folder path:", path); }
+}
 sessionMenu.addEventListener("keydown", event => { if (event.key === "Escape") { event.stopPropagation(); sessionMenu.hidden = true; } });
 async function sessionAction(data: Record<string, unknown>) {
  try { const value = await post("session", data); await loadSessions(); return value; }
