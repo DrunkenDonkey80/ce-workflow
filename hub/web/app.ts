@@ -524,6 +524,7 @@ function renderBlocks(box: HTMLElement, row) {
    if (run) run.textContent += "\n\n" + block.text.trim();
    else { run = Object.assign(document.createElement("div"), { className: "thinking-text", textContent: block.text.trim() }); box.append(run); }
   }
+  if (block.ask) { box.append(askExchange(block)); return; }
   const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
   // Pi's tool colours: grey while running, green when done, red on error.
   item.dataset.key = key; item.open = opened.has(key) || (!known.has(key) && block.type === "tool" && (block.name === "edit" || block.name === "write")); item.className = "block block-" + block.type + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
@@ -541,6 +542,18 @@ function renderBlocks(box: HTMLElement, row) {
   // Tool output images (screenshots, renders) show under the block, visible while it is collapsed.
   appendThumbs(box, images); images.clear();
  });
+}
+// ask_user is part of the conversation: the agent's questions above, your answer below, shown open in every chat view.
+function askExchange(block) {
+ const box = Object.assign(document.createElement("div"), { className: "ask-exchange" }), asked = Object.assign(document.createElement("div"), { className: "ask-q" });
+ for (const question of block.ask) {
+  const title = Object.assign(document.createElement("div"), { className: "ask-question" }); renderLinks(title, question.question); asked.append(title);
+  if (question.context) { const context = Object.assign(document.createElement("div"), { className: "ask-context" }); renderLinks(context, question.context); asked.append(context); }
+  if (question.options.length) asked.append(Object.assign(document.createElement("div"), { className: "ask-options", textContent: question.options.join(" · ") }));
+ }
+ const answer = Object.assign(document.createElement("div"), { className: "ask-a" + (block.error ? " ask-error" : block.result === undefined ? " ask-waiting" : "") });
+ renderLinks(answer, block.result === undefined ? "Waiting for your answer…" : block.result.replace(/^User answered(?: \d+ of \d+ questions)?:\s*/, ""));
+ box.append(asked, answer); return box;
 }
 const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - list.clientHeight < 48;
 // Scrolling near the top loads earlier rows (no button).
@@ -585,7 +598,7 @@ function renderChat() {
   let shown = 0, bytes = 0, keep = rows.length;
   for (; keep > 0; keep--) {
    const row = rows[keep - 1];
-   if (!compact || row.role === "user" || finals.has(row.id)) { shown++; bytes += encoder.encode(row.text).length; }
+   if (!compact || row.role === "user" || finals.has(row.id) || row.blocks?.some(block => block.ask)) { shown++; bytes += encoder.encode(row.text).length; }
    if (shown > 100 || bytes > 512000 || rows.length - keep >= 3000) break;
   }
   for (const row of rows.splice(0, keep)) chat.delete(row.id);
@@ -604,7 +617,7 @@ function renderChat() {
   const json = JSON.stringify(row); if (item.dataset.json === json) continue; item.dataset.json = json;
   const text = row.text.trim(), note = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming && !row.blocks?.length ? "Streaming…" : "");
   // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
-  item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : ""); item.hidden = !text && !row.blocks?.length && !note;
+  item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : "") + (row.blocks?.some(block => block.ask) ? " has-ask" : ""); item.hidden = !text && !row.blocks?.length && !note;
   // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
   item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
   renderBlocks(item.children[1] as HTMLElement, row); renderLinks(item.children[2] as HTMLElement, row.text);

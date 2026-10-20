@@ -308,6 +308,16 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
    (and Compact the live thinking) so the run is visibly moving. */
 .chat-compact .message .block, .chat-compact .message-blocks, .chat-compact .message.assistant:not(.final), .chat-compact #activity:not(.working) .thinking-row, .chat-compact #activity .tool-row:not(.latest),
 .chat-thinking .message .block-tool, .chat-thinking .message-blocks:not(:has(.block-thinking)), .chat-thinking #activity .tool-row:not(.latest) { display: none; }
+/* ask_user exchanges stay in every view; in Compact only the exchange of a non-final row shows. */
+.chat-compact .message.assistant.has-ask, .chat-compact .message-blocks.has-ask, .chat-thinking .message-blocks.has-ask { display: block; }
+.chat-compact .message.has-ask:not(.final) > div:nth-child(3) { display: none; }
+.ask-exchange { margin: 6px 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 14px; }
+.ask-q { padding: 8px 12px; background: var(--final-bg); border-left: 3px solid var(--accent); }
+.ask-question { font-weight: 600; }
+.ask-context { margin-top: 4px; font-size: 13px; }
+.ask-options { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.ask-a { padding: 8px 12px; background: var(--user-bg); border-top: 1px solid var(--line); white-space: pre-wrap; }
+.ask-waiting { color: var(--muted); font-style: italic; } .ask-error { color: var(--error); }
 #chat-compact-m[aria-pressed=true] { border-color: var(--accent); background: var(--accent); color: var(--panel); }
 .message .block { font: 12px/1.4 ui-monospace, Consolas, monospace; color: var(--muted); margin: 3px 0; border-radius: 4px; }
 .message .block summary { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -42,6 +42,11 @@ assert.equal(mirror.row(brief.id).blocks[1].result, "Edited", "full row on expan
 { const writeTurn = { role: "assistant", timestamp: 3.6, content: [{ type: "toolCall", id: "call_w", name: "write", arguments: { path: "b.ts", content: "one\ntwo" } }] };
  chatHooks.get("message_start")({ message: writeTurn }); chatHooks.get("message_end")({ message: writeTurn });
  assert.equal(mirror.snapshot().at(-1).blocks[0].diff, "+one\n+two", "a write shows its content as added lines"); }
+{ const askTurn = { role: "assistant", timestamp: 3.7, content: [{ type: "toolCall", id: "call_a", name: "ask_user", arguments: { question: "Open http://x/ ?", context: "Why", options: [{ title: "Yes" }, { title: "No" }] } }] };
+ chatHooks.get("message_start")({ message: askTurn }); chatHooks.get("message_end")({ message: askTurn });
+ chatHooks.get("message_end")({ message: { role: "toolResult", toolCallId: "call_a", content: [{ type: "text", text: "User answered: Yes" }] } });
+ const ask = mirror.page().rows.at(-1).blocks[0];
+ assert.deepEqual([ask.ask, ask.result], [[{ question: "Open http://x/ ?", context: "Why", options: ["Yes", "No"] }], "User answered: Yes"], "ask_user keeps its questions and answer in check-in rows"); }
 const long = mirror.page().rows.find(row => row.text.length === 2000); assert(long?.excerpt, "long text is a 2 KB excerpt");
 assert.throws(() => mirror.row("missing"), /Unknown chat row/);
 for (let timestamp = 4; timestamp < 110; timestamp++) chatHooks.get("message_end")({ message: { role: "user", timestamp, content: "recent" } });
