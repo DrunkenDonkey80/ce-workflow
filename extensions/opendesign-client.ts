@@ -469,7 +469,7 @@ export function resolveOpenDesignCommand(options: any = {}) {
 			`${resolved} is an octal-dump utility, not OpenDesign; copy the OpenDesign Settings MCP command spec`,
 		);
 	}
-	const command = {
+	const command: any = {
 		command: resolved,
 		args: spec.args.length ? spec.args : ["mcp"],
 		source,
@@ -707,7 +707,7 @@ export class OpenDesignClient {
 				once: true,
 			});
 		}
-		const initialized = await this.request("initialize", {
+		const initialized: any = await this.request("initialize", {
 			protocolVersion: "2025-03-26",
 			capabilities: {},
 			clientInfo: { name: "ce-workflow", version: "1" },
@@ -723,7 +723,7 @@ export class OpenDesignClient {
 			);
 		}
 		this.notify("notifications/initialized", {});
-		const listed = await this.request("tools/list", {});
+		const listed: any = await this.request("tools/list", {});
 		if (!Array.isArray(listed?.tools))
 			throw error("protocol-error", "OpenDesign tools/list returned no tools");
 		this.tools = new Set(

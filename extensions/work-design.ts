@@ -513,7 +513,7 @@ export function writeConfinedDesignArtifact(
 	root,
 	relativePath,
 	content,
-	options = {},
+	options: any = {},
 ) {
 	const target = resolveDesignArtifactPath(root, relativePath, options);
 	const bytes = Buffer.isBuffer(content)
@@ -594,7 +594,7 @@ function designHandoffContractPrompt({
 	briefHash,
 	targetMatrix = [],
 	selection,
-} = {}) {
+}: any = {}) {
 	const selectionContract = selection
 		? {
 				manifestHash: selection.candidateManifestHash,
