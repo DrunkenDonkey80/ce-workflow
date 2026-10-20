@@ -1466,7 +1466,7 @@ try {
 	await run("plan3", "resolve 55555555");
 	assert.equal(dialogs.length, 0);
 	assert.equal(messages.length, beforeDiscussion + 1);
-	assert.match(messages.at(-1).message, /"discussion":true/);
+	assert.match(messages.at(-1).message, /Status: discussion/);
 	const discussing = await readFile(directFile, "utf8");
 	assert(discussing.includes("Which timeout?") && discussing.includes(JSON.stringify(selected)));
 	assert(!discussing.includes('"selections":["Discuss with agent (Plan3)"]'), "discussion is not a settled decision");
@@ -1494,7 +1494,7 @@ try {
 	const stale = await readFile(directFile, "utf8");
 	assert(stale.includes("Changed evidence.") && stale.includes("Which format?") && !stale.includes(JSON.stringify(selected)));
 	assert(stale.includes(JSON.stringify(custom)));
-	assert.match(messages.at(-1).message, /"applied":false/);
+	assert.match(messages.at(-1).message, /Status: not applied/);
 
 	// If every submitted answer is stale, not even the updated timestamp is rewritten.
 	await writeFile(directFile, directPlan);
