@@ -87,7 +87,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   };
   const questions = ask.questions ?? [ask], readers = [];
   for (const [index, question] of questions.entries()) {
-   const section = node("fieldset", { className: "prompt-question" }); section.append(node("legend", ask.questions ? {} : { id: "prompt-title" }, question.question));
+   const section = node("fieldset", { className: "prompt-question" }); const legend = node("legend", ask.questions ? {} : { id: "prompt-title" }); links(legend, question.question); section.append(legend);
    // Image paths in the context or options become links with thumbnails; click opens full size.
    if (question.context) { const context = node("div", { className: "prompt-context" }); links(context, question.context); section.append(context); }
    const inputs = [];
