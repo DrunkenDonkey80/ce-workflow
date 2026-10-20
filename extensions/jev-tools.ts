@@ -28,7 +28,8 @@ export function jevStatus(project, registry) {
 		status: !supported ? "Unsupported Pi API" : !settings.enabled ? "Off" : !model || !configured ? "Enabled but unconfigured" : "Ready" };
 }
 
-export function validateQuestions(questions) {
+type JevQuestion = { type?: string; instructions?: string; criteria?: any };
+export function validateQuestions(questions: Record<string, JevQuestion>) {
 	requireThat(object(questions) && Object.keys(questions).length > 0 && Object.keys(questions).length <= 32, "Supply 1–32 typed questions.");
 	for (const [id, q] of Object.entries(questions)) {
 		requireThat(idOK(id) && object(q) && keys(q, ["type", "instructions", "criteria"]) && textOK(q.instructions),
@@ -115,7 +116,7 @@ function validateJobs(jobs) {
 		}
 	}
 }
-function cleanAnswers(answers, questions) {
+function cleanAnswers(answers, questions: Record<string, JevQuestion>) {
 	requireThat(object(answers) && Object.keys(answers).length === Object.keys(questions).length, "Malformed classifier answers.");
 	const out = {};
 	for (const [id, q] of Object.entries(questions)) {
@@ -194,7 +195,7 @@ export async function runTriage({ jobs, cwd, registry, model, signal, guard = ()
 		}
 	}
 	await Promise.all(Array.from({ length: Math.min(4, jobs.length) }, worker));
-	const out = { results, coverage: { requested: jobs.length, completed: results.filter(row => row.status === "ok").length, calls, incomplete: results.some(row => row.status !== "ok"), unknownUsageCalls: unknownUsage }, usage: calls > unknownUsage ? usage : undefined, costBasis: "catalog estimate when available; actual billing unknown", limits: JEV_LIMITS, note: "Uncalibrated classifications of supplied data, not proof of absence or authority. Read source before editing/quoting." };
+	const out: any = { results, coverage: { requested: jobs.length, completed: results.filter(row => row.status === "ok").length, calls, incomplete: results.some(row => row.status !== "ok"), unknownUsageCalls: unknownUsage }, usage: calls > unknownUsage ? usage : undefined, costBasis: "catalog estimate when available; actual billing unknown", limits: JEV_LIMITS, note: "Uncalibrated classifications of supplied data, not proof of absence or authority. Read source before editing/quoting." };
 	let omitted = 0;
 	while (size(out) > JEV_LIMITS.outputBytes && out.results.length) { out.results.pop(); omitted++; }
 	if (omitted) { out.coverage.omittedResults = omitted; out.coverage.incomplete = true; }
@@ -203,7 +204,7 @@ export async function runTriage({ jobs, cwd, registry, model, signal, guard = ()
 
 // rg runs without a shell; stdout/stderr are bounded and never exposed on failure.
 async function rg(args, cwd, signal, input = undefined) {
-	return new Promise(resolveResult => {
+	return new Promise<any>(resolveResult => {
 		const child = spawn("rg", args, { cwd, shell: false, windowsHide: true, signal });
 		const chunks = []; let bytes = 0, capped = false, failed = false;
 		child.stdout.on("data", chunk => {
@@ -211,7 +212,7 @@ async function rg(args, cwd, signal, input = undefined) {
 			if (bytes > 131072) { capped = true; child.kill(); } else chunks.push(chunk);
 		});
 		child.stderr.resume();
-		child.on("error", error => { failed = true; resolveResult({ error: error.code === "ENOENT" ? "rg unavailable" : "search cancelled/failed", text: "", capped }); });
+		child.on("error", (error: NodeJS.ErrnoException) => { failed = true; resolveResult({ error: error.code === "ENOENT" ? "rg unavailable" : "search cancelled/failed", text: "", capped }); });
 		child.on("close", code => { if (!failed) resolveResult({ text: Buffer.concat(chunks).toString("utf8"), capped, error: code !== 0 && code !== 1 && !capped ? "search failed (invalid regex or inaccessible scope)" : undefined }); });
 		child.stdin.on("error", () => {});
 		child.stdin.end(input);
@@ -289,7 +290,7 @@ export async function runEvidence({ args, cwd, registry, model, signal, guard = 
 		jobs: candidates.map(candidate => ({ id: candidate.id, questions: args.questions, state: { source: candidate.anchor, content: candidate.content } })),
 		cwd: root, registry, model, signal: deadline, guard,
 	});
-	const answers = new Map(classified?.results.map(row => [row.id, row]));
+	const answers = new Map<string, any>(classified?.results.map(row => [row.id, row]));
 	const results = candidates.flatMap(candidate => {
 		const answer = answers.get(candidate.id);
 		if (args.questions && answer?.status !== "ok") return [];
@@ -301,7 +302,7 @@ export async function runEvidence({ args, cwd, registry, model, signal, guard = 
 		const { absolutePath: _absolutePath, ...anchor } = candidate.anchor;
 		return [{ id: candidate.id, ...anchor, excerpt: candidate.content, ...(answer ? { answers: answer.answers } : {}), rank }];
 	}).sort((a, b) => b.rank - a.rank || a.id.localeCompare(b.id));
-	const out = { results: results.slice(0, 10), skipped, failures: classified?.results.filter(row => row.status !== "ok") ?? [],
+	const out: any = { results: results.slice(0, 10), skipped, failures: classified?.results.filter(row => row.status !== "ok") ?? [],
 		coverage: { enumeratedFiles: files.size, scannedFiles, matchedUnits, omittedFiles, candidateOmissions, omittedResults: Math.max(0, results.length - 10), calls: classified?.coverage.calls ?? 0, unknownUsageCalls: classified?.coverage.unknownUsageCalls ?? 0,
 			incomplete: enumerationIncomplete || omittedFiles > 0 || candidateOmissions > 0 || skipped.length > 0 || deadline.aborted || classified?.coverage.incomplete === true },
 		usage: classified?.usage, limits: { ...JEV_LIMITS, enumerated: 128, classified: 32, excerpts: 10 },
@@ -325,7 +326,7 @@ export async function runAsk({ args, cwd, registry, model, signal, runCommand })
 	requireThat(args.state !== undefined || args.paths?.length || args.command, "Supply state, paths, or a command.");
 	requireThat(!secret.test(JSON.stringify(args)), "Potential secret-bearing input excluded.");
 	const deadline = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(JEV_LIMITS.overallMs)]);
-	const state = {}, parts = [];
+	const state: any = {}, parts = [];
 	if (args.state !== undefined) { state.state = args.state; parts.push({ name: "state", bytes: size(args.state) }); }
 	for (const path of args.paths ?? []) {
 		let source;
@@ -403,7 +404,7 @@ const questionsSchema = { type: "object", description: "1–32 native bool/choic
 // readProject(cwd) returns effective settings: global workOrchestrator.jev overridden by the project's.
 export function createJevTools(pi, readProject, register = tool => pi.registerTool(tool), { ask = false } = {}) {
 	let current, signature, registered = false, ledger = { calls: 0, cost: 0 }, noted = 0, advising, pending = Promise.resolve();
-	const active = new Set();
+	const active = new Set<AbortController>();
 	const spend = usage => { if (usage) { ledger.calls++; ledger.cost += usage.cost?.total ?? 0; } };
 	function guard(ctx) {
 		const status = jevStatus(readProject(ctx.cwd), ctx.modelRegistry);
@@ -463,7 +464,7 @@ export function createJevTools(pi, readProject, register = tool => pi.registerTo
 			const status = guard(ctx);
 			const controller = new AbortController(); active.add(controller);
 			try {
-				const result = await runAsk({ args, cwd: ctx.cwd, registry: ctx.modelRegistry, model: status.modelObject, signal: AbortSignal.any([controller.signal, ...(signal ? [signal] : [])]),
+				const result: any = await runAsk({ args, cwd: ctx.cwd, registry: ctx.modelRegistry, model: status.modelObject, signal: AbortSignal.any([controller.signal, ...(signal ? [signal] : [])]),
 					async runCommand(command, commandSignal) {
 						requireThat(typeof ctx.executeTool === "function", "Commands need Pi's executeTool support.");
 						const outcome = await ctx.executeTool("bash", { command, timeout: 60 }, { signal: commandSignal });
@@ -481,7 +482,7 @@ export function createJevTools(pi, readProject, register = tool => pi.registerTo
 	async function advise(event, ctx, tier, percent) {
 		const status = jevStatus(readProject(ctx.cwd), ctx.modelRegistry);
 		const controller = new AbortController(); active.add(controller);
-		const record = { tier, percent: Math.round(percent), show: false };
+		const record: any = { tier, percent: Math.round(percent), show: false };
 		try {
 			const state = compactionState(ctx.sessionManager.getBranch(), event.message, event.toolResults);
 			if (secret.test(JSON.stringify(state))) { record.reason = "skipped: possible secret in conversation"; return; }

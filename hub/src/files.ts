@@ -62,7 +62,7 @@ export async function readProjectDiff(cwd: string, path: unknown) {
 	const from = (await status(cwd)).find(entry => entry.path === valid)?.from;
 	const source = from && !forbiddenPath.test(from) ? [from] : [];
 	const result = await git(cwd, ["diff", "HEAD", "--no-color", "--no-ext-diff", "-M", "--", valid, ...source]);
-	if (result.code !== 0 || !result.stdout) return { path: valid, diff: "", ...await readProjectFile(cwd, valid) };
+	if (result.code !== 0 || !result.stdout) return { diff: "", ...await readProjectFile(cwd, valid) };
 	// The diff passes the same bounds as content, so a removed secret line is never shown.
 	if (Buffer.byteLength(result.stdout) > DIFF_BYTES) throw new FileRefused("Diff too large to show; view it in the terminal.");
 	if (result.stdout.includes("\0")) throw new FileRefused("Binary diff excluded.");
