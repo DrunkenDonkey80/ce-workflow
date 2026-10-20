@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkIn, createChatMirror } from "../src/chat.ts";
-import { readLinkedImage } from "../src/images.ts";
+import { readLinkedImage, savePastedImage } from "../src/images.ts";
 
 const chatHooks = new Map(), mirrored = [];
 const mirror = createChatMirror({ on: (name, handler) => chatHooks.set(name, handler) }, (event, value) => mirrored.push({ event, value }));
@@ -127,6 +127,13 @@ assert.equal(mirror.page(mirror.snapshot()[10].id).more, false);
  await mkdir(join(root, "other", ".secret"), { recursive: true }); await writeFile(join(root, "other", "front.png"), png); await writeFile(join(root, "other", ".secret", "x.png"), png);
  assert.equal((await readLinkedImage(join(root, "other", "front.png"), join(root, "project"))).type, "image/png");
  await assert.rejects(readLinkedImage(join(root, "other", ".secret", "x.png"), join(root, "project")), error => error.status === 403);
+ // Dropped files from a remote device: any type keeps a safe name in its own temp folder; SVG is served as an image.
+ const svg = await savePastedImage(Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'/>"), root, "..\\..\\my house.svg");
+ assert.match(svg, /[\\/]pi-upload-[0-9a-f-]{36}[\\/]my_house\.svg$/);
+ assert.equal((await readLinkedImage(svg)).type, "image/svg+xml");
+ assert.match(await savePastedImage(Buffer.from("notes"), root, ".env"), /[\\/]env$/, "a leading dot cannot hide the file");
+ await assert.rejects(savePastedImage(Buffer.from("x"), root), error => error.status === 415, "an unnamed non-image is refused");
+ await writeFile(join(root, "fake.svg"), "not svg"); await assert.rejects(readLinkedImage(join(root, "fake.svg")), error => error.status === 415);
  await rm(root, { recursive: true });
 }
 console.log("chat files images ok");

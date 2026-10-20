@@ -210,7 +210,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 			const endpoint = page && /^\/api\/([a-z]+)$/.exec(page[2] ?? "")?.[1];
 			if (page && endpoint && request.method === "POST") {
 				if (!registry.get(page[1])) return send(404, { error: "Unknown session." });
-				if (endpoint === "paste") return send(200, { path: await pageApi.saveImage(await raw(request, IMAGE_BODY)) });
+				if (endpoint === "paste") return send(200, { path: await pageApi.saveImage(await raw(request, IMAGE_BODY), undefined, url.searchParams.get("name")) });
 				// A JSON content type needs a CORS preflight, which this server never grants.
 				if (request.headers["content-type"]?.split(";")[0].trim() !== "application/json") return send(415, { error: "JSON content type required." });
 				const data = await body(request, PAGE_BODY);

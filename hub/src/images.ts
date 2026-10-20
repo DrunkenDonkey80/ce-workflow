@@ -1,8 +1,8 @@
 // Pasted and chat-linked images for the page (moved from ce-workflow plan3-web.ts in plan 0db155f7 H9-01).
 import { randomUUID } from "node:crypto";
-import { readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { forbiddenPath } from "../../extensions/jev-tools.ts";
 
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
@@ -14,11 +14,21 @@ const IMAGE_KINDS: [string, (b: Buffer) => boolean][] = [
 	["gif", b => b.subarray(0, 4).toString("latin1") === "GIF8"],
 	["webp", b => b.subarray(0, 4).toString("latin1") === "RIFF" && b.subarray(8, 12).toString("latin1") === "WEBP"],
 ];
-/** Saves a pasted clipboard image like Pi's terminal paste does and returns its path for the chat. */
-export async function savePastedImage(bytes: Buffer, dir = tmpdir()) {
+// SVG has no magic bytes: an .svg name whose text opens an <svg> element.
+const isSvg = (path: string, bytes: Buffer) => /\.svg$/i.test(path) && /<svg[\s>]/i.test(bytes.subarray(0, 4096).toString("utf8"));
+/** Saves a pasted clipboard image like Pi's terminal paste does; any other dropped or pasted file keeps its name in its own temp folder. Returns the path for the chat. */
+export async function savePastedImage(bytes: Buffer, dir = tmpdir(), name?: string | null) {
 	const kind = IMAGE_KINDS.find(([, test]) => test(bytes));
-	if (!kind) throw fail(415, "Paste a PNG, JPEG, GIF or WebP image.");
-	const file = join(dir, `pi-clipboard-${randomUUID()}.${kind[0]}`);
+	if (kind) {
+		const file = join(dir, `pi-clipboard-${randomUUID()}.${kind[0]}`);
+		await writeFile(file, bytes, { flag: "wx" });
+		return file;
+	}
+	// No separators, spaces or leading dots: the name cannot leave its folder, hide itself or split the chat path.
+	const safe = name && basename(name.replaceAll("\\", "/")).replace(/[^\w.()-]/g, "_").replace(/^[._]+/, "").slice(-120);
+	if (!safe) throw fail(415, "Paste a PNG, JPEG, GIF or WebP image, or drop a named file.");
+	const folder = join(dir, `pi-upload-${randomUUID()}`), file = join(folder, safe);
+	await mkdir(folder);
 	await writeFile(file, bytes, { flag: "wx" });
 	return file;
 }
@@ -32,7 +42,7 @@ export async function readPastedImage(name: string | null, dir = tmpdir()) {
 }
 /** Serves an image linked in chat: a real image file inside the project (not hidden/secret paths) or the temp folder. */
 export async function readLinkedImage(path: string | null, project?: string) {
-	if (!path || path.length > 1000 || /[\x00-\x1f]/.test(path) || !/\.(?:png|jpe?g|gif|webp)$/i.test(path)) throw fail(400, "Not an image path.");
+	if (!path || path.length > 1000 || /[\x00-\x1f]/.test(path) || !/\.(?:png|jpe?g|gif|webp|svg)$/i.test(path)) throw fail(400, "Not an image path.");
 	if (!project && !isAbsolute(path)) throw fail(404, "Image not found.");
 	const real = await realpath(resolve(project ?? "", path)).catch(() => { throw fail(404, "Image not found."); });
 	const inside = async (root: string): Promise<string | undefined> => { const rel = relative(await realpath(root), real); return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel.replaceAll("\\", "/") : undefined; };
@@ -41,6 +51,7 @@ export async function readLinkedImage(path: string | null, project?: string) {
 	if (fromProject ? forbiddenPath.test(fromProject) : /[\\/]\.[^\\/]/.test(real)) throw fail(403, "Images in hidden or generated folders are not shown.");
 	if ((await stat(real)).size > IMAGE_BYTES) throw fail(413, "Image too large.");
 	const bytes = await readFile(real), kind = IMAGE_KINDS.find(([, test]) => test(bytes));
+	if (!kind && isSvg(real, bytes)) return { bytes, type: "image/svg+xml" };
 	if (!kind) throw fail(415, "Not a supported image.");
 	return { bytes, type: kind[0] === "jpg" ? "image/jpeg" : "image/" + kind[0] };
 }

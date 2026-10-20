@@ -142,7 +142,8 @@ export function createPageApi({ host, registry, views }: { host: SessionHost; re
 				catch (error) { throw error instanceof FileRefused ? fail(403, error.message) : error; }
 			case "image": {
 				const image = params.has("path") ? await readLinkedImage(params.get("path"), folder(id)) : await readPastedImage(params.get("name"));
-				response.writeHead(200, { "content-type": image.type, "cache-control": "private, max-age=86400" });
+				// SVG can carry script: opened on its own it runs sandboxed, with no scripts at all.
+				response.writeHead(200, { "content-type": image.type, "cache-control": "private, max-age=86400", ...(image.type === "image/svg+xml" ? { "content-security-policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:" } : {}) });
 				response.end(image.bytes);
 				return undefined;
 			}
