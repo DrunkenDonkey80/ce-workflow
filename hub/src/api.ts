@@ -2,7 +2,7 @@
 // Plans, diagrams, files and images are read here with ce-workflow's Pi-free modules, so they also work while parked;
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
-import { statSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { emptyDiagram, loadDiagram } from "../../extensions/plan3-diagram.ts";
@@ -102,7 +102,7 @@ export function createPageApi({ host, registry, views, settings = () => ({}) }: 
 	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
 	const nextName = (folder: string) => nextFreeName(registry, folder);
 	async function session(data: Record<string, unknown>) {
-		only(data, ["target", "action", "id", "name", "folder", "file"], "Invalid session fields.");
+		only(data, ["target", "action", "id", "name", "folder", "file", "create"], "Invalid session fields.");
 		const id = typeof data.id === "string" ? data.id : "", name = typeof data.name === "string" ? data.name.trim() : "";
 		const known = () => { if (!registry.get(id)) throw fail(404, "Unknown session."); return id; };
 		switch (data.action) {
@@ -111,7 +111,12 @@ export function createPageApi({ host, registry, views, settings = () => ({}) }: 
 				const typed = typeof data.folder === "string" ? data.folder.trim().replace(/^"(.*)"$/, "$1") : "";
 				const folder = !typed ? undefined : registry.groups().find(group => group.folder.toLowerCase() === path.resolve(typed).toLowerCase())?.folder
 					?? (path.isAbsolute(typed) && statSync(typed, { throwIfNoEntry: false })?.isDirectory() ? path.resolve(typed) : undefined);
-				if (!folder) throw fail(404, "No such folder; enter the full path of an existing folder.");
+				// A missing absolute folder is created only after the page asked (create: true); its parent may be missing too.
+				if (!folder && data.create === true && path.isAbsolute(typed) && !statSync(typed, { throwIfNoEntry: false })) {
+					mkdirSync(typed, { recursive: true });
+					return host.create(path.resolve(typed), name || nextName(path.resolve(typed)));
+				}
+				if (!folder) throw fail(404, path.isAbsolute(typed) && !statSync(typed, { throwIfNoEntry: false }) ? "Folder does not exist." : "No such folder; enter the full path of an existing folder.");
 				return host.create(folder, name || nextName(folder));
 			}
 			case "rename": if (!name) throw fail(400, "Name required."); return host.rename(known(), name);

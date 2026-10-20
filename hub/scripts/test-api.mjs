@@ -184,7 +184,11 @@ try {
 	assert.equal((await tones())["1"], "seen", "opening the page marks it seen");
 	const created = (await post(id, "session", { action: "new", folder })).body;
 	assert.equal(created.name, "2", "new sessions take the next free number");
-	assert.equal((await post(id, "session", { action: "new", folder: path.join(root, "missing") })).status, 404, "only existing folders");
+	const missing = await post(id, "session", { action: "new", folder: path.join(root, "missing") });
+	assert.deepEqual([missing.status, missing.body.error], [404, "Folder does not exist."], "a missing folder is only reported, so the page can ask");
+	const made = (await post(id, "session", { action: "new", folder: path.join(root, "made", "deep"), create: true })).body;
+	assert.equal(fs.statSync(path.join(root, "made", "deep")).isDirectory(), true, "create: true makes the folder (and its parents)");
+	await hub.host.park(made.id); hub.registry.remove(made.id); // keep the later group checks to their own folders
 	assert.equal((await post(id, "session", { action: "new", folder: "relative" })).status, 404, "only absolute paths");
 	assert.equal((await post(id, "session", { action: "rename", id: created.id, name: "Docs" })).status, 200);
 	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);

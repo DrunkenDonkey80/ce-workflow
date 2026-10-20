@@ -1070,7 +1070,12 @@ async function sessionAction(data: Record<string, unknown>) {
  catch (error) { showNotice(error.message); }
 }
 async function newSession(folder: string) {
- const created = await sessionAction({ action: "new", folder }) as { id?: string } | undefined;
+ let created: { id?: string } | undefined;
+ try { created = await post("session", { action: "new", folder }) as typeof created; }
+ catch (error) {
+  if (error.message !== "Folder does not exist." || !confirm(`${folder} does not exist. Create it and start a session there?`)) { if (error.message !== "Folder does not exist.") showNotice(error.message); return; }
+  created = await sessionAction({ action: "new", folder, create: true }) as typeof created;
+ }
  if (created?.id) location.assign(sessionUrl(created.id));
 }
 // D5 keyboard shortcuts: Alt+↑/↓ previous or next session, Alt+N new session in this folder (Esc in the chat box stops a run).
