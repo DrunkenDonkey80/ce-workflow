@@ -996,6 +996,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  $("switcher").hidden = false; document.body.classList.add("has-switcher");
  sessionOrder = groups.flatMap(group => group.sessions.map(session => session.id));
  ownFolder = groups.find(group => group.sessions.some(session => session.id === sessionId))?.folder ?? "";
+ try { if (ownFolder) localStorage.setItem("hub-last:" + ownFolder, sessionId); } catch { /* private mode */ }
  const open = $("session-list").querySelector<HTMLDetailsElement>(".session-recents")?.open ?? false;
  const rows = groups.flatMap(group => {
   const head = html("div", { className: "session-group" });
@@ -1006,6 +1007,13 @@ function renderSessions(groups: Group[], recents: Recent[]) {
   const box = html("div", { className: "session-folder" }), tones = group.sessions.map(session => session.tone);
   const tone = tones.includes("waiting") ? "waiting" : tones.includes("working") ? "working" : group.sessions.some(session => session.id === sessionId) ? "current" : "";
   if (tone) box.dataset.tone = tone;
+  // A click in the folder box but off any session row opens its last visited session, else the first working, non-parked, or any.
+  box.addEventListener("click", event => {
+   if ((event.target as HTMLElement).closest(".session, button, a") || !group.sessions.length) return;
+   let last = ""; try { last = localStorage.getItem("hub-last:" + group.folder) ?? ""; } catch { /* private mode */ }
+   const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => session.tone !== "parked") ?? group.sessions[0];
+   if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
+  });
   box.append(head, ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
   return [box];
  });

@@ -2,14 +2,14 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 7,
+  "revision": 9,
   "nodes": [
     {
       "id": "pi_host",
       "label": "Pi coding agent host",
       "kind": "external",
       "summary": "Loads the package extensions; provides events, sessions, tools, TUI and models.",
-      "tech": "@earendil-works/pi-coding-agent 1.1.0",
+      "tech": "@earendil-works/pi-coding-agent 1.3.0",
       "details": "package.json pi.extensions: work-models, plan3, screen-read, enter-runs, advisor-model, ask-user/index."
     },
     {
@@ -226,8 +226,9 @@
       "label": "Camera tools",
       "kind": "service",
       "parent": "workflow_group",
-      "summary": "Consent-gated capture/watch via ffmpeg worker.",
-      "tech": "extensions/work-camera*.ts"
+      "summary": "Project opt-in, consent-gated stills, bursts, crops and change/settled watch; red active-use widget; camera_capture, camera_recover, camera_watch, camera_stop.",
+      "tech": "extensions/work-camera*.ts",
+      "details": "work-camera.ts settings, discovery, consent and warning widget; -tools registers the model-only tools; -capture/-detect/-watch acquire and compare frames; -process/-worker run ffmpeg in a separate worker; -images/-retain keep bounded PNGs; -state keeps time grants and the session lock. Never video or audio."
     },
     {
       "id": "subscription_footer",
@@ -354,6 +355,26 @@
       "label": "pi-control-hub",
       "kind": "external",
       "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms."
+    },
+    {
+      "id": "camera_device",
+      "label": "FFmpeg + camera device",
+      "kind": "external",
+      "summary": "ffmpeg.exe DirectShow capture of the selected USB camera (Windows)."
+    },
+    {
+      "id": "camera_images",
+      "label": "Camera image store",
+      "kind": "store",
+      "summary": "OS temp ce-workflow-camera-images, outside the project; 24 h retention, 64 files cap, crash lock.",
+      "tech": "extensions/work-camera-images.ts"
+    },
+    {
+      "id": "camera_grants",
+      "label": "Camera grants",
+      "kind": "store",
+      "summary": "~/.pi/agent/camera: one-shot, 1 h, today or 48 h access grants and the owner lock.",
+      "tech": "extensions/work-camera-state.ts"
     }
   ],
   "edges": [
@@ -668,6 +689,36 @@
       "to": "ask_user",
       "label": "menus",
       "id": "plan3__ask_user"
+    },
+    {
+      "from": "camera",
+      "to": "camera_device",
+      "label": "worker spawns ffmpeg",
+      "id": "camera__camera_device"
+    },
+    {
+      "from": "camera",
+      "to": "camera_images",
+      "label": "retains stills",
+      "id": "camera__camera_images"
+    },
+    {
+      "from": "camera",
+      "to": "camera_grants",
+      "label": "grants, lock",
+      "id": "camera__camera_grants"
+    },
+    {
+      "from": "camera",
+      "to": "settings_files",
+      "label": "enabled, device",
+      "id": "camera__settings_files"
+    },
+    {
+      "from": "camera",
+      "to": "ask_user",
+      "label": "consent dialog",
+      "id": "camera__ask_user"
     }
   ],
   "notes": []

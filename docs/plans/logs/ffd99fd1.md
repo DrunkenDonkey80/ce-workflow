@@ -71,3 +71,8 @@ Planning complete; decisions D1-D5 settled (D1, D2 by the user). Next: CU-01 (ad
   - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json` and refuses missing, unexplained or unverified decisions.
   - Before running it, add each adopted entry's "verification" (command and result) to the JSON above.
   - check: node scripts/work-catch-up-record.mjs ffd99fd1 → "recorded: @earendil-works/pi-coding-agent@1.3.0, pi-subagents@0.79.1, pi-intercom@0.17.1, pi-lens@4.4.4"; commit 8d48ef6
+
+## 2026-10-20T12:02:39.837Z ARCH-RECONCILE done: Product diagram reconciled: only drift was the Pi host version label, updated 1.1.0 → 1.3.0 (CU-04); no components or connections added or removed by this plan.
+
+- [x] **ARCH-RECONCILE** No architecture change: the plan edited guard logic, prompt text, test fixtures and a devDependency pin only; no components or connections were added or removed.
+  - check: plan3_diagram get target product (rev 7) vs package.json devDependencies @earendil-works/pi-coding-agent = 1.3.0 and plan commits (guard logic, prompt text, fixtures, pin only); plan3_diagram apply update pi_host.tech → rev 8.

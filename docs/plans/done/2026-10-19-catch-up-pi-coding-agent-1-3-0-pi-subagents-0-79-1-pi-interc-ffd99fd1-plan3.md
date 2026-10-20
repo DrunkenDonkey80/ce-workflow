@@ -1,12 +1,13 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-10-19
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.3.0","pi-subagents":"0.79.1","pi-intercom":"0.17.1","pi-lens":"4.4.4"}
-updated: 2026-10-19T21:33:36.068Z
+updated: 2026-10-20T12:02:46.137Z
 reviewed: 2026-10-19
 tagsChecked: 51893b22
+started: 2026-10-20T12:02:16.401Z
 ---
 
 # Catch up pi-coding-agent 1.3.0, pi-subagents 0.79.1, pi-intercom 0.17.1, pi-lens 4.4.4
@@ -228,7 +229,7 @@ None.
 - [x] **CU-91** Catch-up baseline recorded for pi-coding-agent 1.3.0, pi-subagents 0.79.1, pi-intercom 0.17.1 and pi-lens 4.4.4; the adopted decisions now carry verification.
 ### P-ARCH [code] Product architecture
 
-- [x] **ARCH-RECONCILE** No architecture change: the plan edited guard logic, prompt text, test fixtures and a devDependency pin only; no components or connections were added or removed.
+- [x] **ARCH-RECONCILE** Product diagram reconciled: only drift was the Pi host version label, updated 1.1.0 → 1.3.0 (CU-04); no components or connections added or removed by this plan.
 
 
 ## Acceptance
@@ -251,3 +252,4 @@ Planning and review complete; decisions D1-D5 settled, review findings recorded 
   - Finding 1 (CU-02 removal has no regression test): accepted. Verified that C2 covers only knowledge notices and that CU-02 removes the only resume injection from the live script. Added a dedicated C2 case to CU-02 and tightened Acceptance.
   - Finding 2 (CU-90 verify:quiet conflicts with the AGENTS.md Test Scope Rule): partly accepted. Added a C1 and C2 rerun after the dependency bump in CU-04. Kept CU-90: the catch-up template generates it (extensions/plan3-catch-up.ts:115), it runs once at the end rather than after every edit, the previous catch-up recorded one full run in work-catch-up-baseline.json, and it is the only check that covers the hub suite and every test-work-* script after the lockfile change.
 - 2026-10-19: Added final architecture reconciliation because a product diagram exists.
+- 2026-10-20: Force-finished by the user.

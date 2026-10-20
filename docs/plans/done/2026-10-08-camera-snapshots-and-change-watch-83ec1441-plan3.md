@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-10-08
-updated: 2026-10-11T10:58:35.393Z
+updated: 2026-10-20T12:04:18.145Z
 started: 2026-10-08T20:25:28.314Z
 ---
 
@@ -164,6 +164,10 @@ needs: R-camera, human
   - Verify OFF opens nothing; A never captures B; disable or expiry releases before warning clears; no video or audio, unbounded files or TTL exception. Do not claim mocks prove physical behavior or complete the plan without deferred qualification evidence or explicit limitation acceptance.
   - Targeted checks: real device, provider and printer trials, CAM-02 limits and CAM-14 observations; full software suite before completion.
   - note: After live UI acceptance and refreshed software checks, user explicitly chose 'Later — not ready' for representative printer trials. R-printer remains off. No camera or printer activity started; wait for user to provide the setup.
+### P-ARCH [code] Product architecture
+
+- [x] **ARCH-RECONCILE** Product diagram rev 9: camera node now lists the built tools, modules and consent/warning; added FFmpeg + camera device (external), camera image store (OS temp, 24 h) and camera grants (~/.pi/agent/camera) with edges, plus camera→settings and camera→ask_user consent edges. Printer qualification (unbuilt) not drawn.
+
 
 ## Checks
 
@@ -223,3 +227,5 @@ Opus's retained recommendations: distinct OFF/ARMED/CAPTURING states, exact iden
 - Reconcile pass: Q-13 to Q-18 answered as D-23 to D-28; CAM-02, CAM-09, CAM-10, Checks and Non-goals updated to match. CAM-02 marker [blocked] → [human] because the camera now exists and only user selection and authorization remain.
 - Optimize pass: phase tags added (Phase 1 and Phase 6 [think], Phases 2 to 5 [code]); R-camera and R-printer requirements with needs lines added for Phase 6; Q-14 to Q-18 flag over-strict checks for /plan3 resolve. No step ID changed, split or merged.
 - CAM-01 through CAM-13 retain stable IDs; no steps merged. CAM-04 remains WIP and existing completion evidence is unchanged. Status stays active. Prior history is in (log).
+- 2026-10-20: Added final architecture reconciliation because a product diagram exists.
+- 2026-10-20: Force-finished by the user with unfinished steps: CAM-09, CAM-10.
