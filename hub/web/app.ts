@@ -1303,6 +1303,19 @@ function renderIconPicker() {
  $("icon-colors").replaceChildren(...ICON_COLORS.map(value => { const button = choice(value, value === color, `<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="16" fill="${value}"/></svg>`, () => void saveHubSettings({ iconColor: value })); button.classList.add("color-choice"); return button; }));
 }
 $("settings-button").addEventListener("click", renderIconPicker);
+// Theme and Auto/Light/Dark are per device (phone and PC may differ), kept in this browser. data-dark drives what CSS
+// light-dark() can't (the diagram's invert filter).
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+const themeSetting = (key: string, value?: string) => { try { if (value === undefined) return localStorage.getItem(key) ?? ""; if (value) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch { /* private mode */ } return value ?? ""; };
+function applyTheme() {
+ const root = document.documentElement, theme = themeSetting("hub-theme"), mode = themeSetting("hub-mode");
+ if (theme) root.dataset.theme = theme; else delete root.dataset.theme;
+ if (mode) root.dataset.mode = mode; else delete root.dataset.mode;
+ root.toggleAttribute("data-dark", mode ? mode === "dark" : darkQuery.matches);
+ ($("hub-theme") as HTMLSelectElement).value = theme; ($("hub-mode") as HTMLSelectElement).value = mode;
+}
+applyTheme(); darkQuery.addEventListener("change", applyTheme);
+for (const key of ["hub-theme", "hub-mode"]) $(key).addEventListener("change", () => { themeSetting(key, ($(key) as HTMLSelectElement).value); applyTheme(); });
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
  if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (herdr, terminals) keeps the old version until restarted.")) return;

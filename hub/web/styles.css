@@ -1,22 +1,34 @@
-/* Light/dark follow the system; chat colours are Pi's own light/dark theme values. */
+/* Themes: one block each, light-dark() pairs; the default is Pi's own light/dark theme values. Auto/Light/Dark
+   sets color-scheme (app.ts applyTheme), so auto works before any script runs. */
 :root {
- color-scheme: light;
- --canvas: #ffffff; --ink: #3b3f41; --muted: #677176; --blue: #a5d8ff; --group: #868e96;
- --pink: #ffc9c9; --focus: #1971c2; --on-focus: #ffffff; --new: #b2f2bb; --changed: #ffec99; --removed: #ced4da;
- --chat: #f7f6f6; --panel: #ffffff; --hover: #eef0f2; --line: #dee2e6; --chat-width: 380px;
- --accent: #7459b4; --error: #c8253d; --success: #337e58; --warning: #8f6802; --thinking: #7c868c;
- --final-bg: #ece6f7; --user-bg: #dfe7ec; --tool-pending: #e4e5e6; --tool-ok: #dee9e1; --tool-error: #eee2e1;
+ color-scheme: light dark; --chat-width: 380px;
  font: 15px/1.45 system-ui, sans-serif; color: var(--ink); background: var(--canvas);
+ --canvas: light-dark(#ffffff, #21252c); --ink: light-dark(#3b3f41, #dee0e1); --muted: light-dark(#677176, #9da5a9); --blue: light-dark(#a5d8ff, #213b49);
+ --group: light-dark(#868e96, #768186); --pink: light-dark(#ffc9c9, #5b282a); --focus: light-dark(#1971c2, #4dabf7); --on-focus: light-dark(#ffffff, #0b1a26);
+ --new: light-dark(#b2f2bb, #254131); --changed: light-dark(#ffec99, #4b4319); --removed: #ced4da; --chat: light-dark(#f7f6f6, #282c34);
+ --panel: light-dark(#ffffff, #2f343c); --hover: light-dark(#eef0f2, #383e47); --line: light-dark(#dee2e6, #3d434c); --accent: light-dark(#7459b4, #a798d7);
+ --error: light-dark(#c8253d, #ea7f81); --success: light-dark(#337e58, #68b78d); --warning: light-dark(#8f6802, #cd9a22); --thinking: light-dark(#7c868c, #96a0a4);
+ --final-bg: light-dark(#ece6f7, #352f4d); --user-bg: light-dark(#dfe7ec, #213b49); --tool-pending: light-dark(#e4e5e6, #34383a); --tool-ok: light-dark(#dee9e1, #254131);
+ --tool-error: light-dark(#eee2e1, #5b282a);
 }
-@media (prefers-color-scheme: dark) {
- :root {
-  color-scheme: dark;
-  --canvas: #21252c; --ink: #dee0e1; --muted: #9da5a9; --blue: #213b49; --group: #768186;
-  --pink: #5b282a; --focus: #4dabf7; --on-focus: #0b1a26; --new: #254131; --changed: #4b4319;
-  --chat: #282c34; --panel: #2f343c; --hover: #383e47; --line: #3d434c;
-  --accent: #a798d7; --error: #ea7f81; --success: #68b78d; --warning: #cd9a22; --thinking: #96a0a4;
-  --final-bg: #352f4d; --user-bg: #213b49; --tool-pending: #34383a; --tool-ok: #254131; --tool-error: #5b282a;
- }
+:root[data-mode=light] { color-scheme: light; } :root[data-mode=dark] { color-scheme: dark; }
+:root[data-theme=nord] {
+ --canvas: light-dark(#eceff4, #2e3440); --ink: light-dark(#2e3440, #eceff4); --muted: light-dark(#4c566a, #a3acbd); --blue: light-dark(#b5cde0, #3b4b60);
+ --group: #7b88a1; --pink: light-dark(#ebcbcf, #5c3a40); --focus: light-dark(#5e81ac, #88c0d0); --on-focus: light-dark(#ffffff, #1f2530);
+ --new: light-dark(#c9dfc0, #3a4a3a); --changed: light-dark(#f3e2b8, #4f4a36); --removed: light-dark(#d8dee9, #4c566a); --chat: light-dark(#e5e9f0, #3b4252);
+ --panel: light-dark(#eceff4, #434c5e); --hover: light-dark(#dfe4ec, #4c566a); --line: light-dark(#d0d6e0, #4c566a); --accent: light-dark(#8a6a9e, #b48ead);
+ --error: light-dark(#a8434d, #e08a92); --success: light-dark(#5a7d48, #a3be8c); --warning: light-dark(#9a6e1f, #ebcb8b); --thinking: light-dark(#6b7589, #8f9bb0);
+ --final-bg: light-dark(#e6dfeb, #463e52); --user-bg: light-dark(#d8e2ee, #3b4b60); --tool-pending: light-dark(#e1e5ec, #3f4656); --tool-ok: light-dark(#dbe6d6, #3a4a3e);
+ --tool-error: light-dark(#efdcdd, #5a3d43);
+}
+:root[data-theme=solarized] {
+ --canvas: light-dark(#fdf6e3, #002b36); --ink: light-dark(#3c4e55, #c9d3d3); --muted: light-dark(#6c7f84, #839496); --blue: light-dark(#c8dff0, #0f4a5c);
+ --group: light-dark(#93a1a1, #657b83); --pink: light-dark(#f3d2c8, #4a2a2a); --focus: light-dark(#268bd2, #2aa1e8); --on-focus: light-dark(#ffffff, #00212b);
+ --new: light-dark(#dbe8b8, #23402a); --changed: light-dark(#f3e3a6, #4a4214); --removed: light-dark(#e0dccb, #586e75); --chat: light-dark(#eee8d5, #073642);
+ --panel: light-dark(#fdf6e3, #0b3d4a); --hover: light-dark(#e8e2cf, #11495a); --line: light-dark(#ddd6c1, #18505f); --accent: light-dark(#6c71c4, #8f93d6);
+ --error: light-dark(#c43a35, #f06a62); --success: light-dark(#6b8000, #a4b82e); --warning: light-dark(#946c00, #d4a72c); --thinking: light-dark(#7d8a8c, #7d9096);
+ --final-bg: light-dark(#e9e3ef, #223a5a); --user-bg: light-dark(#e2e8e0, #0f4a5c); --tool-pending: light-dark(#e9e4d3, #0e3f4c); --tool-ok: light-dark(#e3e8cc, #1d4430);
+ --tool-error: light-dark(#f2dcd3, #4a2a2a);
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -68,9 +80,9 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-body.diff .meta { color: var(--muted); }
 .files-empty { color: var(--muted); font-size: 13px; padding: 4px; }
 @media (max-width: 899px) { .files { grid-template-columns: none; grid-template-rows: minmax(120px, 40%) minmax(0, 1fr); } .files-tree { border-right: 0; border-bottom: 1px solid var(--line); } }
-.canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: #ffffff; }
+.canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); }
 /* The diagram stays a light sketch, inverted like Excalidraw's dark mode. */
-@media (prefers-color-scheme: dark) { .canvas { background: #121212; } #diagram { filter: invert(93%) hue-rotate(180deg); } }
+:root[data-dark] #diagram { filter: invert(93%) hue-rotate(180deg); }
 #diagram { width: 100%; height: 100%; display: block; touch-action: none; color: #1e1e1e; }
 #diagram text { font-family: system-ui, sans-serif; fill: #1e1e1e; }
 .node-label { font-size: 16px; }
@@ -411,6 +423,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session-folder[data-tone=working] { --box: #fab005; } .session-folder[data-tone=waiting] { --box: var(--error); }
 .session-progress { flex-basis: 100%; display: flex; align-items: center; gap: 6px; padding: 0 6px 3px 34px; margin-top: -4px; font-size: 10px; line-height: 1; color: var(--muted); cursor: pointer; }
 .session-progress i { flex: 1; height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill)); }
+/* Collapsed: 28px inside, so the folder box gives up its side padding and the circle stays put. */
+.switcher[data-open=false] .session-folder { padding: 0 0 2px; } .switcher[data-open=false] .session-letter { top: 0; }
 .switcher[data-open=false] .session-progress { padding: 0 2px 2px; } .switcher[data-open=false] .session-progress small { display: none; }
 .session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switcher[data-open=false] .session-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
