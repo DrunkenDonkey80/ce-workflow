@@ -167,12 +167,27 @@ export function createPageApi({ host, registry, views, settings = () => ({}) }: 
 			case "message":
 				// RPC has no reload; D12: Reload is park + resume (idle only).
 				if (typeof data.text === "string" && /^\/(wo )?reload$/.test(data.text.trim())) { await host.restart(id); return { ok: true }; }
+				// /new is a Pi built-in (no extension can run it): a fresh session, and the pages reconnect to its empty chat.
+				if (typeof data.text === "string" && data.text.trim() === "/new") {
+					try { await host.newSession(id); } catch (error) { throw fail(409, (error as Error).message); }
+					views.get(id)?.close(); views.delete(id); return { ok: true };
+				}
 				return call(id, "/api/message", data);
 			case "command": case "bias": case "generate": case "edit": case "comment": case "move": case "pool": return call(id, `/api/${endpoint}`, data);
-			case "stop": {
-				only(data, ["target"], "Invalid Stop fields.");
-				await host.live.get(id)?.rpc.send({ type: "abort" });
-				return { ok: true };
+			// Pi's abort still delivers queued messages, so take them out first and hand them back for editing (rpc-commands.md).
+			// unqueue with text takes back one message (edit or cancel): Pi only clears the whole queue, so the rest is queued again.
+			case "stop": case "unqueue": {
+				only(data, ["target", "text"], "Invalid fields.");
+				const live = host.live.get(id), queued = live ? (await live.rpc.send({ type: "clear_queue" })).data : undefined;
+				const steering: string[] = queued?.steering ?? [], followUp: string[] = queued?.followUp ?? [];
+				if (endpoint === "stop") await live?.rpc.send({ type: "abort" });
+				if (endpoint === "stop" || typeof data.text !== "string") return { ok: true, restored: [...steering, ...followUp] };
+				const list = steering.includes(data.text) ? steering : followUp, at = list.indexOf(data.text);
+				if (at >= 0) list.splice(at, 1);
+				// shortcut: re-queued messages go to the back of any message queued in this instant; fine for one person typing.
+				for (const message of steering) await live!.rpc.send({ type: "steer", message });
+				for (const message of followUp) await live!.rpc.send({ type: "follow_up", message });
+				return { ok: true, restored: at >= 0 ? [data.text] : [], delivered: at < 0 };
 			}
 			case "model": {
 				only(data, ["target", "provider", "id"], "Invalid model fields.");

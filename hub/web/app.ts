@@ -3,7 +3,9 @@ import type { Diagram } from "../../extensions/plan3-diagram.ts";
 import type { createActivityMirror } from "../../extensions/plan3-web.ts";
 // @ts-ignore Browser URL includes the workspace token.
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
-import { ICONS } from "./icons.js?token=__TOKEN__";
+// Optional icons may be absent from an already-running hub after an update.
+// @ts-ignore Browser URL includes the workspace token.
+const { ICONS } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]> }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
@@ -114,16 +116,20 @@ function renderActivity() {
  const tools = data.working ? data.tools ?? [] : [];
  for (const tool of tools) {
   const row = section(tool.id, [tool.name + toolArg(tool.args), tool.state, tool.durationMs === undefined ? "" : Math.round(tool.durationMs) + " ms"].filter(Boolean).join(" · "));
-  if (tool.state === "running" && tool.startedAt) { const clock = make("span", elapsed(Date.now() - tool.startedAt), "tool-elapsed"); clock.dataset.start = String(tool.startedAt); row.firstElementChild!.append(" · ", clock); }
+  if (tool.state === "running" && tool.startedAt) { const clock = make("span", elapsed(Date.now() - tool.startedAt), "tool-elapsed"); clock.dataset.start = String(tool.startedAt); row.firstElementChild!.prepend("(", clock, ") "); } // first, so a stuck tool shows at a glance
   row.className = "tool-row tool-" + (tool.state === "error" ? "error" : tool.state === "done" ? "ok" : "pending") + (tool.parent ? " nested-tool" : "");
   for (const [label, text] of [["Arguments", tool.args], ["Progress", tool.progress], ["Result", tool.result]]) if (text) { row.append(make("strong", label), make("pre", text)); }
  }
  [...root.querySelectorAll(".tool-row")].at(-1)?.classList.add("latest");
  root.classList.toggle("working", !!data.working);
  if (data.queue?.length || data.hasPendingMessages) {
-  const queue = section("queue", "Observed queued messages", true);
-  queue.append(make("p", "May be stale; edit or cancel the real queue in Pi.", "activity-caution"));
-  for (const item of data.queue ?? []) queue.append(make("p", item.delivery + ": " + item.text));
+  // Not yet in the context: grey rows with Edit (back into the box) and ✕ (cancel) until Pi delivers them.
+  for (const item of data.queue ?? []) {
+   const row = make("div", undefined, "queued-msg"), edit = make("button", "edit", "queue-edit") as HTMLButtonElement, drop = make("button", "✕", "queue-drop") as HTMLButtonElement;
+   edit.type = drop.type = "button"; edit.title = "Take it back into the box to change (↑ in an empty box)"; drop.title = "Cancel this queued message"; drop.setAttribute("aria-label", "Cancel queued message");
+   edit.addEventListener("click", () => void editQueued(item.text)); drop.addEventListener("click", () => void editQueued(item.text, true));
+   row.append(make("span", item.text), edit, drop); root.append(row);
+  }
  }
  if (tools.length) root.append(make("p", "Text-only excerpts; custom tool renderers and images stay in Pi.", "activity-caution"));
  pinChat();
@@ -811,6 +817,8 @@ const touchKeyboard = matchMedia("(pointer: coarse)");
 $("message-input").addEventListener("keydown", event => {
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); $("composer").requestSubmit(); }
  if (event.key === "Escape" && !$("stop").hidden && !$("stop").disabled) { event.preventDefault(); $("stop").click(); }
+ // Like Pi's Alt+Up: take queued messages back to edit (plain ↑ only in an empty box, so it never steals caret moves).
+ if (event.key === "ArrowUp" && (event.altKey || !$("message-input").value) && state.activity.queue?.length) { event.preventDefault(); void editQueued(state.activity.queue.at(-1).text); }
 });
 $("composer").addEventListener("submit", async event => {
  event.preventDefault(); if (messageSending || !state.connected) return;
@@ -1108,21 +1116,60 @@ async function loadUsage() {
  } catch { $("usage-button").hidden = true; }
  usageTimer = window.setTimeout(loadUsage, 120_000);
 }
-// The Claude pool's own row text carries ANSI colours (it is the /claude-pool menu line).
-function ansi(text: string) {
- const line = el("div", "pool-line"); let color = "";
- for (const [index, piece] of text.split(/\x1b\[(\d+)m/).entries()) {
-  if (index % 2) { color = ({ 31: "error", 32: "success", 33: "warning", 34: "accent" })[piece] ?? ""; continue; }
-  if (piece) line.append(color ? el("span", "tone-" + color, piece) : piece);
- }
- return line;
-}
-type PoolRow = { label: string; line: string; active: boolean; favorite: boolean; weekend: boolean; disabled: boolean; dead: boolean };
-async function poolAct(act: string, label = "") {
- if (act === "remove" && !confirm(`Remove "${label}" from the Claude pool?`)) return;
- try { const result = await post("pool", { act, label }) as { message?: string }; if (result.message) showNotice(result.message); }
+type Window = { pct: number; tone?: string; resets?: string; clock?: string } | null;
+type PoolRow = { label: string; email?: string; plan?: string; priority: number; state: string; login: string; fiveHour: Window; sevenDay: Window; notes: { text: string; tone?: string }[]; active: boolean; favorite: boolean; weekend: boolean; disabled: boolean; dead: boolean };
+let poolPick = "";
+async function poolAct(act: string, label = "", value?: number) {
+ if (act === "remove" && !confirm(`Delete "${label}" from the Claude pool?`)) return;
+ try { const result = await post("pool", { act, label, value }) as { message?: string }; if (result.message) showNotice(result.message); }
  catch (error) { showNotice(error.message); }
  void loadUsage();
+}
+// One used-quota bar: fill = used, colour = how close to the limit; the reset clock turns red when the week expires soon.
+function poolBar(name: string, w: Window) {
+ const bar = el("div", "pool-bar");
+ if (!w) { bar.append(el("span", "pool-bar-name", name), el("span", "pool-bar-track"), el("span", "pool-bar-text", "—")); return bar; }
+ const track = el("span", "pool-bar-track"), fill = el("span", "pool-bar-fill tone-" + (w.tone ?? "success"));
+ fill.style.width = Math.max(0, Math.min(100, w.pct)) + "%"; track.append(fill);
+ const text = el("span", "pool-bar-text"); text.append(`${w.pct}%`);
+ if (w.resets) text.append(" · ", el("span", w.clock ? "tone-" + w.clock : "", w.resets));
+ bar.append(el("span", "pool-bar-name", name), track, text); return bar;
+}
+const LEVELS: [string, string][] = [["fav", "★ Favourite"], ["2", "++ Prefer"], ["1", "+ Higher"], ["0", "Neutral"], ["-1", "− Lower"], ["-2", "−− Last resort"]];
+function poolActions(row: PoolRow) {
+ const bar = el("div", "pool-actions"), button = (text: string, title: string, run: () => void, cls = "") => { const b = el("button", cls, text); b.type = "button"; b.title = title; b.addEventListener("click", run); bar.append(b); return b; };
+ bar.append(el("b", "pool-pick", row.label));
+ button("Use", "Switch to this account now (held until it runs out)", () => void poolAct("switch", row.label), row.active ? "on" : "").disabled = row.active || row.disabled || row.dead;
+ const level = document.createElement("select"); level.title = "Priority level";
+ for (const [value, text] of LEVELS) level.append(Object.assign(document.createElement("option"), { value, textContent: text }));
+ level.value = row.favorite ? "fav" : String(row.priority);
+ level.addEventListener("change", async () => {
+  if (level.value === "fav") return void poolAct("favorite", row.label);
+  if (row.favorite) await poolAct("favorite", row.label);
+  void poolAct("priority", row.label, Number(level.value));
+ });
+ bar.append(level);
+ button(row.weekend ? "Weekend: on" : "Weekend: off", "Weekend account: drained over the weekend", () => void poolAct("weekend", row.label), row.weekend ? "on" : "");
+ button(row.disabled ? "Enable" : "Disable", row.disabled ? "Put back in rotation" : "Take out of rotation", () => void poolAct("toggle", row.label));
+ button("Delete", "Remove from the pool", () => void poolAct("remove", row.label), "danger");
+ return bar;
+}
+function poolRowBox(row: PoolRow, select: () => void) {
+ const box = el("div", "pool-row" + (row.active ? " active" : "") + (row.disabled || row.dead ? " off" : "") + (row.label === poolPick ? " picked" : ""));
+ box.tabIndex = 0; box.setAttribute("role", "option"); box.setAttribute("aria-selected", String(row.label === poolPick));
+ const head = el("div", "pool-head");
+ head.append(el("span", "pool-mark", row.active ? "▶" : ""), el("b", "", (row.favorite ? "★ " : "") + row.label));
+ const level = row.favorite ? "" : LEVELS.find(([value]) => value === String(row.priority))?.[1].split(" ")[0];
+ if (level && row.priority) head.append(el("span", "pool-chip", level));
+ if (row.plan) head.append(el("span", "pool-chip", row.plan));
+ if (row.weekend) head.append(el("span", "pool-chip", "weekend"));
+ if (row.state !== "ok") head.append(el("span", "pool-chip tone-" + (row.dead ? "error" : "warning"), row.state));
+ if (row.login && row.login !== "ok") head.append(el("span", "pool-chip tone-error", row.login));
+ if (row.email) head.append(el("small", "pool-email", row.email));
+ box.append(head, poolBar("5h", row.fiveHour), poolBar("7d", row.sevenDay));
+ if (row.notes.length) { const notes = el("div", "pool-notes"); for (const note of row.notes) notes.append(el("span", note.tone ? "tone-" + note.tone : "", note.text)); box.append(notes); }
+ box.addEventListener("click", select); box.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } });
+ return box;
 }
 async function openUsage(id: string, open = true) {
  const item = usage.find(entry => entry.id === id), dialog = $("usage-window") as HTMLDialogElement;
@@ -1138,22 +1185,17 @@ async function openUsage(id: string, open = true) {
   let pool: { title: string; drain7d: boolean; rows: PoolRow[] } | null = null;
   try { pool = await get("pool"); } catch { pool = null; }
   if (pool?.rows.length) {
+   const rows = pool.rows;
+   if (!rows.some(row => row.label === poolPick)) poolPick = rows.find(row => row.active)?.label ?? rows[0].label;
    const tools = el("div", "pool-tools");
-   const refresh = el("button", "", "↻ Refresh usage"), drain = el("button", pool.drain7d ? "on" : "", pool.drain7d ? "Drain 7d: on" : "Drain 7d: off");
+   const refresh = el("button", "", "↻ Refresh"), drain = el("button", pool.drain7d ? "on" : "", pool.drain7d ? "Drain 7d: on" : "Drain 7d: off");
    refresh.title = "Fetch every account's usage now"; drain.title = "Drain 7d: serve the soonest-expiring week first, ignoring 5h";
    refresh.addEventListener("click", () => void poolAct("refresh")); drain.addEventListener("click", () => void poolAct("mode"));
    tools.append(el("h3", "", pool.title), refresh, drain);
-   body.push(tools, ...pool.rows.map(row => {
-    const box = el("div", "pool-row" + (row.active ? " active" : "") + (row.disabled || row.dead ? " off" : ""));
-    const actions = el("div", "pool-actions");
-    const action = (act: string, text: string, title: string, on = false) => { const b = el("button", on ? "on" : "", text); b.type = "button"; b.title = title; b.addEventListener("click", () => void poolAct(act, row.label)); actions.append(b); };
-    action("switch", "Use", "Switch to this account now (held until it runs out)", row.active);
-    action("favorite", "★", "Favourite", row.favorite); action("weekend", "Wknd", "Weekend account", row.weekend);
-    action("up", "↑", "Raise priority"); action("down", "↓", "Lower priority");
-    action("toggle", row.disabled ? "Enable" : "Disable", row.disabled ? "Put back in rotation" : "Take out of rotation");
-    action("remove", "✕", "Remove from the pool");
-    box.append(ansi(row.line), actions); return box;
-   }));
+   const list = el("div", "pool-list"), actions = el("div");
+   list.setAttribute("role", "listbox");
+   const draw = () => { list.replaceChildren(...rows.map(row => poolRowBox(row, () => { poolPick = row.label; draw(); }))); actions.replaceChildren(poolActions(rows.find(row => row.label === poolPick)!)); };
+   draw(); body.push(tools, list, actions);
   } else if (usageAccounts.length) body.push(el("h3", "", "Accounts · 7d left · resets in"), ...usageAccounts.map(part => el("div", "usage-line tone-" + part.color + (part.text.startsWith("→") ? " current" : ""), part.text)));
  }
  $("usage-body").replaceChildren(...body);
@@ -1245,7 +1287,7 @@ async function pollLoad() {
 }
 void pollLoad(); setInterval(pollLoad, 5000);
 async function saveHubSettings(change: HubSettings) {
- try { hubSettings = await post("hub", { action: "settings", ...change }) as HubSettings; renderIcon(); if (($("hub-icon") as HTMLDialogElement).open) renderIconPicker(); }
+ try { hubSettings = await post("hub", { action: "settings", ...change }) as HubSettings; renderIcon(); renderIconPicker(); }
  catch (error) { showNotice(error.message); }
 }
 $("hub-park").addEventListener("change", () => void saveHubSettings({ idleParkMinutes: Number(($("hub-park") as HTMLSelectElement).value) }));
@@ -1260,14 +1302,27 @@ function renderIconPicker() {
  $("icon-grid").replaceChildren(choice("Shovel (default)", !current, shovel, () => void saveHubSettings({ icon: "" })), ...Object.keys(ICONS).map(name => choice(name.replaceAll("-", " "), name === current, iconSvg(name, color, "idle"), () => void saveHubSettings({ icon: name }))));
  $("icon-colors").replaceChildren(...ICON_COLORS.map(value => { const button = choice(value, value === color, `<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="16" fill="${value}"/></svg>`, () => void saveHubSettings({ iconColor: value })); button.classList.add("color-choice"); return button; }));
 }
-$("hub-icon-button").addEventListener("click", () => { closeMenus(); setDrawer(false); renderIconPicker(); ($("hub-icon") as HTMLDialogElement).showModal(); });
-$("hub-icon-close").addEventListener("click", () => ($("hub-icon") as HTMLDialogElement).close());
+$("settings-button").addEventListener("click", renderIconPicker);
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
  if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (herdr, terminals) keeps the old version until restarted.")) return;
  try { await post("hub", { action: "update" }); showNotice("Updating Pi and extensions; the page reconnects when the hub is back (a minute or two).", true); } catch (error) { showNotice(error.message); }
 });
-$("stop").addEventListener("click", async () => { try { await post("stop", {}); showNotice("Stop requested.", true); } catch (error) { showNotice(error.message); } });
+// Queued messages come back into the box (Pi would otherwise still deliver them after Stop), ahead of any draft.
+function restoreQueued(restored?: string[]) {
+ if (!restored?.length) return false;
+ const input = $("message-input"); input.value = [...restored, input.value].filter(Boolean).join("\n\n"); input.focus(); input.dispatchEvent(new Event("input")); return true;
+}
+$("stop").addEventListener("click", async () => { try { const result = await post("stop", {}) as { restored?: string[] }; showNotice(restoreQueued(result.restored) ? "Stopped. Your queued message is back in the box to edit." : "Stop requested.", true); } catch (error) { showNotice(error.message); } });
+// One queued message: edit puts it in the box, cancel drops it. Already delivered: its text still comes back, and Send posts it as a new message.
+async function editQueued(text?: string, cancel = false) {
+ try {
+  const result = await post("unqueue", text === undefined ? {} : { text }) as { restored?: string[]; delivered?: boolean };
+  if (result.delivered) { if (!cancel) restoreQueued([text!]); showNotice(cancel ? "Already delivered; it can't be cancelled." : "Already delivered; Send posts your edit as a new message.", true); return; }
+  if (cancel) { showNotice("Queued message cancelled.", true); return; }
+  showNotice(restoreQueued(result.restored) ? "Queued message back in the box to edit." : "Nothing queued.", true);
+ } catch (error) { showNotice(error.message); }
+}
 
 // The server starts every connection with a fresh full snapshot. Native EventSource stops for good on an HTTP error
 // (503 while Pi reloads), so the page reconnects itself with backoff and reloads when the build changed.

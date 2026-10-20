@@ -155,8 +155,25 @@ try {
 	// Stop aborts the run.
 	void hub.host.prompt(id, "hold");
 	await until(() => hub.host.live.get(id).running);
-	assert.equal((await post(id, "stop", {})).status, 200);
+	// One queued message taken back (edit/cancel); the others stay queued, and the page's list follows.
+	await hub.host.live.get(id).rpc.send({ type: "steer", message: "keep me" });
+	await hub.host.live.get(id).rpc.send({ type: "steer", message: "drop me" });
+	await until(async () => (await get(id, "snapshot")).body.activity.queue.length === 2);
+	assert.deepEqual((await post(id, "unqueue", { text: "drop me" })).body, { ok: true, restored: ["drop me"], delivered: false });
+	await until(async () => JSON.stringify((await get(id, "snapshot")).body.activity.queue.map(item => item.text)) === '["keep me"]');
+	assert.equal((await post(id, "unqueue", { text: "long gone" })).body.delivered, true, "already steered: the page posts the edit as a new message");
+	await hub.host.live.get(id).rpc.send({ type: "clear_queue" });
+	await hub.host.live.get(id).rpc.send({ type: "steer", message: "oops, wrong" });
+	const stopped = await post(id, "stop", {});
+	assert.equal(stopped.status, 200);
+	assert.deepEqual(stopped.body.restored, ["oops, wrong"], "Stop takes queued messages back instead of letting abort deliver them");
 	await until(() => !hub.host.live.get(id).running);
+
+	// /new: a fresh session file, the lock moves with it, and the chat starts empty.
+	const oldFile = hub.registry.get(id).sessionFile;
+	assert.equal((await post(id, "message", { text: "/new" })).status, 200);
+	assert.notEqual(hub.registry.get(id).sessionFile, oldFile, "registry follows Pi's new session file");
+	assert.deepEqual((await get(id, "snapshot")).body.chat, [], "the page reconnects to an empty chat");
 
 	// H5-05 session bar: folder groups with state tones, actions, Recents with Star/Unstar (D18).
 	const tones = async () => Object.fromEntries((await get(id, "sessions")).body.groups.flatMap(group => group.sessions.map(session => [session.name, session.tone])));

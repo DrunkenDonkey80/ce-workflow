@@ -14,7 +14,10 @@ import { applyDiagramOperations, toolbarEdit } from "../../extensions/plan3-diag
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `hub-ui-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
- const { stdout } = await execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 });
+ if (process.env.BROWSER_TRACE) console.error(Math.round(performance.now() / 1000) + "s", args.join(" ").slice(0, 100));
+ // execFile's timeout can't end a call whose pipe the agent-browser daemon still holds (Windows), so a failed wait hung the run.
+ const run = execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 }); let timer;
+ const { stdout } = await Promise.race([run, new Promise((_, reject) => { timer = setTimeout(() => { run.child.kill(); reject(new Error("agent-browser timed out: " + args.join(" ").slice(0, 200))); }, 35_000); })]).finally(() => clearTimeout(timer));
  let result; try { result = JSON.parse(stdout); } catch { throw new Error("agent-browser returned non-JSON: " + stdout.slice(0, 500)); }
  assert(result.success, JSON.stringify(result)); return result.data;
 }
@@ -61,7 +64,7 @@ const fail = (status, error) => Object.assign(new Error(error), { status });
 function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
  if (endpoint === "/api/usage") return { summary: [{ id: "claude", label: "Claude", left: 53, color: "text", bars: [{ label: "7d", left: 53, color: "text" }], warnings: [{ text: "expiring in 4h 12m (40% unused)", color: "error" }], notes: ["70% in 2h 0m"] }, { id: "codex", label: "Codex", left: 12, color: "error", resets: "1d 14h", bars: [{ label: "5h", left: 80, color: "text", resets: "2h 3m" }, { label: "7d", left: 12, color: "error", resets: "1d 14h", at: "Tue 10:00" }], warnings: [], notes: [] }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
- if (endpoint === "/api/pool") { if (body.act) { pool.acts.push(body.act + ":" + body.label); return { message: "done " + body.act }; } return { title: "Claude accounts", drain7d: false, rows: [{ label: "flex1", line: "[32m▸ 1. ★[0m 5h 20% 7d 53%", active: true, favorite: true, weekend: false, disabled: false, dead: false }, { label: "flex2", line: "  2.    5h 0% 7d 90%", active: false, favorite: false, weekend: false, disabled: true, dead: false }] }; }
+ if (endpoint === "/api/pool") { if (body.act) { pool.acts.push(body.act + ":" + body.label + (body.value === undefined ? "" : ":" + body.value)); return { message: "done " + body.act }; } return { title: "Claude accounts", drain7d: false, rows: [{ label: "flex1", priority: 0, state: "ok", login: "ok", fiveHour: { pct: 20, resets: "2h" }, sevenDay: { pct: 53, tone: "warning", resets: "4h 12m", clock: "error" }, notes: [{ text: "as of 3m ago" }], active: true, favorite: true, weekend: false, disabled: false, dead: false }, { label: "flex2", priority: -1, state: "ok", login: "ok", fiveHour: null, sevenDay: { pct: 90, tone: "error" }, notes: [], active: false, favorite: false, weekend: false, disabled: false, dead: false }] }; }
  if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }], args: { wo: [{ value: "share", description: "Toggle sharing" }], plan3: [{ value: "review", description: "Review" }, { value: "review all", description: "Review" }] } };
  if (endpoint === "/api/edit" && body.target === "product") { // E-05: Project-tab edits
   const planned = toolbarEdit(product, body.edit), result = applyDiagramOperations(product, planned.operations); toolbarEdits.push(body.edit);
@@ -113,7 +116,13 @@ await rpc().send({ type: "prompt", message: "/state " + JSON.stringify({ plan: {
 let status = (await api("snapshot")).status;
 const server = { url: target => `${origin}/s/${id}/?token=${hub.config.localKey}&target=${target.id}` };
 try {
+ // An older running hub may not serve newly added optional assets: the page must still boot.
+ await browser("network", "route", "**/icons.js?*", "--abort");
  await browser("open", server.url({ kind: "plan", id: "12345678" }));
+ await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
+ assert.equal(await evaluate("document.getElementById(\"send\").disabled"), false, "missing icons do not disable chat");
+ await browser("network", "unroute", "**/icons.js?*");
+ await browser("reload");
  await browser("set", "viewport", "1280", "800");
  await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
  // The excerpt and stream-gap refetches ask the hub for the whole row; here every row's full text is fixed.
@@ -520,12 +529,20 @@ try {
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-window-bar')].map(b => b.textContent)"), ["5h 80% left · resets in 2h 3m", "7d 12% left · resets in 1d 14h (Tue 10:00)"], "codex window: 5h and 7d bars");
  await browser("click", "#usage-close");
  await browser("click", "#usage-button [data-provider=claude]"); await browser("wait", ".pool-row");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-alert, #usage-body .pool-row')].map(e => e.className + ':' + (e.querySelector('.pool-line')?.textContent ?? e.textContent))"), ["usage-alert tone-error:⚠ expiring in 4h 12m (40% unused)", "pool-row active:▸ 1. ★ 5h 20% 7d 53%", "pool-row off:  2.    5h 0% 7d 90%"], "claude window: warning, then the pool rows");
- assert.equal(await evaluate("document.querySelector('.pool-row .pool-line .tone-success')?.textContent"), "▸ 1. ★", "the pool's ANSI colours become tones");
- await browser("click", ".pool-row.off .pool-actions button:first-child"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done switch')");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-alert, #usage-body .pool-row')].map(e => e.className)"), ["usage-alert tone-error", "pool-row active picked", "pool-row"], "claude window: warning, then the pool rows, active one picked");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.pool-row.active .pool-bar-fill')].map(f => f.className + ' ' + f.style.width)"), ["pool-bar-fill tone-success 20%", "pool-bar-fill tone-warning 53%"], "5h and 7d as coloured bars");
+ assert.equal(await evaluate("document.querySelectorAll('.pool-row.active .pool-bar')[1].querySelector('.tone-error')?.textContent"), "4h 12m", "an expiring week's clock is red");
+ assert.equal(await evaluate("document.querySelectorAll('.pool-actions').length"), 1, "one action row for the picked account");
+ await browser("click", ".pool-row:not(.active)"); await browser("wait", "--fn", "document.querySelector('.pool-pick')?.textContent === 'flex2'");
+ assert.equal(await evaluate("document.querySelector('.pool-actions select').value"), "-1", "the level menu shows the picked account's priority");
+ await browser("click", ".pool-actions button:first-of-type"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done switch')");
+ await evaluate("(() => { const s = document.querySelector('.pool-actions select'); s.value = '2'; s.dispatchEvent(new Event('change')); })()"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done priority')");
  await browser("click", ".pool-tools button:nth-of-type(2)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done mode')");
- assert.deepEqual(pool.acts, ["switch:flex2", "mode:"], "pool actions reach the session");
+ assert.deepEqual(pool.acts, ["switch:flex2", "priority:flex2:2", "mode:"], "pool actions reach the session");
  await browser("click", "#usage-close");
+ await browser("click", "#settings-button");
+ assert.deepEqual(await evaluate("[document.querySelectorAll('#settings-menu #icon-grid .icon-choice').length > 1, document.querySelectorAll('#settings-menu #icon-colors .icon-choice').length]"), [true, 6], "icons and colours sit inside the settings menu");
+ await browser("click", "#settings-button");
  // The plan bar lines up with the sidebar's folder boxes below it.
  assert(await evaluate("(() => { const plan = document.getElementById('plan-button').getBoundingClientRect().left, box = document.querySelector('.session-folder')?.getBoundingClientRect().left; return box === undefined || Math.abs(plan - box) < 2; })()"), "plan bar aligns with the sidebar: " + await evaluate("JSON.stringify([document.getElementById('plan-button').getBoundingClientRect().left, document.querySelector('.session-folder')?.getBoundingClientRect().left])"));
  // Think and the usage bars together span the chat panel width.
@@ -605,10 +622,10 @@ try {
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", startedAt: Date.now() - 65_000, args: JSON.stringify({ path: "src/app.ts", limit: 9 }), progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
- assert(await evaluate("document.getElementById(\"activity\").textContent.includes(\"May be stale\")"));
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.queued-msg')].map(r => r.textContent)"), ["Follow upedit✕"], "a queued message shows grey with edit and cancel");
  assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool rows start collapsed");
- assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1] summary\").textContent"), "read src/app.ts · running · 1:05", "the live tool line names its target and counts its running time");
+ assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1] summary\").textContent"), "(1:05) read src/app.ts · running", "the running time leads the live tool line");
  // While working, Thinking and Compact keep the live thinking and only the latest tool call; Compact drops thinking once settled.
  const activityShown = () => evaluate("['#activity [data-id=tool_1]', '#activity [data-id=tool_2]', '#activity .thinking-row'].map(sel => !!document.querySelector(sel) && getComputedStyle(document.querySelector(sel)).display !== 'none')");
  await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Thinking view while working");
@@ -648,7 +665,7 @@ try {
  await browser("wait", "--fn", "document.querySelectorAll('#activity details').length === 0");
  await evaluate("(() => { const l = document.getElementById('feed'); l.scrollTop = l.scrollHeight; })()"); await new Promise(done => setTimeout(done, 100));
  activity = { working: true, error: undefined, thinking: "", queue: [{ id: "q1", text: "Queued follow-up", delivery: "followUp" }], tools: Array.from({ length: 6 }, (_, i) => ({ id: "grow_" + i, name: "bash", state: "running", args: "step " + i })) }; publish("activity", activity);
- await browser("wait", "--fn", "document.querySelectorAll('#activity details').length >= 7"); await new Promise(done => setTimeout(done, 200));
+ await browser("wait", "--fn", "document.querySelectorAll('#activity details').length >= 6 && document.querySelector('.queued-msg')"); await new Promise(done => setTimeout(done, 200));
  assert(await evaluate("(() => { const feed = document.getElementById('feed'), activity = document.getElementById('activity'), messages = document.getElementById('messages'); return [activity, messages].every(item => item.parentElement === feed && item.scrollHeight <= item.clientHeight + 1) && messages.nextElementSibling === activity && activity.getBoundingClientRect().bottom - feed.getBoundingClientRect().bottom < 4; })()"), "one scroll area: messages, then the live activity at the end");
  // A scroll event arriving after content grew below (reader did not move) keeps the pin.
  await evaluate("(() => { document.querySelector('#messages > li:last-child').append(Object.assign(document.createElement('div'), { style: 'height: 200px' })); document.getElementById('feed').dispatchEvent(new Event('scroll')); })()");

@@ -169,6 +169,20 @@ export class SessionHost extends EventEmitter {
 		return record;
 	}
 
+	/** /new from the page: Pi starts a fresh session file in the same process; the hub lock moves with it. */
+	async newSession(id: string): Promise<SessionRecord> {
+		const live = this.live.get(id);
+		if (!live) throw new Error("Session is parked; resume it first.");
+		if (live.running) throw new Error("Stop the agent before starting a new session.");
+		const result = await live.rpc.send({ type: "new_session" });
+		if (!result.success || result.data?.cancelled) throw new Error(result.error ?? "Pi kept the current session.");
+		const state = await live.rpc.send({ type: "get_state" }), sessionFile = state.data?.sessionFile;
+		if (!state.success || typeof sessionFile !== "string") throw new Error(state.error ?? "Pi reported no session file.");
+		if (live.lock) releaseLock(live.lock.file, live.lock.info);
+		live.lock = { file: sessionFile, info: acquireLock(sessionFile, "pi-control-hub") };
+		return this.registry.update(id, { sessionFile });
+	}
+
 	/** D12: RPC has no reload, so Reload parks and resumes, idle only. */
 	async restart(id: string): Promise<SessionRecord> {
 		await this.park(id);

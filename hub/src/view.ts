@@ -75,7 +75,7 @@ export class SessionView {
 				for (const text of next) { const at = before.indexOf(text); if (at >= 0) before.splice(at, 1); else this.emit("input", { text, source: "rpc", streamingBehavior: kind === "steering" ? "steer" : "followUp" }); }
 				this.queue[kind] = next;
 			}
-			return;
+			return this.emit("queue_exact", { texts: [...this.queue.steering, ...this.queue.followUp] });
 		}
 		this.emit(event.type, event); // F4: the chat mirror only keeps user/assistant rows, so the stored system message never reaches a page
 	}

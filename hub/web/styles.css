@@ -174,11 +174,23 @@ h2 { font-size: 15px; font-weight: 600; }
 .usage-alert { margin: 8px 0; padding: 6px 10px; border-radius: 6px; font-weight: 600; background: color-mix(in srgb, currentColor 10%, transparent); }
 .usage-alert.tone-error { color: var(--error); } .usage-alert.tone-warning { color: var(--warning); }
 .pool-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 16px 0 6px; } .pool-tools h3 { margin: 0 auto 0 0; font-size: 1em; }
-.pool-row { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; margin: 4px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
-.pool-row.active { border-color: var(--focus); background: color-mix(in srgb, var(--focus) 8%, transparent); } .pool-row.off { opacity: .6; }
-.pool-line { font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; flex: 1 1 22em; }
-.pool-actions { display: flex; gap: 4px; flex-wrap: wrap; } .pool-actions button, .pool-tools button { padding: 3px 8px; font-size: 12px; }
+.pool-list { display: flex; flex-direction: column; gap: 6px; max-height: 55vh; overflow: auto; padding: 2px; }
+.pool-row { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: grid; gap: 4px; }
+.pool-row:hover { background: var(--hover); } .pool-row:focus-visible { outline: 2px solid var(--focus); }
+.pool-row.active { border-color: var(--success); } .pool-row.off { opacity: .55; }
+.pool-row.picked { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); background: color-mix(in srgb, var(--focus) 10%, transparent); }
+.pool-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .pool-mark { color: var(--success); width: 1em; }
+.pool-chip { font-size: 11px; padding: 0 6px; border-radius: 9px; border: 1px solid var(--line); } .pool-email { color: var(--muted); margin-left: auto; }
+.pool-bar { display: grid; grid-template-columns: 2em 1fr 9em; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pool-bar-name { color: var(--muted); } .pool-bar-text { text-align: right; white-space: nowrap; }
+.pool-bar-track { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 22%, transparent); overflow: hidden; }
+.pool-bar-fill { display: block; height: 100%; background: var(--success); } .pool-bar-fill.tone-warning { background: var(--warning); } .pool-bar-fill.tone-error { background: var(--error); }
+.pool-notes { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); } .pool-notes .tone-error { color: var(--error); } .pool-notes .tone-warning { color: var(--warning); }
+.pool-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pool-pick { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16em; }
+.pool-actions button, .pool-actions select, .pool-tools button { padding: 4px 10px; font-size: 13px; }
 .pool-actions button.on, .pool-tools button.on { border-color: var(--focus); background: color-mix(in srgb, var(--focus) 18%, transparent); }
+.pool-actions button.danger { color: #fff; background: var(--error); border-color: var(--error); }
 @media (max-width: 899px) { .expand-left, #narrow-left, #collapse-left { display: none; } }
 .splitter { background: var(--chat); cursor: col-resize; border-inline: 1px solid var(--line); touch-action: none; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
@@ -270,6 +282,10 @@ h2 { font-size: 15px; font-weight: 600; }
 .activity-error, .tool-error summary { color: var(--error); }
 .activity .thinking-row pre { font-style: italic; }
 .activity-caution { color: var(--muted); }
+.queued-msg { display: flex; align-items: center; gap: 6px; margin: 4px 0; padding: 4px 8px; border: 1px dashed var(--border, #8884); border-radius: 6px; color: var(--muted); opacity: .8; }
+.queued-msg span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 6em; overflow: auto; }
+.queued-msg button { flex: none; padding: 0 6px; font-size: .85em; }
+.queue-drop:hover { color: #d33; }
 /* One scroll area: the conversation, then the live activity below the newest message. */
 .feed { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
 .messages { list-style: none; margin: 0; padding: 16px 16px 0; }
@@ -472,9 +488,11 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 #chat-compact-m { grid-column: 1 / -1; }
 /* Gear menu field and the tab icon picker. */
 .menu-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
-.icon-grid { display: grid; grid-template-columns: repeat(5, 48px); gap: 8px; margin: 8px 0; }
+#settings-menu { width: max-content; max-width: calc(100vw - 16px); }
+.icon-field { display: block; }
+.icon-grid { display: grid; grid-template-columns: repeat(5, 40px); gap: 6px; margin: 6px 0; }
 .icon-colors { display: flex; gap: 8px; margin: 4px 0 8px; }
-.icon-choice { width: 48px; height: 48px; padding: 4px; border: 2px solid transparent; border-radius: 10px; background: none; }
+.icon-choice { width: 40px; height: 40px; padding: 4px; border: 2px solid transparent; border-radius: 10px; background: none; }
 .icon-choice svg { width: 100%; height: 100%; display: block; }
-.icon-choice.color-choice { width: 36px; height: 36px; border-radius: 50%; }
+.icon-choice.color-choice { width: 30px; height: 30px; border-radius: 50%; }
 .icon-choice[aria-checked="true"] { border-color: var(--focus); background: var(--hover); }

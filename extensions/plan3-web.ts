@@ -125,6 +125,12 @@ export function createActivityMirror(pi, publish: (event: string, value: unknown
 		while (queued.length > 100 || Buffer.byteLength(JSON.stringify(queued)) > 512_000) queued.shift();
 		emit();
 	});
+	// Hub only: Pi's exact queue after a change, so messages taken back or cancelled leave the list.
+	pi.on("queue_exact", (event: { texts: string[] }) => {
+		const left = event.texts.map(digest);
+		for (let i = queued.length - 1; i >= 0; i--) { const at = left.lastIndexOf(queued[i].digest); if (at >= 0) left.splice(at, 1); else queued.splice(i, 1); }
+		emit();
+	});
 	pi.on("tool_execution_start", event => tool(event, { state: "running", startedAt: Date.now(), args: brief(event.args) }));
 	pi.on("tool_execution_update", event => tool(event, { progress: resultText(event.partialResult) }));
 	pi.on("tool_execution_end", event => {

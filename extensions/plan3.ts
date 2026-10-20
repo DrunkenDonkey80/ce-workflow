@@ -759,14 +759,15 @@ export default function plan3(pi) {
 	// A message the agent never received must not vanish silently.
 	const notifyWeb = (_event, value) => webCtx?.ui.notify(value.message, "error");
 	// pi-provider-claude-ex exports its /claude-pool list and menu actions; absent means no pool window.
-	const claudePool = () => { const info: { view?: () => unknown; action?: (act: string, label: string) => Promise<{ text: string } | undefined> } = {}; pi.events.emit("claude-pool:web", info); return info; };
-	const POOL_ACTS = new Set(["switch", "favorite", "weekend", "mode", "refresh", "toggle", "remove", "up", "down"]);
+	const claudePool = () => { const info: { view?: () => unknown; action?: (act: string, label: string, value?: number) => Promise<{ text: string } | undefined> } = {}; pi.events.emit("claude-pool:web", info); return info; };
+	const POOL_ACTS = new Set(["switch", "favorite", "weekend", "mode", "refresh", "toggle", "remove", "up", "down", "priority"]);
 	async function postWeb(endpoint, data) {
 		if (endpoint === "/api/pool") {
 			const pool = claudePool();
 			if (!pool.action) throw new WebError(404, "The Claude pool extension is not loaded.");
 			if (!POOL_ACTS.has(data.act) || typeof (data.label ?? "") !== "string") throw new WebError(400, "Unknown pool action.");
-			const message = await pool.action(data.act, data.label ?? "");
+			if (data.act === "priority" && !(Number.isInteger(data.value) && Math.abs(data.value) <= 2)) throw new WebError(400, "Priority is -2..2.");
+			const message = await pool.action(data.act, data.label ?? "", data.value);
 			return { message: message?.text, view: pool.view?.() };
 		}
 		if (!webCtx) throw new WebError(409, "Workspace context expired; reopen /plan3 diagram.");

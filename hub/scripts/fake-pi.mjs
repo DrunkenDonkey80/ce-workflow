@@ -9,9 +9,9 @@ import fs from "node:fs";
 const flags = new Set((process.env.FAKE_PI ?? "").split(",").filter(Boolean));
 const args = process.argv.slice(2);
 const sessionArg = args[args.indexOf("--session") + 1];
-const sessionFile = args.includes("--session") ? sessionArg : `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`;
+let sessionFile = args.includes("--session") ? sessionArg : `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`;
 let sessionName = args.includes("--name") ? args[args.indexOf("--name") + 1] : undefined;
-let model = { provider: "fake", id: "fake-1" }, thinkingLevel = "low", streaming = false;
+let model = { provider: "fake", id: "fake-1" }, thinkingLevel = "low", streaming = false; const queued = [];
 const messages = fs.existsSync(sessionFile)
 	? fs.readFileSync(sessionFile, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)).filter(e => e.type === "message").map(e => e.message)
 	: [];
@@ -36,6 +36,9 @@ async function handle(cmd) {
 		case "set_model": model = { provider: cmd.provider, id: cmd.modelId, name: cmd.modelId }; return reply(model);
 		case "set_thinking_level": thinkingLevel = cmd.level; out({ type: "thinking_level_changed", level: cmd.level }); return reply();
 		case "abort": if (streaming) { streaming = false; out({ type: "agent_settled", aborted: true }); } return reply();
+		case "steer": case "follow_up": queued.push(cmd.message); out({ type: "queue_update", steering: [...queued], followUp: [] }); return reply();
+		case "clear_queue": { const taken = queued.splice(0); out({ type: "queue_update", steering: [], followUp: [] }); return reply({ steering: taken, followUp: [] }); }
+		case "new_session": sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; messages.length = 0; return reply({ cancelled: false });
 		case "set_session_name": sessionName = cmd.name; return reply();
 		case "prompt": {
 			if (flags.has("crash-on-prompt")) process.exit(3);
