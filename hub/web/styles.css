@@ -219,7 +219,7 @@ h2 { font-size: 15px; font-weight: 600; }
 #load-cpu polyline { stroke: var(--accent); } #load-memory polyline { stroke: var(--warning); }
 .load span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--text); text-shadow: 0 0 3px var(--panel); }
 /* Desktop: the plan bar leads the status line, next to the title; the other buttons keep their full text. */
-#plan-button { order: -1; flex: 0 1 28em; margin-right: auto; display: flex; gap: 6px; justify-content: flex-start; }
+#plan-button { order: -1; flex: 1 1 0; display: flex; gap: 6px; justify-content: flex-start; }
 .bar-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; } .bar-count { flex: none; }
 .bar-group { flex: 0 1 auto; } .bar-group .bar { flex: 0 1 auto; }
 .workspace-title { flex: 0 1 auto !important; max-width: 22%; }

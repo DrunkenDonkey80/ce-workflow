@@ -23,11 +23,16 @@ const auth: RequestInit = token ? { credentials: "omit", headers: { Authorizatio
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
-const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; folder?: string; tab?: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; window?: number | null; folder?: string; tab?: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
 const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 0: "Normal", 1: "Think:Task", 2: "Think:Plan" };
+// Without a plan the bias is per session: Think / Normal / Work.
+const SESSION_BIAS = { "-1": "Work", 0: "Normal", 1: "Think" };
+const biasNow = () => state.plan ? state.plan.bias ?? 0 : (state.status as { modes?: { bias?: number } })?.modes?.bias ?? 0;
+// Context fills toward the compaction border, not the model window.
+const COMPACT_AT = 200_000;
 // Progress-bar buttons: fill to percent, coloured by footer tone (accent, success, warning, error, dim).
 function setBar(item: HTMLElement, percent: number, tone: string) {
  item.style.setProperty("--fill", Math.max(0, Math.min(100, percent)) + "%"); item.dataset.tone = tone;
@@ -52,10 +57,12 @@ function renderShell() {
  $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
  // 120k/1m like Pi's footer; tokens are null right after compaction until the next reply.
  const short = n => n >= 1e6 ? +(n / 1e6).toFixed(1) + "m" : Math.round(n / 1e3) + "k";
+ const used = typeof status?.tokens === "number" ? status.tokens / Math.min(COMPACT_AT, status.window || COMPACT_AT) * 100 : status?.context ?? 0;
+ setBar($("context-button"), used, used >= 90 ? "error" : used >= 70 ? "warning" : "accent");
  $("context-button").replaceChildren(html("span", { className: "context-label", textContent: "Context: " }), (status?.window ? (typeof status.tokens === "number" ? short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—")); // the phone drawer hides the label
- $("bias-button").textContent = "💡 " + (BIAS_LABEL[plan?.bias ?? 0] ?? "Normal");
+ $("bias-button").textContent = "💡 " + ((plan ? BIAS_LABEL : SESSION_BIAS)[biasNow()] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
- $("bias-button").disabled = !state.connected || !plan;
+ $("bias-button").disabled = !state.connected;
  // The plan bar names the plan; only the title part truncates, the count stays visible.
  $("plan-button").replaceChildren(Object.assign(document.createElement("span"), { className: "bar-text", textContent: plan?.title ?? "New plan" }), ...plan?.total ? [Object.assign(document.createElement("span"), { className: "bar-count", textContent: `${plan.done ?? 0}/${plan.total}` })] : []);
  $("plan-button").title = plan ? plan.title + " — plan actions" : "Start a new plan";
@@ -180,7 +187,7 @@ const CHAT_VIEWS = ["expanded", "thinking", "compact"], CHAT_LABEL = { expanded:
 function setChatView(view: string) {
  for (const name of CHAT_VIEWS.slice(1)) document.documentElement.classList.toggle("chat-" + name, view === name);
  for (const id of ["chat-compact", "chat-compact-m"]) { $(id).setAttribute("aria-pressed", String(view !== "expanded")); $(id).textContent = (id === "chat-compact-m" ? "▤ Chat: " : "") + CHAT_LABEL[view]; }
- try { localStorage.setItem("plan3-chat", view); } catch {}
+ try { localStorage.setItem("plan3-chat", view); } catch { /* private mode: the view just is not remembered */ }
 }
 const chatView = () => CHAT_VIEWS.find(name => document.documentElement.classList.contains("chat-" + name)) ?? "expanded";
 for (const id of ["chat-compact", "chat-compact-m"]) $(id).addEventListener("click", () => { setChatView(CHAT_VIEWS[(CHAT_VIEWS.indexOf(chatView()) + 1) % CHAT_VIEWS.length]); pinChat(); fillChat(); });
@@ -1184,9 +1191,9 @@ $("compact-now").addEventListener("click", async () => {
  try { await post("message", { text: "/wo compact" }); showNotice("Compaction requested.", true); } catch (error) { showNotice(error.message); }
 });
 $("bias-button").addEventListener("click", () => {
- const menu = $("bias-menu"), current = state.plan?.bias ?? 0;
- menu.replaceChildren(...[2, 1, 0, -1, -2].map(level => {
-  const button = Object.assign(document.createElement("button"), { type: "button", textContent: BIAS_LABEL[level] }); button.dataset.level = String(level);
+ const menu = $("bias-menu"), current = biasNow(), labels = state.plan ? BIAS_LABEL : SESSION_BIAS;
+ menu.replaceChildren(...(state.plan ? [2, 1, 0, -1, -2] : [1, 0, -1]).map(level => {
+  const button = Object.assign(document.createElement("button"), { type: "button", textContent: labels[level] }); button.dataset.level = String(level);
   button.setAttribute("aria-pressed", String(level === current));
   button.addEventListener("click", async () => {
    closeMenus(); setDrawer(false);

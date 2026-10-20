@@ -406,6 +406,9 @@ function biasOf(ctx, plan, lines, avail: any = {}) {
 	if (!data || data.id !== plan.id) return 0;
 	return Math.abs(data.level) === 1 && data.phase !== headingKey(stepHeading(lines, avail) ?? "") ? 0 : data.level;
 }
+// Without a plan the bias is per session: Think (planning model, high) / Normal (back to the session's own) / Work (coding model and effort).
+const sessionBias = (ctx) => { const data = (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === BIAS)?.data; return data && data.id === null ? data.level : 0; };
+const SESSION_BIAS = { "-1": "Work", 1: "Think" };
 const modeOf = (ctx, plan, lines, avail) => { const bias = biasOf(ctx, plan, lines, avail); return bias > 0 ? "think" : bias < 0 ? "coding" : stepMode(lines, avail); };
 // An unfinished phase without a [think]/[code] tag gets a tagging turn on /resume3 (old plans, phases added later).
 // A phase is any ### heading with steps under it ("### Phase 2", "### P0 \u2014 \u2026"), matching stepMode.
@@ -705,8 +708,9 @@ export default function plan3(pi) {
 			const design = plan && localPlanDesign(ctx.cwd, plan);
 			const text = plan ? await readFile(plan.file, "utf8") : "", bias = plan ? biasOf(ctx, plan, split(text).lines, availOf(plan.file)) : 0;
 			hubPlan = hubActive() && plan ? webPlan(plan, bias, text, ctx.cwd) : null;
+			const solo = plan ? 0 : sessionBias(ctx); hubBias = solo;
 			hubCtx = ctx; publishHub();
-			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : undefined);
+			ctx.ui?.setStatus?.("plan3", plan ? `🛠️ Plan (${shortTitle(plan.title)}) ${progressBar(plan.done, plan.total, 8)} ${plan.done}/${plan.total}${focus ? ` · ${focus}` : ""}${bias ? ` \x1b[${BIAS_COLOR[bias]}m[${BIAS_LABEL[bias]}]\x1b[39m` : ""}${design && design.phase !== "abandoned" ? ` · design: ${design.phase} (${planDesignNext(plan, design, plan.status)})` : ""}` : solo ? `[${BIAS_COLOR[solo]}m[${SESSION_BIAS[solo]}][39m` : undefined);
 		} catch { /* Footer status is best effort; a broken plan file must not break the turn. */ }
 	}
 	let webCtx = null, sessionLock;
@@ -732,11 +736,11 @@ export default function plan3(pi) {
 	const modelRef = model => ({ provider: model.provider, id: model.id, name: model.name ?? model.id });
 	const contextPercent = ctx => { try { return ctx?.getContextUsage?.()?.percent ?? null; } catch { return null; } };
 	// Session modes for the page: research comes from work-models (absent when that extension is off), night from Plan3.
-	const webModes = () => { const info: { research?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode() }; };
+	const webModes = () => { const info: { research?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode(), bias: hubBias }; };
 	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), modes: webModes() });
 	pi.events?.on?.("wo:modes-changed", () => publishHub());
 	// H3-04: under pi-control-hub, publish what only Pi knows; sent only when it changed, the hub keeps the latest.
-	let hubCtx = null, hubPlan = null, hubSent = "";
+	let hubCtx = null, hubPlan = null, hubSent = "", hubBias = 0;
 	function publishHub() {
 		if (!hubActive() || !hubCtx) return;
 		const live = activity.snapshot(undefined), state = { plan: hubPlan, modes: webModes(), compacting: live.compacting, subagents: live.subagents };
@@ -817,7 +821,6 @@ export default function plan3(pi) {
 		// alt+= / alt+- from the page: set the Plan3 bias level of the current plan directly.
 		if (endpoint === "/api/bias") {
 			if (Object.keys(data).some(key => !["target", "level"].includes(key)) || ![-2, -1, 0, 1, 2].includes(data.level)) throw new WebError(400, "Invalid bias level.");
-			if (!currentPlan(ctx, await listPlans(ctx.cwd))) throw new WebError(409, "No open plan to bias.");
 			await shiftBias(ctx, data.level, true);
 			return { ok: true };
 		}
@@ -909,7 +912,7 @@ export default function plan3(pi) {
 	// mode: planning | think (planning model, high effort) | coding.
 	async function runPhase(ctx, plan, mode) {
 		const phases = phaseSettings(ctx.cwd, plan);
-		const last = lastRun(ctx) ?? {}, target = mode === "think" ? { model: phases.planning.model, thinking: "high" } : phases[mode];
+		const last = lastRun(ctx) ?? {}, target = mode === "think" ? { model: phases.planning.model, thinking: "high" } : phases[mode] ?? {}; // "normal": back to home
 		const current = { model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined, thinking: pi.getThinkingLevel?.() };
 		const home: Partial<typeof current> = {}, set: Partial<typeof current> = {};
 		for (const key of ["model", "thinking"]) {
@@ -926,7 +929,7 @@ export default function plan3(pi) {
 		}
 		if (set.thinking && set.thinking !== pi.getThinkingLevel?.()) pi.setThinkingLevel?.(set.thinking);
 		set.thinking = pi.getThinkingLevel?.() ?? set.thinking; // the model may clamp the level
-		pi.appendEntry?.(RUN, mode === "planning" ? { home, set } : { id: plan.id, mode, home, set });
+		pi.appendEntry?.(RUN, mode === "planning" ? { home, set } : { id: plan?.id, mode, home, set });
 	}
 
 	async function startPlanning(ctx, plan, lead, fromChat = false, sourceFile?: string) {
@@ -1057,7 +1060,12 @@ export default function plan3(pi) {
 	async function shiftBias(ctx, delta, absolute = false) {
 		try {
 			const plan = currentPlan(ctx, await listPlans(ctx.cwd));
-			if (!plan) return ctx.ui?.notify?.("Plan3: no open plan to bias.", "warning");
+			if (!plan) {
+				const level = Math.max(-1, Math.min(1, absolute ? delta : sessionBias(ctx) + delta));
+				pi.appendEntry?.(BIAS, { id: null, level });
+				await runPhase(ctx, null, level > 0 ? "think" : level < 0 ? "coding" : "normal");
+				return await refresh(ctx);
+			}
 			const lines = split(await readFile(plan.file, "utf8")).lines, avail = availOf(plan.file);
 			const level = Math.max(-2, Math.min(2, absolute ? delta : biasOf(ctx, plan, lines, avail) + delta));
 			pi.appendEntry?.(BIAS, { id: plan.id, level, phase: headingKey(stepHeading(lines, avail) ?? "") });
