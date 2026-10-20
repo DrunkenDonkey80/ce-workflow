@@ -7,7 +7,7 @@ import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
-import { handleHubCommand } from "./hub-command.ts";
+import { handleHubCommand, intercomParkedSessions } from "./hub-command.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
@@ -286,7 +286,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart","herdr import":"Pi control hub: add herdr's Pi sessions, named by tab",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -3477,6 +3477,7 @@ export default function workModelsExtension(pi) {
 	cameraController = createCameraController(pi, { readProjectSettings: readSettings, writeProjectSettings: writeSettings });
 	for (const tool of cameraTools(cameraController, pi)) registerConstrainedTool(pi, tool);
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
+	intercomParkedSessions(pi);
 	registerConstrainedTool(pi, {
 		name: "research_note",
 		label: "Research Note",
@@ -3653,7 +3654,7 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 
 	registerRemoteAskAnswers(pi);
 
-	pi.on("session_start", (event, ctx) => {
+	pi.on("session_start", (_event, ctx) => {
 visionBridge.clear();
 subscriptionFooterController.start(ctx);
 resetContextCompaction();
@@ -3675,7 +3676,7 @@ ctx.ui.notify(`ce-workflow loaded · ${UTILITY_SHORTCUT_STATUS}`, "info");
 sessionCwd = ctx.cwd;
 });
 
-	pi.on("session_shutdown", async (event, ctx) => {
+	pi.on("session_shutdown", async (_event, ctx) => {
 subscriptionFooterController.shutdown(ctx);
 const scoutRuntime = extensionScoutRuns.get(resolve(ctx.cwd));
 if (scoutRuntime) {
@@ -3710,7 +3711,7 @@ showResearchContext(ctx);
  return {systemPrompt:researchContext?`${systemPrompt}\n\n${RESEARCH_INSTRUCTIONS}\n${exit}\nTemporary notebook: ${researchContext.notes}`:systemPrompt};
 });
 
-	pi.on("agent_start", (event,ctx)=>{
+	pi.on("agent_start", (_event,ctx)=>{
 activePromptBackedAgent = pendingPromptBackedAgentStart;
 internalBackgroundWakeEligible = !activePromptBackedAgent;
 pendingPromptBackedAgentStart = false;
@@ -3830,7 +3831,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 	pi.on("session_before_switch", () => { visionBridge.clear(); resetSessionContextFilter(); });
 	pi.on("session_before_fork", () => { visionBridge.clear(); resetSessionContextFilter(); });
 	pi.on("session_before_tree", resetSessionContextFilter);
-	pi.on("session_tree", (event, ctx) => {
+	pi.on("session_tree", (_event, ctx) => {
 		visionBridge.clear();
 		resetSessionContextFilter();
 		restoreResearchContext(ctx);
@@ -4018,7 +4019,6 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(action==="compact") return requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
   if(action==="hub") return handleHubCommand(rest,ctx);
-  if(action==="herdr") return !rest.trim()||/^import\b/.test(rest.trim())?handleHubCommand("import herdr",ctx):ctx.ui?.notify?.("Usage: /wo herdr import","warning");
   if(action==="context-fill") {
    const tokens=Math.max(0,100_000-(ctx.getContextUsage?.()?.tokens??0));
    for(let remaining=tokens;remaining>0;remaining-=10_000) pi.sendMessage({customType:"work-context-fill",content:" the".repeat(Math.min(remaining,10_000)),display:false});

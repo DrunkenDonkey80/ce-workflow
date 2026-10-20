@@ -1,6 +1,7 @@
 // /wo hub: install, start and control pi-control-hub (../hub) from inside Pi. Every action runs the hub's own CLI with
 // Pi's Node, so the terminal command `pi-hub` and this menu share one implementation.
 import { execFile } from "node:child_process";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { showListDialog } from "./ask-user/menu.ts";
 
@@ -15,7 +16,65 @@ export function hubCli(args: string[], timeout = 180_000): Promise<{ ok: boolean
 		resolve({ ok: !error, text: [stdout, stderr].map(s => String(s).trim()).filter(Boolean).join("\n") || (error ? error.message : "Done.") })));
 }
 
-export type HubStatus = { pairing?: { code: string; label?: string; login?: string } | null; running: boolean; autostart: boolean; command: boolean; herdr?: boolean; local?: string; remote: { on: boolean; url?: string; error?: string; missing?: string[] }; sessions?: number; live?: number; busy?: number };
+// Parked hub sessions on intercom: `list` shows them beside the live ones, and a send/ask/handover addressed to one
+// resumes it first (its intercom id is its Pi session id). New sessions are never started here.
+type Parked = { id: string; name: string; folder: string; sessionId: string };
+const SENDS = new Set(["send", "ask", "handover"]);
+const sameFolder = (a: string, b: string) => process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+const RESUME_SETTLE_MS = 3_000; // the resumed Pi joins intercom just after its RPC is ready
+
+export async function parkedSessions(): Promise<Parked[]> {
+	const result = await hubCli(["parked"], 30_000);
+	try { return result.ok ? JSON.parse(result.text) : []; } catch { return []; }
+}
+
+/** The parked session a send addresses: `to` as a Pi session id prefix, or (within `cwd`) its hub name. */
+export function parkedTarget(parked: Parked[], to: string, folder?: string) {
+	const pool = folder ? parked.filter(s => sameFolder(s.folder, folder)) : parked;
+	const byId = pool.filter(s => to.length >= 4 && s.sessionId.startsWith(to));
+	if (byId.length === 1) return byId[0];
+	const byName = folder ? pool.filter(s => s.name.toLowerCase() === to.toLowerCase()) : [];
+	return byName.length === 1 ? byName[0] : undefined;
+}
+
+export const parkedList = (parked: Parked[]) => parked.length
+	? `\n\n**Parked (pi-control-hub; a message to one resumes it first):**\n${parked.map(s => `\u2022 ${s.name} (${s.sessionId.slice(0, 8)}) \u2014 ${s.folder} [parked]`).join("\n")}`
+	: "";
+
+export function intercomParkedSessions(pi) {
+	const woken = new Map<string, string>(); // toolCallId -> session name, for a clearer failure
+	pi.on("tool_call", async (event, ctx) => {
+		const input = event.input ?? {};
+		if (event.toolName !== "intercom" || !SENDS.has(input.action) || typeof input.to !== "string" || !input.to.trim()) return;
+		const folder = typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : undefined;
+		const target = parkedTarget(await parkedSessions(), input.to.trim(), folder);
+		if (!target) return;
+		const woke = await hubCli(["wake", target.id], 120_000);
+		if (!woke.ok) return { block: true, reason: `Could not resume parked session ${target.name} in ${target.folder}: ${woke.text}` };
+		input.to = target.sessionId;
+		delete input.openProjectPaneIfMissing;
+		woken.set(event.toolCallId, target.name);
+		await new Promise(done => setTimeout(done, RESUME_SETTLE_MS));
+	});
+	pi.on("tool_result", async (event, ctx) => {
+		if (event.toolName !== "intercom") return;
+		const text = event.content?.map(part => part.type === "text" ? part.text : "").join("\n") ?? "";
+		const name = woken.get(event.toolCallId); woken.delete(event.toolCallId);
+		if (name && event.isError) return { content: [{ type: "text", text: `${text}\n\nParked session ${name} was just resumed and may not have joined intercom yet; wait ~10 s and send again.` }], isError: true };
+		const action = event.input?.action;
+		// A send by cwd alone finds no live session (intercom's pane opener then fails): point at the parked ones there.
+		if (event.isError && SENDS.has(action) && typeof event.input.cwd === "string" && /HERDR|Herdr|No (other )?intercom sessions? (is |are )?connected in/.test(text)) {
+			const parked = (await parkedSessions()).filter(s => sameFolder(s.folder, resolve(ctx.cwd, event.input.cwd)));
+			if (parked.length) return { content: [{ type: "text", text: `No live session there.${parkedList(parked)}\n\nSend again with to: <id> (drop openProjectPaneIfMissing); it resumes first.` }], isError: true };
+		}
+		if (event.isError || (action !== "list" && action !== "list-cwd")) return;
+		const folder = action === "list-cwd" ? resolve(ctx.cwd, typeof event.input.cwd === "string" ? event.input.cwd : ".") : undefined;
+		const parked = (await parkedSessions()).filter(s => !folder || sameFolder(s.folder, folder));
+		if (parked.length) return { content: [{ type: "text", text: text + parkedList(parked) }], isError: false };
+	});
+}
+
+export type HubStatus = { pairing?: { code: string; label?: string; login?: string } | null; running: boolean; autostart: boolean; command: boolean; local?: string; remote: { on: boolean; url?: string; error?: string; missing?: string[] }; sessions?: number; live?: number; busy?: number };
 
 export async function handleHubCommand(args: string, ctx) {
 	const notify = (text: string, ok = true) => ctx.ui?.notify?.(text, ok ? "info" : "warning");
@@ -47,7 +106,6 @@ export function hubMenu(status: HubStatus, cwd: string) {
 		item("open", "Open local page", `${status.local} in this PC's browser.`),
 		...(status.remote.url ? [item("open remote", "Open remote page", `${status.remote.url}, the address your phone uses.`)] : []),
 		item("new", "New session in this folder", `Starts a hub session in ${cwd}; it shows on the page.`),
-		...(status.herdr ? [item("import herdr", "Import herdr sessions", "Adds every Pi session open in herdr to the hub, parked and named after its herdr tab; sessions already there stay as they are.")] : []),
 		item("restart", "Restart", "Stops every hub session and starts them again; refused while one is busy."),
 		item("stop", "Stop", "Stops the hub and its sessions; refused while one is busy."),
 		item(`remote ${status.remote.on ? "off" : "on"}`, status.remote.on ? "Turn remote access off" : "Turn remote access on", status.remote.on ? "Removes the tailnet address." : "Serves the hub on your tailnet (Tailscale with HTTPS certificates) for the phone; never public."),

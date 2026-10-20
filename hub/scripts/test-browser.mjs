@@ -515,7 +515,7 @@ try {
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
  assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["fake-1: Low", "Context: 84k/200k", "💡 Normal", sample.title + "2/5"]);
- assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - herdr tab; the plan is in its bar");
+ assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - session name; the plan is in its bar");
  // Usage: one bar per provider, filled to 7d left; a warning shows in the button and colours it.
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))"), ["Claude: 53% · expiring in 4h 12m (40% unused)|error|53%", "Codex: 12% 1d 14h|error|12%"], "usage: one bar per provider with its warning");
  assert.match(await evaluate("document.querySelector('#usage-button .usage-bar').title"), /5h 20%/, "hover shows the provider's footer row");

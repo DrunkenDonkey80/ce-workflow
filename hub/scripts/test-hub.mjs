@@ -45,6 +45,13 @@ try {
 	assert(second, "`pi-hub new` prints the session page");
 	assert.equal((await api(`/api/sessions/${second}/park`, {})).status, 200);
 	assert.match(cli("status").out, /idle {2}1 {2}.*\n {2}parked +2 {2}/s, "parked sessions list with their state");
+	// Intercom's view of parked sessions: `parked` lists them, `wake <id>` resumes one.
+	const parked = JSON.parse(cli("parked").out), ids = () => JSON.parse(cli("parked").out).map(s => s.id);
+	assert(parked.some(s => s.id === second) && !parked.some(s => s.id === id), "parked sessions only");
+	assert(parked.every(s => /^[0-9a-f-]{36}$/.test(s.sessionId)));
+	assert.match(cli("wake", second).out, /Resumed/);
+	assert(!ids().includes(second), "a resumed session leaves the list");
+	assert.equal((await api(`/api/sessions/${second}/park`, {})).status, 200);
 
 	// H5-01: the browser app under /s/<session>/ with relative URLs and build-fingerprinted assets.
 	{

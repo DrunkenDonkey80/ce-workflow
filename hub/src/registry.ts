@@ -146,21 +146,6 @@ export function nextName(registry: Registry, folder: string) {
 	return String(n);
 }
 
-/** Import existing session files (e.g. herdr's tabs) as parked records in their header's folder. Files already in the
- * registry or unreadable are skipped, so a repeat import adds nothing. Bare-number names (herdr defaults) fall back to
- * the session's own name, then the next free number. */
-export async function importSessions(registry: Registry, entries: { file: string; name?: string }[]) {
-	const added: SessionRecord[] = [], skipped: string[] = [];
-	for (const entry of entries) {
-		const summary = typeof entry?.file === "string" ? await readSessionSummary(entry.file).catch(() => null) : null;
-		if (!summary || registry.byFile(entry.file)) { skipped.push(String(entry?.file)); continue; }
-		const label = String(entry.name ?? "").trim();
-		const name = label && !/^\d+$/.test(label) ? label : summary.name?.trim() || nextName(registry, summary.cwd);
-		added.push(registry.add({ name, folder: summary.cwd, sessionFile: entry.file, state: "parked" }));
-	}
-	return { added, skipped };
-}
-
 /** Star: a recent session joins its folder's group under the given name (D18). */
 export function star(registry: Registry, recent: Recent, name: string) {
 	return registry.add({ name, folder: recent.cwd, sessionFile: recent.file, state: "parked" });

@@ -15,7 +15,6 @@ assert.deepEqual(values(hubMenu({ running: false, autostart: true, command: true
 const running = hubMenu({ running: true, autostart: true, command: true, local: "http://127.0.0.1:5/", remote: { on: true, url: "https://pc.ts.net:5/" }, sessions: 3, live: 2, busy: 1 }, "/p");
 assert.deepEqual(values(running), ["open", "open remote", "new", "restart", "stop", "remote off", "autostart off"]);
 assert.match(running.summary, /Running · 3 sessions \(2 live, 1 busy\) · http:\/\/127\.0\.0\.1:5\/ · Remote: https:\/\/pc\.ts\.net:5\//);
-assert(values(hubMenu({ running: true, autostart: true, command: true, herdr: true, local: "x", remote: { on: false }, sessions: 0, live: 0, busy: 0 }, "/p")).includes("import herdr"), "herdr on PATH offers the import");
 const waiting = hubMenu({ running: true, autostart: true, command: true, local: "x", remote: { on: true }, pairing: { code: "AB12", label: "iPhone", login: "me@x" }, sessions: 0, live: 0, busy: 0 }, "/p");
 assert.deepEqual(values(waiting).slice(0, 2), ["pair approve", "pair reject"], "a waiting device is approved from the menu");
 assert.match(waiting.items[0].label, /AB12/); assert.match(waiting.summary, /^Device waiting, code AB12/);

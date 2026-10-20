@@ -9,7 +9,6 @@ import { createJiti } from "jiti";
 import { existsSync } from "node:fs";
 import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
-delete process.env.HERDR_TAB_ID; // Inside herdr the web title asks herdr for the tab name via pi.exec.
 import path from "node:path";
 import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices } from "../extensions/plan3.ts";
 // Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
@@ -452,15 +451,12 @@ try {
 		ctx.hasUI = true;
 		selectScript = [["Allow R-reboot?", "Not now"]];
 		// Parallel calls for one requirement ask once; the second waits for the first answer.
-		const eventsBefore = events.length;
 		let [need, again] = await Promise.all([
 			tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-reboot", text: "Restart the device" }),
 			tool({ action: "requirement", plan: "8c8c8c8c", requirement: "R-reboot", text: "Restart the device" }),
 		]);
 		assert.deepEqual([need.on, need.target, again.on], [false, "N-02", false]);
 		assert.equal(selectScript.length, 0);
-		assert.deepEqual(events.slice(eventsBefore).filter((event) => event.name === "herdr:blocked").map((event) => event.active), [true, false], "one dialog, released after the answer");
-		assert.deepEqual(events.filter((event) => event.name === "herdr:blocked").slice(-2).map((event) => event.active), [true, false], "code-raised dialogs mark the session waiting for the user, like ask_user");
 		let needText = await readFile(needFile, "utf8");
 		assert.match(needText, /## Requirements\n\n- \*\*R-reboot\*\* Restart the device/);
 		assert.match(needText, /- \[wip\] \*\*N-02\*\* Flash firmware\n  - needs: R-reboot/);

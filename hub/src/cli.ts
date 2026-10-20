@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | pair approve|reject | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | remote on|off | pair approve|reject | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import os from "node:os";
@@ -150,7 +150,7 @@ const onPath = (command = "pi-hub") => !!findCommand(command);
 async function statusJson() {
 	const running = marker(), config = readConfig();
 	let autostartOn = false; try { autostartOn = /^Autostart on/.test(autostart("status")); } catch { /* unsupported OS */ }
-	const base = { running: !!running, data: hubDataDir(), autostart: autostartOn, command: onPath(), herdr: onPath("herdr") };
+	const base = { running: !!running, data: hubDataDir(), autostart: autostartOn, command: onPath() };
 	if (!running) return { ...base, remote: { on: config?.remote === true } };
 	const status = await call("/api/status");
 	const { pending } = await call("/api/pairing");
@@ -205,18 +205,16 @@ try {
 		let n = 1; while (taken.has(String(n))) n++;
 		const record = await call("/api/sessions", { folder, name: rest[1] ?? String(n) });
 		console.log(`New session ${record.name} in ${record.folder}: http://127.0.0.1:${marker()!.port}/s/${record.id}/?token=${readConfig()!.localKey}`);
-	} else if (verb === "import" && rest[0] === "herdr") {
-		// Every Pi herdr shows with a session file joins its folder's group, named after its herdr tab; known files stay as they are.
-		const herdr = (...args: string[]) => {
-			try { return JSON.parse(execFileSync("herdr", args, { encoding: "utf8", stdio: "pipe", windowsHide: true })).result; }
-			catch (error) { throw new Error(`herdr ${args.join(" ")} failed (is herdr running and on PATH?): ${(error as Error).message.split(/\r?\n/)[0]}`); }
-		};
-		const labels = new Map<string, string>(herdr("tab", "list").tabs.map((t: { tab_id: string; label: string }) => [t.tab_id, t.label]));
-		const sessions = (herdr("agent", "list").agents as { agent: string; tab_id: string; agent_session?: { kind: string; value: string } }[])
-			.filter(a => a.agent === "pi" && a.agent_session?.kind === "path").map(a => ({ file: a.agent_session!.value, name: labels.get(a.tab_id) }));
-		const { added, skipped } = await call("/api/import", { sessions });
-		for (const r of added) console.log(`  + ${r.name}  ${r.folder}`);
-		console.log(`Imported ${added.length} of ${sessions.length} herdr Pi sessions (parked)${skipped.length ? `; ${skipped.length} already in the hub or unreadable` : ""}. A session still open in herdr resumes in the hub once you quit it there.`);
+	} else if (verb === "parked") {
+		// Parked sessions for intercom: its id for a Pi session is the Pi session id, read from the session file.
+		const all = marker() ? (await call("/api/status")).sessions as { id: string; name: string; folder: string; state: string; live: boolean; sessionFile?: string }[] : [];
+		const parked = await Promise.all(all.filter(s => !s.live && s.state !== "terminal" && s.sessionFile).map(async s =>
+			({ id: s.id, name: s.name, folder: s.folder, sessionId: (await readSessionSummary(s.sessionFile!).catch(() => null))?.sessionId })));
+		console.log(JSON.stringify(parked.filter(s => s.sessionId)));
+	} else if (verb === "wake" && rest[0]) {
+		// Resume one parked session (by hub id); never starts a new one.
+		await call(`/api/sessions/${rest[0]}/resume`, {});
+		console.log("Resumed.");
 	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
 		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
 		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));
@@ -233,7 +231,7 @@ try {
 		console.log(rest[0] === "approve" ? "Device paired." : "Device rejected.");
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | import herdr | remote on|off | pair approve|reject | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | remote on|off | pair approve|reject | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {

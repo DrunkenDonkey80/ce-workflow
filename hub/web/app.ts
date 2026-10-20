@@ -1342,7 +1342,7 @@ applyTheme(); darkQuery.addEventListener("change", applyTheme);
 for (const key of ["hub-theme", "hub-mode"]) $(key).addEventListener("change", () => { themeSetting(key, ($(key) as HTMLSelectElement).value); applyTheme(); });
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
- if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (herdr, terminals) keeps the old version until restarted.")) return;
+ if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (terminals) keeps the old version until restarted.")) return;
  try { await post("hub", { action: "update" }); showNotice("Updating Pi and extensions; the page reconnects when the hub is back (a minute or two).", true); } catch (error) { showNotice(error.message); }
 });
 // Queued messages come back into the box (Pi would otherwise still deliver them after Stop), ahead of any draft.

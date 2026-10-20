@@ -685,21 +685,15 @@ export default function plan3(pi) {
 		catch (error) { if (browser) throw error; report(ctx, error); }
 		finally { commandInProgress = false; }
 	}
-	// Dialogs code raises without the user asking (model requirement, auto-resume): mark the session blocked like ask_user
-	// does, so herdr shows it is waiting for the user.
-	async function herdrBlocked(label, run) {
-		pi.events?.emit?.("herdr:blocked", { active: true, label });
-		try { return await run(); } finally { pi.events?.emit?.("herdr:blocked", { active: false }); }
-	}
 	// One code-raised dialog at a time: a second ui.custom replaces the first, whose promise then never settles
-	// (parallel requirement calls hung the tool and left herdr blocked).
+	// (parallel requirement calls hung the tool).
 	let uiChain: Promise<unknown> = Promise.resolve();
 	function serialUI<T>(run: () => Promise<T>) {
 		const next = uiChain.then(run, run);
 		uiChain = next.catch(() => {});
 		return next;
 	}
-	const waitForUser = (label, run) => serialUI(() => herdrBlocked(label, run));
+	const waitForUser = (_label, run): Promise<any> => serialUI(run);
 	const setPointer = (plan, planning) => pi.appendEntry?.(POINTER, { id: plan.id, planning: Boolean(planning) });
 	// force: switch now even mid-run (default defers "off" until idle); used at agent_end, before the next run's system prompt.
 	const research = (ctx, enabled, force = false) => pi.events?.emit?.("plan3:research", { ctx, enabled, force });
@@ -1031,10 +1025,10 @@ export default function plan3(pi) {
 			let on = false;
 			if (ctx.hasUI && (avail.mode ?? "day") === "day") {
 				const about = requirementDefs(split(await readFile(plan.file, "utf8")).lines).get(id);
-				const pick = await herdrBlocked(`Plan3: allow ${id}?`, () => showListDialog(ctx, { title: `Allow ${id}?`, purpose: `${about}${marked.target ? ` \u2014 needed by ${marked.target}` : ""}`, cursorKey: "plan3-allow", filter: false, items: [
+				const pick = await showListDialog(ctx, { title: `Allow ${id}?`, purpose: `${about}${marked.target ? ` \u2014 needed by ${marked.target}` : ""}`, cursorKey: "plan3-allow", filter: false, items: [
 					{ value: "yes", label: "Allow", description: "The agent may do steps that need it" },
 					{ value: "no", label: "Not now", description: "Steps that need it wait; switch it on later with Alt+A" },
-				] }));
+				] });
 				on = pick?.value === "yes";
 			}
 			avail = setBoth(avail, id, on);

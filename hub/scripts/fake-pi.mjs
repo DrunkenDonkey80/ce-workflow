@@ -10,6 +10,9 @@ const flags = new Set((process.env.FAKE_PI ?? "").split(",").filter(Boolean));
 const args = process.argv.slice(2);
 const sessionArg = args[args.indexOf("--session") + 1];
 let sessionFile = args.includes("--session") ? sessionArg : `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`;
+// Like Pi, a new session file starts with its header (the session id intercom uses).
+const header = () => { if (!fs.existsSync(sessionFile)) fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", id: crypto.randomUUID(), cwd: process.cwd() }) + "\n"); };
+header();
 let sessionName = args.includes("--name") ? args[args.indexOf("--name") + 1] : undefined;
 let model = { provider: "fake", id: "fake-1" }, thinkingLevel = "low", streaming = false; const queued = [];
 const messages = fs.existsSync(sessionFile)
@@ -38,7 +41,7 @@ async function handle(cmd) {
 		case "abort": if (streaming) { streaming = false; out({ type: "agent_settled", aborted: true }); } return reply();
 		case "steer": case "follow_up": queued.push(cmd.message); out({ type: "queue_update", steering: [...queued], followUp: [] }); return reply();
 		case "clear_queue": { const taken = queued.splice(0); out({ type: "queue_update", steering: [], followUp: [] }); return reply({ steering: taken, followUp: [] }); }
-		case "new_session": sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; messages.length = 0; return reply({ cancelled: false });
+		case "new_session": sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; header(); messages.length = 0; return reply({ cancelled: false });
 		case "set_session_name": sessionName = cmd.name; return reply();
 		case "prompt": {
 			if (flags.has("crash-on-prompt")) process.exit(3);

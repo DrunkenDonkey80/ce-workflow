@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { importSessions, Registry, scanRecents, star } from "../src/registry.ts";
+import { Registry, scanRecents, star } from "../src/registry.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-registry-"));
 const data = path.join(root, "data"), sessions = path.join(root, "sessions");
@@ -47,14 +47,6 @@ try {
 	assert.equal(fs.existsSync(recentFile), true, "unstar keeps the session file");
 	recents = await scanRecents(reopened, { sessionsDir: sessions });
 	assert.deepEqual(recents.map(r => r.sessionId), ["s1"], "unstarred session is back in Recents while recent");
-	// herdr import: tab labels name sessions, bare numbers fall back to the session name or next number, known files skip.
-	const named = write("--C--work-sketchup--", "named.jsonl", [header("C:\\work\\sketchup", "s3"), { type: "session_info", name: "Walls" }]);
-	const plain = write("--C--work-sketchup--", "plain.jsonl", [header("C:\\work\\sketchup", "s4")]);
-	const game = write("--C--work-sketchup--", "game.jsonl", [header("C:\\work\\sketchup", "s5")]);
-	const imported = await importSessions(reopened, [{ file: game, name: "Game" }, { file: named, name: "3" }, { file: plain, name: "7" }, { file: path.join(root, "gone.jsonl") }]);
-	assert.deepEqual(imported.added.map(r => [r.name, r.folder, r.state]), [["Game", "C:\\work\\sketchup", "parked"], ["Walls", "C:\\work\\sketchup", "parked"], ["1", "C:\\work\\sketchup", "parked"]]);
-	assert.equal(imported.skipped.length, 1, "unreadable file skipped");
-	assert.deepEqual((await importSessions(reopened, [{ file: game.toUpperCase(), name: "Other" }])).added, [], "a repeat import adds nothing (paths compare case-insensitively)");
 	assert.deepEqual(fs.readdirSync(data), ["sessions.json"], "no temporary files left");
 	console.log("registry ok");
 } finally {

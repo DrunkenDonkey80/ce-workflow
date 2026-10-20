@@ -2500,16 +2500,6 @@ function resolvePromptSettings(params: AskParams): PromptSettings {
    };
 }
 
-/** Report the session as blocked on the user (`herdr:blocked`) for the duration of `run`. */
-async function whileBlocked<T>(pi: ExtensionAPI, run: () => Promise<T>): Promise<T> {
-   pi.events.emit("herdr:blocked", { active: true, label: "Waiting for user response" });
-   try {
-      return await run();
-   } finally {
-      pi.events.emit("herdr:blocked", { active: false });
-   }
-}
-
 interface CustomPromptRequest<T> {
    signal?: AbortSignal;
    timeout?: number;
@@ -2777,7 +2767,7 @@ async function executeBatch(
    const deadlineTimer = deadline === undefined ? undefined : setTimeout(() => batch.abort(), params.timeout);
    let answers: BatchAnswer[] | null;
    try {
-      answers = await whileBlocked(pi, () => raceRemoteAsk(pi, { questions, allowComment: settings.allowComment }, batch.signal, undefined,
+      answers = await raceRemoteAsk(pi, { questions, allowComment: settings.allowComment }, batch.signal, undefined,
          payload => remoteBatch(payload, questions, settings.allowComment), localSignal => runCustomPrompt<BatchAnswer[]>(ctx.ui, {
          signal: localSignal,
          displayMode: settings.displayMode,
@@ -2785,7 +2775,7 @@ async function executeBatch(
          createComponent: (tui, theme, keybindings, complete) =>
             new BatchAskComponent(questions, settings, tui, theme, keybindings, complete),
          fallback: () => askBatchViaDialogs(ctx.ui, questions, settings.allowComment, localSignal, deadline),
-      }), ctx.ui));
+      }), ctx.ui);
    } finally {
       if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
       signal?.removeEventListener("abort", forwardAbort);
@@ -3054,11 +3044,11 @@ export function registerAskUser(pi: ExtensionAPI) {
          // A pre-filled answer needs the multi-line editor, so it takes the custom prompt path below.
          if (options.length === 0 && initialText === undefined) {
             const prompt = normalizedContext ? `${question}\n\nContext:\n${normalizedContext}` : question;
-            const response = await whileBlocked(pi, () => raceRemoteAsk(pi, remoteSubject, signal, timeout,
+            const response = await raceRemoteAsk(pi, remoteSubject, signal, timeout,
                payload => remoteResponse(payload, remoteSubject, allowComment), async localSignal => {
                   const answer = await ctx.ui.input(prompt, "Type your answer...", { ...dialogOpts, signal: localSignal });
                   return localSignal.aborted ? null : createFreeformResponse(answer);
-               }, ctx.ui));
+               }, ctx.ui);
 
             if (!response) {
                events.cancelled(subject);
@@ -3080,7 +3070,7 @@ export function registerAskUser(pi: ExtensionAPI) {
             details: { question, context: normalizedContext, options, response: null, cancelled: false },
          });
 
-         const result = await whileBlocked(pi, () => raceRemoteAsk(pi, remoteSubject, signal, timeout,
+         const result = await raceRemoteAsk(pi, remoteSubject, signal, timeout,
             payload => remoteResponse(payload, remoteSubject, allowComment), localSignal => runCustomPrompt<AskUIResult>(ctx.ui, {
             signal: localSignal,
             timeout,
@@ -3118,7 +3108,7 @@ ${normalizedContext}` : question, initialText))
                allowComment,
                { ...dialogOpts, signal: localSignal },
             ),
-         }), ctx.ui));
+         }), ctx.ui);
 
          if (signal?.aborted || result === null) {
             events.cancelled(subject);
