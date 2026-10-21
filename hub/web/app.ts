@@ -515,8 +515,60 @@ $("search").addEventListener("keydown", event => {
  if (event.key === "Enter") { event.preventDefault(); diagramView.search($("search").value, true); }
  if (event.key === "Escape") { $("search").value = ""; diagramView.search(""); $("search-count").textContent = ""; $("diagram").focus(); }
 });
-// Ctrl+F searches the diagram instead of the page.
-window.addEventListener("keydown", event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") { event.preventDefault(); $("search").focus(); $("search").select(); } });
+// Ctrl+F: inside the files/diagram panel it searches the diagram, everywhere else the chat.
+window.addEventListener("keydown", event => {
+ if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "f") return;
+ event.preventDefault();
+ if ((event.target as Element).closest?.("#left-panel") && !$("search").closest("[hidden]")) { $("search").focus(); $("search").select(); return; }
+ openChatSearch();
+});
+// Chat search: marks every hit in the text that is shown now (Compact-hidden rows and closed blocks don't count) with the
+// CSS highlight API, so the chat DOM is untouched; it re-runs as the chat changes.
+// shortcut: a match must sit inside one text node (not across bold/link boundaries); split matching if that is missed.
+let findHits: Range[] = [], findAt = -1, findQueued = false;
+const findInput = () => $("chat-find") as HTMLInputElement;
+function openChatSearch() { $("chat-search").hidden = false; findInput().focus(); findInput().select(); runChatSearch(); }
+function closeChatSearch() { $("chat-search").hidden = true; findHits = []; findAt = -1; paintChatSearch(); $("message-input").focus(); }
+function runChatSearch(keep = false) {
+ const needle = findInput().value.toLowerCase(), previous = findHits[findAt];
+ findHits = [];
+ if (needle && !$("chat-search").hidden) {
+  const walker = document.createTreeWalker($("feed"), NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
+   const parent = node.parentElement;
+   if (!parent || parent.closest("button") || !parent.checkVisibility?.({ visibilityProperty: true } as CheckVisibilityOptions)) continue;
+   const text = node.data.toLowerCase();
+   for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length)) { const range = new Range(); range.setStart(node, at); range.setEnd(node, at + needle.length); findHits.push(range); }
+  }
+ }
+ // While the chat updates, stay on the same hit; a new query starts at the newest one.
+ findAt = !findHits.length ? -1 : keep && previous ? Math.max(0, findHits.findIndex(range => range.startContainer === previous.startContainer && range.startOffset === previous.startOffset)) : findHits.length - 1;
+ paintChatSearch();
+ if (!keep && findAt >= 0) jumpChatSearch(findAt);
+}
+function paintChatSearch() {
+ $("chat-find-count").textContent = !findInput().value ? "" : findHits.length ? `${findAt + 1}/${findHits.length}` : "0";
+ if (!("highlights" in CSS)) return; // no marks on old browsers; count and jumping still work
+ CSS.highlights.set("chat-hit", new Highlight(...findHits.filter((_, index) => index !== findAt)));
+ CSS.highlights.set("chat-hit-current", new Highlight(...findHits[findAt] ? [findHits[findAt]] : []));
+}
+function jumpChatSearch(index: number) {
+ if (!findHits.length) return;
+ findAt = (index + findHits.length) % findHits.length; paintChatSearch();
+ stick = false; $("to-bottom").hidden = false; // reading an older hit must not snap back to the end
+ findHits[findAt].startContainer.parentElement?.scrollIntoView({ block: "center" });
+}
+findInput().addEventListener("input", () => runChatSearch());
+findInput().addEventListener("keydown", event => {
+ if (event.key === "Enter") { event.preventDefault(); jumpChatSearch(findAt + (event.shiftKey ? -1 : 1)); }
+ if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeChatSearch(); }
+});
+for (const button of $("chat-search").querySelectorAll<HTMLButtonElement>("[data-find]")) button.addEventListener("click", () => {
+ const move = button.dataset.find;
+ if (move === "close") return closeChatSearch();
+ jumpChatSearch(move === "first" ? 0 : move === "last" ? findHits.length - 1 : findAt + (move === "next" ? 1 : -1));
+});
+new MutationObserver(() => { if ($("chat-search").hidden || !findInput().value || findQueued) return; findQueued = true; requestAnimationFrame(() => { findQueued = false; runChatSearch(true); }); }).observe($("feed"), { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["open", "hidden", "class"] });
 
 const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice, attachTo, renderLinks);
 // Image links and thumbnails open full size in the page (a new tab on a home-screen app may lack the pairing cookie).

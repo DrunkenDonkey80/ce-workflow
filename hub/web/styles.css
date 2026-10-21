@@ -308,6 +308,13 @@ h2 { font-size: 15px; font-weight: 600; }
 .queue-drop:hover { color: #d33; }
 /* One scroll area: the conversation, then the live activity below the newest message. */
 .feed { flex: 1; min-height: 0; overflow: auto; padding-bottom: 8px; }
+.chat-search { display: flex; gap: 4px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); }
+.chat-search[hidden] { display: none; }
+.chat-search input { flex: 1; min-width: 0; font: inherit; padding: 3px 6px; }
+.chat-search output { min-width: 4.5em; text-align: center; color: var(--muted); font-size: 12px; }
+.chat-search button { padding: 2px 7px; line-height: 1.3; }
+::highlight(chat-hit) { background: color-mix(in srgb, #fab005 45%, transparent); }
+::highlight(chat-hit-current) { background: #fd7e14; color: #fff; }
 .messages { list-style: none; margin: 0; padding: 16px 16px 0; }
 .row-full { display: block; margin-top: 4px; padding: 0; border: 0; background: none; color: var(--focus); font-size: 13px; text-decoration: underline; cursor: pointer; }
 .composer { position: relative; padding: 8px 12px; border-top: 1px solid var(--line); }

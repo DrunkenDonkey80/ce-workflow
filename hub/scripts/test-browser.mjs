@@ -441,6 +441,15 @@ try {
  publish("delta", { id: "assistant_3", role: "assistant", offset: 99, text: "x", streaming: false });
  await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=assistant_3]\")?.children[2].textContent.includes(\"Full body loaded\")");
  assert.equal(await rowText("assistant_3"), "Short excerpt. Full body loaded.", "a gap refetches the row; stale deltas never duplicate text");
+ // Chat search: Ctrl+F opens it, hits are counted and marked, Enter wraps around, Esc closes.
+ await evaluate("document.getElementById('message-input').focus(); dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }))");
+ await evaluate("const input = document.getElementById('chat-find'); input.value = 'loaded'; input.dispatchEvent(new Event('input'))");
+ assert.equal(await evaluate("document.getElementById('chat-find-count').textContent"), "2/2", "both shown rows hit; the newest is current");
+ assert.equal(await evaluate("CSS.highlights.get('chat-hit-current').size"), 1, "the current hit is marked");
+ await evaluate("document.getElementById('chat-find').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))");
+ assert.equal(await evaluate("document.getElementById('chat-find-count').textContent"), "1/2", "next wraps around to the first");
+ await evaluate("document.getElementById('chat-find').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+ assert(await evaluate("document.getElementById('chat-search').hidden && CSS.highlights.get('chat-hit').size === 0"), "Esc closes and clears marks");
  // Pi-style colour coding: tool blocks by state, an edit's diff instead of its arguments, labels only for screen readers.
  publish("message", { id: "assistant_4", role: "assistant", text: "", streaming: false, blocks: [
   { type: "thinking", text: "hmm" },
