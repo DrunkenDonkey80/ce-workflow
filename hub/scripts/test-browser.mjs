@@ -580,6 +580,8 @@ try {
  // one working; a run that ends while no page watches it stays unseen.
  assert.equal(await evaluate("document.getElementById('switcher').hidden"), false, "desktop always shows the session bar");
  fs.writeFileSync(join(root, "two.jsonl"), ""); hub.registry.add({ name: "2", folder, sessionFile: join(root, "two.jsonl"), state: "parked" });
+ // Notifications: a stub records what the page announces once it has a baseline.
+ await evaluate(`(() => { window.notes = []; window.Notification = class { static permission = "granted"; constructor(title, options) { window.notes.push(title + "|" + options.tag.split(":")[1]); } close() {} }; })()`);
  const third = await hub.host.create(folder, "3"); await hub.host.live.get(third.id).rpc.send({ type: "prompt", message: "hold" });
  const tones = "[...document.querySelectorAll('.session:not(.recent)')].map(s => s.querySelector('.session-letter').textContent + ':' + s.dataset.tone).join()";
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:working"`);
@@ -593,6 +595,13 @@ try {
  await browser("click", "#switcher-toggle");
  await hub.host.live.get(third.id).rpc.send({ type: "abort" });
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:unseen"`);
+ assert.deepEqual(await evaluate("window.notes"), ["ce-workflow - 3 finished|unseen"], "working to idle announces once; the new session's first tone does not");
+ { const set = await fetch(`${origin}/s/${id}/api/hub`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ action: "settings", notify: { done: false } }) });
+  assert.deepEqual((await set.json()).notify, { question: true, done: false }, "notify defaults on and saves per key"); }
+ await hub.host.live.get(third.id).rpc.send({ type: "prompt", message: "hold" }); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:working"`);
+ await browser("wait", "--fn", "document.getElementById('notify-done').checked === false");
+ await hub.host.live.get(third.id).rpc.send({ type: "abort" }); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:unseen"`);
+ assert.equal(await evaluate("window.notes.length"), 1, "Finished off: no announcement");
  await hub.host.park(third.id);
  // H6-03 (D19): a phone asks to pair; this local page shows its code, approves it, then lists and revokes it.
  const pairCode = hub.pairing.start({ "user-agent": "Mozilla/5.0 (iPhone) Safari/1" }, "me@example.com").code;

@@ -927,7 +927,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's own icon (gear → Tab icon) sits on its colour when idle and is drawn in that colour on yellow;
 // without one, a shovel laid down when all rest.
-type HubSettings = { idleParkMinutes?: number; icon?: string; iconColor?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[] };
+type HubSettings = { idleParkMinutes?: number; icon?: string; iconColor?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
 let hubSettings: HubSettings = {};
 const ICON_COLORS = ["#343a40", "#1971c2", "#0c8599", "#2f9e44", "#7048e8", "#868e96"];
 function iconSvg(name: string, color: string, key: string) {
@@ -951,7 +951,8 @@ async function loadSessions() {
  const visible = document.visibilityState === "visible";
  try {
   const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
-  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders();
+  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders(); renderNotify();
+  notifyChanges(groups);
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
@@ -1329,6 +1330,37 @@ async function pollLoad() {
  }
 }
 void pollLoad(); setInterval(pollLoad, 5000);
+// Notifications: a session starts asking a question, or stops working (subagents count as working). Every open hub
+// page polls, so the tag makes the OS replace duplicates; the session in view on a visible page is not announced.
+let lastTones: Map<string, string> | null = null;
+function notifyChanges(groups: Group[]) {
+ const tones = new Map(groups.flatMap(group => group.sessions.map(session => [session.id, session.tone] as [string, string])));
+ const before = lastTones; lastTones = tones;
+ if (!before || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+ const notify = hubSettings.notify ?? { question: true, done: true };
+ for (const group of groups) for (const session of group.sessions) {
+  const was = before.get(session.id), now = session.tone;
+  if (was === now || (session.id === sessionId && document.visibilityState === "visible")) continue;
+  // shortcut: one 5 s (15 s in the background) poll decides "finished"; a gap between chained turns can announce early.
+  const kind = now === "waiting" && notify.question ? "asks a question" : was === "working" && ["seen", "unseen", "scheduled"].includes(now) && notify.done ? "finished" : "";
+  if (!kind) continue;
+  try {
+   const note = new Notification(`${group.label} - ${session.name} ${kind}`, { tag: `${session.id}:${now}` });
+   note.onclick = () => { window.focus(); if (session.id !== sessionId) location.href = sessionUrl(session.id); note.close(); };
+  } catch { /* phones without a service worker refuse page notifications */ }
+ }
+}
+function renderNotify() {
+ const notify = hubSettings.notify ?? { question: true, done: true };
+ ($("notify-question") as HTMLInputElement).checked = notify.question; ($("notify-done") as HTMLInputElement).checked = notify.done;
+}
+const askNotifyPermission = () => { if (typeof Notification !== "undefined" && Notification.permission === "default") void Notification.requestPermission(); };
+for (const key of ["question", "done"] as const) $("notify-" + key).addEventListener("change", () => {
+ if (($("notify-" + key) as HTMLInputElement).checked) askNotifyPermission();
+ void saveHubSettings({ notify: { [key]: ($("notify-" + key) as HTMLInputElement).checked } as HubSettings["notify"] });
+});
+// Browsers ask for permission only after a click; on by default, so the first click anywhere asks once.
+addEventListener("pointerdown", () => { const notify = hubSettings.notify ?? { question: true, done: true }; if (notify.question || notify.done) askNotifyPermission(); }, { once: true });
 async function saveHubSettings(change: HubSettings) {
  try { hubSettings = await post("hub", { action: "settings", ...change }) as HubSettings; renderIcon(); renderIconPicker(); }
  catch (error) { showNotice(error.message); }
