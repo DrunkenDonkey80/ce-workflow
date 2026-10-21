@@ -233,7 +233,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "model": {
 				only(data, ["target", "provider", "id"], "Invalid model fields.");
 				const live = host.live.get(id);
-				if (!live) throw fail(409, "Session is parked; resume it first.");
+				if (!live) { // S-11: kept for the resume; only a model the parked list offers (D10)
+					const pick = (await parkedModels(id)).scoped.find(model => model.provider === data.provider && model.id === data.id);
+					if (!pick) throw fail(404, "That model is not in Pi's scoped models.");
+					const record = registry.get(id)!;
+					registry.update(id, { model: pick, pending: { ...record.pending, model: pick } });
+					return publishStatus(id);
+				}
 				const models: { provider: string; id: string }[] = (await live.rpc.send({ type: "get_available_models" })).data?.models ?? [];
 				if (!models.some(model => model.provider === data.provider && model.id === data.id)) throw fail(404, "That model is not available in this session.");
 				const set = await live.rpc.send({ type: "set_model", provider: data.provider, modelId: data.id });
@@ -244,7 +250,11 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				only(data, ["target", "level"], "Invalid effort level.");
 				if (!EFFORTS.includes(data.level as string)) throw fail(400, "Invalid effort level.");
 				const live = host.live.get(id);
-				if (!live) throw fail(409, "Session is parked; resume it first.");
+				if (!live) { // S-11: Pi clamps it to the model on resume
+					const record = registry.get(id)!;
+					registry.update(id, { thinking: data.level as string, pending: { ...record.pending, thinking: data.level as string } });
+					return publishStatus(id);
+				}
 				await live.rpc.send({ type: "set_thinking_level", level: data.level });
 				return publishStatus(id); // the model may clamp the level
 			}
@@ -267,6 +277,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		if (views.has(id)) void publishStatus(id).catch(() => {});
 	});
 	host.on("closed", (id: string, requestId: string) => views.get(id)?.publish("dialog_closed", { askId: requestId }));
+	host.on("notice", (id: string, text: string) => views.get(id)?.publish("notice", { text }));
 	host.on("ui", (id: string, request: RpcRecord) => {
 		const view = views.get(id), form = view && toForm(request);
 		if (form) view.publish("dialog", form);

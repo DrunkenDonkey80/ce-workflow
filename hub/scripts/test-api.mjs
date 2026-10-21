@@ -84,6 +84,13 @@ try {
 	assert.equal((await post(id, "paste", Buffer.from("not an image"), { "content-type": "image/png" })).status, 415);
 	fs.rmSync(pasted.body.path, { force: true });
 
+	// S-11: model and effort picked while parked are kept and set on resume, before the message.
+	assert.equal((await post(id, "model", { provider: "fake", id: "nope" })).status, 404, "parked picks come from the scoped list only");
+	assert.equal((await post(id, "model", { provider: "fake", id: "fake-1" })).body.model.id, "fake-1");
+	assert.equal((await post(id, "effort", { level: "medium" })).body.effort, "medium");
+	assert.equal(hub.host.live.has(id), false, "a parked pick does not start Pi");
+	assert.deepEqual(hub.registry.get(id).pending, { model: { provider: "fake", id: "fake-1", name: "Fake One" }, thinking: "medium" });
+
 	// A write starts a parked session; message goes to ce-workflow as a hub call.
 	const sent = await post(id, "message", { target: "bbbbbbbb", text: "hi" });
 	assert.deepEqual(sent.body, { endpoint: "/api/message", data: { target: "bbbbbbbb", text: "hi" } });
@@ -93,7 +100,8 @@ try {
 
 	// Status from RPC; model and effort through RPC with a status frame.
 	const status = (await get(id, "snapshot")).body.status;
-	assert.deepEqual([status.model.id, status.effort, status.context], ["fake-1", "low", 42]);
+	assert.deepEqual([status.model.id, status.effort, status.context], ["fake-1", "medium", 42], "the parked picks reached Pi");
+	assert.equal(hub.registry.get(id).pending, undefined);
 	assert.equal((await post(id, "model", { provider: "fake", id: "nope" })).status, 404);
 	assert.equal((await post(id, "model", { provider: "fake", id: "fake-2", extra: 1 })).status, 400);
 	assert.equal((await post(id, "model", { provider: "fake", id: "fake-2" })).body.model.id, "fake-2");
@@ -106,10 +114,15 @@ try {
 	const followed = (await get(id, "snapshot")).body;
 	assert.deepEqual([followed.current, followed.target.id, followed.plan?.finishable, followed.status.modes.research], ["aaaaaaaa", "aaaaaaaa", false, "on"]);
 	assert.equal((await get(id, "plans")).body.current, "aaaaaaaa");
+	// A parked pick Pi refuses keeps the previous model and tells the page.
+	const notices = []; hub.host.on("notice", (sid, text) => { if (sid === id) notices.push(text); });
+	hub.registry.update(id, { pending: { model: { provider: "nokey", id: "x", name: "No Key" } } });
 	const pid = hub.host.live.get(id).rpc.process?.pid;
 	assert.deepEqual((await post(id, "message", { text: " /reload " })).body, { ok: true });
 	assert.equal(hub.host.live.has(id), true, "reload resumes");
 	if (pid) assert.notEqual(hub.host.live.get(id).rpc.process?.pid, pid, "reload is a new Pi");
+	assert.match(notices[0] ?? "", /Kept the previous model: No Key/);
+	assert.equal(hub.registry.get(id).pending, undefined);
 
 	// H5-04 forms: every open dialog is a page form keyed by its request id; snapshot, dialog and dialog_closed frames carry it.
 	const notified = prefix => new Promise(r => { const l = (sid, req) => { if (sid === id && req.method === "notify" && req.message.startsWith(prefix)) { hub.host.off("ui", l); r(req.message.slice(prefix.length)); } }; hub.host.on("ui", l); });

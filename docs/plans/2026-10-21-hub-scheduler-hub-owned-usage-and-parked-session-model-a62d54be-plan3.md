@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T13:06:27.683Z
+updated: 2026-10-21T13:08:48.585Z
 reviewed: 2026-10-21
 ---
 
@@ -118,8 +118,7 @@ None.
 
 ### Phase 4: Parked model and unpark on typing [code]
 - [x] **S-10** Hub records keep model+thinking (host.remember at start, after each run/command and page status; cleared on terminal hand-back); parked status and /api/models come from the record or, once, the session file via the SDK (hub/src/pi-sdk.ts: buildSessionContext, enabledModels via resolveModelScopeWithDiagnostics), scoped models only with a note when none (D10).
-- [ ] **S-11** Allow changing model and thinking while parked; apply on resume through RPC before the first message.
-  - Applied inside the S-15 readiness promise, so no message can arrive first.
+- [x] **S-11** Parked model/effort picks (scoped list only) are stored as record.pending and shown at once; resume applies them through set_model/set_thinking_level inside Live.ready, before any message; a refused model keeps Pi's own and the page gets a notice frame.
 - [ ] **S-12** Resume a parked session on the first keystroke in its chat box (debounced, once); tests (C1).
 
 ### Phase 5: Live check [think]

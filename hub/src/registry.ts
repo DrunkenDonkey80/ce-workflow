@@ -18,6 +18,8 @@ export type SessionRecord = {
 	/** S-10: the model and thinking level Pi last reported (or read from the file), shown while parked. */
 	model?: { provider: string; id: string; name: string } | null;
 	thinking?: string;
+	/** S-11: picked while parked; Pi gets them on resume, before any message. */
+	pending?: { model?: { provider: string; id: string; name: string }; thinking?: string };
 	createdAt: number;
 };
 export type Recent = { file: string; cwd: string; sessionId: string; name?: string; modified: number };

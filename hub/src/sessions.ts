@@ -149,7 +149,7 @@ export class SessionHost extends EventEmitter {
 			live.ready = (async () => {
 				const state = await started.rpc.send({ type: "get_state" });
 				if (!state.success) throw new Error(state.error ?? "Pi did not start.");
-				await this.remember(started, state);
+				await this.applyPending(started);
 			})();
 			await live.ready;
 			return this.registry.update(id, { state: "running" });
@@ -167,6 +167,20 @@ export class SessionHost extends EventEmitter {
 		const model = state.data?.model, current = this.registry.get(live.id)!;
 		const next = { model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, thinking: state.data?.thinkingLevel };
 		if (JSON.stringify([current.model, current.thinking]) !== JSON.stringify([next.model, next.thinking])) this.registry.update(live.id, next);
+	}
+
+	/** S-11: the model and thinking level picked while parked, set before the first message; a refused model keeps Pi's own (D10). */
+	private async applyPending(live: Live) {
+		const pending = this.registry.get(live.id)?.pending;
+		if (pending) {
+			if (pending.model) {
+				const set = await live.rpc.send({ type: "set_model", provider: pending.model.provider, modelId: pending.model.id });
+				if (!set.success) this.emit("notice", live.id, `Kept the previous model: ${pending.model.name} could not be used (${set.error ?? "no credentials"}).`);
+			}
+			if (pending.thinking) await live.rpc.send({ type: "set_thinking_level", level: pending.thinking });
+			this.registry.update(live.id, { pending: undefined });
+		}
+		await this.remember(live);
 	}
 
 	private async halt(live: Live) {
