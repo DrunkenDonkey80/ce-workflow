@@ -401,13 +401,16 @@ function stepMode(lines, avail: any = {}) {
 const BIAS = "plan3-bias";
 const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 1: "Think:Task", 2: "Think:Plan" };
 const BIAS_COLOR = { "-2": "31", "-1": "38;5;210", 1: "38;5;151", 2: "32" };
+// The session remembers its choice: Plan levels and the plan-less Think/Work carry over to whichever plan is current.
 function biasOf(ctx, plan, lines, avail: any = {}) {
 	const data = (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === BIAS)?.data;
-	if (!data || data.id !== plan.id) return 0;
+	if (!data) return 0;
+	if (data.id === null) return data.level * 2;
+	if (data.id !== plan.id) return Math.abs(data.level) === 2 ? data.level : 0;
 	return Math.abs(data.level) === 1 && data.phase !== headingKey(stepHeading(lines, avail) ?? "") ? 0 : data.level;
 }
 // Without a plan the bias is per session: Think (planning model, high) / Normal (back to the session's own) / Work (coding model and effort).
-const sessionBias = (ctx) => { const data = (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === BIAS)?.data; return data && data.id === null ? data.level : 0; };
+const sessionBias = (ctx) => { const data = (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === BIAS)?.data; return !data ? 0 : data.id === null ? data.level : Math.abs(data.level) === 2 ? Math.sign(data.level) : 0; };
 const SESSION_BIAS = { "-1": "Work", 1: "Think" };
 const modeOf = (ctx, plan, lines, avail) => { const bias = biasOf(ctx, plan, lines, avail); return bias > 0 ? "think" : bias < 0 ? "coding" : stepMode(lines, avail); };
 // An unfinished phase without a [think]/[code] tag gets a tagging turn on /resume3 (old plans, phases added later).

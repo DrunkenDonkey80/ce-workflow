@@ -625,6 +625,13 @@ try {
 		await press("alt+-");
 		await press("alt+-");
 		assert.match(statuses.at(-1), /\x1b\[31m\[Work:Plan\]/);
+		// The session remembers it: a Plan level set on another plan, or the plan-less Work/Think, carries over.
+		{ const real = ctx.sessionManager.getBranch, last = real().findLast((entry) => entry.customType === "plan3-bias");
+		  ctx.sessionManager.getBranch = () => [...real(), { type: "custom", customType: "plan3-bias", data: { ...last.data, id: "00000000" } }];
+		  await hooks.get("turn_end")({}, ctx); assert.match(statuses.at(-1), /\[Work:Plan\]/, "Plan level carries to another plan");
+		  ctx.sessionManager.getBranch = () => [...real(), { type: "custom", customType: "plan3-bias", data: { id: null, level: 1 } }];
+		  await hooks.get("turn_end")({}, ctx); assert.match(statuses.at(-1), /\[Think:Plan\]/, "session Think becomes Think:Plan");
+		  ctx.sessionManager.getBranch = real; }
 		await press("alt+=");
 		await press("alt+=");
 		assert.doesNotMatch(statuses.at(-1), /\[(?:Work|Think):/, "level 0 shows nothing");
