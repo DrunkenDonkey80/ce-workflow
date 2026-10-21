@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 9,
+  "revision": 10,
   "nodes": [
     {
       "id": "pi_host",
@@ -232,11 +232,11 @@
     },
     {
       "id": "subscription_footer",
-      "label": "Subscription footer",
+      "label": "Subscription usage (hub)",
       "kind": "service",
       "parent": "workflow_group",
-      "summary": "Provider quota footer.",
-      "tech": "extensions/subscription-footer.ts"
+      "summary": "Hub polls provider quotas with Pi's stored logins and serves /api/usage, even with every session parked; the terminal footer is gone.",
+      "tech": "hub/src/usage.ts"
     },
     {
       "id": "extension_scout",

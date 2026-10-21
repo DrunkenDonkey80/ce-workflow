@@ -50,7 +50,7 @@ check(
 	pkg.peerDependencies?.["pi-subagents"] === ">=0.75.0",
 );
 const subscriptionFooterProvenancePath =
-	"extensions/subscription-footer-UPSTREAM.md";
+	"hub/src/usage-UPSTREAM.md";
 const subscriptionFooterProvenance = existsSync(
 	path.join(root, subscriptionFooterProvenancePath),
 )
@@ -58,7 +58,7 @@ const subscriptionFooterProvenance = existsSync(
 	: "";
 check(
 	"subscription footer provenance is packaged",
-	pkg.files?.includes("extensions/") && Boolean(subscriptionFooterProvenance),
+	pkg.files?.includes("hub/") && Boolean(subscriptionFooterProvenance),
 );
 check(
 	"subscription footer provenance retains the exact upstream MIT notice and revision",

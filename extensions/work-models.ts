@@ -14,11 +14,6 @@ import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
 
 
-import {
-	createSubscriptionFooterController,
-	PRODUCTION_PROVIDERS,
-	SUBSCRIPTION_FOOTER_DEFAULTS,
-} from "./subscription-footer.ts";
 
 import { normalizeOpenDesignCommandSpec, redactOpenDesignText } from "./opendesign-client.ts";
 
@@ -316,12 +311,6 @@ function readGlobalSettings() {
 	return readJsonSettings(globalSettingsPath());
 }
 
-export function subscriptionFooterSettingsForTest() {
-	return {
-		...SUBSCRIPTION_FOOTER_DEFAULTS,
-		...(readGlobalSettings().workOrchestrator?.subscriptionFooter ?? {}),
-	};
-}
 
 function mergeSettings(base, override) {
 	const merged = { ...base };
@@ -3531,9 +3520,6 @@ export default function workModelsExtension(pi) {
 				`Knowledge discoverer absorbed ${absorbed.count} ${absorbed.count === 1 ? "item" : "items"}.`,
 			);
 	});
-	subscriptionFooterController = createSubscriptionFooterController(pi, {
-		readGlobalSettings,
-	});
 
 	exposeBundledSubagentAgents();
 
@@ -3656,7 +3642,6 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 
 	pi.on("session_start", (_event, ctx) => {
 visionBridge.clear();
-subscriptionFooterController.start(ctx);
 resetContextCompaction();
 restoreResearchContext(ctx);
 if (extensionScoutEnabled()) {
@@ -3677,7 +3662,6 @@ sessionCwd = ctx.cwd;
 });
 
 	pi.on("session_shutdown", async (_event, ctx) => {
-subscriptionFooterController.shutdown(ctx);
 const scoutRuntime = extensionScoutRuns.get(resolve(ctx.cwd));
 if (scoutRuntime) {
 			scoutRuntime.detached = true;
@@ -4000,7 +3984,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 
 	// pi-control-hub's page: /wo subcommands for its command picker and the footer's quota rows.
 	pi.events?.on?.("wo:cold-cache", (info) => { info.handled = startColdCompact(info.ctx, pi, info.text); });
-	pi.events?.on?.("wo:web-info",(info)=>{ info.wo=Object.entries(woSubcommands()).map(([value,description])=>({value,description})); info.usage=subscriptionFooterController?.webUsage?.(); info.research=researchContext?(researchContext.stopping?"stopping":"on"):"off"; });
+	pi.events?.on?.("wo:web-info",(info)=>{ info.wo=Object.entries(woSubcommands()).map(([value,description])=>({value,description})); info.research=researchContext?(researchContext.stopping?"stopping":"on"):"off"; });
 	pi.registerCommand("wo", {
  description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo compact, /wo fact or /wo hub",
  getArgumentCompletions: (prefix) => {
@@ -4037,10 +4021,6 @@ if (blockedInternalBackgroundCompletionTurn) {
 
 const WO_UTILITY_ACTIONS = { settings: "work-settings", "catch-up": "work-catch-up", context: "work-context", scout: "work-extension-scout" };
 
-function onOff(value) {
-	return value ? "✓ on" : "○ off";
-}
-
 function workSettingsStatus(ctx) {
 	const settings = readEffectiveSettings(ctx.cwd);
 	const compactor = compactionModelSettings(ctx.cwd, settings);
@@ -4057,103 +4037,7 @@ function workSettingsStatus(ctx) {
 }
 
 const SETTINGS_RESET = "__reset__";
-let subscriptionFooterController;
 let cameraController;
-
-function boolLabel(label, value) {
-	const display = String(label).replace(/^([a-z])/, (letter) =>
-		letter.toUpperCase(),
-	);
-	return {
-		label: `${onOff(value)} ${display}`,
-		settingLabel: display,
-		enabled: value,
-	};
-}
-
-async function editSubscriptionFooterSettings(ctx) {
-	let selectedIndex = 0;
-	for (;;) {
-		const current = subscriptionFooterSettingsForTest();
-		const result = await showListDialog(ctx, {
-			title: "Subscription footer: Global",
-			subtitle: "Show context pressure in the interactive terminal footer",
-			items: [
-				{
-					value: "enabled",
-					...boolLabel("subscription footer", current.enabled),
-					description: "Global only · takes ownership of Pi's footer",
-				},
-				{
-					value: "incidents",
-					...boolLabel("provider incident markers", current.incidents),
-					description: "Global only · Claude, Codex, and Copilot public status",
-				},
-				{
-					value: "resetDates",
-					...boolLabel("reset date/time on weekly quotas", current.resetDates),
-					description: "Global only · 7d (3d 17h, Tue 12:35); the 5h window keeps the countdown only",
-				},
-				...PRODUCTION_PROVIDERS.map((entry) => ({
-					value: `provider:${entry.id}`,
-					...boolLabel(`${entry.label} quota row`, !(current.hidden ?? []).includes(entry.id)),
-					description: "Global only · shown when Pi has its login; off skips its quota requests",
-				})),
-			],
-			selectedIndex,
-			cursorKey: "work-subscription-footer-settings",
-			forceCustom: true,
-			selectOnSpace: true,
-			help: "Enter/Space toggle · Esc/Backspace back",
-		});
-		if (!result) return;
-		selectedIndex = result.index;
-		const providerId = result.item.value.startsWith("provider:")
-			? result.item.value.slice("provider:".length)
-			: undefined;
-		if (providerId) {
-			const settings = readGlobalSettings();
-			settings.workOrchestrator ??= {};
-			const footer = { ...SUBSCRIPTION_FOOTER_DEFAULTS, ...(settings.workOrchestrator.subscriptionFooter ?? {}) };
-			const hidden = new Set(Array.isArray(footer.hidden) ? footer.hidden : []);
-			if (hidden.has(providerId)) hidden.delete(providerId);
-			else hidden.add(providerId);
-			settings.workOrchestrator.subscriptionFooter = { ...footer, hidden: [...hidden] };
-			writeScopedSettings(ctx.cwd, "global", settings);
-			subscriptionFooterController.apply(ctx);
-			continue;
-		}
-		if (
-			result.item.value === "enabled" &&
-			!current.enabled &&
-			!current.ownershipNoticeAcknowledged
-		) {
-			const confirmed = await askConfirm(
-				ctx,
-				"Enable subscription footer?",
-				"This replaces any other custom footer. Disabling restores Pi's built-in footer; use /reload for another footer extension to reclaim ownership.",
-			);
-			if (!confirmed) continue;
-		}
-		const settings = readGlobalSettings();
-		settings.workOrchestrator ??= {};
-		settings.workOrchestrator.subscriptionFooter = {
-			...SUBSCRIPTION_FOOTER_DEFAULTS,
-			...(settings.workOrchestrator.subscriptionFooter ?? {}),
-			[result.item.value]: !current[result.item.value],
-			...(result.item.value === "enabled" && !current.enabled
-				? { ownershipNoticeAcknowledged: true }
-				: {}),
-		};
-		writeScopedSettings(ctx.cwd, "global", settings);
-		subscriptionFooterController.apply(ctx);
-		if (result.item.value === "incidents")
-			ctx.ui.notify(
-				`Provider incident markers: ${current.incidents ? "off" : "on"}`,
-				"info",
-			);
-	}
-}
 
 function owns(object, key) {
 	return Object.hasOwn(object ?? {}, key);
@@ -4318,7 +4202,6 @@ export async function importSettings(ctx, scope, pi = undefined) {
 	try {
 
 		jevTools?.refresh(ctx);
-		if (scope === "global") subscriptionFooterController.apply(ctx);
 	} catch {
 		ctx.ui.notify("Settings were imported, but live refresh failed. Use /reload.", "warning");
 	}
@@ -4408,14 +4291,6 @@ async function workSettingsLoop(ctx, pi = undefined) {
 					"Auto discovery or a validated command/args/env JSON spec; credentials are rejected",
 			},
 {
-				kind: "subscriptionFooter",
-				value: "subscriptionFooter",
-				label: `Subscription footer (global only) ${SUBMENU_ARROW}`,
-				description: subscriptionFooterSettingsForTest().enabled
-					? "on · custom context footer owns the active TUI"
-					: "off · Pi's built-in footer remains active",
-			},
-{
 				kind: "reset",
 				value: SETTINGS_RESET,
 				label:
@@ -4490,7 +4365,6 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			delete settings.workResume;
 			if (scope === "global") delete settings.workPerformance;
 			writeScopedSettings(ctx.cwd, scope, settings);
-			if (scope === "global") subscriptionFooterController.apply(ctx);
 			ctx.ui.notify(
 				scope === "global"
 					? "Reset global work settings"
@@ -4539,10 +4413,6 @@ async function workSettingsLoop(ctx, pi = undefined) {
 		}
 		if (pick.kind === "jev") {
 			await jevTools?.panel(ctx, scope, (cwd) => readScopedSettings(cwd, scope), (cwd, next) => writeScopedSettings(cwd, scope, next));
-			continue;
-		}
-		if (pick.kind === "subscriptionFooter") {
-			await editSubscriptionFooterSettings(ctx);
 			continue;
 		}
 

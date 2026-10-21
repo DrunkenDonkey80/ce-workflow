@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T12:01:39.795Z
+updated: 2026-10-21T12:56:17.758Z
 reviewed: 2026-10-21
 ---
 
@@ -111,19 +111,10 @@ None.
 - [x] **S-06** Chat marks delivered scheduled messages: user rows starting with SCHEDULED_PREFIX get class "scheduled" (grey, dashed left border); delivery text format asserted in test-scheduler.
 
 ### Phase 3: Usage owned by the hub [code]
-- [ ] **S-07** Move usage fetching and pool reading into hub/src/usage.ts with its settings; serve /api/usage from the hub itself.
-  - Credentials come from Pi SDK ModelRegistry in the hub (D14), verified first with a short refresh probe; today they come from a live session (subscription-footer.ts lines 1152-1158).
-  - Keep identity-bound cache invalidation and secret-free JSON; test with no Pi children, expired credentials, logout and account switch.
-  - Keep the existing backoff and poll intervals; the hub is the single poller, so the cross-process lock goes away.
-- [ ] **S-13** In pi-provider-claude-ex: add cpool view --json and cpool action (D12), with a test; claudeex still works without the hub.
-  - Make cpool daemon exclusive: a second daemon refuses to start (runDaemon in pool.ts line 736 takes no lock today).
-  - The hub stops only a daemon it started; test an existing standalone daemon, hub restart and daemon failure.
-- [ ] **S-08** Point hub/web/app.ts usage bars and windows at the hub endpoint; serve the pool through cpool.
-  - Pool view and actions through cpool (D12); remove the /api/pool bridge from plan3.ts.
-  - Start and stop cpool daemon with the hub (D13).
-- [ ] **S-09** Remove subscription-footer.ts and its settings and wiring from ce-workflow; update README and tests (C2).
-  - Move extensions/subscription-footer-UPSTREAM.md (MIT notice, required by scripts/verify-package.mjs line 53) with the code to the hub and update that check.
-  - Migrate the parser, backoff and security tests for the moved code instead of deleting them.
+- [x] **S-07** hub/src/usage.ts polls usage in the hub through the Pi SDK ModelRegistry (D14 probe passed) and serves /api/usage; provider hiding moved to the gear menu (config.usageHidden, falls back to the old footer's hidden list).
+- [x] **S-13** pi-provider-claude-ex cdd4580: `cpool view --json` and `cpool action <act> <label> [value] --json`; runDaemon claims the heartbeat under a lock, and a second daemon refuses while one is alive.
+- [x] **S-08** ce-workflow 842d280: hub/src/pool.ts finds claudeex's cpool from Pi's packages and answers /api/pool (view and actions) itself. It keeps one cpool daemon running, leaves a live one alone and stops only its own. The plan3.ts pool bridge is removed.
+- [x] **S-09** Deleted extensions/subscription-footer.ts, its /wo settings submenu, session wiring and test; upstream MIT notice moved to hub/src/usage-UPSTREAM.md (verify-package updated); parser/pool/sanitization tests migrated to hub/scripts/test-usage-providers.mjs; plan3.ts no longer answers /api/usage.
 
 ### Phase 4: Parked model and unpark on typing [code]
 - [ ] **S-10** Store model and thinking level per hub session; show them for parked sessions; model list from Pi settings scoped models (D10).

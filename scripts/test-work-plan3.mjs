@@ -919,8 +919,9 @@ try {
 			await run("pi-hub", JSON.stringify({ id: "c3", endpoint: "/api/answer", data: {} }));
 			assert.deepEqual(results.at(-1), { id: "c3", ok: false, status: 400, error: "Unknown hub call." }, "only the fixed list");
 			// H5-03: reads only Pi can answer, and chat messages for the browser's plan.
+			// Usage is the hub's own (S-07/S-09); a session no longer answers it.
 			await run("pi-hub", JSON.stringify({ id: "c4", endpoint: "/api/usage", data: {} }));
-			assert.deepEqual([results.at(-1).ok, Array.isArray(results.at(-1).value.summary)], [true, true]);
+			assert.equal(results.at(-1).ok, false);
 			await run("pi-hub", JSON.stringify({ id: "c5", endpoint: "/api/commands", data: {} }));
 			assert(results.at(-1).ok && JSON.stringify(results.at(-1).value).includes("reload"));
 			await run("pi-hub", JSON.stringify({ id: "c6", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "hello from the hub" } }));

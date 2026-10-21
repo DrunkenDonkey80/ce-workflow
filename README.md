@@ -1,6 +1,6 @@
 # pi-work-orchestrator
 
-Pi package for Plan3 planning and execution, research mode, context compaction and utility tools (camera, screen and image tools, Jev, subscription footer).
+Pi package for Plan3 planning and execution, research mode, context compaction and utility tools (camera, screen and image tools, Jev). Subscription usage lives in pi-control-hub (`hub/`).
 
 Plan3 keeps durable work state in Markdown plans under `docs/plans/`. Git is the only code state. Runtime logs, telemetry, locks, exports and backups stay ignored.
 

@@ -227,10 +227,10 @@ function claudePoolQuota({ now, agentDir = DEFAULT_AGENT_DIR }) {
 		windows = complete(
 			accounts.length > 1
 				? poolWindows(store, accounts, entries, used, t)
-				: [
+				: ([
 						["5h", used(entries[0].five_hour)],
 						["7d", used(entries[0].seven_day)],
-					]
+					] as [string, any][])
 						.filter(([, w]) => finite(w.pct))
 						.map(([id, w]) => ({ id, label: id, usedPercent: percent(w.pct), resetsAt: w.at })),
 		);
@@ -466,7 +466,7 @@ function provider({
 	url,
 	parser,
 	headers,
-	preferred,
+	preferred = undefined,
 	pollMs = POLL_MS,
 	unavailableMs = UNAVAILABLE_MS,
 }) {

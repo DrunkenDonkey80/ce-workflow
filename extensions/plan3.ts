@@ -835,11 +835,10 @@ export default function plan3(pi) {
 	}
 	async function readWeb(endpoint: string) {
 		if (endpoint === "/api/models") return { ...webStatus(webCtx), ...await webModels(webCtx), efforts: EFFORTS };
-		if (endpoint === "/api/usage" || endpoint === "/api/commands") {
-			// work-models fills these synchronously; absent (extension off) means empty lists.
-			const info: { wo?: { value: string; description: string }[]; usage?: { summary: unknown[]; lines: unknown[] } } = {};
+		if (endpoint === "/api/commands") {
+			// work-models fills this synchronously; absent (extension off) means empty lists. Usage comes from the hub itself (D6).
+			const info: { wo?: { value: string; description: string }[] } = {};
 			pi.events.emit("wo:web-info", info);
-			if (endpoint === "/api/usage") return info.usage ?? { summary: [], lines: [] };
 			const own = (pi.getCommands?.() ?? []).filter(command => command.name !== "wo").map(({ name, description }) => ({ name, description: description ?? "" }));
 			// getCommands() omits built-ins; /reload is the one the web forwards (as /wo reload).
 			own.push({ name: "reload", description: "Reload extensions, skills and prompts; the page reconnects" });
@@ -2028,7 +2027,7 @@ export default function plan3(pi) {
 	// H3-09: the hub calls the page's plan operations with the browser's chosen plan; the result comes back by id as pi-hub:result.
 	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move", "/api/message"]);
 	// H5-03: what only this Pi knows (scoped models, work-models usage and command lists).
-	const HUB_READS = new Set(["/api/models", "/api/usage", "/api/commands"]);
+	const HUB_READS = new Set(["/api/models", "/api/commands"]);
 	if (hubActive()) pi.registerCommand("pi-hub", {
 		description: "Internal: pi-control-hub calls (only present when the hub started this Pi)",
 		handler: async (args, ctx) => {
