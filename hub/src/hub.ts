@@ -15,6 +15,7 @@ import { createPageApi } from "./api.ts";
 import { Scheduler, timerInput } from "./scheduler.ts";
 import { createUsage, USAGE_PROVIDERS, type Usage, type UsageOptions } from "./usage.ts";
 import { createPool, type Pool } from "./pool.ts";
+import { createUpdateCheck, type UpdateCheck } from "./update-check.ts";
 import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { agentDir } from "./rpc-client.ts";
@@ -82,7 +83,7 @@ function envCommand(): string[] | undefined {
 	try { return JSON.parse(value); } catch { throw new Error("PI_HUB_PI_COMMAND must be a JSON array of strings."); }
 }
 
-export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined } = {}) {
+export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined } = {}) {
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
@@ -160,7 +161,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		},
 	};
 
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true } }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, ...(updates ? { updates: updates.state() } : {}) }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection
@@ -252,6 +253,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				if (endpoint === "hub") {
 					// A process cannot restart itself: a detached `pi-hub restart|update` stops this hub (D17 busy rule) and starts a new one.
 					// update: --yes because the page asked already; Pi outside the hub keeps its old version (the log lists them).
+					if (data.action === "check-updates") { if (updates) await updates.check(); return send(200, pageApi.settings()); }
 					if (data.action !== "restart" && data.action !== "update") return send(400, { error: "Unknown hub action." });
 					const busy = summary().filter(s => s.busy.length);
 					if (busy.length) return send(409, { error: `Not ${data.action === "update" ? "updated" : "restarted"}; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
@@ -308,6 +310,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	const restored = await host.restoreRunning(); // D17
 	void usage?.start().catch(error => console.error(`usage: ${(error as Error).message}`));
 	pool?.start();
+	updates?.start();
 	scheduler.on("ended", (timer, reason) => console.log(`${new Date().toISOString()} timer ${timer.id.slice(0, 8)} for ${registry.get(timer.session)?.name ?? timer.session} ended: ${reason}`));
 	// A tick only reads its timers; due ones run in the background and never overlap themselves.
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);
@@ -317,7 +320,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 
 	async function stop() {
 		return closing ??= (async () => {
-			clearInterval(timer); clearInterval(ticks); usage?.stop(); pool?.stop();
+			clearInterval(timer); clearInterval(ticks); usage?.stop(); pool?.stop(); updates?.stop();
 			pairing.close();
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();
@@ -332,7 +335,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 
 if (import.meta.main) {
 	const { openInBrowser } = await import("./platform.ts");
-	const hub = await startHub({ openUrl: openInBrowser });
+	const hub = await startHub({ openUrl: openInBrowser, updates: createUpdateCheck() });
 	console.log(`pi-control-hub ${process.pid} on http://127.0.0.1:${hub.config.port} (restored ${hub.restored.length})`);
 	const remote = hub.remote();
 	if (hub.imported) console.log(`imported ${hub.imported} paired device(s) from ce-workflow`);

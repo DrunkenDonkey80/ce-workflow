@@ -241,6 +241,9 @@ h2 { font-size: 15px; font-weight: 600; }
 /* The gear and the two PC load boxes left of it are squares of one size: CPU in the accent colour, memory in the warning colour, last 2 minutes. */
 #settings-button, .load { order: 1; flex: none !important; width: 34px; height: 34px; padding: 0; }
 #settings-button { font-size: 22px; line-height: 1; }
+#settings-button { position: relative; }
+.update-badge { position: absolute; right: -4px; bottom: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--error, #e03131); color: #fff; font-size: 11px; line-height: 16px; font-weight: 600; }
+.update-list { color: var(--muted); font-size: 12px; white-space: normal; }
 .load { position: relative; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
 .load svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
 .load polyline { stroke-width: 1.5; vector-effect: non-scaling-stroke; }
@@ -516,10 +519,10 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 #chat-compact-m { grid-column: 1 / -1; }
 /* Gear menu field and the tab icon picker. */
 .menu-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
-#settings-menu { width: max-content; max-width: calc(100vw - 16px); }
+#settings-menu { width: min(360px, calc(100vw - 16px)); max-width: none; } /* a definite width, so the icon grid fills its rows */
 .usage-providers { display: flex; flex-wrap: wrap; gap: 2px 10px; font-weight: normal; }
 .icon-field { display: block; }
-.icon-grid { display: grid; grid-template-columns: repeat(5, 40px); gap: 6px; margin: 6px 0; }
+.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, 40px); gap: 6px; margin: 6px 0; }
 .icon-choice { width: 40px; height: 40px; padding: 4px; border: 2px solid transparent; border-radius: 10px; background: none; }
 .icon-choice svg { width: 100%; height: 100%; display: block; }
 .icon-choice[aria-checked="true"] { border-color: var(--focus); background: var(--hover); }

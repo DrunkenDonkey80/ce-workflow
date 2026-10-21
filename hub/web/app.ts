@@ -941,7 +941,8 @@ const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIC
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
-type HubSettings = { idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
+type Updates = { pi: { current: string; latest: string } | null; packages: string[]; checkedAt: number | null; checking: boolean; error?: string };
+type HubSettings = { updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
 let hubSettings: HubSettings = {};
 const ICON_INK = "#343a40", iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function iconSvg(name: string, key: string) {
@@ -964,7 +965,7 @@ async function loadSessions() {
  const visible = document.visibilityState === "visible";
  try {
   const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
-  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders(); renderNotify();
+  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders(); renderNotify(); renderUpdates();
   notifyChanges(groups);
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
@@ -1364,6 +1365,21 @@ function notifyChanges(groups: Group[]) {
   } catch { /* phones without a service worker refuse page notifications */ }
  }
 }
+// Gear badge: how many of Pi and its extensions have an update (hub checks hourly); the list sits in the gear menu.
+function renderUpdates() {
+ const updates = hubSettings.updates, count = updates ? (updates.pi ? 1 : 0) + updates.packages.length : 0;
+ $("update-badge").hidden = !count; $("update-badge").textContent = String(count);
+ $("settings-button").title = count ? `Hub settings (${count} update${count > 1 ? "s" : ""})` : "Hub settings";
+ const when = updates?.checkedAt ? new Date(updates.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+ const names = updates ? [...updates.pi ? [`Pi ${updates.pi.current} → ${updates.pi.latest}`] : [], ...updates.packages] : [];
+ $("update-list").textContent = !updates ? "Not checked by this hub." : updates.checking ? "Checking…" : (names.length ? names.join(", ") : "Everything is up to date.") + (updates.error ? ` Last check failed: ${updates.error}.` : "") + (when ? ` (checked ${when})` : "");
+ ($("update-check") as HTMLButtonElement).disabled = !updates || updates.checking;
+}
+$("update-check").addEventListener("click", async () => {
+ ($("update-check") as HTMLButtonElement).disabled = true; $("update-list").textContent = "Checking…";
+ try { hubSettings = await post("hub", { action: "check-updates" }) as HubSettings; } catch (error) { showNotice(error.message); }
+ renderUpdates();
+});
 function renderNotify() {
  const notify = hubSettings.notify ?? { question: true, done: true };
  ($("notify-question") as HTMLInputElement).checked = notify.question; ($("notify-done") as HTMLInputElement).checked = notify.done;
