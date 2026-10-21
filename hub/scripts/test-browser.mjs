@@ -229,6 +229,10 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('left-panel').getClientRects().length, document.querySelector('.left-tabs').getClientRects().length]"), [0, 0]);
  assert(await evaluate("(() => { const r = document.getElementById('composer').getBoundingClientRect(), a = document.querySelector('.attach').getBoundingClientRect(); return r.bottom <= innerHeight + 1 && r.top > innerHeight / 2 && a.width > 0 && a.bottom <= innerHeight; })()"), "composer and attach stay on screen");
  assert.equal(await evaluate("document.documentElement.scrollWidth"), 390, "no sideways scrolling");
+ // Phones have no Ctrl+F: the drawer's Search button opens the chat search bar, which fits the narrow screen.
+ await browser("click", "#drawer-toggle"); await browser("click", "#chat-search-m");
+ assert(await evaluate("(() => { const bar = document.getElementById('chat-search'), r = bar.getBoundingClientRect(); return document.getElementById('drawer').dataset.open === 'false' && !bar.hidden && document.activeElement.id === 'chat-find' && r.width > 0 && [...bar.children].every(item => { const box = item.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth && box.width > 0; }) && parseFloat(getComputedStyle(document.getElementById('chat-find')).fontSize) >= 16 && document.documentElement.scrollWidth === 390; })()"), "phone: the drawer opens a chat search bar that fits the screen");
+ await browser("click", "#chat-search [data-find=close]"); assert.equal(await evaluate("document.getElementById('chat-search').hidden"), true);
  const phoneBox = await evaluate("[document.getElementById('message-input').rows, document.getElementById('message-input').clientHeight]");
  await browser("set", "viewport", "1280", "800");
  await browser("wait", "--fn", "document.getElementById('message-input').rows === 6");
@@ -450,6 +454,30 @@ try {
  assert.equal(await evaluate("document.getElementById('chat-find-count').textContent"), "1/2", "next wraps around to the first");
  await evaluate("document.getElementById('chat-find').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
  assert(await evaluate("document.getElementById('chat-search').hidden && CSS.highlights.get('chat-hit').size === 0"), "Esc closes and clears marks");
+ // A hit crosses bold/code/link text within a block, never a row; Unicode case folding never shifts the marks.
+ const findRow = { id: "assistant_find", role: "assistant", text: "Split **bo**ld, `co`de and [li](https://example.com/x)nk; \u0130\u0130 tail \u03a3\u0391\u03a3 zq", streaming: false };
+ const nextRow = { id: "assistant_find2", role: "assistant", text: "xw \u0130", streaming: false };
+ for (const row of [findRow, nextRow]) { chatRows.set(row.id, row); publish("message", row); }
+ await browser("wait", "--fn", "document.querySelector('#messages [data-id=assistant_find2]')?.textContent.includes('xw')");
+ await evaluate("dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true }))");
+ const find = query => evaluate(`(() => { const input = document.getElementById('chat-find'); input.value = ${JSON.stringify(query)}; input.dispatchEvent(new Event('input')); const hit = [...CSS.highlights.get('chat-hit-current')][0]; return [document.getElementById('chat-find-count').textContent, hit?.toString() ?? null, hit ? hit.startContainer !== hit.endContainer : null]; })()`);
+ assert.deepEqual(await find("BOLD"), ["1/1", "bold", true], "a hit crosses bold text");
+ assert.deepEqual(await find("code"), ["1/1", "code", true], "a hit crosses inline code");
+ assert.deepEqual(await find("link"), ["1/1", "link", true], "a hit crosses a link");
+ assert.deepEqual(await find("tail"), ["1/1", "tail", false], "\u0130 lowercasing to two units does not shift later marks");
+ assert.deepEqual(await find("\u03c3\u03b1\u03c2"), ["1/1", "\u03a3\u0391\u03a3", false], "Greek sigma forms match case-insensitively");
+ assert.deepEqual(await find("zqxw"), ["0", null, null], "no hit spans two rows");
+ assert.deepEqual(await find("zq"), ["1/1", "zq", false]);
+ assert.deepEqual(await find("\ud800"), ["0", null, null], "a lone surrogate finds nothing and does not throw");
+ assert.deepEqual(await find("\u0130"), ["3/3", "\u0130", false]);
+ // Streaming re-renders the row with the current hit; the search stays on that hit.
+ await evaluate("document.getElementById('chat-find').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }))");
+ assert.equal(await evaluate("document.getElementById('chat-find-count').textContent"), "2/3");
+ findRow.text += " \u0130 more"; publish("message", findRow);
+ await browser("wait", "--fn", "document.getElementById('chat-find-count').textContent === '2/4'");
+ assert.equal(await evaluate("[...CSS.highlights.get('chat-hit-current')][0].startContainer.parentElement.closest('li').dataset.id"), "assistant_find", "the current hit survives its row re-rendering");
+ await evaluate("document.querySelector('#chat-search [data-find=close]').click()");
+ assert.equal(await evaluate("document.getElementById('chat-search').hidden"), true, "the close button closes the search");
  // Pi-style colour coding: tool blocks by state, an edit's diff instead of its arguments, labels only for screen readers.
  publish("message", { id: "assistant_4", role: "assistant", text: "", streaming: false, blocks: [
   { type: "thinking", text: "hmm" },

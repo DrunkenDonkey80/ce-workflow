@@ -510,6 +510,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .drawer #model-button, .drawer #context-button { flex: 1 1 calc(50% - 3px); min-width: 0; }
  .drawer #usage-button { white-space: normal; text-align: left; }
  .drawer-commands { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 12px 16px 0; }
+ /* Phone search bar: 16px input so iOS does not zoom on focus; finger-sized buttons still fit at 320px. */
+ .chat-search { gap: 2px; padding: 4px 8px; } .chat-search input { font-size: 16px; } .chat-search output { min-width: 3.2em; } .chat-search button { min-width: 34px; min-height: 34px; padding: 0; }
  .drawer-backdrop { display: block; position: fixed; z-index: 6; inset: 0; background: rgba(0, 0, 0, .25); }
  .messages { padding: 10px 12px 0; }
  .composer { padding: 6px 8px; }

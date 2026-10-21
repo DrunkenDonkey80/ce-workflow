@@ -524,25 +524,52 @@ window.addEventListener("keydown", event => {
 });
 // Chat search: marks every hit in the text that is shown now (Compact-hidden rows and closed blocks don't count) with the
 // CSS highlight API, so the chat DOM is untouched; it re-runs as the chat changes.
-// shortcut: a match must sit inside one text node (not across bold/link boundaries); split matching if that is missed.
-let findHits: Range[] = [], findAt = -1, findQueued = false;
+// A hit may cross bold/code/link text but not a block (paragraph, code block, cell) or a chat row.
+let findHits: Range[] = [], findKeys: string[] = [], findAt = -1, findQueued = false;
 const findInput = () => $("chat-find") as HTMLInputElement;
+// Folds case one code point at a time so every folded unit maps back to its source character ("İ" folds to two units);
+// upper-then-lower makes ς, σ and Σ alike.
+function foldCase(text: string) {
+ if (!/[^\0-\x7f]/.test(text)) return { folded: text.toLowerCase(), from: null, to: null };
+ let folded = "", at = 0; const from: number[] = [], to: number[] = [];
+ for (const char of text) { const low = char.toUpperCase().toLowerCase(); folded += low; for (let i = 0; i < low.length; i++) { from.push(at); to.push(at + char.length); } at += char.length; }
+ return { folded, from, to };
+}
 function openChatSearch() { $("chat-search").hidden = false; findInput().focus(); findInput().select(); runChatSearch(); }
-function closeChatSearch() { $("chat-search").hidden = true; findHits = []; findAt = -1; paintChatSearch(); $("message-input").focus(); }
+function closeChatSearch() { $("chat-search").hidden = true; findHits = []; findKeys = []; findAt = -1; paintChatSearch(); $("message-input").focus(); }
 function runChatSearch(keep = false) {
- const needle = findInput().value.toLowerCase(), previous = findHits[findAt];
- findHits = [];
+ const needle = foldCase(findInput().value).folded, previous = findKeys[findAt], feed = $("feed");
+ findHits = []; findKeys = [];
  if (needle && !$("chat-search").hidden) {
-  const walker = document.createTreeWalker($("feed"), NodeFilter.SHOW_TEXT);
+  const blocks = new Map<Element, Element>(), perRow = new Map<string, number>();
+  const blockOf = (element: Element): Element => { let block = blocks.get(element); if (!block) { block = element !== feed && element.parentElement && getComputedStyle(element).display === "inline" ? blockOf(element.parentElement) : element; blocks.set(element, block); } return block; };
+  let run: Text[] = [], runBlock: Element | null = null;
+  const searchRun = () => {
+   if (!run.length) return;
+   const starts: number[] = []; let length = 0; for (const node of run) { starts.push(length); length += node.length; }
+   const { folded, from, to } = foldCase(run.map(node => node.data).join(""));
+   // Starts go to the node holding the character, ends to the node holding the one before.
+   const point = (index: number, end: boolean): [Text, number] => { let i = run.length - 1; while (i > 0 && (end ? starts[i] >= index : starts[i] > index)) i--; return [run[i], index - starts[i]]; };
+   // Rows are re-rendered as they stream, so a hit is known by its row id and its place in that row.
+   const row = run[0].parentElement.closest<HTMLElement>("#messages > li, #activity > *"), rowKey = row?.dataset.id ? row.parentElement.id + "/" + row.dataset.id : "";
+   for (let at = folded.indexOf(needle); at >= 0; at = folded.indexOf(needle, at + needle.length)) {
+    const range = new Range(); range.setStart(...point(from ? from[at] : at, false)); range.setEnd(...point(to ? to[at + needle.length - 1] : at + needle.length, true)); findHits.push(range);
+    const nth = perRow.get(rowKey) ?? 0; perRow.set(rowKey, nth + 1); findKeys.push(rowKey ? rowKey + "#" + nth : "");
+   }
+   run = [];
+  };
+  const walker = document.createTreeWalker(feed, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
    const parent = node.parentElement;
-   if (!parent || parent.closest("button") || !parent.checkVisibility?.({ visibilityProperty: true } as CheckVisibilityOptions)) continue;
-   const text = node.data.toLowerCase();
-   for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length)) { const range = new Range(); range.setStart(node, at); range.setEnd(node, at + needle.length); findHits.push(range); }
+   if (!parent || parent.closest("button, .sr-only") || !parent.checkVisibility?.({ visibilityProperty: true } as CheckVisibilityOptions)) { searchRun(); continue; }
+   if (!node.length) continue;
+   const block = blockOf(parent); if (block !== runBlock) { searchRun(); runBlock = block; }
+   run.push(node);
   }
+  searchRun();
  }
  // While the chat updates, stay on the same hit; a new query starts at the newest one.
- findAt = !findHits.length ? -1 : keep && previous ? Math.max(0, findHits.findIndex(range => range.startContainer === previous.startContainer && range.startOffset === previous.startOffset)) : findHits.length - 1;
+ findAt = !findHits.length ? -1 : keep && previous ? Math.max(0, findKeys.indexOf(previous)) : findHits.length - 1;
  paintChatSearch();
  if (!keep && findAt >= 0) jumpChatSearch(findAt);
 }
@@ -559,6 +586,7 @@ function jumpChatSearch(index: number) {
  findHits[findAt].startContainer.parentElement?.scrollIntoView({ block: "center" });
 }
 findInput().addEventListener("input", () => runChatSearch());
+$("chat-search-m").addEventListener("click", () => { setDrawer(false); setMobile("chat"); openChatSearch(); });
 findInput().addEventListener("keydown", event => {
  if (event.key === "Enter") { event.preventDefault(); jumpChatSearch(findAt + (event.shiftKey ? -1 : 1)); }
  if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); closeChatSearch(); }
