@@ -829,13 +829,23 @@ $("composer").addEventListener("submit", async event => {
  // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
  for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
- messageSending = true; renderShell();
+ messageSending = true; expectWork(); renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
  try { const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
- catch (error) { showNotice(error.message + ". Your message draft is kept."); }
+ catch (error) { expectWork(false); showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });
+// Sending shows Working at once instead of when the agent starts seconds later. The server's next activity event
+// replaces this guess; if none comes (a command that starts no turn), it drops back after 15 s.
+let expectTimer = 0;
+function expectWork(on = true) {
+ clearTimeout(expectTimer);
+ if (!on) { if (expectTimer) { expectTimer = 0; state.activity = { ...state.activity, working: false }; renderActivity(); renderShell(); } return; }
+ if (state.activity.working) return;
+ state.activity = { ...state.activity, working: true, tools: [] }; renderActivity();
+ expectTimer = window.setTimeout(() => expectWork(false), 15000);
+}
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
 const menus = [["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
@@ -1204,7 +1214,8 @@ function poolRowBox(row: PoolRow, select: () => void) {
  if (row.state !== "ok") head.append(el("span", "pool-chip tone-" + (row.dead ? "error" : "warning"), row.state));
  if (row.login && row.login !== "ok") head.append(el("span", "pool-chip tone-error", row.login));
  if (row.email) head.append(el("small", "pool-email", row.email));
- box.append(head, poolBar("5h", row.fiveHour), poolBar("7d", row.sevenDay));
+ const bars = el("div", "pool-bars"); bars.append(poolBar("5h", row.fiveHour), poolBar("7d", row.sevenDay));
+ box.append(head, bars);
  if (row.notes.length) { const notes = el("div", "pool-notes"); for (const note of row.notes) notes.append(el("span", note.tone ? "tone-" + note.tone : "", note.text)); box.append(notes); }
  box.addEventListener("click", select); box.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } });
  return box;
@@ -1474,7 +1485,7 @@ listen("message", row => { chat.set(row.id, row); renderChat(); });
 listen("dialog", value => { promptView.pending(value); renderShell(); });
 listen("dialog_closed", value => { promptView.closed(value.askId); renderShell(); });
 // A new run starts with an empty tool list (the server clears its own at agent_start).
-listen("activity", value => { state.activity = { ...state.activity, ...value, ...(value.working && !state.activity.working && !value.tools ? { tools: [] } : {}) }; renderActivity(); renderShell(); });
+listen("activity", value => { if ("working" in value) { clearTimeout(expectTimer); expectTimer = 0; } state.activity = { ...state.activity, ...value, ...(value.working && !state.activity.working && !value.tools ? { tools: [] } : {}) }; renderActivity(); renderShell(); });
 // Appended text per D21: apply only at the current length, ignore stale, refetch the row on a gap.
 listen("delta", delta => {
  const row = chat.get(delta.id), text = applyText(row && !row.excerpt ? row.text : undefined, delta.offset, delta.text);

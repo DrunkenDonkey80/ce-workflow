@@ -194,7 +194,8 @@ h2 { font-size: 15px; font-weight: 600; }
 .pool-row.picked { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); background: color-mix(in srgb, var(--focus) 10%, transparent); }
 .pool-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .pool-mark { color: var(--success); width: 1em; }
 .pool-chip { font-size: 11px; padding: 0 6px; border-radius: 9px; border: 1px solid var(--line); } .pool-email { color: var(--muted); margin-left: auto; }
-.pool-bar { display: grid; grid-template-columns: 2em 1fr 9em; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.pool-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+.pool-bar { display: grid; grid-template-columns: 1.6em 1fr auto; align-items: center; gap: 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .pool-bar-name { color: var(--muted); } .pool-bar-text { text-align: right; white-space: nowrap; }
 .pool-bar-track { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 22%, transparent); overflow: hidden; }
 .pool-bar-fill { display: block; height: 100%; background: var(--success); } .pool-bar-fill.tone-warning { background: var(--warning); } .pool-bar-fill.tone-error { background: var(--error); }
