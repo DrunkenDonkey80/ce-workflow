@@ -45,7 +45,7 @@ for (const bad of [{ act: "explode" }, { act: "priority", label: "a", value: 5 }
 fs.writeFileSync(path.join(root, "alive"), "");
 pool.start();
 await waitFor(() => calls().filter(line => line.startsWith("daemon")).length >= 2, "the refused daemon is retried");
-assert.equal(pool.daemon(), undefined);
+await waitFor(() => pool.daemon() === undefined, "the refused daemon has closed");
 fs.rmSync(path.join(root, "alive"));
 await waitFor(() => pool.daemon()?.exitCode === null && pool.daemon()?.pid, "the hub runs its own daemon once none is alive");
 const own = pool.daemon();
