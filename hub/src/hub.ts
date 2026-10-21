@@ -14,6 +14,7 @@ import { SessionView } from "./view.ts";
 import { createPageApi } from "./api.ts";
 import { Scheduler, timerInput } from "./scheduler.ts";
 import { createUsage, USAGE_PROVIDERS, type Usage, type UsageOptions } from "./usage.ts";
+import { createPool, type Pool } from "./pool.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
@@ -80,7 +81,7 @@ function envCommand(): string[] | undefined {
 	try { return JSON.parse(value); } catch { throw new Error("PI_HUB_PI_COMMAND must be a JSON array of strings."); }
 }
 
-export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false } = {}) {
+export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined } = {}) {
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
@@ -129,6 +130,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	const usageHidden = config.usageHidden ? () => config.usageHidden! : footerHidden;
 	// Tests may pass a ready poller ({ usage, start, stop, refresh }) instead of options.
 	const usage = usageOptions === false ? undefined : "usage" in usageOptions ? usageOptions : createUsage({ dataDir, hidden: () => (config.usageHidden ?? usageHidden()), ...usageOptions });
+	const pool = poolOption === false ? undefined : poolOption ?? createPool();
 	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id), published: host.live.get(record.id)?.published.state }));
 	const routes: Record<string, (data: any, match: RegExpMatchArray) => Promise<unknown> | unknown> = {
 		"GET /api/status": () => ({ pid: process.pid, port: config.port, remote: remoteStatus(), sessions: summary() }),
@@ -157,7 +159,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		},
 	};
 
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection
@@ -304,6 +306,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	host.checkTerminals(); // a terminal closed while the hub was down
 	const restored = await host.restoreRunning(); // D17
 	void usage?.start().catch(error => console.error(`usage: ${(error as Error).message}`));
+	pool?.start();
 	scheduler.on("ended", (timer, reason) => console.log(`${new Date().toISOString()} timer ${timer.id.slice(0, 8)} for ${registry.get(timer.session)?.name ?? timer.session} ended: ${reason}`));
 	// A tick only reads its timers; due ones run in the background and never overlap themselves.
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);
@@ -313,7 +316,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 
 	async function stop() {
 		return closing ??= (async () => {
-			clearInterval(timer); clearInterval(ticks); usage?.stop();
+			clearInterval(timer); clearInterval(ticks); usage?.stop(); pool?.stop();
 			pairing.close();
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();

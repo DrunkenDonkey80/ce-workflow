@@ -24,6 +24,7 @@ In Pi, `/wo hub` shows the hub's status and addresses with Install, Start, Open,
 - `remote on` adds a tailnet-only `tailscale serve` on the hub's port (never Funnel); new devices pair with a code approved on the hub page → Devices.
 - `autostart on` starts the hub at login: Windows per-user Run key (no admin rights), Linux `~/.config/autostart` (desktop logins).
 - WSL2: links open in the Windows default browser (`wslview`, else `rundll32`), and `open`/`new` always print a signed link to click. The hub binds 127.0.0.1, which WSL2 forwards to Windows. `pi-hub` found only under `/mnt/` (the Windows PATH) counts as not installed. `autostart on` writes a systemd user unit (`~/.config/systemd/user/pi-control-hub.service`; the hub starts when WSL starts for you) and needs `[boot] systemd=true` in `/etc/wsl.conf`; without systemd there is no login start, so run `pi-hub start`.
+- Usage and the Claude accounts window come from the hub itself, so they show with every session parked. With pi-provider-claude-ex in Pi's packages, the hub runs its `cpool` CLI for the account list and actions, and keeps one `cpool daemon` refreshing logins (it leaves an already running daemon alone and stops only its own). `PI_HUB_CPOOL=<path to cpool.ts>` overrides the lookup.
 - The hub shows only sessions it started. "Open in terminal" parks a session and hands it to a plain console Pi; the hub takes it back when that Pi exits.
 
 ## Development

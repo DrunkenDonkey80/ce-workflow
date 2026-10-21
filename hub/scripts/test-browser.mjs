@@ -104,7 +104,7 @@ await new Promise(done => relay.listen(0, "127.0.0.1", done));
 process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} } });
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} }, pool: { available: true, daemon: () => undefined, view: async () => stub("/api/pool", {}), action: async data => stub("/api/pool", data), start() {}, stop() {} } });
 const origin = `http://127.0.0.1:${hub.config.port}`;
 const own = await hub.host.create(folder, "1"), id = own.id, rpc = () => hub.host.live.get(id).rpc;
 const publish = (event, value) => hub.views.get(id)?.publish(event, value);
@@ -539,7 +539,7 @@ try {
  await browser("click", ".pool-actions button:first-of-type"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done switch')");
  await evaluate("(() => { const s = document.querySelector('.pool-actions select'); s.value = '2'; s.dispatchEvent(new Event('change')); })()"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done priority')");
  await browser("click", ".pool-tools button:nth-of-type(2)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done mode')");
- assert.deepEqual(pool.acts, ["switch:flex2", "priority:flex2:2", "mode:"], "pool actions reach the session");
+ assert.deepEqual(pool.acts, ["switch:flex2", "priority:flex2:2", "mode:"], "pool actions reach the hub's pool");
  await browser("click", "#usage-close");
  await browser("click", "#settings-button");
  assert.deepEqual(await evaluate("[document.querySelectorAll('#settings-menu #icon-grid .icon-choice').length > 1, document.querySelectorAll('#settings-menu #icon-colors .icon-choice').length]"), [true, 6], "icons and colours sit inside the settings menu");

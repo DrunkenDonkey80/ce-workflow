@@ -14,6 +14,7 @@ import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
 import type { Usage } from "./usage.ts";
+import type { Pool } from "./pool.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
 import type { Scheduler } from "./scheduler.ts";
@@ -26,7 +27,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views, scheduler, usage, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; settings?: () => Record<string, unknown> }) {
+export function createPageApi({ host, registry, views, scheduler, usage, pool, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -172,7 +173,9 @@ export function createPageApi({ host, registry, views, scheduler, usage, setting
 			case "system": return systemLoad();
 			// D6: usage comes from the hub's own poller, so it shows with every session parked.
 			case "usage": return usage?.usage() ?? { summary: [], accounts: [] };
-			case "models": case "commands": case "pool": return call(id, `/api/${endpoint}`, {}, { start: false });
+			// D9: the pool is global, answered by the hub through cpool, never by a session.
+			case "pool": return pool ? pool.view() : null;
+			case "models": case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
 	}
@@ -189,7 +192,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, setting
 					views.get(id)?.close(); views.delete(id); return { ok: true };
 				}
 				return call(id, "/api/message", data);
-			case "command": case "bias": case "generate": case "edit": case "comment": case "move": case "pool": return call(id, `/api/${endpoint}`, data);
+			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
+			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
 			// Pi's abort still delivers queued messages, so take them out first and hand them back for editing (rpc-commands.md).
 			// unqueue with text takes back one message (edit or cancel): Pi only clears the whole queue, so the rest is queued again.
 			case "stop": case "unqueue": {

@@ -759,18 +759,7 @@ export default function plan3(pi) {
 	}
 	// A message the agent never received must not vanish silently.
 	const notifyWeb = (_event, value) => webCtx?.ui.notify(value.message, "error");
-	// pi-provider-claude-ex exports its /claude-pool list and menu actions; absent means no pool window.
-	const claudePool = () => { const info: { view?: () => unknown; action?: (act: string, label: string, value?: number) => Promise<{ text: string } | undefined> } = {}; pi.events.emit("claude-pool:web", info); return info; };
-	const POOL_ACTS = new Set(["switch", "favorite", "weekend", "mode", "refresh", "toggle", "remove", "up", "down", "priority"]);
 	async function postWeb(endpoint, data) {
-		if (endpoint === "/api/pool") {
-			const pool = claudePool();
-			if (!pool.action) throw new WebError(404, "The Claude pool extension is not loaded.");
-			if (!POOL_ACTS.has(data.act) || typeof (data.label ?? "") !== "string") throw new WebError(400, "Unknown pool action.");
-			if (data.act === "priority" && !(Number.isInteger(data.value) && Math.abs(data.value) <= 2)) throw new WebError(400, "Priority is -2..2.");
-			const message = await pool.action(data.act, data.label ?? "", data.value);
-			return { message: message?.text, view: pool.view?.() };
-		}
 		if (!webCtx) throw new WebError(409, "Workspace context expired; reopen /plan3 diagram.");
 		const ctx = webCtx;
 		try { ctx.isIdle(); } catch { webCtx = null; throw new WebError(409, "Workspace context expired; reopen /plan3 diagram."); }
@@ -845,7 +834,6 @@ export default function plan3(pi) {
 		catch (error) { if (error.code) throw error; throw new WebError(400, error.message); }
 	}
 	async function readWeb(endpoint: string) {
-		if (endpoint === "/api/pool") return claudePool().view?.() ?? null;
 		if (endpoint === "/api/models") return { ...webStatus(webCtx), ...await webModels(webCtx), efforts: EFFORTS };
 		if (endpoint === "/api/usage" || endpoint === "/api/commands") {
 			// work-models fills these synchronously; absent (extension off) means empty lists.
@@ -2038,9 +2026,9 @@ export default function plan3(pi) {
 	pi.registerCommand("plans3", commands.plans3);
 	pi.registerCommand("resume3", commands.resume3);
 	// H3-09: the hub calls the page's plan operations with the browser's chosen plan; the result comes back by id as pi-hub:result.
-	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move", "/api/message", "/api/pool"]);
+	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move", "/api/message"]);
 	// H5-03: what only this Pi knows (scoped models, work-models usage and command lists).
-	const HUB_READS = new Set(["/api/models", "/api/usage", "/api/commands", "/api/pool"]);
+	const HUB_READS = new Set(["/api/models", "/api/usage", "/api/commands"]);
 	if (hubActive()) pi.registerCommand("pi-hub", {
 		description: "Internal: pi-control-hub calls (only present when the hub started this Pi)",
 		handler: async (args, ctx) => {
