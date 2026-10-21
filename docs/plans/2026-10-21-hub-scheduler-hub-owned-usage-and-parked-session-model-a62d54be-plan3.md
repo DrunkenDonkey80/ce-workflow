@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T11:43:59.762Z
+updated: 2026-10-21T11:50:19.831Z
 reviewed: 2026-10-21
 ---
 
@@ -99,15 +99,11 @@ None.
 ## Phases
 
 ### Phase 1: Hub scheduler core [code]
-- [ ] **S-01** Add hub/src/scheduler.ts: persisted timers, tick loop, message and script kinds, protocol of D3, limits of D8.
-  - Timers bind to the Pi session id and follow D15 (/new, unstar, terminal handoff); lifecycle tests come before persistence.
-  - Delivery goes through the S-14 path: one-off messages to a busy agent wait as follow-ups, not steers.
-  - Message delivery reuses the page's send path; parked sessions resume first; busy sessions skip a repeating tick.
-  - Script ticks run without resuming; output becomes a message (resume then), exit 3 cancels, 3 failures send the error and stop.
+- [x] **S-01** hub/src/scheduler.ts: persisted timers (timers.json), 5 s tick in hub.ts, message/script kinds with D3 protocol, D8 limits, D15 lifecycle checked per tick, follow-up delivery to busy agents.
 - [x] **S-14** Hub/web page messages now run cold-cache compaction: plan3-web emits wo:cold-cache, work-models startColdCompact compacts and resends once (source extension, never re-checked).
 - [x] **S-15** Live.ready in hub/src/sessions.ts: resume, prompt and call wait for the one start; api.ts call() resumes through it; a failed start rejects every waiter.
 - [ ] **S-02** Add `pi-hub schedule add|list|cancel` to hub/src/cli.ts and matching API routes.
-- [ ] **S-03** Hub tests for the scheduler with a fake clock and fake-pi (C1).
+- [x] **S-03** hub/scripts/test-scheduler.mjs: fake clock + fake-pi; validation, D5 no-resume, output wake, exit 3, failure rule/reset, busy skip, follow-up, D15 terminal/new/unstar, persistence, real runScript.
 
 ### Phase 2: Agent tool and page state [code]
 - [ ] **S-04** Add the `schedule` tool to ce-workflow, calling `pi-hub schedule` for the current hub session; refuse outside the hub.

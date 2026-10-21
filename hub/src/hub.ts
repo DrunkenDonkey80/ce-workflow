@@ -12,6 +12,7 @@ import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
 import { createPageApi } from "./api.ts";
+import { Scheduler } from "./scheduler.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
@@ -283,12 +284,17 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	if (config.remote) await applyRemote().catch(error => { remoteError = (error as Error).message; });
 	host.checkTerminals(); // a terminal closed while the hub was down
 	const restored = await host.restoreRunning(); // D17
+	const scheduler = new Scheduler({ dataDir, registry, host });
+	scheduler.on("ended", (timer, reason) => console.log(`${new Date().toISOString()} timer ${timer.id.slice(0, 8)} for ${registry.get(timer.session)?.name ?? timer.session} ended: ${reason}`));
+	// A tick only reads its timers; due ones run in the background and never overlap themselves.
+	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);
+	ticks.unref();
 	const timer = setInterval(() => { host.checkTerminals(); void host.autoPark().then(ids => { if (ids.length) console.log(`${new Date().toISOString()} auto-parked ${ids.map(id => registry.get(id)?.name ?? id).join(", ")}`); }); }, 60_000);
 	timer.unref();
 
 	async function stop() {
 		return closing ??= (async () => {
-			clearInterval(timer);
+			clearInterval(timer); clearInterval(ticks);
 			pairing.close();
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();
