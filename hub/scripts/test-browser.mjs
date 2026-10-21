@@ -275,10 +275,10 @@ try {
  assert.equal(await shown("web_client__load_balancer"), true, "a clicked box stays in focus");
  await browser("mouse", "move", "2", "2"); await browser("press", "Escape"); assert.equal(await shown("web_client__load_balancer"), false, "Escape clears focus");
  { const hub_ = (body) => fetch(`${origin}/s/${id}/api/hub`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ action: "settings", ...body }) });
-  { const { idleParkMinutes, icon, iconColor, usageHidden } = await (await hub_({ idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44", usageHidden: ["glm"] })).json();
-  assert.deepEqual({ idleParkMinutes, icon, iconColor, usageHidden }, { idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44", usageHidden: ["glm"] }, "gear settings save"); }
-  assert.equal((await hub_({ iconColor: "red" })).status, 400, "colours are #rrggbb only"); assert.equal((await hub_({ idleParkMinutes: -1 })).status, 400);
-  await hub_({ idleParkMinutes: 0, icon: "", iconColor: "" }); }
+  { const { idleParkMinutes, icon, usageHidden } = await (await hub_({ idleParkMinutes: 5, icon: "house", usageHidden: ["glm"] })).json();
+  assert.deepEqual({ idleParkMinutes, icon, usageHidden }, { idleParkMinutes: 5, icon: "house", usageHidden: ["glm"] }, "gear settings save"); }
+  assert.equal((await hub_({ idleParkMinutes: -1 })).status, 400);
+  await hub_({ idleParkMinutes: 0, icon: "" }); }
  { const r = await fetch(`${origin}/s/${id}/api/paste`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin }, body: "<svg onload=alert(1)>" }); assert.match((await r.json()).error, /PNG, JPEG/, "non-image paste rejected by magic bytes"); }
  // Clipboard image paste: saved as a temp file, path inserted into the draft.
  await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob(\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"), c => c.charCodeAt(0))], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");
@@ -550,7 +550,7 @@ try {
  assert.deepEqual(pool.acts, ["switch:flex2", "priority:flex2:2", "mode:"], "pool actions reach the hub's pool");
  await browser("click", "#usage-close");
  await browser("click", "#settings-button");
- assert.deepEqual(await evaluate("[document.querySelectorAll('#settings-menu #icon-grid .icon-choice').length > 1, document.querySelectorAll('#settings-menu #icon-colors .icon-choice').length]"), [true, 6], "icons and colours sit inside the settings menu");
+ assert.deepEqual(await evaluate("[document.querySelectorAll('#settings-menu #icon-grid .icon-choice').length > 1, !!document.getElementById('icon-colors'), document.querySelector('#icon-grid [aria-checked=true]')?.title]"), [true, false, "pc"], "icons sit in the settings menu, no colours, the first is the default");
  await browser("click", "#settings-button");
  // The plan bar lines up with the sidebar's folder boxes below it.
  assert(await evaluate("(() => { const plan = document.getElementById('plan-button').getBoundingClientRect().left, box = document.querySelector('.session-folder')?.getBoundingClientRect().left; return box === undefined || Math.abs(plan - box) < 2; })()"), "plan bar aligns with the sidebar: " + await evaluate("JSON.stringify([document.getElementById('plan-button').getBoundingClientRect().left, document.querySelector('.session-folder')?.getBoundingClientRect().left])"));

@@ -925,25 +925,21 @@ $("message-input").addEventListener("input", () => {
 const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
-// The hub's own icon (gear → Tab icon) sits on its colour when idle and is drawn in that colour on yellow;
-// without one, a shovel laid down when all rest.
-type HubSettings = { idleParkMinutes?: number; icon?: string; iconColor?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
+// The hub's icon (gear → Tab icon, default the first) fills the tab icon: white on dark grey when idle, dark on yellow.
+type HubSettings = { idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
 let hubSettings: HubSettings = {};
-const ICON_COLORS = ["#343a40", "#1971c2", "#0c8599", "#2f9e44", "#7048e8", "#868e96"];
-function iconSvg(name: string, color: string, key: string) {
- const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 22 / Math.max(w, h);
+const ICON_INK = "#343a40", iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
+function iconSvg(name: string, key: string) {
+ const color = ICON_INK, [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
  const back = key === "waiting" ? "#e03131" : key === "working" ? "#fab005" : color, ink = key === "working" ? color : "#fff";
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="${back}"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ink}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/></svg>`;
 }
 function renderIcon() {
  const waiting = promptView.busy || !!state.activity.dialog || sessionStates.includes("waiting");
  const working = !!state.activity.working || !!state.activity.subagents?.length || sessionStates.includes("working");
- const key = waiting ? "waiting" : working ? "working" : "idle", icon = ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : "", color = hubSettings.iconColor || ICON_COLORS[0];
- if (key + icon + color === iconKey) return; iconKey = key + icon + color;
- if (icon) { document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(iconSvg(icon, color, key)); return; }
- const back = { waiting: "#e03131", working: "#fab005", idle: "" }[key], handle = back ? "#ffd8a8" : "#c4893f", blade = back ? "#fff" : "#495057";
- const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">${back ? `<rect width="32" height="32" rx="7" fill="${back}"/>` : ""}<g transform="${back ? "translate(0 1) scale(.9) translate(1.8 0) rotate(40 16 16)" : "translate(0 6) rotate(90 16 16)"}"><rect x="14.5" y="3" width="3" height="16" rx="1.5" fill="${handle}"/><rect x="10.5" y="1.5" width="11" height="3.5" rx="1.75" fill="${handle}"/><path d="M9.5 18.5h13v5.5a6.5 6.5 0 0 1-13 0z" fill="${blade}"/></g></svg>`;
- document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(svg);
+ const key = waiting ? "waiting" : working ? "working" : "idle", icon = iconName();
+ if (!icon || key + icon === iconKey) return; iconKey = key + icon; // no icons served (older hub): keep the static one
+ document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(iconSvg(icon, key));
 }
 async function loadSessions() {
  clearTimeout(sessionsTimer);
@@ -1378,16 +1374,14 @@ function renderUsageProviders() {
   const label = document.createElement("label"); label.append(box, " " + provider.label); return label;
  }));
 }
-// The picker: every icon previewed idle in the chosen colour, then the colours (no names: the pictures say it).
+// The picker: every icon previewed idle (no names: the pictures say it).
 function renderIconPicker() {
- const color = hubSettings.iconColor || ICON_COLORS[0], current = ICONS[hubSettings.icon ?? ""] ? hubSettings.icon : "";
+ const current = iconName();
  const choice = (label: string, picked: boolean, svg: string, pick: () => void) => {
   const button = html("button", { type: "button", className: "icon-choice", title: label }); button.setAttribute("role", "radio"); button.setAttribute("aria-checked", String(picked)); button.setAttribute("aria-label", label);
   button.innerHTML = svg; button.addEventListener("click", pick); return button;
  };
- const shovel = `<svg viewBox="0 0 32 32"><g transform="translate(0 6) rotate(90 16 16)"><rect x="14.5" y="3" width="3" height="16" rx="1.5" fill="#c4893f"/><rect x="10.5" y="1.5" width="11" height="3.5" rx="1.75" fill="#c4893f"/><path d="M9.5 18.5h13v5.5a6.5 6.5 0 0 1-13 0z" fill="#495057"/></g></svg>`;
- $("icon-grid").replaceChildren(choice("Shovel (default)", !current, shovel, () => void saveHubSettings({ icon: "" })), ...Object.keys(ICONS).map(name => choice(name.replaceAll("-", " "), name === current, iconSvg(name, color, "idle"), () => void saveHubSettings({ icon: name }))));
- $("icon-colors").replaceChildren(...ICON_COLORS.map(value => { const button = choice(value, value === color, `<svg viewBox="0 0 32 32"><rect width="32" height="32" rx="16" fill="${value}"/></svg>`, () => void saveHubSettings({ iconColor: value })); button.classList.add("color-choice"); return button; }));
+ $("icon-grid").replaceChildren(...Object.keys(ICONS).map(name => choice(name.replaceAll("-", " "), name === current, iconSvg(name, "idle"), () => void saveHubSettings({ icon: name }))));
 }
 $("settings-button").addEventListener("click", renderIconPicker);
 // Theme and Auto/Light/Dark are per device (phone and PC may differ), kept in this browser. data-dark drives what CSS
