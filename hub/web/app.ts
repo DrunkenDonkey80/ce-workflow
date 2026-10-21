@@ -528,11 +528,11 @@ window.addEventListener("keydown", event => {
 let findHits: Range[] = [], findKeys: string[] = [], findAt = -1, findQueued = false;
 const findInput = () => $("chat-find") as HTMLInputElement;
 // Folds case one code point at a time so every folded unit maps back to its source character ("İ" folds to two units);
-// upper-then-lower makes ς, σ and Σ alike.
+// lower-upper-lower makes ς, σ and Σ alike, and ẞ, ß and ss.
 function foldCase(text: string) {
  if (!/[^\0-\x7f]/.test(text)) return { folded: text.toLowerCase(), from: null, to: null };
  let folded = "", at = 0; const from: number[] = [], to: number[] = [];
- for (const char of text) { const low = char.toUpperCase().toLowerCase(); folded += low; for (let i = 0; i < low.length; i++) { from.push(at); to.push(at + char.length); } at += char.length; }
+ for (const char of text) { const low = char.toLowerCase().toUpperCase().toLowerCase(); folded += low; for (let i = 0; i < low.length; i++) { from.push(at); to.push(at + char.length); } at += char.length; }
  return { folded, from, to };
 }
 function openChatSearch() { $("chat-search").hidden = false; findInput().focus(); findInput().select(); runChatSearch(); }
@@ -551,10 +551,10 @@ function runChatSearch(keep = false) {
    // Starts go to the node holding the character, ends to the node holding the one before.
    const point = (index: number, end: boolean): [Text, number] => { let i = run.length - 1; while (i > 0 && (end ? starts[i] >= index : starts[i] > index)) i--; return [run[i], index - starts[i]]; };
    // Rows are re-rendered as they stream, so a hit is known by its row id and its place in that row.
-   const row = run[0].parentElement.closest<HTMLElement>("#messages > li, #activity > *"), rowKey = row?.dataset.id ? row.parentElement.id + "/" + row.dataset.id : "";
+   const row = run[0].parentElement.closest<HTMLElement>("#messages > li, #activity > *"), rowKey = !row ? "feed" : row.parentElement.id + "/" + (row.dataset.id ?? row.tagName + "." + row.className); // id-less activity lines are told apart by kind
    for (let at = folded.indexOf(needle); at >= 0; at = folded.indexOf(needle, at + needle.length)) {
     const range = new Range(); range.setStart(...point(from ? from[at] : at, false)); range.setEnd(...point(to ? to[at + needle.length - 1] : at + needle.length, true)); findHits.push(range);
-    const nth = perRow.get(rowKey) ?? 0; perRow.set(rowKey, nth + 1); findKeys.push(rowKey ? rowKey + "#" + nth : "");
+    const nth = perRow.get(rowKey) ?? 0; perRow.set(rowKey, nth + 1); findKeys.push(rowKey + "#" + nth);
    }
    run = [];
   };

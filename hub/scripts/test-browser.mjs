@@ -455,7 +455,7 @@ try {
  await evaluate("document.getElementById('chat-find').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
  assert(await evaluate("document.getElementById('chat-search').hidden && CSS.highlights.get('chat-hit').size === 0"), "Esc closes and clears marks");
  // A hit crosses bold/code/link text within a block, never a row; Unicode case folding never shifts the marks.
- const findRow = { id: "assistant_find", role: "assistant", text: "Split **bo**ld, `co`de and [li](https://example.com/x)nk; \u0130\u0130 tail \u03a3\u0391\u03a3 zq", streaming: false };
+ const findRow = { id: "assistant_find", role: "assistant", text: "Split **bo**ld, `co`de and [li](https://example.com/x)nk; \u0130\u0130 tail \u03a3\u0391\u03a3 GRO\u1e9e stra\u00dfe zq", streaming: false };
  const nextRow = { id: "assistant_find2", role: "assistant", text: "xw \u0130", streaming: false };
  for (const row of [findRow, nextRow]) { chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "--fn", "document.querySelector('#messages [data-id=assistant_find2]')?.textContent.includes('xw')");
@@ -466,6 +466,9 @@ try {
  assert.deepEqual(await find("link"), ["1/1", "link", true], "a hit crosses a link");
  assert.deepEqual(await find("tail"), ["1/1", "tail", false], "\u0130 lowercasing to two units does not shift later marks");
  assert.deepEqual(await find("\u03c3\u03b1\u03c2"), ["1/1", "\u03a3\u0391\u03a3", false], "Greek sigma forms match case-insensitively");
+ assert.deepEqual(await find("gro\u00df"), ["1/1", "GRO\u1e9e", false], "\u00df finds capital \u1e9e");
+ assert.deepEqual(await find("STRA\u1e9eE"), ["1/1", "stra\u00dfe", false], "capital \u1e9e finds \u00df");
+ assert.deepEqual(await find("\u1e9e"), ["2/2", "\u00df", false], "\u1e9e and \u00df both hit, each marked whole");
  assert.deepEqual(await find("zqxw"), ["0", null, null], "no hit spans two rows");
  assert.deepEqual(await find("zq"), ["1/1", "zq", false]);
  assert.deepEqual(await find("\ud800"), ["0", null, null], "a lone surrogate finds nothing and does not throw");
@@ -476,6 +479,14 @@ try {
  findRow.text += " \u0130 more"; publish("message", findRow);
  await browser("wait", "--fn", "document.getElementById('chat-find-count').textContent === '2/4'");
  assert.equal(await evaluate("[...CSS.highlights.get('chat-hit-current')][0].startContainer.parentElement.closest('li').dataset.id"), "assistant_find", "the current hit survives its row re-rendering");
+ // Id-less activity lines keep their selected hit through chat updates and activity re-renders.
+ publish("activity", { error: "qvq qvq" }); await browser("wait", "--fn", "document.querySelector('#activity .activity-error')?.textContent === 'qvq qvq'");
+ assert.deepEqual(await find("qvq"), ["2/2", "qvq", false]);
+ await evaluate("document.querySelector('#chat-search [data-find=first]').click()");
+ nextRow.text += " again"; publish("message", nextRow); await browser("wait", "--fn", "document.querySelector('#messages [data-id=assistant_find2]').textContent.includes('again')");
+ publish("activity", { error: "qvq qvq", working: false }); await new Promise(resolve => setTimeout(resolve, 300));
+ assert.equal(await evaluate("document.getElementById('chat-find-count').textContent"), "1/2", "an activity hit stays selected through unrelated updates");
+ publish("activity", { error: null }); await browser("wait", "--fn", "!document.querySelector('#activity .activity-error')");
  await evaluate("document.querySelector('#chat-search [data-find=close]').click()");
  assert.equal(await evaluate("document.getElementById('chat-search').hidden"), true, "the close button closes the search");
  // Pi-style colour coding: tool blocks by state, an edit's diff instead of its arguments, labels only for screen readers.
