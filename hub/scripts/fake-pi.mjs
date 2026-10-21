@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Minimal stand-in for `pi --mode rpc` used by hub tests. Speaks LF-delimited JSONL on stdin/stdout.
 // Behaviour switches come from FAKE_PI (comma list): "crash-on-prompt", "slow-command", "split-output", "no-hub",
+// "slow-start" (the first get_state answers after 300 ms), "fail-start" (get_state fails),
 // "compacted" (get_messages returns only the last 3 messages, like after a compaction, F3).
 // FAKE_PI_HUB_URL: /pi-hub calls are POSTed there as {endpoint, data} and its {ok, value | status, error} is the answer.
 // `/hubask [ms] [json]`: a channel ask with that ask_user data (default {q:"?"}).
@@ -19,6 +20,7 @@ const messages = fs.existsSync(sessionFile)
 	? fs.readFileSync(sessionFile, "utf8").split("\n").filter(Boolean).map(l => JSON.parse(l)).filter(e => e.type === "message").map(e => e.message)
 	: [];
 const pendingUi = new Map();
+let started = false;
 const out = value => {
 	const line = Buffer.from(JSON.stringify(value) + "\n");
 	if (!flags.has("split-output")) return process.stdout.write(line);
@@ -31,7 +33,10 @@ const ui = (method, fields) => new Promise(resolve => { const id = crypto.random
 async function handle(cmd) {
 	const reply = (data, extra = {}) => out({ id: cmd.id, type: "response", command: cmd.type, success: true, ...(data === undefined ? {} : { data }), ...extra });
 	switch (cmd.type) {
-		case "get_state": return reply({ model, thinkingLevel, isStreaming: streaming, isCompacting: false, sessionFile, sessionName, messageCount: messages.length, pendingMessageCount: 0 });
+		case "get_state":
+			if (flags.has("fail-start")) return out({ id: cmd.id, type: "response", command: cmd.type, success: false, error: "fake start failure" });
+			if (flags.has("slow-start") && !started) { started = true; await new Promise(r => setTimeout(r, 300)); }
+			return reply({ model, thinkingLevel, isStreaming: streaming, isCompacting: false, sessionFile, sessionName, messageCount: messages.length, pendingMessageCount: 0 });
 		case "get_messages": return reply({ messages: flags.has("compacted") ? messages.slice(-3) : messages });
 		case "get_commands": return reply({ commands: flags.has("no-hub") ? [] : [{ name: "pi-hub", source: "extension" }] });
 		case "get_available_models": return reply({ models: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }] });

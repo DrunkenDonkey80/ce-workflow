@@ -129,6 +129,25 @@ try {
 	const results = await Promise.allSettled([host.resume(a.id), host.resume(a.id)]);
 	assert.equal(host.live.size, 1);
 	assert.ok(results.some(r => r.status === "fulfilled"));
+	// S-15: a second resume, a prompt and a hub call all wait for the one start; a failed start rejects them all.
+	await host.park(a.id);
+	host.options.env = { FAKE_PI: "slow-start" };
+	const first = host.resume(a.id);
+	assert.ok(host.live.has(a.id), "in the live map before get_state answers");
+	let early = false;
+	const waiters = [host.resume(a.id).then(() => { early = !readyNow(); }), host.prompt(a.id, "after start"), host.call(a.id, "/api/bias", { level: 1 })];
+	const readyNow = () => host.options.registry.get(a.id).state === "running";
+	await Promise.all([first, ...waiters]);
+	assert.equal(early, false, "the second resume returned only after the start finished");
+	await new Promise(r => setTimeout(r, 50));
+	await host.park(a.id);
+	host.options.env = { FAKE_PI: "fail-start" };
+	const failing = [host.resume(a.id), host.resume(a.id)];
+	const sent = host.prompt(a.id, "never");
+	for (const result of await Promise.allSettled([...failing, sent])) assert.match(result.reason?.message ?? "fulfilled", /fake start failure/);
+	assert.equal(host.live.has(a.id), false); assert.equal(host.options.registry.get(a.id).state, "parked");
+	host.options.env = undefined;
+	await host.resume(a.id);
 	const tries = [0, 1, 2, 3].map(() => { try { return acquireLock(path.join(root, "x.jsonl"), "t", process.pid); } catch { return null; } });
 	assert.equal(tries.filter(Boolean).length, 1, "only one lock acquisition succeeds");
 	releaseLock(path.join(root, "x.jsonl"), tries.find(Boolean));

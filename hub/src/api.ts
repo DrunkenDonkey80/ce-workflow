@@ -63,7 +63,8 @@ export function createPageApi({ host, registry, views, settings = () => ({}) }: 
 
 	/** A hub call needs a running Pi; writes start a parked session, reads do not. */
 	async function call(id: string, endpoint: string, data: Record<string, unknown>, { start = true } = {}) {
-		if (!host.live.has(id)) { if (!start) throw fail(409, "Session is parked; resume it first."); await host.resume(id); }
+		if (!host.live.has(id) && !start) throw fail(409, "Session is parked; resume it first.");
+		await host.resume(id); // also waits for a session that is still starting (S-15)
 		const result = await host.call(id, endpoint, data);
 		if (!result.ok) throw fail(result.status ?? 500, result.error ?? "Hub call failed.");
 		return result.value;

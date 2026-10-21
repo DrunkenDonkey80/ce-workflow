@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T11:42:40.648Z
+updated: 2026-10-21T11:43:59.762Z
 reviewed: 2026-10-21
 ---
 
@@ -105,7 +105,7 @@ None.
   - Message delivery reuses the page's send path; parked sessions resume first; busy sessions skip a repeating tick.
   - Script ticks run without resuming; output becomes a message (resume then), exit 3 cancels, 3 failures send the error and stop.
 - [x] **S-14** Hub/web page messages now run cold-cache compaction: plan3-web emits wo:cold-cache, work-models startColdCompact compacts and resends once (source extension, never re-checked).
-- [ ] **S-15** Add one per-session readiness promise in hub/src/sessions.ts that every delivery awaits; test concurrent resume, send and timer, and startup failure.
+- [x] **S-15** Live.ready in hub/src/sessions.ts: resume, prompt and call wait for the one start; api.ts call() resumes through it; a failed start rejects every waiter.
 - [ ] **S-02** Add `pi-hub schedule add|list|cancel` to hub/src/cli.ts and matching API routes.
 - [ ] **S-03** Hub tests for the scheduler with a fake clock and fake-pi (C1).
 

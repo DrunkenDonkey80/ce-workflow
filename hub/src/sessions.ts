@@ -35,6 +35,8 @@ export type Live = {
 	viewers: number;
 	lastActivity: number;
 	stopping: boolean;
+	/** S-15: settles when Pi has started (and parked changes are applied); every delivery awaits it. */
+	ready: Promise<void>;
 };
 
 const DIALOGS = new Set(["select", "confirm", "input", "editor"]);
@@ -71,7 +73,7 @@ export class SessionHost extends EventEmitter {
 
 	private spawn(record: SessionRecord, args: string[]): Live {
 		const rpc = new RpcChild({ cwd: record.folder, args, command: this.options.command, env: { ...this.options.env, PI_HUB: "1" } });
-		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: this.options.viewers?.(record.id) ?? 0, lastActivity: Date.now(), stopping: false };
+		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: this.options.viewers?.(record.id) ?? 0, lastActivity: Date.now(), stopping: false, ready: Promise.resolve() };
 		rpc.on("event", (event: RpcRecord) => {
 			live.lastActivity = Date.now();
 			if (event.type === "agent_start") live.running = true;
@@ -114,7 +116,9 @@ export class SessionHost extends EventEmitter {
 		const record = this.registry.add({ name, folder, state: "running" });
 		const live = this.spawn(record, ["--name", record.name]);
 		try {
-			const state = await live.rpc.send({ type: "get_state" });
+			const pending = live.rpc.send({ type: "get_state" });
+			live.ready = pending.then(() => {});
+			const state = await pending;
 			const sessionFile = state.data?.sessionFile;
 			if (!state.success || typeof sessionFile !== "string") throw new Error(state.error ?? "Pi reported no session file.");
 			live.lock = { file: sessionFile, info: acquireLock(sessionFile, "pi-control-hub") }; // new file name, so nobody else can hold it
@@ -130,7 +134,8 @@ export class SessionHost extends EventEmitter {
 	async resume(id: string): Promise<SessionRecord> {
 		const record = this.registry.get(id);
 		if (!record) throw new Error("Unknown session.");
-		if (this.live.has(id)) return record;
+		const starting = this.live.get(id);
+		if (starting) { await starting.ready; return this.registry.get(id) ?? record; } // a second caller waits for the same start (S-15)
 		if (!record.sessionFile) throw new Error("This session has no file yet.");
 		if (record.state === "terminal") throw new Error("This session is open in a terminal.");
 		const lock = acquireLock(record.sessionFile, "pi-control-hub");
@@ -138,8 +143,12 @@ export class SessionHost extends EventEmitter {
 		try {
 			live = this.spawn(record, ["--session", record.sessionFile]);
 			live.lock = { file: record.sessionFile, info: lock };
-			const state = await live.rpc.send({ type: "get_state" });
-			if (!state.success) throw new Error(state.error ?? "Pi did not start.");
+			const started = live;
+			live.ready = (async () => {
+				const state = await started.rpc.send({ type: "get_state" });
+				if (!state.success) throw new Error(state.error ?? "Pi did not start.");
+			})();
+			await live.ready;
 			return this.registry.update(id, { state: "running" });
 		} catch (error) {
 			if (live) await this.halt(live); else releaseLock(record.sessionFile, lock);
@@ -255,6 +264,7 @@ export class SessionHost extends EventEmitter {
 	async call(id: string, endpoint: string, data: Record<string, unknown>): Promise<{ ok: boolean; value?: unknown; status?: number; error?: string }> {
 		const live = this.live.get(id);
 		if (!live) throw new Error("Session is parked.");
+		await live.ready;
 		// Without ce-workflow's /pi-hub, Pi would send the call to the model as an ordinary prompt.
 		live.hubCommand ??= (await live.rpc.send({ type: "get_commands" })).data?.commands?.some((command: { name?: string }) => command.name === "pi-hub") ?? false;
 		if (!live.hubCommand) throw new Error("This session has no ce-workflow hub support.");
@@ -276,6 +286,7 @@ export class SessionHost extends EventEmitter {
 	async prompt(id: string, message: string, extra: Record<string, unknown> = {}): Promise<RpcRecord> {
 		const live = this.live.get(id);
 		if (!live) throw new Error("Session is parked.");
+		await live.ready;
 		const command = message.trimStart().startsWith("/");
 		if (command) live.command++;
 		live.lastActivity = Date.now();
