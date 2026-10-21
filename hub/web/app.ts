@@ -925,13 +925,13 @@ $("message-input").addEventListener("input", () => {
 const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
-// The hub's icon (gear → Tab icon, default the first) fills the tab icon: white on dark grey when idle, dark on yellow.
+// The hub's icon (gear → Tab icon, default the first) fills the tab icon, drawn in the state colour on white.
 type HubSettings = { idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
 let hubSettings: HubSettings = {};
 const ICON_INK = "#343a40", iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function iconSvg(name: string, key: string) {
- const color = ICON_INK, [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
- const back = key === "waiting" ? "#e03131" : key === "working" ? "#fab005" : color, ink = key === "working" ? color : "#fff";
+ const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
+ const back = "#fff", ink = key === "waiting" ? "#e03131" : key === "working" ? "#f59f00" : ICON_INK;
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="${back}"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ink}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/></svg>`;
 }
 function renderIcon() {
