@@ -760,13 +760,13 @@ function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) 
  flush();
 }
 // Italic markers need text right inside them, and _x_ word boundaries, so "* item" and snake_case stay as they are.
-// A double-quoted path is taken whole, so _ or * in its folder names never splits it.
-const INLINE = new RegExp(/`([^`\n]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+?)\*\*|(?<![*\w])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![*\w])|(?<!\w)_(?=\S)([^_\n]+?)(?<=\S)_(?!\w)/.source + '|"(' + QUOTED_PATH + ')"', "gi");
+// A double-quoted path or a file:/// URL is taken whole, so _ or * in its folder names never splits it.
+const INLINE = new RegExp(/`([^`\n]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+?)\*\*|(?<![*\w])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![*\w])|(?<!\w)_(?=\S)([^_\n]+?)(?<=\S)_(?!\w)/.source + '|"(' + QUOTED_PATH + ')"' + String.raw`|(?<!\w)(file:///[^\s"'\x60<>]+)`, "gi");
 function inline(target: HTMLElement, text: string, images: Set<string>) {
  let at = 0;
  for (const match of text.matchAll(INLINE)) {
   linkPaths(target, text.slice(at, match.index), images); at = match.index + match[0].length;
-  if (match[7] !== undefined) { linkPaths(target, match[0], images); continue; }
+  if (match[7] !== undefined || match[8] !== undefined) { linkPaths(target, match[0], images); continue; }
   if (match[2] !== undefined) {
    // Only targets linkPaths would link (http(s), images, .md) become links, labelled with the link text; others show the label.
    const probe = document.createElement("span"); linkPaths(probe, match[3], images);

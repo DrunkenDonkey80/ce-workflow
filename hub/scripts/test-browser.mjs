@@ -306,7 +306,7 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
  // Quoted or backticked paths may hold spaces (and _ that is not italics); file:/// URLs link to their decoded path.
  {
-  const spaced = join(pasted, "..", "pi _hub_ spaces", "shot one.png"), decoded = spaced.replaceAll("\\", "/"), fileUrl = "file:///" + decoded.replace(/^\//, "").replaceAll(" ", "%20"), bare = process.platform === "win32" ? "C:\\tmp\\a.png" : "/tmp/a.png";
+  const spaced = join(pasted, "..", "_pi_ hub spaces", "shot one.png"), decoded = spaced.replaceAll("\\", "/"), fileUrl = "file:///" + decoded.replace(/^\//, "").replaceAll(" ", "%20"), bare = process.platform === "win32" ? "C:\\tmp\\a.png" : "/tmp/a.png";
   fs.mkdirSync(join(spaced, ".."), { recursive: true }); fs.copyFileSync(pasted, spaced);
   const row = { id: "space_row", role: "agent", text: `quoted "${spaced}" and \`${spaced}\` and ${fileUrl}. [pic](${fileUrl}) "docs/my notes.md" "hello world" file:///C:/archive.png/photo.png file:///C:/a.txt my shot one.png "oops ${bare}\n\n\`\`\`\nsaved "${spaced}"\n\`\`\``, streaming: false }; chatRows.set(row.id, row); publish("message", row);
   await browser("wait", "--fn", "[...document.querySelectorAll('[data-id=space_row] .thumb img')].some(img => img.naturalWidth > 0)");
