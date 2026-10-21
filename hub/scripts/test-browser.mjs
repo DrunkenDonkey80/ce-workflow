@@ -304,6 +304,21 @@ try {
  assert.deepEqual(await evaluate("(() => { const m = document.querySelector('[data-id=md_row]'); return [m.querySelector('b').textContent, m.querySelector('code').textContent, [...m.querySelectorAll('th,td')].map(c => c.textContent), m.textContent.includes('**') || m.textContent.includes('|'), [...m.querySelectorAll('i')].map(i => i.textContent), m.textContent.includes('snake_case_name'), [...m.querySelectorAll('a.chat-link')].map(a => [a.textContent, a.getAttribute('href')]), m.textContent.includes('](')]; })()"), ["Load:", "Thread.Yield", ["Setup", "echo", "RF", "5 ms"], false, ["slow", "fast"], true, [["docs", "https://example.com/a"]], false]);
  await browser("click", "[data-id=img_row] .chat-link[href='#']");
  assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
+ // Quoted or backticked paths may hold spaces (and _ that is not italics); file:/// URLs link to their decoded path.
+ {
+  const spaced = join(pasted, "..", "pi _hub_ spaces", "shot one.png"), decoded = spaced.replaceAll("\\", "/"), fileUrl = "file:///" + decoded.replace(/^\//, "").replaceAll(" ", "%20"), bare = process.platform === "win32" ? "C:\\tmp\\a.png" : "/tmp/a.png";
+  fs.mkdirSync(join(spaced, ".."), { recursive: true }); fs.copyFileSync(pasted, spaced);
+  const row = { id: "space_row", role: "agent", text: `quoted "${spaced}" and \`${spaced}\` and ${fileUrl}. [pic](${fileUrl}) "docs/my notes.md" "hello world" file:///C:/archive.png/photo.png file:///C:/a.txt my shot one.png "oops ${bare}\n\n\`\`\`\nsaved "${spaced}"\n\`\`\``, streaming: false }; chatRows.set(row.id, row); publish("message", row);
+  await browser("wait", "--fn", "[...document.querySelectorAll('[data-id=space_row] .thumb img')].some(img => img.naturalWidth > 0)");
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=space_row] .chat-link')].map(a => a.textContent)"), [spaced, spaced, decoded, "pic", "docs/my notes.md", "C:/archive.png/photo.png", "one.png", bare, spaced], "quoted and file:/// paths link whole");
+  const hrefs = await evaluate("[...document.querySelectorAll('[data-id=space_row] .chat-link')].map(a => a.getAttribute('href'))");
+  assert(hrefs[0].startsWith("api/image?path=" + encodeURIComponent(spaced)) && hrefs[2].startsWith("api/image?path=" + encodeURIComponent(decoded)) && hrefs[3] === hrefs[2] && hrefs[4] === "#", "links go to the exact path");
+  assert.deepEqual(await evaluate(`Promise.all(${JSON.stringify([hrefs[0], hrefs[2]])}.map(async href => { const r = await fetch(href); return [r.status, r.headers.get('content-type')]; }))`), [[200, "image/png"], [200, "image/png"]]);
+  assert(await evaluate("document.querySelector('[data-id=space_row]').textContent.includes('\"hello world\"')"), "quoted plain text stays text");
+  await evaluate("[...document.querySelectorAll('[data-id=space_row] .chat-link')].find(a => a.textContent === 'docs/my notes.md').click()");
+  assert.equal(await evaluate("document.querySelector('.files-viewer h2').textContent"), "docs/my notes.md", "a quoted .md with spaces opens in the Files tab");
+  fs.rmSync(join(spaced, ".."), { recursive: true, force: true });
+ }
  // Tool output paths link too; their thumbnails sit under the collapsed block, and an unservable one is dropped.
  { const row = { id: "tool_img_row", role: "assistant", text: "", streaming: false, blocks: [{ type: "tool", id: "t1", name: "screen_read", title: "screen_read", args: "{}", result: `Saved ${pasted}\nlisted look-missing.png` }] }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=tool_img_row] .thumb img");

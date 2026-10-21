@@ -730,8 +730,10 @@ function renderChat() {
 }
 // Image and Markdown paths in chat text become links: images open full size and show as thumbnails
 // (pasted or terminal Alt+V images too); .md opens in the Files tab. The server shows any image on this PC outside hidden folders.
-// shortcut: paths with spaces are not detected; quote-aware parsing if that matters.
+// A path in double quotes or backticks may contain spaces; file:/// URLs link to the local path they name.
 const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.(?:png|jpe?g|gif|webp|svg|md)(?![\w-])/gi;
+// Body of a quoted path: an optional drive, no colon after it, and the image/.md extension right before the closing quote.
+const QUOTED_PATH = String.raw`(?:[A-Za-z]:)?[^\s"\x60<>|*?:][^"\x60<>|*?:\r\n]*?\.(?:png|jpe?g|gif|webp|svg|md)`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
 function renderLinks(target: HTMLElement, text: string) {
  target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images);
 }
@@ -758,23 +760,27 @@ function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) 
  flush();
 }
 // Italic markers need text right inside them, and _x_ word boundaries, so "* item" and snake_case stay as they are.
-const INLINE = /`([^`\n]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+?)\*\*|(?<![*\w])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![*\w])|(?<!\w)_(?=\S)([^_\n]+?)(?<=\S)_(?!\w)/g;
+// A double-quoted path is taken whole, so _ or * in its folder names never splits it.
+const INLINE = new RegExp(/`([^`\n]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+?)\*\*|(?<![*\w])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![*\w])|(?<!\w)_(?=\S)([^_\n]+?)(?<=\S)_(?!\w)/.source + '|"(' + QUOTED_PATH + ')"', "gi");
 function inline(target: HTMLElement, text: string, images: Set<string>) {
  let at = 0;
  for (const match of text.matchAll(INLINE)) {
   linkPaths(target, text.slice(at, match.index), images); at = match.index + match[0].length;
+  if (match[7] !== undefined) { linkPaths(target, match[0], images); continue; }
   if (match[2] !== undefined) {
    // Only targets linkPaths would link (http(s), images, .md) become links, labelled with the link text; others show the label.
    const probe = document.createElement("span"); linkPaths(probe, match[3], images);
-   const link = probe.querySelector("a"); if (link && link.textContent === probe.textContent) { link.textContent = match[2]; target.append(link); } else target.append(match[2]);
+   const link = probe.querySelector("a"); if (link && [...probe.childNodes].every(node => node === link || !node.textContent)) { link.textContent = match[2]; target.append(link); } else target.append(match[2]);
    continue;
   }
-  const element = document.createElement(match[1] !== undefined ? "code" : match[4] !== undefined ? "b" : "i"); linkPaths(element, match[1] ?? match[4] ?? match[5] ?? match[6], images); target.append(element);
+  const element = document.createElement(match[1] !== undefined ? "code" : match[4] !== undefined ? "b" : "i");
+  if (match[1] !== undefined && WHOLE_QUOTED_PATH.test(match[1])) appendPathLink(element, match[1], images); else linkPaths(element, match[1] ?? match[4] ?? match[5] ?? match[6], images);
+  target.append(element);
  }
  linkPaths(target, text.slice(at), images);
 }
 // Web addresses open in a new tab; trailing Markdown or sentence punctuation is not part of them.
-const LINKED = new RegExp("(https?://[^\\s\"'\\x60<>]+)|" + LINKED_PATH.source, "gi");
+const LINKED = new RegExp(String.raw`(https?://[^\s"'\x60<>]+)|(?<!\w)(file:///[^\s"'\x60<>]+)|(["\x60])(` + QUOTED_PATH + String.raw`)\3|` + LINKED_PATH.source, "gi");
 function linkPaths(target: HTMLElement, text: string, images: Set<string>) {
  let at = 0;
  for (const match of text.matchAll(LINKED)) {
@@ -784,14 +790,26 @@ function linkPaths(target: HTMLElement, text: string, images: Set<string>) {
    target.append(Object.assign(document.createElement("a"), { textContent: url, href: url, target: "_blank", rel: "noopener", className: "chat-link" }));
    continue;
   }
-  const path = match[0], image = !/\.md$/i.test(path);
-  target.append(text.slice(at, match.index)); at = match.index + path.length;
-  const link = Object.assign(document.createElement("a"), { textContent: path, className: "chat-link", href: image ? imageSource(path) : "#" });
-  if (image) { link.target = "_blank"; link.rel = "noopener"; images.add(path); }
-  else link.addEventListener("click", event => { event.preventDefault(); setTab("files"); filesView.open(path); if (matchMedia("(max-width: 899px)").matches) setMobile("files"); });
-  target.append(link);
+  if (match[2]) {
+   // The whole URL is decoded before the extension check, so a folder named like an image (a.png/) never ends it; other files stay text.
+   const url = match[2].replace(/[*_.,;:!?)\]]+$/, ""), raw = url.slice("file://".length);
+   let path = raw; try { path = decodeURIComponent(raw); } catch { /* malformed escapes: keep the raw path */ }
+   path = path.replace(/^\/(?=[A-Za-z]:)/, "");
+   if (!/\.(?:png|jpe?g|gif|webp|svg|md)$/i.test(path)) continue;
+   target.append(text.slice(at, match.index)); at = match.index + url.length; appendPathLink(target, path, images);
+   continue;
+  }
+  // A quoted path links without its quotes; the quotes stay as text.
+  const path = match[4] ?? match[0], start = match.index + (match[4] ? 1 : 0);
+  target.append(text.slice(at, start)); at = start + path.length; appendPathLink(target, path, images);
  }
  target.append(text.slice(at));
+}
+function appendPathLink(target: HTMLElement, path: string, images: Set<string>) {
+ const image = !/\.md$/i.test(path), link = Object.assign(document.createElement("a"), { textContent: path, className: "chat-link", href: image ? imageSource(path) : "#" });
+ if (image) { link.target = "_blank"; link.rel = "noopener"; images.add(path); }
+ else link.addEventListener("click", event => { event.preventDefault(); setTab("files"); filesView.open(path); if (matchMedia("(max-width: 899px)").matches) setMobile("files"); });
+ target.append(link);
 }
 function appendThumbs(target: HTMLElement, images: Set<string>) {
  for (const path of [...images].slice(0, 6)) {
