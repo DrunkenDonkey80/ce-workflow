@@ -732,8 +732,9 @@ function renderChat() {
 // (pasted or terminal Alt+V images too); .md opens in the Files tab. The server shows any image on this PC outside hidden folders.
 // A path in double quotes or backticks may contain spaces; file:/// URLs link to the local path they name.
 const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.(?:png|jpe?g|gif|webp|svg|md)(?![\w-])/gi;
-// Body of a quoted path: an optional drive, no colon after it, and the image/.md extension right before the closing quote.
-const QUOTED_PATH = String.raw`(?:[A-Za-z]:)?[^\s"\x60<>|*?:][^"\x60<>|*?:\r\n]*?\.(?:png|jpe?g|gif|webp|svg|md)`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
+// Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
+// no colon after that, and the image/.md extension right before the closing quote.
+const QUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/]|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.(?:png|jpe?g|gif|webp|svg|md)`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
 function renderLinks(target: HTMLElement, text: string) {
  target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images);
 }
