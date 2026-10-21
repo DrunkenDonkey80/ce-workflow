@@ -2224,18 +2224,24 @@ export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), share = 
 }
 
 // Always compacts, no prompt: terminal and hub/web (rpc) messages alike. Our own resend is source "extension", so it never loops.
-async function compactColdCache(event, ctx, pi) {
-	if ((event.source !== "interactive" && event.source !== "rpc") || ctx.isIdle?.() === false || !event.text?.trim() || event.text.trim().startsWith("/")) return undefined;
+function compactColdCache(event, ctx, pi) {
+	if (event.source !== "interactive" && event.source !== "rpc") return undefined;
+	return startColdCompact(ctx, pi, event.text, event.images) ? { action: "handled" } : undefined;
+}
+
+// Starts compaction and sends the message after it; false = send it now. Also used for hub page messages (wo:cold-cache).
+function startColdCompact(ctx, pi, text, images = undefined) {
+	if (ctx.isIdle?.() === false || !text?.trim() || text.trim().startsWith("/")) return false;
 	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
-	if (minutes === undefined) return undefined;
+	if (minutes === undefined) return false;
 	const tokens = Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000);
 	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${tokens}k tokens before sending.`, "info");
-	const content = event.images?.length ? [{ type: "text", text: event.text }, ...event.images] : event.text;
+	const content = images?.length ? [{ type: "text", text }, ...images] : text;
 	ctx.compact({
 		onComplete: () => pi.sendUserMessage(content),
 		onError: (error) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); sending without it.`, "warning"); pi.sendUserMessage(content); },
 	});
-	return { action: "handled" };
+	return true;
 }
 
 function maybeCompact(ctx, settings) {
@@ -3992,6 +3998,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 	});
 
 	// pi-control-hub's page: /wo subcommands for its command picker and the footer's quota rows.
+	pi.events?.on?.("wo:cold-cache", (info) => { info.handled = startColdCompact(info.ctx, pi, info.text); });
 	pi.events?.on?.("wo:web-info",(info)=>{ info.wo=Object.entries(woSubcommands()).map(([value,description])=>({value,description})); info.usage=subscriptionFooterController?.webUsage?.(); info.research=researchContext?(researchContext.stopping?"stopping":"on"):"off"; });
 	pi.registerCommand("wo", {
  description: "Open utilities and settings; /wo plan, /wo plans, /wo resume, /wo compact, /wo fact or /wo hub",

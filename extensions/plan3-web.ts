@@ -37,6 +37,12 @@ export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagra
 	// Built-in /reload cannot run from sendUserMessage; /wo reload calls ctx.reload() and the page reconnects.
 	if (name === "reload") prepared.message = "/wo reload";
 	const queued = !ctx.isIdle();
+	// Our resend is source "extension", which Pi's input hook skips; work-models compacts a cold cache first and sends after (D1).
+	if (!queued && !command) {
+		const cold = { ctx, text: prepared.message, handled: false };
+		pi.events?.emit?.("wo:cold-cache", cold);
+		if (cold.handled) return { ...prepared, queued, compacting: true };
+	}
 	try {
 		// Like Enter in the terminal: a message sent while the agent works steers it (delivered after the current tool calls).
 		const pending = pi.sendUserMessage(prepared.message, { expandPromptTemplates: command, ...(queued ? { deliverAs: "steer" } : {}) });

@@ -36,6 +36,17 @@ const submitted = [], deliveryErrors = [];
 const sendApi = { sendUserMessage: (message, options) => { submitted.push({ message, options }); return new Promise(() => {}); } };
 forwardDiagramChat(sendApi, { isIdle: () => true }, contextDiagram, "hello", [], () => {});
 assert.equal(submitted.at(-1).message, "hello");
+{ // D1 (S-14): an idle plain message asks work-models to compact a cold cache; when it does, it sends after, not us.
+	const asked = [], before = submitted.length;
+	const coldApi = { ...sendApi, events: { emit: (name, info) => { asked.push(name); info.handled = info.text === "cold"; } } };
+	const result = forwardDiagramChat(coldApi, { isIdle: () => true }, contextDiagram, "cold", [], () => {});
+	assert(result.compacting && submitted.length === before, "a cold cache compacts first and work-models sends the message afterwards");
+	forwardDiagramChat(coldApi, { isIdle: () => true }, contextDiagram, "warm", [], () => {});
+	assert.equal(submitted.at(-1).message, "warm", "a warm cache sends directly");
+	forwardDiagramChat(coldApi, { isIdle: () => false }, contextDiagram, "busy", [], () => {});
+	forwardDiagramChat(coldApi, { isIdle: () => true }, contextDiagram, "/plan3 review 12345678", [], () => {});
+	assert.deepEqual(asked, ["wo:cold-cache", "wo:cold-cache"], "busy sends and commands never compact");
+}
 forwardDiagramChat(sendApi, { isIdle: () => false }, contextDiagram, "/plan3 review 12345678", [], () => {});
 assert.equal(submitted.at(-1).message, "/plan3 review 12345678");
 assert.equal(submitted.at(-1).options.expandPromptTemplates, true);
