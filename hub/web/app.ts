@@ -940,16 +940,16 @@ $("message-input").addEventListener("input", () => {
 const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
-// The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; the state colour is a thick outline around it.
+// The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type HubSettings = { idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
 let hubSettings: HubSettings = {};
 const ICON_INK = "#343a40", iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function iconSvg(name: string, key: string) {
- // The outline is drawn under the fill (paint-order), so its outer half shows: 3 px wide, the icon shrunk to leave room.
- const outline = key === "waiting" ? "#e03131" : key === "working" ? "#f59f00" : "", size = outline ? 28 : 32;
- const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = size / Math.max(w, h);
- const stroke = outline ? ` stroke="${outline}" stroke-width="${(6 / scale).toFixed(1)}" stroke-linejoin="round" paint-order="stroke"` : "";
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#fff"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${stroke}${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/></svg>`;
+ // At 16 px an outline reads as noise: the icon keeps the whole square and a big white-ringed dot (Gmail/Slack style) carries the state.
+ const dot = key === "waiting" ? "#e03131" : key === "working" ? "#f59f00" : "";
+ const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
+ const badge = dot ? `<circle cx="22.5" cy="22.5" r="9.5" fill="${dot}" stroke="#fff" stroke-width="2.5"/>` : "";
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#fff"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>${badge}</svg>`;
 }
 function renderIcon() {
  const waiting = promptView.busy || !!state.activity.dialog || sessionStates.includes("waiting");
