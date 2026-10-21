@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 12,
+  "revision": 13,
   "nodes": [
     {
       "id": "pi_host",
@@ -354,7 +354,7 @@
       "id": "pi_control_hub",
       "label": "pi-control-hub",
       "kind": "external",
-      "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms."
+      "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms; owns timers (message/script), subscription usage, the Claude pool (cpool) and each session's model, also while parked."
     },
     {
       "id": "camera_device",
@@ -719,6 +719,12 @@
       "from": "pi_control_hub",
       "to": "subscription_footer",
       "label": "serves /api/usage"
+    },
+    {
+      "id": "work_models__pi_control_hub",
+      "from": "work_models",
+      "to": "pi_control_hub",
+      "label": "schedule tool, /wo hub (pi-hub CLI)"
     }
   ],
   "notes": []

@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-10-21
-updated: 2026-10-21T14:44:03.517Z
+updated: 2026-10-21T14:50:57.270Z
 reviewed: 2026-10-21
 ---
 
@@ -122,12 +122,10 @@ None.
 - [x] **S-12** The first non-blank keystroke in a parked session's composer sends one resume (guarded until a live status frame arrives or the resume fails); resume publishes the live status so the page leaves its parked look.
 
 ### Phase 5: Live check [think]
-- [ ] **H-01** On the real hub: a script timer that waits for a file, a one-off message to a parked session, usage with all sessions parked, a parked model change, typing to unpark.
+- [x] **H-01** Real hub (pid 37124): script timer saw a file and woke the session; one-off message to a parked session resumed it with the parked pick (Luna/low) and got "h01 ok"; /api/usage served by the hub; typing "h" unparked.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 13: usage node moved to the hub (hub/src/usage.ts, pi_control_hub serves /api/usage), footer dropped from work_models, pi_control_hub summary names timers/usage/pool/parked model, new work_models → pi_control_hub "schedule tool, /wo hub (pi-hub CLI)".
 
 
 ## Backlog
