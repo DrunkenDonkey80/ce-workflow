@@ -5,7 +5,13 @@ import os from "node:os";
 import path from "node:path";
 
 process.env.PI_CODING_AGENT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "wo-hub-")); // the CLI child inherits it: no real hub
-const { hubCli, hubMenu } = await import("../extensions/hub-command.ts");
+const { hubCli, hubMenu, joinedSession } = await import("../extensions/hub-command.ts");
+// A woken parked session is found by its Pi session id, else (stable/claimed intercom id) as the one new session in its folder.
+const target = { id: 'h1', name: 'game', folder: '/p', sessionId: 'pi-1' };
+assert.equal(joinedSession([{ id: 'pi-1', cwd: '/x', pid: 2, startedAt: 0 }], target, 100, 1)?.id, 'pi-1');
+assert.equal(joinedSession([{ id: 'claimed', cwd: '/p', pid: 2, startedAt: 150 }, { id: 'old', cwd: '/p', pid: 3, startedAt: 50 }], target, 100, 1)?.id, 'claimed');
+assert.equal(joinedSession([{ id: 'a', cwd: '/p', pid: 2, startedAt: 150 }, { id: 'b', cwd: '/p', pid: 3, startedAt: 160 }], target, 100, 1), undefined, 'two new sessions: ambiguous, keep waiting');
+assert.equal(joinedSession([{ id: 'me', cwd: '/p', pid: 1, startedAt: 150 }], target, 100, 1), undefined, 'never itself');
 const values = menu => menu.items.map(item => item.value);
 
 const fresh = hubMenu({ running: false, autostart: false, command: false, remote: { on: false } }, "/p");

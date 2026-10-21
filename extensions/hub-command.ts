@@ -17,11 +17,29 @@ export function hubCli(args: string[], timeout = 180_000): Promise<{ ok: boolean
 }
 
 // Parked hub sessions on intercom: `list` shows them beside the live ones, and a send/ask/handover addressed to one
-// resumes it first (its intercom id is its Pi session id). New sessions are never started here.
+// (by id, by name within cwd, or by cwd alone when nothing there is live) resumes it first, waits until it joins
+// intercom and sends to the id it joined with. New sessions are never started here.
 type Parked = { id: string; name: string; folder: string; sessionId: string };
+type Live = { id: string; cwd: string; pid: number; startedAt: number };
 const SENDS = new Set(["send", "ask", "handover"]);
 const sameFolder = (a: string, b: string) => process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
-const RESUME_SETTLE_MS = 3_000; // the resumed Pi joins intercom just after its RPC is ready
+const JOIN_TIMEOUT_MS = 60_000;
+
+/** The intercom session a woken parked session joined as: its Pi session id, else (stable or claimed ids) the one new session in its folder. */
+export function joinedSession(live: Live[], target: Parked, since: number, selfPid = process.pid) {
+	const exact = live.find(s => s.id === target.sessionId);
+	if (exact) return exact;
+	const fresh = live.filter(s => s.pid !== selfPid && sameFolder(s.cwd, target.folder) && s.startedAt >= since);
+	return fresh.length === 1 ? fresh[0] : undefined;
+}
+
+/** Intercom's session list through its extension bus; undefined while intercom is not loaded or not connected. */
+function intercomRoster(pi) {
+	let channel: { listSessions(): Promise<Live[]> } | undefined;
+	const register = () => { if (!channel) pi.events.emit("intercom:extension-register", { namespace: "ce-workflow/hub-parked", ownerEligible: false, onEvent() {}, onReady(c) { channel = c; } }); };
+	register(); pi.events.on("intercom:extension-registry-ready", register); // whichever extension loads first
+	return async () => { try { return channel ? await channel.listSessions() : undefined; } catch { return undefined; } };
+}
 
 export async function parkedSessions(): Promise<Parked[]> {
 	const result = await hubCli(["parked"], 30_000);
@@ -43,18 +61,36 @@ export const parkedList = (parked: Parked[]) => parked.length
 
 export function intercomParkedSessions(pi) {
 	const woken = new Map<string, string>(); // toolCallId -> session name, for a clearer failure
+	const roster = intercomRoster(pi);
 	pi.on("tool_call", async (event, ctx) => {
 		const input = event.input ?? {};
-		if (event.toolName !== "intercom" || !SENDS.has(input.action) || typeof input.to !== "string" || !input.to.trim()) return;
+		if (event.toolName !== "intercom" || !SENDS.has(input.action)) return;
+		const to = typeof input.to === "string" ? input.to.trim() : "";
 		const folder = typeof input.cwd === "string" ? resolve(ctx.cwd, input.cwd) : undefined;
-		const target = parkedTarget(await parkedSessions(), input.to.trim(), folder);
+		if (!to && !folder) return;
+		let target: Parked | undefined;
+		if (to) target = parkedTarget(await parkedSessions(), to, folder);
+		else {
+			// cwd alone: intercom picks the sole live peer there; only when none is live does a parked one stand in.
+			const live = await roster();
+			if (!live || live.some(s => s.pid !== process.pid && sameFolder(s.cwd, folder!))) return;
+			const parked = (await parkedSessions()).filter(s => sameFolder(s.folder, folder!));
+			if (parked.length > 1) return { block: true, reason: `No live session in ${folder}; several are parked. Send again with to: <id>; it resumes first.${parkedList(parked)}` };
+			target = parked[0];
+		}
 		if (!target) return;
+		const since = Date.now() - 2_000;
 		const woke = await hubCli(["wake", target.id], 120_000);
 		if (!woke.ok) return { block: true, reason: `Could not resume parked session ${target.name} in ${target.folder}: ${woke.text}` };
-		input.to = target.sessionId;
+		let joined: Live | undefined;
+		for (const end = Date.now() + JOIN_TIMEOUT_MS; !joined && Date.now() < end; await new Promise(done => setTimeout(done, 500))) {
+			const live = await roster();
+			if (!live) break; // intercom's bus is unavailable: send to the Pi session id and let the result say if it raced
+			joined = joinedSession(live, target, since);
+		}
+		input.to = joined?.id ?? target.sessionId;
 		delete input.openProjectPaneIfMissing;
 		woken.set(event.toolCallId, target.name);
-		await new Promise(done => setTimeout(done, RESUME_SETTLE_MS));
 	});
 	pi.on("tool_result", async (event, ctx) => {
 		if (event.toolName !== "intercom") return;

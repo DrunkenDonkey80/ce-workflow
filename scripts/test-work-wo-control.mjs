@@ -33,7 +33,7 @@ try {
 	for (const name of ["goal", "pause", "monitor", "resume-work", "design", "redesign", "telemetry", "usage", "share"]) assert(!names.includes(name), name);
 	for (const name of ["plan", "plans", "resume", "settings", "compact", "fact"]) assert(names.includes(name), name);
 	for (const args of ["plan finish", "plans", "resume abc"]) await commands.wo.handler(args, ctx);
-	assert.deepEqual(forwarded, [["plan3:command", "plan3", "finish"], ["plan3:command", "plans3", ""], ["plan3:command", "resume3", "abc"]]);
+	assert.deepEqual(forwarded.filter(([name]) => name === "plan3:command"), [["plan3:command", "plan3", "finish"], ["plan3:command", "plans3", ""], ["plan3:command", "resume3", "abc"]]);
 	for (const action of ["goal", "monitor", "telemetry", "usage", "design", "redesign", "resume-work", "pause"])
 		await commands.wo.handler(`${action} forbidden`, ctx);
 	assert.equal(sent.length, 0);

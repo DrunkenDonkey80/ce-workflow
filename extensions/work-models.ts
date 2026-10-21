@@ -2206,8 +2206,8 @@ function runNativeMicrocompact(ctx, customInstructions = undefined, force = fals
 	}
 }
 
-// Cold-cache compaction offer: the next request re-bills the whole prompt anyway, so a large context is cheapest
-// to compact right before it. Returns idle minutes when the offer applies, else undefined.
+// Cold-cache compaction: the next request re-bills the whole prompt anyway, so a large context is cheapest
+// to compact right before it. Returns idle minutes when it applies, else undefined.
 export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), share = 0.6) {
 	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
@@ -2223,20 +2223,13 @@ export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), share = 
 	return last && now - last > ttl ? Math.round((now - last) / 60_000) : undefined;
 }
 
-async function offerColdCacheCompact(event, ctx, pi) {
-	if (event.source !== "interactive" || ctx.mode !== "tui" || ctx.isIdle?.() === false || !event.text?.trim() || event.text.trim().startsWith("/")) return undefined;
+// Always compacts, no prompt: terminal and hub/web (rpc) messages alike. Our own resend is source "extension", so it never loops.
+async function compactColdCache(event, ctx, pi) {
+	if ((event.source !== "interactive" && event.source !== "rpc") || ctx.isIdle?.() === false || !event.text?.trim() || event.text.trim().startsWith("/")) return undefined;
 	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
 	if (minutes === undefined) return undefined;
 	const tokens = Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000);
-	const pick = await showListDialog(ctx, {
-		title: "Compact before sending?", cursorKey: "cold-cache-compact", filter: false, selectedIndex: 0,
-		purpose: `The prompt cache expired ${minutes}m ago, so this message re-sends ${tokens}k tokens uncached either way.`,
-		items: [
-			{ value: "yes", label: "Yes, compact first", description: "Compact with your compaction setting, then send the message" },
-			{ value: "no", label: "No, send now", description: "Send the message with the full context" },
-		],
-	});
-	if (pick?.value !== "yes") return undefined;
+	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${tokens}k tokens before sending.`, "info");
 	const content = event.images?.length ? [{ type: "text", text: event.text }, ...event.images] : event.text;
 	ctx.compact({
 		onComplete: () => pi.sendUserMessage(content),
@@ -3695,7 +3688,7 @@ showResearchContext(ctx);
 });
 
 	pi.on("input", async (event, ctx) => {
-		const coldCache = await offerColdCacheCompact(event, ctx, pi);
+		const coldCache = await compactColdCache(event, ctx, pi);
 		if (coldCache) return coldCache;
 		return;
 
