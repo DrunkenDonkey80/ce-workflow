@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 11,
+  "revision": 12,
   "nodes": [
     {
       "id": "pi_host",
@@ -186,7 +186,7 @@
       "label": "Workflow hub extension",
       "kind": "service",
       "parent": "workflow_group",
-      "summary": "/wo menus, model phases, compaction profiles, knowledge, images, camera, footer, scout.",
+      "summary": "/wo menus, model phases, compaction profiles, knowledge, images, camera, scout.",
       "tech": "extensions/work-models.ts"
     },
     {
@@ -713,6 +713,12 @@
       "to": "ask_user",
       "label": "consent dialog",
       "id": "camera__ask_user"
+    },
+    {
+      "id": "pi_control_hub__subscription_footer",
+      "from": "pi_control_hub",
+      "to": "subscription_footer",
+      "label": "serves /api/usage"
     }
   ],
   "notes": []
