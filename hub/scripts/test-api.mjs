@@ -25,7 +25,13 @@ fs.writeFileSync(path.join(folder, ".env"), "SECRET=1\n");
 const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32)]);
 fs.writeFileSync(path.join(folder, "shot.png"), png);
 
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))] });
+// S-10: Pi's SDK stands in as a fake; a parked session reads its model from the file once and keeps it.
+let fileReads = 0;
+const models = {
+	fromFile: async () => { fileReads++; return { model: { provider: "fake", id: "fake-2", name: "Fake Two" }, thinking: "high" }; },
+	scoped: async () => ({ models: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], unresolved: ["gone/*"] }),
+};
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], models });
 const { port, localKey } = hub.config;
 const origin = `http://127.0.0.1:${port}`;
 const auth = { authorization: `Bearer ${localKey}`, connection: "close" };
@@ -60,12 +66,15 @@ try {
 	const image = await get(id, `image?path=${encodeURIComponent(path.join(folder, "shot.png"))}`);
 	assert.equal(image.status, 200);
 	assert.equal(image.headers.get("content-type"), "image/png");
-	assert.equal((await get(id, "models")).status, 409, "reads that need Pi do not start a parked session");
-	assert.equal(hub.host.live.has(id), false);
+	const parkedModels = (await get(id, "models")).body;
+	assert.deepEqual([parkedModels.model.id, parkedModels.effort, parkedModels.scoped.map(m => m.id), parkedModels.others, parkedModels.unresolved, parkedModels.parked], ["fake-2", "high", ["fake-1", "fake-2"], [], ["gone/*"], true], "D10: scoped models only");
+	assert.equal(hub.host.live.has(id), false, "listing models does not start a parked session");
+	assert.equal((await get(id, "commands")).status, 409, "reads that need Pi do not start a parked session");
 	const snapshot = (await get(id, "snapshot")).body;
 	assert.deepEqual(snapshot.target, { kind: "plan", id: "bbbbbbbb" });
 	assert.equal(snapshot.current, "bbbbbbbb");
-	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, model: null, effort: null, context: null });
+	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
+	assert.equal(fileReads, 1, "the file is read once, then the record keeps it");
 	assert.match(snapshot.build, /^[0-9a-f]{12}$/);
 
 	// Paste: magic bytes decide; the saved path serves back as a thumbnail.
@@ -90,6 +99,7 @@ try {
 	assert.equal((await post(id, "model", { provider: "fake", id: "fake-2" })).body.model.id, "fake-2");
 	assert.equal((await post(id, "effort", { level: "turbo" })).status, 400);
 	assert.equal((await post(id, "effort", { level: "high" })).body.effort, "high");
+	assert.deepEqual([hub.registry.get(id).model.id, hub.registry.get(id).thinking], ["fake-2", "high"], "the record follows the live session");
 
 	// Pi's published plan and diagram changes reach the snapshot; /reload restarts the session (D12).
 	await hub.host.prompt(id, `/state ${JSON.stringify({ plan: { id: "aaaaaaaa", title: "Older", finishable: false }, modes: { research: "on", night: "off" }, compacting: false, subagents: [] })}`);

@@ -136,7 +136,7 @@ export class Scheduler extends EventEmitter {
 		}));
 	}
 
-	private async guard(timer: Timer, work: () => Promise<void>) {
+	private async guard(timer: Timer, work: () => Promise<unknown>) {
 		this.running.add(timer.id);
 		try { await work(); } finally { this.running.delete(timer.id); }
 	}

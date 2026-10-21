@@ -258,6 +258,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .bar-group:hover:not(:disabled) { background: none; }
 .bar-group .bar { flex: 1; min-width: 0; }
 .effort-row { display: flex; gap: 4px; } .effort-row button { flex: 1; text-align: center; border-color: var(--line); }
+.model-note { margin: 4px 2px; color: var(--muted); font-size: .85em; }
 .primary { background: var(--focus); color: var(--on-focus); border-color: var(--focus); }
 /* Footer colours for subscription usage. */
 .tone-error { color: var(--error); } .tone-warning { color: var(--warning); } .tone-accent { color: var(--accent); font-weight: 600; } .tone-dim { color: var(--muted); } .tone-success { color: var(--success); }

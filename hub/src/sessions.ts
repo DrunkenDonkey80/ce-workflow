@@ -8,7 +8,7 @@ import { defaultCommand, RpcChild, type RpcRecord } from "./rpc-client.ts";
 import { acquireLock, holderAlive, lockPath, readLock, releaseLock, type LockInfo } from "./session-lock.ts";
 import type { Registry, SessionRecord } from "./registry.ts";
 
-export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number; viewers?: (id: string) => number; terminal?: (args: string[], cwd: string, env: Record<string, string>) => { pid?: number; once(event: "exit", listener: () => void): unknown } };
+export type HostOptions = { registry: Registry; command?: string[]; env?: Record<string, string>; idleParkMinutes?: number; stopGraceMs?: number; viewers?: (id: string) => number; terminal?: (args: string[], cwd: string, env: Record<string, string>) => { pid?: number; once(event: "exit", listener: () => void): void } };
 /** H7-01 (D20): interactive Pi in its own console window (Windows Terminal hosts it when it is the default terminal). */
 // `start /wait` gives Pi the new console's own handles (spawn's stdio would hand it NUL, and the TUI would exit);
 // the hidden cmd lives exactly as long as that Pi.
@@ -77,7 +77,7 @@ export class SessionHost extends EventEmitter {
 		rpc.on("event", (event: RpcRecord) => {
 			live.lastActivity = Date.now();
 			if (event.type === "agent_start") live.running = true;
-			else if (event.type === "agent_settled") { live.running = false; live.settles++; }
+			else if (event.type === "agent_settled") { live.running = false; live.settles++; void this.remember(live); } // a run (or Plan3) may switch models
 			else if (event.type === "compaction_start") live.compacting = true;
 			else if (event.type === "compaction_end") live.compacting = false;
 			this.emit("event", record.id, event);
@@ -122,7 +122,9 @@ export class SessionHost extends EventEmitter {
 			const sessionFile = state.data?.sessionFile;
 			if (!state.success || typeof sessionFile !== "string") throw new Error(state.error ?? "Pi reported no session file.");
 			live.lock = { file: sessionFile, info: acquireLock(sessionFile, "pi-control-hub") }; // new file name, so nobody else can hold it
-			return this.registry.update(record.id, { sessionFile, state: "running" });
+			this.registry.update(record.id, { sessionFile, state: "running" });
+			await this.remember(live, state);
+			return this.registry.get(record.id)!;
 		} catch (error) {
 			await this.halt(live);
 			this.registry.remove(record.id); // nothing was written yet; a retry starts fresh
@@ -147,6 +149,7 @@ export class SessionHost extends EventEmitter {
 			live.ready = (async () => {
 				const state = await started.rpc.send({ type: "get_state" });
 				if (!state.success) throw new Error(state.error ?? "Pi did not start.");
+				await this.remember(started, state);
 			})();
 			await live.ready;
 			return this.registry.update(id, { state: "running" });
@@ -155,6 +158,15 @@ export class SessionHost extends EventEmitter {
 			this.registry.update(id, { state: "parked" }); // stays retryable
 			throw error;
 		}
+	}
+
+	/** S-10: keep the model and thinking level Pi reports on the record, so a parked session still shows them. */
+	async remember(live: Live, state?: RpcRecord): Promise<void> {
+		state ??= await live.rpc.send({ type: "get_state" }).catch(() => undefined);
+		if (!state?.success || !this.registry.get(live.id)) return;
+		const model = state.data?.model, current = this.registry.get(live.id)!;
+		const next = { model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, thinking: state.data?.thinkingLevel };
+		if (JSON.stringify([current.model, current.thinking]) !== JSON.stringify([next.model, next.thinking])) this.registry.update(live.id, next);
 	}
 
 	private async halt(live: Live) {
@@ -227,7 +239,8 @@ export class SessionHost extends EventEmitter {
 		for (const record of this.registry.list().filter(r => r.state === "terminal")) {
 			const holder = record.sessionFile ? readLock(record.sessionFile) : undefined;
 			if (holder?.owner === "pi-control-hub terminal" && holderAlive(holder)) continue;
-			this.registry.update(record.id, { state: "parked" }); back.push(record.id);
+			// The terminal may have changed the model; forget it so the page reads it from the file again (S-10).
+			this.registry.update(record.id, { state: "parked", model: undefined, thinking: undefined }); back.push(record.id);
 		}
 		if (back.length) this.emit("terminals", back);
 		return back;
@@ -296,7 +309,7 @@ export class SessionHost extends EventEmitter {
 			if (response.data?.disposition === "started" && live.settles === settles) live.running = true; // agent_start may still be on its way
 			return response;
 		}
-		finally { if (command) live.command--; live.lastActivity = Date.now(); }
+		finally { if (command) { live.command--; void this.remember(live); } live.lastActivity = Date.now(); } // a command may set the model
 	}
 
 	/** Hub shutdown: remember what was running (D17), then stop every child. */

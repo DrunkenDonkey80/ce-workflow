@@ -1278,7 +1278,9 @@ $("model-button").addEventListener("click", async () => {
    const button = Object.assign(document.createElement("button"), { type: "button", textContent: level === "medium" ? "Mid" : level[0].toUpperCase() + level.slice(1) }); button.dataset.level = level;
    button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); return button;
   }));
-  menu.replaceChildren(efforts, ...(value.scoped.length ? value.scoped : value.others).map(option));
+  // A parked session lists only scoped models (D10) and says why when there are none.
+  const note = value.note ? [Object.assign(document.createElement("p"), { className: "model-note", textContent: value.note })] : [];
+  menu.replaceChildren(efforts, ...note, ...(value.scoped.length ? value.scoped : value.others).map(option));
   (menu.querySelector<HTMLElement>(".model-option[aria-pressed=true]") ?? menu.querySelector<HTMLElement>(".model-option, button"))?.focus();
  } catch (error) { menu.replaceChildren("Models failed to load: " + error.message); }
 });

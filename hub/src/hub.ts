@@ -15,6 +15,7 @@ import { createPageApi } from "./api.ts";
 import { Scheduler, timerInput } from "./scheduler.ts";
 import { createUsage, USAGE_PROVIDERS, type Usage, type UsageOptions } from "./usage.ts";
 import { createPool, type Pool } from "./pool.ts";
+import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
@@ -81,7 +82,7 @@ function envCommand(): string[] | undefined {
 	try { return JSON.parse(value); } catch { throw new Error("PI_HUB_PI_COMMAND must be a JSON array of strings."); }
 }
 
-export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined } = {}) {
+export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined } = {}) {
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
@@ -159,7 +160,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		},
 	};
 
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection

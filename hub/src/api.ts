@@ -15,6 +15,7 @@ import { nextName as nextFreeName, type Registry, scanRecents, star } from "./re
 import type { RpcRecord } from "./rpc-client.ts";
 import type { Usage } from "./usage.ts";
 import type { Pool } from "./pool.ts";
+import type { ParkedModels } from "./pi-sdk.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
 import type { Scheduler } from "./scheduler.ts";
@@ -27,7 +28,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views, scheduler, usage, pool, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; settings?: () => Record<string, unknown> }) {
+export function createPageApi({ host, registry, views, scheduler, usage, pool, models, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -45,12 +46,23 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, s
 		return { target, plans, now, resolved: { kind: "plan" as const, plan } };
 	}
 
-	/** ce-workflow webStatus; model, effort and context need a running Pi. */
+	/** S-10: a parked session's model and thinking level: what Pi last reported, else read from its file (and kept). */
+	async function parkedModel(id: string) {
+		const record = registry.get(id)!;
+		if (record.model === undefined && record.sessionFile && models) {
+			const read = await models.fromFile(record.sessionFile).catch(() => null);
+			if (read) return registry.update(id, { model: read.model, thinking: read.thinking });
+		}
+		return record;
+	}
+
+	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
 	async function status(id: string) {
 		const record = registry.get(id)!, live = host.live.get(id);
 		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? { research: "off", night: "off" } };
-		if (!live) return { ...base, model: null, effort: null, context: null };
+		if (!live) { const parked = await parkedModel(id); return { ...base, model: parked.model ?? null, effort: parked.thinking ?? null, context: null, parked: true }; }
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
+		void host.remember(live, state);
 		const model = state.data?.model;
 		return { ...base, model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, effort: state.data?.thinkingLevel ?? null, context: stats.data?.contextUsage?.percent ?? null, tokens: stats.data?.contextUsage?.tokens ?? null, window: stats.data?.contextUsage?.contextWindow ?? null };
 	}
@@ -62,6 +74,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, s
 		const { target, now } = await resolve(id, wanted);
 		const plan = published(id)?.plan; // shortcut: only Pi's current plan carries bias/finishable; another displayed plan shows without its action row until Pi switches to it.
 		return { target, current: now?.id ?? null, status: await status(id), ...(plan && target.kind === "plan" && plan.id === target.id ? { plan } : {}) };
+	}
+
+	async function parkedModels(id: string) {
+		const record = await parkedModel(id);
+		const scoped = models ? await models.scoped(record.folder).catch(() => ({ models: [], unresolved: [] })) : { models: [], unresolved: [] };
+		const note = scoped.models.length ? undefined : "No scoped models in Pi settings; only the session's own model is shown.";
+		return { model: record.model ?? null, effort: record.thinking ?? null, scoped: scoped.models.length ? scoped.models : record.model ? [record.model] : [], others: [], unresolved: scoped.unresolved, parked: true, note };
 	}
 
 	/** A hub call needs a running Pi; writes start a parked session, reads do not. */
@@ -175,7 +194,9 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, s
 			case "usage": return usage?.usage() ?? { summary: [], accounts: [] };
 			// D9: the pool is global, answered by the hub through cpool, never by a session.
 			case "pool": return pool ? pool.view() : null;
-			case "models": case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
+			// D10: a parked session picks only from Pi settings' scoped models, never from every model.
+			case "models": if (!host.live.has(id)) return parkedModels(id); return call(id, `/api/${endpoint}`, {}, { start: false });
+			case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
 	}

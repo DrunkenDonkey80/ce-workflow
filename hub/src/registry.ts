@@ -15,6 +15,9 @@ export type SessionRecord = {
 	state: SessionState;
 	wasRunning?: boolean; // D17: running when the hub last stopped
 	lastActivity?: number; // its idle clock then, kept across the restart
+	/** S-10: the model and thinking level Pi last reported (or read from the file), shown while parked. */
+	model?: { provider: string; id: string; name: string } | null;
+	thinking?: string;
 	createdAt: number;
 };
 export type Recent = { file: string; cwd: string; sessionId: string; name?: string; modified: number };
@@ -114,7 +117,7 @@ export async function readSessionSummary(file: string): Promise<Recent | null> {
 	const at = header ? bytes.lastIndexOf('\n{"type":"session_info"') : -1;
 	if (at >= 0) {
 		const end = bytes.indexOf(10, at + 1);
-		try { name = JSON.parse(bytes.subarray(at + 1, end < 0 ? bytes.length : end).toString("utf8")).name?.trim() || undefined; } catch {}
+		try { name = JSON.parse(bytes.subarray(at + 1, end < 0 ? bytes.length : end).toString("utf8")).name?.trim() || undefined; } catch { name = undefined; } // a torn last line: the session shows unnamed
 	}
 	const recent = header ? { file, cwd: header.cwd, sessionId: String(header.id ?? ""), name, modified: stats.mtimeMs } : null;
 	nameCache.set(file, { key, recent });

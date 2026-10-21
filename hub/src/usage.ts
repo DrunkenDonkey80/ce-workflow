@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { piRuntime, piSdk } from "./pi-sdk.ts";
 import { agentDir } from "./rpc-client.ts";
 
 const POLL_MS = 120_000;
@@ -609,12 +609,7 @@ type State = { authenticated: boolean; identityKey?: string; windows?: Window[];
 
 /** Provider credentials from Pi's own SDK (D14): same auth.json, refresh and lock as a running Pi. */
 export async function piAuth(dir = agentDir()): Promise<(provider: string) => Promise<Auth>> {
-	// shortcut: only Pi's managed install (agent/install/current-version) is found; add a `pi` path lookup if a hub runs beside an npm-installed Pi.
-	const version = readFileSync(join(dir, "install", "current-version"), "utf8").trim();
-	const entry = join(dir, "install", "releases", version, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "index.js");
-	const sdk = await import(pathToFileURL(entry).href);
-	const runtime = await sdk.ModelRuntime.create({ authPath: join(dir, "auth.json"), refreshOnCreate: false });
-	const registry = new sdk.ModelRegistry(runtime);
+	const registry = new (await piSdk(dir)).ModelRegistry(await piRuntime(dir));
 	return provider => registry.getProviderAuth(provider);
 }
 

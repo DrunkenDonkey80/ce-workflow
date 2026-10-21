@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T12:56:17.758Z
+updated: 2026-10-21T13:06:27.683Z
 reviewed: 2026-10-21
 ---
 
@@ -117,8 +117,7 @@ None.
 - [x] **S-09** Deleted extensions/subscription-footer.ts, its /wo settings submenu, session wiring and test; upstream MIT notice moved to hub/src/usage-UPSTREAM.md (verify-package updated); parser/pool/sanitization tests migrated to hub/scripts/test-usage-providers.mjs; plan3.ts no longer answers /api/usage.
 
 ### Phase 4: Parked model and unpark on typing [code]
-- [ ] **S-10** Store model and thinking level per hub session; show them for parked sessions; model list from Pi settings scoped models (D10).
-  - Branch-aware reading and scope resolution as in Relevant files and approach; test divergent branches, globs, thinking suffixes and unresolvable models.
+- [x] **S-10** Hub records keep model+thinking (host.remember at start, after each run/command and page status; cleared on terminal hand-back); parked status and /api/models come from the record or, once, the session file via the SDK (hub/src/pi-sdk.ts: buildSessionContext, enabledModels via resolveModelScopeWithDiagnostics), scoped models only with a note when none (D10).
 - [ ] **S-11** Allow changing model and thinking while parked; apply on resume through RPC before the first message.
   - Applied inside the S-15 readiness promise, so no message can arrive first.
 - [ ] **S-12** Resume a parked session on the first keystroke in its chat box (debounced, once); tests (C1).
