@@ -26,7 +26,7 @@ const auth: RequestInit = token ? { credentials: "omit", headers: { Authorizatio
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
-const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; window?: number | null; folder?: string; tab?: string } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; window?: number | null; folder?: string; tab?: string; parked?: boolean } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
@@ -915,7 +915,13 @@ const sessionId = location.pathname.split("/")[2] ?? "";
 // The unsent message survives switching sessions and reloads, per session; pagehide also catches programmatic edits (send clears it).
 const draftKey = "plan3-draft:" + sessionId, saveDraft = () => { try { const value = $("message-input").value; if (value) localStorage.setItem(draftKey, value); else localStorage.removeItem(draftKey); } catch { /* private mode */ } };
 try { if (!$("message-input").value) $("message-input").value = localStorage.getItem(draftKey) ?? ""; } catch { /* private mode */ }
-$("message-input").addEventListener("input", saveDraft); addEventListener("pagehide", saveDraft);
+$("message-input").addEventListener("input", saveDraft);
+// S-12: typing into a parked session starts it once, so Pi is (nearly) ready when the message is sent.
+let waking = false;
+$("message-input").addEventListener("input", () => {
+ if (!state.status?.parked || waking || !$("message-input").value.trim()) return;
+ waking = true; void sessionAction({ action: "resume", id: sessionId }).then(done => { if (!done) waking = false; }); // stays set until a live status arrives
+}); addEventListener("pagehide", saveDraft);
 const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
@@ -1396,7 +1402,7 @@ function applyUpdate(event: MessageEvent, update) {
 }
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
-listen("status", value => { state.status = value; renderShell(); });
+listen("status", value => { state.status = value; if (!value?.parked) waking = false; renderShell(); });
 listen("notice", value => showNotice(value.text)); // e.g. a model picked while parked could not be used (S-11)
 // Plan events always describe Pi's current plan. When Pi switches plans, the page follows it,
 // unless the reader picked another plan in the menu: that view stays until Pi switches again.

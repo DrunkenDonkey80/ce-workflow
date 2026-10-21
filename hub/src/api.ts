@@ -147,7 +147,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			}
 			case "rename": if (!name) throw fail(400, "Name required."); return host.rename(known(), name);
 			case "park": await host.park(known()); return { ok: true };
-			case "resume": await host.resume(known()); return { ok: true };
+			case "resume": { const resumed = known(); await host.resume(resumed); await publishStatus(resumed).catch(() => undefined); return { ok: true }; } // the page leaves its parked look (S-12)
 			case "reload": await host.restart(known()); return { ok: true };
 			case "terminal": await host.openTerminal(known()); return { ok: true };
 			case "star": {
