@@ -284,7 +284,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		if (!view || request.method !== "setStatus") return;
 		if (request.statusKey === "pi-hub:state") {
 			const state = parse(request.statusText);
-			if (state?.plan) view.publish("plan", state.plan);
+			if (state && "plan" in state) view.publish("plan", state.plan ?? null); // null: the plan finished or was closed
 			void publishStatus(id).catch(() => {});
 		}
 		if (request.statusKey === "pi-hub:diagram") void (async () => {

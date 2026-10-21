@@ -1440,6 +1440,12 @@ listen("notice", value => showNotice(value.text)); // e.g. a model picked while 
 // unless the reader picked another plan in the menu: that view stays until Pi switches again.
 let currentPlan: string | null = null;
 listen("plan", value => {
+ // No current plan (it finished or was closed): a page following Pi's plan falls back to the product view, like a fresh load.
+ if (!value) {
+  const following = target === currentPlan; currentPlan = null;
+  if (following && target) { target = "product"; state.plan = null; void loadDiagram("plan", true); renderShell(); }
+  return;
+ }
  if (value.id !== target && value.id !== currentPlan) {
   target = value.id;
   const query = new URLSearchParams(location.search); if (query.has("target")) { query.set("target", value.id); history.replaceState(null, "", "?" + query + location.hash); }

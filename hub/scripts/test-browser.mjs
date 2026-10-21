@@ -637,6 +637,10 @@ try {
  await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('Newer plan')");
  publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: 0 });
  await browser("wait", "--fn", "document.getElementById('plan-button').textContent.includes('0/16') === false && !document.getElementById('plan-button').textContent.includes('Newer plan')");
+ // The plan finishing by itself (Pi publishes no plan) repaints to New plan without a refresh; the next plan comes back.
+ publish("plan", null); await browser("wait", "--fn", "document.getElementById('plan-button').textContent.startsWith('New plan')");
+ publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: 0 });
+ await browser("wait", "--fn", `document.getElementById('plan-button').textContent.includes(${JSON.stringify(sample.title)})`);
  activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", startedAt: Date.now() - 65_000, args: JSON.stringify({ path: "src/app.ts", limit: 9 }), progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
