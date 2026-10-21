@@ -27,6 +27,7 @@ export type Live = {
 	running: boolean; // between agent_start and agent_settled
 	settles: number; // agent_settled count, so a late prompt response cannot mark a finished run as working
 	compacting: boolean;
+	compactedTokens?: number; // Pi's estimate after the last compaction; Pi reports no context tokens until the next reply
 	command: number; // extension commands still waiting for their response (F6)
 	dialogs: Map<string, RpcRecord>; // open select/confirm/input/editor requests
 	busyExtra: Set<string>; // reasons reported by ce-workflow through the hub channel, e.g. "subagents"
@@ -79,7 +80,7 @@ export class SessionHost extends EventEmitter {
 			if (event.type === "agent_start") live.running = true;
 			else if (event.type === "agent_settled") { live.running = false; live.settles++; void this.remember(live); } // a run (or Plan3) may switch models
 			else if (event.type === "compaction_start") live.compacting = true;
-			else if (event.type === "compaction_end") live.compacting = false;
+			else if (event.type === "compaction_end") { live.compacting = false; live.compactedTokens = event.result?.estimatedTokensAfter; }
 			this.emit("event", record.id, event);
 		});
 		rpc.on("ui", (request: RpcRecord) => {

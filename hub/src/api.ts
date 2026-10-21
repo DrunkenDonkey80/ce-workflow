@@ -56,6 +56,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		return record;
 	}
 
+	// Right after a compaction Pi reports null tokens (its footer shows "?"); show Pi's own post-compaction estimate instead.
+	const contextTokens = (tokens?: number | null, compacted?: number) => typeof tokens === "number" ? { tokens } : typeof compacted === "number" ? { tokens: compacted, estimated: true } : { tokens: null };
 	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
 	async function status(id: string) {
 		const record = registry.get(id)!, live = host.live.get(id);
@@ -64,7 +66,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
 		void host.remember(live, state);
 		const model = state.data?.model;
-		return { ...base, model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, effort: state.data?.thinkingLevel ?? null, context: stats.data?.contextUsage?.percent ?? null, tokens: stats.data?.contextUsage?.tokens ?? null, window: stats.data?.contextUsage?.contextWindow ?? null };
+		return { ...base, model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, effort: state.data?.thinkingLevel ?? null, context: stats.data?.contextUsage?.percent ?? null, ...contextTokens(stats.data?.contextUsage?.tokens, live.compactedTokens), window: stats.data?.contextUsage?.contextWindow ?? null };
 	}
 	const publishStatus = async (id: string) => { const value = await status(id); views.get(id)?.publish("status", value); return value; };
 
