@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 10,
+  "revision": 11,
   "nodes": [
     {
       "id": "pi_host",
@@ -599,12 +599,6 @@
       "to": "camera",
       "label": "registers",
       "id": "work_models__camera"
-    },
-    {
-      "from": "work_models",
-      "to": "subscription_footer",
-      "label": "footer",
-      "id": "work_models__subscription_footer"
     },
     {
       "from": "work_models",
