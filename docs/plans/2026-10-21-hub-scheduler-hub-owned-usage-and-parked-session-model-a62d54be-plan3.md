@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T13:12:12.180Z
+updated: 2026-10-21T14:44:03.517Z
 reviewed: 2026-10-21
 ---
 
@@ -144,7 +144,7 @@ None.
 
 ## Resume context
 
-Draft, no open questions. D14 (Codex credentials via Pi SDK ModelRegistry; S-07 probes refresh first) and D15 (timers follow the Pi session id: cancel on /new and unstar, pause in terminal) settled 2026-10-21. Known gap fixed by S-14: 0.1.58 does not compact hub or web messages yet. No product code written for this plan. Next: the user runs /plan3 finish.
+H-01 in progress (15/17). Script timer d6066587 on Remote (7adc5a01) watches %TEMP%\h01-restarted.txt. A detached helper (%TEMP%\h01-restart.mjs, log h01-restart.log) retries `pi-hub restart` every 20 s, for up to 2 h, until no session is busy, then writes that file. The timer's message wakes this session after the restart and covers H-01 check 1. Next: on that message, check the other H-01 items (a one-off message to a parked session, usage with every session parked, a parked model change, typing to unpark), then ARCH-RECONCILE. Unpushed: bbf6af5 (notifications) and af82370 (plan repaint).
 
 ## Amendments
 
