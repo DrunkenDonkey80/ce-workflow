@@ -145,7 +145,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		},
 	};
 
-	const pageApi = createPageApi({ host, registry, views, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "" }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "" }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection

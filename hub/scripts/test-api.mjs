@@ -182,6 +182,14 @@ try {
 	assert.equal((await until(async () => (await tones())["1"] === "unseen" && "ok")), "ok", "a run that ends with no page open is unseen");
 	await get(id, "snapshot");
 	assert.equal((await tones())["1"], "seen", "opening the page marks it seen");
+	// S-05: an idle session with a timer is "scheduled"; the row carries the timers; the menu cancels one (own session only).
+	const timer = await (await fetch(`${origin}/api/sessions/${id}/timers`, { method: "POST", headers: { "x-hub-key": localKey, connection: "close", "content-type": "application/json" }, body: JSON.stringify({ kind: "script", command: "exit 0", everyMinutes: 5 }) })).json();
+	const row = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.id === id);
+	assert.equal((await row()).tone, "scheduled");
+	assert.deepEqual((await row()).timers.map(t => [t.id, t.kind, t.label]), [[timer.id, "script", "exit 0"]]);
+	assert.equal((await post(id, "session", { action: "cancel-timer", id, timer: "nope" })).status, 404);
+	assert.equal((await post(id, "session", { action: "cancel-timer", id, timer: timer.id })).status, 200);
+	assert.equal((await row()).tone, "seen");
 	const created = (await post(id, "session", { action: "new", folder })).body;
 	assert.equal(created.name, "2", "new sessions take the next free number");
 	const missing = await post(id, "session", { action: "new", folder: path.join(root, "missing") });

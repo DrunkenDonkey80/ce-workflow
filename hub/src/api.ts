@@ -15,6 +15,7 @@ import { nextName as nextFreeName, type Registry, scanRecents, star } from "./re
 import type { RpcRecord } from "./rpc-client.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
+import type { Scheduler } from "./scheduler.ts";
 
 const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const ANSWER_FIELDS = ["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"];
@@ -24,7 +25,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; settings?: () => Record<string, unknown> }) {
+export function createPageApi({ host, registry, views, scheduler, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -82,6 +83,7 @@ export function createPageApi({ host, registry, views, settings = () => ({}) }: 
 		if (!host.live.has(id)) return "parked";
 		if (forms(id).length) return "waiting";
 		if (host.busyReasons(id).length) return "working";
+		if (scheduler?.list(id).length) return "scheduled"; // D4: idle, a timer will wake it
 		return unseen.has(id) ? "unseen" : "seen";
 	}
 	// When an idle live session auto-parks (D16).
@@ -95,15 +97,17 @@ export function createPageApi({ host, registry, views, settings = () => ({}) }: 
 		const plan = (host.live.get(id)?.published.state as { plan?: { done?: number; total?: number } } | undefined)?.plan;
 		return plan?.total ? { done: plan.done ?? 0, total: plan.total } : undefined;
 	}
+	// D11: the row shows timers (countdown, last run); ticks never reach the chat.
+	const timers = (id: string) => scheduler?.list(id).sort((a, b) => a.dueAt - b.dueAt).map(t => ({ id: t.id, kind: t.kind, dueAt: t.dueAt, every: t.every, lastRun: t.lastRun, label: (t.text ?? t.command ?? "").slice(0, 80) }));
 	async function sessions() {
-		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id), park: parkNote(record.id) })) }));
+		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id) })) }));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents, settings: settings() };
 	}
 	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
 	const nextName = (folder: string) => nextFreeName(registry, folder);
 	async function session(data: Record<string, unknown>) {
-		only(data, ["target", "action", "id", "name", "folder", "file", "create"], "Invalid session fields.");
+		only(data, ["target", "action", "id", "name", "folder", "file", "create", "timer"], "Invalid session fields.");
 		const id = typeof data.id === "string" ? data.id : "", name = typeof data.name === "string" ? data.name.trim() : "";
 		const known = () => { if (!registry.get(id)) throw fail(404, "Unknown session."); return id; };
 		switch (data.action) {
@@ -130,6 +134,9 @@ export function createPageApi({ host, registry, views, settings = () => ({}) }: 
 				if (!recent) throw fail(404, "That session is no longer recent.");
 				return star(registry, recent, name || nextName(recent.cwd));
 			}
+			case "cancel-timer":
+				if (!scheduler?.list(known()).some(t => t.id === data.timer)) throw fail(404, "No such timer.");
+				return { ok: scheduler.cancel(String(data.timer)) };
 			case "unstar":
 				if (host.live.has(known())) throw fail(409, "Park the session first.");
 				registry.remove(id); unseen.delete(id); return { ok: true }; // the session file stays (D18)

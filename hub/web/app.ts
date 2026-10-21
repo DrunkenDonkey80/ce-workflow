@@ -101,7 +101,10 @@ function elapsed(ms: number) {
  const total = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(total / 3600), m = Math.floor(total / 60) % 60, s = String(total % 60);
  return h ? `${h}:${String(m).padStart(2, "0")}:${s.padStart(2, "0")}` : m ? `${m}:${s.padStart(2, "0")}` : s + "s";
 }
-setInterval(() => { for (const item of document.querySelectorAll<HTMLElement>(".tool-elapsed")) item.textContent = elapsed(Date.now() - Number(item.dataset.start)); }, 1000);
+setInterval(() => {
+ for (const item of document.querySelectorAll<HTMLElement>(".tool-elapsed")) item.textContent = elapsed(Date.now() - Number(item.dataset.start));
+ for (const item of document.querySelectorAll<HTMLElement>(".session-timer")) item.textContent = "⏰ " + elapsed(Number(item.dataset.due) - Date.now());
+}, 1000);
 function renderActivity() {
  const root = $("activity"), data = state.activity, opened = new Map([...root.querySelectorAll("details")].map(item => [item.dataset.id, item.open]));
  const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = undefined, className = "") => { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; if (className) item.className = className; return item; };
@@ -903,8 +906,9 @@ $("mode-research").addEventListener("click", () => void toggleMode("/research " 
 $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("mode-night").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 // H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
-type Tone = "working" | "waiting" | "unseen" | "seen" | "parked" | "terminal";
-type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number }; park?: string };
+type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
+type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
+type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[] };
 type Group = { folder: string; label: string; sessions: HubSession[] };
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
@@ -984,7 +988,7 @@ async function showDevices() {
 }
 $("devices-button").addEventListener("click", () => void showDevices().catch(error => showNotice("Devices: " + error.message)));
 $("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
-const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", unseen: "idle, new activity", seen: "idle", parked: "parked", terminal: "open in a terminal" };
+const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", scheduled: "scheduled", unseen: "idle, new activity", seen: "idle", parked: "parked", terminal: "open in a terminal" };
 function html<K extends keyof HTMLElementTagNameMap>(tag: K, properties: Partial<HTMLElementTagNameMap[K]> = {}) { return Object.assign(document.createElement(tag), properties); }
 // EU style: Today 14:05, Yesterday 09:12, else 18/10/2026 14:05.
 function whenText(time: number) {
@@ -1049,6 +1053,12 @@ function sessionRow(session: HubSession, folder: string, path: string) {
  row.addEventListener("pointerdown", event => { pressed = false; if (event.pointerType === "touch") press = window.setTimeout(() => { pressed = true; openSessionMenu(row, session, path); }, 500); });
  for (const end of ["pointerup", "pointercancel", "pointermove"]) row.addEventListener(end, () => clearTimeout(press));
  row.addEventListener("click", event => { if (pressed) { event.preventDefault(); pressed = false; } }, true); // the long press must not also open the session
+ // D4/D11: the next timer counts down in the row (the 1 s ticker above updates it).
+ const next = session.timers?.[0];
+ if (next) {
+  const timer = html("span", { className: "session-timer", textContent: "⏰ " + elapsed(next.dueAt - Date.now()), title: session.timers!.map(t => `${t.kind}: ${t.label}${t.lastRun ? " · last run " + whenText(t.lastRun) : ""}`).join("\n") });
+  timer.dataset.due = String(next.dueAt); link.append(timer);
+ }
  row.append(link, more);
  // A plan in progress: steps done/total, then a line filled left to right.
  if (session.plan) {
@@ -1070,6 +1080,7 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
  sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path))] : [
   item("Rename…", () => { const name = prompt("New name:", session.name); if (name?.trim()) void sessionAction({ action: "rename", id: session.id, name }); }),
   item("Copy folder path", () => void copyPath(path)),
+  ...(session.timers ?? []).map(t => item(`Cancel ⏰ ${t.kind}: ${t.label.slice(0, 40)}`, () => void sessionAction({ action: "cancel-timer", id: session.id, timer: t.id }))),
   item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
   ...(parked ? [item("Unstar (keep the file)", () => { if (confirm(`Remove "${session.name}" from its group? The session file stays in Recents.`)) void sessionAction({ action: "unstar", id: session.id }); })] : [item("Reload", () => void sessionAction({ action: "reload", id: session.id }))]),
