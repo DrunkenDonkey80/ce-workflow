@@ -1,5 +1,6 @@
 // H5-03: the page API under /s/<id>/api/ (endpoint map in plan 0db155f7 Findings) and the request checks kept from plan3-web.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -73,7 +74,10 @@ try {
 	const snapshot = (await get(id, "snapshot")).body;
 	assert.deepEqual(snapshot.target, { kind: "plan", id: "bbbbbbbb" });
 	assert.equal(snapshot.current, "bbbbbbbb");
-	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
+	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
+	execFileSync("git", ["init", "-q"], { cwd: folder });
+	assert.deepEqual((await get(id, "snapshot")).body.status.git, { changed: fs.readdirSync(folder).filter(name => name !== ".git").length, ahead: 0 }, "Commit buttons: changed files counted, none ahead");
+	fs.rmSync(path.join(folder, ".git"), { recursive: true, force: true });
 	assert.equal(fileReads, 1, "the file is read once, then the record keeps it");
 	assert.match(snapshot.build, /^[0-9a-f]{12}$/);
 

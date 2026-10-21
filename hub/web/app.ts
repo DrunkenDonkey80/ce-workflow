@@ -26,7 +26,7 @@ const auth: RequestInit = token ? { credentials: "omit", headers: { Authorizatio
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
-const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; folder?: string; tab?: string; parked?: boolean } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: { changed: number; ahead: number } | null; folder?: string; tab?: string; parked?: boolean } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
@@ -90,6 +90,10 @@ function renderShell() {
  // Row buttons are also gated by the plan state (no Resume while the plan is still being planned).
  const blocked = { resolve: !plan?.open, finish: !plan?.finishable, resume: !!plan?.planning };
  for (const button of document.querySelectorAll<HTMLButtonElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset) || (button.parentElement?.id === "plan-actions" && !!blocked[button.dataset.command]);
+ // Commit shows with changed files; Commit and push also with unpushed commits. The hub reads git on each status (run end, model change).
+ const git = status?.git, busy = !state.connected || messageSending || !!state.activity.working || promptView.busy;
+ $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead;
+ for (const id of ["git-commit", "git-push"]) ($(id) as HTMLButtonElement).disabled = busy;
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
@@ -912,6 +916,7 @@ async function toggleMode(text: string) {
  if (messageSending) return; messageSending = true; renderShell();
  try { await post("message", { text }); } catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
 }
+for (const id of ["git-commit", "git-push"]) $(id).addEventListener("click", () => void toggleMode($(id).dataset.git!));
 $("mode-research").addEventListener("click", () => void toggleMode("/research " + ($("mode-research").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("mode-night").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 // H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,

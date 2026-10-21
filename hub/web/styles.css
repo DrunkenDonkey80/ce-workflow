@@ -217,6 +217,8 @@ h2 { font-size: 15px; font-weight: 600; }
 /* Phones: the heading is hidden and #connection moves into the top bar, which turns orange instead. */
 #connection { font-size: 13px; color: var(--muted); }
 .modes { display: flex; gap: 6px; margin-left: auto; }
+.git-actions { display: flex; gap: 6px; }
+.git-actions .mode-chip { border-color: var(--accent); color: var(--accent); }
 .mode-chip { font: inherit; font-size: 12px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
 .mode-chip[aria-pressed=true] { border-color: var(--accent); background: var(--accent); color: var(--panel); }
 .mode-chip[data-tone=warning] { border-color: var(--warning); background: var(--warning); }

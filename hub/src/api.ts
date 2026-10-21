@@ -2,6 +2,7 @@
 // Plans, diagrams, files and images are read here with ce-workflow's Pi-free modules, so they also work while parked;
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
+import { execFile } from "node:child_process";
 import { mkdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -57,11 +58,17 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	}
 
 	// Right after a compaction Pi reports null tokens (its footer shows "?"); show Pi's own post-compaction estimate instead.
+	// Commit / Commit and push buttons: changed files and unpushed commits; null outside a git repository.
+	const gitState = (cwd: string) => new Promise<{ changed: number; ahead: number } | null>(resolve => execFile("git", ["status", "--porcelain=v1", "--branch"], { cwd, timeout: 5000, windowsHide: true }, (error, out) => {
+		if (error) return resolve(null);
+		const [head = "", ...files] = out.split("\n").filter(Boolean);
+		resolve({ changed: files.length, ahead: Number(/\[ahead (\d+)/.exec(head)?.[1] ?? 0) });
+	}));
 	const contextTokens = (tokens?: number | null, compacted?: number) => typeof tokens === "number" ? { tokens } : typeof compacted === "number" ? { tokens: compacted, estimated: true } : { tokens: null };
 	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
 	async function status(id: string) {
 		const record = registry.get(id)!, live = host.live.get(id);
-		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? { research: "off", night: "off" } };
+		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? { research: "off", night: "off" }, git: await gitState(record.folder) };
 		if (!live) { const parked = await parkedModel(id); return { ...base, model: parked.model ?? null, effort: parked.thinking ?? null, context: null, parked: true }; }
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
 		void host.remember(live, state);
