@@ -29,7 +29,7 @@ const run = async (command, args) => {
 	return { code: 0, killed: false, stderr: "", stdout: "" };
 };
 const opened = [];
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], run, openUrl: url => opened.push(url) });
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url) });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {
 	const response = await fetch(`http://127.0.0.1:${port}${route}`, { method: body ? "POST" : "GET", headers: { "x-hub-key": localKey, "content-type": "application/json" }, body: body && JSON.stringify(body) });

@@ -921,7 +921,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's own icon (gear → Tab icon) sits on its colour when idle and is drawn in that colour on yellow;
 // without one, a shovel laid down when all rest.
-type HubSettings = { idleParkMinutes?: number; icon?: string; iconColor?: string };
+type HubSettings = { idleParkMinutes?: number; icon?: string; iconColor?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[] };
 let hubSettings: HubSettings = {};
 const ICON_COLORS = ["#343a40", "#1971c2", "#0c8599", "#2f9e44", "#7048e8", "#868e96"];
 function iconSvg(name: string, color: string, key: string) {
@@ -945,7 +945,7 @@ async function loadSessions() {
  const visible = document.visibilityState === "visible";
  try {
   const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
-  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10);
+  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders();
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
@@ -1129,21 +1129,21 @@ void loadSessions();
 type Segment = { text: string; color?: string };
 type UsageBar = { label: string; left: number; color: string; resets?: string; at?: string };
 type Usage = { id: string; label: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[] };
-let usage: Usage[] = [], usageLines: Segment[][] = [], usageAccounts: Segment[] = [], usageTimer = 0, usageShown = "";
+let usage: Usage[] = [], usageAccounts: Segment[] = [], usageTimer = 0, usageShown = "";
 const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
 const tone = (color?: string) => color === "error" || color === "warning" || color === "success" ? color : "accent";
 async function loadUsage() {
  clearTimeout(usageTimer); if (document.visibilityState !== "visible") return;
  try {
-  const value = await get("usage") as { summary: Usage[]; lines: Segment[][]; accounts?: Segment[] };
-  usage = value.summary; usageLines = value.lines; usageAccounts = value.accounts ?? [];
+  const value = await get("usage") as { summary: Usage[]; accounts?: Segment[] };
+  usage = value.summary; usageAccounts = value.accounts ?? [];
   $("usage-button").hidden = !usage.length;
   $("usage-button").replaceChildren(...usage.map(item => {
    const button = el("button", "bar usage-bar"); button.type = "button"; button.dataset.provider = item.id;
    button.append(el("span", "usage-item", `${item.label}: ${item.left}%${item.resets ? " " + item.resets : ""}`), ...(item.warnings ?? []).map(w => el("span", "usage-warning tone-" + w.color, " · " + w.text)));
    // A warning outranks the quota colour: the expiring week is the thing to act on.
    setBar(button, item.left, tone(item.warnings?.find(w => w.color === "error")?.color ?? item.warnings?.[0]?.color ?? item.color));
-   button.title = (usageLines.find(line => line[0]?.text === item.label) ?? []).map(part => part.text).join("") || item.label;
+   button.title = [item.label, ...(item.bars ?? []).map(bar => `${bar.label} ${bar.left}%${bar.resets ? " (" + bar.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text)].join(" · ");
    button.addEventListener("click", () => void openUsage(item.id));
    return button;
   }));
@@ -1326,6 +1326,18 @@ async function saveHubSettings(change: HubSettings) {
  catch (error) { showNotice(error.message); }
 }
 $("hub-park").addEventListener("change", () => void saveHubSettings({ idleParkMinutes: Number(($("hub-park") as HTMLSelectElement).value) }));
+// One checkbox per usage provider; unticked ones are neither polled nor shown.
+function renderUsageProviders() {
+ const hidden = new Set(hubSettings.usageHidden ?? []);
+ $("usage-providers").replaceChildren(...(hubSettings.usageProviders ?? []).map(provider => {
+  const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: !hidden.has(provider.id) });
+  box.addEventListener("change", async () => {
+   const next = (hubSettings.usageProviders ?? []).map(p => p.id).filter(id => id === provider.id ? !box.checked : hidden.has(id));
+   await saveHubSettings({ usageHidden: next }); renderUsageProviders(); void loadUsage();
+  });
+  const label = document.createElement("label"); label.append(box, " " + provider.label); return label;
+ }));
+}
 // The picker: every icon previewed idle in the chosen colour, then the colours (no names: the pictures say it).
 function renderIconPicker() {
  const color = hubSettings.iconColor || ICON_COLORS[0], current = ICONS[hubSettings.icon ?? ""] ? hubSettings.icon : "";

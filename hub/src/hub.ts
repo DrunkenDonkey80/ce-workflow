@@ -13,11 +13,12 @@ import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
 import { createPageApi } from "./api.ts";
 import { Scheduler, timerInput } from "./scheduler.ts";
+import { createUsage, USAGE_PROVIDERS, type Usage, type UsageOptions } from "./usage.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
-export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; iconColor?: string };
+export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; iconColor?: string; usageHidden?: string[] };
 export type HubMarker = { pid: number; port: number; startedAt: number };
 export const configPath = () => path.join(hubDataDir(), "config.json");
 export const markerPath = () => path.join(hubDataDir(), "hub.json");
@@ -73,7 +74,13 @@ function webFile(file: string, key: string) {
 
 export { openInBrowser } from "./platform.ts";
 
-export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.parse(process.env.PI_HUB_PI_COMMAND) : undefined, run = exec as Exec, openUrl = (_url: string) => {} } = {}) {
+function envCommand(): string[] | undefined {
+	const value = process.env.PI_HUB_PI_COMMAND;
+	if (!value) return undefined;
+	try { return JSON.parse(value); } catch { throw new Error("PI_HUB_PI_COMMAND must be a JSON array of strings."); }
+}
+
+export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false } = {}) {
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
@@ -117,6 +124,11 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	host.on("exit", (id: string) => views.get(id)?.feed({ type: "agent_settled", aborted: true }));
 
 	const scheduler = new Scheduler({ dataDir, registry, host });
+	// Until the gear menu saves its own list, keep what the old terminal footer hid (Pi settings.json).
+	const footerHidden = () => { try { const hidden = JSON.parse(readFileSync(path.join(agentDir(), "settings.json"), "utf8")).workOrchestrator?.subscriptionFooter?.hidden; return Array.isArray(hidden) ? hidden as string[] : []; } catch { return []; } };
+	const usageHidden = config.usageHidden ? () => config.usageHidden! : footerHidden;
+	// Tests may pass a ready poller ({ usage, start, stop, refresh }) instead of options.
+	const usage = usageOptions === false ? undefined : "usage" in usageOptions ? usageOptions : createUsage({ dataDir, hidden: () => (config.usageHidden ?? usageHidden()), ...usageOptions });
 	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id), published: host.live.get(record.id)?.published.state }));
 	const routes: Record<string, (data: any, match: RegExpMatchArray) => Promise<unknown> | unknown> = {
 		"GET /api/status": () => ({ pid: process.pid, port: config.port, remote: remoteStatus(), sessions: summary() }),
@@ -145,7 +157,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		},
 	};
 
-	const pageApi = createPageApi({ host, registry, views, scheduler, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "" }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", iconColor: config.iconColor ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection
@@ -222,13 +234,15 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 				if (!data || typeof data !== "object" || Array.isArray(data)) return send(400, { error: "Expected a JSON object." });
 				if (endpoint === "hub" && data.action === "settings") {
 					// Per-hub (per-PC) settings from the gear menu: auto-park minutes and the tab icon.
-					const minutes = data.idleParkMinutes, icon = data.icon, color = data.iconColor;
+					const minutes = data.idleParkMinutes, icon = data.icon, color = data.iconColor, hidden = data.usageHidden;
+					if (hidden !== undefined && !(Array.isArray(hidden) && hidden.every(id => USAGE_PROVIDERS.some(p => p.id === id)))) return send(400, { error: "Unknown usage provider." });
 					if (minutes !== undefined && !(Number.isInteger(minutes) && minutes >= 0 && minutes <= 1440)) return send(400, { error: "Auto-park minutes must be 0 to 1440." });
 					if (icon !== undefined && !(typeof icon === "string" && /^[a-z-]{0,40}$/.test(icon))) return send(400, { error: "Unknown icon." });
 					if (color !== undefined && !(typeof color === "string" && /^(#[0-9a-f]{6})?$/i.test(color))) return send(400, { error: "Colour must be #rrggbb." });
 					if (minutes !== undefined) host.idleParkMinutes = config.idleParkMinutes = minutes as number;
 					if (icon !== undefined) config.icon = icon as string;
 					if (color !== undefined) config.iconColor = color as string;
+					if (hidden !== undefined) { config.usageHidden = [...new Set(hidden as string[])]; void usage?.refresh(); }
 					writeJsonAtomic(configPath(), config);
 					return send(200, pageApi.settings());
 				}
@@ -289,6 +303,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	if (config.remote) await applyRemote().catch(error => { remoteError = (error as Error).message; });
 	host.checkTerminals(); // a terminal closed while the hub was down
 	const restored = await host.restoreRunning(); // D17
+	void usage?.start().catch(error => console.error(`usage: ${(error as Error).message}`));
 	scheduler.on("ended", (timer, reason) => console.log(`${new Date().toISOString()} timer ${timer.id.slice(0, 8)} for ${registry.get(timer.session)?.name ?? timer.session} ended: ${reason}`));
 	// A tick only reads its timers; due ones run in the background and never overlap themselves.
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);
@@ -298,7 +313,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 
 	async function stop() {
 		return closing ??= (async () => {
-			clearInterval(timer); clearInterval(ticks);
+			clearInterval(timer); clearInterval(ticks); usage?.stop();
 			pairing.close();
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();

@@ -104,7 +104,7 @@ await new Promise(done => relay.listen(0, "127.0.0.1", done));
 process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))] });
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} } });
 const origin = `http://127.0.0.1:${hub.config.port}`;
 const own = await hub.host.create(folder, "1"), id = own.id, rpc = () => hub.host.live.get(id).rpc;
 const publish = (event, value) => hub.views.get(id)?.publish(event, value);
@@ -267,7 +267,8 @@ try {
  assert.equal(await shown("web_client__load_balancer"), true, "a clicked box stays in focus");
  await browser("mouse", "move", "2", "2"); await browser("press", "Escape"); assert.equal(await shown("web_client__load_balancer"), false, "Escape clears focus");
  { const hub_ = (body) => fetch(`${origin}/s/${id}/api/hub`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ action: "settings", ...body }) });
-  assert.deepEqual(await (await hub_({ idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44" })).json(), { idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44" }, "gear settings save");
+  { const { idleParkMinutes, icon, iconColor, usageHidden } = await (await hub_({ idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44", usageHidden: ["glm"] })).json();
+  assert.deepEqual({ idleParkMinutes, icon, iconColor, usageHidden }, { idleParkMinutes: 5, icon: "house", iconColor: "#2f9e44", usageHidden: ["glm"] }, "gear settings save"); }
   assert.equal((await hub_({ iconColor: "red" })).status, 400, "colours are #rrggbb only"); assert.equal((await hub_({ idleParkMinutes: -1 })).status, 400);
   await hub_({ idleParkMinutes: 0, icon: "", iconColor: "" }); }
  { const r = await fetch(`${origin}/s/${id}/api/paste`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin }, body: "<svg onload=alert(1)>" }); assert.match((await r.json()).error, /PNG, JPEG/, "non-image paste rejected by magic bytes"); }
@@ -518,7 +519,7 @@ try {
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - session name; the plan is in its bar");
  // Usage: one bar per provider, filled to 7d left; a warning shows in the button and colours it.
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))"), ["Claude: 53% · expiring in 4h 12m (40% unused)|error|53%", "Codex: 12% 1d 14h|error|12%"], "usage: one bar per provider with its warning");
- assert.match(await evaluate("document.querySelector('#usage-button .usage-bar').title"), /5h 20%/, "hover shows the provider's footer row");
+ assert.match(await evaluate("document.querySelector('#usage-button .usage-bar').title"), /Claude · 7d 53% · expiring in 4h 12m/, "hover shows the provider's bars and warnings");
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");

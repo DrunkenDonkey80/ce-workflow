@@ -27,7 +27,7 @@ const writeSession = (name, count) => {
 	return file;
 };
 
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))] });
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false });
 const { port, localKey } = hub.config;
 const get = async (id, route) => { const response = await fetch(`http://127.0.0.1:${port}/s/${id}/api/${route}`, { headers: { authorization: `Bearer ${localKey}`, connection: "close" } }); return { status: response.status, body: await response.json() }; };
 

@@ -80,7 +80,7 @@ try {
 	assert.deepEqual(sent.body, { endpoint: "/api/message", data: { target: "bbbbbbbb", text: "hi" } });
 	assert.equal(hub.host.live.has(id), true);
 	assert.deepEqual((await post(id, "command", { target: "bbbbbbbb", command: "review" })).body.endpoint, "/api/command");
-	assert.deepEqual((await get(id, "usage")).body, { endpoint: "/api/usage", data: {} });
+	assert.deepEqual(Object.keys((await get(id, "usage")).body), ["summary", "accounts"], "usage comes from the hub, not the session");
 
 	// Status from RPC; model and effort through RPC with a status frame.
 	const status = (await get(id, "snapshot")).body.status;

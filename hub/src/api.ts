@@ -13,6 +13,7 @@ import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
 import type { RpcRecord } from "./rpc-client.ts";
+import type { Usage } from "./usage.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
 import type { Scheduler } from "./scheduler.ts";
@@ -25,7 +26,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views, scheduler, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; settings?: () => Record<string, unknown> }) {
+export function createPageApi({ host, registry, views, scheduler, usage, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -169,7 +170,9 @@ export function createPageApi({ host, registry, views, scheduler, settings = () 
 			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
 			case "system": return systemLoad();
-			case "models": case "usage": case "commands": case "pool": return call(id, `/api/${endpoint}`, {}, { start: false });
+			// D6: usage comes from the hub's own poller, so it shows with every session parked.
+			case "usage": return usage?.usage() ?? { summary: [], accounts: [] };
+			case "models": case "commands": case "pool": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
 	}

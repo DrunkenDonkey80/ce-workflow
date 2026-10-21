@@ -513,6 +513,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 /* Gear menu field and the tab icon picker. */
 .menu-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; }
 #settings-menu { width: max-content; max-width: calc(100vw - 16px); }
+.usage-providers { display: flex; flex-wrap: wrap; gap: 2px 10px; font-weight: normal; }
 .icon-field { display: block; }
 .icon-grid { display: grid; grid-template-columns: repeat(5, 40px); gap: 6px; margin: 6px 0; }
 .icon-colors { display: flex; gap: 8px; margin: 4px 0 8px; }
