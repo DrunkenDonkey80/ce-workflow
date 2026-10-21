@@ -12,7 +12,7 @@ import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
 import { createPageApi } from "./api.ts";
-import { Scheduler } from "./scheduler.ts";
+import { Scheduler, timerInput } from "./scheduler.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
@@ -116,6 +116,7 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	// A child that ends mid-run never sends agent_settled; settle the page's activity so it stops showing work.
 	host.on("exit", (id: string) => views.get(id)?.feed({ type: "agent_settled", aborted: true }));
 
+	const scheduler = new Scheduler({ dataDir, registry, host });
 	const summary = () => registry.list().map(record => ({ ...record, busy: host.busyReasons(record.id), live: host.live.has(record.id), published: host.live.get(record.id)?.published.state }));
 	const routes: Record<string, (data: any, match: RegExpMatchArray) => Promise<unknown> | unknown> = {
 		"GET /api/status": () => ({ pid: process.pid, port: config.port, remote: remoteStatus(), sessions: summary() }),
@@ -131,6 +132,10 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 		"POST /api/sessions/([0-9a-f-]{36})/terminal": (_d, m) => host.openTerminal(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/rename": (data, m) => host.rename(m[1], String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/prompt": (data, m) => host.prompt(m[1], String(data.message ?? "")),
+		// S-02: timers of one session; the CLI (and through it the schedule tool) is the only writer.
+		"GET /api/sessions/([0-9a-f-]{36})/timers": (_d, m) => ({ timers: scheduler.list(m[1]) }),
+		"POST /api/sessions/([0-9a-f-]{36})/timers": (data, m) => scheduler.add(timerInput(m[1], data)),
+		"POST /api/timers/([0-9a-f-]{36})/cancel": (_d, m) => ({ ok: scheduler.cancel(m[1]) }),
 		"POST /api/stop": data => {
 			// D17: a normal stop or restart is refused while any session is busy.
 			const busy = summary().filter(s => s.busy.length);
@@ -284,7 +289,6 @@ export async function startHub({ command = process.env.PI_HUB_PI_COMMAND ? JSON.
 	if (config.remote) await applyRemote().catch(error => { remoteError = (error as Error).message; });
 	host.checkTerminals(); // a terminal closed while the hub was down
 	const restored = await host.restoreRunning(); // D17
-	const scheduler = new Scheduler({ dataDir, registry, host });
 	scheduler.on("ended", (timer, reason) => console.log(`${new Date().toISOString()} timer ${timer.id.slice(0, 8)} for ${registry.get(timer.session)?.name ?? timer.session} ended: ${reason}`));
 	// A tick only reads its timers; due ones run in the background and never overlap themselves.
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);

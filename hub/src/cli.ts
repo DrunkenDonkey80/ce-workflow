@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | remote on|off | pair approve|reject | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | remote on|off | pair approve|reject | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import os from "node:os";
@@ -215,6 +215,23 @@ try {
 		// Resume one parked session (by hub id); never starts a new one.
 		await call(`/api/sessions/${rest[0]}/resume`, {});
 		console.log("Resumed.");
+	} else if (verb === "schedule" && ["add", "list", "cancel"].includes(rest[0])) {
+		// S-02: the schedule tool's backend. The session defaults to PI_HUB_SESSION (set for hub-started Pi).
+		const flag = (name: string) => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
+		const num = (name: string) => flag(name) === undefined ? undefined : Number(flag(name));
+		const session = flag("session") ?? process.env.PI_HUB_SESSION;
+		if (!session) throw new Error("Not a hub session: pass --session <hub id>.");
+		const timers = `/api/sessions/${session}/timers`;
+		if (rest[0] === "list") console.log(JSON.stringify((await call(timers)).timers));
+		else if (rest[0] === "cancel") {
+			if (!rest[1]) throw new Error("Usage: pi-hub schedule cancel <timer id>");
+			// The chat shows 8-character ids; only this session's timers match.
+			const id = ((await call(timers)).timers as { id: string }[]).find(t => t.id.startsWith(rest[1]))?.id;
+			console.log(id && (await call(`/api/timers/${id}/cancel`, {})).ok ? "Cancelled." : "No such timer.");
+		} else {
+			const kind = rest[1], value = flag(kind === "script" ? "command" : "text");
+			console.log(JSON.stringify(await call(timers, { kind, [kind === "script" ? "command" : "text"]: value, inMinutes: num("in"), at: flag("at"), everyMinutes: num("every"), until: flag("until"), runs: num("runs") })));
+		}
 	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
 		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
 		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));
@@ -231,7 +248,7 @@ try {
 		console.log(rest[0] === "approve" ? "Device paired." : "Device rejected.");
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | remote on|off | pair approve|reject | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | remote on|off | pair approve|reject | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {

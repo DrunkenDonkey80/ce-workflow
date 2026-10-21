@@ -52,6 +52,15 @@ try {
 	assert.match(cli("wake", second).out, /Resumed/);
 	assert(!ids().includes(second), "a resumed session leaves the list");
 	assert.equal((await api(`/api/sessions/${second}/park`, {})).status, 200);
+	// S-02: `schedule add|list|cancel` through the API; bad input is refused at the API.
+	const timer = JSON.parse(cli("schedule", "add", "script", "--command", "exit 0", "--every", "5", "--session", second).out);
+	assert.equal(timer.kind, "script"); assert.equal(timer.every, 300_000);
+	assert.deepEqual(JSON.parse(cli("schedule", "list", "--session", second).out).map(t => t.id), [timer.id]);
+	assert.match(cli("schedule", "add", "message", "--text", "x", "--every", "0.5", "--session", second).out, /once a minute/);
+	assert.equal((await api(`/api/sessions/${second}/timers`, { kind: "message", text: "x", inMinutes: 1, extra: 1 })).status, 400);
+	assert.match(cli("schedule", "list").out, /Not a hub session/);
+	assert.match(cli("schedule", "cancel", timer.id.slice(0, 8), "--session", second).out, /Cancelled/);
+	assert.match(cli("schedule", "cancel", timer.id.slice(0, 8), "--session", second).out, /No such timer/);
 
 	// H5-01: the browser app under /s/<session>/ with relative URLs and build-fingerprinted assets.
 	{

@@ -72,7 +72,7 @@ export class SessionHost extends EventEmitter {
 	}
 
 	private spawn(record: SessionRecord, args: string[]): Live {
-		const rpc = new RpcChild({ cwd: record.folder, args, command: this.options.command, env: { ...this.options.env, PI_HUB: "1" } });
+		const rpc = new RpcChild({ cwd: record.folder, args, command: this.options.command, env: { ...this.options.env, PI_HUB: "1", PI_HUB_SESSION: record.id } }); // the schedule tool addresses its own session (S-04)
 		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: this.options.viewers?.(record.id) ?? 0, lastActivity: Date.now(), stopping: false, ready: Promise.resolve() };
 		rpc.on("event", (event: RpcRecord) => {
 			live.lastActivity = Date.now();

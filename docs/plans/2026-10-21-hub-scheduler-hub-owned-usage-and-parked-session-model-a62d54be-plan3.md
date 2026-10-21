@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T11:50:19.831Z
+updated: 2026-10-21T11:52:22.423Z
 reviewed: 2026-10-21
 ---
 
@@ -102,7 +102,7 @@ None.
 - [x] **S-01** hub/src/scheduler.ts: persisted timers (timers.json), 5 s tick in hub.ts, message/script kinds with D3 protocol, D8 limits, D15 lifecycle checked per tick, follow-up delivery to busy agents.
 - [x] **S-14** Hub/web page messages now run cold-cache compaction: plan3-web emits wo:cold-cache, work-models startColdCompact compacts and resends once (source extension, never re-checked).
 - [x] **S-15** Live.ready in hub/src/sessions.ts: resume, prompt and call wait for the one start; api.ts call() resumes through it; a failed start rejects every waiter.
-- [ ] **S-02** Add `pi-hub schedule add|list|cancel` to hub/src/cli.ts and matching API routes.
+- [x] **S-02** `pi-hub schedule add|list|cancel` (session from --session or PI_HUB_SESSION, now set for hub-started Pi) over new hub routes /api/sessions/<id>/timers and /api/timers/<id>/cancel; timerInput validates the body.
 - [x] **S-03** hub/scripts/test-scheduler.mjs: fake clock + fake-pi; validation, D5 no-resume, output wake, exit 3, failure rule/reset, busy skip, follow-up, D15 terminal/new/unstar, persistence, real runScript.
 
 ### Phase 2: Agent tool and page state [code]

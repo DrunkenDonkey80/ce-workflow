@@ -33,6 +33,24 @@ export const MIN_EVERY_MS = 60_000, DEFAULT_RUNS = 12, SCRIPT_LIFETIME_MS = 24 *
 export const CANCEL_EXIT = 3;
 const fail = (message: string) => Object.assign(new Error(message), { status: 400 });
 
+/** S-02: the API body of a new timer, checked field by field (trust boundary). Times are epoch ms or ISO strings. */
+export function timerInput(session: string, data: Record<string, unknown>): TimerInput {
+	const allowed = ["kind", "text", "command", "inMinutes", "at", "everyMinutes", "until", "runs"];
+	if (Object.keys(data).some(key => !allowed.includes(key))) throw fail("Invalid timer fields.");
+	if (data.kind !== "message" && data.kind !== "script") throw fail("Timer kind must be message or script.");
+	const text = (key: string) => data[key] === undefined ? undefined : typeof data[key] === "string" && (data[key] as string).length <= 8000 ? data[key] as string : (() => { throw fail(`${key} must be text up to 8000 characters.`); })();
+	const number = (key: string) => data[key] === undefined ? undefined : typeof data[key] === "number" && Number.isFinite(data[key]) && (data[key] as number) > 0 ? data[key] as number : (() => { throw fail(`${key} must be a positive number.`); })();
+	const time = (key: string) => {
+		if (data[key] === undefined) return undefined;
+		const value = typeof data[key] === "string" ? Date.parse(data[key] as string) : data[key];
+		if (typeof value !== "number" || !Number.isFinite(value)) throw fail(`${key} must be a time.`);
+		return value;
+	};
+	const runs = number("runs");
+	if (runs !== undefined && !Number.isInteger(runs)) throw fail("runs must be a whole number.");
+	return { session, kind: data.kind, text: text("text"), command: text("command"), inMinutes: number("inMinutes"), at: time("at"), everyMinutes: number("everyMinutes"), until: time("until"), runs };
+}
+
 /** Runs a script timer's command in the session folder through the platform shell. */
 export function runScript(command: string, cwd: string, timeoutMs = SCRIPT_TIMEOUT_MS): Promise<ScriptResult> {
 	return new Promise(resolve => {
