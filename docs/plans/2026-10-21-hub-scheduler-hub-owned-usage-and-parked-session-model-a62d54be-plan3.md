@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T11:59:56.527Z
+updated: 2026-10-21T12:01:39.795Z
 reviewed: 2026-10-21
 ---
 
@@ -108,7 +108,7 @@ None.
 ### Phase 2: Agent tool and page state [code]
 - [x] **S-04** `schedule` tool (hub-command.ts scheduleTool: add/list/cancel via `pi-hub schedule`), registered only when PI_HUB_SESSION is set; execute still refuses without it.
 - [x] **S-05** Hub "scheduled" tone (idle live session with timers), row timers list with a 1 s "⏰ m:ss" countdown (tooltip: kind, label, last run), Cancel ⏰ items in the session menu via session action cancel-timer (own session only).
-- [ ] **S-06** Mark delivered scheduled messages in the chat; tests (C1, C2).
+- [x] **S-06** Chat marks delivered scheduled messages: user rows starting with SCHEDULED_PREFIX get class "scheduled" (grey, dashed left border); delivery text format asserted in test-scheduler.
 
 ### Phase 3: Usage owned by the hub [code]
 - [ ] **S-07** Move usage fetching and pool reading into hub/src/usage.ts with its settings; serve /api/usage from the hub itself.

@@ -330,6 +330,8 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .md-table th { background: var(--tool-pending); }
 .message > small { font-size: 13px; color: var(--muted); }
 .message.user { background: var(--user-bg); padding: 8px 12px; border-radius: 6px; }
+/* D11: a message a timer delivered (scheduler.ts SCHEDULED_PREFIX), told apart from typed ones. */
+.message.user.scheduled { background: color-mix(in srgb, var(--muted) 14%, transparent); border-left: 3px dashed var(--muted); }
 .message-blocks { margin-bottom: 4px; }
 .message.final { background: var(--final-bg); border-left: 3px solid var(--accent); padding: 8px 12px; border-radius: 6px; }
 .message.final > .row-full { display: none; }

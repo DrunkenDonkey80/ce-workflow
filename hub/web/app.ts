@@ -634,7 +634,7 @@ function renderChat() {
   const json = JSON.stringify(row); if (item.dataset.json === json) continue; item.dataset.json = json;
   const text = row.text.trim(), note = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming && !row.blocks?.length ? "Streaming…" : "");
   // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
-  item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : "") + (row.blocks?.some(block => block.ask) ? " has-ask" : ""); item.hidden = !text && !row.blocks?.length && !note;
+  item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : "") + (row.blocks?.some(block => block.ask) ? " has-ask" : "") + (row.role === "user" && text.startsWith("⏰ Scheduled") ? " scheduled" : ""); item.hidden = !text && !row.blocks?.length && !note;
   // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
   item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
   renderBlocks(item.children[1] as HTMLElement, row); renderLinks(item.children[2] as HTMLElement, row.text);
