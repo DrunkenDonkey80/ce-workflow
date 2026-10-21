@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 process.env.PI_CODING_AGENT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "wo-hub-")); // the CLI child inherits it: no real hub
-const { hubCli, hubMenu, joinedSession } = await import("../extensions/hub-command.ts");
+const { hubCli, hubMenu, joinedSession, scheduleTool } = await import("../extensions/hub-command.ts");
 // A woken parked session is found by its Pi session id, else (stable/claimed intercom id) as the one new session in its folder.
 const target = { id: 'h1', name: 'game', folder: '/p', sessionId: 'pi-1' };
 assert.equal(joinedSession([{ id: 'pi-1', cwd: '/x', pid: 2, startedAt: 0 }], target, 100, 1)?.id, 'pi-1');
@@ -32,5 +32,12 @@ let parsed; try { parsed = JSON.parse(status.text); } catch { assert.fail("statu
 assert.equal(parsed.running, false); assert.equal(parsed.remote.on, false);
 const restart = await hubCli(["stop"], 30_000);
 assert.match(restart.text, /Not running/);
+// S-04: the schedule tool refuses outside a hub session and passes CLI errors through.
+delete process.env.PI_HUB_SESSION;
+await assert.rejects(scheduleTool.execute("t", { action: "list" }), /started by pi-control-hub/);
+process.env.PI_HUB_SESSION = "00000000-0000-0000-0000-000000000000";
+await assert.rejects(scheduleTool.execute("t", { action: "add" }), /needs kind/);
+await assert.rejects(scheduleTool.execute("t", { action: "add", kind: "script", command: "exit 0", everyMinutes: 5 }), /hub is not running/);
+delete process.env.PI_HUB_SESSION;
 fs.rmSync(process.env.PI_CODING_AGENT_DIR, { recursive: true, force: true });
 console.log("ok - /wo hub menu per hub state; CLI bridge status --json and stop against a stopped hub");

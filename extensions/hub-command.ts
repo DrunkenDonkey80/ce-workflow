@@ -126,6 +126,42 @@ export async function handleHubCommand(args: string, ctx) {
 	notify(result.text, result.ok);
 }
 
+// S-04: the agent's timers, through `pi-hub schedule`. Registered only in hub-started Pi (PI_HUB_SESSION), which the hub can wake.
+const nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
+export const scheduleTool = {
+	name: "schedule",
+	label: "Schedule",
+	description: "Wake this hub session later instead of keeping a turn open to poll. Prefer kind script: the hub runs `command` in the project folder each tick at no token cost; exit 0 with no output keeps watching, printed output becomes your next message and ends the timer, exit 3 cancels it, 3 failures in a row report the error. Kind message sends `text` as a full model turn (only when the check needs your judgement). One-off: inMinutes or at (ISO time). Repeating: everyMinutes (at least 1); message repeats need until or runs (default 12); script repeats stop after 24 h. Also list and cancel (by id).",
+	parameters: {
+		type: "object", additionalProperties: false, required: ["action"],
+		properties: {
+			action: { type: "string", enum: ["add", "list", "cancel"] },
+			kind: nullable({ type: "string", enum: ["script", "message"] }),
+			command: nullable({ type: "string", description: "Shell command (script kind)" }),
+			text: nullable({ type: "string", description: "Message to send (message kind)" }),
+			inMinutes: nullable({ type: "number" }),
+			at: nullable({ type: "string", description: "ISO time of the first run" }),
+			everyMinutes: nullable({ type: "number" }),
+			until: nullable({ type: "string", description: "ISO time after which a repeat stops" }),
+			runs: nullable({ type: "integer" }),
+			id: nullable({ type: "string", description: "Timer id (or its first 8 characters) to cancel" }),
+		},
+	},
+	async execute(_id, args) {
+		if (!process.env.PI_HUB_SESSION) throw new Error("Timers need a session started by pi-control-hub; this Pi was not.");
+		const cli = ["schedule", args.action];
+		if (args.action === "cancel") { if (!args.id) throw new Error("cancel needs id."); cli.push(args.id); }
+		if (args.action === "add") {
+			if (!args.kind) throw new Error("add needs kind (script or message).");
+			cli.push(args.kind, args.kind === "script" ? "--command" : "--text", String((args.kind === "script" ? args.command : args.text) ?? ""));
+			for (const [key, flag] of [["inMinutes", "in"], ["at", "at"], ["everyMinutes", "every"], ["until", "until"], ["runs", "runs"]]) if (args[key] != null) cli.push(`--${flag}`, String(args[key]));
+		}
+		const result = await hubCli(cli, 30_000);
+		if (!result.ok) throw new Error(result.text);
+		return { content: [{ type: "text", text: result.text }], details: {} };
+	},
+};
+
 /** The menu for a hub status: Install or Start while stopped, page/session/remote controls while running. */
 export function hubMenu(status: HubStatus, cwd: string) {
 	const installed = status.autostart || status.command;

@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-21
-updated: 2026-10-21T11:52:22.423Z
+updated: 2026-10-21T11:53:35.955Z
 reviewed: 2026-10-21
 ---
 
@@ -106,7 +106,7 @@ None.
 - [x] **S-03** hub/scripts/test-scheduler.mjs: fake clock + fake-pi; validation, D5 no-resume, output wake, exit 3, failure rule/reset, busy skip, follow-up, D15 terminal/new/unstar, persistence, real runScript.
 
 ### Phase 2: Agent tool and page state [code]
-- [ ] **S-04** Add the `schedule` tool to ce-workflow, calling `pi-hub schedule` for the current hub session; refuse outside the hub.
+- [x] **S-04** `schedule` tool (hub-command.ts scheduleTool: add/list/cancel via `pi-hub schedule`), registered only when PI_HUB_SESSION is set; execute still refuses without it.
 - [ ] **S-05** Show the "scheduled" state: light-grey row with "⏰ m:ss" countdown, timer list and cancel in the session menu; no chat line per tick (D11).
 - [ ] **S-06** Mark delivered scheduled messages in the chat; tests (C1, C2).
 
@@ -173,3 +173,4 @@ Append material changes and their reasons; preserve the original request and set
   - 8 accepted: verify-package.mjs line 53 requires subscription-footer-UPSTREAM.md. S-09 moves it and migrates the tests.
   - 9 accepted: C1 pointed at hub/hub/scripts; now npm test from hub/.
 - 2026-10-21: Added final architecture reconciliation because a product diagram exists.
+- S-04 (execution): the schedule tool is registered only in hub-started Pi (PI_HUB_SESSION, now set by the hub for each child) instead of being present everywhere and refusing; saves its schema in every non-hub session. Its execute still refuses without PI_HUB_SESSION. Scheduled sends use a direct RPC prompt (source rpc, compacted by 0.1.58's input hook) rather than the page's /pi-hub path.

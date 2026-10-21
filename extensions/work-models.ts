@@ -7,7 +7,7 @@ import { homedir, tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
-import { handleHubCommand, intercomParkedSessions } from "./hub-command.ts";
+import { handleHubCommand, intercomParkedSessions, scheduleTool } from "./hub-command.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
@@ -3477,6 +3477,7 @@ export default function workModelsExtension(pi) {
 	for (const tool of cameraTools(cameraController, pi)) registerConstrainedTool(pi, tool);
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	intercomParkedSessions(pi);
+	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, scheduleTool); // hub-started Pi only: nobody else can be woken
 	registerConstrainedTool(pi, {
 		name: "research_note",
 		label: "Research Note",
