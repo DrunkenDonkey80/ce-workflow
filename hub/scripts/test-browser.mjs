@@ -567,6 +567,7 @@ try {
   assert.equal(manifest.display, "standalone"); assert.equal(manifest.start_url, "/?token=" + hub.config.localKey);
   const icon = await fetch(new URL(manifest.icons[0].src, origin)); assert.equal(icon.headers.get("content-type"), "image/svg+xml"); assert.match(await icon.text(), /^<svg /);
   assert.equal((await fetch(`${origin}/s/${id}/manifest.webmanifest`)).status, 401, "manifest needs the key");
+  assert(await evaluate("document.querySelector('link[rel=apple-touch-icon]').href.startsWith('data:image/png;base64,')"), "iPhone home-screen icon is a PNG");
  }
  await browser("click", "#hub-version"); await browser("wait", "--fn", "document.getElementById('changelog').open && document.querySelectorAll('#changelog-body h3').length > 5");
  assert.equal(await evaluate("document.getElementById('changelog-title').textContent"), "Changelog", "the version opens the whole changelog");

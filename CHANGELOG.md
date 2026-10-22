@@ -11,12 +11,16 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ![The dialog it opens](docs/changelog/0.1.61-env-var-dialog.png)
 
 - Hub: **Commit and push** asks for scoped tests, the full suite or no tests.
-- Hub: **Install** it as an app (Chrome, Edge, Brave, Android: the install icon in the address bar). It opens in its own window, named after this PC, with the tab icon you picked.
+- Hub: **Install** it as an app (Chrome, Edge, Brave, Android: the install icon in the address bar). It opens in its own window, named after this PC, with the tab icon you picked. On iPhone, use Share → **Add to Home Screen**; it gets the same icon.
 - This changelog: the version at the top of the hub settings opens it, and after an update **What's new** opens once with only the newer versions.
 
 ![The changelog window](docs/changelog/0.1.61-changelog-window.png)
 
 ### Changed
+- Hub tab icon shows one dot per kind of activity across sessions instead of only the most urgent one: red asks a question, orange working, blue finished and not yet looked at. Dots are smaller and fill the lower-right, lower-left, then upper-right corner.
+
+![Tab icon with one, two and three dots](docs/changelog/0.1.61-tab-icon-dots.png)
+
 - Hub Thinking view keeps edit and write blocks visible, collapsed, so you can see what changed.
 
 ### Fixed

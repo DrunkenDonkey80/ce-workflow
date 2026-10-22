@@ -200,7 +200,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			// The installed app's icon: the gear's tab icon, idle. Public like pair.js (it shows only the picked icon).
 			const appIcon = request.method === "GET" && url.pathname === "/app-icon.svg" && (() => {
 				response.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-cache" });
-				return response.end(iconSvg(ICONS[config.icon ?? ""] ? config.icon! : Object.keys(ICONS)[0], "idle"));
+				return response.end(iconSvg(ICONS[config.icon ?? ""] ? config.icon! : Object.keys(ICONS)[0]));
 			});
 			const serveAsset = (build: string, name: string) => {
 				if (build !== currentBuild()) return send(404, { error: "Stale build; reload the page." });

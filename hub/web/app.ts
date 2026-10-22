@@ -5,7 +5,7 @@ import type { createActivityMirror } from "../../extensions/plan3-web.ts";
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 // Optional icons may be absent from an already-running hub after an update.
 // @ts-ignore Browser URL includes the workspace token.
-const { ICONS, iconSvg } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _key: string) => "" }));
+const { ICONS, iconSvg } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _states?: string[]) => "" }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
@@ -43,7 +43,7 @@ function setBar(item: HTMLElement, percent: number, tone: string) {
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
 function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
-let sessionStates: string[] = [], iconKey = "";
+let sessionStates: string[] = [], iconKey = "", appleFor = "";
 function renderShell() {
  // "<folder> - <session name>"; the tab title adds the current plan (H5-05).
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
@@ -1113,11 +1113,20 @@ type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; 
 let hubSettings: HubSettings = {};
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
- const waiting = promptView.busy || !!state.activity.dialog || sessionStates.includes("waiting");
- const working = !!state.activity.working || !!state.activity.subagents?.length || sessionStates.includes("working");
- const key = waiting ? "waiting" : working ? "working" : "idle", icon = iconName();
- if (!icon || key + icon === iconKey) return; iconKey = key + icon; // no icons served (older hub): keep the static one
- document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(iconSvg(icon, key));
+ const states = [...sessionStates];
+ if (promptView.busy || state.activity.dialog) states.push("waiting");
+ if (state.activity.working || state.activity.subagents?.length) states.push("working");
+ const icon = iconName(), svg = icon ? iconSvg(icon, states) : "";
+ if (!icon || svg === iconKey) return; // no icons served (older hub): keep the static one
+ iconKey = svg;
+ document.querySelector<HTMLLinkElement>("link[rel=icon]")!.href = "data:image/svg+xml," + encodeURIComponent(svg);
+ if (icon !== appleFor) { appleFor = icon; appleIcon(iconSvg(icon)); }
+}
+// iOS "Add to Home Screen" reads only a PNG apple-touch-icon, so draw the picked icon (no dots) into one.
+function appleIcon(svg: string) {
+ const image = new Image(), canvas = document.createElement("canvas"); canvas.width = canvas.height = 180;
+ image.onload = () => { canvas.getContext("2d")!.drawImage(image, 0, 0, 180, 180); document.querySelector<HTMLLinkElement>("link[rel=apple-touch-icon]")!.href = canvas.toDataURL("image/png"); };
+ image.src = "data:image/svg+xml," + encodeURIComponent(svg.replace('rx="7" ', ""));
 }
 async function loadSessions() {
  clearTimeout(sessionsTimer);
@@ -1614,7 +1623,7 @@ function renderIconPicker() {
   const button = html("button", { type: "button", className: "icon-choice", title: label }); button.setAttribute("role", "radio"); button.setAttribute("aria-checked", String(picked)); button.setAttribute("aria-label", label);
   button.innerHTML = svg; button.addEventListener("click", pick); return button;
  };
- $("icon-grid").replaceChildren(...Object.keys(ICONS).map(name => choice(name.replaceAll("-", " "), name === current, iconSvg(name, "idle"), () => void saveHubSettings({ icon: name }))));
+ $("icon-grid").replaceChildren(...Object.keys(ICONS).map(name => choice(name.replaceAll("-", " "), name === current, iconSvg(name), () => void saveHubSettings({ icon: name }))));
 }
 $("settings-button").addEventListener("click", renderIconPicker);
 // Theme and Auto/Light/Dark are per device (phone and PC may differ), kept in this browser. data-dark drives what CSS

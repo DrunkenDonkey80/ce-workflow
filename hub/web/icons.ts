@@ -32,10 +32,12 @@ export const ICONS: Record<string, [string, string, boolean]> = {
 
 // The tab icon, and the installed app's icon (hub /app-icon.svg).
 const ICON_INK = "#343a40";
-export function iconSvg(name: string, key: string) {
- // At 16 px an outline reads as noise: the icon keeps the whole square and a big white-ringed dot (Gmail/Slack style) carries the state.
- const dot = key === "waiting" ? "#e03131" : key === "working" ? "#f59f00" : "";
+const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6" };
+// states: any of waiting/working/unseen, each drawn once, most urgent first.
+export function iconSvg(name: string, states: string[] = []) {
+ // At 16 px an outline reads as noise: the icon keeps the whole square and white-ringed dots (Gmail/Slack style) carry the states,
+ // filling lower-right, lower-left, then upper-right; two fit side by side at 16 px.
  const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
- const badge = dot ? `<circle cx="22.5" cy="22.5" r="9.5" fill="${dot}" stroke="#fff" stroke-width="2.5"/>` : "";
+ const badge = Object.keys(DOTS).filter(state => states.includes(state)).map((state, i) => `<circle cx="${i === 1 ? 7.5 : 24.5}" cy="${i === 2 ? 7.5 : 24.5}" r="6.5" fill="${DOTS[state]}" stroke="#fff" stroke-width="2"/>`).join("");
  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#fff"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>${badge}</svg>`;
 }
