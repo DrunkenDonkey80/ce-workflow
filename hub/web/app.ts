@@ -1257,6 +1257,9 @@ type UsageBar = { label: string; left: number; color: string; resets?: string; a
 type Usage = { id: string; label: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[] };
 let usage: Usage[] = [], usageAccounts: Segment[] = [], usageTimer = 0, usageShown = "";
 const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
+// Usage as % left (default) or % used, per device (gear → Usage shows); fills follow the shown number.
+const usageUsed = () => { try { return localStorage.getItem("hub-usage") === "used"; } catch { return false; } };
+const shownLeft = (left: number) => usageUsed() ? 100 - left : left, usageWord = () => usageUsed() ? "used" : "left";
 const tone = (color?: string) => color === "error" || color === "warning" || color === "success" ? color : "accent";
 async function loadUsage() {
  clearTimeout(usageTimer); if (document.visibilityState !== "visible") return;
@@ -1266,10 +1269,10 @@ async function loadUsage() {
   $("usage-button").hidden = !usage.length;
   $("usage-button").replaceChildren(...usage.map(item => {
    const button = el("button", "bar usage-bar"); button.type = "button"; button.dataset.provider = item.id;
-   button.append(el("span", "usage-item", `${item.label}: ${item.left}%${item.resets ? " " + item.resets : ""}`), ...(item.warnings ?? []).map(w => el("span", "usage-warning tone-" + w.color, " · " + w.text)));
+   button.append(el("span", "usage-item", `${item.label}: ${shownLeft(item.left)}%${item.resets ? " " + item.resets : ""}`), ...(item.warnings ?? []).map(w => el("span", "usage-warning tone-" + w.color, " · " + w.text)));
    // A warning outranks the quota colour: the expiring week is the thing to act on.
-   setBar(button, item.left, tone(item.warnings?.find(w => w.color === "error")?.color ?? item.warnings?.[0]?.color ?? item.color));
-   button.title = [item.label, ...(item.bars ?? []).map(bar => `${bar.label} ${bar.left}%${bar.resets ? " (" + bar.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text)].join(" · ");
+   setBar(button, shownLeft(item.left), tone(item.warnings?.find(w => w.color === "error")?.color ?? item.warnings?.[0]?.color ?? item.color));
+   button.title = [item.label, ...(item.bars ?? []).map(bar => `${bar.label} ${shownLeft(bar.left)}% ${usageWord()}${bar.resets ? " (" + bar.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text)].join(" · ");
    button.addEventListener("click", () => void openUsage(item.id));
    return button;
   }));
@@ -1286,13 +1289,13 @@ async function poolAct(act: string, label = "", value?: number) {
  catch (error) { showNotice(error.message); }
  void loadUsage();
 }
-// One used-quota bar: fill = used, colour = how close to the limit; the reset clock turns red when the week expires soon.
+// One quota bar: fill = the shown number (left or used), colour = how close to the limit; the reset clock turns red when the week expires soon.
 function poolBar(name: string, w: Window) {
  const bar = el("div", "pool-bar");
  if (!w) { bar.append(el("span", "pool-bar-name", name), el("span", "pool-bar-track"), el("span", "pool-bar-text", "—")); return bar; }
  const track = el("span", "pool-bar-track"), fill = el("span", "pool-bar-fill tone-" + (w.tone ?? "success"));
- fill.style.width = Math.max(0, Math.min(100, w.pct)) + "%"; track.append(fill);
- const text = el("span", "pool-bar-text"); text.append(`${w.pct}%`);
+ const value = shownLeft(100 - w.pct); fill.style.width = Math.max(0, Math.min(100, value)) + "%"; track.append(fill);
+ const text = el("span", "pool-bar-text"); text.append(`${value}% ${usageWord()}`);
  if (w.resets) text.append(" · ", el("span", w.clock ? "tone-" + w.clock : "", w.resets));
  bar.append(el("span", "pool-bar-name", name), track, text); return bar;
 }
@@ -1339,8 +1342,8 @@ async function openUsage(id: string, open = true) {
  usageShown = id; $("usage-title").textContent = item.label + " usage";
  const body: HTMLElement[] = (item.bars ?? []).map(bar => {
   const row = el("div", "bar usage-window-bar");
-  row.append(el("b", "", bar.label), ` ${bar.left}% left${bar.resets ? " · resets in " + bar.resets : ""}${bar.at ? " (" + bar.at + ")" : ""}`);
-  setBar(row, bar.left, tone(bar.color)); return row;
+  row.append(el("b", "", bar.label), ` ${shownLeft(bar.left)}% ${usageWord()}${bar.resets ? " · resets in " + bar.resets : ""}${bar.at ? " (" + bar.at + ")" : ""}`);
+  setBar(row, shownLeft(bar.left), tone(bar.color)); return row;
  });
  body.push(...(item.warnings ?? []).map(w => el("p", "usage-alert tone-" + w.color, "⚠ " + w.text)), ...(item.notes ?? []).map(note => el("p", "dialog-purpose", note)));
  if (id === "claude") {
@@ -1535,6 +1538,8 @@ function applyTheme() {
  ($("hub-theme") as HTMLSelectElement).value = theme; ($("hub-mode") as HTMLSelectElement).value = mode;
 }
 applyTheme(); darkQuery.addEventListener("change", applyTheme);
+($("hub-usage") as HTMLSelectElement).value = usageUsed() ? "used" : "";
+$("hub-usage").addEventListener("change", () => { themeSetting("hub-usage", ($("hub-usage") as HTMLSelectElement).value); void loadUsage(); });
 for (const key of ["hub-theme", "hub-mode"]) $(key).addEventListener("change", () => { themeSetting(key, ($(key) as HTMLSelectElement).value); applyTheme(); });
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
