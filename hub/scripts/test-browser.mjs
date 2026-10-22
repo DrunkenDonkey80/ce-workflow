@@ -561,7 +561,7 @@ try {
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary"); assert.deepEqual(answers.at(-1).answers[2].response.selections, ["Session"]);
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
- assert.match(await evaluate("document.getElementById('hub-version').textContent"), /^ce-workflow \d+\.\d+\.\d+$/, "settings name the version");
+ assert.match(await evaluate("document.getElementById('hub-version').textContent"), /^Version: \d+\.\d+\.\d+$/, "settings name the version");
  await browser("click", "#hub-version"); await browser("wait", "--fn", "document.getElementById('changelog').open && document.querySelectorAll('#changelog-body h3').length > 5");
  assert.equal(await evaluate("document.getElementById('changelog-title').textContent"), "Changelog", "the version opens the whole changelog");
  await browser("click", "#changelog-close");

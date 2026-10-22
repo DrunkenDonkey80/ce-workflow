@@ -19,7 +19,7 @@ export const readChangelog = () => parseChangelog(readFileSync(path.join(root, "
 
 /** A changelog screenshot by bare file name; anything else is refused. */
 export function changelogImage(name: string | null) {
-	if (!name || !/^[\w-]+\.(png|jpe?g)$/i.test(name)) throw Object.assign(new Error("Unknown changelog image."), { status: 400 });
+	if (!name || !/^[\w.-]+\.(png|jpe?g)$/i.test(name) || name.includes("..")) throw Object.assign(new Error("Unknown changelog image."), { status: 400 });
 	try { return { bytes: readFileSync(path.join(root, "docs", "changelog", name)), type: /\.png$/i.test(name) ? "image/png" : "image/jpeg" }; }
 	catch { throw Object.assign(new Error("Changelog image not found."), { status: 404 }); }
 }

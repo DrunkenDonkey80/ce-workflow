@@ -6,10 +6,14 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - `/wo env` and the hub's **Env var** button: store a secret as an environment variable, for this session only or permanently (Windows and Linux). The value never reaches the model; the agent only learns the variable's name. The name is suggested from the agent's last message.
+
+![The Env var button in the chat header](docs/changelog/0.1.61-env-var-button.png)
+![The dialog it opens](docs/changelog/0.1.61-env-var-dialog.png)
+
 - Hub: **Commit and push** asks for scoped tests, the full suite or no tests.
 - This changelog: the version at the top of the hub settings opens it, and after an update **What's new** opens once with only the newer versions.
 
-![The changelog window](docs/changelog/changelog-window.png)
+![The changelog window](docs/changelog/0.1.61-changelog-window.png)
 
 ### Changed
 - Hub Thinking view keeps edit and write blocks visible, collapsed, so you can see what changed.

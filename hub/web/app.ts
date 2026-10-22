@@ -1544,7 +1544,8 @@ function notifyChanges(groups: Group[]) {
 // Gear badge: how many of Pi and its extensions have an update (hub checks hourly); the list sits in the gear menu.
 function renderUpdates() {
  const updates = hubSettings.updates, count = updates ? (updates.pi ? 1 : 0) + updates.packages.length : 0;
- $("hub-version").textContent = "ce-workflow " + (hubSettings.version ?? "");
+ // An older running hub sends no version and has no changelog endpoint yet.
+ $("hub-version").textContent = "Version: " + (hubSettings.version ?? ""); $("hub-version").hidden = !hubSettings.version;
  $("update-badge").hidden = !count; $("update-badge").textContent = String(count);
  $("settings-button").title = count ? `Hub settings (${count} update${count > 1 ? "s" : ""})` : "Hub settings";
  const when = updates?.checkedAt ? new Date(updates.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
@@ -1575,11 +1576,14 @@ async function openChangelog(seen?: string) {
  if (seen && !value.entries.length) return;
  $("changelog-title").textContent = seen ? `What's new in ${value.version}` : "Changelog";
  $("changelog-body").replaceChildren(...value.entries.map(entry => {
-  const section = html("section", {}), images: string[] = [];
-  // Screenshots (![alt](docs/changelog/x.png)) show as thumbnails under the entry and open full size.
-  const body = entry.body.replace(/^!\[[^\]]*\]\((?:docs\/changelog\/)?([\w-]+\.(?:png|jpe?g))\)\s*$/gim, (_, name) => { images.push(name); return ""; });
-  section.append(html("h3", { textContent: entry.date ? `${entry.version} · ${entry.date}` : entry.version })); const text = html("div", {}); renderMarkdown(text, body, new Set()); section.append(text);
-  for (const name of images) { const source = "api/changelog?image=" + encodeURIComponent(name) + (token ? "&token=" + token : ""), link = html("a", { href: source, className: "thumb" }); link.append(html("img", { src: source, alt: name, loading: "lazy" })); section.append(link); }
+  const section = html("section", {});
+  section.append(html("h3", { textContent: entry.date ? `${entry.version} · ${entry.date}` : entry.version }));
+  // Screenshots (![alt](docs/changelog/x.png)) show as thumbnails right after the line above them and open full size.
+  const parts = entry.body.split(/^!\[[^\]]*\]\((?:docs\/changelog\/)?([\w.-]+\.(?:png|jpe?g))\)[ \t]*$/gim);
+  parts.forEach((part, i) => {
+   if (i % 2) { const source = "api/changelog?image=" + encodeURIComponent(part) + (token ? "&token=" + token : ""), link = html("a", { href: source, className: "thumb" }); link.append(html("img", { src: source, alt: part, loading: "lazy" })); section.append(link); }
+   else if (part.trim()) { const text = html("div", {}); renderMarkdown(text, part, new Set()); section.append(text); }
+  });
   return section;
  }));
  ($("changelog") as HTMLDialogElement).showModal();

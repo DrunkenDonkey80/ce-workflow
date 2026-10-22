@@ -7,7 +7,7 @@ assert.deepEqual(entries.map(e => [e.version, e.date]), [["Unreleased", ""], ["0
 assert.equal(entries[1].body, "### Added\n- ten");
 assert.deepEqual(since(entries, "0.1.9").map(e => e.version), ["0.1.10"], "numeric order (0.1.10 > 0.1.9); Unreleased is never new");
 assert.deepEqual(since(entries, "0.1.10"), []);
-for (const bad of [null, "../package.json", "a/b.png", "x.svg", "x.png.exe"]) assert.throws(() => changelogImage(bad), /Unknown changelog image/);
+for (const bad of [null, "..png", "../package.json", "a/b.png", "x.svg", "x.png.exe"]) assert.throws(() => changelogImage(bad), /Unknown changelog image/);
 assert.throws(() => changelogImage("missing-shot.png"), /not found/);
 
 // Every released section names an x.y.z version and a date, newest first, and the package version has its entry.
