@@ -74,7 +74,7 @@ try {
 	const snapshot = (await get(id, "snapshot")).body;
 	assert.deepEqual(snapshot.target, { kind: "plan", id: "bbbbbbbb" });
 	assert.equal(snapshot.current, "bbbbbbbb");
-	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
+	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, commands: [], model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
 	execFileSync("git", ["init", "-q"], { cwd: folder });
 	assert.deepEqual((await get(id, "snapshot")).body.status.git, { changed: fs.readdirSync(folder).filter(name => name !== ".git").length, ahead: 0 }, "Commit buttons: changed files counted, none ahead");
 	fs.rmSync(path.join(folder, ".git"), { recursive: true, force: true });

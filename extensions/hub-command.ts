@@ -162,6 +162,31 @@ export const scheduleTool = {
 	},
 };
 
+// Project commands: buttons above the hub page's chat for this folder, kept in the hub's data (not the repo).
+export const projectCommandsTool = {
+	name: "project_commands",
+	label: "Project commands",
+	description: "Add, remove or list the user's project command buttons shown above the hub page's chat for this folder. Use when the user asks to add a (custom/user/project) command or button. kind prompt: clicking sends `text` to the agent as a message (costs a turn), e.g. name \"Run tests\", text \"run the tests and fix failures\". kind run: clicking starts `text` as a shell command line in the project folder on the hub PC with no agent and no captured output, for things that open windows, e.g. name \"Terminal\", text \"start wt -d .\" (Windows) or \"x-terminal-emulator\" (Linux). Keep name 1-3 words; help is one short line shown on hover. Adding an existing name replaces it.",
+	parameters: {
+		type: "object", additionalProperties: false, required: ["action"],
+		properties: {
+			action: { type: "string", enum: ["add", "remove", "list"] },
+			name: nullable({ type: "string", description: "Button label (add, remove)" }),
+			kind: nullable({ type: "string", enum: ["prompt", "run"] }),
+			text: nullable({ type: "string", description: "prompt: message to send; run: shell command line" }),
+			help: nullable({ type: "string", description: "One short line shown on hover" }),
+		},
+	},
+	async execute(_id, args, _signal, _update, ctx) {
+		if (args.action !== "list" && !args.name) throw new Error(`${args.action} needs name.`);
+		const cli = ["commands", args.action, "--folder", ctx?.cwd ?? process.cwd()];
+		for (const key of ["name", "kind", "text", "help"]) if (args[key] != null && (args.action === "add" || key === "name")) cli.push(`--${key}`, String(args[key]));
+		const result = await hubCli(cli, 30_000);
+		if (!result.ok) throw new Error(result.text);
+		return { content: [{ type: "text", text: result.text }], details: {} };
+	},
+};
+
 /** The menu for a hub status: Install or Start while stopped, page/session/remote controls while running. */
 export function hubMenu(status: HubStatus, cwd: string) {
 	const installed = status.autostart || status.command;

@@ -19,6 +19,7 @@ import { createUpdateCheck, type UpdateCheck } from "./update-check.ts";
 import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { clipboardFiles } from "./images.ts";
+import { createCommands } from "./commands.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
@@ -153,6 +154,16 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"GET /api/sessions/([0-9a-f-]{36})/timers": (_d, m) => ({ timers: scheduler.list(m[1]) }),
 		"POST /api/sessions/([0-9a-f-]{36})/timers": (data, m) => scheduler.add(timerInput(m[1], data)),
 		"POST /api/timers/([0-9a-f-]{36})/cancel": (_d, m) => ({ ok: scheduler.cancel(m[1]) }),
+		// Project commands for one folder; the CLI (and through it the project_commands tool) adds and removes them.
+		"POST /api/commands": data => {
+			const folder = String(data.folder ?? "");
+			if (!path.isAbsolute(folder)) throw new Error("folder: an absolute path.");
+			if (data.action === "list") return { commands: commands.list(folder) };
+			const value = data.action === "add" ? commands.add(folder, data) : data.action === "remove" ? { ok: commands.remove(folder, String(data.name ?? "")) } : undefined;
+			if (!value) throw new Error("action: list, add or remove.");
+			pageApi.refresh(folder);
+			return value;
+		},
 		"POST /api/stop": data => {
 			// D17: a normal stop or restart is refused while any session is busy.
 			const busy = summary().filter(s => s.busy.length);
@@ -162,7 +173,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		},
 	};
 
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, ...(updates ? { updates: updates.state() } : {}) }) });
+	const commands = createCommands(dataDir);
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, ...(updates ? { updates: updates.state() } : {}) }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection

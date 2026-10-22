@@ -20,6 +20,7 @@ import type { ParkedModels } from "./pi-sdk.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
 import type { Scheduler } from "./scheduler.ts";
+import { runCommand, type Commands } from "./commands.ts";
 
 const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const ANSWER_FIELDS = ["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"];
@@ -29,7 +30,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views, scheduler, usage, pool, models, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; settings?: () => Record<string, unknown> }) {
+export function createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; commands?: Commands; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -68,7 +69,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
 	async function status(id: string) {
 		const record = registry.get(id)!, live = host.live.get(id);
-		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? { research: "off", night: "off" }, git: await gitState(record.folder) };
+		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? { research: "off", night: "off" }, git: await gitState(record.folder), commands: commands?.list(record.folder) ?? [] };
 		if (!live) { const parked = await parkedModel(id); return { ...base, model: parked.model ?? null, effort: parked.thinking ?? null, context: null, parked: true }; }
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
 		void host.remember(live, state);
@@ -224,6 +225,18 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return call(id, "/api/message", data);
 			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
 			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
+			// Project commands run by name only: the page never sends a command line.
+			case "run": {
+				const command = commands?.list(folder(id)).find(item => item.name === data.name);
+				if (!command) throw fail(404, "That command no longer exists.");
+				if (command.kind === "prompt") return call(id, "/api/message", { text: command.text });
+				runCommand(folder(id), command.text); return { ok: true, started: true };
+			}
+			case "commands": {
+				only(data, ["target", "remove"], "Invalid fields.");
+				const ok = commands?.remove(folder(id), String(data.remove ?? "")) ?? false;
+				refresh(folder(id)); return { ok };
+			}
 			// Pi's abort still delivers queued messages, so take them out first and hand them back for editing (rpc-commands.md).
 			// unqueue with text takes back one message (edit or cancel): Pi only clears the whole queue, so the rest is queued again.
 			case "stop": case "unqueue": {
@@ -302,7 +315,10 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		})().catch(() => {}); // a plan deleted meanwhile: nothing to show
 	});
 
-	return { get, post, extras, forms, settings, saveImage: savePastedImage };
+	/** Shows changed project commands on every open page of that folder's sessions. */
+	const refresh = (dir: string) => { for (const record of registry.list()) if (views.has(record.id) && path.relative(record.folder, dir) === "") void publishStatus(record.id).catch(() => {}); };
+
+	return { get, post, extras, forms, settings, refresh, saveImage: savePastedImage };
 }
 
 // PC load for the page's CPU/memory graph: CPU is the busy share of all cores since the previous call.

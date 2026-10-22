@@ -94,6 +94,7 @@ function renderShell() {
  const git = status?.git, busy = !state.connected || messageSending || !!state.activity.working || promptView.busy;
  $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead;
  for (const id of ["git-commit", "git-push"]) ($(id) as HTMLButtonElement).disabled = busy;
+ renderCommands(status?.commands ?? [], busy);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
@@ -962,7 +963,7 @@ function expectWork(on = true) {
  expectTimer = window.setTimeout(() => expectWork(false), 15000);
 }
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
-const menus = [["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["title", "title-menu"]];
+const menus = [["commands-more", "commands-menu"], ["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
@@ -974,7 +975,7 @@ function closeMenus(focus = false) {
  for (const [button, menu] of menus) if (!$(menu).hidden) { toggleMenu(button, menu, false); if (focus) $(button).focus(); }
 }
 document.addEventListener("keydown", event => { if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
-document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions")) closeMenus(); });
+document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions, .commands-more-wrap")) closeMenus(); });
 // The title opens the session picker: a popup on phones, the switcher stripe on desktop.
 // Phones: the title opens the plans with their commands (the plan menu moves under it); sessions live in the drawer.
 async function openTitlePlans() {
@@ -1028,6 +1029,52 @@ async function toggleMode(text: string) {
  try { await post("message", { text }); } catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
 }
 for (const id of ["git-commit", "git-push"]) $(id).addEventListener("click", () => void toggleMode($(id).dataset.git!));
+// Project commands (the project_commands tool): chips right of >>, folded into Commands ▾ when they no longer fit;
+// the phone drawer lists them. Prompt commands send their text to the agent, run commands start on the hub PC.
+type ProjectCommand = { name: string; kind: "prompt" | "run"; text: string; help?: string };
+function commandChip(command: ProjectCommand, withHelp: boolean) {
+ const button = html("button", { type: "button", className: "mode-chip project-command", title: (command.help ? command.help + "\n" : "") + (command.kind === "run" ? "Runs on the hub PC: " : "Sends: ") + command.text + "\nRight-click or long-press to delete" });
+ button.dataset.kind = command.kind; button.append(command.name);
+ if (withHelp && command.help) button.append(html("small", { textContent: command.help }));
+ let press = 0, pressed = false;
+ button.addEventListener("click", event => { if (pressed) { pressed = false; event.preventDefault(); return; } closeMenus(); void runProjectCommand(command); });
+ button.addEventListener("contextmenu", event => { event.preventDefault(); void removeProjectCommand(command.name); });
+ button.addEventListener("pointerdown", event => { pressed = false; if (event.pointerType === "touch") press = window.setTimeout(() => { pressed = true; void removeProjectCommand(command.name); }, 500); });
+ for (const end of ["pointerup", "pointercancel", "pointermove"]) button.addEventListener(end, () => clearTimeout(press));
+ return button;
+}
+function renderCommands(list: ProjectCommand[], busy: boolean) {
+ // renderShell can run before this part of the module loads, so the last list lives on the element.
+ const key = JSON.stringify(list);
+ if (key !== $("project-commands").dataset.key) {
+  $("project-commands").dataset.key = key;
+  $("project-commands").replaceChildren(...list.map(command => commandChip(command, false)));
+  $("commands-menu").replaceChildren(...list.map(command => commandChip(command, true)));
+  $("drawer-project-commands").replaceChildren(...list.map(command => commandChip(command, false)));
+  $("drawer-project-commands").hidden = !list.length;
+  fitCommands();
+ }
+ // Prompt commands wait like Commit; run commands only need the hub.
+ for (const button of document.querySelectorAll<HTMLButtonElement>(".project-command")) button.disabled = button.dataset.kind === "run" ? !state.connected : busy;
+}
+function fitCommands() {
+ const row = $("project-commands"), more = $("commands-more");
+ row.hidden = false; more.hidden = true;
+ const over = row.scrollWidth > row.clientWidth + 1;
+ row.hidden = over; more.hidden = !over;
+ if (!over && !$("commands-menu").hidden) toggleMenu("commands-more", "commands-menu", false);
+}
+new ResizeObserver(fitCommands).observe(document.querySelector(".chat-heading")!);
+$("commands-more").addEventListener("click", () => toggleMenu("commands-more", "commands-menu"));
+async function runProjectCommand(command: ProjectCommand) {
+ if (messageSending) return; messageSending = true; renderShell();
+ try { await post("run", { name: command.name }); if (command.kind === "run") showNotice("Started on the hub PC: " + command.name, true); }
+ catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
+}
+async function removeProjectCommand(name: string) {
+ if (!confirm(`Delete the command "${name}"?`)) return;
+ try { await post("commands", { remove: name }); } catch (error) { showNotice(error.message); }
+}
 $("mode-research").addEventListener("click", () => void toggleMode("/research " + ($("mode-research").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("mode-night").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 // H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,

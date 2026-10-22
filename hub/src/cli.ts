@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | remote on|off | pair approve|reject | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] | remote on|off | pair approve|reject | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import os from "node:os";
@@ -232,6 +232,11 @@ try {
 			const kind = rest[1], value = flag(kind === "script" ? "command" : "text");
 			console.log(JSON.stringify(await call(timers, { kind, [kind === "script" ? "command" : "text"]: value, inMinutes: num("in"), at: flag("at"), everyMinutes: num("every"), until: flag("until"), runs: num("runs") })));
 		}
+	} else if (verb === "commands" && ["add", "list", "remove"].includes(rest[0])) {
+		// The project_commands tool's backend: buttons above the chat for one folder (default: here).
+		const flag = (name: string) => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
+		const result = await call("/api/commands", { action: rest[0], folder: path.resolve(flag("folder") ?? "."), name: flag("name"), kind: flag("kind"), text: flag("text"), help: flag("help") });
+		console.log(rest[0] === "list" ? JSON.stringify(result.commands) : rest[0] === "add" ? `Added "${result.name}".` : result.ok ? "Removed." : "No such command.");
 	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
 		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
 		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));
@@ -248,7 +253,7 @@ try {
 		console.log(rest[0] === "approve" ? "Device paired." : "Device rejected.");
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | remote on|off | pair approve|reject | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] | remote on|off | pair approve|reject | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {

@@ -218,6 +218,14 @@ h2 { font-size: 15px; font-weight: 600; }
 #connection { font-size: 13px; color: var(--muted); }
 .modes { display: flex; gap: 6px; margin-left: auto; }
 .git-actions { display: flex; gap: 6px; }
+/* Project commands: prompt chips (agent, purple) and run chips (hub PC, teal); they fold into Commands ▾ when they no longer fit. */
+.project-commands { display: flex; gap: 6px; flex: 1 1 0; min-width: 0; overflow: hidden; }
+.mode-chip.project-command { flex: none; white-space: nowrap; border-color: var(--accent); color: var(--accent); }
+.mode-chip.project-command[data-kind=run] { border-color: #0ca678; color: #0ca678; }
+.commands-more-wrap { position: relative; flex: none; }
+.commands-menu .project-command { display: grid; width: 100%; text-align: left; border-radius: 6px; padding: 4px 10px; }
+.commands-menu .project-command small { color: var(--muted); font-size: 11px; white-space: normal; }
+.drawer-commands .project-command[data-kind=run] { color: #0ca678; }
 .git-actions .mode-chip { border-color: var(--accent); color: var(--accent); }
 .mode-chip { font: inherit; font-size: 12px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
 .mode-chip[aria-pressed=true] { border-color: var(--accent); background: var(--accent); color: var(--panel); }
