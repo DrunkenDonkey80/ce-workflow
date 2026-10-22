@@ -49,7 +49,7 @@ export async function handleEnvCommand(ctx, pi) {
 		{ question: "Variable name", context: "Letters, digits and _; not starting with a digit.", options: [], allowFreeform: true, initialText: envNameFromText(lastReply(ctx)) },
 		{ question: "Value", context: "Stays out of the chat: the agent is told only the name.", options: [], allowFreeform: true },
 		{ question: "Keep it", options: [
-			{ title: SESSION, description: "Only this Pi session and the tools it runs; gone when it exits." },
+			{ title: SESSION, selected: true, description: "Only this Pi session and the tools it runs; gone when it exits." },
 			{ title: PERMANENT, description: "Also saved for your user; Pi sessions started later see it (hub sessions after a hub restart)." },
 		], allowFreeform: false },
 	] });

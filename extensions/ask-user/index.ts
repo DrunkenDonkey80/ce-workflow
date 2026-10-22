@@ -252,7 +252,8 @@ function coerceOption(option: unknown): QuestionOption | null {
          if (typeof value === "string" && value.trim()) {
             const description =
                typeof record.description === "string" && record.description.trim() ? record.description : undefined;
-            return description ? { title: value.trim(), description } : { title: value.trim() };
+            // ce-workflow: selected pre-selects the option in the web form (the terminal cursor starts on the first option).
+            return { title: value.trim(), ...(description ? { description } : {}), ...(record.selected === true ? { selected: true } : {}) };
          }
       }
    }

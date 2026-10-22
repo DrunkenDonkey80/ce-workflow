@@ -551,14 +551,15 @@ try {
  await browser("fill", "#prompt-form textarea", "Teal"); await browser("press", "Enter");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.equal(answers.at(-1).text, "Teal", "with nothing chosen the text is your own answer");
- ask({ questions: [{ question: "Pick deploy targets", options: [{ title: "Alpha" }, { title: "Beta" }], allowMultiple: true, allowFreeform: false }, { question: "Name the rollout", options: [], allowMultiple: false, allowFreeform: true }], allowComment: false });
+ ask({ questions: [{ question: "Pick deploy targets", options: [{ title: "Alpha" }, { title: "Beta" }], allowMultiple: true, allowFreeform: false }, { question: "Name the rollout", options: [], allowMultiple: false, allowFreeform: true, initialText: "" }, { question: "Keep it", options: [{ title: "Session", selected: true }, { title: "Permanent" }], allowFreeform: false }], allowComment: false });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ assert.deepEqual(await evaluate("[document.querySelector('#prompt-form textarea').rows, document.querySelector('#prompt-form input[value=Session]').checked]"), [1, true], "a short pre-filled answer is one line; a selected option starts chosen");
  await browser("focus", "#prompt-form input[value=Alpha]"); await browser("press", "Enter");
  assert(await evaluate("document.getElementById(\"prompt\").open"), "checklist Enter toggles instead of submitting");
  await browser("focus", "#prompt-form input[value=Beta]"); await browser("press", "Space");
  await browser("fill", "#prompt-form textarea[placeholder=\"Write your answer\"]", "Canary"); await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
- assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary");
+ assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary"); assert.deepEqual(answers.at(-1).answers[2].response.selections, ["Session"]);
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
  await browser("press", "Escape");
  await browser("wait", "--fn", "document.querySelector('#load-cpu polyline').getAttribute('points')");

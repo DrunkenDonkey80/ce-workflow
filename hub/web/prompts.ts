@@ -92,7 +92,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
    if (question.context) { const context = node("div", { className: "prompt-context" }); links(context, question.context); section.append(context); }
    const inputs = [];
    for (const option of question.options) {
-    const input = node("input", { type: question.allowMultiple ? "checkbox" : "radio", name: "question_" + index, value: option.title }); inputs.push(input);
+    const input = node("input", { type: question.allowMultiple ? "checkbox" : "radio", name: "question_" + index, value: option.title, checked: !!option.selected }); input.dataset.on = option.selected ? "1" : ""; inputs.push(input);
     if (question.allowMultiple) input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); input.checked = !input.checked; } });
     // Tapping the chosen radio again clears it, so the text box can become your own answer.
     else input.addEventListener("click", () => { if (input.dataset.on) input.checked = false; for (const other of inputs) other.dataset.on = other.checked ? "1" : ""; });
@@ -102,9 +102,9 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
    // One box like the terminal: with an option chosen it is the comment, with none it is your own answer.
    const freeform = question.allowFreeform || !question.options.length, commented = ask.allowComment && question.options.length > 0;
    const placeholder = !question.options.length ? "Write your answer" : freeform && commented ? "Comment on your choice, or choose nothing and write your own answer" : freeform ? "Or choose nothing and write your own answer" : "Optional comment";
-   // A pre-filled answer (ask_user initialText) opens ready to edit, with room for it.
-   const prefilled = typeof question.initialText === "string" && !question.options.length;
-   const text = node("textarea", { rows: prefilled ? 10 : 3, maxLength: 16000, placeholder, value: prefilled ? question.initialText : "" }); text.setAttribute("aria-label", placeholder + ": " + question.question);
+   // A pre-filled answer (ask_user initialText) opens ready to edit, with room for it; a short one-line one (a name) stays one line.
+   const prefilled = typeof question.initialText === "string" && !question.options.length, oneLine = prefilled && !question.initialText.includes("\n") && question.initialText.length <= 80;
+   const text = node("textarea", { rows: oneLine ? 1 : prefilled ? 10 : 3, maxLength: 16000, placeholder, value: prefilled ? question.initialText : "" }); text.setAttribute("aria-label", placeholder + ": " + question.question);
    if (freeform || commented) { section.append(text); attachTo(text); }
    const skip = node("input", { type: "checkbox" });
    if (ask.questions) { const label = node("label", { className: "prompt-option" }); label.append(skip, "Skip this question"); section.append(label); }

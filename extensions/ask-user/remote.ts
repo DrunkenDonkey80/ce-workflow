@@ -5,7 +5,7 @@ import { ask as hubAsk, hubActive } from "../hub-channel.ts";
 export interface RemoteQuestion {
 	question: string;
 	context?: string;
-	options: { title: string; description?: string }[];
+	options: { title: string; description?: string; selected?: boolean }[];
 	allowMultiple: boolean;
 	allowFreeform: boolean;
 	initialText?: string;
