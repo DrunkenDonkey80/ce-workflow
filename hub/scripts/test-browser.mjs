@@ -590,7 +590,7 @@ try {
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - session name; the plan is in its bar");
  // Usage: one bar per provider, filled to 7d left; a warning shows in the button and colours it.
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))"), ["Claude: 53% · expiring in 4h 12m (40% unused)|error|53%", "Codex: 12% 1d 14h|error|12%"], "usage: one bar per provider with its warning");
- assert.match(await evaluate("document.querySelector('#usage-button .usage-bar').title"), /Claude · 7d 53% · expiring in 4h 12m/, "hover shows the provider's bars and warnings");
+ assert.match(await evaluate("document.querySelector('#usage-button .usage-bar').title"), /Claude · 7d 53% left · expiring in 4h 12m/, "hover shows the provider's bars and warnings");
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
@@ -602,7 +602,7 @@ try {
  await browser("click", "#usage-close");
  await browser("click", "#usage-button [data-provider=claude]"); await browser("wait", ".pool-row");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-alert, #usage-body .pool-row')].map(e => e.className)"), ["usage-alert tone-error", "pool-row active picked", "pool-row"], "claude window: warning, then the pool rows, active one picked");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('.pool-row.active .pool-bar-fill')].map(f => f.className + ' ' + f.style.width)"), ["pool-bar-fill tone-success 20%", "pool-bar-fill tone-warning 53%"], "5h and 7d as coloured bars");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.pool-row.active .pool-bar-fill')].map(f => f.className + ' ' + f.style.width)"), ["pool-bar-fill tone-success 80%", "pool-bar-fill tone-warning 47%"], "5h and 7d as coloured bars (% left by default)");
  assert.equal(await evaluate("document.querySelectorAll('.pool-row.active .pool-bar')[1].querySelector('.tone-error')?.textContent"), "4h 12m", "an expiring week's clock is red");
  assert.equal(await evaluate("document.querySelectorAll('.pool-actions').length"), 1, "one action row for the picked account");
  await browser("click", ".pool-row:not(.active)"); await browser("wait", "--fn", "document.querySelector('.pool-pick')?.textContent === 'flex2'");
