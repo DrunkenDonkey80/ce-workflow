@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.63 — 2026-10-22
 
 ### Changed
 - Hub: an image path in a chat message shows its picture right under that line, not all together at the end of the message.
@@ -11,6 +11,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Fixed
 - Hub on Windows: the hourly update check no longer flashes console windows.
 - Hub: tab and app icons are transparent again, with light ink on a dark tab bar (the iPhone home-screen icon keeps its white square).
+- Hub on Linux/WSL: when the hub runs as a systemd service, Restart and Update from the gear (and pi-hub restart) work instead of killing themselves with the hub.
 
 ## 0.1.62 — 2026-10-22
 
