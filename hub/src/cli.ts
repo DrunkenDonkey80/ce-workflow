@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] | remote on|off | pair approve|reject | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | remote on|off | pair approve|reject | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +31,20 @@ async function call(route: string, data?: unknown) {
 	const value = await response.json();
 	if (!response.ok) throw new Error(value.error ?? `HTTP ${response.status}`);
 	return value;
+}
+
+/** A POST with no client timeout (fetch gives up on headers after 5 minutes): pi-hub ask waits for a person. */
+function callLong(route: string, data: unknown): Promise<Record<string, unknown>> {
+	const config = readConfig(), running = marker();
+	if (!config || !running) throw new Error("The hub is not running.");
+	return new Promise((done, failed) => {
+		const request = http.request({ host: "127.0.0.1", port: running.port, path: route, method: "POST", headers: { "x-hub-key": config.localKey, "content-type": "application/json" } }, response => {
+			let text = ""; response.setEncoding("utf8").on("data", chunk => text += chunk).on("end", () => {
+				try { const value = JSON.parse(text); if (response.statusCode !== 200) failed(new Error(value.error ?? `HTTP ${response.statusCode}`)); else done(value); } catch (error) { failed(error); }
+			});
+		});
+		request.on("error", failed).end(JSON.stringify(data));
+	});
 }
 
 const remoteLine = (remote: { on: boolean; url?: string; missing?: string[]; error?: string }) =>
@@ -237,6 +252,25 @@ try {
 		const flag = (name: string) => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
 		const result = await call("/api/commands", { action: rest[0], folder: path.resolve(flag("folder") ?? "."), name: flag("name"), kind: flag("kind"), text: flag("text"), help: flag("help") });
 		console.log(rest[0] === "list" ? JSON.stringify(result.commands) : rest[0] === "add" ? `Added "${result.name}".` : result.ok ? "Removed." : "No such command.");
+	} else if (verb === "ask" || verb === "notice") {
+		// For run commands' scripts (PI_HUB_SESSION is set): ask the user through the page's ask_user form, or report back.
+		const VALUED = ["session", "json", "option", "context", "text"];
+		const values = (name: string) => rest.flatMap((arg, at) => arg === `--${name}` && at + 1 < rest.length ? [rest[at + 1]] : []);
+		const words = rest.filter((arg, at) => !arg.startsWith("--") && !VALUED.includes(rest[at - 1]?.slice(2) ?? ""));
+		const session = values("session")[0] ?? process.env.PI_HUB_SESSION;
+		if (!session) throw new Error("Not run by a hub command button: pass --session <hub id>.");
+		if (verb === "notice") { await call(`/api/sessions/${session}/notice`, { text: words.join(" ") }); }
+		else {
+			const json = values("json")[0];
+			const form = json !== undefined ? JSON.parse(json === "-" ? readFileSync(0, "utf8") : json) : {
+				question: words.join(" "), options: values("option"), allowMultiple: rest.includes("--multiple"), allowFreeform: !rest.includes("--no-freeform"),
+				...(values("context")[0] ? { context: values("context")[0] } : {}), ...(values("text")[0] ? { initialText: values("text")[0] } : {}),
+			};
+			const answer = await callLong(`/api/sessions/${session}/ask`, form) as { cancel?: boolean; text?: string; selections?: string[] };
+			if (answer.cancel) { console.error("Cancelled."); process.exitCode = 1; }
+			else if (rest.includes("--raw") || form.questions) console.log(JSON.stringify(answer));
+			else console.log(answer.selections ? answer.selections.join("\n") : answer.text ?? "");
+		}
 	} else if (verb === "remote" && ["on", "off"].includes(rest[0])) {
 		// Tailnet-only HTTPS through `tailscale serve` on the hub's port; never Funnel.
 		if (marker()) console.log(remoteLine(await call("/api/remote", { on: rest[0] === "on" })));
@@ -253,7 +287,7 @@ try {
 		console.log(rest[0] === "approve" ? "Device paired." : "Device rejected.");
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] | remote on|off | pair approve|reject | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | remote on|off | pair approve|reject | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {

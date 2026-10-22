@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- Hub: a run button's script can ask you things with no model turn. `pi-hub ask "Deploy where?" --option staging --option prod` shows the usual question form on the page (parked sessions too), waits for your answer and prints it; `pi-hub notice "Done"` shows a line on the page. Ask the agent to make such a button and it writes the script.
+
+### Fixed
+- Hub on Windows: run buttons' commands lost their output, even `> file` redirects.
+
 ## 0.1.61 — 2026-10-22
 
 ### Added

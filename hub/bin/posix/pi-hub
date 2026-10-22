@@ -1,0 +1,3 @@
+#!/bin/sh
+# Run commands get PI_HUB_NODE (the hub's node); a terminal falls back to node on PATH.
+exec "${PI_HUB_NODE:-node}" "$(dirname "$0")/../../src/cli.ts" "$@"

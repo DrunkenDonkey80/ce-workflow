@@ -3,6 +3,7 @@
 // command line in the folder on the hub PC, with no agent and no captured output.
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { writeJsonAtomic } from "./registry.ts";
 
@@ -38,9 +39,22 @@ export function createCommands(dataDir: string) {
 }
 export type Commands = ReturnType<typeof createCommands>;
 
-/** Starts a run command in its folder and forgets it; a window it opens (a terminal, Explorer) shows on the hub PC. */
-export function runCommand(folder: string, line: string) {
-	const child = spawn(line, { cwd: folder, shell: true, detached: true, stdio: "ignore", windowsHide: true });
+// hub/bin holds pi-hub shims, so a run command's script can call `pi-hub ask` even where npm link never ran.
+// Separate folders: cmd would try an extensionless `pi-hub` beside pi-hub.cmd first and fail silently.
+const BIN = fileURLToPath(new URL(process.platform === "win32" ? "../bin/win" : "../bin/posix", import.meta.url));
+
+/**
+ * Starts a run command in its folder and forgets it; a window it opens (a terminal, Explorer) shows on the hub PC.
+ * It gets PI_HUB_SESSION and pi-hub on PATH, so its script can ask the user (pi-hub ask) and report back (pi-hub notice).
+ */
+export function runCommand(folder: string, line: string, session?: string) {
+	const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === "PATH") ?? "PATH";
+	const env = { ...process.env, [pathKey]: BIN + path.delimiter + (process.env[pathKey] ?? ""), PI_HUB_NODE: process.execPath, ...(session ? { PI_HUB_SESSION: session } : {}) };
+	// Windows: a detached (console-less) cmd loses its programs' output, even `> file` redirects, so a detached node
+	// launcher starts the line under a hidden console of its own instead; detaching still lets it outlive the hub.
+	const child = process.platform === "win32"
+		? spawn(process.execPath, ["-e", "require('child_process').spawn(process.env.PI_HUB_RUN, { shell: true, stdio: 'ignore', windowsHide: true }).on('exit', code => process.exit(code ?? 0))"], { cwd: folder, env: { ...env, PI_HUB_RUN: line }, detached: true, stdio: "ignore", windowsHide: true })
+		: spawn(line, { cwd: folder, env, shell: true, detached: true, stdio: "ignore" });
 	child.on("error", () => {}); // a missing program only fails in its own shell; nothing to report back
 	child.unref();
 }

@@ -104,16 +104,42 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	}
 
 	/** Open forms for the snapshot (H5-04): every dialog Pi has open, as page forms. */
-	const forms = (id: string) => host.pendingDialogs(id).flatMap(dialog => toForm(dialog) ?? []);
+	const forms = (id: string) => [...host.pendingDialogs(id).flatMap(dialog => toForm(dialog) ?? []), ...[...scriptAsks.get(id)?.values() ?? []].map(ask => ask.form)];
 	const openDialog = (id: string, askId: unknown) => host.pendingDialogs(id).find(dialog => dialog.id === askId && toForm(dialog));
+
+	// `pi-hub ask` from a run command's script: an ask_user form the hub holds itself (no Pi, no model turn), parked
+	// sessions too. The CLI's request stays open until the page answers; a script that dies takes its form with it.
+	const scriptAsks = new Map<string, Map<string, { form: Record<string, unknown> & { askId: string }; done: (answer: Record<string, unknown>) => void }>>();
+	const closeAsk = (id: string, askId: string) => { if (scriptAsks.get(id)?.delete(askId)) views.get(id)?.publish("dialog_closed", { askId }); };
+	function scriptAsk(id: string, data: Record<string, unknown>, closed: Promise<unknown>): Promise<Record<string, unknown>> {
+		if (!registry.get(id)) throw fail(404, "Unknown session.");
+		const question = (value: unknown) => {
+			const item = value as Record<string, unknown>;
+			if (!item || typeof item.question !== "string" || !item.question.trim()) throw fail(400, "question: the text to ask.");
+			if (item.options !== undefined && !Array.isArray(item.options)) throw fail(400, "options: a list.");
+			const options = ((item.options ?? []) as unknown[]).map(option => typeof option === "string" ? { title: option } : option as Record<string, unknown>);
+			if (options.some(option => !option || typeof option.title !== "string" || !option.title)) throw fail(400, "options: titles (strings or {title, description}).");
+			return { question: item.question, ...(typeof item.context === "string" ? { context: item.context } : {}), options, allowMultiple: item.allowMultiple === true, allowFreeform: item.allowFreeform !== false, ...(typeof item.initialText === "string" ? { initialText: item.initialText } : {}) };
+		};
+		const askId = "script-" + crypto.randomUUID();
+		const form = Array.isArray(data.questions)
+			? { askId, questions: data.questions.map(question), allowComment: data.allowComment === true }
+			: { askId, ...question(data), allowComment: data.allowComment === true };
+		return new Promise(done => {
+			const open = scriptAsks.get(id) ?? new Map(); scriptAsks.set(id, open);
+			open.set(askId, { form, done });
+			views.get(id)?.publish("dialog", form);
+			void closed.then(() => closeAsk(id, askId));
+		});
+	}
 
 	// H5-05: the session bar. A run that ends with no page watching stays "unseen" until a page opens the session.
 	const unseen = new Set<string>();
 	const seen = (id: string) => unseen.delete(id);
 	function tone(id: string) {
 		if (registry.get(id)?.state === "terminal") return "terminal";
+		if (forms(id).length) return "waiting"; // a script's question waits on a parked session too
 		if (!host.live.has(id)) return "parked";
-		if (forms(id).length) return "waiting";
 		if (host.busyReasons(id).length) return "working";
 		if (scheduler?.list(id).length) return "scheduled"; // D4: idle, a timer will wake it
 		return unseen.has(id) ? "unseen" : "seen";
@@ -200,7 +226,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			}
 			// Files named in chat: inline opens it in the browser, download saves it (the remote page's Open and Download).
 			case "download": await sendLinkedFile(params.get("path"), folder(id), params.has("download"), response, remote); return undefined;
-			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
+			case "dialog": { const script = scriptAsks.get(id)?.get(params.get("id") ?? ""); if (script) return script.form; const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
 			case "system": return systemLoad();
 			// D6: usage comes from the hub's own poller, so it shows with every session parked.
@@ -235,7 +261,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				const command = commands?.list(folder(id)).find(item => item.name === data.name);
 				if (!command) throw fail(404, "That command no longer exists.");
 				if (command.kind === "prompt") return call(id, "/api/message", { text: command.text });
-				runCommand(folder(id), command.text); return { ok: true, started: true };
+				runCommand(folder(id), command.text, id); return { ok: true, started: true };
 			}
 			case "commands": {
 				only(data, ["target", "remove"], "Invalid fields.");
@@ -288,6 +314,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "answer": {
 				only(data, ANSWER_FIELDS, "Invalid answer fields.");
 				// First answer wins: a second tab (or a closed ask) gets accepted: false, as ce-workflow's dialogs.answer.
+				const script = scriptAsks.get(id)?.get(data.askId as string);
+				if (script) { const { target: _target, askId: _askId, ...answer } = data; closeAsk(id, data.askId as string); script.done(answer); return { accepted: true }; }
 				const dialog = openDialog(id, data.askId);
 				if (!dialog || !host.respond(id, dialog.id as string, toResponse(dialog, data))) return { accepted: false };
 				views.get(id)?.publish("dialog_closed", { askId: dialog.id });
@@ -323,7 +351,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** Shows changed project commands on every open page of that folder's sessions. */
 	const refresh = (dir: string) => { for (const record of registry.list()) if (views.has(record.id) && path.relative(record.folder, dir) === "") void publishStatus(record.id).catch(() => {}); };
 
-	return { get, post, extras, forms, settings, refresh, saveImage: savePastedImage };
+	return { get, post, extras, forms, settings, refresh, scriptAsk, saveImage: savePastedImage };
 }
 
 // PC load for the page's CPU/memory graph: CPU is the busy share of all cores since the previous call.

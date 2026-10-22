@@ -151,6 +151,26 @@ try {
 	assert.deepEqual((await post(id, "answer", { askId: channel.askId, text: "again" })).body, { accepted: false }, "first answer wins");
 	assert.equal((await get(id, `dialog?id=${channel.askId}`)).status, 404);
 
+	// A run button's script asks through pi-hub ask (shim on PATH, PI_HUB_SESSION set) and gets the answer: no model turn.
+	const noticed = [], withDialogs = view.publish;
+	view.publish = (event, value) => { if (event === "notice") noticed.push(value.text); withDialogs(event, value); };
+	const hubPost = (route, data) => fetch(`${origin}${route}`, { method: "POST", headers: { "x-hub-key": localKey, "content-type": "application/json", connection: "close" }, body: JSON.stringify(data) }).then(r => r.json());
+	await hubPost("/api/commands", { action: "add", folder, name: "Deploy", kind: "run", text: "pi-hub ask \"Deploy where?\" --option staging --option prod > answer.txt && pi-hub notice \"Deployed\"" });
+	assert.deepEqual((await post(id, "run", { name: "Deploy" })).body, { ok: true, started: true });
+	const asked = await until(async () => frames.findLast(frame => frame[0] === "dialog" && frame[1].question === "Deploy where?")?.[1]);
+	assert.deepEqual(asked.options, [{ title: "staging" }, { title: "prod" }]);
+	assert.deepEqual((await get(id, "snapshot")).body.dialogs.map(form => form.askId), [asked.askId]);
+	assert.deepEqual((await post(id, "answer", { askId: asked.askId, selections: ["prod"] })).body, { accepted: true });
+	await until(() => noticed.includes("Deployed"));
+	assert.equal(fs.readFileSync(path.join(folder, "answer.txt"), "utf8").trim(), "prod");
+	// A script that goes away (killed, timed out) takes its form with it.
+	const gone = new AbortController(), pending = fetch(`${origin}/api/sessions/${id}/ask`, { method: "POST", signal: gone.signal, headers: { "x-hub-key": localKey, "content-type": "application/json" }, body: JSON.stringify({ question: "Left?" }) }).catch(() => {});
+	const left = await until(async () => frames.findLast(frame => frame[0] === "dialog" && frame[1].question === "Left?")?.[1]);
+	gone.abort(); await pending;
+	await until(() => frames.some(frame => frame[0] === "dialog_closed" && frame[1].askId === left.askId));
+	assert.equal((await hubPost(`/api/sessions/${id}/ask`, { options: ["x"] })).error, "question: the text to ask.");
+	view.publish = withDialogs;
+
 	// Plain RPC dialogs from other extensions or Pi itself, converted both ways.
 	const select = await open(`/dialog select ${JSON.stringify({ title: "Pick a mode", options: ["Fast", "Slow"] })}`, "dialog:");
 	assert.deepEqual((await get(id, `dialog?id=${select.askId}`)).body, { askId: select.askId, kind: "list", title: "Pick a mode", purpose: "Choose an option to continue.", items: [{ value: "Fast", label: "Fast" }, { value: "Slow", label: "Slow" }] });

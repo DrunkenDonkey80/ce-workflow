@@ -151,6 +151,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/sessions/([0-9a-f-]{36})/restart": (_d, m) => host.restart(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/terminal": (_d, m) => host.openTerminal(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/rename": (data, m) => host.rename(m[1], String(data.name ?? "")),
+		// pi-hub notice: a run command's script reports back on the session's open pages (no model turn).
+		"POST /api/sessions/([0-9a-f-]{36})/notice": (data, m) => { if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 }); views.get(m[1])?.publish("notice", { text: String(data.text ?? "").slice(0, 2000) }); return { ok: true }; },
 		"POST /api/sessions/([0-9a-f-]{36})/prompt": (data, m) => host.prompt(m[1], String(data.message ?? "")),
 		// S-02: timers of one session; the CLI (and through it the schedule tool) is the only writer.
 		"GET /api/sessions/([0-9a-f-]{36})/timers": (_d, m) => ({ timers: scheduler.list(m[1]) }),
@@ -328,6 +330,9 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				// H5-03: the rest of the page API.
 				if (endpoint) { const value = await pageApi.get(page[1], endpoint, url.searchParams, response, remote); return value === undefined ? undefined : send(200, value); }
 			}
+			// pi-hub ask: held open until the page answers; the CLI going away closes the form.
+			const ask = request.method === "POST" && /^\/api\/sessions\/([0-9a-f-]{36})\/ask$/.exec(url.pathname);
+			if (ask) return send(200, await pageApi.scriptAsk(ask[1], await body(request), new Promise(done => response.once("close", done))));
 			for (const [route, handler] of Object.entries(routes)) {
 				const [method, pattern] = route.split(" ");
 				const match = method === request.method ? url.pathname.match(new RegExp(`^${pattern}$`)) : null;
