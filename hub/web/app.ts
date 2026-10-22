@@ -1194,7 +1194,7 @@ function sessionRow(session: HubSession, folder: string, path: string) {
 const sessionMenu = html("div", { className: "status-menu session-menu", hidden: true }); sessionMenu.setAttribute("role", "menu"); document.body.append(sessionMenu);
 function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string) {
  const parked = session.tone === "parked";
- const item = (text: string, run: () => void) => { const button = html("button", { type: "button", textContent: text }); button.setAttribute("role", "menuitem"); button.addEventListener("click", () => { sessionMenu.hidden = true; run(); }); return button; };
+ const item = (text: string, run: () => void, className = "") => { const button = html("button", { type: "button", textContent: text, className }); button.setAttribute("role", "menuitem"); button.addEventListener("click", () => { sessionMenu.hidden = true; run(); }); return button; };
  // H7-01: a session open in a terminal window comes back by itself when that window closes.
  if (session.tone === "terminal") showNotice(`"${session.name}" is open in a terminal on the PC; it returns here when that Pi exits.`);
  sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path))] : [
@@ -1203,7 +1203,13 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
   ...(session.timers ?? []).map(t => item(`Cancel ⏰ ${t.kind}: ${t.label.slice(0, 40)}`, () => void sessionAction({ action: "cancel-timer", id: session.id, timer: t.id }))),
   item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
-  ...(parked ? [item("Unstar (keep the file)", () => { if (confirm(`Remove "${session.name}" from its group? The session file stays in Recents.`)) void sessionAction({ action: "unstar", id: session.id }); })] : [item("Reload", () => void sessionAction({ action: "reload", id: session.id }))]),
+  ...(parked ? [] : [item("Reload", () => void sessionAction({ action: "reload", id: session.id }))]),
+  // Delete = unstar: the record leaves its group, the session file stays in Recents (D18); a live one is parked first.
+  item("Delete session", async () => {
+   if (!confirm(`Delete "${session.name}" from its group? The session file stays in Recents.`)) return;
+   if (!parked) { try { await post("session", { action: "park", id: session.id }); } catch (error) { return showNotice(error.message); } }
+   void sessionAction({ action: "unstar", id: session.id });
+  }, "danger"),
  ]);
  const box = anchor.getBoundingClientRect(); sessionMenu.hidden = false;
  sessionMenu.style.position = "fixed"; sessionMenu.style.top = Math.max(8, Math.min(box.bottom, innerHeight - sessionMenu.offsetHeight - 8)) + "px"; sessionMenu.style.left = Math.max(8, Math.min(box.left, innerWidth - sessionMenu.offsetWidth - 8)) + "px";
