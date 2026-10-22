@@ -42,8 +42,9 @@ For direct commit-and-push requests, use this path: one parallel preflight (`sta
 
 ## Test Scope Rule
 
-After each change, run only the targeted test scripts for the touched code. Run the full
-`npm run verify:quiet` once, just before a push, never after every edit.
+After each change, run only the targeted test scripts for the touched code. Before a push,
+run only the targeted tests for the pushed changes unless the request asks for the full suite
+(then `npm run verify:quiet` once) or says no tests (then none). Never run the full suite after every edit.
 
 ## Version Before Push Rule
 

@@ -93,7 +93,7 @@ function renderShell() {
  // Commit shows with changed files; Commit and push also with unpushed commits. The hub reads git on each status (run end, model change).
  const git = status?.git, busy = !state.connected || messageSending || !!state.activity.working || promptView.busy;
  $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead;
- for (const id of ["git-commit", "git-push"]) ($(id) as HTMLButtonElement).disabled = busy;
+ for (const id of ["git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
  renderCommands(status?.commands ?? [], busy);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
@@ -963,7 +963,7 @@ function expectWork(on = true) {
  expectTimer = window.setTimeout(() => expectWork(false), 15000);
 }
 // Menus: one open at a time; Escape or a click elsewhere closes and returns focus to its button.
-const menus = [["commands-more", "commands-menu"], ["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["title", "title-menu"]];
+const menus = [["git-push", "push-menu"], ["commands-more", "commands-menu"], ["review-button", "review-menu"], ["model-button", "model-menu"], ["context-button", "context-menu"], ["bias-button", "bias-menu"], ["settings-button", "settings-menu"], ["plan-button", "plan-menu"], ["title", "title-menu"]];
 function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
@@ -1028,7 +1028,12 @@ async function toggleMode(text: string) {
  if (messageSending) return; messageSending = true; renderShell();
  try { await post("message", { text }); } catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
 }
-for (const id of ["git-commit", "git-push"]) $(id).addEventListener("click", () => void toggleMode($(id).dataset.git!));
+$("git-commit").addEventListener("click", () => void toggleMode($("git-commit").dataset.git!));
+// Push asks which tests to run first: scoped by default for fast releases, full on request.
+$("git-push").addEventListener("click", () => toggleMenu("git-push", "push-menu"));
+for (const choice of document.querySelectorAll<HTMLButtonElement>(".push-choice")) choice.addEventListener("click", () => { closeMenus(); void toggleMode(choice.dataset.git!); });
+// The value is asked by /wo env through ask_user and never enters the chat.
+for (const id of ["env-var", "drawer-env-var"]) $(id).addEventListener("click", () => void toggleMode("/wo env"));
 // Project commands (the project_commands tool): chips right of >>, folded into Commands ▾ when they no longer fit;
 // the phone drawer lists them. Prompt commands send their text to the agent, run commands start on the hub PC.
 type ProjectCommand = { name: string; kind: "prompt" | "run"; text: string; help?: string };
