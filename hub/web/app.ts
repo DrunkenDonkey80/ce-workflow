@@ -646,7 +646,7 @@ function renderBlocks(box: HTMLElement, row) {
   }
   box.append(item);
   // Tool output images (screenshots, renders) show under the block, visible while it is collapsed.
-  appendThumbs(box, images); images.clear();
+  appendThumbs(box, images); images.clear(); checkFileLinks(box);
  });
 }
 // ask_user is part of the conversation: the agent's questions above, your answer below, shown open in every chat view.
@@ -733,15 +733,16 @@ function renderChat() {
  if (follow) feed.scrollTop = feed.scrollHeight; else if (feed.scrollHeight > feed.clientHeight) $("to-bottom").hidden = false;
  fillChat();
 }
-// Image and Markdown paths in chat text become links: images open full size and show as thumbnails
-// (pasted or terminal Alt+V images too); .md opens in the Files tab. The server shows any image on this PC outside hidden folders.
+// File paths in chat text (any extension) become links once the hub confirms the file exists (checkFileLinks); images also
+// show as thumbnails (pasted or terminal Alt+V images too). The server shares any file on this PC outside hidden folders.
 // A path in double quotes or backticks may contain spaces; file:/// URLs link to the local path they name.
-const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.(?:png|jpe?g|gif|webp|svg|md)(?![\w-])/gi;
+const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-])/gi;
+const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 // Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
-// no colon after that, and the image/.md extension right before the closing quote.
-const QUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/]|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.(?:png|jpe?g|gif|webp|svg|md)`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
+// no colon after that, and a file extension right before the closing quote.
+const QUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/]|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.[A-Za-z][A-Za-z0-9]{0,9}`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
 function renderLinks(target: HTMLElement, text: string) {
- target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images);
+ target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images); checkFileLinks(target);
 }
 // Chat Markdown subset, built as DOM (never innerHTML): ``` code, | tables |, # headings, **bold**, *italic*, [links](url) and `code`; lists stay as text.
 const TABLE_ROW = /^\s*\|.*\|\s*$/, TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
@@ -774,7 +775,7 @@ function inline(target: HTMLElement, text: string, images: Set<string>) {
   linkPaths(target, text.slice(at, match.index), images); at = match.index + match[0].length;
   if (match[7] !== undefined || match[8] !== undefined) { linkPaths(target, match[0], images); continue; }
   if (match[2] !== undefined) {
-   // Only targets linkPaths would link (http(s), images, .md) become links, labelled with the link text; others show the label.
+   // Only targets linkPaths would link (http(s), file paths) become links, labelled with the link text; others show the label.
    const probe = document.createElement("span"); linkPaths(probe, match[3], images);
    const link = probe.querySelector("a"); if (link && [...probe.childNodes].every(node => node === link || !node.textContent)) { link.textContent = match[2]; target.append(link); } else target.append(match[2]);
    continue;
@@ -797,11 +798,9 @@ function linkPaths(target: HTMLElement, text: string, images: Set<string>) {
    continue;
   }
   if (match[2]) {
-   // The whole URL is decoded before the extension check, so a folder named like an image (a.png/) never ends it; other files stay text.
    const url = match[2].replace(/[*_.,;:!?)\]]+$/, ""), raw = url.slice("file://".length);
    let path = raw; try { path = decodeURIComponent(raw); } catch { /* malformed escapes: keep the raw path */ }
    path = path.replace(/^\/(?=[A-Za-z]:)/, "");
-   if (!/\.(?:png|jpe?g|gif|webp|svg|md)$/i.test(path)) continue;
    target.append(text.slice(at, match.index)); at = match.index + url.length; appendPathLink(target, path, images);
    continue;
   }
@@ -812,10 +811,38 @@ function linkPaths(target: HTMLElement, text: string, images: Set<string>) {
  target.append(text.slice(at));
 }
 function appendPathLink(target: HTMLElement, path: string, images: Set<string>) {
- const image = !/\.md$/i.test(path), link = Object.assign(document.createElement("a"), { textContent: path, className: "chat-link", href: image ? imageSource(path) : "#" });
- if (image) { link.target = "_blank"; link.rel = "noopener"; images.add(path); }
- else link.addEventListener("click", event => { event.preventDefault(); setTab("files"); filesView.open(path); if (matchMedia("(max-width: 899px)").matches) setMobile("files"); });
+ const link = Object.assign(document.createElement("a"), { textContent: path, className: "file-link", href: fileSource(path, false) });
+ link.dataset.path = path; if (IMAGE_FILE.test(path)) images.add(path);
  target.append(link);
+}
+// Model text names many things that look like files (Node.js, e.g.); a link stays plain text until the hub finds the file.
+const fileFound = new Map<string, string | null>();
+function checkFileLinks(root: HTMLElement) {
+ const links = [...root.querySelectorAll<HTMLAnchorElement>("a.file-link:not([data-full])")];
+ const apply = () => { for (const link of links) { const full = fileFound.get(link.dataset.path!); if (full === null) link.replaceWith(link.textContent!); else if (full) link.dataset.full = full; } };
+ const unknown = [...new Set(links.map(link => link.dataset.path!))].filter(path => !fileFound.has(path)).slice(0, 200);
+ if (!unknown.length) return apply();
+ post("paths", { paths: unknown }).then(({ found }) => { for (const path of unknown) fileFound.set(path, found[path] ?? null); apply(); }).catch(() => undefined);
+}
+const fileSource = (path: string, download: boolean) => "api/download?path=" + encodeURIComponent(path) + (download ? "&download=1" : "") + (token ? "&token=" + token : "");
+// On this PC (key page): click opens the file, Shift copies its path, Ctrl opens its folder. Remotely a click offers Download / Open.
+document.addEventListener("click", event => {
+ const link = (event.target as HTMLElement).closest?.<HTMLAnchorElement>("a.file-link[data-full]"); if (!link) return;
+ event.preventDefault(); const path = link.dataset.path!, full = link.dataset.full!;
+ if (!token) openFileMenu(link, path, full);
+ else if (event.shiftKey) void copyPath(full);
+ else void openFile(path, event.ctrlKey || event.metaKey);
+});
+document.addEventListener("contextmenu", event => {
+ const link = (event.target as HTMLElement).closest?.<HTMLAnchorElement>("a.file-link[data-full]"); if (!link) return;
+ event.preventDefault(); openFileMenu(link, link.dataset.path!, link.dataset.full!);
+});
+function openFileMenu(link: HTMLElement, path: string, full: string) {
+ showMenu(link, token ? [["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)]]
+  : [["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)]]);
+}
+async function openFile(path: string, reveal: boolean) {
+ try { const { revealed } = await post("open", { path, reveal }); if (revealed && !reveal) showNotice("Programs and scripts open in their folder, never run."); } catch (error) { showNotice(error.message); }
 }
 function appendThumbs(target: HTMLElement, images: Set<string>) {
  for (const path of [...images].slice(0, 6)) {
@@ -829,7 +856,7 @@ function attachTo(text: HTMLTextAreaElement) {
  const picker = Object.assign(document.createElement("input"), { type: "file", multiple: true, hidden: true }), button = Object.assign(document.createElement("label"), { className: "attach button", title: "Attach files (or drop or paste them here)", textContent: "File" }), thumbs = Object.assign(document.createElement("div"), { className: "prompt-thumbs" });
  button.append(picker); picker.addEventListener("change", () => { const files = [...picker.files ?? []]; picker.value = ""; void attachAll(files, text); });
  takeFiles(text, text);
- text.addEventListener("input", () => { thumbs.replaceChildren(); appendThumbs(thumbs, new Set([...text.value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => !/\.md$/i.test(path)))); });
+ text.addEventListener("input", () => { thumbs.replaceChildren(); appendThumbs(thumbs, new Set([...text.value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => IMAGE_FILE.test(path)))); });
  text.after(button, thumbs);
 }
 const imageSource = (path: string) => "api/image?path=" + encodeURIComponent(path) + (token ? "&token=" + token : "");
@@ -1262,9 +1289,15 @@ function sessionRow(session: HubSession, folder: string, path: string) {
 }
 // One popup for the row actions; Park/Resume follow the session's state.
 const sessionMenu = html("div", { className: "status-menu session-menu", hidden: true }); sessionMenu.setAttribute("role", "menu"); document.body.append(sessionMenu);
+const menuItem = (text: string, run: () => void, className = "") => { const button = html("button", { type: "button", textContent: text, className }); button.setAttribute("role", "menuitem"); button.addEventListener("click", () => { sessionMenu.hidden = true; run(); }); return button; };
+function placeMenu(anchor: HTMLElement) {
+ const box = anchor.getBoundingClientRect(); sessionMenu.hidden = false;
+ sessionMenu.style.position = "fixed"; sessionMenu.style.top = Math.max(8, Math.min(box.bottom, innerHeight - sessionMenu.offsetHeight - 8)) + "px"; sessionMenu.style.left = Math.max(8, Math.min(box.left, innerWidth - sessionMenu.offsetWidth - 8)) + "px";
+ sessionMenu.querySelector("button")?.focus();
+}
+function showMenu(anchor: HTMLElement, items: [string, () => void][]) { sessionMenu.replaceChildren(...items.map(([text, run]) => menuItem(text, run))); placeMenu(anchor); }
 function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string) {
- const parked = session.tone === "parked";
- const item = (text: string, run: () => void, className = "") => { const button = html("button", { type: "button", textContent: text, className }); button.setAttribute("role", "menuitem"); button.addEventListener("click", () => { sessionMenu.hidden = true; run(); }); return button; };
+ const parked = session.tone === "parked", item = menuItem;
  // H7-01: a session open in a terminal window comes back by itself when that window closes.
  if (session.tone === "terminal") showNotice(`"${session.name}" is open in a terminal on the PC; it returns here when that Pi exits.`);
  sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path))] : [
@@ -1281,14 +1314,12 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
    void sessionAction({ action: "unstar", id: session.id });
   }, "danger"),
  ]);
- const box = anchor.getBoundingClientRect(); sessionMenu.hidden = false;
- sessionMenu.style.position = "fixed"; sessionMenu.style.top = Math.max(8, Math.min(box.bottom, innerHeight - sessionMenu.offsetHeight - 8)) + "px"; sessionMenu.style.left = Math.max(8, Math.min(box.left, innerWidth - sessionMenu.offsetWidth - 8)) + "px";
- sessionMenu.querySelector("button")?.focus();
+ placeMenu(anchor);
 }
 document.addEventListener("pointerdown", event => { if (!sessionMenu.contains(event.target as Node)) sessionMenu.hidden = true; });
 // The clipboard needs a secure page (localhost or the tailnet https link); otherwise show the path to copy by hand.
 async function copyPath(path: string) {
- try { await navigator.clipboard.writeText(path); showNotice(`Copied ${path}`); } catch { prompt("Folder path:", path); }
+ try { await navigator.clipboard.writeText(path); showNotice(`Copied ${path}`); } catch { prompt("Path:", path); }
 }
 sessionMenu.addEventListener("keydown", event => { if (event.key === "Escape") { event.stopPropagation(); sessionMenu.hidden = true; } });
 async function sessionAction(data: Record<string, unknown>) {

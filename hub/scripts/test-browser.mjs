@@ -292,8 +292,21 @@ try {
 	// Image and Markdown paths in chat become links; images also show as thumbnails. Only temp-folder and project images are served.
  { const row = { id: "img_row", role: "agent", text: `look ${pasted}, see docs/notes.md. and ${process.platform === "win32" ? "C:\\Windows\\Web\\x.png" : "/etc/x.png"}`, streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=img_row] .thumb img");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.textContent.split(/[\\\\/]/).pop())"), [pasted.split(/[\\/]/).pop(), "notes.md", "x.png"]);
- assert.deepEqual(await evaluate("(async () => { const [ok, , outside] = [...document.querySelectorAll('[data-id=img_row] .chat-link')].map(a => a.getAttribute('href')); const a = await fetch(ok), b = await fetch(outside), c = await fetch(ok.replace(/\\.png/, '.txt')); return [a.status, a.headers.get('content-type'), b.status === 403 || b.status === 404, c.status]; })()"), [200, "image/png", true, 400]);
+ const verified = row => browser("wait", "--fn", `!document.querySelector('[data-id=${row}] a.file-link:not([data-full])')`);
+ await verified("img_row"); // files the hub cannot find (x.png) stay plain text
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=img_row] .file-link')].map(a => a.textContent.split(/[\\\\/]/).pop())"), [pasted.split(/[\\/]/).pop(), "notes.md"]);
+ assert(await evaluate("document.querySelector('[data-id=img_row]').textContent.includes('x.png')"));
+ assert.deepEqual(await evaluate("(async () => { const [ok] = [...document.querySelectorAll('[data-id=img_row] .file-link')].map(a => a.getAttribute('href')); const a = await fetch(ok), b = await fetch(ok + '&download=1'), c = await fetch(ok.replace(/\\.png/, '.txt')); return [a.status, a.headers.get('content-type'), a.headers.get('content-disposition').split(';')[0], b.headers.get('content-disposition').split(';')[0], c.status]; })()"), [200, "image/png", "inline", "attachment", 404]);
+ { // Hidden files are never shared; text (even HTML) is served as sandboxed plain text.
+  const { found } = await (await fetch(`${origin}/s/${id}/api/paths`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ paths: ["docs/notes.md", ".gitignore", "top.txt", "nope.txt"] }) })).json();
+  assert.deepEqual(Object.keys(found).sort(), ["docs/notes.md", "top.txt"]); assert.equal(found["top.txt"], fs.realpathSync(join(folder, "top.txt")));
+  const text = await fetch(`${origin}/s/${id}/api/download?path=top.txt`, { headers: { authorization: `Bearer ${hub.config.localKey}` } });
+  assert.equal(text.headers.get("content-type"), "text/plain; charset=utf-8"); assert.match(text.headers.get("content-security-policy"), /^sandbox/);
+ }
+ // Right-click on this PC offers Open, Open folder and Copy path (a click would open the file with its app).
+ await evaluate("document.querySelector('[data-id=img_row] .file-link').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.session-menu:not([hidden]) button')].map(b => b.textContent)"), ["Open", "Open folder", "Copy path"]);
+ await evaluate("document.querySelector('.session-menu').hidden = true");
  // Web addresses link too, without the Markdown bold around them.
  { const row = { id: "url_row", role: "agent", text: "Here's the link: **http://127.0.0.1:8768/index.html** (it's running now).", streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=url_row] a.chat-link");
@@ -302,28 +315,26 @@ try {
  { const row = { id: "md_row", role: "agent", text: "**Load:** use `Thread.Yield`\n\n| Setup | echo |\n|---|---|\n| RF | **5 ms** |\n\nafter *slow* _fast_ snake_case_name [docs](https://example.com/a) [bad](javascript:alert(1))", streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=md_row] table");
  assert.deepEqual(await evaluate("(() => { const m = document.querySelector('[data-id=md_row]'); return [m.querySelector('b').textContent, m.querySelector('code').textContent, [...m.querySelectorAll('th,td')].map(c => c.textContent), m.textContent.includes('**') || m.textContent.includes('|'), [...m.querySelectorAll('i')].map(i => i.textContent), m.textContent.includes('snake_case_name'), [...m.querySelectorAll('a.chat-link')].map(a => [a.textContent, a.getAttribute('href')]), m.textContent.includes('](')]; })()"), ["Load:", "Thread.Yield", ["Setup", "echo", "RF", "5 ms"], false, ["slow", "fast"], true, [["docs", "https://example.com/a"]], false]);
- await browser("click", "[data-id=img_row] .chat-link[href='#']");
- assert.deepEqual(await evaluate("[document.getElementById('files').hidden, document.querySelector('.files-viewer h2').textContent]"), [false, "docs/notes.md"], "a .md link opens in the Files tab");
  // Quoted or backticked paths may hold spaces (and _ that is not italics); file:/// URLs link to their decoded path.
  {
   const spaced = join(pasted, "..", "_pi_ hub spaces", "shot one.png"), decoded = spaced.replaceAll("\\", "/"), fileUrl = "file:///" + decoded.replace(/^\//, "").replaceAll(" ", "%20"), bare = process.platform === "win32" ? "C:\\tmp\\a.png" : "/tmp/a.png";
   fs.mkdirSync(join(spaced, ".."), { recursive: true }); fs.copyFileSync(pasted, spaced);
   const row = { id: "space_row", role: "agent", text: `quoted "${spaced}" and \`${spaced}\` and ${fileUrl}. [pic](${fileUrl}) "docs/my notes.md" "/review docs/plan.md" \`/review docs/plan.md\` "see docs/notes.md" "hello world" file:///C:/archive.png/photo.png file:///C:/a.txt my shot one.png "oops ${bare}\n\n\`\`\`\nsaved "${spaced}"\n\`\`\``, streaming: false }; chatRows.set(row.id, row); publish("message", row);
   await browser("wait", "--fn", "[...document.querySelectorAll('[data-id=space_row] .thumb img')].some(img => img.naturalWidth > 0)");
-  assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=space_row] .chat-link')].map(a => a.textContent)"), [spaced, spaced, decoded, "pic", "docs/my notes.md", "docs/plan.md", "docs/plan.md", "docs/notes.md", "C:/archive.png/photo.png", "one.png", bare, spaced], "quoted and file:/// paths link whole");
-  const hrefs = await evaluate("[...document.querySelectorAll('[data-id=space_row] .chat-link')].map(a => a.getAttribute('href'))");
-  assert(hrefs[0].startsWith("api/image?path=" + encodeURIComponent(spaced)) && hrefs[2].startsWith("api/image?path=" + encodeURIComponent(decoded)) && hrefs[3] === hrefs[2] && hrefs[4] === "#", "links go to the exact path");
+  await verified("space_row");
+  assert.deepEqual((await evaluate("[...document.querySelectorAll('[data-id=space_row] .file-link')].map(a => a.textContent)")).filter(text => text !== bare), [spaced, spaced, decoded, "pic", "docs/notes.md", spaced], "quoted and file:/// paths link whole; missing files stay text");
+  const hrefs = await evaluate("[...document.querySelectorAll('[data-id=space_row] .file-link')].map(a => a.getAttribute('href'))");
+  assert(hrefs[0].startsWith("api/download?path=" + encodeURIComponent(spaced)) && hrefs[2].startsWith("api/download?path=" + encodeURIComponent(decoded)) && hrefs[3] === hrefs[2], "links go to the exact path");
   assert.deepEqual(await evaluate(`Promise.all(${JSON.stringify([hrefs[0], hrefs[2]])}.map(async href => { const r = await fetch(href); return [r.status, r.headers.get('content-type')]; }))`), [[200, "image/png"], [200, "image/png"]]);
   assert(await evaluate("document.querySelector('[data-id=space_row]').textContent.includes('\"hello world\"')"), "quoted plain text stays text");
-  await evaluate("[...document.querySelectorAll('[data-id=space_row] .chat-link')].find(a => a.textContent === 'docs/my notes.md').click()");
-  assert.equal(await evaluate("document.querySelector('.files-viewer h2').textContent"), "docs/my notes.md", "a quoted .md with spaces opens in the Files tab");
   fs.rmSync(join(spaced, ".."), { recursive: true, force: true });
  }
  // Tool output paths link too; their thumbnails sit under the collapsed block, and an unservable one is dropped.
  { const row = { id: "tool_img_row", role: "assistant", text: "", streaming: false, blocks: [{ type: "tool", id: "t1", name: "screen_read", title: "screen_read", args: "{}", result: `Saved ${pasted}\nlisted look-missing.png` }] }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=tool_img_row] .thumb img");
  await browser("wait", "--fn", "document.querySelectorAll('[data-id=tool_img_row] .thumb').length === 1");
- assert.deepEqual(await evaluate("[document.querySelector('[data-id=tool_img_row] details').open, [...document.querySelectorAll('[data-id=tool_img_row] pre .chat-link')].map(a => a.textContent.split(/[\\\\/]/).pop())]"), [false, [pasted.split(/[\\/]/).pop(), "look-missing.png"]], "tool output paths are links, thumbnails visible while collapsed");
+ await verified("tool_img_row");
+ assert.deepEqual(await evaluate("[document.querySelector('[data-id=tool_img_row] details').open, [...document.querySelectorAll('[data-id=tool_img_row] pre .file-link')].map(a => a.textContent.split(/[\\\\/]/).pop())]"), [false, [pasted.split(/[\\/]/).pop()]], "tool output paths are links, thumbnails visible while collapsed");
  await browser("click", "#tab-plan");
  chatRows.delete("img_row"); chatRows.delete("tool_img_row"); await rm(pasted);
  // The Image button (phones have no clipboard paste) uploads the same way.

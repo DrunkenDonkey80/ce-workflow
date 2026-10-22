@@ -10,6 +10,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ![The Env var button in the chat header](docs/changelog/0.1.61-env-var-button.png)
 ![The dialog it opens](docs/changelog/0.1.61-env-var-dialog.png)
 
+- Hub: file paths in the chat (any file the agent names, like `docs/plans/x.md`) are bold green links once the hub finds the file. On this PC a click opens it with its app, Shift+click copies the full path, Ctrl+click opens its folder, and right-click shows all three. From another device a click offers **Download**, **Open** (in a new tab) or **Copy path**. Programs and scripts are only shown in their folder, never started.
+
+![Right-clicking a file link](docs/changelog/0.1.61-file-links.png)
+
 - Hub: **Commit and push** asks for scoped tests, the full suite or no tests.
 - Hub: **Install** it as an app (Chrome, Edge, Brave, Android: the install icon in the address bar). It opens in its own window, named after this PC, with the tab icon you picked. On iPhone, use Share → **Add to Home Screen**; it gets the same icon.
 - This changelog: the version at the top of the hub settings opens it, and after an update **What's new** opens once with only the newer versions.

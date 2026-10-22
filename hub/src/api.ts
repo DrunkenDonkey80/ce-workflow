@@ -10,6 +10,7 @@ import { emptyDiagram, loadDiagram } from "../../extensions/plan3-diagram.ts";
 import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
+import { linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
@@ -197,6 +198,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				response.end(image.bytes);
 				return undefined;
 			}
+			// Files named in chat: inline opens it in the browser, download saves it (the remote page's Open and Download).
+			case "download": await sendLinkedFile(params.get("path"), folder(id), params.has("download"), response); return undefined;
 			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
 			case "system": return systemLoad();
@@ -225,6 +228,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return call(id, "/api/message", data);
 			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
 			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
+			case "paths": return linkedFiles(data.paths, folder(id));
+			case "open": return openLinkedFile(data.path, folder(id), data.reveal === true);
 			// Project commands run by name only: the page never sends a command line.
 			case "run": {
 				const command = commands?.list(folder(id)).find(item => item.name === data.name);
