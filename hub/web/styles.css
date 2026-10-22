@@ -182,6 +182,8 @@ h2 { font-size: 15px; font-weight: 600; }
 .usage-item { font-weight: 600; } .usage-warning { font-weight: 700; } .usage-warning.tone-error { color: var(--error); } .usage-warning.tone-warning { color: var(--warning); }
 #usage-button .usage-bar { flex: 0 1 auto; }
 .usage-window { width: min(760px, 94vw); position: relative; } .usage-window h2 { margin-top: 0; padding-right: 40px; }
+.hub-version { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 2px 0 6px; color: var(--muted); font-size: 12px; } .hub-version:hover { color: var(--ink); text-decoration: underline; }
+.changelog-body { max-height: 75dvh; overflow-y: auto; } .changelog-body h3 { margin: 14px 0 4px; } .changelog-body div { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; } .changelog-body .thumb img { max-width: 240px; }
 .dialog-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 0; font-size: 20px; line-height: 1; }
 .usage-window-bar { display: block; text-align: left; margin: 6px 0; padding: 8px 12px; font-variant-numeric: tabular-nums; }
 .usage-alert { margin: 8px 0; padding: 6px 10px; border-radius: 6px; font-weight: 600; background: color-mix(in srgb, currentColor 10%, transparent); }

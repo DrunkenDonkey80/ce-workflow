@@ -561,7 +561,15 @@ try {
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary"); assert.deepEqual(answers.at(-1).answers[2].response.selections, ["Session"]);
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
- await browser("press", "Escape");
+ assert.match(await evaluate("document.getElementById('hub-version').textContent"), /^ce-workflow \d+\.\d+\.\d+$/, "settings name the version");
+ await browser("click", "#hub-version"); await browser("wait", "--fn", "document.getElementById('changelog').open && document.querySelectorAll('#changelog-body h3').length > 5");
+ assert.equal(await evaluate("document.getElementById('changelog-title').textContent"), "Changelog", "the version opens the whole changelog");
+ await browser("click", "#changelog-close");
+ assert.equal(await evaluate("document.getElementById('changelog').open"), false);
+ const whatsNew = (await api("changelog?since=0.1.58")).entries.map(entry => entry.version);
+ assert(whatsNew.includes("0.1.59") && !whatsNew.includes("0.1.58") && !whatsNew.includes("Unreleased"), "What's new keeps released versions after the one last seen");
+ const badSeen = await fetch(`${origin}/s/${id}/api/hub`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ action: "settings", seenVersion: "../x" }) });
+ assert.equal(badSeen.status, 400, "seen version must be x.y.z");
  await browser("wait", "--fn", "document.querySelector('#load-cpu polyline').getAttribute('points')");
  assert.match(await evaluate("['load-cpu', 'load-memory'].map(id => document.getElementById(id).getAttribute('aria-label')).join(' · ')"), /^CPU \d+% · Memory \d+%$/, "PC load boxes left of the gear");
  assert.deepEqual(await evaluate("['load-cpu', 'load-memory', 'settings-button'].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })"), [[34, 34], [34, 34], [34, 34]], "same-size squares");

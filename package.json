@@ -17,6 +17,8 @@
     "scripts/",
     "skills/",
     "hub/",
+    "docs/changelog/",
+    "CHANGELOG.md",
     "README.md"
   ],
   "scripts": {

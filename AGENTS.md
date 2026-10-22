@@ -50,6 +50,8 @@ run only the targeted tests for the pushed changes unless the request asks for t
 
 Before every push, increment the package version in `package.json` (patch by default) and commit it. Keep any tracked lockfile version in sync. Retrying the same failed push does not require another increment.
 
+In the same commit, move `CHANGELOG.md`'s Unreleased bullets (and anything else since the last version's commit) under a new `## <version> — <date>` heading with `### Added` / `### Changed` / `### Fixed`, in plain user words, hub and `/wo` together. For a visible hub change, add a tight crop: `node hub/scripts/changelog-shot.mjs "<selector>" docs/changelog/<version>-<name>.png "<setup JS>"` (throwaway hub with a fake Pi), then a `![what it shows](docs/changelog/<file>.png)` line under that entry's bullets.
+
 ## Extension File Rule
 
 Write every extension module (anything under `extensions/` or imported by an

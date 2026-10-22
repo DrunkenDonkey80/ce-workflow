@@ -36,6 +36,7 @@
    <div id="context-menu" class="status-menu" role="group" aria-label="Context" hidden><button type="button" id="compact-now">Compact now</button></div>
    <div id="bias-menu" class="status-menu" role="group" aria-label="Plan3 bias" hidden></div>
    <div id="settings-menu" class="status-menu settings-panel" role="group" aria-label="Hub settings" hidden>
+    <button type="button" id="hub-version" class="hub-version" title="What changed in each version">ce-workflow</button>
     <section class="settings-group" aria-labelledby="set-sessions"><h3 id="set-sessions">Sessions</h3>
      <label class="menu-field" title="Idle sessions stop after this long and resume when you open and message them">Auto-park <select id="hub-park"><option value="0">Off</option><option value="5">5 min</option><option value="10">10 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="240">4 hours</option></select></label>
      <div class="menu-field menu-field-top" title="Desktop notifications from every session on this PC, while a hub page is open">Notify me<div class="settings-checks"><label><input type="checkbox" id="notify-question"> Questions</label><label><input type="checkbox" id="notify-done"> Finished</label></div></div>
@@ -156,6 +157,7 @@
  <dialog id="pair-approve" aria-labelledby="pair-approve-title"><h2 id="pair-approve-title">Approve a new device?</h2><p class="dialog-purpose">Approve only if the device shows the same code.</p><p id="pair-device"></p><p id="pair-approve-code" class="pair-code"></p><div class="dialog-actions"><button id="pair-reject" type="button" class="danger">Reject</button><button id="pair-accept" type="button" class="primary">Approve</button></div></dialog>
  <dialog id="devices" aria-labelledby="devices-title"><h2 id="devices-title">Paired devices</h2><p id="devices-remote" class="dialog-purpose"></p><ul id="device-list" class="device-list"></ul><div class="dialog-actions"><button id="devices-close" type="button">Close</button></div></dialog>
  <dialog id="usage-window" class="usage-window" aria-labelledby="usage-title"><button id="usage-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="usage-title">Usage</h2><div id="usage-body"></div></dialog>
+ <dialog id="changelog" class="usage-window" aria-labelledby="changelog-title"><button id="changelog-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="changelog-title">Changelog</h2><div id="changelog-body" class="changelog-body"></div></dialog>
  <dialog id="viewer" aria-label="Image, tap to close"><img alt=""></dialog>
 </body>
 </html>
