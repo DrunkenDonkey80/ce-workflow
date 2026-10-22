@@ -1,4 +1,5 @@
 // Pasted and chat-linked images for the page (moved from ce-workflow plan3-web.ts in plan 0db155f7 H9-01).
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -54,4 +55,12 @@ export async function readLinkedImage(path: string | null, project?: string) {
 	if (!kind && isSvg(real, bytes)) return { bytes, type: "image/svg+xml" };
 	if (!kind) throw fail(415, "Not a supported image.");
 	return { bytes, type: kind[0] === "jpg" ? "image/jpeg" : "image/" + kind[0] };
+}
+/** Files copied in Explorer on this PC (path and size), so a page on this PC links them instead of uploading copies.
+ * shortcut: Windows only (Windows PowerShell's Get-Clipboard -Format); other systems upload as before. */
+export function clipboardFiles(): Promise<{ path: string; size: number }[]> {
+	if (process.platform !== "win32") return Promise.resolve([]);
+	const script = "Get-Clipboard -Format FileDropList | Where-Object { -not $_.PSIsContainer } | ForEach-Object { \"$($_.Length)|$($_.FullName)\" }";
+	return new Promise(done => execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", script], { encoding: "utf8", windowsHide: true, timeout: 5000 }, (error, out) =>
+		done(error ? [] : out.split("\n").flatMap(line => { const m = /^(\d+)\|(.+)$/.exec(line.trim()); return m ? [{ size: Number(m[1]), path: m[2] }] : []; }))));
 }

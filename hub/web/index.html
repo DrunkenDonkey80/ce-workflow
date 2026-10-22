@@ -40,9 +40,8 @@
      <label class="menu-field" title="Idle sessions stop after this long and resume when you open and message them">Auto-park <select id="hub-park"><option value="0">Off</option><option value="5">5 min</option><option value="10">10 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="240">4 hours</option></select></label>
      <div class="menu-field menu-field-top" title="Desktop notifications from every session on this PC, while a hub page is open">Notify me<div class="settings-checks"><label><input type="checkbox" id="notify-question"> Questions</label><label><input type="checkbox" id="notify-done"> Finished</label></div></div>
     </section>
-    <section class="settings-group" aria-labelledby="set-device"><h3 id="set-device">This device</h3>
-     <label class="menu-field">Theme <select id="hub-theme"><option value="">Pi</option><option value="nord">Nord</option><option value="solarized">Solarized</option></select></label>
-     <label class="menu-field" title="Auto follows the system">Mode <select id="hub-mode"><option value="">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    <section class="settings-group" aria-labelledby="set-device"><h3 id="set-device" title="This device only">Display</h3>
+     <div class="menu-field"><label for="hub-theme">Theme</label><div class="theme-pair"><select id="hub-mode" aria-label="Light or dark" title="Auto follows the system"><option value="">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select><select id="hub-theme"><option value="">Pi</option><option value="nord">Nord</option><option value="solarized">Solarized</option></select></div></div>
      <label class="menu-field">Usage shows <select id="hub-usage"><option value="">% left</option><option value="used">% used</option></select></label>
     </section>
     <section class="settings-group" aria-labelledby="set-usage" title="Which subscription usage bars this hub polls and shows"><h3 id="set-usage">Usage bars</h3>

@@ -18,6 +18,7 @@ import { createPool, type Pool } from "./pool.ts";
 import { createUpdateCheck, type UpdateCheck } from "./update-check.ts";
 import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
+import { clipboardFiles } from "./images.ts";
 import { agentDir } from "./rpc-client.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
@@ -273,6 +274,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				}
 				if (asset && (ASSETS[asset[2]] || asset[1] !== currentBuild())) return serveAsset(asset[1], asset[2]);
 				if (asset) return send(404, { error: "Unknown asset." });
+				// The page on this PC links files copied in Explorer instead of uploading copies; remote devices never see this PC's clipboard.
+				if (endpoint === "clipfiles") return remote ? send(403, { error: "Local page only." }) : send(200, { files: await clipboardFiles() });
 				// H5-02: the session view.
 				if (["events", "snapshot", "rows", "row"].includes(endpoint ?? "")) {
 					const sessionView = await view(page[1]);

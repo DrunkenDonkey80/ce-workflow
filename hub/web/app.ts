@@ -864,8 +864,21 @@ const transferFiles = (data: DataTransfer | null) => {
  const image = [...data?.items ?? []].find(item => item.type.startsWith("image/"))?.getAsFile(); return image ? [image] : [];
 };
 async function attachAll(files: File[], input: HTMLTextAreaElement) { for (const file of files) await attach(file, input); }
+// On the hub's own PC (the page has the local key) a file copied in Explorer is already here: insert its real path.
+async function pasteFiles(files: File[], input: HTMLTextAreaElement) {
+ let copied: { path: string; size: number }[] = [];
+ if (token) try { copied = (await get("clipfiles")).files; } catch { /* upload instead */ }
+ for (const file of files) {
+  const local = copied.find(item => item.size === file.size && item.path.split(/[\\/]/).pop() === file.name);
+  if (local) insertPath(input, /\s/.test(local.path) ? `"${local.path}"` : local.path); else await attach(file, input);
+ }
+}
+function insertPath(input: HTMLTextAreaElement, path: string) {
+ const at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); input.dispatchEvent(new Event("input"));
+ if (input === $("message-input")) toBottom();
+}
 function takeFiles(zone: HTMLElement, input: HTMLTextAreaElement) {
- input.addEventListener("paste", event => { const files = transferFiles(event.clipboardData); if (!files.length) return; event.preventDefault(); void attachAll(files, input); });
+ input.addEventListener("paste", event => { const files = transferFiles(event.clipboardData); if (!files.length) return; event.preventDefault(); void pasteFiles(files, input); });
  zone.addEventListener("dragover", event => { if (event.dataTransfer?.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } });
  zone.addEventListener("drop", event => { const files = transferFiles(event.dataTransfer); if (!files.length) return; event.preventDefault(); event.stopPropagation(); void attachAll(files, input); });
 }
@@ -877,8 +890,7 @@ async function attach(file: File, input: HTMLTextAreaElement) {
  try {
   const response = await fetch("api/paste?name=" + encodeURIComponent(file.name), { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": file.type || "application/octet-stream" }, body: file });
   const value = await response.json(); if (!response.ok) throw new Error(value.error ?? "Upload failed.");
-  const at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + value.path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); input.dispatchEvent(new Event("input"));
-  if (input === $("message-input")) toBottom(); showNotice("Saved: " + value.path, true);
+  insertPath(input, value.path); showNotice("Saved: " + value.path, true);
  } catch (error) { showNotice(error.message); }
 }
 // Typing "/name" or "/wo sub" lists matching commands; arrows move, Tab/Enter picks, Escape closes.
@@ -1480,7 +1492,7 @@ function renderUpdates() {
  $("settings-button").title = count ? `Hub settings (${count} update${count > 1 ? "s" : ""})` : "Hub settings";
  const when = updates?.checkedAt ? new Date(updates.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
  const names = updates ? [...updates.pi ? [`Pi ${updates.pi.current} → ${updates.pi.latest}`] : [], ...updates.packages] : [];
- $("update-list").textContent = !updates ? "Not checked by this hub." : updates.checking ? "Checking…" : (names.length ? names.join(", ") : "Everything is up to date.") + (updates.error ? ` Last check failed: ${updates.error}.` : "") + (when ? ` (checked ${when})` : "");
+ $("update-list").textContent = !updates ? "Not checked by this hub." : updates.checking ? "Checking…" : (names.length ? names.join(", ") : when ? `Last checked ${when}` : "Not checked yet") + (updates.error ? ` · check failed: ${updates.error}` : "");
  ($("update-check") as HTMLButtonElement).disabled = !updates || updates.checking;
 }
 $("update-check").addEventListener("click", async () => {
