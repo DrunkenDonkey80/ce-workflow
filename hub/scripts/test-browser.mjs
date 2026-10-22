@@ -302,6 +302,11 @@ try {
   assert.deepEqual(Object.keys(found).sort(), ["docs/notes.md", "top.txt"]); assert.equal(found["top.txt"], fs.realpathSync(join(folder, "top.txt")));
   const text = await fetch(`${origin}/s/${id}/api/download?path=top.txt`, { headers: { authorization: `Bearer ${hub.config.localKey}` } });
   assert.equal(text.headers.get("content-type"), "text/plain; charset=utf-8"); assert.match(text.headers.get("content-security-policy"), /^sandbox/);
+  // A remote device gets only the project, plus temp/Downloads files from the last 5 days.
+  const { linkedFile } = await import("../src/linked-files.ts"), old = join(os.tmpdir(), `hub-old-${process.pid}.txt`);
+  fs.writeFileSync(old, "x"); fs.utimesSync(old, new Date(Date.now() - 6 * 864e5), new Date(Date.now() - 6 * 864e5));
+  assert.deepEqual([!!await linkedFile("top.txt", folder, true), !!await linkedFile(pasted, folder, true), !!await linkedFile(old, folder, true), !!await linkedFile(old, folder, false), !!await linkedFile(process.execPath, folder, true)], [true, true, false, true, false]);
+  fs.rmSync(old);
  }
  // Right-click on this PC offers Open, Open folder and Copy path (a click would open the file with its app).
  await evaluate("document.querySelector('[data-id=img_row] .file-link').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))");

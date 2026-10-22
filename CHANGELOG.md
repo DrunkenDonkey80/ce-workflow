@@ -10,7 +10,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ![The Env var button in the chat header](docs/changelog/0.1.61-env-var-button.png)
 ![The dialog it opens](docs/changelog/0.1.61-env-var-dialog.png)
 
-- Hub: file paths in the chat (any file the agent names, like `docs/plans/x.md`) are bold green links once the hub finds the file. On this PC a click opens it with its app, Shift+click copies the full path, Ctrl+click opens its folder, and right-click shows all three. From another device a click offers **Download**, **Open** (in a new tab) or **Copy path**. Programs and scripts are only shown in their folder, never started.
+- Hub: file paths in the chat (any file the agent names, like `docs/plans/x.md`) are bold green links once the hub finds the file. On this PC a click opens it with its app, Shift+click copies the full path, Ctrl+click opens its folder, and right-click shows all three. From another device a click offers **Download**, **Open** (in a new tab) or **Copy path**, for files in the session's project, or in temp and Downloads when changed in the last 5 days. Programs and scripts are only shown in their folder, never started.
 
 ![Right-clicking a file link](docs/changelog/0.1.61-file-links.png)
 
@@ -21,6 +21,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ![The changelog window](docs/changelog/0.1.61-changelog-window.png)
 
 ### Changed
+- Hub: in research mode the Context bar fills up to the model's real context window, since research doesn't compact at 200k.
 - Hub tab icon shows one dot per kind of activity across sessions instead of only the most urgent one: red asks a question, orange working, blue finished and not yet looked at. Dots are smaller and fill the lower-right, lower-left, then upper-right corner.
 
 ![Tab icon with one, two and three dots](docs/changelog/0.1.61-tab-icon-dots.png)

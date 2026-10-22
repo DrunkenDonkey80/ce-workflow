@@ -176,7 +176,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		throw fail(400, "Unknown session action.");
 	}
 
-	async function get(id: string, endpoint: string, params: URLSearchParams, response: http.ServerResponse): Promise<unknown> {
+	async function get(id: string, endpoint: string, params: URLSearchParams, response: http.ServerResponse, remote = false): Promise<unknown> {
 		switch (endpoint) {
 			case "plans": {
 				const plans = await listPlans(folder(id)), now = current(id, plans);
@@ -199,7 +199,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return undefined;
 			}
 			// Files named in chat: inline opens it in the browser, download saves it (the remote page's Open and Download).
-			case "download": await sendLinkedFile(params.get("path"), folder(id), params.has("download"), response); return undefined;
+			case "download": await sendLinkedFile(params.get("path"), folder(id), params.has("download"), response, remote); return undefined;
 			case "dialog": { const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
 			case "system": return systemLoad();
@@ -214,7 +214,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		throw fail(404, "Unknown workspace endpoint.");
 	}
 
-	async function post(id: string, endpoint: string, data: Record<string, unknown>): Promise<unknown> {
+	async function post(id: string, endpoint: string, data: Record<string, unknown>, remote = false): Promise<unknown> {
 		switch (endpoint) {
 			case "session": return session(data);
 			case "message":
@@ -228,8 +228,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return call(id, "/api/message", data);
 			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
 			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
-			case "paths": return linkedFiles(data.paths, folder(id));
-			case "open": return openLinkedFile(data.path, folder(id), data.reveal === true);
+			case "paths": return linkedFiles(data.paths, folder(id), remote);
+			case "open": return openLinkedFile(data.path, folder(id), data.reveal === true, remote);
 			// Project commands run by name only: the page never sends a command line.
 			case "run": {
 				const command = commands?.list(folder(id)).find(item => item.name === data.name);

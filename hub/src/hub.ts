@@ -286,7 +286,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					spawn(process.execPath, [fileURLToPath(new URL("./cli.ts", import.meta.url)), ...(data.action === "update" ? ["update", "--yes"] : ["restart"])], { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
 					return send(200, { ok: true });
 				}
-				return send(200, await pageApi.post(page[1], endpoint, data));
+				return send(200, await pageApi.post(page[1], endpoint, data, remote));
 			}
 			if (page && request.method === "GET") {
 				if (!registry.get(page[1])) return send(404, { error: "Unknown session." });
@@ -326,7 +326,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					return sessionView.attach(response, extras);
 				}
 				// H5-03: the rest of the page API.
-				if (endpoint) { const value = await pageApi.get(page[1], endpoint, url.searchParams, response); return value === undefined ? undefined : send(200, value); }
+				if (endpoint) { const value = await pageApi.get(page[1], endpoint, url.searchParams, response, remote); return value === undefined ? undefined : send(200, value); }
 			}
 			for (const [route, handler] of Object.entries(routes)) {
 				const [method, pattern] = route.split(" ");

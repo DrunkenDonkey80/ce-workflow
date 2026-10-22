@@ -60,7 +60,9 @@ function renderShell() {
  $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
  // 120k/1m like Pi's footer; tokens are null right after compaction until the next reply.
  const short = n => n >= 1e6 ? +(n / 1e6).toFixed(1) + "m" : Math.round(n / 1e3) + "k";
- const used = typeof status?.tokens === "number" ? status.tokens / Math.min(COMPACT_AT, status.window || COMPACT_AT) * 100 : status?.context ?? 0;
+ // Research suspends compaction, so the bar fills up to the model's real window instead of the 200k compaction border.
+ const researching = ((status as { modes?: { research?: string } })?.modes?.research ?? "off") !== "off";
+ const used = typeof status?.tokens === "number" ? status.tokens / (researching && status.window ? status.window : Math.min(COMPACT_AT, status.window || COMPACT_AT)) * 100 : status?.context ?? 0;
  setBar($("context-button"), used, used >= 90 ? "error" : used >= 70 ? "warning" : "accent");
  $("context-button").replaceChildren(html("span", { className: "context-label", textContent: "Context: " }), (status?.window ? (typeof status.tokens === "number" ? (status.estimated ? "~" : "") + short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—")); // the phone drawer hides the label
  $("bias-button").textContent = "💡 " + ((plan ? BIAS_LABEL : SESSION_BIAS)[biasNow()] ?? "Normal");
