@@ -1,6 +1,6 @@
-// Changelog screenshots: node hub/scripts/changelog-shot.mjs "<css selector>" docs/changelog/<name>.png [setup JS] [--size=1280x800] [--pad=12] [--ask=<ask_user JSON>]
+// Changelog screenshots: node hub/scripts/changelog-shot.mjs "<css selector>" docs/changelog/<name>.png [setup JS] [--size=1280x800] [--pad=12] [--ask=<ask_user JSON>] [--prompt=<chat text>]
 // Starts a throwaway hub (temp PI_CODING_AGENT_DIR, fake Pi, a git folder named ce-workflow with one open plan),
-// opens the page headless, optionally shows an ask_user form (--ask, e.g. a command's dialog), runs the optional setup JS
+// opens the page headless, optionally shows an ask_user form (--ask, e.g. a command's dialog) or a chat turn (--prompt: the fake agent echoes it), runs the optional setup JS
 // in the page (open a menu, click a tab...), then crops the selector plus --pad pixels of what surrounds it.
 // Nothing touches the real hub or its sessions.
 import fs from "node:fs";
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const [selector, out, setup = ""] = process.argv.slice(2).filter(arg => !arg.startsWith("--"));
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
-const pad = Number(flag("pad") ?? 12), ask = flag("ask"), [width, height] = (flag("size") ?? "1280x800").split("x");
+const pad = Number(flag("pad") ?? 12), ask = flag("ask"), chatPrompt = flag("prompt"), [width, height] = (flag("size") ?? "1280x800").split("x");
 if (!selector || !out || !/\.png$/i.test(out)) { console.error('Usage: changelog-shot.mjs "<selector>" <out.png> [setup JS] [--size=WxH] [--pad=N] [--ask=JSON]'); process.exit(2); }
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `hub-shot-${process.pid}`, execute = promisify(execFile);
@@ -41,6 +41,7 @@ const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("
 try {
 	const { id } = await hub.host.create(folder, "1"), rpc = hub.host.live.get(id).rpc;
 	await rpc.send({ type: "prompt", message: "/state " + JSON.stringify({ plan: { id: "12345678", title: "Sample plan", status: "active", done: 1, total: 2, focus: "S02", bias: 0 }, modes: { research: "off", night: "off" } }) });
+	if (chatPrompt) { await rpc.send({ type: "prompt", message: chatPrompt }); for (let n = 0; n < 100 && hub.host.live.get(id).running; n++) await new Promise(done => setTimeout(done, 50)); }
 	await browser("set", "viewport", width, height);
 	await browser("open", `http://127.0.0.1:${hub.config.port}/s/${id}/?token=${hub.config.localKey}`);
 	await browser("wait", "--fn", 'document.getElementById("title").textContent.startsWith("ce-workflow")');

@@ -6,6 +6,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - Hub: a run button's script can ask you things with no model turn. `pi-hub ask "Deploy where?" --option staging --option prod` shows the usual question form on the page (parked sessions too), waits for your answer and prints it; `pi-hub notice "Done"` shows a line on the page. Ask the agent to make such a button and it writes the script.
+- Hub: a red ✕ on your last message removes it, and everything the agent did after it, from the context (a running agent stops first). Useful for a prompt sent by mistake.
+
+![The ✕ on the last message](docs/changelog/0.1.62-remove-last-message.png)
+- Hub: an installed hub app (taskbar, dock, home screen) shows a badge while a session asks something or has finished work you haven't opened.
 
 ### Fixed
 - Hub on Windows: run buttons' commands lost their output, even `> file` redirects.

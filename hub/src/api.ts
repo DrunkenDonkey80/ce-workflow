@@ -252,6 +252,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 					views.get(id)?.close(); views.delete(id); return { ok: true };
 				}
 				return call(id, "/api/message", data);
+			// ✕ on the last prompt: it and the agent's work on it leave the context; the pages reconnect to the shorter chat.
+			case "drop": {
+				only(data, ["target", "text"], "Invalid fields.");
+				if (typeof data.text !== "string") throw fail(400, "text: the last message.");
+				try { await host.dropLastPrompt(id, data.text); } catch (error) { throw fail(409, (error as Error).message); }
+				views.get(id)?.close(); views.delete(id); return { ok: true };
+			}
 			case "command": case "bias": case "generate": case "edit": case "comment": case "move": return call(id, `/api/${endpoint}`, data);
 			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
 			case "paths": return linkedFiles(data.paths, folder(id), remote);

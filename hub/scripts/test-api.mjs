@@ -216,6 +216,17 @@ try {
 	assert.deepEqual(stopped.body.restored, ["oops, wrong"], "Stop takes queued messages back instead of letting abort deliver them");
 	await until(() => !hub.host.live.get(id).running);
 
+	// \u2715 on the last prompt: Pi forks from just before it, the registry follows, and a stale page can't drop another one.
+	await hub.host.prompt(id, "shown by mistake");
+	await until(() => !hub.host.live.get(id).running);
+	const prompts = async () => (await get(id, "snapshot")).body.chat.filter(row => row.role === "user").map(row => row.text);
+	const shown = await prompts(), beforeDrop = hub.registry.get(id).sessionFile;
+	assert.equal(shown.at(-1), "shown by mistake");
+	assert.equal((await post(id, "drop", { text: "an older prompt" })).status, 409, "only the last prompt");
+	assert.deepEqual((await post(id, "drop", { text: "shown by mistake" })).body, { ok: true });
+	assert.notEqual(hub.registry.get(id).sessionFile, beforeDrop);
+	assert.deepEqual(await prompts(), shown.slice(0, -1), "the prompt and the reply to it are gone");
+
 	// /new: a fresh session file, the lock moves with it, and the chat starts empty.
 	const oldFile = hub.registry.get(id).sessionFile;
 	assert.equal((await post(id, "message", { text: "/new" })).status, 200);

@@ -219,6 +219,32 @@ export class SessionHost extends EventEmitter {
 		return this.registry.update(id, { sessionFile });
 	}
 
+	/**
+	 * The page's ✕ on the last prompt: Pi forks from just before it (rpc fork), so the prompt and everything after it leave
+	 * the context. The old file stays as it was; the hub lock moves to the fork. `text` must match the last prompt, so a
+	 * stale page can't drop a newer one.
+	 */
+	async dropLastPrompt(id: string, text: string): Promise<SessionRecord> {
+		const live = this.live.get(id);
+		if (!live) throw new Error("Session is parked; resume it first.");
+		if (live.running) {
+			await live.rpc.send({ type: "abort" });
+			for (let i = 0; i < 100 && live.running; i++) await new Promise(done => setTimeout(done, 50));
+			if (live.running) throw new Error("The agent didn't stop; try again.");
+		}
+		const prompts = (await live.rpc.send({ type: "get_fork_messages" })).data?.messages as { entryId: string; text: string }[] | undefined;
+		const last = prompts?.at(-1);
+		// The page may hold a 2 KB excerpt of a long prompt, so the start decides.
+		if (!last || last.text.trim().slice(0, 1000) !== text.trim().slice(0, 1000)) throw new Error("That is no longer the last message.");
+		const result = await live.rpc.send({ type: "fork", entryId: last.entryId });
+		if (!result.success || result.data?.cancelled) throw new Error(result.error ?? "Pi kept the message.");
+		const state = await live.rpc.send({ type: "get_state" }), sessionFile = state.data?.sessionFile;
+		if (!state.success || typeof sessionFile !== "string") throw new Error(state.error ?? "Pi reported no session file.");
+		if (live.lock) releaseLock(live.lock.file, live.lock.info);
+		live.lock = { file: sessionFile, info: acquireLock(sessionFile, "pi-control-hub") };
+		return this.registry.update(id, { sessionFile });
+	}
+
 	/** D12: RPC has no reload, so Reload parks and resumes, idle only. */
 	async restart(id: string): Promise<SessionRecord> {
 		await this.park(id);

@@ -677,6 +677,12 @@ $("feed").addEventListener("scroll", () => { const list = $("feed"); if (atBotto
 new ResizeObserver(() => { pinChat(); fillChat(); }).observe($("feed"));
 $("feed").addEventListener("load", pinChat, true);
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
+$("messages").addEventListener("click", async event => {
+ const drop = (event.target as HTMLElement).closest<HTMLButtonElement>("#drop-last");
+ if (!drop || !confirm("Remove your last message and everything the agent did after it from the context? A running agent stops first.")) return;
+ drop.disabled = true;
+ try { await post("drop", { text: drop.dataset.text ?? "" }); showNotice("Removed from the context.", true); } catch (error) { showNotice((error as Error).message); } finally { drop.disabled = false; }
+});
 // Opening a thinking/tool block of an excerpt row loads its bodies.
 $("messages").addEventListener("toggle", event => { const item = (event.target as HTMLElement).closest<HTMLLIElement>("li"); const row = chat.get(item?.dataset.id); if ((event.target as HTMLDetailsElement).open && (row?.excerpt || row?.brief)) void loadRow(item.dataset.id); }, true);
 let loadingEarlier = false;
@@ -731,6 +737,10 @@ function renderChat() {
   renderBlocks(item.children[1] as HTMLElement, row); renderLinks(item.children[2] as HTMLElement, row.text);
   item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
  }
+ // ✕ on the last prompt takes it and everything after it out of the context (a prompt sent by mistake).
+ const lastPrompt = [...chat.values()].findLast(row => row.role === "user"), drop = $("drop-last") ?? Object.assign(document.createElement("button"), { id: "drop-last", type: "button", className: "drop-last", textContent: "\u2715", title: "Remove this message and everything after it from the context" });
+ const dropHost = lastPrompt && list.querySelector<HTMLLIElement>(`:scope > li[data-id="${CSS.escape(lastPrompt.id)}"]`);
+ if (dropHost) { drop.dataset.text = lastPrompt.text; if (drop.parentElement !== dropHost) dropHost.append(drop); } else drop.remove();
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
  if (follow) feed.scrollTop = feed.scrollHeight; else if (feed.scrollHeight > feed.clientHeight) $("to-bottom").hidden = false;
  fillChat();
@@ -1139,12 +1149,16 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; checkedAt: number | null; checking: boolean; error?: string };
 type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
-let hubSettings: HubSettings = {};
+let hubSettings: HubSettings = {}, appBadge = false;
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
  const states = [...sessionStates];
  if (promptView.busy || state.activity.dialog) states.push("waiting");
  if (state.activity.working || state.activity.subagents?.length) states.push("working");
+ // An installed app's taskbar/dock icon is fixed at install; its badge is the only live part (Chromium, Safari): a mark while
+ // something needs you (a question, or a finished session you haven't opened). Working has no badge.
+ const needsYou = states.includes("waiting") || states.includes("unseen");
+ if (needsYou !== appBadge && "setAppBadge" in navigator) { appBadge = needsYou; void (needsYou ? navigator.setAppBadge() : navigator.clearAppBadge()).catch(() => {}); }
  const icon = iconName(), svg = icon ? iconSvg(icon, states) : "";
  if (!icon || svg === iconKey) return; // no icons served (older hub): keep the static one
  iconKey = svg;
