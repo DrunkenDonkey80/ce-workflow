@@ -14,6 +14,7 @@ import { defaultCommand } from "./rpc-client.ts";
 import { listProcesses, outsidePis } from "./update.ts";
 import { createInterface } from "node:readline/promises";
 import { findCommand, isWsl, wslSystemd } from "./platform.ts";
+import { HUB_SERVICE, systemdHub } from "./maintenance.ts";
 
 // A marker left by a hub that died with the PC names a pid the OS may have reused; holderAlive checks start times.
 const marker = (): HubMarker | undefined => {
@@ -113,15 +114,19 @@ const waitFor = async (check: () => boolean, ms: number) => {
 	return check();
 };
 
-async function start() {
+async function start(managed = false) {
 	const running = marker();
 	if (running) return console.log(`Already running: pid ${running.pid}, http://127.0.0.1:${running.port}`);
 	mkdirSync(hubDataDir(), { recursive: true });
-	const log = openSync(path.join(hubDataDir(), "hub.log"), "a");
-	const child = spawn(process.execPath, [fileURLToPath(new URL("./hub.ts", import.meta.url))], { detached: true, windowsHide: true, stdio: ["ignore", log, log] });
-	child.unref();
-	if (!await waitFor(() => marker()?.pid === child.pid, 15_000)) throw new Error(`The hub did not start; see ${path.join(hubDataDir(), "hub.log")}.`);
-	console.log(`Started: pid ${child.pid}, http://127.0.0.1:${marker()!.port}`);
+	let pid: number | undefined;
+	if (managed) execFileSync("systemctl", ["--user", "start", HUB_SERVICE], { stdio: "pipe" });
+	else {
+		const log = openSync(path.join(hubDataDir(), "hub.log"), "a");
+		const child = spawn(process.execPath, [fileURLToPath(new URL("./hub.ts", import.meta.url))], { detached: true, windowsHide: true, stdio: ["ignore", log, log] });
+		child.unref(); pid = child.pid;
+	}
+	if (!await waitFor(() => { const current = marker(); return !!current && (managed || current.pid === pid); }, 15_000)) throw new Error(`The hub did not start; see ${path.join(hubDataDir(), "hub.log")}.`);
+	console.log(`Started: pid ${marker()!.pid}, http://127.0.0.1:${marker()!.port}`);
 }
 
 async function stop(force: boolean) {
@@ -134,7 +139,7 @@ async function stop(force: boolean) {
 
 /** Stop the hub, `pi update --all` (Pi and extensions), start it again; the running sessions come back (D17). */
 async function update(yes: boolean) {
-	const running = marker();
+	const running = marker(), managed = !!running && systemdHub(running.pid);
 	if (running) {
 		const busy = ((await call("/api/status")).sessions as { name: string; folder: string; busy: string[] }[]).filter(s => s.busy.length);
 		if (busy.length) throw new Error(`Not updated: busy sessions are never interrupted. Stop them, then retry:\n${busy.map(s => `  ${s.busy.join(", ")}  ${s.name}  ${s.folder}`).join("\n")}`);
@@ -156,7 +161,7 @@ async function update(yes: boolean) {
 	if (running) await stop(false); // refuses if a session turned busy meanwhile
 	const [command, ...prefix] = defaultCommand();
 	try { execFileSync(command, [...prefix, "update", "--all"], { stdio: "inherit", shell: command === "pi" && process.platform === "win32" }); }
-	finally { if (running) await start(); }
+	finally { if (running) await start(managed); }
 }
 
 const onPath = (command = "pi-hub") => !!findCommand(command);
@@ -188,7 +193,7 @@ try {
 	else if (verb === "status" && rest.includes("--json")) console.log(JSON.stringify(await statusJson()));
 	else if (verb === "start") await start();
 	else if (verb === "stop") await stop(rest.includes("--force"));
-	else if (verb === "restart") { await stop(false); await start(); }
+	else if (verb === "restart") { const running = marker(), managed = !!running && systemdHub(running.pid); await stop(false); await start(managed); }
 	else if (verb === "update") await update(rest.includes("--yes"));
 	else if (verb === "status") {
 		const running = marker();

@@ -100,6 +100,22 @@ try {
 	assert.match(cli("restart").out, /Stopped\.[\s\S]*Started/);
 	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).live, false, "parked session stays parked");
 
+	// Updates use a fake managed launcher; success and failure both bring the hub back.
+	const updateArgs = path.join(root, "update-args.json");
+	fs.mkdirSync(path.join(root, "bin"));
+	fs.writeFileSync(path.join(root, "bin", "pi-launcher.js"), `
+		const fs = require("node:fs");
+		fs.writeFileSync(${JSON.stringify(updateArgs)}, JSON.stringify(process.argv.slice(2)));
+		process.exit(process.env.FAKE_UPDATE_FAIL ? 1 : 0);
+	`);
+	assert.equal(cli("update", "--yes").code, 0);
+	assert.deepEqual(JSON.parse(fs.readFileSync(updateArgs, "utf8")), ["update", "--all"]);
+	assert.equal((await api("/api/status")).status, 200);
+	env.FAKE_UPDATE_FAIL = "1";
+	assert.equal(cli("update", "--yes").code, 1, "update failure is reported");
+	delete env.FAKE_UPDATE_FAIL;
+	assert.equal((await api("/api/status")).status, 200, "update failure still restores the hub");
+
 	// A crashed hub leaves a dead-pid lock; the next start takes it over.
 	const { pid } = JSON.parse(fs.readFileSync(path.join(data, "hub.json"), "utf8"));
 	process.kill(pid);

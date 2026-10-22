@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Changed
+- Hub: the installed app's badge is now a number: how many sessions ask something or have finished work you haven't opened.
+
 ### Fixed
 - Hub on Windows: the hourly update check no longer flashes console windows.
 - Hub: tab and app icons are transparent again, with light ink on a dark tab bar (the iPhone home-screen icon keeps its white square).

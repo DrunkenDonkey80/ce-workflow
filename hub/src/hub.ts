@@ -22,6 +22,7 @@ import { clipboardFiles } from "./images.ts";
 import { createCommands } from "./commands.ts";
 import { changelogImage, hubVersion, readChangelog, since, VERSION_PATTERN } from "./changelog.ts";
 import { agentDir } from "./rpc-client.ts";
+import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
@@ -278,14 +279,21 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					return send(200, pageApi.settings());
 				}
 				if (endpoint === "hub") {
-					// A process cannot restart itself: a detached `pi-hub restart|update` stops this hub (D17 busy rule) and starts a new one.
+					// Maintenance runs outside this service so systemd cannot kill it when the hub stops.
 					// update: --yes because the page asked already; Pi outside the hub keeps its old version (the log lists them).
 					if (data.action === "check-updates") { if (updates) await updates.check(); return send(200, pageApi.settings()); }
 					if (data.action !== "restart" && data.action !== "update") return send(400, { error: "Unknown hub action." });
 					const busy = summary().filter(s => s.busy.length);
 					if (busy.length) return send(409, { error: `Not ${data.action === "update" ? "updated" : "restarted"}; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
-					const log = openSync(path.join(dataDir, "hub.log"), "a");
-					spawn(process.execPath, [fileURLToPath(new URL("./cli.ts", import.meta.url)), ...(data.action === "update" ? ["update", "--yes"] : ["restart"])], { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
+					const logFile = path.join(dataDir, "hub.log");
+					const [command, args] = maintenanceCommand(data.action, fileURLToPath(new URL("./cli.ts", import.meta.url)), logFile);
+					if (command === "systemd-run") {
+						const result = await exec(command, args, { timeout: 10_000 });
+						if (result.code !== 0) throw new Error(`Maintenance could not start: ${result.stderr || result.stdout}`);
+					} else {
+						const log = openSync(logFile, "a");
+						spawn(command, args, { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
+					}
 					return send(200, { ok: true });
 				}
 				return send(200, await pageApi.post(page[1], endpoint, data, remote));

@@ -1149,16 +1149,16 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; checkedAt: number | null; checking: boolean; error?: string };
 type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
-let hubSettings: HubSettings = {}, appBadge = false;
+let hubSettings: HubSettings = {}, appBadge = 0;
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
  const states = [...sessionStates];
  if (promptView.busy || state.activity.dialog) states.push("waiting");
  if (state.activity.working || state.activity.subagents?.length) states.push("working");
  // An installed app's taskbar/dock icon is fixed at install; its badge is the only live part (Chromium, Safari): a mark while
- // something needs you (a question, or a finished session you haven't opened). Working has no badge.
- const needsYou = states.includes("waiting") || states.includes("unseen");
- if (needsYou !== appBadge && "setAppBadge" in navigator) { appBadge = needsYou; void (needsYou ? navigator.setAppBadge() : navigator.clearAppBadge()).catch(() => {}); }
+ // count of what needs you (questions, finished sessions you haven't opened); colours are impossible there. Working has no badge.
+ const needsYou = states.filter(tone => tone === "waiting" || tone === "unseen").length;
+ if (needsYou !== appBadge && "setAppBadge" in navigator) { appBadge = needsYou; void (needsYou ? navigator.setAppBadge(needsYou) : navigator.clearAppBadge()).catch(() => {}); }
  const icon = iconName(), svg = icon ? iconSvg(icon, states) : "";
  if (!icon || svg === iconKey) return; // no icons served (older hub): keep the static one
  iconKey = svg;
