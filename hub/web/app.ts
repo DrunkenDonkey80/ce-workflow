@@ -1169,7 +1169,7 @@ function renderIcon() {
 function appleIcon(svg: string) {
  const image = new Image(), canvas = document.createElement("canvas"); canvas.width = canvas.height = 180;
  image.onload = () => { canvas.getContext("2d")!.drawImage(image, 0, 0, 180, 180); document.querySelector<HTMLLinkElement>("link[rel=apple-touch-icon]")!.href = canvas.toDataURL("image/png"); };
- image.src = "data:image/svg+xml," + encodeURIComponent(svg.replace('rx="7" ', ""));
+ image.src = "data:image/svg+xml," + encodeURIComponent(svg.replace("<style>", '<rect width="32" height="32" fill="#fff"/><style>')); // iOS shows transparency as black
 }
 async function loadSessions() {
  clearTimeout(sessionsTimer);

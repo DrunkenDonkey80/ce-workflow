@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+- Hub on Windows: the hourly update check no longer flashes console windows.
+- Hub: tab and app icons are transparent again, with light ink on a dark tab bar (the iPhone home-screen icon keeps its white square).
+
 ## 0.1.62 — 2026-10-22
 
 ### Added

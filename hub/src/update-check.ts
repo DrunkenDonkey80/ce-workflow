@@ -1,5 +1,6 @@
 // Hourly check for a newer Pi and for extension updates (gear badge + list). Checks only; installing stays the gear's
 // "Update Pi and extensions" (pi-hub update), which stops and restarts every session.
+import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -31,7 +32,19 @@ export async function findUpdates(dir = agentDir()): Promise<Found> {
 	return { pi: latest && newer(latest, current) ? { current, latest } : null, packages };
 }
 
-export function createUpdateCheck({ find = findUpdates, every = 3_600_000 }: { find?: () => Promise<Found>; every?: number } = {}): UpdateCheck {
+/**
+ * findUpdates in a child with a hidden console: Pi's package check spawns npm/git without windowsHide, and a console-less
+ * hub (logon start) gives each one its own flashing window. Their console is the child's hidden one instead.
+ */
+export const findUpdatesHidden = () => new Promise<Found>((resolve, reject) => execFile(process.execPath,
+	["--input-type=module", "--no-warnings", "-e", `import { findUpdates } from ${JSON.stringify(import.meta.url)}; process.stdout.write(JSON.stringify(await findUpdates()));`],
+	{ windowsHide: true, encoding: "utf8", timeout: 300_000, maxBuffer: 1_000_000 },
+	(error, stdout, stderr) => {
+		if (error) return reject(new Error(stderr.trim().split("\n").at(-1) || error.message));
+		try { resolve(JSON.parse(stdout)); } catch { reject(new Error("Update check gave no result.")); } // a throw here would end the hub
+	}));
+
+export function createUpdateCheck({ find = findUpdatesHidden, every = 3_600_000 }: { find?: () => Promise<Found>; every?: number } = {}): UpdateCheck {
 	let value: UpdateState = { pi: null, packages: [], checkedAt: null, checking: false }, running: Promise<UpdateState> | undefined, timer: NodeJS.Timeout | undefined;
 	const check = () => running ??= (async () => {
 		value = { ...value, checking: true };

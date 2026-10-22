@@ -30,7 +30,7 @@ export const ICONS: Record<string, [string, string, boolean]> = {
  "shovel": ["0 0 122.88 122.88","M31.77,56.55l12.18,12.18l55.72-52.58c-1.32-3.95-0.42-8.48,2.71-11.6l1.26-1.26 c4.38-4.38,11.57-4.38,15.96,0.01l0,0c4.39,4.39,4.38,11.57,0,15.95l-1.27,1.27c-3.13,3.13-7.67,4.02-11.6,2.71L54.14,78.94 l12.43,12.43c1.54,1.54,1.54,4.06,0,5.6L49.04,114.5c-11.18,11.18-29.47,11.18-40.66,0l0,0c-11.18-11.18-11.18-29.47,0-40.66 l17.28-17.28C27.35,54.88,30.09,54.87,31.77,56.55L31.77,56.55L31.77,56.55z M114.78,8.1L114.78,8.1c1.94,1.94,1.94,5.11,0,7.06 l-0.56,0.56c-1.94,1.94-5.11,1.94-7.06,0l0,0c-1.94-1.94-1.94-5.11,0-7.06l0.56-0.56C109.66,6.15,112.84,6.16,114.78,8.1 L114.78,8.1L114.78,8.1z",true],
 };
 
-// The tab icon, and the installed app's icon (hub /app-icon.svg).
+// The tab icon, and the installed app's icon (hub /app-icon.svg): transparent, dark ink, light ink on a dark tab bar.
 const ICON_INK = "#343a40";
 const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6" };
 // states: any of waiting/working/unseen, each drawn once, most urgent first.
@@ -39,5 +39,5 @@ export function iconSvg(name: string, states: string[] = []) {
  // filling lower-right, lower-left, then upper-right; two fit side by side at 16 px.
  const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
  const badge = Object.keys(DOTS).filter(state => states.includes(state)).map((state, i) => `<circle cx="${i === 1 ? 7.5 : 24.5}" cy="${i === 2 ? 7.5 : 24.5}" r="6.5" fill="${DOTS[state]}" stroke="#fff" stroke-width="2"/>`).join("");
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#fff"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>${badge}</svg>`;
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><style>@media (prefers-color-scheme: dark) { path { fill: #e9ecef } }</style><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>${badge}</svg>`;
 }
