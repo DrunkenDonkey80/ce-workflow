@@ -5,7 +5,7 @@ import type { createActivityMirror } from "../../extensions/plan3-web.ts";
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 // Optional icons may be absent from an already-running hub after an update.
 // @ts-ignore Browser URL includes the workspace token.
-const { ICONS } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]> }));
+const { ICONS, iconSvg } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _key: string) => "" }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
@@ -1111,14 +1111,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; checkedAt: number | null; checking: boolean; error?: string };
 type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
 let hubSettings: HubSettings = {};
-const ICON_INK = "#343a40", iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
-function iconSvg(name: string, key: string) {
- // At 16 px an outline reads as noise: the icon keeps the whole square and a big white-ringed dot (Gmail/Slack style) carries the state.
- const dot = key === "waiting" ? "#e03131" : key === "working" ? "#f59f00" : "";
- const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
- const badge = dot ? `<circle cx="22.5" cy="22.5" r="9.5" fill="${dot}" stroke="#fff" stroke-width="2.5"/>` : "";
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#fff"/><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>${badge}</svg>`;
-}
+const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
  const waiting = promptView.busy || !!state.activity.dialog || sessionStates.includes("waiting");
  const working = !!state.activity.working || !!state.activity.subagents?.length || sessionStates.includes("working");

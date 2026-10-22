@@ -22,6 +22,7 @@ import { clipboardFiles } from "./images.ts";
 import { createCommands } from "./commands.ts";
 import { changelogImage, hubVersion, readChangelog, since, VERSION_PATTERN } from "./changelog.ts";
 import { agentDir } from "./rpc-client.ts";
+import { ICONS, iconSvg } from "../web/icons.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string };
@@ -54,7 +55,7 @@ async function body(request: http.IncomingMessage, limit = MAX_BODY): Promise<an
 	const bytes = await raw(request, limit);
 	try { return bytes.length ? JSON.parse(bytes.toString("utf8")) : {}; } catch { throw Object.assign(new Error("Invalid JSON."), { status: 400 }); }
 }
-const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 const sameKey = (a: unknown, b: string) => typeof a === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 // H5-01: the browser app (copied from ce-workflow extensions/plan3-web) under /s/<session>/, all URLs relative to it.
@@ -196,6 +197,11 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			if (origin !== undefined && origin !== expected) return send(403, { error: "Foreign Origin rejected." });
 			const url = new URL(request.url ?? "/", expected);
 			const rootAsset = request.method === "GET" && /^\/a\/([0-9a-f]{12})\/(pair\.js|styles\.css)$/.exec(url.pathname);
+			// The installed app's icon: the gear's tab icon, idle. Public like pair.js (it shows only the picked icon).
+			const appIcon = request.method === "GET" && url.pathname === "/app-icon.svg" && (() => {
+				response.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-cache" });
+				return response.end(iconSvg(ICONS[config.icon ?? ""] ? config.icon! : Object.keys(ICONS)[0], "idle"));
+			});
 			const serveAsset = (build: string, name: string) => {
 				if (build !== currentBuild()) return send(404, { error: "Stale build; reload the page." });
 				response.writeHead(200, { "content-type": ASSETS[name][1], "cache-control": "private, max-age=31536000, immutable" });
@@ -222,6 +228,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					// A saved session link pairs too; the pairing page then reloads that link.
 					if (request.method === "GET" && /^\/(?:s\/[0-9a-f-]{36}\/?)?$/.test(url.pathname)) { response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }); return response.end(webFile("pair.html", "")); }
 					if (rootAsset) return serveAsset(rootAsset[1], rootAsset[2]);
+					if (appIcon) return appIcon();
 					return send(401, { error: "This device is not paired." });
 				}
 				// A pairing page loaded without the cookie (Strict cookies skip cross-site opens) is already paired: renew and reload.
@@ -235,6 +242,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				if (request.method === "POST" && origin === undefined && !sameKey(request.headers["x-hub-key"], config.localKey)) return send(403, { error: "Missing Origin rejected." });
 			}
 			if (rootAsset) return serveAsset(rootAsset[1], rootAsset[2]);
+			if (appIcon) return appIcon();
 			// The bare address opens a session page: a live one first.
 			if (request.method === "GET" && url.pathname === "/") {
 				// A new hub has no sessions; start one in the home folder so the page (pairing approval, New folder) has somewhere to open.
@@ -287,6 +295,12 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				if (page[2] === "/") {
 					response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
 					return response.end(webFile("index.html", remote ? "" : config.localKey));
+				}
+				// "Install app" (Chrome, Edge, Brave, Android): opens the hub's front door in its own window, named after this PC.
+				if (page[2] === "/manifest.webmanifest") {
+					const key = remote ? "" : "?token=" + config.localKey, name = os.hostname();
+					response.writeHead(200, { "content-type": "application/manifest+json", "cache-control": "no-store" });
+					return response.end(JSON.stringify({ id: "/", name: `pi-hub · ${name}`, short_name: name, start_url: "/" + key, scope: "/", display: "standalone", background_color: "#ffffff", theme_color: "#ffffff", icons: [{ src: "/app-icon.svg" + key, sizes: "any", type: "image/svg+xml", purpose: "any" }] }));
 				}
 				if (asset && (ASSETS[asset[2]] || asset[1] !== currentBuild())) return serveAsset(asset[1], asset[2]);
 				if (asset) return send(404, { error: "Unknown asset." });

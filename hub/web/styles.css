@@ -252,7 +252,7 @@ h2 { font-size: 15px; font-weight: 600; }
 #settings-button, .load { order: 1; flex: none !important; width: 34px; height: 34px; padding: 0; }
 #settings-button { font-size: 22px; line-height: 1; }
 #settings-button { position: relative; }
-.update-badge { position: absolute; right: -4px; bottom: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--error, #e03131); color: #fff; font-size: 11px; line-height: 16px; font-weight: 600; }
+.update-badge { position: absolute; right: 1px; bottom: 1px; min-width: 13px; height: 13px; padding: 0 3px; border-radius: 7px; background: var(--error, #e03131); color: #fff; font-size: 9px; line-height: 13px; font-weight: 600; }
 .update-list { color: var(--muted); font-size: 13px; white-space: normal; align-self: center; }
 .load { position: relative; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
 .load svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }

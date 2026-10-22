@@ -562,6 +562,12 @@ try {
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary"); assert.deepEqual(answers.at(-1).answers[2].response.selections, ["Session"]);
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
  assert.match(await evaluate("document.getElementById('hub-version').textContent"), /^Version: \d+\.\d+\.\d+$/, "settings name the version");
+ { // Install app: the page links a manifest whose start URL and icon work locally; the icon is the picked one.
+  const manifest = await evaluate("fetch(document.querySelector('link[rel=manifest]').href).then(r => r.json())");
+  assert.equal(manifest.display, "standalone"); assert.equal(manifest.start_url, "/?token=" + hub.config.localKey);
+  const icon = await fetch(new URL(manifest.icons[0].src, origin)); assert.equal(icon.headers.get("content-type"), "image/svg+xml"); assert.match(await icon.text(), /^<svg /);
+  assert.equal((await fetch(`${origin}/s/${id}/manifest.webmanifest`)).status, 401, "manifest needs the key");
+ }
  await browser("click", "#hub-version"); await browser("wait", "--fn", "document.getElementById('changelog').open && document.querySelectorAll('#changelog-body h3').length > 5");
  assert.equal(await evaluate("document.getElementById('changelog-title').textContent"), "Changelog", "the version opens the whole changelog");
  await browser("click", "#changelog-close");

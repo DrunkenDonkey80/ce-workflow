@@ -11,12 +11,18 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ![The dialog it opens](docs/changelog/0.1.61-env-var-dialog.png)
 
 - Hub: **Commit and push** asks for scoped tests, the full suite or no tests.
+- Hub: **Install** it as an app (Chrome, Edge, Brave, Android: the install icon in the address bar). It opens in its own window, named after this PC, with the tab icon you picked.
 - This changelog: the version at the top of the hub settings opens it, and after an update **What's new** opens once with only the newer versions.
 
 ![The changelog window](docs/changelog/0.1.61-changelog-window.png)
 
 ### Changed
 - Hub Thinking view keeps edit and write blocks visible, collapsed, so you can see what changed.
+
+### Fixed
+- Hub: the update count on the gear sits fully inside the button instead of being cut off.
+
+![The update count on the gear](docs/changelog/0.1.61-update-badge.png)
 
 ## 0.1.60 — 2026-10-22
 
