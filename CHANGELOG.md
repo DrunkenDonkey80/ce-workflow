@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Changed
+- Hub: an image path in a chat message shows its picture right under that line, not all together at the end of the message.
 - Hub: the installed app's badge is now a number: how many sessions ask something or have finished work you haven't opened.
 
 ### Fixed

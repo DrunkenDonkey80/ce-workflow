@@ -760,7 +760,18 @@ function renderLinks(target: HTMLElement, text: string) {
 const TABLE_ROW = /^\s*\|.*\|\s*$/, TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) {
  const lines = text.split("\n"); let prose: string[] = [];
- const flush = () => { const body = prose.join("\n").replace(/^\n+|\n+$/g, ""); prose = []; if (body) { const div = document.createElement("div"); inline(div, body, images); target.append(div); } };
+ // An image path's thumbnail goes right after its line, not at the end of the message.
+ const flush = () => {
+  const body = prose.join("\n").replace(/^\n+|\n+$/g, ""); prose = []; if (!body) return;
+  let div = document.createElement("div");
+  for (const line of body.split("\n")) {
+   if (!div.childNodes.length && !line.trim()) continue;
+   const before = new Set(images); if (div.childNodes.length) div.append("\n"); inline(div, line, images);
+   const added = [...images].filter(path => !before.has(path)); if (!added.length) continue;
+   target.append(div); appendThumbs(target, new Set(added)); for (const path of added) images.delete(path); div = document.createElement("div");
+  }
+  if (div.childNodes.length) target.append(div);
+ };
  for (let i = 0; i < lines.length; i++) {
   const line = lines[i];
   if (/^\s*```/.test(line)) {
