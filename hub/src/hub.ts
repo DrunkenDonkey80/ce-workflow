@@ -318,7 +318,12 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	// A tick only reads its timers; due ones run in the background and never overlap themselves.
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);
 	ticks.unref();
-	const timer = setInterval(() => { host.checkTerminals(); void host.autoPark().then(ids => { if (ids.length) console.log(`${new Date().toISOString()} auto-parked ${ids.map(id => registry.get(id)?.name ?? id).join(", ")}`); }); }, 60_000);
+	const timer = setInterval(() => {
+		// Windows login can start the hub before Tailscale has its connection and user identity.
+		if (config.remote && !remoteStatus().url) void applyRemote().catch(error => { remoteError = (error as Error).message; });
+		host.checkTerminals();
+		void host.autoPark().then(ids => { if (ids.length) console.log(`${new Date().toISOString()} auto-parked ${ids.map(id => registry.get(id)?.name ?? id).join(", ")}`); });
+	}, 60_000);
 	timer.unref();
 
 	async function stop() {

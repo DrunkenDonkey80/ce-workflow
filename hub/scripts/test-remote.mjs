@@ -1,6 +1,7 @@
 // H6-01: remote access through one `tailscale serve` on the hub's port (fake tailscale), owner login, device pairing
 // approved on the local hub, revoke closing open streams at once, and never Funnel.
 import assert from "node:assert/strict";
+import { mock } from "node:test";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -29,6 +30,7 @@ const run = async (command, args) => {
 	return { code: 0, killed: false, stderr: "", stdout: "" };
 };
 const opened = [];
+mock.timers.enable({ apis: ["setInterval"] });
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url) });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {
@@ -54,7 +56,15 @@ try {
 	const missing = await local("/api/remote", { on: true });
 	assert.deepEqual([missing.body.on, missing.body.url, missing.body.missing.length], [true, undefined, 1]);
 	assert.match(missing.body.missing[0], /HTTPS Certificates/);
+	// Tailscale can become ready after the hub: recover without changing the saved link or restarting.
 	ready = true;
+	mock.timers.tick(60_000);
+	await new Promise(resolve => setImmediate(resolve));
+	assert.equal(hub.remote().url, `https://${remoteHost}/`, "remote access retries after Tailscale becomes ready");
+	const healthyCalls = calls.length;
+	mock.timers.tick(60_000);
+	await new Promise(resolve => setImmediate(resolve));
+	assert.equal(calls.length, healthyCalls, "a healthy mapping is left alone");
 	const on = await local("/api/remote", { on: true });
 	assert.equal(on.body.url, `https://pc.tail.ts.net:${port}/`);
 	assert(calls.includes(`serve --bg --https=${port} http://127.0.0.1:${port}`), calls.join("\n"));
@@ -135,9 +145,14 @@ try {
 	assert.equal((await local("/api/remote", { on: false })).body.url, undefined);
 	assert(calls.includes(`serve --https=${port} off`));
 	assert.equal((await remote("/", { cookie })).status, 403);
+	const offCalls = calls.length;
+	mock.timers.tick(60_000);
+	await new Promise(resolve => setImmediate(resolve));
+	assert.equal(calls.length, offCalls, "remote off stays off");
 	assert(!calls.some(call => /funnel/i.test(call)), "never Funnel");
 	console.log("remote ok");
 } finally {
 	await hub.stop();
+	mock.timers.reset();
 	fs.rmSync(root, { recursive: true, force: true, maxRetries: 5 });
 }

@@ -12,9 +12,13 @@ export type RpcOptions = { cwd: string; args?: string[]; env?: Record<string, st
 const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)/g;
 export const stripAnsi = (text: string) => text.replace(ANSI, "");
 export const agentDir = () => process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), ".pi", "agent");
-// F1: run the launcher with node directly; a shell would concatenate unescaped arguments. Without Pi's own launcher
-// (e.g. Pi installed through npm on Linux) `pi` comes from PATH.
-export const defaultCommand = () => { const launcher = path.join(agentDir(), "bin", "pi-launcher.js"); return existsSync(launcher) ? [process.execPath, launcher] : ["pi"]; };
+// Use managed launchers by absolute path: login services do not inherit the shell's PATH.
+export const defaultCommand = () => {
+	const bin = path.join(agentDir(), "bin"), legacy = path.join(bin, "pi-launcher.js"), launcher = path.join(bin, "pi");
+	if (existsSync(legacy)) return [process.execPath, legacy];
+	if (process.platform !== "win32" && existsSync(launcher)) return [launcher];
+	return ["pi"];
+};
 
 export class RpcChild extends EventEmitter {
 	readonly options: RpcOptions;

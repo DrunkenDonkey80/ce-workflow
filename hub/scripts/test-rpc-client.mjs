@@ -1,9 +1,39 @@
 import assert from "node:assert/strict";
 import os from "node:os";
+import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { RpcChild, stripAnsi } from "../src/rpc-client.ts";
+import { defaultCommand, RpcChild, stripAnsi } from "../src/rpc-client.ts";
 const fake = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
 const start = (flags = "") => new RpcChild({ cwd: os.tmpdir(), command: [process.execPath, fake], env: { FAKE_PI: flags } }).start();
+
+// Login services lack the shell's PATH: managed launchers must work by absolute path.
+{
+	const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub rpc "));
+	const saved = process.env.PI_CODING_AGENT_DIR;
+	let pi;
+	try {
+		process.env.PI_CODING_AGENT_DIR = root;
+		const bin = path.join(root, "bin"), legacy = path.join(bin, "pi-launcher.js"), launcher = path.join(bin, "pi");
+		fs.mkdirSync(bin);
+		assert.deepEqual(defaultCommand(), ["pi"], "npm installs keep the PATH fallback");
+		fs.writeFileSync(legacy, "");
+		assert.deepEqual(defaultCommand(), [process.execPath, legacy], "Windows/legacy JS launcher stays supported");
+		if (process.platform !== "win32") {
+			fs.writeFileSync(launcher, '#!/bin/sh\nexec "$FAKE_PI_NODE" "$FAKE_PI_SCRIPT" "$@"\n', { mode: 0o755 });
+			assert.deepEqual(defaultCommand(), [process.execPath, legacy], "existing JS launcher keeps precedence");
+			fs.rmSync(legacy);
+			assert.deepEqual(defaultCommand(), [launcher]);
+			pi = new RpcChild({ cwd: root, env: { PATH: bin, FAKE_PI_NODE: process.execPath, FAKE_PI_SCRIPT: fake } }).start();
+			assert.equal((await pi.send({ type: "get_state" })).success, true, "managed shell launcher starts without pi on PATH");
+		}
+	} finally {
+		if (pi) await pi.stop();
+		if (saved === undefined) delete process.env.PI_CODING_AGENT_DIR;
+		else process.env.PI_CODING_AGENT_DIR = saved;
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+}
 
 // Split records, U+2028 and multi-byte text survive framing; ANSI is stripped from status text.
 {
