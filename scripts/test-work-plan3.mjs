@@ -519,7 +519,7 @@ try {
 		// Real Sol run wrote "Options: a; b" on one line plus an intro sentence: lint catches the first, counting ignores the second.
 		const bareQuestion = optimizeLint("## Open questions\n\n### Deferred\n\nNone.\n", "## Open questions\n\n### Deferred\n\nIntro sentence.\n\n- **Q-01** Relax D-17?\n  - Options: Keep as is; Relax \u2014 16 MB; Move to Backlog.\n");
 		assert.equal(bareQuestion.length, 1);
-		assert.match(bareQuestion[0], /^1 new open question\(s\) without "  - Option: [\s\S]*\*\*Q-01\*\* Relax D-17\?$/);
+		assert.match(bareQuestion[0], /^1 open question\(s\) without "  - Option: [\s\S]*\*\*Q-01\*\* Relax D-17\?$/);
 		await writeFile(leanFile, beforeOptimize);
 		await run("plan3", "optimize 9a9a9a9a");
 		await writeFile(leanFile, beforeOptimize.replace(/\n## Amendments[\s\S]*$/, "\n## Amendments\n\n- Compacted.\n").replace(/### Deferred\n\nNone\./, "### Deferred\n\n- **Q-01** Keep D-01's measurement corpus?\n  - Option: Keep as is\n  - Option: Relax \u2014 16 MB\n  - Option: Move to Backlog"));
