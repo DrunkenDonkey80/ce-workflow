@@ -360,7 +360,7 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 /* Compact keeps prompts and final replies; Thinking drops only tool blocks. While working both keep the latest tool call
    (and Compact the live thinking) so the run is visibly moving. */
 .chat-compact .message .block, .chat-compact .message-blocks, .chat-compact .message.assistant:not(.final), .chat-compact #activity:not(.working) .thinking-row, .chat-compact #activity .tool-row:not(.latest),
-.chat-thinking .message .block-tool, .chat-thinking .message-blocks:not(:has(.block-thinking)), .chat-thinking #activity .tool-row:not(.latest) { display: none; }
+.chat-thinking .message .block-tool:not(.block-change), .chat-thinking .message-blocks:not(:has(.block-thinking, .block-change)), .chat-thinking #activity .tool-row:not(.latest) { display: none; }
 /* ask_user exchanges stay in every view; in Compact only the exchange of a non-final row shows. */
 .chat-compact .message.assistant.has-ask, .chat-compact .message-blocks.has-ask, .chat-thinking .message-blocks.has-ask { display: block; }
 .chat-compact .message.has-ask:not(.final) > div:nth-child(3) { display: none; }

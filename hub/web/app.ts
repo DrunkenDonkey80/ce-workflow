@@ -202,6 +202,7 @@ const CHAT_VIEWS = ["expanded", "thinking", "compact"], CHAT_LABEL = { expanded:
 function setChatView(view: string) {
  for (const name of CHAT_VIEWS.slice(1)) document.documentElement.classList.toggle("chat-" + name, view === name);
  for (const id of ["chat-compact", "chat-compact-m"]) { $(id).setAttribute("aria-pressed", String(view !== "expanded")); $(id).textContent = (id === "chat-compact-m" ? "▤ Chat: " : "") + CHAT_LABEL[view]; }
+ if (view === "thinking") for (const item of document.querySelectorAll<HTMLDetailsElement>(".block-change[open]")) item.open = false;
  try { localStorage.setItem("plan3-chat", view); } catch { /* private mode: the view just is not remembered */ }
 }
 const chatView = () => CHAT_VIEWS.find(name => document.documentElement.classList.contains("chat-" + name)) ?? "expanded";
@@ -619,7 +620,8 @@ function renderBlocks(box: HTMLElement, row) {
  const opened = new Set([...box.querySelectorAll<HTMLDetailsElement>("details[open]")].map(item => item.dataset.key));
  const known = new Set([...box.querySelectorAll<HTMLDetailsElement>("details")].map(item => item.dataset.key));
  box.replaceChildren(); const images = new Set<string>();
- // Thinking view: one open text block per run of thinking, joined across the (hidden) tool calls between them.
+ // Thinking view: one open text block per run of thinking, joined across the (hidden) tool calls between them;
+ // a file change (edit/write) stays visible there, collapsed, and starts a new run so the order holds.
  let run: HTMLElement | null = null;
  (row.blocks ?? []).forEach((block, index) => {
   if (block.type === "thinking" && block.text?.trim()) {
@@ -627,9 +629,11 @@ function renderBlocks(box: HTMLElement, row) {
    else { run = Object.assign(document.createElement("div"), { className: "thinking-text", textContent: block.text.trim() }); box.append(run); }
   }
   if (block.ask) { box.append(askExchange(block)); return; }
+  const change = block.type === "tool" && (block.name === "edit" || block.name === "write");
+  if (change) run = null;
   const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
   // Pi's tool colours: grey while running, green when done, red on error.
-  item.dataset.key = key; item.open = opened.has(key) || (!known.has(key) && block.type === "tool" && (block.name === "edit" || block.name === "write")); item.className = "block block-" + block.type + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
+  item.dataset.key = key; item.open = opened.has(key) || (!known.has(key) && change && chatView() === "expanded"); item.className = "block block-" + block.type + (change ? " block-change" : "") + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
   if (block.type === "thinking") summary.textContent = "Thinking";
   else summary.append(Object.assign(document.createElement("b"), { textContent: block.name }), block.title.slice(block.name.length) + (block.result === undefined ? (row.streaming ? "" : " \u2026") : block.error ? " \u2715" : ""));
   item.append(summary);

@@ -512,7 +512,7 @@ try {
   { type: "thinking", text: "more" },
   { type: "tool", id: "t3", name: "read", title: "read b.ts", args: "{}" }] });
  await browser("wait", "#messages [data-id=assistant_4] .block-tool");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-ok", "block block-tool block-error", "block block-thinking", "block block-tool block-pending"]);
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-change block-ok", "block block-tool block-error", "block block-thinking", "block block-tool block-pending"]);
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] .diff span')].map(span => span.className)"), ["diff-del", "diff-add", ""]);
  assert.equal(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] pre')].some(pre => pre.textContent === '{oldText}')"), false, "the diff replaces raw edit arguments");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.open)"), [false, true, false, false, false], "only file changes start open");
@@ -714,7 +714,8 @@ try {
  // While working, Thinking and Compact keep the live thinking and only the latest tool call; Compact drops thinking once settled.
  const activityShown = () => evaluate("['#activity [data-id=tool_1]', '#activity [data-id=tool_2]', '#activity .thinking-row'].map(sel => !!document.querySelector(sel) && getComputedStyle(document.querySelector(sel)).display !== 'none')");
  await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Thinking view while working");
- assert.deepEqual(await evaluate("(() => { const text = document.querySelector('#messages [data-id=assistant_4] .thinking-text'); return [text.textContent, getComputedStyle(text).display, getComputedStyle(document.querySelector('#messages [data-id=assistant_4] .block-thinking')).display]; })()"), ["hmm\n\nmore", "block", "none"], "Thinking view shows the thinking text, joined across tool calls");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] .thinking-text')].map(text => [text.textContent, getComputedStyle(text).display])"), [["hmm", "block"], ["more", "block"]], "Thinking view shows the thinking text; a file change splits the run");
+ assert.deepEqual(await evaluate("['t1', 't2'].map(id => { const item = document.querySelector('#messages [data-id=assistant_4] details[data-key=' + id + ']'); return [getComputedStyle(item).display !== 'none', item.open]; })"), [[true, false], [false, false]], "Thinking view keeps edits and writes, collapsed; other tools stay hidden");
  await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Compact view while working");
  publish("activity", { ...activity, working: false }); await browser("wait", "--fn", "!document.getElementById('activity').classList.contains('working')");
  assert.deepEqual(await activityShown(), [false, false, false], "Compact after the run: only the final reply");
