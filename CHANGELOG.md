@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.61 — 2026-10-22
 
 ### Added
 - `/wo env` and the hub's **Env var** button: store a secret as an environment variable, for this session only or permanently (Windows and Linux). The value never reaches the model; the agent only learns the variable's name. The name is suggested from the agent's last message.
