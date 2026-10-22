@@ -21,6 +21,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ![The changelog window](docs/changelog/0.1.61-changelog-window.png)
 
 ### Changed
+- Hub settings gear: a red dot (no number) now means only that ce-workflow itself has an update. Pi and other extension updates show as a fainter yellow count in the lower-left corner.
+
+![Red dot for ce-workflow, yellow count for the rest](docs/changelog/0.1.61-update-badges.png)
+
 - Hub: in research mode the Context bar fills up to the model's real context window, since research doesn't compact at 200k.
 - Hub tab icon shows one dot per kind of activity across sessions instead of only the most urgent one: red asks a question, orange working, blue finished and not yet looked at. Dots are smaller and fill the lower-right, lower-left, then upper-right corner.
 

@@ -1579,9 +1579,11 @@ function notifyChanges(groups: Group[]) {
 // Gear badge: how many of Pi and its extensions have an update (hub checks hourly); the list sits in the gear menu.
 function renderUpdates() {
  const updates = hubSettings.updates, count = updates ? (updates.pi ? 1 : 0) + updates.packages.length : 0;
+ const own = !!updates?.packages.some(name => /ce-workflow/i.test(name)), others = count - (own ? 1 : 0);
  // An older running hub sends no version and has no changelog endpoint yet.
  $("hub-version").textContent = "Version: " + (hubSettings.version ?? ""); $("hub-version").hidden = !hubSettings.version;
- $("update-badge").hidden = !count; $("update-badge").textContent = String(count);
+ // Red dot only for ce-workflow (the one that matters); Pi and other extensions get a fainter yellow count.
+ $("update-badge").hidden = !own; $("update-others").hidden = !others; $("update-others").textContent = String(others);
  $("settings-button").title = count ? `Hub settings (${count} update${count > 1 ? "s" : ""})` : "Hub settings";
  const when = updates?.checkedAt ? new Date(updates.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
  const names = updates ? [...updates.pi ? [`Pi ${updates.pi.current} → ${updates.pi.latest}`] : [], ...updates.packages] : [];

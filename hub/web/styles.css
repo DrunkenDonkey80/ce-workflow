@@ -253,6 +253,9 @@ h2 { font-size: 15px; font-weight: 600; }
 #settings-button { font-size: 22px; line-height: 1; }
 #settings-button { position: relative; }
 .update-badge { position: absolute; right: 1px; bottom: 1px; min-width: 13px; height: 13px; padding: 0 3px; border-radius: 7px; background: var(--error, #e03131); color: #fff; font-size: 9px; line-height: 13px; font-weight: 600; }
+/* Red dot: ce-workflow itself has an update. Fainter yellow count, lower left: Pi and other extensions. */
+.update-badge { width: 9px; min-width: 0; height: 9px; padding: 0; border-radius: 50%; }
+.update-others { position: absolute; left: 1px; bottom: 1px; min-width: 13px; height: 13px; padding: 0 3px; border-radius: 7px; background: color-mix(in srgb, var(--warning) 55%, transparent); color: var(--ink); font-size: 9px; line-height: 13px; font-weight: 600; }
 .update-list { color: var(--muted); font-size: 13px; white-space: normal; align-self: center; }
 .load { position: relative; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
 .load svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
