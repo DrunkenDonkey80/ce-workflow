@@ -1,6 +1,7 @@
 // Files named in chat (any path with an extension): the page asks which exist, then opens, reveals, downloads or copies them.
 // Never hidden dot-folders (.ssh, .pi, .git) or secret-shaped names. On this PC any other file works; a remote device
-// (a phone over the tailnet) only gets the session's project, plus temp and Downloads files changed in the last 5 days.
+// (a phone over the tailnet) gets images from anywhere, other files only from the session's project, plus temp and
+// Downloads files changed in the last 5 days.
 import type http from "node:http";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
@@ -18,11 +19,11 @@ export async function linkedFile(path: unknown, project: string, remote = false)
 	if (!real || /[\\/]\.[^\\/]/.test(real) || forbiddenPath.test(basename(real))) return undefined;
 	const info = await stat(real).catch(() => undefined);
 	if (!info?.isFile()) return undefined;
-	if (!remote || await inside(real, project)) return real;
+	if (!remote || IMAGE.test(real) || await inside(real, project)) return real;
 	const recent = Date.now() - info.mtimeMs < RECENT_MS;
 	return recent && (await inside(real, tmpdir()) || await inside(real, join(homedir(), "Downloads"))) ? real : undefined;
 }
-const RECENT_MS = 5 * 24 * 3600_000;
+const RECENT_MS = 5 * 24 * 3600_000, IMAGE = /\.(?:png|jpe?g|gif|webp|svg|bmp)$/i; // images (other projects' renders) open from anywhere
 /** True when the real file sits under the folder's real path (symlinks resolved on both sides). */
 async function inside(real: string, folder: string) {
 	const root = await realpath(folder).catch(() => undefined), rest = root && relative(root, real);

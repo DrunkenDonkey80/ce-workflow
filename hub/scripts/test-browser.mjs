@@ -304,6 +304,7 @@ try {
   assert.equal(text.headers.get("content-type"), "text/plain; charset=utf-8"); assert.match(text.headers.get("content-security-policy"), /^sandbox/);
   // A remote device gets only the project, plus temp/Downloads files from the last 5 days.
   const { linkedFile } = await import("../src/linked-files.ts"), old = join(os.tmpdir(), `hub-old-${process.pid}.txt`);
+  const oldImage = old.replace(/txt$/, "png"); fs.writeFileSync(oldImage, "x"); fs.utimesSync(oldImage, 0, 0); assert(await linkedFile(oldImage, folder, true), "images open remotely from anywhere"); fs.rmSync(oldImage);
   fs.writeFileSync(old, "x"); fs.utimesSync(old, new Date(Date.now() - 6 * 864e5), new Date(Date.now() - 6 * 864e5));
   assert.deepEqual([!!await linkedFile("top.txt", folder, true), !!await linkedFile(pasted, folder, true), !!await linkedFile(old, folder, true), !!await linkedFile(old, folder, false), !!await linkedFile(process.execPath, folder, true)], [true, true, false, true, false]);
   fs.rmSync(old);
