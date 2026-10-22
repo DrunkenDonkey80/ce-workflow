@@ -1801,7 +1801,7 @@ export default function plan3(pi) {
 					if (value === "complete" && loadDiagram(ctx.cwd, { kind: "product" }) && !architectureDone(lines)) throw new Error(`Finish ${ARCHITECTURE_STEP} first.`);
 					setMeta(lines, "status", value);
 				});
-				if (value === "complete") result = { file: await archive(ctx.cwd, plan) };
+				if (value === "complete") { result = { file: await archive(ctx.cwd, plan) }; pi.events?.emit?.("plan3:completed", { ctx, plan }); }
 			} else if (args.action === "step") {
 				const mark = need("mark");
 				if (!MARKS[mark]) throw new Error(`Unknown mark. Use ${Object.keys(MARKS).join(", ")}.`);

@@ -281,7 +281,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",review:"Review changes since the last commit or review with the other-provider model",reload:"Reload Pi after the current run (works from the browser)",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -4004,6 +4004,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(action==="compact") return requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
   if(action==="hub") return handleHubCommand(rest,ctx);
+  if(action==="review") return pi.events?.emit?.("wo:review",{ctx});
   if(action==="context-fill") {
    const tokens=Math.max(0,100_000-(ctx.getContextUsage?.()?.tokens??0));
    for(let remaining=tokens;remaining>0;remaining-=10_000) pi.sendMessage({customType:"work-context-fill",content:" the".repeat(Math.min(remaining,10_000)),display:false});
@@ -4056,6 +4057,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "visionAltModel") return owns(block, "visionAltModel");
 	if (item.kind === "imageModel") return owns(block, "imageModel");
 	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
+	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit") return owns(block, item.kind);
 	return false;
 }
 
@@ -4251,6 +4253,11 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				label: `Plan3 → Coding effort: ${settings.workOrchestrator?.plan3?.codingEffort ?? "same as session"} ${SUBMENU_ARROW}`,
 				description: "/resume3 execution switches to this effort when it starts; planning switches back. Each switch re-reads the context uncached once.",
 			},
+...[["reviewAfterPlan", "Review after plan finishes", "When a plan completes"], ["reviewBeforeCommit", "Review before commit", "Before the agent runs git commit"]].map(([kind, name, when]) => ({
+				kind, value: kind,
+				label: `${name}: ${settings.workOrchestrator?.[kind] ?? "off"} ${SUBMENU_ARROW}`,
+				description: `${when}: off, ask, or always run the diff reviewer (the other provider's Plan model). /wo review runs it by hand.`,
+			})),
 {
 				kind: "compactionMode", value: "compactionMode",
 				label: `Compact: ${COMPACTION_MODES.find(item => item.value === contextSettings(settings).mode).label} ${SUBMENU_ARROW}`,
@@ -4409,6 +4416,15 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			else settings.workOrchestrator.plan3.codingEffort = level;
 			writeScopedSettings(ctx.cwd, scope, settings);
 			ctx.ui.notify(`Plan3 coding effort: ${level}`, "info");
+			continue;
+		}
+		if (pick.kind === "reviewAfterPlan" || pick.kind === "reviewBeforeCommit") {
+			const mode = await choose(ctx, pick.label.replace(/:.*/, ""), ["off", "ask", "always"].map((value) => ({ value, label: value, description: { off: "Never review automatically", ask: "Ask each time", always: "Always review" }[value] })), settings.workOrchestrator?.[pick.kind] ?? "off");
+			if (!mode) continue;
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			settings.workOrchestrator[pick.kind] = mode;
+			writeScopedSettings(ctx.cwd, scope, settings);
 			continue;
 		}
 		if (pick.kind === "jev") {
