@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.68 — 2026-10-23
+
+### Fixed
+- Desktop app 0.1.2: an unpinned taskbar button now shows the live icon, your hubs' icons with their dots. Before, it showed the app's fixed PC icon. A pinned button still shows the fixed icon plus one live dot, because Windows doesn't let a pinned button change.
+
 ## 0.1.67 — 2026-10-23
 
 ### Added

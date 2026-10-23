@@ -156,10 +156,30 @@ fn show(app: AppHandle, id: u32) {
 fn close(app: AppHandle, id: u32) { if let Some(webview) = app.get_webview(&format!("hub{id}")) { let _ = webview.close(); } }
 #[tauri::command]
 fn reload(app: AppHandle, id: u32) { if let Some(webview) = app.get_webview(&format!("hub{id}")) { let _ = webview.eval("location.reload()"); } }
+/// Tauri's set_icon only sets the small (title bar) icon; the taskbar button draws the big one, else the exe's own icon.
+#[cfg(windows)]
+fn set_taskbar_icon(window: &tauri::Window, rgba: &[u8], size: u32) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{CreateIcon, DestroyIcon, SendMessageW, ICON_BIG, WM_SETICON};
+    static LAST: std::sync::Mutex<usize> = std::sync::Mutex::new(0);
+    let bgra: Vec<u8> = rgba.chunks_exact(4).flat_map(|p| [p[2], p[1], p[0], p[3]]).collect();
+    let mask = vec![0u8; (size * size / 8) as usize]; // all 0: alpha decides
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0;
+    unsafe {
+        let icon = CreateIcon(std::ptr::null_mut(), size as i32, size as i32, 1, 32, mask.as_ptr(), bgra.as_ptr());
+        if icon.is_null() { return Err("CreateIcon failed".into()) }
+        SendMessageW(hwnd as _, WM_SETICON, ICON_BIG as usize, icon as isize);
+        let mut last = LAST.lock().unwrap();
+        if *last != 0 { DestroyIcon(*last as _); }
+        *last = icon as usize;
+    }
+    Ok(())
+}
 /// The strip draws the icons on a canvas and hands over RGBA pixels; the overlay carries state on pinned buttons (A-02).
 #[tauri::command]
 fn set_icons(app: AppHandle, big: Vec<u8>, big_size: u32, small: Vec<u8>, small_size: u32, overlay: Option<Vec<u8>>) -> Result<(), String> {
     let window = app.get_window("main").ok_or("no window")?;
+    #[cfg(windows)]
+    set_taskbar_icon(&window, &big, big_size)?;
     window.set_icon(Image::new_owned(big, big_size, big_size)).map_err(|e| e.to_string())?;
     #[cfg(windows)]
     window.set_overlay_icon(overlay.map(|o| Image::new_owned(o, 16, 16))).map_err(|e| e.to_string())?;

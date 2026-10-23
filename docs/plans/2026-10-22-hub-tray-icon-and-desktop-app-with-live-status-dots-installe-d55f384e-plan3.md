@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T08:08:47.152Z
+updated: 2026-10-23T09:59:12.495Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -147,12 +147,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ### Phase 5: Live acceptance [think]
 
-- [wip] **L-01** On this PC: Install from settings, then tabs for this PC, the WSL hub and the work PC; Ctrl+N; tray; pinned button.
-  - Accept: a question in any hub turns its part of the taskbar icon red within 10 s, also with its tab inactive and the window hidden to the tray; finished unseen work shows blue until opened.
-  - Accept: Restart to update swaps two real builds; with the old file locked by hand the swap fails cleanly and the old version keeps running.
-  - Accept: app started before the hub at login connects once the hub is up.
-  - Accept: bump `release.json` to a test build; within the hourly check the app is staged and switches after restart.
-  - note: User testing on another PC: install ok, pinned overlay ok; fixes requested: label, login on one line, Start/Stop button, + dialog hidden.
+- [x] **L-01** Live on a second Windows PC: install, Update to 0.1.1 + Restart to update, two tabs, in-strip add, Start/Stop, and the pinned overlay all work. Pinned buttons show the static exe icon plus the most-urgent dot (a Windows limit; the user kept it).
 - [blocked] **L-02** Linux check on the friend's machine (needs a Linux desktop): install, tray, icon, tabs; record what the desktop allows (D12).
 ### P-ARCH [code] Product architecture
 
@@ -173,7 +168,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ## Resume context
 
-22/23 code+release done; release app-v0.1.0 pinned and pushed (0.1.65). L-01 [human]: user tests on another free PC after pulling (can't restart the hub here); L-02 Linux friend. Nothing else pending.
+L-01 WIP on the other PC: install OK, pinned overlay OK. Fixes from the user's feedback are in bc8131e (0.1.67, local): settings label, Start/Stop, compact row, and the tab strip asks inline in app 0.1.1 instead of using prompt(). Next: with user approval, push master, then tag app-v0.1.1. When CI is green, run pin-release app-v0.1.1 and commit/push release.json (git add it explicitly). That release also lets L-01 test Restart to update. L-02 (Linux) is still open.
 
 ## Amendments
 

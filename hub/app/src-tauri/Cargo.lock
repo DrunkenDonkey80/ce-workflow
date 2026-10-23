@@ -2518,13 +2518,14 @@ dependencies = [
 
 [[package]]
 name = "pi-hub-app"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-global-shortcut",
  "tauri-plugin-single-instance",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 [package]
 name = "pi-hub-app"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 
 [build-dependencies]
@@ -11,6 +11,9 @@ tauri = { version = "2", features = ["unstable", "tray-icon", "image-png"] }
 tauri-plugin-global-shortcut = "2"
 serde_json = "1"
 tauri-plugin-single-instance = "2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
 opt-level = "s"
