@@ -588,7 +588,9 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .messages { padding: 10px 12px 0; }
  .composer { padding: 6px 8px; }
  textarea { min-height: 40px; }
- .composer-actions { justify-content: flex-end; margin-top: 4px; }
+ .composer-actions { justify-content: flex-end; margin-top: 4px; gap: 4px; }
+ /* Six buttons (💾 🎤 EN ★ Stop Queue) on one row on a 375px phone. */
+ .composer-actions > :is(button, .attach) { padding-inline: 8px; }
 }
 .pairing main { margin: auto; padding: 24px; max-width: 28rem; text-align: center; }
 .pair-code { font: 600 2.5rem/1.2 ui-monospace, monospace; letter-spacing: 0.08em; min-height: 1.2em; }
