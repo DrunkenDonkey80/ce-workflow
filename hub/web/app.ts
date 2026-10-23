@@ -1197,7 +1197,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[] };
+type HubSession = { id: string; name: string; tone: Tone; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[] };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1356,7 +1356,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
   box.addEventListener("click", event => {
    if ((event.target as HTMLElement).closest(".session, button, a") || !group.sessions.length) return;
    let last = ""; try { last = localStorage.getItem("hub-last:" + group.folder) ?? ""; } catch { /* private mode */ }
-   const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => session.tone !== "parked") ?? group.sessions[0];
+   const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => !(session.parked ?? session.tone === "parked")) ?? group.sessions[0];
    if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
   });
   box.append(head, ...gitLine(group.git, group.folder === ownFolder), ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
@@ -1380,7 +1380,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  $("session-list").replaceChildren(...rows, recent, newFolder);
 }
 function sessionRow(session: HubSession, folder: string, path: string) {
- const row = html("div", { className: "session" }); row.dataset.tone = session.tone;
+ const row = html("div", { className: "session" }); row.dataset.tone = session.tone; row.toggleAttribute("data-parked", session.parked ?? session.tone === "parked");
  const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}${session.park ? " · " + session.park : ""}` });
  link.setAttribute("aria-label", `${session.name} in ${folder}, ${words[session.tone]}${session.id === sessionId ? ", this session" : ""}`);
  if (session.id === sessionId) row.setAttribute("aria-current", "page");
@@ -1421,7 +1421,7 @@ function placeMenu(anchor: HTMLElement) {
 }
 function showMenu(anchor: HTMLElement, items: [string, () => void][]) { sessionMenu.replaceChildren(...items.map(([text, run]) => menuItem(text, run))); placeMenu(anchor); }
 function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string) {
- const parked = session.tone === "parked", item = menuItem;
+ const parked = session.parked ?? session.tone === "parked", item = menuItem;
  // H7-01: a session open in a terminal window comes back by itself when that window closes.
  if (session.tone === "terminal") showNotice(`"${session.name}" is open in a terminal on the PC; it returns here when that Pi exits.`);
  sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path))] : [

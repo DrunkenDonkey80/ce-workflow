@@ -14,6 +14,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - On a phone, the File button is now 💾 and the chat box buttons are a little narrower, so Queue fits on the same row as Stop.
 
 ### Fixed
+- A session that finished while you weren't looking stays blue after it auto-parks, with the 💤 beside it, until you open it.
 - Desktop app: links in the chat that point outside the hub open in your default browser instead of doing nothing. The hub's own images and files still open inside the app.
 
 ## 0.1.72 — 2026-10-23

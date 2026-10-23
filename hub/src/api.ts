@@ -153,7 +153,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	function tone(id: string) {
 		if (registry.get(id)?.state === "terminal") return "terminal";
 		if (forms(id).length) return "waiting"; // a script's question waits on a parked session too
-		if (!host.live.has(id)) return "parked";
+		if (!host.live.has(id)) return unseen.has(id) ? "unseen" : "parked"; // auto-park keeps a finished run blue; the row's parked flag shows 💤
 		if (host.busyReasons(id).length) return "working";
 		if (scheduler?.list(id).length) return "scheduled"; // D4: idle, a timer will wake it
 		return unseen.has(id) ? "unseen" : "seen";
@@ -172,7 +172,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// D11: the row shows timers (countdown, last run); ticks never reach the chat.
 	const timers = (id: string) => scheduler?.list(id).sort((a, b) => a.dueAt - b.dueAt).map(t => ({ id: t.id, kind: t.kind, dueAt: t.dueAt, every: t.every, lastRun: t.lastRun, label: (t.text ?? t.command ?? "").slice(0, 80) }));
 	async function sessions() {
-		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id) })) })));
+		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id) })) })));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents, settings: settings() };
 	}

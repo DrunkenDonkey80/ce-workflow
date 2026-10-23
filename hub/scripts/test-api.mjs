@@ -263,7 +263,11 @@ try {
 	await hub.host.park(made.id); hub.registry.remove(made.id); // keep the later group checks to their own folders
 	assert.equal((await post(id, "session", { action: "new", folder: "relative" })).status, 404, "only absolute paths");
 	assert.equal((await post(id, "session", { action: "rename", id: created.id, name: "Docs" })).status, 200);
+	await hub.host.prompt(created.id, "hi"); await until(async () => (await tones()).Docs === "unseen" && "ok");
 	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);
+	const docs = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.name === "Docs");
+	assert.deepEqual([(await docs()).tone, (await docs()).parked], ["unseen", true], "parking keeps a finished run blue until it is looked at");
+	await post(created.id, "seen", {});
 	assert.equal((await tones()).Docs, "parked");
 	assert.equal((await post(id, "session", { action: "unstar", id })).status, 409, "a live session is parked before unstarring");
 	assert.equal((await post(id, "session", { action: "bogus", id })).status, 400);
