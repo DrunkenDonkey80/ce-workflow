@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 13,
+  "revision": 14,
   "nodes": [
     {
       "id": "pi_host",
@@ -354,7 +354,7 @@
       "id": "pi_control_hub",
       "label": "pi-control-hub",
       "kind": "external",
-      "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms; owns timers (message/script), subscription usage, the Claude pool (cpool) and each session's model, also while parked."
+      "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms; owns timers (message/script), subscription usage, the Claude pool (cpool) and each session's model, also while parked; installs and hourly stages the desktop app."
     },
     {
       "id": "camera_device",
@@ -375,6 +375,14 @@
       "kind": "store",
       "summary": "~/.pi/agent/camera: one-shot, 1 h, today or 48 h access grants and the owner lock.",
       "tech": "extensions/work-camera-state.ts"
+    },
+    {
+      "id": "pi_hub_app",
+      "label": "Pi Hub desktop app",
+      "kind": "client",
+      "summary": "Tauri window with a tab per hub (child webviews), live taskbar/overlay/tray icons from each hub page's title line; hide to tray, single instance, staged-update swap at start.",
+      "tech": "hub/app (Rust + Tauri 2, ui/index.html strip, ui/icons.js built from hub/web/icons.ts)",
+      "details": "Installed, staged and removed by the hub (hub/src/app-install.ts) from SHA-256 pins in hub/app/release.json; releases built by .github/workflows/app-release.yml on tag app-v*."
     }
   ],
   "edges": [
@@ -725,6 +733,12 @@
       "from": "work_models",
       "to": "pi_control_hub",
       "label": "schedule tool, /wo hub (pi-hub CLI)"
+    },
+    {
+      "id": "pi_hub_app__pi_control_hub",
+      "from": "pi_hub_app",
+      "to": "pi_control_hub",
+      "label": "hub pages (title state line), app.lock/app.json"
     }
   ],
   "notes": []

@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T07:13:33.091Z
+updated: 2026-10-23T07:13:53.657Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -155,9 +155,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 - [blocked] **L-02** Linux check on the friend's machine (needs a Linux desktop): install, tray, icon, tabs; record what the desktop allows (D12).
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram: added client node pi_hub_app (Tauri tabs, live icons, staged swap; installed from release.json pins, built by app-release.yml) with an edge to pi_control_hub; pi_control_hub summary now says it installs and hourly stages the app.
 
 
 ## Global validation
