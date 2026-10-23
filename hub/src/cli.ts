@@ -160,7 +160,9 @@ async function update(yes: boolean) {
 	}
 	if (running) await stop(false); // refuses if a session turned busy meanwhile
 	const [command, ...prefix] = defaultCommand();
-	try { execFileSync(command, [...prefix, "update", "--all"], { stdio: "inherit", shell: command === "pi" && process.platform === "win32" }); }
+	// windowsHide: npm/git children inherit this hidden console instead of each flashing its own window (the hub starts us console-less).
+	try { execFileSync(command, [...prefix, "update", "--all"], { stdio: "inherit", windowsHide: true, shell: command === "pi" && process.platform === "win32" }); }
+	catch (error) { if (!process.stdout.isTTY) openInBrowser(path.join(hubDataDir(), "hub.log")); throw error; } // from the page: show what failed
 	finally { if (running) await start(managed); }
 }
 
