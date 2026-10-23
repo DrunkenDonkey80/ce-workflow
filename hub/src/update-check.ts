@@ -7,9 +7,11 @@ import path from "node:path";
 import { piSdk } from "./pi-sdk.ts";
 import { agentDir } from "./rpc-client.ts";
 
-export type Found = { pi: { current: string; latest: string } | null; packages: string[] };
+/** One user-scope Pi package as the gear lists it; update comes from the same hourly check. */
+export type Installed = { source: string; name: string; version: string; update: boolean };
+export type Found = { pi: { current: string; latest: string } | null; packages: string[]; installed?: Installed[] };
 export type UpdateState = Found & { checkedAt: number | null; checking: boolean; error?: string };
-export type UpdateCheck = { state(): UpdateState; check(): Promise<UpdateState>; start(): void; stop(): void };
+export type UpdateCheck = { state(): UpdateState; check(): Promise<UpdateState>; remove(source: string): Promise<UpdateState>; start(): void; stop(): void };
 
 /** Numeric x.y.z comparison; a pre-release tag counts as its base version. */
 export const newer = (latest: string, current: string) => {
@@ -28,23 +30,37 @@ export async function findUpdates(dir = agentDir()): Promise<Found> {
 	const sdk = await piSdk(dir), cwd = os.homedir();
 	// shortcut: Pi's package check reports a failed npm/git lookup as "no update"; only the Pi version check can fail visibly.
 	const manager = new sdk.DefaultPackageManager({ cwd, agentDir: dir, settingsManager: sdk.SettingsManager.create(cwd, dir) });
-	const packages: string[] = (await manager.checkForAvailableUpdates()).map((update: { displayName: string }) => update.displayName);
-	return { pi: latest && newer(latest, current) ? { current, latest } : null, packages };
+	const updates: { source: string; displayName: string }[] = await manager.checkForAvailableUpdates();
+	const installed = (manager.listConfiguredPackages() as { source: string; scope: string; installedPath?: string }[]).filter(item => item.scope === "user").map(item => {
+		const update = updates.find(u => u.source === item.source);
+		let version = ""; try { version = String(JSON.parse(readFileSync(path.join(item.installedPath ?? "", "package.json"), "utf8")).version ?? ""); } catch { /* no package.json */ }
+		return { source: item.source, name: update?.displayName ?? packageName(item.source), version, update: !!update };
+	});
+	return { pi: latest && newer(latest, current) ? { current, latest } : null, packages: updates.map(u => u.displayName), installed };
+}
+export const packageName = (source: string) => source.startsWith("npm:") ? source.slice(4) : source.split(/[\\/]/).filter(Boolean).at(-1) ?? source;
+
+/** pi remove <source> through Pi's own package manager; false when the source is not installed for the user. */
+export async function removePackage(source: string, dir = agentDir()) {
+	const sdk = await piSdk(dir), cwd = os.homedir();
+	return new sdk.DefaultPackageManager({ cwd, agentDir: dir, settingsManager: sdk.SettingsManager.create(cwd, dir) }).removeAndPersist(source) as Promise<boolean>;
 }
 
 /**
- * findUpdates in a child with a hidden console: Pi's package check spawns npm/git without windowsHide, and a console-less
+ * Pi's package manager in a child with a hidden console: Pi's package check spawns npm/git without windowsHide, and a console-less
  * hub (logon start) gives each one its own flashing window. Their console is the child's hidden one instead.
  */
-export const findUpdatesHidden = () => new Promise<Found>((resolve, reject) => execFile(process.execPath,
-	["--input-type=module", "--no-warnings", "-e", `import { findUpdates } from ${JSON.stringify(import.meta.url)}; process.stdout.write(JSON.stringify(await findUpdates()));`],
+const hidden = <T>(call: string) => new Promise<T>((resolve, reject) => execFile(process.execPath,
+	["--input-type=module", "--no-warnings", "-e", `import * as m from ${JSON.stringify(import.meta.url)}; process.stdout.write(JSON.stringify(await m.${call}));`],
 	{ windowsHide: true, encoding: "utf8", timeout: 300_000, maxBuffer: 1_000_000 },
 	(error, stdout, stderr) => {
 		if (error) return reject(new Error(stderr.trim().split("\n").at(-1) || error.message));
-		try { resolve(JSON.parse(stdout)); } catch { reject(new Error("Update check gave no result.")); } // a throw here would end the hub
+		try { resolve(JSON.parse(stdout)); } catch { reject(new Error("Pi's package manager gave no result.")); } // a throw here would end the hub
 	}));
+export const findUpdatesHidden = () => hidden<Found>("findUpdates()");
+export const removePackageHidden = (source: string) => hidden<boolean>(`removePackage(${JSON.stringify(source)})`);
 
-export function createUpdateCheck({ find = findUpdatesHidden, every = 3_600_000 }: { find?: () => Promise<Found>; every?: number } = {}): UpdateCheck {
+export function createUpdateCheck({ find = findUpdatesHidden, remove = removePackageHidden, every = 3_600_000 }: { find?: () => Promise<Found>; remove?: (source: string) => Promise<boolean>; every?: number } = {}): UpdateCheck {
 	let value: UpdateState = { pi: null, packages: [], checkedAt: null, checking: false }, running: Promise<UpdateState> | undefined, timer: NodeJS.Timeout | undefined;
 	const check = () => running ??= (async () => {
 		value = { ...value, checking: true };
@@ -54,6 +70,15 @@ export function createUpdateCheck({ find = findUpdatesHidden, every = 3_600_000 
 	})();
 	return {
 		state: () => value, check,
+		// Only a package the last check listed; the hub itself runs from ce-workflow, so that one stays.
+		async remove(source) {
+			const item = value.installed?.find(entry => entry.source === source);
+			if (!item) throw new Error("Not an installed extension; check for updates first.");
+			if (/ce-workflow/i.test(source)) throw new Error("The hub runs from ce-workflow, so it cannot uninstall it.");
+			if (!await remove(source)) throw new Error(`${item.name} was not installed.`);
+			value = { ...value, installed: value.installed!.filter(entry => entry !== item), packages: value.packages.filter(name => name !== item.name) };
+			return value;
+		},
 		start() { void check(); timer = setInterval(() => void check(), every); timer.unref(); },
 		stop() { clearInterval(timer); },
 	};

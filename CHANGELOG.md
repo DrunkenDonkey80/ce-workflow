@@ -4,6 +4,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## 0.1.73 — 2026-10-23
 
+### Added
+- Hub settings list your installed Pi extensions with their versions. A ⟳ in front marks one with an update waiting, and a red × uninstalls it (ce-workflow itself stays). Running sessions keep an uninstalled extension until they restart.
+  ![Extension list in hub settings](docs/changelog/0.1.73-extensions.png)
+
 ### Changed
 - Desktop app: with 3 or 4 hubs, the taskbar icon is a grid of big dots, one row per hub in tab order and one column each for asking (red), working (orange) and finished (blue). The tiny hub pictures are gone, because they couldn't be read at taskbar size.
 - When the chat sits next to the diagram, its header no longer shows Pull, Commit and Commit and push. They stay in the sidebar folder box, and in the header when the chat is expanded.

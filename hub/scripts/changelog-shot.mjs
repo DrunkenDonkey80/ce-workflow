@@ -37,7 +37,10 @@ await new Promise(done => relay.listen(0, "127.0.0.1", done));
 process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, pool: false, models: undefined });
+// Sample extensions for the gear's list; no network, nothing installed or removed.
+const { createUpdateCheck } = await import("../src/update-check.ts");
+const updates = createUpdateCheck({ find: async () => ({ pi: null, packages: ["pi-lens"], installed: [["npm:pi-lens", "4.4.4", true], ["npm:pi-subagents", "0.81.0"], ["npm:pi-web-access", "0.44.0"], ["git:github.com/DrunkenDonkey80/ce-workflow", "0.1.73"]].map(([source, version, update]) => ({ source, name: source.split(/[:/]/).at(-1), version, update: !!update })) }), remove: async () => true });
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, pool: false, models: undefined, updates });
 try {
 	const { id } = await hub.host.create(folder, "1"), rpc = hub.host.live.get(id).rpc;
 	await rpc.send({ type: "prompt", message: "/state " + JSON.stringify({ plan: { id: "12345678", title: "Sample plan", status: "active", done: 1, total: 2, focus: "S02", bias: 0 }, modes: { research: "off", night: "off" } }) });

@@ -1245,7 +1245,7 @@ const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIC
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
-type Updates = { pi: { current: string; latest: string } | null; packages: string[]; checkedAt: number | null; checking: boolean; error?: string };
+type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
 type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string };
 let hubSettings: HubSettings = {}, appBadge = 0;
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
@@ -1790,8 +1790,24 @@ function renderUpdates() {
  $("update-badge").hidden = !own; $("update-others").hidden = !others; $("update-others").textContent = String(others);
  $("settings-button").title = count ? `Hub settings (${count} update${count > 1 ? "s" : ""})` : "Hub settings";
  const when = updates?.checkedAt ? new Date(updates.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
- const names = updates ? [...updates.pi ? [`Pi ${updates.pi.current} → ${updates.pi.latest}`] : [], ...updates.packages] : [];
+ const names = updates ? [...updates.pi ? [`Pi ${updates.pi.current} → ${updates.pi.latest}`] : [], ...updates.installed ? [] : updates.packages] : []; // the extension rows below mark their own updates
  $("update-list").textContent = !updates ? "Not checked by this hub." : updates.checking ? "Checking…" : (names.length ? names.join(", ") : when ? `Last checked ${when}` : "Not checked yet") + (updates.error ? ` · check failed: ${updates.error}` : "");
+ // Installed extensions: ⟳ in front when an update is waiting (Update all installs it), red × uninstalls (not ce-workflow: the hub runs from it).
+ $("extension-list").replaceChildren(...(updates?.installed ?? []).map(item => {
+  const row = html("div", { className: "extension-row", title: item.source });
+  row.append(html("span", { className: "extension-update", textContent: item.update ? "⟳" : "", title: item.update ? "Update available; Update all installs it" : "" }), html("span", { className: "extension-name", textContent: item.name }), html("span", { className: "extension-version", textContent: item.version }));
+  if (!/ce-workflow/i.test(item.source)) {
+   const remove = html("button", { type: "button", className: "extension-remove", textContent: "×", title: `Uninstall ${item.name}` });
+   remove.addEventListener("click", async () => {
+    if (!confirm(`Uninstall ${item.name}? Pi removes it (pi remove ${item.source}); running sessions keep it until they restart.`)) return;
+    remove.disabled = true;
+    try { hubSettings = await post("hub", { action: "remove-package", source: item.source }) as HubSettings; showNotice(`Uninstalled ${item.name}.`, true); } catch (error) { showNotice(error.message); }
+    renderUpdates();
+   });
+   row.append(remove);
+  }
+  return row;
+ }));
  ($("update-check") as HTMLButtonElement).disabled = !updates || updates.checking;
 }
 $("update-check").addEventListener("click", async () => {

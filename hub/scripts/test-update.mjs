@@ -28,3 +28,19 @@ assert.deepEqual(check.state().packages, ["pi-lens"]);
 fail = true; await check.check();
 assert.deepEqual([check.state().packages, check.state().error], [["pi-lens"], "offline"], "a failed check keeps the last list");
 console.log("ok - hourly update check");
+
+// Uninstall from the gear: only a listed package, never ce-workflow, and the list drops it without a new check.
+const removed = [];
+const list = createUpdateCheck({
+	find: async () => ({ pi: null, packages: ["pi-lens"], installed: [{ source: "npm:pi-lens", name: "pi-lens", version: "1.0.0", update: true }, { source: "git:github.com/x/ce-workflow", name: "ce-workflow", version: "0.1.73", update: false }] }),
+	remove: async source => { removed.push(source); return true; },
+});
+await assert.rejects(list.remove("npm:pi-lens"), /check for updates first/, "nothing listed before the first check");
+await list.check();
+await assert.rejects(list.remove("npm:other"), /Not an installed extension/);
+await assert.rejects(list.remove("git:github.com/x/ce-workflow"), /hub runs from ce-workflow/);
+const after = await list.remove("npm:pi-lens");
+assert.deepEqual([removed, after.installed.map(i => i.name), after.packages], [["npm:pi-lens"], ["ce-workflow"], []]);
+const { packageName } = await import("../src/update-check.ts");
+assert.deepEqual(["npm:@upstash/context7-pi", "git:github.com/x/pi-effort", String.raw`..\..\git\pi-chatgpt-web`].map(packageName), ["@upstash/context7-pi", "pi-effort", "pi-chatgpt-web"]);
+console.log("ok - uninstall an extension from the gear");

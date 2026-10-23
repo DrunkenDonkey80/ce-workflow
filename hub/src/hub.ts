@@ -302,6 +302,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					// Maintenance runs outside this service so systemd cannot kill it when the hub stops.
 					// update: --yes because the page asked already; Pi outside the hub keeps its old version (the log lists them).
 					if (data.action === "check-updates") { if (updates) await updates.check(); return send(200, pageApi.settings()); }
+					// Running sessions keep the extension loaded until they restart; the list drops it now.
+					if (data.action === "remove-package" && typeof data.source === "string") { try { await updates?.remove(data.source); } catch (error) { return send(409, { error: (error as Error).message }); } return send(200, pageApi.settings()); }
 					if (data.action !== "restart" && data.action !== "update") return send(400, { error: "Unknown hub action." });
 					const busy = summary().filter(s => s.busy.length);
 					if (busy.length) return send(409, { error: `Not ${data.action === "update" ? "updated" : "restarted"}; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
