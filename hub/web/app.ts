@@ -1111,6 +1111,8 @@ function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
  // Under its button, kept inside the window.
  if (open && $(menu).parentElement === $(button).parentElement?.closest(".status-line")) { const own = $(button).getBoundingClientRect(), line = $(menu).parentElement.getBoundingClientRect(); $(menu).style.left = Math.max(0, Math.min(own.left, innerWidth - $(menu).offsetWidth - 8) - line.left) + "px"; }
+ // Settings grew long: it may use the window's full height below its button.
+ if (open && menu === "settings-menu") $(menu).style.maxHeight = innerHeight - $(menu).getBoundingClientRect().top - 8 + "px";
  if (open) ($(menu).querySelector<HTMLElement>("input, button:not([hidden]):not(:disabled)"))?.focus();
 }
 function closeMenus(focus = false) {
@@ -1149,7 +1151,12 @@ async function loadPlans(list: HTMLElement) {
   }));
  } catch (error) { list.replaceChildren("Plans failed to load: " + error.message); }
 }
-$("review-button").addEventListener("click", () => toggleMenu("review-button", "review-menu"));
+$("review-button").addEventListener("click", event => {
+ toggleMenu("review-button", "review-menu"); const menu = $("review-menu"); if (menu.hidden) return;
+ // At the mouse (the button's corner for keyboard clicks), kept inside the window.
+ const own = $("review-button").getBoundingClientRect(), x = event.detail ? event.clientX : own.left, y = event.detail ? event.clientY : own.bottom;
+ Object.assign(menu.style, { position: "fixed", right: "auto", bottom: "auto", left: Math.max(8, Math.min(x, innerWidth - menu.offsetWidth - 8)) + "px", top: Math.max(8, Math.min(y, innerHeight - menu.offsetHeight - 8)) + "px" });
+});
 // Plan commands go through /api/command with the shown plan (a typed "/plan3 review <id>" would not name the plan).
 for (const button of document.querySelectorAll<HTMLElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.addEventListener("click", async () => {
  const command = button.dataset.command; closeMenus(); setDrawer(false);
@@ -1253,8 +1260,14 @@ function gitLine(git?: GitFiles | null, own = false) {
    list.append(html("strong", { className: "git-" + kind, textContent: words }), ...paths.map(path => html("div", { textContent: path })));
   }
   if (git.changed > git.files.length) list.append(html("em", { textContent: `…and ${git.changed - git.files.length} more` }));
-  // Fixed, placed under the line on hover: the scrolling session list would clip an absolute popup.
-  line.addEventListener("mouseenter", () => { const box = line.getBoundingClientRect(); list.style.left = box.left + "px"; list.style.top = Math.min(box.bottom, innerHeight - 80) + "px"; });
+  // Fixed, beside the sidebar and centred in the window, as tall as its files allow below the chat heading (the >> line);
+  // the scrolling session list would clip an absolute popup.
+  line.addEventListener("mouseenter", () => {
+   const side = (line.closest("#switcher, #drawer") ?? line).getBoundingClientRect(), top = $("chat").querySelector(".chat-heading")?.getBoundingClientRect().bottom ?? 0;
+   list.style.maxHeight = innerHeight - top - 16 + "px";
+   list.style.left = Math.max(8, Math.min(side.right + 8, innerWidth - list.offsetWidth - 8)) + "px";
+   list.style.top = Math.max(top + 8, (innerHeight - list.offsetHeight) / 2) + "px";
+  });
   line.append(list); for (const part of parts) part.removeAttribute("title");
  }
  if (actions.length) { const right = html("span", { className: "session-git-actions" }); right.append(...actions); line.append(right); }

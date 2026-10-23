@@ -2,6 +2,13 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- The sidebar's changed-files list opens beside the sidebar, centred in the window, and grows to fit its files; it scrolls only when it reaches the chat heading.
+- Settings is about 30% wider and can use the full window height.
+- The plan's Review menu opens at the mouse instead of at the far right.
+
 ## 0.1.73 — 2026-10-23
 
 ### Added

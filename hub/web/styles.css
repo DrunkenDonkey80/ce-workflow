@@ -266,7 +266,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .bookmark-use:disabled span { color: var(--muted); font-style: italic; }
 .bookmark-use strong { color: #e67700; }
 .session-git { position: relative; }
-.session-git-files { display: none; position: fixed; z-index: 30; min-width: 220px; max-width: min(520px, 80vw); max-height: 50vh; overflow: auto; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); font: 500 12px/1.5 ui-monospace, Consolas, monospace; color: var(--ink); white-space: nowrap; }
+.session-git-files { display: none; position: fixed; z-index: 30; min-width: 220px; max-width: min(720px, 80vw); overflow: auto; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); box-shadow: 0 4px 14px rgba(0, 0, 0, .18); font: 500 12px/1.5 ui-monospace, Consolas, monospace; color: var(--ink); white-space: nowrap; }
 .session-git-files strong { display: block; margin-top: 4px; font-family: system-ui, sans-serif; }
 .session-git-files strong:first-child { margin-top: 0; }
 .session-git-files em { display: block; color: var(--muted); }
@@ -629,7 +629,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 #chat-compact-m { grid-column: 1 / -1; }
 /* Gear menu field and the tab icon picker. */
 /* Hub settings: titled groups split by hairlines; labels left, every control in one fixed-width right column. */
-#settings-menu { --control: 8.5rem; width: min(360px, calc(100vw - 16px)); max-width: none; gap: 0; padding: 4px 12px 12px; } /* a definite width, so the icon grid fills its rows */
+#settings-menu { --control: 8.5rem; width: min(470px, calc(100vw - 16px)); max-width: none; gap: 0; padding: 4px 12px 12px; } /* a definite width, so the icon grid fills its rows */
 .settings-group { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .settings-group:last-child { border-bottom: 0; padding-bottom: 0; }
 .status-menu .settings-group h3 { margin: 0 0 2px; font-size: 13px; color: var(--ink); }
