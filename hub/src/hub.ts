@@ -66,7 +66,7 @@ const WEB = new URL("../web/", import.meta.url);
 const JS = "text/javascript; charset=utf-8";
 const ASSETS: Record<string, [string, string]> = {
 	"app.js": ["app.ts", JS], "layout.js": ["layout.ts", JS], "diagram.js": ["diagram.ts", JS], "prompts.js": ["prompts.ts", JS],
-	"files.js": ["files.ts", JS], "stream.js": ["stream.ts", JS], "pair.js": ["pair.ts", JS], "icons.js": ["icons.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
+	"files.js": ["files.ts", JS], "stream.js": ["stream.ts", JS], "annotate.js": ["annotate.ts", JS], "pair.js": ["pair.ts", JS], "icons.js": ["icons.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
 };
 // Changes whenever a served file changes, checked per request, so web/ edits go live without restarting the hub
 // (and with it every session); an open page reloads itself when the build differs.

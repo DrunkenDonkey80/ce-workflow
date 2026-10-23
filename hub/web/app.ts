@@ -12,6 +12,8 @@ import { createFilesView } from "./files.js?token=__TOKEN__";
 import { createPromptView } from "./prompts.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { applyText } from "./stream.js?token=__TOKEN__";
+// @ts-ignore Browser URL includes the workspace token.
+import { annotate, legend } from "./annotate.js?token=__TOKEN__";
 function $(id: "message-input" | "comment-text"): HTMLTextAreaElement;
 function $(id: "send" | "stop" | "comment-save" | "model-button" | "context-button" | "bias-button" | "generate"): HTMLButtonElement;
 function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
@@ -906,6 +908,35 @@ function renderMentions() {
  for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = "No matching element; sent as text."; if (entity && "label" in entity) chip.title = entity.label ?? chip.title; if (entity && "text" in entity) chip.title = entity.text; $("mentions").append(chip); }
 }
 $("message-input").addEventListener("input", renderMentions);
+// Images in the chat box show as thumbnails under it; clicking one annotates it. Saving uploads a new PNG, swaps its path in
+// the box and puts the marker notes after it as text. A re-edit starts again from the original with the shapes still editable.
+const annotated = new Map<string, { source: string; state: unknown; notes: string }>();
+function renderComposerThumbs() {
+ const value = $("message-input").value, paths = [...new Set([...value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => IMAGE_FILE.test(path)))].slice(0, 8);
+ $("composer-thumbs").replaceChildren(...paths.map(path => {
+  const button = html("button", { type: "button", className: "composer-thumb", title: "Annotate " + path }), img = html("img", { src: imageSource(path), alt: "" });
+  img.addEventListener("error", () => button.remove()); button.append(img); button.addEventListener("click", () => void annotateImage(path)); return button;
+ }));
+}
+async function annotateImage(path: string) {
+ const previous = annotated.get(path), source = previous?.source ?? path;
+ let result; try { result = await annotate(imageSource(source), previous?.state); } catch (error) { return showNotice(error.message); }
+ if (!result) return;
+ showNotice("Saving the annotated image…");
+ try {
+  const name = "annotated-" + (source.split(/[\\/]/).pop() ?? "image").replace(/\.[^.]+$/, "") + ".png";
+  const response = await fetch("api/paste?name=" + encodeURIComponent(name), { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "image/png" }, body: result.blob });
+  const saved = await response.json(); if (!response.ok) throw new Error(saved.error ?? "Upload failed.");
+  const input = $("message-input"), notes = legend(result.state.shapes), quoted = /\s/.test(saved.path) ? `"${saved.path}"` : saved.path;
+  let text = input.value; if (previous?.notes) text = text.replace("\n" + previous.notes, "");
+  const at = text.indexOf(path); if (at < 0) return showNotice("The image is no longer in the message.");
+  const before = text.slice(0, at).replace(/"$/, ""), after = text.slice(at + path.length).replace(/^"/, "");
+  input.value = before + quoted + (notes ? "\n" + notes : "") + (notes && after && !after.startsWith("\n") ? "\n" : "") + after;
+  annotated.delete(path); annotated.set(saved.path, { source, state: result.state, notes });
+  input.dispatchEvent(new Event("input")); showNotice("Annotated image saved.", true);
+ } catch (error) { showNotice(error.message); }
+}
+$("message-input").addEventListener("input", renderComposerThumbs);
 // Push to talk: the browser's own speech recognition (Chrome and Safari send the audio to Google/Apple). Hold the button,
 // the recognised words appear live in the box without focusing it (no phone keyboard); release to stop. EN or BG.
 const TALK_LANGS = { "en-US": "EN", "bg-BG": "BG" };

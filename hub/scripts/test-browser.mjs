@@ -291,6 +291,13 @@ try {
  await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+ // Its thumbnail under the box opens the annotator; a marker's note goes into the box as text after the new image's path.
+ await browser("click", "#composer-thumbs .composer-thumb"); await browser("wait", "dialog.annotate[open] canvas");
+ await browser("press", "3"); await browser("fill", ".annotate-note", "red mark"); await browser("press", "Enter");
+ assert.equal(await evaluate("document.querySelector('.annotate-legend').textContent"), "(3) red mark");
+ await browser("click", ".annotate-save"); await browser("wait", "--fn", `(v => v.includes(".png\\n(3) red mark") && !v.includes(${JSON.stringify(pasted)}))(document.getElementById("message-input").value)`);
+ assert.equal(await evaluate("!!document.querySelector('dialog.annotate')"), false, "the dialog is removed after saving");
+ await evaluate(`(() => { const input = document.getElementById("message-input"); input.value = ${JSON.stringify(pasted + " ")}; input.dispatchEvent(new Event("input")); })()`);
 	// Image and Markdown paths in chat become links; images also show as thumbnails. Only temp-folder and project images are served.
  { const row = { id: "img_row", role: "agent", text: `look ${pasted}, see docs/notes.md. and ${process.platform === "win32" ? "C:\\Windows\\Web\\x.png" : "/etc/x.png"}`, streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=img_row] .thumb img");

@@ -5,6 +5,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## 0.1.73 — 2026-10-23
 
 ### Added
+- Images in the chat box show as small thumbnails under it. Click one to annotate it: free draw, arrows, rectangles, circles, 6 colours, crop, and numbered markers (click, or press 1–9 over the image) with a note each. Ctrl+Z undoes, Del removes the selected element. Saving swaps in the annotated image and adds the notes as "(1) …" lines after it, so the model reads them exactly.
+![Annotating a pasted image](docs/changelog/0.1.73-annotate.png)
 - Hub settings list your installed Pi extensions with their versions. A ⟳ in front marks one with an update waiting, and a red × uninstalls it (ce-workflow itself stays). Running sessions keep an uninstalled extension until they restart.
   ![Extension list in hub settings](docs/changelog/0.1.73-extensions.png)
 

@@ -406,6 +406,23 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .composer-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; align-items: center; margin-top: 6px; }
 .composer-actions button { white-space: nowrap; }
 .input-help { font-size: 12px; color: var(--muted); margin-right: auto; }
+.composer-thumbs { display: flex; gap: 4px; } .composer-thumbs:empty { display: none; }
+.composer-thumbs:not(:empty) { margin-right: auto; } .composer-thumbs:not(:empty) + .input-help { display: none; }
+.composer-thumb { padding: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; height: 40px; width: 40px; cursor: pointer; background: var(--chat); }
+.composer-thumb:hover { border-color: var(--focus); } .composer-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+dialog.annotate { width: min(1400px, 96vw); max-height: 96dvh; padding: 12px 14px; }
+.annotate-bar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 4px; }
+.annotate-tool { min-width: 34px; height: 34px; padding: 0 6px; font-size: 17px; }
+.annotate-tool[aria-pressed=true] { background: var(--focus); color: var(--on-focus); border-color: var(--focus); }
+.annotate-swatch { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 1px solid var(--line); }
+.annotate-swatch[aria-pressed=true] { outline: 2px solid var(--focus); outline-offset: 2px; }
+.annotate-gap { width: 10px; } .annotate-fill { flex: 1; }
+.annotate-save { background: var(--focus); color: var(--on-focus); border-color: var(--focus); }
+.annotate-stage { position: relative; display: flex; justify-content: center; }
+.annotate-stage canvas { max-width: 100%; max-height: 68dvh; touch-action: none; cursor: crosshair; border: 1px solid var(--line); }
+.annotate-note { position: absolute; width: 280px; z-index: 1; }
+.annotate-legend { margin: 6px 0 0; padding-left: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.annotate-legend li { cursor: pointer; border-left: 4px solid var(--marker); padding-left: 6px; } .annotate-legend li:hover { color: var(--focus); }
 .danger { color: var(--error); border-color: var(--error); }
 #send { background: var(--focus); color: var(--on-focus); border-color: var(--focus); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
