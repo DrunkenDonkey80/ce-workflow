@@ -1004,7 +1004,7 @@ $("composer").addEventListener("submit", async event => {
  messageSending = true; expectWork(); renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
- try { const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
+ try { const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; saveDraft(); renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
  catch (error) { expectWork(false); showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });
@@ -1400,7 +1400,15 @@ void loadSessions();
 // tapping one opens its window: every quota window as a bar, the pool's notes and, for Claude, the account pool.
 type Segment = { text: string; color?: string };
 type UsageBar = { label: string; left: number; color: string; resets?: string; at?: string };
-type Usage = { id: string; label: string; window?: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[] };
+type Usage = { id: string; label: string; window?: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[]; soon?: { left: number; in: string }[] };
+// The next refills (within 48 h) as dotted marks at the level they bring; the usage window labels them in grey.
+function soonMarks(bar: HTMLElement, item: Usage, labelled: boolean) {
+ for (const refill of item.soon ?? []) {
+  const at = shownLeft(refill.left), mark = el("i", "usage-soon" + (at > 70 ? " flip" : ""));
+  mark.style.left = at + "%"; if (labelled) mark.append(el("span", "", `${refill.in} \u00b7 ${at}%`));
+  bar.append(mark);
+ }
+}
 let usage: Usage[] = [], usageAccounts: Segment[] = [], usageTimer = 0, usageShown = "";
 const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
 // Usage as % left (default) or % used, per device (gear → Usage shows); fills follow the shown number.
@@ -1430,7 +1438,8 @@ function renderUsageBar() {
   button.append(el("span", "usage-item", `${item.label} ${label}: ${shownLeft(left)}%${resets ? " " + resets : ""}`), ...warnings.map(w => el("span", "usage-warning tone-" + w.color, " \u00b7 " + w.text)));
   // A warning outranks the quota colour: the expiring week is the thing to act on.
   setBar(button, shownLeft(left), tone(warnings.find(w => w.color === "error")?.color ?? warnings[0]?.color ?? bar.color));
-  button.title = [item.label, ...(item.bars ?? []).map(entry => `${entry.label} ${shownLeft(entry.left)}% ${usageWord()}${entry.resets ? " (" + entry.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text), "Right-click hides this bar"].join(" \u00b7 ");
+  if (head) soonMarks(button, item, false);
+  button.title = [item.label, ...(item.bars ?? []).map(entry => `${entry.label} ${shownLeft(entry.left)}% ${usageWord()}${entry.resets ? " (" + entry.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text), ...(item.soon ?? []).map(s => `${shownLeft(s.left)}% ${usageWord()} in ${s.in}`), "Right-click hides this bar"].join(" \u00b7 ");
   button.addEventListener("click", () => void openUsage(item.id));
   button.addEventListener("contextmenu", event => { event.preventDefault(); void showUsageWindow(item, label, false); });
   return button;
@@ -1509,7 +1518,9 @@ async function openUsage(id: string, open = true) {
  const body: HTMLElement[] = (item.bars ?? []).map(bar => {
   const row = el("div", "bar usage-window-bar");
   row.append(el("b", "", bar.label), ` ${shownLeft(bar.left)}% ${usageWord()}${bar.resets ? " · resets in " + bar.resets : ""}${bar.at ? " (" + bar.at + ")" : ""}`);
-  setBar(row, shownLeft(bar.left), tone(bar.color)); return row;
+  setBar(row, shownLeft(bar.left), tone(bar.color));
+  if (bar.label === item.window && item.soon?.length) { row.classList.add("has-soon"); soonMarks(row, item, true); }
+  return row;
  });
  const hidden = new Set(hubSettings.usageHidden ?? []), top = el("div", "usage-top", "Top bar:");
  for (const label of topWindows(item)) {
@@ -1677,11 +1688,11 @@ function renderApp(app: AppStatus) {
  $("app-group").hidden = false;
  const newer = !!app.latest && app.latest !== app.version && app.latest !== app.staged;
  $("app-status").textContent = !app.supported ? app.note ?? "" : !app.installed ? (app.latest ? `Not installed · ${app.latest} available` : "No app release is pinned yet.")
-  : `Installed ${app.version}` + (app.staged ? ` · ${app.staged} ready: Restart to update in the tray` : newer ? ` · ${app.latest} available` : "") + (app.running ? " · running" : "");
+  : `Installed ${app.version}` + (app.staged ? ` · ${app.staged} ready` : newer ? ` · ${app.latest} available` : "") + (app.running ? " · running" : "");
  $("app-login-field").hidden = $("app-actions").hidden = !app.supported;
  ($("app-login") as HTMLInputElement).checked = app.login; ($("app-login") as HTMLInputElement).disabled = !app.installed;
  const install = $("app-install") as HTMLButtonElement;
- install.textContent = app.installed ? "Update" : "Install"; install.disabled = app.installed ? !newer : !app.latest;
+ install.textContent = app.installed ? "Update" : "Install"; install.disabled = app.installed ? !newer && !app.staged : !app.latest;
  $("app-uninstall").hidden = !app.installed;
  const start = $("app-start") as HTMLButtonElement;
  start.hidden = !app.installed; start.textContent = app.running ? "Stop" : "Start";
@@ -1691,7 +1702,7 @@ async function appAction(body: Record<string, unknown>, busy?: string) {
  try { renderApp(await post("app", body)); } catch (error) { showNotice(error.message); void appAction({ action: "status" }); }
 }
 $("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) void appAction({ action: "status" }); });
-$("app-install").addEventListener("click", () => void appAction({ action: $("app-install").textContent === "Update" ? "update" : "install" }, "Downloading…"));
+$("app-install").addEventListener("click", () => void appAction({ action: $("app-install").textContent === "Update" ? "update" : "install" }, "Downloading…").then(() => setTimeout(() => void appAction({ action: "status" }), 2500)));
 $("app-uninstall").addEventListener("click", () => void appAction({ action: "uninstall" }));
 // The app writes app.lock a moment after it starts, so look again shortly after.
 $("app-start").addEventListener("click", () => void appAction({ action: $("app-start").textContent === "Stop" ? "stop" : "start" }).then(() => setTimeout(() => void appAction({ action: "status" }), 2500)));

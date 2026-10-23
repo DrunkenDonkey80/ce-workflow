@@ -28,7 +28,10 @@ try {
 
 	// Validation and D8 limits.
 	assert.throws(() => s.add({ session: a.id, kind: "message", text: " " }, T), /needs text/);
-	assert.throws(() => s.add({ session: a.id, kind: "script", command: "x", everyMinutes: 0.5 }, T), /once a minute/);
+	assert.throws(() => s.add({ session: a.id, kind: "script", command: "x", everyMinutes: 0.1 }, T), /every 10 seconds/);
+	assert.throws(() => s.add({ session: a.id, kind: "message", text: "x", everyMinutes: 0.5 }, T), /once a minute/);
+	const fast = s.add({ session: a.id, kind: "script", command: "x", everyMinutes: 1 / 6 }, T);
+	assert.equal(fast.every, 10_000, "script timers may tick every 10 s"); s.cancel(fast.id);
 	assert.throws(() => s.add({ session: "missing", kind: "message", text: "x" }, T), /hub session/);
 	assert.throws(() => s.add({ session: a.id, kind: "message", text: "x", at: T - min }, T), /past/);
 	const rep = s.add({ session: a.id, kind: "message", text: "check", everyMinutes: 5 }, T);

@@ -186,6 +186,11 @@ h2 { font-size: 15px; font-weight: 600; }
 .changelog-body { max-height: 75dvh; overflow-y: auto; } .changelog-body h3 { margin: 14px 0 4px; } .changelog-body div { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; } .changelog-body .thumb img { max-width: 240px; }
 .dialog-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 0; font-size: 20px; line-height: 1; }
 .usage-top { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: 13px; margin: 2px 0 6px; }
+.usage-bar, .usage-window-bar { position: relative; }
+.usage-soon { position: absolute; top: 0; bottom: 0; border-left: 2px dotted var(--bar); pointer-events: none; }
+.usage-soon span { position: absolute; bottom: 1px; left: 4px; font-size: 11px; font-style: normal; color: var(--muted); white-space: nowrap; }
+.usage-soon.flip span { left: auto; right: 6px; }
+.usage-window-bar.has-soon { padding-bottom: 20px; }
 .usage-window-bar { display: block; text-align: left; margin: 6px 0; padding: 8px 12px; font-variant-numeric: tabular-nums; }
 .usage-alert { margin: 8px 0; padding: 6px 10px; border-radius: 6px; font-weight: 600; background: color-mix(in srgb, currentColor 10%, transparent); }
 .usage-alert.tone-error { color: var(--error); } .usage-alert.tone-warning { color: var(--warning); }
@@ -555,6 +560,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .settings-group { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .settings-group:last-child { border-bottom: 0; padding-bottom: 0; }
 .status-menu .settings-group h3 { margin: 0 0 2px; font-size: 13px; color: var(--ink); }
+.status-menu .settings-group h3.group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.group-head button { font-size: 12px; font-weight: normal; padding: 3px 10px; }
 .menu-field { display: grid; grid-template-columns: 1fr var(--control, auto); align-items: center; gap: 10px; color: var(--muted); }
 .menu-field-top { align-items: start; }
 #settings-menu .menu-field:has(.theme-pair) { grid-template-columns: auto 1fr; }

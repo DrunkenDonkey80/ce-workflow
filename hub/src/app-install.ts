@@ -128,6 +128,8 @@ export function createAppInstall({
 		if (running()) { try { process.kill(Number(readFileSync(lock, "utf8").trim())); } catch { /* already gone */ } rmSync(lock, { force: true }); }
 		return status();
 	}
+	/** Same as the tray's "Restart to update": the new process swaps the staged build in at start (it waits for the old one to exit). */
+	const restart = () => { stop(); return start(); };
 	function uninstall() {
 		guard();
 		if (running()) throw new Error("Quit Pi Hub from the tray first.");
@@ -135,5 +137,5 @@ export function createAppInstall({
 		rmSync(dir, { recursive: true, force: true }); rmSync(shortcut, { force: true });
 		return status();
 	}
-	return { status, install, stage, autoStage, start, stop, uninstall, setLogin, paths: { dir, file, next, lock, shortcut, autostartFile } };
+	return { status, install, stage, autoStage, start, stop, restart, uninstall, setLogin, paths: { dir, file, next, lock, shortcut, autostartFile } };
 }

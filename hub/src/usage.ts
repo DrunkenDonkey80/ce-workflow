@@ -284,7 +284,8 @@ function poolWindows(store, accounts, entries, used, t) {
 		.slice(0, 2)
 		.entries()) {
 		refilled += w.pct / week.length;
-		windows.push(text(`refill-${index}`, `${Math.round(100 - usedAvg + refilled)}% in ${formatDuration(w.at - t)}`));
+		// usedPercent/resetsAt: the level the pool's 7d refills to and when, drawn as a dotted mark on the bar.
+		windows.push({ ...text(`refill-${index}`, `${Math.round(100 - usedAvg + refilled)}% in ${formatDuration(w.at - t)}`), usedPercent: percent(usedAvg - refilled), resetsAt: w.at });
 	}
 	const short = (label) => String(label).replace(/^.*:/, "").replace(/@.*$/, "");
 	const active = typeof store.active === "string" ? store.active : "";
@@ -749,8 +750,11 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 					: w.id === "5h-full" ? w.text!.replace(/^5h full (.+)$/, "5h full, frees in $1") : w.text!;
 				const text = windows.filter(w => w.text !== undefined && w !== week);
 				const warnings = text.filter(w => w.color).map(w => ({ text: words(w), color: w.color }));
-				const notes = text.filter(w => !w.color).map(w => w.text);
-				return week ? [{ id: entry.id, label: entry.label, window: week.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets, bars, warnings, notes }] : [];
+				// Refills within 48 h become marks on the 7d bar; the active account shows as the pool's "→" row.
+				const soon = text.filter(w => w.id.startsWith("refill-") && w.resetsAt && w.resetsAt > at && w.resetsAt - at <= 48 * 3_600_000)
+					.map(w => ({ left: Math.round(100 - w.usedPercent), in: formatDuration(w.resetsAt! - at) }));
+				const notes = text.filter(w => !w.color && !w.id.startsWith("refill-") && w.id !== "active").map(w => w.text);
+				return week ? [{ id: entry.id, label: entry.label, window: week.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets, bars, warnings, notes, soon }] : [];
 			});
 			return { summary, accounts: hidden().includes("claude") ? [] : poolAccountLines() };
 		},

@@ -29,7 +29,7 @@ export type Timer = {
 export type TimerInput = { session: string; kind: "message" | "script"; text?: string; command?: string; inMinutes?: number; at?: number; everyMinutes?: number; until?: number; runs?: number };
 export type ScriptResult = { code: number | null; output: string; timedOut: boolean };
 
-export const MIN_EVERY_MS = 60_000, DEFAULT_RUNS = 12, SCRIPT_LIFETIME_MS = 24 * 3_600_000, SCRIPT_TIMEOUT_MS = 60_000, OUTPUT_CAP = 4096, MAX_FAILURES = 3;
+export const MIN_EVERY_MS = 60_000, MIN_SCRIPT_EVERY_MS = 10_000, DEFAULT_RUNS = 12, SCRIPT_LIFETIME_MS = 24 * 3_600_000, SCRIPT_TIMEOUT_MS = 60_000, OUTPUT_CAP = 4096, MAX_FAILURES = 3;
 export const CANCEL_EXIT = 3;
 const fail = (message: string) => Object.assign(new Error(message), { status: 400 });
 
@@ -98,7 +98,9 @@ export class Scheduler extends EventEmitter {
 		const dueAt = input.at ?? now + (input.inMinutes ?? input.everyMinutes ?? 0) * 60_000;
 		if (!Number.isFinite(dueAt) || dueAt < now - 1000) throw fail("The time is in the past.");
 		const every = input.everyMinutes === undefined ? undefined : input.everyMinutes * 60_000;
-		if (every !== undefined && !(every >= MIN_EVERY_MS)) throw fail("Repeating timers run at most once a minute (D8).");
+		// Script ticks cost no tokens, so they may poll every 10 s; message ticks are model turns.
+		if (every !== undefined && input.kind === "script" && !(every >= MIN_SCRIPT_EVERY_MS)) throw fail("Repeating script timers run at most every 10 seconds.");
+		if (every !== undefined && input.kind === "message" && !(every >= MIN_EVERY_MS)) throw fail("Repeating message timers run at most once a minute (D8).");
 		const timer: Timer = { id: randomUUID(), session: record.id, sessionFile: record.sessionFile, kind: input.kind, dueAt, failures: 0, createdAt: now,
 			...(input.kind === "message" ? { text: input.text!.trim() } : { command: input.command!.trim() }), ...(every ? { every } : {}) };
 		if (every && input.kind === "message") {

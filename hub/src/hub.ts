@@ -289,7 +289,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					try {
 						if (data.action === "status") return send(200, app.status());
 						if (data.action === "install") return send(200, await app.install());
-						if (data.action === "update") return send(200, await app.stage());
+						// Update = download if needed, then restart a running app into it (like the tray); a stopped one swaps at its next start.
+						if (data.action === "update") { const value = await app.stage(); return send(200, value.staged && value.running ? app.restart() : value); }
 						if (data.action === "uninstall") return send(200, app.uninstall());
 						if (data.action === "start") return send(200, app.start());
 						if (data.action === "stop") return send(200, app.stop());

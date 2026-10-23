@@ -131,7 +131,7 @@ const nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
 export const scheduleTool = {
 	name: "schedule",
 	label: "Schedule",
-	description: "Wake this hub session later instead of keeping a turn open to poll. Prefer kind script: the hub runs `command` in the project folder each tick at no token cost; exit 0 with no output keeps watching, printed output becomes your next message and ends the timer, exit 3 cancels it, 3 failures in a row report the error. Kind message sends `text` as a full model turn (only when the check needs your judgement). One-off: inMinutes or at (ISO time). Repeating: everyMinutes (at least 1); message repeats need until or runs (default 12); script repeats stop after 24 h. Also list and cancel (by id).",
+	description: "Wake this hub session later instead of keeping a turn open to poll. Prefer kind script: the hub runs `command` in the project folder each tick at no token cost; exit 0 with no output keeps watching, printed output becomes your next message and ends the timer, exit 3 cancels it, 3 failures in a row report the error. Kind message sends `text` as a full model turn (only when the check needs your judgement). One-off: inMinutes or at (ISO time). Repeating: everyMinutes (script at least 1/6 = 10 s, e.g. waiting for a program; message at least 1; GitHub runs: 1); message repeats need until or runs (default 12); script repeats stop after 24 h. Also list and cancel (by id).",
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
