@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T06:55:37.154Z
+updated: 2026-10-23T06:58:18.794Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -124,15 +124,8 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 ### Phase 2: Hub side [code]
 
 - [x] **H-01** hubsIconSvg in icons.ts plus hub/app/build-icons.mjs (strips icons.ts → ui/icons.js, gitignored), run automatically as Tauri's beforeBuildCommand.
-- [x] **H-02** In-app title line `pihub {icon,name,states}` (UA PiHubApp/), hostname in settings, own unseen included, snapshot/SSE reconnect no longer clears unseen, app polls every 5 s hidden.
-- [ ] **H-03** `hub/src/app-install.ts` with status, install, stage, uninstall; per-user paths for Windows and Linux.
-  - Windows Start-menu shortcut via PowerShell `WScript.Shell`, run hidden; Linux .desktop file with the AppImage path.
-  - Login entry on by default (D10): HKCU Run value or XDG autostart file, starting the app with `--hidden`; uninstall removes it.
-  - Refuse URLs outside the repo's release path and any SHA-256 mismatch; temp file then rename.
-  - Stage as `pi-hub-app.next(.exe)`. Swap at app start, before the single-instance lock: rename the running file to `.old` (Windows allows renaming a running exe), `.next` to the main name, relaunch it and exit; the next good start deletes `.old`; a failed rename leaves the old version running and reports it.
-  - Uninstall refuses while the app runs ("Quit Pi Hub from the tray first").
-  - The installer writes the hub data folder into the app's config (and the login entry's `--hub-data` argument), because a desktop launch may lack `PI_CODING_AGENT_DIR` (`hub/src/registry.ts` hubDataDir).
-  - Check: C1 (fake release server, temp install root, mismatch refused, uninstall leaves nothing, uninstall refused while a fake app process holds the lock); the real two-version swap is checked in L-01.
+- [x] **H-02** In-app title line `pi-hub-state {icon,name,states}` (UA PiHubApp/), hostname in settings, own unseen included, snapshot/SSE reconnect no longer clears unseen, app polls every 5 s hidden.
+- [x] **H-03** hub/src/app-install.ts: status/install/stage/uninstall/setLogin; installed.json tracks version+staged (a vanished .next means the app swapped); app.lock pid = running; app.json carries hubData; release.json missing = "no release pinned yet".
 - [ ] **H-04** Settings API and UI row "Desktop app": Install, Update, Uninstall, version, and the "Start at login" switch (D10); local page only (D7).
   - On WSL the row shows only the D13 note; the action routes refuse there (C9 or C10 case).
   - Remote pages never see the row; the action route is gated on the request being local (not only on the key), so a paired remote device cannot install, uninstall or change the login entry.
@@ -149,6 +142,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 - [ ] **P-03** Combined taskbar icon from the tabs' states via `ui/icons.js`, plus the overlay icon if A-02 showed pinned buttons need it.
 - [ ] **P-04** Tray icon and menu: hubs with their state, Open, Restart to update (D11), Quit; click brings the window forward.
 - [ ] **P-05** Focus-scoped Ctrl+1 to Ctrl+N (D3), hide to tray on close (D9), hidden start, single instance, staged-update swap at start.
+  - Contract from H-03: write the app's pid to `app.lock` next to the exe while running (the hub's running check); read `hubData` from `app.json` there or `--hub-data`.
   - Check for P-01 to P-05: C5 builds; manual run against the local hub and the WSL hub shows tabs, dots and switching.
 
 ### Phase 4: Release pipeline [code]

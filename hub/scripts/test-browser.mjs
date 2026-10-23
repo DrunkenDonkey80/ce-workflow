@@ -700,11 +700,11 @@ try {
  assert.equal(await evaluate("window.notes.length"), 1, "Finished off: no announcement");
  await hub.host.park(third.id);
  // H-02 (D5): inside the desktop app the title is a machine line; this session's own finished run counts while unfocused.
- assert(!(await evaluate("document.title")).startsWith("pihub"), "a normal browser keeps its own title");
+ assert(!(await evaluate("document.title")).startsWith("pi-hub-state"), "a normal browser keeps its own title");
  await evaluate("(() => { Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 PiHubApp/0.1.0' }); document.hasFocus = () => false; })()");
  await hub.host.prompt(id, "app");
- await browser("wait", "--fn", "document.title.startsWith('pihub {') && JSON.parse(document.title.slice(6)).states.join() === 'unseen'");
- const line = JSON.parse((await evaluate("document.title")).slice(6));
+ await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.join() === 'unseen'");
+ const line = JSON.parse((await evaluate("document.title")).slice(13));
  assert.deepEqual([typeof line.icon, line.icon.length > 0, line.name, line.states], ["string", true, os.hostname(), ["unseen"]], "icon, hub name (hostname) and own unseen");
  await evaluate("(() => { delete navigator.userAgent; delete document.hasFocus; })()");
  // H6-03 (D19): a phone asks to pair; this local page shows its code, approves it, then lists and revokes it.
