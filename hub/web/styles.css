@@ -416,7 +416,8 @@ textarea { display: block; width: 100%; border: 1px solid var(--group); border-r
 .prompt-row > button { text-align: left; margin-right: 6px; }
 .prompt-row > button.current { border-color: var(--focus); }
 .prompt-option { display: flex; align-items: start; flex-wrap: wrap; gap: 8px; margin: 8px 0; cursor: pointer; }
-.prompt-option input { margin-top: 4px; }
+.prompt-option input { margin-top: 4px; flex: none; }
+.prompt-option > span { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
 .prompt-description { display: block; flex-basis: 100%; margin-left: 24px; color: var(--muted); font-size: 13px; }
 .prompt-heading { font-weight: 600; margin-top: 12px; }
 .prompt-question { border: 0; padding: 0; margin: 16px 0 24px; }
@@ -518,7 +519,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .topbar #connection { flex: none; font-size: 12px; white-space: nowrap; }
  /* With a plan the bar wraps: session name and state on top, plan name and steps below. */
  .topbar:has(> .title-plan:not([hidden])) { flex-wrap: wrap; row-gap: 0; padding-top: 2px; padding-bottom: 2px; }
- .title-plan:not([hidden]) { order: 9; flex: 1 0 100%; display: flex; justify-content: space-between; gap: 8px; padding: 0 2px 2px; border: 0; background: none; font-size: 12px; color: var(--muted); text-align: left; }
+ .title-plan:not([hidden]) { order: 9; flex: 1 0 100%; min-width: 0; max-width: 100%; display: flex; justify-content: space-between; gap: 8px; padding: 0 2px 2px; border: 0; background: none; font-size: 12px; color: var(--muted); text-align: left; }
  .title-plan span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .title-plan span:last-child { flex: none; font-weight: 600; }
  body.has-switcher, body.has-switcher.switcher-open { padding-left: 0; }
  .drawer-toggle { display: block; padding: 4px 10px; }

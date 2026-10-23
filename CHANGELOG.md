@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.70 — 2026-10-23
 
 ### Added
 - Hub: the Claude 7d bar shows the next refills within 48 h as dotted lines at the level they bring. The usage window labels each line in grey with when it comes and the %, instead of the separate text lines and the → account line.
@@ -10,11 +10,16 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Changed
 - Hub: in ⚙, Check now sits on the "Pi and extensions" heading, so the update list gets the full width.
+![Check now on the heading](docs/changelog/0.1.70-check-now.png)
 - Hub: ⚙ → Desktop app → Update works like the tray's Restart to update. It downloads the new build if needed and restarts a running app into it. The button no longer greys out once the build is downloaded.
 
 ### Fixed
 - Desktop app 0.1.3: the taskbar button now shows your hubs' icons with their dots and follows icon changes. Since install added a Start Menu shortcut, Windows had drawn that shortcut's fixed PC icon instead.
 - Desktop app 0.1.3: the window remembers whether it was maximized and opens that way next time.
+- Hub (phone): a long plan name now ends in … and the step count (11/23) stays visible on the right.
+![Plan line with step count](docs/changelog/0.1.70-mobile-plan-line.png)
+- Hub: a long ask_user option wraps next to its checkbox instead of dropping below it and leaving the box alone on a line.
+![Wrapped options](docs/changelog/0.1.70-wrapped-options.png)
 - Hub: a message you already sent no longer comes back in the box after the app or the browser closes abruptly.
 
 ## 0.1.69 — 2026-10-23
