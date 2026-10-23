@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Pi Hub",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "dev.ce-workflow.pi-hub-app",
   "build": { "frontendDist": "../ui", "beforeBuildCommand": "node build-icons.mjs", "beforeDevCommand": "node build-icons.mjs" },
   "app": {

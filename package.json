@@ -1,6 +1,6 @@
 {
   "name": "pi-work-orchestrator",
-  "version": "0.1.71",
+  "version": "0.1.72",
   "description": "Plan3 planning and execution, research mode, compaction and utility tools for Pi.",
   "type": "module",
   "license": "MIT",

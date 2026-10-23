@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.72 — 2026-10-23
 
 ### Added
 - In the chat box, ↑ at the start steps back through the messages you sent this session, and ↓ at the end steps forward again. If your last message was stopped, ↑ opens it in orange edit mode. Send then removes it and everything the agent did after it from the context, and sends your corrected version as a new message.
