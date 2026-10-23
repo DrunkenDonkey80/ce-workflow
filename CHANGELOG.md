@@ -6,12 +6,17 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - In the chat box, ↑ at the start steps back through the messages you sent this session, and ↓ at the end steps forward again. If your last message was stopped, ↑ opens it in orange edit mode. Send then removes it and everything the agent did after it from the context, and sends your corrected version as a new message.
+- Bookmarked messages: Ctrl+Shift+1…9 saves the chat box text as bookmark 1–9 for the session, Ctrl+1…9 puts it back. The new ★ button next to Stop lists them; click one to use it, or save the box text over a slot. Bookmarks stay in that browser.
+- Hovering a folder's file counts in the sidebar lists the changed files, grouped as added, not in git yet, modified and deleted.
+- Desktop app: right-clicking a tab opens Rename, Reset name and Remove. Names are kept per PC, and an empty name shows only the icon.
 
 ### Changed
+- Desktop app: Alt+1…9 switches tabs (Ctrl+1…9 now belongs to bookmarks).
 - The model, context, thinking, research, night and env var buttons have small coloured icons.
 - Modified files in the sidebar file line show as +n in red, like the other counts.
 
 ### Fixed
+- Desktop app: dragging a tab to reorder works again.
 - Claude refill marks (dotted lines on the 7d bar) no longer go missing for up to 30 minutes after a hub update.
 
 ## 0.1.71 — 2026-10-23

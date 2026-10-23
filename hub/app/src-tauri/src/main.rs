@@ -244,7 +244,7 @@ fn main() {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());
             let window = WindowBuilder::new(app, "main").title("Pi Hub").inner_size(1200.0, 800.0).maximized(app_config()["maximized"] == true).visible(!start_hidden).build()?;
-            window.add_child(WebviewBuilder::new("strip", WebviewUrl::App("index.html".into())), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1200.0, STRIP))?;
+            window.add_child(WebviewBuilder::new("strip", WebviewUrl::App("index.html".into())).disable_drag_drop_handler(), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1200.0, STRIP))?;
             let handle = app.handle().clone();
             window.on_window_event(move |event| match event {
                 WindowEvent::Resized(_) => {
@@ -256,10 +256,10 @@ fn main() {
                 }
                 // D9: close hides to the tray so the dots stay live; Quit is in the tray menu.
                 WindowEvent::CloseRequested { api, .. } => { api.prevent_close(); if let Some(w) = handle.get_window("main") { let _ = w.hide(); } }
-                // D3: Ctrl+1..9 only while the app has focus; the strip ignores numbers past its last tab.
+                // D3: Alt+1..9 (Ctrl+1..9 belongs to the hub page's bookmarks) only while the app has focus; the strip ignores numbers past its last tab.
                 WindowEvent::Focused(focused) => {
                     let shortcuts = handle.global_shortcut();
-                    if *focused { for i in 1..=9 { let _ = shortcuts.register(format!("ctrl+{i}").as_str()); } } else { let _ = shortcuts.unregister_all(); }
+                    if *focused { for i in 1..=9 { let _ = shortcuts.register(format!("alt+{i}").as_str()); } } else { let _ = shortcuts.unregister_all(); }
                 }
                 _ => {}
             });

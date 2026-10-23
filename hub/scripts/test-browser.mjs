@@ -445,6 +445,14 @@ try {
  await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
  assert.equal(messages.at(-1).text, "@web_client: retry budget\n@web_client: and a timeout\nPlease apply these.", "notes and the closing request go as one message");
  assert.equal(comments.length, commentsBeforeNote, "right-click notes are not pinned to the diagram");
+ // Bookmarks: Ctrl+Shift+N saves the box text, Ctrl+N puts it back; the star window lists them.
+ await browser("fill", "#message-input", "Run the targeted tests"); await browser("press", "Control+Shift+Digit3");
+ await browser("fill", "#message-input", ""); await browser("press", "Control+Digit3");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), "Run the targeted tests", "Ctrl+3 inserts bookmark 3");
+ await browser("click", "#bookmarks-button"); assert.equal(await evaluate("document.querySelectorAll('.bookmark-use')[2].textContent"), "3Run the targeted tests");
+ await evaluate("document.getElementById('bookmarks').close()"); await browser("fill", "#message-input", "");
+ // Hovering the sidebar file counts lists the changed files.
+ assert.match(await evaluate("document.querySelector('.session-git-files')?.textContent"), /Modified.*src\/app\.ts/, "the hover list names the changed file under its kind");
  // Prompt history: ↑ at the start of the box recalls the last prompt; after a stopped run it opens in edit mode (orange),
  // and Send first drops it from the context, then posts the fix.
  await evaluate("(() => { const real = window.fetch; window.drops = []; window.fetch = (url, init) => String(url).endsWith('api/drop') ? (window.drops.push(JSON.parse(init.body).text), Promise.resolve(new Response(JSON.stringify({ ok: true })))) : real(url, init); })()");

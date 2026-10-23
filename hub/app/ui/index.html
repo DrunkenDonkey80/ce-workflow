@@ -10,6 +10,8 @@
  button.tab img { width: 20px; height: 20px; flex: none }
  button.tab span { overflow: hidden; text-overflow: ellipsis }
  button.tab small { color: var(--muted) }
+ button.choice { margin: 6px 2px; padding: 0 10px; border: 1px solid var(--muted); border-radius: 4px }
+ button.choice.danger { color: #e03131; border-color: #e03131 }
  #add { padding: 0 12px; font-size: 18px; color: var(--muted) }
  #ask { flex: 1; margin: 5px 8px; padding: 0 8px; border: 1px solid var(--sel); border-radius: 4px; background: var(--on); color: inherit; font: inherit; outline: none }
  #note { margin-left: auto; align-self: center; padding: 0 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
@@ -26,29 +28,31 @@ const WORD = { waiting: "asking", working: "working", unseen: "finished" };
 let tabs = [], active = 0, nextId = 0, dark = null, iconKey = "", dragged = null, startupError = "";
 
 const host = url => { try { return new URL(url).hostname; } catch { return url; } };
-const label = tab => tab.name || tab.hubName || (tab.local ? "This PC" : host(tab.url));
+const label = tab => tab.name ?? (tab.hubName || (tab.local ? "This PC" : host(tab.url)));
+const fullName = tab => tab.name || tab.hubName || (tab.local ? "This PC" : host(tab.url));
 const stateWord = tab => tab.url ? (WORD[URGENCY.find(s => tab.states.includes(s))] ?? "idle") : "starting…";
 // D14: on a dark taskbar the dark ink vanishes, so swap it for the light one (and drop the page-scheme rule).
 const ink = svg => dark === null ? svg : svg.replace(/<style>.*?<\/style>/, "").replaceAll("#343a40", dark ? "#e9ecef" : "#343a40");
 const dataUrl = svg => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 
-function persist() { void invoke("save", { hubs: tabs.map(tab => tab.local ? { local: true, name: tab.name || undefined } : { url: tab.url, name: tab.name || undefined }) }); }
+function persist() { void invoke("save", { hubs: tabs.map(tab => tab.local ? { local: true, name: tab.name } : { url: tab.url, name: tab.name }) }); }
 function render() {
  if (asking) return void updateIcons(); // keep the open question; icons still follow the hubs
  const buttons = tabs.map((tab, i) => {
   const button = document.createElement("button"), img = document.createElement("img"), text = document.createElement("span");
   img.src = dataUrl(iconSvg(ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, tab.states)); img.alt = "";
-  text.textContent = label(tab);
-  button.className = "tab" + (i === active ? " on" : ""); button.title = `${label(tab)}: ${stateWord(tab)} · Ctrl+${i + 1} · right-click to rename or remove`;
+  text.textContent = label(tab); if (!text.textContent) text.hidden = true;
+  button.className = "tab" + (i === active ? " on" : ""); button.title = `${fullName(tab)}: ${stateWord(tab)} · Alt+${i + 1} · drag to reorder · right-click to rename or remove`;
   button.append(img, text);
   if (!tab.url) { const small = document.createElement("small"); small.textContent = "waiting for the hub"; button.append(small); }
   button.onclick = () => select(tab.id);
-  button.oncontextmenu = event => { event.preventDefault(); edit(tab); };
+  button.oncontextmenu = event => { event.preventDefault(); void menu(tab); };
   button.draggable = true;
-  button.ondragstart = () => { dragged = tab; };
+  button.ondragstart = event => { dragged = tab; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(tab.id)); };
+  button.ondragend = () => { dragged = null; };
   button.ondragover = event => { event.preventDefault(); button.classList.add("drop"); };
   button.ondragleave = () => button.classList.remove("drop");
-  button.ondrop = event => { event.preventDefault(); if (!dragged || dragged === tab) return; const current = tabs[active]; tabs.splice(tabs.indexOf(dragged), 1); tabs.splice(tabs.indexOf(tab), 0, dragged); active = tabs.indexOf(current); persist(); render(); };
+  button.ondrop = event => { event.preventDefault(); if (!dragged || dragged === tab) return; const current = tabs[active], to = tabs.indexOf(tab); tabs.splice(tabs.indexOf(dragged), 1); tabs.splice(to, 0, dragged); dragged = null; active = tabs.indexOf(current); persist(); render(); };
   return button;
  });
  const add = document.createElement("button"); add.id = "add"; add.textContent = "+"; add.title = "Add a hub: paste its link (for example another PC's tailnet address)"; add.onclick = addHub;
@@ -69,13 +73,13 @@ async function updateIcons() {
  const count = tabs.reduce((sum, tab) => sum + (tab.attention || 0), 0), text = count > 9 ? "9+" : count ? String(count) : "";
  const number = text ? `<text x="8" y="12" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="${text.length > 1 ? 8.5 : 11}" fill="#fff">${text}</text>` : "";
  const local = tabs.find(tab => tab.local) ?? tabs[0];
- const key = JSON.stringify([tabs.map(t => [t.icon, t.states, label(t), t.url ? 1 : 0, t.attention]), staged, pinned]);
+ const key = JSON.stringify([tabs.map(t => [t.icon, t.states, fullName(t), t.url ? 1 : 0, t.attention]), staged, pinned]);
  if (key === iconKey) return; iconKey = key;
  const big = ink(hubsIconSvg(tabs.map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
  const small = ink(iconSvg(ICONS[local?.icon] ? local.icon : DEFAULT_ICON, URGENCY.filter(s => all.includes(s))));
  try {
   await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay: pinned && urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="${DOT[urgent]}"/>${number}</svg>`, 16) : null });
-  await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${label(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${label(tab)}: ${stateWord(tab)}`)].join("\n") });
+  await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${fullName(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${fullName(tab)}: ${stateWord(tab)}`)].join("\n") });
  } catch (error) { console.error(error); }
 }
 function select(id) {
@@ -93,7 +97,7 @@ window.onTitle = (webview, title) => {
  render();
 };
 function open(tab) { if (tab.url) void invoke("open", { id: tab.id, url: tab.url }).then(() => { if (tabs[active] === tab) void invoke("show", { id: tab.id }); }, error => { startupError = String(error); render(); }); }
-const newTab = fields => ({ id: nextId++, icon: DEFAULT_ICON, states: [], name: "", ...fields });
+const newTab = fields => ({ id: nextId++, icon: DEFAULT_ICON, states: [], ...fields });
 // prompt()/alert() draw inside this 36 px strip and get cut off, so questions are an input in the strip itself.
 let asking = null, notice = "";
 function ask(hint, value = "") {
@@ -114,21 +118,34 @@ async function addHub() {
  if (!["http:", "https:"].includes(url.protocol)) { notice = "Hub links start with http:// or https://."; return render(); }
  const tab = newTab({ url: url.href }); tabs.push(tab); persist(); open(tab); select(tab.id);
 }
-async function edit(tab) {
- const name = await ask(tab.local ? "Name for this PC's tab:" : "Name for this tab (clear it to remove the tab):", label(tab));
- if (name === null) return;
- if (!name && !tab.local) {
-  void invoke("close", { id: tab.id }); const current = tabs[active]; tabs.splice(tabs.indexOf(tab), 1);
-  notice = `Removed ${label(tab)}; paste its link with + to add it back.`;
-  active = Math.max(0, tabs.indexOf(current)); persist(); if (tabs[active]) select(tabs[active].id); else render(); return;
+// Right-click menu, drawn in the strip like ask(). Names are this PC's own: another PC can show or hide the same hub's name.
+function choose(hint, options) {
+ return new Promise(done => {
+  const text = document.createElement("div"); text.id = "note"; text.style.margin = "0 8px 0 0"; text.textContent = hint;
+  const finish = result => { if (asking !== text) return; asking = null; document.removeEventListener("keydown", onKey); done(result); render(); };
+  const onKey = event => { if (event.key === "Escape") finish(null); };
+  const buttons = [...options, ["Cancel", null]].map(([title, value, danger]) => { const b = document.createElement("button"); b.textContent = title; b.className = "choice" + (danger ? " danger" : ""); b.onclick = () => finish(value); return b; });
+  asking = text; notice = ""; document.addEventListener("keydown", onKey); document.body.replaceChildren(text, ...buttons); buttons[0].focus();
+ });
+}
+async function menu(tab) {
+ const pick = await choose(fullName(tab) + ":", [["Rename", "rename"], ...(tab.name !== undefined ? [["Reset name", "reset"]] : []), ...(tab.local ? [] : [["Remove", "remove", true]])]);
+ if (pick === "reset") { delete tab.name; persist(); render(); }
+ if (pick === "rename") {
+  const name = await ask("Name on this PC (empty shows only the icon):", tab.name ?? fullName(tab)); if (name === null) return;
+  tab.name = name === (tab.hubName || (tab.local ? "This PC" : host(tab.url))) ? undefined : name; persist(); render();
  }
- tab.name = name === (tab.hubName || (tab.local ? "This PC" : host(tab.url))) ? "" : name; persist(); render();
+ if (pick === "remove") {
+  void invoke("close", { id: tab.id }); const current = tabs[active]; tabs.splice(tabs.indexOf(tab), 1);
+  notice = `Removed ${fullName(tab)}; paste its link with + to add it back.`;
+  active = Math.max(0, tabs.indexOf(current)); persist(); if (tabs[active]) select(tabs[active].id); else render();
+ }
 }
 let staged = false;
 const config = await invoke("config");
 dark = config.dark; staged = config.staged; startupError = config.error ?? "";
 const saved = Array.isArray(config.hubs) ? config.hubs : [];
-tabs = saved.filter(h => h?.local || h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, name: h.name ?? "" }));
+tabs = saved.filter(h => h?.local || h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, ...(typeof h.name === "string" ? { name: h.name } : {}) }));
 if (!tabs.some(tab => tab.local)) tabs.unshift(newTab({ local: true, url: config.local }));
 for (const tab of tabs) open(tab);
 select(tabs[0].id);

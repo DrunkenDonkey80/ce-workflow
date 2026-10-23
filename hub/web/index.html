@@ -143,6 +143,7 @@
      <label class="attach button" title="Attach files (or drop or paste them into the chat)">File<input id="attach" type="file" multiple hidden></label>
      <button id="talk" type="button" class="talk" title="Hold to talk; the words appear in the box" aria-label="Hold to talk">🎤</button>
      <button id="talk-lang" type="button" title="Speech language (tap to switch)">EN</button>
+     <button id="bookmarks-button" type="button" title="Bookmarked messages: Ctrl+Shift+1…9 saves the box text, Ctrl+1…9 puts it back" aria-label="Bookmarked messages"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.3l2 4.3 4.7.5-3.5 3.2 1 4.6L8 11.5l-4.2 2.4 1-4.6-3.5-3.2 4.7-.5z" fill="#ffd43b" stroke="#e67700" stroke-width="1" stroke-linejoin="round"/></svg></button>
      <button id="stop" type="button" class="danger" hidden>Stop</button>
      <button id="send" type="submit" disabled>Send</button>
     </div>
@@ -159,6 +160,7 @@
   </form>
  </dialog>
  <dialog id="command-picker" aria-labelledby="command-title"><h2 id="command-title">Commands</h2><p class="dialog-purpose">Pick one to put it in the message box.</p><div id="command-list" class="command-list"></div><div class="dialog-actions"><button id="command-close" type="button">Close</button></div></dialog>
+ <dialog id="bookmarks" aria-labelledby="bookmarks-title"><button id="bookmarks-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="bookmarks-title">Bookmarked messages</h2><p class="dialog-purpose">Click one to put it in the message box. Ctrl+Shift+1…9 saves the box text, Ctrl+1…9 puts it back.</p><div id="bookmark-list" class="bookmark-list"></div></dialog>
  <dialog id="prompt" aria-labelledby="prompt-title"><form id="prompt-form"></form></dialog>
  <dialog id="pair-approve" aria-labelledby="pair-approve-title"><h2 id="pair-approve-title">Approve a new device?</h2><p class="dialog-purpose">Approve only if the device shows the same code.</p><p id="pair-device"></p><p id="pair-approve-code" class="pair-code"></p><div class="dialog-actions"><button id="pair-reject" type="button" class="danger">Reject</button><button id="pair-accept" type="button" class="primary">Approve</button></div></dialog>
  <dialog id="devices" aria-labelledby="devices-title"><h2 id="devices-title">Paired devices</h2><p id="devices-remote" class="dialog-purpose"></p><ul id="device-list" class="device-list"></ul><div class="dialog-actions"><button id="devices-close" type="button">Close</button></div></dialog>

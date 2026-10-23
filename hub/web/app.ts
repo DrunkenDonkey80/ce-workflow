@@ -1185,7 +1185,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
 type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[] };
-type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number };
+type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
 // The open session's folder also gets the header's Pull / Commit / Commit and push as icons on the right; they click the header buttons.
@@ -1201,6 +1201,18 @@ function gitLine(git?: GitFiles | null, own = false) {
  });
  if (!parts.length && !actions.length) return [];
  const line = html("div", { className: "session-git" }); line.append(...parts);
+ // Hovering the counts lists the files, grouped like the counts.
+ if (git?.files?.length) {
+  const list = html("div", { className: "session-git-files" });
+  for (const [kind, words] of [["added", "Added"], ["untracked", "Not in git yet"], ["modified", "Modified"], ["deleted", "Deleted"]]) {
+   const paths = git.files.filter(file => file.kind === kind).map(file => file.path); if (!paths.length) continue;
+   list.append(html("strong", { className: "git-" + kind, textContent: words }), ...paths.map(path => html("div", { textContent: path })));
+  }
+  if (git.changed > git.files.length) list.append(html("em", { textContent: `…and ${git.changed - git.files.length} more` }));
+  // Fixed, placed under the line on hover: the scrolling session list would clip an absolute popup.
+  line.addEventListener("mouseenter", () => { const box = line.getBoundingClientRect(); list.style.left = box.left + "px"; list.style.top = Math.min(box.bottom, innerHeight - 80) + "px"; });
+  line.append(list); for (const part of parts) part.removeAttribute("title");
+ }
  if (actions.length) { const right = html("span", { className: "session-git-actions" }); right.append(...actions); line.append(right); }
  return [line];
 }
@@ -1629,6 +1641,36 @@ async function pickCommand(kind: "pi" | "wo") {
   }) : ["No commands available."]);
  } catch (error) { list.replaceChildren("Commands failed to load: " + error.message); }
 }
+// Bookmarked messages, 1–9 per session: Ctrl+Shift+N saves the box text (overwriting), Ctrl+N puts it at the caret.
+// shortcut: kept in this browser's localStorage, so another device has its own set; move to the hub if they should sync.
+const bookmarkKey = "bookmarks:" + location.pathname;
+const bookmarks = (): Record<string, string> => { try { return JSON.parse(localStorage.getItem(bookmarkKey) ?? "{}"); } catch { return {}; } };
+function saveBookmark(n: number, text: string) { const all = bookmarks(); all[n] = text; localStorage.setItem(bookmarkKey, JSON.stringify(all)); showNotice(`Bookmark ${n} saved; Ctrl+${n} puts it in the box.`); if (($("bookmarks") as HTMLDialogElement).open) renderBookmarks(); }
+function useBookmark(n: number) {
+ const text = bookmarks()[n]; if (!text) return showNotice(`No bookmark ${n} yet: Ctrl+Shift+${n} saves the box text.`);
+ const box = $("message-input"), start = box.selectionStart, end = box.selectionEnd;
+ box.focus(); box.setRangeText(text, start, end, "end"); box.dispatchEvent(new Event("input"));
+}
+function renderBookmarks() {
+ const all = bookmarks(), box = $("message-input").value.trim();
+ $("bookmark-list").replaceChildren(...Array.from({ length: 9 }, (_, i) => {
+  const n = i + 1, row = html("div", { className: "bookmark-row" }), text = all[n];
+  const use = html("button", { type: "button", className: "bookmark-use", disabled: !text, title: text ? `Ctrl+${n}` : "Empty" });
+  use.append(html("strong", { textContent: String(n) }), html("span", { textContent: text ?? "Empty" }));
+  use.addEventListener("click", () => { ($("bookmarks") as HTMLDialogElement).close(); useBookmark(n); });
+  const save = html("button", { type: "button", className: "bookmark-save", textContent: text ? "Overwrite" : "Save box", disabled: !box, title: box ? "Save the message box text here (Ctrl+Shift+" + n + ")" : "Type something in the box first" });
+  save.addEventListener("click", () => saveBookmark(n, $("message-input").value));
+  row.append(use, save); return row;
+ }));
+}
+$("bookmarks-button").addEventListener("click", () => { renderBookmarks(); ($("bookmarks") as HTMLDialogElement).showModal(); });
+$("bookmarks-close").addEventListener("click", () => ($("bookmarks") as HTMLDialogElement).close());
+document.addEventListener("keydown", event => {
+ const n = /^Digit([1-9])$/.exec(event.code)?.[1]; if (!n || !event.ctrlKey || event.altKey || event.metaKey) return;
+ event.preventDefault();
+ if (!event.shiftKey) return useBookmark(Number(n));
+ const text = $("message-input").value; if (text.trim()) saveBookmark(Number(n), text); else showNotice("Type the message in the box first, then Ctrl+Shift+" + n + " bookmarks it.");
+});
 $("pi-commands").addEventListener("click", () => void pickCommand("pi"));
 $("wo-commands").addEventListener("click", () => void pickCommand("wo"));
 $("command-close").addEventListener("click", () => ($("command-picker") as HTMLDialogElement).close());

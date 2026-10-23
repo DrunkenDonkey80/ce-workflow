@@ -38,7 +38,7 @@ overlay and the tray (asking red, working amber, finished-unseen blue), even wit
 - Start at login: the row's checkbox (Windows Run key, Linux `~/.config/autostart`); the app then starts hidden in the tray
   and waits for the hub if it starts first.
 - Tabs: the first is this PC's hub; `+` adds another hub by its link (another PC's tailnet address pairs like a phone).
-  Right-click renames or removes, drag reorders, Ctrl+1…9 switches while the app has focus. Closing hides to the tray; Quit is in the tray menu.
+  Right-click renames (names are per PC; an empty name shows only the icon) or removes, drag reorders, Alt+1…9 switches while the app has focus. Closing hides to the tray; Quit is in the tray menu.
 - Updates: with a newer pin (arrives with ce-workflow updates), the hub stages the new build hourly; the strip shows a note and the
   tray offers Restart to update. The app never restarts unasked.
 - WSL: install from the Windows hub; its app reaches the WSL hub through 127.0.0.1.
