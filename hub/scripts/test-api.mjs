@@ -76,7 +76,8 @@ try {
 	assert.equal(snapshot.current, "bbbbbbbb");
 	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, commands: [], model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
 	execFileSync("git", ["init", "-q"], { cwd: folder });
-	assert.deepEqual((await get(id, "snapshot")).body.status.git, { changed: fs.readdirSync(folder).filter(name => name !== ".git").length, ahead: 0 }, "Commit buttons: changed files counted, none ahead");
+	const loose = fs.readdirSync(folder).filter(name => name !== ".git").length;
+	assert.deepEqual((await get(id, "snapshot")).body.status.git, { changed: loose, added: 0, modified: 0, deleted: 0, untracked: loose, ahead: 0, behind: 0 }, "Commit buttons: new files counted as untracked, none ahead or behind");
 	fs.rmSync(path.join(folder, ".git"), { recursive: true, force: true });
 	assert.equal(fileReads, 1, "the file is read once, then the record keeps it");
 	assert.match(snapshot.build, /^[0-9a-f]{12}$/);

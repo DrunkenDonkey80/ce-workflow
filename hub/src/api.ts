@@ -60,17 +60,28 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	}
 
 	// Right after a compaction Pi reports null tokens (its footer shows "?"); show Pi's own post-compaction estimate instead.
-	// Commit / Commit and push buttons: changed files and unpushed commits; null outside a git repository.
-	const gitState = (cwd: string) => new Promise<{ changed: number; ahead: number } | null>(resolve => execFile("git", ["status", "--porcelain=v1", "--branch"], { cwd, timeout: 5000, windowsHide: true }, (error, out) => {
+	// Commit / Commit and push / Pull latest buttons and the sidebar's per-folder file line: changed files by kind, unpushed and unpulled
+	// commits; null outside a git repository. "behind" needs a fetch: one quiet background fetch per folder every 5 minutes, seen on the
+	// next status. Every open page polls the sidebar, so there one git status per folder serves all pages for 4 s; status reads fresh.
+	type GitState = { changed: number; added: number; modified: number; deleted: number; untracked: number; ahead: number; behind: number } | null;
+	const fetched = new Map<string, number>(), gitCache = new Map<string, { at: number; state: Promise<GitState> }>();
+	const readGit = (cwd: string) => new Promise<GitState>(resolve => execFile("git", ["status", "--porcelain=v1", "--branch"], { cwd, timeout: 5000, windowsHide: true }, (error, out) => {
 		if (error) return resolve(null);
-		const [head = "", ...files] = out.split("\n").filter(Boolean);
-		resolve({ changed: files.length, ahead: Number(/\[ahead (\d+)/.exec(head)?.[1] ?? 0) });
+		const [head = "", ...files] = out.split("\n").filter(Boolean), count = (test: (xy: string) => boolean) => files.filter(line => test(line.slice(0, 2))).length;
+		if (Date.now() - (fetched.get(cwd) ?? 0) > 300_000) { fetched.set(cwd, Date.now()); execFile("git", ["fetch", "--quiet"], { cwd, timeout: 60_000, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } }, () => {}); }
+		const untracked = count(xy => xy === "??"), added = count(xy => xy[0] === "A"), deleted = count(xy => xy[0] !== "A" && xy.includes("D"));
+		resolve({ changed: files.length, added, modified: files.length - untracked - added - deleted, deleted, untracked, ahead: Number(/\bahead (\d+)/.exec(head)?.[1] ?? 0), behind: Number(/\bbehind (\d+)/.exec(head)?.[1] ?? 0) });
 	}));
+	const gitState = (cwd: string) => {
+		const hit = gitCache.get(cwd);
+		if (hit && Date.now() - hit.at < 4000) return hit.state;
+		const state = readGit(cwd); gitCache.set(cwd, { at: Date.now(), state }); return state;
+	};
 	const contextTokens = (tokens?: number | null, compacted?: number) => typeof tokens === "number" ? { tokens } : typeof compacted === "number" ? { tokens: compacted, estimated: true } : { tokens: null };
 	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
 	async function status(id: string) {
 		const record = registry.get(id)!, live = host.live.get(id);
-		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? record.modes ?? { research: "off", night: "off" }, git: await gitState(record.folder), commands: commands?.list(record.folder) ?? [] };
+		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? record.modes ?? { research: "off", night: "off" }, git: await readGit(record.folder), commands: commands?.list(record.folder) ?? [] };
 		if (!live) { const parked = await parkedModel(id); return { ...base, model: parked.model ?? null, effort: parked.thinking ?? null, context: null, parked: true }; }
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
 		void host.remember(live, state);
@@ -158,7 +169,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// D11: the row shows timers (countdown, last run); ticks never reach the chat.
 	const timers = (id: string) => scheduler?.list(id).sort((a, b) => a.dueAt - b.dueAt).map(t => ({ id: t.id, kind: t.kind, dueAt: t.dueAt, every: t.every, lastRun: t.lastRun, label: (t.text ?? t.command ?? "").slice(0, 80) }));
 	async function sessions() {
-		const groups = registry.groups().map(group => ({ ...group, sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id) })) }));
+		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id) })) })));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents, settings: settings() };
 	}

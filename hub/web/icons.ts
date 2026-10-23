@@ -52,7 +52,7 @@ export function iconSvg(name: string, states: string[] = [], r = 6.5) {
 // Three or four: one dot for each hub's most urgent state, inside its cell.
 export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  hubs = hubs.filter(hub => ICONS[hub.icon]).slice(0, 4);
- if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states, 8.5);
+ if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states, 7);
  if (hubs.length === 2) return SVG_HEAD + hubs.map((hub, i) => {
   const x = i * 16, slot: Record<string, [number, number]> = { waiting: [x + 4, 28], working: [x + 12, 28], unseen: [x + 8, 4] };
   const dots = Object.keys(DOTS).filter(state => hub.states.includes(state)).map(state => `<circle cx="${slot[state][0]}" cy="${slot[state][1]}" r="3.4" fill="${DOTS[state]}" stroke="#fff" stroke-width="0.6"/>`).join("");
@@ -60,7 +60,7 @@ export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  }).join("") + "</svg>";
  const rows = hubs.length > 2 ? 2 : 1, cell = 16, top = (32 - rows * cell) / 2;
  return SVG_HEAD + hubs.map((hub, i) => {
-  const x = (i % 2) * cell, y = top + Math.floor(i / 2) * cell, state = Object.keys(DOTS).find(tone => hub.states.includes(tone)), r = cell * 0.3;
+  const x = (i % 2) * cell, y = top + Math.floor(i / 2) * cell, state = Object.keys(DOTS).find(tone => hub.states.includes(tone)), r = cell * 0.24;
   const dot = state ? `<circle cx="${(x + cell - r).toFixed(2)}" cy="${(y + cell - r).toFixed(2)}" r="${r.toFixed(2)}" fill="${DOTS[state]}" stroke="#fff" stroke-width="${(cell / 16).toFixed(2)}"/>` : "";
   return `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(cell / 32).toFixed(4)})">${glyph(hub.icon)}</g>${dot}`;
  }).join("") + "</svg>";

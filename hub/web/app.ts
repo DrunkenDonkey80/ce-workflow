@@ -26,7 +26,7 @@ const auth: RequestInit = token ? { credentials: "omit", headers: { Authorizatio
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
-const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: { changed: number; ahead: number } | null; folder?: string; tab?: string; parked?: boolean } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
@@ -94,10 +94,12 @@ function renderShell() {
  // Row buttons are also gated by the plan state (no Resume while the plan is still being planned).
  const blocked = { resolve: !plan?.open, finish: !plan?.finishable, resume: !!plan?.planning };
  for (const button of document.querySelectorAll<HTMLButtonElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.disabled = !state.connected || commandSending || promptView.busy || (!!state.activity.working && "plan" in button.dataset) || (button.parentElement?.id === "plan-actions" && !!blocked[button.dataset.command]);
- // Commit shows with changed files; Commit and push also with unpushed commits. The hub reads git on each status (run end, model change).
+ // Commit shows with changed files; Commit and push also with unpushed commits; Pull latest when origin is ahead.
+ // The hub reads git on each status (run end, model change) and fetches in the background.
  const git = status?.git, busy = !state.connected || messageSending || !!state.activity.working || promptView.busy;
- $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead;
- for (const id of ["git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
+ $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead; $("git-pull").hidden = !git?.behind;
+ $("git-pull").textContent = git?.behind ? `Pull latest (${git.behind})` : "Pull latest";
+ for (const id of ["git-pull", "git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
  renderCommands(status?.commands ?? [], busy);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
@@ -1084,7 +1086,7 @@ async function toggleMode(text: string) {
  if (messageSending) return; messageSending = true; renderShell();
  try { await post("message", { text }); } catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
 }
-$("git-commit").addEventListener("click", () => void toggleMode($("git-commit").dataset.git!));
+for (const id of ["git-commit", "git-pull"]) $(id).addEventListener("click", () => void toggleMode($(id).dataset.git!));
 // Push asks which tests to run first: scoped by default for fast releases, full on request.
 $("git-push").addEventListener("click", () => toggleMenu("git-push", "push-menu"));
 for (const choice of document.querySelectorAll<HTMLButtonElement>(".push-choice")) choice.addEventListener("click", () => { closeMenus(); void toggleMode(choice.dataset.git!); });
@@ -1143,7 +1145,15 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
 type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[] };
-type Group = { folder: string; label: string; sessions: HubSession[] };
+type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number };
+type Group = { folder: string; label: string; git?: GitFiles | null; sessions: HubSession[] };
+// The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
+function gitLine(git?: GitFiles | null) {
+ const parts = ([["added", "+", "added"], ["untracked", "+", "not in git yet"], ["modified", "~", "modified"], ["deleted", "×", "deleted"]] as const)
+  .filter(([kind]) => git?.[kind]).map(([kind, sign, words]) => html("span", { className: "git-" + kind, textContent: sign + git![kind], title: `${git![kind]} ${words}` }));
+ if (!parts.length) return [];
+ const line = html("div", { className: "session-git" }); line.append(...parts); return [line];
+}
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
 // The unsent message survives switching sessions and reloads, per session; pagehide also catches programmatic edits (send clears it).
@@ -1273,7 +1283,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
    const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => session.tone !== "parked") ?? group.sessions[0];
    if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
   });
-  box.append(head, ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
+  box.append(head, ...gitLine(group.git), ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
   return [box];
  });
  const recent = html("details", { className: "session-recents", open });
