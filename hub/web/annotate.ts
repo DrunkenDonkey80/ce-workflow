@@ -67,8 +67,8 @@ export function annotate(src: string, start: Annotation = { shapes: [], crop: nu
 function open(image: HTMLImageElement, state: Annotation) {
 	const width = image.naturalWidth, height = image.naturalHeight, size = Math.max(width, height);
 	const line = Math.max(2, Math.round(size / 350)), radius = Math.max(12, Math.round(size / 55));
-	const dialog = el("dialog", { className: "annotate" }), bar = el("div", { className: "annotate-bar" }), stage = el("div", { className: "annotate-stage" });
-	const canvas = el("canvas", { width, height }), note = el("input", { className: "annotate-note", type: "text", maxLength: 500, placeholder: "Note for this marker, Enter to keep" });
+	const dialog = el("dialog", { className: "annotate", tabIndex: -1 }), bar = el("div", { className: "annotate-bar" }), stage = el("div", { className: "annotate-stage" });
+	const canvas = el("canvas", { width, height }), note = el("input", { className: "annotate-note", type: "text", hidden: true, maxLength: 500, placeholder: "Note for this marker, Enter to keep" });
 	const notes = el("ol", { className: "annotate-legend" }), ctx = canvas.getContext("2d")!;
 	let tool: Tool = "pen", color = COLORS[0], selected = -1, editing = -1, editingNew = false, last: Point | null = null, dirty = false;
 	let action: { kind: "draw" | "drag" | "crop"; from: Point; moved: boolean } | null = null;
@@ -146,7 +146,7 @@ function open(image: HTMLImageElement, state: Annotation) {
 		const rect = canvas.getBoundingClientRect(), outer = stage.getBoundingClientRect(), scale = rect.width / width;
 		const left = rect.left - outer.left + (shape.at[0] + radius) * scale + 8, top = rect.top - outer.top + shape.at[1] * scale - 16;
 		note.style.left = Math.max(4, Math.min(left, outer.width - 284)) + "px"; note.style.top = Math.max(4, Math.min(top, outer.height - 36)) + "px";
-		note.focus();
+		setTimeout(() => note.focus()); // after the click's own mousedown, which would otherwise take focus back and close the note
 	}
 	function closeNote(keep: boolean) {
 		const shape = state.shapes[editing];
@@ -154,7 +154,7 @@ function open(image: HTMLImageElement, state: Annotation) {
 			if (keep && note.value.trim() !== shape.text) { if (!editingNew) snapshot(); shape.text = note.value.trim(); }
 			else if (!keep && editingNew && !shape.text) { history.pop(); state.shapes.splice(editing, 1); selected = -1; } // Escape on a fresh marker drops it
 		}
-		editing = -1; note.hidden = true; render();
+		editing = -1; note.hidden = true; dialog.focus({ preventScroll: true }); render(); // keeps the 1–9 and Ctrl+Z keys working
 	}
 	function remove() { if (!state.shapes[selected]) return; snapshot(); state.shapes.splice(selected, 1); selected = -1; render(); }
 

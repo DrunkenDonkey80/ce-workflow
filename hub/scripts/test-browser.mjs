@@ -293,7 +293,10 @@ try {
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
  // Its thumbnail under the box opens the annotator; a marker's note goes into the box as text after the new image's path.
  await browser("click", "#composer-thumbs .composer-thumb"); await browser("wait", "dialog.annotate[open] canvas");
- await browser("press", "3"); await browser("fill", ".annotate-note", "red mark"); await browser("press", "Enter");
+ await browser("click", ".annotate-tool[aria-label^=Numbered]"); await browser("click", "dialog.annotate canvas");
+ assert.equal(await evaluate("document.activeElement?.className"), "annotate-note", "a clicked marker opens its note box, ready to type");
+ await browser("press", "Escape"); assert.equal(await evaluate("document.querySelectorAll('.annotate-legend li').length"), 0, "Escape on a fresh marker drops it");
+ await browser("press", "3"); assert.equal(await evaluate("document.activeElement?.className"), "annotate-note"); await browser("fill", ".annotate-note", "red mark"); await browser("press", "Enter");
  assert.equal(await evaluate("document.querySelector('.annotate-legend').textContent"), "(3) red mark");
  await browser("click", ".annotate-save"); await browser("wait", "--fn", `(v => v.includes(".png\\n(3) red mark") && !v.includes(${JSON.stringify(pasted)}))(document.getElementById("message-input").value)`);
  assert.equal(await evaluate("!!document.querySelector('dialog.annotate')"), false, "the dialog is removed after saving");
