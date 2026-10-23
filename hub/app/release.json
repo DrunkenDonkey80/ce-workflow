@@ -1,13 +1,13 @@
 {
-	"version": "0.1.4",
+	"version": "0.1.5",
 	"assets": {
 		"windows-x64": {
-			"url": "https://github.com/DrunkenDonkey80/ce-workflow/releases/download/app-v0.1.4/pi-hub-app-windows-x64.exe",
-			"sha256": "3494ee4bf21bc98e8e4fccdaaba9708b20a23085b08894da06da3eb4073b0ded"
+			"url": "https://github.com/DrunkenDonkey80/ce-workflow/releases/download/app-v0.1.5/pi-hub-app-windows-x64.exe",
+			"sha256": "42125eaf7ee6676884bfb530d36126a8b568b951f3515b0b88dc883b68e55335"
 		},
 		"linux-x64": {
-			"url": "https://github.com/DrunkenDonkey80/ce-workflow/releases/download/app-v0.1.4/pi-hub-app-linux-x64.AppImage",
-			"sha256": "1083fbcb9bfdd89c3fe4cae404cccf87d4fbf0f05283b00184f1c69c3c23bc56"
+			"url": "https://github.com/DrunkenDonkey80/ce-workflow/releases/download/app-v0.1.5/pi-hub-app-linux-x64.AppImage",
+			"sha256": "0c2979aa68180fd514f3a3ff965c918d72d07cd2c143c228f93e737aedbebeda"
 		}
 	}
 }
