@@ -2,9 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.64 — 2026-10-23
 
 ### Added
+- Hub: a desktop app, Pi Hub, for Windows and Linux. Install it from ⚙ → Desktop app on this PC's hub page. It has one tab per hub (this PC, other PCs by their link). Its taskbar icon shows up to 4 hubs with their dots, and the tray shows the same dots even while the window is hidden. Updates arrive with ce-workflow updates; the tray offers Restart to update.
+![Desktop app row in the hub settings](docs/changelog/0.1.64-desktop-app-row.png)
+![The app's tab strip with two hubs](docs/changelog/0.1.64-desktop-app-tabs.png)
 - Hub: Alt+= and Alt+- step the Think/Work bias, like in the terminal.
 - Hub: the top bar shows a provider's 5h window next to its 7d one. Right-click a bar to hide it, or use the Top bar boxes in the provider's window. Hiding all of a provider's bars turns that provider off in the gear menu.
 - Hub: in the Claude account window, Force use / Stop force marks one or more accounts to serve first (green in the terminal). Forced accounts get a green name and tint, and "Use" is now "Switch to".
