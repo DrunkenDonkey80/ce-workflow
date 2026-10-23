@@ -40,17 +40,24 @@ function glyph(name: string) {
  return `<path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>`;
 }
 const SVG_HEAD = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><style>@media (prefers-color-scheme: dark) { path { fill: #e9ecef } }</style>';
-export function iconSvg(name: string, states: string[] = []) {
+export function iconSvg(name: string, states: string[] = [], r = 6.5) {
  // At 16 px an outline reads as noise: the icon keeps the whole square and white-ringed dots (Gmail/Slack style) carry the states,
- // filling lower-right, lower-left, then upper-right; two fit side by side at 16 px.
- const badge = Object.keys(DOTS).filter(state => states.includes(state)).map((state, i) => `<circle cx="${i === 1 ? 7.5 : 24.5}" cy="${i === 2 ? 7.5 : 24.5}" r="6.5" fill="${DOTS[state]}" stroke="#fff" stroke-width="2"/>`).join("");
+ // filling lower-right, lower-left, then upper-right; two fit side by side at 16 px. r: dot radius in the 32 box.
+ const near = r + 1, far = 32 - near;
+ const badge = Object.keys(DOTS).filter(state => states.includes(state)).map((state, i) => `<circle cx="${i === 1 ? near : far}" cy="${i === 2 ? near : far}" r="${r}" fill="${DOTS[state]}" stroke="#fff" stroke-width="2"/>`).join("");
  return `${SVG_HEAD}${glyph(name)}${badge}</svg>`;
 }
-// The desktop app's taskbar icon: one cell per hub (1 = whole square, 2 side by side, 3-4 in 2x2; more show only as app tabs),
-// each hub's icon with one dot for its most urgent state, sized to the cell so it stays visible at 16 px.
+// The desktop app's taskbar icon: one cell per hub (1 = whole square, 2 side by side, 3-4 in 2x2; more show only as app tabs).
+// One hub: bigger dots. Two: the dots sit in the empty strips, waiting and working below the icon, unseen above, so they hide nothing.
+// Three or four: one dot for each hub's most urgent state, inside its cell.
 export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  hubs = hubs.filter(hub => ICONS[hub.icon]).slice(0, 4);
- if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states);
+ if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states, 8.5);
+ if (hubs.length === 2) return SVG_HEAD + hubs.map((hub, i) => {
+  const x = i * 16, slot: Record<string, [number, number]> = { waiting: [x + 4, 28], working: [x + 12, 28], unseen: [x + 8, 4] };
+  const dots = Object.keys(DOTS).filter(state => hub.states.includes(state)).map(state => `<circle cx="${slot[state][0]}" cy="${slot[state][1]}" r="3.4" fill="${DOTS[state]}" stroke="#fff" stroke-width="0.6"/>`).join("");
+  return `<g transform="translate(${x} 8) scale(0.5)">${glyph(hub.icon)}</g>${dots}`;
+ }).join("") + "</svg>";
  const rows = hubs.length > 2 ? 2 : 1, cell = 16, top = (32 - rows * cell) / 2;
  return SVG_HEAD + hubs.map((hub, i) => {
   const x = (i % 2) * cell, y = top + Math.floor(i / 2) * cell, state = Object.keys(DOTS).find(tone => hub.states.includes(tone)), r = cell * 0.3;
