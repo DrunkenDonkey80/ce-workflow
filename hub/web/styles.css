@@ -248,6 +248,7 @@ h2 { font-size: 15px; font-weight: 600; }
 #git-commit .git-icon { stroke: #f59f00; }
 #git-push .git-icon { stroke: #1c7ed6; }
 #git-pull .git-icon { stroke: #0ca678; }
+#message-input.editing-last { background: light-dark(#fff4e6, #3d2a12); border-color: #f08c00; box-shadow: 0 0 0 1px #f08c00; }
 .session-git { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; margin: 0 0 2px; min-height: 20px; }
 .session-git-actions { margin-left: auto; display: flex; gap: 2px; }
 .session-git-action { display: grid; place-items: center; width: 22px; height: 20px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }

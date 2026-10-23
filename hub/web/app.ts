@@ -1009,8 +1009,31 @@ $("message-input").addEventListener("keydown", event => {
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); $("composer").requestSubmit(); }
  if (event.key === "Escape" && !$("stop").hidden && !$("stop").disabled) { event.preventDefault(); $("stop").click(); }
  // Like Pi's Alt+Up: take queued messages back to edit (plain ↑ only in an empty box, so it never steals caret moves).
- if (event.key === "ArrowUp" && (event.altKey || !$("message-input").value) && state.activity.queue?.length) { event.preventDefault(); void editQueued(state.activity.queue.at(-1).text); }
+ if (event.key === "ArrowUp" && (event.altKey || !$("message-input").value) && state.activity.queue?.length) { event.preventDefault(); void editQueued(state.activity.queue.at(-1).text); return; }
+ // Prompt history: ↑ at the very start of the box steps back through this session's prompts, ↓ at the very end steps forward.
+ const box = $("message-input"), atStart = box.selectionStart === 0 && box.selectionEnd === 0, atEnd = box.selectionStart === box.value.length;
+ if (event.altKey || event.shiftKey || event.ctrlKey) return;
+ if (event.key === "ArrowUp" && atStart && historyAt !== 0 && prompts().length) { event.preventDefault(); showHistory(historyAt === -1 ? prompts().length - 1 : historyAt - 1, 0); }
+ if (event.key === "ArrowDown" && atEnd && historyAt !== -1) { event.preventDefault(); showHistory(historyAt + 1 < prompts().length ? historyAt + 1 : -1, -1); }
 });
+// historyAt: the prompt shown from history (-1 = the user's own draft). The last prompt, when its run was stopped
+// (aborted), opens in edit mode (orange): sending first takes it and everything after it out of the context.
+let historyAt = -1, historyDraft = "";
+// shortcut: only prompts loaded in the page, and a long prompt's 2 KB excerpt; load earlier rows or the full row if that bites.
+const prompts = () => [...chat.values()].filter(row => row.role === "user");
+function lastStopped() {
+ const rows = [...chat.values()], last = rows.findLastIndex(row => row.role === "user");
+ return last >= 0 && rows.slice(last + 1).some(row => row.role === "assistant" && /abort/i.test(row.error ?? ""));
+}
+function showHistory(at: number, caret: number) {
+ const box = $("message-input");
+ if (historyAt === -1) historyDraft = box.value;
+ historyAt = at; box.value = at === -1 ? historyDraft : prompts()[at].text;
+ const editing = at !== -1 && at === prompts().length - 1 && lastStopped();
+ box.classList.toggle("editing-last", editing); box.title = editing ? "Editing your stopped last message: Send replaces it and what followed it" : "";
+ box.setSelectionRange(caret === -1 ? box.value.length : caret, caret === -1 ? box.value.length : caret);
+ box.dispatchEvent(new Event("input"));
+}
 $("composer").addEventListener("submit", async event => {
  event.preventDefault(); if (messageSending || !state.connected) return;
  const text = $("message-input").value; if (!text.trim()) return;
@@ -1020,7 +1043,10 @@ $("composer").addEventListener("submit", async event => {
  messageSending = true; expectWork(); renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
- try { const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; saveDraft(); renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
+ const replacing = $("message-input").classList.contains("editing-last") ? prompts().at(-1)?.text : undefined;
+ historyAt = -1; $("message-input").classList.remove("editing-last"); $("message-input").title = "";
+ try {
+  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; saveDraft(); renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
  catch (error) { expectWork(false); showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; renderShell(); }
 });
