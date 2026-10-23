@@ -62,6 +62,28 @@ try {
 	// No SDK (auth resolver throws): everything logged out, nothing thrown.
 	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => { throw new Error("no Pi SDK"); } });
 	await usage.start(); assert.deepEqual(usage.usage(), { summary: [], accounts: [] }); usage.stop();
+
+	// Issue #5: GLM/Kimi ids carry an index and Copilot has only a month, yet each shows; the headline window is named.
+	const at = Date.now() + 3_600_000, fake = (id, windows) => ({ id, label: id, piProviderId: id, fetchQuota: async () => windows });
+	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => async () => credential, providers: [
+		fake("glm", [{ id: "5h-0", label: "5h", usedPercent: 10, resetsAt: at }, { id: "7d-1", label: "7d", usedPercent: 30, resetsAt: at }]),
+		fake("copilot", [{ id: "mo", label: "mo", usedPercent: 50, resetsAt: at }]),
+	] });
+	await usage.start();
+	assert.deepEqual(usage.usage().summary.map(s => [s.id, s.window, s.left, s.bars.map(b => b.label).join()]), [["glm", "7d", 70, "5h,7d"], ["copilot", "mo", 50, "mo"]]);
+	usage.stop();
+
+	// Issue #5: an npm-installed Pi is found beside the `pi` on PATH when the managed install is absent.
+	const { piPackage } = await import("../src/pi-sdk.ts");
+	const npm = path.join(root, "npm"), pkg = path.join(npm, "node_modules", "@earendil-works", "pi-coding-agent");
+	fs.mkdirSync(path.join(pkg, "dist"), { recursive: true }); fs.writeFileSync(path.join(pkg, "package.json"), "{}"); fs.writeFileSync(path.join(pkg, "dist", "cli.js"), "");
+	if (process.platform === "win32") fs.writeFileSync(path.join(npm, "pi.cmd"), "");
+	else { fs.mkdirSync(path.join(npm, "bin")); fs.symlinkSync(path.join(pkg, "dist", "cli.js"), path.join(npm, "bin", "pi")); }
+	const bin = process.platform === "win32" ? npm : path.join(npm, "bin");
+	assert.equal(fs.realpathSync(piPackage(path.join(root, "agent"), [path.join(root, "none"), bin].join(path.delimiter))), fs.realpathSync(pkg));
+	assert.throws(() => piPackage(path.join(root, "agent"), ""), /Pi SDK not found/);
+	fs.mkdirSync(path.join(root, "agent", "install"), { recursive: true }); fs.writeFileSync(path.join(root, "agent", "install", "current-version"), "9.9.9\n");
+	assert.match(piPackage(path.join(root, "agent"), bin), /releases[\\/]9\.9\.9[\\/]node_modules/, "the managed install wins");
 	console.log("usage ok");
 } finally {
 	fs.rmSync(root, { recursive: true, force: true });

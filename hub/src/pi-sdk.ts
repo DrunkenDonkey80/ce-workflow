@@ -1,16 +1,32 @@
 // Pi's own SDK, loaded from Pi's managed install: the hub reads auth, models, settings and session files the way a running Pi does.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { basename, delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { agentDir } from "./rpc-client.ts";
 
 const sdks = new Map<string, Promise<any>>(), runtimes = new Map<string, Promise<any>>();
 
+const PACKAGE = join("node_modules", "@earendil-works", "pi-coding-agent");
+
+/** Pi's package folder: the managed install (agent/install/current-version), else the npm-installed one behind the `pi` on PATH (issue #5). */
+export function piPackage(dir = agentDir(), path = process.env.PATH ?? ""): string {
+	const marker = join(dir, "install", "current-version");
+	if (existsSync(marker)) return join(dir, "install", "releases", readFileSync(marker, "utf8").trim(), PACKAGE);
+	// shortcut: npm layouts only (Windows pi.cmd beside node_modules, POSIX bin/pi linking into the package); pnpm/volta shims are not followed.
+	for (const folder of path.split(delimiter).filter(Boolean)) {
+		if (existsSync(join(folder, "pi.cmd")) && existsSync(join(folder, PACKAGE))) return join(folder, PACKAGE);
+		let at: string;
+		try { at = realpathSync(join(folder, "pi")); } catch { continue; }
+		for (let up = dirname(at); up !== dirname(up); up = dirname(up)) if (basename(up) === "pi-coding-agent" && existsSync(join(up, "package.json"))) return up;
+	}
+	throw new Error(`Pi SDK not found: no ${marker} and no npm-installed pi on PATH.`);
+}
+
 export function piSdk(dir = agentDir()): Promise<any> {
-	// shortcut: only Pi's managed install (agent/install/current-version) is found; add a `pi` path lookup if a hub runs beside an npm-installed Pi.
 	if (!sdks.has(dir)) {
-		const version = readFileSync(join(dir, "install", "current-version"), "utf8").trim();
-		sdks.set(dir, import(pathToFileURL(join(dir, "install", "releases", version, "node_modules", "@earendil-works", "pi-coding-agent", "dist", "index.js")).href));
+		let entry: string;
+		try { entry = join(piPackage(dir), "dist", "index.js"); } catch (error) { return Promise.reject(error); }
+		sdks.set(dir, import(pathToFileURL(entry).href));
 	}
 	return sdks.get(dir)!;
 }

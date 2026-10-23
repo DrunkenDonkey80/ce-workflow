@@ -4,7 +4,18 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Added
+- Hub: Alt+= and Alt+- step the Think/Work bias, like in the terminal.
+- Hub: the top bar shows a provider's 5h window next to its 7d one. Right-click a bar to hide it, or use the Top bar boxes in the provider's window. Hiding all of a provider's bars turns that provider off in the gear menu.
+- Hub: in the Claude account window, Force use / Stop force marks one or more accounts to serve first (green in the terminal). Forced accounts get a green name and tint, and "Use" is now "Switch to".
+
+### Changed
+- Hub: a click outside the usage, devices, command and changelog windows closes them. Questions and approvals still stay open.
+- Hub: in the Claude account window, each account's notes sit on its name line, so every row takes one line less.
+
 ### Fixed
+- Hub: usage bars now show when Pi is installed with npm instead of Pi's own installer. GLM/Z.ai, Kimi and Copilot usage shows too (#5).
+- Hub: a parked session keeps showing Research on when it was on.
 - Hub: a session that finishes stays blue until you look at it, even when a page has it open in a background tab, a minimized app or on another device.
 
 ## 0.1.63 — 2026-10-22

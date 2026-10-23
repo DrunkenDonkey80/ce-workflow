@@ -185,6 +185,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .status-menu #hub-version { display: block; width: 100%; text-align: center; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; padding: 2px 0 8px; margin-bottom: 6px; color: var(--ink); font-weight: 600; font-size: 14px; cursor: pointer; } #hub-version:hover { color: var(--focus); } #hub-version:focus { outline: none; } #hub-version:focus-visible { text-decoration: underline; }
 .changelog-body { max-height: 75dvh; overflow-y: auto; } .changelog-body h3 { margin: 14px 0 4px; } .changelog-body div { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; } .changelog-body .thumb img { max-width: 240px; }
 .dialog-close { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; padding: 0; font-size: 20px; line-height: 1; }
+.usage-top { display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: 13px; margin: 2px 0 6px; }
 .usage-window-bar { display: block; text-align: left; margin: 6px 0; padding: 8px 12px; font-variant-numeric: tabular-nums; }
 .usage-alert { margin: 8px 0; padding: 6px 10px; border-radius: 6px; font-weight: 600; background: color-mix(in srgb, currentColor 10%, transparent); }
 .usage-alert.tone-error { color: var(--error); } .usage-alert.tone-warning { color: var(--warning); }
@@ -193,6 +194,8 @@ h2 { font-size: 15px; font-weight: 600; }
 .pool-row { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: grid; gap: 4px; }
 .pool-row:hover { background: var(--hover); } .pool-row:focus-visible { outline: 2px solid var(--focus); }
 .pool-row.active { border-color: var(--success); } .pool-row.off { opacity: .55; }
+/* Forced (the pool's favourite, green in the terminal): dark-green name on a green tint. */
+.pool-row.forced { background: color-mix(in srgb, var(--success) 9%, transparent); } .pool-row.forced .pool-name, .pool-forced { color: color-mix(in srgb, var(--success) 75%, var(--ink)); } .pool-forced { border-color: currentColor; }
 .pool-row.picked { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); background: color-mix(in srgb, var(--focus) 10%, transparent); }
 .pool-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; } .pool-mark { color: var(--success); width: 1em; }
 .pool-chip { font-size: 11px; padding: 0 6px; border-radius: 9px; border: 1px solid var(--line); } .pool-email { color: var(--muted); margin-left: auto; }
@@ -201,7 +204,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .pool-bar-name { color: var(--muted); } .pool-bar-text { text-align: right; white-space: nowrap; }
 .pool-bar-track { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--muted) 22%, transparent); overflow: hidden; }
 .pool-bar-fill { display: block; height: 100%; background: var(--success); } .pool-bar-fill.tone-warning { background: var(--warning); } .pool-bar-fill.tone-error { background: var(--error); }
-.pool-notes { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); } .pool-notes .tone-error { color: var(--error); } .pool-notes .tone-warning { color: var(--warning); }
+.pool-notes { display: inline-flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); } .pool-notes .tone-error { color: var(--error); } .pool-notes .tone-warning { color: var(--warning); }
 .pool-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .pool-pick { margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16em; }
 .pool-actions button, .pool-actions select, .pool-tools button { padding: 4px 10px; font-size: 13px; }

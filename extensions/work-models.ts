@@ -1381,12 +1381,12 @@ function researchGitPublicationCommand(command) {
 	return false;
 }
 
-function showResearchContext(ctx) {
+function showResearchContext(ctx, publish = true) {
 	const label = researchContext?.stopping
 		? "RESEARCH STOPPING… · waiting for work to finish · Alt+R to keep on"
 		: "RESEARCH MODE · explore, don't implement · Alt+R to exit";
 	ctx.ui?.setStatus?.("work-research-context", researchContext ? label : undefined);
-	workExtensionPi?.events?.emit?.("wo:modes-changed", {}); // pi-control-hub's page shows the mode too
+	if (publish) workExtensionPi?.events?.emit?.("wo:modes-changed", {}); // pi-control-hub's page shows the mode too
 	ctx.ui?.setWidget?.("work-research-context", researchContext && ctx.mode === "tui"
 		? [ctx.ui.theme?.fg?.(researchContext.stopping ? "warning" : "accent", `━━ ${label} ━━`) ?? label,
 			"Temporary notes in system temp · /research notes for path"]
@@ -3676,7 +3676,7 @@ ctx.ui?.setWidget?.("work-extension-scout", undefined);
 resetContextCompaction();
 researchContext = null;
 researchNotes = null;
-showResearchContext(ctx);
+showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps showing its saved mode
 
 });
 

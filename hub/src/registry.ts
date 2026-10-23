@@ -20,6 +20,8 @@ export type SessionRecord = {
 	thinking?: string;
 	/** S-11: picked while parked; Pi gets them on resume, before any message. */
 	pending?: { model?: { provider: string; id: string; name: string }; thinking?: string };
+	/** The session modes (research, night, bias) ce-workflow last published, shown while parked. */
+	modes?: Record<string, unknown>;
 	createdAt: number;
 };
 export type Recent = { file: string; cwd: string; sessionId: string; name?: string; modified: number };

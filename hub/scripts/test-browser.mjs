@@ -63,7 +63,7 @@ const pool = { acts: [] }; const answers = [], messages = [], commands = [], cha
 const fail = (status, error) => Object.assign(new Error(error), { status });
 function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
- if (endpoint === "/api/usage") return { summary: [{ id: "claude", label: "Claude", left: 53, color: "text", bars: [{ label: "7d", left: 53, color: "text" }], warnings: [{ text: "expiring in 4h 12m (40% unused)", color: "error" }], notes: ["70% in 2h 0m"] }, { id: "codex", label: "Codex", left: 12, color: "error", resets: "1d 14h", bars: [{ label: "5h", left: 80, color: "text", resets: "2h 3m" }, { label: "7d", left: 12, color: "error", resets: "1d 14h", at: "Tue 10:00" }], warnings: [], notes: [] }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
+ if (endpoint === "/api/usage") return { summary: [{ id: "claude", label: "Claude", window: "7d", left: 53, color: "text", bars: [{ label: "7d", left: 53, color: "text" }], warnings: [{ text: "expiring in 4h 12m (40% unused)", color: "error" }], notes: ["70% in 2h 0m"] }, { id: "codex", label: "Codex", window: "7d", left: 12, color: "error", resets: "1d 14h", bars: [{ label: "5h", left: 80, color: "text", resets: "2h 3m" }, { label: "7d", left: 12, color: "error", resets: "1d 14h", at: "Tue 10:00" }], warnings: [], notes: [] }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
  if (endpoint === "/api/pool") { if (body.act) { pool.acts.push(body.act + ":" + body.label + (body.value === undefined ? "" : ":" + body.value)); return { message: "done " + body.act }; } return { title: "Claude accounts", drain7d: false, rows: [{ label: "flex1", priority: 0, state: "ok", login: "ok", fiveHour: { pct: 20, resets: "2h" }, sevenDay: { pct: 53, tone: "warning", resets: "4h 12m", clock: "error" }, notes: [{ text: "as of 3m ago" }], active: true, favorite: true, weekend: false, disabled: false, dead: false }, { label: "flex2", priority: -1, state: "ok", login: "ok", fiveHour: null, sevenDay: { pct: 90, tone: "error" }, notes: [], active: false, favorite: false, weekend: false, disabled: false, dead: false }] }; }
  if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }], args: { wo: [{ value: "share", description: "Toggle sharing" }], plan3: [{ value: "review", description: "Review" }, { value: "review all", description: "Review" }] } };
  if (endpoint === "/api/edit" && body.target === "product") { // E-05: Project-tab edits
@@ -280,10 +280,11 @@ try {
  assert.equal(await shown("web_client__load_balancer"), true, "a clicked box stays in focus");
  await browser("mouse", "move", "2", "2"); await browser("press", "Escape"); assert.equal(await shown("web_client__load_balancer"), false, "Escape clears focus");
  { const hub_ = (body) => fetch(`${origin}/s/${id}/api/hub`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify({ action: "settings", ...body }) });
-  { const { idleParkMinutes, icon, usageHidden } = await (await hub_({ idleParkMinutes: 5, icon: "house", usageHidden: ["glm"] })).json();
-  assert.deepEqual({ idleParkMinutes, icon, usageHidden }, { idleParkMinutes: 5, icon: "house", usageHidden: ["glm"] }, "gear settings save"); }
+  { const { idleParkMinutes, icon, usageHidden } = await (await hub_({ idleParkMinutes: 5, icon: "house", usageHidden: ["glm", "codex:5h"] })).json();
+  assert.deepEqual({ idleParkMinutes, icon, usageHidden }, { idleParkMinutes: 5, icon: "house", usageHidden: ["glm", "codex:5h"] }, "gear settings save"); }
+  assert.equal((await hub_({ usageHidden: ["nope:5h"] })).status, 400, "window keys name a known provider");
   assert.equal((await hub_({ idleParkMinutes: -1 })).status, 400);
-  await hub_({ idleParkMinutes: 0, icon: "" }); }
+  await hub_({ idleParkMinutes: 0, icon: "", usageHidden: [] }); }
  { const r = await fetch(`${origin}/s/${id}/api/paste`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin }, body: "<svg onload=alert(1)>" }); assert.match((await r.json()).error, /PNG, JPEG/, "non-image paste rejected by magic bytes"); }
  // Clipboard image paste: saved as a temp file, path inserted into the draft.
  await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob(\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"), c => c.charCodeAt(0))], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");
@@ -627,29 +628,44 @@ try {
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
  assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["fake-1: Low", "Context: 84k/200k", "💡 Normal", sample.title + "2/5"]);
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - session name; the plan is in its bar");
- // Usage: one bar per provider, filled to 7d left; a warning shows in the button and colours it.
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))"), ["Claude: 53% · expiring in 4h 12m (40% unused)|error|53%", "Codex: 12% 1d 14h|error|12%"], "usage: one bar per provider with its warning");
+ // Usage: one bar per window (5h when there is one, then the headline 7d); a warning shows in the headline and colours it.
+ const usageBars = "[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))";
+ assert.deepEqual(await evaluate(usageBars), ["Claude 7d: 53% · expiring in 4h 12m (40% unused)|error|53%", "Codex 5h: 80% 2h 3m|accent|80%", "Codex 7d: 12% 1d 14h|error|12%"], "usage: a bar per window, the warning on the headline");
  assert.match(await evaluate("document.querySelector('#usage-button .usage-bar').title"), /Claude · 7d 53% left · expiring in 4h 12m/, "hover shows the provider's bars and warnings");
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
  await browser("wait", "--fn", "document.getElementById('bias-button').textContent === '💡 Think:Task'");
+ // Alt+= / Alt+- step the bias like the terminal, clamped at the plan's ends.
+ for (const key of ["Alt+Equal", "Alt+Equal"]) await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { code: "${key.slice(4)}", key: "=", altKey: true, bubbles: true }))`);
+ await browser("wait", "--fn", "document.getElementById('bias-button').textContent.startsWith('💡 Think:Plan')");
+ await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { code: "Minus", key: "-", altKey: true, bubbles: true }))`);
+ await browser("wait", "--fn", "document.getElementById('bias-button').textContent === '💡 Think:Task'");
  await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
  // Clicking a provider opens its window: every quota window as a bar; Claude adds the account pool with its actions.
  await browser("click", "#usage-button [data-provider=codex]"); await browser("wait", "--fn", "document.getElementById('usage-window').open");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-window-bar')].map(b => b.textContent)"), ["5h 80% left · resets in 2h 3m", "7d 12% left · resets in 1d 14h (Tue 10:00)"], "codex window: 5h and 7d bars");
- await browser("click", "#usage-close");
+ // Right-click hides one bar; the window's Top bar boxes show it again; a click outside closes the window.
+ await evaluate("document.querySelector('#usage-button [data-provider=codex][data-window=\"5h\"]').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))");
+ await browser("wait", "--fn", "document.querySelectorAll('#usage-button .usage-bar').length === 2");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-top input')].map(b => b.checked)"), [false, true], "the window's Top bar boxes follow the right-click");
+ await evaluate("(() => { const b = document.querySelector('#usage-body .usage-top input'); b.checked = true; b.dispatchEvent(new Event('change')); })()");
+ await browser("wait", "--fn", "document.querySelectorAll('#usage-button .usage-bar').length === 3");
+ await browser("mouse", "move", "3", "300"); await browser("mouse", "down", "left"); await browser("mouse", "up", "left");
+ await browser("wait", "--fn", "!document.getElementById('usage-window').open");
  await browser("click", "#usage-button [data-provider=claude]"); await browser("wait", ".pool-row");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-alert, #usage-body .pool-row')].map(e => e.className)"), ["usage-alert tone-error", "pool-row active picked", "pool-row"], "claude window: warning, then the pool rows, active one picked");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-alert, #usage-body .pool-row')].map(e => e.className)"), ["usage-alert tone-error", "pool-row active forced picked", "pool-row"], "claude window: warning, then the pool rows, active one picked");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('.pool-row.active .pool-bar-fill')].map(f => f.className + ' ' + f.style.width)"), ["pool-bar-fill tone-success 80%", "pool-bar-fill tone-warning 47%"], "5h and 7d as coloured bars (% left by default)");
  assert.equal(await evaluate("document.querySelectorAll('.pool-row.active .pool-bar')[1].querySelector('.tone-error')?.textContent"), "4h 12m", "an expiring week's clock is red");
  assert.equal(await evaluate("document.querySelectorAll('.pool-actions').length"), 1, "one action row for the picked account");
  await browser("click", ".pool-row:not(.active)"); await browser("wait", "--fn", "document.querySelector('.pool-pick')?.textContent === 'flex2'");
  assert.equal(await evaluate("document.querySelector('.pool-actions select').value"), "-1", "the level menu shows the picked account's priority");
  await browser("click", ".pool-actions button:first-of-type"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done switch')");
+ assert.equal(await evaluate("document.querySelector('.pool-actions button:nth-of-type(2)').textContent"), "Force use");
+ await browser("click", ".pool-actions button:nth-of-type(2)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done favorite')");
  await evaluate("(() => { const s = document.querySelector('.pool-actions select'); s.value = '2'; s.dispatchEvent(new Event('change')); })()"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done priority')");
  await browser("click", ".pool-tools button:nth-of-type(2)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done mode')");
- assert.deepEqual(pool.acts, ["switch:flex2", "priority:flex2:2", "mode:"], "pool actions reach the hub's pool");
+ assert.deepEqual(pool.acts, ["switch:flex2", "favorite:flex2", "priority:flex2:2", "mode:"], "pool actions reach the hub's pool");
  await browser("click", "#usage-close");
  await browser("click", "#settings-button");
  assert.deepEqual(await evaluate("[document.querySelectorAll('#settings-menu #icon-grid .icon-choice').length > 1, !!document.getElementById('icon-colors'), document.querySelector('#icon-grid [aria-checked=true]')?.title]"), [true, false, "pc"], "icons sit in the settings menu, no colours, the first is the default");

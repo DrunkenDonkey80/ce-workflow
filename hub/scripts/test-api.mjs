@@ -125,6 +125,7 @@ try {
 	assert.deepEqual((await post(id, "message", { text: " /reload " })).body, { ok: true });
 	assert.equal(hub.host.live.has(id), true, "reload resumes");
 	if (pid) assert.notEqual(hub.host.live.get(id).rpc.process?.pid, pid, "reload is a new Pi");
+	assert.equal((await get(id, "snapshot")).body.status.modes.research, "on", "modes outlive the Pi process until it publishes again");
 	assert.match(notices[0] ?? "", /Kept the previous model: No Key/);
 	assert.equal(hub.registry.get(id).pending, undefined);
 

@@ -632,7 +632,7 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 	const cacheFile = join(dataDir, "usage-cache.json");
 	let cache: { version: 1; providers: Record<string, { identityKey: string; fetchedAt: number; windows: Window[] }> } = { version: 1, providers: {} };
 	let resolver: Promise<(provider: string) => Promise<Auth>> | undefined;
-	let stopped = true;
+	let stopped = true, sdkLogged = false;
 	const isHidden = (entry: { id: string }) => hidden().includes(entry.id);
 
 	async function loadCache() {
@@ -666,7 +666,10 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 		if (!isHidden(entry)) try {
 			resolver ??= auth().catch(error => { resolver = undefined; throw error; });
 			resolved = storedAuth(await (await resolver)(entry.piProviderId));
-		} catch { /* No SDK or no stored auth: shows as logged out. */ }
+		} catch (error) {
+			// No stored auth shows as logged out; a missing SDK hides every provider, so say why once.
+			if (!sdkLogged && /Pi SDK/.test((error as Error)?.message ?? "")) { sdkLogged = true; console.error(`usage: ${(error as Error).message}`); }
+		}
 		if (stopped) return;
 		if (!resolved) {
 			// Logout (or hidden): forget the snapshot; a later login is checked on the next poll.
@@ -732,10 +735,11 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 			const at = now();
 			const summary = providers.filter(entry => !isHidden(entry)).flatMap(entry => {
 				const windows = states.get(entry.id)?.windows ?? [];
-				const week = windows.find(window => window.id === "7d");
+				// The headline: the week, else the month (Copilot), else the first quota window; labels, since GLM/Kimi ids carry an index.
+				const quota = windows.filter(w => w.text === undefined), week = windows.find(w => w.label === "7d") ?? quota.find(w => w.label === "mo") ?? quota[0];
 				// A served Claude pool rotates accounts, so its 7d has no single reset time.
 				const resets = week?.resetsAt && !(entry.id === "claude" && poolAccounts.length) ? formatDuration(week.resetsAt - at) : undefined;
-				const bars = windows.filter(w => w.text === undefined || w.id === "7d").map(w => ({
+				const bars = windows.filter(w => w.text === undefined || w === week).map(w => ({
 					label: w.label, left: Math.round(100 - w.usedPercent), color: quotaColor(w.usedPercent),
 					resets: w.resetsAt ? formatDuration(w.resetsAt - at) : undefined,
 					at: w.resetsAt && w.label !== "5h" ? resetMoment(w.resetsAt, at) : undefined,
@@ -743,10 +747,10 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 				const words = (w: Window) => w.id === "drain" ? w.text!.replace(/^7d: (.*) \((\d+%)\)$/, "expiring in $1 ($2 unused)")
 					: w.id === "login" ? w.text!.replace(/^ER:expired/, "login expired").replace(/^ER:/, "login ends in ")
 					: w.id === "5h-full" ? w.text!.replace(/^5h full (.+)$/, "5h full, frees in $1") : w.text!;
-				const text = windows.filter(w => w.text !== undefined && w.id !== "7d");
+				const text = windows.filter(w => w.text !== undefined && w !== week);
 				const warnings = text.filter(w => w.color).map(w => ({ text: words(w), color: w.color }));
 				const notes = text.filter(w => !w.color).map(w => w.text);
-				return week ? [{ id: entry.id, label: entry.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets, bars, warnings, notes }] : [];
+				return week ? [{ id: entry.id, label: entry.label, window: week.label, left: Math.round(100 - week.usedPercent), color: quotaColor(week.usedPercent), resets, bars, warnings, notes }] : [];
 			});
 			return { summary, accounts: hidden().includes("claude") ? [] : poolAccountLines() };
 		},

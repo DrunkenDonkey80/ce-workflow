@@ -70,7 +70,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
 	async function status(id: string) {
 		const record = registry.get(id)!, live = host.live.get(id);
-		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? { research: "off", night: "off" }, git: await gitState(record.folder), commands: commands?.list(record.folder) ?? [] };
+		const base = { folder: path.basename(record.folder), tab: record.name, modes: published(id)?.modes ?? record.modes ?? { research: "off", night: "off" }, git: await gitState(record.folder), commands: commands?.list(record.folder) ?? [] };
 		if (!live) { const parked = await parkedModel(id); return { ...base, model: parked.model ?? null, effort: parked.thinking ?? null, context: null, parked: true }; }
 		const [state, stats] = await Promise.all([live.rpc.send({ type: "get_state" }), live.rpc.send({ type: "get_session_stats" })]);
 		void host.remember(live, state);

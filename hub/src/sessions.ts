@@ -90,6 +90,8 @@ export class SessionHost extends EventEmitter {
 			if (request.method === "setStatus" && request.statusKey === "pi-hub:state") {
 				const state = parseJson(request.statusText);
 				live.published.state = state;
+				const saved = this.registry.get(record.id); // modes outlive the process: a parked page still shows Research on
+				if (saved && state?.modes && JSON.stringify(state.modes) !== JSON.stringify(saved.modes)) this.registry.update(record.id, { modes: state.modes });
 				live.busyExtra.clear();
 				if (Array.isArray(state?.subagents) && state.subagents.length) live.busyExtra.add("subagents running");
 				if (state?.compacting && !live.compacting) live.busyExtra.add("compacting");

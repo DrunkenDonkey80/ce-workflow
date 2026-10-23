@@ -1380,6 +1380,13 @@ window.addEventListener("keydown", event => {
   if (at >= 0 && next) { event.preventDefault(); location.assign(sessionUrl(next)); }
  }
  if (event.key.toLowerCase() === "n" && ownFolder) { event.preventDefault(); void newSession(ownFolder); }
+ // Alt+= / Alt+- like the terminal: one bias step toward Think or Work (codes, so Shift and keyboard layouts don't matter).
+ const step = { Equal: 1, NumpadAdd: 1, Minus: -1, NumpadSubtract: -1 }[event.code];
+ if (step && state.connected) {
+  event.preventDefault();
+  const limit = state.plan ? 2 : 1, level = Math.max(-limit, Math.min(limit, biasNow() + step));
+  if (level !== biasNow()) post("bias", { level }).then(() => showNotice(""), error => showNotice(error.message));
+ }
 });
 // Desktop session bar: open by default; collapsing to the letter stripe is remembered.
 function toggleSwitcher(open: boolean) { localStorage.setItem("plan3-switcher", open ? "open" : "closed"); document.body.classList.toggle("switcher-open", open); $("switcher").dataset.open = String(open); $("switcher-toggle").setAttribute("aria-expanded", String(open)); $("switcher-toggle").setAttribute("aria-label", open ? "Hide shared sessions" : "Show shared sessions"); }
@@ -1393,7 +1400,7 @@ void loadSessions();
 // tapping one opens its window: every quota window as a bar, the pool's notes and, for Claude, the account pool.
 type Segment = { text: string; color?: string };
 type UsageBar = { label: string; left: number; color: string; resets?: string; at?: string };
-type Usage = { id: string; label: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[] };
+type Usage = { id: string; label: string; window?: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[] };
 let usage: Usage[] = [], usageAccounts: Segment[] = [], usageTimer = 0, usageShown = "";
 const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
 // Usage as % left (default) or % used, per device (gear → Usage shows); fills follow the shown number.
@@ -1405,19 +1412,39 @@ async function loadUsage() {
  try {
   const value = await get("usage") as { summary: Usage[]; accounts?: Segment[] };
   usage = value.summary; usageAccounts = value.accounts ?? [];
-  $("usage-button").hidden = !usage.length;
-  $("usage-button").replaceChildren(...usage.map(item => {
-   const button = el("button", "bar usage-bar"); button.type = "button"; button.dataset.provider = item.id;
-   button.append(el("span", "usage-item", `${item.label}: ${shownLeft(item.left)}%${item.resets ? " " + item.resets : ""}`), ...(item.warnings ?? []).map(w => el("span", "usage-warning tone-" + w.color, " · " + w.text)));
-   // A warning outranks the quota colour: the expiring week is the thing to act on.
-   setBar(button, shownLeft(item.left), tone(item.warnings?.find(w => w.color === "error")?.color ?? item.warnings?.[0]?.color ?? item.color));
-   button.title = [item.label, ...(item.bars ?? []).map(bar => `${bar.label} ${shownLeft(bar.left)}% ${usageWord()}${bar.resets ? " (" + bar.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text)].join(" · ");
-   button.addEventListener("click", () => void openUsage(item.id));
-   return button;
-  }));
+  renderUsageBar();
   if (usageShown && ($("usage-window") as HTMLDialogElement).open) void openUsage(usageShown, false);
  } catch { $("usage-button").hidden = true; }
  usageTimer = window.setTimeout(loadUsage, 120_000);
+}
+// Top-bar windows of a provider: its 5h (when it has one) and the headline (7d, else its longest); each hides on its own.
+const topWindows = (item: Usage) => [...new Set(["5h", item.window ?? "7d"])].filter(label => item.bars?.some(bar => bar.label === label));
+const usageKey = (item: Usage, label: string) => item.id + ":" + label;
+function renderUsageBar() {
+ const hidden = new Set(hubSettings.usageHidden ?? []);
+ $("usage-button").replaceChildren(...usage.flatMap(item => topWindows(item).filter(label => !hidden.has(usageKey(item, label))).map(label => {
+  const bar = item.bars!.find(entry => entry.label === label)!, head = label === item.window, warnings = head ? item.warnings ?? [] : [];
+  // The headline keeps the summary's reset (none for a rotating Claude pool) and the warnings.
+  const left = head ? item.left : bar.left, resets = head ? item.resets : bar.resets;
+  const button = el("button", "bar usage-bar"); button.type = "button"; button.dataset.provider = item.id; button.dataset.window = label;
+  button.append(el("span", "usage-item", `${item.label} ${label}: ${shownLeft(left)}%${resets ? " " + resets : ""}`), ...warnings.map(w => el("span", "usage-warning tone-" + w.color, " \u00b7 " + w.text)));
+  // A warning outranks the quota colour: the expiring week is the thing to act on.
+  setBar(button, shownLeft(left), tone(warnings.find(w => w.color === "error")?.color ?? warnings[0]?.color ?? bar.color));
+  button.title = [item.label, ...(item.bars ?? []).map(entry => `${entry.label} ${shownLeft(entry.left)}% ${usageWord()}${entry.resets ? " (" + entry.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text), "Right-click hides this bar"].join(" \u00b7 ");
+  button.addEventListener("click", () => void openUsage(item.id));
+  button.addEventListener("contextmenu", event => { event.preventDefault(); void showUsageWindow(item, label, false); });
+  return button;
+ })));
+ $("usage-button").hidden = !$("usage-button").childElementCount;
+}
+// Hiding every top-bar window of a provider turns the provider off as a whole: unticked in the gear menu and no longer polled.
+async function showUsageWindow(item: Usage, label: string, show: boolean) {
+ const hidden = new Set(hubSettings.usageHidden ?? []);
+ if (show) hidden.delete(usageKey(item, label)); else hidden.add(usageKey(item, label));
+ if (topWindows(item).every(window => hidden.has(usageKey(item, window)))) { for (const window of topWindows(item)) hidden.delete(usageKey(item, window)); hidden.add(item.id); }
+ await saveHubSettings({ usageHidden: [...hidden] }); renderUsageProviders();
+ if (hidden.has(item.id)) showNotice(`${item.label} usage is off; turn it back on under the gear \u2192 Usage.`, true);
+ void loadUsage();
 }
 type Window = { pct: number; tone?: string; resets?: string; clock?: string } | null;
 type PoolRow = { label: string; email?: string; plan?: string; priority: number; state: string; login: string; fiveHour: Window; sevenDay: Window; notes: { text: string; tone?: string }[]; active: boolean; favorite: boolean; weekend: boolean; disabled: boolean; dead: boolean };
@@ -1438,19 +1465,17 @@ function poolBar(name: string, w: Window) {
  if (w.resets) text.append(" · ", el("span", w.clock ? "tone-" + w.clock : "", w.resets));
  bar.append(el("span", "pool-bar-name", name), track, text); return bar;
 }
-const LEVELS: [string, string][] = [["fav", "★ Favourite"], ["2", "++ Prefer"], ["1", "+ Higher"], ["0", "Neutral"], ["-1", "− Lower"], ["-2", "−− Last resort"]];
+const LEVELS: [string, string][] = [["2", "++ Prefer"], ["1", "+ Higher"], ["0", "Neutral"], ["-1", "− Lower"], ["-2", "−− Last resort"]];
 function poolActions(row: PoolRow) {
  const bar = el("div", "pool-actions"), button = (text: string, title: string, run: () => void, cls = "") => { const b = el("button", cls, text); b.type = "button"; b.title = title; b.addEventListener("click", run); bar.append(b); return b; };
  bar.append(el("b", "pool-pick", row.label));
- button("Use", "Switch to this account now (held until it runs out)", () => void poolAct("switch", row.label), row.active ? "on" : "").disabled = row.active || row.disabled || row.dead;
+ button("Switch to", "Switch to this account now (held until it runs out)", () => void poolAct("switch", row.label)).disabled = row.active || row.disabled || row.dead;
+ // Force = the pool's favourite flag (green in the terminal): forced accounts serve first while they have quota; several may be forced.
+ button(row.favorite ? "Stop force" : "Force use", row.favorite ? "Back to normal ranking" : "Serve this account first while it has quota (several accounts can be forced)", () => void poolAct("favorite", row.label), row.favorite ? "on" : "");
  const level = document.createElement("select"); level.title = "Priority level";
  for (const [value, text] of LEVELS) level.append(Object.assign(document.createElement("option"), { value, textContent: text }));
- level.value = row.favorite ? "fav" : String(row.priority);
- level.addEventListener("change", async () => {
-  if (level.value === "fav") return void poolAct("favorite", row.label);
-  if (row.favorite) await poolAct("favorite", row.label);
-  void poolAct("priority", row.label, Number(level.value));
- });
+ level.value = String(row.priority);
+ level.addEventListener("change", () => void poolAct("priority", row.label, Number(level.value)));
  bar.append(level);
  button(row.weekend ? "Weekend: on" : "Weekend: off", "Weekend account: drained over the weekend", () => void poolAct("weekend", row.label), row.weekend ? "on" : "");
  button(row.disabled ? "Enable" : "Disable", row.disabled ? "Put back in rotation" : "Take out of rotation", () => void poolAct("toggle", row.label));
@@ -1458,33 +1483,41 @@ function poolActions(row: PoolRow) {
  return bar;
 }
 function poolRowBox(row: PoolRow, select: () => void) {
- const box = el("div", "pool-row" + (row.active ? " active" : "") + (row.disabled || row.dead ? " off" : "") + (row.label === poolPick ? " picked" : ""));
+ const box = el("div", "pool-row" + (row.active ? " active" : "") + (row.favorite ? " forced" : "") + (row.disabled || row.dead ? " off" : "") + (row.label === poolPick ? " picked" : ""));
  box.tabIndex = 0; box.setAttribute("role", "option"); box.setAttribute("aria-selected", String(row.label === poolPick));
  const head = el("div", "pool-head");
- head.append(el("span", "pool-mark", row.active ? "▶" : ""), el("b", "", (row.favorite ? "★ " : "") + row.label));
- const level = row.favorite ? "" : LEVELS.find(([value]) => value === String(row.priority))?.[1].split(" ")[0];
+ head.append(el("span", "pool-mark", row.active ? "▶" : ""), el("b", "pool-name", row.label));
+ if (row.favorite) head.append(el("span", "pool-chip pool-forced", "forced"));
+ const level = LEVELS.find(([value]) => value === String(row.priority))?.[1].split(" ")[0];
  if (level && row.priority) head.append(el("span", "pool-chip", level));
  if (row.plan) head.append(el("span", "pool-chip", row.plan));
  if (row.weekend) head.append(el("span", "pool-chip", "weekend"));
  if (row.state !== "ok") head.append(el("span", "pool-chip tone-" + (row.dead ? "error" : "warning"), row.state));
  if (row.login && row.login !== "ok") head.append(el("span", "pool-chip tone-error", row.login));
+ // Notes ("as of 5m ago") ride on the name line instead of a line of their own.
+ if (row.notes.length) { const notes = el("span", "pool-notes"); for (const note of row.notes) notes.append(el("span", note.tone ? "tone-" + note.tone : "", note.text)); head.append(notes); }
  if (row.email) head.append(el("small", "pool-email", row.email));
  const bars = el("div", "pool-bars"); bars.append(poolBar("5h", row.fiveHour), poolBar("7d", row.sevenDay));
  box.append(head, bars);
- if (row.notes.length) { const notes = el("div", "pool-notes"); for (const note of row.notes) notes.append(el("span", note.tone ? "tone-" + note.tone : "", note.text)); box.append(notes); }
  box.addEventListener("click", select); box.addEventListener("keydown", event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); } });
  return box;
 }
 async function openUsage(id: string, open = true) {
  const item = usage.find(entry => entry.id === id), dialog = $("usage-window") as HTMLDialogElement;
- if (!item) return;
+ if (!item) { if (!open) dialog.close(); return; } // the shown provider was just turned off
  usageShown = id; $("usage-title").textContent = item.label + " usage";
  const body: HTMLElement[] = (item.bars ?? []).map(bar => {
   const row = el("div", "bar usage-window-bar");
   row.append(el("b", "", bar.label), ` ${shownLeft(bar.left)}% ${usageWord()}${bar.resets ? " · resets in " + bar.resets : ""}${bar.at ? " (" + bar.at + ")" : ""}`);
   setBar(row, shownLeft(bar.left), tone(bar.color)); return row;
  });
- body.push(...(item.warnings ?? []).map(w => el("p", "usage-alert tone-" + w.color, "⚠ " + w.text)), ...(item.notes ?? []).map(note => el("p", "dialog-purpose", note)));
+ const hidden = new Set(hubSettings.usageHidden ?? []), top = el("div", "usage-top", "Top bar:");
+ for (const label of topWindows(item)) {
+  const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: !hidden.has(usageKey(item, label)) });
+  box.addEventListener("change", () => void showUsageWindow(item, label, box.checked));
+  const field = document.createElement("label"); field.append(box, " " + label); top.append(field);
+ }
+ body.push(top, ...(item.warnings ?? []).map(w => el("p", "usage-alert tone-" + w.color, "⚠ " + w.text)), ...(item.notes ?? []).map(note => el("p", "dialog-purpose", note)));
  if (id === "claude") {
   let pool: { title: string; drain7d: boolean; rows: PoolRow[] } | null = null;
   try { pool = await get("pool"); } catch { pool = null; }
@@ -1526,6 +1559,13 @@ async function pickCommand(kind: "pi" | "wo") {
 $("pi-commands").addEventListener("click", () => void pickCommand("pi"));
 $("wo-commands").addEventListener("click", () => void pickCommand("wo"));
 $("command-close").addEventListener("click", () => ($("command-picker") as HTMLDialogElement).close());
+// A click on the backdrop closes the view-only dialogs; questions, approvals and the note editor keep theirs.
+for (const id of ["command-picker", "devices", "usage-window", "changelog"]) {
+ const dialog = $(id) as HTMLDialogElement, outside = (event: MouseEvent) => { const box = dialog.getBoundingClientRect(); return event.target === dialog && (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom); };
+ let pressed = false; // pressed on the backdrop too, so a text selection dragged out of the dialog does not close it
+ dialog.addEventListener("pointerdown", event => { pressed = outside(event); });
+ dialog.addEventListener("click", event => { if (pressed && outside(event)) dialog.close(); pressed = false; });
+}
 async function changeStatus(endpoint: "model" | "effort", body) {
  closeMenus(); if (drawer.dataset.open === "true") setDrawer(false); else $("model-button").focus();
  try { state.status = { ...state.status, ...await post(endpoint, body) }; renderShell(); showNotice(""); } catch (error) { showNotice(error.message); }
@@ -1702,11 +1742,13 @@ function renderUsageProviders() {
  $("usage-providers").replaceChildren(...(hubSettings.usageProviders ?? []).map(provider => {
   const box = Object.assign(document.createElement("input"), { type: "checkbox", checked: !hidden.has(provider.id) });
   box.addEventListener("change", async () => {
-   const next = (hubSettings.usageProviders ?? []).map(p => p.id).filter(id => id === provider.id ? !box.checked : hidden.has(id));
-   await saveHubSettings({ usageHidden: next }); renderUsageProviders(); void loadUsage();
+   // Ticking a provider back on also shows all its top-bar windows again.
+   const next = [...hidden].filter(key => key !== provider.id && !key.startsWith(provider.id + ":"));
+   await saveHubSettings({ usageHidden: box.checked ? next : [...next, provider.id] }); renderUsageProviders(); void loadUsage();
   });
   const label = document.createElement("label"); label.append(box, " " + provider.label); return label;
  }));
+ renderUsageBar();
 }
 // The picker: every icon previewed idle (no names: the pictures say it).
 function renderIconPicker() {

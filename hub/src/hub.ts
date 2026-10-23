@@ -268,7 +268,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					// Per-hub (per-PC) settings from the gear menu: auto-park minutes and the tab icon.
 					const minutes = data.idleParkMinutes, icon = data.icon, seen = data.seenVersion, hidden = data.usageHidden, notify = data.notify as Record<string, unknown> | undefined;
 					if (notify !== undefined && !(notify && typeof notify === "object" && Object.keys(notify).every(k => ["question", "done"].includes(k)) && Object.values(notify).every(v => typeof v === "boolean"))) return send(400, { error: "Notify takes question and done as true or false." });
-					if (hidden !== undefined && !(Array.isArray(hidden) && hidden.every(id => USAGE_PROVIDERS.some(p => p.id === id)))) return send(400, { error: "Unknown usage provider." });
+					// A provider id hides (and stops polling) it; "id:5h" hides one of its top-bar windows.
+					if (hidden !== undefined && !(Array.isArray(hidden) && hidden.every(key => typeof key === "string" && /^[\w-]+(?::[\w.-]{1,20})?$/.test(key) && USAGE_PROVIDERS.some(p => p.id === key.split(":")[0])))) return send(400, { error: "Unknown usage provider." });
 					if (minutes !== undefined && !(Number.isInteger(minutes) && minutes >= 0 && minutes <= 1440)) return send(400, { error: "Auto-park minutes must be 0 to 1440." });
 					if (seen !== undefined && !(typeof seen === "string" && VERSION_PATTERN.test(seen))) return send(400, { error: "Version must be x.y.z." });
 					if (seen !== undefined) config.seenVersion = seen as string;
