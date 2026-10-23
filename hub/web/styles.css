@@ -242,7 +242,14 @@ h2 { font-size: 15px; font-weight: 600; }
 #git-commit .git-icon { stroke: #f59f00; }
 #git-push .git-icon { stroke: #1c7ed6; }
 #git-pull .git-icon { stroke: #0ca678; }
-.session-git { display: flex; gap: 8px; font-size: 11px; font-weight: 600; margin: 0 0 2px; }
+.session-git { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; margin: 0 0 2px; min-height: 20px; }
+.session-git-actions { margin-left: auto; display: flex; gap: 2px; }
+.session-git-action { display: grid; place-items: center; width: 22px; height: 20px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }
+.session-git-action:hover { border-color: var(--accent); }
+.session-git-action .git-icon { margin: 0; vertical-align: 0; }
+.session-git-action[data-git=git-commit] .git-icon { stroke: #f59f00; }
+.session-git-action[data-git=git-push] .git-icon { stroke: #1c7ed6; }
+.session-git-action[data-git=git-pull] .git-icon { stroke: #0ca678; }
 .git-added { color: var(--success); }
 .git-untracked { color: light-dark(#5fb37f, #a9e0bc); }
 .git-modified, .git-deleted { color: var(--error); }

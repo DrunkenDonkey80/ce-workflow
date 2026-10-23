@@ -1148,11 +1148,21 @@ type HubSession = { id: string; name: string; tone: Tone; plan?: { done: number;
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number };
 type Group = { folder: string; label: string; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
-function gitLine(git?: GitFiles | null) {
+// The open session's folder also gets the header's Pull / Commit / Commit and push as icons on the right; they click the header buttons.
+function gitLine(git?: GitFiles | null, own = false) {
  const parts = ([["added", "+", "added"], ["untracked", "+", "not in git yet"], ["modified", "~", "modified"], ["deleted", "×", "deleted"]] as const)
   .filter(([kind]) => git?.[kind]).map(([kind, sign, words]) => html("span", { className: "git-" + kind, textContent: sign + git![kind], title: `${git![kind]} ${words}` }));
- if (!parts.length) return [];
- const line = html("div", { className: "session-git" }); line.append(...parts); return [line];
+ const actions = !own || !git ? [] : ([["git-pull", !!git.behind, "Pull latest"], ["git-commit", !!git.changed, "Commit"], ["git-push", !!(git.changed || git.ahead), "Commit and push"]] as const).filter(([, shown]) => shown).map(([id, , label]) => {
+  const button = html("button", { type: "button", className: "session-git-action", title: label }); button.dataset.git = id;
+  button.setAttribute("aria-label", label); button.append($(id).querySelector(".git-icon")!.cloneNode(true));
+  // shortcut: the push test menu opens at the header button, so on phones it sits behind the drawer; fine while the drawer is a peek.
+  button.addEventListener("click", event => { event.stopPropagation(); $(id).click(); });
+  return button;
+ });
+ if (!parts.length && !actions.length) return [];
+ const line = html("div", { className: "session-git" }); line.append(...parts);
+ if (actions.length) { const right = html("span", { className: "session-git-actions" }); right.append(...actions); line.append(right); }
+ return [line];
 }
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
@@ -1283,7 +1293,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
    const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => session.tone !== "parked") ?? group.sessions[0];
    if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
   });
-  box.append(head, ...gitLine(group.git), ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
+  box.append(head, ...gitLine(group.git, group.folder === ownFolder), ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
   return [box];
  });
  const recent = html("details", { className: "session-recents", open });
