@@ -5,7 +5,7 @@ import type { createActivityMirror } from "../../extensions/plan3-web.ts";
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 // Optional icons may be absent from an already-running hub after an update.
 // @ts-ignore Browser URL includes the workspace token.
-const { ICONS, iconSvg } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _states?: string[]) => "" }));
+const { ICONS, iconSvg, BUTTON_ICONS } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _states?: string[]) => "", BUTTON_ICONS: {} as Record<string, [string, string]> }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
@@ -48,10 +48,6 @@ let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
 const inApp = () => navigator.userAgent.includes("PiHubApp/");
 // Small line icons for the header buttons; each has its own colour in styles.css (.ui-icon[data-icon]).
 const ICON_PATHS: Record<string, string> = {
- model: '<rect x="4" y="4" width="8" height="8" rx="1"/><rect x="6.5" y="6.5" width="3" height="3"/><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"/>',
- context: '<path d="M2.5 4.5h11l-1.4 9.2a1 1 0 0 1-1 .8H4.9a1 1 0 0 1-1-.8z"/><path d="M2.5 4.5a5.5 2 0 0 1 11 0"/><path d="M4 8.5h8"/>',
- // A worker digging: head, bent body, the shovel's shaft and blade in the ground.
- bias: '<circle cx="5" cy="2.8" r="1.5"/><path d="M5.5 5 7.5 9l-2.5 2.5L4 15M7.5 9l2 6M6 6.5l4.5 1.5M9 3.5l3.5 8.5"/><path d="m11.3 12.3 2.6-1 .9 2.3-2.4 1z"/>',
  think: '<circle cx="8" cy="8" r="6.5"/><path d="M6 6.3a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.3v.4"/><path d="M8 11.8v.1"/>',
  research: '<path d="M3 1.5h7.5l2.5 2.5v4M3 1.5v13h5"/><path d="M5.5 5h4M5.5 8h2"/><circle cx="11" cy="11.5" r="2.3"/><path d="m12.7 13.2 1.8 1.8"/>',
  night: '<path d="M13.5 9.8A6 6 0 1 1 6.2 2.5a4.7 4.7 0 0 0 7.3 7.3z"/>',
@@ -59,8 +55,9 @@ const ICON_PATHS: Record<string, string> = {
 };
 function icon(name: string) {
  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
- svg.setAttribute("viewBox", "0 0 16 16"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("class", "ui-icon"); svg.dataset.icon = name;
- svg.innerHTML = ICON_PATHS[name]; return svg;
+ const colour = BUTTON_ICONS[name];
+ svg.setAttribute("viewBox", colour?.[0] ?? "0 0 16 16"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("class", colour ? "ui-icon color-icon" : "ui-icon"); svg.dataset.icon = name;
+ svg.innerHTML = colour?.[1] ?? ICON_PATHS[name] ?? ""; return svg;
 }
 function renderShell() {
  // "<folder> - <session name>"; the tab title adds the current plan (H5-05).

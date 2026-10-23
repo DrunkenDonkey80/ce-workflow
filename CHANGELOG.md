@@ -15,7 +15,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Changed
 - In the chat box, ↑ at the very top has to be pressed twice before it leaves your draft for older messages.
-- The thinking-level button is renamed: Thinker (Plan), Thinker (Task), Default, Worker (Task), Worker (Plan), or Thinker / Default / Worker without a plan, in the hub and in Pi's status line. It gets a digging-worker icon; the model button gets a chip icon, context a bucket, and the chat view button the ? icon.
+- The thinking-level button is renamed: Thinker (Plan), Thinker (Task), Default, Worker (Task), Worker (Plan), or Thinker / Default / Worker without a plan, in the hub and in Pi's status line. The model, context and thinking-level buttons get coloured icons (a chip, a bucket, crossed tools), and the chat view button gets the ? icon, which now stays visible when the button is switched on.
 ![Model, context and thinking-level buttons](docs/changelog/0.1.72-icons.png)
 - Desktop app: Alt+1…9 switches tabs (Ctrl+1…9 now belongs to bookmarks).
 - The model, context, thinking, research, night and env var buttons have small coloured icons.
