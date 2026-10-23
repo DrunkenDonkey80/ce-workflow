@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## 0.1.73 — 2026-10-23
 
 ### Changed
+- Desktop app: with 3 or 4 hubs, the taskbar icon is a grid of big dots, one row per hub in tab order and one column each for asking (red), working (orange) and finished (blue). The tiny hub pictures are gone, because they couldn't be read at taskbar size.
 - When the chat sits next to the diagram, its header no longer shows Pull, Commit and Commit and push. They stay in the sidebar folder box, and in the header when the chat is expanded.
 - On a phone, the File button is now 💾 and the chat box buttons are a little narrower, so Queue fits on the same row as Stop.
 

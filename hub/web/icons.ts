@@ -49,7 +49,7 @@ export function iconSvg(name: string, states: string[] = [], r = 6.5) {
 }
 // The desktop app's taskbar icon: one cell per hub (1 = whole square, 2 side by side, 3-4 in 2x2; more show only as app tabs).
 // One hub: bigger dots. Two: the dots sit in the empty strips, waiting and working below the icon, unseen above, so they hide nothing.
-// Three or four: one dot for each hub's most urgent state, inside its cell.
+// Three or four: a dot matrix, see below.
 export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  hubs = hubs.filter(hub => ICONS[hub.icon]).slice(0, 4);
  if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states, 7);
@@ -58,12 +58,13 @@ export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
   const dots = Object.keys(DOTS).filter(state => hub.states.includes(state)).map(state => `<circle cx="${slot[state][0]}" cy="${slot[state][1]}" r="3.4" fill="${DOTS[state]}" stroke="#fff" stroke-width="0.6"/>`).join("");
   return `<g transform="translate(${x} 8) scale(0.5)">${glyph(hub.icon)}</g>${dots}`;
  }).join("") + "</svg>";
- const rows = hubs.length > 2 ? 2 : 1, cell = 16, top = (32 - rows * cell) / 2;
- return SVG_HEAD + hubs.map((hub, i) => {
-  const x = (i % 2) * cell, y = top + Math.floor(i / 2) * cell, state = Object.keys(DOTS).find(tone => hub.states.includes(tone)), r = cell * 0.24;
-  const dot = state ? `<circle cx="${(x + cell - r).toFixed(2)}" cy="${(y + cell - r).toFixed(2)}" r="${r.toFixed(2)}" fill="${DOTS[state]}" stroke="#fff" stroke-width="${(cell / 16).toFixed(2)}"/>` : "";
-  return `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(cell / 32).toFixed(4)})">${glyph(hub.icon)}</g>${dot}`;
- }).join("") + "</svg>";
+ // Three or four: icons are mush at 24 px, so a matrix of dots only: one row per hub (tab order), one column per state
+ // (waiting, working, unseen); a faint ring marks an off state so each row stays visible.
+ const row = 32 / hubs.length, r = Math.min(4.6, row / 2 - 0.6);
+ return SVG_HEAD + hubs.map((hub, i) => ["waiting", "working", "unseen"].map((state, j) => {
+  const at = `cx="${5.5 + j * 10.5}" cy="${(row * i + row / 2).toFixed(2)}"`;
+  return hub.states.includes(state) ? `<circle ${at} r="${r.toFixed(2)}" fill="${DOTS[state]}"/>` : `<circle ${at} r="${(r - 0.5).toFixed(2)}" fill="none" stroke="${ICON_INK}" stroke-opacity=".35"/>`;
+ }).join("")).join("") + "</svg>";
 }
 
 // Coloured header-button icons (uxwing.com, free licence): [viewBox, inner SVG]; app.ts icon() prefers these over its line icons.
