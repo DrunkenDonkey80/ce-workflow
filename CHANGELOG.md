@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- Modified files in the sidebar file line show as +n in red, like the other counts.
+
+### Fixed
+- Claude refill marks (dotted lines on the 7d bar) no longer go missing for up to 30 minutes after a hub update.
+
 ## 0.1.71 — 2026-10-23
 
 ### Added

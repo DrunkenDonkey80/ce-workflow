@@ -630,8 +630,9 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 	const states = new Map<string, State>(providers.map(entry => [entry.id, { authenticated: false }]));
 	const timers = new Map<string, NodeJS.Timeout>();
 	const aborters = new Map<string, AbortController>();
+	// Bump the version whenever the cached window shape changes: an older hub's cache would hide new fields (refill marks) for up to 30 min.
 	const cacheFile = join(dataDir, "usage-cache.json");
-	let cache: { version: 1; providers: Record<string, { identityKey: string; fetchedAt: number; windows: Window[] }> } = { version: 1, providers: {} };
+	let cache: { version: 2; providers: Record<string, { identityKey: string; fetchedAt: number; windows: Window[] }> } = { version: 2, providers: {} };
 	let resolver: Promise<(provider: string) => Promise<Auth>> | undefined;
 	let stopped = true, sdkLogged = false;
 	const isHidden = (entry: { id: string }) => hidden().includes(entry.id);
@@ -639,7 +640,7 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 	async function loadCache() {
 		try {
 			const value = JSON.parse(await readFile(cacheFile, "utf8"));
-			if (value?.version === 1 && value.providers && typeof value.providers === "object") cache = value;
+			if (value?.version === 2 && value.providers && typeof value.providers === "object") cache = value;
 		} catch { /* Missing or corrupt cache: start empty. */ }
 	}
 	let saving = Promise.resolve();

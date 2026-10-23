@@ -1150,7 +1150,7 @@ type Group = { folder: string; label: string; git?: GitFiles | null; sessions: H
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
 // The open session's folder also gets the header's Pull / Commit / Commit and push as icons on the right; they click the header buttons.
 function gitLine(git?: GitFiles | null, own = false) {
- const parts = ([["added", "+", "added"], ["untracked", "+", "not in git yet"], ["modified", "~", "modified"], ["deleted", "×", "deleted"]] as const)
+ const parts = ([["added", "+", "added"], ["untracked", "+", "not in git yet"], ["modified", "+", "modified"], ["deleted", "×", "deleted"]] as const)
   .filter(([kind]) => git?.[kind]).map(([kind, sign, words]) => html("span", { className: "git-" + kind, textContent: sign + git![kind], title: `${git![kind]} ${words}` }));
  const actions = !own || !git ? [] : ([["git-pull", !!git.behind, "Pull latest"], ["git-commit", !!git.changed, "Commit"], ["git-push", !!(git.changed || git.ahead), "Commit and push"]] as const).filter(([, shown]) => shown).map(([id, , label]) => {
   const button = html("button", { type: "button", className: "session-git-action", title: label }); button.dataset.git = id;
