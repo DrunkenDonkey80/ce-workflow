@@ -51,6 +51,14 @@ fn local_hub_url() -> Option<String> {
     Some(format!("http://127.0.0.1:{port}/?token={key}"))
 }
 
+/// Hands an http(s)/mailto link to the OS default browser or mail app.
+fn open_external(url: &tauri::Url) {
+    if !matches!(url.scheme(), "http" | "https" | "mailto") { return }
+    #[cfg(windows)]
+    let _ = hidden(std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", url.as_str()])).spawn();
+    #[cfg(not(windows))]
+    let _ = std::process::Command::new("xdg-open").arg(url.as_str()).spawn();
+}
 #[cfg(windows)]
 fn hidden(command: &mut std::process::Command) -> &mut std::process::Command { use std::os::windows::process::CommandExt; command.creation_flags(0x0800_0000) }
 #[cfg(not(windows))]
@@ -133,8 +141,13 @@ async fn open(app: AppHandle, id: u32, url: String) -> Result<(), String> {
     if let Some(webview) = app.get_webview(&label) { return webview.navigate(url.parse().map_err(|_| "Bad link")?).map_err(|e| e.to_string()) }
     let window = app.get_window("main").ok_or("no window")?;
     let handle = app.clone();
-    let builder = WebviewBuilder::new(&label, WebviewUrl::External(url.parse().map_err(|_| "Bad link")?))
+    let hub: tauri::Url = url.parse().map_err(|_| "Bad link")?;
+    let (popup_hub, nav_hub) = (hub.origin(), hub.origin());
+    let builder = WebviewBuilder::new(&label, WebviewUrl::External(hub))
         .user_agent(&ua())
+        // Links off the hub (chat links, docs) open in the default browser; the hub's own popups (images, files) stay in the app.
+        .on_new_window(move |url, _| if url.origin() == popup_hub { tauri::webview::NewWindowResponse::Allow } else { open_external(&url); tauri::webview::NewWindowResponse::Deny })
+        .on_navigation(move |url| url.origin() == nav_hub || !matches!(url.scheme(), "http" | "https") || { open_external(url); false })
         .on_document_title_changed(move |webview, title| {
             strip_eval(&handle, format!("window.onTitle && onTitle({}, {})", json!(webview.label()), json!(title)));
         });

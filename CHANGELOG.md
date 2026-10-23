@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.73 — 2026-10-23
+
+### Fixed
+- Desktop app: links in the chat that point outside the hub open in your default browser instead of doing nothing. The hub's own images and files still open inside the app.
+
 ## 0.1.72 — 2026-10-23
 
 ### Added
