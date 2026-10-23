@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T06:10:17.999Z
+updated: 2026-10-23T06:43:48.727Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -116,11 +116,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 - [x] **A-01** Rust stable 1.99.1 (MSVC, per-user via winget rustup), VS 2026 C++ workload and tauri-cli 2.12.4 installed.
 - [x] **A-01H** User approved UAC; C++ workload added to the existing VS Community 2026 instead of separate VS 2022 Build Tools.
-- [ ] **A-02** Spike in `hub/app/src-tauri`: one window, two child webviews, title hook, set_icon, overlay, tray, focus-scoped Ctrl+1/2.
-  - Load the local hub and a second hub URL; flip states by asking a test question; record which of window icon, overlay icon and tray icon change live.
-  - Record whether `unstable` multiwebview resizes and switches cleanly; if not, take the D6 fallback and note it in Amendments.
-  - Record what a pinned taskbar button shows while running: the live window icon or the shortcut's icon (sources disagree).
-  - Check: C5 builds; findings written under this step.
+- [x] **A-02** Spike in hub/app/src-tauri: multiwebview tabs, title hook, live window/overlay/tray icons, Ctrl+N, hide-to-tray all work; D6 kept; pinned buttons need the overlay.
 - [ ] **A-03** Mock the combined icon for 1 to 6 hubs at 16, 24, 32 and 48 px and show it to the user.
   - Add `hubsIconSvg(hubs)` to `hub/web/icons.ts`; a throwaway page in the research temp folder renders the grid at each size.
   - Then ask, with the rendered sizes: the maximum hubs in the taskbar icon (4 or 6), and what the 16 px tray icon shows (combined grid, or one icon with merged dots).

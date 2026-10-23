@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "strip",
+  "description": "Only the local tab strip gets IPC; hub pages are remote and get none (D5).",
+  "webviews": ["strip"],
+  "permissions": ["core:default"]
+}
