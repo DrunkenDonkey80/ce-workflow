@@ -117,9 +117,10 @@ fn local_url() -> Option<String> { local_hub_url() }
 fn staged() -> bool { next_file().exists() }
 /// Saves the tab list (order, names, remote links) next to the hub's hubData.
 #[tauri::command]
-fn save(hubs: Value) -> Result<(), String> {
+fn save(hubs: Value) -> Result<(), String> { save_key("hubs", hubs) }
+fn save_key(key: &str, data: Value) -> Result<(), String> {
     let mut value = app_config();
-    value["hubs"] = hubs;
+    value[key] = data;
     let path = install_dir().join("app.json");
     let temp = path.with_extension("json.tmp");
     std::fs::write(&temp, serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
@@ -208,6 +209,10 @@ fn restart(app: &AppHandle) {
 }
 
 fn main() {
+    // Windows 11 draws a Start Menu shortcut's icon for any window it matches to that shortcut (by exe path) and ignores
+    // WM_SETICON. An explicit app ID that no shortcut carries keeps the live hub grid on the taskbar.
+    #[cfg(windows)]
+    unsafe { windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(windows_sys::core::w!("dev.ce-workflow.pi-hub-app.live")); }
     let error = swap_staged().err();
     let start_hidden = std::env::args().any(|a| a == "--hidden");
     let app = tauri::Builder::default()
@@ -222,11 +227,17 @@ fn main() {
         .setup(move |app| {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());
-            let window = WindowBuilder::new(app, "main").title("Pi Hub").inner_size(1200.0, 800.0).visible(!start_hidden).build()?;
+            let window = WindowBuilder::new(app, "main").title("Pi Hub").inner_size(1200.0, 800.0).maximized(app_config()["maximized"] == true).visible(!start_hidden).build()?;
             window.add_child(WebviewBuilder::new("strip", WebviewUrl::App("index.html".into())), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1200.0, STRIP))?;
             let handle = app.handle().clone();
             window.on_window_event(move |event| match event {
-                WindowEvent::Resized(_) => layout(&handle),
+                WindowEvent::Resized(_) => {
+                    layout(&handle);
+                    // Remember maximized for the next start; minimizing also resizes, so it doesn't count.
+                    if let Some(w) = handle.get_window("main") {
+                        if let (Ok(false), Ok(max)) = (w.is_minimized(), w.is_maximized()) { if app_config()["maximized"] != max { let _ = save_key("maximized", json!(max)); } }
+                    }
+                }
                 // D9: close hides to the tray so the dots stay live; Quit is in the tray menu.
                 WindowEvent::CloseRequested { api, .. } => { api.prevent_close(); if let Some(w) = handle.get_window("main") { let _ = w.hide(); } }
                 // D3: Ctrl+1..9 only while the app has focus; the strip ignores numbers past its last tab.

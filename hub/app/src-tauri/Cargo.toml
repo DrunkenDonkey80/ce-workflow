@@ -1,6 +1,6 @@
 [package]
 name = "pi-hub-app"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 
 [build-dependencies]
@@ -13,7 +13,7 @@ serde_json = "1"
 tauri-plugin-single-instance = "2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }
 
 [profile.release]
 opt-level = "s"

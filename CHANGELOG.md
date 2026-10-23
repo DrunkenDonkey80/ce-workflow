@@ -13,6 +13,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Hub: ⚙ → Desktop app → Update works like the tray's Restart to update. It downloads the new build if needed and restarts a running app into it. The button no longer greys out once the build is downloaded.
 
 ### Fixed
+- Desktop app 0.1.3: the taskbar button now shows your hubs' icons with their dots and follows icon changes. Since install added a Start Menu shortcut, Windows had drawn that shortcut's fixed PC icon instead.
+- Desktop app 0.1.3: the window remembers whether it was maximized and opens that way next time.
 - Hub: a message you already sent no longer comes back in the box after the app or the browser closes abruptly.
 
 ## 0.1.69 — 2026-10-23
