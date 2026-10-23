@@ -57,6 +57,10 @@
      <div class="menu-field menu-field-top" title="Checked hourly"><div id="update-list" class="update-list"></div><button type="button" id="update-check">Check now</button></div>
      <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button></div>
     </section>
+    <section class="settings-group" id="app-group" aria-labelledby="set-app" hidden><h3 id="set-app">Desktop app</h3>
+     <div class="menu-field menu-field-top"><div id="app-status" class="update-list"></div><label id="app-login-field" title="Starts the app hidden in the tray when you log in"><input type="checkbox" id="app-login"> Start at login</label></div>
+     <div class="settings-actions" id="app-actions"><button type="button" id="app-install" title="Downloads the pinned build, checks its SHA-256 and installs it for this user">Install</button><button type="button" id="app-uninstall" title="Removes the app, its Start-menu entry and its login start">Uninstall</button></div>
+    </section>
    </div>
    <div id="plan-menu" class="status-menu" role="group" aria-label="Plans and plan actions" hidden>
     <div id="plan-list" class="plan-list"></div><hr id="plan-divider" hidden>

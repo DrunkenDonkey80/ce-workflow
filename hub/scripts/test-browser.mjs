@@ -104,7 +104,8 @@ await new Promise(done => relay.listen(0, "127.0.0.1", done));
 process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} }, pool: { available: true, daemon: () => undefined, view: async () => stub("/api/pool", {}), action: async data => stub("/api/pool", data), start() {}, stop() {} } });
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} }, pool: { available: true, daemon: () => undefined, view: async () => stub("/api/pool", {}), action: async data => stub("/api/pool", data), start() {}, stop() {} },
+ app: { status: () => ({ supported: true, installed: true, version: "0.1.0", staged: null, latest: "0.2.0", running: false, login: true }), install() {}, stage: () => ({ supported: true, installed: true, version: "0.1.0", staged: "0.2.0", latest: "0.2.0", running: false, login: true }), uninstall() {}, setLogin() {} } });
 const origin = `http://127.0.0.1:${hub.config.port}`;
 const own = await hub.host.create(folder, "1"), id = own.id, rpc = () => hub.host.live.get(id).rpc;
 const publish = (event, value) => hub.views.get(id)?.publish(event, value);
@@ -578,6 +579,11 @@ try {
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary"); assert.deepEqual(answers.at(-1).answers[2].response.selections, ["Session"]);
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
+ // H-04 (C3): this PC's page shows the Desktop app row; Update stages the newer pin.
+ await browser("wait", "--fn", "document.getElementById('app-status').textContent === 'Installed 0.1.0 · 0.2.0 available'");
+ assert.deepEqual(await evaluate("[document.getElementById('app-group').hidden, document.getElementById('app-install').textContent, document.getElementById('app-login').checked]"), [false, "Update", true]);
+ await browser("click", "#app-install");
+ await browser("wait", "--fn", "document.getElementById('app-status').textContent.includes('0.2.0 ready')");
  assert.match(await evaluate("document.getElementById('hub-version').textContent"), /^Version: \d+\.\d+\.\d+$/, "settings name the version");
  { // Install app: the page links a manifest whose start URL and icon work locally; the icon is the picked one.
   const manifest = await evaluate("fetch(document.querySelector('link[rel=manifest]').href).then(r => r.json())");

@@ -16,6 +16,8 @@ import { Scheduler, timerInput } from "./scheduler.ts";
 import { createUsage, USAGE_PROVIDERS, type Usage, type UsageOptions } from "./usage.ts";
 import { createPool, type Pool } from "./pool.ts";
 import { createUpdateCheck, type UpdateCheck } from "./update-check.ts";
+import { createAppInstall } from "./app-install.ts";
+import { isWsl } from "./platform.ts";
 import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { clipboardFiles } from "./images.ts";
@@ -88,7 +90,7 @@ function envCommand(): string[] | undefined {
 	try { return JSON.parse(value); } catch { throw new Error("PI_HUB_PI_COMMAND must be a JSON array of strings."); }
 }
 
-export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined } = {}) {
+export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined, app = undefined as ReturnType<typeof createAppInstall> | undefined } = {}) {
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
@@ -278,6 +280,20 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					writeJsonAtomic(configPath(), config);
 					return send(200, pageApi.settings());
 				}
+				if (endpoint === "app") {
+					// D7: the app installs onto this PC's disk, so only this PC's own page: not remote, not proxied by tailscale serve, from loopback.
+					const loopback = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(request.socket.remoteAddress ?? "");
+					if (remote || !loopback || request.headers["x-forwarded-proto"] !== undefined || request.headers["tailscale-user-login"] !== undefined) return send(403, { error: "The desktop app is managed from this PC's hub page only." });
+					if (!app) return send(200, { supported: false, note: "This hub does not manage the desktop app.", installed: false, version: null, staged: null, latest: null, running: false, login: false });
+					try {
+						if (data.action === "status") return send(200, app.status());
+						if (data.action === "install") return send(200, await app.install());
+						if (data.action === "update") return send(200, await app.stage());
+						if (data.action === "uninstall") return send(200, app.uninstall());
+						if (data.action === "login" && typeof data.on === "boolean") return send(200, app.setLogin(data.on));
+					} catch (error) { return send(409, { error: (error as Error).message }); }
+					return send(400, { error: "Unknown app action." });
+				}
 				if (endpoint === "hub") {
 					// Maintenance runs outside this service so systemd cannot kill it when the hub stops.
 					// update: --yes because the page asked already; Pi outside the hub keeps its old version (the log lists them).
@@ -392,7 +408,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 
 if (import.meta.main) {
 	const { openInBrowser } = await import("./platform.ts");
-	const hub = await startHub({ openUrl: openInBrowser, updates: createUpdateCheck() });
+	const hub = await startHub({ openUrl: openInBrowser, updates: createUpdateCheck(), app: createAppInstall({ dataDir: hubDataDir(), wsl: isWsl() }) });
 	console.log(`pi-control-hub ${process.pid} on http://127.0.0.1:${hub.config.port} (restored ${hub.restored.length})`);
 	const remote = hub.remote();
 	if (hub.imported) console.log(`imported ${hub.imported} paired device(s) from ce-workflow`);

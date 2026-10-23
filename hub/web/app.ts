@@ -1631,6 +1631,27 @@ $("update-check").addEventListener("click", async () => {
  try { hubSettings = await post("hub", { action: "check-updates" }) as HubSettings; } catch (error) { showNotice(error.message); }
  renderUpdates();
 });
+// H-04 (D7): the Desktop app row lives on this PC's own page only; a remote page has no key and never shows it.
+type AppStatus = { supported: boolean; note?: string; installed: boolean; version: string | null; staged: string | null; latest: string | null; running: boolean; login: boolean };
+function renderApp(app: AppStatus) {
+ $("app-group").hidden = false;
+ const newer = !!app.latest && app.latest !== app.version && app.latest !== app.staged;
+ $("app-status").textContent = !app.supported ? app.note ?? "" : !app.installed ? (app.latest ? `Not installed · ${app.latest} available` : "No app release is pinned yet.")
+  : `Installed ${app.version}` + (app.staged ? ` · ${app.staged} ready: Restart to update in the tray` : newer ? ` · ${app.latest} available` : "") + (app.running ? " · running" : "");
+ $("app-login-field").hidden = $("app-actions").hidden = !app.supported;
+ ($("app-login") as HTMLInputElement).checked = app.login; ($("app-login") as HTMLInputElement).disabled = !app.installed;
+ const install = $("app-install") as HTMLButtonElement;
+ install.textContent = app.installed ? "Update" : "Install"; install.disabled = app.installed ? !newer : !app.latest;
+ $("app-uninstall").hidden = !app.installed;
+}
+async function appAction(body: Record<string, unknown>, busy?: string) {
+ if (busy) $("app-status").textContent = busy;
+ try { renderApp(await post("app", body)); } catch (error) { showNotice(error.message); void appAction({ action: "status" }); }
+}
+$("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) void appAction({ action: "status" }); });
+$("app-install").addEventListener("click", () => void appAction({ action: $("app-install").textContent === "Update" ? "update" : "install" }, "Downloading…"));
+$("app-uninstall").addEventListener("click", () => void appAction({ action: "uninstall" }));
+$("app-login").addEventListener("change", () => void appAction({ action: "login", on: ($("app-login") as HTMLInputElement).checked }));
 function renderNotify() {
  const notify = hubSettings.notify ?? { question: true, done: true };
  ($("notify-question") as HTMLInputElement).checked = notify.question; ($("notify-done") as HTMLInputElement).checked = notify.done;

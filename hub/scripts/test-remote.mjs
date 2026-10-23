@@ -31,20 +31,24 @@ const run = async (command, args) => {
 };
 const opened = [];
 mock.timers.enable({ apis: ["setInterval"] });
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url) });
+// H-04 (C9): a spy app installer; any call that is not status would change files or the login entry.
+const appCalls = [];
+const spy = name => (...args) => { appCalls.push(name); return { supported: true, installed: false, version: null, staged: null, latest: "0.1.0", running: false, login: false, args }; };
+const app = { status: spy("status"), install: spy("install"), stage: spy("stage"), uninstall: spy("uninstall"), setLogin: spy("login") };
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url), app });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {
 	const response = await fetch(`http://127.0.0.1:${port}${route}`, { method: body ? "POST" : "GET", headers: { "x-hub-key": localKey, "content-type": "application/json" }, body: body && JSON.stringify(body) });
 	return { status: response.status, body: await response.json() };
 };
 // What tailscale serve forwards: the tailnet Host, https proto and the verified login. fetch cannot set Host, so http.request.
-const remote = (route, { method = "GET", cookie, login = "me@example.com", proto = "https", origin = method === "POST" ? remoteOrigin : undefined, stream = false } = {}) => new Promise((resolve, reject) => {
-	const headers = { host: remoteHost, "x-forwarded-proto": proto, "tailscale-user-login": login, "user-agent": "Mozilla/5.0 (iPhone) Safari/1", ...(cookie ? { cookie: `pi_remote=${cookie}` } : {}), ...(origin ? { origin } : {}) };
+const remote = (route, { method = "GET", cookie, login = "me@example.com", proto = "https", origin = method === "POST" ? remoteOrigin : undefined, stream = false, body } = {}) => new Promise((resolve, reject) => {
+	const headers = { ...(body ? { "content-type": "application/json" } : {}), host: remoteHost, "x-forwarded-proto": proto, "tailscale-user-login": login, "user-agent": "Mozilla/5.0 (iPhone) Safari/1", ...(cookie ? { cookie: `pi_remote=${cookie}` } : {}), ...(origin ? { origin } : {}) };
 	const request = http.request({ host: "127.0.0.1", port, path: route, method, headers }, response => {
 		if (stream) return resolve(response);
 		let text = ""; response.on("data", chunk => text += chunk); response.on("end", () => resolve({ status: response.statusCode, headers: response.headers, text, json: () => JSON.parse(text) }));
 	});
-	request.on("error", reject); request.end();
+	request.on("error", reject); request.end(body && JSON.stringify(body));
 });
 
 try {
@@ -122,6 +126,22 @@ try {
 	assert.equal((await remote("/api/devices", { cookie })).status, 403, "devices are managed on the local hub only");
 	assert.equal((await remote(`/s/${id}/api/snapshot`, { cookie, login: "other@example.com" })).status, 403, "the cookie is bound to the owner login");
 	assert.equal((await remote("/pair/start", { method: "POST", cookie })).json().paired, true);
+
+	// D7: the Desktop app routes answer this PC's own page only. A paired phone, even holding the local key, is refused,
+	// and so is a missing or wrong key; none of them reaches the installer.
+	for (const action of ["install", "uninstall", "update"]) {
+		assert.equal((await remote(`/s/${id}/api/app`, { method: "POST", cookie, body: { action } })).status, 403, `paired remote ${action}`);
+		assert.equal((await remote(`/s/${id}/api/app?token=${localKey}`, { method: "POST", cookie, body: { action } })).status, 403, "remote with the local key");
+	}
+	assert.equal((await remote(`/s/${id}/api/app`, { method: "POST", body: { action: "login", on: false } })).status, 401, "unpaired remote");
+	for (const key of [undefined, "wrong"]) {
+		const response = await fetch(`http://127.0.0.1:${port}/s/${id}/api/app`, { method: "POST", headers: { ...(key ? { "x-hub-key": key } : {}), "content-type": "application/json" }, body: JSON.stringify({ action: "install" }) });
+		assert.equal(response.status, 401, `key ${key}`);
+	}
+	assert.deepEqual(appCalls, [], "no refused request reached the installer");
+	assert.equal((await local(`/s/${id}/api/app`, { action: "status" })).body.latest, "0.1.0", "the local page reaches it");
+	assert.equal((await local(`/s/${id}/api/app`, { action: "login", on: "yes" })).status, 400);
+	assert.deepEqual(appCalls, ["status"]);
 
 	// Revoke: refused at once, and an open event stream is closed.
 	const devices = (await local("/api/devices")).body.devices;

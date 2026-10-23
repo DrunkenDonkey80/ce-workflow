@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T06:58:18.794Z
+updated: 2026-10-23T07:02:33.162Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -126,10 +126,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 - [x] **H-01** hubsIconSvg in icons.ts plus hub/app/build-icons.mjs (strips icons.ts → ui/icons.js, gitignored), run automatically as Tauri's beforeBuildCommand.
 - [x] **H-02** In-app title line `pi-hub-state {icon,name,states}` (UA PiHubApp/), hostname in settings, own unseen included, snapshot/SSE reconnect no longer clears unseen, app polls every 5 s hidden.
 - [x] **H-03** hub/src/app-install.ts: status/install/stage/uninstall/setLogin; installed.json tracks version+staged (a vanished .next means the app swapped); app.lock pid = running; app.json carries hubData; release.json missing = "no release pinned yet".
-- [ ] **H-04** Settings API and UI row "Desktop app": Install, Update, Uninstall, version, and the "Start at login" switch (D10); local page only (D7).
-  - On WSL the row shows only the D13 note; the action routes refuse there (C9 or C10 case).
-  - Remote pages never see the row; the action route is gated on the request being local (not only on the key), so a paired remote device cannot install, uninstall or change the login entry.
-  - Check: C3 for the row on local and its absence on remote; C9 for paired remote, remote with a local token, and missing/wrong key: each refused with no file or login-entry change; C6 shot of the row.
+- [x] **H-04** POST /s/<id>/api/app (status/install/update/uninstall/login) refused unless non-remote, loopback and not tailscale-forwarded; gear "Desktop app" section (status line, Install/Update, Uninstall, Start at login) fetched only when the page has the local key; WSL shows the D13 note.
 - [ ] **H-05** Hourly check: when the installed app version differs from `release.json`, download and stage it (D4); skipped on WSL (D13).
   - Check: C2 with a fake pin; staged file present, running file untouched.
 
