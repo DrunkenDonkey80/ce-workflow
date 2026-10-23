@@ -98,7 +98,7 @@ function renderShell() {
  // The hub reads git on each status (run end, model change) and fetches in the background.
  const git = status?.git, busy = !state.connected || messageSending || !!state.activity.working || promptView.busy;
  $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead; $("git-pull").hidden = !git?.behind;
- $("git-pull").textContent = git?.behind ? `Pull latest (${git.behind})` : "Pull latest";
+ $("git-pull-text").textContent = git?.behind ? `Pull latest (${git.behind})` : "Pull latest";
  for (const id of ["git-pull", "git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
  renderCommands(status?.commands ?? [], busy);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
