@@ -1190,6 +1190,8 @@ async function loadSessions() {
   const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
   hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders(); renderNotify(); renderUpdates(); checkWhatsNew();
   notifyChanges(groups);
+  // A run that finished here turns blue too; it clears only once this page is in front of the user.
+  if (visible && document.hasFocus() && groups.some(group => group.sessions.some(session => session.id === sessionId && session.tone === "unseen"))) void post("seen", {}).catch(() => {});
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
@@ -1377,6 +1379,7 @@ $("switcher-toggle").addEventListener("click", () => toggleSwitcher($("switcher"
 $("switcher").addEventListener("keydown", event => { if (event.key === "Escape" && $("switcher").dataset.open === "true") { event.stopPropagation(); toggleSwitcher(false); $("switcher-toggle").focus(); } });
 toggleSwitcher(localStorage.getItem("plan3-switcher") !== "closed");
 document.addEventListener("visibilitychange", () => void loadSessions());
+window.addEventListener("focus", () => void loadSessions()); // clears this session's blue once you look at it
 void loadSessions();
 // Subscription usage: one bar per provider (7d left, coloured like the footer, warnings in their colour);
 // tapping one opens its window: every quota window as a bar, the pool's notes and, for Claude, the account pool.

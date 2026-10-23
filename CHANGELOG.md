@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+- Hub: a session that finishes stays blue until you look at it, even when a page has it open in a background tab, a minimized app or on another device.
+
 ## 0.1.63 — 2026-10-22
 
 ### Changed

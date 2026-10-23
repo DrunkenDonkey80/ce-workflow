@@ -133,7 +133,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		});
 	}
 
-	// H5-05: the session bar. A run that ends with no page watching stays "unseen" until a page opens the session.
+	// H5-05: the session bar. A finished run stays "unseen" until a page opens the session or shows it in front of the user.
 	const unseen = new Set<string>();
 	const seen = (id: string) => unseen.delete(id);
 	function tone(id: string) {
@@ -243,6 +243,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	async function post(id: string, endpoint: string, data: Record<string, unknown>, remote = false): Promise<unknown> {
 		switch (endpoint) {
 			case "session": return session(data);
+			case "seen": seen(id); return { ok: true }; // the page showing this session is visible and focused
 			case "message":
 				// RPC has no reload; D12: Reload is park + resume (idle only).
 				if (typeof data.text === "string" && /^\/(wo )?reload$/.test(data.text.trim())) { await host.restart(id); return { ok: true }; }
@@ -335,7 +336,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// Live frames ce-workflow's own server sent: status after runs and mode changes, Pi's plan, changed diagrams.
 	host.on("event", (id: string, event: RpcRecord) => {
 		if (event.type !== "agent_settled") return;
-		if (!views.get(id)?.clients.size) unseen.add(id);
+		unseen.add(id); // an open page in a background tab, a minimized app or another device has not shown it to anyone
 		if (views.has(id)) void publishStatus(id).catch(() => {});
 	});
 	host.on("closed", (id: string, requestId: string) => views.get(id)?.publish("dialog_closed", { askId: requestId }));
