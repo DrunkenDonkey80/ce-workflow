@@ -137,7 +137,8 @@
    <form id="composer" class="composer">
     <div id="mentions" class="mentions" aria-label="Mentioned elements"></div>
     <div id="slash-menu" class="slash-menu" role="listbox" aria-label="Commands" hidden></div>
-    <textarea id="message-input" rows="4" maxlength="20000" placeholder="Ask about the architecture…" aria-label="Message to Pi" aria-describedby="input-help"></textarea>
+    <div class="input-wrap"><div class="history-nav" title="Your earlier messages (↑ twice at the start of the box, ↓ at its end)"><button id="history-older" type="button" aria-label="Older message">▲</button><button id="history-newer" type="button" aria-label="Newer message">▼</button><span id="history-when"></span></div>
+    <textarea id="message-input" rows="4" maxlength="20000" placeholder="Ask about the architecture…" aria-label="Message to Pi" aria-describedby="input-help"></textarea></div>
     <div class="composer-actions">
      <span id="input-help" class="input-help">Ctrl+click a box to mention it</span>
      <label class="attach button" title="Attach files (or drop or paste them into the chat)">File<input id="attach" type="file" multiple hidden></label>

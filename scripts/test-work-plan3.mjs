@@ -613,10 +613,10 @@ try {
 		const press = (key) => shortcuts.get(key).handler(ctx);
 		await press("alt+=");
 		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "high"], "Think:Task switches at once");
-		assert.match(statuses.at(-1), /\x1b\[38;5;151m\[Think:Task\]/);
+		assert.match(statuses.at(-1), /\x1b\[38;5;151m\[Thinker \(Task\)\]/);
 		await press("alt+=");
 		await press("alt+=");
-		assert.match(statuses.at(-1), /\x1b\[32m\[Think:Plan\]/, "clamped at Think:Plan");
+		assert.match(statuses.at(-1), /\x1b\[32m\[Thinker \(Plan\)\]/, "clamped at Think:Plan");
 		await press("alt+-");
 		await writeFile(thinkFile, (await readFile(thinkFile, "utf8")).replace("- [ ] **T-02** Code it", "- [x] **T-02** Code it\n\n### P3 — More [code]\n\n- [ ] **T-03** More"));
 		await hooks.get("turn_end")({}, ctx);
@@ -624,17 +624,17 @@ try {
 		assert.doesNotMatch(statuses.at(-1), /\[Think/);
 		await press("alt+-");
 		await press("alt+-");
-		assert.match(statuses.at(-1), /\x1b\[31m\[Work:Plan\]/);
+		assert.match(statuses.at(-1), /\x1b\[31m\[Worker \(Plan\)\]/);
 		// The session remembers it: a Plan level set on another plan, or the plan-less Work/Think, carries over.
 		{ const real = ctx.sessionManager.getBranch, last = real().findLast((entry) => entry.customType === "plan3-bias");
 		  ctx.sessionManager.getBranch = () => [...real(), { type: "custom", customType: "plan3-bias", data: { ...last.data, id: "00000000" } }];
-		  await hooks.get("turn_end")({}, ctx); assert.match(statuses.at(-1), /\[Work:Plan\]/, "Plan level carries to another plan");
+		  await hooks.get("turn_end")({}, ctx); assert.match(statuses.at(-1), /\[Worker \(Plan\)\]/, "Plan level carries to another plan");
 		  ctx.sessionManager.getBranch = () => [...real(), { type: "custom", customType: "plan3-bias", data: { id: null, level: 1 } }];
-		  await hooks.get("turn_end")({}, ctx); assert.match(statuses.at(-1), /\[Think:Plan\]/, "session Think becomes Think:Plan");
+		  await hooks.get("turn_end")({}, ctx); assert.match(statuses.at(-1), /\[Thinker \(Plan\)\]/, "session Think becomes Think:Plan");
 		  ctx.sessionManager.getBranch = real; }
 		await press("alt+=");
 		await press("alt+=");
-		assert.doesNotMatch(statuses.at(-1), /\[(?:Work|Think):/, "level 0 shows nothing");
+		assert.doesNotMatch(statuses.at(-1), /\[(?:Worker|Thinker) /, "level 0 shows nothing");
 		await run("resume3", "7e7e7e7e");
 		assert.doesNotMatch(messages.at(-1).message, /before executing, tag phases/, "tagged phases need no tagging turn");
 		// Finished phases ([x] steps) never need tags, so they do not trigger a tagging run.

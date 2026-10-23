@@ -30,9 +30,9 @@ const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; s
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
-const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 0: "Normal", 1: "Think:Task", 2: "Think:Plan" };
-// Without a plan the bias is per session: Think / Normal / Work.
-const SESSION_BIAS = { "-1": "Work", 0: "Normal", 1: "Think" };
+const BIAS_LABEL = { "-2": "Worker (Plan)", "-1": "Worker (Task)", 0: "Default", 1: "Thinker (Task)", 2: "Thinker (Plan)" };
+// Without a plan the bias is per session: Thinker / Default / Worker.
+const SESSION_BIAS = { "-1": "Worker", 0: "Default", 1: "Thinker" };
 const biasNow = () => state.plan ? state.plan.bias ?? 0 : (state.status as { modes?: { bias?: number } })?.modes?.bias ?? 0;
 // Context fills toward the compaction border, not the model window.
 const COMPACT_AT = 200_000;
@@ -48,8 +48,10 @@ let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
 const inApp = () => navigator.userAgent.includes("PiHubApp/");
 // Small line icons for the header buttons; each has its own colour in styles.css (.ui-icon[data-icon]).
 const ICON_PATHS: Record<string, string> = {
- model: '<path d="M8 3.5a2.5 2.5 0 0 0-4.6 1.3A2.5 2.5 0 0 0 2.5 9 2.5 2.5 0 0 0 5 12.6 2 2 0 0 0 8 13.5zM8 3.5a2.5 2.5 0 0 1 4.6 1.3A2.5 2.5 0 0 1 13.5 9a2.5 2.5 0 0 1-2.5 3.6 2 2 0 0 1-3 .9zM8 3.5v10"/>',
- context: '<rect x="3" y="2.5" width="10" height="12" rx="1.5"/><path d="M5.5 1v3M8 1v3M10.5 1v3M5.5 8h5M5.5 11h3"/>',
+ model: '<rect x="4" y="4" width="8" height="8" rx="1"/><rect x="6.5" y="6.5" width="3" height="3"/><path d="M6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5"/>',
+ context: '<path d="M2.5 4.5h11l-1.4 9.2a1 1 0 0 1-1 .8H4.9a1 1 0 0 1-1-.8z"/><path d="M2.5 4.5a5.5 2 0 0 1 11 0"/><path d="M4 8.5h8"/>',
+ // A worker digging: head, bent body, the shovel's shaft and blade in the ground.
+ bias: '<circle cx="5" cy="2.8" r="1.5"/><path d="M5.5 5 7.5 9l-2.5 2.5L4 15M7.5 9l2 6M6 6.5l4.5 1.5M9 3.5l3.5 8.5"/><path d="m11.3 12.3 2.6-1 .9 2.3-2.4 1z"/>',
  think: '<circle cx="8" cy="8" r="6.5"/><path d="M6 6.3a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.3v.4"/><path d="M8 11.8v.1"/>',
  research: '<path d="M3 1.5h7.5l2.5 2.5v4M3 1.5v13h5"/><path d="M5.5 5h4M5.5 8h2"/><circle cx="11" cy="11.5" r="2.3"/><path d="m12.7 13.2 1.8 1.8"/>',
  night: '<path d="M13.5 9.8A6 6 0 1 1 6.2 2.5a4.7 4.7 0 0 0 7.3 7.3z"/>',
@@ -81,7 +83,7 @@ function renderShell() {
  const used = typeof status?.tokens === "number" ? status.tokens / (researching && status.window ? status.window : Math.min(COMPACT_AT, status.window || COMPACT_AT)) * 100 : status?.context ?? 0;
  setBar($("context-button"), used, used >= 90 ? "error" : used >= 70 ? "warning" : "accent");
  $("context-button").replaceChildren(icon("context"), html("span", { className: "context-label", textContent: "Context: " }), (status?.window ? (typeof status.tokens === "number" ? (status.estimated ? "~" : "") + short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—")); // the phone drawer hides the label
- $("bias-button").replaceChildren(icon("think"), (plan ? BIAS_LABEL : SESSION_BIAS)[biasNow()] ?? "Normal");
+ $("bias-button").replaceChildren(icon("bias"), (plan ? BIAS_LABEL : SESSION_BIAS)[biasNow()] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
  $("bias-button").disabled = !state.connected;
  // The plan bar names the plan; only the title part truncates, the count stays visible.
@@ -221,7 +223,7 @@ setLeft(leftChoice);
 const CHAT_VIEWS = ["expanded", "thinking", "compact"], CHAT_LABEL = { expanded: "Full", thinking: "Thinking", compact: "Compact" };
 function setChatView(view: string) {
  for (const name of CHAT_VIEWS.slice(1)) document.documentElement.classList.toggle("chat-" + name, view === name);
- for (const id of ["chat-compact", "chat-compact-m"]) { $(id).setAttribute("aria-pressed", String(view !== "expanded")); $(id).textContent = (id === "chat-compact-m" ? "▤ Chat: " : "") + CHAT_LABEL[view]; }
+ for (const id of ["chat-compact", "chat-compact-m"]) { $(id).setAttribute("aria-pressed", String(view !== "expanded")); $(id).replaceChildren(icon("think"), (id === "chat-compact-m" ? "Chat: " : "") + CHAT_LABEL[view]); }
  if (view === "thinking") for (const item of document.querySelectorAll<HTMLDetailsElement>(".block-change[open]")) item.open = false;
  try { localStorage.setItem("plan3-chat", view); } catch { /* private mode: the view just is not remembered */ }
 }
@@ -1013,12 +1015,26 @@ $("message-input").addEventListener("keydown", event => {
  // Prompt history: ↑ at the very start of the box steps back through this session's prompts, ↓ at the very end steps forward.
  const box = $("message-input"), atStart = box.selectionStart === 0 && box.selectionEnd === 0, atEnd = box.selectionStart === box.value.length;
  if (event.altKey || event.shiftKey || event.ctrlKey) return;
+ // Leaving the draft takes a second ↑ at the start, so reaching the top never jumps away by accident.
+ const armed = historyArmed; historyArmed = false;
+ if (event.key === "ArrowUp" && atStart && historyAt === -1 && prompts().length && !armed) { event.preventDefault(); historyArmed = true; return; }
  if (event.key === "ArrowUp" && atStart && historyAt !== 0 && prompts().length) { event.preventDefault(); showHistory(historyAt === -1 ? prompts().length - 1 : historyAt - 1, 0); }
  if (event.key === "ArrowDown" && atEnd && historyAt !== -1) { event.preventDefault(); showHistory(historyAt + 1 < prompts().length ? historyAt + 1 : -1, -1); }
 });
 // historyAt: the prompt shown from history (-1 = the user's own draft). The last prompt, when its run was stopped
 // (aborted), opens in edit mode (orange): sending first takes it and everything after it out of the context.
-let historyAt = -1, historyDraft = "";
+let historyAt = -1, historyDraft = "", historyArmed = false;
+$("message-input").addEventListener("pointerdown", () => { historyArmed = false; });
+$("message-input").addEventListener("focus", renderHistoryNav);
+// The ▲/▼ beside the box step through the same history with one click.
+$("history-older").addEventListener("click", () => { if (prompts().length && historyAt !== 0) showHistory(historyAt === -1 ? prompts().length - 1 : historyAt - 1, -1); $("message-input").focus(); });
+$("history-newer").addEventListener("click", () => { if (historyAt !== -1) showHistory(historyAt + 1 < prompts().length ? historyAt + 1 : -1, -1); $("message-input").focus(); });
+function renderHistoryNav() {
+ const shown = historyAt === -1 ? undefined : prompts()[historyAt], time = Number(/^user_(\d+)/.exec(shown?.id ?? "")?.[1]);
+ ($("history-older") as HTMLButtonElement).disabled = !prompts().length || historyAt === 0;
+ ($("history-newer") as HTMLButtonElement).disabled = historyAt === -1;
+ $("history-when").textContent = shown ? (time > 1e12 ? whenText(time) : "earlier message") : "";
+}
 // shortcut: only prompts loaded in the page, and a long prompt's 2 KB excerpt; load earlier rows or the full row if that bites.
 const prompts = () => [...chat.values()].filter(row => row.role === "user");
 function lastStopped() {
@@ -1030,7 +1046,7 @@ function showHistory(at: number, caret: number) {
  if (historyAt === -1) historyDraft = box.value;
  historyAt = at; box.value = at === -1 ? historyDraft : prompts()[at].text;
  const editing = at !== -1 && at === prompts().length - 1 && lastStopped();
- box.classList.toggle("editing-last", editing); box.title = editing ? "Editing your stopped last message: Send replaces it and what followed it" : "";
+ box.classList.toggle("editing-last", editing); box.classList.toggle("from-history", at !== -1 && !editing); renderHistoryNav(); box.title = editing ? "Editing your stopped last message: Send replaces it and what followed it" : "";
  box.setSelectionRange(caret === -1 ? box.value.length : caret, caret === -1 ? box.value.length : caret);
  box.dispatchEvent(new Event("input"));
 }
@@ -1044,7 +1060,7 @@ $("composer").addEventListener("submit", async event => {
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
  const replacing = $("message-input").classList.contains("editing-last") ? prompts().at(-1)?.text : undefined;
- historyAt = -1; $("message-input").classList.remove("editing-last"); $("message-input").title = "";
+ historyAt = -1; $("message-input").classList.remove("editing-last", "from-history"); $("message-input").title = ""; renderHistoryNav();
  try {
   if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; saveDraft(); renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
  catch (error) { expectWork(false); showNotice(error.message + ". Your message draft is kept."); }

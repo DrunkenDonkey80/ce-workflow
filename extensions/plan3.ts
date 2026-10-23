@@ -398,7 +398,7 @@ function stepMode(lines, avail: any = {}) {
 }
 // alt+= / alt+- bias over the phase tags, per session: "Task" levels (\u00b11) end with the current phase, "Plan" levels (\u00b12) last.
 const BIAS = "plan3-bias";
-const BIAS_LABEL = { "-2": "Work:Plan", "-1": "Work:Task", 1: "Think:Task", 2: "Think:Plan" };
+const BIAS_LABEL = { "-2": "Worker (Plan)", "-1": "Worker (Task)", 1: "Thinker (Task)", 2: "Thinker (Plan)" };
 const BIAS_COLOR = { "-2": "31", "-1": "38;5;210", 1: "38;5;151", 2: "32" };
 // The session remembers its choice: Plan levels and the plan-less Think/Work carry over to whichever plan is current.
 function biasOf(ctx, plan, lines, avail: any = {}) {
@@ -410,7 +410,7 @@ function biasOf(ctx, plan, lines, avail: any = {}) {
 }
 // Without a plan the bias is per session: Think (planning model, high) / Normal (back to the session's own) / Work (coding model and effort).
 const sessionBias = (ctx) => { const data = (ctx.sessionManager?.getBranch?.() ?? []).findLast((entry) => entry.type === "custom" && entry.customType === BIAS)?.data; return !data ? 0 : data.id === null ? data.level : Math.abs(data.level) === 2 ? Math.sign(data.level) : 0; };
-const SESSION_BIAS = { "-1": "Work", 1: "Think" };
+const SESSION_BIAS = { "-1": "Worker", 1: "Thinker" };
 const modeOf = (ctx, plan, lines, avail) => { const bias = biasOf(ctx, plan, lines, avail); return bias > 0 ? "think" : bias < 0 ? "coding" : stepMode(lines, avail); };
 // An unfinished phase without a [think]/[code] tag gets a tagging turn on /resume3 (old plans, phases added later).
 // A phase is any ### heading with steps under it ("### Phase 2", "### P0 \u2014 \u2026"), matching stepMode.
@@ -1064,8 +1064,8 @@ export default function plan3(pi) {
 			await followMode(ctx);
 		} catch (error) { report(ctx, error); }
 	}
-	pi.registerShortcut?.("alt+=", { description: "Plan3: bias toward the thinking model (Think:Task, then Think:Plan)", handler: (ctx) => shiftBias(ctx, 1) });
-	pi.registerShortcut?.("alt+-", { description: "Plan3: bias toward the coding model (Work:Task, then Work:Plan)", handler: (ctx) => shiftBias(ctx, -1) });
+	pi.registerShortcut?.("alt+=", { description: "Plan3: bias toward the thinking model (Thinker (Task), then Thinker (Plan))", handler: (ctx) => shiftBias(ctx, 1) });
+	pi.registerShortcut?.("alt+-", { description: "Plan3: bias toward the coding model (Worker (Task), then Worker (Plan))", handler: (ctx) => shiftBias(ctx, -1) });
 	pi.registerShortcut?.("alt+a", { description: "Plan3 requirements: what the agent may use now", handler: async (ctx) => { try { await editNeeds(ctx, currentPlan(ctx, await listPlans(ctx.cwd))); } catch (error) { report(ctx, error); } } });
 	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging: () => Boolean(tagging), switchNeeds });
 	// shortcut: a run counts while the session's current plan is the one /resume3 executes, so later chat in that session counts too.

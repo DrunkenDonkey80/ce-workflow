@@ -457,10 +457,11 @@ try {
  // and Send first drops it from the context, then posts the fix.
  await evaluate("(() => { const real = window.fetch; window.drops = []; window.fetch = (url, init) => String(url).endsWith('api/drop') ? (window.drops.push(JSON.parse(init.body).text), Promise.resolve(new Response(JSON.stringify({ ok: true })))) : real(url, init); })()");
  publish("message", { id: "assistant_stop", role: "assistant", text: "", error: "Request was aborted", streaming: false });
- await browser("press", "ArrowUp");
+ await browser("press", "ArrowUp"); assert.equal(await evaluate("document.getElementById('message-input').value"), "", "the first ↑ at the top only arms history");
+ await browser("press", "ArrowUp"); assert.match(await evaluate("document.getElementById('history-when').textContent"), /./, "the recalled message shows when it was sent");
  assert.deepEqual(await evaluate("[document.getElementById('message-input').value.endsWith('Please apply these.'), document.getElementById('message-input').classList.contains('editing-last')]"), [true, true], "↑ recalls the stopped prompt in edit mode");
  await evaluate("(b => b.setSelectionRange(b.value.length, b.value.length))(document.getElementById('message-input'))"); await browser("press", "ArrowDown"); assert.equal(await evaluate("document.getElementById('message-input').value"), "", "↓ past the newest returns to the draft");
- await browser("press", "ArrowUp"); await browser("fill", "#message-input", "Please apply only the first."); await browser("press", "Enter");
+ await browser("press", "ArrowUp"); await browser("press", "ArrowUp"); await browser("fill", "#message-input", "Please apply only the first."); await browser("press", "Enter");
  await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
  assert.deepEqual([await evaluate("window.drops.at(-1)?.endsWith('Please apply these.')"), messages.at(-1).text], [true, "Please apply only the first."], "Send drops the stopped prompt, then posts the edit");
  await withPageCdp(origin, send => send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: "reduce" }] }));
@@ -644,7 +645,7 @@ try {
  assert.equal(await evaluate("document.activeElement.value"), "two"); await browser("press", "Escape");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).values, ["one", "two"]);
  // R13/D19 status line: [model: effort] [context] [bias]; plan and usage as coloured progress bars; title folder - tab: plan.
- assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["fake-1: Low", "Context: 84k/200k", "Normal", sample.title + "2/5"]);
+ assert.deepEqual(await evaluate("['model-button', 'context-button', 'bias-button', 'plan-button'].map(id => document.getElementById(id).textContent)"), ["fake-1: Low", "Context: 84k/200k", "Default", sample.title + "2/5"]);
  assert.equal(await evaluate("document.getElementById('title').textContent"), "ce-workflow - 1", "desktop title: folder - session name; the plan is in its bar");
  // Usage: one bar per window (5h when there is one, then the headline 7d); a warning shows in the headline and colours it.
  const usageBars = "[...document.querySelectorAll('#usage-button .usage-bar')].map(b => b.textContent + '|' + b.dataset.tone + '|' + b.style.getPropertyValue('--fill'))";
@@ -653,12 +654,12 @@ try {
  assert.equal(await evaluate("document.getElementById('plan-button').style.getPropertyValue('--fill')"), "40%");
  assert(await evaluate("(() => { const top = document.querySelector('.topbar').getBoundingClientRect(), ids = ['model-button', 'context-button', 'bias-button', 'plan-button', 'usage-button'].map(id => document.getElementById(id).getBoundingClientRect()); return ids.every(r => r.top >= top.top && r.bottom <= top.bottom && Math.abs(r.top - ids[0].top) < 4); })()"), "desktop: the whole status line is one row in the top bar");
  await browser("click", "#bias-button"); await browser("click", "#bias-menu [data-level='1']");
- await browser("wait", "--fn", "document.getElementById('bias-button').textContent === 'Think:Task'");
+ await browser("wait", "--fn", "document.getElementById('bias-button').textContent === 'Thinker (Task)'");
  // Alt+= / Alt+- step the bias like the terminal, clamped at the plan's ends.
  for (const key of ["Alt+Equal", "Alt+Equal"]) await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { code: "${key.slice(4)}", key: "=", altKey: true, bubbles: true }))`);
- await browser("wait", "--fn", "document.getElementById('bias-button').textContent.startsWith('Think:Plan')");
+ await browser("wait", "--fn", "document.getElementById('bias-button').textContent.startsWith('Thinker (Plan)')");
  await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { code: "Minus", key: "-", altKey: true, bubbles: true }))`);
- await browser("wait", "--fn", "document.getElementById('bias-button').textContent === 'Think:Task'");
+ await browser("wait", "--fn", "document.getElementById('bias-button').textContent === 'Thinker (Task)'");
  await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
  // Clicking a provider opens its window: every quota window as a bar; Claude adds the account pool with its actions.
  await browser("click", "#usage-button [data-provider=codex]"); await browser("wait", "--fn", "document.getElementById('usage-window').open");
