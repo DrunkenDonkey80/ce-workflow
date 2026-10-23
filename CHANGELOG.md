@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.69 — 2026-10-23
+
+### Fixed
+- Hub: Update no longer opens a pile of npm windows. It runs hidden, and if it fails, the hub opens its log so you see why.
+- Desktop app: the pinned release is now 0.1.2, so ⚙ → Update brings the live taskbar icon.
+
 ## 0.1.68 — 2026-10-23
 
 ### Fixed
