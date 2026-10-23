@@ -27,6 +27,26 @@ In Pi, `/wo hub` shows the hub's status and addresses with Install, Start, Open,
 - Usage and the Claude accounts window come from the hub itself, so they show with every session parked. With pi-provider-claude-ex in Pi's packages, the hub runs its `cpool` CLI for the account list and actions, and keeps one `cpool daemon` refreshing logins (it leaves an already running daemon alone and stops only its own). `PI_HUB_CPOOL=<path to cpool.ts>` overrides the lookup.
 - The hub shows only sessions it started. "Open in terminal" parks a session and hands it to a plain console Pi; the hub takes it back when that Pi exits.
 
+## Desktop app
+
+Pi Hub (`hub/app`, Tauri) is one window with a tab per hub and live state dots on the taskbar icon (up to 4 hubs), its
+overlay and the tray (asking red, working amber, finished-unseen blue), even with the window hidden.
+
+- Install: on this PC's hub page, ⚙ → Desktop app → Install. The hub downloads the build pinned in `hub/app/release.json`,
+  checks its SHA-256 and installs per user (Windows `%LOCALAPPDATA%\Programs\pi-hub-app`, Start menu "Pi Hub";
+  Linux `~/.local/share/pi-hub-app` AppImage plus a menu entry). Uninstall is in the same row; quit the app from the tray first.
+- Start at login: the row's checkbox (Windows Run key, Linux `~/.config/autostart`); the app then starts hidden in the tray
+  and waits for the hub if it starts first.
+- Tabs: the first is this PC's hub; `+` adds another hub by its link (another PC's tailnet address pairs like a phone).
+  Right-click renames or removes, drag reorders, Ctrl+1…9 switches while the app has focus. Closing hides to the tray; Quit is in the tray menu.
+- Updates: with a newer pin (arrives with ce-workflow updates), the hub stages the new build hourly; the strip shows a note and the
+  tray offers Restart to update. The app never restarts unasked.
+- WSL: install from the Windows hub; its app reaches the WSL hub through 127.0.0.1.
+- Linux limits: GNOME shows the tray only with the AppIndicator extension, and live icon changes may not show on Wayland.
+- Release: push a tag `app-v<version>` matching `hub/app/src-tauri/tauri.conf.json` (`.github/workflows/app-release.yml`
+  builds both files), then `node hub/app/pin-release.mjs app-v<version>` and commit `hub/app/release.json`.
+  Local build: `cargo tauri build --no-bundle` in `hub/app/src-tauri`.
+
 ## Development
 
 Node 24; no install step of its own (ce-workflow's `npm install` covers the imported modules). `npm test` runs `scripts/test-*.mjs`; `scripts/fake-pi.mjs` stands in for `pi --mode rpc`.

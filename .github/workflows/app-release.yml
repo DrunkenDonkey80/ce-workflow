@@ -1,0 +1,58 @@
+# R-01: the Pi Hub desktop app release. Push a tag app-v<version> (matching hub/app/src-tauri/tauri.conf.json);
+# the asset names match hub/src/app-install.ts. Afterwards pin it: node hub/app/pin-release.mjs app-v<version>.
+name: app-release
+on:
+  push:
+    tags: ["app-v*"]
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            asset: pi-hub-app-windows-x64.exe
+          - os: ubuntu-22.04
+            asset: pi-hub-app-linux-x64.AppImage
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: hub/app/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: hub/app/src-tauri
+      - name: Tag matches the app version
+        run: test "app-v$(node -p "require('./tauri.conf.json').version")" = "$GITHUB_REF_NAME"
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf file
+      - name: Build (Windows exe)
+        if: runner.os == 'Windows'
+        run: npx --yes @tauri-apps/cli@2 build --no-bundle && cp target/release/pi-hub-app.exe "$RUNNER_TEMP/${{ matrix.asset }}"
+      - name: Build (Linux AppImage)
+        if: runner.os == 'Linux'
+        run: npx --yes @tauri-apps/cli@2 build --bundles appimage --config '{"bundle":{"active":true}}' && cp target/release/bundle/appimage/*.AppImage "$RUNNER_TEMP/${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ runner.temp }}/${{ matrix.asset }}
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --title "Pi Hub app ${GITHUB_REF_NAME#app-v}" --notes "Desktop app for pi-control-hub. Install it from the hub's settings (gear → Desktop app); the hub checks these files against the SHA-256 pinned in hub/app/release.json."

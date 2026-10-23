@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T07:11:54.334Z
+updated: 2026-10-23T07:13:33.091Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -139,10 +139,9 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ### Phase 4: Release pipeline [code]
 
-- [ ] **R-01** `.github/workflows/app-release.yml` for tag `app-v*` on Windows and Ubuntu; uploads the exe and the AppImage.
-- [ ] **R-02** `hub/app/pin-release.mjs` writes version, URLs and SHA-256 into `release.json` from a published release.
-  - Check: run against a fake release folder; output matches `sha256sum` of the files.
-- [ ] **R-05** Write the app section of hub/README.md: install from settings, login start, updates, and the Linux desktop limits (D12).
+- [x] **R-01** .github/workflows/app-release.yml: tag app-v* → checks tag = tauri.conf version, builds Windows exe (--no-bundle) and Linux AppImage on ubuntu-22.04 via npx @tauri-apps/cli@2, one release job publishes pi-hub-app-windows-x64.exe and pi-hub-app-linux-x64.AppImage.
+- [x] **R-02** hub/app/pin-release.mjs app-v<x.y.z> [--from <folder>]: gh release download (or a local folder) → release.json {version, assets: windows-x64/linux-x64 {url, sha256}}; bad tag exits 2.
+- [x] **R-05** hub/README.md 'Desktop app' section: install/uninstall from the gear, login start, tabs and shortcuts, hourly staged updates with Restart to update, WSL, Linux limits (D12), release steps.
 - [human] **R-03** Push master and the first `app-v0.1.0` tag (pushing is the user's call).
 - [blocked] **R-04** After R-03: confirm the workflow run is green, run R-02, commit the pin.
 
