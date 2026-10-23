@@ -34,10 +34,27 @@ export const ICONS: Record<string, [string, string, boolean]> = {
 const ICON_INK = "#343a40";
 const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6" };
 // states: any of waiting/working/unseen, each drawn once, most urgent first.
+// The icon alone, centred in a 32 box.
+function glyph(name: string) {
+ const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
+ return `<path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>`;
+}
+const SVG_HEAD = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><style>@media (prefers-color-scheme: dark) { path { fill: #e9ecef } }</style>';
 export function iconSvg(name: string, states: string[] = []) {
  // At 16 px an outline reads as noise: the icon keeps the whole square and white-ringed dots (Gmail/Slack style) carry the states,
  // filling lower-right, lower-left, then upper-right; two fit side by side at 16 px.
- const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
  const badge = Object.keys(DOTS).filter(state => states.includes(state)).map((state, i) => `<circle cx="${i === 1 ? 7.5 : 24.5}" cy="${i === 2 ? 7.5 : 24.5}" r="6.5" fill="${DOTS[state]}" stroke="#fff" stroke-width="2"/>`).join("");
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><style>@media (prefers-color-scheme: dark) { path { fill: #e9ecef } }</style><path transform="translate(${(16 - w * scale / 2).toFixed(2)} ${(16 - h * scale / 2).toFixed(2)}) scale(${scale.toFixed(4)})" fill="${ICON_INK}"${evenodd ? ' fill-rule="evenodd"' : ""} d="${d}"/>${badge}</svg>`;
+ return `${SVG_HEAD}${glyph(name)}${badge}</svg>`;
+}
+// The desktop app's taskbar icon: one cell per hub (1 = whole square, 2 side by side, 3-4 in 2x2; more show only as app tabs),
+// each hub's icon with one dot for its most urgent state, sized to the cell so it stays visible at 16 px.
+export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
+ hubs = hubs.filter(hub => ICONS[hub.icon]).slice(0, 4);
+ if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states);
+ const rows = hubs.length > 2 ? 2 : 1, cell = 16, top = (32 - rows * cell) / 2;
+ return SVG_HEAD + hubs.map((hub, i) => {
+  const x = (i % 2) * cell, y = top + Math.floor(i / 2) * cell, state = Object.keys(DOTS).find(tone => hub.states.includes(tone)), r = cell * 0.3;
+  const dot = state ? `<circle cx="${(x + cell - r).toFixed(2)}" cy="${(y + cell - r).toFixed(2)}" r="${r.toFixed(2)}" fill="${DOTS[state]}" stroke="#fff" stroke-width="${(cell / 16).toFixed(2)}"/>` : "";
+  return `<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${(cell / 32).toFixed(4)})">${glyph(hub.icon)}</g>${dot}`;
+ }).join("") + "</svg>";
 }
