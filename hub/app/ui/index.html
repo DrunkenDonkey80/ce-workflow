@@ -20,7 +20,7 @@
 import { ICONS, iconSvg, hubsIconSvg } from "./icons.js";
 const { invoke } = window.__TAURI__.core;
 const DEFAULT_ICON = Object.keys(ICONS)[0];
-const URGENCY = ["waiting", "working", "unseen"], DOT = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6" };
+const URGENCY = ["waiting", "working", "unseen"];
 const WORD = { waiting: "asking", working: "working", unseen: "finished" };
 let tabs = [], active = 0, nextId = 0, dark = null, iconKey = "", dragged = null, startupError = "";
 
@@ -60,17 +60,17 @@ async function pixels(svg, size) {
  const canvas = new OffscreenCanvas(size, size), g = canvas.getContext("2d"); g.drawImage(img, 0, 0, size, size);
  return Array.from(g.getImageData(0, 0, size, size).data);
 }
-// P-03/P-04: taskbar = up to 4 hubs with their dots; tray = this PC's icon with every hub's states merged; overlay = most urgent of all.
+// P-03/P-04: taskbar = up to 4 hubs with their dots; tray = this PC's icon with every hub's states merged.
+// No overlay badge: Windows draws it at 16 px over a 24 px button, hiding the hubs' own dots.
 async function updateIcons() {
- const all = [...new Set(tabs.flatMap(tab => tab.states))], urgent = URGENCY.find(s => all.includes(s));
+ const all = [...new Set(tabs.flatMap(tab => tab.states))];
  const local = tabs.find(tab => tab.local) ?? tabs[0];
  const key = JSON.stringify([tabs.map(t => [t.icon, t.states, label(t), t.url ? 1 : 0]), staged]);
  if (key === iconKey) return; iconKey = key;
  const big = ink(hubsIconSvg(tabs.map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
  const small = ink(iconSvg(ICONS[local?.icon] ? local.icon : DEFAULT_ICON, URGENCY.filter(s => all.includes(s))));
- const overlay = urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="${DOT[urgent]}" stroke="#fff" stroke-width="1.5"/></svg>`, 16) : null;
  try {
-  await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay });
+  await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay: null });
   await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${label(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${label(tab)}: ${stateWord(tab)}`)].join("\n") });
  } catch (error) { console.error(error); }
 }
