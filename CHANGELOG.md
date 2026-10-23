@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## 0.1.73 — 2026-10-23
 
 ### Changed
+- When the chat sits next to the diagram, its header no longer shows Pull, Commit and Commit and push. They stay in the sidebar folder box, and in the header when the chat is expanded.
 - On a phone, the File button is now 💾 and the chat box buttons are a little narrower, so Queue fits on the same row as Stop.
 
 ### Fixed

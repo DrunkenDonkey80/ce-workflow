@@ -228,6 +228,8 @@ h2 { font-size: 15px; font-weight: 600; }
 #connection { font-size: 13px; color: var(--muted); }
 .modes { display: flex; gap: 6px; margin-left: auto; }
 .git-actions { display: flex; gap: 6px; }
+/* Next to the diagram the chat header is cramped; the sidebar folder box keeps the same git buttons. */
+@media (min-width: 900px) { .workspace:not([data-left=collapsed]) :is(#git-pull, #git-commit, #git-push) { display: none; } }
 /* Project commands: prompt chips (agent, purple) and run chips (hub PC, teal); they fold into Commands ▾ when they no longer fit. */
 .project-commands { display: flex; gap: 6px; flex: 1 1 0; min-width: 0; overflow: hidden; }
 .mode-chip.project-command { flex: none; white-space: nowrap; border-color: var(--accent); color: var(--accent); }
