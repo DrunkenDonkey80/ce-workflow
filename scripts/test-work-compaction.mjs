@@ -631,4 +631,62 @@ assert.deepEqual(wakeRequests, ["Fix the parser.", "Subagent updates above. Summ
 // A malformed JSON line in a prior summary is skipped, not fatal.
 const { header } = await import("../extensions/work-compaction-memory.ts");
 assert.deepEqual(decodeMemory(`${header}{broken\n{"source":"s","kind":"user-request","text":"t"}\n`).records, [{ source: "s", kind: "user-request", text: "t" }]);
-process.stdout.write("ok - work compaction policy, selected/current/cleaned fallback, bounded attempts, usage, cancellation\n");
+
+// Protected history stays bounded: answers keep question, answer and picked descriptions; 20 requests stay verbatim, older ones age
+// into the checkpoint only through a validated model answer; a failure keeps everything.
+{
+	const ask = { questions: [{ question: "Which store?", context: "x".repeat(5000), options: [{ title: "SQLite (Recommended)", description: "One file, no server." }, { title: "Postgres", description: "y".repeat(3000) }] }, { question: "Never asked in the text?", options: [{ title: "Yes" }] }] };
+	const answer = "User answered 1 of 2 questions:\n1. Which store? → SQLite (Recommended) — keep backups\n2. Other → (skipped)";
+	const [record] = gather([{ role: "assistant", content: [{ type: "toolCall", id: "q", name: "ask_user", arguments: ask }] }, { role: "toolResult", toolName: "ask_user", toolCallId: "q", content: answer + "z".repeat(3000) }], [], "ask");
+	assert.deepEqual(Object.keys(record).sort(), ["failed", "kind", "picked", "questions", "result", "source", "tool"], "no arguments");
+	assert.equal(record.result.text.length, answer.length + 3000, "a fresh answer is never excerpted");
+	assert.deepEqual([record.picked, record.questions], [["SQLite (Recommended): One file, no server."], ["Never asked in the text?"]]);
+	// A summary written before this change heals at the next compaction, and normalizing again keeps the picked description.
+	const legacy = `${header}{"source":"old:1","kind":"tool-result","tool":"ask_user","arguments":${JSON.stringify(ask)},"failed":false,"result":{"text":${JSON.stringify(answer)}}}\n`;
+	const healed = decodeMemory(legacy).records[0];
+	assert.deepEqual([healed.arguments, healed.picked], [undefined, record.picked]);
+	assert.deepEqual(decodeMemory(`${header}${JSON.stringify(healed)}\n`).records[0], healed);
+
+	const requests = Array.from({ length: 25 }, (_, i) => ({ role: "user", content: `Request ${i}: rule ${i}.` }));
+	let seen, reply = "valid";
+	const model = { find: (provider, id) => ({ provider, id }), streamSimple(_m, context) {
+		const task = context.messages[0].content[0].text;
+		// Like the real prompt asks: keep the old knowledge, add the aging requests as decisions.
+		let old;
+		try { seen = JSON.parse(task.slice(task.indexOf("\n") + 1)); old = seen.previous ? JSON.parse(seen.previous).knowledge : []; } catch (error) { assert.fail(`Invalid compaction request JSON: ${error.message}`); }
+		seen.task = task.slice(0, task.indexOf("\n"));
+		const text = reply === "invalid" ? "nope" : JSON.stringify({ checkpoint: "Rules still apply.", knowledge: [...old, ...(seen.aging ?? []).map(r => ({ claim: r.text, status: "decision", sources: [r.source] }))] });
+		return { result: async () => ({ content: [{ type: "text", text }], stopReason: "stop" }) };
+	} };
+	const rolled = await compactMemory({ messages: requests, registry: model, model: "test/summary" });
+	assert.equal(rolled.mode, "hybrid");
+	// One invented citation among many drops that fact only; mostly invented ones still reject the answer (the "citation" case above).
+	const { validateMemory } = await import("../extensions/work-compaction-memory.ts");
+	const facts = ["a", "b", "c", "d"].map(source => ({ claim: source, status: "observed", sources: [source] }));
+	assert.deepEqual(validateMemory(JSON.stringify({ checkpoint: "x", knowledge: [...facts, { claim: "e", status: "observed", sources: ["a", "a:70"] }] }), new Set("abcd"), 9999).knowledge, facts);
+	assert.throws(() => validateMemory(JSON.stringify({ checkpoint: "x", knowledge: [facts[0], { ...facts[1], sources: ["z"] }] }), new Set("a"), 9999), /unknown citation/);
+	// A stray `}]` or fence after the object (seen live) keeps the answer; no object at all still fails.
+	assert.equal(validateMemory("```json\n{\"checkpoint\":\"x\",\"knowledge\":[]}] }]}\n```", new Set(), 9999).tail, '{"checkpoint":"x","knowledge":[]}');
+	assert.throws(() => validateMemory("not JSON", new Set(), 9999), /Invalid memory JSON/);
+	assert.deepEqual(seen.aging.map(r => r.text), requests.slice(0, 5).map(m => m.content), "the 5 oldest go to the model as aging");
+	assert(!seen.delta.some(r => seen.aging.some(a => a.source === r.source)), "aging is not sent twice");
+	assert.match(seen.task, /"aging" holds older user requests/);
+	assert.deepEqual(decodeMemory(rolled.summary).records.map(r => r.text), requests.slice(5).map(m => m.content), "20 stay verbatim");
+	assert.match(rolled.summary, /Request 0: rule 0\./, "the aged request lives on as cited knowledge");
+	// Next round: the model gets the checkpoint, not the raw summary; citations to aged sources stay valid.
+	const next = await compactMemory({ messages: [{ role: "user", content: "Request 25." }], previousSummary: rolled.summary, registry: model, model: "test/summary" });
+	assert.equal(next.mode, "hybrid", next.fallback);
+	assert.deepEqual(seen.aging.map(r => r.text), ["Request 5: rule 5."]);
+	assert.equal(seen.previous, decodeMemory(rolled.summary).tail, "the model input is the checkpoint, not the whole previous summary");
+	assert.match(next.summary, /Request 0: rule 0\./, "old citations survive the next round");
+	// A failed checkpoint keeps every request verbatim: nothing ages out without a summary.
+	reply = "invalid";
+	const kept = await compactMemory({ messages: requests, registry: model, model: "test/summary" });
+	assert.equal(kept.mode, "fallback");
+	assert.equal(decodeMemory(kept.summary).records.filter(r => r.kind === "user-request").length, 25);
+	// The checkpoint gets real room even when 20 long requests fill the target (it used to get about 1k and failed).
+	reply = "valid";
+	await compactMemory({ messages: Array.from({ length: 20 }, () => ({ role: "user", content: "w".repeat(3000) })), registry: model, model: "test/summary", limit: 32000 });
+	assert.match(seen.task, /Target 8000 characters; hard maximum 8000/);
+}
+process.stdout.write("ok - work compaction policy, selected/current/cleaned fallback, bounded attempts, usage, cancellation, bounded protected history\n");

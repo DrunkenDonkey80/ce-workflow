@@ -9,6 +9,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Settings is about 30% wider and can use the full window height.
 - The plan's Review menu opens at the mouse instead of at the far right.
 
+### Fixed
+- Compaction in long sessions frees much more context. Only your last 20 messages are kept word for word; older ones are summarized into the decisions and rules that still apply. Answered questions keep only the question, your answer and the picked option. In two real long sessions the summary went from 245k and 145k characters to about 20k. Compactions that used to fail over a stray bracket or one bad citation now succeed.
+
 ## 0.1.73 — 2026-10-23
 
 ### Added
