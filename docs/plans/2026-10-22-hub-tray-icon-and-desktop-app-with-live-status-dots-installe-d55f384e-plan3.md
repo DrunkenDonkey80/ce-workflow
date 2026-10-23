@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T06:48:29.844Z
+updated: 2026-10-23T06:51:37.289Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -123,8 +123,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ### Phase 2: Hub side [code]
 
-- [ ] **H-01** Add `hubsIconSvg(hubs)` and `build-icons.mjs` (D8); keep `iconSvg` output unchanged for the tab icon.
-  - Check: C7 writes `ui/icons.js`; C3 still passes.
+- [x] **H-01** hubsIconSvg in icons.ts plus hub/app/build-icons.mjs (strips icons.ts → ui/icons.js, gitignored), run automatically as Tauri's beforeBuildCommand.
 - [ ] **H-02** In-app title line in `hub/web/app.ts` (D5), set only when the user agent carries `PiHubApp/`.
   - Hub name: add `hostname` (os.hostname()) to `pageApi.settings()` and the page's `HubSettings` type; the title line uses it, never a session or folder name.
   - States include the displayed session's own `unseen` (today `loadSessions` drops the current session's tone and `renderIcon` adds back only waiting/working).

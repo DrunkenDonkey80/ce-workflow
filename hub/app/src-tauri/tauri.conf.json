@@ -3,7 +3,7 @@
   "productName": "Pi Hub",
   "version": "0.1.0",
   "identifier": "dev.ce-workflow.pi-hub-app",
-  "build": { "frontendDist": "../ui" },
+  "build": { "frontendDist": "../ui", "beforeBuildCommand": "node build-icons.mjs", "beforeDevCommand": "node build-icons.mjs" },
   "app": {
     "withGlobalTauri": true,
     "windows": [],
