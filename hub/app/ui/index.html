@@ -20,7 +20,8 @@
 import { ICONS, iconSvg, hubsIconSvg } from "./icons.js";
 const { invoke } = window.__TAURI__.core;
 const DEFAULT_ICON = Object.keys(ICONS)[0];
-const URGENCY = ["waiting", "working", "unseen"];
+const URGENCY = ["waiting", "working", "unseen"], DOT = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6" };
+let pinned = false;
 const WORD = { waiting: "asking", working: "working", unseen: "finished" };
 let tabs = [], active = 0, nextId = 0, dark = null, iconKey = "", dragged = null, startupError = "";
 
@@ -61,16 +62,19 @@ async function pixels(svg, size) {
  return Array.from(g.getImageData(0, 0, size, size).data);
 }
 // P-03/P-04: taskbar = up to 4 hubs with their dots; tray = this PC's icon with every hub's states merged.
-// No overlay badge: Windows draws it at 16 px over a 24 px button, hiding the hubs' own dots.
+// Overlay badge only on a pinned button (its icon is fixed): Windows draws it at 16 px over a 24 px button, which would hide
+// the live icon's own dots. It shows the most urgent state and how many things need you.
 async function updateIcons() {
- const all = [...new Set(tabs.flatMap(tab => tab.states))];
+ const all = [...new Set(tabs.flatMap(tab => tab.states))], urgent = URGENCY.find(s => all.includes(s));
+ const count = tabs.reduce((sum, tab) => sum + (tab.attention || 0), 0), text = count > 9 ? "9+" : count ? String(count) : "";
+ const number = text ? `<text x="8" y="12" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-weight="700" font-size="${text.length > 1 ? 8.5 : 11}" fill="#fff">${text}</text>` : "";
  const local = tabs.find(tab => tab.local) ?? tabs[0];
- const key = JSON.stringify([tabs.map(t => [t.icon, t.states, label(t), t.url ? 1 : 0]), staged]);
+ const key = JSON.stringify([tabs.map(t => [t.icon, t.states, label(t), t.url ? 1 : 0, t.attention]), staged, pinned]);
  if (key === iconKey) return; iconKey = key;
  const big = ink(hubsIconSvg(tabs.map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
  const small = ink(iconSvg(ICONS[local?.icon] ? local.icon : DEFAULT_ICON, URGENCY.filter(s => all.includes(s))));
  try {
-  await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay: null });
+  await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay: pinned && urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="${DOT[urgent]}"/>${number}</svg>`, 16) : null });
   await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${label(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${label(tab)}: ${stateWord(tab)}`)].join("\n") });
  } catch (error) { console.error(error); }
 }
@@ -84,8 +88,8 @@ window.shortcut = index => { if (tabs[index]) select(tabs[index].id); };
 window.onTitle = (webview, title) => {
  const tab = tabs.find(t => "hub" + t.id === webview); if (!tab) return;
  const line = /^pi-hub-state (\{.*\})$/.exec(title ?? "");
- if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { icon: value.icon || tab.icon, hubName: value.name || tab.hubName, states: Array.isArray(value.states) ? value.states : [] }); } catch { /* half-written title */ } }
- else tab.states = (title ?? "").startsWith("(!)") ? ["waiting"] : [];
+ if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { icon: value.icon || tab.icon, hubName: value.name || tab.hubName, states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0 }); } catch { /* half-written title */ } }
+ else { tab.states = (title ?? "").startsWith("(!)") ? ["waiting"] : []; tab.attention = tab.states.length; }
  render();
 };
 function open(tab) { if (tab.url) void invoke("open", { id: tab.id, url: tab.url }).then(() => { if (tabs[active] === tab) void invoke("show", { id: tab.id }); }, error => { startupError = String(error); render(); }); }
@@ -135,5 +139,8 @@ const wait = setInterval(async () => {
  const url = await invoke("local_url"); if (url) { local.url = url; open(local); render(); clearInterval(wait); }
 }, 3000);
 setInterval(async () => { const now = await invoke("staged"); if (now !== staged) { staged = now; iconKey = ""; render(); } }, 60_000);
+// Pinning has no event; check every 10 s so the badge follows a pin or unpin.
+const checkPinned = async () => { const now = await invoke("pinned"); if (now !== pinned) { pinned = now; render(); } };
+void checkPinned(); setInterval(checkPinned, 10_000);
 </script>
 </body></html>

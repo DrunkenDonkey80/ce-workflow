@@ -5,7 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Fixed
-- Desktop app 0.1.4: the taskbar button no longer gets a big extra dot that covered the hub icons; each hub shows its own small dot. A pinned button now shows no state.
+- Desktop app 0.1.4: the big extra dot that covered the hub icons on the taskbar button now shows only when the app is pinned, where the icon itself can't change. There it carries the number of things waiting for you (questions and finished sessions you haven't opened).
 
 ## 0.1.70 — 2026-10-23
 

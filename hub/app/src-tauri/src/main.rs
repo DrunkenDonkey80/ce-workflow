@@ -208,11 +208,27 @@ fn restart(app: &AppHandle) {
     if std::process::Command::new(main_file()).args(args).arg("--restarted").spawn().is_ok() { app.exit(0) }
 }
 
+/// Pinned buttons keep a fixed icon, so only they get the overlay badge. Windows has no API for "is pinned"; a pin made
+/// from our window stores our app ID (UTF-16) in a shortcut under User Pinned\TaskBar. A pin of the old shortcut won't match it.
+#[tauri::command]
+fn pinned() -> bool {
+    #[cfg(windows)]
+    {
+        let id: Vec<u8> = AUMID.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+        let Some(dir) = std::env::var_os("APPDATA").map(|a| PathBuf::from(a).join(r"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar")) else { return false };
+        let Ok(entries) = std::fs::read_dir(dir) else { return false };
+        entries.flatten().any(|e| std::fs::read(e.path()).is_ok_and(|bytes| bytes.windows(id.len()).any(|w| w == id.as_slice())))
+    }
+    #[cfg(not(windows))]
+    false
+}
+#[cfg(windows)]
+const AUMID: &str = "dev.ce-workflow.pi-hub-app.live";
 fn main() {
     // Windows 11 draws a Start Menu shortcut's icon for any window it matches to that shortcut (by exe path) and ignores
     // WM_SETICON. An explicit app ID that no shortcut carries keeps the live hub grid on the taskbar.
     #[cfg(windows)]
-    unsafe { windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(windows_sys::core::w!("dev.ce-workflow.pi-hub-app.live")); }
+    unsafe { windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID(windows_sys::core::w!("dev.ce-workflow.pi-hub-app.live") /* = AUMID */); }
     let error = swap_staged().err();
     let start_hidden = std::env::args().any(|a| a == "--hidden");
     let app = tauri::Builder::default()
@@ -223,7 +239,7 @@ fn main() {
             if key >= first && key < first + 9 { strip_eval(app, format!("window.shortcut && shortcut({})", key - first)); }
         }).build())
         .manage(Startup { error })
-        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray])
+        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned])
         .setup(move |app| {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());

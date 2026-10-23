@@ -1172,7 +1172,8 @@ function renderIcon() {
  // count of what needs you (questions, finished sessions you haven't opened); colours are impossible there. Working has no badge.
  if (inApp()) {
   const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen"].includes(tone)); // the app has no page in front: own unseen counts
-  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)] });
+  // attention: how many things need you, for the app's badge on a pinned button.
+  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone !== "working").length });
   if (document.title !== line) document.title = line;
  }
  const needsYou = states.filter(tone => tone === "waiting" || tone === "unseen").length;
