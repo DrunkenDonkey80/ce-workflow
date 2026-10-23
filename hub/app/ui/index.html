@@ -1,41 +1,124 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Pi Hub tabs</title>
 <style>
- body { margin: 0; font: 13px system-ui, sans-serif; background: #f1f3f5; display: flex; height: 36px; align-items: stretch; overflow: hidden; user-select: none }
- button { border: 0; background: none; padding: 0 14px; font: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px; max-width: 280px; white-space: nowrap; overflow: hidden }
- button.on { background: #fff; box-shadow: inset 0 -2px #4dabf7 }
- i { width: 9px; height: 9px; border-radius: 50%; background: #adb5bd; flex: none }
- i.waiting { background: #e03131 } i.working { background: #f59f00 } i.unseen { background: #1c7ed6 }
+ :root { color-scheme: light dark; --bar: #f1f3f5; --on: #fff; --ink: #212529; --muted: #6c757d; --sel: #4dabf7 }
+ @media (prefers-color-scheme: dark) { :root { --bar: #1f2328; --on: #2d333b; --ink: #e9ecef; --muted: #adb5bd } }
+ body { margin: 0; font: 13px system-ui, "Segoe UI", sans-serif; background: var(--bar); color: var(--ink); display: flex; height: 36px; align-items: stretch; overflow: hidden; user-select: none }
+ button { border: 0; background: none; color: inherit; padding: 0 12px; font: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; max-width: 240px; white-space: nowrap; overflow: hidden }
+ button.tab.on { background: var(--on); box-shadow: inset 0 -2px var(--sel) }
+ button.tab.drop { box-shadow: inset 2px 0 var(--sel) }
+ button.tab img { width: 20px; height: 20px; flex: none }
+ button.tab span { overflow: hidden; text-overflow: ellipsis }
+ button.tab small { color: var(--muted) }
+ #add { padding: 0 12px; font-size: 18px; color: var(--muted) }
+ #note { margin-left: auto; align-self: center; padding: 0 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 </style></head>
 <body>
-<script>
-// A-02 spike strip: tabs from the hub list, state from each page's title, icons drawn here and handed to Rust.
+<script type="module">
+// The strip is the app's brain: tab list, each hub's state from its page title (D5), icons drawn with the hub's own icons.ts (D8).
+import { ICONS, iconSvg, hubsIconSvg } from "./icons.js";
 const { invoke } = window.__TAURI__.core;
-const COLORS = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6", idle: "#adb5bd" };
-let tabs = [], active = 0, iconKey = "";
-const stateOf = title => title.startsWith("(!)") ? "waiting" : "idle"; // spike: today's page title only marks questions
+const DEFAULT_ICON = Object.keys(ICONS)[0];
+const URGENCY = ["waiting", "working", "unseen"], DOT = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6" };
+const WORD = { waiting: "asking", working: "working", unseen: "finished" };
+let tabs = [], active = 0, nextId = 0, dark = null, iconKey = "", dragged = null, startupError = "";
+
+const host = url => { try { return new URL(url).hostname; } catch { return url; } };
+const label = tab => tab.name || tab.hubName || (tab.local ? "This PC" : host(tab.url));
+const stateWord = tab => tab.url ? (WORD[URGENCY.find(s => tab.states.includes(s))] ?? "idle") : "starting…";
+// D14: on a dark taskbar the dark ink vanishes, so swap it for the light one (and drop the page-scheme rule).
+const ink = svg => dark === null ? svg : svg.replace(/<style>.*?<\/style>/, "").replaceAll("#343a40", dark ? "#e9ecef" : "#343a40");
+const dataUrl = svg => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+
+function persist() { void invoke("save", { hubs: tabs.map(tab => tab.local ? { local: true, name: tab.name || undefined } : { url: tab.url, name: tab.name || undefined }) }); }
 function render() {
- document.body.replaceChildren(...tabs.map((tab, i) => {
-  const button = document.createElement("button"), dot = document.createElement("i");
-  dot.className = tab.state; button.className = i === active ? "on" : "";
-  button.append(dot, `${i + 1} · ${tab.title}`); button.onclick = () => invoke("select", { index: i });
+ const buttons = tabs.map((tab, i) => {
+  const button = document.createElement("button"), img = document.createElement("img"), text = document.createElement("span");
+  img.src = dataUrl(iconSvg(ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, tab.states)); img.alt = "";
+  text.textContent = label(tab);
+  button.className = "tab" + (i === active ? " on" : ""); button.title = `${label(tab)}: ${stateWord(tab)} · Ctrl+${i + 1} · right-click to rename or remove`;
+  button.append(img, text);
+  if (!tab.url) { const small = document.createElement("small"); small.textContent = "waiting for the hub"; button.append(small); }
+  button.onclick = () => select(tab.id);
+  button.oncontextmenu = event => { event.preventDefault(); edit(tab); };
+  button.draggable = true;
+  button.ondragstart = () => { dragged = tab; };
+  button.ondragover = event => { event.preventDefault(); button.classList.add("drop"); };
+  button.ondragleave = () => button.classList.remove("drop");
+  button.ondrop = event => { event.preventDefault(); if (!dragged || dragged === tab) return; const current = tabs[active]; tabs.splice(tabs.indexOf(dragged), 1); tabs.splice(tabs.indexOf(tab), 0, dragged); active = tabs.indexOf(current); persist(); render(); };
   return button;
- }));
- const key = tabs.map(t => t.state).join();
- if (key !== iconKey) { iconKey = key; void drawIcons(); }
+ });
+ const add = document.createElement("button"); add.id = "add"; add.textContent = "+"; add.title = "Add a hub: paste its link (for example another PC's tailnet address)"; add.onclick = addHub;
+ const note = document.createElement("div"); note.id = "note"; note.textContent = startupError || (staged ? "Update ready: Restart to update in the tray" : "");
+ document.body.replaceChildren(...buttons, add, note);
+ void updateIcons();
 }
-function pixels(size, draw) { const c = new OffscreenCanvas(size, size), g = c.getContext("2d"); draw(g, size); return Array.from(g.getImageData(0, 0, size, size).data); }
-function grid(g, size) { // 2x2: one square per hub in its state colour
- tabs.slice(0, 4).forEach((tab, i) => { const h = size / 2; g.fillStyle = COLORS[tab.state]; g.fillRect((i % 2) * h + 1, Math.floor(i / 2) * h + 1, h - 2, h - 2); });
+async function pixels(svg, size) {
+ const img = new Image(); img.src = dataUrl(svg); await img.decode();
+ const canvas = new OffscreenCanvas(size, size), g = canvas.getContext("2d"); g.drawImage(img, 0, 0, size, size);
+ return Array.from(g.getImageData(0, 0, size, size).data);
 }
-async function drawIcons() {
- const waiting = tabs.some(t => t.state === "waiting");
- const overlay = waiting ? pixels(16, g => { g.fillStyle = COLORS.waiting; g.beginPath(); g.arc(8, 8, 7, 0, 7); g.fill(); }) : null;
- try { await invoke("set_icons", { big: pixels(32, grid), bigSize: 32, small: pixels(16, grid), smallSize: 16, overlay }); } catch (e) { console.error(e); }
+// P-03/P-04: taskbar = up to 4 hubs with their dots; tray = this PC's icon with every hub's states merged; overlay = most urgent of all.
+async function updateIcons() {
+ const all = [...new Set(tabs.flatMap(tab => tab.states))], urgent = URGENCY.find(s => all.includes(s));
+ const local = tabs.find(tab => tab.local) ?? tabs[0];
+ const key = JSON.stringify([tabs.map(t => [t.icon, t.states, label(t), t.url ? 1 : 0]), staged]);
+ if (key === iconKey) return; iconKey = key;
+ const big = ink(hubsIconSvg(tabs.map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
+ const small = ink(iconSvg(ICONS[local?.icon] ? local.icon : DEFAULT_ICON, URGENCY.filter(s => all.includes(s))));
+ const overlay = urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" fill="${DOT[urgent]}" stroke="#fff" stroke-width="1.5"/></svg>`, 16) : null;
+ try {
+  await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay });
+  await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${label(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${label(tab)}: ${stateWord(tab)}`)].join("\n") });
+ } catch (error) { console.error(error); }
 }
-window.onTitle = (label, title) => { const i = Number(label.slice(3)); tabs[i] = { title: title || tabs[i]?.title || "hub", state: stateOf(title) }; render(); };
-window.selected = i => { active = i; render(); };
-const host = url => { try { return new URL(url).host; } catch { return url; } };
-invoke("hubs").then(urls => { tabs = urls.map(u => ({ title: host(u), state: "idle" })); render(); });
+function select(id) {
+ const index = tabs.findIndex(tab => tab.id === id); if (index < 0) return;
+ active = index; void invoke("show", { id }); render();
+}
+window.select = select;
+window.shortcut = index => { if (tabs[index]) select(tabs[index].id); };
+// The hub page's title line (hub/web/app.ts): `pi-hub-state {"icon","name","states"}`; an older hub sends a plain title.
+window.onTitle = (webview, title) => {
+ const tab = tabs.find(t => "hub" + t.id === webview); if (!tab) return;
+ const line = /^pi-hub-state (\{.*\})$/.exec(title ?? "");
+ if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { icon: value.icon || tab.icon, hubName: value.name || tab.hubName, states: Array.isArray(value.states) ? value.states : [] }); } catch { /* half-written title */ } }
+ else tab.states = (title ?? "").startsWith("(!)") ? ["waiting"] : [];
+ render();
+};
+function open(tab) { if (tab.url) void invoke("open", { id: tab.id, url: tab.url }).then(() => { if (tabs[active] === tab) void invoke("show", { id: tab.id }); }, error => { startupError = String(error); render(); }); }
+const newTab = fields => ({ id: nextId++, icon: DEFAULT_ICON, states: [], name: "", ...fields });
+function addHub() {
+ const link = prompt("Paste the hub's link (http://127.0.0.1:… or https://<pc>.<tailnet>.ts.net:…):")?.trim();
+ if (!link) return;
+ let url; try { url = new URL(link); } catch { alert("That is not a link."); return; }
+ if (!["http:", "https:"].includes(url.protocol)) { alert("Hub links start with http:// or https://."); return; }
+ const tab = newTab({ url: url.href }); tabs.push(tab); persist(); open(tab); select(tab.id);
+}
+function edit(tab) {
+ const name = prompt(tab.local ? "Name for this PC's tab:" : "Name for this tab (clear it to remove the tab):", label(tab));
+ if (name === null) return;
+ if (!name.trim() && !tab.local) {
+  if (!confirm(`Remove ${label(tab)}? Its pairing stays in the app until you add it again.`)) return;
+  void invoke("close", { id: tab.id }); const current = tabs[active]; tabs.splice(tabs.indexOf(tab), 1);
+  active = Math.max(0, tabs.indexOf(current)); persist(); if (tabs[active]) select(tabs[active].id); else render(); return;
+ }
+ tab.name = name.trim() === (tab.hubName || (tab.local ? "This PC" : host(tab.url))) ? "" : name.trim(); persist(); render();
+}
+let staged = false;
+const config = await invoke("config");
+dark = config.dark; staged = config.staged; startupError = config.error ?? "";
+const saved = Array.isArray(config.hubs) ? config.hubs : [];
+tabs = saved.filter(h => h?.local || h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, name: h.name ?? "" }));
+if (!tabs.some(tab => tab.local)) tabs.unshift(newTab({ local: true, url: config.local }));
+for (const tab of tabs) open(tab);
+select(tabs[0].id);
+// P-01: the app may start at login before the hub: keep the tab and look for hub.json every few seconds.
+const local = tabs.find(tab => tab.local);
+const wait = setInterval(async () => {
+ if (local.url) return clearInterval(wait);
+ const url = await invoke("local_url"); if (url) { local.url = url; open(local); render(); clearInterval(wait); }
+}, 3000);
+setInterval(async () => { const now = await invoke("staged"); if (now !== staged) { staged = now; iconKey = ""; render(); } }, 60_000);
 </script>
 </body></html>

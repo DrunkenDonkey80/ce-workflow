@@ -10,6 +10,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["unstable", "tray-icon", "image-png"] }
 tauri-plugin-global-shortcut = "2"
 serde_json = "1"
+tauri-plugin-single-instance = "2"
 
 [profile.release]
 opt-level = "s"

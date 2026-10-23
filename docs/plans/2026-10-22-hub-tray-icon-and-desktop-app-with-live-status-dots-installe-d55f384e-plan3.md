@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T07:03:44.730Z
+updated: 2026-10-23T07:11:54.334Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -131,15 +131,11 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ### Phase 3: The app [code]
 
-- [ ] **P-01** Tab strip and hub list: local hub from `hub.json` and `config.json` (D7), added remote hubs saved in the app's config.
-  - The local tab reads the hub data folder saved at install (H-03); a missing `hub.json` (app started before the hub at login) keeps the tab and retries every few seconds.
-  - Add a hub by pasting its link; rename and remove from the tab's menu; order sets Ctrl+N.
-- [ ] **P-02** Child webview per hub (or the A-02 fallback), user agent marker, title hook feeding each tab's name, icon and dots.
-- [ ] **P-03** Combined taskbar icon from the tabs' states via `ui/icons.js`, plus the overlay icon if A-02 showed pinned buttons need it.
-- [ ] **P-04** Tray icon and menu: hubs with their state, Open, Restart to update (D11), Quit; click brings the window forward.
-- [ ] **P-05** Focus-scoped Ctrl+1 to Ctrl+N (D3), hide to tray on close (D9), hidden start, single instance, staged-update swap at start.
-  - Contract from H-03: write the app's pid to `app.lock` next to the exe while running (the hub's running check); read `hubData` from `app.json` there or `--hub-data`.
-  - Check for P-01 to P-05: C5 builds; manual run against the local hub and the WSL hub shows tabs, dots and switching.
+- [x] **P-01** Strip reads app.json hubs + local hub from hubData (hub.json/config.json, retries every 3 s until the hub is up); + adds a pasted http(s) link; right-click renames or removes; drag reorders (sets Ctrl+N); saved to app.json.
+- [x] **P-02** Child webview per hub created on demand (async command), UA 'PiHubApp/<version>', title hook parses the pi-hub-state line (name, icon, states) with a '(!)' fallback for older hubs.
+- [x] **P-03** Window icon = hubsIconSvg (≤4 hubs) at 64 px, overlay = most urgent dot over all hubs, tray = this PC's icon with merged dots; ink follows SystemUsesLightTheme (D14).
+- [x] **P-04** Tray menu rebuilt on state change: each hub with its state (click selects it), Open, Restart to update while .next exists, Quit; tooltip lists hubs; left click brings the window forward.
+- [x] **P-05** Ctrl+1..9 registered only while focused, close hides to tray, --hidden start, single-instance plugin, swap of .next at start (rollback on failure, error shown in the strip), app.lock pid written and removed on exit.
 
 ### Phase 4: Release pipeline [code]
 

@@ -1,28 +1,93 @@
-// A-02 spike: one window, a local tab strip, one child webview per hub, title hook, live icons, tray, focus-scoped Ctrl+N.
+// Pi Hub desktop app: one window, a local tab strip (ui/index.html) that drives everything, one child webview per hub (D6),
+// state from each hub page's title (D5), live taskbar/overlay/tray icons drawn by the strip (D8, D14), tray (D9, D11).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::sync::Mutex;
+use serde_json::{json, Value};
+use std::path::{Path, PathBuf};
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     webview::WebviewBuilder,
     window::WindowBuilder,
-    AppHandle, LogicalPosition, LogicalSize, Manager, Rect, WebviewUrl, WindowEvent,
+    AppHandle, LogicalPosition, LogicalSize, Manager, Rect, RunEvent, WebviewUrl, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 const STRIP: f64 = 36.0;
-const UA: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0 PiHubApp/0.1.0";
+#[cfg(windows)]
+const UA_BASE: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0";
+#[cfg(not(windows))]
+const UA_BASE: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+const EXT: &str = if cfg!(windows) { ".exe" } else { ".AppImage" };
 
-struct Hubs { urls: Vec<String>, active: Mutex<usize> }
+fn ua() -> String { format!("{UA_BASE} PiHubApp/{}", env!("CARGO_PKG_VERSION")) }
+/// The install folder: the hub writes app.json there and reads app.lock (hub/src/app-install.ts).
+fn install_dir() -> PathBuf {
+    // An AppImage runs from a mount; $APPIMAGE is the real file.
+    let exe = std::env::var_os("APPIMAGE").map(PathBuf::from).or_else(|| std::env::current_exe().ok()).unwrap_or_default();
+    exe.parent().map(Path::to_path_buf).unwrap_or_default()
+}
+fn main_file() -> PathBuf { install_dir().join(format!("pi-hub-app{EXT}")) }
+fn next_file() -> PathBuf { install_dir().join(format!("pi-hub-app.next{EXT}")) }
+fn old_file() -> PathBuf { install_dir().join(format!("pi-hub-app.old{EXT}")) }
+fn read_json(path: &Path) -> Option<Value> { serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok() }
+fn app_config() -> Value { read_json(&install_dir().join("app.json")).unwrap_or_else(|| json!({})) }
+fn arg_after(name: &str) -> Option<String> { let args: Vec<String> = std::env::args().collect(); args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned()) }
 
+/// The hub data folder saved at install (a login or desktop launch may lack PI_CODING_AGENT_DIR), else the hub's own default.
+fn hub_data() -> PathBuf {
+    if let Some(dir) = arg_after("--hub-data").or_else(|| app_config()["hubData"].as_str().map(String::from)) { return dir.into(); }
+    let agent = std::env::var("PI_CODING_AGENT_DIR").map(PathBuf::from).unwrap_or_else(|_| {
+        let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+        Path::new(&home).join(".pi").join("agent")
+    });
+    agent.join("pi-control-hub")
+}
+/// D7: the local hub's link from hub.json (port) and config.json (key), read fresh so a changed port never goes stale.
 fn local_hub_url() -> Option<String> {
-    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).ok()?;
-    let dir = std::path::Path::new(&home).join(".pi/agent/pi-control-hub");
-    let read = |name: &str| -> Option<serde_json::Value> { serde_json::from_str(&std::fs::read_to_string(dir.join(name)).ok()?).ok() };
-    let port = read("hub.json")?["port"].as_u64()?;
-    let key = read("config.json")?["localKey"].as_str()?.to_string();
+    let dir = hub_data();
+    let port = read_json(&dir.join("hub.json"))?["port"].as_u64()?;
+    let key = read_json(&dir.join("config.json"))?["localKey"].as_str()?.to_string();
     Some(format!("http://127.0.0.1:{port}/?token={key}"))
+}
+
+#[cfg(windows)]
+fn hidden(command: &mut std::process::Command) -> &mut std::process::Command { use std::os::windows::process::CommandExt; command.creation_flags(0x0800_0000) }
+#[cfg(not(windows))]
+fn hidden(command: &mut std::process::Command) -> &mut std::process::Command { command }
+fn alive(pid: u32) -> bool {
+    if cfg!(windows) {
+        let out = hidden(std::process::Command::new("tasklist").args(["/FI", &format!("PID eq {pid}"), "/NH", "/FO", "CSV"])).output();
+        out.map(|o| String::from_utf8_lossy(&o.stdout).contains(&format!("\"{pid}\""))).unwrap_or(false)
+    } else { Path::new(&format!("/proc/{pid}")).exists() }
+}
+fn other_instance() -> bool {
+    std::fs::read_to_string(install_dir().join("app.lock")).ok().and_then(|s| s.trim().parse::<u32>().ok()).is_some_and(|pid| pid != std::process::id() && alive(pid))
+}
+/// D14: ink follows the Windows taskbar theme, not the page's colour scheme; None elsewhere (the strip then uses prefers-color-scheme).
+fn taskbar_dark() -> Option<bool> {
+    if !cfg!(windows) { return None }
+    let out = hidden(std::process::Command::new("reg").args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "/v", "SystemUsesLightTheme"])).output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    if text.contains("0x1") { Some(false) } else if text.contains("0x0") { Some(true) } else { None }
+}
+
+/// H-03 swap, before the single-instance lock: running file → .old, .next → main, relaunch, exit.
+/// Windows allows renaming a running exe; a failed step puts the old file back and keeps running it.
+fn swap_staged() -> Result<(), String> {
+    // "Restart to update": wait (up to 10 s) for the quitting process, or the single-instance lock would hand us back to it.
+    if std::env::args().any(|a| a == "--restarted") {
+        for _ in 0..50 { if !other_instance() { break } std::thread::sleep(std::time::Duration::from_millis(200)); }
+    }
+    let (main, next, old) = (main_file(), next_file(), old_file());
+    if !next.exists() { let _ = std::fs::remove_file(&old); return Ok(()) } // the next good start deletes .old
+    if other_instance() || !std::env::current_exe().map(|e| e == main || std::env::var_os("APPIMAGE").is_some()).unwrap_or(false) { return Ok(()) }
+    let _ = std::fs::remove_file(&old);
+    std::fs::rename(&main, &old).map_err(|e| format!("Update not applied: {e}"))?;
+    if let Err(error) = std::fs::rename(&next, &main) { let _ = std::fs::rename(&old, &main); return Err(format!("Update not applied: {error}")) }
+    let args: Vec<String> = std::env::args().skip(1).filter(|a| a != "--restarted").collect();
+    std::process::Command::new(&main).args(args).spawn().map_err(|e| format!("Updated, but the new version did not start: {e}"))?;
+    std::process::exit(0);
 }
 
 fn layout(app: &AppHandle) {
@@ -35,26 +100,63 @@ fn layout(app: &AppHandle) {
         let _ = webview.set_bounds(Rect { position: LogicalPosition::new(0.0, y).into(), size: LogicalSize::new(w, height).into() });
     }
 }
-
-fn show_tab(app: &AppHandle, index: usize) {
-    let hubs = app.state::<Hubs>();
-    if index >= hubs.urls.len() { return }
-    *hubs.active.lock().unwrap() = index;
-    for i in 0..hubs.urls.len() {
-        if let Some(webview) = app.get_webview(&format!("hub{i}")) {
-            let _ = if i == index { webview.show().and_then(|_| webview.set_focus()) } else { webview.hide() };
-        }
-    }
-    if let Some(strip) = app.get_webview("strip") { let _ = strip.eval(format!("window.selected && selected({index})")); }
+fn strip_eval(app: &AppHandle, script: String) { if let Some(strip) = app.get_webview("strip") { let _ = strip.eval(script); } }
+fn bring_forward(app: &AppHandle) {
+    if let Some(window) = app.get_window("main") { let _ = window.show(); let _ = window.unminimize(); let _ = window.set_focus(); }
 }
 
-#[tauri::command]
-fn select(app: AppHandle, index: usize) { show_tab(&app, index) }
+struct Startup { error: Option<String> }
 
 #[tauri::command]
-fn hubs(state: tauri::State<Hubs>) -> Vec<String> { state.urls.clone() }
-
-/// The strip draws icons on a canvas (one drawing source, D8) and hands the pixels over.
+fn config(state: tauri::State<Startup>) -> Value {
+    json!({ "hubs": app_config()["hubs"], "local": local_hub_url(), "dark": taskbar_dark(), "staged": next_file().exists(), "version": env!("CARGO_PKG_VERSION"), "error": state.error })
+}
+#[tauri::command]
+fn local_url() -> Option<String> { local_hub_url() }
+#[tauri::command]
+fn staged() -> bool { next_file().exists() }
+/// Saves the tab list (order, names, remote links) next to the hub's hubData.
+#[tauri::command]
+fn save(hubs: Value) -> Result<(), String> {
+    let mut value = app_config();
+    value["hubs"] = hubs;
+    let path = install_dir().join("app.json");
+    let temp = path.with_extension("json.tmp");
+    std::fs::write(&temp, serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    std::fs::rename(&temp, &path).map_err(|e| e.to_string())
+}
+/// Creates hub `id`'s webview (async: creating webviews in a sync command deadlocks on Windows).
+#[tauri::command]
+async fn open(app: AppHandle, id: u32, url: String) -> Result<(), String> {
+    let label = format!("hub{id}");
+    if let Some(webview) = app.get_webview(&label) { return webview.navigate(url.parse().map_err(|_| "Bad link")?).map_err(|e| e.to_string()) }
+    let window = app.get_window("main").ok_or("no window")?;
+    let handle = app.clone();
+    let builder = WebviewBuilder::new(&label, WebviewUrl::External(url.parse().map_err(|_| "Bad link")?))
+        .user_agent(&ua())
+        .on_document_title_changed(move |webview, title| {
+            strip_eval(&handle, format!("window.onTitle && onTitle({}, {})", json!(webview.label()), json!(title)));
+        });
+    let child = window.add_child(builder, LogicalPosition::new(0.0, STRIP), LogicalSize::new(800.0, 600.0)).map_err(|e| e.to_string())?;
+    child.hide().map_err(|e| e.to_string())?;
+    layout(&app);
+    Ok(())
+}
+#[tauri::command]
+fn show(app: AppHandle, id: u32) {
+    let label = format!("hub{id}");
+    if let Some(window) = app.get_window("main") {
+        for webview in window.webviews() {
+            if webview.label() == "strip" { continue }
+            let _ = if webview.label() == label { webview.show().and_then(|_| webview.set_focus()) } else { webview.hide() };
+        }
+    }
+}
+#[tauri::command]
+fn close(app: AppHandle, id: u32) { if let Some(webview) = app.get_webview(&format!("hub{id}")) { let _ = webview.close(); } }
+#[tauri::command]
+fn reload(app: AppHandle, id: u32) { if let Some(webview) = app.get_webview(&format!("hub{id}")) { let _ = webview.eval("location.reload()"); } }
+/// The strip draws the icons on a canvas and hands over RGBA pixels; the overlay carries state on pinned buttons (A-02).
 #[tauri::command]
 fn set_icons(app: AppHandle, big: Vec<u8>, big_size: u32, small: Vec<u8>, small_size: u32, overlay: Option<Vec<u8>>) -> Result<(), String> {
     let window = app.get_window("main").ok_or("no window")?;
@@ -66,68 +168,65 @@ fn set_icons(app: AppHandle, big: Vec<u8>, big_size: u32, small: Vec<u8>, small_
     if let Some(tray) = app.tray_by_id("tray") { tray.set_icon(Some(Image::new_owned(small, small_size, small_size))).map_err(|e| e.to_string())?; }
     Ok(())
 }
+/// P-04: tray menu lists the hubs with their state; "Restart to update" only while an update is staged (D11).
+#[tauri::command]
+fn set_tray(app: AppHandle, hubs: Vec<(u32, String)>, tooltip: String) -> Result<(), String> {
+    let Some(tray) = app.tray_by_id("tray") else { return Ok(()) };
+    let menu = Menu::new(&app).map_err(|e| e.to_string())?;
+    for (id, label) in hubs { menu.append(&MenuItem::with_id(&app, format!("hub:{id}"), label, true, None::<&str>).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?; }
+    menu.append(&PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    menu.append(&MenuItem::with_id(&app, "open", "Open", true, None::<&str>).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    if next_file().exists() { menu.append(&MenuItem::with_id(&app, "restart", "Restart to update", true, None::<&str>).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?; }
+    menu.append(&MenuItem::with_id(&app, "quit", "Quit", true, None::<&str>).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    tray.set_menu(Some(menu)).map_err(|e| e.to_string())?;
+    tray.set_tooltip(Some(tooltip)).map_err(|e| e.to_string())
+}
 
-fn bring_forward(app: &AppHandle) {
-    if let Some(window) = app.get_window("main") { let _ = window.show(); let _ = window.unminimize(); let _ = window.set_focus(); }
+fn restart(app: &AppHandle) {
+    let args: Vec<String> = std::env::args().skip(1).filter(|a| a != "--hidden").collect();
+    if std::process::Command::new(main_file()).args(args).arg("--restarted").spawn().is_ok() { app.exit(0) }
 }
 
 fn main() {
-    let mut urls: Vec<String> = std::env::args().skip(1).filter(|a| a.starts_with("http")).collect();
-    if urls.is_empty() { urls.extend(local_hub_url()); }
-    let hidden = std::env::args().any(|a| a == "--hidden");
-    tauri::Builder::default()
+    let error = swap_staged().err();
+    let start_hidden = std::env::args().any(|a| a == "--hidden");
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| bring_forward(app)))
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, shortcut, event| {
             if event.state != ShortcutState::Pressed { return }
-            let key = shortcut.key as u32;
-            let first = tauri_plugin_global_shortcut::Code::Digit1 as u32;
-            if key >= first && key < first + 9 { show_tab(app, (key - first) as usize); }
+            let (key, first) = (shortcut.key as u32, tauri_plugin_global_shortcut::Code::Digit1 as u32);
+            if key >= first && key < first + 9 { strip_eval(app, format!("window.shortcut && shortcut({})", key - first)); }
         }).build())
-        .manage(Hubs { urls: urls.clone(), active: Mutex::new(0) })
-        .invoke_handler(tauri::generate_handler![select, hubs, set_icons])
+        .manage(Startup { error })
+        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray])
         .setup(move |app| {
-            // Spike comparison: one plain webview window (no strip, no child webviews).
-            if std::env::args().any(|a| a == "--plain") {
-                tauri::WebviewWindowBuilder::new(app, "plain", WebviewUrl::External(urls[0].parse()?)).title("Pi Hub plain").inner_size(1200.0, 800.0).user_agent(UA).build()?;
-                return Ok(());
-            }
-            let window = WindowBuilder::new(app, "main").title("Pi Hub").inner_size(1200.0, 800.0).visible(!hidden).build()?;
+            // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
+            let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());
+            let window = WindowBuilder::new(app, "main").title("Pi Hub").inner_size(1200.0, 800.0).visible(!start_hidden).build()?;
             window.add_child(WebviewBuilder::new("strip", WebviewUrl::App("index.html".into())), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1200.0, STRIP))?;
-            for (i, url) in urls.iter().enumerate() {
-                let handle = app.handle().clone();
-                let builder = WebviewBuilder::new(format!("hub{i}"), WebviewUrl::External(url.parse()?))
-                    .user_agent(UA)
-                    .on_document_title_changed(move |webview, title| {
-                        if let Some(strip) = handle.get_webview("strip") {
-                            let label = serde_json::to_string(webview.label()).unwrap();
-                            let _ = strip.eval(format!("window.onTitle && onTitle({label}, {})", serde_json::to_string(&title).unwrap()));
-                        }
-                    });
-                let child = window.add_child(builder, LogicalPosition::new(0.0, STRIP), LogicalSize::new(1200.0, 800.0 - STRIP))?;
-                if i != 0 { child.hide()?; }
-            }
             let handle = app.handle().clone();
             window.on_window_event(move |event| match event {
                 WindowEvent::Resized(_) => layout(&handle),
+                // D9: close hides to the tray so the dots stay live; Quit is in the tray menu.
                 WindowEvent::CloseRequested { api, .. } => { api.prevent_close(); if let Some(w) = handle.get_window("main") { let _ = w.hide(); } }
-                // D3: Ctrl+1..N only while the app has focus.
+                // D3: Ctrl+1..9 only while the app has focus; the strip ignores numbers past its last tab.
                 WindowEvent::Focused(focused) => {
                     let shortcuts = handle.global_shortcut();
-                    eprintln!("focused {focused}");
-                    if *focused {
-                        let n = handle.state::<Hubs>().urls.len().min(9);
-                        for i in 1..=n { let _ = shortcuts.register(format!("ctrl+{i}").as_str()); }
-                    } else { let _ = shortcuts.unregister_all(); }
+                    if *focused { for i in 1..=9 { let _ = shortcuts.register(format!("ctrl+{i}").as_str()); } } else { let _ = shortcuts.unregister_all(); }
                 }
                 _ => {}
             });
-            let open = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().ok_or("no icon")?)
                 .tooltip("Pi Hub")
-                .menu(&Menu::with_items(app, &[&open, &quit])?)
+                .menu(&Menu::with_items(app, &[&MenuItem::with_id(app, "open", "Open", true, None::<&str>)?, &MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?])?)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| match event.id.as_ref() { "open" => bring_forward(app), "quit" => app.exit(0), _ => {} })
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => bring_forward(app),
+                    "restart" => restart(app),
+                    "quit" => app.exit(0),
+                    id => if let Some(hub) = id.strip_prefix("hub:") { bring_forward(app); strip_eval(app, format!("window.select && select({hub})")); },
+                })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event { bring_forward(tray.app_handle()); }
                 })
@@ -135,6 +234,10 @@ fn main() {
             layout(app.handle());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Pi Hub");
+        .build(tauri::generate_context!())
+        .expect("error while starting Pi Hub");
+    app.run(|_app, event| if let RunEvent::Exit = event {
+        let lock = install_dir().join("app.lock");
+        if std::fs::read_to_string(&lock).is_ok_and(|pid| pid.trim() == std::process::id().to_string()) { let _ = std::fs::remove_file(lock); }
+    });
 }
