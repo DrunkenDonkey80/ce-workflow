@@ -43,7 +43,9 @@ function setBar(item: HTMLElement, percent: number, tone: string) {
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
 function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
-let sessionStates: string[] = [], iconKey = "", appleFor = "";
+let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
+// D5: inside the desktop app (user agent marker) the title is a machine line the app reads for its tab, taskbar and tray.
+const inApp = () => navigator.userAgent.includes("PiHubApp/");
 function renderShell() {
  // "<folder> - <session name>"; the tab title adds the current plan (H5-05).
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
@@ -53,7 +55,7 @@ function renderShell() {
  $("title-plan").hidden = !plan?.title; $("title-plan").title = plan?.title ?? "";
  if (plan?.title) { const [name, steps] = $("title-plan").children; name.textContent = plan.title; steps.textContent = plan.total ? `${plan.done ?? 0}/${plan.total}` : ""; }
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
- document.title = promptView.busy || state.activity.dialog ? "(!) " + full + " needs an answer" : full;
+ if (!inApp()) document.title = promptView.busy || state.activity.dialog ? "(!) " + full + " needs an answer" : full;
  renderIcon();
  // D19 status line. Line 1: [model: effort] [Context: n%] [💡 bias]; line 2: the plan as a progress bar (or New plan).
  const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
@@ -1159,7 +1161,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; checkedAt: number | null; checking: boolean; error?: string };
-type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean } };
+type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string };
 let hubSettings: HubSettings = {}, appBadge = 0;
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
@@ -1168,6 +1170,11 @@ function renderIcon() {
  if (state.activity.working || state.activity.subagents?.length) states.push("working");
  // An installed app's taskbar/dock icon is fixed at install; its badge is the only live part (Chromium, Safari): a mark while
  // count of what needs you (questions, finished sessions you haven't opened); colours are impossible there. Working has no badge.
+ if (inApp()) {
+  const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen"].includes(tone)); // the app has no page in front: own unseen counts
+  const line = "pihub " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)] });
+  if (document.title !== line) document.title = line;
+ }
  const needsYou = states.filter(tone => tone === "waiting" || tone === "unseen").length;
  if (needsYou !== appBadge && "setAppBadge" in navigator) { appBadge = needsYou; void (needsYou ? navigator.setAppBadge(needsYou) : navigator.clearAppBadge()).catch(() => {}); }
  const icon = iconName(), svg = icon ? iconSvg(icon, states) : "";
@@ -1192,11 +1199,12 @@ async function loadSessions() {
   notifyChanges(groups);
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
   if (visible && document.hasFocus() && groups.some(group => group.sessions.some(session => session.id === sessionId && session.tone === "unseen"))) void post("seen", {}).catch(() => {});
+  ownTone = groups.flatMap(group => group.sessions).find(session => session.id === sessionId)?.tone ?? "";
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
  void checkPairing();
- sessionsTimer = window.setTimeout(loadSessions, visible ? 5000 : 15000);
+ sessionsTimer = window.setTimeout(loadSessions, visible || inApp() ? 5000 : 15000); // the app's hidden tabs still feed its icon
 }
 // H6-03 (D19): new devices are approved, and paired ones revoked, on local hub pages only: remote pages carry no key.
 async function hub(route: string, data?: unknown) {

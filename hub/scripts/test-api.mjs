@@ -235,13 +235,11 @@ try {
 
 	// H5-05 session bar: folder groups with state tones, actions, Recents with Star/Unstar (D18).
 	const tones = async () => Object.fromEntries((await get(id, "sessions")).body.groups.flatMap(group => group.sessions.map(session => [session.name, session.tone])));
-	await get(id, "snapshot"); assert.equal((await tones())["1"], "seen");
+	await post(id, "seen", {}); assert.equal((await tones())["1"], "seen");
 	await hub.host.prompt(id, "hi");
 	assert.equal((await until(async () => (await tones())["1"] === "unseen" && "ok")), "ok", "a finished run is unseen, open page or not");
 	await get(id, "snapshot");
-	assert.equal((await tones())["1"], "seen", "opening the page marks it seen");
-	await hub.host.prompt(id, "again");
-	assert.equal((await until(async () => (await tones())["1"] === "unseen" && "ok")), "ok");
+	assert.equal((await tones())["1"], "unseen", "a (re)connect alone, as a background tab or the app's hidden tab, keeps it unseen");
 	assert.equal((await post(id, "seen", {})).status, 200);
 	assert.equal((await tones())["1"], "seen", "a focused page showing it marks it seen");
 	// S-05: an idle session with a timer is "scheduled"; the row carries the timers; the menu cancels one (own session only).

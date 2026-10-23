@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T06:51:37.289Z
+updated: 2026-10-23T06:55:37.154Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -124,12 +124,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 ### Phase 2: Hub side [code]
 
 - [x] **H-01** hubsIconSvg in icons.ts plus hub/app/build-icons.mjs (strips icons.ts → ui/icons.js, gitignored), run automatically as Tauri's beforeBuildCommand.
-- [ ] **H-02** In-app title line in `hub/web/app.ts` (D5), set only when the user agent carries `PiHubApp/`.
-  - Hub name: add `hostname` (os.hostname()) to `pageApi.settings()` and the page's `HubSettings` type; the title line uses it, never a session or folder name.
-  - States include the displayed session's own `unseen` (today `loadSessions` drops the current session's tone and `renderIcon` adds back only waiting/working).
-  - `extras()` in `hub/src/api.ts` stops clearing `unseen` on every snapshot/SSE reconnect; only an explicit open (session click) or the visible-and-focused `seen` post clears it.
-  - Freshness: inside the app the page keeps polling sessions every 5 s even when hidden, so a state change reaches the icon within 10 s (L-01's bound).
-  - Check: C3 with a test that sets the marker and reads `document.title` (hostname, own unseen, normal browsers keep their title); C10 for a background reconnect leaving `unseen` set.
+- [x] **H-02** In-app title line `pihub {icon,name,states}` (UA PiHubApp/), hostname in settings, own unseen included, snapshot/SSE reconnect no longer clears unseen, app polls every 5 s hidden.
 - [ ] **H-03** `hub/src/app-install.ts` with status, install, stage, uninstall; per-user paths for Windows and Linux.
   - Windows Start-menu shortcut via PowerShell `WScript.Shell`, run hidden; Linux .desktop file with the AppImage path.
   - Login entry on by default (D10): HKCU Run value or XDG autostart file, starting the app with `--hidden`; uninstall removes it.

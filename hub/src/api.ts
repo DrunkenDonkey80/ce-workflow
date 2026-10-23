@@ -81,7 +81,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 
 	/** Snapshot extras, as ce-workflow's snapshot: target, current, status and (for Pi's own plan) its action state. */
 	async function extras(id: string, wanted?: string | null) {
-		seen(id); // a page opened (or reconnected to) this session
+		// No seen() here: background tabs and the app's hidden tabs reconnect too; only a page in front of the user posts "seen".
 		const { target, now } = await resolve(id, wanted);
 		const plan = published(id)?.plan; // shortcut: only Pi's current plan carries bias/finishable; another displayed plan shows without its action row until Pi switches to it.
 		return { target, current: now?.id ?? null, status: await status(id), ...(plan && target.kind === "plan" && plan.id === target.id ? { plan } : {}) };
