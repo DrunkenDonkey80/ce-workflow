@@ -105,7 +105,7 @@ process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} }, pool: { available: true, daemon: () => undefined, view: async () => stub("/api/pool", {}), action: async data => stub("/api/pool", data), start() {}, stop() {} },
- app: { status: () => ({ supported: true, installed: true, version: "0.1.0", staged: null, latest: "0.2.0", running: false, login: true }), install() {}, stage: () => ({ supported: true, installed: true, version: "0.1.0", staged: "0.2.0", latest: "0.2.0", running: false, login: true }), uninstall() {}, setLogin() {} } });
+ app: { status: () => ({ supported: true, installed: true, version: "0.1.0", staged: null, latest: "0.2.0", running: false, login: true }), install() {}, autoStage: async () => ({}), stage: () => ({ supported: true, installed: true, version: "0.1.0", staged: "0.2.0", latest: "0.2.0", running: false, login: true }), uninstall() {}, setLogin() {} } });
 const origin = `http://127.0.0.1:${hub.config.port}`;
 const own = await hub.host.create(folder, "1"), id = own.id, rpc = () => hub.host.live.get(id).rpc;
 const publish = (event, value) => hub.views.get(id)?.publish(event, value);

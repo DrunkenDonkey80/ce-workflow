@@ -34,7 +34,7 @@ mock.timers.enable({ apis: ["setInterval"] });
 // H-04 (C9): a spy app installer; any call that is not status would change files or the login entry.
 const appCalls = [];
 const spy = name => (...args) => { appCalls.push(name); return { supported: true, installed: false, version: null, staged: null, latest: "0.1.0", running: false, login: false, args }; };
-const app = { status: spy("status"), install: spy("install"), stage: spy("stage"), uninstall: spy("uninstall"), setLogin: spy("login") };
+const app = { autoStage: async () => ({}), status: spy("status"), install: spy("install"), stage: spy("stage"), uninstall: spy("uninstall"), setLogin: spy("login") };
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url), app });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {

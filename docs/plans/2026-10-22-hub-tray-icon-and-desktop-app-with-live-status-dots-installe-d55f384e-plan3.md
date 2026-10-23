@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T07:02:33.162Z
+updated: 2026-10-23T07:03:44.730Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -127,8 +127,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 - [x] **H-02** In-app title line `pi-hub-state {icon,name,states}` (UA PiHubApp/), hostname in settings, own unseen included, snapshot/SSE reconnect no longer clears unseen, app polls every 5 s hidden.
 - [x] **H-03** hub/src/app-install.ts: status/install/stage/uninstall/setLogin; installed.json tracks version+staged (a vanished .next means the app swapped); app.lock pid = running; app.json carries hubData; release.json missing = "no release pinned yet".
 - [x] **H-04** POST /s/<id>/api/app (status/install/update/uninstall/login) refused unless non-remote, loopback and not tailscale-forwarded; gear "Desktop app" section (status line, Install/Update, Uninstall, Start at login) fetched only when the page has the local key; WSL shows the D13 note.
-- [ ] **H-05** Hourly check: when the installed app version differs from `release.json`, download and stage it (D4); skipped on WSL (D13).
-  - Check: C2 with a fake pin; staged file present, running file untouched.
+- [x] **H-05** app.autoStage() runs at hub start and hourly (unref'd, cleared on stop): stages a newer pin as .next when installed and supported; no-op when not installed, unsupported or on WSL; failures go to the hub log.
 
 ### Phase 3: The app [code]
 

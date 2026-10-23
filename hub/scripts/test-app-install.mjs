@@ -25,6 +25,7 @@ const listed = () => fs.existsSync(root) ? fs.readdirSync(root, { recursive: tru
 let holder;
 try {
 	assert.deepEqual(app.status(), { supported: true, installed: false, version: null, staged: null, latest: "0.1.0", running: false, login: false });
+	assert.equal((await app.autoStage()).installed, false, "the hourly check never installs");
 	await assert.rejects(app.stage(), /not installed/);
 
 	// Refusals: a URL outside the release path, a hash mismatch; neither leaves a file.
@@ -46,7 +47,7 @@ try {
 
 	// Stage: a newer pin downloads to .next; the running file stays as it was.
 	pin = { version: "0.2.0", assets: { [asset]: { url: base + "app-v0.2.0/v2.bin", sha256: sha("v2.bin") } } };
-	const staged = await app.stage();
+	const staged = await app.autoStage(); // H-05: the hourly check (C2)
 	assert.deepEqual([staged.version, staged.staged, staged.latest], ["0.1.0", "0.2.0", "0.2.0"]);
 	assert.equal(fs.readFileSync(app.paths.file, "utf8"), "app build 1", "running file untouched");
 	assert.equal(fs.readFileSync(app.paths.next, "utf8"), "app build 2");
@@ -71,7 +72,7 @@ try {
 	// D13: WSL and other platforms refuse every action and say why.
 	const wsl = createAppInstall({ platform: "linux", wsl: true, home: root, dataDir: root, release: () => pin });
 	assert.deepEqual([wsl.status().supported, wsl.status().note], [false, "Install the app from the Windows hub."]);
-	await assert.rejects(wsl.install(), /Windows hub/); assert.throws(() => wsl.uninstall(), /Windows hub/);
+	await assert.rejects(wsl.install(), /Windows hub/); assert.equal((await wsl.autoStage()).supported, false, "no staging on WSL"); assert.throws(() => wsl.uninstall(), /Windows hub/);
 	assert.match(createAppInstall({ platform: "darwin", home: root, dataDir: root, release: () => pin }).status().note, /64-bit Windows and Linux/);
 	assert.equal(createAppInstall({ home: root, dataDir: root, release: () => null }).status().latest, null, "no pin yet");
 	console.log("ok - app install: refused URL and hash, install with shortcut and login entry, stage, swap, lock, uninstall, WSL refusal");

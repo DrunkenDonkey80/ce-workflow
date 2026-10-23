@@ -383,6 +383,11 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	// A tick only reads its timers; due ones run in the background and never overlap themselves.
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);
 	ticks.unref();
+	// H-05 (D4): an installed app gets a newer pinned build staged hourly; it switches on its next start.
+	const stageApp = () => void app?.autoStage().catch(error => console.error(`desktop app update: ${(error as Error).message}`));
+	stageApp();
+	const appTimer = setInterval(stageApp, 3_600_000);
+	appTimer.unref();
 	const timer = setInterval(() => {
 		// Windows login can start the hub before Tailscale has its connection and user identity.
 		if (config.remote && !remoteStatus().url) void applyRemote().catch(error => { remoteError = (error as Error).message; });
@@ -393,7 +398,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 
 	async function stop() {
 		return closing ??= (async () => {
-			clearInterval(timer); clearInterval(ticks); usage?.stop(); pool?.stop(); updates?.stop();
+			clearInterval(timer); clearInterval(ticks); clearInterval(appTimer); usage?.stop(); pool?.stop(); updates?.stop();
 			pairing.close();
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();

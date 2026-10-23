@@ -114,6 +114,8 @@ export function createAppInstall({
 		write({ version: value.version, staged: await fetchTo(next) });
 		return status();
 	}
+	/** The hourly check (H-05): stage when installed and supported (not on WSL, D13); otherwise nothing. */
+	const autoStage = async () => unsupported || !current() ? status() : stage();
 	function uninstall() {
 		guard();
 		if (running()) throw new Error("Quit Pi Hub from the tray first.");
@@ -121,5 +123,5 @@ export function createAppInstall({
 		rmSync(dir, { recursive: true, force: true }); rmSync(shortcut, { force: true });
 		return status();
 	}
-	return { status, install, stage, uninstall, setLogin, paths: { dir, file, next, lock, shortcut, autostartFile } };
+	return { status, install, stage, autoStage, uninstall, setLogin, paths: { dir, file, next, lock, shortcut, autostartFile } };
 }
