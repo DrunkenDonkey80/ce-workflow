@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T07:13:53.657Z
+updated: 2026-10-23T07:14:13.390Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -172,7 +172,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ## Resume context
 
-Planning draft, nothing implemented. D1–D13 settled; D13: a WSL hub hides Install and points to the Windows hub. The Astra review's 9 findings were folded in (see Amendments). No open questions remain. Next: A-01 installs Rust, the VS C++ build tools and tauri-cli; A-01H needs the user to approve the admin prompt. The A-02 spike may switch D6 to its fallback, and the A-03 mockup sets the hub count and the tray icon design; ask about both once the evidence exists.
+19/23 done, HEAD 91eff55, all local (never pushed). Code complete: hub side (H-01..H-05), app (P-01..P-05, live-checked tabs/icons/single instance/.next swap from a temp folder), release workflow + pin script + README, product diagram. C1/C2/C3/C9/C10 pass, C5 builds. Next is the user's: R-03 push master (with version bump + changelog entry incl. C6 shots) and tag app-v0.1.0; then R-04 (green run, pin-release, commit release.json), L-01 live acceptance (tray menu, Ctrl+N, Restart to update, pinned button, WSL tab), L-02 Linux.
 
 ## Amendments
 
