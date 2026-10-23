@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T07:51:13.257Z
+updated: 2026-10-23T08:08:47.152Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -147,11 +147,12 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ### Phase 5: Live acceptance [think]
 
-- [human] **L-01** On this PC: Install from settings, then tabs for this PC, the WSL hub and the work PC; Ctrl+N; tray; pinned button.
+- [wip] **L-01** On this PC: Install from settings, then tabs for this PC, the WSL hub and the work PC; Ctrl+N; tray; pinned button.
   - Accept: a question in any hub turns its part of the taskbar icon red within 10 s, also with its tab inactive and the window hidden to the tray; finished unseen work shows blue until opened.
   - Accept: Restart to update swaps two real builds; with the old file locked by hand the swap fails cleanly and the old version keeps running.
   - Accept: app started before the hub at login connects once the hub is up.
   - Accept: bump `release.json` to a test build; within the hourly check the app is staged and switches after restart.
+  - note: User testing on another PC: install ok, pinned overlay ok; fixes requested: label, login on one line, Start/Stop button, + dialog hidden.
 - [blocked] **L-02** Linux check on the friend's machine (needs a Linux desktop): install, tray, icon, tabs; record what the desktop allows (D12).
 ### P-ARCH [code] Product architecture
 

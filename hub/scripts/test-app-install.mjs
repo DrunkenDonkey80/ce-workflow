@@ -61,7 +61,9 @@ try {
 	assert.equal(app.status().running, true);
 	assert.throws(() => app.uninstall(), /Quit Pi Hub from the tray first/);
 	await assert.rejects(app.install(), /Quit Pi Hub from the tray first/);
-	holder.kill(); await new Promise(resolve => holder.once("exit", resolve));
+	const exited = new Promise(resolve => holder.once("exit", resolve));
+	assert.equal(app.stop().running, false, "Stop ends the app's pid"); await exited;
+	fs.writeFileSync(app.paths.lock, String(holder.pid));
 	assert.equal(app.status().running, false, "a dead pid is a stale lock");
 
 	const removed = app.uninstall();

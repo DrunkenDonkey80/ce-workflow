@@ -291,6 +291,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 						if (data.action === "install") return send(200, await app.install());
 						if (data.action === "update") return send(200, await app.stage());
 						if (data.action === "uninstall") return send(200, app.uninstall());
+						if (data.action === "start") return send(200, app.start());
+						if (data.action === "stop") return send(200, app.stop());
 						if (data.action === "login" && typeof data.on === "boolean") return send(200, app.setLogin(data.on));
 					} catch (error) { return send(409, { error: (error as Error).message }); }
 					return send(400, { error: "Unknown app action." });

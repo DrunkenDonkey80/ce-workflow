@@ -2,6 +2,15 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.67 — 2026-10-23
+
+### Added
+- Hub: ⚙ → Desktop app (Pi Hub) has a Start button, which reads Stop while the app runs. Start at login now shares a row with Uninstall.
+![Desktop app row with Start/Stop](docs/changelog/0.1.67-desktop-app-start.png)
+
+### Fixed
+- Desktop app 0.1.1: adding, renaming and removing a tab now asks inside the tab strip. The old pop-up was cut off behind the hub page.
+
 ## 0.1.66 — 2026-10-23
 
 ### Fixed

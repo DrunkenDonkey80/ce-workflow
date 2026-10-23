@@ -11,6 +11,7 @@
  button.tab span { overflow: hidden; text-overflow: ellipsis }
  button.tab small { color: var(--muted) }
  #add { padding: 0 12px; font-size: 18px; color: var(--muted) }
+ #ask { flex: 1; margin: 5px 8px; padding: 0 8px; border: 1px solid var(--sel); border-radius: 4px; background: var(--on); color: inherit; font: inherit; outline: none }
  #note { margin-left: auto; align-self: center; padding: 0 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 </style></head>
 <body>
@@ -32,6 +33,7 @@ const dataUrl = svg => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
 
 function persist() { void invoke("save", { hubs: tabs.map(tab => tab.local ? { local: true, name: tab.name || undefined } : { url: tab.url, name: tab.name || undefined }) }); }
 function render() {
+ if (asking) return void updateIcons(); // keep the open question; icons still follow the hubs
  const buttons = tabs.map((tab, i) => {
   const button = document.createElement("button"), img = document.createElement("img"), text = document.createElement("span");
   img.src = dataUrl(iconSvg(ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, tab.states)); img.alt = "";
@@ -49,7 +51,7 @@ function render() {
   return button;
  });
  const add = document.createElement("button"); add.id = "add"; add.textContent = "+"; add.title = "Add a hub: paste its link (for example another PC's tailnet address)"; add.onclick = addHub;
- const note = document.createElement("div"); note.id = "note"; note.textContent = startupError || (staged ? "Update ready: Restart to update in the tray" : "");
+ const note = document.createElement("div"); note.id = "note"; note.textContent = notice || startupError || (staged ? "Update ready: Restart to update in the tray" : "");
  document.body.replaceChildren(...buttons, add, note);
  void updateIcons();
 }
@@ -88,22 +90,35 @@ window.onTitle = (webview, title) => {
 };
 function open(tab) { if (tab.url) void invoke("open", { id: tab.id, url: tab.url }).then(() => { if (tabs[active] === tab) void invoke("show", { id: tab.id }); }, error => { startupError = String(error); render(); }); }
 const newTab = fields => ({ id: nextId++, icon: DEFAULT_ICON, states: [], name: "", ...fields });
-function addHub() {
- const link = prompt("Paste the hub's link (http://127.0.0.1:… or https://<pc>.<tailnet>.ts.net:…):")?.trim();
+// prompt()/alert() draw inside this 36 px strip and get cut off, so questions are an input in the strip itself.
+let asking = null, notice = "";
+function ask(hint, value = "") {
+ return new Promise(done => {
+  const text = document.createElement("div"), input = document.createElement("input");
+  text.id = "note"; text.style.margin = "0"; text.textContent = hint;
+  input.id = "ask"; input.value = value; input.title = "Enter saves · Esc cancels";
+  const finish = result => { if (asking !== input) return; asking = null; done(result); render(); };
+  input.onkeydown = event => { if (event.key === "Enter") finish(input.value.trim()); else if (event.key === "Escape") finish(null); };
+  input.onblur = () => finish(null);
+  asking = input; notice = ""; document.body.replaceChildren(text, input); input.focus(); input.select();
+ });
+}
+async function addHub() {
+ const link = await ask("Paste the hub's link (http://127.0.0.1:… or https://<pc>.<tailnet>.ts.net:…):");
  if (!link) return;
- let url; try { url = new URL(link); } catch { alert("That is not a link."); return; }
- if (!["http:", "https:"].includes(url.protocol)) { alert("Hub links start with http:// or https://."); return; }
+ let url; try { url = new URL(link); } catch { notice = "That is not a link."; return render(); }
+ if (!["http:", "https:"].includes(url.protocol)) { notice = "Hub links start with http:// or https://."; return render(); }
  const tab = newTab({ url: url.href }); tabs.push(tab); persist(); open(tab); select(tab.id);
 }
-function edit(tab) {
- const name = prompt(tab.local ? "Name for this PC's tab:" : "Name for this tab (clear it to remove the tab):", label(tab));
+async function edit(tab) {
+ const name = await ask(tab.local ? "Name for this PC's tab:" : "Name for this tab (clear it to remove the tab):", label(tab));
  if (name === null) return;
- if (!name.trim() && !tab.local) {
-  if (!confirm(`Remove ${label(tab)}? Its pairing stays in the app until you add it again.`)) return;
+ if (!name && !tab.local) {
   void invoke("close", { id: tab.id }); const current = tabs[active]; tabs.splice(tabs.indexOf(tab), 1);
+  notice = `Removed ${label(tab)}; paste its link with + to add it back.`;
   active = Math.max(0, tabs.indexOf(current)); persist(); if (tabs[active]) select(tabs[active].id); else render(); return;
  }
- tab.name = name.trim() === (tab.hubName || (tab.local ? "This PC" : host(tab.url))) ? "" : name.trim(); persist(); render();
+ tab.name = name === (tab.hubName || (tab.local ? "This PC" : host(tab.url))) ? "" : name; persist(); render();
 }
 let staged = false;
 const config = await invoke("config");

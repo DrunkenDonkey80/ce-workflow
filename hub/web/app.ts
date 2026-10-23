@@ -1683,6 +1683,8 @@ function renderApp(app: AppStatus) {
  const install = $("app-install") as HTMLButtonElement;
  install.textContent = app.installed ? "Update" : "Install"; install.disabled = app.installed ? !newer : !app.latest;
  $("app-uninstall").hidden = !app.installed;
+ const start = $("app-start") as HTMLButtonElement;
+ start.hidden = !app.installed; start.textContent = app.running ? "Stop" : "Start";
 }
 async function appAction(body: Record<string, unknown>, busy?: string) {
  if (busy) $("app-status").textContent = busy;
@@ -1691,6 +1693,8 @@ async function appAction(body: Record<string, unknown>, busy?: string) {
 $("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) void appAction({ action: "status" }); });
 $("app-install").addEventListener("click", () => void appAction({ action: $("app-install").textContent === "Update" ? "update" : "install" }, "Downloading…"));
 $("app-uninstall").addEventListener("click", () => void appAction({ action: "uninstall" }));
+// The app writes app.lock a moment after it starts, so look again shortly after.
+$("app-start").addEventListener("click", () => void appAction({ action: $("app-start").textContent === "Stop" ? "stop" : "start" }).then(() => setTimeout(() => void appAction({ action: "status" }), 2500)));
 $("app-login").addEventListener("change", () => void appAction({ action: "login", on: ($("app-login") as HTMLInputElement).checked }));
 function renderNotify() {
  const notify = hubSettings.notify ?? { question: true, done: true };

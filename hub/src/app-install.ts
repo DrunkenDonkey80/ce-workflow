@@ -1,6 +1,6 @@
 // D4/D10/D13: the hub installs, stages and removes the desktop app from the hashes pinned in hub/app/release.json.
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -116,6 +116,18 @@ export function createAppInstall({
 	}
 	/** The hourly check (H-05): stage when installed and supported (not on WSL, D13); otherwise nothing. */
 	const autoStage = async () => unsupported || !current() ? status() : stage();
+	function start() {
+		guard();
+		if (!current()) throw new Error("The desktop app is not installed.");
+		if (!running()) spawn(file, ["--hub-data", dataDir], { cwd: dir, detached: true, stdio: "ignore" }).on("error", () => {}).unref();
+		return status();
+	}
+	/** Stop = quit: the app holds no unsaved state (tabs are saved on change), so ending its pid is safe. */
+	function stop() {
+		guard();
+		if (running()) { try { process.kill(Number(readFileSync(lock, "utf8").trim())); } catch { /* already gone */ } rmSync(lock, { force: true }); }
+		return status();
+	}
 	function uninstall() {
 		guard();
 		if (running()) throw new Error("Quit Pi Hub from the tray first.");
@@ -123,5 +135,5 @@ export function createAppInstall({
 		rmSync(dir, { recursive: true, force: true }); rmSync(shortcut, { force: true });
 		return status();
 	}
-	return { status, install, stage, autoStage, uninstall, setLogin, paths: { dir, file, next, lock, shortcut, autostartFile } };
+	return { status, install, stage, autoStage, start, stop, uninstall, setLogin, paths: { dir, file, next, lock, shortcut, autostartFile } };
 }
