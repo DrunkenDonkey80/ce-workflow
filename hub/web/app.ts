@@ -46,6 +46,20 @@ function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice"
 let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
 // D5: inside the desktop app (user agent marker) the title is a machine line the app reads for its tab, taskbar and tray.
 const inApp = () => navigator.userAgent.includes("PiHubApp/");
+// Small line icons for the header buttons; each has its own colour in styles.css (.ui-icon[data-icon]).
+const ICON_PATHS: Record<string, string> = {
+ model: '<path d="M8 3.5a2.5 2.5 0 0 0-4.6 1.3A2.5 2.5 0 0 0 2.5 9 2.5 2.5 0 0 0 5 12.6 2 2 0 0 0 8 13.5zM8 3.5a2.5 2.5 0 0 1 4.6 1.3A2.5 2.5 0 0 1 13.5 9a2.5 2.5 0 0 1-2.5 3.6 2 2 0 0 1-3 .9zM8 3.5v10"/>',
+ context: '<rect x="3" y="2.5" width="10" height="12" rx="1.5"/><path d="M5.5 1v3M8 1v3M10.5 1v3M5.5 8h5M5.5 11h3"/>',
+ think: '<circle cx="8" cy="8" r="6.5"/><path d="M6 6.3a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.3v.4"/><path d="M8 11.8v.1"/>',
+ research: '<path d="M3 1.5h7.5l2.5 2.5v4M3 1.5v13h5"/><path d="M5.5 5h4M5.5 8h2"/><circle cx="11" cy="11.5" r="2.3"/><path d="m12.7 13.2 1.8 1.8"/>',
+ night: '<path d="M13.5 9.8A6 6 0 1 1 6.2 2.5a4.7 4.7 0 0 0 7.3 7.3z"/>',
+ env: '<path d="M3.5 1.5h6l3 3v10h-9z"/><path d="M9.5 1.5v3h3M6 8.5h4M6 11h4"/>',
+};
+function icon(name: string) {
+ const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+ svg.setAttribute("viewBox", "0 0 16 16"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("class", "ui-icon"); svg.dataset.icon = name;
+ svg.innerHTML = ICON_PATHS[name]; return svg;
+}
 function renderShell() {
  // "<folder> - <session name>"; the tab title adds the current plan (H5-05).
  const status = state.status, plan = state.plan, head = [status?.folder, status?.tab].filter(Boolean).join(" - ");
@@ -57,17 +71,17 @@ function renderShell() {
  // Cheap cue for a backgrounded tab (D20): a waiting answer shows in the tab title.
  if (!inApp()) document.title = promptView.busy || state.activity.dialog ? "(!) " + full + " needs an answer" : full;
  renderIcon();
- // D19 status line. Line 1: [model: effort] [Context: n%] [💡 bias]; line 2: the plan as a progress bar (or New plan).
+ // D19 status line. Line 1: [model: effort] [Context: n%] [? bias]; line 2: the plan as a progress bar (or New plan).
  const effort = status?.effort ? status.effort[0].toUpperCase() + status.effort.slice(1) : "—";
- $("model-button").textContent = (status?.model?.name ?? "Model") + ": " + effort;
+ $("model-button").replaceChildren(icon("model"), (status?.model?.name ?? "Model") + ": " + effort);
  // 120k/1m like Pi's footer; tokens are null right after compaction until the next reply.
  const short = n => n >= 1e6 ? +(n / 1e6).toFixed(1) + "m" : Math.round(n / 1e3) + "k";
  // Research suspends compaction, so the bar fills up to the model's real window instead of the 200k compaction border.
  const researching = ((status as { modes?: { research?: string } })?.modes?.research ?? "off") !== "off";
  const used = typeof status?.tokens === "number" ? status.tokens / (researching && status.window ? status.window : Math.min(COMPACT_AT, status.window || COMPACT_AT)) * 100 : status?.context ?? 0;
  setBar($("context-button"), used, used >= 90 ? "error" : used >= 70 ? "warning" : "accent");
- $("context-button").replaceChildren(html("span", { className: "context-label", textContent: "Context: " }), (status?.window ? (typeof status.tokens === "number" ? (status.estimated ? "~" : "") + short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—")); // the phone drawer hides the label
- $("bias-button").textContent = "💡 " + ((plan ? BIAS_LABEL : SESSION_BIAS)[biasNow()] ?? "Normal");
+ $("context-button").replaceChildren(icon("context"), html("span", { className: "context-label", textContent: "Context: " }), (status?.window ? (typeof status.tokens === "number" ? (status.estimated ? "~" : "") + short(status.tokens) : "?") + "/" + short(status.window) : typeof status?.context === "number" ? Math.round(status.context) + "%" : "—")); // the phone drawer hides the label
+ $("bias-button").replaceChildren(icon("think"), (plan ? BIAS_LABEL : SESSION_BIAS)[biasNow()] ?? "Normal");
  for (const id of ["model-button", "context-button"] as const) $(id).disabled = !state.connected;
  $("bias-button").disabled = !state.connected;
  // The plan bar names the plan; only the title part truncates, the count stays visible.
@@ -77,8 +91,8 @@ function renderShell() {
  for (const button of $("plan-menu").querySelectorAll<HTMLElement>("[data-plan]")) button.hidden = !plan;
  // Session modes: chips toggle them; the chat panel takes the mode's colour.
  const modes = (status as { modes?: { research?: string; night?: string } })?.modes ?? {}, research = modes.research ?? "off", night = modes.night ?? "off";
- $("mode-research").setAttribute("aria-pressed", String(research !== "off")); $("mode-research").textContent = research === "stopping" ? "Research: stopping" : "Research"; $("mode-research").dataset.tone = research === "stopping" ? "warning" : "";
- $("mode-night").setAttribute("aria-pressed", String(night !== "off")); $("mode-night").textContent = night === "paused" ? "Night: paused" : night === "complete" ? "Night: done" : "Night"; $("mode-night").dataset.tone = night === "paused" || night === "complete" ? "warning" : "";
+ $("mode-research").setAttribute("aria-pressed", String(research !== "off")); $("mode-research").replaceChildren(icon("research"), research === "stopping" ? "Research: stopping" : "Research"); $("mode-research").dataset.tone = research === "stopping" ? "warning" : "";
+ $("mode-night").setAttribute("aria-pressed", String(night !== "off")); $("mode-night").replaceChildren(icon("night"), night === "paused" ? "Night: paused" : night === "complete" ? "Night: done" : "Night"); $("mode-night").dataset.tone = night === "paused" || night === "complete" ? "warning" : "";
  for (const id of ["mode-research", "mode-night"] as const) ($(id) as HTMLButtonElement).disabled = !state.connected || messageSending;
  $("chat").dataset.mode = research === "stopping" || (research === "off" && ["paused", "complete"].includes(night)) ? "warning" : research !== "off" || night !== "off" ? "accent" : "";
  // Research mode: Resolve (n) / Review / Finish / Resume, each enabled only when the plan allows it (the /plans3 menu gates).
@@ -1264,6 +1278,7 @@ async function showDevices() {
 $("devices-button").addEventListener("click", () => void showDevices().catch(error => showNotice("Devices: " + error.message)));
 $("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
 const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", scheduled: "scheduled", unseen: "idle, new activity", seen: "idle", parked: "parked", terminal: "open in a terminal" };
+for (const id of ["env-var", "drawer-env-var"]) $(id).prepend(icon("env"));
 function html<K extends keyof HTMLElementTagNameMap>(tag: K, properties: Partial<HTMLElementTagNameMap[K]> = {}) { return Object.assign(document.createElement(tag), properties); }
 // EU style: Today 14:05, Yesterday 09:12, else 18/10/2026 14:05.
 function whenText(time: number) {
