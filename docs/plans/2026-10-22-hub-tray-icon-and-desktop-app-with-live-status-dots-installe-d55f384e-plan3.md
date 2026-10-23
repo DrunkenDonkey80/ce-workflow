@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-22
-updated: 2026-10-23T07:14:13.390Z
+updated: 2026-10-23T07:51:13.257Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -142,8 +142,8 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 - [x] **R-01** .github/workflows/app-release.yml: tag app-v* → checks tag = tauri.conf version, builds Windows exe (--no-bundle) and Linux AppImage on ubuntu-22.04 via npx @tauri-apps/cli@2, one release job publishes pi-hub-app-windows-x64.exe and pi-hub-app-linux-x64.AppImage.
 - [x] **R-02** hub/app/pin-release.mjs app-v<x.y.z> [--from <folder>]: gh release download (or a local folder) → release.json {version, assets: windows-x64/linux-x64 {url, sha256}}; bad tag exits 2.
 - [x] **R-05** hub/README.md 'Desktop app' section: install/uninstall from the gear, login start, tabs and shortcuts, hourly staged updates with Restart to update, WSL, Linux limits (D12), release steps.
-- [human] **R-03** Push master and the first `app-v0.1.0` tag (pushing is the user's call).
-- [blocked] **R-04** After R-03: confirm the workflow run is green, run R-02, commit the pin.
+- [x] **R-03** User approved; pushed master f8a0cb8 (0.1.64 with changelog + 2 shots, other session's usage/pool commit included) and tag app-v0.1.0; app-release run 39919710459 started.
+- [x] **R-04** app-release run 39919710459 green (Windows exe, Linux AppImage, release); pin-release wrote hub/app/release.json for app-v0.1.0; pushed with 0.1.65.
 
 ### Phase 5: Live acceptance [think]
 
@@ -172,7 +172,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 
 ## Resume context
 
-19/23 done, HEAD 91eff55, all local (never pushed). Code complete: hub side (H-01..H-05), app (P-01..P-05, live-checked tabs/icons/single instance/.next swap from a temp folder), release workflow + pin script + README, product diagram. C1/C2/C3/C9/C10 pass, C5 builds. Next is the user's: R-03 push master (with version bump + changelog entry incl. C6 shots) and tag app-v0.1.0; then R-04 (green run, pin-release, commit release.json), L-01 live acceptance (tray menu, Ctrl+N, Restart to update, pinned button, WSL tab), L-02 Linux.
+22/23 code+release done; release app-v0.1.0 pinned and pushed (0.1.65). L-01 [human]: user tests on another free PC after pulling (can't restart the hub here); L-02 Linux friend. Nothing else pending.
 
 ## Amendments
 

@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.65 — 2026-10-23
+
+### Fixed
+- Hub: Install in ⚙ → Desktop app works now; the first app release (0.1.0) is pinned.
+
 ## 0.1.64 — 2026-10-23
 
 ### Added
