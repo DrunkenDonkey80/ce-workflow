@@ -48,6 +48,12 @@ try {
 	recents = await scanRecents(reopened, { sessionsDir: sessions });
 	assert.deepEqual(recents.map(r => r.sessionId), ["s1"], "unstarred session is back in Recents while recent");
 	assert.deepEqual(fs.readdirSync(data), ["sessions.json"], "no temporary files left");
+	// Sidebar folders: dragged order first, the rest by name; archive flags survive a reload.
+	const folders = new Registry(path.join(root, "folders")), [a, b, c] = ["alpha", "beta", "gamma"].map(name => path.join(root, name));
+	for (const [n, folder] of [a, b, b, c].entries()) folders.add({ name: String(n), folder });
+	folders.arrange({ order: [c, a] }); folders.arrange({ archive: b });
+	assert.deepEqual(new Registry(path.join(root, "folders")).groups().map(g => [g.label, g.archived]), [["gamma", false], ["alpha", false], ["beta", true]]);
+	assert.throws(() => folders.arrange({ archive: path.join(root, "nope") }), /Unknown folder/);
 	console.log("registry ok");
 } finally {
 	fs.rmSync(root, { recursive: true, force: true });

@@ -1253,7 +1253,7 @@ type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" |
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
 type HubSession = { id: string; name: string; tone: Tone; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
-type Group = { folder: string; label: string; git?: GitFiles | null; sessions: HubSession[] };
+type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
 // The open session's folder also gets the header's Pull / Commit / Commit and push as icons on the right; they click the header buttons.
 function gitLine(git?: GitFiles | null, own = false) {
@@ -1301,6 +1301,9 @@ $("message-input").addEventListener("input", () => {
  if (!state.status?.parked || waking || !$("message-input").value.trim()) return;
  waking = true; void sessionAction({ action: "resume", id: sessionId }).then(done => { if (!done) waking = false; }); // stays set until a live status arrives
 }); addEventListener("pagehide", saveDraft);
+// Typing in a live session's chat counts as activity (at most one ping per 30 s), so auto-park waits until you stop.
+let typingPing = 0;
+$("message-input").addEventListener("input", () => { if (state.status?.parked || Date.now() - typingPing < 30_000) return; typingPing = Date.now(); void post("typing", {}).catch(() => {}); });
 const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIComponent(token) : "");
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
@@ -1418,7 +1421,7 @@ function toggleFold(folder: string, hidden: number) {
  rerenderSessions();
 }
 // Sidebar filter (Ctrl+Shift+F): matches folder and session names, folds ignored; ↑/↓ move the dashed pick, Enter opens it.
-const filterInput = $("session-filter") as HTMLInputElement, pickRows = () => [...$("session-list").querySelectorAll<HTMLElement>(".session[data-id]")];
+const filterInput = $("session-filter") as HTMLInputElement, pickRows = () => [...$("session-list").querySelectorAll<HTMLElement>(".session[data-id]")].filter(row => row.getClientRects().length); // not inside closed Archives
 function markPick(id = filterPick) {
  const rows = pickRows(); filterPick = rows.some(row => row.dataset.id === id) ? id : rows[0]?.dataset.id ?? "";
  for (const row of rows) row.classList.toggle("picked", row.dataset.id === filterPick);
@@ -1433,15 +1436,46 @@ filterInput.addEventListener("keydown", event => {
  if (event.key === "Enter" && filterPick) { event.preventDefault(); if (filterPick !== sessionId) location.assign(sessionUrl(filterPick)); else filterInput.blur(); }
  if (event.key === "Escape" && filterInput.value) { event.preventDefault(); event.stopPropagation(); filterInput.value = ""; filterPick = ""; rerenderSessions(); }
 });
+// Folder drag (mouse, by its name row): a dashed line shows where it lands; the order is saved on the hub.
+let dragging = false, draggedAt = 0, archivesOpen = false;
+function dragFolder(head: HTMLElement, box: HTMLElement, folder: string) {
+ head.addEventListener("pointerdown", down => {
+  if (down.button !== 0 || down.pointerType !== "mouse" || (down.target as Element).closest("button")) return;
+  let target: { box: HTMLElement; after: boolean } | undefined;
+  const clear = () => $("session-list").querySelectorAll(".drop-before, .drop-after").forEach(item => item.classList.remove("drop-before", "drop-after"));
+  const move = (event: PointerEvent) => {
+   if (!dragging && Math.abs(event.clientY - down.clientY) < 6) return;
+   dragging = true; box.classList.add("dragged"); clear();
+   const over = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(".session-folder");
+   target = over && over !== box ? { box: over, after: event.clientY > over.getBoundingClientRect().top + over.offsetHeight / 2 } : undefined;
+   target?.box.classList.add(target.after ? "drop-after" : "drop-before");
+  };
+  const up = () => {
+   removeEventListener("pointermove", move); removeEventListener("pointerup", up);
+   if (!dragging) return;
+   dragging = false; draggedAt = Date.now(); // the click that ends a drag must not fold or open the folder
+   const onto = target?.box.dataset.folder;
+   if (onto && lastSessions) {
+    const order = lastSessions[0].map(group => group.folder).filter(item => item !== folder);
+    order.splice(order.indexOf(onto) + (target!.after ? 1 : 0), 0, folder);
+    lastSessions[0].sort((a, b) => order.indexOf(a.folder) - order.indexOf(b.folder));
+    void sessionAction({ action: "order", folders: order });
+   }
+   rerenderSessions();
+  };
+  addEventListener("pointermove", move); addEventListener("pointerup", up);
+ });
+}
 function renderSessions(groups: Group[], recents: Recent[]) {
  lastSessions = [groups, recents];
+ if (dragging) return; // a rebuilt list would drop the folder being dragged
  $("switcher").hidden = false; document.body.classList.add("has-switcher");
  const query = filterInput.value.trim().toLowerCase(), now = Date.now();
  sessionOrder = groups.flatMap(group => group.sessions.map(session => session.id));
  ownFolder = groups.find(group => group.sessions.some(session => session.id === sessionId))?.folder ?? "";
  try { if (ownFolder) localStorage.setItem("hub-last:" + ownFolder, sessionId); } catch { /* private mode */ }
  const open = $("session-list").querySelector<HTMLDetailsElement>(".session-recents")?.open ?? false;
- const rows = groups.flatMap(group => {
+ const folderBox = (group: Group) => {
   const shown = group.sessions.filter(session => query ? `${group.label} ${session.name}`.toLowerCase().includes(query) : !folded(session, group.folder, now));
   if (query && !shown.length) return [];
   const hidden = query ? 0 : group.sessions.length - shown.length;
@@ -1451,23 +1485,34 @@ function renderSessions(groups: Group[], recents: Recent[]) {
   fold.setAttribute("aria-label", `${fold.title} in ${group.label}`); fold.addEventListener("click", () => toggleFold(group.folder, hidden));
   const add = html("button", { type: "button", className: "session-add", textContent: "+", title: `New session in ${group.label} (Alt+N)` });
   add.setAttribute("aria-label", `New session in ${group.label}`); add.addEventListener("click", () => void newSession(group.folder));
-  const label = html("span", { className: "session-group-label", textContent: group.label, title: group.folder });
-  label.addEventListener("click", event => { event.stopPropagation(); toggleFold(group.folder, hidden); });
+  const label = html("span", { className: "session-group-label", textContent: `${group.label} (${group.sessions.length})`, title: `${group.folder}\nRight-click: open folder, archive` });
+  label.addEventListener("click", event => { event.stopPropagation(); if (Date.now() - draggedAt > 300) toggleFold(group.folder, hidden); });
+  head.addEventListener("contextmenu", event => {
+   event.preventDefault(); event.stopPropagation();
+   showMenu(label, [["Open folder", () => void sessionAction({ action: "open-folder", folder: group.folder })], group.archived ? ["Unarchive", () => void sessionAction({ action: "unarchive", folder: group.folder })] : ["Archive", () => void sessionAction({ action: "archive", folder: group.folder })]]);
+  });
   head.append(fold, label, add);
   // One framed box per folder: red while one waits for an answer, orange while one works, light blue for the open session's folder.
   const box = html("div", { className: "session-folder" }), tones = group.sessions.map(session => session.tone);
+  box.dataset.folder = group.folder; dragFolder(head, box, group.folder);
   const tone = tones.includes("waiting") ? "waiting" : tones.includes("working") ? "working" : group.sessions.some(session => session.id === sessionId) ? "current" : "";
   if (tone) box.dataset.tone = tone;
   // A click in the folder box but off any session row opens its last visited session, else the first working, non-parked, or any.
   box.addEventListener("click", event => {
-   if ((event.target as HTMLElement).closest(".session, button, a") || !group.sessions.length) return;
+   if ((event.target as HTMLElement).closest(".session, button, a") || !group.sessions.length || Date.now() - draggedAt < 300) return;
    let last = ""; try { last = localStorage.getItem("hub-last:" + group.folder) ?? ""; } catch { /* private mode */ }
    const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => !(session.parked ?? session.tone === "parked")) ?? group.sessions[0];
    if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
   });
-  box.append(head, ...gitLine(group.git, group.folder === ownFolder), ...shown.map(session => sessionRow(session, group.label, group.folder)));
+  // Fully folded: just the name row, no git line.
+  box.append(head, ...shown.length ? gitLine(group.git, group.folder === ownFolder) : [], ...shown.map(session => sessionRow(session, group.label, group.folder)));
   return [box];
- });
+ };
+ const rows = groups.filter(group => !group.archived).flatMap(folderBox), archivedRows = groups.filter(group => group.archived).flatMap(folderBox);
+ // Archived folders: below the others in a closed-by-default section (open while a filter matches one).
+ const archives = html("details", { className: "session-archives", open: archivesOpen || (!!query && archivedRows.length > 0) });
+ archives.addEventListener("toggle", () => { if (!query) archivesOpen = archives.open; });
+ archives.append(html("summary", { textContent: `Archives (${groups.filter(group => group.archived).length})` }), ...archivedRows);
  const recent = html("details", { className: "session-recents", open });
  recent.append(html("summary", { textContent: `Recents (${recents.length})` }), ...recents.map(item => {
   const row = html("div", { className: "session recent" }), name = item.name ?? whenText(item.modified);
@@ -1483,7 +1528,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  // Inside the list, so the phone drawer gets it too.
  const newFolder = html("button", { type: "button", className: "session-devices", textContent: "New folder" });
  newFolder.addEventListener("click", () => { const folder = prompt("Full path of the folder to start a Pi session in:"); if (folder?.trim()) void newSession(folder.trim()); });
- $("session-list").replaceChildren(...rows, ...query ? [] : [recent, newFolder]);
+ $("session-list").replaceChildren(...rows, ...archivedRows.length ? [archives] : [], ...query ? [] : [recent, newFolder]);
  markPick();
 }
 function sessionRow(session: HubSession, folder: string, path: string) {

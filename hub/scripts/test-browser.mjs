@@ -742,7 +742,7 @@ try {
  const third = await hub.host.create(folder, "3"); await hub.host.live.get(third.id).rpc.send({ type: "prompt", message: "hold" });
  const tones = "[...document.querySelectorAll('.session:not(.recent)')].map(s => s.querySelector('.session-letter').textContent + ':' + s.dataset.tone).join()";
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:working"`);
- assert.equal(await evaluate("document.querySelector('.session-group-label').textContent"), "ce-workflow");
+ assert.equal(await evaluate("document.querySelector('.session-group-label').textContent"), "ce-workflow (3)");
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').closest('.session-folder').dataset.tone"), "working", "the open session's folder is boxed; working (orange) beats current (blue)");
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page] .session-link').getAttribute('aria-label')"), "1 in ce-workflow, idle, this session");
  assert(await evaluate("document.getElementById('switcher').getBoundingClientRect().width === 200 && document.querySelector('.session-label').getBoundingClientRect().width > 4 && document.querySelector('.session-label').textContent === '1'"), "open by default with the session name");

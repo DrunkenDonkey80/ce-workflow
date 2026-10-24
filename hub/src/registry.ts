@@ -50,6 +50,8 @@ export function writeJsonAtomic(file: string, value: unknown) {
 export class Registry {
 	readonly file: string;
 	private records: SessionRecord[] = [];
+	/** Sidebar folder order (dragged) and archived folders, as lower-case paths. */
+	private folders: { order: string[]; archived: string[] } = { order: [], archived: [] };
 
 	constructor(dataDir = hubDataDir()) {
 		this.file = path.join(dataDir, "sessions.json");
@@ -57,10 +59,20 @@ export class Registry {
 			const saved = JSON.parse(readFileSync(this.file, "utf8"));
 			if (saved?.version !== 1 || !Array.isArray(saved.sessions)) throw new Error(`Unreadable hub registry: ${this.file}`);
 			this.records = saved.sessions;
+			this.folders = { order: saved.folders?.order ?? [], archived: saved.folders?.archived ?? [] };
 		}
 	}
 
-	private save() { writeJsonAtomic(this.file, { version: 1, sessions: this.records }); }
+	private save() { writeJsonAtomic(this.file, { version: 1, sessions: this.records, folders: this.folders }); }
+	/** Folder keys of every group, a new order (unknown or missing folders keep their place after it), or archive flags. */
+	arrange(change: { order?: string[]; archive?: string; unarchive?: string }) {
+		const known = new Set(this.records.map(r => r.folder.toLowerCase())), key = (folder: string) => path.resolve(folder).toLowerCase();
+		for (const folder of [change.archive, change.unarchive]) if (folder !== undefined && !known.has(key(folder))) throw new Error("Unknown folder.");
+		if (change.order) this.folders.order = [...new Set(change.order.map(key).filter(folder => known.has(folder)))];
+		if (change.archive) this.folders.archived = [...new Set([...this.folders.archived, key(change.archive)])];
+		if (change.unarchive) this.folders.archived = this.folders.archived.filter(folder => folder !== key(change.unarchive!));
+		this.save();
+	}
 	list(): SessionRecord[] { return structuredClone(this.records); }
 	get(id: string) { const record = this.records.find(r => r.id === id); return record && structuredClone(record); }
 	byFile(file: string) { return this.records.find(r => sameFile(r.sessionFile, file)); }
@@ -91,16 +103,17 @@ export class Registry {
 		this.save();
 	}
 
-	/** Groups are working folders (D2), sorted by folder name then session name. */
-	groups(): { folder: string; label: string; sessions: SessionRecord[] }[] {
+	/** Groups are working folders (D2), in the dragged order, then by folder name; sessions by name. */
+	groups(): { folder: string; label: string; archived: boolean; sessions: SessionRecord[] }[] {
+		const rank = (folder: string) => { const at = this.folders.order.indexOf(folder.toLowerCase()); return at < 0 ? Infinity : at; };
 		const map = new Map<string, SessionRecord[]>();
 		for (const record of this.records) {
 			const key = record.folder.toLowerCase();
 			map.set(key, [...(map.get(key) ?? []), structuredClone(record)]);
 		}
 		return [...map.values()]
-			.map(sessions => ({ folder: sessions[0].folder, label: path.basename(sessions[0].folder) || sessions[0].folder, sessions: sessions.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })) }))
-			.sort((a, b) => a.label.localeCompare(b.label));
+			.map(sessions => ({ folder: sessions[0].folder, label: path.basename(sessions[0].folder) || sessions[0].folder, archived: this.folders.archived.includes(sessions[0].folder.toLowerCase()), sessions: sessions.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })) }))
+			.sort((a, b) => rank(a.folder) - rank(b.folder) || a.label.localeCompare(b.label));
 	}
 }
 

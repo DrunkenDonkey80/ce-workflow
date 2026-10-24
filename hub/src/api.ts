@@ -2,7 +2,7 @@
 // Plans, diagrams, files and images are read here with ce-workflow's Pi-free modules, so they also work while parked;
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -182,7 +182,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
 	const nextName = (folder: string) => nextFreeName(registry, folder);
 	async function session(data: Record<string, unknown>) {
-		only(data, ["target", "action", "id", "name", "folder", "file", "create", "timer"], "Invalid session fields.");
+		only(data, ["target", "action", "id", "name", "folder", "file", "create", "timer", "folders"], "Invalid session fields.");
 		const id = typeof data.id === "string" ? data.id : "", name = typeof data.name === "string" ? data.name.trim() : "";
 		const known = () => { if (!registry.get(id)) throw fail(404, "Unknown session."); return id; };
 		switch (data.action) {
@@ -212,6 +212,19 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "cancel-timer":
 				if (!scheduler?.list(known()).some(t => t.id === data.timer)) throw fail(404, "No such timer.");
 				return { ok: scheduler.cancel(String(data.timer)) };
+			// Sidebar folders: dragged order, archive/unarchive, open in the PC's file manager (a group's folder only).
+			case "order":
+				if (!Array.isArray(data.folders) || data.folders.length > 500 || !data.folders.every(folder => typeof folder === "string")) throw fail(400, "Folders must be a list of paths.");
+				registry.arrange({ order: data.folders as string[] }); return { ok: true };
+			case "archive": case "unarchive": case "open-folder": {
+				const group = registry.groups().find(item => typeof data.folder === "string" && item.folder.toLowerCase() === path.resolve(data.folder).toLowerCase());
+				if (!group) throw fail(404, "Unknown folder.");
+				if (data.action !== "open-folder") { registry.arrange({ [data.action]: group.folder }); return { ok: true }; }
+				// Windows paths cannot contain quotes, so verbatim quoting is safe; explorer.exe never goes through cmd's & parsing.
+				const [command, args, verbatim] = process.platform === "win32" ? ["explorer.exe", [`"${group.folder}"`], true] : [process.platform === "darwin" ? "open" : "xdg-open", [group.folder], false];
+				spawn(command as string, args as string[], { detached: true, stdio: "ignore", windowsVerbatimArguments: verbatim as boolean }).on("error", () => {}).unref();
+				return { ok: true };
+			}
 			case "unstar":
 				if (host.live.has(known())) throw fail(409, "Park the session first.");
 				registry.remove(id); unseen.delete(id); return { ok: true }; // the session file stays (D18)
@@ -265,6 +278,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	async function post(id: string, endpoint: string, data: Record<string, unknown>, remote = false): Promise<unknown> {
 		switch (endpoint) {
 			case "session": return session(data);
+			case "typing": { const live = host.live.get(id); if (live) live.lastActivity = Date.now(); return { ok: true }; } // typing in the chat keeps it from auto-parking
 			case "seen": seen(id); return { ok: true }; // the page showing this session is visible and focused
 			case "message":
 				// RPC has no reload; D12: Reload is park + resume (idle only).

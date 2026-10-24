@@ -567,11 +567,15 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session-more, .session-add { flex: none; padding: 0 6px; border-color: transparent; background: none; color: var(--muted); }
 .session-group { display: flex; align-items: center; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
 .session-group-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.session-recents summary { cursor: pointer; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.session-recents summary, .session-archives summary { cursor: pointer; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.session-archives > .session-folder { margin-top: 4px; }
+.session-group { user-select: none; }
+.session-folder.dragged { opacity: .45; }
+.session-folder.drop-before { box-shadow: 0 -3px 0 -1px var(--focus); } .session-folder.drop-after { box-shadow: 0 3px 0 -1px var(--focus); }
 .session.recent .session-label { flex: 1; font-size: 12px; }
 .recent-when { color: var(--muted); font-size: 11px; }
 .recent-text { display: flex; flex-direction: column; min-width: 0; } .recent-text > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.switcher[data-open=false] :is(.session-more, .session-group, .session-git, .session-recents, .session-devices) { display: none; }
+.switcher[data-open=false] :is(.session-more, .session-group, .session-git, .session-recents, .session-archives, .session-devices) { display: none; }
 .session-devices { margin: 8px 6px; font-size: 12px; }
 .device-list { list-style: none; padding: 0; display: grid; gap: 6px; } .device-list li { display: flex; gap: 8px; align-items: center; } .device-list span { flex: 1; }
 .mobile-tabs { display: none; }
