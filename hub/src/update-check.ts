@@ -1,6 +1,7 @@
 // Hourly check for a newer Pi and for extension updates (gear badge + list). Checks only; installing stays the gear's
 // "Update Pi and extensions" (pi-hub update), which stops and restarts every session.
 import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -30,13 +31,25 @@ export async function findUpdates(dir = agentDir()): Promise<Found> {
 	const sdk = await piSdk(dir), cwd = os.homedir();
 	// shortcut: Pi's package check reports a failed npm/git lookup as "no update"; only the Pi version check can fail visibly.
 	const manager = new sdk.DefaultPackageManager({ cwd, agentDir: dir, settingsManager: sdk.SettingsManager.create(cwd, dir) });
-	const updates: { source: string; displayName: string }[] = await manager.checkForAvailableUpdates();
-	const installed = (manager.listConfiguredPackages() as { source: string; scope: string; installedPath?: string }[]).filter(item => item.scope === "user").map(item => {
+	const found: { source: string; displayName: string }[] = await manager.checkForAvailableUpdates();
+	const configured = (manager.listConfiguredPackages() as { source: string; scope: string; installedPath?: string }[]).filter(item => item.scope === "user");
+	// Pi flags a git package whenever its commit differs from the remote's, also when the local clone is ahead of it.
+	const ahead = await Promise.all(found.map(u => { const dir = configured.find(item => item.source === u.source)?.installedPath; return u.source.startsWith("git:") && dir ? remoteIsBehind(dir) : false; }));
+	const updates = found.filter((_, i) => !ahead[i]);
+	const installed = configured.map(item => {
 		const update = updates.find(u => u.source === item.source);
 		let version = ""; try { version = String(JSON.parse(readFileSync(path.join(item.installedPath ?? "", "package.json"), "utf8")).version ?? ""); } catch { /* no package.json */ }
 		return { source: item.source, name: update?.displayName ?? packageName(item.source), version, update: !!update };
 	});
 	return { pi: latest && newer(latest, current) ? { current, latest } : null, packages: updates.map(u => u.displayName), installed };
+}
+/** True when the remote HEAD commit is already in the local clone's history (nothing to pull). */
+export async function remoteIsBehind(dir: string) {
+	const git = (...args: string[]) => promisify(execFile)("git", args, { cwd: dir, windowsHide: true, timeout: 30_000 });
+	try {
+		const remote = (await git("ls-remote", "origin", "HEAD")).stdout.split(/\s/)[0];
+		return !!remote && (await git("merge-base", "--is-ancestor", remote, "HEAD").then(() => true, () => false));
+	} catch { return false; }
 }
 export const packageName = (source: string) => source.startsWith("npm:") ? source.slice(4) : source.split(/[\\/]/).filter(Boolean).at(-1) ?? source;
 

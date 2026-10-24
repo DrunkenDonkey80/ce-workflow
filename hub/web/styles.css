@@ -322,6 +322,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .extension-version { color: var(--muted); font-variant-numeric: tabular-nums; }
 .status-menu .extension-remove { grid-column: 4; display: grid; place-items: center; width: 22px; height: 20px; min-height: 0; padding: 0; border: 1px solid var(--error); border-radius: 5px; background: var(--error); color: #fff; font-weight: 700; line-height: 1; text-align: center; cursor: pointer; }
 .status-menu .extension-remove:hover { filter: brightness(1.15); }
+@media (hover: hover) { .extension-row:not(:hover, :focus-within) .extension-remove { visibility: hidden; } } /* touch screens have no hover: keep it shown */
 .load { position: relative; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
 .load svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
 .load polyline { stroke-width: 1.5; vector-effect: non-scaling-stroke; }
