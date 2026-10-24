@@ -2888,7 +2888,10 @@ export function registerAskUser(pi: ExtensionAPI) {
       ),
    });
 
+   // Spread for older host types; codemode scripts must not hold workers waiting on dialogs.
+   const modelOnly: Record<string, unknown> = { exposure: "model-only" };
    pi.registerTool({
+      ...modelOnly,
       name: "ask_user",
       label: "Ask User",
       description:

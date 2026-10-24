@@ -21,6 +21,7 @@ let tool;
 registerAskUser({ registerTool: (registered) => { tool = registered; }, events: { on: (name, fn) => { bus.on(name, fn); return () => bus.off(name, fn); }, emit: (name, event) => bus.emit(name, event) } });
 assert.equal(tool.name, "ask_user");
 assert.equal(tool.executionMode, "sequential");
+assert.equal(tool.exposure, "model-only");
 assert.equal(tool.parameters.properties.questions.maxItems, 4);
 await assert.rejects(tool.execute("a", { question: "Choose?" }, undefined, undefined, { hasUI: false }), /interactive mode/);
 await assert.rejects(tool.execute("b", { questions: [{ question: "Only one?" }] }, undefined, undefined, { hasUI: false }), /2-4/);
