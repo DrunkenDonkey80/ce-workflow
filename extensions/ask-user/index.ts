@@ -64,7 +64,7 @@ export async function pasteClipboardImage(read = () => getNativeClipboard()?.get
    return file;
 }
 
-const ASK_USER_VERSION = "0.16.0";
+const ASK_USER_VERSION = "0.17.0";
 
 /**
  * Emit a flat `{ type: "string", enum: [...] }` JSON Schema instead of the

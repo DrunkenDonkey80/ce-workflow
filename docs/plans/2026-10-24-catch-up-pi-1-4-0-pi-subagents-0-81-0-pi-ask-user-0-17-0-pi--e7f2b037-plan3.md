@@ -4,7 +4,7 @@ status: active
 created: 2026-10-24
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.4.0","pi-subagents":"0.81.0","pi-ask-user":"0.17.0","pi-intercom":"0.18.1"}
-updated: 2026-10-24T22:02:07.529Z
+updated: 2026-10-24T22:02:28.974Z
 reviewed: 2026-10-24
 started: 2026-10-24T21:59:19.099Z
 ---
@@ -222,9 +222,7 @@ None.
 - [x] **CU-01** Pinned Pi SDK and lockfile to 1.4.0; isolated native selfcheck from inherited hub mode.
 - [x] **CU-02** Ported batch headings across terminal frame/review, fallbacks, results, events and hub payload; added regressions and changelog.
 - [x] **CU-03** Registered ask_user as model-only using the upstream-compatible spread and asserted exposure.
-- [ ] **CU-04** Update extensions/ask-user/UPSTREAM.md and ASK_USER_VERSION to 0.17.0.
-  - Pinned release 0.17.0 and copy date; add the heading and exposure to the ported behavior.
-  - Under Divergences, list what was not ported (ask-user.json, Tern, activate/submit refactor), per D1.
+- [x] **CU-04** Updated vendored version and provenance to reviewed 0.17.0, documenting ports and deliberate omissions.
 
 ### Phase 2: Verify and record [code]
 
