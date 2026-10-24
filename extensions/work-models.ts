@@ -214,7 +214,7 @@ const DEFAULT_CONTEXT = {
 	enabled: true,
 	autoCompact: true,
 	compactAtTokens: 150_000,
-	keepRecentTokens: 30_000,
+	keepRecentTokens: 20_000, // Pi's own default; 30k kept ~10k more of the recent tail after every compaction
 	maxSummaryChars: 32_000,
 };
 const COMPACTION_MODES = [

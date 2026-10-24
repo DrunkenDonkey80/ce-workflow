@@ -3,7 +3,7 @@ export const COMPACTION_PROFILES = Object.freeze({
 });
 
 const OMITTED = "[... omitted by compaction budget ...]";
-const DEFAULT_KEEP_RECENT_TOKENS = 30_000;
+const DEFAULT_KEEP_RECENT_TOKENS = 20_000;
 const DEFAULT_MAX_SUMMARY_CHARS = 12_000;
 const LATEST_REQUESTS_CHAR_BUDGET = 3_600;
 const MIN_TRIGGER_TOKENS = 30_000;

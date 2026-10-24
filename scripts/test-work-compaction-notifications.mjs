@@ -1023,7 +1023,7 @@ try {
 		{ role: "assistant", content: [{ type: "text", text: "used giant" }] },
 		{
 			role: "assistant",
-			content: [{ type: "text", text: "y".repeat(100_000) }],
+			content: [{ type: "text", text: "y".repeat(60_000) }], // ~15k tokens: the giant result still falls inside the 20k kept tail
 		},
 	];
 	requestContextFilter(activeCtx);
@@ -1049,7 +1049,7 @@ try {
 		"active filtering does not mutate stored input messages",
 	);
 	resetContextFilter();
-	// A large advertised window must not inflate the 30k retention target.
+	// A large advertised window must not inflate the 20k retention target.
 	const millionTokenCtx = { ...ctx, model: { contextWindow: 1_000_000 } };
 	const batch = (start, count) =>
 		Array.from({ length: count }, (_, offset) => {
@@ -1090,7 +1090,7 @@ try {
 		assert.match(result.messages[0].summary, /CURRENT-REQUEST/);
 		assert(
 			JSON.stringify(result.messages).length / 4 < 42_000,
-			"a 1M-window model must retain roughly 30k plus the 8k summary and one batch, not the entire 160k turn",
+			"a 1M-window model must retain roughly 20k plus the 8k summary and one batch, not the entire 160k turn",
 		);
 		const calls = new Set(
 			result.messages.flatMap((message) =>
