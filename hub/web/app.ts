@@ -1504,8 +1504,8 @@ function renderSessions(groups: Group[], recents: Recent[]) {
    const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => !(session.parked ?? session.tone === "parked")) ?? group.sessions[0];
    if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
   });
-  // Fully folded: just the name row, no git line.
-  box.append(head, ...shown.length ? gitLine(group.git, group.folder === ownFolder) : [], ...shown.map(session => sessionRow(session, group.label, group.folder)));
+  // The git line only in the open session's folder, and not when it is fully folded.
+  box.append(head, ...shown.length && group.folder === ownFolder ? gitLine(group.git, true) : [], ...shown.map(session => sessionRow(session, group.label, group.folder)));
   return [box];
  };
  const rows = groups.filter(group => !group.archived).flatMap(folderBox), archivedRows = groups.filter(group => group.archived).flatMap(folderBox);
