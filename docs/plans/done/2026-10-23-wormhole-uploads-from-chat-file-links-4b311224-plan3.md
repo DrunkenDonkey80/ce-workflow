@@ -2,7 +2,7 @@
 plan3: true
 status: complete
 created: 2026-10-23
-updated: 2026-10-24T06:35:50.038Z
+updated: 2026-10-24T06:50:28.865Z
 reviewed: 2026-10-23
 ---
 
@@ -70,7 +70,7 @@ Not covered by automated tests: the remote (phone) page menu, the 7z item's visi
 
 ## Resume context
 
-Review added S6 to S8: literal archive names (7z -spd, zip -nw), upload stopping cleanly on the first failed piece with a mocked-fetch test, and the targeted re-run. S1 to S5 code is uncommitted and not pushed. Next: S6 in hub/src/wormhole.ts archive(). Before a push, bump to 0.1.74 and add a changelog screenshot.
+Complete: S1–S8 and ARCH-RECONCILE done, committed locally (9b3c056, 377129d, fc57870), not pushed. Before a push: bump to 0.1.74 and add a changelog screenshot of the menu. Untested: remote phone menu, 7z item visibility, clipboard, Zip on macOS; live round trips predate S6/S7.
 
 ## Amendments
 
