@@ -345,7 +345,27 @@ const { cameraTools } = await createJiti(import.meta.url).import("../extensions/
 const recovery = cameraTools(fakeController).find(tool => tool.name === "camera_recover");
 const recovered = await recovery.execute("test", { frame: burst.frames[1].id }, undefined, undefined, ctx);
 assert.equal(recovered.content.filter(part => part.type === "image").length, 1);
-const { stripProcessedPayloads } = await import("../extensions/work-models.ts");
+const { stripProcessedPayloads, syncCameraTools } = await import("../extensions/work-models.ts");
+// Camera tools are declared only while the project camera is ON with a device; other tools stay as they are.
+{
+	const dir = join(sandbox, "sync"), cam = ["camera_capture", "camera_recover", "camera_watch", "camera_stop"];
+	mkdirSync(join(dir, ".pi"), { recursive: true });
+	let active = ["read", ...cam], sets = 0;
+	const api = { getActiveTools: () => active, setActiveTools: next => { active = next; sets++; } };
+	syncCameraTools(api, dir);
+	assert.deepEqual(active, ["read"], "no settings: camera tools off by default");
+	const set = camera => writeFileSync(join(dir, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { camera } }));
+	set({ enabled: true });
+	syncCameraTools(api, dir);
+	assert.deepEqual(active, ["read"], "ON without a device stays off");
+	set({ enabled: true, device: { id: "@device_pnp_cam", label: "Cam" } });
+	syncCameraTools(api, dir); syncCameraTools(api, dir);
+	assert.deepEqual(active, ["read", ...cam]);
+	assert.equal(sets, 2, "unchanged sets are skipped");
+	set({ enabled: false, device: { id: "@device_pnp_cam", label: "Cam" } });
+	syncCameraTools(api, dir);
+	assert.deepEqual(active, ["read"]);
+}
 const conversation = [{ role: "toolResult", toolName: "camera_recover", toolCallId: "test", timestamp: 1, ...recovered }];
 const stripped = stripProcessedPayloads(conversation, { imageBeforeTimestamp: Infinity });
 assert.ok(!stripped[0].content.some(part => part.type === "image"));

@@ -3643,6 +3643,7 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 	registerRemoteAskAnswers(pi);
 
 	pi.on("session_start", (_event, ctx) => {
+syncCameraTools(pi, ctx.cwd);
 visionBridge.clear();
 resetContextCompaction();
 restoreResearchContext(ctx);
@@ -3687,7 +3688,8 @@ showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps
 
 	});
 
-	pi.on("before_agent_start", (event) => {
+	pi.on("before_agent_start", (event, ctx) => {
+ syncCameraTools(pi, ctx.cwd); // picks up a camera switched on or off in settings since the last run
  blockedInternalBackgroundCompletionTurn = Boolean(pendingInternalBackgroundCompletionPrompt && contentText(event.prompt).trim() === pendingInternalBackgroundCompletionPrompt);
  pendingInternalBackgroundCompletionPrompt = null;
  // Pi 1.2+ also fires this for sendMessage(triggerTurn) runs (messageType "custom"); only prompts are user work.
@@ -4042,6 +4044,14 @@ function workSettingsStatus(ctx) {
 
 const SETTINGS_RESET = "__reset__";
 let cameraController;
+const CAMERA_TOOLS = ["camera_capture", "camera_recover", "camera_watch", "camera_stop"];
+// The camera tools cost ~4k chars on every request: declare them only while this project's camera is ON with a device.
+export function syncCameraTools(pi, cwd) {
+	if (!pi?.getActiveTools || !pi.setActiveTools) return;
+	const camera = cameraSettings(readSettings(cwd)), active = pi.getActiveTools();
+	const next = camera.enabled && camera.device ? [...new Set([...active, ...CAMERA_TOOLS])] : active.filter(name => !CAMERA_TOOLS.includes(name));
+	if (next.length !== active.length) pi.setActiveTools(next);
+}
 
 function owns(object, key) {
 	return Object.hasOwn(object ?? {}, key);
