@@ -270,7 +270,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .session-git-files strong { display: block; margin-top: 4px; font-family: system-ui, sans-serif; }
 .session-git-files strong:first-child { margin-top: 0; }
 .session-git-files em { display: block; color: var(--muted); }
-.session-git:hover .session-git-files { display: block; }
+@media (hover: hover) { .session-git:hover .session-git-files { display: block; } } /* a tap on touch screens would stick it open over the list */
 .session-git { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; margin: 0 0 2px; min-height: 20px; }
 .session-git-actions { margin-left: auto; display: flex; gap: 2px; }
 .session-git-action { display: grid; place-items: center; width: 22px; height: 20px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }

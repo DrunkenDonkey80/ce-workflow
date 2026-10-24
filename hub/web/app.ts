@@ -1305,7 +1305,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
-type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string };
+type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean };
 let hubSettings: HubSettings = {}, appBadge = 0;
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
@@ -1340,7 +1340,9 @@ async function loadSessions() {
  const visible = document.visibilityState === "visible";
  try {
   const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
+  const uacBefore = !!hubSettings.uac;
   hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders(); renderNotify(); renderUpdates(); checkWhatsNew();
+  if (!!hubSettings.uac !== uacBefore) notifyUac(!!hubSettings.uac);
   notifyChanges(groups);
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
   if (visible && document.hasFocus() && groups.some(group => group.sessions.some(session => session.id === sessionId && session.tone === "unseen"))) void post("seen", {}).catch(() => {});
@@ -1822,6 +1824,14 @@ void pollLoad(); setInterval(pollLoad, 5000);
 // Notifications: a session starts asking a question, or stops working (subagents count as working). Every open hub
 // page polls, so the tag makes the OS replace duplicates; the session in view on a visible page is not announced.
 let lastTones: Map<string, string> | null = null;
+// A Windows UAC prompt blocks whatever started it and can only be answered at the PC itself, never from this page.
+const uacText = () => `Admin approval (UAC) is waiting on ${hubSettings.hostname ?? "the hub PC"}; answer it at that PC.`;
+function notifyUac(open: boolean) {
+ if (!open) { if ($("notice").textContent?.startsWith("Admin approval (UAC)")) showNotice(""); return; }
+ showNotice(uacText());
+ if (typeof Notification === "undefined" || Notification.permission !== "granted" || !(hubSettings.notify ?? { question: true }).question) return;
+ try { new Notification(uacText(), { tag: "uac" }); } catch { /* phones without a service worker refuse page notifications */ }
+}
 function notifyChanges(groups: Group[]) {
  const tones = new Map(groups.flatMap(group => group.sessions.map(session => [session.id, session.tone] as [string, string])));
  const before = lastTones; lastTones = tones;

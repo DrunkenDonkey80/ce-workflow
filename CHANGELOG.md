@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- Windows: while a UAC admin prompt is open on the hub PC, every hub page (also on your phone) shows a notice, plus a desktop notification when question notifications are on. The prompt itself can only be answered at the PC.
+
+### Changed
+- On phones and other touch screens, tapping a session's git counts no longer pops up the changed-files list over the session list.
+
 ## 0.1.75 — 2026-10-24
 
 ### Added

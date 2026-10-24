@@ -1,6 +1,6 @@
 // WSL needs its own browser opener, command lookup and login start; Windows, macOS and plain Linux keep theirs.
 import { existsSync, readFileSync } from "node:fs";
-import { execFileSync, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 
 export function isWsl(env: NodeJS.ProcessEnv = process.env, procVersion?: string) {
 	if (process.platform !== "linux" && procVersion === undefined) return false;
@@ -34,3 +34,15 @@ export function findCommand(command: string): string | undefined {
 
 /** WSL with systemd as PID 1 can start the hub through a user unit; without it there is no login start. */
 export const wslSystemd = () => existsSync("/run/systemd/system");
+
+/**
+ * True while a Windows UAC prompt is open on this PC: Windows runs consent.exe only then. Checked at most every 3 s and
+ * only when asked (pages poll), so an idle hub spawns nothing; the first call after a gap returns the last known value.
+ */
+let uac = false, uacAt = 0;
+export function uacPending(now = Date.now()) {
+	if (process.platform !== "win32" || now - uacAt < 3000) return uac;
+	uacAt = now;
+	execFile("tasklist", ["/FI", "IMAGENAME eq consent.exe", "/NH", "/FO", "CSV"], { windowsHide: true, timeout: 5000 }, (error, stdout) => { if (!error) uac = /consent\.exe/i.test(stdout); });
+	return uac;
+}
