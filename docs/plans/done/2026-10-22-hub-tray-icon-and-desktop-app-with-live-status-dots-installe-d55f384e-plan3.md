@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-10-22
-updated: 2026-10-23T09:59:12.495Z
+updated: 2026-10-23T21:41:18.025Z
 reviewed: 2026-10-23
 started: 2026-10-23T05:51:30.778Z
 ---
@@ -151,7 +151,7 @@ Run hub tests with `PI_HUB= PI_HUB_SESSION=` set in the environment.
 - [blocked] **L-02** Linux check on the friend's machine (needs a Linux desktop): install, tray, icon, tabs; record what the desktop allows (D12).
 ### P-ARCH [code] Product architecture
 
-- [x] **ARCH-RECONCILE** Product diagram: added client node pi_hub_app (Tauri tabs, live icons, staged swap; installed from release.json pins, built by app-release.yml) with an edge to pi_control_hub; pi_control_hub summary now says it installs and hourly stages the app.
+- [x] **ARCH-RECONCILE** Product diagram: client node pi_hub_app (Tauri tabs, live taskbar/tray icons incl. 3-4 hub dot matrix, pinned-only badge, own AUMID, external links to default browser, remembers maximized, staged swap; release.json pins via pin-release.mjs, app-release.yml) with edge to pi_control_hub; pi_control_hub installs and hourly stages the app.
 
 
 ## Global validation
@@ -185,3 +185,4 @@ Append material changes and their reasons; preserve the original request and set
   - 8 Accepted: tsconfig.json includes only extensions/**. C4 relabelled; C9/C10 added.
   - 9 Accepted: settings markup is in hub/web/index.html; listed under Relevant files.
 - 2026-10-23: Added final architecture reconciliation because a product diagram exists.
+- 2026-10-23: Force-finished by the user with unfinished steps: L-02.

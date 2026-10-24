@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 14,
+  "revision": 16,
   "nodes": [
     {
       "id": "pi_host",
@@ -380,9 +380,17 @@
       "id": "pi_hub_app",
       "label": "Pi Hub desktop app",
       "kind": "client",
-      "summary": "Tauri window with a tab per hub (child webviews), live taskbar/overlay/tray icons from each hub page's title line; hide to tray, single instance, staged-update swap at start.",
+      "summary": "Tauri window with a tab per hub (child webviews); live taskbar icon (1-2 hub icons with dots, 3-4 a state-dot matrix) and tray icon from each hub page's title line; overlay badge with count only on pinned buttons; own AppUserModelID; external links open in the default browser; hide to tray, single instance, remembers maximized, staged-update swap at start.",
       "tech": "hub/app (Rust + Tauri 2, ui/index.html strip, ui/icons.js built from hub/web/icons.ts)",
-      "details": "Installed, staged and removed by the hub (hub/src/app-install.ts) from SHA-256 pins in hub/app/release.json; releases built by .github/workflows/app-release.yml on tag app-v*."
+      "details": "Installed, staged and removed by the hub (hub/src/app-install.ts) from SHA-256 pins in hub/app/release.json; releases built by .github/workflows/app-release.yml on tag app-v*; pins written by hub/app/pin-release.mjs."
+    },
+    {
+      "id": "wormhole_app",
+      "label": "wormhole.app",
+      "kind": "external",
+      "summary": "Undocumented site API plus Backblaze B2 pieces; receives end-to-end encrypted files (24 h, unlimited downloads).",
+      "tech": "wormhole-crypto 0.3.1 (MIT), used by hub/src/wormhole.ts",
+      "details": "Chat file-link menu Upload / Zip and upload / 7z and upload; only files Download would serve; key stays in the link's #fragment."
     }
   ],
   "edges": [
@@ -739,6 +747,12 @@
       "from": "pi_hub_app",
       "to": "pi_control_hub",
       "label": "hub pages (title state line), app.lock/app.json"
+    },
+    {
+      "id": "pi_control_hub__wormhole_app",
+      "from": "pi_control_hub",
+      "to": "wormhole_app",
+      "label": "encrypted file uploads"
     }
   ],
   "notes": []

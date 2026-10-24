@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-10-23
-updated: 2026-10-24T06:23:41.603Z
+updated: 2026-10-24T06:35:50.038Z
 reviewed: 2026-10-23
 ---
 
@@ -56,12 +56,10 @@ None.
 - [x] **S5** Added Unreleased changelog bullet; nothing committed or pushed
 - [x] **S6** Archives keep the name literal (7z -spd, zip -nw); archive test proves only the picked file is packed
 - [x] **S7** First failed piece stops new pieces; in-flight pieces settle before close/cleanup; mocked-fetch success and failure tests added
-- [ ] **S8** Re-run node --test scripts/test-wormhole.mjs, scripts/test-api.mjs and scripts/test-browser.mjs in hub/ plus LSP diagnostics on hub/src/wormhole.ts.
+- [x] **S8** Targeted tests pass on the final code: test-wormhole 6/6, test-api 1/1, test-browser 1/1; LSP shows no errors in hub/src/wormhole.ts
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram: added external node wormhole_app (wormhole-crypto, B2 pieces, 24 h) and edge pi_control_hub → wormhole_app "encrypted file uploads"
 
 
 ## Global validation
