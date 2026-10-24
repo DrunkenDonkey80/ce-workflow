@@ -7,6 +7,8 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+// Exercise native prompts even when this selfcheck is launched from the hub.
+delete process.env.PI_HUB;
 const releases = path.join(homedir(), ".pi", "agent", "install", "releases");
 const sdkRoots = existsSync(releases) ? readdirSync(releases).sort((a, b) => b.localeCompare(a, undefined, { numeric: true })).map(version => path.join(releases, version, "node_modules", "@earendil-works", "pi-coding-agent")) : [];
 try { sdkRoots.push(path.dirname(path.dirname(createRequire(import.meta.url).resolve("@earendil-works/pi-coding-agent")))); } catch { /* Managed host installation supplies the SDK. */ }
