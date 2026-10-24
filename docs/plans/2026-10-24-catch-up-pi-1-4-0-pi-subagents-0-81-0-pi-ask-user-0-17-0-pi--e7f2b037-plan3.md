@@ -4,7 +4,7 @@ status: active
 created: 2026-10-24
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.4.0","pi-subagents":"0.81.0","pi-ask-user":"0.17.0","pi-intercom":"0.18.1"}
-updated: 2026-10-24T22:02:28.974Z
+updated: 2026-10-24T22:11:16.093Z
 reviewed: 2026-10-24
 started: 2026-10-24T21:59:19.099Z
 ---
@@ -193,6 +193,8 @@ Fill during planning. Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-p
 - **Assumption (over 95%, evidence)** No ce-workflow flow calls ask_user from codemode, so model-only exposure removes nothing in use. rg finds no `tools.ask_user` in extensions or scripts.
 - **Assumption (over 95%, evidence)** Bumping the devDependency is dev-only. Runtime uses Pi's managed install, the same assumption as the 1.3.0 catch-up.
 - **User preference (2026-10-24)** "Here we are developing the ce-workflow, we shall be running DIRECTLY from the source": Pi loads ce-workflow from `C:\SOFT\git\ce-workflow` (global settings.json package entry), never the GitHub install. Test changes against the source checkout.
+D5 (user, 2026-10-24, Q-01): Accept validation limitations and complete the catch-up: full suite failed live Android capture and hub diagram stale-revision drag; hub CLI passed with inherited hub-session variables removed. Do not claim a clean full suite; preserve concurrent hub edits. LSP is inconclusive; authored-source compiler selfcheck passed.
+
 
 
 ## Open questions
@@ -226,8 +228,7 @@ None.
 
 ### Phase 2: Verify and record [code]
 
-- [ ] **CU-90** Run `npm run verify:quiet` (C6) after the adopted changes and record the result.
-  - Environment-only failures (for example the attached-device branch of test-work-screen-read) are recorded as such, not fixed here.
+- [x] **CU-90** Ran full verification; catch-up and TypeScript passed, with Android/browser limitations explicitly accepted in D5.
 - [ ] **CU-91** Record the reviewed versions: `node scripts/work-catch-up-record.mjs <this plan's id>` (C7).
   - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json` and refuses missing, unexplained or unverified decisions.
   - Before running it, add each adopted entry's "verification" (command and result) to the JSON above.
@@ -259,3 +260,5 @@ Planning and review complete: every change graded in Catch-up decisions; 3 adopt
   - Finding 2 (upstream presentation described wrongly): accepted. The 0.17.0 diff adds the heading to the shared frame title (line 557) and below "Review answers" (line 634), and prefixes fallback dialog titles (line 649); question pages keep their titles. CU-02 and the decision rationale now say so.
 - 2026-10-24: Added final architecture reconciliation because a product diagram exists.
 CU-01 validation: the ask_user selfcheck inherited PI_HUB=1 from this runner and entered the hub path with native-only mocks. Clear PI_HUB at test startup; its explicit hub cases still enable it. No production change.
+CU-90: npm run verify:quiet completed in 123 s; all root tests except live Android screen capture passed (including authored-source TypeScript). Hub suite failed; diagnostic rerun showed test-browser diagram stale-revision drag had no effect and test-hub inherited hub-session context. Concurrent unrelated edits appeared under hub/src/api.ts, hub/src/registry.ts, hub/web/app.ts and hub/web/styles.css during validation; preserve them. No production hub/screen code changed by this plan.
+Backlog (outside catch-up): investigate live Android CLI capture ShellCommandImpl.pickProtocol failure and hub test-browser stale-revision drag failure at line 404 (baseline unverified); isolate hub CLI test from inherited PI_HUB_SESSION. npm install reported 2 moderate and 1 high vulnerabilities; no audit fix attempted.
