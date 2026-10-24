@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.74 — 2026-10-24
 
 ### Added
 - Right-click a file link in the hub chat for Upload, Zip and upload, or 7z and upload (when 7z is installed). The hub encrypts the file, sends it to wormhole.app and copies the link, which works for 24 hours with no download limit. Only the key-holding link can open it. Files only, up to 5 GB; on Linux, Zip needs the zip package.
@@ -15,6 +15,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - The plan's Review menu opens at the mouse instead of at the far right.
 
 ### Fixed
+- A message sent from the hub no longer reappears in the message box when you switch tabs or sessions before the send finishes.
+- Stopping the hub no longer hangs while a browser tab is still connected.
 - Compaction in long sessions frees much more context. Only your last 20 messages are kept word for word; older ones are summarized into the decisions and rules that still apply. Answered questions keep only the question, your answer and the picked option. In two real long sessions the summary went from 245k and 145k characters to about 20k. Compactions that used to fail over a stray bracket or one bad citation now succeed. The recent part kept word for word after a compaction is now 20k tokens (Pi's default) instead of 30k.
 
 ## 0.1.73 — 2026-10-23

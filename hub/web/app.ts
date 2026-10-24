@@ -1099,15 +1099,15 @@ $("composer").addEventListener("submit", async event => {
  // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
  for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
- messageSending = true; expectWork(); renderShell();
+ messageSending = true; saveDraft(); expectWork(); renderShell(); // the stored draft goes now: leaving the page mid-send must not bring the sent text back
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
  const replacing = $("message-input").classList.contains("editing-last") ? prompts().at(-1)?.text : undefined;
  historyAt = -1; $("message-input").classList.remove("editing-last", "from-history"); $("message-input").title = ""; renderHistoryNav();
  try {
-  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; saveDraft(); renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
+  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
  catch (error) { expectWork(false); showNotice(error.message + ". Your message draft is kept."); }
- finally { messageSending = false; renderShell(); }
+ finally { messageSending = false; saveDraft(); renderShell(); }
 });
 // Sending shows Working at once instead of when the agent starts seconds later. The server's next activity event
 // replaces this guess; if none comes (a command that starts no turn), it drops back after 15 s.
@@ -1291,7 +1291,7 @@ function gitLine(git?: GitFiles | null, own = false) {
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
 // The unsent message survives switching sessions and reloads, per session; pagehide also catches programmatic edits (send clears it).
-const draftKey = "plan3-draft:" + sessionId, saveDraft = () => { try { const value = $("message-input").value; if (value) localStorage.setItem(draftKey, value); else localStorage.removeItem(draftKey); } catch { /* private mode */ } };
+const draftKey = "plan3-draft:" + sessionId, saveDraft = () => { try { const value = messageSending ? "" : $("message-input").value; if (value) localStorage.setItem(draftKey, value); else localStorage.removeItem(draftKey); } catch { /* private mode */ } };
 try { if (!$("message-input").value) $("message-input").value = localStorage.getItem(draftKey) ?? ""; } catch { /* private mode */ }
 $("message-input").addEventListener("input", saveDraft);
 // S-12: typing into a parked session starts it once, so Pi is (nearly) ready when the message is sent.

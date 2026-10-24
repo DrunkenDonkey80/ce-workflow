@@ -59,7 +59,7 @@ const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.e
 git("init", "-q"); git("add", "-A"); git("commit", "-qm", "init"); write("src/app.ts", "new line\n");
 
 // What ce-workflow answers through /pi-hub, as the old in-process stub did; fake Pi relays each call here.
-const pool = { acts: [] }; const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, activity = { working: false };
+const pool = { acts: [] }; const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, holdMessage = null, activity = { working: false };
 const fail = (status, error) => Object.assign(new Error(error), { status });
 function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
@@ -94,9 +94,9 @@ function stub(endpoint, body) {
  publish("diagram", { target: { kind: "plan", id: "12345678" }, diagram }); return { diagram };
 }
 const relay = http.createServer((request, response) => {
- let text = ""; request.on("data", chunk => text += chunk); request.on("end", () => {
+ let text = ""; request.on("data", chunk => text += chunk); request.on("end", async () => {
   let result;
-  try { const { endpoint, data } = JSON.parse(text); result = { ok: true, value: stub(endpoint, data) }; } catch (error) { result = { ok: false, status: error.status ?? 500, error: error.message }; }
+  try { const { endpoint, data } = JSON.parse(text); if (endpoint === "/api/message" && holdMessage) await holdMessage; result = { ok: true, value: stub(endpoint, data) }; } catch (error) { result = { ok: false, status: error.status ?? 500, error: error.message }; }
   response.end(JSON.stringify(result));
  });
 });
@@ -583,9 +583,16 @@ try {
  assert.equal(await evaluate("document.querySelectorAll(\".mention-chip\").length"), 2, "emails are not mentions");
  await browser("click", "#send"); await browser("wait", "--fn", "document.getElementById(\"message-input\").value === \"\"");
  assert(messages[0].text.includes("@web_client")); assert.equal(await evaluate("document.querySelector(\"#messages img\")"), null);
+ // Leaving the page while a send is in flight must not restore the sent text from storage.
+ let release; holdMessage = new Promise(resolve => release = resolve);
+ await browser("fill", "#message-input", "Sent while leaving"); await browser("click", "#send");
+ await browser("wait", "--fn", "document.getElementById(\"send\").disabled");
+ assert.equal(await evaluate("localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])"), null, "a send in flight drops the stored draft");
+ holdMessage = null; release(); await browser("wait", "--fn", "document.getElementById(\"message-input\").value === \"\"");
  rejectMessage = true; await browser("fill", "#message-input", "Keep this draft"); await browser("press", "Control+Enter");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"draft is kept\")");
  assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this draft");
+ assert.equal(await evaluate("localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])"), "Keep this draft", "a failed send stores the draft again");
  ask({ question: "Pick a colour", context: "Single choice", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  assert.equal(await evaluate("document.querySelectorAll('#prompt-form textarea').length"), 1, "one text box, like the terminal");
@@ -990,6 +997,6 @@ try {
  await evaluate("localStorage.setItem(\"plan3-chat\", \"expanded\")");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
- await hub.stop(); relay.close(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});
+ await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});
  if (!process.argv.includes("--keep-browser")) await browser("close");
 }

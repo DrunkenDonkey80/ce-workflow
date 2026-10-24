@@ -93,7 +93,7 @@ const runtimeTracked = execFileSync("git", ["ls-files"], {
 	.filter((file) =>
 		/(^|\/)(?:\.pi(?:\/|$)|\.pi-subagents(?:\/|$)|\.beads(?:\/|$)|\.dolt(?:\/|$)|.*(?:backup|export|telemetry|\.lock|\.tmp)(?:\/|$))/i.test(
 			file,
-		),
+		) && !file.endsWith("/Cargo.lock"), // the desktop app's Cargo.lock is a real lockfile, not a runtime lock
 	);
 check(
 	"no runtime or legacy artifacts are tracked",

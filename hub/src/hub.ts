@@ -409,7 +409,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();
 			await host.shutdown();
-			await new Promise(resolve => server.close(resolve));
+			await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); // a browser's reconnecting events stream would otherwise hold the stop forever
 			if (existsSync(markerPath())) rmSync(markerPath(), { force: true });
 			releaseLock(path.join(dataDir, "hub"), lock);
 		})();
