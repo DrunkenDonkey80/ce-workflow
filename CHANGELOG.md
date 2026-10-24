@@ -2,10 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.75 — 2026-10-24
 
 ### Added
 - Hub settings: a Remote access section on this PC's hub page turns Tailscale remote access on or off and copies the remote hub address for your other devices.
+![Remote access section in hub settings](docs/changelog/0.1.75-remote-access.png)
 
 ### Changed
 - Hub settings: an extension's red × uninstall button shows only while the mouse is over its row (touch screens keep it).
