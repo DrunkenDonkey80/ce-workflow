@@ -108,6 +108,17 @@ fn layout(app: &AppHandle) {
         let _ = webview.set_bounds(Rect { position: LogicalPosition::new(0.0, y).into(), size: LogicalSize::new(w, height).into() });
     }
 }
+/// Linux: Tauri packs child webviews into the window's GtkBox, each expanding, and ignores set_bounds there, so the strip
+/// took half the window. Fixed height for the strip; the one visible hub webview fills the rest (hidden ones take no space).
+#[cfg(target_os = "linux")]
+fn pin_strip(strip: &tauri::Webview) {
+    let _ = strip.with_webview(|platform| {
+        use gtk::prelude::*;
+        let view = platform.inner();
+        view.set_size_request(-1, STRIP as i32);
+        if let Some(parent) = view.parent().and_then(|p| p.downcast::<gtk::Box>().ok()) { parent.set_child_packing(&view, false, true, 0, gtk::PackType::Start); }
+    });
+}
 fn strip_eval(app: &AppHandle, script: String) { if let Some(strip) = app.get_webview("strip") { let _ = strip.eval(script); } }
 fn bring_forward(app: &AppHandle) {
     if let Some(window) = app.get_window("main") { let _ = window.show(); let _ = window.unminimize(); let _ = window.set_focus(); }
@@ -257,7 +268,9 @@ fn main() {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());
             let window = WindowBuilder::new(app, "main").title("Pi Hub").inner_size(1200.0, 800.0).maximized(app_config()["maximized"] == true).visible(!start_hidden).build()?;
-            window.add_child(WebviewBuilder::new("strip", WebviewUrl::App("index.html".into())).disable_drag_drop_handler(), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1200.0, STRIP))?;
+            let _strip = window.add_child(WebviewBuilder::new("strip", WebviewUrl::App("index.html".into())).disable_drag_drop_handler(), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1200.0, STRIP))?;
+            #[cfg(target_os = "linux")]
+            pin_strip(&_strip);
             let handle = app.handle().clone();
             window.on_window_event(move |event| match event {
                 WindowEvent::Resized(_) => {

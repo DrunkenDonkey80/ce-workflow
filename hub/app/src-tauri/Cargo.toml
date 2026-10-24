@@ -15,6 +15,9 @@ tauri-plugin-single-instance = "2"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell"] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18" # same version Tauri uses; pins the strip's height (pin_strip in main.rs)
+
 [profile.release]
 opt-level = "s"
 lto = true
