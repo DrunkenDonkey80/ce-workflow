@@ -73,6 +73,31 @@ assert.equal(bus.listenerCount("ask:answer"), 0);
  assert.deepEqual(prefilledBatch.details.answers[1], { status: "answered", response: { kind: "freeform", text: "Saved, edited" } });
 }
 
+// A top-level question names the batch without becoming an extra question.
+{
+ const heading = "Release choices", args = { question: `  ${heading}  `, questions: [question, { ...question, question: "Deploy?" }] };
+ const theme = { fg: (_color, text) => text, bg: (_color, text) => text, bold: text => text, italic: text => text, underline: text => text, strikethrough: text => text, inverse: text => text };
+ let frame, review;
+ const custom = async factory => {
+  const component = factory({ requestRender() {}, terminal: { rows: 40, columns: 100 } }, theme, { matches: () => false, getKeys: () => [] }, () => {});
+  frame = component.render(100).join("\n");
+  component.handleInput("\t"); component.handleInput("\t");
+  review = component.render(100).join("\n");
+  return [{ status: "skipped" }, { status: "skipped" }];
+ };
+ bus.once("ask:pending", event => { assert.equal(event.title, heading); assert.equal(event.questions.length, 2); });
+ const result = await tool.execute("heading", args, undefined, undefined, { hasUI: true, ui: { custom } });
+ assert.equal(result.details.heading, heading);
+ assert(result.content[0].text.startsWith(heading + "\n"));
+ assert.match(frame.split("\n")[0], /ask_user · Release choices/);
+ assert.match(review, /Review answers[\s\S]*Release choices/);
+ assert.match(tool.renderCall(args, theme).render(100).join("\n"), /2 questions ·\s+Release choices/);
+ const titles = [];
+ await tool.execute("heading-fallback", args, undefined, undefined, { hasUI: true, ui: { custom: async () => undefined, select: async title => { titles.push(title); return "Ship"; } } });
+ assert.deepEqual(titles, [`${heading}\n(1/2) Ship?`, `${heading}\n(2/2) Deploy?`]);
+ await assert.rejects(tool.execute("heading-no-ui", args, undefined, undefined, { hasUI: false }), /Release choices/);
+}
+
 for (const external of [false, true]) {
  let start, registrations = 0, warnings = 0;
  factory({ on: (name, fn) => { assert.equal(name, "session_start"); start = fn; },
@@ -114,8 +139,9 @@ for (const external of [false, true]) {
  assert.deepEqual(sent[0].data.options.map(option => option.title), ["Ship", "Hold"]);
  assert.equal(sent[0].data.askId, pending[0], "the hub gets the same askId as intercom and the web");
  assert.deepEqual(closed, [sent[0].id]);
- const many = await tool.execute("hub-batch", { questions: [question, { ...question, question: "Deploy?" }] }, undefined, undefined, { hasUI: true, ui: hubUi({ answers: [{ status: "skipped" }, { status: "answered", response: { kind: "selection", selections: ["Hold"] } }] }) });
+ const many = await tool.execute("hub-batch", { question: "Release choices", questions: [question, { ...question, question: "Deploy?" }] }, undefined, undefined, { hasUI: true, ui: hubUi({ answers: [{ status: "skipped" }, { status: "answered", response: { kind: "selection", selections: ["Hold"] } }] }) });
  assert.equal(sent[1].data.questions.length, 2);
+ assert.equal(sent[1].data.title, "Release choices");
  assert.deepEqual(many.details.answers, [{ status: "skipped" }, { status: "answered", response: { kind: "selection", selections: ["Hold"] } }]);
  const cancelled = await tool.execute("hub-cancel", question, undefined, undefined, { hasUI: true, ui: hubUi(undefined) });
  assert.equal(cancelled.details.cancelled, true, "hub cancel cancels");

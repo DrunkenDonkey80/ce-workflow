@@ -209,6 +209,7 @@ type BatchAnswer = { status: "answered"; response: AskResponse } | { status: "sk
 /** Result details of a `questions` batch. Single-question results keep AskToolDetails. */
 interface AskBatchDetails {
    kind: "batch";
+   heading?: string;
    questions: Array<{ question: string; context?: string; options: QuestionOption[] }>;
    /** Index-aligned with `questions`; empty when the batch was cancelled. */
    answers: BatchAnswer[];
@@ -2109,6 +2110,7 @@ class BatchAskComponent implements Component {
       private theme: Theme,
       private keybindings: KeybindingsManager,
       private onDone: (answers: BatchAnswer[] | null) => void,
+      private heading?: string,
    ) {
       this.answers = questions.map(() => undefined);
       this.pages = questions.map((entry, index) => new AskComponent(
@@ -2204,7 +2206,9 @@ class BatchAskComponent implements Component {
          return index === this.current ? `[${label}]` : label;
       });
       const review = this.current === this.questions.length ? "[review]" : "review";
-      this.title = `ask_user ${labels.join(" ")} · ${review}`;
+      // The frame is one row; preserve the full heading elsewhere.
+      const heading = this.heading ? ` · ${truncateToWidth(this.heading.replace(/\s+/g, " "), 40, "…")}` : "";
+      this.title = `ask_user${heading} ${labels.join(" ")} · ${review}`;
       const hint = literalHint(this.theme, "tab/shift+tab", "questions");
       for (const page of this.pages) page.setBatchChrome(this.title, hint);
    }
@@ -2256,6 +2260,7 @@ class BatchAskComponent implements Component {
       const wrapFooter = (text: string) => wrapTextWithAnsi(text, innerWidth);
       const contentLines = [
          ...wrap(theme.fg("accent", theme.bold("Review answers"))),
+         ...(this.heading ? wrap(theme.fg("text", this.heading)) : []),
          "",
       ];
       this.questions.forEach((entry, index) => {
@@ -2429,12 +2434,13 @@ async function askBatchViaDialogs(
    allowComment: boolean,
    signal: AbortSignal | undefined,
    deadline: number | undefined,
+   heading?: string,
 ): Promise<BatchAnswer[] | null> {
    const dialogOpts = signal ? { signal } : undefined;
    const answers: BatchAnswer[] = [];
    for (const [index, entry] of questions.entries()) {
       if (signal?.aborted) return null;
-      const title = `(${index + 1}/${questions.length}) ${entry.question}`;
+      const title = `${heading ? `${heading}\n` : ""}(${index + 1}/${questions.length}) ${entry.question}`;
       let response: AskResponse | null;
       if (entry.options.length === 0) {
          // Same as a single question without options: a plain text answer.
@@ -2598,6 +2604,11 @@ async function runCustomPrompt<T>(ui: ExtensionUIContext, request: CustomPromptR
    }
 }
 
+/** A top-level question sent with questions is the batch heading, not another question (#80). */
+function batchHeading(params: AskParams): string | undefined {
+   return typeof params.question === "string" && params.question.trim() ? params.question.trim() : undefined;
+}
+
 /**
  * Validate and normalize a `questions` batch. Every problem throws before any
  * UI opens or event fires (#67), with a message that tells the model how to
@@ -2605,11 +2616,6 @@ async function runCustomPrompt<T>(ui: ExtensionUIContext, request: CustomPromptR
  */
 function normalizeBatchQuestions(params: AskParams): BatchQuestion[] {
    const { questions } = params;
-   if (typeof params.question === "string" && params.question.trim()) {
-      throw new Error(
-         "Use exactly one of question or questions. Put every question in questions, or ask a single question with question.",
-      );
-   }
    const misplaced = BATCH_ENTRY_FIELDS.filter((field) => params[field] != null);
    if (misplaced.length > 0) {
       throw new Error(
@@ -2710,10 +2716,10 @@ function formatBatchAnswers(details: AskBatchDetails): string {
       return `${index + 1}. ${subject.question} → ${summary}`;
    });
    const answered = details.answers.filter((answer) => answer.status === "answered").length;
-   return [`User answered ${answered} of ${details.questions.length} questions:`, ...lines].join("\n");
+   return [...(details.heading ? [details.heading] : []), `User answered ${answered} of ${details.questions.length} questions:`, ...lines].join("\n");
 }
 
-function formatBatchForMessage(questions: BatchQuestion[], allowComment: boolean): string {
+function formatBatchForMessage(questions: BatchQuestion[], allowComment: boolean, heading?: string): string {
    const blocks = questions.map((entry, index) => {
       const lines = [`${index + 1}. ${entry.question}`];
       if (entry.context) lines.push(`   Context: ${entry.context.replace(/\n/g, "\n   ")}`);
@@ -2725,7 +2731,8 @@ function formatBatchForMessage(questions: BatchQuestion[], allowComment: boolean
       return lines.join("\n");
    });
    const commentHint = allowComment ? "\n\nAfter choosing an option, you may add an optional comment." : "";
-   return `Ask requires interactive mode. Please answer these questions:\n\n${blocks.join("\n\n")}${commentHint}`;
+   const intro = heading ? `\n\n${heading}` : "";
+   return `Ask requires interactive mode. Please answer these questions:${intro}\n\n${blocks.join("\n\n")}${commentHint}`;
 }
 
 async function executeBatch(
@@ -2736,18 +2743,20 @@ async function executeBatch(
    ctx: ExtensionContext,
 ): Promise<AgentToolResult<AskBatchDetails>> {
    const questions = normalizeBatchQuestions(params);
+   const heading = batchHeading(params);
    const settings = resolvePromptSettings(params);
    const events = createAskEventEmitter(pi);
    const subjects = questions.map(({ question, context, options }) => ({ question, context, options }));
    const details = (answers: BatchAnswer[], cancelled: boolean): AskBatchDetails => ({
       kind: "batch",
+      ...(heading ? { heading } : {}),
       questions: subjects,
       answers,
       cancelled,
    });
 
    if (!ctx.hasUI || !ctx.ui) {
-      throw new Error(formatBatchForMessage(questions, settings.allowComment));
+      throw new Error(formatBatchForMessage(questions, settings.allowComment, heading));
    }
 
    onUpdate?.({
@@ -2768,14 +2777,14 @@ async function executeBatch(
    const deadlineTimer = deadline === undefined ? undefined : setTimeout(() => batch.abort(), params.timeout);
    let answers: BatchAnswer[] | null;
    try {
-      answers = await raceRemoteAsk(pi, { questions, allowComment: settings.allowComment }, batch.signal, undefined,
+      answers = await raceRemoteAsk(pi, { questions, allowComment: settings.allowComment, title: heading }, batch.signal, undefined,
          payload => remoteBatch(payload, questions, settings.allowComment), localSignal => runCustomPrompt<BatchAnswer[]>(ctx.ui, {
          signal: localSignal,
          displayMode: settings.displayMode,
          overlayToggle: settings.shortcuts.overlayToggle,
          createComponent: (tui, theme, keybindings, complete) =>
-            new BatchAskComponent(questions, settings, tui, theme, keybindings, complete),
-         fallback: () => askBatchViaDialogs(ctx.ui, questions, settings.allowComment, localSignal, deadline),
+            new BatchAskComponent(questions, settings, tui, theme, keybindings, complete, heading),
+         fallback: () => askBatchViaDialogs(ctx.ui, questions, settings.allowComment, localSignal, deadline, heading),
       }), ctx.ui);
    } finally {
       if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
@@ -2883,7 +2892,7 @@ export function registerAskUser(pi: ExtensionAPI) {
       name: "ask_user",
       label: "Ask User",
       description:
-         "Ask the user a question with optional multiple-choice answers. Use this to gather information interactively. Ask one focused question per call, or 2-4 independent questions together through questions. Before calling, gather context with tools (read/web/ref) and pass a short summary via the context field.",
+         "Ask the user a question with optional multiple-choice answers. Use this to gather information interactively. Ask one focused question per call, or 2-4 independent questions together through questions. A top-level question with questions is only the batch heading. Before calling, gather context with tools (read/web/ref) and pass a short summary via the context field.",
       promptSnippet:
          "Ask the user one focused question (or 2-4 independent ones together) with optional multiple-choice answers to gather information interactively",
       promptGuidelines: [
@@ -2891,6 +2900,7 @@ export function registerAskUser(pi: ExtensionAPI) {
          "Use ask_user when the user's intent is ambiguous, when a decision requires explicit user input, or when multiple valid options exist.",
          "Ask one focused question per ask_user call by default.",
          "Use questions (2-4 entries) only for independent decisions whose prerequisites are already settled; ask anything that depends on another answer in a later ask_user call.",
+         "With questions, put every question inside questions. A top-level question is only shown as the batch heading and is never asked or answered.",
          "Do not combine multiple numbered, multipart, or unrelated questions into one question's text.",
       ],
       // Block other tool calls in the same assistant turn until the user answers,
@@ -2899,7 +2909,7 @@ export function registerAskUser(pi: ExtensionAPI) {
       executionMode: "sequential",
       parameters: Type.Object({
          question: Type.Optional(
-            Type.String({ description: "The question to ask the user. Omit when using questions." }),
+            Type.String({ description: "The question to ask the user. With questions, it is only an optional heading for the batch; put every actual question inside questions." }),
          ),
          questions: Type.Optional(
             Type.Array(
@@ -3137,6 +3147,9 @@ ${normalizedContext}` : question, initialText))
             const entries: unknown[] = args.questions;
             let text = theme.fg("toolTitle", theme.bold("ask_user "));
             text += theme.fg("muted", `${entries.length} questions`);
+            if (typeof args.question === "string" && args.question.trim()) {
+               text += theme.fg("muted", ` · ${args.question.trim()}`);
+            }
             if (args.allowComment) {
                text += theme.fg("dim", " [optional comment]");
             }

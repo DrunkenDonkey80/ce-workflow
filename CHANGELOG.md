@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Fixed
+- Asking several questions with a shared heading now opens the form instead of returning an error; the heading appears in the terminal, hub and answer summary.
+
 ### Added
 - Hub sidebar: a +/− box in front of each folder (or a click on its name) hides the sessions that are not working, or shows them all again. Sessions that have not worked for 2 days hide by themselves (Auto-collapse in hub settings: off, 12 hours to 1 week); shown again with +, they stay 5 minutes before hiding again.
 - Hub sidebar: a filter box next to the ☰ button (Ctrl+Shift+F) finds sessions by folder or name; ↑/↓ move a dashed outline over the matches and Enter opens the picked one (the first match by default).

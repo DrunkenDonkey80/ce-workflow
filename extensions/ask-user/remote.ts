@@ -51,7 +51,7 @@ export interface RemoteListPrompt {
 }
 
 // The native popup and authenticated local browser race; remote answers close the losing UI by aborting its signal.
-export async function raceRemoteAsk<T>(pi: ExtensionAPI, subject: RemoteQuestion & { allowComment: boolean } | { questions: RemoteQuestion[]; allowComment: boolean } | RemoteListPrompt, signal: AbortSignal | undefined, timeout: number | undefined,
+export async function raceRemoteAsk<T>(pi: ExtensionAPI, subject: RemoteQuestion & { allowComment: boolean } | { questions: RemoteQuestion[]; allowComment: boolean; title?: string } | RemoteListPrompt, signal: AbortSignal | undefined, timeout: number | undefined,
 	decode: (payload: unknown) => T | undefined, run: (signal: AbortSignal) => Promise<T | null>, hubUi?: Parameters<typeof hubAsk>[0]): Promise<T | null> {
 	if (signal?.aborted) return null;
 	const askId = randomUUID(), local = new AbortController();

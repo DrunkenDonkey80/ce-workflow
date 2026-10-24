@@ -4,7 +4,7 @@ status: active
 created: 2026-10-24
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.4.0","pi-subagents":"0.81.0","pi-ask-user":"0.17.0","pi-intercom":"0.18.1"}
-updated: 2026-10-24T22:00:11.894Z
+updated: 2026-10-24T22:01:27.279Z
 reviewed: 2026-10-24
 started: 2026-10-24T21:59:19.099Z
 ---
@@ -220,19 +220,7 @@ None.
 ### Phase 1: Apply adopted changes [code]
 
 - [x] **CU-01** Pinned Pi SDK and lockfile to 1.4.0; isolated native selfcheck from inherited hub mode.
-- [ ] **CU-02** Port the pi-ask-user 0.17.0 batch heading into extensions/ask-user/index.ts.
-  - Follow upstream: `batchHeading()`; normalizeBatchQuestions stops throwing on a top-level question; `AskBatchDetails.heading`.
-  - BatchAskComponent takes the heading: the shared frame title (collapsed to one line, 40 columns) and the full heading below "Review answers".
-  - Question pages keep their own titles, as upstream does (diff lines 557 and 634).
-  - askBatchViaDialogs prefixes each dialog title with the heading and a line break; formatBatchForMessage shows it; the batch result text starts with it; renderCall appends ` · <question>`.
-  - Port the tool description and `question` parameter text that say a top-level question is only a heading.
-  - The batch subject passed to raceRemoteAsk (index.ts:2771) gets `title: heading` (D2).
-  - C1 gains cases that fail before the port, reusing its custom-component and hubUi mocks:
-    - question plus questions returns the heading in the result text and details;
-    - the rendered batch frame and review page contain the heading;
-    - fallback dialog titles start with the heading;
-    - the ask:pending event and the hub payload carry `title` equal to the heading.
-  - Add a CHANGELOG.md Unreleased bullet in plain words. Check with C1, C2 and C5.
+- [x] **CU-02** Ported batch headings across terminal frame/review, fallbacks, results, events and hub payload; added regressions and changelog.
 - [ ] **CU-03** Register ask_user with `exposure: "model-only"` the way upstream does (spread, so older hosts ignore it); C1 asserts it.
 - [ ] **CU-04** Update extensions/ask-user/UPSTREAM.md and ASK_USER_VERSION to 0.17.0.
   - Pinned release 0.17.0 and copy date; add the heading and exposure to the ported behavior.
