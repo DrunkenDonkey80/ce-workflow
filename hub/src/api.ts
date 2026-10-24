@@ -369,6 +369,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		unseen.add(id); // an open page in a background tab, a minimized app or another device has not shown it to anyone
 		if (views.has(id)) void publishStatus(id).catch(() => {});
 	});
+	host.on("switched", (id: string) => { views.get(id)?.close(); views.delete(id); }); // the pages reconnect to the new session's chat
 	host.on("closed", (id: string, requestId: string) => views.get(id)?.publish("dialog_closed", { askId: requestId }));
 	host.on("notice", (id: string, text: string) => views.get(id)?.publish("notice", { text }));
 	host.on("ui", (id: string, request: RpcRecord) => {

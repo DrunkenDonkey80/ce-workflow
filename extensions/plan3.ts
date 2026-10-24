@@ -1248,12 +1248,29 @@ export default function plan3(pi) {
 		setPointer(plan, false);
 		research(ctx, false);
 		await refresh(ctx);
+		// Session replacement exists only on command contexts (not the browser workspace's).
+		const fresh = typeof ctx.newSession === "function";
+		const pick = ctx.hasUI ? await showListDialog(ctx, { title: "Plan ready", purpose: "Planning is finished and research is off. Start implementation when you choose.", cursorKey: `plan3-ready:${plan.id}`, items: [
+			...(fresh ? [{ value: "new", label: "Start work in a new session", description: "Save your standing requirements into the plan, then start in a fresh session" }] : []),
+			{ value: "resume", label: "Start work here", description: "Compact this session, then start" },
+			{ value: "later", label: "Not yet", description: `Compact now; resume later with /resume3 ${plan.id}` },
+		] }) : undefined;
+		if (pick?.value === "new") return startFresh(ctx, plan);
 		const compacted = await compactFirst(ctx, plan, true); // The plan is ready either way; a failed compaction was already reported.
 		ctx.ui.notify(`Plan ready · /resume3 ${plan.id}\n${plan.file}`, "info");
-		if (ctx.hasUI && compacted) {
-			const pick = await showListDialog(ctx, { title: "Plan ready", purpose: "Planning is finished and research is off. Start implementation when you choose.", cursorKey: `plan3-ready:${plan.id}`, items: [{ value: "resume", label: "Start work", description: plan.title }, { value: "later", label: "Not yet", description: `Resume later with /resume3 ${plan.id}` }] });
-			if (pick?.value === "resume") await resume(ctx, { ...plan, status: "ready" });
-		}
+		if (pick?.value === "resume" && compacted) await resume(ctx, { ...plan, status: "ready" });
+	}
+	// The agent still holds the planning talk: it copies what the user asked for that the plan lacks into Decisions,
+	// then the plan continues in a fresh session that sees only the plan file.
+	let onSettled: ((aborted: boolean) => void) | null = null;
+	async function startFresh(ctx, plan) {
+		// shortcut: a prompt Pi refuses before the run starts (no credentials) leaves this waiting; add a timeout if that shows up.
+		const settled = new Promise<boolean>((done) => { onSettled = done; });
+		send(`Plan3 handoff: ${JSON.stringify(plan.file)} continues in a fresh session that sees only the plan file. With plan3 action section (plan ${plan.id}, name Decisions), append every standing requirement, constraint or preference the user stated in this conversation that the plan does not hold yet: devices, accounts or tools to use or avoid, files and areas not to touch, commit and push rules, how to work and report. One short bullet each, in the user's words where possible. Change nothing else and start no work; if nothing is missing, say so.`);
+		if (await settled) return ctx.ui.notify(`Plan3: handoff stopped; the plan is ready · /resume3 ${plan.id}`, "warning");
+		await ctx.waitForIdle();
+		// This instance is stale after the switch; the new session's own /resume3 starts the work.
+		await ctx.newSession({ parentSession: ctx.sessionManager.getSessionFile?.(), withSession: (next) => next.sendUserMessage(`/resume3 ${plan.id}`, { expandPromptTemplates: true }) });
 	}
 	// Starting an unreviewed ready plan offers the review first; true = handled (review sent or cancelled).
 	async function offerReview(ctx, plan) {
@@ -2106,6 +2123,7 @@ export default function plan3(pi) {
 	});
 	// R25: after a planning turn, show exactly one state-aware next action.
 	pi.on?.("agent_settled", async (event, ctx) => {
+		const handoff = onSettled; onSettled = null; handoff?.(Boolean(event?.aborted));
 		await afterForcedArchitecture(ctx, event?.aborted).catch((error) => report(ctx, error));
 		await afterTagging(ctx, event?.aborted).catch((error) => report(ctx, error));
 		await afterResolve(ctx, event?.aborted).catch((error) => report(ctx, error));

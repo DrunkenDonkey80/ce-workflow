@@ -92,6 +92,8 @@ async function handle(cmd) {
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "notify", message: `dialog:${JSON.stringify(rest)}` });
 				}
 				if (cmd.message.startsWith("/diagram ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:diagram", statusText: cmd.message.slice(9) });
+				// Mirrors plan3.ts "Start work in a new session": an extension command replaces the session in-process.
+				if (cmd.message === "/switch") { sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; header(); messages.length = 0; }
 				if (cmd.message.startsWith("/state ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:state", statusText: cmd.message.slice(7) });
 				if (flags.has("slow-command")) await new Promise(r => setTimeout(r, 300));
 				return reply({ disposition: "handled" });

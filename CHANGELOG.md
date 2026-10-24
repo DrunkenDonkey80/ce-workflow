@@ -6,6 +6,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - Right-click a file link in the hub chat for Upload, Zip and upload, or 7z and upload (when 7z is installed). The hub encrypts the file, sends it to wormhole.app and copies the link, which works for 24 hours with no download limit. Only the key-holding link can open it. Files only, up to 5 GB; on Linux, Zip needs the zip package.
+- When a plan is finished, the Plan ready menu offers "Start work in a new session". The agent first copies anything you asked for that the plan doesn't yet have into the plan's Decisions (devices, accounts, files to leave alone, push rules and so on), then the work starts in a fresh session with a small context. If you stop that step, you stay in the current session. The hub follows the switch: the chat shows the new session, and parking and resuming reopen it. The hub encrypts the file, sends it to wormhole.app and copies the link, which works for 24 hours with no download limit. Only the key-holding link can open it. Files only, up to 5 GB; on Linux, Zip needs the zip package.
 
 ### Changed
 - The sidebar's changed-files list opens beside the sidebar, centred in the window, and grows to fit its files; it scrolls only when it reaches the chat heading.

@@ -106,6 +106,19 @@ try {
 	const restarted = await host.restart(a.id);
 	assert.equal(restarted.sessionFile, a.sessionFile);
 
+	// An extension's in-process session switch: the next run moves the lock and the record, and the pages are told.
+	{
+		const s = await host.create(folder, "switch"), switched = new Promise(r => host.once("switched", r));
+		await host.prompt(s.id, "/switch");
+		const run = settled(s.id); await host.prompt(s.id, "after switch"); await run;
+		assert.equal(await switched, s.id);
+		const moved = host.options.registry.get(s.id).sessionFile;
+		assert.notEqual(moved, s.sessionFile);
+		assert.equal(fs.existsSync(lockPath(s.sessionFile)), false, "the old file's lock is released");
+		assert.equal(readLock(moved).pid, process.pid);
+		await host.park(s.id);
+	}
+
 	// Automatic parking: idle past the limit, even while a browser is viewing (D16).
 	host.idleParkMinutes = 60;
 	host.live.get(a.id).viewers = 1;

@@ -815,6 +815,34 @@ try {
 	assert.deepEqual(await Promise.all(viewFiles.map(file => readFile(file, "utf8"))), beforeViewBytes);
 	assert.equal(messages.length, beforeViewMessages, "Not yet never starts implementation");
 	await rm(handoffFile); entries.splice(beforeHandoffEntries);
+	// "Start work in a new session": the agent first copies standing requirements into Decisions; after that run the
+	// session is replaced and the new one runs /resume3. A stopped handoff run keeps this session.
+	for (const aborted of [false, true]) {
+		const freshFile = path.join(directory, "2026-10-08-fresh-47474747-plan3.md"), beforeFresh = entries.length, switches = [];
+		await writeFile(freshFile, validPlan("47474747", "Newstart", "draft", "- [ ] **F-01** Implement", "reviewed: 2026-10-01\n"));
+		Object.assign(ctx, { waitForIdle: async () => {}, newSession: async (options) => { switches.push(options); return { cancelled: false }; } });
+		ctx.sessionManager.getSessionFile = () => "old.jsonl";
+		selectScript = [["Plans3", "Newstart"], ["Newstart", "Finish planning"], ["Plan ready", "Start work in a new session"]];
+		const beforeMessages = messages.length, beforeCompactions = compactions, finishing = run("plans3");
+		let ended = false; finishing.then(() => { ended = true; }, () => { ended = true; });
+		while (messages.length === beforeMessages && !ended) await new Promise((r) => setTimeout(r, 5));
+		if (ended) await finishing;
+		assert(!ended, `finish ended before the handoff message (aborted ${aborted}): ${JSON.stringify(notices.at(-1))}`);
+		assert.match(messages.at(-1).message, /^Plan3 handoff: .*fresh-47474747.*plan 47474747, name Decisions/s);
+		await hooks.get("agent_settled")({ aborted }, ctx);
+		await finishing;
+		assert.equal(compactions, beforeCompactions, "a fresh start does not compact the old session");
+		if (aborted) assert.deepEqual(switches, [], "a stopped handoff stays in this session");
+		else {
+			assert.equal(switches.length, 1);
+			assert.equal(switches[0].parentSession, "old.jsonl");
+			const sent = [];
+			await switches[0].withSession({ sendUserMessage: async (text, options) => sent.push([text, options]) });
+			assert.deepEqual(sent, [["/resume3 47474747", { expandPromptTemplates: true }]]);
+		}
+		delete ctx.waitForIdle; delete ctx.newSession; delete ctx.sessionManager.getSessionFile;
+		await rm(freshFile); entries.splice(beforeFresh);
+	}
 	// Finish offers review before compacting when the plan was never reviewed: one other model → "Review first"; several → one or all.
 	{
 		const settingsFile = path.join(agentDir, "settings.json"), savedSettings = await readFile(settingsFile, "utf8").catch(() => "{}");

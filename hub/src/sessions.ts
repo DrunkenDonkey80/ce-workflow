@@ -77,7 +77,7 @@ export class SessionHost extends EventEmitter {
 		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: this.options.viewers?.(record.id) ?? 0, lastActivity: Date.now(), stopping: false, ready: Promise.resolve() };
 		rpc.on("event", (event: RpcRecord) => {
 			live.lastActivity = Date.now();
-			if (event.type === "agent_start") live.running = true;
+			if (event.type === "agent_start") { live.running = true; void this.remember(live); } // follows a session switch before the run streams far
 			else if (event.type === "agent_settled") { live.running = false; live.settles++; void this.remember(live); } // a run (or Plan3) may switch models
 			else if (event.type === "compaction_start") live.compacting = true;
 			else if (event.type === "compaction_end") { live.compacting = false; live.compactedTokens = event.result?.estimatedTokensAfter; }
@@ -167,6 +167,16 @@ export class SessionHost extends EventEmitter {
 	async remember(live: Live, state?: RpcRecord): Promise<void> {
 		state ??= await live.rpc.send({ type: "get_state" }).catch(() => undefined);
 		if (!state?.success || !this.registry.get(live.id)) return;
+		// An extension switched sessions in-process (Plan3's "Start work in a new session"): the lock, the record and the pages follow.
+		const file = state.data?.sessionFile;
+		if (typeof file === "string" && live.lock && file !== live.lock.file) {
+			let info;
+			try { info = acquireLock(file, "pi-control-hub"); } catch { return; } // the hub's own /new or drop is moving it right now
+			releaseLock(live.lock.file, live.lock.info);
+			live.lock = { file, info };
+			this.registry.update(live.id, { sessionFile: file });
+			this.emit("switched", live.id);
+		}
 		const model = state.data?.model, current = this.registry.get(live.id)!;
 		const next = { model: model ? { provider: model.provider, id: model.id, name: model.name ?? model.id } : null, thinking: state.data?.thinkingLevel };
 		if (JSON.stringify([current.model, current.thinking]) !== JSON.stringify([next.model, next.thinking])) this.registry.update(live.id, next);
