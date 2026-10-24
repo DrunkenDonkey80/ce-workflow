@@ -4,7 +4,7 @@ status: active
 created: 2026-10-24
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.4.0","pi-subagents":"0.81.0","pi-ask-user":"0.17.0","pi-intercom":"0.18.1"}
-updated: 2026-10-24T22:11:16.093Z
+updated: 2026-10-24T22:11:31.128Z
 reviewed: 2026-10-24
 started: 2026-10-24T21:59:19.099Z
 ---
@@ -37,8 +37,6 @@ Several releases may lie between the last reviewed version and the target; revie
 
 ## Catch-up decisions
 
-Fill during planning. Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "adopted|no-action", "rationale"}; adopted entries also need "verification" (the check command and its result), added when the step is done. The recorder fills in the version.
-
 ```json
 {
   "@earendil-works/pi-coding-agent": [
@@ -46,7 +44,8 @@ Fill during planning. Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-p
       "title": "Pin the devDependency to the reviewed release 1.4.0",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "package.json pins @earendil-works/pi-coding-agent 1.3.0 for type checks and tests, while the managed host already runs 1.4.0 (~/.pi/agent/install/current-version). The extension API types are unchanged between the installed 1.3.0 and 1.4.0 releases (only agent-session, compaction, model-config, provider-composer, interactive-mode and pi-user-agent .d.ts files differ), so the bump is low risk. Same step as CU-04 of the 1.3.0 catch-up (ffd99fd1). CU-01."
+      "rationale": "package.json pins @earendil-works/pi-coding-agent 1.3.0 for type checks and tests, while the managed host already runs 1.4.0 (~/.pi/agent/install/current-version). The extension API types are unchanged between the installed 1.3.0 and 1.4.0 releases (only agent-session, compaction, model-config, provider-composer, interactive-mode and pi-user-agent .d.ts files differ), so the bump is low risk. Same step as CU-04 of the 1.3.0 catch-up (ffd99fd1). CU-01.",
+      "verification": "npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.4.0 succeeded; package and both lockfile entries read 1.4.0. node scripts/test-work-ask-user.mjs, node scripts/test-work-compaction.mjs and node scripts/test-work-compaction-notifications.mjs passed. Full verification authored-source TypeScript passed; unrelated limitations accepted in D5."
     },
     {
       "title": "Compaction and branch summaries use the model's output limit; generateSummary(WithUsage) ignore reserveTokens (#9512)",
@@ -146,13 +145,15 @@ Fill during planning. Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-p
       "title": "A top-level question sent with questions becomes the batch heading instead of an error (#80)",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "0.17.0 shows that question as the batch heading (frame title, review page, dialog fallback, result text, call card) and no longer throws \"Use exactly one of question or questions\". Our vendored copy still throws it (extensions/ask-user/index.ts:2606-2611), and 15 earlier session files contain that error, each costing the model a retry. The hub batch form already renders ask.title as its heading (hub/web/prompts.ts:21), so passing the heading as title covers the browser too. CU-02."
+      "rationale": "0.17.0 shows that question as the batch heading (frame title, review page, dialog fallback, result text, call card) and no longer throws \"Use exactly one of question or questions\". Our vendored copy still throws it (extensions/ask-user/index.ts:2606-2611), and 15 earlier session files contain that error, each costing the model a retry. The hub batch form already renders ask.title as its heading (hub/web/prompts.ts:21), so passing the heading as title covers the browser too. CU-02.",
+      "verification": "node scripts/test-work-ask-user.mjs failed before port with exactly-one error, then passed heading result/details, terminal frame/review, fallback titles, call card, ask:pending title and hub payload assertions. node scripts/test-work-ask-remote.mjs passed. LSP inconclusive; authored-source TypeScript passed in npm run verify:quiet; unrelated suite limitations accepted in D5."
     },
     {
       "title": "ask_user is registered with exposure \"model-only\"",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "Pi's extensions.md:270 says model-only is meant for tools that ask the user: declared to the model, never callable from codemode. A codemode script waiting on a dialog runs into script deadlines and holds a worker. ce-workflow's own callers use execute directly (registerAskUser for the Plan3 adapter) or the model, never codemode (rg tools.ask_user: none). One line. CU-03."
+      "rationale": "Pi's extensions.md:270 says model-only is meant for tools that ask the user: declared to the model, never callable from codemode. A codemode script waiting on a dialog runs into script deadlines and holds a worker. ce-workflow's own callers use execute directly (registerAskUser for the Plan3 adapter) or the model, never codemode (rg tools.ask_user: none). One line. CU-03.",
+      "verification": "node scripts/test-work-ask-user.mjs passed including exposure=model-only, native single/batch remote races and D12 coexistence. Authored-source TypeScript passed in npm run verify:quiet; unrelated suite limitations accepted in D5."
     },
     {
       "title": "ask-user.json settings file for display defaults (settings.ts)",
@@ -229,9 +230,7 @@ None.
 ### Phase 2: Verify and record [code]
 
 - [x] **CU-90** Ran full verification; catch-up and TypeScript passed, with Android/browser limitations explicitly accepted in D5.
-- [ ] **CU-91** Record the reviewed versions: `node scripts/work-catch-up-record.mjs <this plan's id>` (C7).
-  - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json` and refuses missing, unexplained or unverified decisions.
-  - Before running it, add each adopted entry's "verification" (command and result) to the JSON above.
+- [x] **CU-91** Recorded all four exact reviewed targets with verified adopted decisions.
 ### P-ARCH [code] Product architecture
 
 - [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.

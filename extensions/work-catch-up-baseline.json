@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-10-19T21:33:16.702Z",
+  "capturedAt": "2026-10-24T22:11:18.499Z",
   "verification": {
     "command": "npm run verify:quiet",
     "fullRuns": 1,
@@ -15,74 +15,80 @@
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "1.3.0",
-      "reviewedAt": "2026-10-19T21:33:16.702Z",
-      "reviewedVersion": "1.3.0",
+      "version": "1.4.0",
+      "reviewedAt": "2026-10-24T22:11:18.499Z",
+      "reviewedVersion": "1.4.0",
       "decisions": [
         {
-          "title": "before_agent_start also fires for sendMessage triggerTurn runs (messageType union)",
+          "title": "Pin the devDependency to the reviewed release 1.4.0",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "1.2.0: runs started by pi.sendMessage(..., { triggerTurn: true }) now emit before_agent_start with messageType \"custom\" and the starting message, before that message's message_start (agent-session.js _prepareRun). work-models.ts:3721-3725 marks every before_agent_start as a user prompt (pendingPromptBackedAgentStart = true). A custom run is therefore treated as user work, and the internal background-notice guard (work-models.ts:3732-3760) never aborts it. The unit test in test-work-compaction-notifications.mjs (around line 197) still passes only because it replays the pre-1.2 order without before_agent_start. Today the guard covers only the retired knowledge discoverer (launchKnowledgeDiscoverer has no production caller), so the fix stays minimal: a custom run is not marked as prompt-backed, plus one 1.2-ordered unit case. Research-mode prompt sections now also reach custom runs, which is intended. advisor-model.ts, jev-tools.ts:511 and work-images.ts:267 work for both kinds. CU-03.",
-          "verification": "node scripts/test-work-compaction-notifications.mjs: Pi 1.2-ordered custom-run case fails before the fix, passes after (commit 84a45f3).",
-          "version": "1.3.0"
+          "rationale": "package.json pins @earendil-works/pi-coding-agent 1.3.0 for type checks and tests, while the managed host already runs 1.4.0 (~/.pi/agent/install/current-version). The extension API types are unchanged between the installed 1.3.0 and 1.4.0 releases (only agent-session, compaction, model-config, provider-composer, interactive-mode and pi-user-agent .d.ts files differ), so the bump is low risk. Same step as CU-04 of the 1.3.0 catch-up (ffd99fd1). CU-01.",
+          "verification": "npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.4.0 succeeded; package and both lockfile entries read 1.4.0. node scripts/test-work-ask-user.mjs, node scripts/test-work-compaction.mjs and node scripts/test-work-compaction-notifications.mjs passed. Full verification authored-source TypeScript passed; unrelated limitations accepted in D5.",
+          "version": "1.4.0"
         },
         {
-          "title": "Pin the devDependency types to the runtime 1.3.0",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "package.json devDependencies pins @earendil-works/pi-coding-agent 1.1.0 for editor and LSP types, while the runtime is 1.3.0. CU-03 reads event.messageType, which 1.1.0 types lack. The catch-up tool also reads this pin as 'Installed'. Bump it to 1.3.0 exactly and keep package-lock.json in sync. Dev-only; nothing ships at runtime. CU-04.",
-          "verification": "npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.3.0: package.json and package-lock at 1.3.0; C2 passes after updating the assistant fixture for 1.3.0 estimateTokens (commits 1808861, bfee8bb).",
-          "version": "1.3.0"
-        },
-        {
-          "title": "Session counts as busy while a run starts; sendUserMessage needs deliverAs then; sendMessage queues into the starting run",
+          "title": "Compaction and branch summaries use the model's output limit; generateSummary(WithUsage) ignore reserveTokens (#9512)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.2.0: ctx.isIdle() is false during start and before_agent_start. A triggerTurn sendMessage in that window joins the starting run instead of failing with 'Agent is already processing'. plan3-web.ts:39-42 already sends steer when !ctx.isIdle(). work-models.ts:2730-2738 and plan3.ts:697 pass deliverAs. work-models.ts:2244 sends after compaction completes, from an idle session. Our triggerTurn wakes (work-camera-watch.ts:44, plan3-night.ts:66) gain the queueing fix with no change.",
-          "version": "1.3.0"
+          "rationale": "Pi no longer sets a fixed maxTokens on summary requests, so long reasoning cannot cut a summary at the cap. work-models.ts summarizeNativeContext passes reserveTokens positionally to generateSummaryWithUsage; 1.4.0 keeps that parameter as _reserveTokens (compaction.d.ts:114) and the later positions (signal, customInstructions, previousSummary, streamFn, retry) are unchanged, so the call stays valid and the native and default modes get the fix for free. Keeping the argument keeps older Pi hosts (peerDependency \"*\") working.",
+          "version": "1.4.0"
         },
         {
-          "title": "Codemode: input-constraint tags, elapsed time, @options must be the first line, two-worker admission, node --watch bridge, quadratic text() join",
-          "pov": "Not-our-problem",
+          "title": "Same fixed-cap pattern in ce-workflow's own hybrid compaction and vision calls",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "1.2.0 and 1.3.0 change how Pi declares and runs codemode scripts. ce-workflow never generates codemode scripts. Its tools (jev_*, process_image, generate_image) are called from scripts, and Pi generates their declarations from the existing schemas. Nothing to change.",
-          "version": "1.3.0"
+          "rationale": "work-compaction-memory.ts:236 (maxTokens 16384) and work-vision.ts:56 (maxTokens 4096) still cap output while reasoning, the failure class Pi fixed. A search of every session log found no \"Compaction response stopped: length\" or \"Vision model failed (length)\" outside this review, and both paths fail safely (the next compaction model or local memory; a clear vision error). Raising the caps could raise cost with no observed failure. Revisit if a length stop appears.",
+          "version": "1.4.0"
         },
         {
-          "title": "reachesTools and namespace aliases on tool definitions",
-          "pov": "Not-our-problem",
+          "title": "Concurrent extension dialogs form a stack instead of replacing each other (#11166)",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "1.2.0: a tool that calls other tools may declare which ones a call can reach. The MCP extension uses this to wait for servers and to decide whether a replacement codemode or tool_search reaches MCP tools (docs/extensions.md). jev-tools.ts:469 runs only bash through ctx.executeTool and never MCP tools, so declaring it changes nothing.",
-          "version": "1.3.0"
+          "rationale": "Pi now stacks select, confirm, input, editor and inline custom() dialogs so no promise is left pending. plan3.ts:690-697 serialUI works around exactly the old bug, but it stays: Pi's stack does not cover overlay custom() components, which ask_user uses by default; serialUI keeps first-in-first-out order for parallel requirement asks instead of newest-first; and it still protects older Pi hosts. Other concurrent dialogs benefit without changes.",
+          "version": "1.4.0"
         },
         {
-          "title": "Model switching drops thinking from other models; serializeConversation omits thinking",
+          "title": "Resume and /tree keep extension tools active unless registered with defaultActive: false (#11062, #11075)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.3.0 drops earlier models' thinking blocks on a model switch. 1.2.0 drops thinking from compaction and branch-summary serialization. The STRIP_THINKING filter (work-models.ts:1757, 1988) is a separate opt-in context experiment. Plan3 advisors run in fresh child sessions. No duplicate logic to delete, nothing to add.",
-          "version": "1.3.0"
+          "rationale": "The restore applies only to direct and model-only tools (agent-session.js _isActivatedOnRegistration). The opt-in camera tools (model-only) are re-synced by syncCameraTools on session_start and before_agent_start (work-models.ts:3651, 3697), so a restored camera tool is removed before the next request. plan3_design is deferred and unaffected. Every other ce-workflow tool is meant to be active.",
+          "version": "1.4.0"
         },
         {
-          "title": "ctx.ui.custom overlay done() closes its own overlay",
+          "title": "Codemode waits for a free worker; PI_CODEMODE_MAX_WORKERS raises the limit (#11184)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.3.0 fix: done() used to close the topmost overlay, which could leave another extension's dialog unresolved. The vendored ask_user overlays (extensions/ask-user/index.ts:543, 557) get the fix automatically. The repo has no workaround to remove.",
-          "version": "1.3.0"
+          "rationale": "Parallel codemode scripts and in-process subagents now queue for up to 60 s instead of failing. ce-workflow has no workaround to delete (no busy-worker handling or PI_CODEMODE references). The process_image wait in work-images.ts:137 handles a different race (a screenshot file not written yet).",
+          "version": "1.4.0"
         },
         {
-          "title": "Resumed sessions keep their active tools",
+          "title": "Provider attribution headers come from pi-ai's client identity; before_provider_headers no longer sees them",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.3.0 restores tools activated during the session on resume. The only setActiveTools caller, plan3.ts:1270 (adds plan3_design), now survives a resume as intended.",
-          "version": "1.3.0"
+          "rationale": "ce-workflow registers no before_provider_headers handler and sets no User-Agent or attribution header.",
+          "version": "1.4.0"
         },
         {
-          "title": "Provider, catalog, retry, MCP, OpenRouter, Kimi, Nix, config-schema, clipboard, /share, --model ambiguity, tool-argument parsing and print-mode fixes",
+          "title": "Codemode models.classify() accepts images for Jev and Clef",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "jev-tools.ts sends typed questions about JSON and file text through registry.classify; image questions already go through process_image and the configured vision model. Nobody asked for image classification.",
+          "version": "1.4.0"
+        },
+        {
+          "title": "Extension loader exposes @earendil-works/pi-ai/models (#11156)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "1.2.0 and 1.3.0 provider and runtime fixes and features owned by Pi. ce-workflow ships no themes or theme $schema, does not parse `pi mcp list`, and its scripts pass provider-qualified --model ids and use RPC mode, not -p. Benefits arrive automatically.",
-          "version": "1.3.0"
+          "rationale": "No ce-workflow extension imports @earendil-works/pi-ai.",
+          "version": "1.4.0"
+        },
+        {
+          "title": "Other 1.4.0 runtime fixes and additions",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Recovery from responses cut at the output limit (#11227), grep --no-config, Windows shell detection, BOM-tolerant managed-install.json and mcp.json, terminal teardown, clipboard on Ctrl+Z, /compact instructions on split turns, retries, prompt-cache fix, Markdown and HTML rendering, Rex terminal, models.json reference, new and default models. None has a ce-workflow code path or workaround; the extension types.d.ts is identical between 1.3.0 and 1.4.0.",
+          "version": "1.4.0"
         }
       ]
     },
@@ -107,116 +113,111 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.79.1",
-      "reviewedAt": "2026-10-19T21:33:16.702Z",
-      "reviewedVersion": "0.79.1",
+      "version": "0.81.0",
+      "reviewedAt": "2026-10-24T22:11:18.499Z",
+      "reviewedVersion": "0.81.0",
       "decisions": [
         {
-          "title": "Idle-parent wake prompt text changed to 'Inspect subagent updates above. …'",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "0.77.0 rewrote PARENT_WAKE_TEXT (installed src/shared/parent-wake.js:1) to a longer instruction. work-compaction.ts:449-453 syntheticWakePrompt matches only the 0.76.1 text 'Subagent updates above.'. New wake prompts are therefore kept as protected user requests in compaction summaries and memory (work-compaction-memory.ts:62), which is the problem the 0.76.1 adoption fixed. Match the old and new exact texts, since old sessions still hold the old one. CU-01.",
-          "verification": "node scripts/test-work-compaction.mjs: both the old and new wake texts are classified as synthetic (commit 9fda699).",
-          "version": "0.79.1"
-        },
-        {
-          "title": "Post-compaction resume now goes through the shared parent wake",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "0.77 and 0.78: when background runs are active and the parent is idle, pi-subagents appends the hidden 'Compaction is complete. Resume the parent task now…' message without a trigger, then wakes with PARENT_WAKE_TEXT as a user prompt (src/extension/index.js around line 1040). work-models.ts blocks the resume by its text. before_agent_start resets the block for the wake prompt (work-models.ts:3722), so the guard no longer works. The user decided to let pi-subagents resume: the guard existed for the removed ce-workflow goal loop (Decisions D1). Delete the compaction-resume guard and keep the summary-hygiene regex in work-compaction.ts. CU-02.",
-          "verification": "node scripts/test-work-compaction-notifications.mjs: the input-hook regression case passes; live C5 with Pi 1.3.0 and openai-codex/gpt-6-luna passes (commit a1f357b).",
-          "version": "0.79.1"
-        },
-        {
-          "title": "subagent schema moves rare fields into options; launch by name with did-you-mean errors",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "0.77.0: the tool description now says to launch by name with an exact provider/id. Unknown agents or models fail with suggestions, so list and models are needed only on demand. Top-level management fields still work: subagent-options.js flattens them and schemas.js:44 allows extra properties. The launches in plan3.ts:563 and work-models.ts:1236 (context: \"fresh\") and the model:thinking suffix that advisor-model.ts sets need no change. The research advisor prompt (work-models.ts:491) still tells the model to call action:list capabilities:true and action:models first. Per Decisions D2, drop that clause and claim no savings. CU-05.",
-          "verification": "node scripts/test-work-compaction-notifications.mjs asserts that the advisor prompt has no action:list or action:models (commit bfee8bb).",
-          "version": "0.79.1"
-        },
-        {
-          "title": "bg_wait and subagent_supervisor are declared only after delegation",
+          "title": "An idle parent is woken by the notice itself; no \"Inspect subagent updates above\" line (0.80.0)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.79.1 leaves these tools undeclared until subagent is enabled or other background work registers. Plan3 ideas, review and the research advisors call subagent (after subagents_enable) before any wait, which turns them on. No ce-workflow code calls or lists them.",
-          "version": "0.79.1"
+          "rationale": "work-compaction.ts:449-457 keeps the old wake texts so old sessions stay clean (D3 of ffd99fd1). The new wake is the notice, a role \"custom\" message, which gather() in work-compaction-memory.ts:83 never records as a user request. The hub has no wake-text handling. 0.80 needs Pi 1.2.0 or newer; the host runs 1.4.0.",
+          "version": "0.81.0"
         },
         {
-          "title": "Forks reuse the parent prompt cache, get <subagent_instructions> and see parent context",
+          "title": "Model-visible notices are wrapped in <pi_subagents_notice> by a context hook (0.81.0)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.78.0 and 0.79.0 change only context: \"fork\" children. Every ce-workflow launch uses context: \"fresh\" (plan3.ts:563, work-models.ts:491, 1236).",
-          "version": "0.79.1"
+          "rationale": "The wrapper changes only the provider request (src/extension/index.js:561-586); the stored transcript, customType and details stay the same, and ce-workflow's checks read those (work-compaction.ts:406, work-models.ts:831). The content-based check in isKnowledgeDiscovererCompletionMessage serves the retired knowledge discoverer, which has no production caller.",
+          "version": "0.81.0"
         },
         {
-          "title": "Built-in reviewer, oracle and evidence-auditor skip the acceptance report unless acceptance is passed",
-          "pov": "Not-our-problem",
+          "title": "parallel, tasks and chain children accept per-child cwd and model (0.80.0)",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "0.78.0. Research advisors use oracle for read-only critique and read its reply text. plan3-advisor is ce-workflow's own agent. Neither wants an acceptance report.",
-          "version": "0.79.1"
+          "rationale": "Plan3 review launches one async subagent call per advisor (plan3.ts:575). Merging them into one tasks call would change how completions wake the parent and, under the Optimization Regression Rule in AGENTS.md, needs an end-to-end benchmark before it counts as an improvement. No problem with the current launches is reported.",
+          "version": "0.81.0"
         },
         {
-          "title": "Shared idle wake with pi-intercom; Esc keeps the parent stopped",
-          "pov": "Not-our-problem",
+          "title": "providerDiagnostics on structured delegation :update and :response events (0.81.0)",
+          "pov": "Reject",
           "status": "no-action",
-          "rationale": "0.77 and 0.78: one wake reservation per session (Symbol.for(\"pi.idle-wake.v1\")), and completions after Esc no longer restart the parent. ce-workflow's own wakes use sendMessage triggerTurn, which Pi 1.2 queues into a starting run. Joining the reservation contract would add coupling to a private symbol for no observed problem.",
-          "version": "0.79.1"
+          "rationale": "ce-workflow uses only the v1 status RPC (plan3-web.ts:68) and has no view of child retry state; nobody asked for one.",
+          "version": "0.81.0"
         },
         {
-          "title": "Handoff ownership, reuseFrom, finished-child resume, RPC snapshot fields, launcher sandboxes, program status, tmux inspector, parallel workflow, pinToolDeclarations, activeRunsPrompt, PI_SUBAGENTS_COMPONENT_UI, run-history removal, watchdog and runner fixes",
+          "title": "A child with outputSchema that skips structured_output gets one follow-up turn (0.81.0)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.77.0 to 0.79.1 features and fixes inside pi-subagents. The hub runs Pi as `--mode rpc` (hub/src/rpc-client.ts:33) and renders ask_user forms, not custom TUI components, so PI_SUBAGENTS_COMPONENT_UI does not apply. Plan3 uses only fresh async advisors. The benefits arrive automatically.",
-          "version": "0.79.1"
+          "rationale": "The only subagent launch with outputSchema is the retired knowledge discoverer (work-models.ts:1229, no production caller). jev-tools.ts outputSchema is a tool result schema, not a subagent one.",
+          "version": "0.81.0"
+        },
+        {
+          "title": "Other 0.79.2 to 0.81.0 fixes and options",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Faster Windows start and EPERM temp-folder fix, completion notices kept across a restart, steer fixes, children no longer get APPEND_SYSTEM.md, compacted sessions keep subagent, YAML frontmatter comments, enableSlashCommands, FleetView mouse support, Codex-wire tool ids. ce-workflow neither uses APPEND_SYSTEM.md nor sets enableSlashCommands, and none of these has a ce-workflow code path. The notice-across-restart fix helps hub-parked sessions without changes.",
+          "version": "0.81.0"
         }
       ]
     },
     {
       "name": "pi-ask-user",
-      "version": "0.16.0",
-      "reviewedAt": "2026-10-04T08:48:06.970Z",
-      "reviewedVersion": "0.16.0",
+      "version": "0.17.0",
+      "reviewedAt": "2026-10-24T22:11:18.499Z",
+      "reviewedVersion": "0.17.0",
       "decisions": [
         {
-          "version": "0.16.0",
-          "title": "Recognize answered, skipped and cancelled decision batches",
+          "title": "A top-level question sent with questions becomes the batch heading instead of an error (#80)",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 result-normalization rollback. Bottom line: recognize 0.16.0 batch answers without treating a successful batch as unavailable, and honor an explicit Pause/Wait selection in an answered batch. Project fit: recordWorkGoalAskUserResult currently requires details.response and incorrectly sets unavailable for every batch; askUserPauseSelection reads only the single result. Coded dirty/improvement approvals remain intentionally single-question and reject batches. Upstream evidence: README Result details, public schema and index.ts executeBatch define aligned questions/answers with answered or skipped status and empty answers on cancellation; malformed/UI failures throw. Benefit: independent decision batches work safely with work-goal continuation; skipped questions remain unresolved. Cost/risk: validate full alignment and require every question answered before clearing fallback-unavailable. Confidence: high. Recommendation: adopt now with single/batch/cancelled/skipped/pause regression cases. tooTechnical:false.",
-          "tooTechnical": false,
-          "verification": "PASS: node scripts/test-work-goal.mjs; node scripts/test-work-compaction-notifications.mjs. Regression cases cover single, complete batch, skipped, cancelled, malformed alignment and Pause/Wait."
+          "rationale": "0.17.0 shows that question as the batch heading (frame title, review page, dialog fallback, result text, call card) and no longer throws \"Use exactly one of question or questions\". Our vendored copy still throws it (extensions/ask-user/index.ts:2606-2611), and 15 earlier session files contain that error, each costing the model a retry. The hub batch form already renders ask.title as its heading (hub/web/prompts.ts:21), so passing the heading as title covers the browser too. CU-02.",
+          "verification": "node scripts/test-work-ask-user.mjs failed before port with exactly-one error, then passed heading result/details, terminal frame/review, fallback titles, call card, ask:pending title and hub payload assertions. node scripts/test-work-ask-remote.mjs passed. LSP inconclusive; authored-source TypeScript passed in npm run verify:quiet; unrelated suite limitations accepted in D5.",
+          "version": "0.17.0"
         },
         {
-          "version": "0.16.0",
-          "title": "Retarget the optional remote-answer patch to the abortable UI lifecycle",
+          "title": "ask_user is registered with exposure \"model-only\"",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Grade: Adopt. Reversibility: Tier 1 patch-helper rollback. Bottom line: retarget the opt-in patch to current public UI lifecycle using an abortable race; do not mutate the installed package during catch-up. Project fit: packaged scripts/patch-ask-user-remote-answer.mjs and test-work-ask-remote.mjs promise remote answers but installed 0.16 is unpatched, env flag unset; test assumes a patch even when disabled. External evidence: captured ask-user diff and current execute(), dialog options and runCustomPrompt signal cleanup. Benefit: preserve optional single-question remote answering without leaking losing UI and make default verification independent of installed patch state. Cost/risk: batch remote answering remains unsupported and local UI remains available; patch must still fail loudly on anchor drift. Confidence: high. Recommendation: adopt with temp-source patch/idempotence and abort-race checks. tooTechnical:false.",
-          "tooTechnical": false,
-          "verification": "PASS: node scripts/test-work-ask-remote.mjs. Patches installed 0.16 source in memory only, asserts idempotence, syntax, anchor-drift rejection, winning-side races, abort cleanup and listener disposal. Live opt-in TUI/intercom interaction not exercised; installed source remains untouched."
+          "rationale": "Pi's extensions.md:270 says model-only is meant for tools that ask the user: declared to the model, never callable from codemode. A codemode script waiting on a dialog runs into script deadlines and holds a worker. ce-workflow's own callers use execute directly (registerAskUser for the Plan3 adapter) or the model, never codemode (rg tools.ask_user: none). One line. CU-03.",
+          "verification": "node scripts/test-work-ask-user.mjs passed including exposure=model-only, native single/batch remote races and D12 coexistence. Authored-source TypeScript passed in npm run verify:quiet; unrelated suite limitations accepted in D5.",
+          "version": "0.17.0"
+        },
+        {
+          "title": "ask-user.json settings file for display defaults (settings.ts)",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Adds a second configuration source and an 81-line module next to the environment variables, which keep working. ce-workflow keeps its own settings; nobody asked for this file.",
+          "version": "0.17.0"
+        },
+        {
+          "title": "Tern native sheet (tern.ts) and the Space and Enter activate/submit refactor",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "ce-workflow targets the terminal and the hub, not Tern panes; the refactor only serves Tern's sheets and changes no terminal behavior. README and skill text changes describe these features; ce-workflow does not ship the upstream skill.",
+          "version": "0.17.0"
         }
       ]
     },
     {
       "name": "pi-intercom",
-      "version": "0.17.1",
-      "reviewedAt": "2026-10-19T21:33:16.702Z",
-      "reviewedVersion": "0.17.1",
+      "version": "0.18.1",
+      "reviewedAt": "2026-10-24T22:11:18.499Z",
+      "reviewedVersion": "0.18.1",
       "decisions": [
         {
-          "title": "Shared idle-wake reservation (idle-wake.ts); wake text unchanged",
+          "title": "Mailbox: sends to a disconnected session report that the message waits; the broker stays up while mail waits; late messages emit expired",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.17 moves the wake into a reservation shared with pi-subagents. The prompt is still 'New intercom message above.' (installed index.ts:1312), which work-compaction.ts already treats as synthetic. Nothing to change.",
-          "version": "0.17.1"
+          "rationale": "hub-command.ts intercomParkedSessions wakes a parked session before sending and only rewrites error results; a \"waiting for reconnect\" result is not an error. work-ask-remote.ts sends through intercom:outbox-request and does not read delivery text. No ce-workflow code depends on broker exit timing.",
+          "version": "0.18.1"
         },
         {
-          "title": "Delivery receipts, E_SESSION_HELD, /intercom-pool, broker liveness drop, bare-reply targeting, Windows fsync fix",
+          "title": "Click to expand or collapse one intercom message in fullscreen mode",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.17.x broker and protocol changes. ce-workflow's only integration, work-ask-remote.ts, emits intercom:outbox-request and reads intercom_message details.from.id and bodyText. Neither changed in the diff, and it does not read delivery results. No stableId or PI_INTERCOM_* use in the repo.",
-          "version": "0.17.1"
+          "rationale": "Terminal display only; the hub renders its own chat.",
+          "version": "0.18.1"
         }
       ]
     },
