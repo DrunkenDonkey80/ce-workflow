@@ -51,16 +51,20 @@ async function upload(real: string, pack: Pack, job: Job) {
 		job.status = "Uploading…";
 		const handle = await open(encrypted);
 		try {
-			let next = 0;
+			let next = 0, failure: { error: unknown } | undefined;
+			// The first failure stops new pieces; the others in flight settle before the file closes and the job fails.
 			const worker = async () => {
-				for (let i = next++; i < hashes.length; i = next++) {
-					const bytes = new Uint8Array(Math.min(length, total - i * length));
-					await handle.read(bytes, 0, bytes.length, i * length);
-					await retry(() => piece(tokens[i], `${room.id}/${i}`, hashes[i].toString("hex"), bytes));
-					job.sent += bytes.length; job.status = `Uploading ${Math.floor(job.sent / total * 100)}%`;
-				}
+				try {
+					for (let i = next++; i < hashes.length && !failure; i = next++) {
+						const bytes = new Uint8Array(Math.min(length, total - i * length));
+						await handle.read(bytes, 0, bytes.length, i * length);
+						await retry(() => piece(tokens[i], `${room.id}/${i}`, hashes[i].toString("hex"), bytes));
+						job.sent += bytes.length; job.status = `Uploading ${Math.floor(job.sent / total * 100)}%`;
+					}
+				} catch (error) { failure ??= { error }; }
 			};
 			await Promise.all([worker(), worker(), worker(), worker()]); // 4 pieces in flight
+			if (failure) throw failure.error;
 		} finally { await handle.close(); }
 		await api(`/room/${room.id}/b2/finish-upload`, "POST", room.writerToken, { success: true });
 		return `https://wormhole.app/${room.id}#${key.toString("base64url")}`;

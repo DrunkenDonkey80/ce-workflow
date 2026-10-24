@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-23
-updated: 2026-10-24T06:22:29.867Z
+updated: 2026-10-24T06:23:41.603Z
 reviewed: 2026-10-23
 ---
 
@@ -55,9 +55,7 @@ None.
 - [x] **S4** Live plain, zip and 7z round trips matched bytes; temp folders removed
 - [x] **S5** Added Unreleased changelog bullet; nothing committed or pushed
 - [x] **S6** Archives keep the name literal (7z -spd, zip -nw); archive test proves only the picked file is packed
-- [ ] **S7** Stop piece uploads on the first failure: no new pieces, wait for in-flight workers, then close, clean and mark failed; job never changes after done.
-  - Add a mocked-fetch test in hub/scripts/test-wormhole.mjs: one success run (link format, progress reaches total) and one failing piece with a delayed sibling.
-  - Assert status and sent stay fixed after done and the pi-hub-upload- temp folder is gone.
+- [x] **S7** First failed piece stops new pieces; in-flight pieces settle before close/cleanup; mocked-fetch success and failure tests added
 - [ ] **S8** Re-run node --test scripts/test-wormhole.mjs, scripts/test-api.mjs and scripts/test-browser.mjs in hub/ plus LSP diagnostics on hub/src/wormhole.ts.
 ### P-ARCH [code] Product architecture
 
