@@ -376,6 +376,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		const view = views.get(id), form = view && toForm(request);
 		if (form) view.publish("dialog", form);
 		if (!view || request.method !== "setStatus") return;
+		if (request.statusKey === "pi-hub:notice") { const text = parse(request.statusText)?.text; if (typeof text === "string") view.publish("notice", { text: text.slice(0, 2000) }); }
 		if (request.statusKey === "pi-hub:state") {
 			const state = parse(request.statusText);
 			if (state && "plan" in state) view.publish("plan", state.plan ?? null); // null: the plan finished or was closed

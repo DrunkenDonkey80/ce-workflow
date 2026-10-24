@@ -48,7 +48,8 @@ async function handle(cmd) {
 		case "abort": if (streaming) { streaming = false; out({ type: "agent_settled", aborted: true }); } return reply();
 		case "steer": case "follow_up": queued.push(cmd.message); out({ type: "queue_update", steering: [...queued], followUp: [] }); return reply();
 		case "clear_queue": { const taken = queued.splice(0); out({ type: "queue_update", steering: [], followUp: [] }); return reply({ steering: taken, followUp: [] }); }
-		case "new_session": sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; header(); messages.length = 0; return reply({ cancelled: false });
+		// Like Pi in RPC: a new session falls back to the default model and thinking level.
+		case "new_session": sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; model = { provider: "fake", id: "fake-1" }; thinkingLevel = "low"; header(); messages.length = 0; return reply({ cancelled: false });
 		// Like Pi: fork from a user message starts a new file holding only what came before it.
 		case "get_fork_messages": return reply({ messages: messages.flatMap((m, at) => m.role === "user" ? [{ entryId: String(at), text: m.content.map(p => p.text ?? "").join("") }] : []) });
 		case "fork": {

@@ -2,13 +2,19 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.76 — 2026-10-24
 
 ### Added
 - Windows: while a UAC admin prompt is open on the hub PC, every hub page (also on your phone) shows a notice, plus a desktop notification when question notifications are on. The prompt itself can only be answered at the PC.
+- Hub settings has a Catch up button in sessions of the ce-workflow checkout itself; it runs `/wo catch-up`.
 
 ### Changed
 - On phones and other touch screens, tapping a session's git counts no longer pops up the changed-files list over the session list.
+- `/wo catch-up` shows its progress (each package's version change and diff download) in Pi and on the hub page instead of freezing Pi until the plan appears.
+
+### Fixed
+- `/new` on the hub page keeps the session's model and thinking level instead of switching back to the defaults.
+- Desktop app on Linux: the tab strip no longer takes half the window (needs the next desktop app release).
 
 ## 0.1.75 — 2026-10-24
 

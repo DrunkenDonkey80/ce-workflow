@@ -116,7 +116,10 @@ try {
 	assert.equal(s.list().length, 0, "delivered once the hub has the session back");
 	s.add({ session: a.id, kind: "message", text: "old work", inMinutes: 5 }, T);
 	await idle(a.id);
+	await host.live.get(a.id).rpc.send({ type: "set_model", provider: "fake", modelId: "fake-2" });
+	await host.live.get(a.id).rpc.send({ type: "set_thinking_level", level: "high" });
 	await host.newSession(a.id);
+	assert.deepEqual([registry.get(a.id).model?.id, registry.get(a.id).thinking], ["fake-2", "high"], "/new keeps the model and thinking level");
 	await s.tick(T + min);
 	assert.equal(ended.at(-1), "the session started a new conversation");
 	s.add({ session: a.id, kind: "message", text: "gone", inMinutes: 5 }, T);

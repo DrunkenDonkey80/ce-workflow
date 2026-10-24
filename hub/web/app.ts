@@ -1801,7 +1801,16 @@ $("bias-button").addEventListener("click", () => {
  }));
  toggleMenu("bias-button", "bias-menu");
 });
-$("settings-button").addEventListener("click", () => toggleMenu("settings-button", "settings-menu"));
+$("settings-button").addEventListener("click", () => {
+ toggleMenu("settings-button", "settings-menu");
+ // Catch up exists only in a session of the ce-workflow checkout itself (/wo lists it there).
+ slashCommands ??= get("commands").catch(error => { slashCommands = undefined; throw error; });
+ slashCommands.then(list => { $("hub-catchup").hidden = !list.wo.some(item => item.value === "catch-up"); }, () => {});
+});
+$("hub-catchup").addEventListener("click", async () => {
+ closeMenus(); setDrawer(false);
+ try { await post("message", { text: "/wo catch-up" }); showNotice("Catch-up started; progress shows here.", true); } catch (error) { showNotice(error.message); }
+});
 $("hub-restart").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
  if (!confirm("Restart the hub? Every session stops and starts again; nothing is lost.")) return;

@@ -1,12 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { appendFileSync, copyFileSync, constants as fsConstants, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 
 import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
+import { publish } from "./hub-channel.ts";
 import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
@@ -2481,23 +2483,23 @@ function npmBin() {
 	return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
-function npmExec(args, options) {
+// Async so progress notices reach the TUI and the hub page while npm runs (sync calls froze Pi for minutes).
+async function npmExec(args, options) {
 	const windows = process.platform === "win32";
-	return execFileSync(
+	return (await promisify(execFile)(
 		windows ? (process.env.ComSpec ?? "cmd.exe") : npmBin(),
 		windows ? ["/d", "/s", "/c", npmBin(), ...args] : args,
 		options,
-	);
+	)).stdout.toString();
 }
 
-function npmLatestVersion(name) {
+async function npmLatestVersion(name) {
 	if (process.env.WORK_CATCH_UP_OFFLINE === "1") return "";
 	try {
-		return npmExec(["view", name, "version"], {
+		return (await npmExec(["view", name, "version"], {
 			encoding: "utf8",
-			stdio: ["ignore", "pipe", "pipe"],
 			timeout: 15_000,
-		})
+		}))
 			.trim()
 			.replace(/^"|"$/g, "");
 	} catch {
@@ -2539,16 +2541,15 @@ function installedPackageVersion(name) {
 	return "";
 }
 
-function writeWorkCatchUpDiff(cwd, dir, name, from, to) {
+async function writeWorkCatchUpDiff(cwd, dir, name, from, to) {
 	if (!from || !to || from === to) return undefined;
 	const file = join(dir, `${safeArtifactPart(name)}-${from}-to-${to}.diff`);
 	try {
-		const output = npmExec(
+		const output = await npmExec(
 			["diff", `--diff=${name}@${from}`, `--diff=${name}@${to}`],
 			{
 				cwd,
 				encoding: "utf8",
-				stdio: ["ignore", "pipe", "pipe"],
 				maxBuffer: 64 * 1024 * 1024,
 				timeout: 180_000,
 			},
@@ -2566,7 +2567,7 @@ function writeWorkCatchUpDiff(cwd, dir, name, from, to) {
 	}
 }
 
-function buildWorkCatchUpState(cwd, names) {
+async function buildWorkCatchUpState(cwd, names, progress = (_text) => {}) {
 	const baseline = readWorkCatchUpBaseline();
 	const dir = join(
 		cwd,
@@ -2575,14 +2576,15 @@ function buildWorkCatchUpState(cwd, names) {
 		new Date().toISOString().replace(/[:.]/g, "-"),
 	);
 	mkdirSync(dir, { recursive: true });
-	const packages = baseline.packages.filter((item) => !names || names.includes(item.name)).map((item) => {
+	const packages = await Promise.all(baseline.packages.filter((item) => !names || names.includes(item.name)).map(async (item) => {
 		const name = String(item.name ?? "").trim();
 		const baselineVersion = String(item.version ?? "").trim();
-		const latestVersion = npmLatestVersion(name);
+		const latestVersion = await npmLatestVersion(name);
 		const installedVersion = installedPackageVersion(name);
 		const targetVersion = latestVersion || installedVersion || baselineVersion;
 		const changed = Boolean(baselineVersion && targetVersion !== baselineVersion);
-		const diffPath = writeWorkCatchUpDiff(
+		progress(changed ? `Catch-up: ${name} ${baselineVersion} → ${targetVersion}, downloading the diff…` : `Catch-up: ${name} ${baselineVersion} unchanged.`);
+		const diffPath = await writeWorkCatchUpDiff(
 			cwd,
 			dir,
 			name,
@@ -2599,7 +2601,7 @@ function buildWorkCatchUpState(cwd, names) {
 			needsReview: changed || Boolean(catchUpReviewBlocker(item, targetVersion)),
 			diffPath,
 		};
-	});
+	}));
 	const summaryPath = join(dir, "summary.json");
 	const state = {
 		ok: true,
@@ -2638,11 +2640,14 @@ async function startPlan3CatchUp(args, pi, ctx) {
 		notify(ctx, `Continuing the open catch-up plan (delete it in /plans3 to regenerate): ${open.file}`, "info");
 		return pi.events?.emit?.("plan3:start", { ctx, file: open.file });
 	}
-	notify(ctx, `Checking ${PLAN3_CATCH_UP_PACKAGES.join(", ")} against their last reviewed versions (npm view + npm diff; can take a few minutes)…`, "info");
-	await new Promise((resolve) => setTimeout(resolve, 50)); // Let the notice render before the blocking npm calls.
-	const state = buildWorkCatchUpState(ctx.cwd, PLAN3_CATCH_UP_PACKAGES);
+	// The hub page drops plain notify, so each step is also published as a page notice.
+	const progress = (text) => { notify(ctx, text, "info"); publish(ctx.ui, "notice", { text }); };
+	progress(`Catch-up: checking ${PLAN3_CATCH_UP_PACKAGES.join(", ")} against their last reviewed versions (npm view + npm diff; can take a few minutes)…`);
+	const state = await buildWorkCatchUpState(ctx.cwd, PLAN3_CATCH_UP_PACKAGES, progress);
 	notify(ctx, renderWorkCatchUpText(state), "info");
-	if (!state.packages.some((pkg) => pkg.needsReview)) return;
+	const pending = state.packages.filter((pkg) => pkg.needsReview).map((pkg) => pkg.name);
+	publish(ctx.ui, "notice", { text: pending.length ? `Catch-up: ${pending.join(", ")} need review; writing the plan and starting the review…` : "Catch-up: nothing changed since the last review." });
+	if (!pending.length) return;
 	const dir = join(ctx.cwd, "docs", "plans");
 	mkdirSync(dir, { recursive: true });
 	const file = join(dir, `${new Date().toISOString().slice(0, 10)}-catch-up-pi-packages-${randomUUID().slice(0, 8)}-plan3.md`);

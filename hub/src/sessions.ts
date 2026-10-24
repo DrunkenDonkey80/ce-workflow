@@ -222,13 +222,19 @@ export class SessionHost extends EventEmitter {
 		const live = this.live.get(id);
 		if (!live) throw new Error("Session is parked; resume it first.");
 		if (live.running) throw new Error("Stop the agent before starting a new session.");
+		// Pi's new_session falls back to the default model and thinking level; keep the ones this session uses.
+		const before = (await live.rpc.send({ type: "get_state" })).data;
 		const result = await live.rpc.send({ type: "new_session" });
 		if (!result.success || result.data?.cancelled) throw new Error(result.error ?? "Pi kept the current session.");
 		const state = await live.rpc.send({ type: "get_state" }), sessionFile = state.data?.sessionFile;
 		if (!state.success || typeof sessionFile !== "string") throw new Error(state.error ?? "Pi reported no session file.");
 		if (live.lock) releaseLock(live.lock.file, live.lock.info);
 		live.lock = { file: sessionFile, info: acquireLock(sessionFile, "pi-control-hub") };
-		return this.registry.update(id, { sessionFile });
+		this.registry.update(id, { sessionFile });
+		if (before?.model) await live.rpc.send({ type: "set_model", provider: before.model.provider, modelId: before.model.id });
+		if (before?.thinkingLevel) await live.rpc.send({ type: "set_thinking_level", level: before.thinkingLevel });
+		await this.remember(live);
+		return this.registry.get(id)!;
 	}
 
 	/**

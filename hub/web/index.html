@@ -56,7 +56,7 @@
     <section class="settings-group" aria-labelledby="set-pi"><h3 id="set-pi" class="group-head">Pi and extensions<button type="button" id="update-check" title="Checked hourly">Check now</button></h3>
      <div id="update-list" class="update-list"></div>
      <div id="extension-list" class="extension-list"></div>
-     <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button></div>
+     <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button><button type="button" id="hub-catchup" title="Runs /wo catch-up in this session: reviews Pi and plugin updates in a Plan3 plan (ce-workflow checkout only)" hidden>Catch up</button></div>
     </section>
     <section class="settings-group" id="remote-group" aria-labelledby="set-remote" hidden><h3 id="set-remote" class="group-head" title="Tailnet-only HTTPS through Tailscale; each new device is approved on this PC">Remote access<label><input type="checkbox" id="remote-on"> On</label></h3>
      <div id="remote-status" class="update-list"></div>
