@@ -320,10 +320,13 @@ try {
   fs.writeFileSync(old, "x"); fs.utimesSync(old, new Date(Date.now() - 6 * 864e5), new Date(Date.now() - 6 * 864e5));
   assert.deepEqual([!!await linkedFile("top.txt", folder, true), !!await linkedFile(pasted, folder, true), !!await linkedFile(old, folder, true), !!await linkedFile(old, folder, false), !!await linkedFile(process.execPath, folder, true)], [true, true, false, true, false]);
   fs.rmSync(old);
+  // Wormhole upload takes only what Download would serve (no network here: every request is refused before it starts).
+  const upload = body => fetch(`${origin}/s/${id}/api/upload`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify(body) }).then(r => r.status);
+  assert.deepEqual([await upload({ path: ".gitignore" }), await upload({ path: "nope.txt" }), await upload({ path: "top.txt", pack: "rar" })], [404, 404, 400]);
  }
- // Right-click on this PC offers Open, Open folder and Copy path (a click would open the file with its app).
+ // Right-click on this PC offers Open, Open folder, Copy path and the Wormhole uploads (a click would open the file with its app).
  await evaluate("document.querySelector('[data-id=img_row] .file-link').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('.session-menu:not([hidden]) button')].map(b => b.textContent)"), ["Open", "Open folder", "Copy path"]);
+ assert.deepEqual((await evaluate("[...document.querySelectorAll('.session-menu:not([hidden]) button')].map(b => b.textContent)")).filter(text => text !== "7z and upload"), ["Open", "Open folder", "Copy path", "Upload", "Zip and upload"]);
  await evaluate("document.querySelector('.session-menu').hidden = true");
  // Web addresses link too, without the Markdown bold around them.
  { const row = { id: "url_row", role: "agent", text: "Here's the link: **http://127.0.0.1:8768/index.html** (it's running now).", streaming: false }; chatRows.set(row.id, row); publish("message", row); }

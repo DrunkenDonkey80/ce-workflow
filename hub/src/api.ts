@@ -10,7 +10,8 @@ import { emptyDiagram, loadDiagram } from "../../extensions/plan3-diagram.ts";
 import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
-import { linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
+import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
+import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
@@ -240,6 +241,11 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			}
 			// Files named in chat: inline opens it in the browser, download saves it (the remote page's Open and Download).
 			case "download": await sendLinkedFile(params.get("path"), folder(id), params.has("download"), response, remote); return undefined;
+			case "upload": {
+				if (!params.has("id")) return { sevenZip: !!sevenZip() };
+				const job = uploadJob(params.get("id")!); if (!job) throw fail(404, "That upload is no longer known.");
+				return job;
+			}
 			case "dialog": { const script = scriptAsks.get(id)?.get(params.get("id") ?? ""); if (script) return script.form; const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
 			case "system": return systemLoad();
@@ -278,6 +284,16 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
 			case "paths": return linkedFiles(data.paths, folder(id), remote);
 			case "open": return openLinkedFile(data.path, folder(id), data.reveal === true, remote);
+			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.
+			case "upload": {
+				only(data, ["target", "path", "pack"], "Invalid fields.");
+				const pack = data.pack ?? "";
+				if (pack !== "" && pack !== "zip" && pack !== "7z") throw fail(400, "pack: zip, 7z or empty.");
+				const real = await linkedFile(data.path, folder(id), remote);
+				if (!real) throw fail(404, "File not found or not shared.");
+				if (pack === "7z" && !sevenZip()) throw fail(409, "7z is not installed.");
+				return { id: startUpload(real, pack) };
+			}
 			// Project commands run by name only: the page never sends a command line.
 			case "run": {
 				const command = commands?.list(folder(id)).find(item => item.name === data.name);

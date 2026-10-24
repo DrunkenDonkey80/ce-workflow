@@ -880,8 +880,23 @@ document.addEventListener("contextmenu", event => {
  event.preventDefault(); openFileMenu(link, link.dataset.path!, link.dataset.full!);
 });
 function openFileMenu(link: HTMLElement, path: string, full: string) {
- showMenu(link, token ? [["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)]]
-  : [["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)]]);
+ const uploads: [string, () => void][] = [["Upload", () => void wormhole(path, "")], ["Zip and upload", () => void wormhole(path, "zip")], ...(sevenZip ? [["7z and upload", () => void wormhole(path, "7z")] as [string, () => void]] : [])];
+ showMenu(link, token ? [["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]
+  : [["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
+}
+// Wormhole upload: the hub packs, encrypts and uploads; the page polls once a second and copies the link (key in its #fragment).
+let sevenZip = false; get("upload").then(value => { sevenZip = value.sevenZip; }, () => undefined);
+async function wormhole(path: string, pack: string) {
+ try {
+  const { id } = await post("upload", { path, pack });
+  for (;;) {
+   const job = await get("upload?id=" + encodeURIComponent(id));
+   if (job.error) return showNotice(job.error);
+   if (job.url) { try { await navigator.clipboard.writeText(job.url); showNotice("Wormhole link copied (24 h): " + job.url); } catch { prompt("Wormhole link (24 h):", job.url); } return; }
+   showNotice(`${job.name}: ${job.status}`);
+   await new Promise(done => setTimeout(done, 1000));
+  }
+ } catch (error) { showNotice(error.message); }
 }
 async function openFile(path: string, reveal: boolean) {
  try { const { revealed } = await post("open", { path, reveal }); if (revealed && !reveal) showNotice("Programs and scripts open in their folder, never run."); } catch (error) { showNotice(error.message); }
