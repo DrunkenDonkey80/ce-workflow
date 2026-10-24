@@ -58,6 +58,10 @@
      <div id="extension-list" class="extension-list"></div>
      <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button></div>
     </section>
+    <section class="settings-group" id="remote-group" aria-labelledby="set-remote" hidden><h3 id="set-remote" class="group-head" title="Tailnet-only HTTPS through Tailscale; each new device is approved on this PC">Remote access<label><input type="checkbox" id="remote-on"> On</label></h3>
+     <div id="remote-status" class="update-list"></div>
+     <div class="settings-actions"><button type="button" id="remote-copy" title="Copies the address to open on your other devices" disabled>Copy address</button></div>
+    </section>
     <section class="settings-group" id="app-group" aria-labelledby="set-app" hidden><h3 id="set-app">Desktop app (Pi Hub)</h3>
      <div id="app-status" class="update-list"></div>
      <div class="settings-actions" id="app-actions"><button type="button" id="app-install" title="Downloads the pinned build, checks its SHA-256 and installs it for this user">Install</button><button type="button" id="app-start" title="Starts or quits the app">Start</button><label id="app-login-field" title="Starts the app hidden in the tray when you log in"><input type="checkbox" id="app-login"> Start at login</label><button type="button" id="app-uninstall" title="Removes the app, its Start-menu entry and its login start">Uninstall</button></div>

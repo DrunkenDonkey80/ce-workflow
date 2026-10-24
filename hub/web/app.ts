@@ -1893,7 +1893,21 @@ async function appAction(body: Record<string, unknown>, busy?: string) {
  if (busy) $("app-status").textContent = busy;
  try { renderApp(await post("app", body)); } catch (error) { showNotice(error.message); void appAction({ action: "status" }); }
 }
-$("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) void appAction({ action: "status" }); });
+$("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) { void appAction({ action: "status" }); void remoteAction(); } });
+// Remote access (tailscale serve) is switched and its address copied on this PC's own page only, like pairing.
+type RemoteStatus = { on: boolean; url?: string; missing?: string[]; error?: string };
+let remoteUrl = "";
+async function remoteAction(on?: boolean) {
+ $("remote-group").hidden = false;
+ const box = $("remote-on") as HTMLInputElement, copy = $("remote-copy") as HTMLButtonElement;
+ if (on !== undefined) { box.disabled = copy.disabled = true; $("remote-status").textContent = on ? "Turning on\u2026" : "Turning off\u2026"; }
+ let remote: RemoteStatus;
+ try { remote = on === undefined ? (await hub("status")).remote : await hub("remote", { on }); } catch (error) { showNotice("Remote: " + error.message); remote = (await hub("status").catch(() => ({ remote: { on: false } }))).remote; }
+ remoteUrl = remote.url ?? ""; box.checked = remote.on; box.disabled = false; copy.disabled = !remoteUrl;
+ $("remote-status").textContent = !remote.on ? "Off" : remoteUrl || "Not served: " + (remote.error ?? remote.missing?.join(" ") ?? "starting");
+}
+$("remote-on").addEventListener("change", () => void remoteAction(($("remote-on") as HTMLInputElement).checked));
+$("remote-copy").addEventListener("click", () => { if (remoteUrl) void copyPath(remoteUrl); });
 $("app-install").addEventListener("click", () => void appAction({ action: $("app-install").textContent === "Update" ? "update" : "install" }, "Downloading…").then(() => setTimeout(() => void appAction({ action: "status" }), 2500)));
 $("app-uninstall").addEventListener("click", () => void appAction({ action: "uninstall" }));
 // The app writes app.lock a moment after it starts, so look again shortly after.

@@ -635,7 +635,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .settings-group:last-child { border-bottom: 0; padding-bottom: 0; }
 .status-menu .settings-group h3 { margin: 0 0 2px; font-size: 13px; color: var(--ink); }
 .status-menu .settings-group h3.group-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.group-head button { font-size: 12px; font-weight: normal; padding: 3px 10px; }
+.group-head button, .group-head label { font-size: 12px; font-weight: normal; padding: 3px 10px; }
 .menu-field { display: grid; grid-template-columns: 1fr var(--control, auto); align-items: center; gap: 10px; color: var(--muted); }
 .menu-field-top { align-items: start; }
 #settings-menu .menu-field:has(.theme-pair) { grid-template-columns: auto 1fr; }
