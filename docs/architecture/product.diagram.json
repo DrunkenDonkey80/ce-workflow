@@ -2,14 +2,14 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 16,
+  "revision": 17,
   "nodes": [
     {
       "id": "pi_host",
       "label": "Pi coding agent host",
       "kind": "external",
       "summary": "Loads the package extensions; provides events, sessions, tools, TUI and models.",
-      "tech": "@earendil-works/pi-coding-agent 1.3.0",
+      "tech": "@earendil-works/pi-coding-agent 1.4.0",
       "details": "package.json pi.extensions: work-models, plan3, screen-read, enter-runs, advisor-model, ask-user/index."
     },
     {
@@ -148,16 +148,16 @@
       "id": "ask_group",
       "label": "ask_user (vendored)",
       "kind": "group",
-      "summary": "Fork of pi-ask-user 0.16.0 (D3)."
+      "summary": "Selective fork of pi-ask-user 0.17.0 (D3)."
     },
     {
       "id": "ask_user",
       "label": "ask_user tool",
       "kind": "service",
       "parent": "ask_group",
-      "summary": "Terminal single/batch question popups.",
+      "summary": "Model-only single/batch question tool with optional shared batch heading; terminal popups and hub forms.",
       "tech": "extensions/ask-user/index.ts, single-select-layout.ts",
-      "details": "Skips registration and warns once if external pi-ask-user is loaded (D12)."
+      "details": "Skips registration and warns once if external pi-ask-user is loaded (D12). Command adapter executes directly. Batch heading travels as title through the existing remote-answer race."
     },
     {
       "id": "ask_remote",

@@ -4,7 +4,7 @@ status: active
 created: 2026-10-24
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.4.0","pi-subagents":"0.81.0","pi-ask-user":"0.17.0","pi-intercom":"0.18.1"}
-updated: 2026-10-24T22:11:31.128Z
+updated: 2026-10-24T22:12:25.254Z
 reviewed: 2026-10-24
 started: 2026-10-24T21:59:19.099Z
 ---
@@ -230,12 +230,10 @@ None.
 ### Phase 2: Verify and record [code]
 
 - [x] **CU-90** Ran full verification; catch-up and TypeScript passed, with Android/browser limitations explicitly accepted in D5.
-- [x] **CU-91** Recorded all four exact reviewed targets with verified adopted decisions.
+- [x] **CU-91** Recorded all four exact reviewed targets with verified adopted decisions; corrected nonexistent selfcheck claim.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Updated product diagram to Pi 1.4.0 and selective ask_user 0.17.0 with heading/model-only behavior; topology unchanged.
 
 
 ## Acceptance
@@ -248,7 +246,7 @@ None.
 
 ## Resume context
 
-Planning and review complete: every change graded in Catch-up decisions; 3 adopted (devDependency 1.4.0, ask_user batch heading, ask_user model-only exposure). Review findings 1 and 2 accepted and applied to CU-02 and Acceptance (see Amendments). Decisions D1-D4 settled from evidence; no open questions. Next: CU-01 (C3, then C1 and C4). Status stays draft until /plan3 finish.
+All 7 steps verified and complete. Adopted Pi SDK 1.4.0 and ask_user 0.17.0 heading/model-only changes; four exact reviewed targets recorded. Focused tests, authored-source TypeScript, Plan3 and diagram selfchecks passed. Full verification ran once; Android CLI capture and hub diagram drag remain failures accepted by user in D5; hub CLI passed with inherited session variables removed. LSP inconclusive. No open questions. Product diagram revision 17 reconciled. Next: archive complete plan. Preserve concurrent unrelated hub edits and telemetry; no push.
 
 ## Amendments
 
