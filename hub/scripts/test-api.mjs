@@ -31,7 +31,9 @@ let fileReads = 0;
 const models = {
 	fromFile: async () => { fileReads++; return { model: { provider: "fake", id: "fake-2", name: "Fake Two" }, thinking: "high" }; },
 	scoped: async () => ({ models: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], unresolved: ["gone/*"] }),
+	defaultModel: async () => defaultModel, setDefault: async (provider, id) => { defaultModel = provider + "/" + id; },
 };
+let defaultModel = "fake/fake-2";
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], models });
 const { port, localKey } = hub.config;
 const origin = `http://127.0.0.1:${port}`;
@@ -93,6 +95,10 @@ try {
 
 	// S-11: model and effort picked while parked are kept and set on resume, before the message.
 	assert.equal((await post(id, "model", { provider: "fake", id: "nope" })).status, 404, "parked picks come from the scoped list only");
+	assert.equal((await get(id, "models")).body.default, "fake/fake-2", "the list names Pi's default model");
+	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "nope" })).status, 404, "only a listed model becomes the default");
+	const crowned = await post(id, "defaultmodel", { provider: "fake", id: "fake-1" }); assert.equal(crowned.body.default, "fake/fake-1", JSON.stringify(crowned));
+	assert.equal(defaultModel, "fake/fake-1", "saved through Pi's settings");
 	assert.equal((await post(id, "model", { provider: "fake", id: "fake-1" })).body.model.id, "fake-1");
 	assert.equal((await post(id, "effort", { level: "medium" })).body.effort, "medium");
 	assert.equal(hub.host.live.has(id), false, "a parked pick does not start Pi");

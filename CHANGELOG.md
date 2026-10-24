@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.77 — 2026-10-24
 
 ### Fixed
 - Asking several questions with a shared heading now opens the form instead of returning an error; the heading appears in the terminal, hub and answer summary.
@@ -12,6 +12,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Hub sidebar: a +/− box in front of each folder (or a click on its name) hides the sessions that are not working, or shows them all again. Sessions that have not worked for 2 days hide by themselves (Auto-collapse in hub settings: off, 12 hours to 1 week); shown again with +, they stay 5 minutes before hiding again.
 - Hub sidebar: a filter box next to the ☰ button (Ctrl+Shift+F) finds sessions by folder or name; ↑/↓ move a dashed outline over the matches and Enter opens the picked one (the first match by default).
 - Hub sidebar: right-click a folder name to open the folder on the PC or archive it; archived folders move to a closed Archives (n) section below, and right-click there unarchives them. Drag a folder by its name row to reorder the list; the order is kept on the hub.
+- Hub model menu: Pi's default model (the one new sessions start on) has a 👑; right-click a model and pick Set as default model to change it.
 - Hub sidebar: each folder name shows how many sessions it has, e.g. CE-WORKFLOW (3); the git line shows only in the open session's folder (and not while it is fully folded).
 
 ## 0.1.76 — 2026-10-24

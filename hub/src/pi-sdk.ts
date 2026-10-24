@@ -45,6 +45,10 @@ export type ParkedModels = {
 	fromFile(file: string): Promise<{ model: ModelRef | null; thinking: string }>;
 	/** Pi settings' enabledModels for this folder, resolved; patterns that match no known model are listed as unresolved. */
 	scoped(folder: string): Promise<{ models: ModelRef[]; unresolved: string[] }>;
+	/** Pi settings' default model for this folder, as provider/id, or null. */
+	defaultModel(folder: string): Promise<string | null>;
+	/** Saves the default model in Pi's global settings (what Pi's /model does). */
+	setDefault(provider: string, id: string): Promise<void>;
 };
 
 export function piModels(dir = agentDir()): ParkedModels {
@@ -57,6 +61,14 @@ export function piModels(dir = agentDir()): ParkedModels {
 		async fromFile(file) {
 			const context = (await piSdk(dir)).SessionManager.open(file).buildSessionContext();
 			return { model: context.model ? await named(context.model.provider, context.model.modelId) : null, thinking: context.thinkingLevel };
+		},
+		async defaultModel(folder) {
+			const settings = (await piSdk(dir)).SettingsManager.create(folder, dir), provider = settings.getDefaultProvider(), id = settings.getDefaultModel();
+			return provider && id ? provider + "/" + id : null;
+		},
+		async setDefault(provider, id) {
+			const settings = (await piSdk(dir)).SettingsManager.create(process.cwd(), dir);
+			settings.setDefaultModelAndProvider(provider, id); await settings.flush();
 		},
 		async scoped(folder) {
 			const sdk = await piSdk(dir), patterns: string[] = sdk.SettingsManager.create(folder, dir).getEnabledModels() ?? [];

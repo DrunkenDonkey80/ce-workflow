@@ -269,7 +269,10 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			// D9: the pool is global, answered by the hub through cpool, never by a session.
 			case "pool": return pool ? pool.view() : null;
 			// D10: a parked session picks only from Pi settings' scoped models, never from every model.
-			case "models": if (!host.live.has(id)) return parkedModels(id); return call(id, `/api/${endpoint}`, {}, { start: false });
+			case "models": {
+				const list = host.live.has(id) ? await call(id, `/api/${endpoint}`, {}, { start: false }) as Record<string, unknown> : await parkedModels(id);
+				return { ...list, default: await models?.defaultModel(folder(id)).catch(() => null) ?? null }; // the list marks it with a crown
+			}
 			case "commands": return call(id, `/api/${endpoint}`, {}, { start: false });
 		}
 		throw fail(404, "Unknown workspace endpoint.");
@@ -352,6 +355,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				const set = await live.rpc.send({ type: "set_model", provider: data.provider, modelId: data.id });
 				if (!set.success) throw fail(409, set.error ?? `No credentials for ${data.provider}/${data.id}.`);
 				return publishStatus(id);
+			}
+			case "defaultmodel": {
+				only(data, ["target", "provider", "id"], "Invalid model fields.");
+				if (!models) throw fail(404, "Pi settings are not available.");
+				const list = (await get(id, "models", new URLSearchParams(), undefined as never)) as { scoped?: { provider: string; id: string }[]; others?: { provider: string; id: string }[]; model?: { provider: string; id: string } | null };
+				if (![...list.scoped ?? [], ...list.others ?? [], ...list.model ? [list.model] : []].some(model => model.provider === data.provider && model.id === data.id)) throw fail(404, "That model is not in this session's list.");
+				await models.setDefault(String(data.provider), String(data.id)); return { ok: true, default: data.provider + "/" + data.id };
 			}
 			case "effort": {
 				only(data, ["target", "level"], "Invalid effort level.");

@@ -726,7 +726,7 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.activeElement.id]"), ["/plan3 ", "message-input"]); await browser("fill", "#message-input", "");
  await browser("click", "#model-button"); await browser("wait", ".model-option");
  assert.deepEqual(await evaluate("[[...document.querySelectorAll('#model-menu .model-option')].map(b => b.textContent), document.querySelector('#model-menu input'), document.activeElement.textContent]"), [["Fake One", "Fake Two"], null, "Fake One"], "scoped models only, no filter; focus on the current one");
- await browser("click", "[title='fake/fake-2']"); // the hub sets it in Pi over RPC
+ await browser("click", "[data-ref='fake/fake-2']"); // the hub sets it in Pi over RPC
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'fake-2: Low'");
  assert.equal(await evaluate("document.getElementById('model-menu').hidden"), true);
  await browser("click", "#model-button"); await browser("wait", "#model-menu .effort-row button");

@@ -1855,8 +1855,17 @@ $("model-button").addEventListener("click", async () => {
  const menu = $("model-menu"); menu.replaceChildren("Loading models…"); toggleMenu("model-button", "model-menu", true);
  try {
   const value = await get("models"), current = value.model;
+  // Pi's default model (new sessions start on it) wears a crown; right-click a model to make it the default.
+  const crown = (button: HTMLElement, ref: string) => { button.dataset.default = String(ref === value.default); button.title = ref + (ref === value.default ? " · default model" : " · right-click: set as default"); };
   const option = (model: Model) => {
-   const button = document.createElement("button"); button.type = "button"; button.className = "model-option"; button.textContent = model.name; button.title = model.provider + "/" + model.id;
+   const button = document.createElement("button"), ref = model.provider + "/" + model.id; button.type = "button"; button.className = "model-option"; button.textContent = model.name; crown(button, ref);
+   button.addEventListener("contextmenu", event => {
+    event.preventDefault();
+    showMenu(button, [[ref === value.default ? "Already the default model" : "Set as default model", async () => {
+     try { value.default = (await post("defaultmodel", { provider: model.provider, id: model.id })).default; menu.querySelectorAll<HTMLElement>(".model-option").forEach(item => crown(item, item.dataset.ref!)); showNotice(model.name + " is now the default model.", true); } catch (error) { showNotice(error.message); }
+    }]]);
+   });
+   button.dataset.ref = ref;
    button.setAttribute("aria-pressed", String(current?.provider === model.provider && current?.id === model.id));
    button.addEventListener("click", () => changeStatus("model", { provider: model.provider, id: model.id })); return button;
   };
