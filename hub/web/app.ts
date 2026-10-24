@@ -542,6 +542,7 @@ $("search").addEventListener("keydown", event => {
 window.addEventListener("keydown", event => {
  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "f") return;
  event.preventDefault();
+ if (event.shiftKey) { toggleSwitcher(true); $("session-filter").focus(); ($("session-filter") as HTMLInputElement).select(); return; } // the sidebar filter
  if ((event.target as Element).closest?.("#left-panel") && !$("search").closest("[hidden]")) { $("search").focus(); $("search").select(); return; }
  openChatSearch();
 });
@@ -1250,7 +1251,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[] };
+type HubSession = { id: string; name: string; tone: Tone; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1305,7 +1306,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
-type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean };
+type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number };
 let hubSettings: HubSettings = {}, appBadge = 0;
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
@@ -1341,7 +1342,7 @@ async function loadSessions() {
  try {
   const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
   const uacBefore = !!hubSettings.uac;
-  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); renderUsageProviders(); renderNotify(); renderUpdates(); checkWhatsNew();
+  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); ($("hub-collapse") as HTMLSelectElement).value = String(hubSettings.collapseHours ?? 48); renderUsageProviders(); renderNotify(); renderUpdates(); checkWhatsNew();
   if (!!hubSettings.uac !== uacBefore) notifyUac(!!hubSettings.uac);
   notifyChanges(groups);
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
@@ -1398,17 +1399,61 @@ function whenText(time: number) {
  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(time).setHours(0, 0, 0, 0)) / 86_400_000);
  return `${days === 0 ? "Today" : days === 1 ? "Yesterday" : `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`} ${clock}`;
 }
+// Folder fold, per browser: open (all shown) until a time, closed (only working/waiting sessions and this one), else auto:
+// sessions that have not worked for the Auto-collapse hours hide. Opening shows them 5 min, then auto applies again.
+let folds: Record<string, { open?: number; closed?: boolean }> = {};
+try { folds = JSON.parse(localStorage.getItem("hub-folds") ?? "{}"); } catch { /* private mode or bad JSON */ }
+let lastSessions: [Group[], Recent[]] | undefined, filterPick = "";
+const rerenderSessions = () => { if (lastSessions) renderSessions(...lastSessions); };
+function folded(session: HubSession, folder: string, now = Date.now()) {
+ if (session.id === sessionId || session.tone === "working" || session.tone === "waiting") return false;
+ const fold = folds[folder], hours = hubSettings.collapseHours ?? 48;
+ if (fold?.open && fold.open > now) return false;
+ if (fold?.closed) return true;
+ return !!hours && (session.tone === "seen" || session.tone === "parked") && !!session.worked && now - session.worked > hours * 3_600_000;
+}
+function toggleFold(folder: string, hidden: number) {
+ folds[folder] = hidden ? { open: Date.now() + 5 * 60_000 } : { closed: true };
+ try { localStorage.setItem("hub-folds", JSON.stringify(folds)); } catch { /* private mode */ }
+ rerenderSessions();
+}
+// Sidebar filter (Ctrl+Shift+F): matches folder and session names, folds ignored; ↑/↓ move the dashed pick, Enter opens it.
+const filterInput = $("session-filter") as HTMLInputElement, pickRows = () => [...$("session-list").querySelectorAll<HTMLElement>(".session[data-id]")];
+function markPick(id = filterPick) {
+ const rows = pickRows(); filterPick = rows.some(row => row.dataset.id === id) ? id : rows[0]?.dataset.id ?? "";
+ for (const row of rows) row.classList.toggle("picked", row.dataset.id === filterPick);
+}
+filterInput.addEventListener("input", () => { filterPick = ""; rerenderSessions(); });
+filterInput.addEventListener("keydown", event => {
+ const rows = pickRows(), at = rows.findIndex(row => row.dataset.id === filterPick);
+ if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+  event.preventDefault(); if (!rows.length) return;
+  const next = rows[(at + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length]; markPick(next.dataset.id); next.scrollIntoView({ block: "nearest" });
+ }
+ if (event.key === "Enter" && filterPick) { event.preventDefault(); if (filterPick !== sessionId) location.assign(sessionUrl(filterPick)); else filterInput.blur(); }
+ if (event.key === "Escape" && filterInput.value) { event.preventDefault(); event.stopPropagation(); filterInput.value = ""; filterPick = ""; rerenderSessions(); }
+});
 function renderSessions(groups: Group[], recents: Recent[]) {
+ lastSessions = [groups, recents];
  $("switcher").hidden = false; document.body.classList.add("has-switcher");
+ const query = filterInput.value.trim().toLowerCase(), now = Date.now();
  sessionOrder = groups.flatMap(group => group.sessions.map(session => session.id));
  ownFolder = groups.find(group => group.sessions.some(session => session.id === sessionId))?.folder ?? "";
  try { if (ownFolder) localStorage.setItem("hub-last:" + ownFolder, sessionId); } catch { /* private mode */ }
  const open = $("session-list").querySelector<HTMLDetailsElement>(".session-recents")?.open ?? false;
  const rows = groups.flatMap(group => {
+  const shown = group.sessions.filter(session => query ? `${group.label} ${session.name}`.toLowerCase().includes(query) : !folded(session, group.folder, now));
+  if (query && !shown.length) return [];
+  const hidden = query ? 0 : group.sessions.length - shown.length;
   const head = html("div", { className: "session-group" });
+  // Treeview box: + while any session is hidden (shows all for 5 min), − hides the ones not working; the name does the same.
+  const fold = html("button", { type: "button", className: "session-fold", textContent: hidden ? "+" : "−", title: hidden ? `Show ${hidden} hidden session${hidden === 1 ? "" : "s"}` : "Hide the sessions that are not working" });
+  fold.setAttribute("aria-label", `${fold.title} in ${group.label}`); fold.addEventListener("click", () => toggleFold(group.folder, hidden));
   const add = html("button", { type: "button", className: "session-add", textContent: "+", title: `New session in ${group.label} (Alt+N)` });
   add.setAttribute("aria-label", `New session in ${group.label}`); add.addEventListener("click", () => void newSession(group.folder));
-  head.append(html("span", { className: "session-group-label", textContent: group.label, title: group.folder }), add);
+  const label = html("span", { className: "session-group-label", textContent: group.label, title: group.folder });
+  label.addEventListener("click", event => { event.stopPropagation(); toggleFold(group.folder, hidden); });
+  head.append(fold, label, add);
   // One framed box per folder: red while one waits for an answer, orange while one works, light blue for the open session's folder.
   const box = html("div", { className: "session-folder" }), tones = group.sessions.map(session => session.tone);
   const tone = tones.includes("waiting") ? "waiting" : tones.includes("working") ? "working" : group.sessions.some(session => session.id === sessionId) ? "current" : "";
@@ -1420,7 +1465,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
    const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => !(session.parked ?? session.tone === "parked")) ?? group.sessions[0];
    if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
   });
-  box.append(head, ...gitLine(group.git, group.folder === ownFolder), ...group.sessions.map(session => sessionRow(session, group.label, group.folder)));
+  box.append(head, ...gitLine(group.git, group.folder === ownFolder), ...shown.map(session => sessionRow(session, group.label, group.folder)));
   return [box];
  });
  const recent = html("details", { className: "session-recents", open });
@@ -1438,10 +1483,11 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  // Inside the list, so the phone drawer gets it too.
  const newFolder = html("button", { type: "button", className: "session-devices", textContent: "New folder" });
  newFolder.addEventListener("click", () => { const folder = prompt("Full path of the folder to start a Pi session in:"); if (folder?.trim()) void newSession(folder.trim()); });
- $("session-list").replaceChildren(...rows, recent, newFolder);
+ $("session-list").replaceChildren(...rows, ...query ? [] : [recent, newFolder]);
+ markPick();
 }
 function sessionRow(session: HubSession, folder: string, path: string) {
- const row = html("div", { className: "session" }); row.dataset.tone = session.tone; row.toggleAttribute("data-parked", session.parked ?? session.tone === "parked");
+ const row = html("div", { className: "session" }); row.dataset.tone = session.tone; row.dataset.id = session.id; row.toggleAttribute("data-parked", session.parked ?? session.tone === "parked");
  const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}${session.park ? " · " + session.park : ""}` });
  link.setAttribute("aria-label", `${session.name} in ${folder}, ${words[session.tone]}${session.id === sessionId ? ", this session" : ""}`);
  if (session.id === sessionId) row.setAttribute("aria-current", "page");
@@ -1976,6 +2022,7 @@ async function saveHubSettings(change: HubSettings) {
  catch (error) { showNotice(error.message); }
 }
 $("hub-park").addEventListener("change", () => void saveHubSettings({ idleParkMinutes: Number(($("hub-park") as HTMLSelectElement).value) }));
+$("hub-collapse").addEventListener("change", () => void saveHubSettings({ collapseHours: Number(($("hub-collapse") as HTMLSelectElement).value) }).then(rerenderSessions));
 // One checkbox per usage provider; unticked ones are neither polled nor shown.
 function renderUsageProviders() {
  const hidden = new Set(hubSettings.usageHidden ?? []);
