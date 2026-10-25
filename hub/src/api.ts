@@ -198,7 +198,9 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		switch (data.action) {
 			case "new": {
 				// A known group, or (New folder) an existing absolute folder, which starts its group.
-				const typed = typeof data.folder === "string" ? data.folder.trim().replace(/^"(.*)"$/, "$1") : "";
+				let typed = typeof data.folder === "string" ? data.folder.trim().replace(/^"(.*)"$/, "$1") : "";
+				// ~ is the hub user's home, so the page can name ~/pi-local (Local button) without knowing it.
+				if (/^~($|[\\/])/.test(typed)) typed = os.homedir() + typed.slice(1);
 				const folder = !typed ? undefined : registry.groups().find(group => group.folder.toLowerCase() === path.resolve(typed).toLowerCase())?.folder
 					?? (path.isAbsolute(typed) && statSync(typed, { throwIfNoEntry: false })?.isDirectory() ? path.resolve(typed) : undefined);
 				// A missing absolute folder is created only after the page asked (create: true); its parent may be missing too.

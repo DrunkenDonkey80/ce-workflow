@@ -1595,7 +1595,10 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  // Inside the list, so the phone drawer gets it too.
  const newFolder = html("button", { type: "button", className: "session-devices", textContent: "New folder" });
  newFolder.addEventListener("click", () => { const folder = prompt("Full path of the folder to start a Pi session in:"); if (folder?.trim()) void newSession(folder.trim()); });
- $("session-list").replaceChildren(...rows, ...archivedRows.length ? [archives] : [], ...query ? [] : [recent, newFolder]);
+ // Local: one folder for machine requests (install, check something) that belong to no project; made on first use.
+ const local = html("button", { type: "button", className: "session-devices", textContent: "Local", title: "New session in ~/pi-local, for machine tasks (install, check…) outside any project" });
+ local.addEventListener("click", async () => { const made = await sessionAction({ action: "new", folder: "~/pi-local", create: true }) as { id?: string } | undefined; if (made?.id) jumpTo(made.id); });
+ $("session-list").replaceChildren(...rows, ...archivedRows.length ? [archives] : [], ...query ? [] : [recent, newFolder, local]);
  markPick();
 }
 function sessionRow(session: HubSession, folder: string, path: string) {

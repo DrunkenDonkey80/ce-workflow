@@ -297,6 +297,7 @@ try {
 	assert.equal(fs.statSync(path.join(root, "made", "deep")).isDirectory(), true, "create: true makes the folder (and its parents)");
 	await hub.host.park(made.id); hub.registry.remove(made.id); // keep the later group checks to their own folders
 	assert.equal((await post(id, "session", { action: "new", folder: "relative" })).status, 404, "only absolute paths");
+	assert.equal((await post(id, "session", { action: "new", folder: "~/pi-hub-test-missing-" + process.pid })).body.error, "Folder does not exist.", "~ is the home folder (Local uses ~/pi-local)");
 	assert.equal((await post(id, "session", { action: "rename", id: created.id, name: "Docs" })).status, 200);
 	await hub.host.prompt(created.id, "hi"); await until(async () => (await tones()).Docs === "unseen" && "ok");
 	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);
