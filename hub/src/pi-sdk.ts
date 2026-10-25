@@ -1,5 +1,5 @@
 // Pi's own SDK, loaded from Pi's managed install: the hub reads auth, models, settings and session files the way a running Pi does.
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, delimiter, dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { agentDir } from "./rpc-client.ts";
@@ -49,7 +49,16 @@ export type ParkedModels = {
 	defaultModel(folder: string): Promise<string | null>;
 	/** Saves the default model in Pi's global settings (what Pi's /model does). */
 	setDefault(provider: string, id: string): Promise<void>;
+	/** The workflow's /wo models (global settings): work = Plan3 coding model, think = the Plan models list, as provider/id. */
+	roles(): { work: string | null; think: string[] };
+	/** Sets or clears the work model, or adds (high effort) or removes a think model; one model may hold every role. */
+	setRole(role: "work" | "think", ref: string, on: boolean): void;
 };
+
+function readSettings(dir: string): any {
+	const file = join(dir, "settings.json");
+	return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {}; // a broken file throws rather than being overwritten
+}
 
 export function piModels(dir = agentDir()): ParkedModels {
 	const ref = (model: any): ModelRef => ({ provider: model.provider, id: model.id, name: model.name ?? model.id });
@@ -69,6 +78,17 @@ export function piModels(dir = agentDir()): ParkedModels {
 		async setDefault(provider, id) {
 			const settings = (await piSdk(dir)).SettingsManager.create(process.cwd(), dir);
 			settings.setDefaultModelAndProvider(provider, id); await settings.flush();
+		},
+		// shortcut: global settings only, like /wo's Global scope; a project override in .pi/settings.json still wins there.
+		roles() {
+			const plan3 = readSettings(dir).workOrchestrator?.plan3 ?? {};
+			return { work: plan3.codingModel ?? null, think: (plan3.models ?? []).map((entry: { model: string }) => entry.model) };
+		},
+		setRole(role, ref, on) {
+			const settings = readSettings(dir), plan3 = ((settings.workOrchestrator ??= {}).plan3 ??= {});
+			if (role === "work") { if (on) plan3.codingModel = ref; else delete plan3.codingModel; }
+			else { const list = (plan3.models ?? []).filter((entry: { model: string }) => entry.model !== ref); plan3.models = on ? [...list, { model: ref, thinking: "high" }] : list; }
+			writeFileSync(join(dir, "settings.json"), `${JSON.stringify(settings, null, "\t")}\n`);
 		},
 		async scoped(folder) {
 			const sdk = await piSdk(dir), patterns: string[] = sdk.SettingsManager.create(folder, dir).getEnabledModels() ?? [];

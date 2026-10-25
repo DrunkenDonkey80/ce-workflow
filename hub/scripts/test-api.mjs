@@ -34,6 +34,10 @@ const models = {
 	defaultModel: async () => defaultModel, setDefault: async (provider, id) => { defaultModel = provider + "/" + id; },
 };
 let defaultModel = "fake/fake-2";
+// The /wo roles are real: they edit a settings.json, here a temp one that keeps its other keys.
+const rolesDir = fs.mkdtempSync(path.join(os.tmpdir(), "hub-roles-"));
+fs.writeFileSync(path.join(rolesDir, "settings.json"), JSON.stringify({ theme: "dark", workOrchestrator: { plan3: { models: [{ model: "other/x", thinking: "low" }] } } }));
+const { roles, setRole } = (await import("../src/pi-sdk.ts")).piModels(rolesDir); Object.assign(models, { roles, setRole });
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], models });
 const { port, localKey } = hub.config;
 const origin = `http://127.0.0.1:${port}`;
@@ -99,6 +103,14 @@ try {
 	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "nope" })).status, 404, "only a listed model becomes the default");
 	const crowned = await post(id, "defaultmodel", { provider: "fake", id: "fake-1" }); assert.equal(crowned.body.default, "fake/fake-1", JSON.stringify(crowned));
 	assert.equal(defaultModel, "fake/fake-1", "saved through Pi's settings");
+	// The same model may be default, work and think; think is a list.
+	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "boss" })).status, 400);
+	await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "work" });
+	const roled = (await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "think" })).body;
+	assert.deepEqual([roled.default, roled.work, roled.think], ["fake/fake-1", "fake/fake-1", ["other/x", "fake/fake-1"]], JSON.stringify(roled));
+	assert.deepEqual([(await get(id, "models")).body.work, (await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "think", on: false })).body.think], ["fake/fake-1", ["other/x"]], "listed, and removable");
+	const saved = JSON.parse(fs.readFileSync(path.join(rolesDir, "settings.json"), "utf8"));
+	assert.deepEqual([saved.theme, saved.workOrchestrator.plan3], ["dark", { models: [{ model: "other/x", thinking: "low" }], codingModel: "fake/fake-1" }], "other settings and efforts kept");
 	assert.equal((await post(id, "model", { provider: "fake", id: "fake-1" })).body.model.id, "fake-1");
 	assert.equal((await post(id, "effort", { level: "medium" })).body.effort, "medium");
 	assert.equal(hub.host.live.has(id), false, "a parked pick does not start Pi");

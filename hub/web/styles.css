@@ -366,7 +366,10 @@ h2 { font-size: 15px; font-weight: 600; }
 .status-menu { position: absolute; z-index: 5; left: 0; top: 100%; width: max-content; min-width: 180px; max-width: min(360px, 92vw); display: grid; gap: 4px; max-height: 60vh; overflow: auto; padding: 8px; background: var(--panel); border: 1px solid var(--ink); border-radius: 6px; }
 .status-menu h3 { margin: 6px 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
 .status-menu button { text-align: left; border-color: transparent; }
-.model-option[data-default=true]::after { content: " 👑"; }
+.model-option[data-roles~=default]::after { content: " 👑"; }
+.model-option[data-roles~=work]::before { content: "🔨 "; }
+.model-option[data-roles~=think]::before { content: "💭 "; }
+.model-option[data-roles~=work][data-roles~=think]::before { content: "🔨💭 "; }
 .status-menu button[aria-pressed=true], .plan-option[aria-pressed=true] { background: color-mix(in srgb, var(--focus) 22%, var(--panel)); border-color: var(--focus); }
 .effort-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .model-list { display: grid; gap: 2px; }

@@ -1896,15 +1896,25 @@ $("model-button").addEventListener("click", async () => {
  const menu = $("model-menu"); menu.replaceChildren("Loading models…"); toggleMenu("model-button", "model-menu", true);
  try {
   const value = await get("models"), current = value.model;
-  // Pi's default model (new sessions start on it) wears a crown; right-click a model to make it the default.
-  const crown = (button: HTMLElement, ref: string) => { button.dataset.default = String(ref === value.default); button.title = ref + (ref === value.default ? " · default model" : " · right-click: set as default"); };
+  // Pi's default model (new sessions start on it) wears a crown, the /wo work model (Plan3 coding) a hammer, think models
+  // (Plan models: advisors and review) a thought bubble; one model may wear all three. Right-click a model to change them.
+  const crown = (button: HTMLElement, ref: string) => {
+   const roles = [ref === value.default && "default", ref === value.work && "work", value.think?.includes(ref) && "think"].filter(Boolean) as string[];
+   button.dataset.roles = roles.join(" "); button.title = ref + (roles.length ? " · " + roles.join(", ") + " model" : "") + " · right-click: set roles";
+  };
   const option = (model: Model) => {
    const button = document.createElement("button"), ref = model.provider + "/" + model.id; button.type = "button"; button.className = "model-option"; button.textContent = model.name; crown(button, ref);
    button.addEventListener("contextmenu", event => {
     event.preventDefault();
-    showMenu(button, [[ref === value.default ? "Already the default model" : "Set as default model", async () => {
-     try { value.default = (await post("defaultmodel", { provider: model.provider, id: model.id })).default; menu.querySelectorAll<HTMLElement>(".model-option").forEach(item => crown(item, item.dataset.ref!)); showNotice(model.name + " is now the default model.", true); } catch (error) { showNotice(error.message); }
-    }]]);
+    const set = (body: Record<string, unknown>, done: string) => async () => {
+     try { Object.assign(value, await post("defaultmodel", { provider: model.provider, id: model.id, ...body })); menu.querySelectorAll<HTMLElement>(".model-option").forEach(item => crown(item, item.dataset.ref!)); showNotice(model.name + done, true); } catch (error) { showNotice(error.message); }
+    };
+    const think = value.think?.includes(ref);
+    showMenu(button, [
+     [ref === value.default ? "Already the default model" : "Set as default model", set({}, " is now the default model.")],
+     ref === value.work ? ["Unset work model", set({ role: "work", on: false }, " is no longer the work model.")] : ["Set as work model", set({ role: "work" }, " is now the work model (Plan3 coding).")],
+     think ? ["Remove from think models", set({ role: "think", on: false }, " is no longer a think model.")] : ["Add to think models", set({ role: "think" }, " is now a think model (Plan models, high effort).")],
+    ]);
    });
    button.dataset.ref = ref;
    button.setAttribute("aria-pressed", String(current?.provider === model.provider && current?.id === model.id));
