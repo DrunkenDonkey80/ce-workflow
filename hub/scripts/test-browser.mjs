@@ -733,6 +733,16 @@ try {
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .effort-row button')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'))"), ["Low:true", "Mid:false", "High:false"], "effort on one line in the model menu");
  await browser("click", "#model-menu [data-level=high]");
  await browser("wait", "--fn", "document.getElementById('model-button').textContent === 'fake-2: High'");
+ // Sketch C: a Roles summary under the list; a role row opens that role's list, Escape goes back. (No role is set here:
+ // this hub uses the real Pi settings.)
+ await browser("click", "#model-button"); await browser("wait", "#model-menu .role-summary");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .role-summary')].map(b => b.dataset.role)"), ["default", "work", "think"], "roles summary under the list");
+ await browser("click", "#model-menu .model-all");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .model-option')].map(b => b.textContent)"), ["Fake One", "Fake Two", "Other"], "show all models adds the unscoped ones");
+ await browser("click", "#model-menu [data-role=work]"); await browser("wait", "#model-menu .model-back");
+ assert.equal(await evaluate("document.querySelector('#model-menu .model-back').textContent"), "← 🔨 Work model");
+ await browser("press", "Escape"); assert.deepEqual(await evaluate("[document.getElementById('model-menu').hidden, !!document.querySelector('#model-menu .role-summary')]"), [false, true], "Escape goes back to this chat's list");
+ await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('model-menu').hidden"), true);
  // H5-05 session bar: one group per folder, colour-coded letters. This page's session is seen, a parked one grey, a running
  // one working; a run that ends while no page watches it stays unseen.
  assert.equal(await evaluate("document.getElementById('switcher').hidden"), false, "desktop always shows the session bar");

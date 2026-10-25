@@ -1140,7 +1140,7 @@ function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
 function closeMenus(focus = false) {
  for (const [button, menu] of menus) if (!$(menu).hidden) { toggleMenu(button, menu, false); if (focus) $(button).focus(); }
 }
-document.addEventListener("keydown", event => { if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
+document.addEventListener("keydown", event => { if (event.key === "Escape" && modelBack && !$("model-menu").hidden) { event.stopPropagation(); modelBack(); return; } if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
 document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions, .commands-more-wrap")) closeMenus(); });
 // The title opens the session picker: a popup on phones, the switcher stripe on desktop.
 // Phones: the title opens the plans with their commands (the plan menu moves under it); sessions live in the drawer.
@@ -1891,47 +1891,93 @@ async function changeStatus(endpoint: "model" | "effort", body) {
  closeMenus(); if (drawer.dataset.open === "true") setDrawer(false); else $("model-button").focus();
  try { state.status = { ...state.status, ...await post(endpoint, body) }; renderShell(); showNotice(""); } catch (error) { showNotice(error.message); }
 }
+// The model menu (D19, sketch C): the list sets this chat's model; below it a Roles summary (default, work, think models,
+// each with its own effort) whose rows open the same list for that role; Escape or ← goes back to this chat's list.
+let modelBack: (() => void) | null = null;
+const effortName = (level: string | null) => !level ? "Session's" : level === "medium" ? "Mid" : level === "xhigh" ? "XHigh" : level[0].toUpperCase() + level.slice(1);
+function modelMenu(menu: HTMLElement, value, mode: "chat" | "default" | "work" | "think" = "chat", all = false) {
+ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}) => Object.assign(document.createElement(tag), tag === "button" ? { type: "button" } : {}, props);
+ const refOf = (model: Model) => model.provider + "/" + model.id, current = value.model;
+ const known = [...value.scoped, ...value.others, ...current ? [current] : []];
+ const nameOf = (ref: string | null) => !ref ? "—" : known.find(model => refOf(model) === ref)?.name ?? ref.split("/").slice(1).join("/");
+ const holds = (ref: string) => mode === "default" ? ref === value.default : mode === "work" ? ref === value.work : mode === "think" ? value.think?.includes(ref) : current && refOf(current) === ref;
+ const again = (to = mode) => modelMenu(menu, value, to, all);
+ // Pi's default model (new sessions start on it) wears a crown, the /wo work model (Plan3 coding) a hammer, think models
+ // (Plan models: advisors and review) a thought bubble; one model may wear all three.
+ const crown = (button: HTMLElement, ref: string) => {
+  const roles = [ref === value.default && "default", ref === value.work && "work", value.think?.includes(ref) && "think"].filter(Boolean) as string[];
+  button.dataset.roles = roles.join(" "); button.dataset.ref = ref; button.title = ref + (roles.length ? " · " + roles.join(", ") + " model" : "") + (mode === "chat" ? " · right-click: set roles" : "");
+ };
+ const set = (model: { provider: string; id: string }, body: Record<string, unknown>, done: string) => async () => {
+  try { Object.assign(value, await post("defaultmodel", { provider: model.provider, id: model.id, ...body })); if (!menu.hidden) again(); showNotice(done, true); } catch (error) { showNotice(error.message); }
+ };
+ const option = (model: Model) => {
+  const ref = refOf(model), button = el("button", { className: "model-option", textContent: model.name }); crown(button, ref);
+  button.setAttribute("aria-pressed", String(!!holds(ref)));
+  if (mode === "chat") {
+   button.addEventListener("click", () => changeStatus("model", { provider: model.provider, id: model.id }));
+   button.addEventListener("contextmenu", event => {
+    event.preventDefault(); const think = value.think?.includes(ref);
+    showMenu(button, [
+     [ref === value.default ? "Already the default model" : "Set as default model", set(model, {}, model.name + " is now the default model.")],
+     ref === value.work ? ["Unset work model", set(model, { role: "work", on: false }, model.name + " is no longer the work model.")] : ["Set as work model", set(model, { role: "work" }, model.name + " is now the work model (Plan3 coding).")],
+     think ? ["Remove from think models", set(model, { role: "think", on: false }, model.name + " is no longer a think model.")] : ["Add to think models", set(model, { role: "think" }, model.name + " is now a think model (Plan models).")],
+    ]);
+   });
+   return button;
+  }
+  // A role list: clicking picks it (think: toggles it, several allowed); the picked row carries its effort button.
+  const role = mode === "default" ? undefined : mode, on = !!holds(ref);
+  button.addEventListener("click", set(model, mode === "think" ? { role, on: !on } : { role }, mode === "think" && on ? model.name + " is no longer a think model." : model.name + " is now the " + mode + " model" + (mode === "think" ? " (one of them)." : ".")));
+  if (!on) return button;
+  const level = mode === "default" ? value.defaultEffort ?? "medium" : mode === "work" ? value.workEffort : value.thinkEffort?.[ref];
+  const effort = el("button", { className: "role-effort", textContent: effortName(level) + " ▾", title: "Effort for this role" });
+  effort.addEventListener("click", () => showMenu(effort, [...(mode === "work" ? [null] : []), "minimal", "low", "medium", "high", "xhigh"].map(next => [(next === level ? "✓ " : "") + (next ? effortName(next) : "Session's effort"), set(model, { role, effort: next }, model.name + ": " + effortName(next) + " effort as the " + mode + " model.")])));
+  const row = el("div", { className: "role-row" }); row.append(button, effort); return row;
+ };
+ const models = all || !value.scoped.length ? [...value.scoped, ...value.others] : value.scoped;
+ const items: Node[] = [];
+ if (mode === "chat") {
+  modelBack = null;
+  // This chat's thinking level on one line (Low / Mid / High, plus the current one if different).
+  const efforts = el("div", { className: "effort-row" });
+  efforts.append(...["low", "medium", "high", ...(["low", "medium", "high"].includes(value.effort) || !value.effort ? [] : [value.effort])].map(level => {
+   const button = el("button", { textContent: effortName(level) }); button.dataset.level = level;
+   button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); return button;
+  }));
+  items.push(efforts);
+ } else {
+  modelBack = () => again("chat");
+  const back = el("button", { className: "model-back", textContent: "← " + { default: "👑 Default model", work: "🔨 Work model", think: "💭 Think models" }[mode] });
+  back.addEventListener("click", modelBack);
+  items.push(back, el("p", { className: "model-note", textContent: { default: "New sessions start on it, at its effort.", work: "/resume3 switches to it to code a plan.", think: "Advisors and reviews (Plan models); pick several." }[mode] }));
+  if (mode === "work" && value.work) {
+   const [provider, ...id] = value.work.split("/"), none = el("button", { className: "model-option", textContent: "Don't switch (keep the session's model)" });
+   none.addEventListener("click", set({ provider, id: id.join("/") }, { role: "work", on: false }, "No work model: /resume3 keeps the session's model."));
+   items.push(none);
+  }
+ }
+ // A parked session lists only scoped models (D10) and says why when there are none; Pi's Ctrl+P set unless "all".
+ if (value.note) items.push(el("p", { className: "model-note", textContent: value.note }));
+ items.push(...models.map(option));
+ if (value.scoped.length && value.others.length) {
+  const toggle = el("button", { className: "model-all", textContent: (all ? "☑" : "☐") + " Show all models" }); toggle.setAttribute("aria-pressed", String(all));
+  toggle.addEventListener("click", () => modelMenu(menu, value, mode, !all)); items.push(toggle);
+ }
+ if (mode === "chat") {
+  const row = (to: "default" | "work" | "think", label: string, text: string) => { const button = el("button", { className: "role-summary" }); button.append(el("span", { className: "role-label", textContent: label }), el("span", { className: "role-value", textContent: text }), el("span", { textContent: "›" })); button.dataset.role = to; button.addEventListener("click", () => again(to)); return button; };
+  items.push(el("h3", { textContent: "Roles" }),
+   row("default", "👑 Default", nameOf(value.default) + (value.default ? " · " + effortName(value.defaultEffort ?? "medium") : "")),
+   row("work", "🔨 Work", value.work ? nameOf(value.work) + " · " + effortName(value.workEffort) : "—"),
+   row("think", "💭 Think", value.think?.length ? value.think.map(ref => nameOf(ref) + " · " + effortName(value.thinkEffort?.[ref])).join(", ") : "—"));
+ }
+ menu.replaceChildren(...items);
+ (menu.querySelector<HTMLElement>(".model-option[aria-pressed=true]") ?? menu.querySelector<HTMLElement>(".model-option, button"))?.focus();
+}
 $("model-button").addEventListener("click", async () => {
  if (!$("model-menu").hidden) return toggleMenu("model-button", "model-menu", false);
  const menu = $("model-menu"); menu.replaceChildren("Loading models…"); toggleMenu("model-button", "model-menu", true);
- try {
-  const value = await get("models"), current = value.model;
-  // Pi's default model (new sessions start on it) wears a crown, the /wo work model (Plan3 coding) a hammer, think models
-  // (Plan models: advisors and review) a thought bubble; one model may wear all three. Right-click a model to change them.
-  const crown = (button: HTMLElement, ref: string) => {
-   const roles = [ref === value.default && "default", ref === value.work && "work", value.think?.includes(ref) && "think"].filter(Boolean) as string[];
-   button.dataset.roles = roles.join(" "); button.title = ref + (roles.length ? " · " + roles.join(", ") + " model" : "") + " · right-click: set roles";
-  };
-  const option = (model: Model) => {
-   const button = document.createElement("button"), ref = model.provider + "/" + model.id; button.type = "button"; button.className = "model-option"; button.textContent = model.name; crown(button, ref);
-   button.addEventListener("contextmenu", event => {
-    event.preventDefault();
-    const set = (body: Record<string, unknown>, done: string) => async () => {
-     try { Object.assign(value, await post("defaultmodel", { provider: model.provider, id: model.id, ...body })); menu.querySelectorAll<HTMLElement>(".model-option").forEach(item => crown(item, item.dataset.ref!)); showNotice(model.name + done, true); } catch (error) { showNotice(error.message); }
-    };
-    const think = value.think?.includes(ref);
-    showMenu(button, [
-     [ref === value.default ? "Already the default model" : "Set as default model", set({}, " is now the default model.")],
-     ref === value.work ? ["Unset work model", set({ role: "work", on: false }, " is no longer the work model.")] : ["Set as work model", set({ role: "work" }, " is now the work model (Plan3 coding).")],
-     think ? ["Remove from think models", set({ role: "think", on: false }, " is no longer a think model.")] : ["Add to think models", set({ role: "think" }, " is now a think model (Plan models, high effort).")],
-    ]);
-   });
-   button.dataset.ref = ref;
-   button.setAttribute("aria-pressed", String(current?.provider === model.provider && current?.id === model.id));
-   button.addEventListener("click", () => changeStatus("model", { provider: model.provider, id: model.id })); return button;
-  };
-  // Thinking level on one line (Low / Mid / High, plus the current one if different), then scoped models only
-  // (Pi's Ctrl+P set); all available models when nothing is scoped.
-  const efforts = Object.assign(document.createElement("div"), { className: "effort-row" });
-  efforts.append(...["low", "medium", "high", ...(["low", "medium", "high"].includes(value.effort) || !value.effort ? [] : [value.effort])].map(level => {
-   const button = Object.assign(document.createElement("button"), { type: "button", textContent: level === "medium" ? "Mid" : level[0].toUpperCase() + level.slice(1) }); button.dataset.level = level;
-   button.setAttribute("aria-pressed", String(level === value.effort)); button.addEventListener("click", () => changeStatus("effort", { level })); return button;
-  }));
-  // A parked session lists only scoped models (D10) and says why when there are none.
-  const note = value.note ? [Object.assign(document.createElement("p"), { className: "model-note", textContent: value.note })] : [];
-  menu.replaceChildren(efforts, ...note, ...(value.scoped.length ? value.scoped : value.others).map(option));
-  (menu.querySelector<HTMLElement>(".model-option[aria-pressed=true]") ?? menu.querySelector<HTMLElement>(".model-option, button"))?.focus();
- } catch (error) { menu.replaceChildren("Models failed to load: " + error.message); }
+ try { modelMenu(menu, await get("models")); } catch (error) { menu.replaceChildren("Models failed to load: " + error.message); }
 });
 $("context-button").addEventListener("click", () => toggleMenu("context-button", "context-menu"));
 // Compact runs /wo compact, which uses the compaction method chosen in /wo settings.

@@ -368,15 +368,17 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return publishStatus(id);
 			}
 			case "defaultmodel": {
-				only(data, ["target", "provider", "id", "role", "on"], "Invalid model fields.");
+				only(data, ["target", "provider", "id", "role", "on", "effort"], "Invalid model fields.");
 				if (![undefined, "work", "think"].includes(data.role as string) || (data.on !== undefined && typeof data.on !== "boolean")) throw fail(400, "Invalid model role.");
+				// effort: that role's thinking level; null (work only) = use the session's level.
+				if (data.effort !== undefined && !(EFFORTS.includes(data.effort as string) || (data.effort === null && data.role === "work"))) throw fail(400, "Invalid effort level.");
 				if (!models) throw fail(404, "Pi settings are not available.");
 				const list = (await get(id, "models", new URLSearchParams(), undefined as never)) as { scoped?: { provider: string; id: string }[]; others?: { provider: string; id: string }[]; model?: { provider: string; id: string } | null };
 				if (![...list.scoped ?? [], ...list.others ?? [], ...list.model ? [list.model] : []].some(model => model.provider === data.provider && model.id === data.id)) throw fail(404, "That model is not in this session's list.");
 				const ref = data.provider + "/" + data.id;
 				// role work/think: the /wo models (on false clears); no role: Pi's default model.
-				if (data.role) models.setRole(data.role as "work" | "think", ref, data.on !== false);
-				else await models.setDefault(String(data.provider), String(data.id));
+				if (data.role) models.setRole(data.role as "work" | "think", ref, data.on !== false, data.effort as string | null | undefined);
+				else await models.setDefault(String(data.provider), String(data.id), data.effort as string | undefined);
 				return { ok: true, default: await models.defaultModel(folder(id)).catch(() => null) ?? ref, ...models.roles() };
 			}
 			case "effort": {

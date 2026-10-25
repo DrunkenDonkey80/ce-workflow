@@ -31,9 +31,9 @@ let fileReads = 0;
 const models = {
 	fromFile: async () => { fileReads++; return { model: { provider: "fake", id: "fake-2", name: "Fake Two" }, thinking: "high" }; },
 	scoped: async () => ({ models: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], unresolved: ["gone/*"] }),
-	defaultModel: async () => defaultModel, setDefault: async (provider, id) => { defaultModel = provider + "/" + id; },
+	defaultModel: async () => defaultModel, setDefault: async (provider, id, effort) => { defaultModel = provider + "/" + id; defaultEffort = effort; },
 };
-let defaultModel = "fake/fake-2";
+let defaultModel = "fake/fake-2"; let defaultEffort;
 // The /wo roles are real: they edit a settings.json, here a temp one that keeps its other keys.
 const rolesDir = fs.mkdtempSync(path.join(os.tmpdir(), "hub-roles-"));
 fs.writeFileSync(path.join(rolesDir, "settings.json"), JSON.stringify({ theme: "dark", workOrchestrator: { plan3: { models: [{ model: "other/x", thinking: "low" }] } } }));
@@ -111,6 +111,15 @@ try {
 	assert.deepEqual([(await get(id, "models")).body.work, (await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "think", on: false })).body.think], ["fake/fake-1", ["other/x"]], "listed, and removable");
 	const saved = JSON.parse(fs.readFileSync(path.join(rolesDir, "settings.json"), "utf8"));
 	assert.deepEqual([saved.theme, saved.workOrchestrator.plan3], ["dark", { models: [{ model: "other/x", thinking: "low" }], codingModel: "fake/fake-1" }], "other settings and efforts kept");
+	// Each role has its own effort: work may use the session's (null); a think model keeps its place when only its effort changes.
+	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "fake-1", effort: "turbo" })).status, 400);
+	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "fake-1", effort: null })).status, 400, "only work may use the session's effort");
+	await post(id, "defaultmodel", { provider: "fake", id: "fake-1", effort: "high" }); assert.equal(defaultEffort, "high", "the default model's effort goes to Pi");
+	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "work", effort: "medium" })).body.workEffort, "medium");
+	await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "think", effort: "xhigh" }); await post(id, "defaultmodel", { provider: "fake", id: "fake-2", role: "think" });
+	const tuned = (await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "think", effort: "low" })).body;
+	assert.deepEqual([tuned.think, tuned.thinkEffort], [["other/x", "fake/fake-1", "fake/fake-2"], { "other/x": "low", "fake/fake-1": "low", "fake/fake-2": "high" }], JSON.stringify(tuned));
+	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "work", effort: null })).body.workEffort, null, "work back on the session's effort");
 	assert.equal((await post(id, "model", { provider: "fake", id: "fake-1" })).body.model.id, "fake-1");
 	assert.equal((await post(id, "effort", { level: "medium" })).body.effort, "medium");
 	assert.equal(hub.host.live.has(id), false, "a parked pick does not start Pi");

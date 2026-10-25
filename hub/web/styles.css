@@ -373,6 +373,10 @@ h2 { font-size: 15px; font-weight: 600; }
 .status-menu button[aria-pressed=true], .plan-option[aria-pressed=true] { background: color-mix(in srgb, var(--focus) 22%, var(--panel)); border-color: var(--focus); }
 .effort-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .model-list { display: grid; gap: 2px; }
+/* Model menu roles: summary rows under the list, and a role list's picked row with its effort button. */
+.status-menu .role-summary { display: flex; gap: 8px; white-space: nowrap; } .role-label { flex: none; width: 5.5em; } .role-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.role-row { display: flex; gap: 4px; } .role-row .model-option { flex: 1; min-width: 0; } .status-menu .role-effort { flex: none; border-color: var(--line); }
+.model-back { font-weight: 600; } .model-all { color: var(--muted); }
 .activity:empty { display: none; }
 .activity > * { margin: 8px 16px; }
 .activity details { border-radius: 4px; padding: 4px 8px; background: var(--tool-pending); }
