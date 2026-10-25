@@ -563,7 +563,7 @@ try {
   { type: "thinking", text: "more" },
   { type: "tool", id: "t3", name: "read", title: "read b.ts", args: "{}" }] });
  await browser("wait", "#messages [data-id=assistant_4] .block-tool");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-change block-ok", "block block-tool block-error", "block block-thinking", "block block-tool block-pending"]);
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-change block-ok", "block block-tool block-error", "block block-thinking", "block block-tool block-read block-pending"]);
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] .diff span')].map(span => span.className)"), ["diff-del", "diff-add", ""]);
  assert.equal(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] pre')].some(pre => pre.textContent === '{oldText}')"), false, "the diff replaces raw edit arguments");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.open)"), [false, true, false, false, false], "only file changes start open");

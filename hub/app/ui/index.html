@@ -100,6 +100,9 @@ window.onTitle = (webview, title) => {
  const line = /^pi-hub-state (\{.*\})$/.exec(title ?? "");
  if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { icon: value.icon || tab.icon, hubName: value.name || tab.hubName, states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0 });
   // This PC's hub holds the attention key setting.
+  // A newer "needs you" than this tab has shown flashes the taskbar; the first title after start only sets the mark.
+  if (tab.peak !== undefined && tab.latest > tab.peak) void invoke("flash").catch(console.error);
+  tab.peak = Math.max(tab.peak ?? 0, tab.latest);
   if (tab.local && typeof value.key === "string" && value.key !== attentionKey) { attentionKey = value.key; void invoke("attention_key", { key: value.key }).catch(error => { notice = "Attention key: " + error; render(); }); }
  } catch { /* half-written title */ } }
  else { tab.states = (title ?? "").startsWith("(!)") ? ["waiting"] : []; tab.attention = tab.states.length; }

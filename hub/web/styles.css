@@ -473,6 +473,10 @@ dialog.annotate { width: min(1400px, 96vw); max-height: 96dvh; padding: 12px 14p
 .message .block-tool { color: var(--ink); background: var(--tool-pending); padding: 4px 8px; }
 .message .block-ok { background: var(--tool-ok); }
 .message .block-error { background: var(--tool-error); }
+/* Collapsed, a finished call tints by kind so file changes stand out: edit/write slight red, reads slight green, the rest plain. */
+.message .block-ok:not([open]) { background: var(--tool-pending); }
+.message .block-ok.block-read:not([open]) { background: var(--tool-ok); }
+.message .block-ok.block-change:not([open]) { background: var(--tool-error); }
 .message .block-error summary { color: var(--error); }
 .message .block-tool b { color: var(--ink); }
 .message .block pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 240px; overflow: auto; margin: 4px 0 2px; padding: 0; color: var(--muted); font-style: normal; }

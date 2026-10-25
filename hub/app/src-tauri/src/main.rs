@@ -223,6 +223,14 @@ fn set_taskbar_icon(window: &tauri::Window, rgba: &[u8], size: u32) -> Result<()
     }
     Ok(())
 }
+/// Something new needs you (a question, a finished run): flash the taskbar button (urgency hint on Linux) until the window
+/// is focused; skipped while it already is.
+#[tauri::command]
+fn flash(app: AppHandle) -> Result<(), String> {
+    let window = app.get_window("main").ok_or("no window")?;
+    if window.is_focused().unwrap_or(false) { return Ok(()); }
+    window.request_user_attention(Some(tauri::UserAttentionType::Informational)).map_err(|e| e.to_string())
+}
 /// The strip draws the icons on a canvas and hands over RGBA pixels; the overlay carries state on pinned buttons (A-02).
 #[tauri::command]
 fn set_icons(app: AppHandle, big: Vec<u8>, big_size: u32, small: Vec<u8>, small_size: u32, overlay: Option<Vec<u8>>) -> Result<(), String> {
@@ -304,7 +312,7 @@ fn main() {
         }).build())
         .manage(Startup { error })
         .manage(Attention(Default::default()))
-        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned, attention_key, attend])
+        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned, attention_key, attend, flash])
         .setup(move |app| {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());

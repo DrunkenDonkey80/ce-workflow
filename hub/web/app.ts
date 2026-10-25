@@ -661,7 +661,7 @@ function renderBlocks(box: HTMLElement, row) {
   if (change) run = null;
   const item = document.createElement("details"), summary = document.createElement("summary"), key = block.id ?? "thinking_" + index;
   // Pi's tool colours: grey while running, green when done, red on error.
-  item.dataset.key = key; item.open = opened.has(key) || (!known.has(key) && change && chatView() === "expanded"); item.className = "block block-" + block.type + (change ? " block-change" : "") + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
+  item.dataset.key = key; item.open = opened.has(key) || (!known.has(key) && change && chatView() === "expanded"); item.className = "block block-" + block.type + (change ? " block-change" : block.type === "tool" && /^read/.test(block.name) ? " block-read" : "") + (block.type === "tool" ? block.error ? " block-error" : block.result === undefined ? " block-pending" : " block-ok" : "");
   if (block.type === "thinking") summary.textContent = "Thinking";
   else summary.append(Object.assign(document.createElement("b"), { textContent: block.name }), block.title.slice(block.name.length) + (block.result === undefined ? (row.streaming ? "" : " \u2026") : block.error ? " \u2715" : ""));
   item.append(summary);
