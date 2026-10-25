@@ -2,6 +2,19 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- Hub sidebar: drag a session row (mouse) to reorder the sessions inside its folder; the order is kept on the hub.
+
+### Fixed
+- Desktop app (Windows): Alt+1…9 no longer stops working after switching tabs; the shortcuts are dropped only when another app is in front.
+
+## Unreleased
+
+### Fixed
+- The WSL hub can reuse Windows Tailscale for private remote access without installing a second Tailscale client.
+
 ## 0.1.77 — 2026-10-24
 
 ### Fixed

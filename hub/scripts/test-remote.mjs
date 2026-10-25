@@ -11,7 +11,13 @@ import { fileURLToPath } from "node:url";
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-remote-"));
 process.env.PI_CODING_AGENT_DIR = root;
 const { startHub } = await import("../src/hub.ts");
-const { createDeviceRegistry } = await import("../src/remote.ts");
+const { createDeviceRegistry, tailscaleCommand } = await import("../src/remote.ts");
+const windowsTailscale = "/mnt/c/Program Files/Tailscale/tailscale.exe";
+assert.equal(tailscaleCommand("linux", true, candidate => candidate === windowsTailscale), windowsTailscale, "WSL reuses Windows Tailscale without depending on PATH");
+assert.equal(tailscaleCommand("linux", true, () => false), "tailscale", "WSL without Windows Tailscale keeps the native command");
+assert.equal(tailscaleCommand("linux", false, () => true), "tailscale", "plain Linux never uses Windows Tailscale");
+assert.equal(tailscaleCommand("win32", false, () => true), path.join(process.env.ProgramFiles || "C:\\Program Files", "Tailscale", "tailscale.exe"), "Windows keeps its standard location");
+assert.equal(tailscaleCommand("darwin", false, () => true), "/Applications/Tailscale.app/Contents/MacOS/Tailscale", "macOS keeps its standard location");
 const folder = path.join(root, "proj");
 fs.mkdirSync(folder);
 // H6-02: a phone paired with ce-workflow's /wo share, plus one expired device that is not carried over.

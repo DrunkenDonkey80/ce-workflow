@@ -54,6 +54,11 @@ try {
 	folders.arrange({ order: [c, a] }); folders.arrange({ archive: b });
 	assert.deepEqual(new Registry(path.join(root, "folders")).groups().map(g => [g.label, g.archived]), [["gamma", false], ["alpha", false], ["beta", true]]);
 	assert.throws(() => folders.arrange({ archive: path.join(root, "nope") }), /Unknown folder/);
+	// Sessions inside a folder: dragged order first, the rest by name.
+	const [one, two] = folders.groups().find(g => g.label === "beta").sessions;
+	folders.arrange({ sessions: [two.id] });
+	assert.deepEqual(new Registry(path.join(root, "folders")).groups().find(g => g.label === "beta").sessions.map(s => s.id), [two.id, one.id]);
+	assert.throws(() => folders.arrange({ sessions: ["nope"] }), /Unknown session/);
 	console.log("registry ok");
 } finally {
 	fs.rmSync(root, { recursive: true, force: true });

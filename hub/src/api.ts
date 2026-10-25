@@ -182,7 +182,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** The first free number in a folder group: sessions are named 1, 2, 3… unless renamed. */
 	const nextName = (folder: string) => nextFreeName(registry, folder);
 	async function session(data: Record<string, unknown>) {
-		only(data, ["target", "action", "id", "name", "folder", "file", "create", "timer", "folders"], "Invalid session fields.");
+		only(data, ["target", "action", "id", "name", "folder", "file", "create", "timer", "folders", "sessions"], "Invalid session fields.");
 		const id = typeof data.id === "string" ? data.id : "", name = typeof data.name === "string" ? data.name.trim() : "";
 		const known = () => { if (!registry.get(id)) throw fail(404, "Unknown session."); return id; };
 		switch (data.action) {
@@ -214,8 +214,10 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return { ok: scheduler.cancel(String(data.timer)) };
 			// Sidebar folders: dragged order, archive/unarchive, open in the PC's file manager (a group's folder only).
 			case "order":
-				if (!Array.isArray(data.folders) || data.folders.length > 500 || !data.folders.every(folder => typeof folder === "string")) throw fail(400, "Folders must be a list of paths.");
-				registry.arrange({ order: data.folders as string[] }); return { ok: true };
+				// folders: the folder order; sessions: session ids in their new order inside one folder.
+				for (const list of [data.folders, data.sessions]) if (list !== undefined && (!Array.isArray(list) || list.length > 500 || !list.every(item => typeof item === "string"))) throw fail(400, "Order must be a list of strings.");
+				try { registry.arrange({ order: data.folders as string[] | undefined, sessions: data.sessions as string[] | undefined }); } catch (error) { throw fail(404, (error as Error).message); }
+				return { ok: true };
 			case "archive": case "unarchive": case "open-folder": {
 				const group = registry.groups().find(item => typeof data.folder === "string" && item.folder.toLowerCase() === path.resolve(data.folder).toLowerCase());
 				if (!group) throw fail(404, "Unknown folder.");

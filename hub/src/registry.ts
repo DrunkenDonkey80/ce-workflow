@@ -18,6 +18,8 @@ export type SessionRecord = {
 	/** S-10: the model and thinking level Pi last reported (or read from the file), shown while parked. */
 	model?: { provider: string; id: string; name: string } | null;
 	thinking?: string;
+	/** Place in its folder, set by dragging; unplaced sessions follow by name. */
+	order?: number;
 	/** S-11: picked while parked; Pi gets them on resume, before any message. */
 	pending?: { model?: { provider: string; id: string; name: string }; thinking?: string };
 	/** The session modes (research, night, bias) ce-workflow last published, shown while parked. */
@@ -65,7 +67,9 @@ export class Registry {
 
 	private save() { writeJsonAtomic(this.file, { version: 1, sessions: this.records, folders: this.folders }); }
 	/** Folder keys of every group, a new order (unknown or missing folders keep their place after it), or archive flags. */
-	arrange(change: { order?: string[]; archive?: string; unarchive?: string }) {
+	arrange(change: { order?: string[]; sessions?: string[]; archive?: string; unarchive?: string }) {
+		if (change.sessions?.some(id => !this.records.some(r => r.id === id))) throw new Error("Unknown session.");
+		change.sessions?.forEach((id, at) => { this.records.find(r => r.id === id)!.order = at; });
 		const known = new Set(this.records.map(r => r.folder.toLowerCase())), key = (folder: string) => path.resolve(folder).toLowerCase();
 		for (const folder of [change.archive, change.unarchive]) if (folder !== undefined && !known.has(key(folder))) throw new Error("Unknown folder.");
 		if (change.order) this.folders.order = [...new Set(change.order.map(key).filter(folder => known.has(folder)))];
@@ -112,7 +116,7 @@ export class Registry {
 			map.set(key, [...(map.get(key) ?? []), structuredClone(record)]);
 		}
 		return [...map.values()]
-			.map(sessions => ({ folder: sessions[0].folder, label: path.basename(sessions[0].folder) || sessions[0].folder, archived: this.folders.archived.includes(sessions[0].folder.toLowerCase()), sessions: sessions.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })) }))
+			.map(sessions => ({ folder: sessions[0].folder, label: path.basename(sessions[0].folder) || sessions[0].folder, archived: this.folders.archived.includes(sessions[0].folder.toLowerCase()), sessions: sessions.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.name.localeCompare(b.name, undefined, { numeric: true })) }))
 			.sort((a, b) => rank(a.folder) - rank(b.folder) || a.label.localeCompare(b.label));
 	}
 }

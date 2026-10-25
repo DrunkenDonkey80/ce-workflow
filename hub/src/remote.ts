@@ -6,6 +6,7 @@ import { execFile } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pidAlive } from "./session-lock.ts";
+import { isWsl } from "./platform.ts";
 
 export type Exec = (command: string, args: string[], options?: { timeout?: number }) => Promise<{ stdout: string; stderr: string; code: number; killed: boolean }>;
 export const exec: Exec = (command, args, options = {}) => new Promise(resolve => {
@@ -14,9 +15,14 @@ export const exec: Exec = (command, args, options = {}) => new Promise(resolve =
 });
 
 export type Tailnet = { host?: string; login?: string; missing: string[] };
-// The Windows and macOS installers often leave tailscale off PATH; use their standard location when it exists.
-const installed = process.platform === "win32" ? path.join(process.env.ProgramFiles || "C:\\Program Files", "Tailscale", "tailscale.exe") : process.platform === "darwin" ? "/Applications/Tailscale.app/Contents/MacOS/Tailscale" : "";
-export const tailscaleCommand = () => installed && existsSync(installed) ? installed : "tailscale";
+// WSL can share Windows Tailscale through localhost forwarding; it needs no second daemon.
+export function tailscaleCommand(platform = process.platform, wsl = isWsl(), exists = existsSync) {
+	const installed = platform === "win32" ? path.join(process.env.ProgramFiles || "C:\\Program Files", "Tailscale", "tailscale.exe")
+		: platform === "darwin" ? "/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+		// shortcut: WSL uses the standard Windows install and C: mount; extend discovery if custom locations are needed.
+		: platform === "linux" && wsl ? "/mnt/c/Program Files/Tailscale/tailscale.exe" : "";
+	return installed && exists(installed) ? installed : "tailscale";
+}
 /** The tailnet host and owner login, or the setup steps still missing. */
 export async function tailscaleStatus(run: Exec): Promise<Tailnet> {
 	let status;

@@ -171,10 +171,9 @@ async fn open(app: AppHandle, id: u32, url: String) -> Result<(), String> {
 fn show(app: AppHandle, id: u32) {
     let label = format!("hub{id}");
     if let Some(window) = app.get_window("main") {
-        for webview in window.webviews() {
-            if webview.label() == "strip" { continue }
-            let _ = if webview.label() == label { webview.show().and_then(|_| webview.set_focus()) } else { webview.hide() };
-        }
+        // Hide the others first: hiding the focused one after focusing the new tab would leave no webview focused.
+        for webview in window.webviews() { if webview.label() != "strip" && webview.label() != label { let _ = webview.hide(); } }
+        if let Some(webview) = window.webviews().into_iter().find(|w| w.label() == label) { let _ = webview.show().and_then(|_| webview.set_focus()); }
     }
 }
 #[tauri::command]
@@ -232,6 +231,19 @@ fn restart(app: &AppHandle) {
     if std::process::Command::new(main_file()).args(args).arg("--restarted").spawn().is_ok() { app.exit(0) }
 }
 
+/// True while one of our windows is the foreground window; true off Windows, where blur events are reliable.
+fn app_in_front() -> bool {
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(GetForegroundWindow(), &mut pid);
+        return pid == std::process::id();
+    }
+    #[allow(unreachable_code)]
+    true
+}
+
 /// Pinned buttons keep a fixed icon, so only they get the overlay badge. Windows has no API for "is pinned"; a pin made
 /// from our window stores our app ID (UTF-16) in a shortcut under User Pinned\TaskBar. A pin of the old shortcut won't match it.
 #[tauri::command]
@@ -259,6 +271,8 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| bring_forward(app)))
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, shortcut, event| {
             if event.state != ShortcutState::Pressed { return }
+            // A blur Tauri never reported can leave them registered while another app is in front: drop them there.
+            if !app_in_front() { let _ = app.global_shortcut().unregister_all(); return }
             let (key, first) = (shortcut.key as u32, tauri_plugin_global_shortcut::Code::Digit1 as u32);
             if key >= first && key < first + 9 { strip_eval(app, format!("window.shortcut && shortcut({})", key - first)); }
         }).build())
@@ -285,7 +299,9 @@ fn main() {
                 // D3: Alt+1..9 (Ctrl+1..9 belongs to the hub page's bookmarks) only while the app has focus; the strip ignores numbers past its last tab.
                 WindowEvent::Focused(focused) => {
                     let shortcuts = handle.global_shortcut();
-                    if *focused { for i in 1..=9 { let _ = shortcuts.register(format!("alt+{i}").as_str()); } } else { let _ = shortcuts.unregister_all(); }
+                    // Hiding the focused tab webview on a tab switch also reports a blur (Tauri synthesizes window focus from
+                    // the webviews), so only another app in front drops them.
+                    if *focused { for i in 1..=9 { let _ = shortcuts.register(format!("alt+{i}").as_str()); } } else if !cfg!(windows) || !app_in_front() { let _ = shortcuts.unregister_all(); }
                 }
                 _ => {}
             });
