@@ -1336,7 +1336,8 @@ const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Objec
 function renderIcon() {
  const states = [...sessionStates];
  if (promptView.busy || state.activity.dialog) states.push("waiting");
- if (state.activity.working || state.activity.subagents?.length) states.push("working");
+ // A question replaces this session's working tone: one session asking is red only, not red and orange.
+ else if (state.activity.working || state.activity.subagents?.length) states.push("working");
  // An installed app's taskbar/dock icon is fixed at install; its badge is the only live part (Chromium, Safari): a mark while
  // count of what needs you (questions, finished sessions you haven't opened); colours are impossible there. Working has no badge.
  if (inApp()) {

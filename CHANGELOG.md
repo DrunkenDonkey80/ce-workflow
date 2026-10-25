@@ -7,6 +7,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## 0.1.79 — 2026-10-25
 
 ### Changed
+- Tab and taskbar icon: a session asking a question shows red only; orange appears with it only when another session is working.
 - Usage window: refill marks close together (e.g. 75% and 65%) put their labels on separate lines instead of printing over each other; the bar grows to fit.
 - Settings → Remote access: Copy is a small button on the right of the address.
 - The sidebar updates as soon as another session starts, finishes, asks a question or parks, even in a background tab, instead of on the next poll (up to 15 s, longer when the browser slows hidden tabs). A finish no longer seems to happen just when you click the session.
