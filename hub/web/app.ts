@@ -1020,27 +1020,41 @@ async function attach(file: File, input: HTMLTextAreaElement) {
 }
 // Typing "/name" or "/wo sub" lists matching commands; arrows move, Tab/Enter picks, Escape closes.
 type SlashItem = { value: string; description: string };
+let slashAt = -1; // where an @session word starts, -1 for a /command
+// Typing "@" and part of folder/name (or the intercom id) lists the other hub sessions; picking one writes its intercom reference.
 let slashCommands: Promise<{ pi: { name: string; description: string }[]; wo: SlashItem[]; args?: Record<string, SlashItem[]> }> | undefined, slashPick = 0;
 async function updateSlash() {
  const input = $("message-input") as HTMLTextAreaElement, menu = $("slash-menu"), value = input.value;
  const match = input.selectionStart === value.length ? /^\/(?:([\w-]+) (\S*(?: \S*)?)|(\S*))$/.exec(value) : null;
+ const caret = input.selectionStart, word = match ? null : /(?:^|\s)@([^\s@]*)$/.exec(value.slice(0, caret));
+ if (word && lastSessions) {
+  const query = word[1].toLowerCase(); slashAt = caret - word[1].length - 1;
+  return showSlash(lastSessions[0].flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => [sessionRef(group.folder, session).replace(/ \(.*/, ""), session.pi ? "intercom " + session.pi : "no intercom id yet", sessionRef(group.folder, session)]))
+   .filter(row => row[2].toLowerCase().includes(query)).slice(0, 12));
+ }
+ slashAt = -1;
  if (!match) { menu.hidden = true; return; }
  slashCommands ??= get("commands").catch(error => { slashCommands = undefined; throw error; });
  let list; try { list = await slashCommands; } catch { menu.hidden = true; return; }
  if (input.value !== value) return;
  const rows = match[1] ? (list.args?.[match[1]] ?? []).filter(item => item.value.startsWith(match[2]) && item.value !== match[2]).map(item => [`/${match[1]} ${item.value}`, item.description])
   : list.pi.filter(item => item.name.startsWith(match[3])).map(item => ["/" + item.name, item.description]);
+ showSlash(rows);
+}
+function showSlash(rows: string[][]) {
+ const menu = $("slash-menu");
  slashPick = Math.min(slashPick, Math.max(0, rows.length - 1));
- menu.replaceChildren(...rows.map(([command, description], index) => {
-  const option = document.createElement("div"); option.className = "slash-option"; option.setAttribute("role", "option"); option.dataset.command = command; option.setAttribute("aria-selected", String(index === slashPick));
+ menu.replaceChildren(...rows.map(([command, description, insert = command], index) => {
+  const option = document.createElement("div"); option.className = "slash-option"; option.setAttribute("role", "option"); option.dataset.command = insert; option.setAttribute("aria-selected", String(index === slashPick));
   option.append(Object.assign(document.createElement("strong"), { textContent: command }), Object.assign(document.createElement("small"), { textContent: description }));
-  option.addEventListener("mousedown", event => { event.preventDefault(); pickSlash(command); });
+  option.addEventListener("mousedown", event => { event.preventDefault(); pickSlash(insert); });
   return option;
  }));
  menu.hidden = !rows.length;
 }
 function pickSlash(command: string) {
- const input = $("message-input") as HTMLTextAreaElement; input.value = command + " "; input.focus(); input.setSelectionRange(input.value.length, input.value.length);
+ const input = $("message-input") as HTMLTextAreaElement, caret = input.selectionStart, head = slashAt >= 0 ? input.value.slice(0, slashAt) + command + " " : command + " ";
+ input.value = head + (slashAt >= 0 ? input.value.slice(caret) : ""); input.focus(); input.setSelectionRange(head.length, head.length);
  slashPick = 0; $("slash-menu").hidden = true; renderMentions(); void updateSlash(); // "/plan3 " opens its arguments
 }
 $("message-input").addEventListener("input", () => { slashPick = 0; void updateSlash(); });
@@ -1257,7 +1271,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number };
+type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number; pi?: string };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1620,6 +1634,7 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
  sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path))] : [
   item("Rename…", () => { const name = prompt("New name:", session.name); if (name?.trim()) void sessionAction({ action: "rename", id: session.id, name }); }),
   item("Copy folder path", () => void copyPath(path)),
+  item("Copy intercom id", () => void copyPath(sessionRef(path, session))),
   ...(session.timers ?? []).map(t => item(`Cancel ⏰ ${t.kind}: ${t.label.slice(0, 40)}`, () => void sessionAction({ action: "cancel-timer", id: session.id, timer: t.id }))),
   item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
@@ -1635,6 +1650,8 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
 }
 document.addEventListener("pointerdown", event => { if (!sessionMenu.contains(event.target as Node)) sessionMenu.hidden = true; });
 // The clipboard needs a secure page (localhost or the tailnet https link); otherwise show the path to copy by hand.
+// How another session reaches this one: folder/name for people, the intercom short id for the agent.
+const sessionRef = (folder: string, session: HubSession) => (folder.split(/[\\/]/).filter(Boolean).pop() ?? folder) + "/" + session.name + (session.pi ? " (intercom " + session.pi + ")" : "");
 async function copyPath(path: string) {
  try { await navigator.clipboard.writeText(path); showNotice(`Copied ${path}`); } catch { prompt("Path:", path); }
 }

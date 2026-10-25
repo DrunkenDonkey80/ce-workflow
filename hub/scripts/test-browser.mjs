@@ -753,6 +753,10 @@ try {
  const tones = "[...document.querySelectorAll('.session:not(.recent)')].map(s => s.querySelector('.session-letter').textContent + ':' + s.dataset.tone).join()";
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:working"`);
  assert.equal(await evaluate("document.querySelector('.session-group-label').textContent"), "ce-workflow (3)");
+ // @ lists the other sessions by folder/name; picking one writes its reference in place of the word.
+ await browser("fill", "#message-input", "ask @CE-workflow/2"); await browser("wait", "#slash-menu:not([hidden])");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#slash-menu .slash-option')].map(o => o.dataset.command)"), ["ce-workflow/2"], "this session is not listed");
+ await browser("press", "Enter"); assert.equal(await evaluate("document.getElementById('message-input').value"), "ask ce-workflow/2 "); await browser("fill", "#message-input", "");
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page]').closest('.session-folder').dataset.tone"), "working", "the open session's folder is boxed; working (orange) beats current (blue)");
  assert.equal(await evaluate("document.querySelector('.session[aria-current=page] .session-link').getAttribute('aria-label')"), "1 in ce-workflow, idle, this session");
  assert(await evaluate("document.getElementById('switcher').getBoundingClientRect().width === 200 && document.querySelector('.session-label').getBoundingClientRect().width > 4 && document.querySelector('.session-label').textContent === '1'"), "open by default with the session name");
