@@ -2,19 +2,21 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.78 — 2026-10-25
 
 ### Added
 - Hub sidebar: drag a session row (mouse) to reorder the sessions inside its folder; the order is kept on the hub.
 - Desktop app: an attention hotkey (default Ctrl+Shift+A, works from any app) brings Pi Hub to the front on the newest session that asks a question or finished; looking at it takes it off the list, so the next press goes to the one before. Change or turn it off under Attention key in hub settings (shown in the app).
 - Hub model menu: right-click a model to set it as the work model (Plan3 coding) or add it to / remove it from the think models (Plan models, high effort), next to Set as default; one model can hold every role. The list marks them 👑 default, 🔨 work, 💭 think.
-- Phone: the usage window fills the screen; each account shows its e-mail on its own line and the 5h and 7d bars one under the other (nothing cut off on the right), and the picked account's buttons stay docked at the bottom in two neat rows.
-- Sessions: every switch (sidebar click, group click, Alt+↑/↓, new session, a notification) opens the session with the chat box focused, ready to type; an open question keeps its own focus. Phones are exempt, so the keyboard does not pop up.
 - Sessions: right-click → Copy intercom id copies e.g. `ce-workflow/1 (intercom 01a1543e)`, so another session can message it. In the chat, type @ and part of a folder/name (`@1`, `@lib`) to pick another session from a list (arrows, Enter/Tab) and write that reference.
 - Model menu: the list still sets this chat's model; below it a Roles summary (👑 default, 🔨 work, 💭 think models) with each role's model and effort. A role row opens that role's list: pick the model (several think models), set its own effort on the picked row (work can keep the session's effort, or not switch model at all); ← or Escape goes back. Show all models lists the ones outside Pi's scoped set.
 - Chat: a collapsed finished tool call is tinted by kind, file edits/writes slight red, reads slight green, the rest plain.
 - Desktop app: the taskbar button flashes when something new needs you (a question, a finished run) while the window is not focused.
 - Desktop app: with 3 or 4 hubs the taskbar icon is coloured dots only, one column per hub in tab order (rows: question, working, finished).
+
+### Changed
+- Phone: the usage window fills the screen; each account shows its e-mail on its own line and the 5h and 7d bars one under the other (nothing cut off on the right), and the picked account's buttons stay docked at the bottom in two neat rows.
+- Sessions: every switch (sidebar click, group click, Alt+↑/↓, new session, a notification) opens the session with the chat box focused, ready to type; an open question keeps its own focus. Phones are exempt, so the keyboard does not pop up.
 - Picking a session with the attention key, Alt+1…9 or the sidebar filter puts the cursor in the chat box, unless a question is open.
 
 ### Fixed
