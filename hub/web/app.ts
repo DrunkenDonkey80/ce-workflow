@@ -1489,7 +1489,8 @@ filterInput.addEventListener("keydown", event => {
  }
  // Enter opens the pick and clears the filter, so the sidebar shows every folder again.
  if (event.key === "Enter" && filterPick) { event.preventDefault(); const pick = filterPick; filterInput.value = ""; filterPick = ""; rerenderSessions(); if (pick !== sessionId) jumpTo(pick); else focusChat(); }
- if (event.key === "Escape" && filterInput.value) { event.preventDefault(); event.stopPropagation(); filterInput.value = ""; filterPick = ""; rerenderSessions(); }
+ // Escape clears the filter; on an empty one it goes back to the chat box.
+ if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); if (!filterInput.value) return focusChat(); filterInput.value = ""; filterPick = ""; rerenderSessions(); }
 });
 // Mouse drag of a folder (by its name row) or of a session row inside its folder: a line shows where it lands;
 // drop(onto, after) saves the order on the hub.

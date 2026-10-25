@@ -6,7 +6,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - New folder opens a proper dialog instead of the browser prompt, with a Local button that starts a session in ~/pi-local (made on first use) for machine requests like installing or checking something that belong to no project. The path box also accepts ~ for your home folder.
-- Escape in an empty sidebar filter box no longer folds the session list away (with text in it, Escape still just clears it).
+- Escape in an empty sidebar filter box puts the cursor back in the chat box instead of folding the session list away (with text in it, Escape still just clears it).
 - Devices moved out of the sidebar into Settings → Remote access, next to Copy.
 
 ## 0.1.80 — 2026-10-25

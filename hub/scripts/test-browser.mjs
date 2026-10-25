@@ -790,9 +790,9 @@ try {
  // Sidebar filter: Enter on this session clears the filter and puts the cursor in the chat box.
  await browser("fill", "#session-filter", "1"); await browser("press", "Enter");
  assert.deepEqual(await evaluate("[document.getElementById('session-filter').value, document.activeElement.id]"), ["", "message-input"], "filter cleared, chat focused");
- // Escape in the filter box clears it but never folds the session list away.
+ // Escape in an empty filter box goes back to the chat; it never folds the session list away.
  await evaluate("(() => { const box = document.getElementById('session-filter'); box.focus(); box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); })()");
- assert.equal(await evaluate("document.getElementById('switcher').dataset.open"), "true", "Escape in the filter keeps the sessions open");
+ assert.deepEqual(await evaluate("[document.getElementById('switcher').dataset.open, document.activeElement.id]"), ["true", "message-input"], "Escape in an empty filter keeps the sessions open and goes back to the chat box");
  // A sidebar click marks the next page to start with the chat box focused (navigation blocked here).
  assert.equal(await evaluate("(() => { const stop = event => event.preventDefault(); window.addEventListener('click', stop, true); document.querySelector('.session-link').click(); window.removeEventListener('click', stop, true); const set = sessionStorage.getItem('focus-chat'); sessionStorage.removeItem('focus-chat'); return set; })()"), "1");
  // New folder opens a dialog whose Local button starts a session in ~/pi-local, creating it without asking (request stubbed: no real home folder).
