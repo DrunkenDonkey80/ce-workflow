@@ -1706,7 +1706,8 @@ window.addEventListener("keydown", event => {
 // Desktop session bar: open by default; collapsing to the letter stripe is remembered.
 function toggleSwitcher(open: boolean) { localStorage.setItem("plan3-switcher", open ? "open" : "closed"); document.body.classList.toggle("switcher-open", open); $("switcher").dataset.open = String(open); $("switcher-toggle").setAttribute("aria-expanded", String(open)); $("switcher-toggle").setAttribute("aria-label", open ? "Hide shared sessions" : "Show shared sessions"); }
 $("switcher-toggle").addEventListener("click", () => toggleSwitcher($("switcher").dataset.open !== "true"));
-$("switcher").addEventListener("keydown", event => { if (event.key === "Escape" && $("switcher").dataset.open === "true") { event.stopPropagation(); toggleSwitcher(false); $("switcher-toggle").focus(); } });
+// Not from the filter box: Escape there only clears it, and an extra press must not fold the list away.
+$("switcher").addEventListener("keydown", event => { if (event.key === "Escape" && $("switcher").dataset.open === "true" && event.target !== $("session-filter")) { event.stopPropagation(); toggleSwitcher(false); $("switcher-toggle").focus(); } });
 toggleSwitcher(localStorage.getItem("plan3-switcher") !== "closed");
 document.addEventListener("visibilitychange", () => void loadSessions());
 window.addEventListener("focus", () => void loadSessions()); // clears this session's blue once you look at it
