@@ -8,6 +8,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Hub sidebar: drag a session row (mouse) to reorder the sessions inside its folder; the order is kept on the hub.
 - Desktop app: an attention hotkey (default Ctrl+Shift+A, works from any app) brings Pi Hub to the front on the newest session that asks a question or finished; looking at it takes it off the list, so the next press goes to the one before. Change or turn it off under Attention key in hub settings (shown in the app).
 - Hub model menu: right-click a model to set it as the work model (Plan3 coding) or add it to / remove it from the think models (Plan models, high effort), next to Set as default; one model can hold every role. The list marks them 👑 default, 🔨 work, 💭 think.
+- Desktop app: with 3 or 4 hubs the taskbar icon is coloured dots only, one column per hub in tab order (rows: question, working, finished).
 - Picking a session with the attention key, Alt+1…9 or the sidebar filter puts the cursor in the chat box, unless a question is open.
 
 ### Fixed

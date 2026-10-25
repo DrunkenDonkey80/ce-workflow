@@ -57,11 +57,11 @@ export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
   const dots = Object.keys(DOTS).filter(state => hub.states.includes(state)).map(state => `<circle cx="${slot[state][0]}" cy="${slot[state][1]}" r="3.4" fill="${DOTS[state]}" stroke="#fff" stroke-width="0.6"/>`).join("");
   return `<g transform="translate(${x} 8) scale(0.5)">${glyph(hub.icon)}</g>${dots}`;
  }).join("") + "</svg>";
- // Three or four: icons are mush at 24 px, so a matrix of dots only: one row per hub (tab order), one column per state
- // (waiting, working, unseen); a faint ring marks an off state so each row stays visible.
- const row = 32 / hubs.length, r = Math.min(4.6, row / 2 - 0.6);
+ // Three or four: icons are mush at 24 px, so a matrix of dots only: one column per hub (left to right like the tabs),
+ // one row per state (waiting, working, unseen); a faint ring marks an off state so each column stays visible.
+ const column = 32 / hubs.length, r = Math.min(4.6, column / 2 - 0.6);
  return SVG_HEAD + hubs.map((hub, i) => ["waiting", "working", "unseen"].map((state, j) => {
-  const at = `cx="${5.5 + j * 10.5}" cy="${(row * i + row / 2).toFixed(2)}"`;
+  const at = `cx="${(column * i + column / 2).toFixed(2)}" cy="${5.5 + j * 10.5}"`;
   return hub.states.includes(state) ? `<circle ${at} r="${r.toFixed(2)}" fill="${DOTS[state]}"/>` : `<circle ${at} r="${(r - 0.5).toFixed(2)}" fill="none" stroke="${ICON_INK}" stroke-opacity=".35"/>`;
  }).join("")).join("") + "</svg>";
 }
