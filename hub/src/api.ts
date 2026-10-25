@@ -185,7 +185,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// The intercom short id: the first 8 characters of the Pi session id, which Pi puts at the end of the file name.
 	const intercomId = (file?: string) => /_([0-9a-f]{8})[0-9a-f-]{28}\.jsonl$/i.exec(file ?? "")?.[1];
 	async function sessions() {
-		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), attention: attentionAt(record.id, tone(record.id)), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile), pi: intercomId(record.sessionFile) })) })));
+		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), attention: attentionAt(record.id, tone(record.id)), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile), pi: intercomId(record.sessionFile), quiet: host.live.get(record.id)?.intercomRun || undefined })) })));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents, settings: settings() };
 	}
@@ -412,7 +412,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// Live frames ce-workflow's own server sent: status after runs and mode changes, Pi's plan, changed diagrams.
 	host.on("event", (id: string, event: RpcRecord) => {
 		if (event.type !== "agent_settled") return;
-		unseen.add(id); // an open page in a background tab, a minimized app or another device has not shown it to anyone
+		if (!host.live.get(id)?.intercomRun) unseen.add(id); // sessions chatting over intercom don't mark themselves ready; an open page in a background tab, a minimized app or another device has not shown it to anyone
 		if (views.has(id)) void publishStatus(id).catch(() => {});
 	});
 	host.on("switched", (id: string) => { views.get(id)?.close(); views.delete(id); }); // the pages reconnect to the new session's chat

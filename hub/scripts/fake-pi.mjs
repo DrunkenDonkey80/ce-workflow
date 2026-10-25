@@ -103,7 +103,8 @@ async function handle(cmd) {
 			streaming = true;
 			out({ type: "agent_start" });
 			if (cmd.message === "hold") return; // stays working until abort
-			const user = { role: "user", content: [{ type: "text", text: cmd.message }], timestamp: Date.now() };
+			// `intercom`: the run starts from another session's message, as pi-intercom wakes an idle session.
+			const user = cmd.message === "intercom" ? { role: "custom", customType: "intercom_message", content: "**From other**", display: true, timestamp: Date.now() } : { role: "user", content: [{ type: "text", text: cmd.message }], timestamp: Date.now() };
 			out({ type: "message_start", message: user });
 			out({ type: "message_end", message: user });
 			save(user);

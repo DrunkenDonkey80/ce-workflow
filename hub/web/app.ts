@@ -1272,7 +1272,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number; pi?: string };
+type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1375,7 +1375,8 @@ async function loadSessions() {
   // Looking at it also drops it from the attention key's list.
   const own = groups.flatMap(group => group.sessions).find(session => session.id === sessionId);
   if (visible && document.hasFocus() && own && (own.tone === "unseen" || own.attention)) { void post("seen", {}).catch(() => {}); delete own.attention; }
-  attentionList = groups.flatMap(group => group.sessions).filter(session => session.attention).sort((a, b) => b.attention! - a.attention!);
+  // Questions first, then the newest: a question blocks work, a finished run can wait.
+  attentionList = groups.flatMap(group => group.sessions).filter(session => session.attention).sort((a, b) => Number(b.tone === "waiting") - Number(a.tone === "waiting") || b.attention! - a.attention!);
   $("attention-field").hidden = !inApp(); ($("attention-key") as HTMLInputElement).value = hubSettings.attentionKey ?? "";
   ownTone = groups.flatMap(group => group.sessions).find(session => session.id === sessionId)?.tone ?? "";
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
@@ -2070,7 +2071,7 @@ function notifyChanges(groups: Group[]) {
   const was = before.get(session.id), now = session.tone;
   if (was === now || (session.id === sessionId && document.visibilityState === "visible")) continue;
   // shortcut: one 5 s (15 s in the background) poll decides "finished"; a gap between chained turns can announce early.
-  const kind = now === "waiting" && notify.question ? "asks a question" : was === "working" && ["seen", "unseen", "scheduled"].includes(now) && notify.done ? "finished" : "";
+  const kind = now === "waiting" && notify.question ? "asks a question" : was === "working" && ["seen", "unseen", "scheduled"].includes(now) && notify.done && !session.quiet ? "finished" : "";
   if (!kind) continue;
   try {
    const note = new Notification(`${group.label} - ${session.name} ${kind}`, { tag: `${session.id}:${now}` });

@@ -34,6 +34,8 @@ export type Live = {
 	published: Record<string, unknown>;
 	hubCommand?: boolean; // ce-workflow's /pi-hub is registered (checked once per child) // latest `pi-hub:<kind>` update per kind (ce-workflow H3-04: state = plan, modes, compacting, subagents)
 	viewers: number;
+	/** The current or last run was started by another session's intercom message, with no prompt from you in it. */
+	intercomRun?: boolean;
 	lastActivity: number;
 	stopping: boolean;
 	/** S-15: settles when Pi has started (and parked changes are applied); every delivery awaits it. */
@@ -77,7 +79,12 @@ export class SessionHost extends EventEmitter {
 		const live: Live = { id: record.id, rpc, running: false, settles: 0, compacting: false, command: 0, dialogs: new Map(), busyExtra: new Set(), published: {}, viewers: this.options.viewers?.(record.id) ?? 0, lastActivity: Date.now(), stopping: false, ready: Promise.resolve() };
 		rpc.on("event", (event: RpcRecord) => {
 			live.lastActivity = Date.now();
-			if (event.type === "agent_start") { live.running = true; void this.remember(live); } // follows a session switch before the run streams far
+			if (event.type === "agent_start") { live.running = true; live.intercomRun = undefined; void this.remember(live); }
+			else if (event.type === "message_start" && (event.message?.role === "user" || event.message?.customType === "intercom_message")) {
+				// pi-intercom wakes an idle session with an intercom_message (or, before Pi 1.2.0, this exact user prompt); any other prompt is yours.
+				const intercom = event.message.role === "custom" || JSON.stringify(event.message.content).includes("New intercom message above.");
+				if (!intercom) live.intercomRun = false; else live.intercomRun ??= true;
+			} // follows a session switch before the run streams far
 			else if (event.type === "agent_settled") { live.running = false; live.settles++; void this.remember(live); } // a run (or Plan3) may switch models
 			else if (event.type === "compaction_start") live.compacting = true;
 			else if (event.type === "compaction_end") { live.compacting = false; live.compactedTokens = event.result?.estimatedTokensAfter; }

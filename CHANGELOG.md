@@ -8,6 +8,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Usage window: refill marks close together (e.g. 75% and 65%) put their labels on separate lines instead of printing over each other; the bar grows to fit.
 - Settings → Remote access: Copy is a small button on the right of the address.
 - The sidebar updates as soon as another session starts, finishes, asks a question or parks, even in a background tab, instead of on the next poll (up to 15 s, longer when the browser slows hidden tabs). A finish no longer seems to happen just when you click the session.
+- The attention key (Ctrl+Shift+A in the app) opens a session asking a question before one that only finished.
+- Sessions talking to each other over intercom no longer show as ready or send "finished" notifications when a run started only by the other session's message ends. A run you prompted still does.
 
 ## 0.1.78 — 2026-10-25
 

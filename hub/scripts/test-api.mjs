@@ -276,6 +276,11 @@ try {
 	assert.equal((await post(id, "seen", {})).status, 200);
 	assert.equal((await tones())["1"], "seen", "a focused page showing it marks it seen");
 	assert.equal(await attention(), undefined, "and drops it from the attention list");
+	// A run another session started over intercom finishes quietly: not unseen, flagged so the page sends no "finished".
+	const settles = hub.host.live.get(id).settles;
+	await hub.host.prompt(id, "intercom"); await until(() => hub.host.live.get(id).settles > settles);
+	const quiet = (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.id === id);
+	assert.deepEqual([quiet.tone, quiet.quiet], ["seen", true], "an intercom-only run stays seen");
 	// S-05: an idle session with a timer is "scheduled"; the row carries the timers; the menu cancels one (own session only).
 	const timer = await (await fetch(`${origin}/api/sessions/${id}/timers`, { method: "POST", headers: { "x-hub-key": localKey, connection: "close", "content-type": "application/json" }, body: JSON.stringify({ kind: "script", command: "exit 0", everyMinutes: 5 }) })).json();
 	const row = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.id === id);
