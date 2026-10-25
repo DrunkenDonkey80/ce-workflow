@@ -11,12 +11,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Fixed
 - Sidebar filter: Enter on a session clears the filter, so every folder shows again.
-- Desktop app (Windows): Alt+1…9 no longer stops working after switching tabs; the shortcuts are dropped only when another app is in front.
-
-## Unreleased
-
-### Fixed
 - The WSL hub can reuse Windows Tailscale for private remote access without installing a second Tailscale client.
+- Desktop app (Windows): Alt+1…9 no longer stops working after switching tabs; the shortcuts are dropped only when another app is in front.
 
 ## 0.1.77 — 2026-10-24
 
