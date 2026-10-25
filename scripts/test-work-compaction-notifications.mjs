@@ -1594,6 +1594,21 @@ try {
 	const coldTurn = await hooks.turn_end(toolTurn, lastAsk(10 * 60_000));
 	assert.match(boundaryWarnings.find(message => /Prompt cache expired/.test(message)) ?? "", /10m of tool work/);
 	assert(coldTurn?.entries?.[0]?.type === "compaction" || boundaryWarnings.at(-1)?.includes("native summary generator is unavailable"), "a cold cache at 65% compacts first");
+	{ // Hub typing wake (/wo compact early): a cold cache compacts now; a message sent meanwhile waits for it, then goes out.
+		let finish; const sent = [];
+		pi.sendUserMessage = message => sent.push(message);
+		const wakeCtx = { ...lastAsk(10 * 60_000), isIdle: () => true, compact: options => { finish = options.onComplete; } };
+		await commands.wo.handler("compact early", wakeCtx);
+		assert(finish, "a cold cache compacts as soon as the hub wakes the session");
+		const info = { ctx: { ...wakeCtx, isIdle: () => false }, text: "hello", handled: false };
+		listeners.get("wo:cold-cache")(info);
+		assert(info.handled && !sent.length, "a message sent during it waits");
+		finish(); await new Promise(resolve => setImmediate(resolve));
+		assert.deepEqual(sent, ["hello"], "and goes out after it");
+		finish = undefined; await commands.wo.handler("compact early", { ...lastAsk(60_000), isIdle: () => true, compact: options => { finish = options.onComplete; } });
+		assert.equal(finish, undefined, "a warm cache does not compact early");
+		delete pi.sendUserMessage;
+	}
 	const nativeDraft = await buildBoundaryCompaction(boundary, nativeCtx, "native-200k", async (...args) => {
 		assert(args[0].some(message => message.content?.some?.(part => part.thinking === "Full retained reasoning")), "native summary gets unstripped reasoning");
 		assert(args[0].some(message => message.role === "toolResult" && message.toolCallId === "old" && message.content[0].text.length > 300_000));

@@ -38,10 +38,11 @@ export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagra
 	if (name === "reload") prepared.message = "/wo reload";
 	const queued = !ctx.isIdle();
 	// Our resend is source "extension", which Pi's input hook skips; work-models compacts a cold cache first and sends after (D1).
-	if (!queued && !command) {
+	// Also while busy: an early compaction (hub typing wake) is busy too, and the message has to wait for it.
+	if (!command) {
 		const cold = { ctx, text: prepared.message, handled: false };
 		pi.events?.emit?.("wo:cold-cache", cold);
-		if (cold.handled) return { ...prepared, queued, compacting: true };
+		if (cold.handled) return { ...prepared, queued: false, compacting: true };
 	}
 	try {
 		// Like Enter in the terminal: a message sent while the agent works steers it (delivered after the current tool calls).

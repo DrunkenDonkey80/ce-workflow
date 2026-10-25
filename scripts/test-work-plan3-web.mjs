@@ -44,8 +44,9 @@ assert.equal(submitted.at(-1).message, "hello");
 	forwardDiagramChat(coldApi, { isIdle: () => true }, contextDiagram, "warm", [], () => {});
 	assert.equal(submitted.at(-1).message, "warm", "a warm cache sends directly");
 	forwardDiagramChat(coldApi, { isIdle: () => false }, contextDiagram, "busy", [], () => {});
+	assert.equal(submitted.at(-1).options.deliverAs, "steer", "a busy send not held by an early compaction steers");
 	forwardDiagramChat(coldApi, { isIdle: () => true }, contextDiagram, "/plan3 review 12345678", [], () => {});
-	assert.deepEqual(asked, ["wo:cold-cache", "wo:cold-cache"], "busy sends and commands never compact");
+	assert.deepEqual(asked, ["wo:cold-cache", "wo:cold-cache", "wo:cold-cache"], "busy sends ask too (an early compaction holds them); commands never do");
 }
 forwardDiagramChat(sendApi, { isIdle: () => false }, contextDiagram, "/plan3 review 12345678", [], () => {});
 assert.equal(submitted.at(-1).message, "/plan3 review 12345678");

@@ -215,10 +215,13 @@ try {
  await browser("fill", "#message-input", "");
  // S-12: the first keystroke in a parked session resumes it once; more typing does not resume again.
  const resumes = []; const resume = hub.host.resume.bind(hub.host); hub.host.resume = async sid => { resumes.push(sid); return resume(sid); };
+ const early = []; const sendPrompt = hub.host.prompt.bind(hub.host); hub.host.prompt = async (sid, text, ...rest) => { if (text.includes("/wo compact early")) early.push(sid); return sendPrompt(sid, text, ...rest); };
  publish("status", { ...status, parked: true }); await browser("wait", "200");
  await browser("type", "#message-input", "he"); for (let i = 0; i < 100 && !resumes.length; i++) await new Promise(r => setTimeout(r, 20));
  await browser("type", "#message-input", "llo"); await new Promise(r => setTimeout(r, 200));
- assert.deepEqual(resumes, [id], "one resume for the first keystrokes");
+ // The second resume is the early-compact message (every message resumes first; a no-op on a live session).
+ assert.deepEqual([resumes, early], [[id, id], [id]], "one resume for the first keystrokes, then the woken session compacts early if it needs to");
+ hub.host.prompt = sendPrompt;
  assert.equal(await evaluate("document.querySelector('#model-button') !== null"), true);
  hub.host.resume = resume; await browser("fill", "#message-input", "");
  await browser("click", "#title"); assert(await evaluate("!document.getElementById('title-menu').hidden && document.getElementById('title-menu').contains(document.getElementById('plan-menu')) && !document.getElementById('plan-menu').hidden && document.getElementById('drawer-sessions').contains(document.getElementById('session-list'))"), "phone: the title opens plans and commands; sessions sit in the drawer");

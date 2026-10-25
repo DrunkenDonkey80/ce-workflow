@@ -2279,7 +2279,12 @@ function applyUpdate(event: MessageEvent, update) {
 }
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
-listen("status", value => { state.status = value; if (!value?.parked) waking = false; renderShell(); });
+listen("status", value => {
+ state.status = value;
+ // Woken by typing: a compaction the message would wait for starts now, while you finish typing (ce-workflow /wo compact early).
+ if (!value?.parked && waking && $("message-input").value.trim()) void post("message", { text: "/wo compact early" }).catch(() => {});
+ if (!value?.parked) waking = false; renderShell();
+});
 listen("sessions", () => void loadSessions()); // another session started, finished, asked or parked
 listen("notice", value => showNotice(value.text)); // e.g. a model picked while parked could not be used (S-11)
 // Plan events always describe Pi's current plan. When Pi switches plans, the page follows it,

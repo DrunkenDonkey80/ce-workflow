@@ -2221,8 +2221,25 @@ function compactColdCache(event, ctx, pi) {
 	return startColdCompact(ctx, pi, event.text, event.images) ? { action: "handled" } : undefined;
 }
 
+// The hub page resumes a parked session when you start typing (/wo compact early): a cold cache would be compacted when the
+// message is sent, so start now and let the message wait for it (startColdCompact).
+let earlyCompact = null;
+function startEarlyCompact(ctx) {
+	if (earlyCompact || ctx.isIdle?.() === false || typeof ctx.compact !== "function") return false;
+	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
+	if (minutes === undefined) return false;
+	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens while you type.`, "info");
+	earlyCompact = new Promise((resolve) => ctx.compact({
+		onComplete: () => resolve(),
+		onError: (error) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); your message goes without it.`, "warning"); resolve(); },
+	})).finally(() => { earlyCompact = null; });
+	return true;
+}
+
 // Starts compaction and sends the message after it; false = send it now. Also used for hub page messages (wo:cold-cache).
 function startColdCompact(ctx, pi, text, images = undefined) {
+	// Pi refuses prompts while compacting: a message sent during an early compaction waits for it.
+	if (earlyCompact && text?.trim() && !text.trim().startsWith("/")) { void earlyCompact.then(() => pi.sendUserMessage(images?.length ? [{ type: "text", text }, ...images] : text)); return true; }
 	if (ctx.isIdle?.() === false || !text?.trim() || text.trim().startsWith("/")) return false;
 	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
 	if (minutes === undefined) return false;
@@ -4010,7 +4027,7 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(action==="reload") { await ctx.waitForIdle(); return ctx.reload(); }
   const utility=WO_UTILITY_ACTIONS[action];
   if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
-  if(action==="compact") return requestMicrocompact(ctx);
+  if(action==="compact") return rest==="early" ? void startEarlyCompact(ctx) : requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
   if(action==="hub") return handleHubCommand(rest,ctx);
   if(action==="review") return pi.events?.emit?.("wo:review",{ctx});
