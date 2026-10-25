@@ -5,7 +5,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Added
-- Sidebar: a Local button next to New folder starts a session in ~/pi-local (made on first use), for machine requests like installing or checking something that belong to no project. New folder also accepts ~ for your home folder.
+- New folder opens a proper dialog instead of the browser prompt, with a Local button that starts a session in ~/pi-local (made on first use) for machine requests like installing or checking something that belong to no project. The path box also accepts ~ for your home folder.
+- Devices moved out of the sidebar into Settings → Remote access, next to Copy.
 
 ## 0.1.80 — 2026-10-25
 

@@ -1445,7 +1445,7 @@ async function showDevices() {
  }) : [html("li", { textContent: "No paired devices." })]));
  const dialog = $("devices") as HTMLDialogElement; if (!dialog.open) dialog.showModal();
 }
-$("devices-button").addEventListener("click", () => void showDevices().catch(error => showNotice("Devices: " + error.message)));
+$("devices-button").addEventListener("click", () => void (closeMenus(), showDevices()).catch(error => showNotice("Devices: " + error.message)));
 $("devices-close").addEventListener("click", () => ($("devices") as HTMLDialogElement).close());
 const words: Record<Tone, string> = { working: "working", waiting: "waiting for an answer", scheduled: "scheduled", unseen: "idle, new activity", seen: "idle", parked: "parked", terminal: "open in a terminal" };
 for (const id of ["env-var", "drawer-env-var"]) $(id).prepend(icon("env"));
@@ -1594,11 +1594,8 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  }));
  // Inside the list, so the phone drawer gets it too.
  const newFolder = html("button", { type: "button", className: "session-devices", textContent: "New folder" });
- newFolder.addEventListener("click", () => { const folder = prompt("Full path of the folder to start a Pi session in:"); if (folder?.trim()) void newSession(folder.trim()); });
- // Local: one folder for machine requests (install, check something) that belong to no project; made on first use.
- const local = html("button", { type: "button", className: "session-devices", textContent: "Local", title: "New session in ~/pi-local, for machine tasks (install, check…) outside any project" });
- local.addEventListener("click", async () => { const made = await sessionAction({ action: "new", folder: "~/pi-local", create: true }) as { id?: string } | undefined; if (made?.id) jumpTo(made.id); });
- $("session-list").replaceChildren(...rows, ...archivedRows.length ? [archives] : [], ...query ? [] : [recent, newFolder, local]);
+ newFolder.addEventListener("click", () => { const dialog = $("new-folder") as HTMLDialogElement; ($("new-folder-path") as HTMLInputElement).value = ""; dialog.showModal(); });
+ $("session-list").replaceChildren(...rows, ...archivedRows.length ? [archives] : [], ...query ? [] : [recent, newFolder]);
  markPick();
 }
 function sessionRow(session: HubSession, folder: string, path: string) {
@@ -1677,9 +1674,13 @@ async function sessionAction(data: Record<string, unknown>) {
  try { const value = await post("session", data); await loadSessions(); return value; }
  catch (error) { showNotice(error.message); }
 }
-async function newSession(folder: string) {
+// Local: one folder for machine requests (install, check something) that belong to no project; made on first use.
+$("new-folder-form").addEventListener("submit", event => { event.preventDefault(); const folder = ($("new-folder-path") as HTMLInputElement).value.trim(); if (!folder) return; ($("new-folder") as HTMLDialogElement).close(); void newSession(folder); });
+$("new-folder-local").addEventListener("click", () => { ($("new-folder") as HTMLDialogElement).close(); void newSession("~/pi-local", true); });
+$("new-folder-cancel").addEventListener("click", () => ($("new-folder") as HTMLDialogElement).close());
+async function newSession(folder: string, create = false) {
  let created: { id?: string } | undefined;
- try { created = await post("session", { action: "new", folder }) as typeof created; }
+ try { created = await post("session", { action: "new", folder, ...create ? { create } : {} }) as typeof created; }
  catch (error) {
   if (error.message !== "Folder does not exist." || !confirm(`${folder} does not exist. Create it and start a session there?`)) { if (error.message !== "Folder does not exist.") showNotice(error.message); return; }
   created = await sessionAction({ action: "new", folder, create: true }) as typeof created;

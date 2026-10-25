@@ -15,7 +15,6 @@
  <nav id="switcher" class="switcher" aria-label="Shared sessions" data-open="false" hidden>
   <div class="switcher-top"><button id="switcher-toggle" type="button" aria-expanded="false" aria-controls="session-list" aria-label="Show shared sessions">☰</button><input id="session-filter" type="search" placeholder="Filter (Ctrl+Shift+F)" aria-label="Filter sessions; arrows pick, Enter opens" autocomplete="off" spellcheck="false"></div>
   <div id="session-list" class="session-list"></div>
-  <button id="devices-button" class="session-devices" type="button" hidden>Devices</button>
  </nav>
  <header class="topbar">
   <button id="drawer-toggle" class="drawer-toggle" type="button" aria-controls="drawer" aria-expanded="false" aria-label="Open menu">☰</button>
@@ -61,7 +60,7 @@
      <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button><button type="button" id="hub-catchup" title="Runs /wo catch-up in this session: reviews Pi and plugin updates in a Plan3 plan (ce-workflow checkout only)" hidden>Catch up</button></div>
     </section>
     <section class="settings-group" id="remote-group" aria-labelledby="set-remote" hidden><h3 id="set-remote" class="group-head" title="Tailnet-only HTTPS through Tailscale; each new device is approved on this PC">Remote access<label><input type="checkbox" id="remote-on"> On</label></h3>
-     <div class="remote-line"><div id="remote-status" class="update-list"></div><button type="button" id="remote-copy" title="Copies the address to open on your other devices" disabled>Copy</button></div>
+     <div class="remote-line"><div id="remote-status" class="update-list"></div><button type="button" id="remote-copy" title="Copies the address to open on your other devices" disabled>Copy</button><button type="button" id="devices-button" title="Paired phones and other devices; revoke one here" hidden>Devices</button></div>
     </section>
     <section class="settings-group" id="app-group" aria-labelledby="set-app" hidden><h3 id="set-app">Desktop app (Pi Hub)</h3>
      <div id="app-status" class="update-list"></div>
@@ -171,6 +170,7 @@
  <dialog id="bookmarks" aria-labelledby="bookmarks-title"><button id="bookmarks-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="bookmarks-title">Bookmarked messages</h2><p class="dialog-purpose">Click one to put it in the message box. Ctrl+Shift+1…9 saves the box text, Ctrl+1…9 puts it back.</p><div id="bookmark-list" class="bookmark-list"></div></dialog>
  <dialog id="prompt" aria-labelledby="prompt-title"><form id="prompt-form"></form></dialog>
  <dialog id="pair-approve" aria-labelledby="pair-approve-title"><h2 id="pair-approve-title">Approve a new device?</h2><p class="dialog-purpose">Approve only if the device shows the same code.</p><p id="pair-device"></p><p id="pair-approve-code" class="pair-code"></p><div class="dialog-actions"><button id="pair-reject" type="button" class="danger">Reject</button><button id="pair-accept" type="button" class="primary">Approve</button></div></dialog>
+ <dialog id="new-folder" aria-labelledby="new-folder-title"><form id="new-folder-form"><h2 id="new-folder-title">New folder</h2><p class="dialog-purpose">Start a Pi session in a folder on this PC; ~ is your home folder.</p><label for="new-folder-path">Full path</label><input id="new-folder-path" type="text" autocomplete="off" spellcheck="false" required><div class="dialog-actions"><button id="new-folder-local" type="button" title="~/pi-local, made on first use: for machine tasks (install, check something) that belong to no project">Local</button><button id="new-folder-cancel" type="button">Cancel</button><button type="submit">Start</button></div></form></dialog>
  <dialog id="devices" aria-labelledby="devices-title"><h2 id="devices-title">Paired devices</h2><p id="devices-remote" class="dialog-purpose"></p><ul id="device-list" class="device-list"></ul><div class="dialog-actions"><button id="devices-close" type="button">Close</button></div></dialog>
  <dialog id="usage-window" class="usage-window" aria-labelledby="usage-title"><button id="usage-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="usage-title">Usage</h2><div id="usage-body"></div></dialog>
  <dialog id="changelog" class="usage-window" aria-labelledby="changelog-title"><button id="changelog-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="changelog-title">Changelog</h2><div id="changelog-body" class="changelog-body"></div></dialog>

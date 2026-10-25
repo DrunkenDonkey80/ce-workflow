@@ -792,13 +792,19 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('session-filter').value, document.activeElement.id]"), ["", "message-input"], "filter cleared, chat focused");
  // A sidebar click marks the next page to start with the chat box focused (navigation blocked here).
  assert.equal(await evaluate("(() => { const stop = event => event.preventDefault(); window.addEventListener('click', stop, true); document.querySelector('.session-link').click(); window.removeEventListener('click', stop, true); const set = sessionStorage.getItem('focus-chat'); sessionStorage.removeItem('focus-chat'); return set; })()"), "1");
+ // New folder opens a dialog whose Local button starts a session in ~/pi-local, creating it without asking (request stubbed: no real home folder).
+ await evaluate("(() => { window.__sent = []; window.__fetch = fetch; window.fetch = (url, init) => { if (String(init?.body).includes('pi-local')) { __sent.push(JSON.parse(init.body)); return Promise.reject(new Error('stub')); } return __fetch(url, init); }; [...document.querySelectorAll('#session-list .session-devices')].find(b => b.textContent === 'New folder').click(); })()");
+ assert.equal(await evaluate("document.getElementById('new-folder').open"), true, "New folder is a dialog");
+ await browser("click", "#new-folder-local"); await browser("wait", "--fn", "window.__sent.length");
+ assert.deepEqual(await evaluate("(() => { window.fetch = __fetch; return [document.getElementById('new-folder').open, __sent.map(b => [b.action, b.folder, b.create])]; })()"), [false, [["new", "~/pi-local", true]]]);
  // H6-03 (D19): a phone asks to pair; this local page shows its code, approves it, then lists and revokes it.
  const pairCode = hub.pairing.start({ "user-agent": "Mozilla/5.0 (iPhone) Safari/1" }, "me@example.com").code;
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "document.getElementById('pair-approve').open");
  assert.deepEqual(await evaluate("[document.getElementById('pair-approve-code').textContent, document.getElementById('pair-device').textContent, document.activeElement.id]"), [pairCode, "iPhone Safari \u00b7 me@example.com \u00b7 unknown address", "pair-reject"], "focus starts on Reject");
  await browser("click", "#pair-accept"); await browser("wait", "--fn", "!document.getElementById('pair-approve').open");
  assert.deepEqual(hub.devices.list().map(device => device.label), ["iPhone Safari"]);
- await browser("click", "#devices-button"); await browser("wait", "--fn", "document.getElementById('devices').open && document.querySelector('#device-list button')");
+ assert.equal(await evaluate("!!document.getElementById('devices-button').closest('#remote-group')"), true, "Devices sits with Remote access, not in the sidebar");
+ await evaluate("document.getElementById('devices-button').click()"); await browser("wait", "--fn", "document.getElementById('devices').open && document.querySelector('#device-list button')");
  assert.equal(await evaluate("document.getElementById('devices-remote').textContent"), "Remote access is off (pi-hub remote on).");
  await browser("click", "#device-list button"); await browser("wait", "--fn", "document.querySelector('#device-list li').textContent === 'No paired devices.'");
  assert.deepEqual(hub.devices.list(), []); await browser("click", "#devices-close"); await browser("hover", "#message-input"); // leave the session bar, whose hover card covers the chips
