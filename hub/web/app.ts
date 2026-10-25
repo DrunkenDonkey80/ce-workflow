@@ -625,7 +625,8 @@ new MutationObserver(() => { if ($("chat-search").hidden || !findInput().value |
 const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice, attachTo, renderLinks);
 // A session switched to any way (sidebar click, attention key, Alt+1…9, Alt+↑/↓, the filter, a notification) starts with the chat box focused, so you can
 // type at once; an open question keeps its own focus. jumpTo carries that over the page load.
-const focusChat = () => { if (!promptView.busy) $("message-input").focus(); };
+// A touch screen is exempt: focusing would pop its keyboard over the chat.
+const focusChat = () => { if (!promptView.busy && !matchMedia("(pointer: coarse)").matches) $("message-input").focus(); };
 const jumpTo = (id: string) => { sessionStorage.setItem("focus-chat", "1"); location.assign(sessionUrl(id)); };
 (window as unknown as { piHubFocus: () => void }).piHubFocus = focusChat;
 if (sessionStorage.getItem("focus-chat")) { sessionStorage.removeItem("focus-chat"); focusChat(); }
@@ -1838,7 +1839,7 @@ async function openUsage(id: string, open = true) {
    refresh.title = "Fetch every account's usage now"; drain.title = "Drain 7d: serve the soonest-expiring week first, ignoring 5h";
    refresh.addEventListener("click", () => void poolAct("refresh")); drain.addEventListener("click", () => void poolAct("mode"));
    tools.append(el("h3", "", pool.title), refresh, drain);
-   const list = el("div", "pool-list"), actions = el("div");
+   const list = el("div", "pool-list"), actions = el("div", "pool-dock");
    list.setAttribute("role", "listbox");
    const draw = () => { list.replaceChildren(...rows.map(row => poolRowBox(row, () => { poolPick = row.label; draw(); }))); actions.replaceChildren(poolActions(rows.find(row => row.label === poolPick)!)); };
    draw(); body.push(tools, list, actions);

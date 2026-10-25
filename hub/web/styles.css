@@ -642,6 +642,18 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .composer-actions { justify-content: flex-end; margin-top: 4px; gap: 4px; }
  /* Six buttons (💾 🎤 EN ★ Stop Queue) on one row on a 375px phone. */
  .composer-actions > :is(button, .attach) { padding-inline: 8px; }
+ /* Usage and changelog fill the phone; the account list scrolls with the page, one bar per line, the e-mail on its own
+    line, and the picked account's actions stay docked at the bottom. */
+ dialog.usage-window { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; border: 0; border-radius: 0; padding: 12px 12px 0; }
+ .usage-window h2 { font-size: 1.15em; margin-bottom: 8px; }
+ .pool-list { max-height: none; overflow: visible; }
+ .pool-row { padding: 8px; }
+ .pool-email { margin-left: 0; flex-basis: 100%; padding-left: calc(1em + 6px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+ .pool-bars { grid-template-columns: 1fr; }
+ .pool-dock { position: sticky; bottom: 0; background: var(--chat); padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+ .pool-actions { margin-top: 6px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+ .pool-pick { grid-column: 1 / -1; max-width: none; }
+ .pool-actions :is(button, select) { min-height: 36px; padding-inline: 4px; }
 }
 .pairing main { margin: auto; padding: 24px; max-width: 28rem; text-align: center; }
 .pair-code { font: 600 2.5rem/1.2 ui-monospace, monospace; letter-spacing: 0.08em; min-height: 1.2em; }
