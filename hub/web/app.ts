@@ -623,7 +623,7 @@ for (const button of $("chat-search").querySelectorAll<HTMLButtonElement>("[data
 new MutationObserver(() => { if ($("chat-search").hidden || !findInput().value || findQueued) return; findQueued = true; requestAnimationFrame(() => { findQueued = false; runChatSearch(true); }); }).observe($("feed"), { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["open", "hidden", "class"] });
 
 const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice, attachTo, renderLinks);
-// A session picked by the attention key, Alt+1…9 (the app) or the sidebar filter starts with the chat box focused, so you can
+// A session switched to any way (sidebar click, attention key, Alt+1…9, Alt+↑/↓, the filter, a notification) starts with the chat box focused, so you can
 // type at once; an open question keeps its own focus. jumpTo carries that over the page load.
 const focusChat = () => { if (!promptView.busy) $("message-input").focus(); };
 const jumpTo = (id: string) => { sessionStorage.setItem("focus-chat", "1"); location.assign(sessionUrl(id)); };
@@ -1546,7 +1546,7 @@ function renderSessions(groups: Group[], recents: Recent[]) {
    if ((event.target as HTMLElement).closest(".session, button, a") || !group.sessions.length || Date.now() - draggedAt < 300) return;
    let last = ""; try { last = localStorage.getItem("hub-last:" + group.folder) ?? ""; } catch { /* private mode */ }
    const pick = group.sessions.find(session => session.id === last) ?? group.sessions.find(session => session.tone === "working") ?? group.sessions.find(session => !(session.parked ?? session.tone === "parked")) ?? group.sessions[0];
-   if (pick.id !== sessionId) location.href = sessionUrl(pick.id);
+   if (pick.id !== sessionId) jumpTo(pick.id);
   });
   // The git line only in the open session's folder, and not when it is fully folded.
   box.append(head, ...shown.length && group.folder === ownFolder ? gitLine(group.git, true) : [], ...shown.map(session => {
@@ -1588,7 +1588,8 @@ function renderSessions(groups: Group[], recents: Recent[]) {
 function sessionRow(session: HubSession, folder: string, path: string) {
  const row = html("div", { className: "session" }); row.dataset.tone = session.tone; row.dataset.id = session.id; row.toggleAttribute("data-parked", session.parked ?? session.tone === "parked");
  const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}${session.park ? " · " + session.park : ""}` });
-link.draggable = false; // the row drags instead of the browser's link drag
+link.addEventListener("click", () => sessionStorage.setItem("focus-chat", "1")); // the next page starts with the chat box focused
+ link.draggable = false; // the row drags instead of the browser's link drag
  link.setAttribute("aria-label", `${session.name} in ${folder}, ${words[session.tone]}${session.id === sessionId ? ", this session" : ""}`);
  if (session.id === sessionId) row.setAttribute("aria-current", "page");
  link.append(html("span", { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }), html("span", { className: "session-label", textContent: session.name }), html("small", { className: "session-state", textContent: words[session.tone] + (session.park ? " · " + session.park : "") }));
@@ -1667,14 +1668,14 @@ async function newSession(folder: string) {
   if (error.message !== "Folder does not exist." || !confirm(`${folder} does not exist. Create it and start a session there?`)) { if (error.message !== "Folder does not exist.") showNotice(error.message); return; }
   created = await sessionAction({ action: "new", folder, create: true }) as typeof created;
  }
- if (created?.id) location.assign(sessionUrl(created.id));
+ if (created?.id) jumpTo(created.id);
 }
 // D5 keyboard shortcuts: Alt+↑/↓ previous or next session, Alt+N new session in this folder (Esc in the chat box stops a run).
 window.addEventListener("keydown", event => {
  if (!event.altKey || event.ctrlKey || event.metaKey) return;
  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
   const at = sessionOrder.indexOf(sessionId), next = sessionOrder[at + (event.key === "ArrowDown" ? 1 : -1)];
-  if (at >= 0 && next) { event.preventDefault(); location.assign(sessionUrl(next)); }
+  if (at >= 0 && next) { event.preventDefault(); jumpTo(next); }
  }
  if (event.key.toLowerCase() === "n" && ownFolder) { event.preventDefault(); void newSession(ownFolder); }
  // Alt+= / Alt+- like the terminal: one bias step toward Think or Work (codes, so Shift and keyboard layouts don't matter).
@@ -2068,7 +2069,7 @@ function notifyChanges(groups: Group[]) {
   if (!kind) continue;
   try {
    const note = new Notification(`${group.label} - ${session.name} ${kind}`, { tag: `${session.id}:${now}` });
-   note.onclick = () => { window.focus(); if (session.id !== sessionId) location.href = sessionUrl(session.id); note.close(); };
+   note.onclick = () => { window.focus(); if (session.id !== sessionId) jumpTo(session.id); note.close(); };
   } catch { /* phones without a service worker refuse page notifications */ }
  }
 }

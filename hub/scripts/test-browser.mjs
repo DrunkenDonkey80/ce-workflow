@@ -786,6 +786,8 @@ try {
  // Sidebar filter: Enter on this session clears the filter and puts the cursor in the chat box.
  await browser("fill", "#session-filter", "1"); await browser("press", "Enter");
  assert.deepEqual(await evaluate("[document.getElementById('session-filter').value, document.activeElement.id]"), ["", "message-input"], "filter cleared, chat focused");
+ // A sidebar click marks the next page to start with the chat box focused (navigation blocked here).
+ assert.equal(await evaluate("(() => { const stop = event => event.preventDefault(); window.addEventListener('click', stop, true); document.querySelector('.session-link').click(); window.removeEventListener('click', stop, true); const set = sessionStorage.getItem('focus-chat'); sessionStorage.removeItem('focus-chat'); return set; })()"), "1");
  // H6-03 (D19): a phone asks to pair; this local page shows its code, approves it, then lists and revokes it.
  const pairCode = hub.pairing.start({ "user-agent": "Mozilla/5.0 (iPhone) Safari/1" }, "me@example.com").code;
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "document.getElementById('pair-approve').open");
