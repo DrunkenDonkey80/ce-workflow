@@ -46,6 +46,7 @@ let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
 function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
 let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
+let navRequest: { n: number; dir: number; ctrl: boolean } | null = null; // a back/forward press for the app (see piHubGo)
 // D5: inside the desktop app (user agent marker) the title is a machine line the app reads for its tab, taskbar and tray.
 const inApp = () => navigator.userAgent.includes("PiHubApp/");
 // Small line icons for the header buttons; each has its own colour in styles.css (.ui-icon[data-icon]).
@@ -1343,7 +1344,8 @@ function renderIcon() {
  if (inApp()) {
   const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen"].includes(tone)); // the app has no page in front: own unseen counts
   // attention: how many things need you, for the app's badge on a pinned button.
-  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone !== "working").length,
+  // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
+  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone !== "working").length, session: sessionId, nav: navRequest,
    // latest: the newest session needing you, so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
    latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "" });
   if (document.title !== line) document.title = line;
@@ -1386,6 +1388,14 @@ async function loadSessions() {
  void checkPairing();
  sessionsTimer = window.setTimeout(loadSessions, visible || inApp() ? 5000 : 15000); // the app's hidden tabs still feed its icon
 }
+// Desktop app: the mouse back/forward buttons walk the sessions visited across every hub tab (with Ctrl, this hub only).
+// The app's tab strip keeps that trail; the press goes to it in the title line, and piHubGo opens the session it picks.
+for (const type of ["mousedown", "mouseup", "auxclick"]) window.addEventListener(type, event => {
+ const press = event as MouseEvent; if ((press.button !== 3 && press.button !== 4) || !inApp()) return;
+ press.preventDefault(); // the webview's own history step would fight the app's
+ if (type === "mouseup") { navRequest = { n: Date.now(), dir: press.button === 3 ? -1 : 1, ctrl: press.ctrlKey }; renderIcon(); }
+}, true);
+(window as unknown as { piHubGo: (id: string) => void }).piHubGo = jumpTo;
 // The app's attention key (hub/app): open the newest session that needs you; this page being in front counts as seen.
 (window as unknown as { piHubAttention: () => void }).piHubAttention = () => {
  const next = attentionList.shift();

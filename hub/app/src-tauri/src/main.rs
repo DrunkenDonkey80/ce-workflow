@@ -150,6 +150,9 @@ fn attention_key(app: AppHandle, key: String) -> Result<(), String> {
 /// Opens the newest session that needs you in a hub tab (hub/web/app.ts piHubAttention).
 #[tauri::command]
 fn attend(app: AppHandle, id: u32) { if let Some(webview) = app.get_webview(&format!("hub{id}")) { let _ = webview.eval("window.piHubAttention && piHubAttention()"); } }
+/// Opens one session in a hub tab, for the back/forward mouse buttons (hub/web/app.ts piHubGo).
+#[tauri::command]
+fn go(app: AppHandle, id: u32, session: String) { if let Some(webview) = app.get_webview(&format!("hub{id}")) { let _ = webview.eval(format!("window.piHubGo && piHubGo({})", json!(session))); } }
 
 #[tauri::command]
 fn config(state: tauri::State<Startup>) -> Value {
@@ -312,7 +315,7 @@ fn main() {
         }).build())
         .manage(Startup { error })
         .manage(Attention(Default::default()))
-        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned, attention_key, attend, flash])
+        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned, attention_key, attend, go, flash])
         .setup(move |app| {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());

@@ -82,10 +82,26 @@ async function updateIcons() {
   await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${fullName(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${fullName(tab)}: ${stateWord(tab)}`)].join("\n") });
  } catch (error) { console.error(error); }
 }
-function select(id) {
+function select(id, stepping = false) {
  const index = tabs.findIndex(tab => tab.id === id); if (index < 0) return;
  active = index; void invoke("show", { id }); render();
+ if (!stepping) visited(tabs[index]);
 }
+// Back/forward mouse buttons: every session seen in the app, across hubs, like a browser's history; with Ctrl, this hub's only.
+let trail = [], spot = -1;
+function visited(tab) {
+ if (tabs[active] !== tab || !tab.session) return;
+ const here = trail[spot]; if (here && here.id === tab.id && here.session === tab.session) return;
+ trail = trail.slice(0, spot + 1); trail.push({ id: tab.id, session: tab.session }); if (trail.length > 200) trail.shift(); spot = trail.length - 1;
+}
+function step(dir, sameHub) {
+ let i = spot + dir;
+ while (trail[i] && (!tabs.some(t => t.id === trail[i].id) || (sameHub && trail[i].id !== tabs[active]?.id))) i += dir;
+ const to = trail[i]; if (!to) return;
+ spot = i; const tab = tabs.find(t => t.id === to.id);
+ select(tab.id, true); if (tab.session !== to.session) void invoke("go", { id: tab.id, session: to.session });
+}
+for (const type of ["mousedown", "mouseup", "auxclick"]) addEventListener(type, event => { if (event.button !== 3 && event.button !== 4) return; event.preventDefault(); if (type === "mouseup") step(event.button === 3 ? -1 : 1, event.ctrlKey); });
 window.select = select;
 window.shortcut = index => { if (tabs[index]) select(tabs[index].id); };
 // The attention key (main.rs already brought the window up): the hub with the newest session that needs you opens that session.
@@ -102,6 +118,8 @@ window.onTitle = (webview, title) => {
   // This PC's hub holds the attention key setting.
   // A newer "needs you" than this tab has shown flashes the taskbar; the first title after start only sets the mark.
   if (tab.peak !== undefined && tab.latest > tab.peak) void invoke("flash").catch(console.error);
+  if (typeof value.session === "string" && value.session !== tab.session) { tab.session = value.session; visited(tab); }
+  if (value.nav?.n && value.nav.n !== tab.nav) { const fresh = tab.nav !== undefined || Date.now() - value.nav.n < 2000; tab.nav = value.nav.n; if (fresh && tabs[active] === tab) step(value.nav.dir < 0 ? -1 : 1, !!value.nav.ctrl); }
   tab.peak = Math.max(tab.peak ?? 0, tab.latest);
   if (tab.local && typeof value.key === "string" && value.key !== attentionKey) { attentionKey = value.key; void invoke("attention_key", { key: value.key }).catch(error => { notice = "Attention key: " + error; render(); }); }
  } catch { /* half-written title */ } }
