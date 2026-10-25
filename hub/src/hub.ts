@@ -28,7 +28,7 @@ import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 
-export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string; collapseHours?: number };
+export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string; collapseHours?: number; attentionKey?: string };
 export type HubMarker = { pid: number; port: number; startedAt: number };
 export const configPath = () => path.join(hubDataDir(), "config.json");
 export const markerPath = () => path.join(hubDataDir(), "hub.json");
@@ -182,7 +182,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 
 	const commands = createCommands(dataDir);
 	const version = hubVersion(); // the code this hub runs; an update restarts the hub
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, version, seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}) }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, attentionKey: config.attentionKey ?? "ctrl+shift+a", version, seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}) }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection
@@ -266,13 +266,16 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				if (!data || typeof data !== "object" || Array.isArray(data)) return send(400, { error: "Expected a JSON object." });
 				if (endpoint === "hub" && data.action === "settings") {
 					// Per-hub (per-PC) settings from the gear menu: auto-park minutes and the tab icon.
-					const minutes = data.idleParkMinutes, collapse = data.collapseHours, icon = data.icon, seen = data.seenVersion, hidden = data.usageHidden, notify = data.notify as Record<string, unknown> | undefined;
+					const minutes = data.idleParkMinutes, collapse = data.collapseHours, key = data.attentionKey, icon = data.icon, seen = data.seenVersion, hidden = data.usageHidden, notify = data.notify as Record<string, unknown> | undefined;
 					if (notify !== undefined && !(notify && typeof notify === "object" && Object.keys(notify).every(k => ["question", "done"].includes(k)) && Object.values(notify).every(v => typeof v === "boolean"))) return send(400, { error: "Notify takes question and done as true or false." });
 					// A provider id hides (and stops polling) it; "id:5h" hides one of its top-bar windows.
 					if (hidden !== undefined && !(Array.isArray(hidden) && hidden.every(key => typeof key === "string" && /^[\w-]+(?::[\w.-]{1,20})?$/.test(key) && USAGE_PROVIDERS.some(p => p.id === key.split(":")[0])))) return send(400, { error: "Unknown usage provider." });
 					if (minutes !== undefined && !(Number.isInteger(minutes) && minutes >= 0 && minutes <= 1440)) return send(400, { error: "Auto-park minutes must be 0 to 1440." });
 					if (collapse !== undefined && !(Number.isInteger(collapse) && collapse >= 0 && collapse <= 8760)) return send(400, { error: "Auto-collapse hours must be 0 to 8760." });
 					if (collapse !== undefined) config.collapseHours = collapse as number;
+					// The desktop app's attention hotkey, e.g. ctrl+shift+a; empty turns it off. The app checks the key itself.
+					if (key !== undefined && !(typeof key === "string" && /^((ctrl|shift|alt|super)+){1,4}[a-z0-9]+$|^$/.test(key))) return send(400, { error: "Hotkey must be modifiers and a key, e.g. ctrl+shift+a." });
+					if (key !== undefined) config.attentionKey = key as string;
 					if (seen !== undefined && !(typeof seen === "string" && VERSION_PATTERN.test(seen))) return send(400, { error: "Version must be x.y.z." });
 					if (seen !== undefined) config.seenVersion = seen as string;
 					if (icon !== undefined && !(typeof icon === "string" && /^[a-z-]{0,40}$/.test(icon))) return send(400, { error: "Unknown icon." });

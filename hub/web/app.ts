@@ -623,6 +623,12 @@ for (const button of $("chat-search").querySelectorAll<HTMLButtonElement>("[data
 new MutationObserver(() => { if ($("chat-search").hidden || !findInput().value || findQueued) return; findQueued = true; requestAnimationFrame(() => { findQueued = false; runChatSearch(true); }); }).observe($("feed"), { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["open", "hidden", "class"] });
 
 const promptView = createPromptView($("prompt"), $("prompt-form"), post, showNotice, attachTo, renderLinks);
+// A session picked by the attention key, Alt+1…9 (the app) or the sidebar filter starts with the chat box focused, so you can
+// type at once; an open question keeps its own focus. jumpTo carries that over the page load.
+const focusChat = () => { if (!promptView.busy) $("message-input").focus(); };
+const jumpTo = (id: string) => { sessionStorage.setItem("focus-chat", "1"); location.assign(sessionUrl(id)); };
+(window as unknown as { piHubFocus: () => void }).piHubFocus = focusChat;
+if (sessionStorage.getItem("focus-chat")) { sessionStorage.removeItem("focus-chat"); focusChat(); }
 // Image links and thumbnails open full size in the page (a new tab on a home-screen app may lack the pairing cookie).
 document.addEventListener("click", event => {
  const link = (event.target as HTMLElement).closest?.<HTMLAnchorElement>("a.thumb, a.chat-link"); if (!link || !/\/api\/(image|changelog)\?/.test(link.href)) return;
@@ -1251,7 +1257,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number };
+type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1309,8 +1315,8 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
-type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number };
-let hubSettings: HubSettings = {}, appBadge = 0;
+type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string };
+let hubSettings: HubSettings = {}, appBadge = 0, attentionList: HubSession[] = [];
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
  const states = [...sessionStates];
@@ -1321,7 +1327,9 @@ function renderIcon() {
  if (inApp()) {
   const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen"].includes(tone)); // the app has no page in front: own unseen counts
   // attention: how many things need you, for the app's badge on a pinned button.
-  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone !== "working").length });
+  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone !== "working").length,
+   // latest: the newest session needing you, so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
+   latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "" });
   if (document.title !== line) document.title = line;
  }
  const needsYou = states.filter(tone => tone === "waiting" || tone === "unseen").length;
@@ -1349,7 +1357,11 @@ async function loadSessions() {
   if (!!hubSettings.uac !== uacBefore) notifyUac(!!hubSettings.uac);
   notifyChanges(groups);
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
-  if (visible && document.hasFocus() && groups.some(group => group.sessions.some(session => session.id === sessionId && session.tone === "unseen"))) void post("seen", {}).catch(() => {});
+  // Looking at it also drops it from the attention key's list.
+  const own = groups.flatMap(group => group.sessions).find(session => session.id === sessionId);
+  if (visible && document.hasFocus() && own && (own.tone === "unseen" || own.attention)) { void post("seen", {}).catch(() => {}); delete own.attention; }
+  attentionList = groups.flatMap(group => group.sessions).filter(session => session.attention).sort((a, b) => b.attention! - a.attention!);
+  $("attention-field").hidden = !inApp(); ($("attention-key") as HTMLInputElement).value = hubSettings.attentionKey ?? "";
   ownTone = groups.flatMap(group => group.sessions).find(session => session.id === sessionId)?.tone ?? "";
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
   renderSessions(groups, recents);
@@ -1357,6 +1369,21 @@ async function loadSessions() {
  void checkPairing();
  sessionsTimer = window.setTimeout(loadSessions, visible || inApp() ? 5000 : 15000); // the app's hidden tabs still feed its icon
 }
+// The app's attention key (hub/app): open the newest session that needs you; this page being in front counts as seen.
+(window as unknown as { piHubAttention: () => void }).piHubAttention = () => {
+ const next = attentionList.shift();
+ if (next?.id === sessionId) { void post("seen", {}).catch(() => {}); renderIcon(); focusChat(); } // already open: now it is in front
+ else if (next) jumpTo(next.id);
+};
+// Click the box and press the keys (a modifier plus a letter or digit); Backspace or Delete turns the key off.
+$("attention-key").addEventListener("keydown", event => {
+ if (event.key === "Tab" || event.key === "Escape") return;
+ event.preventDefault();
+ const key = /^(Key|Digit)([A-Z0-9])$/.exec(event.code)?.[2]?.toLowerCase(), mods = ([["ctrl", event.ctrlKey], ["shift", event.shiftKey], ["alt", event.altKey], ["super", event.metaKey]] as const).filter(([, on]) => on).map(([name]) => name);
+ const value = event.key === "Backspace" || event.key === "Delete" ? "" : key && mods.length ? [...mods, key].join("+") : null;
+ if (value === null) return;
+ ($("attention-key") as HTMLInputElement).value = value; void saveHubSettings({ attentionKey: value });
+});
 // H6-03 (D19): new devices are approved, and paired ones revoked, on local hub pages only: remote pages carry no key.
 async function hub(route: string, data?: unknown) {
  const response = await fetch("../../api/" + route, data === undefined ? auth : { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify(data) });
@@ -1433,7 +1460,8 @@ filterInput.addEventListener("keydown", event => {
   event.preventDefault(); if (!rows.length) return;
   const next = rows[(at + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length]; markPick(next.dataset.id); next.scrollIntoView({ block: "nearest" });
  }
- if (event.key === "Enter" && filterPick) { event.preventDefault(); if (filterPick !== sessionId) location.assign(sessionUrl(filterPick)); else filterInput.blur(); }
+ // Enter opens the pick and clears the filter, so the sidebar shows every folder again.
+ if (event.key === "Enter" && filterPick) { event.preventDefault(); const pick = filterPick; filterInput.value = ""; filterPick = ""; rerenderSessions(); if (pick !== sessionId) jumpTo(pick); else focusChat(); }
  if (event.key === "Escape" && filterInput.value) { event.preventDefault(); event.stopPropagation(); filterInput.value = ""; filterPick = ""; rerenderSessions(); }
 });
 // Mouse drag of a folder (by its name row) or of a session row inside its folder: a line shows where it lands;

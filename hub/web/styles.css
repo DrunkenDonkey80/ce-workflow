@@ -652,6 +652,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .menu-field-top { align-items: start; }
 #settings-menu .menu-field:has(.theme-pair) { grid-template-columns: auto 1fr; }
 .theme-pair { display: grid; grid-template-columns: 5rem var(--control); gap: 6px; justify-content: end; }
+#attention-key { width: 9em; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: inherit; text-align: center; cursor: pointer; }
 .menu-field select, .theme-pair select, #settings-menu .menu-field > button { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
 #settings-menu .menu-field > button { text-align: center; }
 .settings-checks { display: grid; gap: 4px; color: var(--ink); }

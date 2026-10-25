@@ -767,7 +767,11 @@ try {
  await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.join() === 'unseen'");
  const line = JSON.parse((await evaluate("document.title")).slice(13));
  assert.deepEqual([typeof line.icon, line.icon.length > 0, line.name, line.states], ["string", true, os.hostname(), ["unseen"]], "icon, hub name (hostname) and own unseen");
+ assert.deepEqual([line.latest > 0, line.key], [true, "ctrl+shift+a"], "the newest attention time and the app's attention key");
  await evaluate("(() => { delete navigator.userAgent; delete document.hasFocus; })()");
+ // Sidebar filter: Enter on this session clears the filter and puts the cursor in the chat box.
+ await browser("fill", "#session-filter", "1"); await browser("press", "Enter");
+ assert.deepEqual(await evaluate("[document.getElementById('session-filter').value, document.activeElement.id]"), ["", "message-input"], "filter cleared, chat focused");
  // H6-03 (D19): a phone asks to pair; this local page shows its code, approves it, then lists and revokes it.
  const pairCode = hub.pairing.start({ "user-agent": "Mozilla/5.0 (iPhone) Safari/1" }, "me@example.com").code;
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "document.getElementById('pair-approve').open");

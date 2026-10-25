@@ -250,8 +250,11 @@ try {
 	assert.equal((await until(async () => (await tones())["1"] === "unseen" && "ok")), "ok", "a finished run is unseen, open page or not");
 	await get(id, "snapshot");
 	assert.equal((await tones())["1"], "unseen", "a (re)connect alone, as a background tab or the app's hidden tab, keeps it unseen");
+	const attention = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.id === id).attention;
+	assert.equal(typeof await attention(), "number", "a finished run joins the attention key's list");
 	assert.equal((await post(id, "seen", {})).status, 200);
 	assert.equal((await tones())["1"], "seen", "a focused page showing it marks it seen");
+	assert.equal(await attention(), undefined, "and drops it from the attention list");
 	// S-05: an idle session with a timer is "scheduled"; the row carries the timers; the menu cancels one (own session only).
 	const timer = await (await fetch(`${origin}/api/sessions/${id}/timers`, { method: "POST", headers: { "x-hub-key": localKey, connection: "close", "content-type": "application/json" }, body: JSON.stringify({ kind: "script", command: "exit 0", everyMinutes: 5 }) })).json();
 	const row = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.id === id);

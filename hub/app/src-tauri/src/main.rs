@@ -11,7 +11,7 @@ use tauri::{
     window::WindowBuilder,
     AppHandle, LogicalPosition, LogicalSize, Manager, Rect, RunEvent, WebviewUrl, WindowEvent,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 const STRIP: f64 = 36.0;
 #[cfg(windows)]
@@ -125,6 +125,31 @@ fn bring_forward(app: &AppHandle) {
 }
 
 struct Startup { error: Option<String> }
+/// The attention hotkey (hub settings, default Ctrl+Shift+A): global, so it works while another app is in front.
+struct Attention(std::sync::Mutex<Option<Shortcut>>);
+
+fn alt_digits(app: &AppHandle, on: bool) {
+    for i in 1..=9 { let key = format!("alt+{i}"); let _ = if on { app.global_shortcut().register(key.as_str()) } else { app.global_shortcut().unregister(key.as_str()) }; }
+}
+fn set_attention(app: &AppHandle, key: &str) -> Result<(), String> {
+    let state = app.state::<Attention>();
+    let mut current = state.0.lock().unwrap();
+    if let Some(old) = current.take() { let _ = app.global_shortcut().unregister(old); }
+    if key.is_empty() { return Ok(()) }
+    let shortcut: Shortcut = key.parse().map_err(|e| format!("{e}"))?;
+    app.global_shortcut().register(shortcut).map_err(|e| format!("{key} is taken: {e}"))?;
+    *current = Some(shortcut);
+    Ok(())
+}
+/// The hub page's setting reaches the app through the local tab's title line; the strip passes it on. Saved for the next start.
+#[tauri::command]
+fn attention_key(app: AppHandle, key: String) -> Result<(), String> {
+    let _ = save_key("attentionKey", json!(key));
+    set_attention(&app, &key)
+}
+/// Opens the newest session that needs you in a hub tab (hub/web/app.ts piHubAttention).
+#[tauri::command]
+fn attend(app: AppHandle, id: u32) { if let Some(webview) = app.get_webview(&format!("hub{id}")) { let _ = webview.eval("window.piHubAttention && piHubAttention()"); } }
 
 #[tauri::command]
 fn config(state: tauri::State<Startup>) -> Value {
@@ -173,7 +198,7 @@ fn show(app: AppHandle, id: u32) {
     if let Some(window) = app.get_window("main") {
         // Hide the others first: hiding the focused one after focusing the new tab would leave no webview focused.
         for webview in window.webviews() { if webview.label() != "strip" && webview.label() != label { let _ = webview.hide(); } }
-        if let Some(webview) = window.webviews().into_iter().find(|w| w.label() == label) { let _ = webview.show().and_then(|_| webview.set_focus()); }
+        if let Some(webview) = window.webviews().into_iter().find(|w| w.label() == label) { let _ = webview.show().and_then(|_| webview.set_focus()).and_then(|_| webview.eval("window.piHubFocus && piHubFocus()")); } // type at once (hub/web/app.ts)
     }
 }
 #[tauri::command]
@@ -272,12 +297,14 @@ fn main() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, shortcut, event| {
             if event.state != ShortcutState::Pressed { return }
             // A blur Tauri never reported can leave them registered while another app is in front: drop them there.
-            if !app_in_front() { let _ = app.global_shortcut().unregister_all(); return }
+            if app.state::<Attention>().0.lock().unwrap().as_ref() == Some(shortcut) { bring_forward(app); strip_eval(app, "window.attention && attention()".into()); return }
+            if !app_in_front() { alt_digits(app, false); return }
             let (key, first) = (shortcut.key as u32, tauri_plugin_global_shortcut::Code::Digit1 as u32);
             if key >= first && key < first + 9 { strip_eval(app, format!("window.shortcut && shortcut({})", key - first)); }
         }).build())
         .manage(Startup { error })
-        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned])
+        .manage(Attention(Default::default()))
+        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned, attention_key, attend])
         .setup(move |app| {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());
@@ -285,6 +312,8 @@ fn main() {
             let _strip = window.add_child(WebviewBuilder::new("strip", WebviewUrl::App("index.html".into())).disable_drag_drop_handler(), LogicalPosition::new(0.0, 0.0), LogicalSize::new(1200.0, STRIP))?;
             #[cfg(target_os = "linux")]
             pin_strip(&_strip);
+            // Before the hub is up (start at login), the key saved last time; the hub's setting replaces it once its tab loads.
+            let _ = set_attention(app.handle(), app_config()["attentionKey"].as_str().unwrap_or("ctrl+shift+a"));
             let handle = app.handle().clone();
             window.on_window_event(move |event| match event {
                 WindowEvent::Resized(_) => {
@@ -298,10 +327,9 @@ fn main() {
                 WindowEvent::CloseRequested { api, .. } => { api.prevent_close(); if let Some(w) = handle.get_window("main") { let _ = w.hide(); } }
                 // D3: Alt+1..9 (Ctrl+1..9 belongs to the hub page's bookmarks) only while the app has focus; the strip ignores numbers past its last tab.
                 WindowEvent::Focused(focused) => {
-                    let shortcuts = handle.global_shortcut();
                     // Hiding the focused tab webview on a tab switch also reports a blur (Tauri synthesizes window focus from
                     // the webviews), so only another app in front drops them.
-                    if *focused { for i in 1..=9 { let _ = shortcuts.register(format!("alt+{i}").as_str()); } } else if !cfg!(windows) || !app_in_front() { let _ = shortcuts.unregister_all(); }
+                    if *focused { alt_digits(&handle, true) } else if !cfg!(windows) || !app_in_front() { alt_digits(&handle, false) }
                 }
                 _ => {}
             });

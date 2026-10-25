@@ -150,7 +150,15 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 
 	// H5-05: the session bar. A finished run stays "unseen" until a page opens the session or shows it in front of the user.
 	const unseen = new Set<string>();
-	const seen = (id: string) => unseen.delete(id);
+	// Attention: when a session last turned waiting (red) or unseen (blue); the app's attention hotkey jumps to the newest,
+	// and a page showing the session in front of the user drops it, so the next press goes to the one before.
+	const attention = new Map<string, number>(), lastTone = new Map<string, string>();
+	const seen = (id: string) => { attention.delete(id); return unseen.delete(id); };
+	function attentionAt(id: string, now: string) {
+		if (now !== lastTone.get(id) && (now === "waiting" || now === "unseen")) attention.set(id, Date.now());
+		if (now !== "waiting" && now !== "unseen") attention.delete(id);
+		lastTone.set(id, now); return attention.get(id);
+	}
 	function tone(id: string) {
 		if (registry.get(id)?.state === "terminal") return "terminal";
 		if (forms(id).length) return "waiting"; // a script's question waits on a parked session too
@@ -175,7 +183,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// When Pi last wrote the conversation; the sidebar hides sessions that have not worked for collapseHours.
 	const worked = (file?: string) => { try { return file ? statSync(file).mtimeMs : undefined; } catch { return undefined; } };
 	async function sessions() {
-		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile) })) })));
+		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), attention: attentionAt(record.id, tone(record.id)), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile) })) })));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents, settings: settings() };
 	}

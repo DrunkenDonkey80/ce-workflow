@@ -6,8 +6,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Added
 - Hub sidebar: drag a session row (mouse) to reorder the sessions inside its folder; the order is kept on the hub.
+- Desktop app: an attention hotkey (default Ctrl+Shift+A, works from any app) brings Pi Hub to the front on the newest session that asks a question or finished; looking at it takes it off the list, so the next press goes to the one before. Change or turn it off under Attention key in hub settings (shown in the app).
+- Picking a session with the attention key, Alt+1…9 or the sidebar filter puts the cursor in the chat box, unless a question is open.
 
 ### Fixed
+- Sidebar filter: Enter on a session clears the filter, so every folder shows again.
 - Desktop app (Windows): Alt+1…9 no longer stops working after switching tabs; the shortcuts are dropped only when another app is in front.
 
 ## Unreleased
