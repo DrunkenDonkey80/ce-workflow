@@ -4,6 +4,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.80 — 2026-10-25
+
 ### Added
 - Typing into a parked session that needs compacting (cache expired, large context) starts the compaction right away, while you finish typing; your message waits for it and then goes out, instead of the compaction starting only after you press Send.
 - Desktop app: the mouse back/forward buttons go back and forth through the sessions you visited, across every hub tab (answer a question with Ctrl+Shift+A, press back, and you are where you were); with Ctrl held they stay in the current hub.
