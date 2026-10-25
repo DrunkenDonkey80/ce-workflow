@@ -4,6 +4,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.79 — 2026-10-25
+
 ### Changed
 - Usage window: refill marks close together (e.g. 75% and 65%) put their labels on separate lines instead of printing over each other; the bar grows to fit.
 - Settings → Remote access: Copy is a small button on the right of the address.
