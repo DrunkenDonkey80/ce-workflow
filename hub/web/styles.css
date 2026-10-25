@@ -693,3 +693,5 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .file-link[data-full]:hover { text-decoration: underline; }
 #app-login-field { display: flex; align-items: center; gap: 6px; }
 #app-login-field[hidden] { display: none; }
+/* Remote access: the address with a small Copy button on its right. */
+.remote-line { display: flex; align-items: center; gap: 8px; } .remote-line #remote-status { flex: 1; min-width: 0; overflow-wrap: anywhere; } .settings-panel #remote-copy { flex: none; width: auto; padding: 2px 10px; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; }

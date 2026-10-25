@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- Settings → Remote access: Copy is a small button on the right of the address.
+
 ## 0.1.78 — 2026-10-25
 
 ### Added
