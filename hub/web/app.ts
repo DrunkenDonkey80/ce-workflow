@@ -1702,9 +1702,13 @@ type UsageBar = { label: string; left: number; color: string; resets?: string; a
 type Usage = { id: string; label: string; window?: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[]; soon?: { left: number; in: string }[] };
 // The next refills (within 48 h) as dotted marks at the level they bring; the usage window labels them in grey.
 function soonMarks(bar: HTMLElement, item: Usage, labelled: boolean) {
- for (const refill of item.soon ?? []) {
+ // Labels stack one line apart, so close refills (75% and 65%) never print over each other; the bar grows to fit.
+ const soon = item.soon ?? [];
+ if (labelled && soon.length > 1) bar.style.paddingBottom = 20 + (soon.length - 1) * 13 + "px";
+ for (const [line, refill] of soon.entries()) {
   const at = shownLeft(refill.left), mark = el("i", "usage-soon" + (at > 70 ? " flip" : ""));
-  mark.style.left = at + "%"; if (labelled) mark.append(el("span", "", `${refill.in} \u00b7 ${at}%`));
+  mark.style.left = at + "%";
+  if (labelled) { const label = el("span", "", `${refill.in} \u00b7 ${at}%`); label.style.bottom = 1 + line * 13 + "px"; mark.append(label); }
   bar.append(mark);
  }
 }
