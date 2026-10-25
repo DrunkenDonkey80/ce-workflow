@@ -132,6 +132,12 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	host.on("event", (id: string, event) => views.get(id)?.feed(event));
 	// A child that ends mid-run never sends agent_settled; settle the page's activity so it stops showing work.
 	host.on("exit", (id: string) => views.get(id)?.feed({ type: "agent_settled", aborted: true }));
+	// The sidebar shows every session's state: tell all open pages when one changes, instead of waiting for their 5-15 s poll.
+	let sessionsTimer: NodeJS.Timeout | undefined;
+	const sessionsChanged = () => { sessionsTimer ??= setTimeout(() => { sessionsTimer = undefined; for (const value of views.values()) value.publish("sessions", {}); }, 200); };
+	host.on("event", (_id: string, event) => { if (["agent_start", "agent_settled", "compaction_start", "compaction_end"].includes(event.type)) sessionsChanged(); });
+	host.on("ui", (_id: string, request) => { if (["select", "confirm", "input", "editor"].includes(request.method) || request.statusKey === "pi-hub:state") sessionsChanged(); });
+	for (const name of ["closed", "answered", "exit", "switched", "terminals"]) host.on(name, sessionsChanged);
 
 	const scheduler = new Scheduler({ dataDir, registry, host });
 	// Until the gear menu saves its own list, keep what the old terminal footer hid (Pi settings.json).
@@ -390,6 +396,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	void usage?.start().catch(error => console.error(`usage: ${(error as Error).message}`));
 	pool?.start();
 	updates?.start();
+	scheduler.on("change", sessionsChanged);
 	scheduler.on("ended", (timer, reason) => console.log(`${new Date().toISOString()} timer ${timer.id.slice(0, 8)} for ${registry.get(timer.session)?.name ?? timer.session} ended: ${reason}`));
 	// A tick only reads its timers; due ones run in the background and never overlap themselves.
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);

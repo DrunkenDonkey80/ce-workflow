@@ -98,6 +98,7 @@ try {
 	const text = stream.frames.filter(frame => frame.event === "delta" && frame.data.id === done.data.id).reduce((value, frame) => value.slice(0, frame.data.offset) + frame.data.text, "");
 	assert.equal(text, "echo: hi", "deltas rebuild the streamed text");
 	await stream.next(frame => frame.event === "activity" && frame.data.working === false);
+	await stream.next(frame => frame.event === "sessions"); // the sidebar reloads without waiting for its poll
 	assert(!stream.frames.some(frame => frame.raw.includes("SYSTEM PROMPT")), "no system message frames");
 	const after = (await get(record.id, "snapshot")).body;
 	assert.deepEqual(after.chat.slice(-2).map(row => row.text), ["hi", "echo: hi"], "snapshot endpoint");

@@ -2268,6 +2268,7 @@ function applyUpdate(event: MessageEvent, update) {
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
 listen("status", value => { state.status = value; if (!value?.parked) waking = false; renderShell(); });
+listen("sessions", () => void loadSessions()); // another session started, finished, asked or parked
 listen("notice", value => showNotice(value.text)); // e.g. a model picked while parked could not be used (S-11)
 // Plan events always describe Pi's current plan. When Pi switches plans, the page follows it,
 // unless the reader picked another plan in the menu: that view stays until Pi switches again.

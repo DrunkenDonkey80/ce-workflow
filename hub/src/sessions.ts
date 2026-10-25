@@ -325,6 +325,7 @@ export class SessionHost extends EventEmitter {
 		if (!live?.dialogs.delete(requestId)) return false;
 		live.rpc.respondUi(requestId, response);
 		live.lastActivity = Date.now();
+		this.emit("answered", id); // no longer waiting for an answer
 		return true;
 	}
 
