@@ -327,7 +327,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .load svg { position: absolute; inset: 2px; width: calc(100% - 4px); height: calc(100% - 4px); }
 .load polyline { stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 #load-cpu polyline { stroke: var(--accent); } #load-memory polyline { stroke: var(--warning); }
-.load span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--text); text-shadow: 0 0 3px var(--panel); }
+.load span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--text); /* a solid halo in the box colour keeps the number readable over the graph line */ text-shadow: -1px -1px 0 var(--panel), 1px -1px 0 var(--panel), -1px 1px 0 var(--panel), 1px 1px 0 var(--panel), 0 -1px 0 var(--panel), 0 1px 0 var(--panel), -1px 0 0 var(--panel), 1px 0 0 var(--panel), 0 0 3px var(--panel); }
 /* Desktop: the plan bar leads the status line, next to the title; the other buttons keep their full text. */
 #plan-button { order: -1; flex: 1 1 0; display: flex; gap: 6px; justify-content: flex-start; }
 .bar-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; } .bar-count { flex: none; }
