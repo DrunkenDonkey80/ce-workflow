@@ -4,9 +4,22 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.83 — 2026-10-26
+
+### Added
+- The Files tab shows sizes in a right column: each file, and each folder's total (project files and explored archives).
+
+![File and folder sizes in the Files tab](docs/changelog/0.1.83-file-sizes.png)
+
 ### Changed
 - The hub checks for a new desktop app build every 10 minutes instead of hourly, so a release reaches the app soon after its build finishes.
 - Desktop app on Windows has no title bar: the session sidebar runs to the top of the window, the hub tabs sit right of it, and the gear (with its update badge) plus minimize, maximize and close are at the top right of the tab line. Drag the empty tab line to move the window; double-click it to maximize.
+- Closing an explored archive (Close, the browser's Back, or the mouse Back button in the desktop app) puts the chat back the way it was before Explore.
+- On the dark taskbar tile the state bars are brighter, and waiting for a timer is light grey there; the timer blue elsewhere is a little brighter.
+
+### Fixed
+- A finished session counted as seen while the desktop app sat behind another program; now only the active window counts, and the session's own question/finished notification is no longer skipped then.
+- The desktop app shows the hub's question and finished notifications (only the taskbar flashed before).
 
 ## 0.1.82 — 2026-10-26
 

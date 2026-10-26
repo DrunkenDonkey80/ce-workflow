@@ -534,7 +534,7 @@ window.addEventListener("keydown", event => { if (event.key === "Escape") { $("h
 $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
-const filesView = createFilesView($("files"), { get, image: src => openViewer(src), markdown: (target, text) => renderMarkdown(target, text, new Set()) });
+const filesView = createFilesView($("files"), { get, image: src => openViewer(src), markdown: (target, text) => renderMarkdown(target, text, new Set()), closed: () => closeExplore() });
 // /plan3 architecture links open on the Project tab.
 setTab(target === "product" ? "project" : remembered("plan3-tab", [...LEFT_TABS, "diagram"], "plan"));
 { const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view); }
@@ -938,11 +938,25 @@ async function exploreArchive(path: string) {
  showNotice("Unpacking " + path.split(/[\/]/).pop() + "…");
  try {
   const value = await post("explore", { path });
+  if (!filesView.exploring) {
+   beforeExplore = { left: workspace.dataset.left!, tab: $("files").hidden ? diagramTab : "files", width: splitter.getAttribute("aria-valuenow")!, mobile: workspace.dataset.mobile === "chat" ? "chat" : "files" };
+   history.pushState({ explore: true }, "");
+  }
   filesView.explore(value);
   if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
   showNotice(`${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
  } catch (error) { showNotice(error.message); }
 }
+// Close (or Back: the browser's, the mouse's) puts the chat back the way it was.
+let beforeExplore: { left: string; tab: string; width: string; mobile: string } | null = null;
+function closeExplore() {
+ if (history.state?.explore) return history.back(); // popstate comes back here
+ if (!filesView.exploring) return;
+ filesView.close();
+ const was = beforeExplore; beforeExplore = null; if (!was) return;
+ if (phone.matches) setMobile(was.mobile); else { setTab(was.tab); setLeft(was.left); resizeChat(Number(was.width)); }
+}
+addEventListener("popstate", () => closeExplore());
 async function openFile(path: string, reveal: boolean) {
  try { const { revealed } = await post("open", { path, reveal }); if (revealed && !reveal) showNotice("Programs and scripts open in their folder, never run."); } catch (error) { showNotice(error.message); }
 }
@@ -1412,6 +1426,9 @@ function appleIcon(svg: string) {
  image.src = "data:image/svg+xml," + encodeURIComponent(svg.replace("<style>", '<rect width="32" height="32" fill="#fff"/><style>')); // iOS shows transparency as black
 }
 // Icons: a parked session with a timer still counts as waiting for it (blue); questions and finished runs keep their own colour.
+// Seen = this page is in the active window. The app's webview keeps its focus while another program is in front;
+// the app says so in piHubFront (hub/app main.rs).
+const seenNow = () => document.visibilityState === "visible" && document.hasFocus() && (window as unknown as { piHubFront?: boolean }).piHubFront !== false;
 const iconTone = (session?: HubSession) => !session ? "" : session.tone === "parked" && session.timers?.length ? "scheduled" : session.tone;
 async function loadSessions() {
  clearTimeout(sessionsTimer);
@@ -1426,7 +1443,7 @@ async function loadSessions() {
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
   // Looking at it also drops it from the attention key's list.
   const own = groups.flatMap(group => group.sessions).find(session => session.id === sessionId);
-  if (visible && document.hasFocus() && own && (own.tone === "unseen" || own.attention)) { void post("seen", {}).catch(() => {}); delete own.attention; }
+  if (seenNow() && own && (own.tone === "unseen" || own.attention)) { void post("seen", {}).catch(() => {}); delete own.attention; }
   // Questions first, then the newest: a question blocks work, a finished run can wait.
   attentionList = groups.flatMap(group => group.sessions).filter(session => session.attention).sort((a, b) => Number(b.tone === "waiting") - Number(a.tone === "waiting") || b.attention! - a.attention!);
   $("attention-field").hidden = !inApp(); ($("attention-key") as HTMLInputElement).value = hubSettings.attentionKey ?? "";
@@ -1442,6 +1459,7 @@ async function loadSessions() {
 for (const type of ["mousedown", "mouseup", "auxclick"]) window.addEventListener(type, event => {
  const press = event as MouseEvent; if ((press.button !== 3 && press.button !== 4) || !inApp()) return;
  press.preventDefault(); // the webview's own history step would fight the app's
+ if (press.button === 3 && filesView.exploring) { if (type === "mouseup") closeExplore(); return; } // Back leaves Explore first
  if (type === "mouseup") { navRequest = { n: Date.now(), dir: press.button === 3 ? -1 : 1, ctrl: press.ctrlKey }; renderIcon(); }
 }, true);
 (window as unknown as { piHubGo: (id: string) => void }).piHubGo = jumpTo;
@@ -2146,7 +2164,7 @@ function notifyChanges(groups: Group[]) {
  const notify = hubSettings.notify ?? { question: true, done: true };
  for (const group of groups) for (const session of group.sessions) {
   const was = before.get(session.id), now = session.tone;
-  if (was === now || (session.id === sessionId && document.visibilityState === "visible")) continue;
+  if (was === now || (session.id === sessionId && seenNow())) continue;
   // shortcut: one 5 s (15 s in the background) poll decides "finished"; a gap between chained turns can announce early.
   const kind = now === "waiting" && notify.question ? "asks a question" : was === "working" && ["seen", "unseen", "scheduled"].includes(now) && notify.done && !session.quiet ? "finished" : "";
   if (!kind) continue;

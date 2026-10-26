@@ -1,6 +1,6 @@
 // Project file tree, file and diff reads for the page (moved from ce-workflow plan3-files.ts in plan 0db155f7 H9-01).
 import { execFile } from "node:child_process";
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { captureSource, forbiddenPath, safePath, secret } from "../../extensions/jev-tools.ts";
 
@@ -11,7 +11,7 @@ const git = (cwd: string, args: string[]) => new Promise<Git>(resolve => execFil
 	(error, stdout) => resolve({ code: error ? (typeof error.code === "number" ? error.code : 1) : 0, stdout: stdout ?? "" })));
 export class FileRefused extends Error {}
 
-export type ProjectFile = { path: string; change?: string };
+export type ProjectFile = { path: string; change?: string; size?: number };
 /** Porcelain paths are repository-root relative; return them relative to cwd, limited to it. */
 async function status(cwd: string) {
 	const prefix = (await git(cwd, ["rev-parse", "--show-prefix"])).stdout.trim();
@@ -34,7 +34,9 @@ export async function listFiles(cwd: string): Promise<{ files: ProjectFile[]; tr
 		for (const { code, path } of await status(cwd)) { changes.set(path, code.trim() || code); paths.add(path); }
 	} else await walk(cwd, "", paths, 0);
 	const visible = [...paths].filter(path => !forbiddenPath.test(path)).sort();
-	return { files: visible.slice(0, MAX_FILES).map(path => changes.has(path) ? { path, change: changes.get(path) } : { path }), truncated: visible.length > MAX_FILES || paths.size > MAX_FILES * 4, git: listed.code === 0 };
+	// Sizes for the tree's size column; a deleted file has none.
+	const files = await Promise.all(visible.slice(0, MAX_FILES).map(async path => ({ path, ...changes.has(path) && { change: changes.get(path) }, ...await stat(join(cwd, path)).then(info => ({ size: info.size }), () => ({})) })));
+	return { files, truncated: visible.length > MAX_FILES || paths.size > MAX_FILES * 4, git: listed.code === 0 };
 }
 async function walk(root: string, prefix: string, paths: Set<string>, depth: number) {
 	if (depth > 8 || paths.size > MAX_FILES * 4) return;

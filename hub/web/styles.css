@@ -66,9 +66,12 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-tree summary { cursor: pointer; padding: 2px 4px; border-radius: 6px; }
 .files-tree summary.changed { font-weight: 600; }
 .files-tree details > .file { margin-left: 12px; width: calc(100% - 12px); }
-.file { display: flex; gap: 6px; width: 100%; text-align: left; border-color: transparent; padding: 2px 4px; overflow-wrap: anywhere; }
+.file { display: flex; align-items: flex-start; gap: 6px; width: 100%; text-align: left; border-color: transparent; padding: 2px 4px; overflow-wrap: anywhere; }
 .file[aria-current=true] { border-color: var(--ink); }
-.file-mark { margin-left: auto; padding: 0 4px; border-radius: 6px; background: var(--changed); font-size: 12px; }
+.file-size { margin-left: auto; padding-left: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.files-tree summary { display: flex; } .files-tree summary::before { content: "▸"; width: 1em; flex: none; } .files-tree details[open] > summary::before { content: "▾"; }
+.file-mark + .file-size, .file-size + .file-mark { margin-left: 0; }
+.file-mark { flex: none; white-space: nowrap; margin-left: auto; padding: 0 4px; border-radius: 6px; background: var(--changed); font-size: 12px; }
 .file[data-change^="?"] .file-mark, .file[data-change^=A] .file-mark { background: var(--new); }
 .file[data-change^=D] .file-mark { background: var(--pink); }
 .files-viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; padding: 8px 12px; }
@@ -572,7 +575,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session[data-tone=waiting] .session-letter { background: var(--error); }
 .session[data-tone=unseen] .session-letter { background: light-dark(#2b8a3e, #37b24d); color: #fff; }
 .session[data-tone=scheduled] { background: color-mix(in srgb, var(--muted) 12%, transparent); border-radius: 6px; }
-.session[data-tone=scheduled] .session-letter { background: #1c7ed6; color: #fff; }
+.session[data-tone=scheduled] .session-letter { background: #339af0; color: #fff; }
 .session-timer { margin-left: auto; padding-left: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .switcher[data-open=false] .session-timer { display: none; }
 .session[data-tone=seen] .session-letter { background: #ced4da; color: #1e1e1e; }

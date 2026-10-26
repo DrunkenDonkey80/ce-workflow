@@ -406,6 +406,11 @@ async fn open(app: AppHandle, id: u32, url: String) -> Result<(), String> {
     let (popup_hub, nav_hub) = (hub.origin(), hub.origin());
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(hub))
         .user_agent(&ua())
+        // WebView2 shows no prompt for page notifications and leaves them off; the hub's question/finished alerts need them.
+        .on_permission_request(|_, kind| match kind {
+            tauri::webview::PermissionKind::Notifications => tauri::webview::PermissionResponse::Allow,
+            _ => tauri::webview::PermissionResponse::Default,
+        })
         // Links off the hub (chat links, docs) open in the default browser; the hub's own popups (images, files) stay in the app.
         .on_new_window(move |url, _| {
             if url.origin() == popup_hub {
@@ -770,6 +775,15 @@ fn main() {
                         alt_digits(&handle, true)
                     } else if !cfg!(windows) || !app_in_front() {
                         alt_digits(&handle, false)
+                    }
+                    // A hub page still has focus while another program is in front, so it would mark a finished run seen;
+                    // tell it (piHubFront in hub/web/app.ts), and re-check on coming back (its focus listener).
+                    let front = *focused || (cfg!(windows) && app_in_front());
+                    let script = format!("window.piHubFront={front};{}", if front { "dispatchEvent(new Event('focus'))" } else { "" });
+                    if let Some(w) = handle.get_window("main") {
+                        for webview in w.webviews().into_iter().filter(|w| w.label() != "strip") {
+                            let _ = webview.eval(&script);
+                        }
                     }
                 }
                 _ => {}

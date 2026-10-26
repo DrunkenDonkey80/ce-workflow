@@ -32,7 +32,9 @@ export const ICONS: Record<string, [string, string, boolean]> = {
 // The tab icon, and the installed app's icon (hub /app-icon.svg): transparent, dark ink, light ink on a dark tab bar.
 const ICON_INK = "#343a40";
 // waiting: asks you; working; unseen: finished, not yet looked at (ready); scheduled: idle, a timer will wake it.
-const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#1c7ed6" };
+const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#339af0" };
+// The same states on the taskbar's dark tile: brighter, or they sink into the dark; a timer is light grey there (blue read too dim).
+const BRIGHT: Record<string, string> = { waiting: "#ff6b6b", working: "#ffa94d", unseen: "#69db7c", scheduled: "#dee2e6" };
 // states: any of waiting/working/unseen/scheduled, each drawn once, most urgent first.
 // The icon alone, centred in a 32 box.
 function glyph(name: string) {
@@ -60,7 +62,7 @@ export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
   const lit = Object.keys(DOTS).filter(state => hub.states.includes(state)), x = (2 + column * i + gap).toFixed(2), w = (column - 2 * gap).toFixed(2);
   if (!lit.length) return `<rect x="${x}" y="${2 + gap}" width="${w}" height="${28 - 2 * gap}" rx="2" fill="#3a3f45"/>`;
   const part = (28 - 2 * gap) / lit.length;
-  return lit.map((state, k) => `<rect x="${x}" y="${(2 + gap + k * part).toFixed(2)}" width="${w}" height="${(part - (k < lit.length - 1 ? 1 : 0)).toFixed(2)}" rx="2" fill="${DOTS[state]}"/>`).join("");
+  return lit.map((state, k) => `<rect x="${x}" y="${(2 + gap + k * part).toFixed(2)}" width="${w}" height="${(part - (k < lit.length - 1 ? 1 : 0)).toFixed(2)}" rx="2" fill="${BRIGHT[state]}"/>`).join("");
  }).join("") + "</svg>";
 }
 

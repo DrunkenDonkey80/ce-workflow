@@ -30,7 +30,7 @@
 import { ICONS, iconSvg, hubsIconSvg } from "./icons.js";
 const { invoke } = window.__TAURI__.core;
 const DEFAULT_ICON = Object.keys(ICONS)[0];
-const URGENCY = ["waiting", "working", "unseen", "scheduled"], DOT = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#1c7ed6" };
+const URGENCY = ["waiting", "working", "unseen", "scheduled"], DOT = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#339af0" };
 let pinned = false;
 const WORD = { waiting: "asking", working: "working", unseen: "finished", scheduled: "timer" };
 let tabs = [], active = 0, nextId = 0, dark = null, iconKey = "", dragged = null, startupError = "";

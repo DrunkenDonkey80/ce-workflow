@@ -4,10 +4,10 @@ type ProjectFile = { path: string; change?: string; size?: number };
 type Archive = { key: string; name: string; files: ProjectFile[]; truncated: boolean };
 const IMAGE = /.(?:png|jpe?g|gif|webp|bmp|svg|ico)$/i, FRAME = /.(?:html?|pdf)$/i, MEDIA = /.(?:mp4|webm|mp3|wav)$/i, MARKDOWN = /.(?:md|markdown)$/i, TEXT_BYTES = 1_048_576;
 const size = (bytes = 0) => bytes < 1024 ? bytes + " B" : bytes < 1_048_576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1_048_576).toFixed(1) + " MB";
-type Folder = { folders: Map<string, Folder>; files: ProjectFile[]; changed: boolean };
+type Folder = { folders: Map<string, Folder>; files: ProjectFile[]; changed: boolean; size: number };
 const CHANGE_NAMES = { M: "modified", A: "added", D: "deleted", R: "renamed", C: "copied", "??": "untracked" };
 
-export function createFilesView(root: HTMLElement, { get, image, markdown }: { get: (endpoint: string) => Promise<any>; image: (src: string) => void; markdown: (target: HTMLElement, text: string) => void }) {
+export function createFilesView(root: HTMLElement, { get, image, markdown, closed }: { get: (endpoint: string) => Promise<any>; image: (src: string) => void; markdown: (target: HTMLElement, text: string) => void; closed: () => void }) {
  root.replaceChildren();
  const tree = Object.assign(document.createElement("nav"), { className: "files-tree" }), viewer = Object.assign(document.createElement("section"), { className: "files-viewer" });
  tree.setAttribute("aria-label", "Project files"); viewer.setAttribute("aria-label", "File content"); viewer.tabIndex = 0;
@@ -18,24 +18,25 @@ export function createFilesView(root: HTMLElement, { get, image, markdown }: { g
  const open = new Set<string>();
 
  function folder(files: ProjectFile[]) {
-  const top: Folder = { folders: new Map(), files: [], changed: false };
+  const top: Folder = { folders: new Map(), files: [], changed: false, size: 0 };
   for (const file of files) {
    let at = top; const parts = file.path.split("/");
    for (const part of parts.slice(0, -1)) {
     if (file.change) at.changed = true;
-    if (!at.folders.has(part)) at.folders.set(part, { folders: new Map(), files: [], changed: false });
-    at = at.folders.get(part);
+    if (!at.folders.has(part)) at.folders.set(part, { folders: new Map(), files: [], changed: false, size: 0 });
+    at = at.folders.get(part); at.size += file.size ?? 0;
    }
    if (file.change) at.changed = true;
    at.files.push(file);
   }
   return top;
  }
+ const sizeCell = (bytes: number) => Object.assign(document.createElement("span"), { className: "file-size", textContent: size(bytes) });
  // Native <details>/<summary> folders give Enter/Space toggling; changed folders start open.
  function draw(at: Folder, prefix: string, into: HTMLElement) {
   for (const [name, child] of [...at.folders].sort(([a], [b]) => a.localeCompare(b))) {
    const path = prefix + name + "/", details = document.createElement("details"), summary = document.createElement("summary");
-   summary.textContent = name; if (child.changed) summary.classList.add("changed");
+   summary.append(name, sizeCell(child.size)); if (child.changed) summary.classList.add("changed");
    details.open = open.has(path) || (child.changed && !open.has("!" + path));
    details.addEventListener("toggle", () => { open.delete(details.open ? "!" + path : path); open.add(details.open ? path : "!" + path); });
    details.append(summary); draw(child, path, details); into.append(details);
@@ -44,6 +45,7 @@ export function createFilesView(root: HTMLElement, { get, image, markdown }: { g
    const button = document.createElement("button"); button.type = "button"; button.className = "file"; button.dataset.path = file.path;
    button.textContent = file.path.slice(prefix.length);
    if (file.change) { const mark = Object.assign(document.createElement("span"), { className: "file-mark", textContent: file.change }); mark.title = CHANGE_NAMES[file.change[0] === "?" ? "??" : file.change[0]] ?? "changed"; button.append(" ", mark); button.dataset.change = file.change; }
+   if (file.size !== undefined) button.append(sizeCell(file.size));
    button.setAttribute("aria-current", String(file.path === selected));
    button.addEventListener("click", () => show(file));
    into.append(button);
@@ -57,7 +59,7 @@ export function createFilesView(root: HTMLElement, { get, image, markdown }: { g
    loaded = true; tree.replaceChildren();
    if (archive) {
     const close = Object.assign(document.createElement("button"), { type: "button", textContent: "Close" });
-    close.addEventListener("click", () => { archive = null; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); });
+    close.addEventListener("click", () => closed());
     const bar = Object.assign(document.createElement("div"), { className: "files-archive", textContent: "📦 " + archive.name }); bar.append(close); tree.append(bar);
    }
    draw(folder(value.files), "", tree);
@@ -111,6 +113,9 @@ export function createFilesView(root: HTMLElement, { get, image, markdown }: { g
  return {
   /** Shows an explored archive's files instead of the project's until Close. */
   explore(value: Archive) { archive = value; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); },
+  /** Back to the project's files (the page restores its layout through closed). */
+  close() { archive = null; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); },
+  get exploring() { return !!archive; },
   /** First show loads; later file changes refresh only while visible, otherwise on next show. */
   shown() { if (!loaded) void refresh(); },
   open(path: string) { linked = path; void show({ path }); },

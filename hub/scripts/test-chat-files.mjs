@@ -94,7 +94,7 @@ assert.equal(mirror.page(mirror.snapshot()[10].id).more, false);
  try {
   const plain = await mkdtemp(join(tmpdir(), "plan3-files-plain-"));
   await mkdir(join(plain, "src")); await mkdir(join(plain, "node_modules")); await writeFile(join(plain, "src", "a.ts"), "x"); await writeFile(join(plain, "node_modules", "b.js"), "x"); await writeFile(join(plain, ".env"), "K=1");
-  assert.deepEqual(await listFiles(plain), { files: [{ path: "src/a.ts" }], truncated: false, git: false }, "a walk outside git still hides secrets and generated folders");
+  assert.deepEqual(await listFiles(plain), { files: [{ path: "src/a.ts", size: 1 }], truncated: false, git: false }, "a walk outside git still hides secrets and generated folders");
   await rm(plain, { recursive: true, force: true });
   run("init", "-q");
   assert.deepEqual(await readProjectDiff(repo, "x.txt").catch(error => error.constructor.name), "FileRefused", "a missing file is refused, not crashed");
@@ -106,7 +106,7 @@ assert.equal(mirror.page(mirror.snapshot()[10].id).more, false);
   await writeFile(join(repo, "conf.txt"), "port = 1\n"); await writeFile(join(repo, "fresh.txt"), "new\n"); await writeFile(join(repo, "ignored.log"), "x"); await writeFile(join(repo, ".env.local"), "K=1");
   const { files, git } = await listFiles(repo);
   assert.equal(git, true);
-  assert.deepEqual(files, [{ path: ".gitignore" }, { path: "conf.txt", change: "M" }, { path: "first.txt" }, { path: "fresh.txt", change: "??" }, { path: "gone.txt", change: "D" }, { path: "keep.txt", change: "M" }, { path: "new.txt", change: "R" }]);
+  assert.deepEqual(files, [{ path: ".gitignore", size: 12 }, { path: "conf.txt", change: "M", size: 9 }, { path: "first.txt", size: 4 }, { path: "fresh.txt", change: "??", size: 4 }, { path: "gone.txt", change: "D" }, { path: "keep.txt", change: "M", size: 4 }, { path: "new.txt", change: "R", size: 90 }]);
   assert.match((await readProjectDiff(repo, "keep.txt")).diff, /^-b$[\s\S]*^\+B$/m);
   assert.match((await readProjectDiff(repo, "gone.txt")).diff, /deleted file mode/, "a deleted file shows its diff without the file existing");
   assert.match((await readProjectDiff(repo, "new.txt")).diff, /rename from old\.txt/, "staged renames are diffed against HEAD");
@@ -116,7 +116,7 @@ assert.equal(mirror.page(mirror.snapshot()[10].id).more, false);
   await assert.rejects(readProjectDiff(repo, ".env.local"), FileRefused);
   assert.deepEqual(await readProjectFile(repo, "keep.txt"), { path: "keep.txt", content: "a\nB\n" });
   await mkdir(join(repo, "sub")); await writeFile(join(repo, "sub", "s.txt"), "line\n".repeat(9) + "s\n"); run("add", "sub/s.txt"); run("commit", "-qm", "sub"); await writeFile(join(repo, "sub", "s.txt"), "line\n".repeat(9) + "S\n"); run("mv", "sub/s.txt", "sub/t.txt");
-  assert.deepEqual((await listFiles(join(repo, "sub"))).files, [{ path: "t.txt", change: "RM" }], "a session in a subfolder sees cwd-relative marks only");
+  assert.deepEqual((await listFiles(join(repo, "sub"))).files, [{ path: "t.txt", change: "RM", size: 47 }], "a session in a subfolder sees cwd-relative marks only");
   assert.match((await readProjectDiff(join(repo, "sub"), "t.txt")).diff, /rename from sub\/s\.txt/);
  } finally { await rm(repo, { recursive: true, force: true }); }
 }
