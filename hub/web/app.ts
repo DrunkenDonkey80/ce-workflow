@@ -792,7 +792,7 @@ function renderChat() {
  }
  // ✕ on the last prompt takes it and everything after it out of the context (a prompt sent by mistake).
  const lastPrompt = [...chat.values()].findLast(row => row.role === "user"), drop = $("drop-last") ?? Object.assign(document.createElement("button"), { id: "drop-last", type: "button", className: "drop-last", textContent: "\u2715", title: "Remove this message and everything after it from the context" });
- const dropHost = lastPrompt && list.querySelector<HTMLLIElement>(`:scope > li[data-id="${CSS.escape(lastPrompt.id)}"]`);
+ const dropHost = lastPrompt && !lastPrompt.text.startsWith("!") && list.querySelector<HTMLLIElement>(`:scope > li[data-id="${CSS.escape(lastPrompt.id)}"]`);
  if (dropHost) { drop.dataset.text = lastPrompt.text; if (drop.parentElement !== dropHost) dropHost.append(drop); } else drop.remove();
  // Follow new output only while the reader is at the bottom; otherwise offer a jump button.
  if (follow) feed.scrollTop = feed.scrollHeight; else if (feed.scrollHeight > feed.clientHeight) $("to-bottom").hidden = false;
@@ -1054,13 +1054,16 @@ function insertPath(input: HTMLTextAreaElement, path: string) {
  const at = input.selectionStart; input.setRangeText((at && !/\s/.test(input.value[at - 1]) ? " " : "") + path + " ", at, input.selectionEnd, "end"); input.scrollTop = input.scrollHeight; input.focus(); input.dispatchEvent(new Event("input"));
  if (input === $("message-input")) toBottom();
 }
+// Uploads still saving into the chat box: Send waits for them, so a fast paste-then-Enter sends text and image together.
+const chatUploads = new Set<Promise<void>>();
+function trackUpload(job: Promise<void>, input: HTMLTextAreaElement) { if (input !== $("message-input")) return; chatUploads.add(job); void job.finally(() => chatUploads.delete(job)); }
 function takeFiles(zone: HTMLElement, input: HTMLTextAreaElement) {
- input.addEventListener("paste", event => { const files = transferFiles(event.clipboardData); if (!files.length) return; event.preventDefault(); void pasteFiles(files, input); });
+ input.addEventListener("paste", event => { const files = transferFiles(event.clipboardData); if (!files.length) return; event.preventDefault(); trackUpload(pasteFiles(files, input), input); });
  zone.addEventListener("dragover", event => { if (event.dataTransfer?.types.includes("Files")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } });
- zone.addEventListener("drop", event => { const files = transferFiles(event.dataTransfer); if (!files.length) return; event.preventDefault(); event.stopPropagation(); void attachAll(files, input); });
+ zone.addEventListener("drop", event => { const files = transferFiles(event.dataTransfer); if (!files.length) return; event.preventDefault(); event.stopPropagation(); trackUpload(attachAll(files, input), input); });
 }
 takeFiles($("chat"), $("message-input"));
-$("attach").addEventListener("change", () => { const input = $("attach") as HTMLInputElement, files = [...input.files ?? []]; input.value = ""; void attachAll(files, $("message-input")); });
+$("attach").addEventListener("change", () => { const input = $("attach") as HTMLInputElement, files = [...input.files ?? []]; input.value = ""; trackUpload(attachAll(files, $("message-input")), $("message-input")); });
 // Saves the file on the hub PC and inserts its path at the cursor of `input` (chat box or a prompt's answer box).
 async function attach(file: File, input: HTMLTextAreaElement) {
  showNotice("Saving " + file.name + "\u2026");
@@ -1175,6 +1178,11 @@ function showHistory(at: number, caret: number) {
 }
 $("composer").addEventListener("submit", async event => {
  event.preventDefault(); if (messageSending || !state.connected) return;
+ if (chatUploads.size) {
+  messageSending = true; showNotice("Waiting for the pasted file\u2026");
+  try { while (chatUploads.size) await Promise.allSettled([...chatUploads]); } finally { messageSending = false; }
+  if (!state.connected) return;
+ }
  const text = $("message-input").value; if (!text.trim()) return;
  // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();

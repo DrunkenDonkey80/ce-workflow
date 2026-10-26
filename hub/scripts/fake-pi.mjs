@@ -57,6 +57,8 @@ async function handle(cmd) {
 			sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; header(); messages.length = 0; kept.forEach(save);
 			return reply({ text, cancelled: false });
 		}
+		// Like Pi: runs the command, stores a bashExecution message and sends no message event.
+		case "bash": { const data = { output: "ran " + cmd.command, exitCode: 0, cancelled: false, truncated: false }; save({ role: "bashExecution", command: cmd.command, excludeFromContext: !!cmd.excludeFromContext, timestamp: Date.now(), ...data }); return reply(data); }
 		case "set_session_name": sessionName = cmd.name; return reply();
 		case "prompt": {
 			if (flags.has("crash-on-prompt")) process.exit(3);

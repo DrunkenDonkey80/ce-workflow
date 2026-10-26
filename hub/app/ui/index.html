@@ -6,12 +6,11 @@
  body { margin: 0; font: 13px system-ui, "Segoe UI", sans-serif; background: var(--bar); color: var(--ink); display: flex; height: 36px; align-items: stretch; overflow: hidden; user-select: none }
  button { border: 0; background: none; color: inherit; padding: 0 12px; font: inherit; cursor: pointer; display: flex; align-items: center; gap: 7px; max-width: 240px; white-space: nowrap; overflow: hidden }
  button.tab.on { background: var(--on); box-shadow: inset 0 -2px var(--sel) }
+ button.tab.hidden { opacity: .6; font-style: italic }
  button.tab.drop { box-shadow: inset 2px 0 var(--sel) }
  button.tab img { width: 20px; height: 20px; flex: none }
  button.tab span { overflow: hidden; text-overflow: ellipsis }
  button.tab small { color: var(--muted) }
- button.choice { margin: 6px 2px; padding: 0 10px; border: 1px solid var(--muted); border-radius: 4px }
- button.choice.danger { color: #e03131; border-color: #e03131 }
  #add { padding: 0 12px; font-size: 18px; color: var(--muted) }
  #ask { flex: 1; margin: 5px 8px; padding: 0 8px; border: 1px solid var(--sel); border-radius: 4px; background: var(--on); color: inherit; font: inherit; outline: none }
  #note.update { cursor: pointer; color: var(--ink); text-decoration: underline }
@@ -43,14 +42,15 @@ const stateWord = tab => tab.url ? (WORD[URGENCY.find(s => tab.states.includes(s
 const ink = svg => dark === null ? svg : svg.replace(/<style>.*?<\/style>/, "").replaceAll("#343a40", dark ? "#e9ecef" : "#343a40");
 const dataUrl = svg => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 
-function persist() { void invoke("save", { hubs: tabs.map(tab => tab.local ? { local: true, name: tab.name } : { url: tab.url, name: tab.name }) }); }
+function persist() { void invoke("save", { hubs: tabs.map(tab => tab.local ? { local: true, name: tab.name, hidden: tab.hidden } : { url: tab.url, name: tab.name, hidden: tab.hidden }) }); }
 function render() {
  if (asking) return void updateIcons(); // keep the open question; icons still follow the hubs
- const buttons = tabs.map((tab, i) => {
+ const buttons = tabs.flatMap((tab, i) => {
+  if (tab.hidden && !revealed && i !== active) return [];
   const button = document.createElement("button"), img = document.createElement("img"), text = document.createElement("span");
   img.src = dataUrl(iconSvg(ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, tab.states)); img.alt = "";
   text.textContent = label(tab); if (!text.textContent) text.hidden = true;
-  button.className = "tab" + (i === active ? " on" : ""); button.title = `${fullName(tab)}: ${stateWord(tab)} · Alt+${i + 1} · drag to reorder · right-click to rename or remove`;
+  button.className = "tab" + (i === active ? " on" : "") + (tab.hidden ? " hidden" : ""); button.title = `${fullName(tab)}: ${stateWord(tab)} · Alt+${i + 1} · drag to reorder · right-click for rename, copy link, reload, remove`;
   button.append(img, text);
   if (!tab.url) { const small = document.createElement("small"); small.textContent = "waiting for the hub"; button.append(small); }
   button.onclick = () => select(tab.id);
@@ -84,7 +84,7 @@ async function updateIcons() {
  const local = tabs.find(tab => tab.local) ?? tabs[0];
  const key = JSON.stringify([tabs.map(t => [t.icon, t.states, fullName(t), t.url ? 1 : 0, t.attention]), staged, pinned]);
  if (key === iconKey) return; iconKey = key;
- const big = ink(hubsIconSvg(tabs.map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
+ const big = ink(hubsIconSvg(tabs.filter(tab => !tab.hidden).map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
  const small = ink(iconSvg(ICONS[local?.icon] ? local.icon : DEFAULT_ICON, URGENCY.filter(s => all.includes(s))));
  try {
   await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay: pinned && urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="${DOT[urgent]}"/>${number}</svg>`, 16) : null });
@@ -113,7 +113,7 @@ function frameButtons() {
 }
 function select(id, stepping = false) {
  const index = tabs.findIndex(tab => tab.id === id); if (index < 0) return;
- active = index; void invoke("show", { id }); placeStrip(); render();
+ active = index; if (!tabs[index].hidden) lastShown = id; void invoke("show", { id }); placeStrip(); render();
  if (!stepping) visited(tabs[index]);
 }
 // Back/forward mouse buttons: every session seen in the app, across hubs, like a browser's history; with Ctrl, this hub's only.
@@ -177,19 +177,25 @@ async function addHub() {
  if (!["http:", "https:"].includes(url.protocol)) { notice = "Hub links start with http:// or https://."; return render(); }
  const tab = newTab({ url: url.href }); tabs.push(tab); persist(); open(tab); select(tab.id);
 }
-// Right-click menu, drawn in the strip like ask(). Names are this PC's own: another PC can show or hide the same hub's name.
-function choose(hint, options) {
- return new Promise(done => {
-  const text = document.createElement("div"); text.id = "note"; text.style.margin = "0 8px 0 0"; text.textContent = hint;
-  const finish = result => { if (asking !== text) return; asking = null; document.removeEventListener("keydown", onKey); done(result); render(); };
-  const onKey = event => { if (event.key === "Escape") finish(null); };
-  const buttons = [...options, ["Cancel", null]].map(([title, value, danger]) => { const b = document.createElement("button"); b.textContent = title; b.className = "choice" + (danger ? " danger" : ""); b.onclick = () => finish(value); return b; });
-  asking = text; notice = ""; document.addEventListener("keydown", onKey); document.body.replaceChildren(text, ...buttons); buttons[0].focus();
- });
-}
+// Names are this PC's own: another PC can show or hide the same hub's name.
+// A native popup menu at the cursor (the 36 px strip cannot draw a dropdown over the hub page below it).
 async function menu(tab) {
- const pick = await choose(fullName(tab) + ":", [["Rename", "rename"], ...(tab.name !== undefined ? [["Reset name", "reset"]] : []), ...(tab.local ? [] : [["Remove", "remove", true]])]);
+ const pick = await new Promise(done => {
+  const item = (text, value) => ({ text, action: () => done(value) });
+  void window.__TAURI__.menu.Menu.new({ items: [
+   item("Rename…", "rename"), ...(tab.name !== undefined ? [item("Reset name", "reset")] : []),
+   ...(tab.url ? [item("Copy link", "copy"), item("Reload", "reload")] : []),
+   ...(tab.hidden ? [item("Unhide", "hide")] : tabs.some(other => other !== tab && !other.hidden) ? [item("Hide", "hide")] : []),
+   ...(tab.local ? [] : [{ item: "Separator" }, item("Remove", "remove")]),
+  ] }).then(m => m.popup()).then(() => setTimeout(() => done(null), 500), error => { notice = "Menu: " + error; render(); done(null); });
+ });
  if (pick === "reset") { delete tab.name; persist(); render(); }
+ if (pick === "reload") open(tab);
+ if (pick === "hide") { tab.hidden = !tab.hidden; persist(); render(); }
+ if (pick === "copy") {
+  try { await navigator.clipboard.writeText(tab.url); notice = "Link copied."; } catch { notice = tab.url; }
+  render(); setTimeout(() => { if (notice === "Link copied.") { notice = ""; render(); } }, 3000);
+ }
  if (pick === "rename") {
   const name = await ask("Name on this PC (empty shows only the icon):", tab.name ?? fullName(tab)); if (name === null) return;
   tab.name = name === (tab.hubName || (tab.local ? "This PC" : host(tab.url))) ? undefined : name; persist(); render();
@@ -200,14 +206,25 @@ async function menu(tab) {
   active = Math.max(0, tabs.indexOf(current)); persist(); if (tabs[active]) select(tabs[active].id); else render();
  }
 }
+// Hidden hubs: only shown while picked (Alt+number, tray) or after a right-click on the strip's empty part; 10 s after
+// the app loses focus they go away again and a hidden hub on screen gives way to the last visible one.
+let revealed = false, lastShown = null, concealTimer = 0;
+document.body.addEventListener("contextmenu", event => { event.preventDefault(); if (event.target.closest("button.tab") || !tabs.some(tab => tab.hidden)) return; revealed = true; render(); });
+function conceal() {
+ revealed = false;
+ if (!tabs[active]?.hidden) return render();
+ const back = tabs.find(tab => tab.id === lastShown && !tab.hidden) ?? tabs.find(tab => !tab.hidden);
+ if (back) select(back.id); else render();
+}
+void window.__TAURI__.window.getCurrentWindow().onFocusChanged(({ payload: focused }) => { clearTimeout(concealTimer); if (!focused) concealTimer = setTimeout(conceal, 10_000); });
 let staged = false, config = {};
 config = await invoke("config");
 dark = config.dark; staged = config.staged; startupError = config.error ?? "";
 const saved = Array.isArray(config.hubs) ? config.hubs : [];
-tabs = saved.filter(h => h?.local || h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, ...(typeof h.name === "string" ? { name: h.name } : {}) }));
+tabs = saved.filter(h => h?.local || h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, ...(typeof h.name === "string" ? { name: h.name } : {}), ...(h.hidden ? { hidden: true } : {}) }));
 if (!tabs.some(tab => tab.local)) tabs.unshift(newTab({ local: true, url: config.local }));
 for (const tab of tabs) open(tab);
-select(tabs[0].id);
+select((tabs.find(tab => !tab.hidden) ?? tabs[0]).id);
 // P-01: the app may start at login before the hub: keep the tab and look for hub.json every few seconds.
 const local = tabs.find(tab => tab.local);
 const wait = setInterval(async () => {

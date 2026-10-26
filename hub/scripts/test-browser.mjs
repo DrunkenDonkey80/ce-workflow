@@ -1012,6 +1012,10 @@ try {
   before = await revision(); await browser("click", "#comment-delete"); await after(before);
   assert.deepEqual(["new_group", "new_box", "new_box_2"].map(id => node(id)), [undefined, undefined, undefined]); assert(node("web_client"), "the box moved out stays");
   // A2: a Project edit keeps its context after switching to Plan, even with the same id in both diagrams.
+  // `!cmd` runs through Pi's bash command (not a prompt): the command and its output show as your row.
+  { const before = messages.length; await browser("fill", "#message-input", "!echo hi"); await browser("click", "#send");
+  await browser("wait", "--fn", "[...document.querySelectorAll('#messages li.user')].some(li => li.textContent.includes('ran echo hi'))");
+  assert.equal(messages.length, before, "no prompt was sent"); }
   await browser("fill", "#message-input", ""); await browser("click", "#tab-project");
   await browser("click", "[data-tool=box]"); await tap(await emptyAt(40, 40)); await browser("wait", "[data-node=new_box]");
   await browser("click", "#tab-plan"); await browser("wait", "[data-node=web_client]");
@@ -1019,6 +1023,12 @@ try {
   await browser("press", "Escape"); const sentBefore = messages.length; await browser("click", "#send");
   await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
   assert.equal(messages.length, sentBefore + 1); assert.deepEqual(messages.at(-1).diagrams, [{ target: "product", ids: ["new_box"] }, { target: "12345678", ids: ["new_box"] }], "Send carries each line's diagram");
+  // Paste an image and send at once: Send waits for the upload, so text and image go in one message (not text now, image as a steer).
+  { const before = messages.length;
+  await evaluate(`(() => { const box = document.getElementById("message-input"); box.value = "look at this"; const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), c => c.charCodeAt(0))], "p.png", { type: "image/png" })); box.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true })); document.getElementById("composer").requestSubmit(); })()`);
+  await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
+  assert.equal(messages.length, before + 1, "one message");
+  const pastedImage = messages.at(-1).text.match(/\S*pi-clipboard-[0-9a-f-]+\.png/)?.[0]; assert(messages.at(-1).text.startsWith("look at this") && pastedImage, "the pasted image rides in the same message: " + messages.at(-1).text); await rm(pastedImage); }
   await browser("click", "#generate"); await browser("wait", "--fn", "document.getElementById('prompt').open");
   assert.equal(await evaluate("document.querySelector('#prompt-form textarea').value"), "Saved directions", "Generate opens a pre-filled prompt");
   // A prompt's answer box takes a pasted (or picked) image: its path is inserted and a small thumbnail shows below.

@@ -20,6 +20,10 @@ assert.equal(mirror.snapshot()[0].text, user.content, "text remains data, never 
 assert.equal(mirror.snapshot()[1].text, "Reply complete");
 assert.equal(mirror.snapshot()[1].streaming, false);
 assert(mirrored.some(item => item.event === "input" && item.value.streamingBehavior === "followUp"));
+// `!cmd` from the chat box: Pi's bashExecution message shows as your row with the output in a code block.
+{ const hooks = new Map(), bash = createChatMirror({ on: (name, handler) => hooks.set(name, handler) }, () => {});
+ hooks.get("message_end")({ message: { role: "bashExecution", command: "ls", output: "a.txt\n", exitCode: 2, excludeFromContext: true, timestamp: 7 } });
+ assert.deepEqual(bash.snapshot().map(({ id, role, text }) => ({ id, role, text })), [{ id: "user_7", role: "user", text: "!!ls\n```\na.txt\n```\nexit code 2" }]); }
 const branch = { sessionManager: { getBranch: () => [{ type: "message", message: { role: "user", timestamp: 0, content: "Older" } }, { type: "message", message: user }, { type: "message", message: { ...assistant, content: [{ type: "text", text: "Reply complete" }] } }] } };
 mirror.hydrate(branch);
 assert.equal(mirror.snapshot().length, 3, "hydrate adds earlier branch chat without duplicating streamed rows");

@@ -4,6 +4,18 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.85 — 2026-10-26
+
+### Added
+- Desktop app: hide a hub from its tab's right-click menu. Hidden hubs leave the tab strip and the taskbar icon. Right-click an empty part of the strip to show them; Alt+number and the tray menu still open them. 10 seconds after the app loses focus they hide again, and the app switches back to the last hub that isn't hidden.
+- Run a shell command from the chat box, like in Pi's terminal: `!git status` runs in the session's folder and shows the command and its output in the chat; the agent sees it on its next turn. `!!command` keeps the output from the agent. Works from a remote device too.
+
+### Changed
+- Desktop app: right-clicking a hub tab opens a normal menu at the mouse (Rename…, Reset name, Copy link, Reload, Remove) instead of a row of buttons across the tab strip.
+
+### Fixed
+- Pasting an image and pressing Enter right away now sends the text and the image together. Before, only the text went, and the image stayed in the box or went later as a steer. Send now waits while the pasted, dropped or attached file is still saving.
+
 ## 0.1.84 — 2026-10-26
 
 ### Added

@@ -53,6 +53,13 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 		for (const key of sent.keys()) if (!rows.some(item => item.id === key)) sent.delete(key);
 	});
 	const put = (message, streaming: boolean, emit = true, start = false) => {
+		// `!cmd` from the chat box (Pi's bash command): your row, with the output as a code block.
+		// shortcut: an output line starting with ``` ends the code block early; fine for command output.
+		if (message?.role === "bashExecution") {
+			const fence = "```", output = clip(String(message.output ?? "").trimEnd() || "(no output)", 16_000);
+			const end = message.cancelled ? "\ncancelled" : message.exitCode ? `\nexit code ${message.exitCode}` : "";
+			message = { role: "user", timestamp: message.timestamp, content: `${message.excludeFromContext ? "!!" : "!"}${message.command}\n${fence}\n${output}\n${fence}${end}` };
+		}
 		if (message?.role === "toolResult") {
 			const row = rows.findLast(item => item.blocks?.some(block => block.type === "tool" && block.id === message.toolCallId));
 			const block = row?.blocks.find(item => item.type === "tool" && item.id === message.toolCallId);

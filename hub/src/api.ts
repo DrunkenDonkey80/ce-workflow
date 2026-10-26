@@ -119,6 +119,19 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		return result.value;
 	}
 
+	async function bash(id: string, text: string) {
+		const excludeFromContext = text.startsWith("!!"), command = text.slice(excludeFromContext ? 2 : 1).trim();
+		if (!command) throw fail(400, "Type a command after !.");
+		await host.resume(id);
+		const live = host.live.get(id);
+		if (!live) throw fail(409, "Session is parked; resume it first.");
+		const response = await live.rpc.send({ type: "bash", command, excludeFromContext });
+		if (!response.success) throw fail(409, String(response.error ?? "The command did not run."));
+		// RPC sends no message event for it: show it as Pi stores it (a bashExecution message).
+		views.get(id)?.feed({ type: "message_end", message: { role: "bashExecution", command, excludeFromContext, timestamp: Date.now(), ...response.data } });
+		return { ok: true };
+	}
+
 	/** Open forms for the snapshot (H5-04): every dialog Pi has open, as page forms. */
 	const forms = (id: string) => [...host.pendingDialogs(id).flatMap(dialog => toForm(dialog) ?? []), ...[...scriptAsks.get(id)?.values() ?? []].map(ask => ask.form)];
 	const openDialog = (id: string, askId: unknown) => host.pendingDialogs(id).find(dialog => dialog.id === askId && toForm(dialog));
@@ -309,6 +322,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 					try { await host.newSession(id); } catch (error) { throw fail(409, (error as Error).message); }
 					views.get(id)?.close(); views.delete(id); return { ok: true };
 				}
+				// `!cmd` runs in the session's folder like in Pi's terminal; `!!cmd` keeps the output from the agent.
+				if (typeof data.text === "string" && data.text.trimStart().startsWith("!")) return bash(id, data.text.trim());
 				return call(id, "/api/message", data);
 			// ✕ on the last prompt: it and the agent's work on it leave the context; the pages reconnect to the shorter chat.
 			case "drop": {
