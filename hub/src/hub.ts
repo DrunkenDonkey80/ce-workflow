@@ -27,6 +27,7 @@ import { agentDir } from "./rpc-client.ts";
 import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
+import { sendExplored } from "./explore.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string; collapseHours?: number; attentionKey?: string };
 export type HubMarker = { pid: number; port: number; startedAt: number };
@@ -225,6 +226,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				response.writeHead(200, { "content-type": "image/svg+xml", "cache-control": "no-cache" });
 				return response.end(iconSvg(ICONS[config.icon ?? ""] ? config.icon! : Object.keys(ICONS)[0]));
 			});
+			// Explored archives: a random key per unpacked folder is the capability (pages inside load relative files without auth).
+			if (request.method === "GET" && await sendExplored(url.pathname, url.searchParams.has("download"), expected, response)) return;
 			const serveAsset = (build: string, name: string) => {
 				if (build !== currentBuild()) return send(404, { error: "Stale build; reload the page." });
 				response.writeHead(200, { "content-type": ASSETS[name][1], "cache-control": "private, max-age=31536000, immutable" });

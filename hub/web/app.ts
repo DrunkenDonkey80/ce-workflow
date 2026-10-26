@@ -530,7 +530,7 @@ window.addEventListener("keydown", event => { if (event.key === "Escape") { $("h
 $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
-const filesView = createFilesView($("files"), { get });
+const filesView = createFilesView($("files"), { get, image: src => openViewer(src), markdown: (target, text) => renderMarkdown(target, text, new Set()) });
 // /plan3 architecture links open on the Project tab.
 setTab(target === "product" ? "project" : remembered("plan3-tab", [...LEFT_TABS, "diagram"], "plan"));
 { const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view); }
@@ -634,9 +634,30 @@ if (sessionStorage.getItem("focus-chat")) { sessionStorage.removeItem("focus-cha
 // Image links and thumbnails open full size in the page (a new tab on a home-screen app may lack the pairing cookie).
 document.addEventListener("click", event => {
  const link = (event.target as HTMLElement).closest?.<HTMLAnchorElement>("a.thumb, a.chat-link"); if (!link || !/\/api\/(image|changelog)\?/.test(link.href)) return;
- event.preventDefault(); const viewer = document.getElementById("viewer") as HTMLDialogElement; (viewer.querySelector("img") as HTMLImageElement).src = link.href; viewer.showModal();
+ event.preventDefault(); openViewer(link.href);
 });
-document.getElementById("viewer").addEventListener("click", () => (document.getElementById("viewer") as HTMLDialogElement).close());
+// The viewer: centred; the wheel zooms at the pointer (the box grows to the screen, then scrolls), a drag pans, a click closes.
+const viewer = $("viewer") as HTMLDialogElement, viewed = viewer.querySelector("img")!;
+let zoom = 1, fit = 1, drag: { x: number; y: number; left: number; top: number; moved: boolean } | null = null;
+function openViewer(src: string) { zoom = 1; viewed.style.cssText = ""; delete viewer.dataset.zoomed; viewed.src = src; viewer.showModal(); }
+viewer.addEventListener("wheel", event => {
+ event.preventDefault(); if (!viewed.naturalWidth) return;
+ const box = viewed.getBoundingClientRect(), x = (event.clientX - box.left) / box.width, y = (event.clientY - box.top) / box.height;
+ if (zoom === 1) fit = box.width / viewed.naturalWidth;
+ zoom = Math.max(1, Math.min(16, zoom * (event.deltaY < 0 ? 1.25 : 0.8)));
+ viewed.style.cssText = zoom > 1 ? `max-width: none; max-height: none; width: ${viewed.naturalWidth * fit * zoom}px` : "";
+ if (zoom > 1) viewer.dataset.zoomed = ""; else delete viewer.dataset.zoomed;
+ const after = viewed.getBoundingClientRect(); // keep the point under the pointer where it was
+ viewer.scrollLeft += after.left + x * after.width - event.clientX; viewer.scrollTop += after.top + y * after.height - event.clientY;
+}, { passive: false });
+viewer.addEventListener("pointerdown", event => { if (event.button === 0) drag = { x: event.clientX, y: event.clientY, left: viewer.scrollLeft, top: viewer.scrollTop, moved: false }; });
+viewer.addEventListener("pointermove", event => {
+ if (!drag || !(event.buttons & 1)) return;
+ const dx = event.clientX - drag.x, dy = event.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+ if (drag.moved) { viewer.scrollLeft = drag.left - dx; viewer.scrollTop = drag.top - dy; event.preventDefault(); }
+});
+viewer.addEventListener("click", () => { if (!drag?.moved) viewer.close(); drag = null; });
+viewer.addEventListener("dragstart", event => event.preventDefault());
 // The live tool line names what it works on, like the chat rows' titles (hub/src/chat.ts toolTitle); CSS cuts it at the box width.
 function toolArg(args?: string) {
  let value: unknown; try { value = JSON.parse(args ?? ""); } catch { return ""; }
@@ -890,8 +911,9 @@ document.addEventListener("contextmenu", event => {
 });
 function openFileMenu(link: HTMLElement, path: string, full: string) {
  const uploads: [string, () => void][] = [["Upload", () => void wormhole(path, "")], ["Zip and upload", () => void wormhole(path, "zip")], ...(sevenZip ? [["7z and upload", () => void wormhole(path, "7z")] as [string, () => void]] : [])];
- showMenu(link, token ? [["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]
-  : [["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
+ const explore: [string, () => void][] = /.(zip|7z|rar|tar|tgz|tbz2?|txz|tar.(gz|bz2|xz|zst))$/i.test(path) ? [["Explore", () => void exploreArchive(path)]] : [];
+ showMenu(link, token ? [...explore, ["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]
+  : [...explore, ["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
 }
 // Wormhole upload: the hub packs, encrypts and uploads; the page polls once a second and copies the link (key in its #fragment).
 let sevenZip = false; get("upload").then(value => { sevenZip = value.sevenZip; }, () => undefined);
@@ -905,6 +927,16 @@ async function wormhole(path: string, pack: string) {
    showNotice(`${job.name}: ${job.status}`);
    await new Promise(done => setTimeout(done, 1000));
   }
+ } catch (error) { showNotice(error.message); }
+}
+// Explore: the hub unpacks the archive into a temp folder; the Files tab walks it and the chat shrinks to make room.
+async function exploreArchive(path: string) {
+ showNotice("Unpacking " + path.split(/[\/]/).pop() + "…");
+ try {
+  const value = await post("explore", { path });
+  filesView.explore(value);
+  if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
+  showNotice(`${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
  } catch (error) { showNotice(error.message); }
 }
 async function openFile(path: string, reveal: boolean) {

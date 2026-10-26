@@ -4,7 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Added
+- Explore an archive from chat: the file menu on a zip, 7z, rar or tar link unpacks it on the hub PC and the Files tab walks it (the chat shrinks to make room). Images open zoomable, markdown renders, HTML and PDF open in a frame, text shows as text, and every file has Download and Open. Works remotely too.
+
 ### Changed
+- The full-size image viewer is centred on the image, the mouse wheel zooms at the pointer (the box grows to the screen, then scrolls), and dragging pans.
 - Project command buttons can be this-PC-only (project_commands local): remote pages hide them, for runs that open windows or act on this desktop.
 - hub/app/dev-restart.mjs (the Rebuild app button here) builds on every core: about a minute instead of several.
 - A fourth session state: blue now means waiting for a timer (any pending timer, also when parked) and a finished, unseen session is green, in the tab icon, the desktop app icon and the sidebar. This replaces showing a timer due within 10 minutes as working.

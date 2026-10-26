@@ -11,6 +11,7 @@ import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
+import { explore } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
@@ -320,6 +321,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "pool": if (!pool) throw fail(404, "The Claude pool is not available."); return pool.action(data);
 			case "paths": return linkedFiles(data.paths, folder(id), remote);
 			case "open": return openLinkedFile(data.path, folder(id), data.reveal === true, remote);
+			// Explore: the same files Download would serve this device, unpacked for the Files tab.
+			case "explore": {
+				only(data, ["target", "path"], "Invalid fields.");
+				const real = await linkedFile(data.path, folder(id), remote);
+				if (!real) throw fail(404, "File not found or not shared.");
+				return explore(real);
+			}
 			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.
 			case "upload": {
 				only(data, ["target", "path", "pack"], "Invalid fields.");
