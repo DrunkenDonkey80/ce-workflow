@@ -1626,13 +1626,13 @@ link.addEventListener("click", () => sessionStorage.setItem("focus-chat", "1"));
   timer.dataset.due = String(next.dueAt); link.append(timer);
  }
  row.append(link, more);
- // A long job (pi-hub progress) above the plan line: only its percent and bar.
+ // A long job (pi-hub progress) above the name, so it never meets the plan line below: only its percent and bar.
  if (session.job !== undefined) {
   const line = html("span", { className: "session-progress session-job", title: `Job: ${session.job}%` });
   line.style.setProperty("--fill", session.job + "%");
   line.append(html("small", { textContent: session.job + "%" }), html("i"));
   line.addEventListener("click", () => link.click());
-  row.append(line);
+  row.prepend(line);
  }
  // A plan in progress: steps done/total, then a line filled left to right.
  if (session.plan) {
