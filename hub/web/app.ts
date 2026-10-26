@@ -1075,7 +1075,13 @@ $("message-input").addEventListener("keydown", event => {
 const touchKeyboard = matchMedia("(pointer: coarse)");
 $("message-input").addEventListener("keydown", event => {
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); $("composer").requestSubmit(); }
- if (event.key === "Escape" && !$("stop").hidden && !$("stop").disabled) { event.preventDefault(); $("stop").click(); }
+ // Escape: a recalled prompt goes back to the draft, typed text is cleared (Ctrl+Z brings it back), and only an empty box stops the run.
+ if (event.key === "Escape") {
+  const input = $("message-input") as HTMLTextAreaElement;
+  if (historyAt !== -1) { event.preventDefault(); event.stopPropagation(); showHistory(-1, -1); return; }
+  if (input.value) { event.preventDefault(); event.stopPropagation(); input.select(); document.execCommand("delete"); return; }
+  if (!$("stop").hidden && !$("stop").disabled) { event.preventDefault(); $("stop").click(); }
+ }
  // Like Pi's Alt+Up: take queued messages back to edit (plain ↑ only in an empty box, so it never steals caret moves).
  if (event.key === "ArrowUp" && (event.altKey || !$("message-input").value) && state.activity.queue?.length) { event.preventDefault(); void editQueued(state.activity.queue.at(-1).text); return; }
  // Prompt history: ↑ at the very start of the box steps back through this session's prompts, ↓ at the very end steps forward.
@@ -1111,8 +1117,9 @@ function showHistory(at: number, caret: number) {
  const box = $("message-input");
  if (historyAt === -1) historyDraft = box.value;
  historyAt = at; box.value = at === -1 ? historyDraft : prompts()[at].text;
- const editing = at !== -1 && at === prompts().length - 1 && lastStopped();
- box.classList.toggle("editing-last", editing); box.classList.toggle("from-history", at !== -1 && !editing); renderHistoryNav(); box.title = editing ? "Editing your stopped last message: Send replaces it and what followed it" : "";
+ // The last prompt is editable while its run still goes too: Send stops it first (the server's drop aborts a running agent).
+ const running = !$("stop").hidden, editing = at !== -1 && at === prompts().length - 1 && (lastStopped() || running);
+ box.classList.toggle("editing-last", editing); box.classList.toggle("from-history", at !== -1 && !editing); renderHistoryNav(); box.title = editing ? `Editing your ${running ? "running" : "stopped"} last message: Send ${running ? "stops the run, " : ""}replaces it and what followed it` : "";
  box.setSelectionRange(caret === -1 ? box.value.length : caret, caret === -1 ? box.value.length : caret);
  box.dispatchEvent(new Event("input"));
 }

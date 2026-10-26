@@ -480,6 +480,10 @@ try {
  await browser("press", "ArrowUp"); assert.match(await evaluate("document.getElementById('history-when').textContent"), /./, "the recalled message shows when it was sent");
  assert.deepEqual(await evaluate("[document.getElementById('message-input').value.endsWith('Please apply these.'), document.getElementById('message-input').classList.contains('editing-last')]"), [true, true], "↑ recalls the stopped prompt in edit mode");
  await evaluate("(b => b.setSelectionRange(b.value.length, b.value.length))(document.getElementById('message-input'))"); await browser("press", "ArrowDown"); assert.equal(await evaluate("document.getElementById('message-input').value"), "", "↓ past the newest returns to the draft");
+ // Escape: a recalled prompt goes back to the (empty) draft; typed text is cleared; nothing is stopped while text was there.
+ await browser("press", "ArrowUp"); await browser("press", "ArrowUp"); await browser("press", "Escape");
+ assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('message-input').classList.contains('editing-last')]"), ["", false], "Escape leaves a recalled prompt");
+ await browser("type", "#message-input", "typo"); await browser("press", "Escape"); assert.equal(await evaluate("document.getElementById('message-input').value"), "", "Escape clears typed text");
  await browser("press", "ArrowUp"); await browser("press", "ArrowUp"); await browser("fill", "#message-input", "Please apply only the first."); await browser("press", "Enter");
  await browser("wait", "--fn", "document.getElementById('message-input').value === ''");
  assert.deepEqual([await evaluate("window.drops.at(-1)?.endsWith('Please apply these.')"), messages.at(-1).text], [true, "Please apply only the first."], "Send drops the stopped prompt, then posts the edit");

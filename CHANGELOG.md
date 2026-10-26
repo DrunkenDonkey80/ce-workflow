@@ -19,6 +19,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - A red Update button appears top-right within about 10 minutes of a new ce-workflow version on GitHub (for git installs; Pi and other extensions are still checked hourly). It offers Update everything (Pi, extensions, ce-workflow) or Update only ce-workflow; the gear's update badges open the same choice.
 - Desktop app taskbar icon: one hub shows its own icon; two or more show the dot grid (two hubs use the outer columns, the middle one stays empty) instead of two shrunken icons.
 - Pairing a phone or browser with one hub no longer unpairs it from another hub on the same Tailscale name (Windows and WSL hubs on one PC shared one cookie). Already paired devices keep working.
+- Escape in the message box first clears what you typed (Ctrl+Z brings it back) or leaves a recalled prompt; only Escape in an empty box stops the run.
+- ↑ on your last prompt while it is still running opens it in orange edit mode: Send stops the run and replaces the prompt instead of adding a second one.
 - Devices moved out of the sidebar into Settings → Remote access, next to Copy.
 
 ## 0.1.80 — 2026-10-25
