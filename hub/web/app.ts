@@ -2131,6 +2131,8 @@ function renderUpdates() {
  }));
  ($("update-check") as HTMLButtonElement).disabled = !updates || updates.checking;
 }
+// A click on either badge goes straight to Update all (same confirm) instead of opening the gear menu.
+for (const badge of ["update-badge", "update-others"]) { $(badge).title = "Update now"; $(badge).addEventListener("click", event => { event.stopPropagation(); $("hub-update").click(); }); }
 $("update-check").addEventListener("click", async () => {
  ($("update-check") as HTMLButtonElement).disabled = true; $("update-list").textContent = "Checking…";
  try { hubSettings = await post("hub", { action: "check-updates" }) as HubSettings; } catch (error) { showNotice(error.message); }
