@@ -52,14 +52,15 @@ export function iconSvg(name: string, states: string[] = [], r = 6.5) {
 export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  hubs = hubs.filter(hub => ICONS[hub.icon]).slice(0, 4);
  if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states, 7);
- // Two or more: icons are mush at 24 px, so a matrix of dots only: one column per hub (left to right like the tabs),
- // one row per state (waiting, working, unseen); a faint ring marks an off state so each column stays visible.
- // Two hubs take the outer columns of three, leaving the middle one empty.
- const slots = hubs.length === 2 ? 3 : hubs.length, column = 32 / slots, r = Math.min(4.6, column / 2 - 0.6);
- return SVG_HEAD + hubs.map((hub, index) => ["waiting", "working", "unseen"].map((state, j) => {
-  const i = hubs.length === 2 ? index * 2 : index, at = `cx="${(column * i + column / 2).toFixed(2)}" cy="${5.5 + j * 10.5}"`;
-  return hub.states.includes(state) ? `<circle ${at} r="${r.toFixed(2)}" fill="${DOTS[state]}"/>` : `<circle ${at} r="${(r - 0.5).toFixed(2)}" fill="none" stroke="${ICON_INK}" stroke-opacity=".35"/>`;
- }).join("")).join("") + "</svg>";
+ // Two or more: icons are mush at 24 px, so a dark tile with one bar per hub (left to right like the tabs); a hub's
+ // states (waiting, working, unseen, top down) split its bar, and a quiet hub's bar stays dim. The tile reads on any taskbar.
+ const column = 28 / hubs.length, gap = 1.2;
+ return SVG_HEAD.replace(/<style>.*<\/style>/, "") + `<rect width="32" height="32" rx="6" fill="#212529"/>` + hubs.map((hub, i) => {
+  const lit = Object.keys(DOTS).filter(state => hub.states.includes(state)), x = (2 + column * i + gap).toFixed(2), w = (column - 2 * gap).toFixed(2);
+  if (!lit.length) return `<rect x="${x}" y="${2 + gap}" width="${w}" height="${28 - 2 * gap}" rx="2" fill="#3a3f45"/>`;
+  const part = (28 - 2 * gap) / lit.length;
+  return lit.map((state, k) => `<rect x="${x}" y="${(2 + gap + k * part).toFixed(2)}" width="${w}" height="${(part - (k < lit.length - 1 ? 1 : 0)).toFixed(2)}" rx="2" fill="${DOTS[state]}"/>`).join("");
+ }).join("") + "</svg>";
 }
 
 // Coloured header-button icons (uxwing.com, free licence): [viewBox, inner SVG]; app.ts icon() prefers these over its line icons.

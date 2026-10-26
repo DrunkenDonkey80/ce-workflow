@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Changed
+- Desktop app taskbar icon with two or more hubs: a dark tile with one bar per hub (up to four), split into red, orange and blue for its states and dim when the hub is quiet, so it reads on light and dark taskbars.
+
 ## 0.1.81 — 2026-10-26
 
 ### Added
