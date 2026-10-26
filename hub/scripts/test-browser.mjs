@@ -786,6 +786,11 @@ try {
  const line = JSON.parse((await evaluate("document.title")).slice(13));
  assert.deepEqual([typeof line.icon, line.icon.length > 0, line.name, line.states], ["string", true, os.hostname(), ["unseen"]], "icon, hub name (hostname) and own unseen");
  assert.deepEqual([line.latest > 0, line.key], [true, "ctrl+shift+a"], "the newest attention time and the app's attention key");
+ // A parked session whose check timer fires within 10 minutes shows as working on the icon only.
+ { const other = hub.registry.list().find(record => record.id !== id && !hub.host.live.has(record.id)).id, post = (route, body) => fetch(`${origin}/api/${route}`, { method: "POST", headers: { "x-hub-key": hub.config.localKey, "content-type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
+  const check = await post(`sessions/${other}/timers`, { kind: "script", command: "exit 0", everyMinutes: 5 });
+  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "JSON.parse(document.title.slice(13)).states.includes('working')");
+  await post(`timers/${check.id}/cancel`, {}); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "!JSON.parse(document.title.slice(13)).states.includes('working')"); }
  await evaluate("(() => { delete navigator.userAgent; delete document.hasFocus; })()");
  // Sidebar filter: Enter on this session clears the filter and puts the cursor in the chat box.
  await browser("fill", "#session-filter", "1"); await browser("press", "Enter");

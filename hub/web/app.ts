@@ -1338,7 +1338,7 @@ function renderIcon() {
  const states = [...sessionStates];
  if (promptView.busy || state.activity.dialog) states.push("waiting");
  // A question replaces this session's working tone: one session asking is red only, not red and orange.
- else if (state.activity.working || state.activity.subagents?.length) states.push("working");
+ else if (state.activity.working || state.activity.subagents?.length || ownTone === "working") states.push("working");
  // An installed app's taskbar/dock icon is fixed at install; its badge is the only live part (Chromium, Safari): a mark while
  // count of what needs you (questions, finished sessions you haven't opened); colours are impossible there. Working has no badge.
  if (inApp()) {
@@ -1364,6 +1364,9 @@ function appleIcon(svg: string) {
  image.onload = () => { canvas.getContext("2d")!.drawImage(image, 0, 0, 180, 180); document.querySelector<HTMLLinkElement>("link[rel=apple-touch-icon]")!.href = canvas.toDataURL("image/png"); };
  image.src = "data:image/svg+xml," + encodeURIComponent(svg.replace("<style>", '<rect width="32" height="32" fill="#fff"/><style>')); // iOS shows transparency as black
 }
+// Icon dots only: an idle or parked session whose timer fires within 10 minutes (a check loop) counts as working, so it shows
+// it is still on it. Questions and finished runs keep their own colour.
+const iconTone = (session?: HubSession) => !session ? "" : ["scheduled", "parked"].includes(session.tone) && session.timers?.some(timer => timer.dueAt - Date.now() < 600_000) ? "working" : session.tone;
 async function loadSessions() {
  clearTimeout(sessionsTimer);
  // A background tab keeps polling, slower, so its icon still shows the other sessions.
@@ -1381,8 +1384,8 @@ async function loadSessions() {
   // Questions first, then the newest: a question blocks work, a finished run can wait.
   attentionList = groups.flatMap(group => group.sessions).filter(session => session.attention).sort((a, b) => Number(b.tone === "waiting") - Number(a.tone === "waiting") || b.attention! - a.attention!);
   $("attention-field").hidden = !inApp(); ($("attention-key") as HTMLInputElement).value = hubSettings.attentionKey ?? "";
-  ownTone = groups.flatMap(group => group.sessions).find(session => session.id === sessionId)?.tone ?? "";
-  sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => session.tone)); renderIcon();
+  ownTone = iconTone(groups.flatMap(group => group.sessions).find(session => session.id === sessionId));
+  sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(iconTone)); renderIcon();
   renderSessions(groups, recents);
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
  void checkPairing();
