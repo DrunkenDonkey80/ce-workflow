@@ -414,13 +414,13 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	const ticks = setInterval(() => { void scheduler.tick().catch(error => console.error(`timer tick: ${(error as Error).message}`)); }, 5_000);
 	ticks.unref();
 	// H-05 (D4): an installed app gets a newer pinned build staged hourly; it switches on its next start.
-	const stageApp = (apply = false) => void app?.autoStage().then(value => {
-		// Issue #6: a hub start (every Update all ends in one) hands a running app straight to its new build, the way the tray's
-		// Restart to update does; drafts (localStorage) and tabs (saved on change) survive. The hourly check only stages.
-		if (apply && value.staged && value.running) { console.log(`${new Date().toISOString()} desktop app: restarting onto ${value.staged}`); app.restart(); }
+	const stageApp = () => void app?.autoStage().then(value => {
+		// Issue #6: a new build (at hub start, which every Update all ends in, or hourly once CI has published it) goes straight
+		// into a running app, the way the tray's Restart to update does; drafts (localStorage) and tabs (saved on change) survive.
+		if (value.staged && value.running) { console.log(`${new Date().toISOString()} desktop app: restarting onto ${value.staged}`); app.restart(); }
 	}).catch(error => console.error(`desktop app update: ${(error as Error).message}`));
-	stageApp(true);
-	const appTimer = setInterval(() => stageApp(), 3_600_000);
+	stageApp();
+	const appTimer = setInterval(stageApp, 3_600_000);
 	appTimer.unref();
 	const timer = setInterval(() => {
 		// Windows login can start the hub before Tailscale has its connection and user identity.

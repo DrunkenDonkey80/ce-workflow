@@ -1,4 +1,6 @@
-// D4/D10/D13: the hub installs, stages and removes the desktop app from the hashes pinned in hub/app/release.json.
+// D4/D10/D13: the hub installs, stages and removes the desktop app. One version: CI builds the app for every pushed ce-workflow
+// version as release app-v<version> (.github/workflows/app-release.yml), and the hub takes the build matching its own version,
+// checked against the SHA-256 digest GitHub reports for the file (issue #6; replaces the hashes pinned in the repo).
 import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -9,19 +11,33 @@ import { iconSvg, ICONS } from "../web/icons.ts";
 export type Release = { version: string; assets: Record<string, { url: string; sha256: string }> };
 export type AppStatus = { supported: boolean; note?: string; installed: boolean; version: string | null; staged: string | null; latest: string | null; running: boolean; login: boolean };
 
-const RELEASES = "https://github.com/DrunkenDonkey80/ce-workflow/releases/download/";
+const REPO = "DrunkenDonkey80/ce-workflow";
+const RELEASES = `https://github.com/${REPO}/releases/download/`;
 const RUN_VALUE = "PiHubApp";
-/** The pin, or null before the first app release is pinned (R-04) or when the file is unreadable. */
-function pinned(): Release | null {
-	try { return JSON.parse(readFileSync(new URL("../app/release.json", import.meta.url), "utf8")); } catch { return null; }
+const ASSETS: Record<string, string> = { "pi-hub-app-windows-x64.exe": "windows-x64", "pi-hub-app-linux-x64.AppImage": "linux-x64" };
+export const PACKAGE_VERSION: string = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version;
+
+/** The app build for one ce-workflow version, or null while CI has not published it yet (or never will: an unpushed version). */
+export async function lookupRelease(version = PACKAGE_VERSION, get: typeof fetch = fetch): Promise<Release | null> {
+	const response = await get(`https://api.github.com/repos/${REPO}/releases/tags/app-v${version}`, { headers: { accept: "application/vnd.github+json" } });
+	if (response.status === 404) return null;
+	if (!response.ok) throw new Error(`Release check failed: HTTP ${response.status}.`);
+	const body = await response.json() as { assets?: { name: string; browser_download_url: string; digest?: string | null }[] };
+	const assets = (body.assets ?? []).filter(item => ASSETS[item.name] && item.digest?.startsWith("sha256:"))
+		.map(item => [ASSETS[item.name], { url: item.browser_download_url, sha256: item.digest!.slice(7) }] as const);
+	return { version, assets: Object.fromEntries(assets) };
 }
 
 export function createAppInstall({
 	platform = process.platform, wsl = false, arch = process.arch, home = os.homedir(),
 	localAppData = process.env.LOCALAPPDATA ?? path.join(home, "AppData", "Local"), appData = process.env.APPDATA ?? path.join(home, "AppData", "Roaming"),
-	dataDir, release = pinned,
+	dataDir, release, refresh,
 	releaseBase = RELEASES, runKey = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", download = fetch,
-}: { platform?: string; wsl?: boolean; arch?: string; home?: string; localAppData?: string; appData?: string; dataDir: string; release?: () => Release | null; releaseBase?: string; runKey?: string; download?: typeof fetch }) {
+}: { platform?: string; wsl?: boolean; arch?: string; home?: string; localAppData?: string; appData?: string; dataDir: string; release?: () => Release | null; refresh?: () => Promise<void>; releaseBase?: string; runKey?: string; download?: typeof fetch }) {
+	// Default: the last GitHub answer, refreshed before every install and stage.
+	let known: Release | null = null;
+	release ??= () => known;
+	refresh ??= async () => { known = await lookupRelease(); };
 	const windows = platform === "win32";
 	const asset = windows ? "windows-x64" : "linux-x64";
 	const unsupported = wsl ? "Install the app from the Windows hub." : !(windows || platform === "linux") || arch !== "x64" ? "The desktop app is for 64-bit Windows and Linux." : undefined;
@@ -63,16 +79,16 @@ export function createAppInstall({
 	const desktopEntry = (exec: string, autostart = false) => `[Desktop Entry]\nType=Application\nName=Pi Hub\nExec=${exec}\nIcon=${path.join(dir, "icon.svg")}\nCategories=Development;\n${autostart ? "X-GNOME-Autostart-enabled=true\n" : ""}`;
 
 	function guard() { if (unsupported) throw new Error(unsupported); }
-	/** Downloads the pinned asset, refusing other URLs and any hash mismatch; writes a temp file, then renames it into place. */
+	/** Downloads the release asset, refusing other URLs and any hash mismatch; writes a temp file, then renames it into place. */
 	async function fetchTo(target: string) {
-		const pin = release(), item = pin?.assets[asset];
-		if (!pin) throw new Error("No desktop app release is pinned yet.");
+		const pin = release!(), item = pin?.assets[asset];
+		if (!pin) throw new Error(`No desktop app build for version ${PACKAGE_VERSION} yet; it is published a few minutes after that version is pushed.`);
 		if (!item) throw new Error(`No ${asset} build in release ${pin.version}.`);
-		if (!item.url.startsWith(releaseBase)) throw new Error("Refused: the pinned URL is not a release of this repo.");
+		if (!item.url.startsWith(releaseBase)) throw new Error("Refused: the URL is not a release of this repo.");
 		const response = await download(item.url);
 		if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}.`);
 		const bytes = Buffer.from(await response.arrayBuffer()), hash = createHash("sha256").update(bytes).digest("hex");
-		if (hash !== item.sha256.toLowerCase()) throw new Error("Refused: the downloaded file does not match the pinned SHA-256.");
+		if (hash !== item.sha256.toLowerCase()) throw new Error("Refused: the downloaded file does not match the release's SHA-256.");
 		mkdirSync(dir, { recursive: true });
 		const temp = `${target}.${process.pid}.tmp`;
 		writeFileSync(temp, bytes, { mode: 0o755 });
@@ -82,11 +98,12 @@ export function createAppInstall({
 
 	function status(): AppStatus {
 		const value = unsupported ? null : current();
-		return { supported: !unsupported, ...(unsupported ? { note: unsupported } : {}), installed: !!value, version: value?.version ?? null, staged: value?.staged ?? null, latest: release()?.version ?? null, running: !unsupported && running(), login: !unsupported && !!value && login() };
+		return { supported: !unsupported, ...(unsupported ? { note: unsupported } : {}), installed: !!value, version: value?.version ?? null, staged: value?.staged ?? null, latest: release!()?.version ?? null, running: !unsupported && running(), login: !unsupported && !!value && login() };
 	}
 	async function install() {
 		guard();
 		if (running()) throw new Error("Quit Pi Hub from the tray first.");
+		await refresh!();
 		const version = await fetchTo(file);
 		rmSync(next, { force: true });
 		write({ version });
@@ -104,12 +121,13 @@ export function createAppInstall({
 		}
 		return setLogin(true); // D10: on by default
 	}
-	/** D4: stage a newer pinned build as .next; the running file stays untouched until the app restarts. */
+	/** D4: stage the build for this version as .next; the running file stays untouched until the app restarts. */
 	async function stage() {
 		guard();
 		const value = current();
 		if (!value) throw new Error("The desktop app is not installed.");
-		const latest = release()?.version;
+		await refresh!();
+		const latest = release!()?.version;
 		if (!latest || latest === value.version || latest === value.staged) return status();
 		write({ version: value.version, staged: await fetchTo(next) });
 		return status();

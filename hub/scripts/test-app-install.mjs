@@ -6,7 +6,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { createAppInstall } from "../src/app-install.ts";
+import { createAppInstall, lookupRelease } from "../src/app-install.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "app-install-"));
 const files = { "v1.bin": Buffer.from("app build 1"), "v2.bin": Buffer.from("app build 2") };
@@ -20,7 +20,7 @@ const sha = name => createHash("sha256").update(files[name]).digest("hex");
 const windows = process.platform === "win32", asset = windows ? "windows-x64" : "linux-x64";
 let pin = { version: "0.1.0", assets: { [asset]: { url: base + "app-v0.1.0/v1.bin", sha256: sha("v1.bin") } } };
 const runKey = `HKCU\\Software\\pi-hub-app-test-${process.pid}`;
-const app = createAppInstall({ platform: windows ? "win32" : "linux", arch: "x64", home: root, localAppData: path.join(root, "local"), appData: path.join(root, "roaming"), dataDir: path.join(root, "hub data"), release: () => pin, releaseBase: base, runKey });
+const app = createAppInstall({ platform: windows ? "win32" : "linux", arch: "x64", home: root, localAppData: path.join(root, "local"), appData: path.join(root, "roaming"), dataDir: path.join(root, "hub data"), release: () => pin, refresh: async () => {}, releaseBase: base, runKey });
 const listed = () => fs.existsSync(root) ? fs.readdirSync(root, { recursive: true }).filter(name => fs.statSync(path.join(root, name)).isFile()) : [];
 let holder;
 try {
@@ -32,7 +32,7 @@ try {
 	pin = { version: "0.1.0", assets: { [asset]: { url: "http://evil.example/v1.bin", sha256: sha("v1.bin") } } };
 	await assert.rejects(app.install(), /not a release of this repo/);
 	pin = { version: "0.1.0", assets: { [asset]: { url: base + "app-v0.1.0/v1.bin", sha256: sha("v2.bin") } } };
-	await assert.rejects(app.install(), /does not match the pinned SHA-256/);
+	await assert.rejects(app.install(), /does not match the release's SHA-256/);
 	assert.deepEqual(listed(), [], "refused downloads write nothing");
 
 	pin = { version: "0.1.0", assets: { [asset]: { url: base + "app-v0.1.0/v1.bin", sha256: sha("v1.bin") } } };
@@ -76,7 +76,14 @@ try {
 	assert.deepEqual([wsl.status().supported, wsl.status().note], [false, "Install the app from the Windows hub."]);
 	await assert.rejects(wsl.install(), /Windows hub/); assert.equal((await wsl.autoStage()).supported, false, "no staging on WSL"); assert.throws(() => wsl.uninstall(), /Windows hub/);
 	assert.match(createAppInstall({ platform: "darwin", home: root, dataDir: root, release: () => pin }).status().note, /64-bit Windows and Linux/);
-	assert.equal(createAppInstall({ home: root, dataDir: root, release: () => null }).status().latest, null, "no pin yet");
+	assert.equal(createAppInstall({ home: root, dataDir: root, release: () => null }).status().latest, null, "no build yet");
+	// GitHub's release answer: only our two asset names with a sha256 digest; 404 = not published yet.
+	const answer = { assets: [{ name: "pi-hub-app-windows-x64.exe", browser_download_url: "https://x/a.exe", digest: "sha256:AB" }, { name: "pi-hub-app-linux-x64.AppImage", browser_download_url: "https://x/a", digest: null }, { name: "other", browser_download_url: "https://x/o", digest: "sha256:CD" }] };
+	let asked = "";
+	assert.deepEqual(await lookupRelease("0.1.81", async url => { asked = url; return new Response(JSON.stringify(answer)); }), { version: "0.1.81", assets: { "windows-x64": { url: "https://x/a.exe", sha256: "AB" } } });
+	assert(asked.endsWith("/releases/tags/app-v0.1.81"), asked);
+	assert.equal(await lookupRelease("0.1.81", async () => new Response("{}", { status: 404 })), null);
+	await assert.rejects(lookupRelease("0.1.81", async () => new Response("{}", { status: 403 })), /HTTP 403/);
 	console.log("ok - app install: refused URL and hash, install with shortcut and login entry, stage, swap, lock, uninstall, WSL refusal");
 } finally {
 	holder?.kill(); server.close();

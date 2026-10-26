@@ -1,13 +1,32 @@
-# R-01: the Pi Hub desktop app release. Push a tag app-v<version> (matching hub/app/src-tauri/tauri.conf.json);
-# the asset names match hub/src/app-install.ts. Afterwards pin it: node hub/app/pin-release.mjs app-v<version>.
+# R-01 / issue #6: one version. Every pushed ce-workflow version (package.json) gets its desktop app built and published as
+# release app-v<version>; the hub installs the build matching its own version (hub/src/app-install.ts, asset names there).
 name: app-release
 on:
   push:
-    tags: ["app-v*"]
+    branches: [master]
+    paths: [package.json]
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.check.outputs.tag }}
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # A push that does not change the version (or re-runs) finds its release already published.
+        run: |
+          tag="app-v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then echo "build=no" >> "$GITHUB_OUTPUT"; else echo "build=yes" >> "$GITHUB_OUTPUT"; fi
   build:
+    needs: version
+    if: needs.version.outputs.build == 'yes'
     strategy:
       matrix:
         include:
@@ -29,8 +48,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: hub/app/src-tauri
-      - name: Tag matches the app version
-        run: test "app-v$(node -p "require('./tauri.conf.json').version")" = "$GITHUB_REF_NAME"
+      - name: The app takes the package version
+        run: |
+          version="$(node -p "require('../../../package.json').version")"
+          node -e "const f=require('fs'),c=JSON.parse(f.readFileSync('tauri.conf.json','utf8'));c.version=process.argv[1];f.writeFileSync('tauri.conf.json',JSON.stringify(c,null,2))" "$version"
+          sed -i.bak "0,/^version = .*/s//version = \"$version\"/" Cargo.toml && rm Cargo.toml.bak
       - name: Linux build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf file
@@ -45,7 +67,7 @@ jobs:
           name: ${{ matrix.asset }}
           path: ${{ runner.temp }}/${{ matrix.asset }}
   release:
-    needs: build
+    needs: [version, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -55,4 +77,5 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --title "Pi Hub app ${GITHUB_REF_NAME#app-v}" --notes "Desktop app for pi-control-hub. Install it from the hub's settings (gear → Desktop app); the hub checks these files against the SHA-256 pinned in hub/app/release.json."
+          TAG: ${{ needs.version.outputs.tag }}
+        run: gh release create "$TAG" assets/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "Pi Hub app ${TAG#app-v}" --notes "Desktop app for pi-control-hub ${TAG#app-v}. The hub of the same ce-workflow version installs it from its settings (gear → Desktop app) and updates it on its own, checking each file against the SHA-256 GitHub reports."

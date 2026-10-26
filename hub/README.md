@@ -32,19 +32,19 @@ In Pi, `/wo hub` shows the hub's status and addresses with Install, Start, Open,
 Pi Hub (`hub/app`, Tauri) is one window with a tab per hub and live state dots on the taskbar icon (up to 4 hubs), its
 overlay and the tray (asking red, working amber, finished-unseen blue), even with the window hidden.
 
-- Install: on this PC's hub page, ⚙ → Desktop app → Install. The hub downloads the build pinned in `hub/app/release.json`,
-  checks its SHA-256 and installs per user (Windows `%LOCALAPPDATA%\Programs\pi-hub-app`, Start menu "Pi Hub";
+- Install: on this PC's hub page, ⚙ → Desktop app → Install. The hub downloads the build of its own ce-workflow version (GitHub release
+  `app-v<version>`), checks it against the SHA-256 GitHub reports and installs per user (Windows `%LOCALAPPDATA%\Programs\pi-hub-app`, Start menu "Pi Hub";
   Linux `~/.local/share/pi-hub-app` AppImage plus a menu entry). Uninstall is in the same row; quit the app from the tray first.
 - Start at login: the row's checkbox (Windows Run key, Linux `~/.config/autostart`); the app then starts hidden in the tray
   and waits for the hub if it starts first.
 - Tabs: the first is this PC's hub; `+` adds another hub by its link (another PC's tailnet address pairs like a phone).
   Right-click renames (names are per PC; an empty name shows only the icon) or removes, drag reorders, Alt+1…9 switches while the app has focus. Closing hides to the tray; Quit is in the tray menu.
-- Updates: with a newer pin (arrives with ce-workflow updates), the hub stages the new build hourly; the strip shows a note and the
-  tray offers Restart to update. The app never restarts unasked.
+- Updates: the app has the ce-workflow version. After an update the hub (at start, then hourly until CI has published the
+  build) downloads the matching build and restarts a running app onto it; drafts and tabs are kept, hubs and sessions keep running.
 - WSL: install from the Windows hub; its app reaches the WSL hub through 127.0.0.1.
 - Linux limits: GNOME shows the tray only with the AppIndicator extension, and live icon changes may not show on Wayland.
-- Release: push a tag `app-v<version>` matching `hub/app/src-tauri/tauri.conf.json` (`.github/workflows/app-release.yml`
-  builds both files), then `node hub/app/pin-release.mjs app-v<version>` and commit `hub/app/release.json`.
+- Release: automatic. Every push that changes the version in `package.json` builds both files as release `app-v<version>`
+  (`.github/workflows/app-release.yml`, which stamps that version into the app).
   Local build: `cargo tauri build --no-bundle` in `hub/app/src-tauri`.
 
 ## Development
