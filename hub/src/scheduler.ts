@@ -2,6 +2,7 @@
 // a script timer runs a command each tick and wakes the agent only when the command prints something.
 import { spawn } from "node:child_process";
 import { piSdk } from "./pi-sdk.ts";
+import { hubEnv } from "./commands.ts";
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -58,10 +59,10 @@ let bash: Promise<{ shell: string; args: string[] } | null> | undefined;
 const windowsBash = () => bash ??= process.platform !== "win32" ? Promise.resolve(null) : piSdk().then(sdk => { const config = sdk.getShellConfig(); return config.commandTransport ? null : config; }).catch(() => null); // WSL-only PC: cmd.exe
 
 /** Runs a script timer's command in the session folder: Pi's bash on Windows, else the platform shell. */
-export async function runScript(command: string, cwd: string, timeoutMs = SCRIPT_TIMEOUT_MS): Promise<ScriptResult> {
+export async function runScript(command: string, cwd: string, timeoutMs = SCRIPT_TIMEOUT_MS, env?: Record<string, string>): Promise<ScriptResult> {
 	const shell = await windowsBash();
 	return new Promise(resolve => {
-		const options = { cwd, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] } as const;
+		const options = { cwd, env: { ...process.env, ...env }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] } as const;
 		const child = shell ? spawn(shell.shell, [...shell.args, command], options) : spawn(command, { ...options, shell: true });
 		let output = "", timedOut = false;
 		const take = (chunk: Buffer) => { if (output.length < OUTPUT_CAP * 2) output += chunk.toString("utf8"); };
@@ -172,7 +173,7 @@ export class Scheduler extends EventEmitter {
 
 	private async scriptTick(timer: Timer, now: number) {
 		const record = this.options.registry.get(timer.session)!;
-		const result = await (this.options.run ?? runScript)(timer.command!, record.folder);
+		const result = await (this.options.run ?? runScript)(timer.command!, record.folder, undefined, hubEnv(timer.session));
 		if (!this.timers.includes(timer)) return; // cancelled while the script ran
 		if (result.code === CANCEL_EXIT) return this.cancel(timer.id, "the script cancelled it");
 		if (result.code === 0 && !result.timedOut) {

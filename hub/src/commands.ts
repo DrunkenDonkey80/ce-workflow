@@ -42,14 +42,21 @@ export type Commands = ReturnType<typeof createCommands>;
 // hub/bin holds pi-hub shims, so a run command's script can call `pi-hub ask` even where npm link never ran.
 // Separate folders: cmd would try an extensionless `pi-hub` beside pi-hub.cmd first and fail silently.
 const BIN = fileURLToPath(new URL(process.platform === "win32" ? "../bin/win" : "../bin/posix", import.meta.url));
+const POSIX_BIN = fileURLToPath(new URL("../bin/posix", import.meta.url));
+
+/** pi-hub on PATH (Git Bash on Windows finds the sh shim after the .cmd folder), the hub's node, and the session to report to. */
+export function hubEnv(session?: string): Record<string, string> {
+	const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === "PATH") ?? "PATH";
+	const bins = process.platform === "win32" ? [BIN, POSIX_BIN] : [BIN];
+	return { [pathKey]: [...bins, process.env[pathKey] ?? ""].join(path.delimiter), PI_HUB_NODE: process.execPath, ...(session ? { PI_HUB_SESSION: session } : {}) };
+}
 
 /**
  * Starts a run command in its folder and forgets it; a window it opens (a terminal, Explorer) shows on the hub PC.
  * It gets PI_HUB_SESSION and pi-hub on PATH, so its script can ask the user (pi-hub ask) and report back (pi-hub notice).
  */
 export function runCommand(folder: string, line: string, session?: string) {
-	const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === "PATH") ?? "PATH";
-	const env = { ...process.env, [pathKey]: BIN + path.delimiter + (process.env[pathKey] ?? ""), PI_HUB_NODE: process.execPath, ...(session ? { PI_HUB_SESSION: session } : {}) };
+	const env = { ...process.env, ...hubEnv(session) };
 	// Windows: a detached (console-less) cmd loses its programs' output, even `> file` redirects, so a detached node
 	// launcher starts the line under a hidden console of its own instead; detaching still lets it outlive the hub.
 	const child = process.platform === "win32"

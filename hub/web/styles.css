@@ -221,6 +221,12 @@ h2 { font-size: 15px; font-weight: 600; }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-heading h2 { margin-right: auto; }
 .chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); }
+/* pi-hub progress: a long job's thin bar under the chat heading. */
+.job-progress { display: flex; align-items: center; gap: 8px; padding: 2px 12px; border-bottom: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+.job-progress[hidden] { display: none; }
+.job-progress span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+.job-progress i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.job-progress b { display: block; height: 100%; background: var(--accent); }
 .chat-heading > button { padding: 2px 10px; line-height: 1.4; }
 /* Working (or compacting, or subagents busy): the heading turns orange like the working session letter. */
 .chat-heading:has(#connection[data-state=working]), .topbar:has(> #connection[data-state=working]) { background: color-mix(in srgb, #fab005 30%, var(--chat)); }

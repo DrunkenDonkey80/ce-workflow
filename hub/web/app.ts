@@ -2290,6 +2290,20 @@ function applyUpdate(event: MessageEvent, update) {
  try { update(JSON.parse(event.data)); }
  catch (error) { showNotice("Workspace update failed: " + error.message + ". Reopen from the Pi terminal; your message draft is kept."); }
 }
+// pi-hub progress bar: hidden 1 min after done reaches total, or 15 min after the last report (a job that died or was forgotten).
+let jobProgress: { done: number; total: number; label: string; seen: number } | null = null;
+function setProgress(value?: { done: number; total: number; label: string; ago: number } | null) {
+ jobProgress = value ? { ...value, seen: Date.now() - value.ago } : null; renderProgress();
+}
+function renderProgress() {
+ const box = $("job-progress"), job = jobProgress, age = job ? Date.now() - job.seen : 0;
+ box.hidden = !job || age > 15 * 60_000 || (job.done >= job.total && age > 60_000);
+ if (box.hidden || !job) return;
+ const percent = Math.min(100, Math.floor(job.done / job.total * 100)), text = `${job.label ? job.label + " " : ""}${job.done}/${job.total} (${percent}%)`;
+ box.querySelector("span")!.textContent = text; box.title = text; box.querySelector("b")!.style.width = percent + "%";
+ box.setAttribute("aria-valuemax", String(job.total)); box.setAttribute("aria-valuenow", String(job.done)); box.setAttribute("aria-label", text);
+}
+setInterval(renderProgress, 30_000);
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
 listen("status", value => {
@@ -2299,7 +2313,8 @@ listen("status", value => {
  if (!value?.parked) waking = false; renderShell();
 });
 listen("sessions", () => void loadSessions()); // another session started, finished, asked or parked
-listen("notice", value => showNotice(value.text)); // e.g. a model picked while parked could not be used (S-11)
+listen("notice", value => showNotice(value.text));
+listen("progress", value => setProgress(value)); // e.g. a model picked while parked could not be used (S-11)
 // Plan events always describe Pi's current plan. When Pi switches plans, the page follows it,
 // unless the reader picked another plan in the menu: that view stays until Pi switches again.
 let currentPlan: string | null = null;
@@ -2319,6 +2334,7 @@ listen("plan", value => {
  if (value.id === target) { state.plan = value; renderShell(); }
 });
 listen("snapshot", value => {
+ setProgress(value.progress);
  if (build && value.build && value.build !== build) { location.reload(); return; }
  build ||= value.build ?? ""; retryDelay = 1000;
  if (value.target) target = value.target.kind === "product" ? "product" : value.target.id;

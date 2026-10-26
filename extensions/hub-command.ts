@@ -137,7 +137,7 @@ export const scheduleTool = {
 		properties: {
 			action: { type: "string", enum: ["add", "list", "cancel"] },
 			kind: nullable({ type: "string", enum: ["script", "message"] }),
-			command: nullable({ type: "string", description: "Shell command (script kind); runs in the same bash as your bash tool (Git Bash on Windows)" }),
+			command: nullable({ type: "string", description: "Shell command (script kind); runs in the same bash as your bash tool (Git Bash on Windows). For a long job (downloads, a batch), the script or your bash can show a bar above the chat with `pi-hub progress <done> <total> [label]` (`pi-hub progress --clear` removes it); it hides itself 1 min after done reaches total or 15 min after the last report." }),
 			text: nullable({ type: "string", description: "Message to send (message kind)" }),
 			inMinutes: nullable({ type: "number" }),
 			at: nullable({ type: "string", description: "ISO time of the first run" }),

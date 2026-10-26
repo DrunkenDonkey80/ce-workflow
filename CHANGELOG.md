@@ -12,6 +12,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Script timers on Windows run in Git Bash, the same shell as the agent's bash tool, instead of cmd.exe, where `bash` started WSL.
 - Clicking the update badge on the gear button starts Update all directly (after the usual confirm) instead of opening the settings menu.
 - Desktop app: the "Update ready" note at the right of the tab strip is clickable and restarts the app on the new version, like the tray's Restart to update.
+- Progress bar for long jobs: `pi-hub progress 2450 5000 items` (from the agent's bash, a background script or a timer script) shows a thin "items 2450/5000 (49%)" bar under the chat heading. It hides itself a minute after reaching the total or 15 minutes after the last report, so a forgotten one does not linger; `pi-hub progress --clear` removes it. Hub sessions and timer scripts now have `pi-hub` on PATH.
 - Devices moved out of the sidebar into Settings → Remote access, next to Copy.
 
 ## 0.1.80 — 2026-10-25

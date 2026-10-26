@@ -21,7 +21,7 @@ import { isWsl, uacPending } from "./platform.ts";
 import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { clipboardFiles } from "./images.ts";
-import { createCommands } from "./commands.ts";
+import { createCommands, hubEnv } from "./commands.ts";
 import { changelogImage, hubVersion, readChangelog, since, VERSION_PATTERN } from "./changelog.ts";
 import { agentDir } from "./rpc-client.ts";
 import { maintenanceCommand } from "./maintenance.ts";
@@ -100,7 +100,10 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	const config: HubConfig = saved ?? { version: 1, port: 0, localKey: crypto.randomBytes(32).toString("hex"), idleParkMinutes: 10 };
 	const registry = new Registry(dataDir);
 	const views = new Map<string, SessionView>();
-	const host = new SessionHost({ registry, command, idleParkMinutes: config.idleParkMinutes, viewers: id => views.get(id)?.clients.size ?? 0 });
+	// Per session, in memory only: ago (ms since the last report) instead of a time, so a page with a skewed clock still ages it right.
+	const progress = new Map<string, { done: number; total: number; label: string; at: number }>();
+	const progressOf = (id: string) => { const value = progress.get(id); return value ? { done: value.done, total: value.total, label: value.label, ago: Date.now() - value.at } : null; };
+	const host = new SessionHost({ registry, command, env: hubEnv(), idleParkMinutes: config.idleParkMinutes, viewers: id => views.get(id)?.clients.size ?? 0 });
 	let closing: Promise<void> | undefined;
 	// H6-01 remote access: the tailnet while serving, paired devices and their open streams (dropped on revoke).
 	const devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), streams = new Map<string, Set<http.ServerResponse>>();
@@ -162,6 +165,15 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/sessions/([0-9a-f-]{36})/rename": (data, m) => host.rename(m[1], String(data.name ?? "")),
 		// pi-hub notice: a run command's script reports back on the session's open pages (no model turn).
 		"POST /api/sessions/([0-9a-f-]{36})/notice": (data, m) => { if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 }); views.get(m[1])?.publish("notice", { text: String(data.text ?? "").slice(0, 2000) }); return { ok: true }; },
+		// pi-hub progress: a long job's done/total bar above the chat; the page hides it once finished or stale.
+		"POST /api/sessions/([0-9a-f-]{36})/progress": (data, m) => {
+			if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 });
+			const done = Number(data.done), total = Number(data.total);
+			if (data.clear) progress.delete(m[1]);
+			else if (Number.isFinite(done) && Number.isFinite(total) && total > 0 && done >= 0) progress.set(m[1], { done, total, label: String(data.label ?? "").slice(0, 200), at: Date.now() });
+			else throw Object.assign(new Error("Give done and total as numbers, total above 0."), { status: 400 });
+			views.get(m[1])?.publish("progress", progressOf(m[1])); return { ok: true };
+		},
 		"POST /api/sessions/([0-9a-f-]{36})/prompt": (data, m) => host.prompt(m[1], String(data.message ?? "")),
 		// S-02: timers of one session; the CLI (and through it the schedule tool) is the only writer.
 		"GET /api/sessions/([0-9a-f-]{36})/timers": (_d, m) => ({ timers: scheduler.list(m[1]) }),
@@ -360,7 +372,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					const sessionView = await view(page[1]);
 					if (endpoint === "rows") return send(200, await sessionView.page(url.searchParams.get("before") ?? undefined));
 					if (endpoint === "row") return send(200, await sessionView.row(url.searchParams.get("id") ?? ""));
-					const extras = { ...await pageApi.extras(page[1], url.searchParams.get("target")), build: currentBuild() };
+					const extras = { ...await pageApi.extras(page[1], url.searchParams.get("target")), build: currentBuild(), progress: progressOf(page[1]) };
 					if (endpoint !== "events") return send(200, sessionView.snapshot(extras));
 					if (device) {
 						const open = streams.get(device) ?? new Set(); streams.set(device, open.add(response));
