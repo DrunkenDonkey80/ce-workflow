@@ -142,6 +142,7 @@ try {
 	void record;
 
 	// The real script runner: shell, folder, output cap, exit code and timeout.
+	if (process.platform === "win32") assert.match((await runScript("uname -s", folder)).output, /MINGW|MSYS/, "Windows timers run in Git Bash, not WSL");
 	const echo = await runScript("echo hi&& exit 3", folder);
 	assert.deepEqual([echo.code, echo.output, echo.timedOut], [3, "hi", false]);
 	const slow = await runScript(`"${process.execPath}" -e "setTimeout(() => {}, 5000)"`, folder, 200);

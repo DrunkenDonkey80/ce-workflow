@@ -1,6 +1,7 @@
 // S-01: timers per hub session (plan a62d54be D2-D5, D8, D15). A message timer sends a fixed message each tick;
 // a script timer runs a command each tick and wakes the agent only when the command prints something.
 import { spawn } from "node:child_process";
+import { piSdk } from "./pi-sdk.ts";
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -51,10 +52,17 @@ export function timerInput(session: string, data: Record<string, unknown>): Time
 	return { session, kind: data.kind, text: text("text"), command: text("command"), inMinutes: number("inMinutes"), at: time("at"), everyMinutes: number("everyMinutes"), until: time("until"), runs };
 }
 
-/** Runs a script timer's command in the session folder through the platform shell. */
-export function runScript(command: string, cwd: string, timeoutMs = SCRIPT_TIMEOUT_MS): Promise<ScriptResult> {
+// Windows: the bash Pi's own bash tool uses (Git Bash), so a timer runs what the agent tested; cmd.exe would find WSL's bash.exe first.
+// shortcut: ignores a shellPath set in Pi's settings, read it here if someone sets one.
+let bash: Promise<{ shell: string; args: string[] } | null> | undefined;
+const windowsBash = () => bash ??= process.platform !== "win32" ? Promise.resolve(null) : piSdk().then(sdk => { const config = sdk.getShellConfig(); return config.commandTransport ? null : config; }).catch(() => null); // WSL-only PC: cmd.exe
+
+/** Runs a script timer's command in the session folder: Pi's bash on Windows, else the platform shell. */
+export async function runScript(command: string, cwd: string, timeoutMs = SCRIPT_TIMEOUT_MS): Promise<ScriptResult> {
+	const shell = await windowsBash();
 	return new Promise(resolve => {
-		const child = spawn(command, { cwd, shell: true, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+		const options = { cwd, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] } as const;
+		const child = shell ? spawn(shell.shell, [...shell.args, command], options) : spawn(command, { ...options, shell: true });
 		let output = "", timedOut = false;
 		const take = (chunk: Buffer) => { if (output.length < OUTPUT_CAP * 2) output += chunk.toString("utf8"); };
 		child.stdout.on("data", take); child.stderr.on("data", take);
