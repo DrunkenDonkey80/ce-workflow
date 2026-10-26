@@ -5,7 +5,7 @@ import { promisify } from "node:util";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { piSdk } from "./pi-sdk.ts";
+import { piPackage, piSdk } from "./pi-sdk.ts";
 import { agentDir } from "./rpc-client.ts";
 
 /** One user-scope Pi package as the gear lists it; update comes from the same hourly check. */
@@ -24,7 +24,8 @@ export const newer = (latest: string, current: string) => {
 
 /** Pi's own checks: pi.dev's latest version (as Pi's startup notice) and DefaultPackageManager for user packages. */
 export async function findUpdates(dir = agentDir()): Promise<Found> {
-	const current = readFileSync(path.join(dir, "install", "current-version"), "utf8").trim();
+	// Managed or npm-installed Pi alike: the version of the package the hub loads Pi's SDK from.
+	const current = String(JSON.parse(readFileSync(path.join(piPackage(dir), "package.json"), "utf8")).version ?? "");
 	const response = await fetch("https://pi.dev/api/latest-version", { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
 	if (!response.ok) throw new Error(`pi.dev answered ${response.status}`);
 	const latest = String((await response.json()).version ?? "").trim();
@@ -67,7 +68,8 @@ const hidden = <T>(call: string) => new Promise<T>((resolve, reject) => execFile
 	["--input-type=module", "--no-warnings", "-e", `import * as m from ${JSON.stringify(import.meta.url)}; process.stdout.write(JSON.stringify(await m.${call}));`],
 	{ windowsHide: true, encoding: "utf8", timeout: 300_000, maxBuffer: 1_000_000 },
 	(error, stdout, stderr) => {
-		if (error) return reject(new Error(stderr.trim().split("\n").at(-1) || error.message));
+		// Node ends a crash with its own "Node.js v24…" line; the cause is the first Error line above it.
+		if (error) { const lines = stderr.trim().split("\n"); return reject(new Error(lines.find(line => /^\w*Error\b/.test(line.trim()))?.trim() || lines.at(-1) || error.message)); }
 		try { resolve(JSON.parse(stdout)); } catch { reject(new Error("Pi's package manager gave no result.")); } // a throw here would end the hub
 	}));
 export const findUpdatesHidden = () => hidden<Found>("findUpdates()");
