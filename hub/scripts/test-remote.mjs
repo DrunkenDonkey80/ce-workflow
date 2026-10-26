@@ -40,7 +40,9 @@ mock.timers.enable({ apis: ["setInterval"] });
 // H-04 (C9): a spy app installer; any call that is not status would change files or the login entry.
 const appCalls = [];
 const spy = name => (...args) => { appCalls.push(name); return { supported: true, installed: false, version: null, staged: null, latest: "0.1.0", running: false, login: false, args }; };
-const app = { autoStage: async () => ({}), status: spy("status"), install: spy("install"), stage: spy("stage"), uninstall: spy("uninstall"), setLogin: spy("login") };
+// Issue #6: at hub start a newly staged build restarts the running app once.
+const restarts = [];
+const app = { autoStage: async () => ({ staged: "0.2.0", running: true }), restart: () => restarts.push(1), status: spy("status"), install: spy("install"), stage: spy("stage"), uninstall: spy("uninstall"), setLogin: spy("login") };
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url), app });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {
@@ -144,6 +146,7 @@ try {
 		const response = await fetch(`http://127.0.0.1:${port}/s/${id}/api/app`, { method: "POST", headers: { ...(key ? { "x-hub-key": key } : {}), "content-type": "application/json" }, body: JSON.stringify({ action: "install" }) });
 		assert.equal(response.status, 401, `key ${key}`);
 	}
+	assert.equal(restarts.length, 1, "hub start applied the staged app build");
 	assert.deepEqual(appCalls, [], "no refused request reached the installer");
 	assert.equal((await local(`/s/${id}/api/app`, { action: "status" })).body.latest, "0.1.0", "the local page reaches it");
 	assert.equal((await local(`/s/${id}/api/app`, { action: "login", on: "yes" })).status, 400);

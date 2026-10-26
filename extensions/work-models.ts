@@ -2231,7 +2231,7 @@ function startEarlyCompact(ctx) {
 	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens while you type.`, "info");
 	earlyCompact = new Promise((resolve) => ctx.compact({
 		onComplete: () => resolve(),
-		onError: (error) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); your message goes without it.`, "warning"); resolve(); },
+		onError: (error: unknown) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); your message goes without it.`, "warning"); resolve(); },
 	})).finally(() => { earlyCompact = null; });
 	return true;
 }
