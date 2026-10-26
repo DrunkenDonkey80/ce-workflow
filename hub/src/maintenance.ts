@@ -8,8 +8,8 @@ export function systemdHub(pid: number, cgroup?: string): boolean {
 	try { return /\/pi-control-hub\.service(?:\/|\n|$)/.test(cgroup ?? readFileSync(`/proc/${pid}/cgroup`, "utf8")); } catch { return false; }
 }
 
-export function maintenanceCommand(action: "restart" | "update", cli: string, log: string, managed = systemdHub(process.pid)): [string, string[]] {
-	const args = [cli, ...(action === "update" ? ["update", "--yes"] : ["restart"])];
+export function maintenanceCommand(action: "restart" | "update", cli: string, log: string, managed = systemdHub(process.pid), only?: string): [string, string[]] {
+	const args = [cli, ...(action === "update" ? ["update", "--yes", ...(only ? ["--extension", only] : [])] : ["restart"])];
 	if (!managed) return [process.execPath, args];
 	const env = { PATH: process.env.PATH, PI_CODING_AGENT_DIR: agentDir(), PI_HUB_PI_COMMAND: process.env.PI_HUB_PI_COMMAND };
 	return ["systemd-run", ["--user", "--collect", "--quiet", "--property=Type=exec",

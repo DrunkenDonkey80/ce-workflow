@@ -16,6 +16,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - The schedule tool's help now says plainly that any output ends even a repeating timer, that timers survive a hub restart, that an ended timer's message can still arrive later as a follow-up, and that `pi-hub progress`/`notice` need PI_HUB_SESSION or --session.
 - Desktop app has the ce-workflow version and follows it (#6): every pushed version gets its app built and published automatically, and after an update the hub downloads the matching app and restarts a running one onto it, with no extra step. Drafts and tabs are kept; hubs and sessions keep running.
 - Check now for updates works with an npm-installed Pi; it failed with just "Node.js v24…". A failed check now shows the real error line.
+- A red Update button appears top-right within about 10 minutes of a new ce-workflow version on GitHub (for git installs; Pi and other extensions are still checked hourly). It offers Update everything (Pi, extensions, ce-workflow) or Update only ce-workflow; the gear's update badges open the same choice.
 - Devices moved out of the sidebar into Settings → Remote access, next to Copy.
 
 ## 0.1.80 — 2026-10-25

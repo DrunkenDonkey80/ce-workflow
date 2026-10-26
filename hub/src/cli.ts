@@ -138,7 +138,8 @@ async function stop(force: boolean) {
 }
 
 /** Stop the hub, `pi update --all` (Pi and extensions), start it again; the running sessions come back (D17). */
-async function update(yes: boolean) {
+/** only: one package source (pi update --extension), e.g. just ce-workflow; else Pi and every package (--all). */
+async function update(yes: boolean, only?: string) {
 	const running = marker(), managed = !!running && systemdHub(running.pid);
 	if (running) {
 		const busy = ((await call("/api/status")).sessions as { name: string; folder: string; busy: string[] }[]).filter(s => s.busy.length);
@@ -161,7 +162,7 @@ async function update(yes: boolean) {
 	if (running) await stop(false); // refuses if a session turned busy meanwhile
 	const [command, ...prefix] = defaultCommand();
 	// windowsHide: npm/git children inherit this hidden console instead of each flashing its own window (the hub starts us console-less).
-	try { execFileSync(command, [...prefix, "update", "--all"], { stdio: "inherit", windowsHide: true, shell: command === "pi" && process.platform === "win32" }); }
+	try { execFileSync(command, [...prefix, "update", ...(only ? ["--extension", only] : ["--all"])], { stdio: "inherit", windowsHide: true, shell: command === "pi" && process.platform === "win32" }); }
 	catch (error) { if (!process.stdout.isTTY) openInBrowser(path.join(hubDataDir(), "hub.log")); throw error; } // from the page: show what failed
 	finally { if (running) await start(managed); }
 }
@@ -196,7 +197,7 @@ try {
 	else if (verb === "start") await start();
 	else if (verb === "stop") await stop(rest.includes("--force"));
 	else if (verb === "restart") { const running = marker(), managed = !!running && systemdHub(running.pid); await stop(false); await start(managed); }
-	else if (verb === "update") await update(rest.includes("--yes"));
+	else if (verb === "update") await update(rest.includes("--yes"), rest.includes("--extension") ? rest[rest.indexOf("--extension") + 1] : undefined);
 	else if (verb === "status") {
 		const running = marker();
 		if (!running) console.log(`Not running. Data: ${hubDataDir()}`);

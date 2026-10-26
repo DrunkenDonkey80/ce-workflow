@@ -104,7 +104,10 @@ await new Promise(done => relay.listen(0, "127.0.0.1", done));
 process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} }, pool: { available: true, daemon: () => undefined, view: async () => stub("/api/pool", {}), action: async data => stub("/api/pool", data), start() {}, stop() {} },
+const { createUpdateCheck } = await import("../src/update-check.ts");
+// ce-workflow has an update: the Update button shows (its menu is checked; no item is picked, that would run pi update).
+const updates = createUpdateCheck({ find: async () => ({ pi: null, packages: ["ce-workflow"], installed: [{ source: "git:github.com/x/ce-workflow", name: "ce-workflow", version: "0.1.0", update: true }] }), latest: async () => null });
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], updates, usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} }, pool: { available: true, daemon: () => undefined, view: async () => stub("/api/pool", {}), action: async data => stub("/api/pool", data), start() {}, stop() {} },
  app: { status: () => ({ supported: true, installed: true, version: "0.1.0", staged: null, latest: "0.2.0", running: false, login: true }), install() {}, autoStage: async () => ({}), stage: () => ({ supported: true, installed: true, version: "0.1.0", staged: "0.2.0", latest: "0.2.0", running: false, login: true }), uninstall() {}, setLogin() {} } });
 const origin = `http://127.0.0.1:${hub.config.port}`;
 const own = await hub.host.create(folder, "1"), id = own.id, rpc = () => hub.host.live.get(id).rpc;
@@ -621,6 +624,10 @@ try {
  await browser("fill", "#prompt-form textarea[placeholder=\"Write your answer\"]", "Canary"); await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).answers[0].response.selections, ["Alpha", "Beta"]); assert.equal(answers.at(-1).answers[1].response.text, "Canary"); assert.deepEqual(answers.at(-1).answers[2].response.selections, ["Session"]);
+ await browser("wait", "--fn", "!document.getElementById('update-button').hidden");
+ await browser("click", "#update-button");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('.session-menu:not([hidden]) button')].map(b => b.textContent)"), ["Update everything (Pi, extensions, ce-workflow)", "Update only ce-workflow"], "Update offers everything or just ce-workflow");
+ await browser("press", "Escape");
  await browser("click", "#settings-button"); assert(await evaluate("!document.getElementById('settings-menu').hidden && !!document.getElementById('hub-restart') && !!document.getElementById('hub-update')"), "gear opens the hub settings menu");
  // H-04 (C3): this PC's page shows the Desktop app row; Update stages the newer pin.
  await browser("wait", "--fn", "document.getElementById('app-status').textContent === 'Installed 0.1.0 · 0.2.0 available'");

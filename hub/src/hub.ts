@@ -331,7 +331,10 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					const busy = summary().filter(s => s.busy.length);
 					if (busy.length) return send(409, { error: `Not ${data.action === "update" ? "updated" : "restarted"}; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
 					const logFile = path.join(dataDir, "hub.log");
-					const [command, args] = maintenanceCommand(data.action, fileURLToPath(new URL("./cli.ts", import.meta.url)), logFile);
+					// only: just ce-workflow (the source the last check listed), never an arbitrary string from the page.
+					const only = data.action === "update" && data.only === "ce-workflow" ? updates?.state().installed?.find(item => /ce-workflow/i.test(item.source))?.source : undefined;
+					if (data.only && !only) return send(409, { error: "ce-workflow is not an installed package here; check for updates first." });
+					const [command, args] = maintenanceCommand(data.action, fileURLToPath(new URL("./cli.ts", import.meta.url)), logFile, undefined, only);
 					if (command === "systemd-run") {
 						const result = await exec(command, args, { timeout: 10_000 });
 						if (result.code !== 0) throw new Error(`Maintenance could not start: ${result.stderr || result.stdout}`);

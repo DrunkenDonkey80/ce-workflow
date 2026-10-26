@@ -18,4 +18,5 @@ for (const action of ["restart", "update"]) {
 	assert(args.some(arg => arg.startsWith("--setenv=PI_CODING_AGENT_DIR=")), "worker uses the same data directory");
 	assert.deepEqual(args.slice(args.indexOf("--") + 1), tail, "paths with spaces remain single arguments");
 }
+assert.deepEqual(maintenanceCommand("update", cli, log, false, "git:github.com/x/ce-workflow")[1], [cli, "update", "--yes", "--extension", "git:github.com/x/ce-workflow"], "just one package");
 console.log("maintenance ok");

@@ -44,3 +44,13 @@ assert.deepEqual([removed, after.installed.map(i => i.name), after.packages], [[
 const { packageName } = await import("../src/update-check.ts");
 assert.deepEqual(["npm:@upstash/context7-pi", "git:github.com/x/pi-effort", String.raw`..\..\git\pi-chatgpt-web`].map(packageName), ["@upstash/context7-pi", "pi-effort", "pi-chatgpt-web"]);
 console.log("ok - uninstall an extension from the gear");
+
+// The 10-minute look at ce-workflow alone: a newer GitHub version marks it, no full check runs; local checkouts are skipped.
+for (const [source, remote, marked] of [["git:github.com/x/ce-workflow", "0.1.81", true], ["git:github.com/x/ce-workflow", "0.1.80", false], [String.raw`C:gitce-workflow`, "0.1.81", false]]) {
+	let full = 0;
+	const quick = createUpdateCheck({ find: async () => { full++; return { pi: null, packages: [], installed: [{ source, name: "ce-workflow", version: "0.1.80", update: false }] }; }, latest: async () => remote });
+	await quick.check(); const state = await quick.quick();
+	assert.deepEqual([state.packages, state.installed[0].update, full], [marked ? ["ce-workflow"] : [], marked, 1], `${source} ${remote}`);
+	if (marked) assert.deepEqual((await quick.quick()).packages, ["ce-workflow"], "marked once");
+}
+console.log("ok - quick ce-workflow check");

@@ -2116,7 +2116,7 @@ function renderUpdates() {
  // An older running hub sends no version and has no changelog endpoint yet.
  $("hub-version").textContent = "Version: " + (hubSettings.version ?? ""); $("hub-version").hidden = !hubSettings.version;
  // Red dot only for ce-workflow (the one that matters); Pi and other extensions get a fainter yellow count.
- $("update-badge").hidden = !own; $("update-others").hidden = !others; $("update-others").textContent = String(others);
+ $("update-badge").hidden = !own; $("update-others").hidden = !others; $("update-button").hidden = !own; $("update-others").textContent = String(others);
  $("settings-button").title = count ? `Hub settings (${count} update${count > 1 ? "s" : ""})` : "Hub settings";
  const when = updates?.checkedAt ? new Date(updates.checkedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
  const names = updates ? [...updates.pi ? [`Pi ${updates.pi.current} → ${updates.pi.latest}`] : [], ...updates.installed ? [] : updates.packages] : []; // the extension rows below mark their own updates
@@ -2140,7 +2140,13 @@ function renderUpdates() {
  ($("update-check") as HTMLButtonElement).disabled = !updates || updates.checking;
 }
 // A click on either badge goes straight to Update all (same confirm) instead of opening the gear menu.
-for (const badge of ["update-badge", "update-others"]) { $(badge).title = "Update now"; $(badge).addEventListener("click", event => { event.stopPropagation(); $("hub-update").click(); }); }
+// The Update button (and the gear's badges): everything, or just ce-workflow when it has the update. Picking is the go-ahead.
+function updateMenu(anchor: HTMLElement) {
+ const own = !!hubSettings.updates?.packages.some(name => /ce-workflow/i.test(name));
+ showMenu(anchor, [["Update everything (Pi, extensions, ce-workflow)", () => void runUpdate()], ...own ? [["Update only ce-workflow", () => void runUpdate("ce-workflow")] as [string, () => void]] : []]);
+}
+$("update-button").addEventListener("click", event => { event.stopPropagation(); updateMenu($("update-button")); });
+for (const badge of ["update-badge", "update-others"]) { $(badge).title = "Update now"; $(badge).addEventListener("click", event => { event.stopPropagation(); updateMenu($("settings-button")); }); }
 $("update-check").addEventListener("click", async () => {
  ($("update-check") as HTMLButtonElement).disabled = true; $("update-list").textContent = "Checking…";
  try { hubSettings = await post("hub", { action: "check-updates" }) as HubSettings; } catch (error) { showNotice(error.message); }
@@ -2272,8 +2278,11 @@ for (const key of ["hub-theme", "hub-mode"]) $(key).addEventListener("change", (
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
  if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (terminals) keeps the old version until restarted.")) return;
- try { await post("hub", { action: "update" }); showNotice("Updating Pi and extensions; the page reconnects when the hub is back (a minute or two).", true); } catch (error) { showNotice(error.message); }
+ await runUpdate();
 });
+async function runUpdate(only?: "ce-workflow") {
+ try { await post("hub", { action: "update", ...only ? { only } : {} }); showNotice(`Updating ${only ?? "Pi and extensions"}; the page reconnects when the hub is back (a minute or two).`, true); } catch (error) { showNotice(error.message); }
+}
 // Queued messages come back into the box (Pi would otherwise still deliver them after Stop), ahead of any draft.
 function restoreQueued(restored?: string[]) {
  if (!restored?.length) return false;

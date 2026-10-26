@@ -12,7 +12,7 @@ import { agentDir } from "./rpc-client.ts";
 export type Installed = { source: string; name: string; version: string; update: boolean };
 export type Found = { pi: { current: string; latest: string } | null; packages: string[]; installed?: Installed[] };
 export type UpdateState = Found & { checkedAt: number | null; checking: boolean; error?: string };
-export type UpdateCheck = { state(): UpdateState; check(): Promise<UpdateState>; remove(source: string): Promise<UpdateState>; start(): void; stop(): void };
+export type UpdateCheck = { state(): UpdateState; check(): Promise<UpdateState>; quick(): Promise<UpdateState>; remove(source: string): Promise<UpdateState>; start(): void; stop(): void };
 
 /** Numeric x.y.z comparison; a pre-release tag counts as its base version. */
 export const newer = (latest: string, current: string) => {
@@ -75,8 +75,25 @@ const hidden = <T>(call: string) => new Promise<T>((resolve, reject) => execFile
 export const findUpdatesHidden = () => hidden<Found>("findUpdates()");
 export const removePackageHidden = (source: string) => hidden<boolean>(`removePackage(${JSON.stringify(source)})`);
 
-export function createUpdateCheck({ find = findUpdatesHidden, remove = removePackageHidden, every = 3_600_000 }: { find?: () => Promise<Found>; remove?: (source: string) => Promise<boolean>; every?: number } = {}): UpdateCheck {
-	let value: UpdateState = { pi: null, packages: [], checkedAt: null, checking: false }, running: Promise<UpdateState> | undefined, timer: NodeJS.Timeout | undefined;
+/** ce-workflow's version on GitHub master (every push bumps it); null when GitHub cannot be reached. */
+export async function latestWorkflow(get: typeof fetch = fetch): Promise<string | null> {
+	try {
+		const response = await get("https://raw.githubusercontent.com/DrunkenDonkey80/ce-workflow/master/package.json", { signal: AbortSignal.timeout(10_000) });
+		return response.ok ? String((await response.json()).version ?? "") || null : null;
+	} catch { return null; }
+}
+
+export function createUpdateCheck({ find = findUpdatesHidden, remove = removePackageHidden, latest = latestWorkflow, every = 3_600_000, quickEvery = 600_000 }: { find?: () => Promise<Found>; remove?: (source: string) => Promise<boolean>; latest?: () => Promise<string | null>; every?: number; quickEvery?: number } = {}): UpdateCheck {
+	let value: UpdateState = { pi: null, packages: [], checkedAt: null, checking: false }, running: Promise<UpdateState> | undefined, timer: NodeJS.Timeout | undefined, quickTimer: NodeJS.Timeout | undefined;
+	// Between the hourly full checks, a cheap look at ce-workflow alone, so its update shows within minutes of a push.
+	// shortcut: git installs only; an npm or local-path (developer checkout) ce-workflow waits for the hourly check.
+	const quick = async () => {
+		const own = value.installed?.find(item => /ce-workflow/i.test(item.source));
+		if (running || !own || own.update || !own.source.startsWith("git:") || !own.version) return value;
+		const version = await latest();
+		if (version && newer(version, own.version)) value = { ...value, packages: [...value.packages, own.name], installed: value.installed!.map(item => item === own ? { ...item, update: true } : item) };
+		return value;
+	};
 	const check = () => running ??= (async () => {
 		value = { ...value, checking: true };
 		try { value = { ...await find(), checkedAt: Date.now(), checking: false }; }
@@ -84,7 +101,7 @@ export function createUpdateCheck({ find = findUpdatesHidden, remove = removePac
 		running = undefined; return value;
 	})();
 	return {
-		state: () => value, check,
+		state: () => value, check, quick,
 		// Only a package the last check listed; the hub itself runs from ce-workflow, so that one stays.
 		async remove(source) {
 			const item = value.installed?.find(entry => entry.source === source);
@@ -94,7 +111,7 @@ export function createUpdateCheck({ find = findUpdatesHidden, remove = removePac
 			value = { ...value, installed: value.installed!.filter(entry => entry !== item), packages: value.packages.filter(name => name !== item.name) };
 			return value;
 		},
-		start() { void check(); timer = setInterval(() => void check(), every); timer.unref(); },
-		stop() { clearInterval(timer); },
+		start() { void check(); timer = setInterval(() => void check(), every); timer.unref(); quickTimer = setInterval(() => void quick(), quickEvery); quickTimer.unref(); },
+		stop() { clearInterval(timer); clearInterval(quickTimer); },
 	};
 }
