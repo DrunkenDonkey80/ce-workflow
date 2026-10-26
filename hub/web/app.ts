@@ -2062,7 +2062,9 @@ async function pollLoad() {
  if (loadSamples.length > 24) loadSamples.shift();
  for (const [key, name] of [["cpu", "CPU"], ["memory", "Memory"]] as const) {
   const box = $("load-" + key), value = loadSamples.at(-1)![key];
-  box.querySelector("polyline")!.setAttribute("points", loadSamples.map((sample, index) => `${index * 2 + 48 - loadSamples.length * 2},${(20 - sample[key] / 5).toFixed(1)}`).join(" "));
+  // Closed down to the bottom edge, so the graph is a filled area the number stands out against.
+  const left = 48 - loadSamples.length * 2;
+  box.querySelector("polyline")!.setAttribute("points", [`${left},20`, ...loadSamples.map((sample, index) => `${index * 2 + left},${(20 - sample[key] / 5).toFixed(1)}`), "46,20"].join(" "));
   box.querySelector("span")!.textContent = String(value);
   box.setAttribute("aria-label", `${name} ${value}%`); box.title = `${name} ${value}% (graph: last 2 minutes)`;
  }
