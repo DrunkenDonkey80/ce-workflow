@@ -262,6 +262,10 @@ fn set_tray(app: AppHandle, hubs: Vec<(u32, String)>, tooltip: String) -> Result
     tray.set_tooltip(Some(tooltip)).map_err(|e| e.to_string())
 }
 
+/// The strip's "Update ready" note: same as the tray's Restart to update.
+#[tauri::command]
+fn restart_update(app: AppHandle) { if staged() { restart(&app) } }
+
 fn restart(app: &AppHandle) {
     let args: Vec<String> = std::env::args().skip(1).filter(|a| a != "--hidden").collect();
     if std::process::Command::new(main_file()).args(args).arg("--restarted").spawn().is_ok() { app.exit(0) }
@@ -315,7 +319,7 @@ fn main() {
         }).build())
         .manage(Startup { error })
         .manage(Attention(Default::default()))
-        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned, attention_key, attend, go, flash])
+        .invoke_handler(tauri::generate_handler![config, local_url, staged, save, open, show, close, reload, set_icons, set_tray, pinned, attention_key, attend, go, flash, restart_update])
         .setup(move |app| {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.
             let _ = std::fs::write(install_dir().join("app.lock"), std::process::id().to_string());

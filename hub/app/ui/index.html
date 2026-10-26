@@ -14,6 +14,7 @@
  button.choice.danger { color: #e03131; border-color: #e03131 }
  #add { padding: 0 12px; font-size: 18px; color: var(--muted) }
  #ask { flex: 1; margin: 5px 8px; padding: 0 8px; border: 1px solid var(--sel); border-radius: 4px; background: var(--on); color: inherit; font: inherit; outline: none }
+ #note.update { cursor: pointer; color: var(--ink); text-decoration: underline }
  #note { margin-left: auto; align-self: center; padding: 0 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 </style></head>
 <body>
@@ -56,7 +57,8 @@ function render() {
   return button;
  });
  const add = document.createElement("button"); add.id = "add"; add.textContent = "+"; add.title = "Add a hub: paste its link (for example another PC's tailnet address)"; add.onclick = addHub;
- const note = document.createElement("div"); note.id = "note"; note.textContent = notice || startupError || (staged ? "Update ready: Restart to update in the tray" : "");
+ const note = document.createElement("div"); note.id = "note"; note.textContent = notice || startupError || (staged ? "Update ready: click to restart" : "");
+ if (!notice && !startupError && staged) { note.className = "update"; note.title = "Restarts the app on the new version (hubs and sessions keep running)"; note.onclick = () => void invoke("restart_update"); }
  document.body.replaceChildren(...buttons, add, note);
  void updateIcons();
 }
