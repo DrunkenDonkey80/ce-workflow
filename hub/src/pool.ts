@@ -35,12 +35,13 @@ export type Pool = ReturnType<typeof createPool>;
 
 export function createPool({ cpool = findCpool(), retryMs = 300_000, log = (line: string) => console.error(line) }: { cpool?: string; retryMs?: number; log?: (line: string) => void } = {}) {
 	let daemon: ChildProcess | undefined, retry: NodeJS.Timeout | undefined, stopped = true, lastExit = "";
-	const run = (args: string[]) => new Promise<any>((resolve, reject) => {
+	const run = (args: string[], input?: string) => new Promise<any>((resolve, reject) => {
 		if (!cpool) return reject(fail(404, "The Claude pool (pi-provider-claude-ex) is not installed."));
-		execFile(process.execPath, [cpool, ...args], { timeout: 30_000, windowsHide: true, maxBuffer: 4_000_000 }, (error, stdout, stderr) => {
+		const child = execFile(process.execPath, [cpool, ...args], { timeout: 30_000, windowsHide: true, maxBuffer: 4_000_000 }, (error, stdout, stderr) => {
 			if (error) return reject(fail(502, (String(stderr).trim().split("\n").pop() || error.message)));
 			try { resolve(JSON.parse(stdout)); } catch { reject(fail(502, "cpool printed no JSON.")); }
 		});
+		child.stdin?.end(input ?? "");
 	});
 
 	// D13: one daemon refreshes the pool while the hub runs. cpool itself refuses a second daemon, so a
@@ -67,7 +68,14 @@ export function createPool({ cpool = findCpool(), retryMs = 300_000, log = (line
 		daemon: () => daemon,
 		/** The /claude-pool list (title, drain7d, rows); null when claudeex is not installed. */
 		view: async () => cpool ? run(["view", "--json"]) : null,
-		async action(data: { act?: unknown; label?: unknown; value?: unknown }) {
+		async action(data: { act?: unknown; label?: unknown; value?: unknown; text?: unknown }) {
+			// Moving logins between hubs: the export holds refresh tokens and the sync key, so only the paired page gets it.
+			if (data.act === "export") return { config: await run(["export", "--json"]) };
+			if (data.act === "import") {
+				if (typeof data.text !== "string" || !data.text.trim() || data.text.length > 1_000_000) throw fail(400, "Paste an exported pool config.");
+				const result = await run(["import"], data.text);
+				return { message: result?.text as string | undefined, view: await run(["view", "--json"]) };
+			}
 			if (!ACTS.has(data.act as string) || typeof (data.label ?? "") !== "string") throw fail(400, "Unknown pool action.");
 			if (data.act === "priority" && !(Number.isInteger(data.value) && Math.abs(data.value as number) <= 2)) throw fail(400, "Priority is -2..2.");
 			if (data.value !== undefined && !Number.isInteger(data.value)) throw fail(400, "Value must be an integer.");

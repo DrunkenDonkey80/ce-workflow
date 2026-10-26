@@ -719,7 +719,8 @@ try {
  await browser("click", ".pool-actions button:nth-of-type(2)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done favorite')");
  await evaluate("(() => { const s = document.querySelector('.pool-actions select'); s.value = '2'; s.dispatchEvent(new Event('change')); })()"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done priority')");
  await browser("click", ".pool-tools button:nth-of-type(2)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done mode')");
- assert.deepEqual(pool.acts, ["switch:flex2", "favorite:flex2", "priority:flex2:2", "mode:"], "pool actions reach the hub's pool");
+ await evaluate("window.prompt = () => '{\"accounts\":[]}', 0"); await browser("click", ".pool-tools button:nth-of-type(4)"); await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('done import')");
+ assert.deepEqual(pool.acts, ["switch:flex2", "favorite:flex2", "priority:flex2:2", "mode:", "import:undefined"], "pool actions reach the hub's pool; Paste logins sends the pasted text");
  await browser("click", "#usage-close");
  await browser("click", "#settings-button");
  assert.deepEqual(await evaluate("[document.querySelectorAll('#settings-menu #icon-grid .icon-choice').length > 1, !!document.getElementById('icon-colors'), document.querySelector('#icon-grid [aria-checked=true]')?.title]"), [true, false, "pc"], "icons sit in the settings menu, no colours, the first is the default");

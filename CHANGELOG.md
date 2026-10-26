@@ -4,6 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.84 — 2026-10-26
+
+### Added
+- The Claude accounts window has Copy logins and Paste logins: copy the pool's logins (and its login-sync key) on one hub and paste them in another hub's window. Needs pi-provider-claude-ex with `cpool export`/`cpool import`.
+
 ## 0.1.83 — 2026-10-26
 
 ### Added

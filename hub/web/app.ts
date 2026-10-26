@@ -1862,6 +1862,21 @@ async function poolAct(act: string, label = "", value?: number) {
  void loadUsage();
 }
 // One quota bar: fill = the shown number (left or used), colour = how close to the limit; the reset clock turns red when the week expires soon.
+async function copyPool() {
+ if (!confirm("Copy the Claude pool's logins? They grant access to these subscriptions: treat them like a password.\n\nUnless login sync is on, both PCs then share single-use tokens and one of them loses the accounts at the next refresh.")) return;
+ try {
+  const text = JSON.stringify((await post("pool", { act: "export" }) as { config: unknown }).config, null, 2);
+  // The clipboard needs a secure page; otherwise the text is shown to copy by hand.
+  try { await navigator.clipboard.writeText(text); showNotice("Logins copied: paste them in the other hub's Claude window."); } catch { prompt("Copy these logins:", text); }
+ } catch (error) { showNotice("Copy failed: " + (error as Error).message); }
+}
+async function pastePool() {
+ const text = prompt("Paste the logins copied from another hub:", "");
+ if (!text?.trim()) return;
+ try { const result = await post("pool", { act: "import", text }) as { message?: string }; showNotice(result.message ?? "Logins added."); }
+ catch (error) { showNotice("Paste failed: " + (error as Error).message); }
+ void loadUsage();
+}
 function poolBar(name: string, w: Window) {
  const bar = el("div", "pool-bar");
  if (!w) { bar.append(el("span", "pool-bar-name", name), el("span", "pool-bar-track"), el("span", "pool-bar-text", "—")); return bar; }
@@ -1929,6 +1944,14 @@ async function openUsage(id: string, open = true) {
  if (id === "claude") {
   let pool: { title: string; drain7d: boolean; rows: PoolRow[] } | null = null;
   try { pool = await get("pool"); } catch { pool = null; }
+  // Copy/paste the pool's logins (refresh tokens + login-sync key) to set up the pool on another hub.
+  const copyPaste = () => {
+   const copy = el("button", "", "Copy logins"), paste = el("button", "", "Paste logins");
+   copy.title = "Copy every account's login to paste into another hub"; paste.title = "Add the logins copied from another hub";
+   copy.addEventListener("click", () => void copyPool()); paste.addEventListener("click", () => void pastePool());
+   return [copy, paste];
+  };
+  if (pool && !pool.rows.length) { const tools = el("div", "pool-tools"); tools.append(el("h3", "", pool.title || "Claude pool"), ...copyPaste()); body.push(tools); }
   if (pool?.rows.length) {
    const rows = pool.rows;
    if (!rows.some(row => row.label === poolPick)) poolPick = rows.find(row => row.active)?.label ?? rows[0].label;
@@ -1936,7 +1959,7 @@ async function openUsage(id: string, open = true) {
    const refresh = el("button", "", "↻ Refresh"), drain = el("button", pool.drain7d ? "on" : "", pool.drain7d ? "Drain 7d: on" : "Drain 7d: off");
    refresh.title = "Fetch every account's usage now"; drain.title = "Drain 7d: serve the soonest-expiring week first, ignoring 5h";
    refresh.addEventListener("click", () => void poolAct("refresh")); drain.addEventListener("click", () => void poolAct("mode"));
-   tools.append(el("h3", "", pool.title), refresh, drain);
+   tools.append(el("h3", "", pool.title), refresh, drain, ...copyPaste());
    const list = el("div", "pool-list"), actions = el("div", "pool-dock");
    list.setAttribute("role", "listbox");
    const draw = () => { list.replaceChildren(...rows.map(row => poolRowBox(row, () => { poolPick = row.label; draw(); }))); actions.replaceChildren(poolActions(rows.find(row => row.label === poolPick)!)); };

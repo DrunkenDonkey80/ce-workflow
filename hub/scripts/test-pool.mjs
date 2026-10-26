@@ -15,6 +15,8 @@ fs.writeFileSync(cpool, `import fs from "node:fs";
 const args = process.argv.slice(2); fs.appendFileSync(${JSON.stringify(log)}, args.join(" ") + "\\n");
 if (args[0] === "view") console.log(JSON.stringify({ title: "Claude accounts", drain7d: false, rows: [{ label: "a" }] }));
 else if (args[0] === "action") args[1] === "explode" ? (console.error("no such act"), process.exit(1)) : console.log(JSON.stringify({ text: "did " + args[1] }));
+else if (args[0] === "export") console.log(JSON.stringify({ accounts: [{ label: "a", refresh: "r" }] }));
+else if (args[0] === "import") { const text = fs.readFileSync(0, "utf8"); text.startsWith("{") ? console.log(JSON.stringify({ text: "Imported " + JSON.parse(text).accounts.length })) : (console.error("Import failed: not valid JSON"), process.exit(1)); }
 else if (args[0] === "daemon") { if (fs.existsSync(${JSON.stringify(path.join(root, "alive"))})) { console.error("cpool daemon already running (pid 1)"); process.exit(1); } setInterval(() => {}, 1000); }`);
 fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "claudeex", bin: { cpool: "bin/cpool.mjs" } }));
 fs.writeFileSync(path.join(agent, "settings.json"), JSON.stringify({ packages: ["npm:pi-lens", { source: "npm:other@1.0.0" }, path.relative(agent, pkg)] }));
@@ -38,6 +40,12 @@ assert.equal(done.message, "did priority"); assert.equal(done.view.title, "Claud
 assert(calls().includes("action priority a 2 --json"));
 await pool.action({ act: "mode" });
 assert(calls().includes("action mode  --json"), "global acts pass an empty label");
+// Copy/paste logins between hubs: export prints the config; import reads the pasted text on stdin.
+assert.deepEqual(await pool.action({ act: "export" }), { config: { accounts: [{ label: "a", refresh: "r" }] } });
+const pasted = await pool.action({ act: "import", text: JSON.stringify({ accounts: [{ label: "b" }] }) });
+assert.equal(pasted.message, "Imported 1"); assert.equal(pasted.view.title, "Claude accounts");
+await assert.rejects(pool.action({ act: "import", text: "junk" }), error => error.status === 502 && /not valid JSON/.test(error.message));
+for (const bad of [{ act: "import" }, { act: "import", text: "  " }]) await assert.rejects(pool.action(bad), error => error.status === 400);
 for (const bad of [{ act: "explode" }, { act: "priority", label: "a", value: 5 }, { act: "switch", label: "--help" }, { act: "up", label: 3 }, { act: "up", label: "a", value: 1.5 }])
 	await assert.rejects(pool.action(bad), error => error.status === 400, JSON.stringify(bad));
 
