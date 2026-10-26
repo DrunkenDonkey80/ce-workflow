@@ -2229,7 +2229,7 @@ function startEarlyCompact(ctx) {
 	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
 	if (minutes === undefined) return false;
 	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens while you type.`, "info");
-	earlyCompact = new Promise((resolve) => ctx.compact({
+	earlyCompact = new Promise<void>((resolve) => ctx.compact({
 		onComplete: () => resolve(),
 		onError: (error: unknown) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); your message goes without it.`, "warning"); resolve(); },
 	})).finally(() => { earlyCompact = null; });

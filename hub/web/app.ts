@@ -1243,6 +1243,7 @@ function commandChip(command: ProjectCommand, withHelp: boolean) {
  return button;
 }
 function renderCommands(list: ProjectCommand[], busy: boolean) {
+ list = token ? list : list.filter(command => !command.local); // remote pages (no local key) skip this-PC-only buttons
  // renderShell can run before this part of the module loads, so the last list lives on the element.
  const key = JSON.stringify(list);
  if (key !== $("project-commands").dataset.key) {

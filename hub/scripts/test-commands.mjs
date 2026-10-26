@@ -12,9 +12,10 @@ try {
 	fs.mkdirSync(folder);
 	assert.deepEqual(commands.list(folder), []);
 	commands.add(folder, { name: "Tests", kind: "prompt", text: "run the tests", help: "Agent runs tests" });
-	commands.add(folder, { name: "Terminal", kind: "run", text: "start wt -d ." });
+	commands.add(folder, { name: "Terminal", kind: "run", text: "start wt -d .", local: true });
 	commands.add(folder, { name: "tests", kind: "prompt", text: "run the tests and fix failures" });
 	assert.deepEqual(commands.list(folder).map(c => [c.name, c.text]), [["Terminal", "start wt -d ."], ["tests", "run the tests and fix failures"]], "same name replaces");
+	assert.deepEqual(commands.list(folder).map(c => c.local), [true, undefined], "local (this PC only) is kept");
 	if (process.platform === "win32") assert.equal(commands.list(folder.toUpperCase()).length, 2, "Windows folders match in any case");
 	assert.deepEqual(commands.list(path.join(root, "Other")), [], "commands belong to one folder");
 	assert.throws(() => commands.add(folder, { name: "X", kind: "shell", text: "x" }), /kind/);

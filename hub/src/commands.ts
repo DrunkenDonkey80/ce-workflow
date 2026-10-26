@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { writeJsonAtomic } from "./registry.ts";
 
-export type ProjectCommand = { name: string; kind: "prompt" | "run"; text: string; help?: string };
+// local: only on this PC's own page (a run that opens windows or rebuilds the desktop app is pointless from a phone).
+export type ProjectCommand = { name: string; kind: "prompt" | "run"; text: string; help?: string; local?: boolean };
 const key = (folder: string) => { const full = path.resolve(folder); return process.platform === "win32" ? full.toLowerCase() : full; };
 const fail = (message: string) => Object.assign(new Error(message), { status: 400 });
 
@@ -24,7 +25,7 @@ export function createCommands(dataDir: string) {
 			if (!name || name.length > 40) throw fail("name: 1-40 characters.");
 			if (input.kind !== "prompt" && input.kind !== "run") throw fail("kind: prompt or run.");
 			if (!text) throw fail(input.kind === "run" ? "text: the command line to run." : "text: the message to send.");
-			const command: ProjectCommand = { name, kind: input.kind, text, ...(help ? { help } : {}) };
+			const command: ProjectCommand = { name, kind: input.kind, text, ...(help ? { help } : {}), ...(input.local === true ? { local: true } : {}) };
 			const folders = read(), own = (folders[key(folder)] ?? []).filter(item => item.name.toLowerCase() !== name.toLowerCase());
 			folders[key(folder)] = [...own, command]; write(folders);
 			return command;

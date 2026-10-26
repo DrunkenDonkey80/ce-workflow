@@ -5,6 +5,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Changed
+- Project command buttons can be this-PC-only (project_commands local): remote pages hide them, for runs that open windows or act on this desktop.
+- hub/app/dev-restart.mjs (the Rebuild app button here) builds on every core: about a minute instead of several.
 - A fourth session state: blue now means waiting for a timer (any pending timer, also when parked) and a finished, unseen session is green, in the tab icon, the desktop app icon and the sidebar. This replaces showing a timer due within 10 minutes as working.
 - Desktop app taskbar icon with two or more hubs: a dark tile with one bar per hub (up to four), split into red, orange and blue for its states and dim when the hub is quiet, so it reads on light and dark taskbars.
 

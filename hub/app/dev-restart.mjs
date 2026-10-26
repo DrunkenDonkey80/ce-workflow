@@ -14,7 +14,9 @@ try {
 	if (!app.status().supported) throw new Error(app.status().note);
 	if (!app.status().installed) throw new Error("Install the desktop app from the hub page first.");
 	tell("Building the desktop app from source (a minute or two)…");
-	execFileSync("cargo", ["tauri", "build", "--no-bundle"], { cwd: tauri, stdio: "inherit", windowsHide: true });
+	// Release LTO links on one core for most of the build; a dev build skips it and splits codegen across every core (CI releases keep both).
+	const env = { ...process.env, CARGO_PROFILE_RELEASE_LTO: "false", CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "256", CARGO_PROFILE_RELEASE_INCREMENTAL: "true" };
+	execFileSync("cargo", ["tauri", "build", "--no-bundle"], { cwd: tauri, stdio: "inherit", windowsHide: true, env });
 	const built = fileURLToPath(new URL(`./src-tauri/target/release/pi-hub-app${process.platform === "win32" ? ".exe" : ""}`, import.meta.url));
 	if (!existsSync(built)) throw new Error(`No build at ${built}`);
 	copyFileSync(built, app.paths.next);

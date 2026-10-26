@@ -175,12 +175,14 @@ export const projectCommandsTool = {
 			kind: nullable({ type: "string", enum: ["prompt", "run"] }),
 			text: nullable({ type: "string", description: "prompt: message to send; run: shell command line" }),
 			help: nullable({ type: "string", description: "One short line shown on hover" }),
+			local: nullable({ type: "boolean", description: "Show only on this PC's own hub page, not remote ones (for runs that open windows or act on this desktop)" }),
 		},
 	},
 	async execute(_id, args, _signal, _update, ctx) {
 		if (args.action !== "list" && !args.name) throw new Error(`${args.action} needs name.`);
 		const cli = ["commands", args.action, "--folder", ctx?.cwd ?? process.cwd()];
 		for (const key of ["name", "kind", "text", "help"]) if (args[key] != null && (args.action === "add" || key === "name")) cli.push(`--${key}`, String(args[key]));
+		if (args.action === "add" && args.local === true) cli.push("--local");
 		const result = await hubCli(cli, 30_000);
 		if (!result.ok) throw new Error(result.text);
 		return { content: [{ type: "text", text: result.text }], details: {} };

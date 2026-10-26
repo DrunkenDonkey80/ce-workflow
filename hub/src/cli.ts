@@ -258,7 +258,7 @@ try {
 	} else if (verb === "commands" && ["add", "list", "remove"].includes(rest[0])) {
 		// The project_commands tool's backend: buttons above the chat for one folder (default: here).
 		const flag = (name: string) => { const at = rest.indexOf(`--${name}`); return at < 0 ? undefined : rest[at + 1]; };
-		const result = await call("/api/commands", { action: rest[0], folder: path.resolve(flag("folder") ?? "."), name: flag("name"), kind: flag("kind"), text: flag("text"), help: flag("help") });
+		const result = await call("/api/commands", { action: rest[0], folder: path.resolve(flag("folder") ?? "."), name: flag("name"), kind: flag("kind"), text: flag("text"), help: flag("help"), local: rest.includes("--local") });
 		console.log(rest[0] === "list" ? JSON.stringify(result.commands) : rest[0] === "add" ? `Added "${result.name}".` : result.ok ? "Removed." : "No such command.");
 	} else if (verb === "progress") {
 		// A long job's bar above the session's chat: pi-hub progress 2450 5000 downloading items, or --clear.
