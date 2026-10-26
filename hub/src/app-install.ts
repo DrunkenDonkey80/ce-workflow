@@ -132,7 +132,7 @@ export function createAppInstall({
 		write({ version: value.version, staged: await fetchTo(next) });
 		return status();
 	}
-	/** The hourly check (H-05): stage when installed and supported (not on WSL, D13); otherwise nothing. */
+	/** The periodic check (H-05): stage when installed and supported (not on WSL, D13); otherwise nothing. */
 	const autoStage = async () => unsupported || !current() ? status() : stage();
 	function start() {
 		guard();

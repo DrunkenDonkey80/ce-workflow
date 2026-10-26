@@ -239,22 +239,43 @@ fn gear(app: AppHandle, id: u32) {
 /// frameless window; put both back on top.
 #[cfg(windows)]
 fn raise(app: &AppHandle) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{FindWindowExW, SetWindowPos, HWND_TOP, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        FindWindowExW, SetWindowPos, HWND_TOP, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    };
     let top = |hwnd: *mut std::ffi::c_void| unsafe {
-        SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        SetWindowPos(
+            hwnd,
+            HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
     };
     if let Some(strip) = app.get_webview("strip") {
         let _ = strip.with_webview(move |platform| unsafe {
             let mut hwnd: *mut std::ffi::c_void = std::ptr::null_mut();
             // SAFETY: windows' HWND is a transparent wrapper around the raw handle pointer.
-            if platform.controller().ParentWindow(&mut hwnd as *mut _ as *mut _).is_ok() {
+            if platform
+                .controller()
+                .ParentWindow(&mut hwnd as *mut _ as *mut _)
+                .is_ok()
+            {
                 top(hwnd);
             }
         });
     }
     if let Some(window) = app.get_window("main").and_then(|w| w.hwnd().ok()) {
         let name: Vec<u16> = "TAURI_DRAG_RESIZE_BORDERS\0".encode_utf16().collect();
-        let borders = unsafe { FindWindowExW(window.0 as _, std::ptr::null_mut(), name.as_ptr(), std::ptr::null()) };
+        let borders = unsafe {
+            FindWindowExW(
+                window.0 as _,
+                std::ptr::null_mut(),
+                name.as_ptr(),
+                std::ptr::null(),
+            )
+        };
         if !borders.is_null() {
             top(borders);
         }

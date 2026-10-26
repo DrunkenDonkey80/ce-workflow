@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Changed
+- The hub checks for a new desktop app build every 10 minutes instead of hourly, so a release reaches the app soon after its build finishes.
 - Desktop app on Windows has no title bar: the session sidebar runs to the top of the window, the hub tabs sit right of it, and the gear (with its update badge) plus minimize, maximize and close are at the top right of the tab line. Drag the empty tab line to move the window; double-click it to maximize.
 
 ## 0.1.82 — 2026-10-26
