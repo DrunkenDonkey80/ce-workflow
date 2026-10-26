@@ -45,7 +45,7 @@ overlay and the tray (asking red, working amber, finished-unseen blue), even wit
 - Linux limits: GNOME shows the tray only with the AppIndicator extension, and live icon changes may not show on Wayland.
 - Release: automatic. Every push that changes the version in `package.json` builds both files as release `app-v<version>`
   (`.github/workflows/app-release.yml`, which stamps that version into the app).
-  Local build: `cargo tauri build --no-bundle` in `hub/app/src-tauri`.
+  Local build: `cargo tauri build --no-bundle` in `hub/app/src-tauri`. To try it in the installed app, `node hub/app/dev-restart.mjs` builds, stages and restarts the app onto it (the next release update replaces it).
 
 ## Development
 
