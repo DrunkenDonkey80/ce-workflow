@@ -13,6 +13,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Clicking the update badge on the gear button starts Update all directly (after the usual confirm) instead of opening the settings menu.
 - Desktop app: the "Update ready" note at the right of the tab strip is clickable and restarts the app on the new version, like the tray's Restart to update.
 - Progress bar for long jobs: `pi-hub progress 2450 5000 items` (from the agent's bash, a background script or a timer script) shows a thin "items 2450/5000 (49%)" bar under the chat heading. It hides itself a minute after reaching the total or 15 minutes after the last report, so a forgotten one does not linger; `pi-hub progress --clear` removes it. Hub sessions and timer scripts now have `pi-hub` on PATH.
+- The schedule tool's help now says plainly that any output ends even a repeating timer, that timers survive a hub restart, that an ended timer's message can still arrive later as a follow-up, and that `pi-hub progress`/`notice` need PI_HUB_SESSION or --session.
 - Devices moved out of the sidebar into Settings → Remote access, next to Copy.
 
 ## 0.1.80 — 2026-10-25

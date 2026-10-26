@@ -263,7 +263,7 @@ try {
 		// A long job's bar above the session's chat: pi-hub progress 2450 5000 downloading items, or --clear.
 		const at = rest.indexOf("--session"), session = at < 0 ? process.env.PI_HUB_SESSION : rest[at + 1];
 		if (!session) throw new Error("Not run inside a hub session: pass --session <hub id>.");
-		const words = rest.filter((_arg, index) => index !== at && index !== at + 1);
+		const words = at < 0 ? rest : rest.filter((_arg, index) => index !== at && index !== at + 1);
 		await call(`/api/sessions/${session}/progress`, words[0] === "--clear" ? { clear: true } : { done: Number(words[0]), total: Number(words[1]), label: words.slice(2).join(" ") });
 	} else if (verb === "ask" || verb === "notice") {
 		// For run commands' scripts (PI_HUB_SESSION is set): ask the user through the page's ask_user form, or report back.

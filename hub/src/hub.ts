@@ -171,7 +171,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			const done = Number(data.done), total = Number(data.total);
 			if (data.clear) progress.delete(m[1]);
 			else if (Number.isFinite(done) && Number.isFinite(total) && total > 0 && done >= 0) progress.set(m[1], { done, total, label: String(data.label ?? "").slice(0, 200), at: Date.now() });
-			else throw Object.assign(new Error("Give done and total as numbers, total above 0."), { status: 400 });
+			else throw Object.assign(new Error(`Give done and total as numbers, total above 0 (got done=${data.done} total=${data.total}).`), { status: 400 });
 			views.get(m[1])?.publish("progress", progressOf(m[1])); return { ok: true };
 		},
 		"POST /api/sessions/([0-9a-f-]{36})/prompt": (data, m) => host.prompt(m[1], String(data.message ?? "")),

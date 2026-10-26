@@ -43,6 +43,10 @@ try {
 	// `pi-hub new` takes the next free number in the folder's group.
 	const second = /\/s\/([0-9a-f-]{36})\//.exec(cli("new", folder).out)?.[1];
 	assert(second, "`pi-hub new` prints the session page");
+	// pi-hub progress without --session (PI_HUB_SESSION, as in a hub session's bash) keeps its first number.
+	env.PI_HUB_SESSION = id; assert.equal(cli("progress", "2450", "5000", "items").code, 0, "progress from PI_HUB_SESSION"); delete env.PI_HUB_SESSION;
+	assert.equal(cli("progress", "1", "2", "--session", id).code, 0, "progress with --session");
+	assert.match(cli("progress", "x", "--session", id).out, /got done=null total=null/, "the refusal shows what it got");
 	assert.equal((await api(`/api/sessions/${second}/park`, {})).status, 200);
 	assert.match(cli("status").out, /idle {2}1 {2}.*\n {2}parked +2 {2}/s, "parked sessions list with their state");
 	// Intercom's view of parked sessions: `parked` lists them, `wake <id>` resumes one.
