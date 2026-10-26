@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Changed
+- A fourth session state: blue now means waiting for a timer (any pending timer, also when parked) and a finished, unseen session is green, in the tab icon, the desktop app icon and the sidebar. This replaces showing a timer due within 10 minutes as working.
 - Desktop app taskbar icon with two or more hubs: a dark tile with one bar per hub (up to four), split into red, orange and blue for its states and dim when the hub is quiet, so it reads on light and dark taskbars.
 
 ## 0.1.81 — 2026-10-26

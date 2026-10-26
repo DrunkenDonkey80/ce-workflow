@@ -804,11 +804,13 @@ try {
   assert.deepEqual(await evaluate("[document.querySelector('#job-progress span').textContent, document.querySelector('#job-progress b').style.width]"), ["items 2450/5000 (49%)", "49%"], "label, count, percent and bar");
   await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "document.querySelector('.session-job small')?.textContent === '49%'");
   await report({ clear: true }); await browser("wait", "--fn", "document.getElementById('job-progress').hidden"); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "!document.querySelector('.session-job')"); }
- // A parked session whose check timer fires within 10 minutes shows as working on the icon only.
+  // A parked session with a check timer shows blue (scheduled) on the icon; it needs nobody, so the attention count stays.
  { const other = hub.registry.list().find(record => record.id !== id && !hub.host.live.has(record.id)).id, post = (route, body) => fetch(`${origin}/api/${route}`, { method: "POST", headers: { "x-hub-key": hub.config.localKey, "content-type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
+  const before = JSON.parse((await evaluate("document.title")).slice(13)).attention;
   const check = await post(`sessions/${other}/timers`, { kind: "script", command: "exit 0", everyMinutes: 5 });
-  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "JSON.parse(document.title.slice(13)).states.includes('working')");
-  await post(`timers/${check.id}/cancel`, {}); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "!JSON.parse(document.title.slice(13)).states.includes('working')"); }
+  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "JSON.parse(document.title.slice(13)).states.includes('scheduled')");
+  assert.equal(JSON.parse((await evaluate("document.title")).slice(13)).attention, before, "a timer is not attention");
+  await post(`timers/${check.id}/cancel`, {}); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "!JSON.parse(document.title.slice(13)).states.includes('scheduled')"); }
  await evaluate("(() => { delete navigator.userAgent; delete document.hasFocus; })()");
  // Sidebar filter: Enter on this session clears the filter and puts the cursor in the chat box.
  await browser("fill", "#session-filter", "1"); await browser("press", "Enter");

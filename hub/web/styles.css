@@ -559,9 +559,9 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session:has(.session-progress:not(.session-job)) .session-link .session-letter { position: relative; top: 5px; }
 .session[data-tone=working] .session-letter { background: #fab005; color: #1e1e1e; }
 .session[data-tone=waiting] .session-letter { background: var(--error); }
-.session[data-tone=unseen] .session-letter { background: var(--focus); }
+.session[data-tone=unseen] .session-letter { background: light-dark(#2b8a3e, #37b24d); color: #fff; }
 .session[data-tone=scheduled] { background: color-mix(in srgb, var(--muted) 12%, transparent); border-radius: 6px; }
-.session[data-tone=scheduled] .session-letter { background: #dee2e6; color: #1e1e1e; }
+.session[data-tone=scheduled] .session-letter { background: #1c7ed6; color: #fff; }
 .session-timer { margin-left: auto; padding-left: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .switcher[data-open=false] .session-timer { display: none; }
 .session[data-tone=seen] .session-letter { background: #ced4da; color: #1e1e1e; }

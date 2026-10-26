@@ -31,8 +31,9 @@ export const ICONS: Record<string, [string, string, boolean]> = {
 
 // The tab icon, and the installed app's icon (hub /app-icon.svg): transparent, dark ink, light ink on a dark tab bar.
 const ICON_INK = "#343a40";
-const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#1c7ed6" };
-// states: any of waiting/working/unseen, each drawn once, most urgent first.
+// waiting: asks you; working; unseen: finished, not yet looked at (ready); scheduled: idle, a timer will wake it.
+const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#1c7ed6" };
+// states: any of waiting/working/unseen/scheduled, each drawn once, most urgent first.
 // The icon alone, centred in a 32 box.
 function glyph(name: string) {
  const [box, d, evenodd] = ICONS[name], [, , w, h] = box.split(" ").map(Number), scale = 32 / Math.max(w, h);
@@ -43,7 +44,7 @@ export function iconSvg(name: string, states: string[] = [], r = 6.5) {
  // At 16 px an outline reads as noise: the icon keeps the whole square and white-ringed dots (Gmail/Slack style) carry the states,
  // filling lower-right, lower-left, then upper-right; two fit side by side at 16 px. r: dot radius in the 32 box.
  const near = r + 1, far = 32 - near;
- const badge = Object.keys(DOTS).filter(state => states.includes(state)).map((state, i) => `<circle cx="${i === 1 ? near : far}" cy="${i === 2 ? near : far}" r="${r}" fill="${DOTS[state]}" stroke="#fff" stroke-width="2"/>`).join("");
+ const badge = Object.keys(DOTS).filter(state => states.includes(state)).map((state, i) => `<circle cx="${i % 2 ? near : far}" cy="${i >= 2 ? near : far}" r="${r}" fill="${DOTS[state]}" stroke="#fff" stroke-width="2"/>`).join("");
  return `${SVG_HEAD}${glyph(name)}${badge}</svg>`;
 }
 // The desktop app's taskbar icon: one cell per hub (1 = whole square, 2 side by side, 3-4 in 2x2; more show only as app tabs).
@@ -53,7 +54,7 @@ export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  hubs = hubs.filter(hub => ICONS[hub.icon]).slice(0, 4);
  if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states, 7);
  // Two or more: icons are mush at 24 px, so a dark tile with one bar per hub (left to right like the tabs); a hub's
- // states (waiting, working, unseen, top down) split its bar, and a quiet hub's bar stays dim. The tile reads on any taskbar.
+ // states (waiting, working, unseen, scheduled, top down) split its bar, and a quiet hub's bar stays dim. The tile reads on any taskbar.
  const column = 28 / hubs.length, gap = 1.2;
  return SVG_HEAD.replace(/<style>.*<\/style>/, "") + `<rect width="32" height="32" rx="6" fill="#212529"/>` + hubs.map((hub, i) => {
   const lit = Object.keys(DOTS).filter(state => hub.states.includes(state)), x = (2 + column * i + gap).toFixed(2), w = (column - 2 * gap).toFixed(2);

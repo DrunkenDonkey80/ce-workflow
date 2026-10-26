@@ -1276,8 +1276,8 @@ async function removeProjectCommand(name: string) {
 }
 $("mode-research").addEventListener("click", () => void toggleMode("/research " + ($("mode-research").getAttribute("aria-pressed") === "true" ? "off" : "on")));
 $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("mode-night").getAttribute("aria-pressed") === "true" ? "off" : "on")));
-// H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, blue unseen idle,
-// grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
+// H5-05 session bar: every hub session grouped by folder, colour-coded (orange working, red waiting, green unseen idle,
+// blue waiting for a timer, grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
 type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; job?: number; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
@@ -1349,10 +1349,10 @@ function renderIcon() {
  // An installed app's taskbar/dock icon is fixed at install; its badge is the only live part (Chromium, Safari): a mark while
  // count of what needs you (questions, finished sessions you haven't opened); colours are impossible there. Working has no badge.
  if (inApp()) {
-  const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen"].includes(tone)); // the app has no page in front: own unseen counts
+  const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen", "scheduled"].includes(tone)); // the app has no page in front: own unseen counts
   // attention: how many things need you, for the app's badge on a pinned button.
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
-  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone !== "working").length, session: sessionId, nav: navRequest,
+  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
    // latest: the newest session needing you, so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
    latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "" });
   if (document.title !== line) document.title = line;
@@ -1371,9 +1371,8 @@ function appleIcon(svg: string) {
  image.onload = () => { canvas.getContext("2d")!.drawImage(image, 0, 0, 180, 180); document.querySelector<HTMLLinkElement>("link[rel=apple-touch-icon]")!.href = canvas.toDataURL("image/png"); };
  image.src = "data:image/svg+xml," + encodeURIComponent(svg.replace("<style>", '<rect width="32" height="32" fill="#fff"/><style>')); // iOS shows transparency as black
 }
-// Icon dots only: an idle or parked session whose timer fires within 10 minutes (a check loop) counts as working, so it shows
-// it is still on it. Questions and finished runs keep their own colour.
-const iconTone = (session?: HubSession) => !session ? "" : ["scheduled", "parked"].includes(session.tone) && session.timers?.some(timer => timer.dueAt - Date.now() < 600_000) ? "working" : session.tone;
+// Icons: a parked session with a timer still counts as waiting for it (blue); questions and finished runs keep their own colour.
+const iconTone = (session?: HubSession) => !session ? "" : session.tone === "parked" && session.timers?.length ? "scheduled" : session.tone;
 async function loadSessions() {
  clearTimeout(sessionsTimer);
  // A background tab keeps polling, slower, so its icon still shows the other sessions.
