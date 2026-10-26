@@ -4,6 +4,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.82 — 2026-10-26
+
 ### Added
 - Explore an archive from chat: the file menu on a zip, 7z, rar or tar link unpacks it on the hub PC and the Files tab walks it (the chat shrinks to make room). Images open zoomable, markdown renders, HTML and PDF open in a frame, text shows as text, and every file has Download and Open. Works remotely too.
 
