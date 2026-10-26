@@ -15,9 +15,16 @@
  #add { padding: 0 12px; font-size: 18px; color: var(--muted) }
  #ask { flex: 1; margin: 5px 8px; padding: 0 8px; border: 1px solid var(--sel); border-radius: 4px; background: var(--on); color: inherit; font: inherit; outline: none }
  #note.update { cursor: pointer; color: var(--ink); text-decoration: underline }
- #note { margin-left: auto; align-self: center; padding: 0 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+ #note { flex: 1; text-align: right; align-self: center; padding: 0 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+ /* The frameless window's buttons (Windows): gear for the shown hub's settings, then minimize, maximize, close. */
+ button.win { width: 46px; padding: 0; justify-content: center; font-size: 15px; flex: none; position: relative }
+ button.win:hover { background: color-mix(in srgb, var(--ink) 12%, transparent) }
+ button.win.close:hover { background: #e81123; color: #fff }
+ button.win.gear { font-size: 19px; width: 40px }
+ button.win b { position: absolute; right: 6px; bottom: 6px; min-width: 9px; height: 9px; border-radius: 5px; background: #e03131; font: 600 9px/9px system-ui; color: #fff; padding: 0 }
+ button.win b.count { background: #f59f00; padding: 0 3px; min-width: 7px; height: 12px; line-height: 12px; color: #000 }
 </style></head>
-<body>
+<body data-tauri-drag-region="deep">
 <script type="module">
 // The strip is the app's brain: tab list, each hub's state from its page title (D5), icons drawn with the hub's own icons.ts (D8).
 import { ICONS, iconSvg, hubsIconSvg } from "./icons.js";
@@ -57,9 +64,9 @@ function render() {
   return button;
  });
  const add = document.createElement("button"); add.id = "add"; add.textContent = "+"; add.title = "Add a hub: paste its link (for example another PC's tailnet address)"; add.onclick = addHub;
- const note = document.createElement("div"); note.id = "note"; note.textContent = notice || startupError || (staged ? "Update ready: click to restart" : "");
- if (!notice && !startupError && staged) { note.className = "update"; note.title = "Restarts the app on the new version (hubs and sessions keep running)"; note.onclick = () => void invoke("restart_update"); }
- document.body.replaceChildren(...buttons, add, note);
+ const note = document.createElement("div"); note.id = "note"; note.dataset.tauriDragRegion = ""; note.textContent = notice || startupError || (staged ? "Update ready: click to restart" : "");
+ if (!notice && !startupError && staged) { note.className = "update"; note.dataset.tauriDragRegion = "false"; note.title = "Restarts the app on the new version (hubs and sessions keep running)"; note.onclick = () => void invoke("restart_update"); }
+ document.body.replaceChildren(...buttons, add, note, ...frameButtons());
  void updateIcons();
 }
 async function pixels(svg, size) {
@@ -84,9 +91,29 @@ async function updateIcons() {
   await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${fullName(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${fullName(tab)}: ${stateWord(tab)}`)].join("\n") });
  } catch (error) { console.error(error); }
 }
+// The frameless window (config.frame): the shown hub page says where its sidebar ends (side) and the strip starts there;
+// an older page sends none and the strip spans the top above it.
+let stripLeft = null;
+function placeStrip() {
+ const side = tabs[active]?.side, left = config.frame && typeof side === "number" ? Math.max(0, Math.round(side)) : -1;
+ if (left !== stripLeft) { stripLeft = left; void invoke("strip_left", { left }); }
+}
+function frameButtons() {
+ if (!config.frame) return [];
+ const win = window.__TAURI__.window.getCurrentWindow();
+ const make = (text, title, action, extra = "") => { const b = document.createElement("button"); b.className = "win " + extra; b.textContent = text; b.title = title; b.onclick = action; return b; };
+ const tab = tabs[active], list = [];
+ if (tab && typeof tab.side === "number") {
+  const gear = make("⚙", "Hub settings", () => void invoke("gear", { id: tab.id }), "gear");
+  if (tab.gear) { const badge = document.createElement("b"); if (tab.gear !== "!") { badge.className = "count"; badge.textContent = tab.gear; } gear.append(badge); gear.title += " (updates)"; }
+  list.push(gear);
+ }
+ list.push(make("─", "Minimize", () => void win.minimize()), make("☐", "Maximize / restore", () => void win.toggleMaximize()), make("✕", "Close (keeps running in the tray)", () => void win.close(), "close"));
+ return list;
+}
 function select(id, stepping = false) {
  const index = tabs.findIndex(tab => tab.id === id); if (index < 0) return;
- active = index; void invoke("show", { id }); render();
+ active = index; void invoke("show", { id }); placeStrip(); render();
  if (!stepping) visited(tabs[index]);
 }
 // Back/forward mouse buttons: every session seen in the app, across hubs, like a browser's history; with Ctrl, this hub's only.
@@ -116,7 +143,7 @@ let attentionKey = null;
 window.onTitle = (webview, title) => {
  const tab = tabs.find(t => "hub" + t.id === webview); if (!tab) return;
  const line = /^pi-hub-state (\{.*\})$/.exec(title ?? "");
- if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { icon: value.icon || tab.icon, hubName: value.name || tab.hubName, states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0 });
+ if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { side: value.side, gear: value.gear ?? "", icon: value.icon || tab.icon, hubName: value.name || tab.hubName, states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0 });
   // This PC's hub holds the attention key setting.
   // A newer "needs you" than this tab has shown flashes the taskbar; the first title after start only sets the mark.
   if (tab.peak !== undefined && tab.latest > tab.peak) void invoke("flash").catch(console.error);
@@ -126,7 +153,7 @@ window.onTitle = (webview, title) => {
   if (tab.local && typeof value.key === "string" && value.key !== attentionKey) { attentionKey = value.key; void invoke("attention_key", { key: value.key }).catch(error => { notice = "Attention key: " + error; render(); }); }
  } catch { /* half-written title */ } }
  else { tab.states = (title ?? "").startsWith("(!)") ? ["waiting"] : []; tab.attention = tab.states.length; }
- render();
+ placeStrip(); render();
 };
 function open(tab) { if (tab.url) void invoke("open", { id: tab.id, url: tab.url }).then(() => { if (tabs[active] === tab) void invoke("show", { id: tab.id }); }, error => { startupError = String(error); render(); }); }
 const newTab = fields => ({ id: nextId++, icon: DEFAULT_ICON, states: [], ...fields });
@@ -173,8 +200,8 @@ async function menu(tab) {
   active = Math.max(0, tabs.indexOf(current)); persist(); if (tabs[active]) select(tabs[active].id); else render();
  }
 }
-let staged = false;
-const config = await invoke("config");
+let staged = false, config = {};
+config = await invoke("config");
 dark = config.dark; staged = config.staged; startupError = config.error ?? "";
 const saved = Array.isArray(config.hubs) ? config.hubs : [];
 tabs = saved.filter(h => h?.local || h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, ...(typeof h.name === "string" ? { name: h.name } : {}) }));

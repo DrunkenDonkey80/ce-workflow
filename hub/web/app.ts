@@ -259,7 +259,11 @@ function setDrawer(open: boolean) {
  $("drawer-toggle").setAttribute("aria-expanded", String(open)); $("drawer-toggle").setAttribute("aria-label", open ? "Close menu" : "Open menu");
  if (open) { drawer.querySelector<HTMLElement>("[aria-selected=true]")?.focus(); void loadUsage(); }
 }
-phone.addEventListener("change", () => { placeForPhone(); renderShell(); }); placeForPhone();
+// The app's frameless window (Windows): the sidebar runs to the top, the app's tab strip lies over the band right of it,
+// and the strip's gear opens these settings. The title line tells the app where the sidebar ends (side).
+const setFrame = () => document.body.classList.toggle("app-frame", navigator.userAgent.includes("PiHubFrame") && !phone.matches);
+phone.addEventListener("change", () => { placeForPhone(); setFrame(); renderShell(); }); placeForPhone(); setFrame();
+(window as unknown as { piHubSettings: () => void }).piHubSettings = () => $("settings-button").click();
 $("drawer-toggle").addEventListener("click", () => setDrawer(drawer.dataset.open !== "true"));
 $("drawer-backdrop").addEventListener("click", () => setDrawer(false));
 drawer.addEventListener("keydown", event => { if (event.key === "Escape") { event.stopPropagation(); setDrawer(false); $("drawer-toggle").focus(); } });
@@ -1187,7 +1191,7 @@ function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  for (const [other, panel] of menus) if (open && other !== button && !$(panel).hidden) toggleMenu(other, panel, false);
  $(menu).hidden = !open; $(button).setAttribute("aria-expanded", String(open));
  // Under its button, kept inside the window.
- if (open && $(menu).parentElement === $(button).parentElement?.closest(".status-line")) { const own = $(button).getBoundingClientRect(), line = $(menu).parentElement.getBoundingClientRect(); $(menu).style.left = Math.max(0, Math.min(own.left, innerWidth - $(menu).offsetWidth - 8) - line.left) + "px"; }
+ if (open && $(menu).parentElement === $(button).parentElement?.closest(".status-line")) { const own = $(button).getBoundingClientRect(), line = $(menu).parentElement.getBoundingClientRect(); $(menu).style.left = Math.max(0, Math.min($(button).offsetWidth ? own.left : innerWidth, innerWidth - $(menu).offsetWidth - 8) - line.left) + "px"; }
  // Settings grew long: it may use the window's full height below its button.
  if (open && menu === "settings-menu") $(menu).style.maxHeight = innerHeight - $(menu).getBoundingClientRect().top - 8 + "px";
  if (open) ($(menu).querySelector<HTMLElement>("input, button:not([hidden]):not(:disabled)"))?.focus();
@@ -1387,7 +1391,10 @@ function renderIcon() {
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
   const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
    // latest: the newest session needing you, so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
-   latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "" });
+   latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "",
+   // side: where the strip starts (frameless app); gear: the settings badge the strip's gear repeats ("!" ce-workflow, else a count).
+   // shortcut: CSS px equal the app's logical px only at 100% page zoom; scale by the zoom if the app ever allows it.
+   ...document.body.classList.contains("app-frame") && { side: $("switcher").hidden ? 0 : Math.round($("switcher").getBoundingClientRect().right), gear: !$("update-badge").hidden ? "!" : $("update-others").hidden ? "" : $("update-others").textContent } });
   if (document.title !== line) document.title = line;
  }
  const needsYou = states.filter(tone => tone === "waiting" || tone === "unseen").length;
@@ -1757,6 +1764,7 @@ window.addEventListener("keydown", event => {
 // Desktop session bar: open by default; collapsing to the letter stripe is remembered.
 function toggleSwitcher(open: boolean) { localStorage.setItem("plan3-switcher", open ? "open" : "closed"); document.body.classList.toggle("switcher-open", open); $("switcher").dataset.open = String(open); $("switcher-toggle").setAttribute("aria-expanded", String(open)); $("switcher-toggle").setAttribute("aria-label", open ? "Hide shared sessions" : "Show shared sessions"); }
 $("switcher-toggle").addEventListener("click", () => toggleSwitcher($("switcher").dataset.open !== "true"));
+new ResizeObserver(() => renderIcon()).observe($("switcher")); // the app's strip follows the sidebar's edge
 // Not from the filter box: Escape there only clears it, and an extra press must not fold the list away.
 $("switcher").addEventListener("keydown", event => { if (event.key === "Escape" && $("switcher").dataset.open === "true" && event.target !== $("session-filter")) { event.stopPropagation(); toggleSwitcher(false); $("switcher-toggle").focus(); } });
 toggleSwitcher(localStorage.getItem("plan3-switcher") !== "closed");
