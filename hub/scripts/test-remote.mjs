@@ -51,7 +51,7 @@ const local = async (route, body) => {
 };
 // What tailscale serve forwards: the tailnet Host, https proto and the verified login. fetch cannot set Host, so http.request.
 const remote = (route, { method = "GET", cookie, login = "me@example.com", proto = "https", origin = method === "POST" ? remoteOrigin : undefined, stream = false, body } = {}) => new Promise((resolve, reject) => {
-	const headers = { ...(body ? { "content-type": "application/json" } : {}), host: remoteHost, "x-forwarded-proto": proto, "tailscale-user-login": login, "user-agent": "Mozilla/5.0 (iPhone) Safari/1", ...(cookie ? { cookie: `pi_remote=${cookie}` } : {}), ...(origin ? { origin } : {}) };
+	const headers = { ...(body ? { "content-type": "application/json" } : {}), host: remoteHost, "x-forwarded-proto": proto, "tailscale-user-login": login, "user-agent": "Mozilla/5.0 (iPhone) Safari/1", ...(cookie ? { cookie: cookie.includes("=") ? cookie : `pi_remote_${port}=${cookie}` } : {}), ...(origin ? { origin } : {}) };
 	const request = http.request({ host: "127.0.0.1", port, path: route, method, headers }, response => {
 		if (stream) return resolve(response);
 		let text = ""; response.on("data", chunk => text += chunk); response.on("end", () => resolve({ status: response.statusCode, headers: response.headers, text, json: () => JSON.parse(text) }));
@@ -120,7 +120,11 @@ try {
 	assert.deepEqual((await local("/api/pairing", { approve: true })).body, { ok: true });
 	const approved = await waiting;
 	assert.equal(approved.json().state, "approved");
-	const cookie = /pi_remote=([^;]+); HttpOnly; Secure; SameSite=Lax/.exec(approved.headers["set-cookie"][0])[1];
+	const cookie = new RegExp(`pi_remote_${port}=([^;]+); HttpOnly; Secure; SameSite=Lax`).exec(approved.headers["set-cookie"][0])[1];
+	// Another hub on the same tailnet name (WSL) has its own cookie; the old shared name still works and is renamed.
+	assert.equal((await remote(`/s/${id}/api/snapshot`, { cookie: `pi_remote_1=x.y; pi_remote_${port}=${cookie}` })).status, 200, "another port's cookie does not interfere");
+	const legacy = await remote(`/s/${id}/api/snapshot`, { cookie: `pi_remote=${cookie}` });
+	assert.deepEqual([legacy.status, legacy.headers["set-cookie"]?.[0].startsWith(`pi_remote_${port}=${cookie};`)], [200, true], "the old cookie name is renamed, not re-paired");
 	assert.equal((await remote(`/pair/status?id=${started.id}`)).status, 404, "the cookie is delivered once");
 	assert.equal((await local("/api/pairing")).body.pending, null);
 

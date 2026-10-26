@@ -18,6 +18,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Check now for updates works with an npm-installed Pi; it failed with just "Node.js v24…". A failed check now shows the real error line.
 - A red Update button appears top-right within about 10 minutes of a new ce-workflow version on GitHub (for git installs; Pi and other extensions are still checked hourly). It offers Update everything (Pi, extensions, ce-workflow) or Update only ce-workflow; the gear's update badges open the same choice.
 - Desktop app taskbar icon: one hub shows its own icon; two or more show the dot grid (two hubs use the outer columns, the middle one stays empty) instead of two shrunken icons.
+- Pairing a phone or browser with one hub no longer unpairs it from another hub on the same Tailscale name (Windows and WSL hubs on one PC shared one cookie). Already paired devices keep working.
 - Devices moved out of the sidebar into Settings → Remote access, next to Copy.
 
 ## 0.1.80 — 2026-10-25

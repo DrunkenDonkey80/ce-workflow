@@ -235,7 +235,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				if (request.headers["x-forwarded-proto"] !== "https" || request.headers["tailscale-user-login"] !== tailnet!.login) return send(403, { error: "Only the Tailscale owner may connect." });
 				if (request.method === "POST" && origin === undefined) return send(403, { error: "Missing Origin rejected." });
 				// The local key never authorizes remote requests: a leaked link still needs pairing.
-				const cookie = cookieOf(request.headers.cookie);
+				const [cookie, named] = cookieOf(request.headers.cookie, config.port) ?? [];
 				if (!cookie || !await devices.check(cookie, tailnet!.login!)) {
 					if (request.method === "POST" && url.pathname === "/pair/start") {
 						const started = pairing.start(request.headers, tailnet!.login!);
@@ -245,7 +245,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					}
 					if (request.method === "GET" && url.pathname === "/pair/status") {
 						const result = await pairing.status(url.searchParams.get("id"), new Promise(done => response.once("close", done)));
-						if (result.cookie) response.setHeader("set-cookie", deviceCookie(result.cookie));
+						if (result.cookie) response.setHeader("set-cookie", deviceCookie(result.cookie, config.port));
 						return send(200, { state: result.state });
 					}
 					// A saved session link pairs too; the pairing page then reloads that link.
@@ -255,7 +255,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					return send(401, { error: "This device is not paired." });
 				}
 				// A pairing page loaded without the cookie (Strict cookies skip cross-site opens) is already paired: renew and reload.
-				if (request.method === "POST" && url.pathname === "/pair/start") { response.setHeader("set-cookie", deviceCookie(cookie)); return send(200, { paired: true }); }
+				if (request.method === "POST" && url.pathname === "/pair/start") { response.setHeader("set-cookie", deviceCookie(cookie, config.port)); return send(200, { paired: true }); }
+				if (!named) response.setHeader("set-cookie", deviceCookie(cookie, config.port));
 				device = cookie.split(".")[0];
 			} else {
 				// The CLI sends x-hub-key; the browser app sends the same key as a Bearer token or ?token= (its page carries it).

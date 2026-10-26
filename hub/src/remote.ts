@@ -118,8 +118,14 @@ export function createDeviceRegistry(directory: string, now = Date.now) {
 	};
 }
 
-export const deviceCookie = (value: string) => `pi_remote=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000`;
-export const cookieOf = (header: string | undefined) => /(?:^|;\s*)pi_remote=([A-Za-z0-9._-]{1,200})(?:;|$)/.exec(header ?? "")?.[1];
+// Cookies are per host, not per port: hubs sharing one tailnet name (Windows and WSL) each need their own, or pairing one unpairs the other.
+export const deviceCookie = (value: string, port: number) => `pi_remote_${port}=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=7776000`;
+/** [value, named]: named is false for the old shared pi_remote cookie, which the caller then renames. */
+export const cookieOf = (header: string | undefined, port: number): [string, boolean] | undefined => {
+	const read = (name: string) => new RegExp(`(?:^|;\\s*)${name}=([A-Za-z0-9._-]{1,200})(?:;|$)`).exec(header ?? "")?.[1];
+	const own = read(`pi_remote_${port}`), old = read("pi_remote");
+	return own ? [own, true] : old ? [old, false] : undefined;
+};
 
 type Pairing = { id: string; code: string; label: string; address: string; login: string; state: "pending" | "approved" | "denied" | "expired"; cookie?: string; waiters: Set<() => void> };
 /** One pending request at a time (the newest wins), 2-minute codes, at most 5 starts per 10 minutes; the local hub approves or rejects it. */
