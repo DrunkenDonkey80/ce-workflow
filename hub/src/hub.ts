@@ -200,7 +200,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 
 	const commands = createCommands(dataDir);
 	const version = hubVersion(); // the code this hub runs; an update restarts the hub
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, attentionKey: config.attentionKey ?? "ctrl+shift+a", version, seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}) }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, progress: progressOf, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, attentionKey: config.attentionKey ?? "ctrl+shift+a", version, seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}) }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection

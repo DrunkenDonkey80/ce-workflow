@@ -1273,7 +1273,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
+type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; job?: number; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1626,6 +1626,14 @@ link.addEventListener("click", () => sessionStorage.setItem("focus-chat", "1"));
   timer.dataset.due = String(next.dueAt); link.append(timer);
  }
  row.append(link, more);
+ // A long job (pi-hub progress) above the plan line: only its percent and bar.
+ if (session.job !== undefined) {
+  const line = html("span", { className: "session-progress session-job", title: `Job: ${session.job}%` });
+  line.style.setProperty("--fill", session.job + "%");
+  line.append(html("small", { textContent: session.job + "%" }), html("i"));
+  line.addEventListener("click", () => link.click());
+  row.append(line);
+ }
  // A plan in progress: steps done/total, then a line filled left to right.
  if (session.plan) {
   const line = html("span", { className: "session-progress", title: `Plan: ${session.plan.done}/${session.plan.total} steps` });

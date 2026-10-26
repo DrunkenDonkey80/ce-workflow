@@ -791,7 +791,8 @@ try {
   assert.equal((await report({ done: "x", total: 5 })).status, 400, "progress needs numbers");
   await report({ done: 2450, total: 5000, label: "items" }); await browser("wait", "--fn", "!document.getElementById('job-progress').hidden");
   assert.deepEqual(await evaluate("[document.querySelector('#job-progress span').textContent, document.querySelector('#job-progress b').style.width]"), ["items 2450/5000 (49%)", "49%"], "label, count, percent and bar");
-  await report({ clear: true }); await browser("wait", "--fn", "document.getElementById('job-progress').hidden"); }
+  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "document.querySelector('.session-job small')?.textContent === '49%'");
+  await report({ clear: true }); await browser("wait", "--fn", "document.getElementById('job-progress').hidden"); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", "!document.querySelector('.session-job')"); }
  // A parked session whose check timer fires within 10 minutes shows as working on the icon only.
  { const other = hub.registry.list().find(record => record.id !== id && !hub.host.live.has(record.id)).id, post = (route, body) => fetch(`${origin}/api/${route}`, { method: "POST", headers: { "x-hub-key": hub.config.localKey, "content-type": "application/json" }, body: JSON.stringify(body) }).then(r => r.json());
   const check = await post(`sessions/${other}/timers`, { kind: "script", command: "exit 0", everyMinutes: 5 });

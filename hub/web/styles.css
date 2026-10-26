@@ -569,7 +569,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session-folder[data-tone] { --box: var(--focus); border-color: color-mix(in srgb, var(--box) 45%, transparent); background: color-mix(in srgb, var(--box) 7%, transparent); }
 .session-folder[data-tone=working] { --box: #fab005; } .session-folder[data-tone=waiting] { --box: var(--error); }
 .session-progress { flex-basis: 100%; display: flex; align-items: center; gap: 6px; padding: 0 6px 3px 34px; margin-top: -4px; font-size: 10px; line-height: 1; color: var(--muted); cursor: pointer; }
-.session-progress i { flex: 1; height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--fill), var(--line) var(--fill)); }
+.session-progress i { flex: 1; height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--tint, var(--accent)) var(--fill), var(--line) var(--fill)); }
+.session-job { --tint: var(--warning); } .session-progress + .session-progress { margin-top: 0; }
 /* Collapsed: 28px inside, so the folder box gives up its side padding and the circle stays put. */
 .switcher[data-open=false] .session-folder { padding: 0 0 2px; } .switcher[data-open=false] .session-letter { top: 0; }
 .switcher[data-open=false] .session-progress { padding: 0 2px 2px; } .switcher[data-open=false] .session-progress small { display: none; }

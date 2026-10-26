@@ -32,7 +32,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, settings = () => ({}) }: { host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; commands?: Commands; settings?: () => Record<string, unknown> }) {
+export function createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, progress, settings = () => ({}) }: { progress?: (id: string) => { done: number; total: number; ago: number } | null; host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; commands?: Commands; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -184,8 +184,10 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	const worked = (file?: string) => { try { return file ? statSync(file).mtimeMs : undefined; } catch { return undefined; } };
 	// The intercom short id: the first 8 characters of the Pi session id, which Pi puts at the end of the file name.
 	const intercomId = (file?: string) => /_([0-9a-f]{8})[0-9a-f-]{28}\.jsonl$/i.exec(file ?? "")?.[1];
+	// pi-hub progress for the sidebar row, by the page bar's rule: gone 1 min after done reaches total or 15 min after the last report.
+	const job = (id: string) => { const value = progress?.(id); return !value || value.ago > 900_000 || (value.done >= value.total && value.ago > 60_000) ? undefined : Math.min(100, Math.floor(value.done / value.total * 100)); };
 	async function sessions() {
-		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), attention: attentionAt(record.id, tone(record.id)), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile), pi: intercomId(record.sessionFile), quiet: host.live.get(record.id)?.intercomRun || undefined })) })));
+		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), attention: attentionAt(record.id, tone(record.id)), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), job: job(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile), pi: intercomId(record.sessionFile), quiet: host.live.get(record.id)?.intercomRun || undefined })) })));
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents, settings: settings() };
 	}
