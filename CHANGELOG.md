@@ -4,24 +4,29 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.81 — 2026-10-26
+
 ### Added
 - New folder opens a proper dialog instead of the browser prompt, with a Local button that starts a session in ~/pi-local (made on first use) for machine requests like installing or checking something that belong to no project. The path box also accepts ~ for your home folder.
-- Escape in an empty sidebar filter box puts the cursor back in the chat box instead of folding the session list away (with text in it, Escape still just clears it).
-- The CPU and memory boxes in the top bar draw a faded filled graph instead of a thin line, with the number outlined in the box colour on top, so it stays readable.
 - Tab and app icon: a session whose timer fires within 10 minutes (e.g. a check loop) shows the working dot, so you can tell it is still on the job; the sidebar keeps showing it as scheduled.
-- Script timers on Windows run in Git Bash, the same shell as the agent's bash tool, instead of cmd.exe, where `bash` started WSL.
-- Clicking the update badge on the gear button starts Update all directly (after the usual confirm) instead of opening the settings menu.
 - Desktop app: the "Update ready" note at the right of the tab strip is clickable and restarts the app on the new version, like the tray's Restart to update.
 - Progress bar for long jobs: `pi-hub progress 2450 5000 items` (from the agent's bash, a background script or a timer script) shows a thin "items 2450/5000 (49%)" bar under the chat heading. It hides itself a minute after reaching the total or 15 minutes after the last report, so a forgotten one does not linger; `pi-hub progress --clear` removes it. Hub sessions and timer scripts now have `pi-hub` on PATH. The sidebar row shows it too, as a short percent and yellow bar above the session name, clear of the plan line below it.
-- The schedule tool's help now says plainly that any output ends even a repeating timer, that timers survive a hub restart, that an ended timer's message can still arrive later as a follow-up, and that `pi-hub progress`/`notice` need PI_HUB_SESSION or --session.
 - Desktop app has the ce-workflow version and follows it (#6): every pushed version gets its app built and published automatically, and after an update the hub downloads the matching app and restarts a running one onto it, with no extra step. Drafts and tabs are kept; hubs and sessions keep running.
-- Check now for updates works with an npm-installed Pi; it failed with just "Node.js v24…". A failed check now shows the real error line.
 - A red Update button appears top-right within about 10 minutes of a new ce-workflow version on GitHub (for git installs; Pi and other extensions are still checked hourly). It offers Update everything (Pi, extensions, ce-workflow) or Update only ce-workflow; the gear's update badges open the same choice.
+
+### Changed
+- Escape in an empty sidebar filter box puts the cursor back in the chat box instead of folding the session list away (with text in it, Escape still just clears it).
+- The CPU and memory boxes in the top bar draw a faded filled graph instead of a thin line, with the number outlined in the box colour on top, so it stays readable.
+- The schedule tool's help now says plainly that any output ends even a repeating timer, that timers survive a hub restart, that an ended timer's message can still arrive later as a follow-up, and that `pi-hub progress`/`notice` need PI_HUB_SESSION or --session.
 - Desktop app taskbar icon: one hub shows its own icon; two or more show the dot grid (two hubs use the outer columns, the middle one stays empty) instead of two shrunken icons.
-- Pairing a phone or browser with one hub no longer unpairs it from another hub on the same Tailscale name (Windows and WSL hubs on one PC shared one cookie). Already paired devices keep working.
 - Escape in the message box first clears what you typed (Ctrl+Z brings it back) or leaves a recalled prompt; only Escape in an empty box stops the run.
 - ↑ on your last prompt while it is still running opens it in orange edit mode: Send stops the run and replaces the prompt instead of adding a second one.
 - Devices moved out of the sidebar into Settings → Remote access, next to Copy.
+
+### Fixed
+- Script timers on Windows run in Git Bash, the same shell as the agent's bash tool, instead of cmd.exe, where `bash` started WSL.
+- Check now for updates works with an npm-installed Pi; it failed with just "Node.js v24…". A failed check now shows the real error line.
+- Pairing a phone or browser with one hub no longer unpairs it from another hub on the same Tailscale name (Windows and WSL hubs on one PC shared one cookie). Already paired devices keep working.
 
 ## 0.1.80 — 2026-10-25
 
