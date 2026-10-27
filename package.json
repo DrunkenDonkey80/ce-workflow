@@ -14,6 +14,7 @@
     "utility-agents/",
     "benchmarks/",
     "extensions/",
+    "browser-fetch/",
     "scripts/",
     "skills/",
     "hub/",
@@ -33,6 +34,7 @@
       "extensions/work-models.ts",
       "extensions/plan3.ts",
       "extensions/screen-read.ts",
+      "extensions/browser-fetch.ts",
       "extensions/enter-runs.ts",
       "extensions/advisor-model.ts",
       "extensions/ask-user/index.ts"

@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Pi browser fetch",
+  "version": "1.0",
+  "description": "Lets your Pi agent read pages in this browser after you approve each site. Click the icon to pause.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6x9bwEqSCRXRaNJGCxIfg316ISaedHJUgf/Zj145+q6l+o5cqlPjGEM5C9TKnZ6AcPjgBMPnXMR23AijTkh8DfYtwv2A8TiHiIkJHsLXi0ScoMeTUZrMO0lP78NmWgNFptkPTKKKlmcZmDuPIm91ymPqMaEk1EiaBTaNUvuDznXeO/1cwuOOzZrFAvjemZTwGiQLoBhe82WgdzgZ1mhUYUP+j0TKut+RLmxA86J6Y4C32Els2UGLjI1eQvrBim0bfn1TmAbd/Ht9Of65Wxo8vElAgJmNTg4ZwAuLWcuRtTa3ojdmy50Yo3LYfEtBeTvnll3K3933l9PeIAQGMkCobwIDAQAB",
+  "icons": { "32": "icon.png" },
+  "action": { "default_title": "Pi browser fetch: on (click to pause)", "default_icon": "icon.png" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["nativeMessaging", "tabs", "scripting", "declarativeNetRequest", "webRequest", "storage", "alarms"],
+  "host_permissions": ["<all_urls>"]
+}

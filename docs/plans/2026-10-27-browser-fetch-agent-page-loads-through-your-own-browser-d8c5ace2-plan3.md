@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-27
-updated: 2026-10-27T18:52:22.642Z
+updated: 2026-10-27T19:00:17.825Z
 reviewed: 2026-10-27
 started: 2026-10-27T18:49:18.546Z
 ---
@@ -100,16 +100,10 @@ None.
 ### Phase 1: Build [code]
 
 - [x] **P1-01** Policy in extensions/browser-fetch.ts: default block list, host/grant matching, locked atomic policy writes failing closed, log, URL and DNS checks (D14, D16).
-- [wip] **P1-02** Tool `browser_fetch {url, images?}`: check, approval dialog, send to the pipe, re-check final host, return text and image paths.
-  - One-shot grants bound to request ID and URL (D13); approve cross-site navigations mid-request (D12).
-  - `images` defaults to false (Q-01); the description tells the agent to set it for product or gallery pages. Without it, image URLs are listed, not downloaded.
-- [ ] **P1-03** Native host `browser-fetch/host.mjs`: stdio framing (4-byte length), pipe server, request relay with ids and timeouts, image files.
-  - DNS pre-check of new hostnames (D16); cancel a client's requests on disconnect (D15).
-- [ ] **P1-04** Extension: page loading in an inactive agent tab, with the toolbar pause button.
-  - connectNative on start; one inactive tab per request with tab-scoped block rules.
-  - Wait for load and for challenge pages to clear; extract text, links and images; close the tab.
-  - Navigation gate (D12); image downloads checked like pages (block list, redirects), covered by the page approval; other-host images use `credentials: "omit"` (Q-02); pause and deadlines (D15).
-- [ ] **P1-05** Install action and `/wo` Browser access menu: install, show status, edit block list, revoke grants, open log.
+- [x] **P1-02** browser_fetch tool {url, images?} in extensions/browser-fetch.ts (registered in package.json): gate + approval dialog (once per request, shared grants, 5 min deny), pipe link, mid-request redirect approval, final-host re-check, image list or download, log.
+- [x] **P1-03** browser-fetch/host.mjs: native frames, pipe server relaying by id (requester-only steering), image files under %TEMP%/pi-browser-fetch/<id>/, cancel on Pi disconnect, closes Pi sockets when the browser goes. DNS pre-check lives Pi-side (dnsCheck) for every new host, the same machine.
+- [x] **P1-04** browser-fetch/extension (MV3, fixed key, ID dmbpeaidhpenhihgngkgekaieninaapk): inactive muted tab per request, DNR gate (main frames only to approved hosts, block list for tab and own fetches), redirect approval via ERR_BLOCKED_BY_CLIENT, challenge wait, extract, image downloads (redirect: error, cookies only same host), toolbar pause.
+- [wip] **P1-05** Install action and `/wo` Browser access menu: install, show status, edit block list, revoke grants, open log.
 - [ ] **P1-06** Self-check `scripts/test-work-browser-fetch.mjs`, README and CHANGELOG.
   - Cover policy, approval choices, fake host round trip, adversarial URLs (IPv6, mapped IPv4, DNS to private), concurrent same-host requests.
   - Also: concurrent policy writers, revoke seen by another process, denied redirect gets no request, blocked image host, other-host image sent without cookies, pause and cancel mid-request.

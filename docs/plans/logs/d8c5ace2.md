@@ -20,3 +20,24 @@ Reviewed; all 8 findings accepted (D12 to D16, new P1-07, test renamed to test-w
   - Refuse non-http(s), localhost, private and link-local IPs, and bare hostnames without a dot (D16).
   - Locked atomic writes, fail-closed on corrupt file, fresh read per request (D14).
   - check: node scripts/test-work-browser-fetch.mjs → "policy ok" (adversarial URLs, DNS-to-private, 20 concurrent writers, cross-process revoke, corrupt file)
+
+## 2026-10-27T19:00:17.816Z P1-02 done: browser_fetch tool {url, images?} in extensions/browser-fetch.ts (registered in package.json): gate + approval dialog (once per request, shared grants, 5 min deny), pipe link, mid-request redirect approval, final-host re-check, image list or download, log.
+
+- [x] **P1-02** Tool `browser_fetch {url, images?}`: check, approval dialog, send to the pipe, re-check final host, return text and image paths.
+  - One-shot grants bound to request ID and URL (D13); approve cross-site navigations mid-request (D12).
+  - `images` defaults to false (Q-01); the description tells the agent to set it for product or gallery pages. Without it, image URLs are listed, not downloaded.
+  - check: node scripts/test-work-browser-fetch.mjs → "round trip ok" (approval once/shared/deny/unanswered/block, redirect refused with no request, final-host check, images cookie scope)
+
+## 2026-10-27T19:00:17.821Z P1-03 done: browser-fetch/host.mjs: native frames, pipe server relaying by id (requester-only steering), image files under %TEMP%/pi-browser-fetch/<id>/, cancel on Pi disconnect, closes Pi sockets when the browser goes. DNS pre-check lives Pi-side (dnsCheck) for every new host, the same machine.
+
+- [x] **P1-03** Native host `browser-fetch/host.mjs`: stdio framing (4-byte length), pipe server, request relay with ids and timeouts, image files.
+  - DNS pre-check of new hostnames (D16); cancel a client's requests on disconnect (D15).
+  - check: node scripts/test-work-browser-fetch.mjs → "round trip ok" (real host in-process; disconnect cancels; browser close ends Pi waits)
+
+## 2026-10-27T19:00:17.826Z P1-04 done: browser-fetch/extension (MV3, fixed key, ID dmbpeaidhpenhihgngkgekaieninaapk): inactive muted tab per request, DNR gate (main frames only to approved hosts, block list for tab and own fetches), redirect approval via ERR_BLOCKED_BY_CLIENT, challenge wait, extract, image downloads (redirect: error, cookies only same host), toolbar pause.
+
+- [x] **P1-04** Extension: page loading in an inactive agent tab, with the toolbar pause button.
+  - connectNative on start; one inactive tab per request with tab-scoped block rules.
+  - Wait for load and for challenge pages to clear; extract text, links and images; close the tab.
+  - Navigation gate (D12); image downloads checked like pages (block list, redirects), covered by the page approval; other-host images use `credentials: "omit"` (Q-02); pause and deadlines (D15).
+  - check: node scripts/test-work-browser-fetch.mjs → "round trip ok" (real background.js in a VM with a fake chrome enforcing DNR rules; pause and cancel close tabs). Real-browser behavior is P2-01.

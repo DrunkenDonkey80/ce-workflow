@@ -177,7 +177,7 @@ async function ask(ctx, key: string, url: string, policy: Policy, signal?: Abort
 		title: "Browser fetch",
 		purpose: `${ctx.cwd ? `${path.basename(ctx.cwd)}: ` : ""}the agent wants to open ${key} in your browser, with your cookies.${policy.corrupt ? ` ${policy.corrupt}.` : ""} Unanswered in 5 minutes = deny.`,
 		detail: url,
-		filter: false, cursorKey: "browser-fetch-approval", signal: both,
+		filter: false, cursorKey: `browser-fetch-approval-${randomUUID()}`, signal: both, // never preselect a remembered (maybe "Always") answer
 		items: [
 			{ value: "once", label: "Allow this request once" },
 			...HOURS.map(hours => ({ value: `h${hours}`, label: `Allow ${key} for ${hours} hour${hours > 1 ? "s" : ""}`, preserveCase: true })),
