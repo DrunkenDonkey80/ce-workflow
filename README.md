@@ -58,6 +58,18 @@ Offline self-check: `node "scripts/test-jev-tools.mjs"`.
 
 `screen_read` returns a small PNG for visual testing: an app window (Windows only; also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, or an Android screen. `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
 
+## Browser fetch
+
+`browser_fetch {url, images?}` loads a page in **your own browser** (Helium, Chrome, Edge or Chromium, your everyday profile and cookies) through the Pi browser fetch extension, so Cloudflare and similar bot checks see a real browser. It returns the page's text (up to 100 KB), links and image URLs, marked as untrusted data. With `images: true` it downloads up to 30 images (8 MB each, 60 MB total) to `%TEMP%/pi-browser-fetch/<request>/` and returns their paths. Read-only: no clicking or typing.
+
+- **Set up:** `/wo → Settings → Browser access → Install or update the browser extension` copies the extension and its native host to `~/.pi/agent/browser-fetch/` and registers the host for each browser (Windows). Then open `chrome://extensions`, turn on Developer mode and **Load unpacked** that `extension` folder (ID `dmbpeaidhpenhihgngkgekaieninaapk`). Node must be installed. The agent opens an inactive, muted tab per request and closes it after reading.
+- **Approval:** each new site asks through `ask_user` (terminal, hub and phone) with the full URL: allow this request once, allow the site for 1, 2 or 4 hours, always allow it, deny, or block it. No answer in 5 minutes is a deny. Parallel requests to one site share one question; "once" covers only its own request. Subagents and other sessions without a UI only get sites already allowed.
+- **Never opened:** a built-in block list of mail, sign-in and password-manager sites (with subdomains), plus sites you add; local names, private, loopback and link-local addresses (also through DNS, best effort: DNS rebinding after the check stays possible). A redirect or script navigation to another site is stopped in the browser before any request reaches it and approved separately (at most 5 per request); the page that comes back must be on an approved site. Images on other hosts are covered by the page approval but sent without your cookies; image redirects are not followed.
+- **Pause:** the extension's toolbar button pauses all agent browsing (badge `II`); running requests stop and new ones fail with "paused by the user".
+- **Policy and log:** grants and your block list live in `~/.pi/agent/browser-fetch/policy.json`, shared by all sessions (Browser access revokes grants and edits the block list). Every request is logged to `log.jsonl` there with time, project, URL, final URL and what allowed or refused it.
+
+Self-check: `node scripts/test-work-browser-fetch.mjs`.
+
 ## Plan3
 
 Plan3 is the primary planning/execution flow: one living Markdown plan per task in `docs/plans/` (`plan3: true` frontmatter), worked by the current agent and model. No work items or gates; statuses and checks are agent-reported. Execution commits locally (never pushes) the files it changed after each verified step and checkpoint, picks a recorded `assumed` default for reversible choices instead of asking, and implements each step only to its acceptance (extra hardening goes to Backlog).

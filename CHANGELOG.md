@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Added
+- `browser_fetch`: the agent can read a page in your own browser (Helium, Chrome, Edge), so Cloudflare checks pass. You approve each site (once, 1/2/4 hours or always) with the full address shown; mail, sign-in and password sites and local addresses are never opened; a toolbar button pauses it; every fetch is logged; `images: true` saves the page images for the agent to look at. Set it up in `/wo` → Settings → Browser access.
 - Ctrl+mouse wheel makes the hub page 10% bigger or smaller (50–200%), in the browser and the Pi Hub app; each hub remembers its size.
 
 ### Fixed

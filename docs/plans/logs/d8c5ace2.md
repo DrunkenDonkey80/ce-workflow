@@ -46,3 +46,10 @@ Reviewed; all 8 findings accepted (D12 to D16, new P1-07, test renamed to test-w
 
 - [x] **P1-05** Install action and `/wo` Browser access menu: install, show status, edit block list, revoke grants, open log.
   - check: node scripts/test-work-browser-fetch.mjs → "install ok"; env -u PI_HUB node scripts/test-work-settings.mjs → ok; standalone host smoke (spawned host.mjs relays to browser stdout, reports "The browser closed." and exits 0 on stdin end)
+
+## 2026-10-27T19:02:39.329Z P1-06 done: scripts/test-work-browser-fetch.mjs (picked up by verify) covers policy, URLs, approvals, real host + real background.js round trip, pause/cancel/disconnect, install; README "Browser fetch" section and CHANGELOG bullet.
+
+- [x] **P1-06** Self-check `scripts/test-work-browser-fetch.mjs`, README and CHANGELOG.
+  - Cover policy, approval choices, fake host round trip, adversarial URLs (IPv6, mapped IPv4, DNS to private), concurrent same-host requests.
+  - Also: concurrent policy writers, revoke seen by another process, denied redirect gets no request, blocked image host, other-host image sent without cookies, pause and cancel mid-request.
+  - check: node scripts/test-work-browser-fetch.mjs → policy ok / round trip ok / install ok
