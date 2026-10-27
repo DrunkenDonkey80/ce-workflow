@@ -77,15 +77,17 @@ try {
 		assert.deepEqual([moved.status, moved.headers.get("location")], [301, `/s/${id}/?token=${localKey}`]);
 		assert.equal((await get(`http://127.0.0.1:${port}/s/00000000-0000-0000-0000-000000000000/?token=${localKey}`)).status, 404);
 		const html = await (await get(`${base}/?token=${localKey}`)).text();
-		const [, build] = /src="a\/([0-9a-f]{12})\/app\.js\?token=([0-9a-f]+)"/.exec(html) ?? [];
+		const [, build] = /src="\.\.\/\.\.\/a\/([0-9a-f]{12})\/app\.js\?token=([0-9a-f]+)"/.exec(html) ?? [];
 		assert(build && html.includes(`?token=${localKey}`), "relative asset URLs carrying the key");
-		const app = await get(`${base}/a/${build}/app.js`, { authorization: `Bearer ${localKey}` });
+		// ../../a/ from /s/<id>/: one address for every session's page, so switching sessions loads from the cache.
+		const assets = `http://127.0.0.1:${port}/a/${build}`;
+		const app = await get(`${assets}/app.js`, { authorization: `Bearer ${localKey}` });
 		assert.equal(app.headers.get("cache-control"), "private, max-age=31536000, immutable");
 		const js = await app.text();
 		assert(!/import type|__TOKEN__|__BUILD__/.test(js) && js.includes(`const token = "${localKey}"`), "types stripped, placeholders filled");
 		assert(!/fetch\("\/|EventSource\("\//.test(js), "no root-absolute requests: every call stays under /s/<session>/");
-		for (const file of ["layout.js", "diagram.js", "prompts.js", "files.js", "stream.js", "vendor/rough.js", "styles.css"]) assert.equal((await get(`${base}/a/${build}/${file}?token=${localKey}`)).status, 200, file);
-		assert.equal((await get(`${base}/a/000000000000/app.js?token=${localKey}`)).status, 404, "a stale build is refused");
+		for (const file of ["layout.js", "diagram.js", "prompts.js", "files.js", "stream.js", "vendor/rough.js", "styles.css"]) assert.equal((await get(`${assets}/${file}?token=${localKey}`)).status, 200, file);
+		assert.equal((await get(`http://127.0.0.1:${port}/a/000000000000/app.js?token=${localKey}`)).status, 404, "a stale build is refused");
 	}
 
 	// A busy session refuses a normal stop/restart (D17); --force stops anyway.

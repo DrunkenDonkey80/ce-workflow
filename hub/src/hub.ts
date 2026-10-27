@@ -1,6 +1,6 @@
 // The hub process (H2-05): one per user, HTTP on 127.0.0.1 at a port fixed at first start (D11).
 // It serves the local JSON API (CLI, tests), the web app under /s/<session>/, and remote access through Tailscale (H6-01).
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import http from "node:http";
@@ -71,17 +71,15 @@ const ASSETS: Record<string, [string, string]> = {
 	"app.js": ["app.ts", JS], "layout.js": ["layout.ts", JS], "diagram.js": ["diagram.ts", JS], "prompts.js": ["prompts.ts", JS],
 	"files.js": ["files.ts", JS], "stream.js": ["stream.ts", JS], "annotate.js": ["annotate.ts", JS], "pair.js": ["pair.ts", JS], "icons.js": ["icons.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
 };
-// Changes whenever a served file changes, checked per request, so web/ edits go live without restarting the hub
-// (and with it every session); an open page reloads itself when the build differs.
+// Read once at start, so pages always match this process's server code: an update downloaded under running sessions, or a
+// half-done local edit, must not serve new web files against old hub code. New web files arrive with the next hub restart;
+// an open page then reloads itself because the build differs.
 const WEB_FILES = ["index.html", "pair.html", ...Object.values(ASSETS).map(([file]) => file)];
-let built = { stamp: "", build: "" };
-function currentBuild() {
-	const stamp = WEB_FILES.map(file => statSync(new URL(file, WEB)).mtimeMs).join();
-	if (stamp !== built.stamp) built = { stamp, build: crypto.createHash("sha256").update(WEB_FILES.map(file => readFileSync(new URL(file, WEB))).join("\0")).digest("hex").slice(0, 12) };
-	return built.build;
-}
+const WEB_TEXT = Object.fromEntries(WEB_FILES.map(file => [file, readFileSync(new URL(file, WEB), "utf8")]));
+const BUILD = crypto.createHash("sha256").update(WEB_FILES.map(file => WEB_TEXT[file]).join("\0")).digest("hex").slice(0, 12);
+const currentBuild = () => BUILD;
 function webFile(file: string, key: string) {
-	const text = readFileSync(new URL(file, WEB), "utf8");
+	const text = WEB_TEXT[file];
 	return (file.endsWith(".ts") ? stripTypeScriptTypes(text) : text).replaceAll("__TOKEN__", key).replaceAll("__BUILD__", currentBuild());
 }
 
@@ -284,7 +282,9 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				// Browsers always send an Origin on POST; only the CLI posts without one, and it sends x-hub-key.
 				if (request.method === "POST" && origin === undefined && !sameKey(request.headers["x-hub-key"], config.localKey)) return send(403, { error: "Missing Origin rejected." });
 			}
-			if (rootAsset) return serveAsset(rootAsset[1], rootAsset[2]);
+			// One address per build for every session's page, so switching sessions loads the scripts from the browser's cache.
+			const asset = request.method === "GET" && /^\/a\/([0-9a-f]{12})\/(.+)$/.exec(url.pathname);
+			if (asset) return ASSETS[asset[2]] || asset[1] !== currentBuild() ? serveAsset(asset[1], asset[2]) : send(404, { error: "Unknown asset." });
 			if (appIcon) return appIcon();
 			// The bare address opens a session page: a live one first.
 			if (request.method === "GET" && url.pathname === "/") {
@@ -365,7 +365,6 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			if (page && request.method === "GET") {
 				if (!registry.get(page[1])) return send(404, { error: "Unknown session." });
 				if (!page[2]) { response.writeHead(301, { location: `/s/${page[1]}/${url.search}` }); return response.end(); }
-				const asset = /^\/a\/([0-9a-f]{12})\/(.+)$/.exec(page[2]);
 				if (page[2] === "/") {
 					response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
 					return response.end(webFile("index.html", remote ? "" : config.localKey));
@@ -376,8 +375,6 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					response.writeHead(200, { "content-type": "application/manifest+json", "cache-control": "no-store" });
 					return response.end(JSON.stringify({ id: "/", name: `pi-hub · ${name}`, short_name: name, start_url: "/" + key, scope: "/", display: "standalone", background_color: "#ffffff", theme_color: "#ffffff", icons: [{ src: "/app-icon.svg" + key, sizes: "any", type: "image/svg+xml", purpose: "any" }] }));
 				}
-				if (asset && (ASSETS[asset[2]] || asset[1] !== currentBuild())) return serveAsset(asset[1], asset[2]);
-				if (asset) return send(404, { error: "Unknown asset." });
 				// The page on this PC links files copied in Explorer instead of uploading copies; remote devices never see this PC's clipboard.
 				if (endpoint === "clipfiles") return remote ? send(403, { error: "Local page only." }) : send(200, { files: await clipboardFiles() });
 				// The changelog (gear → version, What's new): ?since=x.y.z keeps newer versions only; ?image= serves its screenshots.

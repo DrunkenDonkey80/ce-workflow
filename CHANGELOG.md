@@ -2,6 +2,17 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- Ctrl+mouse wheel makes the hub page 10% bigger or smaller (50–200%), in the browser and the Pi Hub app; each hub remembers its size.
+
+### Fixed
+- Pi Hub app: Yes/No questions such as "Delete session" opened under the tab strip with their title hidden; they now open in the middle of the page.
+- Switching sessions on a hub is faster, mostly from another PC or a phone: every session's page now shares one copy of the page scripts in the browser cache instead of downloading about 500 KB again for each session.
+- After a background update, a page could load the new page files against the old hub still running and come up without its sidebar or diagram. The hub now reads its page files once at start, so page and hub always match; a page reloads by itself once the hub restarts onto new ones.
+- Running the hub's tests could restart the Pi Hub desktop app onto a throwaway test hub ("127.0.0.1 refused to connect"); the test hubs now keep to a temporary profile.
+
 ## 0.1.86 — 2026-10-27
 
 ### Added

@@ -9,6 +9,18 @@ export type Shape =
 export type Annotation = { shapes: Shape[]; crop: { a: Point; b: Point } | null };
 type Tool = "move" | "pen" | "arrow" | "rect" | "ellipse" | "marker" | "crop";
 
+/** confirm() in the page: the browser's own box opens at the top, where the Pi Hub app's tab strip covers it. */
+export function confirmBox(text: string): Promise<boolean> {
+	const dialog = document.createElement("dialog"), message = document.createElement("p"), actions = document.createElement("div");
+	const cancel = Object.assign(document.createElement("button"), { type: "button", textContent: "Cancel" });
+	const ok = Object.assign(document.createElement("button"), { type: "button", textContent: "OK", className: "primary" });
+	dialog.className = "compact"; message.style.whiteSpace = "pre-line"; message.textContent = text; actions.className = "dialog-actions";
+	actions.append(cancel, ok); dialog.append(message, actions); document.body.append(dialog);
+	ok.onclick = () => dialog.close("ok"); cancel.onclick = () => dialog.close();
+	dialog.showModal(); ok.focus();
+	return new Promise(resolve => dialog.addEventListener("close", () => { dialog.remove(); resolve(dialog.returnValue === "ok"); }));
+}
+
 /** Lowest marker number not used yet (1–99), or 0 when all are taken. */
 export function nextNumber(shapes: Shape[]) {
 	const used = new Set(shapes.flatMap(shape => shape.kind === "marker" ? [shape.n] : []));
@@ -208,8 +220,8 @@ function open(image: HTMLImageElement, state: Annotation) {
 
 	return new Promise<{ blob: Blob; state: Annotation } | null>(resolve => {
 		const done = (value: { blob: Blob; state: Annotation } | null) => { dialog.close(); dialog.remove(); resolve(value); };
-		dialog.addEventListener("cancel", event => { event.preventDefault(); if (!dirty || confirm("Discard the annotations?")) done(null); });
-		cancel.addEventListener("click", () => { if (!dirty || confirm("Discard the annotations?")) done(null); });
+		dialog.addEventListener("cancel", async event => { event.preventDefault(); if (!dirty || await confirmBox("Discard the annotations?")) done(null); });
+		cancel.addEventListener("click", async () => { if (!dirty || await confirmBox("Discard the annotations?")) done(null); });
 		save.addEventListener("click", () => {
 			if (editing >= 0) closeNote(true);
 			const r = state.crop ? box(state.crop.a, state.crop.b) : { x: 0, y: 0, w: width, h: height };

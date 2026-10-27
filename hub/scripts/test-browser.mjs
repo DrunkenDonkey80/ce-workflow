@@ -129,6 +129,11 @@ try {
  await browser("reload");
  await browser("set", "viewport", "1280", "800");
  await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
+ // Ctrl+wheel: the page 10% bigger, still exactly filling the window; and back.
+ const wheel = up => `document.getElementById("chat").dispatchEvent(new WheelEvent("wheel", { deltaY: ${up ? -100 : 100}, ctrlKey: true, bubbles: true, cancelable: true }))`;
+ assert.deepEqual(await evaluate(`(() => { ${wheel(true)}; const r = document.body.getBoundingClientRect(); return [document.body.style.zoom, Math.round(r.bottom) === innerHeight, localStorage.getItem("hub-zoom")]; })()`), ["1.1", true, "1.1"]);
+ await new Promise(resolve => setTimeout(resolve, 150));
+ assert.equal(await evaluate(`(() => { ${wheel(false)}; localStorage.removeItem("hub-zoom"); return document.body.style.zoom; })()`), "1");
  // The excerpt and stream-gap refetches ask the hub for the whole row; here every row's full text is fixed.
  hub.views.get(id).row = async rowId => ({ id: rowId, role: "assistant", text: "Short excerpt. Full body loaded.", streaming: false });
  const snapshot = await browser("snapshot", "-i"); assert(JSON.stringify(snapshot).includes("Resize chat pane"));

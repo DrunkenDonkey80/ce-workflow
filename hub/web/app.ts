@@ -13,7 +13,7 @@ import { createPromptView } from "./prompts.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { applyText } from "./stream.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
-import { annotate, legend } from "./annotate.js?token=__TOKEN__";
+import { annotate, confirmBox, legend } from "./annotate.js?token=__TOKEN__";
 function $(id: "message-input" | "comment-text"): HTMLTextAreaElement;
 function $(id: "send" | "stop" | "comment-save" | "model-button" | "context-button" | "bias-button" | "generate"): HTMLButtonElement;
 function $(id: "comment-prompt" | "prompt"): HTMLDialogElement;
@@ -281,9 +281,22 @@ document.addEventListener("touchend", event => {
 // scrollTo while the keyboard is up, so the page follows the visible area; a leftover scroll is undone once it is gone.
 // Add #debug to the address to see the numbers on screen.
 const debugViewport = location.hash.includes("debug") ? document.body.appendChild(Object.assign(document.createElement("output"), { style: "position:fixed;z-index:99;right:4px;top:30%;font:11px monospace;background:#ff0c;color:#000;padding:2px 4px;white-space:pre;pointer-events:none" })) : undefined;
+// Ctrl+wheel: the whole page 10% bigger or smaller (50\u2013200%), remembered per hub; a pinch on a touchpad arrives the same way, one step per 120 ms.
+let pageZoom = Number(localStorage.getItem("hub-zoom")) || 1, zoomedAt = 0;
+document.body.style.zoom = String(pageZoom);
+document.addEventListener("wheel", event => {
+ if (!event.ctrlKey || event.defaultPrevented) return; // the diagram and image viewer zoom themselves
+ event.preventDefault();
+ if (event.timeStamp - zoomedAt < 120 || !event.deltaY) return;
+ zoomedAt = event.timeStamp;
+ pageZoom = Math.round(Math.min(2, Math.max(0.5, pageZoom + (event.deltaY < 0 ? 0.1 : -0.1))) * 10) / 10;
+ document.body.style.zoom = String(pageZoom); remember("hub-zoom", String(pageZoom)); fitViewport();
+ showNotice(`Size ${Math.round(pageZoom * 100)}%`, true);
+}, { passive: false });
 const fitViewport = () => {
  const view = window.visualViewport, root = document.documentElement.style, height = view?.height ?? window.innerHeight, top = view?.offsetTop ?? 0;
- root.setProperty("--app-height", height + "px"); root.setProperty("--app-top", top + "px");
+ // The body's own lengths are zoomed (Ctrl+wheel below), so it gets the visible size divided by its zoom.
+ root.setProperty("--app-height", height / pageZoom + "px"); root.setProperty("--app-top", top / pageZoom + "px");
  if (!top && (window.scrollY || window.scrollX)) window.scrollTo(0, 0);
  if (debugViewport) debugViewport.textContent = `vv ${Math.round(height)} top ${Math.round(top)}\ninner ${innerHeight} scrollY ${Math.round(scrollY)}\nbody ${Math.round(document.body.getBoundingClientRect().top)}/${Math.round(document.body.getBoundingClientRect().height)}`;
 };
@@ -732,7 +745,7 @@ $("feed").addEventListener("load", pinChat, true);
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
 $("messages").addEventListener("click", async event => {
  const drop = (event.target as HTMLElement).closest<HTMLButtonElement>("#drop-last");
- if (!drop || !confirm("Remove your last message and everything the agent did after it from the context? A running agent stops first.")) return;
+ if (!drop || !await confirmBox("Remove your last message and everything the agent did after it from the context? A running agent stops first.")) return;
  drop.disabled = true;
  try { await post("drop", { text: drop.dataset.text ?? "" }); showNotice("Removed from the context.", true); } catch (error) { showNotice((error as Error).message); } finally { drop.disabled = false; }
 });
@@ -1264,8 +1277,8 @@ $("review-button").addEventListener("click", event => {
 for (const button of document.querySelectorAll<HTMLElement>("#plan-menu [data-command], #plan-actions [data-command]")) button.addEventListener("click", async () => {
  const command = button.dataset.command; closeMenus(); setDrawer(false);
  if (command === "new") return newPlan();
- if (command === "delete" && !confirm(`Delete the plan "${state.plan?.title ?? "shown here"}" and its diagram permanently?`)) return;
- if (command === "force finish" && !confirm(`Force finish "${state.plan?.title ?? "this plan"}"? It is archived as complete; its unfinished steps are listed in the plan.`)) return;
+ if (command === "delete" && !await confirmBox(`Delete the plan "${state.plan?.title ?? "shown here"}" and its diagram permanently?`)) return;
+ if (command === "force finish" && !await confirmBox(`Force finish "${state.plan?.title ?? "this plan"}"? It is archived as complete; its unfinished steps are listed in the plan.`)) return;
  if (commandSending) return; commandSending = true; renderShell();
  try {
   await post("command", { command }); showNotice("");
@@ -1330,7 +1343,7 @@ async function runProjectCommand(command: ProjectCommand) {
  catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
 }
 async function removeProjectCommand(name: string) {
- if (!confirm(`Delete the command "${name}"?`)) return;
+ if (!await confirmBox(`Delete the command "${name}"?`)) return;
  try { await post("commands", { remove: name }); } catch (error) { showNotice(error.message); }
 }
 $("mode-research").addEventListener("click", () => void toggleMode("/research " + ($("mode-research").getAttribute("aria-pressed") === "true" ? "off" : "on")));
@@ -1739,7 +1752,7 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
   ...(parked ? [] : [item("Reload", () => void sessionAction({ action: "reload", id: session.id }))]),
   // Delete = unstar: the record leaves its group, the session file stays in Recents (D18); a live one is parked first.
   item("Delete session", async () => {
-   if (!confirm(`Delete "${session.name}" from its group? The session file stays in Recents.`)) return;
+   if (!await confirmBox(`Delete "${session.name}" from its group? The session file stays in Recents.`)) return;
    if (!parked) { try { await post("session", { action: "park", id: session.id }); } catch (error) { return showNotice(error.message); } }
    void sessionAction({ action: "unstar", id: session.id });
   }, "danger"),
@@ -1766,7 +1779,7 @@ async function newSession(folder: string, create = false) {
  let created: { id?: string } | undefined;
  try { created = await post("session", { action: "new", folder, ...create ? { create } : {} }) as typeof created; }
  catch (error) {
-  if (error.message !== "Folder does not exist." || !confirm(`${folder} does not exist. Create it and start a session there?`)) { if (error.message !== "Folder does not exist.") showNotice(error.message); return; }
+  if (error.message !== "Folder does not exist." || !await confirmBox(`${folder} does not exist. Create it and start a session there?`)) { if (error.message !== "Folder does not exist.") showNotice(error.message); return; }
   created = await sessionAction({ action: "new", folder, create: true }) as typeof created;
  }
  if (created?.id) jumpTo(created.id);
@@ -1866,14 +1879,14 @@ type Window = { pct: number; tone?: string; resets?: string; clock?: string } | 
 type PoolRow = { label: string; email?: string; plan?: string; priority: number; state: string; login: string; fiveHour: Window; sevenDay: Window; notes: { text: string; tone?: string }[]; active: boolean; favorite: boolean; weekend: boolean; disabled: boolean; dead: boolean };
 let poolPick = "";
 async function poolAct(act: string, label = "", value?: number) {
- if (act === "remove" && !confirm(`Delete "${label}" from the Claude pool?`)) return;
+ if (act === "remove" && !await confirmBox(`Delete "${label}" from the Claude pool?`)) return;
  try { const result = await post("pool", { act, label, value }) as { message?: string }; if (result.message) showNotice(result.message); }
  catch (error) { showNotice(error.message); }
  void loadUsage();
 }
 // One quota bar: fill = the shown number (left or used), colour = how close to the limit; the reset clock turns red when the week expires soon.
 async function copyPool() {
- if (!confirm("Copy the Claude pool's logins? They grant access to these subscriptions: treat them like a password.\n\nUnless login sync is on, both PCs then share single-use tokens and one of them loses the accounts at the next refresh.")) return;
+ if (!await confirmBox("Copy the Claude pool's logins? They grant access to these subscriptions: treat them like a password.\n\nUnless login sync is on, both PCs then share single-use tokens and one of them loses the accounts at the next refresh.")) return;
  try {
   const text = JSON.stringify((await post("pool", { act: "export" }) as { config: unknown }).config, null, 2);
   // The clipboard needs a secure page; otherwise the text is shown to copy by hand.
@@ -2160,7 +2173,7 @@ $("hub-catchup").addEventListener("click", async () => {
 });
 $("hub-restart").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
- if (!confirm("Restart the hub? Every session stops and starts again; nothing is lost.")) return;
+ if (!await confirmBox("Restart the hub? Every session stops and starts again; nothing is lost.")) return;
  try { await post("hub", { action: "restart" }); showNotice("Hub restarting; the page reconnects by itself.", true); } catch (error) { showNotice(error.message); }
 });
 // PC load every 5 s while the page is visible; 24 samples = the last 2 minutes.
@@ -2236,7 +2249,7 @@ function renderUpdates() {
   if (!/ce-workflow/i.test(item.source)) {
    const remove = html("button", { type: "button", className: "extension-remove", textContent: "×", title: `Uninstall ${item.name}` });
    remove.addEventListener("click", async () => {
-    if (!confirm(`Uninstall ${item.name}? Pi removes it (pi remove ${item.source}); running sessions keep it until they restart.`)) return;
+    if (!await confirmBox(`Uninstall ${item.name}? Pi removes it (pi remove ${item.source}); running sessions keep it until they restart.`)) return;
     remove.disabled = true;
     try { hubSettings = await post("hub", { action: "remove-package", source: item.source }) as HubSettings; showNotice(`Uninstalled ${item.name}.`, true); } catch (error) { showNotice(error.message); }
     renderUpdates();
@@ -2284,7 +2297,7 @@ async function appAction(body: Record<string, unknown>, busy?: string) {
 }
 // Linux: the daily cleanup moves old sessions to the Trash, which a server never empties.
 async function trashAction(empty = false) {
- if (empty && !confirm("Delete the trashed sessions for good?")) return;
+ if (empty && !await confirmBox("Delete the trashed sessions for good?")) return;
  try {
   const trash = await post("hub", { action: "trash", empty }) as { supported: boolean; files: number; bytes: number; freed?: number };
   $("trash-field").hidden = !trash.supported;
@@ -2401,7 +2414,7 @@ $("hub-usage").addEventListener("change", () => { themeSetting("hub-usage", ($("
 for (const key of ["hub-theme", "hub-mode"]) $(key).addEventListener("change", () => { themeSetting(key, ($(key) as HTMLSelectElement).value); applyTheme(); });
 $("hub-update").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
- if (!confirm("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (terminals) keeps the old version until restarted.")) return;
+ if (!await confirmBox("Update Pi and extensions? Every session stops, pi update --all runs, then they start again; nothing is lost. Pi outside the hub (terminals) keeps the old version until restarted.")) return;
  await runUpdate();
 });
 async function runUpdate(only?: "ce-workflow") {
