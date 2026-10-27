@@ -53,3 +53,10 @@ Reviewed; all 8 findings accepted (D12 to D16, new P1-07, test renamed to test-w
   - Cover policy, approval choices, fake host round trip, adversarial URLs (IPv6, mapped IPv4, DNS to private), concurrent same-host requests.
   - Also: concurrent policy writers, revoke seen by another process, denied redirect gets no request, blocked image host, other-host image sent without cookies, pause and cancel mid-request.
   - check: node scripts/test-work-browser-fetch.mjs → policy ok / round trip ok / install ok
+
+## 2026-10-27T19:05:27.160Z P1-07 done: List dialogs take a `detail` shown whole: terminal hard-wraps it (hardWrap in menu.ts), the hub draws .dialog-detail (wraps anywhere), native fallback puts it in the title; browser_fetch passes the full URL.
+
+- [x] **P1-07** Full-URL field in the shared dialog, so the whole address shows in terminal, native fallback and hub.
+  - Touch `extensions/ask-user/menu.ts` (`listSubject`, `localListDialog`), the hub list form in `hub/web/`, and their tests.
+  - Check: a URL longer than the window, with `?data=secret` at its end, is fully visible everywhere.
+  - check: env -u PI_HUB node scripts/test-work-dialogs.mjs → ok - shared work dialogs (new case: 90-char URL at width 36 shown whole, lines ≤34)

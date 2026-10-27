@@ -265,6 +265,18 @@ await drive(
 	},
 );
 
+// A detail (e.g. a URL to approve) shows whole: wrapped anywhere, never cut (browser_fetch R5).
+const longUrl = "https://shop.example/products/very-long-path/with/many/segments?ref=agent&page=2&data=secret";
+await drive(
+	{ title: "Browser fetch", purpose: "Open it?", detail: longUrl, filter: false, items: [{ value: "deny", label: "Deny" }] },
+	(component) => {
+		const lines = component.render(36).map(plain);
+		assert(lines.every((line) => line.length <= 34), "detail lines stay bounded");
+		assert(lines.join("").includes(longUrl), "the whole URL is shown, ?data=secret included");
+		component.handleInput("escape");
+	},
+);
+
 let all = false;
 const tabbed = await drive(
 	{

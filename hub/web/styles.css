@@ -166,6 +166,8 @@ h2 { font-size: 15px; font-weight: 600; }
 #comment-delete { margin-right: auto; color: #e03131; border-color: #e03131; }
 #diagram [data-note]:focus-visible > g > path { stroke: var(--focus); stroke-width: 2px; }
 .dialog-purpose { color: var(--muted); font-size: 13px; margin: 6px 0 16px; }
+/* the whole value, e.g. a URL to approve: wraps anywhere, never cut */
+.dialog-detail { font-family: ui-monospace, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; margin: -8px 0 16px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 #comment-error { margin-top: 8px; color: var(--error); font-size: 13px; }
 @media (min-width: 900px) {

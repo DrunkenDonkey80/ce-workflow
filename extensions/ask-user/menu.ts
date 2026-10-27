@@ -138,6 +138,20 @@ function wrapText(value, width, maxLines) {
 	return lines;
 }
 
+/** Every character kept: lines break anywhere (a URL has no spaces), never truncated. */
+export function hardWrap(value, width) {
+	const lines = [];
+	let line = "", used = 0;
+	for (const { segment } of graphemes.segment(stripAnsi(value ?? "").replace(/\s+/g, " "))) {
+		const next = cellWidth(segment);
+		if (used + next > width && line) { lines.push(line); line = ""; used = 0; }
+		line += segment;
+		used += next;
+	}
+	if (line) lines.push(line);
+	return lines;
+}
+
 function sectionLine(theme, title, width) {
 	const label = `-- ${title} `;
 	return theme.fg(
@@ -157,7 +171,9 @@ function initialIndex(items, { cursorKey, currentValue, selectedIndex = undefine
 }
 
 async function nativeListDialog(ctx, options) {
-	const { title, items, currentValue, multi, cursorKey, tabAction } = options;
+	const { items, currentValue, multi, cursorKey, tabAction } = options;
+	const title = options.detail ? `${options.title}
+${options.detail}` : options.title;
 	if (multi) {
 		const enabled = new Set(multi.selected ?? []);
 		for (;;) {
@@ -314,6 +330,7 @@ export function listSubject(options): RemoteListPrompt {
 		items: options.items.map(item => ({ value: item.value, label: item.label, description: item.description, heading: item.heading, disabled: item.disabled, enabled: item.enabled, rowAction: item.rowAction })),
 		currentValue: options.currentValue, ...(options.multi ? { multi: { selected: [...(options.multi.selected ?? [])], requireOne: options.multi.requireOne } } : {}),
 		spaceAction: Boolean(options.spaceAction), rowAction: Boolean(options.rowAction), tabAction: Boolean(options.tabAction),
+		...(options.detail ? { detail: String(options.detail) } : {}),
 		...(options.compact ? { compact: true } : {}),
 	};
 }
@@ -439,6 +456,7 @@ async function localListDialog(ctx, options) {
 					)}`,
 				);
 				add(theme.fg("text", purpose));
+				for (const line of hardWrap(options.detail, safeWidth)) lines.push(theme.fg("accent", line));
 				let defaultHelp = "Up/Down to navigate · Enter to select · Esc to cancel";
 				if (multi)
 					defaultHelp =

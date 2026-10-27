@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-27
-updated: 2026-10-27T19:02:39.329Z
+updated: 2026-10-27T19:05:27.159Z
 reviewed: 2026-10-27
 started: 2026-10-27T18:49:18.546Z
 ---
@@ -105,13 +105,11 @@ None.
 - [x] **P1-04** browser-fetch/extension (MV3, fixed key, ID dmbpeaidhpenhihgngkgekaieninaapk): inactive muted tab per request, DNR gate (main frames only to approved hosts, block list for tab and own fetches), redirect approval via ERR_BLOCKED_BY_CLIENT, challenge wait, extract, image downloads (redirect: error, cookies only same host), toolbar pause.
 - [x] **P1-05** install() copies extension+host to ~/.pi/agent/browser-fetch, writes host launcher/manifest, reg add for Helium/Chrome/Edge/Chromium; /wo Settings "Browser access (all projects)" → browserAccessMenu: connection status, install, revoke grants, block list add/remove, open log.
 - [x] **P1-06** scripts/test-work-browser-fetch.mjs (picked up by verify) covers policy, URLs, approvals, real host + real background.js round trip, pause/cancel/disconnect, install; README "Browser fetch" section and CHANGELOG bullet.
-- [wip] **P1-07** Full-URL field in the shared dialog, so the whole address shows in terminal, native fallback and hub.
-  - Touch `extensions/ask-user/menu.ts` (`listSubject`, `localListDialog`), the hub list form in `hub/web/`, and their tests.
-  - Check: a URL longer than the window, with `?data=secret` at its end, is fully visible everywhere.
+- [x] **P1-07** List dialogs take a `detail` shown whole: terminal hard-wraps it (hardWrap in menu.ts), the hub draws .dialog-detail (wraps anywhere), native fallback puts it in the title; browser_fetch passes the full URL.
 
 ### Phase 2: Live check [code]
 
-- [ ] **P2-01** [human] Load the unpacked extension in Helium and approve a first fetch of a Cloudflare-protected page.
+- [wip] **P2-01** [human] Load the unpacked extension in Helium and approve a first fetch of a Cloudflare-protected page.
 ### P-ARCH [code] Product architecture
 
 - [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.

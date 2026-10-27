@@ -19,7 +19,7 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   form.onsubmit = event => event.preventDefault();
   // Menus keep their title and purpose line; a single question's own header is its title (no repeated lines).
   const heading = ask.kind === "list" || ask.questions ? [node("h2", { id: "prompt-title" }, ask.title ?? "Answer questions")] : [];
-  form.replaceChildren(...heading, ...(ask.purpose && heading.length ? [node("p", { className: "dialog-purpose" }, ask.purpose)] : []));
+  form.replaceChildren(...heading, ...(ask.purpose && heading.length ? [node("p", { className: "dialog-purpose" }, ask.purpose)] : []), ...(ask.detail && heading.length ? [node("p", { className: "dialog-detail" }, ask.detail)] : []));
   const error = node("p", { className: "prompt-error", hidden: true }); error.setAttribute("role", "alert");
   let collect;
   if (ask.kind === "list" && ask.compact) {
