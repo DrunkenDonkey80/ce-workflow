@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 // browser_fetch self-check (plan d8c5ace2): policy, URL checks, approvals, host round trip and the extension's logic with a fake chrome.
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
@@ -64,10 +65,13 @@ try {
 	await roundTrip();
 	console.log("round trip ok");
 
-	// Install copies extension and host out of the package and registers the host per browser (D11).
+	// Install points the browser at the package's extension, writes a launcher for the package host.mjs and registers it per browser.
 	const calls = [], installed = await bf.install(async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0 }; }, path.join(agent, "install"));
 	assert.equal(installed.id, "dmbpeaidhpenhihgngkgekaieninaapk");
-	assert.ok(existsSync(path.join(installed.extension, "background.js")) && existsSync(path.join(agent, "install", "host", "host.mjs")));
+	const root = fileURLToPath(new URL("..", import.meta.url));
+	assert.equal(installed.extension, path.join(root, "browser-fetch", "extension"), "the extension loads from the package itself");
+	assert.ok(existsSync(path.join(installed.extension, "background.js")) && !existsSync(path.join(agent, "install", "extension")));
+	assert.ok(readFileSync(JSON.parse(readFileSync(installed.manifest, "utf8")).path, "utf8").includes(path.join(root, "browser-fetch", "host.mjs")), "the launcher runs the package host");
 	const hostManifest = JSON.parse(readFileSync(installed.manifest, "utf8"));
 	assert.deepEqual([hostManifest.name, hostManifest.type, hostManifest.allowed_origins], ["pi.browser_fetch", "stdio", ["chrome-extension://dmbpeaidhpenhihgngkgekaieninaapk/"]]);
 	assert.ok(existsSync(hostManifest.path));

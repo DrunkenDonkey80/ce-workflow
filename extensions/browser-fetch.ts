@@ -1,6 +1,6 @@
 // browser_fetch (plan d8c5ace2): the agent loads pages in the user's own browser through the Pi browser-fetch extension,
 // so bot checks see a real browser. Pi owns the policy (block list, site grants, approvals, log); the browser only loads.
-import { appendFileSync, closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, chmodSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, chmodSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
@@ -377,25 +377,23 @@ export const browserFetchTool = () => ({
 	},
 });
 
-// Install (D11): copy the extension and host out of the package so updates never move the loaded folder.
+// Install: the browser loads the extension straight from this package and the host runs the package's host.mjs (user decision, replaces D11's copy); only the generated launcher and host manifest live in the agent dir.
 const packageDir = () => path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "browser-fetch");
 export function extensionId(key: string) {
 	return [...createHash("sha256").update(Buffer.from(key, "base64")).digest().subarray(0, 16)].map(byte => String.fromCharCode(97 + (byte >> 4), 97 + (byte & 15))).join("");
 }
 export const BROWSER_KEYS = ["imput\\Helium", "Google\\Chrome", "Microsoft\\Edge", "Chromium"];
 export async function install(exec: (cmd: string, args: string[]) => Promise<{ code: number; stderr?: string }>, dir = fetchDir()) {
-	const source = packageDir(), extension = path.join(dir, "extension"), hostDir = path.join(dir, "host");
-	rmSync(extension, { recursive: true, force: true });
-	cpSync(path.join(source, "extension"), extension, { recursive: true });
+	const source = path.resolve(packageDir()), extension = path.join(source, "extension"), hostDir = path.join(dir, "host");
 	mkdirSync(hostDir, { recursive: true });
-	cpSync(path.join(source, "host.mjs"), path.join(hostDir, "host.mjs"));
 	let id: string;
 	try { id = extensionId(JSON.parse(readFileSync(path.join(extension, "manifest.json"), "utf8")).key); }
 	catch (error) { throw new Error(`Browser fetch extension manifest is unreadable: ${(error as Error).message}`); }
 	const node = /^node(\.exe)?$/i.test(path.basename(process.execPath)) ? process.execPath : "node";
 	const win = process.platform === "win32";
 	const launcher = path.join(hostDir, win ? "host.bat" : "host.sh");
-	writeFileSync(launcher, win ? `@echo off\r\n"${node}" "%~dp0host.mjs"\r\n` : `#!/bin/sh\nexec "${node}" "$(dirname "$0")/host.mjs"\n`);
+	const host = path.join(source, "host.mjs");
+	writeFileSync(launcher, win ? `@echo off\r\n"${node}" "${host}"\r\n` : `#!/bin/sh\nexec "${node}" "${host}"\n`);
 	if (!win) chmodSync(launcher, 0o755);
 	const manifest = path.join(hostDir, `${HOST_NAME}.json`);
 	writeFileSync(manifest, JSON.stringify({ name: HOST_NAME, description: "Pi browser fetch", path: launcher, type: "stdio", allowed_origins: [`chrome-extension://${id}/`] }, null, 1));
@@ -430,7 +428,7 @@ export async function browserAccessMenu(ctx, pi) {
 			purpose: policy.corrupt ?? `browser_fetch loads pages in your own browser. ${isConnected ? "The browser is connected." : "The browser is not connected."}`,
 			cursorKey: "browser-access", filter: false,
 			items: [
-				{ value: "install", label: "Install or update the browser extension", description: `Copies it to ${path.join(fetchDir(), "extension")} and registers the native host for Helium, Chrome, Edge and Chromium.` },
+				{ value: "install", label: "Install or update the browser extension", description: `Registers the native host for Helium, Chrome, Edge and Chromium; the browser loads the extension from ${path.resolve(packageDir(), "extension")}.` },
 				{ value: "grants", label: `Allowed sites (${grants.length}) →`, description: "Revoke a site grant." },
 				{ value: "blocked", label: `Block list (${DEFAULT_BLOCKED.length} built in, ${policy.blocked.length} added) →`, description: "Sites the agent can never open, with their subdomains." },
 				{ value: "log", label: "Open the fetch log", description: logFile() },
