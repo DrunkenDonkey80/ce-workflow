@@ -742,6 +742,8 @@ export default function plan3(pi) {
 	const webModes = () => { const info: { research?: string } = {}; pi.events?.emit?.("wo:web-info", info); return { research: info.research ?? "off", night: night.mode(), bias: hubBias }; };
 	const webStatus = ctx => ({ model: ctx?.model ? modelRef(ctx.model) : null, effort: pi.getThinkingLevel?.() ?? null, context: contextPercent(ctx), modes: webModes() });
 	pi.events?.on?.("wo:modes-changed", () => publishHub());
+	// work-self-update.ts: never reload under running subagents or a compaction.
+	pi.events?.on?.("plan3:busy-info", info => { const live = activity.snapshot(undefined); info.subagents = live.subagents?.length ?? 0; info.compacting = !!live.compacting; });
 	// H3-04: under pi-control-hub, publish what only Pi knows; sent only when it changed, the hub keeps the latest.
 	let hubCtx = null, hubPlan = null, hubSent = "", hubBias = 0;
 	function publishHub() {

@@ -42,6 +42,7 @@
     <section class="settings-group" aria-labelledby="set-sessions"><h3 id="set-sessions">Sessions</h3>
      <label class="menu-field" title="Idle sessions stop after this long and resume when you open and message them">Auto-park <select id="hub-park"><option value="0">Off</option><option value="5">5 min</option><option value="10">10 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="240">4 hours</option></select></label>
      <label class="menu-field" title="The sidebar hides sessions that have not worked for this long; the ± box in front of a folder shows them">Auto-collapse <select id="hub-collapse"><option value="0">Off</option><option value="12">12 hours</option><option value="24">1 day</option><option value="48">2 days</option><option value="168">1 week</option></select></label>
+     <div class="menu-field" id="trash-field" title="Old sessions the daily cleanup moved to the Trash; other trashed files stay" hidden>Trashed sessions <span id="trash-size"></span><button type="button" id="trash-empty">Empty</button></div>
      <label class="menu-field" id="attention-field" title="Pi Hub app: brings the app to the front on the newest session that asks something or finished; press again for the one before. Click the box and press the keys; Backspace turns it off" hidden>Attention key <input id="attention-key" readonly placeholder="Off"></label>
      <div class="menu-field menu-field-top" title="Desktop notifications from every session on this PC, while a hub page is open">Notify me<div class="settings-checks"><label><input type="checkbox" id="notify-question"> Questions</label><label><input type="checkbox" id="notify-done"> Finished</label></div></div>
     </section>
@@ -57,6 +58,7 @@
     </section>
     <section class="settings-group" aria-labelledby="set-pi"><h3 id="set-pi" class="group-head">Pi and extensions<button type="button" id="update-check" title="Checked hourly">Check now</button></h3>
      <div id="update-list" class="update-list"></div>
+     <div id="update-waiting" class="update-list" title="Running sessions reload onto new extensions by themselves when quiet; Pi and the hub itself need a hub restart, which waits until every session is idle" hidden></div>
      <div id="extension-list" class="extension-list"></div>
      <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button><button type="button" id="hub-catchup" title="Runs /wo catch-up in this session: reviews Pi and plugin updates in a Plan3 plan (ce-workflow checkout only)" hidden>Catch up</button></div>
     </section>

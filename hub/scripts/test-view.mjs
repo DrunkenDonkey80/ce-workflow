@@ -12,6 +12,11 @@ process.env.FAKE_PI = "compacted";
 const { startHub } = await import("../src/hub.ts");
 const folder = path.join(root, "proj");
 fs.mkdirSync(folder);
+// Tool results read from a file keep only what the chat shows: no image data, no bulky details (a 540 MB session holds screenshots).
+{ const { branchMessages } = await import("../src/view.ts"), file = path.join(root, "tools.jsonl");
+ fs.writeFileSync(file, JSON.stringify({ type: "message", message: { role: "toolResult", toolCallId: "t", content: [{ type: "text", text: "x".repeat(9000) }, { type: "image", data: "A".repeat(1000), mimeType: "image/png" }], details: { blob: "B".repeat(1000) } } }) + "\n");
+ const [{ message }] = await branchMessages(file);
+ assert.deepEqual([message.content[0].text.length, message.content[1], message.details], [4001, { type: "image" }, undefined]); }
 
 // A tree session: 50 messages on the current branch plus one abandoned branch entry that must not show.
 const writeSession = (name, count) => {

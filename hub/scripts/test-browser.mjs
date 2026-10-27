@@ -1062,10 +1062,12 @@ try {
  view.emit("message_end", { message: { role: "assistant", timestamp: t0 + 30, content: [{ type: "text", text: "Long turn done" }] } });
  await browser("reload");
  await browser("wait", "--fn", "document.documentElement.classList.contains(\"chat-compact\")");
+ // The reload drew the sidebar from the last list at once (sessionStorage), before the hub answered, without errors.
+ assert.deepEqual((await browser("errors")).errors ?? [], []); assert.equal(await evaluate("document.getElementById(\"switcher\").hidden"), false);
  await browser("wait", "--fn", "[...document.querySelectorAll(\"#messages li\")].some(item => item.textContent.includes(\"Earlier question\") && item.offsetParent)");
  await evaluate("localStorage.setItem(\"plan3-chat\", \"expanded\")");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});
- if (!process.argv.includes("--keep-browser")) await browser("close");
+ if (!process.argv.includes("--keep-browser")) await browser("close").catch(() => {}); // a failed close must not hide the test failure
 }

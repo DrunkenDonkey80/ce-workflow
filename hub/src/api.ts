@@ -5,6 +5,7 @@ import type http from "node:http";
 import { execFile, spawn } from "node:child_process";
 import { mkdirSync, statSync } from "node:fs";
 import os from "node:os";
+import { promisify } from "node:util";
 import path from "node:path";
 import { emptyDiagram, loadDiagram } from "../../extensions/plan3-diagram.ts";
 import { webTarget } from "../../extensions/plan3-web.ts";
@@ -294,6 +295,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "dialog": { const script = scriptAsks.get(id)?.get(params.get("id") ?? ""); if (script) return script.form; const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
 			case "sessions": return sessions();
 			case "system": return systemLoad();
+			case "processes": return topProcesses();
 			// D6: usage comes from the hub's own poller, so it shows with every session parked.
 			case "usage": return usage?.usage() ?? { summary: [], accounts: [] };
 			// D9: the pool is global, answered by the hub through cpool, never by a session.
@@ -473,4 +475,24 @@ let lastCpu = cpuTimes();
 export function systemLoad() {
 	const now = cpuTimes(), total = now.total - lastCpu.total, idle = now.idle - lastCpu.idle; lastCpu = now;
 	return { cpu: total > 0 ? Math.round(100 * (1 - idle / total)) : 0, memory: Math.round(100 * (1 - os.freemem() / os.totalmem())) };
+}
+
+/** The 5 programs using the most CPU (% of all cores) and memory (bytes), same-name processes added up, for the graphs' hover. */
+export async function topProcesses() {
+	const run = promisify(execFile);
+	// Windows: CPU seconds sampled 0.7 s apart (the perf counters take 7 s). Elsewhere ps's %CPU, which is of one core.
+	// shortcut: on Linux ps %CPU is the average over each process's life, not right now; read /proc twice if that misleads.
+	const rows = process.platform === "win32"
+		? (await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "$a=@{}; Get-Process | % { $a[$_.Id]=$_.CPU }; Start-Sleep -Milliseconds 700; Get-Process | % { $_.Name + [char]9 + (($_.CPU - $a[$_.Id]) / 0.7 * 100 / [Environment]::ProcessorCount) + [char]9 + $_.WorkingSet64 }"], { windowsHide: true, timeout: 15_000 })).stdout
+			.split(/\r?\n/).map(line => line.split("\t")).map(([name, cpu, memory]) => ({ name, cpu: Number(cpu) || 0, memory: Number(memory) || 0 }))
+		: (await run("ps", ["-Ao", "pcpu=,rss=,comm="], { timeout: 15_000 })).stdout.split("\n").map(line => /^\s*([\d.]+)\s+(\d+)\s+(.+)$/.exec(line)).filter(match => match !== null)
+			.map(([, cpu, rss, comm]) => ({ name: path.basename(comm.trim()), cpu: Number(cpu) / os.cpus().length, memory: Number(rss) * 1024 }));
+	const byName = new Map<string, { name: string; cpu: number; memory: number }>();
+	for (const row of rows) {
+		if (!row.name) continue;
+		const sum = byName.get(row.name) ?? { name: row.name, cpu: 0, memory: 0 };
+		sum.cpu += row.cpu; sum.memory += row.memory; byName.set(row.name, sum);
+	}
+	const all = [...byName.values()], top = (key: "cpu" | "memory") => [...all].sort((a, b) => b[key] - a[key]).slice(0, 5).map(item => ({ name: item.name, value: Math.round(item[key] * (key === "cpu" ? 10 : 1)) / (key === "cpu" ? 10 : 1) }));
+	return { cpu: top("cpu"), memory: top("memory") };
 }

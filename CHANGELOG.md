@@ -2,7 +2,23 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.86 — 2026-10-27
+
+### Added
+- Old session cleanup, once a day in the hub. Sessions untouched for 14 days lose their images, tool output past the first 500 characters and tool details, and stay resumable. Subagent forks go to the Recycle Bin at 14 days, other sessions at 30. Sessions in the hub sidebar are only trimmed, never deleted.
+- Linux: hub settings show the sessions the cleanup moved to the Trash, with an Empty (N GB) button that deletes only those.
+- Hovering the CPU or memory graph lists the 5 programs using the most of it.
+- Updates no longer interrupt work. A session reloads onto a new ce-workflow by itself at its first quiet moment: when a run ends, between two plan steps (the plan then carries on), or after 2 idle minutes in the hub.
+- The hub downloads extension updates as soon as it finds them, with sessions running. What needs a hub restart (the hub's own code, Pi itself) waits until no session is busy; the gear menu shows what is waiting and for whom. Update all with busy sessions now downloads instead of refusing.
+- Pi Hub app: a tab's tooltip shows its hub's ce-workflow version, and a hub behind the newest one gets an orange ↑.
+
+### Changed
+- `/wo env` and the hub's env button set several variables at once: one `NAME=value` per line (a pasted `.env` works). The box starts with every name the last reply asked for, and nothing is set if any line is wrong.
+
+### Fixed
+- A very long session (a session file over 512 MB, mostly screenshots in tool output) opened with an empty chat. The hub now reads the file line by line and keeps only what the chat shows.
+- Switching sessions no longer makes the sidebar vanish and come back: the new page draws the last session list right away and updates it when the hub answers.
+- Desktop app settings: Update is always clickable and checks GitHub right away. It says when the build for this hub's version isn't published yet, and shows "up to date" when nothing is newer. Before, it stayed greyed out until the hub's own check (every 10 minutes) found the new build.
 
 ## 0.1.85 — 2026-10-26
 

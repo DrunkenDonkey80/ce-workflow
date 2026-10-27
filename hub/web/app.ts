@@ -1397,7 +1397,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
-type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string };
+type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string; waiting?: { action: string; why: string[]; busy: string[] } | null };
 let hubSettings: HubSettings = {}, appBadge = 0, attentionList: HubSession[] = [];
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
@@ -1411,7 +1411,7 @@ function renderIcon() {
   const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen", "scheduled"].includes(tone)); // the app has no page in front: own unseen counts
   // attention: how many things need you, for the app's badge on a pinned button.
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
-  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
+  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
    // latest: the newest session needing you, so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
    latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "",
    // side: where the strip starts (frameless app); gear: the settings badge the strip's gear repeats ("!" ce-workflow, else a count).
@@ -1457,7 +1457,7 @@ async function loadSessions() {
   $("attention-field").hidden = !inApp(); ($("attention-key") as HTMLInputElement).value = hubSettings.attentionKey ?? "";
   ownTone = iconTone(groups.flatMap(group => group.sessions).find(session => session.id === sessionId));
   sessionStates = groups.flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(iconTone)); renderIcon();
-  renderSessions(groups, recents);
+  renderSessions(groups, recents); try { sessionStorage.setItem("hub-sessions", JSON.stringify([groups, recents])); } catch { /* full: the next page waits for the hub */ }
  } catch (error) { showNotice("Sessions failed to load: " + error.message); }
  void checkPairing();
  sessionsTimer = window.setTimeout(loadSessions, visible || inApp() ? 5000 : 15000); // the app's hidden tabs still feed its icon
@@ -1796,6 +1796,8 @@ $("switcher").addEventListener("keydown", event => { if (event.key === "Escape" 
 toggleSwitcher(localStorage.getItem("plan3-switcher") !== "closed");
 document.addEventListener("visibilitychange", () => void loadSessions());
 window.addEventListener("focus", () => void loadSessions()); // clears this session's blue once you look at it
+// Switching sessions loads a new page: draw the last list at once so the sidebar does not vanish until the hub answers.
+try { const last = JSON.parse(sessionStorage.getItem("hub-sessions") ?? "null"); if (last) renderSessions(last[0], last[1]); } catch (error) { reportError(error); } // still loads the list below
 void loadSessions();
 // Subscription usage: one bar per provider (7d left, coloured like the footer, warnings in their colour);
 // tapping one opens its window: every quota window as a bar, the pool's notes and, for Claude, the account pool.
@@ -2173,9 +2175,19 @@ async function pollLoad() {
   const left = 48 - loadSamples.length * 2;
   box.querySelector("polyline")!.setAttribute("points", [`${left},20`, ...loadSamples.map((sample, index) => `${index * 2 + left},${(20 - sample[key] / 5).toFixed(1)}`), "46,20"].join(" "));
   box.querySelector("span")!.textContent = String(value);
-  box.setAttribute("aria-label", `${name} ${value}%`); box.title = `${name} ${value}% (graph: last 2 minutes)`;
+  box.setAttribute("aria-label", `${name} ${value}%`); box.title = `${name} ${value}% (graph: last 2 minutes)` + topText(key);
  }
 }
+// Hovering a graph lists the 5 programs using the most of it; looked up on hover only, at most every 10 s (it costs about a second).
+type Top = { name: string; value: number }[];
+let topProcs: { cpu: Top; memory: Top } | null = null, topAt = 0;
+const topText = (key: "cpu" | "memory") => !topProcs?.[key].length ? "" : "\n\nTop programs:\n" + topProcs[key].map(item => `${key === "cpu" ? `${item.value}%` : `${(item.value / 1e9).toFixed(1)} GB`}  ${item.name}`).join("\n");
+for (const key of ["cpu", "memory"] as const) $("load-" + key).addEventListener("mouseenter", async () => {
+ if (Date.now() - topAt < 10_000) return;
+ topAt = Date.now();
+ try { topProcs = await get("processes"); } catch { return; }
+ const box = $("load-" + key); box.title = box.title.split("\n\n")[0] + topText(key);
+});
 void pollLoad(); setInterval(pollLoad, 5000);
 // Notifications: a session starts asking a question, or stops working (subagents count as working). Every open hub
 // page polls, so the tag makes the OS replace duplicates; the session in view on a visible page is not announced.
@@ -2234,6 +2246,9 @@ function renderUpdates() {
   return row;
  }));
  ($("update-check") as HTMLButtonElement).disabled = !updates || updates.checking;
+ const wait = hubSettings.waiting;
+ $("update-waiting").hidden = !wait;
+ if (wait) $("update-waiting").textContent = `Hub restart waiting: ${wait.why.join(", ")}` + (wait.busy.length ? ` · until idle: ${wait.busy.join(", ")}` : " · restarting shortly");
 }
 // A click on either badge goes straight to Update all (same confirm) instead of opening the gear menu.
 // The Update button (and the gear's badges): everything, or just ce-workflow when it has the update. Picking is the go-ahead.
@@ -2254,11 +2269,11 @@ function renderApp(app: AppStatus) {
  $("app-group").hidden = false;
  const newer = !!app.latest && app.latest !== app.version && app.latest !== app.staged;
  $("app-status").textContent = !app.supported ? app.note ?? "" : !app.installed ? (app.latest ? `Not installed · ${app.latest} available` : "No app release is pinned yet.")
-  : `Installed ${app.version}` + (app.staged ? ` · ${app.staged} ready` : newer ? ` · ${app.latest} available` : "") + (app.running ? " · running" : "");
+  : `Installed ${app.version}` + (app.staged ? ` · ${app.staged} ready` : newer ? ` · ${app.latest} available` : app.latest === app.version ? " · up to date" : "") + (app.running ? " · running" : "");
  $("app-login-field").hidden = $("app-actions").hidden = !app.supported;
  ($("app-login") as HTMLInputElement).checked = app.login; ($("app-login") as HTMLInputElement).disabled = !app.installed;
  const install = $("app-install") as HTMLButtonElement;
- install.textContent = app.installed ? "Update" : "Install"; install.disabled = app.installed ? !newer && !app.staged : !app.latest;
+ install.textContent = app.installed ? "Update" : "Install"; install.disabled = !app.installed && !app.latest; // Update always checks GitHub now (the hub itself only checks every 10 minutes)
  $("app-uninstall").hidden = !app.installed;
  const start = $("app-start") as HTMLButtonElement;
  start.hidden = !app.installed; start.textContent = app.running ? "Stop" : "Start";
@@ -2267,7 +2282,20 @@ async function appAction(body: Record<string, unknown>, busy?: string) {
  if (busy) $("app-status").textContent = busy;
  try { renderApp(await post("app", body)); } catch (error) { showNotice(error.message); void appAction({ action: "status" }); }
 }
-$("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) { void appAction({ action: "status" }); void remoteAction(); } });
+// Linux: the daily cleanup moves old sessions to the Trash, which a server never empties.
+async function trashAction(empty = false) {
+ if (empty && !confirm("Delete the trashed sessions for good?")) return;
+ try {
+  const trash = await post("hub", { action: "trash", empty }) as { supported: boolean; files: number; bytes: number; freed?: number };
+  $("trash-field").hidden = !trash.supported;
+  $("trash-size").textContent = trash.files ? `${trash.files} files` : "None";
+  const button = $("trash-empty") as HTMLButtonElement;
+  button.disabled = !trash.files; button.textContent = trash.files ? `Empty (${(trash.bytes / 1e9).toFixed(1)} GB)` : "Empty";
+  if (empty) showNotice(`Freed ${Math.round((trash.freed ?? 0) / 1e6)} MB.`, true);
+ } catch (error) { showNotice("Trash: " + error.message); }
+}
+$("trash-empty").addEventListener("click", () => void trashAction(true));
+$("settings-button").addEventListener("click", () => { if (token && !$("settings-menu").hidden) { void appAction({ action: "status" }); void remoteAction(); } if (!$("settings-menu").hidden) void trashAction(); });
 // Remote access (tailscale serve) is switched and its address copied on this PC's own page only, like pairing.
 type RemoteStatus = { on: boolean; url?: string; missing?: string[]; error?: string };
 let remoteUrl = "";
@@ -2377,7 +2405,10 @@ $("hub-update").addEventListener("click", async () => {
  await runUpdate();
 });
 async function runUpdate(only?: "ce-workflow") {
- try { await post("hub", { action: "update", ...only ? { only } : {} }); showNotice(`Updating ${only ?? "Pi and extensions"}; the page reconnects when the hub is back (a minute or two).`, true); } catch (error) { showNotice(error.message); }
+ try {
+  const result = await post("hub", { action: "update", ...only ? { only } : {} }) as { queued?: string[] };
+  if (result.queued) return showNotice(`Downloading now. Busy sessions (${result.queued.join(", ")}) reload onto it when quiet; the hub restarts once every session is idle.`, true);
+  showNotice(`Updating ${only ?? "Pi and extensions"}; the page reconnects when the hub is back (a minute or two).`, true); } catch (error) { showNotice(error.message); }
 }
 // Queued messages come back into the box (Pi would otherwise still deliver them after Stop), ahead of any draft.
 function restoreQueued(restored?: string[]) {

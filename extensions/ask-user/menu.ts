@@ -318,7 +318,13 @@ export function listSubject(options): RemoteListPrompt {
 	};
 }
 
-export async function showListDialog(ctx, options) {
+// Open ce-workflow dialogs (every one goes through showListDialog or showAskDialog); self-update never reloads under one.
+let dialogs = 0;
+export const openDialogs = () => dialogs;
+async function counted<T>(open: Promise<T>): Promise<T> { dialogs++; try { return await open; } finally { dialogs--; } }
+
+export function showListDialog(ctx, options) { return counted(listDialog(ctx, options)); }
+async function listDialog(ctx, options) {
 	if (hubActive()) {
 		// Under pi-control-hub there is no terminal: terminal-only approvals are refused, everything else is drawn by the hub (D21).
 		if (options.terminalOnly || options.signal?.aborted) return;
@@ -663,7 +669,7 @@ export function showAskDialog(ctx, ask, params, signal?: AbortSignal, ideaLayout
 			return component;
 		}, { ...options, overlayOptions: { ...options?.overlayOptions, width: "98%", maxHeight: "100%", margin: 1 } }) } };
 	}
-	return ask.execute(randomUUID(), { allowComment: true, ...params, displayMode: "overlay" }, signal, undefined, askContext);
+	return counted<any>(ask.execute(randomUUID(), { allowComment: true, ...params, displayMode: "overlay" }, signal, undefined, askContext));
 }
 
 /** Free-text prompt through ask_user (terminal, web share and hub alike); undefined when cancelled.

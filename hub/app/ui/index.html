@@ -11,6 +11,7 @@
  button.tab img { width: 20px; height: 20px; flex: none }
  button.tab span { overflow: hidden; text-overflow: ellipsis }
  button.tab small { color: var(--muted) }
+ button.tab small.behind { color: #d97706; font-weight: 700 }
  #add { padding: 0 12px; font-size: 18px; color: var(--muted) }
  #ask { flex: 1; margin: 5px 8px; padding: 0 8px; border: 1px solid var(--sel); border-radius: 4px; background: var(--on); color: inherit; font: inherit; outline: none }
  #note.update { cursor: pointer; color: var(--ink); text-decoration: underline }
@@ -43,15 +44,20 @@ const ink = svg => dark === null ? svg : svg.replace(/<style>.*?<\/style>/, "").
 const dataUrl = svg => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 
 function persist() { void invoke("save", { hubs: tabs.map(tab => tab.local ? { local: true, name: tab.name, hidden: tab.hidden } : { url: tab.url, name: tab.name, hidden: tab.hidden }) }); }
+// A hub behind the newest version any tab runs is marked, so an out-of-date PC shows.
+const parts = v => v.split(".").map(Number), older = (a, b) => { const x = parts(a), y = parts(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); return false; };
 function render() {
  if (asking) return void updateIcons(); // keep the open question; icons still follow the hubs
+ const newest = tabs.map(tab => tab.version).filter(Boolean).reduce((a, b) => older(a, b) ? b : a, "");
  const buttons = tabs.flatMap((tab, i) => {
   if (tab.hidden && !revealed && i !== active) return [];
   const button = document.createElement("button"), img = document.createElement("img"), text = document.createElement("span");
   img.src = dataUrl(iconSvg(ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, tab.states)); img.alt = "";
   text.textContent = label(tab); if (!text.textContent) text.hidden = true;
   button.className = "tab" + (i === active ? " on" : "") + (tab.hidden ? " hidden" : ""); button.title = `${fullName(tab)}: ${stateWord(tab)} · Alt+${i + 1} · drag to reorder · right-click for rename, copy link, reload, remove`;
+  if (tab.version) button.title += `\nce-workflow ${tab.version}` + (older(tab.version, newest) ? ` (behind: ${newest} runs on another hub)` : "");
   button.append(img, text);
+  if (tab.version && older(tab.version, newest)) { const mark = document.createElement("small"); mark.className = "behind"; mark.textContent = "\u2191"; mark.title = `ce-workflow ${tab.version}; ${newest} is out`; button.append(mark); }
   if (!tab.url) { const small = document.createElement("small"); small.textContent = "waiting for the hub"; button.append(small); }
   button.onclick = () => select(tab.id);
   button.oncontextmenu = event => { event.preventDefault(); void menu(tab); };
@@ -143,7 +149,7 @@ let attentionKey = null;
 window.onTitle = (webview, title) => {
  const tab = tabs.find(t => "hub" + t.id === webview); if (!tab) return;
  const line = /^pi-hub-state (\{.*\})$/.exec(title ?? "");
- if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { side: value.side, gear: value.gear ?? "", icon: value.icon || tab.icon, hubName: value.name || tab.hubName, states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0 });
+ if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { side: value.side, gear: value.gear ?? "", icon: value.icon || tab.icon, hubName: value.name || tab.hubName, version: value.version || "", states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0 });
   // This PC's hub holds the attention key setting.
   // A newer "needs you" than this tab has shown flashes the taskbar; the first title after start only sets the mark.
   if (tab.peak !== undefined && tab.latest > tab.peak) void invoke("flash").catch(console.error);

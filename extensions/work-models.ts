@@ -11,6 +11,7 @@ import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
 import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
+import { registerSelfUpdate } from "./work-self-update.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
@@ -3482,6 +3483,7 @@ export default function workModelsExtension(pi) {
 	});
 	process.env.PI_ASK_USER_CONTEXT_EXPANDED ||= "true";
 	workExtensionPi = pi;
+	registerSelfUpdate(pi);
 	// Read once at load; the Settings toggle reloads the runtime (D10).
 
 	const visionBridge = createVisionBridge();

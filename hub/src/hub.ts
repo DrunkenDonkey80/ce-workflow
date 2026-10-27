@@ -16,7 +16,7 @@ import { Scheduler, timerInput } from "./scheduler.ts";
 import { createUsage, USAGE_PROVIDERS, type Usage, type UsageOptions } from "./usage.ts";
 import { createPool, type Pool } from "./pool.ts";
 import { createUpdateCheck, type UpdateCheck } from "./update-check.ts";
-import { createAppInstall } from "./app-install.ts";
+import { createAppInstall, PACKAGE_VERSION } from "./app-install.ts";
 import { isWsl, uacPending } from "./platform.ts";
 import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
@@ -28,6 +28,8 @@ import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 import { sendExplored } from "./explore.ts";
+import { pruneSessions, sessionTrash } from "./session-prune.ts";
+import { createAutoUpdate } from "./auto-update.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string; collapseHours?: number; attentionKey?: string };
 export type HubMarker = { pid: number; port: number; startedAt: number };
@@ -200,8 +202,22 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	};
 
 	const commands = createCommands(dataDir);
+	/** Restart, or update Pi and extensions, from a process outside the hub that stops and starts it again. */
+	async function startMaintenance(action: "restart" | "update", only?: string) {
+		const logFile = path.join(dataDir, "hub.log");
+		const [command, args] = maintenanceCommand(action, fileURLToPath(new URL("./cli.ts", import.meta.url)), logFile, undefined, only);
+		if (command === "systemd-run") {
+			const result = await exec(command, args, { timeout: 10_000 });
+			if (result.code !== 0) throw new Error(`Maintenance could not start: ${result.stderr || result.stdout}`);
+		} else {
+			const log = openSync(logFile, "a");
+			spawn(command, args, { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
+		}
+	}
 	const version = hubVersion(); // the code this hub runs; an update restarts the hub
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, progress: progressOf, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, attentionKey: config.attentionKey ?? "ctrl+shift+a", version, seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}) }) });
+	const autoUpdate = updates && createAutoUpdate({ state: () => updates.state(), refresh: () => updates.check(), busy: () => summary().filter(s => s.busy.length).map(s => s.name),
+		loaded: version, disk: hubVersion, maintain: action => startMaintenance(action), attemptsFile: path.join(dataDir, "auto-update.json") });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, progress: progressOf, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, attentionKey: config.attentionKey ?? "ctrl+shift+a", version, seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}), ...(autoUpdate ? { waiting: autoUpdate.waiting() } : {}) }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection
@@ -317,7 +333,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 						if (data.action === "status") return send(200, app.status());
 						if (data.action === "install") return send(200, await app.install());
 						// Update = download if needed, then restart a running app into it (like the tray); a stopped one swaps at its next start.
-						if (data.action === "update") { const value = await app.stage(); return send(200, value.staged && value.running ? app.restart() : value); }
+						if (data.action === "update") { const value = await app.stage(); if (!value.latest) return send(409, { error: `GitHub has no desktop app build for ${PACKAGE_VERSION} yet; CI attaches it a few minutes after the push.` }); return send(200, value.staged && value.running ? app.restart() : value); }
 						if (data.action === "uninstall") return send(200, app.uninstall());
 						if (data.action === "start") return send(200, app.start());
 						if (data.action === "stop") return send(200, app.stop());
@@ -331,21 +347,17 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					if (data.action === "check-updates") { if (updates) await updates.check(); return send(200, pageApi.settings()); }
 					// Running sessions keep the extension loaded until they restart; the list drops it now.
 					if (data.action === "remove-package" && typeof data.source === "string") { try { await updates?.remove(data.source); } catch (error) { return send(409, { error: (error as Error).message }); } return send(200, pageApi.settings()); }
+					// Linux keeps old sessions in the Trash, which nobody empties on a server; the settings offer it.
+					if (data.action === "trash") return send(200, sessionTrash(path.join(agentDir(), "sessions"), data.empty === true));
 					if (data.action !== "restart" && data.action !== "update") return send(400, { error: "Unknown hub action." });
 					const busy = summary().filter(s => s.busy.length);
-					if (busy.length) return send(409, { error: `Not ${data.action === "update" ? "updated" : "restarted"}; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
-					const logFile = path.join(dataDir, "hub.log");
 					// only: just ce-workflow (the source the last check listed), never an arbitrary string from the page.
 					const only = data.action === "update" && data.only === "ce-workflow" ? updates?.state().installed?.find(item => /ce-workflow/i.test(item.source))?.source : undefined;
 					if (data.only && !only) return send(409, { error: "ce-workflow is not an installed package here; check for updates first." });
-					const [command, args] = maintenanceCommand(data.action, fileURLToPath(new URL("./cli.ts", import.meta.url)), logFile, undefined, only);
-					if (command === "systemd-run") {
-						const result = await exec(command, args, { timeout: 10_000 });
-						if (result.code !== 0) throw new Error(`Maintenance could not start: ${result.stderr || result.stdout}`);
-					} else {
-						const log = openSync(logFile, "a");
-						spawn(command, args, { detached: true, windowsHide: true, stdio: ["ignore", log, log] }).unref();
-					}
+					// Busy: the extensions download now and sessions reload onto them when quiet; the hub restarts once all are idle.
+					if (busy.length && data.action === "update" && autoUpdate) { void autoUpdate.fetchUpdates(only); return send(200, { ok: true, queued: busy.map(s => s.name) }); }
+					if (busy.length) return send(409, { error: `Not ${data.action === "update" ? "updated" : "restarted"}; busy: ${busy.map(s => `${s.name} (${s.busy.join(", ")})`).join("; ")}` });
+					await startMaintenance(data.action, only);
 					return send(200, { ok: true });
 				}
 				return send(200, await pageApi.post(page[1], endpoint, data, remote));
@@ -429,17 +441,25 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	stageApp();
 	const appTimer = setInterval(stageApp, 600_000);
 	appTimer.unref();
+	// Old session files: trimmed at 14 days, deleted (to the Recycle Bin) at 30; first run 10 minutes after start, then daily.
+	let pruning = false;
+	const prune = () => { if (pruning) return; pruning = true; void pruneSessions(registry, path.join(agentDir(), "sessions")).then(result => {
+		if (result.trimmed || result.deleted) console.log(`${new Date().toISOString()} session cleanup: trimmed ${result.trimmed} (${Math.round(result.saved / 1e6)} MB), moved ${result.deleted} to the bin (${Math.round(result.freed / 1e6)} MB)`);
+	}).catch(error => console.error(`session cleanup: ${(error as Error).message}`)).finally(() => { pruning = false; }); };
+	const pruneStart = setTimeout(prune, 600_000), pruneTimer = setInterval(prune, 86_400_000);
+	pruneStart.unref(); pruneTimer.unref();
 	const timer = setInterval(() => {
 		// Windows login can start the hub before Tailscale has its connection and user identity.
 		if (config.remote && !remoteStatus().url) void applyRemote().catch(error => { remoteError = (error as Error).message; });
 		host.checkTerminals();
+		if (autoUpdate) void autoUpdate.tick().catch(error => console.error(`auto-update: ${(error as Error).message}`));
 		void host.autoPark().then(ids => { if (ids.length) console.log(`${new Date().toISOString()} auto-parked ${ids.map(id => registry.get(id)?.name ?? id).join(", ")}`); });
 	}, 60_000);
 	timer.unref();
 
 	async function stop() {
 		return closing ??= (async () => {
-			clearInterval(timer); clearInterval(ticks); clearInterval(appTimer); usage?.stop(); pool?.stop(); updates?.stop();
+			clearInterval(timer); clearInterval(ticks); clearInterval(appTimer); clearTimeout(pruneStart); clearInterval(pruneTimer); usage?.stop(); pool?.stop(); updates?.stop();
 			pairing.close();
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();

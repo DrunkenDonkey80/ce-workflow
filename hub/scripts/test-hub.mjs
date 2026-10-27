@@ -9,7 +9,8 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-cli-"));
 const folder = path.join(root, "proj");
 fs.mkdirSync(folder);
 const fake = fileURLToPath(new URL("./fake-pi.mjs", import.meta.url));
-const env = { ...process.env, PI_CODING_AGENT_DIR: root, PI_HUB_PI_COMMAND: JSON.stringify([process.execPath, fake]) };
+// Temp home and app dirs: a spawned hub stages and restarts the installed desktop app at start, which must never be the user's.
+const env = { ...process.env, PI_CODING_AGENT_DIR: root, PI_HUB_PI_COMMAND: JSON.stringify([process.execPath, fake]), HOME: root, USERPROFILE: root, LOCALAPPDATA: root, APPDATA: root };
 const cli = (...args) => {
 	try { return { code: 0, out: execFileSync(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), ...args], { env, encoding: "utf8", stdio: "pipe" }) }; }
 	catch (error) { return { code: error.status, out: error.stdout + error.stderr }; }

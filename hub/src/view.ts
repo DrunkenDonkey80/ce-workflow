@@ -1,6 +1,7 @@
 // H5-02: the browser's session view. ce-workflow's own chat and activity mirrors (D14) run here, fed by RPC events
 // instead of extension hooks. History comes from get_messages; chat older than the last compaction from the JSONL (F3).
-import { readFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { createInterface } from "node:readline";
 import type { ServerResponse } from "node:http";
 import { createActivityMirror } from "../../extensions/plan3-web.ts";
 import { checkIn, createChatMirror } from "./chat.ts";
@@ -16,8 +17,17 @@ const stamp = (id: string) => { const value = Number(/^[a-z]+_(\d+)(?:_\d+)?$/.e
 
 /** Message entries of the session's current branch, oldest first. Read-only; the hub never writes a session file. */
 export async function branchMessages(file: string): Promise<{ type: "message"; message: any }[]> {
-	// shortcut: reads the whole file per request (29 MB ≈ 0.2 s); index line offsets if paging ever feels slow.
-	const entries = (await readFile(file, "utf8")).split("\n").flatMap(line => { try { return line ? [JSON.parse(line)] : []; } catch { return []; } });
+	// shortcut: reads the whole file per request (540 MB ≈ 2 s); index line offsets if paging ever feels slow.
+	// Line by line: one string of a big file passes V8's 512 MB limit. Tool results keep only what the chat shows, since
+	// screenshots in them make up most of a long session (bulky details and image data would hold hundreds of MB here).
+	const entries: any[] = [];
+	for await (const line of createInterface({ input: createReadStream(file), crlfDelay: Infinity })) {
+		let entry; try { entry = line ? JSON.parse(line) : null; } catch { continue; }
+		const message = entry?.message;
+		if (message?.role === "toolResult") entry.message = { ...message, details: typeof message.details?.diff === "string" ? { diff: message.details.diff.slice(0, 8001) } : undefined,
+			content: Array.isArray(message.content) ? message.content.map(part => part?.type === "text" ? { type: "text", text: String(part.text).slice(0, 4001) } : { type: part?.type }) : [] };
+		if (entry) entries.push(entry);
+	}
 	const byId = new Map(entries.filter(entry => typeof entry?.id === "string").map(entry => [entry.id, entry]));
 	let branch = entries;
 	if (byId.size) { // a tree session: walk from the newest entry to the root
