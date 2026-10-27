@@ -66,11 +66,16 @@ try {
 	console.log("round trip ok");
 
 	// Install points the browser at the package's extension, writes a launcher for the package host.mjs and registers it per browser.
-	const calls = [], installed = await bf.install(async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0 }; }, path.join(agent, "install"));
+	const tools = [], fakePi = { registerTool: tool => tools.push(tool.name) };
+	bf.default(fakePi);
+	assert.deepEqual(tools, [], "no tool before Install");
+	const calls = [], installed = await bf.install(async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0 }; });
+	bf.default(fakePi);
+	assert.deepEqual(tools, ["browser_fetch"], "the tool appears once Install wrote the host manifest");
 	assert.equal(installed.id, "dmbpeaidhpenhihgngkgekaieninaapk");
 	const root = fileURLToPath(new URL("..", import.meta.url));
 	assert.equal(installed.extension, path.join(root, "browser-fetch", "extension"), "the extension loads from the package itself");
-	assert.ok(existsSync(path.join(installed.extension, "background.js")) && !existsSync(path.join(agent, "install", "extension")));
+	assert.ok(existsSync(path.join(installed.extension, "background.js")) && !existsSync(path.join(bf.fetchDir(), "extension")));
 	assert.ok(readFileSync(JSON.parse(readFileSync(installed.manifest, "utf8")).path, "utf8").includes(path.join(root, "browser-fetch", "host.mjs")), "the launcher runs the package host");
 	const hostManifest = JSON.parse(readFileSync(installed.manifest, "utf8"));
 	assert.deepEqual([hostManifest.name, hostManifest.type, hostManifest.allowed_origins], ["pi.browser_fetch", "stdio", ["chrome-extension://dmbpeaidhpenhihgngkgekaieninaapk/"]]);

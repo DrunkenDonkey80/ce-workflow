@@ -382,6 +382,10 @@ const packageDir = () => path.join(path.dirname(fileURLToPath(import.meta.url)),
 export function extensionId(key: string) {
 	return [...createHash("sha256").update(Buffer.from(key, "base64")).digest().subarray(0, 16)].map(byte => String.fromCharCode(97 + (byte >> 4), 97 + (byte & 15))).join("");
 }
+/** Written by Install; the tool is offered only on machines where it exists. */
+export const hostManifest = (dir = fetchDir()) => path.join(dir, "host", `${HOST_NAME}.json`);
+const extensionDir = () => path.resolve(packageDir(), "extension");
+const openCommand = (target: string): [string, string[]] => process.platform === "win32" ? ["cmd", ["/c", "start", "", target]] : [process.platform === "darwin" ? "open" : "xdg-open", [target]];
 export const BROWSER_KEYS = ["imput\\Helium", "Google\\Chrome", "Microsoft\\Edge", "Chromium"];
 export async function install(exec: (cmd: string, args: string[]) => Promise<{ code: number; stderr?: string }>, dir = fetchDir()) {
 	const source = path.resolve(packageDir()), extension = path.join(source, "extension"), hostDir = path.join(dir, "host");
@@ -395,7 +399,7 @@ export async function install(exec: (cmd: string, args: string[]) => Promise<{ c
 	const host = path.join(source, "host.mjs");
 	writeFileSync(launcher, win ? `@echo off\r\n"${node}" "${host}"\r\n` : `#!/bin/sh\nexec "${node}" "${host}"\n`);
 	if (!win) chmodSync(launcher, 0o755);
-	const manifest = path.join(hostDir, `${HOST_NAME}.json`);
+	const manifest = hostManifest(dir);
 	writeFileSync(manifest, JSON.stringify({ name: HOST_NAME, description: "Pi browser fetch", path: launcher, type: "stdio", allowed_origins: [`chrome-extension://${id}/`] }, null, 1));
 	const failed: string[] = [];
 	// shortcut: native host registration is Windows only (plan non-goal: Linux install); macOS/Linux need the manifest copied to each browser's NativeMessagingHosts folder.
@@ -421,14 +425,15 @@ const until = (grant: Grant) => grant.until === null ? "always" : `until ${new D
 /** /wo → Settings → Browser access (D7). */
 export async function browserAccessMenu(ctx, pi) {
 	for (;;) {
-		const policy = readPolicy(), isConnected = await connected();
+		const policy = readPolicy(), isConnected = await connected(), registered = existsSync(hostManifest());
 		const grants = Object.entries(policy.grants).filter(([host]) => granted(policy, host));
 		const picked = await showListDialog(ctx, {
 			title: "Browser access",
-			purpose: policy.corrupt ?? `browser_fetch loads pages in your own browser. ${isConnected ? "The browser is connected." : "The browser is not connected."}`,
+			purpose: policy.corrupt ?? `browser_fetch loads pages in your own browser. ${!registered ? "The browser extension is not registered: Install it, then Load unpacked the extension folder." : isConnected ? "The browser is connected." : "The browser is not connected."}`,
 			cursorKey: "browser-access", filter: false,
 			items: [
-				{ value: "install", label: "Install or update the browser extension", description: `Registers the native host for Helium, Chrome, Edge and Chromium; the browser loads the extension from ${path.resolve(packageDir(), "extension")}.` },
+				{ value: "install", label: "Install or update the browser extension", description: `Registers the native host for Helium, Chrome, Edge and Chromium; the browser loads the extension from ${extensionDir()}.` },
+				{ value: "folder", label: "Open the extension folder", description: `${extensionDir()}: Load unpacked this folder in chrome://extensions (Developer mode).` },
 				{ value: "grants", label: `Allowed sites (${grants.length}) →`, description: "Revoke a site grant." },
 				{ value: "blocked", label: `Block list (${DEFAULT_BLOCKED.length} built in, ${policy.blocked.length} added) →`, description: "Sites the agent can never open, with their subdomains." },
 				{ value: "log", label: "Open the fetch log", description: logFile() },
@@ -438,7 +443,9 @@ export async function browserAccessMenu(ctx, pi) {
 		try {
 			if (picked.value === "install") {
 				const done = await install((cmd, args) => pi.exec(cmd, args));
-				ctx.ui.notify(`${done.failed.length ? `Registration failed for ${done.failed.join("; ")}. ` : ""}${done.registered ? "" : "Native host registration is Windows only; "}In the browser open chrome://extensions, turn on Developer mode, Load unpacked: ${done.extension} (ID ${done.id}). Reload the extension after an update.`, done.failed.length ? "warning" : "info");
+				ctx.ui.notify(`${registered ? "" : "Run /reload to enable browser_fetch. "}${done.failed.length ? `Registration failed for ${done.failed.join("; ")}. ` : ""}${done.registered ? "" : "Native host registration is Windows only; "}In the browser open chrome://extensions, turn on Developer mode, Load unpacked: ${done.extension} (ID ${done.id}). Reload the extension after an update.`, done.failed.length ? "warning" : "info");
+			} else if (picked.value === "folder") {
+				await pi.exec(...openCommand(extensionDir()));
 			} else if (picked.value === "grants") {
 				const host = await showListDialog(ctx, { title: "Allowed sites", purpose: "Choose a site to revoke its grant.", filter: false, cursorKey: "browser-access-grants",
 					items: grants.length ? grants.map(([host, grant]) => ({ value: host, label: host, preserveCase: true, description: until(grant) })) : [{ value: "", label: "No allowed sites", disabled: true }] });
@@ -455,12 +462,13 @@ export async function browserAccessMenu(ctx, pi) {
 				} else if (entry?.value) { await updatePolicy(p => { p.blocked = p.blocked.filter(host => host !== entry.value); }); ctx.ui.notify(`Removed ${entry.value} from the block list`, "info"); }
 			} else if (picked.value === "log") {
 				if (!existsSync(logFile())) ctx.ui.notify("No fetches logged yet.", "info");
-				else await pi.exec(process.platform === "win32" ? "cmd" : process.platform === "darwin" ? "open" : "xdg-open", process.platform === "win32" ? ["/c", "start", "", logFile()] : [logFile()]);
+				else await pi.exec(...openCommand(logFile()));
 			}
 		} catch (error) { ctx.ui.notify((error as Error).message, "error"); }
 	}
 }
 
 export default function browserFetchExtension(pi) {
-	pi.registerTool?.(browserFetchTool());
+	// Only where Install ran (host manifest written); a closed browser still keeps the tool, its error says to open it.
+	if (existsSync(hostManifest())) pi.registerTool?.(browserFetchTool());
 }
