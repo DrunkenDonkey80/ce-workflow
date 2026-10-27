@@ -63,6 +63,16 @@ try {
 
 	await roundTrip();
 	console.log("round trip ok");
+
+	// Install copies extension and host out of the package and registers the host per browser (D11).
+	const calls = [], installed = await bf.install(async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0 }; }, path.join(agent, "install"));
+	assert.equal(installed.id, "dmbpeaidhpenhihgngkgekaieninaapk");
+	assert.ok(existsSync(path.join(installed.extension, "background.js")) && existsSync(path.join(agent, "install", "host", "host.mjs")));
+	const hostManifest = JSON.parse(readFileSync(installed.manifest, "utf8"));
+	assert.deepEqual([hostManifest.name, hostManifest.type, hostManifest.allowed_origins], ["pi.browser_fetch", "stdio", ["chrome-extension://dmbpeaidhpenhihgngkgekaieninaapk/"]]);
+	assert.ok(existsSync(hostManifest.path));
+	if (process.platform === "win32") assert.deepEqual(calls.map(call => call[2]), bf.BROWSER_KEYS.map(key => `HKCU\\Software\\${key}\\NativeMessagingHosts\\pi.browser_fetch`));
+	console.log("install ok");
 } finally {
 	rmSync(agent, { recursive: true, force: true });
 }

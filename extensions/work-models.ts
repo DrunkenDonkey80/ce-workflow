@@ -16,6 +16,7 @@ import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
+import { browserAccessMenu } from "./browser-fetch.ts";
 
 
 
@@ -4362,6 +4363,11 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				kind: "camera", value: "camera",
 				label: `Camera (project only): ${camera.enabled ? "ON" : "OFF"} · ${camera.device?.label ?? "None"} ${SUBMENU_ARROW}`,
 				description: "Local TUI only · explicit device/permission · stills, never recorded video",
+			},
+{
+				kind: "browserAccess", value: "browserAccess",
+				label: `Browser access (all projects) ${SUBMENU_ARROW}`,
+				description: "browser_fetch: install the browser extension, allowed sites, block list, fetch log",
 			}
 ];
 		for (const item of items)
@@ -4376,6 +4382,10 @@ async function workSettingsLoop(ctx, pi = undefined) {
 		const { pick } = selected;
 		if (pick.kind === "camera") {
 			await cameraController.menu(ctx);
+			continue;
+		}
+		if (pick.kind === "browserAccess") {
+			await browserAccessMenu(ctx, pi);
 			continue;
 		}
 		if (pick.kind === "export") {

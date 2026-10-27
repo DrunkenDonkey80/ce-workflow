@@ -41,3 +41,8 @@ Reviewed; all 8 findings accepted (D12 to D16, new P1-07, test renamed to test-w
   - Wait for load and for challenge pages to clear; extract text, links and images; close the tab.
   - Navigation gate (D12); image downloads checked like pages (block list, redirects), covered by the page approval; other-host images use `credentials: "omit"` (Q-02); pause and deadlines (D15).
   - check: node scripts/test-work-browser-fetch.mjs → "round trip ok" (real background.js in a VM with a fake chrome enforcing DNR rules; pause and cancel close tabs). Real-browser behavior is P2-01.
+
+## 2026-10-27T19:01:45.050Z P1-05 done: install() copies extension+host to ~/.pi/agent/browser-fetch, writes host launcher/manifest, reg add for Helium/Chrome/Edge/Chromium; /wo Settings "Browser access (all projects)" → browserAccessMenu: connection status, install, revoke grants, block list add/remove, open log.
+
+- [x] **P1-05** Install action and `/wo` Browser access menu: install, show status, edit block list, revoke grants, open log.
+  - check: node scripts/test-work-browser-fetch.mjs → "install ok"; env -u PI_HUB node scripts/test-work-settings.mjs → ok; standalone host smoke (spawned host.mjs relays to browser stdout, reports "The browser closed." and exits 0 on stdin end)

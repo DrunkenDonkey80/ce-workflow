@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-27
-updated: 2026-10-27T19:00:17.825Z
+updated: 2026-10-27T19:01:45.049Z
 reviewed: 2026-10-27
 started: 2026-10-27T18:49:18.546Z
 ---
@@ -103,8 +103,8 @@ None.
 - [x] **P1-02** browser_fetch tool {url, images?} in extensions/browser-fetch.ts (registered in package.json): gate + approval dialog (once per request, shared grants, 5 min deny), pipe link, mid-request redirect approval, final-host re-check, image list or download, log.
 - [x] **P1-03** browser-fetch/host.mjs: native frames, pipe server relaying by id (requester-only steering), image files under %TEMP%/pi-browser-fetch/<id>/, cancel on Pi disconnect, closes Pi sockets when the browser goes. DNS pre-check lives Pi-side (dnsCheck) for every new host, the same machine.
 - [x] **P1-04** browser-fetch/extension (MV3, fixed key, ID dmbpeaidhpenhihgngkgekaieninaapk): inactive muted tab per request, DNR gate (main frames only to approved hosts, block list for tab and own fetches), redirect approval via ERR_BLOCKED_BY_CLIENT, challenge wait, extract, image downloads (redirect: error, cookies only same host), toolbar pause.
-- [wip] **P1-05** Install action and `/wo` Browser access menu: install, show status, edit block list, revoke grants, open log.
-- [ ] **P1-06** Self-check `scripts/test-work-browser-fetch.mjs`, README and CHANGELOG.
+- [x] **P1-05** install() copies extension+host to ~/.pi/agent/browser-fetch, writes host launcher/manifest, reg add for Helium/Chrome/Edge/Chromium; /wo Settings "Browser access (all projects)" → browserAccessMenu: connection status, install, revoke grants, block list add/remove, open log.
+- [wip] **P1-06** Self-check `scripts/test-work-browser-fetch.mjs`, README and CHANGELOG.
   - Cover policy, approval choices, fake host round trip, adversarial URLs (IPv6, mapped IPv4, DNS to private), concurrent same-host requests.
   - Also: concurrent policy writers, revoke seen by another process, denied redirect gets no request, blocked image host, other-host image sent without cookies, pause and cancel mid-request.
 - [ ] **P1-07** Full-URL field in the shared dialog, so the whole address shows in terminal, native fallback and hub.
