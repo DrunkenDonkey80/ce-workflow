@@ -60,3 +60,15 @@ Reviewed; all 8 findings accepted (D12 to D16, new P1-07, test renamed to test-w
   - Touch `extensions/ask-user/menu.ts` (`listSubject`, `localListDialog`), the hub list form in `hub/web/`, and their tests.
   - Check: a URL longer than the window, with `?data=secret` at its end, is fully visible everywhere.
   - check: env -u PI_HUB node scripts/test-work-dialogs.mjs → ok - shared work dialogs (new case: 90-char URL at width 36 shown whole, lines ≤34)
+
+## 2026-10-27T20:45:40.608Z P2-01 done: Live in Helium: extension loaded from the package, user granted developer.ebay.com (Always), fetch of /develop/api/buy (403 to scripts) returned title "search: Browse API", 2274 chars, 200 links.
+
+- [x] **P2-01** [human] Load the unpacked extension in Helium and approve a first fetch of a Cloudflare-protected page.
+  - check: node script → browserFetch(https://developer.ebay.com/develop/api/buy) → finalUrl same, title "search: Browse API | eBay Developers Program"; log.jsonl outcome ok. Approval asked via ask_user here (script had no UI); in-tool dialog not exercised live.
+
+## 2026-10-27T20:52:12.156Z ARCH-RECONCILE done: Product diagram rev 18: browser_fetch service, extension+host client, user's browser, policy/log store, edges from pi_host, work_models, ask_user.
+
+- [x] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
+  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
+  - Changed plan elements: none flagged; inspect actual implementation.
+  - check: env -u PI_HUB npm run verify:quiet → all ce-workflow suites pass except test-work-screen-read (android CLI crash, environment); hub: test-browser ok, test-app-trail (placeStrip, user's uncommitted hub/app/ui/index.html) and test-scheduler fail outside this plan's files.

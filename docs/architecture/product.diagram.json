@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 17,
+  "revision": 18,
   "nodes": [
     {
       "id": "pi_host",
@@ -391,6 +391,33 @@
       "summary": "Undocumented site API plus Backblaze B2 pieces; receives end-to-end encrypted files (24 h, unlimited downloads).",
       "tech": "wormhole-crypto 0.3.1 (MIT), used by hub/src/wormhole.ts",
       "details": "Chat file-link menu Upload / Zip and upload / 7z and upload; only files Download would serve; key stays in the link's #fragment."
+    },
+    {
+      "id": "browser_fetch",
+      "label": "browser_fetch",
+      "kind": "service",
+      "parent": "standalone_group",
+      "summary": "Loads a page in the user's own browser: block list, local-address/DNS checks, per-site approval through ask_user, redirect re-approval, optional image downloads; /wo Browser access menu and installer.",
+      "tech": "extensions/browser-fetch.ts"
+    },
+    {
+      "id": "browser_fetch_host",
+      "label": "Browser fetch extension + native host",
+      "kind": "client",
+      "summary": "MV3 extension (browser-fetch/extension, loaded unpacked from the package) opens an inactive muted tab, blocks unapproved hosts with DNR, extracts text/links/images, pause button; host.mjs relays over the named pipe.",
+      "tech": "browser-fetch/extension, browser-fetch/host.mjs"
+    },
+    {
+      "id": "user_browser",
+      "label": "User's browser",
+      "kind": "external",
+      "summary": "Helium / Chrome / Edge / Chromium with the everyday profile and cookies."
+    },
+    {
+      "id": "browser_fetch_files",
+      "label": "Browser fetch policy and log",
+      "kind": "store",
+      "summary": "~/.pi/agent/browser-fetch: policy.json (grants, block list), log.jsonl, host launcher and manifest; images in %TEMP%/pi-browser-fetch."
     }
   ],
   "edges": [
@@ -753,6 +780,42 @@
       "from": "pi_control_hub",
       "to": "wormhole_app",
       "label": "encrypted file uploads"
+    },
+    {
+      "from": "pi_host",
+      "to": "browser_fetch",
+      "label": "loads",
+      "id": "pi_host__browser_fetch"
+    },
+    {
+      "from": "browser_fetch",
+      "to": "ask_user",
+      "label": "site approval (full URL detail)",
+      "id": "browser_fetch__ask_user"
+    },
+    {
+      "from": "browser_fetch",
+      "to": "browser_fetch_host",
+      "label": "named pipe pi-browser-fetch",
+      "id": "browser_fetch__browser_fetch_host"
+    },
+    {
+      "from": "browser_fetch_host",
+      "to": "user_browser",
+      "label": "native messaging, tabs",
+      "id": "browser_fetch_host__user_browser"
+    },
+    {
+      "from": "browser_fetch",
+      "to": "browser_fetch_files",
+      "label": "grants, log, images",
+      "id": "browser_fetch__browser_fetch_files"
+    },
+    {
+      "from": "work_models",
+      "to": "browser_fetch",
+      "label": "Browser access menu",
+      "id": "work_models__browser_fetch"
     }
   ],
   "notes": []

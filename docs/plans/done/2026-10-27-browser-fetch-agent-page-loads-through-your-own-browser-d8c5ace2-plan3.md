@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-10-27
-updated: 2026-10-27T19:05:27.159Z
+updated: 2026-10-27T20:52:35.546Z
 reviewed: 2026-10-27
 started: 2026-10-27T18:49:18.546Z
 ---
@@ -74,6 +74,8 @@ Non-goals (v1): clicking, typing or form submission; replacing the search plugin
 - (user, standing) The worktree holds uncommitted hub work from the same conversation (View page, CPU/memory popup, hidden-hub taskbar icon, CHANGELOG lines); keep it, do not revert or mix it into this plan's commits unless asked.
 - (user, standing) Do not restart the hub yourself: it restarts every session and the user's sessions are usually busy; tell the user to run `node hub/src/cli.ts restart` when it suits them.
 - (user, standing) Browser work for testing stays headless (agent-browser); the live extension check runs in the user's own Helium (P2-01).
+- **D11 revised (user, P2-01):** the browser loads the extension straight from the ce-workflow package (`browser-fetch/extension`) and the host launcher runs the package's `browser-fetch/host.mjs`; only the launcher and host manifest go to `~/.pi/agent/browser-fetch/host/`. Reload the extension after a package update.
+
 
 
 
@@ -109,12 +111,10 @@ None.
 
 ### Phase 2: Live check [code]
 
-- [wip] **P2-01** [human] Load the unpacked extension in Helium and approve a first fetch of a Cloudflare-protected page.
+- [x] **P2-01** Live in Helium: extension loaded from the package, user granted developer.ebay.com (Always), fetch of /develop/api/buy (403 to scripts) returned title "search: Browse API", 2274 chars, 200 links.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 18: browser_fetch service, extension+host client, user's browser, policy/log store, edges from pi_host, work_models, ask_user.
 
 
 ## Global validation
@@ -141,3 +141,6 @@ Append material changes and their reasons; preserve the original request and set
   - 7 Pause and cancel lifecycle: accepted, D15.
   - 8 Test not picked up by verify-package (confirmed `test-work-*` filter): accepted, renamed.
 - 2026-10-27: Added final architecture reconciliation because a product diagram exists.
+- Backlog: follow image redirects with per-hop checks (now refused); named-pipe ACL hardening; Linux/macOS host registration.
+- Assumed: concurrent same-host waiters share deny/block/unanswered; DNS check is Pi-side, not in the host; no cursor memory on the approval dialog.
+- Final verify: test-work-screen-read fails on an android CLI crash (environment); hub test-app-trail/test-scheduler fail on the user's uncommitted hub work, outside this plan.
