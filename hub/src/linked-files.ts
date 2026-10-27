@@ -9,13 +9,14 @@ import { realpath, stat } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, isAbsolute } from "node:path";
 import { forbiddenPath } from "../../extensions/jev-tools.ts";
+import { fromWindowsPath, isWsl, toWindowsPath } from "./platform.ts";
 
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 
 /** The real absolute path of an existing, shareable file, or undefined. Relative paths are the session folder's. */
 export async function linkedFile(path: unknown, project: string, remote = false): Promise<string | undefined> {
 	if (typeof path !== "string" || !path || path.length > 1000 || /[\x00-\x1f]/.test(path)) return undefined;
-	const real = await realpath(resolve(project, path)).catch(() => undefined);
+	const real = await realpath(resolve(project, fromWindowsPath(path))).catch(() => undefined);
 	if (!real || /[\\/]\.[^\\/]/.test(real) || forbiddenPath.test(basename(real))) return undefined;
 	const info = await stat(real).catch(() => undefined);
 	if (!info?.isFile()) return undefined;
@@ -61,8 +62,9 @@ export async function openLinkedFile(path: unknown, project: string, reveal: boo
 	const show = reveal || RUNS.test(extname(real));
 	// Windows paths cannot contain quotes, so verbatim quoting is safe; explorer.exe never goes through cmd's & parsing.
 	const [command, args, verbatim] = process.platform === "win32" ? ["explorer.exe", [show ? `/select,"${real}"` : `"${real}"`], true]
+		: isWsl() ? ["explorer.exe", [show ? `/select,${toWindowsPath(real)}` : toWindowsPath(real)], false] // WSL has no xdg-open by default
 		: process.platform === "darwin" ? ["open", show ? ["-R", real] : [real], false]
-		: ["xdg-open", [show ? dirname(real) : real], false]; // shortcut: Linux opens the folder without selecting the file; WSL needs wslview
+		: ["xdg-open", [show ? dirname(real) : real], false]; // shortcut: Linux opens the folder without selecting the file
 	spawn(command, args as string[], { detached: true, stdio: "ignore", windowsHide: false, windowsVerbatimArguments: verbatim as boolean }).on("error", () => {}).unref();
 	return { ok: true, revealed: show, path: real };
 }

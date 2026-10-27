@@ -8,6 +8,15 @@ export function isWsl(env: NodeJS.ProcessEnv = process.env, procVersion?: string
 	try { return /microsoft/i.test(procVersion ?? readFileSync("/proc/version", "utf8")); } catch { return false; }
 }
 
+/** WSL: a Windows drive path (C:\x or C:/x) as its /mnt/c/x mount; anything else unchanged. */
+export const fromWindowsPath = (path: string, wsl = isWsl()) =>
+	wsl && /^[A-Za-z]:[\\/]/.test(path) ? `/mnt/${path[0].toLowerCase()}/${path.slice(3).replace(/\\/g, "/")}` : path;
+/** WSL: the Windows view of a Linux path, so Explorer can open it (/mnt/c/x -> C:\x, else \\wsl.localhost\<distro>\...). */
+export const toWindowsPath = (path: string, distro = process.env.WSL_DISTRO_NAME ?? "Ubuntu") => {
+	const drive = /^\/mnt\/([a-z])(?:\/|$)(.*)/.exec(path);
+	return drive ? `${drive[1].toUpperCase()}:\\${drive[2].replace(/\//g, "\\")}` : `\\\\wsl.localhost\\${distro}${path.replace(/\//g, "\\")}`;
+};
+
 /** The command that opens a URL. WSL: wslview, else rundll32 hands the URL to the Windows default browser
  * as one argument, so `&` and `?` need no escaping (cmd.exe start would parse `&` as a command separator). */
 export function browserOpener(url: string, platform = process.platform, wsl = isWsl(), hasWslview = false): [string, string[]] {
