@@ -35,6 +35,7 @@
       "extensions/plan3.ts",
       "extensions/screen-read.ts",
       "extensions/browser-fetch.ts",
+      "extensions/browser-act.ts",
       "extensions/enter-runs.ts",
       "extensions/advisor-model.ts",
       "extensions/ask-user/index.ts"

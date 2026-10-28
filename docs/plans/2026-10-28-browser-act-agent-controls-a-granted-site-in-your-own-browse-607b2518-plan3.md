@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-28
-updated: 2026-10-28T19:48:21.382Z
+updated: 2026-10-28T19:53:59.146Z
 reviewed: 2026-10-28
 started: 2026-10-28T19:39:33.590Z
 ---
@@ -180,14 +180,12 @@ None.
 
 - [x] **P2-01** Policy has a separate `control` map with timed-only grants (controlUntil, CONTROL_MINUTES 10/20/30), pruned on write; a malformed map fails closed.
 - [x] **P2-07** D14's 23 bank and payment domains added to DEFAULT_BLOCKED; checkUrl refuses them (browser_act reuses checkUrl, its refusal is asserted in P2-06).
-- [ ] **P2-02** Add the control approval dialog (showListDialog, purpose line, full URL), re-asked on expiry.
-- [ ] **P2-03** Register `browser_act` with D17's per-action parameters and validation, `find` over the stored full snapshot (D6), and untrusted-content guidance.
-- [ ] **P2-04** Enforce in Pi: block list, private addresses, off-site navigation asks, password refusal, risky-action confirm.
-  - Element checks follow D16 (inspect, authorize, execute); navigation follows D18.
-- [ ] **P2-05** Log every action (site, action, ref, element name, decision) through logFetch; never log typed text of fields.
-- [ ] **P2-08** Session lifecycle per D20: close control on session_shutdown and session_switch; reread the grant after every approval dialog before executing.
-- [ ] **P2-06** Tests in C1 for grants, blocks, off-site asks, D16 checks, D17 validation and logs; run C1 and C2.
-  - Include: grant expiry and revocation, no "always", replaced element and password type change between inspect and execute, risky coordinate click, invalid parameter combinations.
+- [x] **P2-02** Control approval dialog (10/20/30 min, Deny; 5 min timeout = deny) in extensions/browser-act.ts; asked again when the grant expired or was revoked.
+- [x] **P2-03** browser_act tool registered (new extensions/browser-act.ts, added to package.json) with D17 validation, find over the stored snapshot, 8,000-char snapshot cut, untrusted-content guidance.
+- [x] **P2-04** Pi enforces block list, private addresses, DNS, D16 inspect/judge/execute with D23 rules, D18 blocked-navigation grants, D19 spawned-tab notes, and closes control when the tab leaves granted sites.
+- [x] **P2-05** Every action logged via logFetch with tool, site, action, ref, element name, decision; typed text never logged (asserted).
+- [x] **P2-08** closeSession on session_shutdown/session_switch and on browser 'closed' events; grant reread every action and after a risk confirmation.
+- [x] **P2-06** C1 covers validation, grants, blocks, denial, risky/password/payment cases, point click, blocked nav, spawned tab, revocation, browser close, session end, logs and the D23 table.
 
 ### Phase 3: Browser add-on: control session [code]
 

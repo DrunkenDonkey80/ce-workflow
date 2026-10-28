@@ -78,6 +78,9 @@ try {
 	await roundTrip();
 	console.log("round trip ok");
 
+	await actPiSide();
+	console.log("browser_act pi side ok");
+
 	// Install points the browser at the package's extension, writes a launcher for the package host.mjs and registers it per browser.
 	const tools = [], fakePi = { registerTool: tool => tools.push(tool.name) };
 	bf.default(fakePi);
@@ -85,6 +88,8 @@ try {
 	const calls = [], installed = await bf.install(async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0 }; });
 	bf.default(fakePi);
 	assert.deepEqual(tools, ["browser_fetch"], "the tool appears once Install wrote the host manifest");
+	(await import("../extensions/browser-act.ts")).default({ ...fakePi, on() {} });
+	assert.deepEqual(tools, ["browser_fetch", "browser_act"], "browser_act registers on the same condition");
 	assert.equal(installed.id, "dmbpeaidhpenhihgngkgekaieninaapk");
 	const root = fileURLToPath(new URL("..", import.meta.url));
 	assert.equal(installed.extension, path.join(root, "browser-fetch", "extension"), "the extension loads from the package itself");
@@ -251,6 +256,137 @@ async function roundTrip() {
 	await assert.rejects(run(quiet, { url: "https://shop.test/p" }), /browser is not connected/);
 	assert.equal(extensionId(readFileSync(new URL("../browser-fetch/extension/manifest.json", import.meta.url), "utf8").match(/"key": "([^"]+)"/)[1]), "dmbpeaidhpenhihgngkgekaieninaapk");
 	assert.ok(existsSync(imageDir));
+}
+// browser_act Pi side (plan 607b2518 P2-06) against a fake add-on on a test pipe: grants, blocks, D16 checks, D17 validation, D18/D19, log.
+async function actPiSide() {
+	const act = await import("../extensions/browser-act.ts");
+	const pipe = process.platform === "win32" ? String.raw`\\.\pipe\pi-browser-act-test-` + randomUUID() : path.join(agent, "act.sock");
+	process.env.PI_BROWSER_FETCH_PIPE = pipe;
+	const got = [], sockets = [], facts = {
+		e1: { tag: "button", role: "button", name: "Save" }, e2: { tag: "button", role: "button", name: "Delete repository" },
+		e3: { tag: "input", role: "textbox", name: "Password", type: "password" }, e4: { tag: "input", role: "textbox", name: "Code", autocomplete: "one-time-code" },
+		e5: { tag: "a", role: "link", name: "Elsewhere" }, e6: { tag: "a", role: "link", name: "Docs" }, e7: { tag: "input", role: "textbox", name: "Comment" },
+		e9: { tag: "button", role: "button", name: "Next", isSubmit: true, formPayment: true },
+	};
+	let page = "https://shop.test/";
+	const server = net.createServer(socket => {
+		sockets.push(socket);
+		let buffer = "";
+		socket.on("data", chunk => {
+			buffer += chunk;
+			for (let end; (end = buffer.indexOf("\n")) >= 0;) {
+				const line = buffer.slice(0, end);
+				buffer = buffer.slice(end + 1);
+				let m;
+				try { m = JSON.parse(line); } catch { assert.fail(`Pi sent a malformed line: ${line}`); }
+				got.push(m);
+				if (m.type !== "act") continue;
+				const reply = extra => socket.write(`${JSON.stringify({ type: "result", id: m.id, seq: m.seq, url: page, title: "T", ...extra })}\n`);
+				if (m.action === "open") { page = m.url; reply(); }
+				else if (m.action === "snapshot") reply({ items: [{ ref: "e1", role: "button", name: "Save", x: 1, y: 2, w: 3, h: 4 }, { ref: "e2", role: "button", name: "Delete repository", x: 1, y: 9, w: 3, h: 4 }, { ref: "e7", role: "textbox", name: "Comment", value: "hi", x: 1, y: 20, w: 3, h: 4 }], frames: ["https://ads.test/f"] });
+				else if (m.phase === "inspect") reply({ facts: { ...(m.ref ? facts[m.ref] : { tag: "button", role: "button", name: "Pay now" }), url: page } });
+				else if (m.action === "click" && m.ref === "e5") reply({ blocked: ["https://other.test/x"] });
+				else if (m.action === "click" && m.ref === "e6") reply({ spawned: ["https://docs.test/"] });
+				else if (m.action === "back") { page = "https://evil.test/"; reply(); }
+				else if (m.action === "screenshot") reply({ path: "shot.png" });
+				else reply();
+			}
+		});
+	});
+	await new Promise(resolve => server.listen(pipe, resolve));
+	const dns = async () => [{ address: "93.184.216.34" }];
+	let picks = [];
+	const ctx = { cwd: agent, hasUI: true, ui: { notify() {}, select: async (_title, labels) => { const want = picks.shift(); return want && labels.find(l => l.startsWith(want)); } } };
+	const run = (p, c = ctx) => act.browserAct(c, p, undefined, { resolve: dns });
+	const executed = () => got.filter(m => m.phase === "execute").map(m => m.ref ?? `${m.x},${m.y}`);
+	try {
+		// D17 validation before anything reaches the browser.
+		for (const [p, why] of [[{ action: "fly" }, /unknown action/], [{ action: "click" }, /ref, or x and y/], [{ action: "click", ref: "e1", x: 1, y: 2 }, /not both/],
+			[{ action: "type", ref: "e1" }, /ref and text/], [{ action: "snapshot", url: "x" }, /does not take url/], [{ action: "scroll" }, /direction/], [{ action: "find" }, /query/]]) await assert.rejects(run(p), why);
+		assert.equal(got.length, 0);
+		await assert.rejects(run({ action: "snapshot" }), /no page is open/);
+		// Blocked and local sites never ask; no grant without UI; denial; grant choices are 10/20/30 minutes only.
+		await assert.rejects(run({ action: "open", url: "https://e-fibank.bg/" }), /block list/);
+		await assert.rejects(run({ action: "open", url: "http://127.0.0.1/" }), /private/);
+		await assert.rejects(run({ action: "open", url: "https://shop.test/" }, { cwd: agent, hasUI: false }), /not approved/);
+		let labels;
+		await assert.rejects(run({ action: "open", url: "https://shop.test/" }, { cwd: agent, hasUI: true, ui: { select: async (_t, l) => { labels = l; return "Deny"; } } }), /denied/);
+		assert.deepEqual(labels, ["Allow control of shop.test for 10 minutes", "Allow control of shop.test for 20 minutes", "Allow control of shop.test for 30 minutes", "Deny"]);
+		assert.equal(got.length, 0, "nothing reaches the browser before a grant");
+		picks = ["Allow control of shop.test for 10 minutes"];
+		assert.match(await run({ action: "open", url: "https://shop.test/" }), /URL: https:\/\/shop\.test\//);
+		const until = readPolicy().control["shop.test"].until;
+		assert.ok(until > Date.now() + 590_000 && until < Date.now() + 610_000);
+		assert.deepEqual([got[0].type, got[1].action, got[1].until], ["control-open", "open", until], "the deadline travels with each action (D20)");
+		// Snapshot and find.
+		const snap = await run({ action: "snapshot" });
+		assert.match(snap, /^UNTRUSTED[\s\S]*\[e1\] button "Save" @\(1,2 3x4\)[\s\S]*\[e7\] textbox "Comment" = "hi"[\s\S]*\[frame\] https:\/\/ads\.test\/f/);
+		assert.match(await run({ action: "find", query: "delete" }), /^\[e2\]/);
+		assert.match(await run({ action: "find", query: "save", role: "link" }), /No element matches/);
+		// D16/D23: safe click runs; risky asks and a denial never executes; password refused; risky point click asks.
+		await run({ action: "click", ref: "e1" });
+		picks = ["Deny"];
+		await assert.rejects(run({ action: "click", ref: "e2" }), /did not allow: click "Delete repository"/);
+		await assert.rejects(run({ action: "type", ref: "e3", text: "hunter2" }), /password or one-time-code/);
+		await assert.rejects(run({ action: "type", ref: "e4", text: "123456" }), /password or one-time-code/);
+		picks = ["Deny"];
+		await assert.rejects(run({ action: "click", x: 900, y: 400 }), /Pay now/);
+		picks = ["Deny"];
+		await assert.rejects(run({ action: "click", ref: "e9" }), /payment form/);
+		picks = ["Allow this action"];
+		await run({ action: "click", ref: "e2" });
+		assert.deepEqual(executed(), ["e1", "e2"], "only allowed actions reach execute");
+		assert.equal(got.find(m => m.phase === "execute" && m.ref === "e2").facts.name, "Delete repository", "execute carries the inspected facts");
+		await run({ action: "type", ref: "e7", text: "nice" });
+		// D18: a blocked navigation asks for a grant on the new host and tells the agent to repeat; D19: spawned tab reported.
+		picks = ["Allow control of other.test for 10 minutes"];
+		assert.match(await run({ action: "click", ref: "e5" }), /user approved that site: repeat the action/);
+		assert.ok(readPolicy().control["other.test"]);
+		assert.match(await run({ action: "click", ref: "e6" }), /new tab for https:\/\/docs\.test\/; it was closed/);
+		assert.ok(got.at(-1).hosts.includes("other.test"), "the approved host is allowed on the next action");
+		assert.match(await run({ action: "screenshot" }), /saved: shot\.png/);
+		await assert.rejects(run({ action: "find", query: "x" }), /no snapshot yet/, "refs expire when the page changes");
+		// Revoked grant asks again; denial closes control.
+		await updatePolicy(p => { delete p.control["shop.test"]; });
+		picks = ["Deny"];
+		await assert.rejects(run({ action: "snapshot" }), /denied/);
+		await sleep(50);
+		assert.equal(got.at(-1).type, "control-close");
+		await assert.rejects(run({ action: "snapshot" }), /no page is open/);
+		// Tab ending on an unapproved site closes control.
+		await run({ action: "open", url: "https://other.test/" });
+		await assert.rejects(run({ action: "back" }), /evil\.test\/, which was not approved; control was closed/);
+		// The browser ending control (pause, deadline, tab closed) closes the session in Pi.
+		await run({ action: "open", url: "https://other.test/" });
+		const sid = got.at(-1).id;
+		for (const socket of sockets) socket.write(`${JSON.stringify({ type: "closed", id: sid, reason: "paused by the user" })}\n`);
+		await sleep(50);
+		await assert.rejects(run({ action: "snapshot" }), /no page is open/);
+		// Session end closes control (D20).
+		const handlers = {}, tools = [];
+		act.default({ registerTool: tool => tools.push(tool.name), on: (event, f) => { handlers[event] = f; } });
+		await run({ action: "open", url: "https://other.test/" });
+		handlers.session_shutdown();
+		await sleep(50);
+		assert.equal(got.at(-1).type, "control-close");
+		// Log: every action, never typed text.
+		const log = readFileSync(bf.logFile(), "utf8");
+		assert.ok(!log.includes("hunter2") && !log.includes("nice") && !log.includes("123456"), "typed text is never logged");
+		const acts = log.trim().split("\n").map(line => JSON.parse(line)).filter(e => e.tool === "browser_act");
+		assert.ok(acts.some(e => e.action === "click" && e.name === "Delete repository" && e.by === "confirmed by the user" && e.outcome === "ok"));
+		assert.ok(acts.some(e => e.outcome === "refused" && /password/.test(e.by)));
+	} finally {
+		act.closeSession();
+		for (const socket of sockets) socket.destroy();
+		server.close();
+	}
+	// D23 table cases.
+	for (const [text, risky] of [["Save", false], ["Delete repository", true], ["Posts", true], ["Postal code help", false], ["Изпрати", true], ["Купи сега", true], ["Search", false], ["Check out", true], ["Ordering", true]])
+		assert.equal(act.riskyWords(text), risky, text);
+	assert.match(act.judge({ action: "type", ref: "e", text: "1" }, { tag: "input", role: "textbox", name: "Card", autocomplete: "cc-number", url: "" }).ask, /payment field/);
+	assert.match(act.judge({ action: "type", ref: "e", text: "1", submit: true }, { tag: "input", role: "textbox", name: "Comment", formSubmitNames: ["Post comment"], url: "" }).ask, /Post comment/);
+	assert.deepEqual(act.judge({ action: "select", ref: "e", value: "BG" }, { tag: "select", role: "combobox", name: "Country", url: "" }), {});
+	assert.match(act.formatLines(Array.from({ length: 400 }, (_, n) => `[e${n}] button "${"x".repeat(30)}" @(1,1 1x1)`), "use find"), /\n\d+ more elements: use find$/);
 }
 function hostOf(url) { try { return new URL(url).hostname; } catch { return ""; } }
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }

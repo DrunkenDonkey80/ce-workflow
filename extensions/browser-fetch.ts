@@ -216,10 +216,10 @@ async function ask(ctx, key: string, url: string, policy: Policy, signal?: Abort
 }
 
 // Pipe link to the native host (D5): newline-delimited JSON, one connection per Pi process.
-type Link = { send(message: Record<string, unknown>): void; handlers: Map<string, (message: any) => void> };
+export type Link = { send(message: Record<string, unknown>): void; handlers: Map<string, (message: any) => void> };
 let link: Promise<Link> | undefined;
 const NOT_CONNECTED = "The browser is not connected: open Helium (or Chrome/Edge) with the Pi browser fetch extension loaded. Set it up in /wo → Settings → Browser access.";
-function connect(): Promise<Link> {
+export function connect(): Promise<Link> {
 	link ??= new Promise<Link>((resolve, reject) => {
 		const socket = net.connect(pipePath()), handlers = new Map<string, (message: any) => void>();
 		let buffer = "";
