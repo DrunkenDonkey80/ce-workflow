@@ -116,10 +116,10 @@ async function act(s, m) {
 
 async function openTab(s) {
 	const [current] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-	const tab = await chrome.tabs.create({ url: "about:blank", active: false, ...(current ? { windowId: current.windowId, index: current.index + 1 } : {}) });
+	const tab = await chrome.tabs.create({ url: "about:blank", active: true, ...(current ? { windowId: current.windowId, index: current.index + 1 } : {}) });
 	s.tab = tab.id;
 	await chrome.tabs.update(tab.id, { autoDiscardable: false }).catch(() => {});
-	// D11: a background tab in a "Pi" group; a failed group only costs findability.
+	// D11: a tab in front, in a "Pi" group, so the user watches what the agent does; a failed group only costs findability.
 	try {
 		const [group] = await chrome.tabGroups.query({ title: "Pi", windowId: tab.windowId });
 		const id = await chrome.tabs.group({ tabIds: [tab.id], ...(group ? { groupId: group.id } : {}) });
@@ -128,7 +128,7 @@ async function openTab(s) {
 	await chrome.debugger.attach({ tabId: s.tab }, "1.3");
 	await cdp(s, "Page.enable");
 	await cdp(s, "Page.addScriptToEvaluateOnNewDocument", { source: SAME_TAB });
-	await cdp(s, "Emulation.setFocusEmulationEnabled", { enabled: true }); // background tab still gets focus and input
+	await cdp(s, "Emulation.setFocusEmulationEnabled", { enabled: true }); // still gets focus and input after the user switches away
 }
 
 const ref = (s, name) => {
@@ -261,6 +261,6 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 	cdp(s, "Page.handleJavaScriptDialog", { accept }).catch(() => {});
 });
 chrome.tabs.onRemoved.addListener(tabId => { const s = sessionOf(tabId); if (s) endSession(s.id, "ended: the agent tab was closed"); });
-chrome.debugger.onDetach.addListener(source => { const s = sessionOf(source.tabId); if (s) endSession(s.id, "ended: the debugger was detached (the debugging bar was cancelled)"); });
+chrome.debugger.onDetach.addListener((source, reason) => { const s = sessionOf(source.tabId); if (s) endSession(s.id, `ended: the browser detached the debugger (${reason}; canceled_by_user is the debugging bar's Cancel)`); });
 chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name.startsWith("control:")) endSession(alarm.name.slice(8), "ended: the control grant expired"); });
 chrome.action.onClicked.addListener(() => { if (paused) closeAllControl("paused by the user (the Pi browser fetch toolbar button)"); });

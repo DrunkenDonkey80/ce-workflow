@@ -346,7 +346,7 @@ async function roundTrip() {
 			const ends = [
 				[() => listeners.alarm.forEach(f => f({ name: [...alarms.keys()].find(name => name.startsWith("control:")) })), /grant expired/],
 				[async () => { for (const click of listeners.click) await click(); }, /paused/],
-				[() => listeners.detach.forEach(f => f({ tabId: agentTab().id })), /debugger was detached/],
+				[() => listeners.detach.forEach(f => f({ tabId: agentTab().id }, "target_closed")), /detached the debugger \(target_closed/],
 				[() => listeners.closedTab.forEach(f => f(agentTab().id)), /agent tab was closed/],
 			];
 			for (const [end, why] of ends) {
