@@ -1,6 +1,6 @@
 // browser_fetch (plan d8c5ace2): the agent loads pages in the user's own browser through the Pi browser-fetch extension,
 // so bot checks see a real browser. Pi owns the policy (block list, site grants, approvals, log); the browser only loads.
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, chmodSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
@@ -402,7 +402,11 @@ export const hostManifest = (dir = fetchDir()) => path.join(dir, "host", `${HOST
 const extensionDir = () => path.resolve(packageDir(), "extension");
 const openCommand = (target: string): [string, string[]] => process.platform === "win32" ? ["cmd", ["/c", "start", "", target]] : [process.platform === "darwin" ? "open" : "xdg-open", [target]];
 export const BROWSER_KEYS = ["imput\\Helium", "Google\\Chrome", "Microsoft\\Edge", "Chromium"];
-export async function install(exec: (cmd: string, args: string[]) => Promise<{ code: number; stderr?: string }>, dir = fetchDir()) {
+/** macOS/Linux per-user browser data folders; each takes the host manifest in its NativeMessagingHosts subfolder. */
+export const browserFolders = (home = os.homedir()) => process.platform === "darwin"
+	? ["net.imput.helium", "Google/Chrome", "Chromium", "Microsoft Edge", "BraveSoftware/Brave-Browser"].map(name => path.join(home, "Library", "Application Support", name))
+	: ["net.imput.helium", "google-chrome", "chromium", "microsoft-edge", "BraveSoftware/Brave-Browser"].map(name => path.join(home, ".config", name));
+export async function install(exec: (cmd: string, args: string[]) => Promise<{ code: number; stderr?: string }>, dir = fetchDir(), folders = browserFolders()) {
 	const source = path.resolve(packageDir()), extension = path.join(source, "extension"), hostDir = path.join(dir, "host");
 	mkdirSync(hostDir, { recursive: true });
 	let id: string;
@@ -416,13 +420,21 @@ export async function install(exec: (cmd: string, args: string[]) => Promise<{ c
 	if (!win) chmodSync(launcher, 0o755);
 	const manifest = hostManifest(dir);
 	writeFileSync(manifest, JSON.stringify({ name: HOST_NAME, description: "Pi browser fetch", path: launcher, type: "stdio", allowed_origins: [`chrome-extension://${id}/`] }, null, 1));
-	const failed: string[] = [];
-	// shortcut: native host registration is Windows only (plan non-goal: Linux install); macOS/Linux need the manifest copied to each browser's NativeMessagingHosts folder.
+	const failed: string[] = [], registered: string[] = [];
 	if (win) for (const browser of BROWSER_KEYS) {
 		const result = await exec("reg", ["add", `HKCU\\Software\\${browser}\\NativeMessagingHosts\\${HOST_NAME}`, "/ve", "/t", "REG_SZ", "/d", manifest, "/f"]);
 		if (result.code) failed.push(`${browser}: ${result.stderr ?? "reg add failed"}`);
+		else registered.push(browser);
 	}
-	return { extension, id, manifest, failed, registered: win };
+	else for (const folder of folders) {
+		if (!existsSync(folder)) continue; // browser not installed
+		try {
+			mkdirSync(path.join(folder, "NativeMessagingHosts"), { recursive: true });
+			copyFileSync(manifest, path.join(folder, "NativeMessagingHosts", `${HOST_NAME}.json`));
+			registered.push(folder);
+		} catch (error) { failed.push(`${folder}: ${(error as Error).message}`); }
+	}
+	return { extension, id, manifest, failed, registered };
 }
 
 export function connected() {
@@ -463,7 +475,7 @@ export async function browserAccessMenu(ctx, pi) {
 		try {
 			if (picked.value === "install") {
 				const done = await install((cmd, args) => pi.exec(cmd, args));
-				ctx.ui.notify(`${registered ? "" : "Run /reload to enable browser_fetch. "}${done.failed.length ? `Registration failed for ${done.failed.join("; ")}. ` : ""}${done.registered ? "" : "Native host registration is Windows only; "}In the browser open chrome://extensions, turn on Developer mode, Load unpacked: ${done.extension} (ID ${done.id}). Reload the extension after an update.`, done.failed.length ? "warning" : "info");
+				ctx.ui.notify(`${registered ? "" : "Run /reload to enable browser_fetch. "}${done.failed.length ? `Registration failed for ${done.failed.join("; ")}. ` : ""}${done.registered.length ? `Registered the native host for ${done.registered.join(", ")}. ` : "No supported browser found to register the native host for. "}In the browser open chrome://extensions, turn on Developer mode, Load unpacked: ${done.extension} (ID ${done.id}). Reload the extension after an update.`, done.failed.length ? "warning" : "info");
 			} else if (picked.value === "copy") {
 				const { copyToClipboard } = await import("@earendil-works/pi-coding-agent");
 				await copyToClipboard(extensionDir());

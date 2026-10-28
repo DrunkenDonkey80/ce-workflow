@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 // browser_fetch self-check (plan d8c5ace2): policy, URL checks, approvals, host round trip and the extension's logic with a fake chrome.
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, statSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import net from "node:net";
@@ -85,7 +85,9 @@ try {
 	const tools = [], fakePi = { registerTool: tool => tools.push(tool.name) };
 	bf.default(fakePi);
 	assert.deepEqual(tools, [], "no tool before Install");
-	const calls = [], installed = await bf.install(async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0 }; });
+	const present = path.join(agent, "browsers", "helium"), absent = path.join(agent, "browsers", "chrome");
+	mkdirSync(present, { recursive: true });
+	const calls = [], installed = await bf.install(async (cmd, args) => { calls.push([cmd, ...args]); return { code: 0 }; }, undefined, [present, absent]);
 	bf.default(fakePi);
 	assert.deepEqual(tools, ["browser_fetch"], "the tool appears once Install wrote the host manifest");
 	(await import("../extensions/browser-act.ts")).default({ ...fakePi, on() {} });
@@ -99,6 +101,13 @@ try {
 	assert.deepEqual([hostManifest.name, hostManifest.type, hostManifest.allowed_origins], ["pi.browser_fetch", "stdio", ["chrome-extension://dmbpeaidhpenhihgngkgekaieninaapk/"]]);
 	assert.ok(existsSync(hostManifest.path));
 	if (process.platform === "win32") assert.deepEqual(calls.map(call => call[2]), bf.BROWSER_KEYS.map(key => `HKCU\\Software\\${key}\\NativeMessagingHosts\\pi.browser_fetch`));
+	else {
+		assert.deepEqual([installed.registered, installed.failed], [[present], []], "only installed browsers get the manifest");
+		assert.equal(readFileSync(path.join(present, "NativeMessagingHosts", "pi.browser_fetch.json"), "utf8"), readFileSync(installed.manifest, "utf8"));
+		assert.ok(!existsSync(absent), "a missing browser folder is not created");
+		assert.ok(statSync(hostManifest.path).mode & 0o111, "the launcher is executable");
+		assert.match(readFileSync(hostManifest.path, "utf8"), /^#!\/bin\/sh\nexec "\/[^"]+" /, "the launcher runs node by absolute path (no PATH when a browser starts from Finder)");
+	}
 	console.log("install ok");
 } finally {
 	rmSync(agent, { recursive: true, force: true });
