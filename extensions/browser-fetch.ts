@@ -443,12 +443,15 @@ export async function browserAccessMenu(ctx, pi) {
 		const policy = readPolicy(), isConnected = await connected(), registered = existsSync(hostManifest());
 		const grants = Object.entries(policy.grants).filter(([host]) => granted(policy, host));
 		const controls = Object.entries(policy.control).filter(([host]) => controlUntil(policy, host));
+		let version = "unknown";
+		try { version = JSON.parse(readFileSync(path.join(extensionDir(), "manifest.json"), "utf8")).version; } catch { /* menu still opens */ }
 		const picked = await showListDialog(ctx, {
 			title: "Browser access",
 			purpose: policy.corrupt ?? `browser_fetch reads and browser_act operates pages in your own browser. ${!registered ? "The browser extension is not registered: Install it, then Load unpacked the extension folder." : isConnected ? "The browser is connected." : "The browser is not connected."}`,
 			cursorKey: "browser-access", filter: false,
 			items: [
 				{ value: "install", label: "Install or update the browser extension", description: `Registers the native host for Helium, Chrome, Edge and Chromium; the browser loads the extension from ${extensionDir()}.` },
+				{ value: "copy", label: `Extension version ${version}: copy folder path`, description: `${extensionDir()}: compare with the version in chrome://extensions; reload the extension there when it is older.` },
 				{ value: "folder", label: "Open the extension folder", description: `${extensionDir()}: Load unpacked this folder in chrome://extensions (Developer mode).` },
 				{ value: "grants", label: `Allowed sites (${grants.length}) →`, description: "Revoke a site grant." },
 				{ value: "control", label: `Controlled sites (${controls.length}) →`, description: "Sites browser_act may operate right now; revoking stops the next action." },
@@ -461,6 +464,10 @@ export async function browserAccessMenu(ctx, pi) {
 			if (picked.value === "install") {
 				const done = await install((cmd, args) => pi.exec(cmd, args));
 				ctx.ui.notify(`${registered ? "" : "Run /reload to enable browser_fetch. "}${done.failed.length ? `Registration failed for ${done.failed.join("; ")}. ` : ""}${done.registered ? "" : "Native host registration is Windows only; "}In the browser open chrome://extensions, turn on Developer mode, Load unpacked: ${done.extension} (ID ${done.id}). Reload the extension after an update.`, done.failed.length ? "warning" : "info");
+			} else if (picked.value === "copy") {
+				const { copyToClipboard } = await import("@earendil-works/pi-coding-agent");
+				await copyToClipboard(extensionDir());
+				ctx.ui.notify(`Copied ${extensionDir()}`, "info");
 			} else if (picked.value === "folder") {
 				await pi.exec(...openCommand(extensionDir()));
 			} else if (picked.value === "grants") {
