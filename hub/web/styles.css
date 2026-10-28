@@ -75,6 +75,8 @@ h2 { font-size: 15px; font-weight: 600; }
 .file[data-change^="?"] .file-mark, .file[data-change^=A] .file-mark { background: var(--new); }
 .file[data-change^=D] .file-mark { background: var(--pink); }
 .files-viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; padding: 8px 12px; }
+.files-head { display: flex; align-items: baseline; gap: 8px; } .files-toggle { flex: none; font-size: 12px; padding: 2px 8px; }
+.files.tree-hidden { grid-template: minmax(0, 1fr) / minmax(0, 1fr); } .files.tree-hidden .files-tree { display: none; }
 .files-viewer h2 { font-size: 13px; padding-bottom: 6px; overflow-wrap: anywhere; }
 .files-body { margin: 0; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
 .files-body.diff .add { background: var(--new); }

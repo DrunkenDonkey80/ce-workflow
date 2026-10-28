@@ -13,7 +13,11 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
  const tree = Object.assign(document.createElement("nav"), { className: "files-tree" }), viewer = Object.assign(document.createElement("section"), { className: "files-viewer" });
  tree.setAttribute("aria-label", "Project files"); viewer.setAttribute("aria-label", "File content"); viewer.tabIndex = 0;
  const heading = Object.assign(document.createElement("h2"), { textContent: "Select a file" }), body = Object.assign(document.createElement("pre"), { className: "files-body" });
- viewer.append(heading, body); root.append(tree, viewer);
+ // Hide files gives the viewer (a viewed page, a long file) the whole panel.
+ const toggle = Object.assign(document.createElement("button"), { type: "button", className: "files-toggle", textContent: "Hide files" });
+ toggle.addEventListener("click", () => { const hidden = root.classList.toggle("tree-hidden"); toggle.textContent = hidden ? "Show files" : "Hide files"; toggle.setAttribute("aria-pressed", String(hidden)); });
+ const head = Object.assign(document.createElement("div"), { className: "files-head" }); head.append(toggle, heading);
+ viewer.append(head, body); root.append(tree, viewer);
  // linked: a file opened from a chat link, kept even when the tree does not list it (absolute path).
  let selected = "", linked = "", loaded = false, version = 0, archive: Archive | null = null;
  const open = new Set<string>();

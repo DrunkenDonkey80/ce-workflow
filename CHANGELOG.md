@@ -4,6 +4,12 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Added
+- Files and View page: Hide files gives the viewed page or file the whole panel; Show files brings the list back.
+
+### Fixed
+- A file path stayed plain text in chat when it had been mentioned before the file existed (an agent naming a render it was about to write); the hub now checks again.
+
 ## 0.1.90 — 2026-10-28
 
 ### Fixed

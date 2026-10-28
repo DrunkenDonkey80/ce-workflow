@@ -911,13 +911,14 @@ function appendPathLink(target: HTMLElement, path: string, images: Set<string>) 
  target.append(link);
 }
 // Model text names many things that look like files (Node.js, e.g.); a link stays plain text until the hub finds the file.
-const fileFound = new Map<string, string | null>(), folderFound = new Set<string>();
+// A miss holds its time and is asked again after a while: agents name renders before they are written.
+const fileFound = new Map<string, string | number>(), folderFound = new Set<string>(), MISS_MS = 15_000;
 function checkFileLinks(root: HTMLElement) {
  const links = [...root.querySelectorAll<HTMLAnchorElement>("a.file-link:not([data-full])")];
- const apply = () => { for (const link of links) { const full = fileFound.get(link.dataset.path!); if (full === null) link.replaceWith(link.textContent!); else if (full) { link.dataset.full = full; if (folderFound.has(link.dataset.path!)) link.dataset.folder = ""; } } };
- const unknown = [...new Set(links.map(link => link.dataset.path!))].filter(path => !fileFound.has(path)).slice(0, 200);
+ const apply = () => { for (const link of links) { const full = fileFound.get(link.dataset.path!); if (typeof full === "number") link.replaceWith(link.textContent!); else if (full) { link.dataset.full = full; if (folderFound.has(link.dataset.path!)) link.dataset.folder = ""; } } };
+ const unknown = [...new Set(links.map(link => link.dataset.path!))].filter(path => { const known = fileFound.get(path); return known === undefined || typeof known === "number" && Date.now() - known > MISS_MS; }).slice(0, 200);
  if (!unknown.length) return apply();
- post("paths", { paths: unknown }).then(({ found, folders = [] }) => { for (const path of folders) folderFound.add(path); for (const path of unknown) fileFound.set(path, found[path] ?? null); apply(); }).catch(() => undefined);
+ post("paths", { paths: unknown }).then(({ found, folders = [] }) => { for (const path of folders) folderFound.add(path); for (const path of unknown) fileFound.set(path, found[path] ?? Date.now()); apply(); }).catch(() => undefined);
 }
 const fileSource = (path: string, download: boolean) => "api/download?path=" + encodeURIComponent(path) + (download ? "&download=1" : "") + (token ? "&token=" + token : "");
 // On this PC (key page): click opens the file, Shift copies its path, Ctrl opens its folder. Remotely a click offers Download / Open.
