@@ -211,7 +211,7 @@ function cloneEnvironment(home) {
 }
 
 function defaultClone(repositoryUrl, destination, home, signal) {
-	return new Promise((resolve, reject) => execFile("git", ["-c", "submodule.recurse=false", "clone", "--quiet", "--depth", "1", "--no-recurse-submodules", "--", repositoryUrl, destination], {
+	return new Promise<void>((resolve, reject) => execFile("git", ["-c", "submodule.recurse=false", "clone", "--quiet", "--depth", "1", "--no-recurse-submodules", "--", repositoryUrl, destination], {
 		env: cloneEnvironment(home), timeout: 180_000, signal,
 	}, (error) => error ? reject(error) : resolve()));
 }
@@ -223,7 +223,7 @@ function defaultGit(root, args) {
 function inspectionFiles(root, git = defaultGit) {
 	const records = git(root, ["ls-files", "-s", "-z"]).split("\0").filter(Boolean);
 	if (!records.length || records.length > 2_000) throw new Error("tracked source file count is empty or over limit");
-	const allowed = new Set();
+	const allowed = new Set<string>();
 	for (const record of records) {
 		const tab = record.indexOf("\t");
 		if (tab < 0) throw new Error("malformed tracked source entry");
@@ -297,7 +297,7 @@ export async function runExtensionScout(cwd, options: any = {}) {
 	const now = new Date(options.now ?? Date.now());
 	const ledger = readExtensionScoutLedger(cwd);
 	const since = ledger.cursor ?? new Date(now.getTime() - 30 * DAY_MS).toISOString();
-	let discovered;
+	let discovered: any[];
 	try {
 		const pages = await options.collect({ since, page: options.page });
 		discovered = (Array.isArray(pages) ? pages : [pages]).flatMap(parseRecentExtensions)
