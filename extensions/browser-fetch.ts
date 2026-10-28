@@ -25,6 +25,10 @@ export const DEFAULT_BLOCKED = [
 	"appleid.apple.com", "idmsa.apple.com", "account.apple.com", "login.yahoo.com",
 	// password managers
 	"1password.com", "bitwarden.com", "bitwarden.eu", "lastpass.com", "dashlane.com", "keepersecurity.com", "nordpass.com",
+	// banks and payments (plan 607b2518 D13, D14)
+	"dskbank.bg", "dskdirect.bg", "ubb.bg", "unicreditbulbank.bg", "postbank.bg", "e-postbank.bg", "fibank.bg", "e-fibank.bg", "ccbank.bg",
+	"bank.allianz.bg", "procreditbank.bg", "bacb.bg", "iabank.bg", "tbibank.bg", "dbank.bg", "municipalbank.bg", "bbr.bg",
+	"paypal.com", "revolut.com", "wise.com", "dashboard.stripe.com", "epay.bg", "easypay.bg",
 ];
 
 export const normHost = (host: string) => host.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
@@ -87,28 +91,38 @@ export async function dnsCheck(host: string, resolve: typeof lookup = lookup) {
 }
 
 type Grant = { until: number | null };
-export type Policy = { blocked: string[]; grants: Record<string, Grant>; corrupt?: string };
+/** browser_act control grants (plan 607b2518 D5): always timed, separate from read grants. */
+export type Policy = { blocked: string[]; grants: Record<string, Grant>; control: Record<string, { until: number }>; corrupt?: string };
+export const CONTROL_MINUTES = [10, 20, 30];
 const policyFile = () => path.join(fetchDir(), "policy.json");
 export const logFile = () => path.join(fetchDir(), "log.jsonl");
 
 /** Fresh read per request (D14); a corrupt file fails closed: no grants, every site asks. */
 export function readPolicy(): Policy {
 	const file = policyFile();
-	if (!existsSync(file)) return { blocked: [], grants: {} };
+	if (!existsSync(file)) return { blocked: [], grants: {}, control: {} };
 	try {
 		const value = JSON.parse(readFileSync(file, "utf8"));
-		if (!Array.isArray(value?.blocked) || !value.blocked.every(entry => typeof entry === "string") || typeof value.grants !== "object" || !value.grants || Array.isArray(value.grants)) throw new Error("unexpected shape");
-		const grants: Record<string, Grant> = {};
+		const map = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+		if (!Array.isArray(value?.blocked) || !value.blocked.every(entry => typeof entry === "string") || !map(value.grants) || (value.control !== undefined && !map(value.control))) throw new Error("unexpected shape");
+		const grants: Record<string, Grant> = {}, control: Policy["control"] = {};
 		for (const [host, grant] of Object.entries(value.grants as Record<string, Grant>)) if (grant && (grant.until === null || Number.isFinite(grant.until))) grants[host] = { until: grant.until };
-		return { blocked: value.blocked, grants };
+		// a control grant without a finite deadline is dropped: control is never "always"
+		for (const [host, grant] of Object.entries((value.control ?? {}) as Record<string, Grant>)) if (Number.isFinite(grant?.until)) control[host] = { until: grant.until! };
+		return { blocked: value.blocked, grants, control };
 	} catch (error) {
-		return { blocked: [], grants: {}, corrupt: `${file} is unreadable (${(error as Error).message}); fix or delete it` };
+		return { blocked: [], grants: {}, control: {}, corrupt: `${file} is unreadable (${(error as Error).message}); fix or delete it` };
 	}
 }
 export const blockedList = (policy: Policy) => [...DEFAULT_BLOCKED, ...policy.blocked];
 export const granted = (policy: Policy, host: string, now = Date.now()) => {
 	const grant = policy.corrupt ? undefined : policy.grants[grantKey(host)];
 	return Boolean(grant && (grant.until === null || grant.until > now));
+};
+/** Deadline of a live control grant for the host, or undefined. */
+export const controlUntil = (policy: Policy, host: string, now = Date.now()) => {
+	const until = policy.corrupt ? undefined : policy.control[grantKey(host)]?.until;
+	return until !== undefined && until > now ? until : undefined;
 };
 
 /** Serialized read-modify-write under a lock file, atomic replace (D14). */
@@ -133,7 +147,8 @@ export async function updatePolicy(change: (policy: Policy) => void) {
 		change(policy);
 		const now = Date.now();
 		for (const [host, grant] of Object.entries(policy.grants)) if (grant.until !== null && grant.until <= now) delete policy.grants[host];
-		writeFileSync(temporary, JSON.stringify({ blocked: [...new Set(policy.blocked)], grants: policy.grants }, null, 1));
+		for (const [host, grant] of Object.entries(policy.control)) if (!(grant.until > now)) delete policy.control[host];
+		writeFileSync(temporary, JSON.stringify({ blocked: [...new Set(policy.blocked)], grants: policy.grants, control: policy.control }, null, 1));
 		renameSync(temporary, policyFile());
 	} finally {
 		rmSync(temporary, { force: true });

@@ -13,7 +13,7 @@ delete process.env.PI_HUB; // a hub-hosted Pi routes dialogs to the hub; this te
 const agent = mkdtempSync(path.join(os.tmpdir(), "browser-fetch-test-"));
 process.env.PI_CODING_AGENT_DIR = agent;
 const bf = await import("../extensions/browser-fetch.ts");
-const { checkUrl, privateIp, blockedList, readPolicy, updatePolicy, granted, grantKey, blockEntry, dnsCheck, fetchDir, DEFAULT_BLOCKED, extensionId } = bf;
+const { checkUrl, privateIp, blockedList, readPolicy, updatePolicy, granted, controlUntil, grantKey, blockEntry, dnsCheck, fetchDir, DEFAULT_BLOCKED, extensionId } = bf;
 
 try {
 	// URL checks (D16, R1)
@@ -26,7 +26,8 @@ try {
 		["http://[::1]/", /private/], ["http://[::]/", /private/], ["http://[::ffff:127.0.0.1]/", /private/], ["http://[0:0:0:0:0:ffff:7f00:1]/", /private/],
 		["http://[::ffff:10.0.0.1]/", /private/], ["http://[fe80::1]/", /private/], ["http://[fd00::1]/", /private/], ["http://[64:ff9b::a00:1]/", /private/], ["http://[2002:c0a8:101::1]/", /private/],
 		["https://mail.google.com/mail/u/0", /block list \(mail\.google\.com\)/], ["https://outlook.live.com/", /block list/], ["https://login.live.com/", /block list \(live\.com\)/],
-		["https://vault.bitwarden.com/", /block list \(bitwarden\.com\)/], ["https://WWW.ABV.BG./", /block list \(abv\.bg\)/], ["not a url", /valid URL/],
+		["https://vault.bitwarden.com/", /block list \(bitwarden\.com\)/], ["https://WWW.ABV.BG./", /block list \(abv\.bg\)/],
+		["https://e-fibank.bg/login", /block list \(e-fibank\.bg\)/], ["https://www.paypal.com/signin", /block list \(paypal\.com\)/], ["https://dashboard.stripe.com/", /block list/], ["not a url", /valid URL/],
 	]) assert.match(checkUrl(url, blocked).refused ?? "", why, url);
 	for (const url of ["https://example.com/a?b=1", "http://8.8.8.8/", "http://[2606:4700::1111]/", "https://google.com/search?q=x", "https://notgmail.com/"]) assert.equal(checkUrl(url, blocked).refused, undefined, url);
 	assert.equal(privateIp("::ffff:8.8.8.8"), false);
@@ -40,7 +41,7 @@ try {
 	assert.equal(await dnsCheck("gone.test", fakeDns({})), undefined, "unresolvable names are left to the browser");
 
 	// Policy: grants with expiry, user block list, concurrent writers, corrupt file fails closed (D9, D14)
-	assert.deepEqual(readPolicy(), { blocked: [], grants: {} });
+	assert.deepEqual(readPolicy(), { blocked: [], grants: {}, control: {} });
 	await updatePolicy(p => { p.grants["example.com"] = { until: Date.now() + 3_600_000 }; p.grants["old.com"] = { until: Date.now() - 1 }; p.grants["always.com"] = { until: null }; p.blocked.push("evil.test"); });
 	let policy = readPolicy();
 	assert.ok(granted(policy, "www.example.com") && granted(policy, "always.com") && !granted(policy, "sub.example.com"), "grants match the exact host without www");
@@ -52,6 +53,18 @@ try {
 	const { execFileSync } = await import("node:child_process");
 	execFileSync(process.execPath, ["--input-type=module", "-e", `const m = await import(${JSON.stringify(new URL("../extensions/browser-fetch.ts", import.meta.url).href)}); await m.updatePolicy(p => { delete p.grants["example.com"]; });`], { env: { ...process.env } });
 	assert.equal(granted(readPolicy(), "example.com"), false, "revoke in another process applies here");
+	// Control grants (plan 607b2518 P2-01): timed only, separate from read grants, pruned when expired.
+	const soon = Date.now() + 600_000;
+	await updatePolicy(p => { p.control["shop.test"] = { until: soon }; p.control["gone.test"] = { until: Date.now() - 1 }; });
+	policy = readPolicy();
+	assert.equal(controlUntil(policy, "www.shop.test"), soon);
+	assert.equal(controlUntil(policy, "always.com"), undefined, "a read grant is not a control grant");
+	assert.equal(granted(policy, "shop.test"), false, "a control grant is not a read grant");
+	assert.equal(policy.control["gone.test"], undefined, "expired control grants pruned on write");
+	writeFileSync(path.join(fetchDir(), "policy.json"), JSON.stringify({ blocked: [], grants: {}, control: { "x.test": { until: null } } }));
+	assert.equal(controlUntil(readPolicy(), "x.test"), undefined, "control is never always");
+	writeFileSync(path.join(fetchDir(), "policy.json"), JSON.stringify({ blocked: [], grants: {}, control: [] }));
+	assert.match(readPolicy().corrupt, /unexpected shape/, "a malformed control map fails closed");
 	writeFileSync(path.join(fetchDir(), "policy.json"), "{broken");
 	policy = readPolicy();
 	assert.match(policy.corrupt, /unreadable/);

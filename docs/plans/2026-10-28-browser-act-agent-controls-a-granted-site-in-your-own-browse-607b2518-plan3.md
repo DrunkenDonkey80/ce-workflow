@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-28
-updated: 2026-10-28T19:46:33.910Z
+updated: 2026-10-28T19:48:21.382Z
 reviewed: 2026-10-28
 started: 2026-10-28T19:39:33.590Z
 ---
@@ -178,8 +178,8 @@ None.
 
 ### Phase 2: Pi side: grants, tool and safety checks [code]
 
-- [ ] **P2-01** Add control grants to the policy file: 10, 20, 30 minutes per site, separate from read grants; a corrupt file fails closed.
-- [ ] **P2-07** Add the D14 bank and payment domains to DEFAULT_BLOCKED; test in C1 that browser_fetch and browser_act both refuse them.
+- [x] **P2-01** Policy has a separate `control` map with timed-only grants (controlUntil, CONTROL_MINUTES 10/20/30), pruned on write; a malformed map fails closed.
+- [x] **P2-07** D14's 23 bank and payment domains added to DEFAULT_BLOCKED; checkUrl refuses them (browser_act reuses checkUrl, its refusal is asserted in P2-06).
 - [ ] **P2-02** Add the control approval dialog (showListDialog, purpose line, full URL), re-asked on expiry.
 - [ ] **P2-03** Register `browser_act` with D17's per-action parameters and validation, `find` over the stored full snapshot (D6), and untrusted-content guidance.
 - [ ] **P2-04** Enforce in Pi: block list, private addresses, off-site navigation asks, password refusal, risky-action confirm.
