@@ -166,7 +166,14 @@ async function gate(ctx, url: string, signal: AbortSignal | undefined, resolve: 
 }
 
 type Deps = { resolve?: typeof lookup };
-export async function browserAct(ctx, p: ActParams, signal?: AbortSignal, { resolve = lookup }: Deps = {}): Promise<string> {
+// One action at a time: parallel tool calls would otherwise reach the tab out of order (a snapshot overtaking an open).
+let queue: Promise<unknown> = Promise.resolve();
+export function browserAct(ctx, p: ActParams, signal?: AbortSignal, deps: Deps = {}): Promise<string> {
+	const run = queue.then(() => runAct(ctx, p, signal, deps));
+	queue = run.catch(() => {});
+	return run;
+}
+async function runAct(ctx, p: ActParams, signal?: AbortSignal, { resolve = lookup }: Deps = {}): Promise<string> {
 	const entry: Record<string, unknown> = { tool: "browser_act", project: ctx.cwd, action: p.action, ref: p.ref, url: p.url };
 	const done = (outcome: string, extra: Record<string, unknown> = {}) => logFetch({ ...entry, site: session?.host, outcome, ...extra }); // R16; never the typed text
 	const refuse = (reason: string): never => { done("refused", { by: reason }); throw new Error(`browser_act refused: ${reason}`); };

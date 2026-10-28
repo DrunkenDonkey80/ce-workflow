@@ -512,6 +512,9 @@ async function actPiSide() {
 		const until = readPolicy().control["shop.test"].until;
 		assert.ok(until > Date.now() + 590_000 && until < Date.now() + 610_000);
 		assert.deepEqual([got[0].type, got[1].action, got[1].until], ["control-open", "open", until], "the deadline travels with each action (D20)");
+		// Parallel calls run in order: the snapshot sees the page the open went to.
+		const [, early] = await Promise.all([run({ action: "open", url: "https://shop.test/two" }), run({ action: "snapshot" })]);
+		assert.match(early, /URL: https:\/\/shop\.test\/two/);
 		// Snapshot and find.
 		const snap = await run({ action: "snapshot" });
 		assert.match(snap, /^UNTRUSTED[\s\S]*\[e1\] button "Save" @\(1,2 3x4\)[\s\S]*\[e7\] textbox "Comment" = "hi"[\s\S]*\[frame\] https:\/\/ads\.test\/f/);
