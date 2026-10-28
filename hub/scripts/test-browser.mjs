@@ -711,8 +711,10 @@ try {
  await browser("click", "#usage-button [data-provider=codex]"); await browser("wait", "--fn", "document.getElementById('usage-window').open");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-window-bar')].map(b => b.textContent)"), ["5h 80% left · resets in 2h 3m", "7d 12% left · resets in 1d 14h (Tue 10:00)18h 19m · 75%1d 9m · 65%"], "codex window: 5h and 7d bars");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-soon span')].map(s => s.style.bottom)"), ["1px", "14px"], "close refill labels stack instead of overlapping");
- // Right-click hides one bar; the window's Top bar boxes show it again; a click outside closes the window.
+ // Right-click opens a menu (nothing hidden yet); its Hide hides one bar; the window's Top bar boxes show it again; a click outside closes the window.
  await evaluate("document.querySelector('#usage-button [data-provider=codex][data-window=\"5h\"]').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))");
+ assert.equal(await evaluate("document.querySelectorAll('#usage-button .usage-bar').length"), 3, "right-click alone hides nothing");
+ await evaluate("[...document.querySelectorAll('.session-menu button')].find(b => b.textContent.startsWith('Hide')).click()");
  await browser("wait", "--fn", "document.querySelectorAll('#usage-button .usage-bar').length === 2");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-top input')].map(b => b.checked)"), [false, true], "the window's Top bar boxes follow the right-click");
  await evaluate("(() => { const b = document.querySelector('#usage-body .usage-top input'); b.checked = true; b.dispatchEvent(new Event('change')); })()");

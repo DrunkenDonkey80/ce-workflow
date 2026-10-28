@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Fixed
+- Right-clicking a usage bar (Claude, Codex…) no longer hides it on the spot; it opens a menu with Open usage and Hide from the top bar.
+
 ## 0.1.89 — 2026-10-28
 
 ### Added

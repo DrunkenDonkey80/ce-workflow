@@ -1870,7 +1870,8 @@ function renderUsageBar() {
   if (head) soonMarks(button, item, false);
   button.title = [item.label, ...(item.bars ?? []).map(entry => `${entry.label} ${shownLeft(entry.left)}% ${usageWord()}${entry.resets ? " (" + entry.resets + ")" : ""}`), ...(item.warnings ?? []).map(w => w.text), ...(item.soon ?? []).map(s => `${shownLeft(s.left)}% ${usageWord()} in ${s.in}`), "Right-click hides this bar"].join(" \u00b7 ");
   button.addEventListener("click", () => void openUsage(item.id));
-  button.addEventListener("contextmenu", event => { event.preventDefault(); void showUsageWindow(item, label, false); });
+  // Right-click asks first: hiding straight away lost bars to a stray click.
+  button.addEventListener("contextmenu", event => { event.preventDefault(); showMenu(button, [["Open usage", () => void openUsage(item.id)], [`Hide ${item.label} ${label} from the top bar`, () => void showUsageWindow(item, label, false)]]); });
   return button;
  })));
  $("usage-button").hidden = !$("usage-button").childElementCount;
