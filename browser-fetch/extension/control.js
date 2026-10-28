@@ -106,8 +106,9 @@ async function act(s, m) {
 			if (!m.facts || keys.some(key => JSON.stringify(m.facts[key]) !== JSON.stringify(facts[key])))
 				throw new Error("The element changed since it was checked; take a new snapshot.");
 			await perform(s, m, target);
-			s.refs.clear();
-			return await after(s, 10_000, before);
+			const done = await after(s, 10_000, before);
+			if (done.url !== before) s.refs.clear(); // same page: refs stay, each target is rechecked above
+			return done;
 		}
 	}
 	throw new Error(`Unknown action ${m.action}.`);

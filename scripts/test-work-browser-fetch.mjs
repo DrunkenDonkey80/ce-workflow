@@ -261,8 +261,7 @@ async function roundTrip() {
 			assert.match(snap, /\[frame\] https:\/\/ads\.test\/f/);
 			assert.ok(!/Hidden menu|wrapper/.test(snap), "boxless and ignored nodes are dropped");
 			// Click, type, select, password refusal, risky confirm.
-			await go({ action: "click", ref: refOf(snap, "Save") });
-			snap = await go({ action: "snapshot" });
+			await go({ action: "click", ref: refOf(snap, "Save") }); // same page: the refs below stay valid
 			await assert.rejects(go({ action: "type", ref: refOf(snap, "Password"), text: "hunter2" }), /password/);
 			await go({ action: "type", ref: refOf(snap, "Search"), text: "shoes", submit: true });
 			snap = await go({ action: "snapshot" });
@@ -531,6 +530,8 @@ async function actPiSide() {
 		assert.match(await run({ action: "click", ref: "e6" }), /new tab for https:\/\/docs\.test\/; it was closed/);
 		assert.ok(got.at(-1).hosts.includes("other.test"), "the approved host is allowed on the next action");
 		assert.match(await run({ action: "screenshot" }), /saved: shot\.png/);
+		assert.match(await run({ action: "find", query: "x" }), /No element matches/, "refs survive actions on the same page");
+		await run({ action: "open", url: "https://shop.test/other" });
 		await assert.rejects(run({ action: "find", query: "x" }), /no snapshot yet/, "refs expire when the page changes");
 		// Revoked grant asks again; denial closes control.
 		await updatePolicy(p => { delete p.control["shop.test"]; });
