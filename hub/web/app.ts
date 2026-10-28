@@ -1421,7 +1421,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
-type HubSettings = { version?: string; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string; waiting?: { action: string; why: string[]; busy: string[] } | null };
+type HubSettings = { version?: string; browserExtension?: { version: string; path: string }; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string; waiting?: { action: string; why: string[]; busy: string[] } | null };
 let hubSettings: HubSettings = {}, appBadge = 0, attentionList: HubSession[] = [];
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
@@ -2261,6 +2261,7 @@ function renderUpdates() {
  const own = !!updates?.packages.some(name => /ce-workflow/i.test(name)), others = count - (own ? 1 : 0);
  // An older running hub sends no version and has no changelog endpoint yet.
  $("hub-version").textContent = "Version: " + (hubSettings.version ?? ""); $("hub-version").hidden = !hubSettings.version;
+ $("browser-ext").hidden = !hubSettings.browserExtension?.version; $("browser-ext-version").textContent = "Browser extension " + (hubSettings.browserExtension?.version ?? "");
  // Red dot only for ce-workflow (the one that matters); Pi and other extensions get a fainter yellow count.
  $("update-badge").hidden = !own; $("update-others").hidden = !others; $("update-button").hidden = !own; $("update-others").textContent = String(others);
  $("settings-button").title = count ? `Hub settings (${count} update${count > 1 ? "s" : ""})` : "Hub settings";
@@ -2296,6 +2297,7 @@ function updateMenu(anchor: HTMLElement) {
 }
 $("update-button").addEventListener("click", event => { event.stopPropagation(); updateMenu($("update-button")); });
 for (const badge of ["update-badge", "update-others"]) { $(badge).title = "Update now"; $(badge).addEventListener("click", event => { event.stopPropagation(); updateMenu($("settings-button")); }); }
+$("browser-ext-copy").addEventListener("click", async () => { const path = hubSettings.browserExtension?.path ?? ""; try { await navigator.clipboard.writeText(path); showNotice(`Copied ${path}`); } catch { prompt("Path:", path); } });
 $("update-check").addEventListener("click", async () => {
  ($("update-check") as HTMLButtonElement).disabled = true; $("update-list").textContent = "Checking…";
  try { hubSettings = await post("hub", { action: "check-updates" }) as HubSettings; } catch (error) { showNotice(error.message); }

@@ -60,6 +60,7 @@
      <div id="update-list" class="update-list"></div>
      <div id="update-waiting" class="update-list" title="Running sessions reload onto new extensions by themselves when quiet; Pi and the hub itself need a hub restart, which waits until every session is idle" hidden></div>
      <div id="extension-list" class="extension-list"></div>
+     <div id="browser-ext" class="browser-ext" hidden><span id="browser-ext-version" class="update-list"></span><button type="button" id="browser-ext-copy" title="Copies the folder to Load unpacked in chrome://extensions; reload the extension there when its version is older">Copy path</button></div>
      <div class="settings-actions"><button type="button" id="hub-update" title="Stops every session, runs pi update --all (Pi and extensions), then starts them again; refused while one is busy">Update all</button><button type="button" id="hub-restart" title="Stops every session and starts them again; refused while one is busy">Restart hub</button><button type="button" id="hub-catchup" title="Runs /wo catch-up in this session: reviews Pi and plugin updates in a Plan3 plan (ce-workflow checkout only)" hidden>Catch up</button></div>
     </section>
     <section class="settings-group" id="remote-group" aria-labelledby="set-remote" hidden><h3 id="set-remote" class="group-head" title="Tailnet-only HTTPS through Tailscale; each new device is approved on this PC">Remote access<label><input type="checkbox" id="remote-on"> On</label></h3>

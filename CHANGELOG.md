@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- Hub gear menu → Pi and extensions shows the browser extension's version with a Copy path button, to compare with chrome://extensions and Load unpacked or reload it.
+![Browser extension version and Copy path in the gear menu](docs/changelog/0.1.93-browser-extension.png)
+
 ## 0.1.92 — 2026-10-28
 
 ### Added

@@ -22,7 +22,7 @@ import { piModels, type ParkedModels } from "./pi-sdk.ts";
 import { acquireLock, releaseLock } from "./session-lock.ts";
 import { clipboardFiles } from "./images.ts";
 import { createCommands, hubEnv } from "./commands.ts";
-import { changelogImage, hubVersion, readChangelog, since, VERSION_PATTERN } from "./changelog.ts";
+import { browserExtension, changelogImage, hubVersion, readChangelog, since, VERSION_PATTERN } from "./changelog.ts";
 import { agentDir } from "./rpc-client.ts";
 import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
@@ -215,7 +215,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	const version = hubVersion(); // the code this hub runs; an update restarts the hub
 	const autoUpdate = updates && createAutoUpdate({ state: () => updates.state(), refresh: () => updates.check(), busy: () => summary().filter(s => s.busy.length).map(s => s.name),
 		loaded: version, disk: hubVersion, maintain: action => startMaintenance(action), attemptsFile: path.join(dataDir, "auto-update.json") });
-	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, progress: progressOf, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, attentionKey: config.attentionKey ?? "ctrl+shift+a", version, seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}), ...(autoUpdate ? { waiting: autoUpdate.waiting() } : {}) }) });
+	const pageApi = createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, progress: progressOf, settings: () => ({ idleParkMinutes: host.idleParkMinutes, icon: config.icon ?? "", usageHidden: config.usageHidden ?? usageHidden(), usageProviders: USAGE_PROVIDERS, notify: config.notify ?? { question: true, done: true }, collapseHours: config.collapseHours ?? 48, attentionKey: config.attentionKey ?? "ctrl+shift+a", version, browserExtension: browserExtension(), seenVersion: config.seenVersion ?? "", hostname: os.hostname(), uac: uacPending(), ...(updates ? { updates: updates.state() } : {}), ...(autoUpdate ? { waiting: autoUpdate.waiting() } : {}) }) });
 	const server = http.createServer(async (request, response) => {
 		const send = (status: number, value: unknown) => {
 			if (response.headersSent) return void response.destroy(); // failed mid-image: drop the connection

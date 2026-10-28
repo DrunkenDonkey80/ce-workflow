@@ -6,6 +6,11 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 export const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+/** The Pi browser fetch extension the browser loads unpacked from this checkout: its version and folder (gear → Pi and extensions). */
+export function browserExtension(): { version: string; path: string } {
+	const dir = path.join(root, "browser-fetch", "extension");
+	try { return { version: JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8")).version ?? "", path: dir }; } catch { return { version: "", path: dir }; }
+}
 export function hubVersion(): string { try { return JSON.parse(readFileSync(path.join(root, "package.json"), "utf8")).version ?? ""; } catch { return ""; } }
 
 export type ChangelogEntry = { version: string; date: string; body: string };
