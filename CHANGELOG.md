@@ -2,11 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.91 — 2026-10-28
 
 ### Added
 - browser_act: the agent can operate a site in your own browser, logged in as you, after you allow that site for 10, 20 or 30 minutes. It reads the page as a list of buttons, links and fields with positions, clicks, types, picks from dropdowns, scrolls, goes back and takes screenshots, in its own background tab in a "Pi" tab group. It never types passwords or one-time codes, and asks you before buying, paying, sending, deleting or publishing. Revoke a site in /wo → Settings → Browser access → Controlled sites. Reload the browser extension after updating.
 - Files and View page: Hide files gives the viewed page or file the whole panel; Show files brings the list back.
+![Hide files button above the viewed file](docs/changelog/0.1.91-hide-files.png)
 
 ### Changed
 - browser_fetch no longer opens common bank and payment sites (Bulgarian banks, PayPal, Revolut, Wise, Stripe dashboard, ePay, EasyPay); they joined the built-in block list.
