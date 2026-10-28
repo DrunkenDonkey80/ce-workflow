@@ -63,6 +63,14 @@ try {
 	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => { throw new Error("no Pi SDK"); } });
 	await usage.start(); assert.deepEqual(usage.usage(), { summary: [], accounts: [] }); usage.stop();
 
+	// A Claude token that lapsed while no session used Claude still shows a fresh pool reading.
+	const week = { pct: 30, resets_at: new Date(Date.now() + 86_400_000).toISOString() };
+	fs.writeFileSync(path.join(root, "claude-pool.json"), JSON.stringify({ active: "a", accounts: [{ label: "a" }] }));
+	fs.writeFileSync(path.join(root, "claude-pool-usage.json"), JSON.stringify({ a: { at: Date.now(), five_hour: { pct: 10, resets_at: week.resets_at }, seven_day: week } }));
+	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => async () => undefined });
+	await usage.start(); assert.deepEqual(usage.usage().summary.map(s => [s.id, s.left]), [["claude", 70]]); usage.stop();
+	fs.rmSync(path.join(root, "claude-pool-usage.json"));
+
 	// Issue #5: GLM/Kimi ids carry an index and Copilot has only a month, yet each shows; the headline window is named.
 	const at = Date.now() + 3_600_000, fake = (id, windows) => ({ id, label: id, piProviderId: id, fetchQuota: async () => windows });
 	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => async () => credential, providers: [

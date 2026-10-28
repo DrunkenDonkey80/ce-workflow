@@ -477,6 +477,7 @@ function provider({
 		piProviderId,
 		pollMs,
 		unavailableMs,
+		preferred,
 		async fetchQuota(auth, options) {
 			const reused = await preferred?.(options);
 			if (reused) return reused;
@@ -674,6 +675,9 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 		}
 		if (stopped) return;
 		if (!resolved) {
+			// Pool numbers need no login: a Claude token that lapsed while no session used Claude must not hide them.
+			const pooled = isHidden(entry) ? undefined : entry.preferred?.({ now, agentDir: dir });
+			if (pooled) { Object.assign(state, { authenticated: true, identityKey: undefined, windows: complete(pooled), fetchedAt: now(), failure: undefined }); return schedule(entry, POLL_MS); }
 			// Logout (or hidden): forget the snapshot; a later login is checked on the next poll.
 			Object.assign(state, { authenticated: false, identityKey: undefined, windows: undefined, fetchedAt: undefined, failure: undefined });
 			return schedule(entry, POLL_MS);
