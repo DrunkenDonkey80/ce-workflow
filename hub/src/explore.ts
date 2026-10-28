@@ -7,7 +7,8 @@ import { randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, readdir, realpath, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, extname, join, relative, resolve, isAbsolute } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, isAbsolute } from "node:path";
+import { linkedFile } from "./linked-files.ts";
 import { sevenZip } from "./wormhole.ts";
 
 const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
@@ -16,6 +17,8 @@ const root = join(tmpdir(), "pi-hub-explore");
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 // archive real path + mtime + size → key, for this hub run; the first explore clears earlier runs' folders.
 const unpacked = new Map<string, string>(), folders = new Map<string, string>();
+// A viewed page's live folder: each file served must pass the same check as a chat link for that project and device.
+const live = new Map<string, { project: string; remote: boolean }>();
 let cleared: Promise<unknown> | undefined;
 
 const run = (command: string, args: string[]) => new Promise<void>((done, failed) => execFile(command, args, { timeout: 300_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
@@ -49,11 +52,22 @@ export async function explore(real: string) {
 	await walk(folders.get(key)!, "", files);
 	return { key, name: basename(real), files: files.slice(0, MAX_FILES).sort((a, b) => a.path.localeCompare(b.path)), truncated: files.length > MAX_FILES };
 }
-async function walk(base: string, prefix: string, files: { path: string; size: number }[]) {
+/** A chat-linked HTML page (a validated real path): its folder served as is, so relative images, scripts and data load. */
+export async function viewPage(real: string, project: string, remote: boolean) {
+	if (!/\.html?$/i.test(real)) throw fail(400, "Only HTML pages can be viewed.");
+	const folder = dirname(real), id = `page|${folder}|${project}|${remote}`;
+	let key = unpacked.get(id);
+	if (!key) { key = randomBytes(16).toString("hex"); unpacked.set(id, key); folders.set(key, folder); live.set(key, { project, remote }); }
+	const files: { path: string; size: number }[] = [];
+	await walk(folder, "", files, true);
+	return { key, name: basename(folder), files: files.slice(0, MAX_FILES).sort((a, b) => a.path.localeCompare(b.path)), truncated: files.length > MAX_FILES, open: basename(real) };
+}
+async function walk(base: string, prefix: string, files: { path: string; size: number }[], skipHidden = false) {
 	if (files.length > MAX_FILES) return;
 	for (const entry of await readdir(join(base, prefix), { withFileTypes: true }).catch(() => [])) {
+		if (skipHidden && entry.name.startsWith(".")) continue;
 		const path = prefix ? `${prefix}/${entry.name}` : entry.name;
-		if (entry.isDirectory()) await walk(base, path, files);
+		if (entry.isDirectory()) await walk(base, path, files, skipHidden);
 		else if (entry.isFile()) files.push({ path, size: (await stat(join(base, path))).size });
 	}
 }
@@ -69,12 +83,15 @@ export async function sendExplored(pathname: string, download: boolean, origin: 
 	let rel: string; try { rel = decodeURIComponent(match[2]); } catch { rel = ""; }
 	const real = base && rel && await realpath(resolve(base, rel)).catch(() => undefined), rest = real && relative(await realpath(base!), real);
 	const info = rest && !rest.startsWith("..") && !isAbsolute(rest) ? await stat(real!).catch(() => undefined) : undefined;
-	if (!info?.isFile()) { response.writeHead(404, { "content-type": "text/plain" }); response.end("Not found (the hub restarted? Explore the archive again)."); return true; }
+	const access = live.get(match[1]);
+	if (!info?.isFile() || access && !await linkedFile(real, access.project, access.remote)) { response.writeHead(404, { "content-type": "text/plain" }); response.end("Not found (the hub restarted? Explore the archive again)."); return true; }
 	const type = TYPES[extname(real!).toLowerCase()] ?? "text/plain; charset=utf-8"; // unknown: plain text, never sniffed into a page
 	response.writeHead(200, {
 		"content-type": download ? "application/octet-stream" : type, "content-length": info.size, "cache-control": "private, no-store", "x-content-type-options": "nosniff",
-		// Opaque origin (no allow-same-origin): page scripts run but cannot read the hub, and fetch only from this host.
-		"content-security-policy": `sandbox allow-scripts allow-popups; default-src ${origin} data: blob: 'unsafe-inline' 'unsafe-eval'`,
+		// Opaque origin (no allow-same-origin): page scripts run but cannot read the hub. https: lets pages load libraries from a CDN;
+		// their module scripts and fetches are cross-origin to this opaque page, hence allow-origin * (the key is the capability).
+		"content-security-policy": `sandbox allow-scripts allow-popups allow-pointer-lock allow-downloads; default-src ${origin} https: data: blob: 'unsafe-inline' 'unsafe-eval'`,
+		"access-control-allow-origin": "*",
 		"content-disposition": `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(basename(real!))}`,
 	});
 	createReadStream(real!).on("error", () => response.destroy()).pipe(response);

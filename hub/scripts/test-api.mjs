@@ -335,6 +335,7 @@ try {
 	const headers = (await get(id, "plans")).headers;
 	assert.equal(headers.get("x-content-type-options"), "nosniff");
 	assert.match(headers.get("content-security-policy"), /default-src 'none'/);
+	assert.match(headers.get("content-security-policy"), /frame-src 'self'/, "View page and explored HTML show in a frame");
 	assert.equal(headers.get("referrer-policy"), "no-referrer");
 	console.log("api ok");
 } finally {

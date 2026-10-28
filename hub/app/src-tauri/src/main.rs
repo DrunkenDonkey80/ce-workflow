@@ -408,7 +408,9 @@ async fn open(app: AppHandle, id: u32, url: String) -> Result<(), String> {
         .user_agent(&ua())
         // WebView2 shows no prompt for page notifications and leaves them off; the hub's question/finished alerts need them.
         .on_permission_request(|_, kind| match kind {
-            tauri::webview::PermissionKind::Notifications => tauri::webview::PermissionResponse::Allow,
+            tauri::webview::PermissionKind::Notifications => {
+                tauri::webview::PermissionResponse::Allow
+            }
             _ => tauri::webview::PermissionResponse::Default,
         })
         // Links off the hub (chat links, docs) open in the default browser; the hub's own popups (images, files) stay in the app.
@@ -617,7 +619,10 @@ fn restart(app: &AppHandle) {
 #[tauri::command]
 fn in_front(app: AppHandle) -> bool {
     (cfg!(windows) && app_in_front())
-        || app.get_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false)
+        || app
+            .get_window("main")
+            .and_then(|w| w.is_focused().ok())
+            .unwrap_or(false)
 }
 /// True while one of our windows is the foreground window; true off Windows, where blur events are reliable.
 fn app_in_front() -> bool {
@@ -786,7 +791,14 @@ fn main() {
                     // A hub page still has focus while another program is in front, so it would mark a finished run seen;
                     // tell it (piHubFront in hub/web/app.ts), and re-check on coming back (its focus listener).
                     let front = *focused || (cfg!(windows) && app_in_front());
-                    let script = format!("window.piHubFront={front};{}", if front { "dispatchEvent(new Event('focus'))" } else { "" });
+                    let script = format!(
+                        "window.piHubFront={front};{}",
+                        if front {
+                            "dispatchEvent(new Event('focus'))"
+                        } else {
+                            ""
+                        }
+                    );
                     if let Some(w) = handle.get_window("main") {
                         for webview in w.webviews().into_iter().filter(|w| w.label() != "strip") {
                             let _ = webview.eval(&script);

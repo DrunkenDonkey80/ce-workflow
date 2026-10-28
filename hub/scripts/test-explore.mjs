@@ -1,10 +1,10 @@
 // Explore: an archive unpacks once into a temp folder, its files serve under /x/<key>/, nothing outside it does.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { explore, sendExplored } from "../src/explore.ts";
+import { explore, sendExplored, viewPage } from "../src/explore.ts";
 
 const work = await mkdtemp(join(tmpdir(), "pi-hub-explore-test-"));
 try {
@@ -31,9 +31,23 @@ try {
 	};
 	const page = await fetchLike(`/x/${first.key}/img/a.png`);
 	assert.deepEqual([page.status, page.head["content-type"], page.body], [200, "image/png", "PNG"], "a file inside serves");
-	assert.match((await fetchLike(`/x/${first.key}/index.html`)).head["content-security-policy"], /^sandbox allow-scripts allow-popups; default-src http:\/\/127\.0\.0\.1:1 /, "pages run sandboxed, this host only");
+	assert.match((await fetchLike(`/x/${first.key}/index.html`)).head["content-security-policy"], /^sandbox allow-scripts allow-popups allow-pointer-lock allow-downloads; default-src http:\/\/127\.0\.0\.1:1 https: /, "pages run sandboxed: this host and https CDNs");
 	assert.equal((await fetchLike(`/x/${first.key}/..%2F..%2F${encodeURIComponent(archive.split(/[\\/]/).pop())}`)).status, 404, "no way out of the folder");
 	assert.equal((await fetchLike(`/x/${"0".repeat(32)}/index.html`)).status, 404, "unknown key");
 	assert.equal(await fetchLike("/s/x"), false, "other paths are not explore URLs");
+
+	// View page: the HTML's folder serves live, each file checked like a chat link (no dotfiles; remotely, the project only).
+	await writeFile(join(work, "site", ".env"), "SECRET=1");
+	const view = await viewPage(join(work, "site", "index.html"), join(work, "site"), true);
+	assert.equal(view.open, "index.html");
+	assert.deepEqual(view.files.map(file => file.path), ["img/a.png", "index.html", "notes.md"], "hidden files are not listed");
+	assert.equal((await fetchLike(`/x/${view.key}/img/a.png`)).status, 200);
+	await writeFile(join(work, "site", "img", "later.md"), "new");
+	assert.equal((await fetchLike(`/x/${view.key}/img/later.md`)).status, 200, "live: files written after opening serve too");
+	assert.equal((await fetchLike(`/x/${view.key}/.env`)).status, 404, "no dotfiles");
+	const old = new Date(Date.now() - 10 * 864e5); await utimes(join(work, "site", "notes.md"), old, old); // recent temp files stay open to remote, like chat links
+	const outside = await viewPage(join(work, "site", "index.html"), join(work, "elsewhere"), true);
+	assert.equal((await fetchLike(`/x/${outside.key}/notes.md`)).status, 404, "remotely, files outside the project stay closed");
+	await assert.rejects(viewPage(join(work, "site", "notes.md"), work, false), /Only HTML/);
 	console.log("explore ok");
 } finally { await rm(work, { recursive: true, force: true }); }

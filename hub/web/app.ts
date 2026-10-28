@@ -935,7 +935,7 @@ function openFileMenu(link: HTMLElement, path: string, full: string) {
  // A folder (this PC only) can't be sent as it is: open, copy or zip it.
  if ("folder" in link.dataset) return showMenu(link, [["Open", () => void openFile(path, false)], ["Copy path", () => void copyPath(full)], ["Zip and upload", () => void wormhole(path, "zip")]]);
  const uploads: [string, () => void][] = [["Upload", () => void wormhole(path, "")], ["Zip and upload", () => void wormhole(path, "zip")], ...(sevenZip ? [["7z and upload", () => void wormhole(path, "7z")] as [string, () => void]] : [])];
- const explore: [string, () => void][] = /.(zip|7z|rar|tar|tgz|tbz2?|txz|tar.(gz|bz2|xz|zst))$/i.test(path) ? [["Explore", () => void exploreArchive(path)]] : [];
+ const explore: [string, () => void][] = /.(zip|7z|rar|tar|tgz|tbz2?|txz|tar.(gz|bz2|xz|zst))$/i.test(path) ? [["Explore", () => void exploreArchive(path)]] : /\.html?$/i.test(path) ? [["View page", () => void exploreArchive(path)]] : [];
  showMenu(link, token ? [...explore, ["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]
   : [...explore, ["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
 }
@@ -955,7 +955,7 @@ async function wormhole(path: string, pack: string) {
 }
 // Explore: the hub unpacks the archive into a temp folder; the Files tab walks it and the chat shrinks to make room.
 async function exploreArchive(path: string) {
- showNotice("Unpacking " + path.split(/[\/]/).pop() + "…");
+ showNotice((/\.html?$/i.test(path) ? "Opening " : "Unpacking ") + path.split(/[\/]/).pop() + "…");
  try {
   const value = await post("explore", { path });
   if (!filesView.exploring) {
@@ -964,7 +964,7 @@ async function exploreArchive(path: string) {
   }
   filesView.explore(value);
   if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
-  showNotice(`${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
+  showNotice(value.open ? "" : `${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
  } catch (error) { showNotice(error.message); }
 }
 // Close (or Back: the browser's, the mouse's) puts the chat back the way it was.
@@ -977,6 +977,8 @@ function closeExplore() {
  if (phone.matches) setMobile(was.mobile); else { setTab(was.tab); setLeft(was.left); resizeChat(Number(was.width)); }
 }
 addEventListener("popstate", () => closeExplore());
+// Escape closes it too, unless typing (the chat box's Escape clears or stops) or something else took the key. A key pressed inside the page's frame stays there.
+document.addEventListener("keydown", event => { if (event.key === "Escape" && filesView.exploring && !event.defaultPrevented && !(event.target as HTMLElement).closest?.("input, textarea, select, dialog")) closeExplore(); });
 async function openFile(path: string, reveal: boolean) {
  try { const { revealed } = await post("open", { path, reveal }); if (revealed && !reveal) showNotice("Programs and scripts open in their folder, never run."); } catch (error) { showNotice(error.message); }
 }
@@ -2195,19 +2197,32 @@ async function pollLoad() {
   const left = 48 - loadSamples.length * 2;
   box.querySelector("polyline")!.setAttribute("points", [`${left},20`, ...loadSamples.map((sample, index) => `${index * 2 + left},${(20 - sample[key] / 5).toFixed(1)}`), "46,20"].join(" "));
   box.querySelector("span")!.textContent = String(value);
-  box.setAttribute("aria-label", `${name} ${value}%`); box.title = `${name} ${value}% (graph: last 2 minutes)` + topText(key);
+  box.setAttribute("aria-label", `${name} ${value}%`);
  }
+ showLoadTip();
 }
 // Hovering a graph lists the 5 programs using the most of it; looked up on hover only, at most every 10 s (it costs about a second).
+// Our own tooltip, not title: the browser hides a title tooltip whenever it changes, so every 5 s update made it blink.
 type Top = { name: string; value: number }[];
-let topProcs: { cpu: Top; memory: Top } | null = null, topAt = 0;
+let topProcs: { cpu: Top; memory: Top } | null = null, topAt = 0, tipKey: "cpu" | "memory" | null = null;
 const topText = (key: "cpu" | "memory") => !topProcs?.[key].length ? "" : "\n\nTop programs:\n" + topProcs[key].map(item => `${key === "cpu" ? `${item.value}%` : `${(item.value / 1e9).toFixed(1)} GB`}  ${item.name}`).join("\n");
-for (const key of ["cpu", "memory"] as const) $("load-" + key).addEventListener("mouseenter", async () => {
- if (Date.now() - topAt < 10_000) return;
- topAt = Date.now();
- try { topProcs = await get("processes"); } catch { return; }
- const box = $("load-" + key); box.title = box.title.split("\n\n")[0] + topText(key);
-});
+function showLoadTip() {
+ const tip = $("load-tip");
+ if (!tipKey) { tip.hidden = true; return; }
+ const value = loadSamples.at(-1)?.[tipKey];
+ tip.textContent = `${tipKey === "cpu" ? "CPU" : "Memory"} ${value ?? "…"}% (graph: last 2 minutes)` + topText(tipKey);
+ tip.hidden = false;
+ const box = $("load-" + tipKey).getBoundingClientRect();
+ tip.style.top = box.bottom + 4 + "px"; tip.style.left = Math.max(4, Math.min(box.left, innerWidth - tip.offsetWidth - 4)) + "px";
+ if (Date.now() - topAt >= 10_000) {
+  topAt = Date.now();
+  get("processes").then(value => { topProcs = value; showLoadTip(); }, () => {});
+ }
+}
+for (const key of ["cpu", "memory"] as const) {
+ $("load-" + key).addEventListener("mouseenter", () => { tipKey = key; showLoadTip(); });
+ $("load-" + key).addEventListener("mouseleave", () => { tipKey = null; showLoadTip(); });
+}
 void pollLoad(); setInterval(pollLoad, 5000);
 // Notifications: a session starts asking a question, or stops working (subagents count as working). Every open hub
 // page polls, so the tag makes the OS replace duplicates; the session in view on a visible page is not announced.

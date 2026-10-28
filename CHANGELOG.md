@@ -4,6 +4,18 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.89 — 2026-10-28
+
+### Added
+- View page: right-click (or, remotely, click) an HTML file linked in the chat and pick View page. It opens in the left pane with its folder's files beside it, from any device; Close, Back or Escape returns to the full chat. Images, data files and scripts next to the page load as they would from a local web server, including libraries from a CDN, so a 3D walkthrough runs without `py -m http.server`. Remotely, only files inside the session's project are served, and hidden files never are.
+![Right-click menu on an HTML file with View page](docs/changelog/0.1.89-view-page.png)
+
+### Fixed
+- Hub running in WSL: Windows file paths in chat (C:\Users\…) are clickable again, and Open, Download and Upload work on them; clicking opens the file through Windows Explorer.
+- HTML pages inside an explored archive showed "This content is blocked" instead of the page.
+- The CPU and memory hover popup no longer vanishes and comes back every few seconds; it now updates in place, top programs included.
+- Pi Hub app: a hidden hub's state shows in the taskbar icon again; hiding only takes it off the tab strip.
+
 ## 0.1.88 — 2026-10-28
 
 ### Added

@@ -61,7 +61,7 @@ async function body(request: http.IncomingMessage, limit = MAX_BODY): Promise<an
 	const bytes = await raw(request, limit);
 	try { return bytes.length ? JSON.parse(bytes.toString("utf8")) : {}; } catch { throw Object.assign(new Error("Invalid JSON."), { status: 400 }); }
 }
-const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self'; frame-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 const sameKey = (a: unknown, b: string) => typeof a === "string" && a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
 // H5-01: the browser app (copied from ce-workflow extensions/plan3-web) under /s/<session>/, all URLs relative to it.
@@ -232,8 +232,10 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			const remote = hostName === remoteHost;
 			if (!remote && ![`127.0.0.1:${config.port}`, `localhost:${config.port}`].includes(hostName)) return send(403, { error: "Foreign Host rejected." });
 			const origin = request.headers.origin, expected = remote ? `https://${remoteHost}` : `http://${hostName}`;
-			if (origin !== undefined && origin !== expected) return send(403, { error: "Foreign Origin rejected." });
 			const url = new URL(request.url ?? "/", expected);
+			// Explored pages run in an opaque sandbox: their module scripts and fetches send Origin: null (GET only, key-guarded).
+			const exploredRead = request.method === "GET" && origin === "null" && url.pathname.startsWith("/x/");
+			if (origin !== undefined && origin !== expected && !exploredRead) return send(403, { error: "Foreign Origin rejected." });
 			const rootAsset = request.method === "GET" && /^\/a\/([0-9a-f]{12})\/(pair\.js|styles\.css)$/.exec(url.pathname);
 			// The installed app's icon: the gear's tab icon, idle. Public like pair.js (it shows only the picked icon).
 			const appIcon = request.method === "GET" && url.pathname === "/app-icon.svg" && (() => {

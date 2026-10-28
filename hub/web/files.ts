@@ -1,7 +1,8 @@
 // Browser Files tab (R8, D10): read-only project tree beside (desktop) or above (phone) a content or diff viewer.
 type ProjectFile = { path: string; change?: string; size?: number };
 // An explored archive (hub/src/explore.ts): its files are served raw under /x/<key>/.
-type Archive = { key: string; name: string; files: ProjectFile[]; truncated: boolean };
+// open: a viewed HTML page (its live folder, explore.ts viewPage), shown at once.
+type Archive = { key: string; name: string; files: ProjectFile[]; truncated: boolean; open?: string };
 const IMAGE = /.(?:png|jpe?g|gif|webp|bmp|svg|ico)$/i, FRAME = /.(?:html?|pdf)$/i, MEDIA = /.(?:mp4|webm|mp3|wav)$/i, MARKDOWN = /.(?:md|markdown)$/i, TEXT_BYTES = 1_048_576;
 const size = (bytes = 0) => bytes < 1024 ? bytes + " B" : bytes < 1_048_576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1_048_576).toFixed(1) + " MB";
 type Folder = { folders: Map<string, Folder>; files: ProjectFile[]; changed: boolean; size: number };
@@ -60,7 +61,7 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
    if (archive) {
     const close = Object.assign(document.createElement("button"), { type: "button", textContent: "Close" });
     close.addEventListener("click", () => closed());
-    const bar = Object.assign(document.createElement("div"), { className: "files-archive", textContent: "📦 " + archive.name }); bar.append(close); tree.append(bar);
+    const bar = Object.assign(document.createElement("div"), { className: "files-archive", textContent: (archive.open ? "📁 " : "📦 ") + archive.name }); bar.append(close); tree.append(bar);
    }
    draw(folder(value.files), "", tree);
    if (!value.files.length) tree.append(Object.assign(document.createElement("p"), { className: "files-empty", textContent: archive ? "The archive is empty." : "No visible project files." }));
@@ -112,7 +113,10 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
  }
  return {
   /** Shows an explored archive's files instead of the project's until Close. */
-  explore(value: Archive) { archive = value; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); },
+  explore(value: Archive) {
+   archive = value; selected = ""; heading.textContent = "Select a file"; body.replaceChildren();
+   void refresh().then(() => { const page = archive === value && value.files.find(file => file.path === value.open); if (page) void show(page); });
+  },
   /** Back to the project's files (the page restores its layout through closed). */
   close() { archive = null; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); },
   get exploring() { return !!archive; },

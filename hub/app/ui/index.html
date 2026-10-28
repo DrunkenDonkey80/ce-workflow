@@ -90,7 +90,8 @@ async function updateIcons() {
  const local = tabs.find(tab => tab.local) ?? tabs[0];
  const key = JSON.stringify([tabs.map(t => [t.icon, t.states, fullName(t), t.url ? 1 : 0, t.attention]), staged, pinned]);
  if (key === iconKey) return; iconKey = key;
- const big = ink(hubsIconSvg(tabs.filter(tab => !tab.hidden).map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
+ // Hidden hubs too: hiding takes a hub off the strip, not off the taskbar icon.
+ const big = ink(hubsIconSvg(tabs.map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
  const small = ink(iconSvg(ICONS[local?.icon] ? local.icon : DEFAULT_ICON, URGENCY.filter(s => all.includes(s))));
  try {
   await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay: pinned && urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="${DOT[urgent]}"/>${number}</svg>`, 16) : null });
