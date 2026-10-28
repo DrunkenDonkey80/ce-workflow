@@ -14,11 +14,13 @@ import { fromWindowsPath, isWsl, toWindowsPath } from "./platform.ts";
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 
 /** The real absolute path of an existing, shareable file, or undefined. Relative paths are the session folder's. */
-export async function linkedFile(path: unknown, project: string, remote = false): Promise<string | undefined> {
+/** folders: on this PC an absolute folder path also links; it only opens in the file manager (no download, upload or explore). */
+export async function linkedFile(path: unknown, project: string, remote = false, folders = false): Promise<string | undefined> {
 	if (typeof path !== "string" || !path || path.length > 1000 || /[\x00-\x1f]/.test(path)) return undefined;
 	const real = await realpath(resolve(project, fromWindowsPath(path))).catch(() => undefined);
 	if (!real || /[\\/]\.[^\\/]/.test(real) || forbiddenPath.test(basename(real))) return undefined;
 	const info = await stat(real).catch(() => undefined);
+	if (folders && !remote && info?.isDirectory() && isAbsolute(fromWindowsPath(path))) return real;
 	if (!info?.isFile()) return undefined;
 	if (!remote || IMAGE.test(real) || await inside(real, project)) return real;
 	const recent = Date.now() - info.mtimeMs < RECENT_MS;
@@ -33,7 +35,7 @@ async function inside(real: string, folder: string) {
 export async function linkedFiles(paths: unknown, project: string, remote = false) {
 	if (!Array.isArray(paths) || paths.length > 200) throw fail(400, "Invalid paths.");
 	const found: Record<string, string> = {};
-	const reals = await Promise.all(paths.map(path => linkedFile(path, project, remote)));
+	const reals = await Promise.all(paths.map(path => linkedFile(path, project, remote, true)));
 	reals.forEach((real, i) => { if (real) found[paths[i] as string] = real; });
 	return { found };
 }
@@ -57,7 +59,7 @@ export async function sendLinkedFile(path: string | null, project: string, downl
 const RUNS = /^\.(?:exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|mjs|cjs|wsf|wsh|msi|msp|msc|lnk|scr|hta|cpl|reg|jar|url|sh|bash|appimage|desktop|run|app|command|pif|scf|inf|application|gadget)$/i;
 /** Opens the file with its default app, or with reveal shows it selected in its folder (Explorer, Finder, the Linux file manager). */
 export async function openLinkedFile(path: unknown, project: string, reveal: boolean, remote = false) {
-	const real = await linkedFile(path, project, remote);
+	const real = await linkedFile(path, project, remote, true);
 	if (!real) throw fail(404, "File not found or not shared.");
 	const show = reveal || RUNS.test(extname(real));
 	// Windows paths cannot contain quotes, so verbatim quoting is safe; explorer.exe never goes through cmd's & parsing.

@@ -817,7 +817,8 @@ function renderChat() {
 // File paths in chat text (any extension) become links once the hub confirms the file exists (checkFileLinks); images also
 // show as thumbnails (pasted or terminal Alt+V images too). The server shares any file on this PC outside hidden folders.
 // A path in double quotes or backticks may contain spaces; file:/// URLs link to the local path they name; \\server\share paths link too.
-const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\\\\|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-])/gi;
+// An absolute path (C:\x, \\server\share\x) links without an extension too, so folders open (this PC only); trailing .,;!? stay text.
+const LINKED_PATH = /(?<![\w:/\\.-])(?:(?:[A-Za-z]:|\\\\[^\s"'`<>|*?()[\]:\\/]+)(?:[\\/][^\s"'`<>|*?()[\]:\\/]+)*[\\/][^\s"'`<>|*?()[\]:\\/]*[^\s"'`<>|*?()[\]:\\/.,;!?]|(?:[A-Za-z]:[\\/]|\\\\|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-]))/gi;
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 // Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
 // no colon after that, and a file extension right before the closing quote.
