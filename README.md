@@ -56,7 +56,9 @@ Offline self-check: `node "scripts/test-jev-tools.mjs"`.
 
 ## Screen read tool
 
-`screen_read` returns a small PNG for visual testing: an app window (Windows only; also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, or an Android screen. `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
+`screen_read` returns a small PNG for visual testing: an app window (Windows only; also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, an Android screen or, on macOS, a booted iOS Simulator (`target: "ios"`). `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
+
+`simulator_act` drives an iOS Simulator on macOS without opening Simulator.app: list and boot simulators, launch an app, read the screen as a list of labelled elements with accessibility ids and positions, tap, type, swipe and press hardware buttons. It needs [AXe](https://github.com/cameroncooke/AXe) (`brew tap cameroncooke/axe && brew install cameroncooke/axe/axe`). Physical iPhones and Android devices are not supported yet.
 
 ## Browser fetch
 

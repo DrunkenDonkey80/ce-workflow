@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- simulator_act: the agent can drive an iOS Simulator on macOS without opening a window. It reads the screen as labelled buttons and fields with positions, taps, types, swipes and presses Home or Lock. Needs AXe from Homebrew.
+- screen_read target "ios" captures a booted iOS Simulator screen.
+
 ## 0.1.98 — 2026-10-28
 
 ### Changed
