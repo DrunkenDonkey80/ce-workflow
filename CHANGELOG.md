@@ -4,6 +4,20 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.1.88 — 2026-10-28
+
+### Added
+- Folder paths in chat (`C:\renders\p709`, `\\server\share\dir`, also in quotes with spaces) are links on the PC: click opens the folder; right-click offers Open, Copy path and Zip and upload.
+![Folder link menu: Open, Copy path, Zip and upload](docs/changelog/0.1.88-folder-menu.png)
+- Network share file paths (`\\server\share\file.pdf`) link like local files.
+
+### Changed
+- Phones: the message box slides away while you scroll back through the chat and returns at the end (or with ↓ New messages); it stays while you type.
+
+### Fixed
+- Claude usage no longer disappears from the usage bar after hours without using Claude; the account pool's reading shows even while the Claude login waits to be refreshed.
+- Pi Hub app: a hidden hub you switch to no longer hides itself again a few seconds later while the app is still in front.
+
 ## 0.1.87 — 2026-10-27
 
 ### Added
