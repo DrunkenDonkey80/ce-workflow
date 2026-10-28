@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 18,
+  "revision": 19,
   "nodes": [
     {
       "id": "pi_host",
@@ -404,8 +404,8 @@
       "id": "browser_fetch_host",
       "label": "Browser fetch extension + native host",
       "kind": "client",
-      "summary": "MV3 extension (browser-fetch/extension, loaded unpacked from the package) opens an inactive muted tab, blocks unapproved hosts with DNR, extracts text/links/images, pause button; host.mjs relays over the named pipe.",
-      "tech": "browser-fetch/extension, browser-fetch/host.mjs"
+      "summary": "MV3 extension (browser-fetch/extension, loaded unpacked from the package): fetch tabs with DNR host blocking, extraction and pause button; control.js drives browser_act's background tab in a \"Pi\" group via chrome.debugger with deadline alarms; host.mjs relays over the named pipe, owns sessions per socket and saves screenshots.",
+      "tech": "browser-fetch/extension (background.js, control.js), browser-fetch/host.mjs"
     },
     {
       "id": "user_browser",
@@ -417,7 +417,15 @@
       "id": "browser_fetch_files",
       "label": "Browser fetch policy and log",
       "kind": "store",
-      "summary": "~/.pi/agent/browser-fetch: policy.json (grants, block list), log.jsonl, host launcher and manifest; images in %TEMP%/pi-browser-fetch."
+      "summary": "~/.pi/agent/browser-fetch: policy.json (read grants, timed control grants, block list), log.jsonl, host launcher and manifest; images and screenshots in %TEMP%/pi-browser-fetch."
+    },
+    {
+      "id": "browser_act",
+      "label": "browser_act",
+      "kind": "service",
+      "parent": "standalone_group",
+      "summary": "Operates one granted site (10/20/30 min) in the user's browser: snapshot refs, find, click/type/select/scroll/back, screenshots; password refusal, risky-action confirmation, inspect-then-execute, cross-site navigation grants.",
+      "tech": "extensions/browser-act.ts"
     }
   ],
   "edges": [
@@ -816,6 +824,24 @@
       "to": "browser_fetch",
       "label": "Browser access menu",
       "id": "work_models__browser_fetch"
+    },
+    {
+      "from": "pi_host",
+      "to": "browser_act",
+      "label": "loads",
+      "id": "pi_host__browser_act"
+    },
+    {
+      "from": "browser_act",
+      "to": "browser_fetch",
+      "label": "policy, block list, pipe, log",
+      "id": "browser_act__browser_fetch"
+    },
+    {
+      "from": "browser_act",
+      "to": "browser_fetch_host",
+      "label": "control sessions (control-open, act, control-close)",
+      "id": "browser_act__browser_fetch_host"
     }
   ],
   "notes": []

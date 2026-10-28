@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-28
-updated: 2026-10-28T20:37:58.294Z
+updated: 2026-10-28T20:38:40.199Z
 reviewed: 2026-10-28
 started: 2026-10-28T19:39:33.590Z
 ---
@@ -209,9 +209,7 @@ None.
 - [x] **P5-02** README Browser act section (actions, safety, ending control, reload for new permissions) and block-list wording; CHANGELOG Unreleased Added browser_act and Changed bank/payment block.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 19: new browser_act node with edges to pi_host, browser_fetch and the extension/host; extension and policy-store summaries now cover control.js, sessions, screenshots and control grants.
 
 
 ## Global validation
@@ -222,7 +220,7 @@ None.
 
 ## Resume context
 
-Phases 1 and 2 done (HEAD f602d67). Pi side in extensions/browser-act.ts speaks D15 messages: control-open {id}; act {id, seq, action, phase inspect|execute, ref, x, y, facts, text, submit, value, direction, hosts, blocked, until}; replies {type result, id, seq, url, title, items, frames, facts, blocked[], spawned[], path}; browser-initiated {type closed, id, reason}; control-close {id}. Next: P3-01, add debugger and tabGroups permissions and the agent tab in a Pi group in browser-fetch/extension/background.js; then P3-07 host.mjs ownership for control-open/control-close.
+Only P4-01 left (live Helium test). HEAD after 2b23006 plus diagram commit. Live run so far on github.com/settings: grant, snapshot, hidden-tab screenshot, click, type, select worked; fixed hung-queue timeout, frozen tab wake, SPA URL wait, refs-on-same-page, page dialogs (935672e). Waiting for the user to reload the add-on in Helium and /reload Pi; then finish the password refusal and risky-action confirm checks live. Unexplained once: first click after snapshot+parallel screenshot said Unknown ref.
 
 ## Amendments
 
