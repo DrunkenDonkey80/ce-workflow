@@ -723,7 +723,7 @@ function askExchange(block) {
  for (const question of block.ask) {
   const title = Object.assign(document.createElement("div"), { className: "ask-question" }); renderLinks(title, question.question); asked.append(title);
   if (question.context) { const context = Object.assign(document.createElement("div"), { className: "ask-context" }); renderLinks(context, question.context); asked.append(context); }
-  if (question.options.length) asked.append(Object.assign(document.createElement("div"), { className: "ask-options", textContent: question.options.join(" · ") }));
+  if (question.options.length) { const options = Object.assign(document.createElement("div"), { className: "ask-options" }); renderLinks(options, question.options.join(" · ")); asked.append(options); }
  }
  const answer = Object.assign(document.createElement("div"), { className: "ask-a" + (block.error ? " ask-error" : block.result === undefined ? " ask-waiting" : "") });
  renderLinks(answer, block.result === undefined ? "Waiting for your answer…" : block.result.replace(/^User answered(?: \d+ of \d+ questions)?:\s*/, ""));

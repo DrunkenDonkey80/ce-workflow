@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Fixed
+- ask_user options link file paths, folders and web addresses like the chat does, in the live form and in the answered question.
 - Linux/macOS folder paths in chat (/home/you/project/lib) link and open like Windows ones; ~/ paths (~/notes/r.html) point to your home folder.
 - Right-clicking a usage bar (Claude, Codex…) no longer hides it on the spot; it opens a menu with Open usage and Hide from the top bar.
 

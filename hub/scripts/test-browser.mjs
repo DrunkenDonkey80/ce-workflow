@@ -618,8 +618,9 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"draft is kept\")");
  assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this draft");
  assert.equal(await evaluate("localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])"), "Keep this draft", "a failed send stores the draft again");
- ask({ question: "Pick a colour", context: "Single choice", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
+ ask({ question: "Pick a colour", context: "Single choice", options: [{ title: "Blue" }, { title: "Pink" }, { title: "Docs https://example.com/a" }], allowMultiple: false, allowFreeform: true, allowComment: true });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-option a')].map(a => a.getAttribute('href'))"), ["https://example.com/a"], "links in options work like in chat");
  assert.equal(await evaluate("document.querySelectorAll('#prompt-form textarea').length"), 1, "one text box, like the terminal");
  await browser("click", "#prompt-form input[value=Blue]"); await browser("fill", "#prompt-form textarea", "Matches the boxes"); await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");

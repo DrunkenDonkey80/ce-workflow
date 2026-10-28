@@ -96,7 +96,9 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
     if (question.allowMultiple) input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); input.checked = !input.checked; } });
     // Tapping the chosen radio again clears it, so the text box can become your own answer.
     else input.addEventListener("click", () => { if (input.dataset.on) input.checked = false; for (const other of inputs) other.dataset.on = other.checked ? "1" : ""; });
-    const row = node("label", { className: "prompt-option" }); row.append(input, node("span", {}, option.title));
+    // Paths and URLs in an option link like in chat (a file link's click is handled, so it doesn't tick the option).
+    const title = node("span"); links(title, option.title);
+    const row = node("label", { className: "prompt-option" }); row.append(input, title);
     if (option.description) { const description = node("small", { className: "prompt-description" }); links(description, option.description); row.append(description); } section.append(row);
    }
    // One box like the terminal: with an option chosen it is the comment, with none it is your own answer.
