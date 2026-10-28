@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-28
-updated: 2026-10-28T19:46:17.376Z
+updated: 2026-10-28T19:46:33.910Z
 reviewed: 2026-10-28
 started: 2026-10-28T19:39:33.590Z
 ---
@@ -225,7 +225,7 @@ None.
 
 ## Resume context
 
-Review done: all 8 advisor findings accepted (finding 5 in reduced form), added D15 to D20 and steps P1-04, P2-08, P3-07. No open questions. Nothing built. Next: P1-04, the user loads a temporary prototype add-on in Helium and names three logged-in test sites; then P1-02 prototype.
+Phase 1 done (commit e09e65a): Helium supports chrome.debugger, tab groups and hidden-tab screenshots; snapshot uses the AX tree sorted by position (D22); safety rules are D23. Prototype code removed from the add-on, nothing else built. Next: P2-01, control grants (10/20/30 min per site, separate from read grants) in extensions/browser-fetch.ts. Stopped at the Phase 1 to Phase 2 boundary so Phase 2 [code] runs on the coding model. No blockers.
 
 ## Amendments
 
