@@ -613,6 +613,12 @@ fn restart(app: &AppHandle) {
     }
 }
 
+/// The strip's hidden-tab timer asks before hiding: a tab switch fakes a blur (WindowEvent::Focused), so check what is really in front.
+#[tauri::command]
+fn in_front(app: AppHandle) -> bool {
+    (cfg!(windows) && app_in_front())
+        || app.get_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false)
+}
 /// True while one of our windows is the foreground window; true off Windows, where blur events are reliable.
 fn app_in_front() -> bool {
     #[cfg(windows)]
@@ -714,7 +720,8 @@ fn main() {
             flash,
             restart_update,
             strip_left,
-            gear
+            gear,
+            in_front
         ])
         .setup(move |app| {
             // The hub's running check (hub/src/app-install.ts): our pid, removed on exit.

@@ -350,7 +350,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				only(data, ["target", "path", "pack"], "Invalid fields.");
 				const pack = data.pack ?? "";
 				if (pack !== "" && pack !== "zip" && pack !== "7z") throw fail(400, "pack: zip, 7z or empty.");
-				const real = await linkedFile(data.path, folder(id), remote);
+				// A folder (this PC only) goes packed.
+				const real = await linkedFile(data.path, folder(id), remote, pack !== "");
 				if (!real) throw fail(404, "File not found or not shared.");
 				if (pack === "7z" && !sevenZip()) throw fail(409, "7z is not installed.");
 				return { id: startUpload(real, pack) };

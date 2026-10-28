@@ -37,7 +37,9 @@ export async function linkedFiles(paths: unknown, project: string, remote = fals
 	const found: Record<string, string> = {};
 	const reals = await Promise.all(paths.map(path => linkedFile(path, project, remote, true)));
 	reals.forEach((real, i) => { if (real) found[paths[i] as string] = real; });
-	return { found };
+	// Folders get their own menu on the page (open, copy, zip and upload).
+	const folders = (await Promise.all(Object.entries(found).map(async ([path, real]) => (await stat(real)).isDirectory() && path))).filter(Boolean);
+	return { found, folders };
 }
 
 // Text opens as plain text: a same-origin HTML or SVG page could run script with the page's rights, and the sandbox CSP backs that up.

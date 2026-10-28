@@ -822,7 +822,8 @@ const LINKED_PATH = /(?<![\w:/\\.-])(?:(?:[A-Za-z]:|\\\\[^\s"'`<>|*?()[\]:\\/]+)
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 // Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
 // no colon after that, and a file extension right before the closing quote.
-const QUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/]|\\\\|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.[A-Za-z][A-Za-z0-9]{0,9}`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
+// An absolute one (C:\x, \\server\x) needs no extension, so quoted folders link too.
+const QUOTED_PATH = String.raw`(?:(?:[A-Za-z]:[\\/]|\\\\)[^"\x60<>|*?:\r\n]*[^"\x60<>|*?:\r\n\\/ .]|(?:[A-Za-z]:[\\/]|\\\\|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.[A-Za-z][A-Za-z0-9]{0,9})`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
 function renderLinks(target: HTMLElement, text: string) {
  target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images); checkFileLinks(target);
 }
@@ -909,13 +910,13 @@ function appendPathLink(target: HTMLElement, path: string, images: Set<string>) 
  target.append(link);
 }
 // Model text names many things that look like files (Node.js, e.g.); a link stays plain text until the hub finds the file.
-const fileFound = new Map<string, string | null>();
+const fileFound = new Map<string, string | null>(), folderFound = new Set<string>();
 function checkFileLinks(root: HTMLElement) {
  const links = [...root.querySelectorAll<HTMLAnchorElement>("a.file-link:not([data-full])")];
- const apply = () => { for (const link of links) { const full = fileFound.get(link.dataset.path!); if (full === null) link.replaceWith(link.textContent!); else if (full) link.dataset.full = full; } };
+ const apply = () => { for (const link of links) { const full = fileFound.get(link.dataset.path!); if (full === null) link.replaceWith(link.textContent!); else if (full) { link.dataset.full = full; if (folderFound.has(link.dataset.path!)) link.dataset.folder = ""; } } };
  const unknown = [...new Set(links.map(link => link.dataset.path!))].filter(path => !fileFound.has(path)).slice(0, 200);
  if (!unknown.length) return apply();
- post("paths", { paths: unknown }).then(({ found }) => { for (const path of unknown) fileFound.set(path, found[path] ?? null); apply(); }).catch(() => undefined);
+ post("paths", { paths: unknown }).then(({ found, folders = [] }) => { for (const path of folders) folderFound.add(path); for (const path of unknown) fileFound.set(path, found[path] ?? null); apply(); }).catch(() => undefined);
 }
 const fileSource = (path: string, download: boolean) => "api/download?path=" + encodeURIComponent(path) + (download ? "&download=1" : "") + (token ? "&token=" + token : "");
 // On this PC (key page): click opens the file, Shift copies its path, Ctrl opens its folder. Remotely a click offers Download / Open.
@@ -931,6 +932,8 @@ document.addEventListener("contextmenu", event => {
  event.preventDefault(); openFileMenu(link, link.dataset.path!, link.dataset.full!);
 });
 function openFileMenu(link: HTMLElement, path: string, full: string) {
+ // A folder (this PC only) can't be sent as it is: open, copy or zip it.
+ if ("folder" in link.dataset) return showMenu(link, [["Open", () => void openFile(path, false)], ["Copy path", () => void copyPath(full)], ["Zip and upload", () => void wormhole(path, "zip")]]);
  const uploads: [string, () => void][] = [["Upload", () => void wormhole(path, "")], ["Zip and upload", () => void wormhole(path, "zip")], ...(sevenZip ? [["7z and upload", () => void wormhole(path, "7z")] as [string, () => void]] : [])];
  const explore: [string, () => void][] = /.(zip|7z|rar|tar|tgz|tbz2?|txz|tar.(gz|bz2|xz|zst))$/i.test(path) ? [["Explore", () => void exploreArchive(path)]] : [];
  showMenu(link, token ? [...explore, ["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]

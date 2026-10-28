@@ -216,7 +216,9 @@ async function menu(tab) {
 // the app loses focus they go away again and a hidden hub on screen gives way to the last visible one.
 let revealed = false, lastShown = null, concealTimer = 0;
 document.body.addEventListener("contextmenu", event => { event.preventDefault(); if (event.target.closest("button.tab") || !tabs.some(tab => tab.hidden)) return; revealed = true; render(); });
-function conceal() {
+async function conceal() {
+ // A tab switch reports a blur with the app still in front (and may never report the focus back): look again later.
+ if (await invoke("in_front").catch(() => false)) { concealTimer = setTimeout(conceal, 10_000); return; }
  revealed = false;
  if (!tabs[active]?.hidden) return render();
  const back = tabs.find(tab => tab.id === lastShown && !tab.hidden) ?? tabs.find(tab => !tab.hidden);

@@ -331,6 +331,9 @@ try {
   fs.writeFileSync(old, "x"); fs.utimesSync(old, new Date(Date.now() - 6 * 864e5), new Date(Date.now() - 6 * 864e5));
   assert.deepEqual([!!await linkedFile("top.txt", folder, true), !!await linkedFile(pasted, folder, true), !!await linkedFile(old, folder, true), !!await linkedFile(old, folder, false), !!await linkedFile(process.execPath, folder, true)], [true, true, false, true, false]);
   fs.rmSync(old);
+  // Absolute folders link on this PC only, flagged as folders; relative names and remote devices get nothing.
+  const { linkedFiles } = await import("../src/linked-files.ts");
+  assert.deepEqual((await linkedFiles([folder, "docs"], folder)).folders, [folder]); assert.deepEqual(await linkedFiles([folder], folder, true), { found: {}, folders: [] });
   // Wormhole upload takes only what Download would serve (no network here: every request is refused before it starts).
   const upload = body => fetch(`${origin}/s/${id}/api/upload`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin, "content-type": "application/json" }, body: JSON.stringify(body) }).then(r => r.status);
   assert.deepEqual([await upload({ path: ".gitignore" }), await upload({ path: "nope.txt" }), await upload({ path: "top.txt", pack: "rar" })], [404, 404, 400]);
