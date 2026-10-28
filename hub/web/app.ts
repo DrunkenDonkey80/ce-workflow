@@ -735,11 +735,14 @@ const atBottom = (list: HTMLElement) => list.scrollHeight - list.scrollTop - lis
 // growing, images loading or the keyboard opening shrink or grow the list without a scroll event, and must not unpin it.
 let stick = true;
 // Explicit jumps re-pin at once; the scroll event that would do it arrives a frame later.
-function toBottom() { stick = true; pinChat(); $("to-bottom").hidden = true; }
+function toBottom() { stick = true; pinChat(); $("to-bottom").hidden = true; $("composer").classList.remove("tucked"); }
 const pinChat = () => { const list = $("feed"); if (stick) list.scrollTop = list.scrollHeight; };
 // Only moving up unpins: a late scroll event after content grew below finds the list off the end without the reader moving.
 let lastTop = 0;
-$("feed").addEventListener("scroll", () => { const list = $("feed"); if (atBottom(list)) stick = true; else if (list.scrollTop < lastTop - 2) stick = false; lastTop = list.scrollTop; if (stick) $("to-bottom").hidden = true; if (list.scrollTop < 48 && state.more) void loadEarlier(); });
+$("feed").addEventListener("scroll", () => { const list = $("feed"); if (atBottom(list)) stick = true; else if (list.scrollTop < lastTop - 2) stick = false; lastTop = list.scrollTop; if (stick) $("to-bottom").hidden = true;
+ // Phones (CSS): scrolling back tucks the composer away; the end of the chat brings it back. 300 px off the end, so hiding it cannot re-reach the end and flicker.
+ if (stick) $("composer").classList.remove("tucked"); else if (list.scrollHeight - list.scrollTop - list.clientHeight > 300) $("composer").classList.add("tucked");
+ if (list.scrollTop < 48 && state.more) void loadEarlier(); });
 new ResizeObserver(() => { pinChat(); fillChat(); }).observe($("feed"));
 $("feed").addEventListener("load", pinChat, true);
 $("messages").addEventListener("click", event => { const id = (event.target as HTMLElement).closest<HTMLElement>("[data-full]")?.dataset.full; if (id) void loadRow(id); });
@@ -813,12 +816,12 @@ function renderChat() {
 }
 // File paths in chat text (any extension) become links once the hub confirms the file exists (checkFileLinks); images also
 // show as thumbnails (pasted or terminal Alt+V images too). The server shares any file on this PC outside hidden folders.
-// A path in double quotes or backticks may contain spaces; file:/// URLs link to the local path they name.
-const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-])/gi;
+// A path in double quotes or backticks may contain spaces; file:/// URLs link to the local path they name; \\server\share paths link too.
+const LINKED_PATH = /(?<![\w:/\\.-])(?:[A-Za-z]:[\\/]|\\\\|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-])/gi;
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 // Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
 // no colon after that, and a file extension right before the closing quote.
-const QUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/]|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.[A-Za-z][A-Za-z0-9]{0,9}`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
+const QUOTED_PATH = String.raw`(?:[A-Za-z]:[\\/]|\\\\|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.[A-Za-z][A-Za-z0-9]{0,9}`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
 function renderLinks(target: HTMLElement, text: string) {
  target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images); checkFileLinks(target);
 }

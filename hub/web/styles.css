@@ -664,6 +664,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .drawer-backdrop { display: block; position: fixed; z-index: 6; inset: 0; background: rgba(0, 0, 0, .25); }
  .messages { padding: 10px 12px 0; }
  .composer { padding: 6px 8px; }
+ /* Tucked while reading back (app.ts feed scroll); typing keeps it. */
+ .composer.tucked:not(:focus-within) { display: none; }
  textarea { min-height: 40px; }
  .composer-actions { justify-content: flex-end; margin-top: 4px; gap: 4px; }
  /* Six buttons (💾 🎤 EN ★ Stop Queue) on one row on a 375px phone. */
