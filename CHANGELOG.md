@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.94 — 2026-10-28
+
+### Fixed
+- Browser access → Install now registers the browser helper on macOS and Linux (Helium, Chrome, Chromium, Edge, Brave), so browser_fetch and browser_act work there.
+
 ## 0.1.93 — 2026-10-28
 
 ### Added
