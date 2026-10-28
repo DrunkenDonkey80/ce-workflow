@@ -2,11 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.93 — 2026-10-28
 
 ### Added
 - Hub gear menu → Pi and extensions shows the browser extension's version with a Copy path button, to compare with chrome://extensions and Load unpacked or reload it.
 ![Browser extension version and Copy path in the gear menu](docs/changelog/0.1.93-browser-extension.png)
+
+### Fixed
+- Rebuild app now records the checkout's version, so the desktop app row shows it instead of the old one and the hub no longer downloads a release over the local build.
 
 ## 0.1.92 — 2026-10-28
 
