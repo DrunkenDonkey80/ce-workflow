@@ -2,9 +2,9 @@
 // Usage: node hub/app/dev-restart.mjs (a project button runs it; progress and errors go to pi-hub notice when available).
 // The build is staged as pi-hub-app.next like a release, so the app's own start-up swap installs it (P-05).
 import { execFileSync, execSync } from "node:child_process";
-import { copyFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { createAppInstall } from "../src/app-install.ts";
+import { createAppInstall, PACKAGE_VERSION } from "../src/app-install.ts";
 import { hubDataDir } from "../src/registry.ts";
 
 const tauri = fileURLToPath(new URL("./src-tauri/", import.meta.url));
@@ -20,6 +20,9 @@ try {
 	const built = fileURLToPath(new URL(`./src-tauri/target/release/pi-hub-app${process.platform === "win32" ? ".exe" : ""}`, import.meta.url));
 	if (!existsSync(built)) throw new Error(`No build at ${built}`);
 	copyFileSync(built, app.paths.next);
+	// Staged as this checkout's version: the hub shows it after the swap and does not stage the CI release of that version over it.
+	const record = JSON.parse(readFileSync(app.paths.record, "utf8"));
+	writeFileSync(app.paths.record, JSON.stringify({ version: record.version, staged: PACKAGE_VERSION }));
 	app.restart();
 	tell("Desktop app restarted on the local build.");
 } catch (error) {

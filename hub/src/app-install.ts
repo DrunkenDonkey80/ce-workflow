@@ -155,5 +155,5 @@ export function createAppInstall({
 		rmSync(dir, { recursive: true, force: true }); rmSync(shortcut, { force: true });
 		return status();
 	}
-	return { status, install, stage, autoStage, start, stop, restart, uninstall, setLogin, paths: { dir, file, next, lock, shortcut, autostartFile } };
+	return { status, install, stage, autoStage, start, stop, restart, uninstall, setLogin, paths: { dir, file, next, record, lock, shortcut, autostartFile } };
 }
