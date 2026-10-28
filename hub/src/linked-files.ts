@@ -17,10 +17,11 @@ const fail = (status: number, message: string) => Object.assign(new Error(messag
 /** folders: on this PC an absolute folder path also links; it only opens in the file manager (no download, upload or explore). */
 export async function linkedFile(path: unknown, project: string, remote = false, folders = false): Promise<string | undefined> {
 	if (typeof path !== "string" || !path || path.length > 1000 || /[\x00-\x1f]/.test(path)) return undefined;
-	const real = await realpath(resolve(project, fromWindowsPath(path))).catch(() => undefined);
+	const local = fromWindowsPath(path).replace(/^~(?=[\\/])/, homedir()); // ~/x is the home folder, as in a shell
+	const real = await realpath(resolve(project, local)).catch(() => undefined);
 	if (!real || /[\\/]\.[^\\/]/.test(real) || forbiddenPath.test(basename(real))) return undefined;
 	const info = await stat(real).catch(() => undefined);
-	if (folders && !remote && info?.isDirectory() && isAbsolute(fromWindowsPath(path))) return real;
+	if (folders && !remote && info?.isDirectory() && isAbsolute(local)) return real;
 	if (!info?.isFile()) return undefined;
 	if (!remote || IMAGE.test(real) || await inside(real, project)) return real;
 	const recent = Date.now() - info.mtimeMs < RECENT_MS;

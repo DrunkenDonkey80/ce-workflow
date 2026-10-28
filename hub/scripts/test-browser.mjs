@@ -350,6 +350,13 @@ try {
  { const row = { id: "md_row", role: "agent", text: "**Load:** use `Thread.Yield`\n\n| Setup | echo |\n|---|---|\n| RF | **5 ms** |\n\nafter *slow* _fast_ snake_case_name [docs](https://example.com/a) [bad](javascript:alert(1))", streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=md_row] table");
  assert.deepEqual(await evaluate("(() => { const m = document.querySelector('[data-id=md_row]'); return [m.querySelector('b').textContent, m.querySelector('code').textContent, [...m.querySelectorAll('th,td')].map(c => c.textContent), m.textContent.includes('**') || m.textContent.includes('|'), [...m.querySelectorAll('i')].map(i => i.textContent), m.textContent.includes('snake_case_name'), [...m.querySelectorAll('a.chat-link')].map(a => [a.textContent, a.getAttribute('href')]), m.textContent.includes('](')]; })()"), ["Load:", "Thread.Yield", ["Setup", "echo", "RF", "5 ms"], false, ["slow", "fast"], true, [["docs", "https://example.com/a"]], false]);
+ // A POSIX folder (/a/b, end of sentence) links as a folder; /wo commands and and/or stay text.
+ {
+  const dir = join(pasted, "..").replaceAll("\\", "/").replace(/^[A-Za-z]:/, "");
+  const row = { id: "posix_row", role: "agent", text: `All three are in ${dir}/. Run /wo compact and/or retry.`, streaming: false }; chatRows.set(row.id, row); publish("message", row);
+  await browser("wait", "[data-id=posix_row]"); await verified("posix_row");
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('[data-id=posix_row] .file-link')].map(a => [a.textContent, 'folder' in a.dataset])"), [[dir, true]], "POSIX folders link");
+ }
  // Quoted or backticked paths may hold spaces (and _ that is not italics); file:/// URLs link to their decoded path.
  {
   const spaced = join(pasted, "..", "_pi_ hub spaces", "shot one.png"), decoded = spaced.replaceAll("\\", "/"), fileUrl = "file:///" + decoded.replace(/^\//, "").replaceAll(" ", "%20"), bare = process.platform === "win32" ? "C:\\tmp\\a.png" : "/tmp/a.png";

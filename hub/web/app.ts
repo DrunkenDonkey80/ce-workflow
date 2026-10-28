@@ -817,13 +817,14 @@ function renderChat() {
 // File paths in chat text (any extension) become links once the hub confirms the file exists (checkFileLinks); images also
 // show as thumbnails (pasted or terminal Alt+V images too). The server shares any file on this PC outside hidden folders.
 // A path in double quotes or backticks may contain spaces; file:/// URLs link to the local path they name; \\server\share paths link too.
-// An absolute path (C:\x, \\server\share\x) links without an extension too, so folders open (this PC only); trailing .,;!? stay text.
-const LINKED_PATH = /(?<![\w:/\\.-])(?:(?:[A-Za-z]:|\\\\[^\s"'`<>|*?()[\]:\\/]+)(?:[\\/][^\s"'`<>|*?()[\]:\\/]+)*[\\/][^\s"'`<>|*?()[\]:\\/]*[^\s"'`<>|*?()[\]:\\/.,;!?]|(?:[A-Za-z]:[\\/]|\\\\|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-]))/gi;
+// An absolute path (C:\x, \\server\share\x, /a/b, ~/a/b) links without an extension too, so folders open (this PC only); trailing .,;!? stay text.
+// A POSIX one needs two parts, so /wo and other slash commands stay text.
+const LINKED_PATH = /(?<![\w:/\\.-])(?:(?:[A-Za-z]:|\\\\[^\s"'`<>|*?()[\]:\\/]+|~?\/[^\s"'`<>|*?()[\]:\\/]+)(?:[\\/][^\s"'`<>|*?()[\]:\\/]+)*[\\/][^\s"'`<>|*?()[\]:\\/]*[^\s"'`<>|*?()[\]:\\/.,;!?]|(?:[A-Za-z]:[\\/]|\\\\|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-]))/gi;
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
 // Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
 // no colon after that, and a file extension right before the closing quote.
-// An absolute one (C:\x, \\server\x) needs no extension, so quoted folders link too.
-const QUOTED_PATH = String.raw`(?:(?:[A-Za-z]:[\\/]|\\\\)[^"\x60<>|*?:\r\n]*[^"\x60<>|*?:\r\n\\/ .]|(?:[A-Za-z]:[\\/]|\\\\|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.[A-Za-z][A-Za-z0-9]{0,9})`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
+// An absolute one (C:\x, \\server\x, /a/b, ~/a/b) needs no extension, so quoted folders link too.
+const QUOTED_PATH = String.raw`(?:(?:[A-Za-z]:[\\/]|\\\\|~?\/[^\s"\x60<>|*?:\\/]+\/)[^"\x60<>|*?:\r\n]*[^"\x60<>|*?:\r\n\\/ .]|(?:[A-Za-z]:[\\/]|\\\\|[\\/]?[^\s"\x60<>|*?:\\/]+[\\/])[^"\x60<>|*?:\r\n]*?\.[A-Za-z][A-Za-z0-9]{0,9})`, WHOLE_QUOTED_PATH = new RegExp("^" + QUOTED_PATH + "$", "i");
 function renderLinks(target: HTMLElement, text: string) {
  target.replaceChildren(); const images = new Set<string>(); renderMarkdown(target, text, images); appendThumbs(target, images); checkFileLinks(target);
 }
