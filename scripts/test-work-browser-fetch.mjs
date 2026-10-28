@@ -115,7 +115,58 @@ async function roundTrip() {
 
 	const requests = [], fetched = [], tabs = new Map(), removed = [];
 	let rules = [], tabId = 1;
-	const listeners = { message: [], disconnect: [], error: [], click: [] };
+	const listeners = { message: [], disconnect: [], error: [], click: [], created: [], closedTab: [], detach: [], alarm: [] };
+	// browser_act fake page (plan 607b2518 P3-06): AX nodes with boxes; links navigate through the DNR rules, "opens" spawns a tab.
+	const node = (id, role, name, tag, box, extra = {}) => ({ id, role, name, tag, box, ...extra });
+	const pages = {
+		"https://shop.test/act": [
+			node(10, "button", "Delete item", "button", [10, 300, 80, 20]), node(11, "heading", "Shop", "h1", [10, 5, 100, 30]), node(12, "button", "Save", "button", [10, 50, 60, 20]),
+			node(13, "textbox", "Password", "input", [10, 80, 100, 20], { type: "password" }), node(14, "link", "Away", "a", [10, 110, 40, 20], { href: "https://away.test/" }),
+			node(15, "link", "Popup", "a", [60, 110, 40, 20], { opens: "https://pop.test/" }), node(16, "combobox", "Country", "select", [10, 140, 100, 20], { options: ["BG", "US"], value: "BG" }),
+			node(17, "textbox", "Search", "input", [10, 170, 100, 20]), node(18, "link", "Hidden menu", "a", undefined), node(19, "generic", "wrapper", "div", [0, 0, 800, 600]),
+		],
+		"https://away.test/": [node(20, "heading", "Away", "h1", [10, 5, 100, 30])],
+	};
+	const cdpLog = [], typed = [], alarms = new Map(), attached = new Set();
+	const nodesOf = tabId => pages[tabs.get(tabId)?.url] ?? [];
+	const findNode = (tabId, id) => { const n = nodesOf(tabId).find(entry => entry.id === id); if (!n) throw new Error("No node with given id found"); return n; };
+	const ax = n => ({ nodeId: String(n.id), ignored: n.role === "generic", role: { value: n.role }, name: { value: n.name }, backendDOMNodeId: n.id, ...(n.value ? { value: { value: n.value } } : {}) });
+	const at = (tabId, x, y) => nodesOf(tabId).find(n => n.box && n.role !== "generic" && x >= n.box[0] && x <= n.box[0] + n.box[2] && y >= n.box[1] && y <= n.box[1] + n.box[3]);
+	let focused;
+	const sendCommand = async ({ tabId }, method, params = {}) => {
+		if (!attached.has(tabId)) throw new Error("Debugger is not attached to the tab");
+		cdpLog.push(method);
+		const objectNode = () => findNode(tabId, Number(String(params.objectId).slice(1)));
+		switch (method) {
+			case "Accessibility.getFullAXTree": return { nodes: nodesOf(tabId).map(ax) };
+			case "Accessibility.getPartialAXTree": return { nodes: [ax(findNode(tabId, params.backendNodeId))] };
+			case "DOM.getBoxModel": { const b = findNode(tabId, params.backendNodeId).box; if (!b) throw new Error("Could not compute box model."); const [x, y, w, h] = b; return { model: { border: [x, y, x + w, y, x + w, y + h, x, y + h] } }; }
+			case "DOM.resolveNode": return { object: { objectId: `o${findNode(tabId, params.backendNodeId).id}` } };
+			case "DOM.describeNode": return { node: { backendNodeId: objectNode().id } };
+			case "DOM.getNodeForLocation": { const n = at(tabId, params.x, params.y); if (!n) throw new Error("No node found at given location"); return { backendNodeId: n.id }; }
+			case "DOM.focus": focused = params.backendNodeId; return {};
+			case "Input.insertText": typed.push([findNode(tabId, focused).name, params.text]); return {};
+			case "Input.dispatchKeyEvent": if (params.type === "keyDown") typed.push([findNode(tabId, focused).name, params.key]); return {};
+			case "Input.dispatchMouseEvent": {
+				const n = params.type === "mouseReleased" && at(tabId, params.x, params.y);
+				if (n) typed.push([n.name, "click"]);
+				if (n?.href) navigate(tabs.get(tabId), n.href);
+				if (n?.opens) { const tab = { id: 900 + tabs.size, url: "", pendingUrl: n.opens, openerTabId: tabId, status: "loading" }; tabs.set(tab.id, tab); listeners.created.forEach(f => f(tab)); }
+				return {};
+			}
+			case "Runtime.callFunctionOn": {
+				const n = objectNode(), fn = params.functionDeclaration;
+				if (fn.startsWith("function elementFacts")) return { result: { value: { tag: n.tag, type: n.type ?? "", autocomplete: "", isSubmit: false, formPayment: false, formSubmitNames: [] } } };
+				if (fn.startsWith("function clickable")) return { result: { objectId: params.objectId } };
+				if (fn.startsWith("function pickOption")) { const value = params.arguments[0].value; if (!n.options?.includes(value)) return { result: { value: `no option "${value}"` } }; n.value = value; return { result: { value: "" } }; }
+				return { result: {} };
+			}
+			case "Runtime.evaluate": return { result: { value: params.expression.includes("iframe") ? ["https://ads.test/f"] : undefined } };
+			case "Page.captureScreenshot": return { data: Buffer.from([137, 80, 78, 71]).toString("base64") };
+			default: return {};
+		}
+	};
+
 	const redirects = { "https://shop.test/go": "https://other.test/page", "https://shop.test/loop": "https://mail.google.com/" };
 	const domainHit = (host, list) => list?.some(d => host === d || host.endsWith(`.${d}`));
 	const decide = (tab, url) => {
@@ -125,7 +176,8 @@ async function roundTrip() {
 		hits.sort((a, b) => b.priority - a.priority);
 		return hits[0]?.action.type ?? "allow";
 	};
-	const navigate = (tab, url) => {
+	const navigate = (tab, url, push = true) => {
+		if (push) (tab.history ??= []).push(tab.url);
 		for (let hop = url; ;) {
 			if (decide(tab.id, hop) === "block") { Object.assign(tab, { url: hop, status: "complete" }); setTimeout(() => listeners.error.forEach(f => f({ tabId: tab.id, type: "main_frame", url: hop, error: "net::ERR_BLOCKED_BY_CLIENT" }))); return; }
 			requests.push(hop);
@@ -147,7 +199,18 @@ async function roundTrip() {
 			update: async (id, { url }) => { navigate(tabs.get(id), url); return tabs.get(id); },
 			get: async id => { if (!tabs.has(id)) throw new Error("no tab"); return { ...tabs.get(id) }; },
 			remove: async id => { tabs.delete(id); removed.push(id); },
-			onRemoved: { addListener() {} },
+			onRemoved: { addListener: f => listeners.closedTab.push(f) },
+			onCreated: { addListener: f => listeners.created.push(f) },
+			query: async () => [{ id: 0, windowId: 1, index: 0 }],
+			group: async () => 7,
+			goBack: async id => { const tab = tabs.get(id), previous = tab.history?.pop(); if (!previous) throw new Error("no history"); navigate(tab, previous, false); },
+		},
+		tabGroups: { query: async () => [], update: async () => {} },
+		debugger: {
+			attach: async ({ tabId }) => { attached.add(tabId); },
+			detach: async ({ tabId }) => { attached.delete(tabId); },
+			sendCommand,
+			onDetach: { addListener: f => listeners.detach.push(f) },
 		},
 		scripting: {
 			executeScript: async ({ target, func }) => {
@@ -161,18 +224,131 @@ async function roundTrip() {
 		webRequest: { onErrorOccurred: { addListener: f => listeners.error.push(f) } },
 		action: { onClicked: { addListener: f => listeners.click.push(f) }, setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {}, setTitle: async () => {} },
 		storage: { local: { get: async () => ({}), set: async () => {} } },
-		alarms: { create() {}, onAlarm: { addListener() {} } },
+		alarms: { create: (name, info) => { if (info?.when) alarms.set(name, info.when); }, clear: name => alarms.delete(name), onAlarm: { addListener: f => listeners.alarm.push(f) } },
 	};
 	const fakeFetch = async (url, init) => {
 		fetched.push({ url, credentials: init.credentials, redirect: init.redirect });
 		const html = url.endsWith(".html");
 		return new Response(html ? "<p>" : new Uint8Array([1, 2, 3]), { headers: { "content-type": html ? "text/html" : "image/png" } });
 	};
-	vm.runInNewContext(readFileSync(new URL("../browser-fetch/extension/background.js", import.meta.url), "utf8"),
-		{ chrome, fetch: fakeFetch, AbortSignal, AbortController, setTimeout, clearTimeout, URL, btoa, console }, { filename: "background.js" });
+	const worker = vm.createContext({ chrome, fetch: fakeFetch, AbortSignal, AbortController, setTimeout, clearTimeout, URL, btoa, console });
+	const load = name => vm.runInContext(readFileSync(new URL(`../browser-fetch/extension/${name}`, import.meta.url), "utf8"), worker, { filename: name });
+	worker.importScripts = load;
+	load("background.js");
 
 	const dns = async host => [{ address: host === "private.test" ? "10.0.0.5" : "93.184.216.34" }];
 	const quiet = { cwd: agent, hasUI: false };
+
+	// browser_act through the real host and the real add-on code (control.js) with the fake debugger (P3-06).
+	async function controlRoundTrip() {
+		const act = await import("../extensions/browser-act.ts");
+		const until = Date.now() + 600_000;
+		await updatePolicy(p => { p.control["shop.test"] = { until }; });
+		let picks = [];
+		const ctx = { cwd: agent, hasUI: true, ui: { notify() {}, select: async (_title, labels) => { const want = picks.shift(); return want && labels.find(l => l.startsWith(want)); } } };
+		const go = p => act.browserAct(ctx, p, undefined, { resolve: dns });
+		const refOf = (snap, name) => snap.match(new RegExp(`\\[(e\\d+)\\] \\w+ "${name}"`))[1];
+		const agentTab = () => [...tabs.values()].find(tab => attached.has(tab.id));
+		try {
+			assert.match(await go({ action: "open", url: "https://shop.test/act" }), /URL: https:\/\/shop\.test\/act/);
+			const tab = agentTab();
+			assert.ok(tab, "the debugger is attached to the agent tab (D4)");
+			assert.equal([...alarms.entries()].find(([name]) => name.startsWith("control:"))[1], until, "the deadline alarm matches the grant (D20)");
+			let snap = await go({ action: "snapshot" });
+			const lines = snap.split("\n").filter(line => line.startsWith("["));
+			assert.deepEqual(lines.slice(0, 3), ['[e1] heading "Shop" @(10,5 100x30)', '[e2] button "Save" @(10,50 60x20)', '[e3] textbox "Password" @(10,80 100x20)'], "sorted by position (D22)");
+			assert.match(snap, /\[e\d+\] combobox "Country" = "BG"/);
+			assert.match(snap, /\[frame\] https:\/\/ads\.test\/f/);
+			assert.ok(!/Hidden menu|wrapper/.test(snap), "boxless and ignored nodes are dropped");
+			// Click, type, select, password refusal, risky confirm.
+			await go({ action: "click", ref: refOf(snap, "Save") });
+			snap = await go({ action: "snapshot" });
+			await assert.rejects(go({ action: "type", ref: refOf(snap, "Password"), text: "hunter2" }), /password/);
+			await go({ action: "type", ref: refOf(snap, "Search"), text: "shoes", submit: true });
+			snap = await go({ action: "snapshot" });
+			await go({ action: "select", ref: refOf(snap, "Country"), value: "US" });
+			snap = await go({ action: "snapshot" });
+			assert.match(snap, /combobox "Country" = "US"/);
+			await assert.rejects(go({ action: "select", ref: refOf(snap, "Country"), value: "XX" }), /no option "XX"/);
+			snap = await go({ action: "snapshot" });
+			picks = ["Deny"];
+			await assert.rejects(go({ action: "click", ref: refOf(snap, "Delete item") }), /did not allow/);
+			picks = ["Allow this action"];
+			await go({ action: "click", x: 20, y: 305 });
+			assert.deepEqual(typed, [["Save", "click"], ["Search", "shoes"], ["Search", "Enter"], ["Delete item", "click"]], "only allowed actions reach the page");
+			await assert.rejects(go({ action: "click", x: 700, y: 700 }), /Nothing at \(700, 700\)/);
+			// D18: a link to another site is stopped before any request; approval needs a repeat, which then loads.
+			snap = await go({ action: "snapshot" });
+			picks = ["Allow control of away.test for 10 minutes"];
+			assert.match(await go({ action: "click", ref: refOf(snap, "Away") }), /URL: https:\/\/shop\.test\/act[\s\S]*repeat the action/);
+			assert.ok(!requests.includes("https://away.test/"), "the blocked navigation got no request");
+			snap = await go({ action: "snapshot" });
+			assert.match(await go({ action: "click", ref: refOf(snap, "Away") }), /URL: https:\/\/away\.test\//);
+			assert.ok(requests.includes("https://away.test/"));
+			assert.match(await go({ action: "back" }), /URL: https:\/\/shop\.test\/act/);
+			// D19: a spawned tab is closed and reported.
+			snap = await go({ action: "snapshot" });
+			const closedBefore = removed.length;
+			assert.match(await go({ action: "click", ref: refOf(snap, "Popup") }), /new tab for https:\/\/pop\.test\/; it was closed/);
+			assert.equal(removed.length, closedBefore + 1);
+			// Scroll, stale ref, screenshot saved by the host (D10).
+			assert.match(await go({ action: "scroll", direction: "down" }), /Done/);
+			const shot = (await go({ action: "screenshot" })).match(/saved: (.+\.png)/)[1];
+			assert.deepEqual([...readFileSync(shot)], [137, 80, 78, 71]);
+			assert.ok(shot.startsWith(imageDir));
+			// D15: another socket cannot steer this session; its own session fails closed on changed facts (D16).
+			const other = net.connect(pipe), answers = [];
+			await new Promise(resolve => other.once("connect", resolve));
+			other.setEncoding("utf8");
+			other.on("data", chunk => answers.push(...chunk.trim().split("\n").map(line => JSON.parse(line))));
+			const cdpBefore = cdpLog.length, sid = [...alarms.keys()].find(name => name.startsWith("control:")).slice(8);
+			other.write(`${JSON.stringify({ type: "act", id: sid, seq: 1, action: "snapshot", hosts: ["shop.test"], blocked: [], until })}\n`);
+			other.write(`${JSON.stringify({ type: "control-close", id: sid })}\n`);
+			other.write(`${JSON.stringify({ type: "control-open", id: "other-1" })}\n`);
+			other.write(`${JSON.stringify({ type: "act", id: "other-1", seq: 1, action: "open", url: "https://shop.test/act", hosts: ["shop.test"], blocked: [], until })}\n`);
+			other.write(`${JSON.stringify({ type: "act", id: "other-1", seq: 2, action: "click", phase: "execute", x: 20, y: 55, facts: { name: "Save" }, hosts: ["shop.test"], blocked: [], until })}\n`);
+			await sleep(1500);
+			assert.ok(!answers.some(m => m.id === sid), "a foreign socket gets nothing for this session");
+			assert.ok(tabs.has(tab.id), "a foreign control-close is ignored");
+			assert.match(answers.find(m => m.id === "other-1" && m.seq === 2)?.error ?? "", /changed since it was checked/);
+			assert.ok(cdpLog.length > cdpBefore);
+			// The owner socket closing ends its session in the browser (D15).
+			const otherTab = [...tabs.values()].find(t => attached.has(t.id) && t.id !== tab.id).id;
+			other.destroy();
+			await sleep(200);
+			assert.ok(!tabs.has(otherTab) && !attached.has(otherTab), "disconnect closes the session's tab");
+			// The deadline alarm, the pause button, the debugger bar and closing the tab each end control (D20, R15).
+			const ends = [
+				[() => listeners.alarm.forEach(f => f({ name: [...alarms.keys()].find(name => name.startsWith("control:")) })), /grant expired/],
+				[async () => { for (const click of listeners.click) await click(); }, /paused/],
+				[() => listeners.detach.forEach(f => f({ tabId: agentTab().id })), /debugger was detached/],
+				[() => listeners.closedTab.forEach(f => f(agentTab().id)), /agent tab was closed/],
+			];
+			for (const [end, why] of ends) {
+				if (!agentTab()) await go({ action: "open", url: "https://shop.test/act" });
+				const id = agentTab().id;
+				await end();
+				await sleep(100);
+				assert.ok(!attached.has(id) && removed.includes(id), `${why}: tab closed and debugger detached`);
+				await assert.rejects(go({ action: "snapshot" }), /no page is open/);
+				assert.match(readFileSync(bf.logFile(), "utf8"), why);
+				if (/paused/.test(String(why))) {
+					await assert.rejects(go({ action: "open", url: "https://shop.test/act" }), /paused/i);
+					for (const click of listeners.click) await click();
+				}
+			}
+			assert.equal([...alarms.keys()].filter(name => name.startsWith("control:")).length, 0, "no deadline alarm outlives its session");
+			// Pi closing the session closes the tab.
+			await go({ action: "open", url: "https://shop.test/act" });
+			const last = agentTab().id;
+			act.closeSession();
+			await sleep(100);
+			assert.ok(!tabs.has(last), "control-close closes the tab");
+		} finally {
+			act.closeSession();
+			await updatePolicy(p => { p.control = {}; });
+		}
+	}
 	const run = (ctx, params, signal) => bf.browserFetch(ctx, params, signal, { resolve: dns });
 	try {
 		await updatePolicy(p => { p.grants["shop.test"] = { until: null }; });
@@ -247,6 +423,8 @@ async function roundTrip() {
 		const log = readFileSync(bf.logFile(), "utf8").trim().split("\n").map(line => JSON.parse(line));
 		assert.ok(log.some(entry => entry.outcome === "ok" && entry.finalUrl === "https://other.test/page"));
 		assert.ok(log.some(entry => entry.outcome === "refused" && /not approved/.test(entry.by)));
+
+		await controlRoundTrip();
 	} finally {
 		toHost.end();
 		await sleep(100);

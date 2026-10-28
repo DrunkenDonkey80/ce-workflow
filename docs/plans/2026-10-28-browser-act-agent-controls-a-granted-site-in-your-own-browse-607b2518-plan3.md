@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-28
-updated: 2026-10-28T19:54:13.157Z
+updated: 2026-10-28T20:01:53.637Z
 reviewed: 2026-10-28
 started: 2026-10-28T19:39:33.590Z
 ---
@@ -189,14 +189,13 @@ None.
 
 ### Phase 3: Browser add-on: control session [code]
 
-- [ ] **P3-01** Add the `debugger` and `tabGroups` permissions; open and reuse the agent tab in a "Pi" tab group (D11, D7).
-- [ ] **P3-07** host.mjs: own control sessions per D15 (control-open, act by seq, control-close, close on socket end); real-host test with several actions in C1.
-- [ ] **P3-02** Snapshot with refs and boxes per P1-02; keep a ref map per tab, refreshed on each snapshot; stale refs fail clearly.
-- [ ] **P3-03** Actions through CDP per D16 and D17: click by ref or point, type, select, scroll, back; re-resolve the target before dispatch.
-- [ ] **P3-04** Screenshot via `Page.captureScreenshot`, saved by the host to a temp PNG (D10).
-- [ ] **P3-05** Gate navigation per D18 and close spawned tabs per D19; pause and the D20 deadline alarm detach and close the tab.
-- [ ] **P3-06** Extend the vm harness in C1 with a fake `chrome.debugger`; cover attach, refs, pause, deadline, spawned tab and detach; run C1.
-  - Also: an approved POST is not replayed, a denied host gets no request (rule check), a stale ref fails. This is mocked CDP evidence, not Helium evidence.
+- [x] **P3-01** manifest gains debugger and tabGroups; control.js (importScripts from background.js) opens one background agent tab next to the active one, in a blue "Pi" group, kept per session.
+- [x] **P3-07** host.mjs owns control-open/act/control-close per socket (foreign sockets dropped), saves result.png as shot-NNN.png and sends path; socket close sends cancel which ends the session.
+- [x] **P3-02** Snapshot from Accessibility.getFullAXTree + DOM.getBoxModel in chunks of 50, sorted by y,x, refs per session cleared on every navigating action; unknown/removed refs fail asking for a new snapshot.
+- [x] **P3-03** click (ref or hit-tested point via clickable()), type (select-all + Input.insertText, optional Enter), select (<select> by value or text), scroll, back via CDP trusted input; execute re-resolves and refuses when node/facts/url changed.
+- [x] **P3-04** Page.captureScreenshot PNG relayed as base64 and saved by host.mjs under the image dir; Pi returns the path.
+- [x] **P3-05** Tab-scoped DNR rules reused (rules()), blocked main-frame URLs reported and the error page undone; spawned tabs closed and reported, window.open/target rewritten to same tab; alarm, pause, debugger detach, tab close and port drop end the session with a closed message.
+- [x] **P3-06** C1 controlRoundTrip covers attach, alarm deadline, snapshot order/filters/frames, click/type/select/password/risk, point click, blocked nav no request + repeat, back, spawned tab, scroll, screenshot file, foreign socket ownership, D16 changed-facts refusal, disconnect, alarm/pause/detach/tab close/closeSession endings.
 
 ### Phase 4: Live check [code]
 

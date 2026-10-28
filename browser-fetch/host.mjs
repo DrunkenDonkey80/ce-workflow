@@ -57,9 +57,11 @@ export function runHost({ input = process.stdin, output = process.stdout, pipe =
 				let message;
 				try { message = JSON.parse(line); } catch { continue; }
 				if (typeof message?.id !== "string" || !/^[\w-]{1,64}$/.test(message.id)) continue;
-				if (message.type === "fetch") { owners.set(message.id, socket); mine.add(message.id); }
-				else if (owners.get(message.id) !== socket) continue; // only the requester steers its request
-				if (message.type === "done") { owners.delete(message.id); mine.delete(message.id); }
+				const owner = owners.get(message.id);
+				if (owner !== undefined && owner !== socket) continue; // only the requester steers its request or control session
+				if (message.type === "fetch" || message.type === "control-open") { owners.set(message.id, socket); mine.add(message.id); }
+				else if (owner === undefined) continue;
+				if (message.type === "done" || message.type === "control-close") { owners.delete(message.id); mine.delete(message.id); }
 				toBrowser(message);
 			}
 		});
@@ -79,9 +81,21 @@ export function runHost({ input = process.stdin, output = process.stdout, pipe =
 		toPi(owner, { type: "image", id: message.id, url: message.url, path: file, bytes: data.length });
 	};
 
+	// browser_act screenshots (plan 607b2518 D10): saved like images, the path goes to Pi instead of the pixels.
+	const saveShot = ({ png, ...message }) => {
+		const owner = owners.get(message.id), data = Buffer.from(png, "base64");
+		if (!owner) return;
+		if (!data.length || data.length > MAX_FRAME || !Number.isSafeInteger(message.seq)) return toPi(owner, { type: "error", id: message.id, seq: message.seq, error: "The screenshot was empty or too large." });
+		const dir = path.join(imageDir, message.id), file = path.join(dir, `shot-${String(message.seq).padStart(3, "0")}.png`);
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(file, data);
+		toPi(owner, { ...message, path: file });
+	};
+
 	const reading = (async () => {
 		for await (const message of frames(input)) {
 			if (message.type === "image") saveImage(message);
+			else if (message.type === "result" && typeof message.png === "string") saveShot(message);
 			else if (typeof message.id === "string" && owners.has(message.id)) toPi(owners.get(message.id), message);
 		}
 	})();

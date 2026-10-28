@@ -18,6 +18,7 @@ function connect() {
 	port.onDisconnect.addListener(() => {
 		port = undefined;
 		for (const id of [...jobs.keys()]) finish(id);
+		closeAllControl();
 	});
 }
 
@@ -56,6 +57,7 @@ function finish(id) {
 }
 
 async function onMessage(m) {
+	if (["control-open", "act", "control-close"].includes(m.type) || (m.type === "cancel" && sessions.has(m.id))) return onControl(m); // browser_act (control.js)
 	const job = jobs.get(m.id);
 	if (m.type === "fetch") return start(m);
 	if (!job) return;
@@ -191,3 +193,4 @@ chrome.runtime.onInstalled.addListener(connect);
 chrome.alarms.create("reconnect", { periodInMinutes: 1 });
 chrome.alarms.onAlarm.addListener(connect);
 connect();
+importScripts("control.js");

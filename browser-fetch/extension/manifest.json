@@ -7,6 +7,6 @@
   "icons": { "32": "icon.png" },
   "action": { "default_title": "Pi browser fetch: on (click to pause)", "default_icon": "icon.png" },
   "background": { "service_worker": "background.js" },
-  "permissions": ["nativeMessaging", "tabs", "scripting", "declarativeNetRequest", "webRequest", "storage", "alarms"],
+  "permissions": ["nativeMessaging", "tabs", "scripting", "declarativeNetRequest", "webRequest", "storage", "alarms", "debugger", "tabGroups"],
   "host_permissions": ["<all_urls>"]
 }

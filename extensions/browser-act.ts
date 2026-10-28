@@ -89,7 +89,8 @@ async function openSession(): Promise<Session> {
 	link.handlers.set(s.id, message => {
 		if (message.type === "closed" || message.type === "error" && message.seq === undefined) {
 			// pause, deadline alarm, tab closed by the user, or the pipe dropped (D20)
-			if (session === s) closeSession(String(message.reason ?? message.error ?? "closed by the browser"));
+			const reason = String(message.reason ?? message.error ?? "closed by the browser");
+			if (session === s) { logFetch({ tool: "browser_act", site: s.host, outcome: "closed", by: reason }); closeSession(reason); }
 			return;
 		}
 		s.waiting.get(message.seq)?.(message);
