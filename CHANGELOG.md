@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.96 — 2026-10-28
 
 ### Changed
 - browser_act opens its tab in front so you watch every click and what it types (browser extension 1.2: reload it in chrome://extensions).
