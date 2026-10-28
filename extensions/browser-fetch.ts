@@ -406,18 +406,21 @@ export const BROWSER_KEYS = ["imput\\Helium", "Google\\Chrome", "Microsoft\\Edge
 export const browserFolders = (home = os.homedir()) => process.platform === "darwin"
 	? ["net.imput.helium", "Google/Chrome", "Chromium", "Microsoft Edge", "BraveSoftware/Brave-Browser"].map(name => path.join(home, "Library", "Application Support", name))
 	: ["net.imput.helium", "google-chrome", "chromium", "microsoft-edge", "BraveSoftware/Brave-Browser"].map(name => path.join(home, ".config", name));
+/** The launcher the browser starts: this node's absolute path (a Finder-started browser has no shell PATH) running the package's host.mjs. */
+export function writeLauncher(dir = fetchDir()) {
+	const node = /^node(\.exe)?$/i.test(path.basename(process.execPath)) ? process.execPath : "node";
+	const win = process.platform === "win32", launcher = path.join(dir, "host", win ? "host.bat" : "host.sh"), host = path.join(path.resolve(packageDir()), "host.mjs");
+	writeFileSync(launcher, win ? `@echo off\r\n"${node}" "${host}"\r\n` : `#!/bin/sh\nexec "${node}" "${host}"\n`);
+	if (!win) chmodSync(launcher, 0o755);
+	return launcher;
+}
 export async function install(exec: (cmd: string, args: string[]) => Promise<{ code: number; stderr?: string }>, dir = fetchDir(), folders = browserFolders()) {
 	const source = path.resolve(packageDir()), extension = path.join(source, "extension"), hostDir = path.join(dir, "host");
 	mkdirSync(hostDir, { recursive: true });
 	let id: string;
 	try { id = extensionId(JSON.parse(readFileSync(path.join(extension, "manifest.json"), "utf8")).key); }
 	catch (error) { throw new Error(`Browser fetch extension manifest is unreadable: ${(error as Error).message}`); }
-	const node = /^node(\.exe)?$/i.test(path.basename(process.execPath)) ? process.execPath : "node";
-	const win = process.platform === "win32";
-	const launcher = path.join(hostDir, win ? "host.bat" : "host.sh");
-	const host = path.join(source, "host.mjs");
-	writeFileSync(launcher, win ? `@echo off\r\n"${node}" "${host}"\r\n` : `#!/bin/sh\nexec "${node}" "${host}"\n`);
-	if (!win) chmodSync(launcher, 0o755);
+	const win = process.platform === "win32", launcher = writeLauncher(dir);
 	const manifest = hostManifest(dir);
 	writeFileSync(manifest, JSON.stringify({ name: HOST_NAME, description: "Pi browser fetch", path: launcher, type: "stdio", allowed_origins: [`chrome-extension://${id}/`] }, null, 1));
 	const failed: string[] = [], registered: string[] = [];
@@ -510,5 +513,8 @@ export async function browserAccessMenu(ctx, pi) {
 
 export default function browserFetchExtension(pi) {
 	// Only where Install ran (host manifest written); a closed browser still keeps the tool, its error says to open it.
-	if (existsSync(hostManifest())) pi.registerTool?.(browserFetchTool());
+	if (!existsSync(hostManifest())) return;
+	// Refresh the launcher on every load: a node upgrade can move node's path, and the browser would silently fail to start the old one.
+	try { writeLauncher(); } catch { /* the old launcher stays */ }
+	pi.registerTool?.(browserFetchTool());
 }

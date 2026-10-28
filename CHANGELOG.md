@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.95 — 2026-10-28
+
+### Fixed
+- The browser helper keeps working after a node upgrade: Pi points it at the current node every time it starts, instead of only at Install.
+
 ## 0.1.94 — 2026-10-28
 
 ### Fixed
