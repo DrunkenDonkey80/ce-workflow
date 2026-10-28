@@ -241,6 +241,7 @@ async function finishPage(ctx, s: Session, result, done, signal: AbortSignal | u
 		if (g.refused === undefined) { s.hosts.add(g.host!); notes.push(`The page tried to go to ${url}; it was stopped before loading. The user approved that site: repeat the action to continue.`); }
 		else notes.push(`The page tried to go to ${url}; it was stopped before loading (${g.refused}).`);
 	}
+	for (const text of Array.isArray(result.dialogs) ? result.dialogs.map(String) : []) notes.push(`The page showed a dialog, which was cancelled (UNTRUSTED text): ${text}`);
 	for (const url of Array.isArray(result.spawned) ? result.spawned.map(String) : []) notes.push(`The page opened a new tab for ${url}; it was closed. Use action open with that url to go there.`);
 	if (result.url !== s.itemsUrl) s.items = []; // refs belong to the page they came from; the add-on rechecks each target anyway (D16)
 	done("ok", { finalUrl: result.url, blocked: result.blocked, spawned: result.spawned });

@@ -46,7 +46,7 @@ const call = async (s, objectId, fn, args = [], byValue = true) => (await cdp(s,
 async function onControl(m) {
 	if (m.type === "control-open") {
 		if (paused) return send({ type: "closed", id: m.id, reason: "paused by the user (the Pi browser fetch toolbar button)" });
-		if (!sessions.has(m.id)) sessions.set(m.id, { id: m.id, hosts: [], blocked: [], base: nextControlRule, queue: Promise.resolve(), refs: new Map(), stopped: [], spawned: [] });
+		if (!sessions.has(m.id)) sessions.set(m.id, { id: m.id, hosts: [], blocked: [], base: nextControlRule, queue: Promise.resolve(), refs: new Map(), stopped: [], spawned: [], dialogs: [] });
 		nextControlRule = nextControlRule > 9_000_000 ? 2_000_000 : nextControlRule + 50;
 		return;
 	}
@@ -222,7 +222,7 @@ async function after(s, ms, before) {
 		const tab = await chrome.tabs.get(s.tab);
 		if (s.stopped.includes(tab.url)) { await chrome.tabs.goBack(s.tab).catch(() => {}); await sleep(400); }
 	}
-	return { ...await page(s), blocked: s.stopped.splice(0), spawned: s.spawned.splice(0) };
+	return { ...await page(s), blocked: s.stopped.splice(0), spawned: s.spawned.splice(0), dialogs: s.dialogs.splice(0) };
 }
 
 function endSession(id, reason) {
@@ -250,6 +250,15 @@ chrome.tabs.onCreated.addListener(tab => {
 	if (!s) return;
 	s.spawned.push(tab.pendingUrl || tab.url || "");
 	chrome.tabs.remove(tab.id).catch(() => {});
+});
+// Page dialogs block a hidden tab: leaving the page is the agent's own request, anything else is cancelled and reported.
+// shortcut: confirm() is always cancelled, so sites that confirm with a native dialog cannot be completed; accept it after a D16 approval if needed.
+chrome.debugger.onEvent.addListener((source, method, params) => {
+	const s = method === "Page.javascriptDialogOpening" && sessionOf(source.tabId);
+	if (!s) return;
+	const accept = params.type === "beforeunload";
+	if (!accept) s.dialogs.push(`${params.type}: ${String(params.message ?? "").slice(0, 300)}`);
+	cdp(s, "Page.handleJavaScriptDialog", { accept }).catch(() => {});
 });
 chrome.tabs.onRemoved.addListener(tabId => { const s = sessionOf(tabId); if (s) endSession(s.id, "ended: the agent tab was closed"); });
 chrome.debugger.onDetach.addListener(source => { const s = sessionOf(source.tabId); if (s) endSession(s.id, "ended: the debugger was detached (the debugging bar was cancelled)"); });

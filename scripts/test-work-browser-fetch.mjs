@@ -115,7 +115,7 @@ async function roundTrip() {
 
 	const requests = [], fetched = [], tabs = new Map(), removed = [];
 	let rules = [], tabId = 1;
-	const listeners = { message: [], disconnect: [], error: [], click: [], created: [], closedTab: [], detach: [], alarm: [] };
+	const listeners = { message: [], disconnect: [], error: [], click: [], created: [], closedTab: [], detach: [], alarm: [], cdpEvent: [] };
 	// browser_act fake page (plan 607b2518 P3-06): AX nodes with boxes; links navigate through the DNR rules, "opens" spawns a tab.
 	const node = (id, role, name, tag, box, extra = {}) => ({ id, role, name, tag, box, ...extra });
 	const pages = {
@@ -123,11 +123,11 @@ async function roundTrip() {
 			node(10, "button", "Delete item", "button", [10, 300, 80, 20]), node(11, "heading", "Shop", "h1", [10, 5, 100, 30]), node(12, "button", "Save", "button", [10, 50, 60, 20]),
 			node(13, "textbox", "Password", "input", [10, 80, 100, 20], { type: "password" }), node(14, "link", "Away", "a", [10, 110, 40, 20], { href: "https://away.test/" }),
 			node(15, "link", "Popup", "a", [60, 110, 40, 20], { opens: "https://pop.test/" }), node(16, "combobox", "Country", "select", [10, 140, 100, 20], { options: ["BG", "US"], value: "BG" }),
-			node(17, "textbox", "Search", "input", [10, 170, 100, 20]), node(18, "link", "Hidden menu", "a", undefined), node(19, "generic", "wrapper", "div", [0, 0, 800, 600]),
+			node(17, "textbox", "Search", "input", [10, 170, 100, 20]), node(21, "button", "Ask", "button", [10, 200, 40, 20], { dialog: "confirm" }), node(18, "link", "Hidden menu", "a", undefined), node(19, "generic", "wrapper", "div", [0, 0, 800, 600]),
 		],
 		"https://away.test/": [node(20, "heading", "Away", "h1", [10, 5, 100, 30])],
 	};
-	const cdpLog = [], typed = [], alarms = new Map(), attached = new Set();
+	const cdpLog = [], dialogsHandled = [], typed = [], alarms = new Map(), attached = new Set();
 	const nodesOf = tabId => pages[tabs.get(tabId)?.url] ?? [];
 	const findNode = (tabId, id) => { const n = nodesOf(tabId).find(entry => entry.id === id); if (!n) throw new Error("No node with given id found"); return n; };
 	const ax = n => ({ nodeId: String(n.id), ignored: n.role === "generic", role: { value: n.role }, name: { value: n.name }, backendDOMNodeId: n.id, ...(n.value ? { value: { value: n.value } } : {}) });
@@ -144,12 +144,14 @@ async function roundTrip() {
 			case "DOM.resolveNode": return { object: { objectId: `o${findNode(tabId, params.backendNodeId).id}` } };
 			case "DOM.describeNode": return { node: { backendNodeId: objectNode().id } };
 			case "DOM.getNodeForLocation": { const n = at(tabId, params.x, params.y); if (!n) throw new Error("No node found at given location"); return { backendNodeId: n.id }; }
+			case "Page.handleJavaScriptDialog": dialogsHandled.push(params.accept); return {};
 			case "DOM.focus": focused = params.backendNodeId; return {};
 			case "Input.insertText": typed.push([findNode(tabId, focused).name, params.text]); return {};
 			case "Input.dispatchKeyEvent": if (params.type === "keyDown") typed.push([findNode(tabId, focused).name, params.key]); return {};
 			case "Input.dispatchMouseEvent": {
 				const n = params.type === "mouseReleased" && at(tabId, params.x, params.y);
 				if (n) typed.push([n.name, "click"]);
+				if (n?.dialog) listeners.cdpEvent.forEach(f => f({ tabId }, "Page.javascriptDialogOpening", { type: n.dialog, message: "Really?" }));
 				if (n?.href) navigate(tabs.get(tabId), n.href);
 				if (n?.opens) { const tab = { id: 900 + tabs.size, url: "", pendingUrl: n.opens, openerTabId: tabId, status: "loading" }; tabs.set(tab.id, tab); listeners.created.forEach(f => f(tab)); }
 				return {};
@@ -211,6 +213,7 @@ async function roundTrip() {
 			detach: async ({ tabId }) => { attached.delete(tabId); },
 			sendCommand,
 			onDetach: { addListener: f => listeners.detach.push(f) },
+			onEvent: { addListener: f => listeners.cdpEvent.push(f) },
 		},
 		scripting: {
 			executeScript: async ({ target, func }) => {
@@ -285,6 +288,12 @@ async function roundTrip() {
 			assert.match(await go({ action: "click", ref: refOf(snap, "Away") }), /URL: https:\/\/away\.test\//);
 			assert.ok(requests.includes("https://away.test/"));
 			assert.match(await go({ action: "back" }), /URL: https:\/\/shop\.test\/act/);
+			// Page dialogs: confirm is cancelled and reported; beforeunload (leaving) is accepted.
+			snap = await go({ action: "snapshot" });
+			assert.match(await go({ action: "click", ref: refOf(snap, "Ask") }), /dialog, which was cancelled \(UNTRUSTED text\): confirm: Really\?/);
+			listeners.cdpEvent.forEach(f => f({ tabId: tab.id }, "Page.javascriptDialogOpening", { type: "beforeunload", message: "" }));
+			await sleep(20);
+			assert.deepEqual(dialogsHandled, [false, true]);
 			// D19: a spawned tab is closed and reported.
 			snap = await go({ action: "snapshot" });
 			const closedBefore = removed.length;
