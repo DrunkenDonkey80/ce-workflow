@@ -3,6 +3,7 @@
 // and keeps it inside the hosts Pi allowed with the same tab-scoped declarativeNetRequest rules as fetch jobs (D18).
 const sessions = new Map();
 let nextControlRule = 2_000_000;
+let ACT_MS = 45_000; // below Pi's 60 s wait; a hung CDP call must not wedge the session queue
 const KEEP = new Set(["button", "link", "textbox", "searchbox", "checkbox", "radio", "combobox", "listbox", "option", "menuitem", "menuitemcheckbox", "menuitemradio", "tab", "switch", "slider", "spinbutton", "treeitem", "heading"]);
 // D19: links and forms that would open a new tab load in the agent tab instead, where the navigation rules apply.
 const SAME_TAB = `(() => {
@@ -55,7 +56,8 @@ async function onControl(m) {
 	if (m.type !== "act") return;
 	// One action at a time per session, in arrival order.
 	s.queue = s.queue.then(async () => {
-		try { send({ type: "result", id: m.id, seq: m.seq, ...await act(s, m) }); }
+		const timeout = sleep(ACT_MS).then(() => { throw new Error(`The page did not respond within ${ACT_MS / 1000} s (frozen or busy tab); try again or take a screenshot.`); });
+		try { send({ type: "result", id: m.id, seq: m.seq, ...await Promise.race([act(s, m), timeout]) }); }
 		catch (error) { send({ type: "error", id: m.id, seq: m.seq, error: String(error?.message ?? error) }); }
 	});
 }
@@ -74,11 +76,14 @@ async function act(s, m) {
 		await openTab(s);
 	}
 	await rules(s);
+	// Background tabs get frozen or throttled; wake this one before acting.
+	await cdp(s, "Page.setWebLifecycleState", { state: "active" }).catch(() => {});
+	const before = (await chrome.tabs.get(s.tab)).url;
 	switch (m.action) {
 		case "open":
 			s.refs.clear();
 			await chrome.tabs.update(s.tab, { url: m.url });
-			return await after(s, 30_000);
+			return await after(s, 30_000, before);
 		case "snapshot": return await snapshot(s);
 		case "scroll":
 			if (m.ref) await cdp(s, "DOM.scrollIntoViewIfNeeded", { backendNodeId: ref(s, m.ref) });
@@ -87,7 +92,7 @@ async function act(s, m) {
 		case "back":
 			s.refs.clear();
 			await chrome.tabs.goBack(s.tab).catch(() => { throw new Error("There is no previous page."); });
-			return await after(s, 30_000);
+			return await after(s, 30_000, before);
 		case "screenshot": {
 			const shot = await cdp(s, "Page.captureScreenshot", { format: "png" });
 			return { ...await page(s), png: shot.data }; // the host saves it and replaces png with path (D10)
@@ -102,7 +107,7 @@ async function act(s, m) {
 				throw new Error("The element changed since it was checked; take a new snapshot.");
 			await perform(s, m, target);
 			s.refs.clear();
-			return await after(s, 10_000);
+			return await after(s, 10_000, before);
 		}
 	}
 	throw new Error(`Unknown action ${m.action}.`);
@@ -112,6 +117,7 @@ async function openTab(s) {
 	const [current] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
 	const tab = await chrome.tabs.create({ url: "about:blank", active: false, ...(current ? { windowId: current.windowId, index: current.index + 1 } : {}) });
 	s.tab = tab.id;
+	await chrome.tabs.update(tab.id, { autoDiscardable: false }).catch(() => {});
 	// D11: a background tab in a "Pi" group; a failed group only costs findability.
 	try {
 		const [group] = await chrome.tabGroups.query({ title: "Pi", windowId: tab.windowId });
@@ -205,8 +211,10 @@ async function page(s) {
 	return { url: tab.url, title: tab.title ?? "" };
 }
 /** After a navigating action: wait for the load, undo a blocked navigation's error page, report what was stopped (D18, D19). */
-async function after(s, ms) {
+async function after(s, ms, before) {
 	await sleep(400);
+	// Single-page sites change the URL with script after a fetch, not a load; give that a moment.
+	for (const wait = Date.now() + 1500; Date.now() < wait && sessions.has(s.id) && (await chrome.tabs.get(s.tab)).url === before;) await sleep(150);
 	const until = Date.now() + ms;
 	while (Date.now() < until && sessions.has(s.id) && (await chrome.tabs.get(s.tab)).status !== "complete") await sleep(200);
 	if (s.stopped.length) {

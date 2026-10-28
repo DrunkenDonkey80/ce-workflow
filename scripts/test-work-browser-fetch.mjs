@@ -132,7 +132,7 @@ async function roundTrip() {
 	const findNode = (tabId, id) => { const n = nodesOf(tabId).find(entry => entry.id === id); if (!n) throw new Error("No node with given id found"); return n; };
 	const ax = n => ({ nodeId: String(n.id), ignored: n.role === "generic", role: { value: n.role }, name: { value: n.name }, backendDOMNodeId: n.id, ...(n.value ? { value: { value: n.value } } : {}) });
 	const at = (tabId, x, y) => nodesOf(tabId).find(n => n.box && n.role !== "generic" && x >= n.box[0] && x <= n.box[0] + n.box[2] && y >= n.box[1] && y <= n.box[1] + n.box[3]);
-	let focused;
+	let focused, hang = false;
 	const sendCommand = async ({ tabId }, method, params = {}) => {
 		if (!attached.has(tabId)) throw new Error("Debugger is not attached to the tab");
 		cdpLog.push(method);
@@ -162,7 +162,7 @@ async function roundTrip() {
 				return { result: {} };
 			}
 			case "Runtime.evaluate": return { result: { value: params.expression.includes("iframe") ? ["https://ads.test/f"] : undefined } };
-			case "Page.captureScreenshot": return { data: Buffer.from([137, 80, 78, 71]).toString("base64") };
+			case "Page.captureScreenshot": if (hang) return new Promise(() => {}); return { data: Buffer.from([137, 80, 78, 71]).toString("base64") };
 			default: return {};
 		}
 	};
@@ -196,7 +196,7 @@ async function roundTrip() {
 		},
 		tabs: {
 			create: async ({ url }) => { const tab = { id: tabId++, url, status: "complete" }; tabs.set(tab.id, tab); return tab; },
-			update: async (id, { url }) => { navigate(tabs.get(id), url); return tabs.get(id); },
+			update: async (id, { url }) => { if (url) navigate(tabs.get(id), url); return tabs.get(id); },
 			get: async id => { if (!tabs.has(id)) throw new Error("no tab"); return { ...tabs.get(id) }; },
 			remove: async id => { tabs.delete(id); removed.push(id); },
 			onRemoved: { addListener: f => listeners.closedTab.push(f) },
@@ -296,6 +296,14 @@ async function roundTrip() {
 			const shot = (await go({ action: "screenshot" })).match(/saved: (.+\.png)/)[1];
 			assert.deepEqual([...readFileSync(shot)], [137, 80, 78, 71]);
 			assert.ok(shot.startsWith(imageDir));
+			// A hung CDP call (frozen tab) fails that action and frees the queue for the next one.
+			vm.runInContext("ACT_MS = 300", worker);
+			hang = true;
+			await assert.rejects(go({ action: "screenshot" }), /did not respond within 0\.3 s/);
+			hang = false;
+			vm.runInContext("ACT_MS = 45_000", worker);
+			assert.match(await go({ action: "snapshot" }), /\[e1\] heading "Shop"/);
+			assert.ok(cdpLog.includes("Page.setWebLifecycleState"), "the tab is woken before acting");
 			// D15: another socket cannot steer this session; its own session fails closed on changed facts (D16).
 			const other = net.connect(pipe), answers = [];
 			await new Promise(resolve => other.once("connect", resolve));
