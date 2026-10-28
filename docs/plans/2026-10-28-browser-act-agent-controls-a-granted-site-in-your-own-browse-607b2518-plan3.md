@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-28
-updated: 2026-10-28T19:53:59.146Z
+updated: 2026-10-28T19:54:13.157Z
 reviewed: 2026-10-28
 started: 2026-10-28T19:39:33.590Z
 ---
@@ -223,7 +223,7 @@ None.
 
 ## Resume context
 
-Phase 1 done (commit e09e65a): Helium supports chrome.debugger, tab groups and hidden-tab screenshots; snapshot uses the AX tree sorted by position (D22); safety rules are D23. Prototype code removed from the add-on, nothing else built. Next: P2-01, control grants (10/20/30 min per site, separate from read grants) in extensions/browser-fetch.ts. Stopped at the Phase 1 to Phase 2 boundary so Phase 2 [code] runs on the coding model. No blockers.
+Phases 1 and 2 done (HEAD f602d67). Pi side in extensions/browser-act.ts speaks D15 messages: control-open {id}; act {id, seq, action, phase inspect|execute, ref, x, y, facts, text, submit, value, direction, hosts, blocked, until}; replies {type result, id, seq, url, title, items, frames, facts, blocked[], spawned[], path}; browser-initiated {type closed, id, reason}; control-close {id}. Next: P3-01, add debugger and tabGroups permissions and the agent tab in a Pi group in browser-fetch/extension/background.js; then P3-07 host.mjs ownership for control-open/control-close.
 
 ## Amendments
 
