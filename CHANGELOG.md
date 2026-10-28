@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- browser_act can upload images: only PNG, JPEG, GIF or WebP files inside the project folder (checked by content, max 10 of 20 MB), and Pi shows you each file, the site and the upload field and asks before every upload (browser extension 1.3: reload it in chrome://extensions).
+
 ## 0.1.96 — 2026-10-28
 
 ### Changed

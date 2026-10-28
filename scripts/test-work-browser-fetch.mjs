@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 // browser_fetch self-check (plan d8c5ace2): policy, URL checks, approvals, host round trip and the extension's logic with a fake chrome.
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, statSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, statSync, rmSync, writeFileSync, readFileSync, existsSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import net from "node:net";
@@ -132,16 +132,17 @@ async function roundTrip() {
 			node(10, "button", "Delete item", "button", [10, 300, 80, 20]), node(11, "heading", "Shop", "h1", [10, 5, 100, 30]), node(12, "button", "Save", "button", [10, 50, 60, 20]),
 			node(13, "textbox", "Password", "input", [10, 80, 100, 20], { type: "password" }), node(14, "link", "Away", "a", [10, 110, 40, 20], { href: "https://away.test/" }),
 			node(15, "link", "Popup", "a", [60, 110, 40, 20], { opens: "https://pop.test/" }), node(16, "combobox", "Country", "select", [10, 140, 100, 20], { options: ["BG", "US"], value: "BG" }),
-			node(17, "textbox", "Search", "input", [10, 170, 100, 20]), node(21, "button", "Ask", "button", [10, 200, 40, 20], { dialog: "confirm" }), node(18, "link", "Hidden menu", "a", undefined), node(19, "generic", "wrapper", "div", [0, 0, 800, 600]),
+			node(17, "textbox", "Search", "input", [10, 170, 100, 20]), node(21, "button", "Ask", "button", [10, 200, 40, 20], { dialog: "confirm" }),
+			node(22, "button", "Add image", "button", [10, 230, 60, 20], { chooser: 23 }), node(24, "button", "Photo", "input", [10, 260, 100, 20], { type: "file" }), node(18, "link", "Hidden menu", "a", undefined), node(19, "generic", "wrapper", "div", [0, 0, 800, 600]),
 		],
 		"https://away.test/": [node(20, "heading", "Away", "h1", [10, 5, 100, 30])],
 	};
-	const cdpLog = [], dialogsHandled = [], typed = [], alarms = new Map(), attached = new Set();
+	const cdpLog = [], dialogsHandled = [], typed = [], uploaded = [], alarms = new Map(), attached = new Set();
 	const nodesOf = tabId => pages[tabs.get(tabId)?.url] ?? [];
 	const findNode = (tabId, id) => { const n = nodesOf(tabId).find(entry => entry.id === id); if (!n) throw new Error("No node with given id found"); return n; };
 	const ax = n => ({ nodeId: String(n.id), ignored: n.role === "generic", role: { value: n.role }, name: { value: n.name }, backendDOMNodeId: n.id, ...(n.value ? { value: { value: n.value } } : {}) });
 	const at = (tabId, x, y) => nodesOf(tabId).find(n => n.box && n.role !== "generic" && x >= n.box[0] && x <= n.box[0] + n.box[2] && y >= n.box[1] && y <= n.box[1] + n.box[3]);
-	let focused, hang = false;
+	let focused, hang = false, intercept = false;
 	const sendCommand = async ({ tabId }, method, params = {}) => {
 		if (!attached.has(tabId)) throw new Error("Debugger is not attached to the tab");
 		cdpLog.push(method);
@@ -154,12 +155,15 @@ async function roundTrip() {
 			case "DOM.describeNode": return { node: { backendNodeId: objectNode().id } };
 			case "DOM.getNodeForLocation": { const n = at(tabId, params.x, params.y); if (!n) throw new Error("No node found at given location"); return { backendNodeId: n.id }; }
 			case "Page.handleJavaScriptDialog": dialogsHandled.push(params.accept); return {};
+			case "Page.setInterceptFileChooserDialog": intercept = params.enabled; return {};
+			case "DOM.setFileInputFiles": uploaded.push([params.backendNodeId, params.files]); return {};
 			case "DOM.focus": focused = params.backendNodeId; return {};
 			case "Input.insertText": typed.push([findNode(tabId, focused).name, params.text]); return {};
 			case "Input.dispatchKeyEvent": if (params.type === "keyDown") typed.push([findNode(tabId, focused).name, params.key]); return {};
 			case "Input.dispatchMouseEvent": {
 				const n = params.type === "mouseReleased" && at(tabId, params.x, params.y);
 				if (n) typed.push([n.name, "click"]);
+				if (n?.chooser && intercept) listeners.cdpEvent.forEach(f => f({ tabId }, "Page.fileChooserOpened", { backendNodeId: n.chooser, mode: "selectMultiple" }));
 				if (n?.dialog) listeners.cdpEvent.forEach(f => f({ tabId }, "Page.javascriptDialogOpening", { type: n.dialog, message: "Really?" }));
 				if (n?.href) navigate(tabs.get(tabId), n.href);
 				if (n?.opens) { const tab = { id: 900 + tabs.size, url: "", pendingUrl: n.opens, openerTabId: tabId, status: "loading" }; tabs.set(tab.id, tab); listeners.created.forEach(f => f(tab)); }
@@ -288,6 +292,24 @@ async function roundTrip() {
 			await go({ action: "click", x: 20, y: 305 });
 			assert.deepEqual(typed, [["Save", "click"], ["Search", "shoes"], ["Search", "Enter"], ["Delete item", "click"]], "only allowed actions reach the page");
 			await assert.rejects(go({ action: "click", x: 700, y: 700 }), /Nothing at \(700, 700\)/);
+			// Upload: only real images inside the project folder, each confirmed; a button's file picker is intercepted.
+			mkdirSync(path.join(agent, "img"), { recursive: true });
+			const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]), outside = path.join(os.tmpdir(), `outside-${randomUUID()}.png`);
+			writeFileSync(path.join(agent, "img", "a.png"), png); writeFileSync(path.join(agent, "img", "fake.png"), "not an image"); writeFileSync(outside, png);
+			snap = await go({ action: "snapshot" });
+			const add = refOf(snap, "Add image"), image = realpathSync(path.join(agent, "img", "a.png"));
+			await assert.rejects(go({ action: "upload", ref: add, files: [path.relative(agent, outside)] }), /outside the project folder/);
+			rmSync(outside);
+			await assert.rejects(go({ action: "upload", ref: add, files: ["img/fake.png"] }), /does not contain the image/);
+			await assert.rejects(go({ action: "upload", ref: add, files: ["notes.txt"] }), /does not exist|not a PNG/);
+			picks = ["Deny"];
+			await assert.rejects(go({ action: "upload", ref: add, files: ["img/a.png"] }), /did not allow: upload 1 image/);
+			picks = ["Allow this action"];
+			await go({ action: "upload", ref: add, files: ["img/a.png"] });
+			picks = ["Allow this action"];
+			await go({ action: "upload", ref: refOf(snap, "Photo"), files: ["img/a.png"] });
+			assert.deepEqual(uploaded, [[23, [image]], [24, [image]]], "the picker's input, then the file field, get the checked file");
+			assert.equal(intercept, false, "the file picker is no longer intercepted afterwards");
 			// D18: a link to another site is stopped before any request; approval needs a repeat, which then loads.
 			snap = await go({ action: "snapshot" });
 			picks = ["Allow control of away.test for 10 minutes"];

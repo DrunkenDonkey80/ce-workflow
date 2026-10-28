@@ -97,7 +97,7 @@ async function act(s, m) {
 			const shot = await cdp(s, "Page.captureScreenshot", { format: "png" });
 			return { ...await page(s), png: shot.data }; // the host saves it and replaces png with path (D10)
 		}
-		case "click": case "type": case "select": {
+		case "click": case "type": case "select": case "upload": {
 			const target = await resolve(s, m);
 			const facts = await factsOf(s, target);
 			if (m.phase === "inspect") return { ...await page(s), facts };
@@ -105,7 +105,7 @@ async function act(s, m) {
 			const keys = ["node", "tag", "type", "autocomplete", "isSubmit", "formPayment", "role", "name", "url"];
 			if (!m.facts || keys.some(key => JSON.stringify(m.facts[key]) !== JSON.stringify(facts[key])))
 				throw new Error("The element changed since it was checked; take a new snapshot.");
-			await perform(s, m, target);
+			if (m.action === "upload") await upload(s, m, target, facts); else await perform(s, m, target);
 			const done = await after(s, 10_000, before);
 			if (done.url !== before) s.refs.clear(); // same page: refs stay, each target is rechecked above
 			return done;
@@ -183,6 +183,27 @@ async function perform(s, m, target) {
 	for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) await cdp(s, "Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: type === "mouseMoved" ? 0 : 1 });
 }
 
+/** Hands Pi's checked files to a file field, or to the file picker its button opens (intercepted, so no system dialog appears). */
+async function upload(s, m, target, facts) {
+	const files = Array.isArray(m.files) ? m.files.map(String) : [];
+	const set = backendNodeId => cdp(s, "DOM.setFileInputFiles", { files, backendNodeId }).catch(error => {
+		throw new Error(/not allowed/i.test(error.message) ? "The browser refused the files: turn on \"Allow access to file URLs\" for Pi browser fetch in chrome://extensions → Details." : error.message);
+	});
+	if (facts.tag === "input" && facts.type === "file") return await set(target.backendNodeId);
+	await cdp(s, "Page.setInterceptFileChooserDialog", { enabled: true });
+	try {
+		const opened = new Promise(done => { s.chooser = done; });
+		await perform(s, { action: "click" }, target);
+		const chooser = await Promise.race([opened, sleep(3000)]);
+		if (!chooser?.backendNodeId) throw new Error("That click opened no file picker; pick the page's upload button or file field.");
+		if (chooser.mode === "selectSingle" && files.length > 1) throw new Error("This picker takes one file; upload them one at a time.");
+		await set(chooser.backendNodeId);
+	} finally {
+		s.chooser = undefined;
+		await cdp(s, "Page.setInterceptFileChooserDialog", { enabled: false }).catch(() => {});
+	}
+}
+
 /** Accessibility-tree snapshot (D22): visible interactive elements and headings with boxes, sorted by position. */
 async function snapshot(s) {
 	const { nodes } = await cdp(s, "Accessibility.getFullAXTree");
@@ -254,8 +275,9 @@ chrome.tabs.onCreated.addListener(tab => {
 // Page dialogs block a hidden tab: leaving the page is the agent's own request, anything else is cancelled and reported.
 // shortcut: confirm() is always cancelled, so sites that confirm with a native dialog cannot be completed; accept it after a D16 approval if needed.
 chrome.debugger.onEvent.addListener((source, method, params) => {
-	const s = method === "Page.javascriptDialogOpening" && sessionOf(source.tabId);
-	if (!s) return;
+	const s = sessionOf(source.tabId);
+	if (s && method === "Page.fileChooserOpened") return s.chooser?.(params);
+	if (!s || method !== "Page.javascriptDialogOpening") return;
 	const accept = params.type === "beforeunload";
 	if (!accept) s.dialogs.push(`${params.type}: ${String(params.message ?? "").slice(0, 300)}`);
 	cdp(s, "Page.handleJavaScriptDialog", { accept }).catch(() => {});
