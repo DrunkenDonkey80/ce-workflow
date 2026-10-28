@@ -442,14 +442,16 @@ export async function browserAccessMenu(ctx, pi) {
 	for (;;) {
 		const policy = readPolicy(), isConnected = await connected(), registered = existsSync(hostManifest());
 		const grants = Object.entries(policy.grants).filter(([host]) => granted(policy, host));
+		const controls = Object.entries(policy.control).filter(([host]) => controlUntil(policy, host));
 		const picked = await showListDialog(ctx, {
 			title: "Browser access",
-			purpose: policy.corrupt ?? `browser_fetch loads pages in your own browser. ${!registered ? "The browser extension is not registered: Install it, then Load unpacked the extension folder." : isConnected ? "The browser is connected." : "The browser is not connected."}`,
+			purpose: policy.corrupt ?? `browser_fetch reads and browser_act operates pages in your own browser. ${!registered ? "The browser extension is not registered: Install it, then Load unpacked the extension folder." : isConnected ? "The browser is connected." : "The browser is not connected."}`,
 			cursorKey: "browser-access", filter: false,
 			items: [
 				{ value: "install", label: "Install or update the browser extension", description: `Registers the native host for Helium, Chrome, Edge and Chromium; the browser loads the extension from ${extensionDir()}.` },
 				{ value: "folder", label: "Open the extension folder", description: `${extensionDir()}: Load unpacked this folder in chrome://extensions (Developer mode).` },
 				{ value: "grants", label: `Allowed sites (${grants.length}) →`, description: "Revoke a site grant." },
+				{ value: "control", label: `Controlled sites (${controls.length}) →`, description: "Sites browser_act may operate right now; revoking stops the next action." },
 				{ value: "blocked", label: `Block list (${DEFAULT_BLOCKED.length} built in, ${policy.blocked.length} added) →`, description: "Sites the agent can never open, with their subdomains." },
 				{ value: "log", label: "Open the fetch log", description: logFile() },
 			],
@@ -465,6 +467,10 @@ export async function browserAccessMenu(ctx, pi) {
 				const host = await showListDialog(ctx, { title: "Allowed sites", purpose: "Choose a site to revoke its grant.", filter: false, cursorKey: "browser-access-grants",
 					items: grants.length ? grants.map(([host, grant]) => ({ value: host, label: host, preserveCase: true, description: until(grant) })) : [{ value: "", label: "No allowed sites", disabled: true }] });
 				if (host?.value) { await updatePolicy(p => { delete p.grants[host.value]; }); ctx.ui.notify(`Revoked ${host.value}`, "info"); }
+			} else if (picked.value === "control") {
+				const host = await showListDialog(ctx, { title: "Controlled sites", purpose: "Choose a site to revoke its control grant.", filter: false, cursorKey: "browser-access-control",
+					items: controls.length ? controls.map(([host, grant]) => ({ value: host, label: host, preserveCase: true, description: until(grant) })) : [{ value: "", label: "No controlled sites", disabled: true }] });
+				if (host?.value) { await updatePolicy(p => { delete p.control[host.value]; }); ctx.ui.notify(`Revoked control of ${host.value}`, "info"); }
 			} else if (picked.value === "blocked") {
 				const entry = await showListDialog(ctx, { title: "Block list", purpose: "Add a site, or choose an added site to remove it. Built-in entries stay.", cursorKey: "browser-access-blocked",
 					items: [{ value: "__add", label: "Add a site" }, ...policy.blocked.map(host => ({ value: host, label: host, preserveCase: true, description: "Added by you; Enter removes it" })),
@@ -473,7 +479,7 @@ export async function browserAccessMenu(ctx, pi) {
 					const text = await askText(ctx, pi, "Site to block (host or URL; subdomains are included)");
 					const host = text && blockEntry(text);
 					if (text && !host) ctx.ui.notify(`Not a site: ${text}`, "warning");
-					if (host) { await updatePolicy(p => { p.blocked.push(host); delete p.grants[host]; }); ctx.ui.notify(`Blocked ${host}`, "info"); }
+					if (host) { await updatePolicy(p => { p.blocked.push(host); delete p.grants[host]; delete p.control[host]; }); ctx.ui.notify(`Blocked ${host}`, "info"); }
 				} else if (entry?.value) { await updatePolicy(p => { p.blocked = p.blocked.filter(host => host !== entry.value); }); ctx.ui.notify(`Removed ${entry.value} from the block list`, "info"); }
 			} else if (picked.value === "log") {
 				if (!existsSync(logFile())) ctx.ui.notify("No fetches logged yet.", "info");

@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-28
-updated: 2026-10-28T20:01:53.637Z
+updated: 2026-10-28T20:37:58.294Z
 reviewed: 2026-10-28
 started: 2026-10-28T19:39:33.590Z
 ---
@@ -205,8 +205,8 @@ None.
 
 ### Phase 5: Docs [code]
 
-- [ ] **P5-01** Show and revoke control grants in /wo → Settings → Browser access.
-- [ ] **P5-02** README section and CHANGELOG Unreleased entry in plain words, including that browser_fetch now refuses bank and payment sites (D13).
+- [x] **P5-01** Browser access menu gains "Controlled sites (n)" listing live control grants with deadlines; Enter revokes; blocking a site also drops its control grant.
+- [x] **P5-02** README Browser act section (actions, safety, ending control, reload for new permissions) and block-list wording; CHANGELOG Unreleased Added browser_act and Changed bank/payment block.
 ### P-ARCH [code] Product architecture
 
 - [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
