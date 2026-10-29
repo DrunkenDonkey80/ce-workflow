@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Changed
+- With two or more hubs in the desktop app, each hub's taskbar bar splits into up to 4 segments, one per session: e.g. 2 working, 1 finished and 1 question show 2 orange, 1 green and 1 red. Every state keeps at least one segment; spare ones go to questions first, then finished sessions.
 - mobile_act and screen_read target "device" use mobilecli bundled with ce-workflow (macOS, Linux and Windows, x64 and arm64), so there is nothing to install and the tool always works.
 
 ## 0.1.100 — 2026-10-29

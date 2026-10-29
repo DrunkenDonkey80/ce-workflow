@@ -1435,7 +1435,7 @@ function renderIcon() {
   const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen", "scheduled"].includes(tone)); // the app has no page in front: own unseen counts
   // attention: how many things need you, for the app's badge on a pinned button.
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
-  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: [...new Set(tones)], attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
+  const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: tones, attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
    // latest: the newest session needing you, so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
    latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "",
    // side: where the strip starts (frameless app); gear: the settings badge the strip's gear repeats ("!" ce-workflow, else a count).

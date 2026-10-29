@@ -52,6 +52,17 @@ export function iconSvg(name: string, states: string[] = [], r = 6.5) {
 // The desktop app's taskbar icon: one cell per hub (1 = whole square, 2 side by side, 3-4 in 2x2; more show only as app tabs).
 // One hub: bigger dots. Two: the dots sit in the empty strips, waiting and working below the icon, unseen above, so they hide nothing.
 // Three or four: a dot matrix, see below.
+// A hub's bar holds up to 4 segments: one per state present, then spare segments go to states with more sessions
+// (states repeat once per session), questions first, then finished, working, timers; drawn top down in DOTS order.
+export function barSlots(states: string[]) {
+ const count = (state: string) => states.filter(s => s === state).length;
+ const lit = Object.keys(DOTS).filter(state => count(state)), slots: Record<string, number> = Object.fromEntries(lit.map(state => [state, 1]));
+ for (let left = 4 - lit.length, grew = true; left > 0 && grew;) {
+  grew = false;
+  for (const state of ["waiting", "unseen", "working", "scheduled"]) if (left > 0 && slots[state] && slots[state] < count(state)) { slots[state]++; left--; grew = true; }
+ }
+ return lit.flatMap(state => Array<string>(slots[state]).fill(state));
+}
 export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  hubs = hubs.filter(hub => ICONS[hub.icon]).slice(0, 4);
  if (hubs.length < 2) return iconSvg(hubs[0]?.icon ?? Object.keys(ICONS)[0], hubs[0]?.states, 7);
@@ -59,7 +70,7 @@ export function hubsIconSvg(hubs: { icon: string; states: string[] }[]) {
  // states (waiting, working, unseen, scheduled, top down) split its bar, and a quiet hub's bar stays dim. The tile reads on any taskbar.
  const column = 28 / hubs.length, gap = 1.2;
  return SVG_HEAD.replace(/<style>.*<\/style>/, "") + `<rect width="32" height="32" rx="6" fill="#212529"/>` + hubs.map((hub, i) => {
-  const lit = Object.keys(DOTS).filter(state => hub.states.includes(state)), x = (2 + column * i + gap).toFixed(2), w = (column - 2 * gap).toFixed(2);
+  const lit = barSlots(hub.states), x = (2 + column * i + gap).toFixed(2), w = (column - 2 * gap).toFixed(2);
   if (!lit.length) return `<rect x="${x}" y="${2 + gap}" width="${w}" height="${28 - 2 * gap}" rx="2" fill="#3a3f45"/>`;
   const part = (28 - 2 * gap) / lit.length;
   return lit.map((state, k) => `<rect x="${x}" y="${(2 + gap + k * part).toFixed(2)}" width="${w}" height="${(part - (k < lit.length - 1 ? 1 : 0)).toFixed(2)}" rx="2" fill="${BRIGHT[state]}"/>`).join("");
