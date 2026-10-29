@@ -1035,8 +1035,9 @@ async function annotateImage(path: string) {
  } catch (error) { showNotice(error.message); }
 }
 $("message-input").addEventListener("input", renderComposerThumbs);
-// Push to talk: the browser's own speech recognition (Chrome and Safari send the audio to Google/Apple). Hold the button,
-// the recognised words appear live in the box without focusing it (no phone keyboard); release to stop. EN or BG.
+// Talk: the browser's own speech recognition (Chrome and Safari send the audio to Google/Apple). Tap to start, tap again to stop;
+// the recognised words appear live in the box without focusing it (no phone keyboard). EN or BG. A tap, not a hold:
+// lifting the finger to answer the phone's permission prompt used to stop it before it began.
 const TALK_LANGS = { "en-US": "EN", "bg-BG": "BG" };
 let talkLang = localStorage.getItem("plan3-talk-lang") in TALK_LANGS ? localStorage.getItem("plan3-talk-lang") : "en-US", talking;
 $("talk-lang").textContent = TALK_LANGS[talkLang];
@@ -1049,15 +1050,11 @@ function startTalk() {
  talking = recognition; recognition.lang = talkLang; recognition.interimResults = true; recognition.continuous = true;
  recognition.onresult = event => { input.value = base + [...event.results].map(result => result[0].transcript).join(""); input.scrollTop = input.scrollHeight; input.dispatchEvent(new Event("input")); };
  recognition.onerror = event => { if (event.error !== "aborted" && event.error !== "no-speech") showNotice(event.error === "not-allowed" ? "Microphone blocked: allow it for this site in the browser settings." : "Speech recognition failed: " + event.error); };
- recognition.onend = () => { if (talking === recognition) talking = undefined; $("talk").classList.remove("live"); };
- $("talk").classList.add("live"); recognition.start();
+ recognition.onend = () => { if (talking === recognition) talking = undefined; $("talk").classList.remove("live"); $("talk").setAttribute("aria-pressed", "false"); };
+ $("talk").classList.add("live"); $("talk").setAttribute("aria-pressed", "true"); recognition.start();
 }
-const stopTalk = () => talking?.stop();
-$("talk").addEventListener("pointerdown", event => { event.preventDefault(); $("talk").setPointerCapture(event.pointerId); startTalk(); });
-for (const type of ["pointerup", "pointercancel"]) $("talk").addEventListener(type, stopTalk);
-$("talk").addEventListener("contextmenu", event => event.preventDefault());
-$("talk").addEventListener("keydown", event => { if ((event.key === " " || event.key === "Enter") && !event.repeat) { event.preventDefault(); startTalk(); } });
-$("talk").addEventListener("keyup", event => { if (event.key === " " || event.key === "Enter") stopTalk(); });
+$("talk").addEventListener("pointerdown", event => event.preventDefault()); // keeps focus (and the phone keyboard) where it is
+$("talk").addEventListener("click", () => talking ? talking.stop() : startTalk());
 // Pasted, dropped and attached files become temp files on the hub PC (images like Pi's terminal paste); the chat gets their paths.
 // From a remote device this is how a local file reaches the hub: copy it in Explorer and paste, or drag it in.
 const transferFiles = (data: DataTransfer | null) => {
