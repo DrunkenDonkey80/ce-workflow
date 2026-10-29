@@ -82,14 +82,25 @@ async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 	if (dev.platform !== "ios" || agentOk.has(dev.id)) return;
 	const installed = await run(exec, ["agent", "status", "--device", dev.id], o.signal).then(out => JSON.parse(out).status === "ok", () => false);
 	if (!installed) {
+		const install = async (extra: string[]) => {
+			await run(exec, ["agent", "install", "--device", dev.id, ...extra], o.signal, 300_000);
+			// The install closes the open app a few seconds after it returns, and on iOS the open app cannot be asked before the agent exists.
+			for (let i = 0; i < 20; i++) {
+				const front = await run(exec, ["apps", "foreground", "--device", dev.id], o.signal).then(out => data(out)?.packageName, () => undefined);
+				if (front === "com.apple.springboard") break;
+				await (o.sleep ?? (ms => new Promise(res => setTimeout(res, ms))))(500);
+			}
+			agentOk.add(dev.id);
+			throw new Error(`Installed the mobilecli helper on ${dev.name}; this closed the open app. Launch your app again (action launch), then retry.`);
+		};
 		if (dev.type === "real") {
 			const cmd = `mobilecli agent install --device ${dev.id} --provisioning-profile <wildcard .mobileprovision>`;
 			if (!o.confirm || !(await o.confirm(`Install the mobilecli agent on ${dev.name}?`, `mobile_act needs the DeviceKit helper app (com.mobilenext.devicekit-iosUITests.xctrunner) on this iPhone, signed with your development profile. Install it now?`)))
 				throw new Error(`The mobilecli agent is not on ${dev.name}. Install it with: ${cmd}`);
 			const profile = await findProfile(exec, dev.id, o.signal, o.profileDirs);
 			if (!profile) throw new Error(`No development provisioning profile for ${dev.name} (${dev.id}) with a wildcard App ID was found.\n${PROFILE_HELP}`);
-			await run(exec, ["agent", "install", "--device", dev.id, "--provisioning-profile", profile], o.signal, 300_000);
-		} else await run(exec, ["agent", "install", "--device", dev.id], o.signal, 300_000);
+			await install(["--provisioning-profile", profile]);
+		} else await install([]);
 	}
 	agentOk.add(dev.id);
 }

@@ -33,6 +33,7 @@ function fake({ list = [SIM], screens = [home], agent = true } = {}) {
 		if (args[0] === "devices") return ok({ devices: list });
 		if (args[0] === "device" && args[1] === "info") return ok({ device: { screenSize: { width: 402, height: 874, scale: 3 } } });
 		if (args[0] === "agent" && args[1] === "status") return agent ? ok({ version: "0.0.35" }) : { code: 1, stdout: JSON.stringify({ status: "error", error: "agent not installed" }) };
+		if (args[0] === "apps" && args[1] === "foreground") return ok({ packageName: "com.apple.springboard" });
 		if (args[0] === "dump") return ok({ elements: screens[Math.min(shown++, screens.length - 1)] });
 		return ok({});
 	};
@@ -172,8 +173,10 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 
 	resetSession();
 	const sim = fake({ agent: false });
-	await mobileAct(sim.exec, { action: "snapshot" }, opts({ confirm: async () => assert.fail("no question for a simulator") }));
-	assert.deepEqual(sim.acts(), ["agent install --device SIM-1"]);
+	await assert.rejects(mobileAct(sim.exec, { action: "tap", x: 1, y: 1 }, opts({ confirm: async () => assert.fail("no question for a simulator") })), /Installed the mobilecli helper on iPhone 17; this closed the open app\. Launch your app again/);
+	assert.deepEqual(sim.acts().filter(a => !a.startsWith("apps foreground")), ["agent install --device SIM-1"], "no tap on the home screen the install left behind");
+	await mobileAct(sim.exec, { action: "snapshot" }, opts());
+	assert.equal(sim.calls.filter(c => c[1] === "agent" && c[2] === "install").length, 1, "installed once");
 
 	resetSession();
 	const real = fake({ list: [PHONE], agent: false });
@@ -192,8 +195,8 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 		await rm(path.join(dir, "e.mobileprovision"));
 		assert.equal(await findProfile(sec, "0000-REAL", undefined, [dir, "/nope"], now), path.join(dir, "d.mobileprovision"), "skips other device, expired, non-development");
 		const agent = fake({ list: [PHONE], agent: false });
-		await mobileAct(async (c, a) => c === "security" ? sec(c, a) : agent.exec(c, a), { action: "snapshot" }, opts({ confirm: async () => true, profileDirs: [dir] }));
-		assert.deepEqual(agent.acts(), [`agent install --device 0000-REAL --provisioning-profile ${path.join(dir, "d.mobileprovision")}`]);
+		await assert.rejects(mobileAct(async (c, a) => c === "security" ? sec(c, a) : agent.exec(c, a), { action: "snapshot" }, opts({ confirm: async () => true, profileDirs: [dir] })), /Installed the mobilecli helper/);
+		assert.deepEqual(agent.acts().filter(a => !a.startsWith("apps foreground")), [`agent install --device 0000-REAL --provisioning-profile ${path.join(dir, "d.mobileprovision")}`]);
 		await rm(dir, { recursive: true });
 	}
 	resetSession();

@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.2 — 2026-10-29
+
+### Fixed
+- mobile_act: the first action on an iPhone or simulator without the mobilecli helper used to install the helper and then report "nothing matches", because the install closes the open app. It now waits for the install to finish and says to launch the app again.
+
 ## 0.2.1 — 2026-10-29
 
 ### Fixed
