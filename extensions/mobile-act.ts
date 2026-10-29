@@ -23,7 +23,9 @@ const BIN = "mobilecli";
 export const INSTALL_CMD = "npm install -g mobilecli";
 export const PROFILE_HELP = "Create a development provisioning profile with a wildcard App ID (TEAMID.*) that includes this iPhone's UDID at developer.apple.com > Certificates, IDs & Profiles, then download it in Xcode (Settings > Accounts > Download Manual Profiles) so it lands in ~/Library/Developer/Xcode/UserData/Provisioning Profiles.";
 // Containers and decorative images carry no meaning of their own; they show only with a label, value or accessibility id.
-const CONTAINERS = new Set(["Group", "Other", "Application", "Window", "ScrollView", "Unknown", "Image", "android.view.View", "android.widget.FrameLayout", "android.widget.LinearLayout"]);
+const CONTAINERS = new Set(["Group", "Other", "Application", "Window", "ScrollView", "Unknown", "Image", "View", "FrameLayout", "LinearLayout", "RelativeLayout", "ViewGroup"]);
+// Android puts a resource id on nearly every layout, so an id alone does not keep an unlabelled Android container.
+const ANDROID_LAYOUT = /^android\.(view|widget)\.(View|ViewGroup|FrameLayout|LinearLayout|RelativeLayout|ScrollView)$/;
 const ACTIONABLE = /Button|Link|Cell|Switch|TextField|SearchField|Tab|MenuItem|CheckBox|RadioButton/;
 const snapshots = new Map<string, Snap>();
 const devices = new Map<string, Device>(); // device arg -> resolved device, dropped when a call fails
@@ -120,9 +122,13 @@ export async function resolveDevice(exec: Exec, device: string | undefined, need
 export function flatten(nodes: any[]): Omit<Element, "ref">[] {
 	const out: Omit<Element, "ref">[] = [];
 	const walk = (n: any, owner: string) => {
-		const type = String(n.type ?? ""), label = String(n.label ?? n.text ?? "").trim(), value = n.value == null ? "" : String(n.value), id = String(n.identifier ?? "");
+		const raw = String(n.type ?? ""), type = raw.replace(/^android\.(view|widget)\./, "");
+		let label = String(n.label ?? n.text ?? "").trim();
+		const value = n.value == null ? "" : String(n.value), id = String(n.identifier ?? "");
+		// Android reports a field's text as both text and value; keeping it only as the value keeps the ref stable while typing.
+		if (value && label === value) label = "";
 		const repeats = /StaticText|TextView/.test(type) && !!label && owner.includes(label);
-		if (!repeats && (label || value || id || (type && !CONTAINERS.has(type))))
+		if (!repeats && (label || value || (id && !ANDROID_LAYOUT.test(raw)) || (type && !CONTAINERS.has(type))))
 			out.push({ type, label, value, id, frame: n.rect ?? { x: 0, y: 0, width: 0, height: 0 } });
 		for (const c of n.children ?? []) walk(c, ACTIONABLE.test(type) ? label : owner);
 	};

@@ -48,6 +48,11 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 		'[e3] TextField "Room code" = "AB12" @(16,500 200x40)',
 		'[e4] Button "⚙, Settings" #nav_settings @(16,546 370x48)',
 	]);
+	const android = [{ type: "android.widget.FrameLayout", identifier: "com.x:id/root", rect: { x: 0, y: 0, width: 360, height: 640 }, children: [
+		{ type: "android.widget.TextView", label: "11:15", identifier: "com.x:id/clock", rect: { x: 4, y: 4, width: 47, height: 16 } },
+		{ type: "android.widget.Button", label: "", identifier: "com.x:id/go", rect: { x: 0, y: 100, width: 50, height: 50 } },
+		{ type: "android.widget.EditText", label: "wifi", value: "wifi", rect: { x: 0, y: 200, width: 300, height: 50 } }] }];
+	assert.deepEqual(assignRefs(undefined, flatten(android)).snap.elements.map(line), ['[e1] TextView "11:15" #com.x:id/clock @(4,4 47x16)', '[e2] Button "" #com.x:id/go @(0,100 50x50)', '[e3] EditText "" = "wifi" @(0,200 300x50)'], "Android: short types, bare layouts dropped");
 	assert.deepEqual(swipePoints("down", { x: 0, y: 0, width: 100, height: 200 }), [50, 160, 50, 40], "down moves the finger up");
 	assert.throws(() => swipePoints("sideways", { x: 0, y: 0, width: 1, height: 1 }), /direction/);
 	assert.equal(onPath("node"), true);
