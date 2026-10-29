@@ -1,117 +1,165 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { flatten, line, listSims, resolveSim, mobileAct, mobileActTool, swipePoints } from "../extensions/mobile-act.ts";
-import { screenRead } from "../extensions/screen-read.ts";
+import { assignRefs, flatten, line, mobileAct, mobileActTool, onPath, resetSession, resolveDevice, swipePoints } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
-const A = "AAAA-1", B = "BBBB-2";
-const devices = (bootedB = false) => JSON.stringify({ devices: {
-	"com.apple.CoreSimulator.SimRuntime.iOS-26-0": [{ udid: A, name: "iPhone 17", state: "Booted" }, { udid: B, name: "iPhone Air", state: bootedB ? "Booted" : "Shutdown" }],
-	"com.apple.CoreSimulator.SimRuntime.watchOS-26-0": [{ udid: "W", name: "Watch", state: "Booted" }],
-} });
-const tree = [{ type: "Application", AXLabel: "Demo", frame: { x: 0, y: 0, width: 402, height: 874 }, children: [
-	{ type: "Group", frame: { x: 0, y: 0, width: 402, height: 874 }, children: [
-		{ type: "Heading", AXLabel: "TITLE", AXUniqueId: "title", frame: { x: 16, y: 76, width: 234, height: 33 } },
-		{ type: "Button", AXLabel: "Local game", AXUniqueId: "play", frame: { x: 16, y: 369, width: 370, height: 48 }, children: [
-			{ type: "StaticText", AXLabel: "Local game", frame: { x: 161, y: 385, width: 81, height: 16 } }] },
-		{ type: "TextField", AXLabel: "Room code", AXValue: "AB12", enabled: false, frame: { x: 16, y: 500, width: 200, height: 40 } },
-		{ type: "Group", frame: { x: 0, y: 0, width: 10, height: 10 } },
-	] }] }];
+const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
+const OLD = { id: "SIM-2", name: "iPhone 17", platform: "ios", type: "simulator", state: "offline", version: "27.0" };
+const AIR = { id: "SIM-3", name: "iPhone Air", platform: "ios", type: "simulator", state: "offline", version: "26.0" };
+const PHONE = { id: "0000-REAL", name: "Lorenz’s iPhone", platform: "ios", type: "real", state: "online", version: "27.0" };
+const PIXEL = { id: "emulator-5554", name: "Pixel", platform: "android", type: "emulator", state: "online", version: "15" };
+const ok = (data) => ({ code: 0, stdout: JSON.stringify({ status: "ok", data }) });
+const btn = (label, id, y, extra = {}) => ({ type: "Button", label, identifier: id, rect: { x: 16, y, width: 370, height: 48 }, ...extra });
+const home = [
+	{ type: "Other", label: "TITLE", identifier: "title", rect: { x: 16, y: 76, width: 234, height: 33 } },
+	btn("Local game", "play", 369, { children: [{ type: "StaticText", label: "Local game", rect: { x: 161, y: 385, width: 81, height: 16 } }] }),
+	{ type: "TextField", label: "Room code", value: "AB12", rect: { x: 16, y: 500, width: 200, height: 40 } },
+	{ type: "Other", rect: { x: 0, y: 0, width: 10, height: 10 } },
+	btn("⚙, Settings", "nav_settings", 546),
+];
 
-function fakeExec(bootedB = false) {
+/** Fake mobilecli: `screens` is the sequence of dump ui results; `agent` says whether the helper app is installed. */
+function fake({ list = [SIM], screens = [home], agent = true } = {}) {
 	const calls = [];
+	let shown = 0;
 	const exec = async (command, args) => {
 		calls.push([command, ...args]);
-		if (args[0] === "simctl" && args[1] === "list") return { code: 0, stdout: devices(bootedB) };
-		if (args[0] === "simctl" && args[1] === "launch") return { code: 0, stdout: "com.demo: 4242\n" };
-		if (command === "axe" && args[0] === "describe-ui") return { code: 0, stdout: JSON.stringify(tree) };
-		return { code: 0, stdout: "" };
+		if (command === "npm") return { code: 0, stdout: "added 2 packages" };
+		if (args[0] === "devices") return ok({ devices: list });
+		if (args[0] === "device" && args[1] === "info") return ok({ device: { screenSize: { width: 402, height: 874, scale: 3 } } });
+		if (args[0] === "agent" && args[1] === "status") return agent ? ok({ version: "0.0.35" }) : { code: 1, stdout: JSON.stringify({ status: "error", error: "agent not installed" }) };
+		if (args[0] === "dump") return ok({ elements: screens[Math.min(shown++, screens.length - 1)] });
+		return ok({});
 	};
-	return { exec, calls };
+	return { exec, calls, acts: () => calls.filter(c => c[1] === "io" || c[1] === "apps" || c[0] === "npm" || (c[1] === "agent" && c[2] === "install")).map(c => c.slice(1).join(" ")) };
 }
+const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...extra });
 
-// Flattening: containers without labels vanish, a button's own text child is not repeated.
+// Flattening: containers without labels vanish, a button's own text child is not repeated; no [disabled] flag (D10).
 {
-	const { elements, screen } = flatten(tree);
-	assert.deepEqual(screen, { x: 0, y: 0, width: 402, height: 874 });
-	assert.deepEqual(elements.map(line), [
-		'[e1] Application "Demo" @(0,0 402x874)',
-		'[e2] Heading "TITLE" #title @(16,76 234x33)',
-		'[e3] Button "Local game" #play @(16,369 370x48)',
-		'[e4] TextField "Room code" = "AB12" [disabled] @(16,500 200x40)',
+	const els = assignRefs(undefined, flatten(home)).snap.elements;
+	assert.deepEqual(els.map(line), [
+		'[e1] Other "TITLE" #title @(16,76 234x33)',
+		'[e2] Button "Local game" #play @(16,369 370x48)',
+		'[e3] TextField "Room code" = "AB12" @(16,500 200x40)',
+		'[e4] Button "⚙, Settings" #nav_settings @(16,546 370x48)',
 	]);
 	assert.deepEqual(swipePoints("down", { x: 0, y: 0, width: 100, height: 200 }), [50, 160, 50, 40], "down moves the finger up");
-	assert.deepEqual(swipePoints("right", { x: 0, y: 0, width: 100, height: 200 }), [80, 100, 20, 100]);
 	assert.throws(() => swipePoints("sideways", { x: 0, y: 0, width: 1, height: 1 }), /direction/);
+	assert.equal(onPath("node"), true);
+	assert.equal(onPath("surely-not-a-binary-xyz"), false);
 }
 
-// Device resolution: the only booted iOS simulator by default; ambiguous or unknown devices explain themselves.
+// Stable refs: unchanged elements keep refs, equal keys match the nearest frame, new ones get fresh refs.
 {
-	assert.equal((await resolveSim(fakeExec().exec, undefined, true)).udid, A, "watchOS runtimes are ignored");
-	await assert.rejects(resolveSim(fakeExec(true).exec, undefined, true), /Several simulators are booted; pass device:\nAAAA-1 iPhone 17 \(iOS 26.0\)/);
-	assert.equal((await resolveSim(fakeExec(true).exec, "iPhone Air", true)).udid, B);
-	await assert.rejects(resolveSim(fakeExec().exec, "iPhone Air", true), /Shutdown; boot it first/);
-	await assert.rejects(resolveSim(fakeExec().exec, "Pixel", true), /No available iOS simulator/);
-	await assert.rejects(mobileAct(fakeExec().exec, { action: "list" }, undefined, "linux"), /needs macOS/);
+	const first = assignRefs(undefined, flatten(home));
+	const moved = [home[0], { ...home[2], value: "ZZ" }, btn("Local game", "play", 380), btn("Local game", "play", 700), btn("Online", "online", 600)];
+	const { snap, added, removed, changed } = assignRefs(first.snap, flatten(moved));
+	assert.deepEqual(snap.elements.map(e => e.ref), ["e1", "e3", "e2", "e5", "e6"]);
+	assert.deepEqual(added.map(e => e.ref), ["e5", "e6"]);
+	assert.deepEqual(removed.map(e => e.ref), ["e4"]);
+	assert.deepEqual(changed.map(e => e.ref), ["e3", "e2"], "value and frame changes");
 }
 
-// Actions map to simctl and AXe calls in points, with refs from the last snapshot.
+// Devices: the only online one by default; names prefer the online device; ambiguity explains itself.
 {
-	const { exec, calls } = fakeExec();
-	assert.match(await mobileAct(exec, { action: "list" }, undefined, "darwin"), /^AAAA-1 BOOTED iPhone 17 \(iOS 26.0\)\nBBBB-2 iPhone Air/);
-	await assert.rejects(mobileAct(exec, { action: "tap", ref: "e3" }, undefined, "darwin"), /No snapshot yet/);
-	const snap = await mobileAct(exec, { action: "snapshot" }, undefined, "darwin");
+	const list = [SIM, OLD, AIR, PIXEL];
+	assert.equal((await resolveDevice(fake({ list: [SIM, OLD] }).exec, undefined, true)).id, "SIM-1");
+	await assert.rejects(resolveDevice(fake({ list }).exec, undefined, true), /Several devices are online; pass device:\nSIM-1 iPhone 17 \(ios simulator 26.0\)\nemulator-5554/);
+	assert.equal((await resolveDevice(fake({ list }).exec, "iPhone 17", true)).id, "SIM-1", "duplicate name -> the online one");
+	await assert.rejects(resolveDevice(fake({ list: [OLD, { ...OLD, id: "SIM-9" }] }).exec, "iPhone 17", true), /Several devices are named "iPhone 17"; pass the id/);
+	await assert.rejects(resolveDevice(fake({ list }).exec, "iPhone Air", true), /offline; boot it first/);
+	await assert.rejects(resolveDevice(fake({ list }).exec, "Nokia", true), /No device "Nokia"/);
+}
+
+// Actions map to mobilecli calls; each returns the change list after settleMs.
+{
+	resetSession();
+	const settings = [home[0], btn("Language", "language", 200), home[2], btn("⚙, Settings", "nav_settings", 546)];
+	const f = fake({ screens: [home, settings, settings] });
+	assert.match(await mobileAct(f.exec, { action: "list" }, opts()), /^SIM-1 ONLINE iPhone 17 \(ios simulator 26.0\)/);
+	await assert.rejects(mobileAct(f.exec, { action: "tap", ref: "e4" }, opts()), /No snapshot yet/);
+	const snap = await mobileAct(f.exec, { action: "snapshot" }, opts());
 	assert.match(snap, /^UNTRUSTED app content/);
 	assert.match(snap, /iPhone 17 402x874 points/);
-	assert.match(snap, /\[e3\] Button "Local game" #play/);
-	assert.equal(await mobileAct(exec, { action: "find", query: "room" }, undefined, "darwin"), '[e4] TextField "Room code" = "AB12" [disabled] @(16,500 200x40)');
-	calls.length = 0;
-	await mobileAct(exec, { action: "tap", ref: "e3" }, undefined, "darwin");
-	await mobileAct(exec, { action: "tap", x: 10.123, y: 20 }, undefined, "darwin");
-	await mobileAct(exec, { action: "type", ref: "e4", text: "XY", submit: true }, undefined, "darwin");
-	await mobileAct(exec, { action: "swipe", direction: "down" }, undefined, "darwin");
-	await mobileAct(exec, { action: "button", button: "home" }, undefined, "darwin");
-	assert.match(await mobileAct(exec, { action: "launch", bundleId: "com.demo" }, undefined, "darwin"), /Launched com.demo: 4242/);
-	const acts = calls.filter(c => c[0] === "axe" || c[2] === "launch");
-	const u = ["--udid", A];
-	assert.deepEqual(acts, [
-		["axe", "tap", "-x", "201", "-y", "393", ...u],
-		["axe", "tap", "-x", "10.12", "-y", "20", ...u],
-		["axe", "tap", "-x", "116", "-y", "520", "--post-delay", "0.3", ...u],
-		["axe", "type", "XY", ...u],
-		["axe", "key", "40", ...u],
-		["axe", "swipe", "--start-x", "201", "--start-y", "699.2", "--end-x", "201", "--end-y", "174.8", ...u],
-		["axe", "button", "home", ...u],
-		["xcrun", "simctl", "launch", "--terminate-running-process", A, "com.demo"],
+	assert.equal(await mobileAct(f.exec, { action: "find", query: "room" }, opts()), '[e3] TextField "Room code" = "AB12" @(16,500 200x40)');
+	const tap = await mobileAct(f.exec, { action: "tap", ref: "e4" }, opts());
+	assert.match(tap, /^Done\. Changes \(\+ added, - removed, ~ changed\):\nUNTRUSTED/);
+	assert.match(tap, /\+ \[e5\] Button "Language" #language/);
+	assert.match(tap, /- \[e2\] Button "Local game"/);
+	assert.doesNotMatch(tap, /nav_settings/, "unchanged elements are not repeated");
+	assert.equal(await mobileAct(f.exec, { action: "tap", ref: "e5" }, opts()), "Done. No visible change.");
+	await mobileAct(f.exec, { action: "tap", x: 10.4, y: 20, settleMs: 0 }, opts());
+	await mobileAct(f.exec, { action: "longpress", ref: "e5", durationMs: 1500, settleMs: 0 }, opts());
+	await mobileAct(f.exec, { action: "type", ref: "e5", text: "XY", submit: true, settleMs: 0 }, opts());
+	await mobileAct(f.exec, { action: "swipe", direction: "down", settleMs: 0 }, opts());
+	assert.equal(await mobileAct(f.exec, { action: "button", button: "home", settleMs: 0 }, opts()), "Done.");
+	assert.match(await mobileAct(f.exec, { action: "launch", appId: "com.demo" }, opts()), /Launched com.demo/);
+	const d = "--device SIM-1";
+	assert.deepEqual(f.acts(), [
+		`io tap 201,570 ${d}`, `io tap 201,224 ${d}`, `io tap 10,20 ${d}`, `io longpress 201,224 --duration 1500 ${d}`,
+		`io tap 201,224 ${d}`, `io text XY ${d}`, `io keys enter ${d}`, `io swipe 201,699,201,175 ${d}`, `io button HOME ${d}`, `apps launch com.demo ${d}`,
 	]);
-	await assert.rejects(mobileAct(exec, { action: "tap", ref: "e99" }, undefined, "darwin"), /Unknown ref e99/);
-	await assert.rejects(mobileAct(exec, { action: "tap" }, undefined, "darwin"), /needs ref, or x and y/);
-	await assert.rejects(mobileAct(exec, { action: "launch" }, undefined, "darwin"), /needs bundleId/);
-	const missing = async (command, args) => command === "axe" ? { code: 127, stderr: "spawn axe ENOENT" } : { code: 0, stdout: devices() };
-	await assert.rejects(mobileAct(missing, { action: "snapshot" }, undefined, "darwin"), /AXe is not installed: brew tap cameroncooke\/axe/);
-	const failing = async (command, args) => command === "axe" ? { code: 1, stderr: "No element found matching label" } : { code: 0, stdout: devices() };
-	await assert.rejects(mobileAct(failing, { action: "button", button: "home" }, undefined, "darwin"), /axe button home failed: No element found/);
-	let tries = 0;
-	const flaky = async (command, args) => command !== "axe" ? { code: 0, stdout: devices() } : ++tries === 1 ? { code: 1, stderr: "Error: Timed out creating the simulator remote automation session" } : { code: 0, stdout: "" };
-	assert.equal(await mobileAct(flaky, { action: "button", button: "home" }, undefined, "darwin"), "Done. Take a snapshot to see the screen now.");
-	assert.equal(tries, 2, "one retry after an automation-session timeout");
-	const tool = mobileActTool(exec);
-	assert.equal(tool.name, "mobile_act");
-	assert.deepEqual((await tool.execute("1", { action: "button", button: "lock" })).content[0].text, "Done. Take a snapshot to see the screen now.");
+	assert.equal(f.calls.filter(c => c[1] === "agent").length, 1, "agent status is checked once per device per session");
+	assert.equal(f.calls.filter(c => c[1] === "devices").length, 3, "list, one resolve, one more after the failed tap dropped the cached device");
+	await assert.rejects(mobileAct(f.exec, { action: "tap", ref: "e99" }, opts()), /Unknown ref e99/);
+	await assert.rejects(mobileAct(f.exec, { action: "tap" }, opts()), /needs ref, or x and y/);
+	await assert.rejects(mobileAct(f.exec, { action: "launch" }, opts()), /needs appId/);
+	const failing = async (c, a) => a[0] === "io" ? { code: 1, stdout: JSON.stringify({ status: "error", error: "device not found: SIM-1" }) } : f.exec(c, a);
+	await assert.rejects(mobileAct(failing, { action: "button", button: "home" }, opts()), /mobilecli io button failed: device not found: SIM-1/);
+	const full = fake({ screens: [home, [btn("Other screen", "x", 100), btn("More", "y", 200), btn("Yet more", "z", 300)]] });
+	resetSession();
+	await mobileAct(full.exec, { action: "snapshot" }, opts());
+	assert.match(await mobileAct(full.exec, { action: "tap", ref: "e1" }, opts()), /^Done\. The screen changed:\nUNTRUSTED[^]*\[e5\] Button "Other screen"/, "mostly new screen -> full list");
 }
 
-// Live: only on macOS with AXe and a booted simulator; reads only, never boots, launches or taps.
-if (process.platform === "darwin") {
-	const exec = async (command, args, { timeout }) => run(command, args, { timeout, maxBuffer: 64 << 20 }).then(r => ({ code: 0, ...r }), e => ({ code: e.code ?? 1, stdout: e.stdout, stderr: e.stderr || e.message }));
-	const hasAxe = await run("axe", ["--version"]).then(() => true, () => false);
-	const booted = hasAxe ? (await listSims(exec).catch(() => [])).find(s => s.state === "Booted") : undefined;
-	if (booted) {
-		const snap = await mobileAct(exec, { action: "snapshot", device: booted.udid }, undefined, "darwin");
-		assert.match(snap, /\[e1\] Application "/, "live snapshot lists the foreground app");
-		const shot = await screenRead(null, { target: "ios", ios: { device: booted.udid }, maxEdge: 256 });
-		assert.ok(shot.height === 256 && shot.sourceHeight > 1000, `live iOS screenshot ${shot.width}x${shot.height} of ${shot.sourceWidth}x${shot.sourceHeight}`);
-		console.log(`live ${booted.name}: ${snap.split("\n").length - 3} elements, screenshot ${shot.sourceWidth}x${shot.sourceHeight}`);
-	} else console.log("live check skipped: needs AXe and a booted simulator");
+// D5 installs: mobilecli only after Yes; simulator agent automatic; real iPhone agent only after Yes.
+{
+	resetSession();
+	const f = fake();
+	const asked = [];
+	const no = opts({ hasCli: () => false, confirm: async (t) => (asked.push(t), false) });
+	await assert.rejects(mobileAct(f.exec, { action: "list" }, no), /mobilecli is not installed\. Install it with: npm install -g mobilecli/);
+	assert.deepEqual(asked, ["Install mobilecli?"]);
+	await assert.rejects(mobileAct(f.exec, { action: "list" }, opts({ hasCli: () => false })), /Install it with: npm install -g mobilecli/, "no UI: command only");
+	assert.deepEqual(f.acts(), [], "nothing installed without a Yes");
+	await mobileAct(f.exec, { action: "list" }, opts({ hasCli: () => false, confirm: async () => true }));
+	assert.deepEqual(f.acts(), ["install -g mobilecli"]);
+
+	resetSession();
+	const sim = fake({ agent: false });
+	await mobileAct(sim.exec, { action: "snapshot" }, opts({ confirm: async () => assert.fail("no question for a simulator") }));
+	assert.deepEqual(sim.acts(), ["agent install --device SIM-1"]);
+
+	resetSession();
+	const real = fake({ list: [PHONE], agent: false });
+	await assert.rejects(mobileAct(real.exec, { action: "snapshot" }, opts({ confirm: async () => false })), /not on Lorenz’s iPhone\. Install it with: mobilecli agent install --device 0000-REAL/);
+	await assert.rejects(mobileAct(real.exec, { action: "snapshot" }, opts()), /not on Lorenz’s iPhone/, "no UI: never installs on a phone");
+	assert.deepEqual(real.acts(), []);
+	const noProfile = async (c, a) => a[1] === "install" ? { code: 1, stdout: JSON.stringify({ status: "error", error: "no matching provisioning profile found" }) } : real.exec(c, a);
+	await assert.rejects(mobileAct(noProfile, { action: "snapshot" }, opts({ confirm: async () => true })), /no matching provisioning profile[^]*wildcard App ID \(TEAMID\.\*\) that includes this iPhone's UDID/);
+	resetSession();
+	const pixel = fake({ list: [PIXEL], agent: false });
+	await mobileAct(pixel.exec, { action: "button", button: "back", settleMs: 0 }, opts());
+	assert.deepEqual(pixel.acts(), ["io button BACK --device emulator-5554"], "Android needs no agent check");
+
+	const tool = mobileActTool(f.exec);
+	assert.equal(tool.name, "mobile_act");
+	assert.ok(tool.parameters.properties.action.enum.includes("longpress"));
 }
+
+// Live: only with mobilecli on PATH and one online simulator with its agent; reads only, never taps.
+if (onPath("mobilecli")) {
+	resetSession();
+	const exec = async (command, args, { timeout }) => run(command, args, { timeout, maxBuffer: 64 << 20 }).then(r => ({ code: 0, ...r }), e => ({ code: e.code ?? 1, stdout: e.stdout, stderr: e.stderr || e.message }));
+	const sims = (await resolveDevice(exec, undefined, true).then(d => [d], () => []));
+	const sim = sims.find(d => d.type === "simulator");
+	const agent = sim && await run("mobilecli", ["agent", "status", "--device", sim.id]).then(() => true, () => false);
+	if (agent) {
+		const snap = await mobileAct(exec, { action: "snapshot", device: sim.id }, { confirm: async () => false });
+		assert.match(snap, /^UNTRUSTED[^]*\n\[e1\] /, "live snapshot lists elements");
+		console.log(`live ${sim.name}: ${snap.split("\n").length - 3} elements`);
+	} else console.log("live check skipped: needs exactly one online simulator with the mobilecli agent");
+} else console.log("live check skipped: mobilecli is not on PATH");
 console.log("mobile_act ok");
