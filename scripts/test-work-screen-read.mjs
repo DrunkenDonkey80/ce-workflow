@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import { MOBILECLI } from "../extensions/mobile-act.ts";
 import { captureFile, decodePng, encodePng, processPng, screenRead, screenReadPlan, screenReadTool } from "../extensions/screen-read.ts";
 
 const file = "C:/tmp/x.png";
@@ -18,7 +18,7 @@ assert.deepEqual(screenReadPlan({ target: "android", android: { device: "emu" } 
 assert.deepEqual(screenReadPlan({ target: "android", android: { device: "emu" } }, file).alt, { exe: "adb", runs: [["-s", "emu", "exec-out", "screencap", "-p"]] });
 assert.deepEqual(screenReadPlan({ target: "device" }, file).runs, [["screenshot", "--output", "C:/tmp/x-raw.png"]]);
 assert.deepEqual(screenReadPlan({ target: "device", device: { device: "UDID-1" } }, file).runs, [["screenshot", "--device", "UDID-1", "--output", "C:/tmp/x-raw.png"]]);
-if (!process.env.PATH?.split(path.delimiter).some(d => d && existsSync(path.join(d, "mobilecli")))) await assert.rejects(screenRead(null, { target: "device" }, undefined, os.tmpdir(), "linux"), /needs mobilecli: npm install -g mobilecli/);
+assert.equal(screenReadPlan({ target: "device" }, file).exe, MOBILECLI, "the bundled mobilecli binary");
 assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
 
 // Non-Windows path: pure Node PNG decode (all five filters, RGB and RGBA), crop and downscale.

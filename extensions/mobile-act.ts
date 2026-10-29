@@ -1,6 +1,7 @@
 // mobile_act: read and drive an iOS Simulator, a real iPhone or an Android device/emulator through mobilecli (https://github.com/mobile-next/mobilecli).
 // The screen comes from the accessibility tree as labelled elements with frames; every action returns what changed on screen.
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -17,12 +18,16 @@ type Frame = { x: number; y: number; width: number; height: number };
 export type Element = { ref: string; type: string; label: string; value: string; id: string; frame: Frame };
 export type Device = { id: string; name: string; platform: string; type: string; state: string; version: string };
 type Snap = { elements: Element[]; next: number };
-export type Options = { signal?: AbortSignal; confirm?: Confirm; hasCli?: () => boolean; sleep?: (ms: number) => Promise<void>; profileDirs?: string[]; ocr?: (png: string) => Promise<OcrHit[]> };
+export type Options = { signal?: AbortSignal; confirm?: Confirm; sleep?: (ms: number) => Promise<void>; profileDirs?: string[]; ocr?: (png: string) => Promise<OcrHit[]> };
 /** Vision text box, normalized 0..1 from the top left. */
 export type OcrHit = { text: string; x: number; y: number; w: number; h: number };
 
-const BIN = "mobilecli";
-export const INSTALL_CMD = "npm install -g mobilecli";
+/** The native binary from the mobilecli npm dependency (platform package); "mobilecli" on PATH when this platform has none. */
+export const MOBILECLI = (() => {
+	const os_ = ({ darwin: "darwin", linux: "linux", android: "linux", win32: "windows" } as Record<string, string>)[process.platform], arch = ({ x64: "amd64", arm64: "arm64" } as Record<string, string>)[process.arch];
+	try { return path.join(path.dirname(createRequire(import.meta.url).resolve(`@mobilenext/mobilecli-${os_}-${arch}/package.json`)), `mobilecli-${os_}-${arch}${os_ === "windows" ? ".exe" : ""}`); }
+	catch { return "mobilecli"; }
+})();
 export const PROFILE_HELP = "Create a development provisioning profile with a wildcard App ID (TEAMID.*) that includes this iPhone's UDID at developer.apple.com > Certificates, IDs & Profiles, then download it in Xcode (Settings > Accounts > Download Manual Profiles) so it lands in ~/Library/Developer/Xcode/UserData/Provisioning Profiles.";
 // Containers and decorative images carry no meaning of their own; they show only with a label, value or accessibility id.
 const CONTAINERS = new Set(["Group", "Other", "Application", "Window", "ScrollView", "Unknown", "Image", "View", "FrameLayout", "LinearLayout", "RelativeLayout", "ViewGroup"]);
@@ -37,13 +42,10 @@ const ocrTexts = new Map<string, Element[]>(); // device -> text boxes from the 
 const devices = new Map<string, Device>(); // device arg -> resolved device, dropped when a call fails
 const screens = new Map<string, Frame>();
 const agentOk = new Set<string>();
-let cliOk = false;
-export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); cliOk = false; }
-
-export const onPath = (name: string, PATH = process.env.PATH ?? "") => PATH.split(path.delimiter).some(d => d && existsSync(path.join(d, name)));
+export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); }
 
 async function run(exec: Exec, args: string[], signal?: AbortSignal, timeout = 60_000) {
-	const r = await exec(BIN, args, { timeout, signal });
+	const r = await exec(MOBILECLI, args, { timeout, signal });
 	if (r.killed) throw new Error(`mobilecli ${args[0]} timed out.`);
 	const out = String(r.stdout ?? "");
 	if (r.code) {
@@ -53,17 +55,7 @@ async function run(exec: Exec, args: string[], signal?: AbortSignal, timeout = 6
 	}
 	return out;
 }
-const data = (out: string) => JSON.parse(out).data;
-
-/** Offers to install mobilecli once per session; never installs without a Yes. */
-async function ensureCli(exec: Exec, o: Options) {
-	if (cliOk || (o.hasCli ?? (() => onPath(BIN)))()) return void (cliOk = true);
-	const missing = `mobilecli is not installed. Install it with: ${INSTALL_CMD}`;
-	if (!o.confirm || !(await o.confirm("Install mobilecli?", `mobile_act reads and controls phones and simulators through mobilecli (npm, by Mobile Next). Run "${INSTALL_CMD}" now?`))) throw new Error(missing);
-	const r = await exec("npm", ["install", "-g", "mobilecli"], { timeout: 300_000, signal: o.signal });
-	if (r.code || r.killed) throw new Error(`${INSTALL_CMD} failed: ${String(r.stderr || r.stdout || "").trim().slice(-1500)}`);
-	cliOk = true;
-}
+const data = (out: string) => { try { return JSON.parse(out).data; } catch { throw new Error(`mobilecli returned non-JSON output: ${out.slice(0, 300)}`); } };
 
 const PROFILE_DIRS = ["Library/MobileDevice/Provisioning Profiles", "Library/Developer/Xcode/UserData/Provisioning Profiles"].map(d => path.join(os.homedir(), d));
 const AGENT_ID = "com.mobilenext.devicekit-iosUITests.xctrunner";
@@ -322,7 +314,6 @@ export function swipePoints(direction: string, f: Frame) {
 
 export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}): Promise<string> {
 	const { signal } = o;
-	await ensureCli(exec, o);
 	if (args.action === "list") {
 		const list = await listDevices(exec, signal);
 		return list.length ? list.map(d => `${d.id} ${d.state === "online" ? "ONLINE " : ""}${d.name} (${d.platform} ${d.type} ${d.version})`).join("\n") : "No devices: create a simulator in Xcode or an emulator in Android Studio, or plug in a phone.";

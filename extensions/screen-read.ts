@@ -4,6 +4,7 @@ import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import { MOBILECLI } from "./mobile-act.ts";
 
 // One PowerShell/C# helper: window enumeration, PrintWindow capture (minimized windows included) and PNG crop/downscale.
 const source = String.raw`
@@ -165,7 +166,7 @@ export function screenReadPlan(args: ScreenReadArgs, file: string) {
 		// alt: plain adb when the android CLI is not installed; screencap writes the PNG to stdout, which goes to raw
 		return { ...base, op: "file", exe: "android", runs: [["screen", "capture", ...(device ? [`--device=${device}`] : []), `--output=${raw}`]], raw, alt: { exe: "adb", runs: [[...(device ? ["-s", device] : []), "exec-out", "screencap", "-p"]] } };
 	}
-	if (args.target === "device") { const d = args.device?.device; return { ...base, op: "file", exe: "mobilecli", runs: [["screenshot", ...(d ? ["--device", d] : []), "--output", raw]], raw }; }
+	if (args.target === "device") { const d = args.device?.device; return { ...base, op: "file", exe: MOBILECLI, runs: [["screenshot", ...(d ? ["--device", d] : []), "--output", raw]], raw }; }
 	throw new Error("target must be window, browser, android or device.");
 }
 
@@ -283,7 +284,7 @@ export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: Abor
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
 	if (platform !== "win32") return { file, ...await captureFile(plan as FilePlan, signal).catch(e => {
-		throw e?.code === "ENOENT" && plan.exe === "mobilecli" ? new Error("screen_read target=device needs mobilecli: npm install -g mobilecli (mobile_act offers to install it).") : e;
+		throw e?.code === "ENOENT" && (plan as FilePlan).exe === MOBILECLI ? new Error("screen_read target=device needs mobilecli, which ships with ce-workflow on macOS, Linux and Windows (x64, arm64); reinstall ce-workflow or put mobilecli on PATH.") : e;
 	}) };
 	// env, not argv: no quoting issues; spawn copies it synchronously, so parallel calls cannot mix it up
 	process.env.SCREEN_READ_ARGS = Buffer.from(JSON.stringify(plan), "utf8").toString("base64");

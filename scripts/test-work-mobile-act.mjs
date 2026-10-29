@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { assignRefs, findProfile, flatten, line, matches, mobileAct, mobileActTool, onPath, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
+import { assignRefs, findProfile, flatten, line, matches, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -37,7 +38,7 @@ function fake({ list = [SIM], screens = [home], agent = true } = {}) {
 	};
 	return { exec, calls, acts: () => calls.filter(c => c[1] === "io" || c[1] === "apps" || c[0] === "npm" || (c[1] === "agent" && c[2] === "install")).map(c => c.slice(1).join(" ")) };
 }
-const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...extra });
+const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 
 // Flattening: containers without labels vanish, a button's own text child is not repeated; no [disabled] flag (D10).
 {
@@ -59,8 +60,7 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 	assert.deepEqual(flatten(ios).map(e => e.label), ["12:30 left"], "iOS status bar dropped, the same text lower down kept");
 	assert.deepEqual(swipePoints("down", { x: 0, y: 0, width: 100, height: 200 }), [50, 160, 50, 40], "down moves the finger up");
 	assert.throws(() => swipePoints("sideways", { x: 0, y: 0, width: 1, height: 1 }), /direction/);
-	assert.equal(onPath("node"), true);
-	assert.equal(onPath("surely-not-a-binary-xyz"), false);
+	assert.ok(existsSync(MOBILECLI), "the mobilecli npm dependency ships this platform's binary");
 }
 
 // Overlapped elements: tap the visible strip of a fanned card, not the neighbour on top of its center.
@@ -163,18 +163,12 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 	assert.ok(f.calls.some(c => c[1] === "screenshot"), "OCR takes a screenshot");
 }
 
-// D5 installs: mobilecli only after Yes; simulator agent automatic; real iPhone agent only after Yes.
+// D5 installs: mobilecli is a bundled dependency; simulator agent automatic; real iPhone agent only after Yes.
 {
 	resetSession();
 	const f = fake();
-	const asked = [];
-	const no = opts({ hasCli: () => false, confirm: async (t) => (asked.push(t), false) });
-	await assert.rejects(mobileAct(f.exec, { action: "list" }, no), /mobilecli is not installed\. Install it with: npm install -g mobilecli/);
-	assert.deepEqual(asked, ["Install mobilecli?"]);
-	await assert.rejects(mobileAct(f.exec, { action: "list" }, opts({ hasCli: () => false })), /Install it with: npm install -g mobilecli/, "no UI: command only");
-	assert.deepEqual(f.acts(), [], "nothing installed without a Yes");
-	await mobileAct(f.exec, { action: "list" }, opts({ hasCli: () => false, confirm: async () => true }));
-	assert.deepEqual(f.acts(), ["install -g mobilecli"]);
+	await mobileAct(f.exec, { action: "list" }, opts());
+	assert.deepEqual(f.calls.map(c => c[0]), [MOBILECLI], "runs the bundled binary, never npm install");
 
 	resetSession();
 	const sim = fake({ agent: false });
@@ -212,17 +206,17 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 	assert.ok(tool.parameters.properties.action.enum.includes("longpress"));
 }
 
-// Live: only with mobilecli on PATH and one online simulator with its agent; reads only, never taps.
-if (onPath("mobilecli")) {
+// Live: only with the bundled mobilecli and one online simulator with its agent; reads only, never taps.
+if (existsSync(MOBILECLI)) {
 	resetSession();
 	const exec = async (command, args, { timeout }) => run(command, args, { timeout, maxBuffer: 64 << 20 }).then(r => ({ code: 0, ...r }), e => ({ code: e.code ?? 1, stdout: e.stdout, stderr: e.stderr || e.message }));
 	const sims = (await resolveDevice(exec, undefined, true).then(d => [d], () => []));
 	const sim = sims.find(d => d.type === "simulator");
-	const agent = sim && await run("mobilecli", ["agent", "status", "--device", sim.id]).then(() => true, () => false);
+	const agent = sim && await run(MOBILECLI, ["agent", "status", "--device", sim.id]).then(() => true, () => false);
 	if (agent) {
 		const snap = await mobileAct(exec, { action: "snapshot", device: sim.id }, { confirm: async () => false });
 		assert.match(snap, /^UNTRUSTED[^]*\n\[e1\] /, "live snapshot lists elements");
 		console.log(`live ${sim.name}: ${snap.split("\n").length - 3} elements`);
 	} else console.log("live check skipped: needs exactly one online simulator with the mobilecli agent");
-} else console.log("live check skipped: mobilecli is not on PATH");
+} else console.log("live check skipped: no mobilecli binary for this platform");
 console.log("mobile_act ok");

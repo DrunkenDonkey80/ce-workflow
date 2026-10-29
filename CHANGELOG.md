@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- mobile_act and screen_read target "device" use mobilecli bundled with ce-workflow (macOS, Linux and Windows, x64 and arm64), so there is nothing to install and the tool always works.
+
 ## 0.1.100 — 2026-10-29
 
 ### Added
