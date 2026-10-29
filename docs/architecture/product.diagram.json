@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 19,
+  "revision": 20,
   "nodes": [
     {
       "id": "pi_host",
@@ -404,7 +404,7 @@
       "id": "browser_fetch_host",
       "label": "Browser fetch extension + native host",
       "kind": "client",
-      "summary": "MV3 extension (browser-fetch/extension, loaded unpacked from the package): fetch tabs with DNR host blocking, extraction and pause button; control.js drives browser_act's background tab in a \"Pi\" group via chrome.debugger with deadline alarms; host.mjs relays over the named pipe, owns sessions per socket and saves screenshots.",
+      "summary": "MV3 extension (browser-fetch/extension, loaded unpacked from the package): fetch tabs with DNR host blocking, extraction and pause button; a serial Google search queue (2 s gap, CAPTCHA cooldown) with web/image extractors and an OffscreenCanvas contact sheet; control.js drives browser_act's background tab in a \"Pi\" group via chrome.debugger with deadline alarms; host.mjs relays over the named pipe, owns sessions per socket and saves screenshots.",
       "tech": "browser-fetch/extension (background.js, control.js), browser-fetch/host.mjs"
     },
     {
@@ -426,6 +426,14 @@
       "parent": "standalone_group",
       "summary": "Operates one granted site (10/20/30 min) in the user's browser: snapshot refs, find, click/type/select/scroll/back, screenshots; password refusal, risky-action confirmation, inspect-then-execute, cross-site navigation grants.",
       "tech": "extensions/browser-act.ts"
+    },
+    {
+      "id": "browser_search",
+      "label": "browser_search / image_search",
+      "kind": "service",
+      "parent": "standalone_group",
+      "summary": "Google web and image search in the user's browser over browserFetch's extract mode: numbered untrusted results, image contact sheet and result sets (last 10) whose originals save without cookies; every failure falls back to web_search.",
+      "tech": "extensions/browser-search.ts"
     }
   ],
   "edges": [
@@ -842,6 +850,18 @@
       "to": "browser_fetch_host",
       "label": "control sessions (control-open, act, control-close)",
       "id": "browser_act__browser_fetch_host"
+    },
+    {
+      "id": "pi_host__browser_search",
+      "from": "pi_host",
+      "to": "browser_search",
+      "label": "loads"
+    },
+    {
+      "id": "browser_search__browser_fetch",
+      "from": "browser_search",
+      "to": "browser_fetch",
+      "label": "browserFetch extract, checks, log"
     }
   ],
   "notes": []

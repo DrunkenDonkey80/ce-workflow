@@ -30,7 +30,7 @@ export function normalizeWeb(raw: unknown): Web[] {
 		const url = decodeHref(String(r?.href ?? "")), title = String(r?.title ?? "").replace(/\s+/g, " ").trim();
 		if (!url || !title || seen.has(url)) continue;
 		seen.add(url);
-		const lines: string[] = (Array.isArray(r.lines) ? r.lines : []).map(line => String(line).trim()).filter(line => line && line !== title && !line.includes("›") && !/^(Missing:|More results from|Read more$)/.test(line));
+		const lines: string[] = (Array.isArray(r.lines) ? r.lines : []).map(line => String(line).trim()).filter(line => line && line !== title && !line.includes("›") && !/^(Missing:|More results from|Read more$|Web results$|Search Results$|https?:\/\/\S+$)/.test(line));
 		const site = lines[0] && lines[0].length <= 60 && !DATE.test(lines[0]) ? lines[0] : hostOf(url);
 		let snippet = lines.filter(line => line !== site).sort((a, b) => b.length - a.length)[0] ?? "";
 		const date = snippet.match(DATE)?.[1] ?? "";

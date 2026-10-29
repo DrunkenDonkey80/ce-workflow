@@ -253,8 +253,8 @@ async function roundTrip() {
 	// plan 71dc4da4: fake Google extractor output (shapes from the P1-02 probe) and a canvas that records what it draws
 	const searched = [], drawn = [];
 	const webRaw = [
-		{ href: "https://www.google.com/url?q=https://a.test/x&sa=U", title: "Alpha", lines: ["Alpha", "Alpha Site", "https://a.test › x", "Dec 15, 2025 — Snippet about alpha.Read more", "Missing: foo ‎| Show results with: foo"] },
-		{ href: "https://b.test/y", title: "Beta", lines: ["Beta", "https://b.test › y", "3 days ago — Beta snippet"] },
+		{ href: "https://www.google.com/url?q=https://a.test/x&sa=U", title: "Alpha", lines: ["Web results", "Alpha", "Alpha Site", "https://a.test › x", "Dec 15, 2025 — Snippet about alpha.Read more", "Missing: foo ‎| Show results with: foo"] },
+		{ href: "https://b.test/y", title: "Beta", lines: ["Beta", "https://b.test", "https://b.test › y", "3 days ago — Beta snippet"] },
 		{ href: "https://www.google.com/search?q=related", title: "Related", lines: [] },
 		{ href: "https://b.test/y", title: "Beta again", lines: [] },
 	];

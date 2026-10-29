@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-29
-updated: 2026-10-29T11:28:26.559Z
+updated: 2026-10-29T11:43:31.059Z
 reviewed: 2026-10-29
 started: 2026-10-29T11:11:27.916Z
 ---
@@ -140,19 +140,14 @@ Prompt guidance for the new tools (exact wording settled in P4-05): web search t
 
 ### Phase 5: Live evaluation and tuning [think]
 
-- [ ] **P4-01** [human] Reload the add-on (1.4) in `chrome://extensions`, `/reload` Pi, and grant google.com when first asked.
-- [ ] **P4-02** Run browser_search live on 5 real queries from recent sessions; fix extractor misses; compare each with `web_search` results.
-  - Record per query: results found, real URLs correct, snippet quality, time taken, and whether the answer needed extra fetches.
-- [ ] **P4-03** Run image_search live on 3 queries; check the contact sheet is readable to the model and `save` gets real originals.
-- [ ] **P4-04** Check spacing and the CAPTCHA path: back-to-back searches from two Pi sessions, and the cooldown message; tune the gap if needed.
-  - Do not provoke a real CAPTCHA on purpose; test the detection on a saved `/sorry/` URL in the fake test instead.
-- [ ] **P4-05** Settle the prompt guidance from the P4-02 numbers: browser_search first, or only when web_search fails.
-  - Ask with numbers then if the comparison clearly favors web_search for quality.
+- [x] **P4-01** User reloaded the add-on (1.4) and Pi; google.com grant already in place.
+- [x] **P4-02** Live: 5/5 queries gave 8-10 results with correct direct URLs in 2.7-4.1 s; fixed "Web results"/bare-URL lines shown as site; web_search gave longer page extracts (1.3-8 k chars, 1.4-11 s) but fewer distinct sources.
+- [x] **P4-03** Live: 3 image queries gave 30/30 tiles with originals, sizes and pages; sheet numbers match the list, and saved originals 3 and 11 match their thumbnails. Instagram crawler URL refused cleanly as not-an-image.
+- [x] **P4-04** Live: parallel searches serialize (2nd image search done 4.5 s after the 1st; web searches logged 3.1-3.9 s apart); every search and save logged with tool/outcome. CAPTCHA cooldown message covered by C1 only, not provoked live (D10).
+- [x] **P4-05** Kept browser_search first, web_search as fallback: browser_search was consistent (2.7-4.1 s, 8-10 results with real ranking) and web_search ranged 1.4-11 s; the existing promptGuidelines already say this.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 20: added browser_search/image_search node with loads + browserFetch edges; add-on node summary now mentions the search queue, extractors and contact sheet.
 
 
 ## Global validation
