@@ -116,10 +116,10 @@ async function act(s, m) {
 
 async function openTab(s) {
 	const [current] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-	const tab = await chrome.tabs.create({ url: "about:blank", active: true, ...(current ? { windowId: current.windowId, index: current.index + 1 } : {}) });
+	const tab = await chrome.tabs.create({ url: "about:blank", active: false, ...(current ? { windowId: current.windowId, index: current.index + 1 } : {}) });
 	s.tab = tab.id;
 	await chrome.tabs.update(tab.id, { autoDiscardable: false }).catch(() => {});
-	// D11: a tab in front, in a "Pi" group, so the user watches what the agent does; a failed group only costs findability.
+	// D1: a background tab, so it never interrupts the user, in a "Pi" group they can click to watch; a failed group only costs findability.
 	try {
 		const [group] = await chrome.tabGroups.query({ title: "Pi", windowId: tab.windowId });
 		const id = await chrome.tabs.group({ tabIds: [tab.id], ...(group ? { groupId: group.id } : {}) });

@@ -210,7 +210,7 @@ async function roundTrip() {
 			onStartup: { addListener() {} }, onInstalled: { addListener() {} },
 		},
 		tabs: {
-			create: async ({ url }) => { const tab = { id: tabId++, url, status: "complete" }; tabs.set(tab.id, tab); return tab; },
+			create: async ({ url, active }) => { const tab = { id: tabId++, url, active, status: "complete" }; tabs.set(tab.id, tab); return tab; },
 			update: async (id, { url }) => { if (url) navigate(tabs.get(id), url); return tabs.get(id); },
 			get: async id => { if (!tabs.has(id)) throw new Error("no tab"); return { ...tabs.get(id) }; },
 			remove: async id => { tabs.delete(id); removed.push(id); },
@@ -269,6 +269,7 @@ async function roundTrip() {
 			assert.match(await go({ action: "open", url: "https://shop.test/act" }), /URL: https:\/\/shop\.test\/act/);
 			const tab = agentTab();
 			assert.ok(tab, "the debugger is attached to the agent tab (D4)");
+			assert.equal(tab.active, false, "the agent tab opens in the background (D1)");
 			assert.equal([...alarms.entries()].find(([name]) => name.startsWith("control:"))[1], until, "the deadline alarm matches the grant (D20)");
 			let snap = await go({ action: "snapshot" });
 			const lines = snap.split("\n").filter(line => line.startsWith("["));

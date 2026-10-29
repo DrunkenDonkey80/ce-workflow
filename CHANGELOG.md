@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- browser_act works in a background tab again, so it no longer takes over your screen; click the blue "Pi" tab group to watch. Reload the add-on (1.4) in `chrome://extensions`.
+
 ## 0.1.99 — 2026-10-29
 
 ### Added
