@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.1 — 2026-10-29
 
 ### Fixed
 - The desktop app's attention key (Ctrl+Shift+A) now jumps to a hub with a question before any hub with a finished session, even when the finished one is newer.
