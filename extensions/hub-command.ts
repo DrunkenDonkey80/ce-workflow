@@ -96,7 +96,8 @@ export function intercomParkedSessions(pi) {
 		if (event.toolName !== "intercom") return;
 		const text = event.content?.map(part => part.type === "text" ? part.text : "").join("\n") ?? "";
 		const name = woken.get(event.toolCallId); woken.delete(event.toolCallId);
-		if (name && event.isError) return { content: [{ type: "text", text: `${text}\n\nParked session ${name} was just resumed and may not have joined intercom yet; wait ~10 s and send again.` }], isError: true };
+		// Only a failed delivery means it may not have joined yet; an ask that timed out was delivered and is still being worked on.
+		if (name && event.isError && !/No reply from .* within/.test(text)) return { content: [{ type: "text", text: `${text}\n\nParked session ${name} was just resumed and may not have joined intercom yet; wait ~10 s and send again.` }], isError: true };
 		const action = event.input?.action;
 		// A send by cwd alone finds no live session (intercom's pane opener then fails): point at the parked ones there.
 		if (event.isError && SENDS.has(action) && typeof event.input.cwd === "string" && /HERDR|Herdr|No (other )?intercom sessions? (is |are )?connected in/.test(text)) {
