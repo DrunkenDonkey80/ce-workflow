@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { assignRefs, findProfile, flatten, line, matches, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
+import { assignRefs, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -62,6 +62,33 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	assert.deepEqual(swipePoints("down", { x: 0, y: 0, width: 100, height: 200 }), [50, 160, 50, 40], "down moves the finger up");
 	assert.throws(() => swipePoints("sideways", { x: 0, y: 0, width: 1, height: 1 }), /direction/);
 	assert.ok(existsSync(MOBILECLI), "the mobilecli npm dependency ships this platform's binary");
+}
+
+// Long labels, offscreen pages, retries and one gesture at a time (belot feedback).
+{
+	assert.equal(short("Read \u{10FBB7}".repeat(1) + "\u{10FBB7}".repeat(3000)), "Read \u{10FBB7}×3001");
+	assert.equal(short("x".repeat(5) + "ab".repeat(60)), "xxxxx" + "ab".repeat(37) + "a…(+45)");
+	const e = { ref: "e1", type: "Button", label: "Maps", value: "", id: "", frame: { x: 420, y: 100, width: 60, height: 60 } };
+	assert.match(line(e, { x: 0, y: 0, width: 402, height: 874 }), /\) offscreen$/);
+	assert.doesNotMatch(line({ ...e, frame: { ...e.frame, x: 20 } }, { x: 0, y: 0, width: 402, height: 874 }), /offscreen/);
+
+	resetSession();
+	const f = fake();
+	let fails = 2;
+	const slow = async (c, a) => a[0] === "dump" && fails-- > 0 ? { code: 1, stdout: JSON.stringify({ status: "error", error: "timed out waiting for WebDriverAgent to be ready" }) } : f.exec(c, a);
+	assert.match(await mobileAct(slow, { action: "snapshot" }, opts()), /\[e1\]/, "two agent-start timeouts are retried");
+
+	resetSession();
+	let busy = 0, overlap = false;
+	const gate = async (c, a) => {
+		if (a[0] !== "io") return f.exec(c, a);
+		if (busy++) overlap = true;
+		await new Promise(res => setTimeout(res, 20));
+		busy--;
+		return ok({});
+	};
+	await Promise.all([1, 2, 3].map(() => mobileAct(gate, { action: "swipe", direction: "left", settleMs: 0 }, opts())));
+	assert.equal(overlap, false, "parallel swipes run one after another");
 }
 
 // Overlapped elements: tap the visible strip of a fanned card, not the neighbour on top of its center.

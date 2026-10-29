@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.3 — 2026-10-29
+
+### Fixed
+- mobile_act: retries when the helper agent is slow to start right after a simulator boot, instead of failing the first calls.
+- mobile_act: home-screen widget placeholders no longer flood a snapshot; runs of one repeated character collapse and labels stop at 80 characters.
+- mobile_act: actions sent in parallel to one device now run one after another instead of failing with "only one gesture at a time".
+- mobile_act: elements on other pages of a pager (such as other home-screen pages) are marked offscreen, and the swipe direction is described as the side whose content it reveals.
+
 ## 0.2.2 — 2026-10-29
 
 ### Fixed
