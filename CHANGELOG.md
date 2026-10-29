@@ -2,6 +2,13 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.1.98 — 2026-10-28
+
+### Changed
+- The browser_act upload confirmation shows a thumbnail of each image in the hub, wraps long page addresses instead of cutting them, and offers "Allow .png from <folder> on <site> for 10 or 20 minutes" so repeated uploads from one folder stop asking.
+
+![Upload confirmation with thumbnail and folder allowance](docs/changelog/0.1.98-upload-confirm.png)
+
 ## 0.1.97 — 2026-10-28
 
 ### Added

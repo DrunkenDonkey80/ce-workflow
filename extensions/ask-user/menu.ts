@@ -331,6 +331,7 @@ export function listSubject(options): RemoteListPrompt {
 		currentValue: options.currentValue, ...(options.multi ? { multi: { selected: [...(options.multi.selected ?? [])], requireOne: options.multi.requireOne } } : {}),
 		spaceAction: Boolean(options.spaceAction), rowAction: Boolean(options.rowAction), tabAction: Boolean(options.tabAction),
 		...(options.detail ? { detail: String(options.detail) } : {}),
+		...(options.images?.length ? { images: options.images } : {}),
 		...(options.compact ? { compact: true } : {}),
 	};
 }

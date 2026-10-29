@@ -304,10 +304,13 @@ async function roundTrip() {
 			await assert.rejects(go({ action: "upload", ref: add, files: ["notes.txt"] }), /does not exist|not a PNG/);
 			picks = ["Deny"];
 			await assert.rejects(go({ action: "upload", ref: add, files: ["img/a.png"] }), /did not allow: upload 1 image/);
-			picks = ["Allow this action"];
+			picks = ["Allow this upload"];
 			await go({ action: "upload", ref: add, files: ["img/a.png"] });
-			picks = ["Allow this action"];
+			picks = ["Allow .png from img"]; // grants this folder's PNGs: the next upload asks nothing
 			await go({ action: "upload", ref: refOf(snap, "Photo"), files: ["img/a.png"] });
+			await go({ action: "upload", ref: refOf(snap, "Photo"), files: ["img/a.png"] });
+			assert.equal(picks.length, 0);
+			uploaded.pop();
 			assert.deepEqual(uploaded, [[23, [image]], [24, [image]]], "the picker's input, then the file field, get the checked file");
 			assert.equal(intercept, false, "the file picker is no longer intercepted afterwards");
 			// D18: a link to another site is stopped before any request; approval needs a repeat, which then loads.

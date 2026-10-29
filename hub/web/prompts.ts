@@ -20,6 +20,10 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   // Menus keep their title and purpose line; a single question's own header is its title (no repeated lines).
   const heading = ask.kind === "list" || ask.questions ? [node("h2", { id: "prompt-title" }, ask.title ?? "Answer questions")] : [];
   form.replaceChildren(...heading, ...(ask.purpose && heading.length ? [node("p", { className: "dialog-purpose" }, ask.purpose)] : []), ...(ask.detail && heading.length ? [node("p", { className: "dialog-detail" }, ask.detail)] : []));
+  // Thumbnails (e.g. browser_act uploads): raster data URLs only, never SVG or remote addresses.
+  const images = (Array.isArray(ask.images) ? ask.images : []).filter(image => /^data:image\/(png|jpeg|gif|webp);base64,/.test(String(image?.src)));
+  if (images.length && heading.length) form.append(node("div", { className: "dialog-images" }, undefined));
+  for (const image of images) { const figure = node("figure"); figure.append(node("img", { src: image.src, alt: String(image.caption ?? "") }), node("figcaption", {}, String(image.caption ?? ""))); form.querySelector(".dialog-images")?.append(figure); }
   const error = node("p", { className: "prompt-error", hidden: true }); error.setAttribute("role", "alert");
   let collect;
   if (ask.kind === "list" && ask.compact) {

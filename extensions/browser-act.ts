@@ -41,10 +41,40 @@ export function validate(p: ActParams): string | undefined {
 // Upload rules: images only, recognised by their first bytes, not just the name.
 const MAX_FILES = 10, MAX_BYTES = 20 * 1024 * 1024;
 const jpeg = (b: Buffer) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
-const IMAGES: Record<string, (b: Buffer) => boolean> = {
-	".png": b => b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), ".jpg": jpeg, ".jpeg": jpeg,
-	".gif": b => /^GIF8[79]a/.test(b.toString("latin1", 0, 6)), ".webp": b => b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP",
+const IMAGES: Record<string, [string, (b: Buffer) => boolean]> = {
+	".png": ["image/png", b => b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))], ".jpg": ["image/jpeg", jpeg], ".jpeg": ["image/jpeg", jpeg],
+	".gif": ["image/gif", b => /^GIF8[79]a/.test(b.toString("latin1", 0, 6))], ".webp": ["image/webp", b => b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP"],
 };
+type Upload = { path: string; rel: string; size: number };
+// Upload grants ("these image types from this folder on this site"); in memory, so they end with the Pi session.
+const UPLOAD_MINUTES = [10, 20], PREVIEW_BYTES = 2 * 1024 * 1024, PREVIEW_TOTAL = 6 * 1024 * 1024;
+const uploadGrants = new Map<string, number>();
+const grantOf = (host: string, f: Upload) => `${host}\n${path.dirname(f.path)}\n${path.extname(f.path).toLowerCase()}`;
+export const uploadGranted = (host: string, files: Upload[]) => files.every(f => (uploadGrants.get(grantOf(host, f)) ?? 0) > Date.now());
+
+/** Every upload not covered by a grant asks: each file with a thumbnail (hub), the page and the field; Allow once, or the same types from that folder for 10 or 20 minutes. */
+async function confirmUpload(ctx, host: string, what: string, url: string, files: Upload[], signal?: AbortSignal) {
+	if (!ctx.hasUI) return false;
+	const dirs = [...new Set(files.map(f => path.dirname(f.rel)))], types = [...new Set(files.map(f => path.extname(f.path).toLowerCase()))].join(", ");
+	const folder = dirs[0] === "." ? "the project folder" : `${dirs[0]}${path.sep}`;
+	let budget = PREVIEW_TOTAL;
+	const images = files.flatMap(f => {
+		if (f.size > PREVIEW_BYTES || f.size > budget) return [];
+		budget -= f.size;
+		return [{ src: `data:${IMAGES[path.extname(f.path).toLowerCase()][0]};base64,${readFileSync(f.path).toString("base64")}`, caption: f.rel }];
+	});
+	const timeout = AbortSignal.timeout(APPROVAL_MS);
+	const picked = await showListDialog(ctx, {
+		title: "Browser control: upload", purpose: `The agent wants to ${what} on ${host}. Page labels can mislead; check the Pi tab if unsure.`,
+		detail: [`Page: ${url}`, ...files.map(f => `${f.path} (${Math.ceil(f.size / 1024)} KB)`)].join("\n"), images,
+		filter: false, cursorKey: `browser-act-upload-${randomUUID()}`, signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+		items: [{ value: "no", label: "Deny" }, { value: "yes", label: "Allow this upload" },
+			...(dirs.length === 1 ? UPLOAD_MINUTES.map(m => ({ value: String(m), label: `Allow ${types} from ${folder} on ${host} for ${m} minutes`, preserveCase: true })) : [])],
+	});
+	const minutes = Number(picked?.value);
+	if (UPLOAD_MINUTES.includes(minutes)) for (const f of files) uploadGrants.set(grantOf(host, f), Date.now() + minutes * 60_000);
+	return picked?.value === "yes" || UPLOAD_MINUTES.includes(minutes);
+}
 /** Files the agent may upload: PNG, JPEG, GIF or WebP images inside the project folder (links resolved first), at most 20 MB each. */
 // shortcut: the browser reads the paths itself, so Pi in WSL driving a Windows browser cannot upload; translate with wslpath if that is needed.
 export function uploadFiles(cwd: string, files: string[]) {
@@ -54,7 +84,7 @@ export function uploadFiles(cwd: string, files: string[]) {
 		try { real = realpathSync(path.resolve(root, file)); } catch { throw new Error(`${file} does not exist`); }
 		const rel = path.relative(root, real);
 		if (!rel || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`${file} is outside the project folder ${root}`);
-		const isImage = IMAGES[path.extname(real).toLowerCase()];
+		const isImage = IMAGES[path.extname(real).toLowerCase()]?.[1];
 		if (!isImage) throw new Error(`${file} is not a PNG, JPEG, GIF or WebP image`);
 		const stat = statSync(real);
 		if (!stat.isFile()) throw new Error(`${file} is not a file`);
@@ -171,11 +201,11 @@ async function askControl(ctx, key: string, url: string, signal?: AbortSignal) {
 	await updatePolicy(p => { p.control[key] = { until: Date.now() + minutes * 60_000 }; });
 }
 
-async function confirmRisk(ctx, key: string, what: string, signal?: AbortSignal, detail?: string) {
+async function confirmRisk(ctx, key: string, what: string, signal?: AbortSignal) {
 	if (!ctx.hasUI) return false;
 	const timeout = AbortSignal.timeout(APPROVAL_MS);
 	const picked = await showListDialog(ctx, {
-		title: "Browser control: confirm", purpose: `The agent wants to ${what} on ${key}. Page labels can mislead; check the Pi tab if unsure.`, detail,
+		title: "Browser control: confirm", purpose: `The agent wants to ${what} on ${key}. Page labels can mislead; check the Pi tab if unsure.`,
 		filter: false, cursorKey: `browser-act-risk-${randomUUID()}`, signal: signal ? AbortSignal.any([signal, timeout]) : timeout, compact: true,
 		items: [{ value: "no", label: "Deny" }, { value: "yes", label: "Allow this action" }],
 	});
@@ -228,17 +258,17 @@ async function runAct(ctx, p: ActParams, signal?: AbortSignal, { resolve = looku
 			if (denied) { closeSession("ended: the control grant expired"); refuse(denied); }
 		}
 		if (p.action === "click" || p.action === "type" || p.action === "select" || p.action === "upload") {
-			let uploads: ReturnType<typeof uploadFiles> = [];
+			let uploads: Upload[] = [];
 			if (p.action === "upload") try { uploads = uploadFiles(ctx.cwd, p.files!); entry.files = uploads.map(f => f.rel); } catch (error) { refuse((error as Error).message); }
 			const target = { ref: p.ref, x: p.x, y: p.y };
 			const inspected = await call(s!, { action: p.action, phase: "inspect", ...target }, signal);
 			const facts = inspected.facts as Facts;
 			entry.name = facts.name;
-			// Every upload asks: the user sees each file and the field on the page that receives it.
-			const verdict = p.action === "upload" ? { ask: `upload ${uploads.length} image${uploads.length > 1 ? "s" : ""} through "${facts.name || facts.tag}" on ${facts.url}` } as { refuse?: string; ask?: string } : judge(p, facts);
+			const verdict = p.action === "upload" ? (uploadGranted(s!.host, uploads) ? {} : { ask: `upload ${uploads.length} image${uploads.length > 1 ? "s" : ""} through "${facts.name || facts.tag}"` }) as { refuse?: string; ask?: string } : judge(p, facts);
 			if (verdict.refuse) refuse(verdict.refuse);
+			if (p.action === "upload" && !verdict.ask) entry.by = "the user's upload grant";
 			if (verdict.ask) {
-				const ok = await confirmRisk(ctx, s!.host, verdict.ask, signal, uploads.map(f => `${f.path} (${Math.ceil(f.size / 1024)} KB)`).join("\n") || undefined);
+				const ok = p.action === "upload" ? await confirmUpload(ctx, s!.host, verdict.ask, facts.url, uploads, signal) : await confirmRisk(ctx, s!.host, verdict.ask, signal);
 				if (!ok) refuse(`the user did not allow: ${verdict.ask}`);
 				entry.by = "confirmed by the user";
 				if (!controlUntil(readPolicy(), s!.host)) refuse("the control grant ended while waiting for confirmation"); // D20
@@ -297,7 +327,7 @@ export const browserActTool = () => ({
 		"Control one site in the user's real browser through the Pi browser fetch add-on, in a tab it brings to the front in a \"Pi\" tab group. The user grants each site for 10, 20 or 30 minutes.",
 		"Actions: open {url}; snapshot (elements as [ref] role \"name\" @(x,y wxh)); find {query, role?} (searches the last snapshot); click {ref} or {x, y}; type {ref, text, submit?};",
 		"select {ref, value} (dropdowns; checkboxes use click); scroll {direction} or {ref}; screenshot (saves a PNG path to read); back.",
-		"upload {ref, files}: ref is the page's upload button or file field; files are PNG, JPEG, GIF or WebP images inside the project folder (max 10, 20 MB each). The user confirms every upload.",
+		"upload {ref, files}: ref is the page's upload button or file field; files are PNG, JPEG, GIF or WebP images inside the project folder (max 10, 20 MB each). The user confirms each upload or grants that folder's image types for a while.",
 		"Refused: password and one-time-code fields, blocked sites (mail, sign-in, password managers, banks, payments), local addresses. Buying, paying, sending, deleting or publishing asks the user first.",
 		"Links to other sites are stopped before loading and need the user's grant; new tabs are closed and their URL reported. Refs expire when the page changes.",
 	].join("\n"),

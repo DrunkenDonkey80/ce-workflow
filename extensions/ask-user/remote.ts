@@ -48,6 +48,7 @@ export interface RemoteListPrompt {
 	currentValue?: string; multi?: { selected: string[]; requireOne?: boolean };
 	spaceAction?: boolean; rowAction?: boolean; tabAction?: boolean;
 	detail?: string; // shown whole (wrapped anywhere, never cut), e.g. a full URL to approve
+	images?: { src: string; caption: string }[]; // data:image thumbnails, web only (the terminal shows detail)
 	compact?: boolean; // a few actions and nothing else: one terminal line, a small web card (H3-07)
 }
 
