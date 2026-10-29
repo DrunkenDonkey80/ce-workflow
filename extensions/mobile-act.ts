@@ -1,6 +1,8 @@
 // mobile_act: read and drive an iOS Simulator, a real iPhone or an Android device/emulator through mobilecli (https://github.com/mobile-next/mobilecli).
 // The screen comes from the accessibility tree as labelled elements with frames; every action returns what changed on screen.
 import { existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { askConfirm } from "./ask-user/menu.ts";
 
@@ -15,7 +17,7 @@ type Frame = { x: number; y: number; width: number; height: number };
 export type Element = { ref: string; type: string; label: string; value: string; id: string; frame: Frame };
 export type Device = { id: string; name: string; platform: string; type: string; state: string; version: string };
 type Snap = { elements: Element[]; next: number };
-export type Options = { signal?: AbortSignal; confirm?: Confirm; hasCli?: () => boolean; sleep?: (ms: number) => Promise<void> };
+export type Options = { signal?: AbortSignal; confirm?: Confirm; hasCli?: () => boolean; sleep?: (ms: number) => Promise<void>; profileDirs?: string[] };
 
 const BIN = "mobilecli";
 export const INSTALL_CMD = "npm install -g mobilecli";
@@ -55,19 +57,38 @@ async function ensureCli(exec: Exec, o: Options) {
 	cliOk = true;
 }
 
+const PROFILE_DIRS = ["Library/MobileDevice/Provisioning Profiles", "Library/Developer/Xcode/UserData/Provisioning Profiles"].map(d => path.join(os.homedir(), d));
+const AGENT_ID = "com.mobilenext.devicekit-iosUITests.xctrunner";
+/** Picks an unexpired development profile that lists the device and covers the agent's bundle id (exact App ID first, then a wildcard). */
+export async function findProfile(exec: Exec, udid: string, signal?: AbortSignal, dirs = PROFILE_DIRS, now = Date.now()) {
+	let wildcard: string | undefined;
+	for (const dir of dirs) {
+		for (const name of await readdir(dir).catch(() => [] as string[])) {
+			if (!name.endsWith(".mobileprovision")) continue;
+			const file = path.join(dir, name), r = await exec("security", ["cms", "-D", "-i", file], { timeout: 10_000, signal });
+			const xml = String(r.stdout ?? ""), str = (k: string) => xml.match(new RegExp(`<key>${k}</key>\\s*<string>([^<]*)</string>`))?.[1];
+			const expires = Date.parse(xml.match(/<key>ExpirationDate<\/key>\s*<date>([^<]*)<\/date>/)?.[1] ?? "");
+			if (r.code || !(expires > now) || !/<key>get-task-allow<\/key>\s*<true\/>/.test(xml) || !xml.includes(`<string>${udid}</string>`)) continue;
+			const appId = str("application-identifier") ?? "";
+			if (appId.endsWith(`.${AGENT_ID}`)) return file;
+			if (appId.endsWith(".*")) wildcard ??= file;
+		}
+	}
+	return wildcard;
+}
+
 /** The DeviceKit helper agent must be on an iOS device before reading or touching it: automatic on simulators, asked on real iPhones. */
 async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 	if (dev.platform !== "ios" || agentOk.has(dev.id)) return;
 	const installed = await run(exec, ["agent", "status", "--device", dev.id], o.signal).then(out => JSON.parse(out).status === "ok", () => false);
 	if (!installed) {
 		if (dev.type === "real") {
-			const cmd = `mobilecli agent install --device ${dev.id}`;
+			const cmd = `mobilecli agent install --device ${dev.id} --provisioning-profile <wildcard .mobileprovision>`;
 			if (!o.confirm || !(await o.confirm(`Install the mobilecli agent on ${dev.name}?`, `mobile_act needs the DeviceKit helper app (com.mobilenext.devicekit-iosUITests.xctrunner) on this iPhone, signed with your development profile. Install it now?`)))
 				throw new Error(`The mobilecli agent is not on ${dev.name}. Install it with: ${cmd}`);
-			// shortcut: relies on mobilecli finding the profile itself, pass --provisioning-profile when DA-12 shows it cannot.
-			await run(exec, ["agent", "install", "--device", dev.id], o.signal, 300_000).catch(e => {
-				throw /provision|profile|sign/i.test(e.message) ? new Error(`${e.message}\n${PROFILE_HELP}`) : e;
-			});
+			const profile = await findProfile(exec, dev.id, o.signal, o.profileDirs);
+			if (!profile) throw new Error(`No development provisioning profile for ${dev.name} (${dev.id}) with a wildcard App ID was found.\n${PROFILE_HELP}`);
+			await run(exec, ["agent", "install", "--device", dev.id, "--provisioning-profile", profile], o.signal, 300_000);
 		} else await run(exec, ["agent", "install", "--device", dev.id], o.signal, 300_000);
 	}
 	agentOk.add(dev.id);

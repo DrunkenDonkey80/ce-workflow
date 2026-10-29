@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { promisify } from "node:util";
-import { assignRefs, flatten, line, mobileAct, mobileActTool, onPath, resetSession, resolveDevice, swipePoints } from "../extensions/mobile-act.ts";
+import { assignRefs, findProfile, flatten, line, mobileAct, mobileActTool, onPath, resetSession, resolveDevice, swipePoints } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -137,8 +140,22 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 	await assert.rejects(mobileAct(real.exec, { action: "snapshot" }, opts({ confirm: async () => false })), /not on Lorenz’s iPhone\. Install it with: mobilecli agent install --device 0000-REAL/);
 	await assert.rejects(mobileAct(real.exec, { action: "snapshot" }, opts()), /not on Lorenz’s iPhone/, "no UI: never installs on a phone");
 	assert.deepEqual(real.acts(), []);
-	const noProfile = async (c, a) => a[1] === "install" ? { code: 1, stdout: JSON.stringify({ status: "error", error: "no matching provisioning profile found" }) } : real.exec(c, a);
-	await assert.rejects(mobileAct(noProfile, { action: "snapshot" }, opts({ confirm: async () => true })), /no matching provisioning profile[^]*wildcard App ID \(TEAMID\.\*\) that includes this iPhone's UDID/);
+	await assert.rejects(mobileAct(real.exec, { action: "snapshot" }, opts({ confirm: async () => true, profileDirs: [] })), /No development provisioning profile for Lorenz’s iPhone[^]*wildcard App ID \(TEAMID\.\*\)/);
+	assert.deepEqual(real.acts(), [], "no profile: nothing installed");
+	{
+		const dir = await mkdtemp(path.join(os.tmpdir(), "mobile-act-")), now = Date.parse("2026-01-01");
+		const plist = (appId, { udid = "0000-REAL", expires = "2027-01-01T00:00:00Z", dev = true } = {}) => `<plist><dict><key>ExpirationDate</key>\n<date>${expires}</date><key>Entitlements</key><dict><key>application-identifier</key>\n<string>${appId}</string>${dev ? "<key>get-task-allow</key>\n<true/>" : ""}</dict><key>ProvisionedDevices</key><array><string>${udid}</string></array></dict></plist>`;
+		const files = { "a.mobileprovision": plist("T.*", { udid: "OTHER" }), "b.mobileprovision": plist("T.*", { expires: "2025-01-01T00:00:00Z" }), "c.mobileprovision": plist("T.*", { dev: false }), "d.mobileprovision": plist("T.*"), "e.mobileprovision": plist("T.com.mobilenext.devicekit-iosUITests.xctrunner"), "x.txt": "" };
+		for (const [n, body] of Object.entries(files)) await writeFile(path.join(dir, n), body);
+		const sec = async (_c, a) => ({ code: 0, stdout: await readFile(a[3], "utf8") });
+		assert.equal(await findProfile(sec, "0000-REAL", undefined, [dir], now), path.join(dir, "e.mobileprovision"), "exact App ID beats wildcard");
+		await rm(path.join(dir, "e.mobileprovision"));
+		assert.equal(await findProfile(sec, "0000-REAL", undefined, [dir, "/nope"], now), path.join(dir, "d.mobileprovision"), "skips other device, expired, non-development");
+		const agent = fake({ list: [PHONE], agent: false });
+		await mobileAct(async (c, a) => c === "security" ? sec(c, a) : agent.exec(c, a), { action: "snapshot" }, opts({ confirm: async () => true, profileDirs: [dir] }));
+		assert.deepEqual(agent.acts(), [`agent install --device 0000-REAL --provisioning-profile ${path.join(dir, "d.mobileprovision")}`]);
+		await rm(dir, { recursive: true });
+	}
 	resetSession();
 	const pixel = fake({ list: [PIXEL], agent: false });
 	await mobileAct(pixel.exec, { action: "button", button: "back", settleMs: 0 }, opts());
