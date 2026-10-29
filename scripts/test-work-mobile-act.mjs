@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { flatten, line, listSims, resolveSim, simulatorAct, simulatorActTool, swipePoints } from "../extensions/simulator-act.ts";
+import { flatten, line, listSims, resolveSim, mobileAct, mobileActTool, swipePoints } from "../extensions/mobile-act.ts";
 import { screenRead } from "../extensions/screen-read.ts";
 
 const run = promisify(execFile);
@@ -53,26 +53,26 @@ function fakeExec(bootedB = false) {
 	assert.equal((await resolveSim(fakeExec(true).exec, "iPhone Air", true)).udid, B);
 	await assert.rejects(resolveSim(fakeExec().exec, "iPhone Air", true), /Shutdown; boot it first/);
 	await assert.rejects(resolveSim(fakeExec().exec, "Pixel", true), /No available iOS simulator/);
-	await assert.rejects(simulatorAct(fakeExec().exec, { action: "list" }, undefined, "linux"), /needs macOS/);
+	await assert.rejects(mobileAct(fakeExec().exec, { action: "list" }, undefined, "linux"), /needs macOS/);
 }
 
 // Actions map to simctl and AXe calls in points, with refs from the last snapshot.
 {
 	const { exec, calls } = fakeExec();
-	assert.match(await simulatorAct(exec, { action: "list" }, undefined, "darwin"), /^AAAA-1 BOOTED iPhone 17 \(iOS 26.0\)\nBBBB-2 iPhone Air/);
-	await assert.rejects(simulatorAct(exec, { action: "tap", ref: "e3" }, undefined, "darwin"), /No snapshot yet/);
-	const snap = await simulatorAct(exec, { action: "snapshot" }, undefined, "darwin");
+	assert.match(await mobileAct(exec, { action: "list" }, undefined, "darwin"), /^AAAA-1 BOOTED iPhone 17 \(iOS 26.0\)\nBBBB-2 iPhone Air/);
+	await assert.rejects(mobileAct(exec, { action: "tap", ref: "e3" }, undefined, "darwin"), /No snapshot yet/);
+	const snap = await mobileAct(exec, { action: "snapshot" }, undefined, "darwin");
 	assert.match(snap, /^UNTRUSTED app content/);
 	assert.match(snap, /iPhone 17 402x874 points/);
 	assert.match(snap, /\[e3\] Button "Local game" #play/);
-	assert.equal(await simulatorAct(exec, { action: "find", query: "room" }, undefined, "darwin"), '[e4] TextField "Room code" = "AB12" [disabled] @(16,500 200x40)');
+	assert.equal(await mobileAct(exec, { action: "find", query: "room" }, undefined, "darwin"), '[e4] TextField "Room code" = "AB12" [disabled] @(16,500 200x40)');
 	calls.length = 0;
-	await simulatorAct(exec, { action: "tap", ref: "e3" }, undefined, "darwin");
-	await simulatorAct(exec, { action: "tap", x: 10.123, y: 20 }, undefined, "darwin");
-	await simulatorAct(exec, { action: "type", ref: "e4", text: "XY", submit: true }, undefined, "darwin");
-	await simulatorAct(exec, { action: "swipe", direction: "down" }, undefined, "darwin");
-	await simulatorAct(exec, { action: "button", button: "home" }, undefined, "darwin");
-	assert.match(await simulatorAct(exec, { action: "launch", bundleId: "com.demo" }, undefined, "darwin"), /Launched com.demo: 4242/);
+	await mobileAct(exec, { action: "tap", ref: "e3" }, undefined, "darwin");
+	await mobileAct(exec, { action: "tap", x: 10.123, y: 20 }, undefined, "darwin");
+	await mobileAct(exec, { action: "type", ref: "e4", text: "XY", submit: true }, undefined, "darwin");
+	await mobileAct(exec, { action: "swipe", direction: "down" }, undefined, "darwin");
+	await mobileAct(exec, { action: "button", button: "home" }, undefined, "darwin");
+	assert.match(await mobileAct(exec, { action: "launch", bundleId: "com.demo" }, undefined, "darwin"), /Launched com.demo: 4242/);
 	const acts = calls.filter(c => c[0] === "axe" || c[2] === "launch");
 	const u = ["--udid", A];
 	assert.deepEqual(acts, [
@@ -85,19 +85,19 @@ function fakeExec(bootedB = false) {
 		["axe", "button", "home", ...u],
 		["xcrun", "simctl", "launch", "--terminate-running-process", A, "com.demo"],
 	]);
-	await assert.rejects(simulatorAct(exec, { action: "tap", ref: "e99" }, undefined, "darwin"), /Unknown ref e99/);
-	await assert.rejects(simulatorAct(exec, { action: "tap" }, undefined, "darwin"), /needs ref, or x and y/);
-	await assert.rejects(simulatorAct(exec, { action: "launch" }, undefined, "darwin"), /needs bundleId/);
+	await assert.rejects(mobileAct(exec, { action: "tap", ref: "e99" }, undefined, "darwin"), /Unknown ref e99/);
+	await assert.rejects(mobileAct(exec, { action: "tap" }, undefined, "darwin"), /needs ref, or x and y/);
+	await assert.rejects(mobileAct(exec, { action: "launch" }, undefined, "darwin"), /needs bundleId/);
 	const missing = async (command, args) => command === "axe" ? { code: 127, stderr: "spawn axe ENOENT" } : { code: 0, stdout: devices() };
-	await assert.rejects(simulatorAct(missing, { action: "snapshot" }, undefined, "darwin"), /AXe is not installed: brew tap cameroncooke\/axe/);
+	await assert.rejects(mobileAct(missing, { action: "snapshot" }, undefined, "darwin"), /AXe is not installed: brew tap cameroncooke\/axe/);
 	const failing = async (command, args) => command === "axe" ? { code: 1, stderr: "No element found matching label" } : { code: 0, stdout: devices() };
-	await assert.rejects(simulatorAct(failing, { action: "button", button: "home" }, undefined, "darwin"), /axe button home failed: No element found/);
+	await assert.rejects(mobileAct(failing, { action: "button", button: "home" }, undefined, "darwin"), /axe button home failed: No element found/);
 	let tries = 0;
 	const flaky = async (command, args) => command !== "axe" ? { code: 0, stdout: devices() } : ++tries === 1 ? { code: 1, stderr: "Error: Timed out creating the simulator remote automation session" } : { code: 0, stdout: "" };
-	assert.equal(await simulatorAct(flaky, { action: "button", button: "home" }, undefined, "darwin"), "Done. Take a snapshot to see the screen now.");
+	assert.equal(await mobileAct(flaky, { action: "button", button: "home" }, undefined, "darwin"), "Done. Take a snapshot to see the screen now.");
 	assert.equal(tries, 2, "one retry after an automation-session timeout");
-	const tool = simulatorActTool(exec);
-	assert.equal(tool.name, "simulator_act");
+	const tool = mobileActTool(exec);
+	assert.equal(tool.name, "mobile_act");
 	assert.deepEqual((await tool.execute("1", { action: "button", button: "lock" })).content[0].text, "Done. Take a snapshot to see the screen now.");
 }
 
@@ -107,11 +107,11 @@ if (process.platform === "darwin") {
 	const hasAxe = await run("axe", ["--version"]).then(() => true, () => false);
 	const booted = hasAxe ? (await listSims(exec).catch(() => [])).find(s => s.state === "Booted") : undefined;
 	if (booted) {
-		const snap = await simulatorAct(exec, { action: "snapshot", device: booted.udid }, undefined, "darwin");
+		const snap = await mobileAct(exec, { action: "snapshot", device: booted.udid }, undefined, "darwin");
 		assert.match(snap, /\[e1\] Application "/, "live snapshot lists the foreground app");
 		const shot = await screenRead(null, { target: "ios", ios: { device: booted.udid }, maxEdge: 256 });
 		assert.ok(shot.height === 256 && shot.sourceHeight > 1000, `live iOS screenshot ${shot.width}x${shot.height} of ${shot.sourceWidth}x${shot.sourceHeight}`);
 		console.log(`live ${booted.name}: ${snap.split("\n").length - 3} elements, screenshot ${shot.sourceWidth}x${shot.sourceHeight}`);
 	} else console.log("live check skipped: needs AXe and a booted simulator");
 }
-console.log("simulator_act ok");
+console.log("mobile_act ok");
