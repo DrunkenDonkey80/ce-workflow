@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -15,9 +16,9 @@ for (const region of [[0, 0, 1], [-1, 0, 1, 1], [0, 0, 0, 1], [0.5, 0, 1, 1]]) a
 assert.deepEqual(screenReadPlan({ target: "browser", browser: { url: "http://x", selector: "#a", full: true, session: "s" } }, file).runs, [["--session", "s", "open", "http://x"], ["--session", "s", "screenshot", "#a", "C:/tmp/x-raw.png", "--full"]]);
 assert.deepEqual(screenReadPlan({ target: "android", android: { device: "emu" } }, file).runs, [["screen", "capture", "--device=emu", "--output=C:/tmp/x-raw.png"]]);
 assert.deepEqual(screenReadPlan({ target: "android", android: { device: "emu" } }, file).alt, { exe: "adb", runs: [["-s", "emu", "exec-out", "screencap", "-p"]] });
-assert.deepEqual(screenReadPlan({ target: "ios" }, file).runs, [["simctl", "io", "booted", "screenshot", "C:/tmp/x-raw.png"]]);
-assert.deepEqual(screenReadPlan({ target: "ios", ios: { device: "UDID-1" } }, file).runs, [["simctl", "io", "UDID-1", "screenshot", "C:/tmp/x-raw.png"]]);
-await assert.rejects(screenRead(null, { target: "ios" }, undefined, os.tmpdir(), "linux"), /needs macOS/);
+assert.deepEqual(screenReadPlan({ target: "device" }, file).runs, [["screenshot", "--output", "C:/tmp/x-raw.png"]]);
+assert.deepEqual(screenReadPlan({ target: "device", device: { device: "UDID-1" } }, file).runs, [["screenshot", "--device", "UDID-1", "--output", "C:/tmp/x-raw.png"]]);
+if (!process.env.PATH?.split(path.delimiter).some(d => d && existsSync(path.join(d, "mobilecli")))) await assert.rejects(screenRead(null, { target: "device" }, undefined, os.tmpdir(), "linux"), /needs mobilecli: npm install -g mobilecli/);
 assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
 
 // Non-Windows path: pure Node PNG decode (all five filters, RGB and RGBA), crop and downscale.

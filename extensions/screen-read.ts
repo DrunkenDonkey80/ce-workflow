@@ -104,9 +104,9 @@ public class ScreenRead {
 
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 export type ScreenReadArgs = {
-	target: "window" | "browser" | "android" | "ios";
+	target: "window" | "browser" | "android" | "device";
 	window?: { title?: string; pid?: number; handle?: number; minimize?: boolean };
-	ios?: { device?: string };
+	device?: { device?: string };
 	browser?: { url?: string; selector?: string; full?: boolean; session?: string };
 	android?: { device?: string };
 	region?: number[];
@@ -165,8 +165,8 @@ export function screenReadPlan(args: ScreenReadArgs, file: string) {
 		// alt: plain adb when the android CLI is not installed; screencap writes the PNG to stdout, which goes to raw
 		return { ...base, op: "file", exe: "android", runs: [["screen", "capture", ...(device ? [`--device=${device}`] : []), `--output=${raw}`]], raw, alt: { exe: "adb", runs: [[...(device ? ["-s", device] : []), "exec-out", "screencap", "-p"]] } };
 	}
-	if (args.target === "ios") return { ...base, op: "file", exe: "xcrun", runs: [["simctl", "io", args.ios?.device || "booted", "screenshot", raw]], raw };
-	throw new Error("target must be window, browser, android or ios.");
+	if (args.target === "device") { const d = args.device?.device; return { ...base, op: "file", exe: "mobilecli", runs: [["screenshot", ...(d ? ["--device", d] : []), "--output", raw]], raw }; }
+	throw new Error("target must be window, browser, android or device.");
 }
 
 const CRC = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
@@ -279,11 +279,12 @@ export async function captureFile(plan: FilePlan, signal?: AbortSignal) {
 
 export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: AbortSignal, dir = path.join(os.tmpdir(), "pi-screen-read"), platform = process.platform) {
 	if (platform !== "win32" && args.target === "window") throw new Error("screen_read target=window needs Windows (PrintWindow); browser and android work on every platform.");
-	if (platform !== "darwin" && args.target === "ios") throw new Error("screen_read target=ios needs macOS with Xcode.");
 	await mkdir(dir, { recursive: true });
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
-	if (platform !== "win32") return { file, ...await captureFile(plan as FilePlan, signal) };
+	if (platform !== "win32") return { file, ...await captureFile(plan as FilePlan, signal).catch(e => {
+		throw e?.code === "ENOENT" && plan.exe === "mobilecli" ? new Error("screen_read target=device needs mobilecli: npm install -g mobilecli (mobile_act offers to install it).") : e;
+	}) };
 	// env, not argv: no quoting issues; spawn copies it synchronously, so parallel calls cannot mix it up
 	process.env.SCREEN_READ_ARGS = Buffer.from(JSON.stringify(plan), "utf8").toString("base64");
 	const pending = exec("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(SCRIPT, "utf16le").toString("base64")], { timeout: 120_000, signal });
@@ -310,16 +311,16 @@ export const screenReadTool = (exec: Exec) => ({
 		"target=window (Windows only): a Windows app window by title substring, pid or handle; omit all three to list windows. Works on minimized and background windows without focusing or showing them; launch test apps minimized. minimize=true minimizes a window that popped up after capturing it. Capture only the app under test, not the user's own windows.",
 		"target=browser: the current agent-browser page (headless; never use --headed for checks). url opens it first; selector captures one element; full captures the whole page; session picks an agent-browser session.",
 		"target=android: android screen capture of the device, or `adb exec-out screencap -p` when the android CLI is missing (serial from `adb devices`; omit when only one is attached).",
-		"target=ios (macOS): a booted iOS Simulator via simctl, no window needed (device = UDID; omit when one is booted). Source pixels are points times the screen scale (3x on most iPhones).",
+		"target=device: any iOS Simulator, real iPhone or Android device through mobilecli, no window needed (device = id from mobile_act list; omit when one is online). Source pixels are points times the screen scale on iOS (3x on most iPhones).",
 	].join("\n"),
 	parameters: {
 		type: "object", additionalProperties: false, required: ["target"],
 		properties: {
-			target: { type: "string", enum: ["window", "browser", "android", "ios"] },
+			target: { type: "string", enum: ["window", "browser", "android", "device"] },
 			window: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, pid: { type: "integer" }, handle: { type: "integer" }, minimize: { type: "boolean" } } },
 			browser: { type: "object", additionalProperties: false, properties: { url: { type: "string" }, selector: { type: "string" }, full: { type: "boolean" }, session: { type: "string" } } },
 			android: { type: "object", additionalProperties: false, properties: { device: { type: "string" } } },
-			ios: { type: "object", additionalProperties: false, properties: { device: { type: "string" } } },
+			device: { type: "object", additionalProperties: false, properties: { device: { type: "string" } } },
 			region: { type: "array", items: { type: "integer" }, minItems: 4, maxItems: 4, description: "[x, y, width, height] crop in source pixels" },
 			maxEdge: { type: "integer", minimum: 64, maximum: 4096, description: "Longest output edge in pixels (default 1024)" },
 		},
@@ -331,7 +332,7 @@ export const screenReadTool = (exec: Exec) => ({
 			const text = shot.matches.length ? `${shot.matches.length} window(s); pass handle, pid or a unique title:\n${lines.join("\n")}` : "No matching window.";
 			return { content: [{ type: "text", text }], details: shot };
 		}
-		const what = shot.window ? `Window "${shot.window.title}" (pid ${shot.window.pid}, handle ${shot.window.handle}${shot.window.minimized ? ", minimized" : ""})` : args.target === "browser" ? "Browser" : args.target === "ios" ? "iOS Simulator screen" : "Android screen";
+		const what = shot.window ? `Window "${shot.window.title}" (pid ${shot.window.pid}, handle ${shot.window.handle}${shot.window.minimized ? ", minimized" : ""})` : args.target === "browser" ? "Browser" : args.target === "device" ? "Device screen" : "Android screen";
 		const text = `${what}: ${shot.width}x${shot.height} PNG${shot.scale < 1 ? `, scaled x${shot.scale}` : ""} from ${args.region ? `region ${args.region.join(",")} of ` : ""}${shot.sourceWidth}x${shot.sourceHeight} source. ${shot.uniform ? "WARNING: the image is one flat color; the app may not render off-screen. " : ""}File: ${shot.file}`;
 		return { content: [{ type: "text", text }, { type: "image", data: (await readFile(shot.file)).toString("base64"), mimeType: "image/png" }], details: shot };
 	},

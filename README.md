@@ -56,9 +56,9 @@ Offline self-check: `node "scripts/test-jev-tools.mjs"`.
 
 ## Screen read tool
 
-`screen_read` returns a small PNG for visual testing: an app window (Windows only; also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, an Android screen or, on macOS, a booted iOS Simulator (`target: "ios"`). `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
+`screen_read` returns a small PNG for visual testing: an app window (Windows only; also minimized or in the background, without focusing or showing it), the current headless agent-browser page or element, an Android screen, or any iOS Simulator, iPhone or Android device through mobilecli (`target: "device"`). `maxEdge` (default 1024) downscales and `region` crops in source pixels. With no window selector it lists windows. `/resume3` tells agents to launch test apps minimized or headless.
 
-`mobile_act` drives an iOS Simulator on macOS without opening Simulator.app: list and boot simulators, launch an app, read the screen as a list of labelled elements with accessibility ids and positions, tap, type, swipe and press hardware buttons. It needs [AXe](https://github.com/cameroncooke/AXe) (`brew tap cameroncooke/axe && brew install cameroncooke/axe/axe`). Physical iPhones and Android devices are not supported yet.
+`mobile_act` drives an iOS Simulator, a real iPhone or an Android emulator/phone through [mobilecli](https://github.com/mobile-next/mobilecli): list and boot devices, launch an app, read the screen as a list of labelled elements with accessibility ids and positions, tap, long press, type, swipe and press hardware buttons. Each action returns what changed on screen (`settleMs`, default 500; 0 skips it), and refs stay the same while an element stays on screen. When mobilecli is missing it asks to run `npm install -g mobilecli`; its helper agent installs by itself on simulators and only after a Yes on a real iPhone, which needs a development provisioning profile with a wildcard App ID that includes the phone.
 
 ## Browser fetch
 

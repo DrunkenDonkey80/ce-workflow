@@ -5,8 +5,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Added
-- mobile_act: the agent can drive an iOS Simulator on macOS without opening a window. It reads the screen as labelled buttons and fields with positions, taps, types, swipes and presses Home or Lock. Needs AXe from Homebrew.
-- screen_read target "ios" captures a booted iOS Simulator screen.
+- mobile_act: the agent can read and drive an iOS Simulator, a real iPhone or an Android device through mobilecli. It reads the screen as labelled buttons and fields with positions, taps, long presses, types, swipes and presses hardware buttons, and every action returns what changed on screen. If mobilecli is missing, it asks before installing it.
+- screen_read target "device" captures any iOS Simulator, iPhone or Android screen through mobilecli.
 
 ## 0.1.98 — 2026-10-28
 
