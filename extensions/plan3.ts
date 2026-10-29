@@ -2012,6 +2012,11 @@ export default function plan3(pi) {
 	};
 	pi.registerCommand("plan3", planCommand);
 	pi.on?.("input", async (event, ctx) => {
+		// Chatting after an executed plan stopped: back to the session's own model/effort until /resume3 (a steer mid-run stays in the plan).
+		if (["interactive", "rpc"].includes(event.source) && !event.text.trimStart().startsWith("/") && ctx.isIdle?.() && executingPlan(ctx)) {
+			await runPhase(ctx, null, "normal");
+			ctx.ui.notify("Plan3: plan paused, back to your own model; /resume3 continues it on the work model.", "info");
+		}
 		// Only exact operator words during live planning, never injected messages or ordinary sentences.
 		if (!["interactive", "rpc"].includes(event.source) || event.images?.length || !pointer(ctx).planning) return;
 		const command = event.text.trim();

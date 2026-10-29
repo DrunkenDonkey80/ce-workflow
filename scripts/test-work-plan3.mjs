@@ -556,6 +556,16 @@ try {
 		assert.equal(ref(), "anthropic/claude-opus-5-5", "planning switches to the planning model");
 		await run("resume3", "7c7c7c7c");
 		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "coding switches model and effort");
+		idle = false; await hooks.get("input")({ text: "also fix the typo", source: "interactive" }, ctx);
+		assert.equal(ref(), "openai-codex/gpt-6-sol", "a steer during the run stays on the work model");
+		idle = true; await hooks.get("input")({ text: "/resume3", source: "interactive" }, ctx);
+		assert.equal(ref(), "openai-codex/gpt-6-sol", "commands are not chat");
+		await hooks.get("input")({ text: "what is the meaning of life?", source: "interactive" }, ctx);
+		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "xhigh"], "chat after the run returns to the session's own model/effort"); assert.match(notices.at(-1).message, /plan paused/);
+		const chatNotices = notices.length; await hooks.get("input")({ text: "and then?", source: "interactive" }, ctx);
+		assert.equal(notices.length, chatNotices, "only the first chat message switches");
+		await run("resume3", "7c7c7c7c");
+		assert.deepEqual([ref(), thinking], ["openai-codex/gpt-6-sol", "medium"], "/resume3 goes back to the work model");
 		await settings({ codingModel: "openai-codex/gpt-6-sol" });
 		ctx.model = { provider: "anthropic", id: "claude-opus-4" };
 		await run("resume3", "7d7d7d7d");
