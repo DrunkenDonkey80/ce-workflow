@@ -3,8 +3,11 @@
 const HOST = "pi.browser_fetch";
 const LOAD_MS = 30_000, CHALLENGE_MS = 20_000, IMAGE_MS = 20_000, MAX_IMAGE = 8 * 1024 * 1024, MAX_TOTAL = 60 * 1024 * 1024, MAX_IMAGES = 30;
 const CHALLENGE = /just a moment|attention required|checking your browser|verify you are human|ddos-guard|please wait while we verify/i;
+// Searches (plan 71dc4da4 R4): one at a time per browser, spaced, and paused after a Google CAPTCHA (5 min, doubling to 1 h).
+let SEARCH_GAP_MS = 2000;
+const COOLDOWN_MS = 300_000, COOLDOWN_MAX = 3_600_000, SHEET_COLS = 6, CELL = 170;
 const jobs = new Map();
-let port, paused = false, nextRule = 100;
+let port, paused = false, nextRule = 100, searches = Promise.resolve(), lastSearch = 0, cooldown = 0, cooldownUntil = 0;
 
 const send = message => { try { port?.postMessage(message); } catch {} };
 const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -59,7 +62,7 @@ function finish(id) {
 async function onMessage(m) {
 	if (["control-open", "act", "control-close"].includes(m.type) || (m.type === "cancel" && sessions.has(m.id))) return onControl(m); // browser_act (control.js)
 	const job = jobs.get(m.id);
-	if (m.type === "fetch") return start(m);
+	if (m.type === "fetch") return m.download ? download(m) : m.extract ? queueSearch(m) : start(m);
 	if (!job) return;
 	if (m.type === "navigate-answer") {
 		if (m.ok) { job.hosts = m.hosts; await rules(job); }
@@ -68,11 +71,35 @@ async function onMessage(m) {
 	else if (m.type === "done" || m.type === "cancel") finish(m.id);
 }
 
-async function start(m) {
+function register(m) {
 	if (paused) return send({ type: "error", id: m.id, error: "Paused by the user (the Pi browser fetch toolbar button)." });
 	const job = { id: m.id, hosts: m.hosts ?? [], blocked: m.blocked ?? [], abort: new AbortController(), hops: 0, base: nextRule };
 	nextRule = nextRule > 1_000_000 ? 100 : nextRule + 50;
 	jobs.set(m.id, job);
+	return job;
+}
+
+// A queued search is already a job, so pause, disconnect and cancel drop it before it navigates.
+function queueSearch(m) {
+	const job = register(m);
+	if (!job) return;
+	searches = searches.then(async () => {
+		if (!jobs.has(m.id)) return;
+		if (Date.now() < cooldownUntil) return fail(m.id, `Google showed a CAPTCHA; browser searches are paused until ${new Date(cooldownUntil).toLocaleTimeString()}.`);
+		await sleep(lastSearch + SEARCH_GAP_MS - Date.now());
+		if (!jobs.has(m.id)) return;
+		try { await start(m, job); } finally { lastSearch = Date.now(); }
+	});
+}
+
+// Download-only request (image_search save): no tab, Pi already checked every URL.
+function download(m) {
+	const job = register(m);
+	if (job) downloadImages(job, Array.isArray(m.download) ? m.download : []);
+}
+
+async function start(m, job = register(m)) {
+	if (!job) return;
 	try {
 		const tab = await chrome.tabs.create({ url: "about:blank", active: false });
 		job.tab = tab.id;
@@ -80,8 +107,17 @@ async function start(m) {
 		await chrome.tabs.update(tab.id, { url: m.url, muted: true });
 		await settle(job, LOAD_MS, false);
 		await settle(job, CHALLENGE_MS, true);
-		const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: job.tab }, func: extract });
+		const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: job.tab }, func: m.extract === "web" ? extractWeb : m.extract === "images" ? extractImages : extract });
 		if (!jobs.has(m.id)) return;
+		if (m.extract) {
+			if (result.captcha) {
+				cooldown = Math.min(COOLDOWN_MAX, cooldown ? cooldown * 2 : COOLDOWN_MS);
+				cooldownUntil = Date.now() + cooldown;
+				throw new Error(`Google showed a CAPTCHA; browser searches are paused for ${cooldown / 60_000} minutes.`);
+			}
+			cooldown = 0;
+			if (m.extract === "images") await sendSheet(job, result.results ?? []);
+		}
 		send({ type: "page", id: m.id, ...result });
 		chrome.tabs.remove(job.tab).catch(() => {});
 		job.tab = undefined;
@@ -132,6 +168,76 @@ function extract() {
 	return { url: location.href, title: document.title, text: (document.body?.innerText ?? "").slice(0, 200_000), links, images: [...new Set(images.filter(Boolean))].slice(0, 100) };
 }
 
+// Runs in the page (plan 71dc4da4 D9): raw candidates only; Pi normalizes them.
+// Each page function is serialized alone by executeScript, so the CAPTCHA test is repeated in both.
+function extractWeb() {
+	const captcha = location.pathname.startsWith("/sorry/") || /unusual traffic from your computer/i.test(document.body?.innerText ?? "") || Boolean(document.querySelector("#captcha-form, iframe[src*='recaptcha']"));
+	const results = [];
+	for (const h3 of document.querySelectorAll("#search a h3, #rso a h3")) {
+		const a = h3.closest("a");
+		// the result block: the largest ancestor that holds no other result title
+		let block = a;
+		while (block.parentElement && !/^(rso|search)$/.test(block.parentElement.id) && block.parentElement.querySelectorAll("h3").length === 1) block = block.parentElement;
+		results.push({ href: a.href, title: h3.innerText, lines: block.innerText.split("\n").map(line => line.trim()).filter(Boolean).slice(0, 20) });
+	}
+	return { url: location.href, title: document.title, captcha, results };
+}
+function extractImages() {
+	const captcha = location.pathname.startsWith("/sorry/") || /unusual traffic from your computer/i.test(document.body?.innerText ?? "") || Boolean(document.querySelector("#captcha-form, iframe[src*='recaptcha']"));
+	const scripts = [...document.scripts].map(script => script.textContent).join("\n"), results = [], seen = new Set();
+	for (const tile of document.querySelectorAll("[data-docid]")) {
+		const docid = tile.dataset.docid;
+		if (!docid || seen.has(docid) || results.length >= 30) continue;
+		seen.add(docid);
+		const img = tile.querySelector("img"), at = scripts.indexOf(docid);
+		// originals sit in inline scripts as ["url",height,width] after the tile's docid; Google's own thumbnails are skipped
+		let original;
+		if (at >= 0) {
+			const triple = /\["(https?:\/\/[^"]+)",(\d+),(\d+)\]/g;
+			triple.lastIndex = at;
+			for (let m; (m = triple.exec(scripts)) && m.index < at + 5000;) if (!/\.gstatic\.com|\.google\./.test(m[1])) { original = [m[1], Number(m[2]), Number(m[3])]; break; }
+		}
+		const page = tile.dataset.lpage || tile.querySelector("[data-lpage]")?.dataset.lpage || tile.closest("[data-lpage]")?.dataset.lpage || "";
+		results.push({ docid, page, thumb: img?.currentSrc || img?.src || "", original, lines: tile.innerText.split("\n").map(line => line.trim()).filter(Boolean).slice(0, 4) });
+	}
+	return { url: location.href, title: document.title, captcha, results };
+}
+
+// One numbered grid of the thumbnails (D7); only Google's own thumbnails or inline data are fetched, without cookies.
+async function sendSheet(job, results) {
+	if (!results.length) return;
+	try {
+		const canvas = new OffscreenCanvas(SHEET_COLS * CELL, Math.ceil(results.length / SHEET_COLS) * CELL), g = canvas.getContext("2d");
+		g.fillStyle = "#fff";
+		g.fillRect(0, 0, canvas.width, canvas.height);
+		const safe = results.map(({ thumb }) => /^(data:image\/|https:\/\/[\w-]+\.gstatic\.com\/)/.test(thumb ?? "") ? thumb : "");
+		const draw = async (thumb, n) => {
+			if (thumb) try {
+				const response = await fetch(thumb, { credentials: "omit", signal: AbortSignal.any([job.abort.signal, AbortSignal.timeout(IMAGE_MS)]) });
+				const bitmap = await createImageBitmap(await response.blob()), scale = Math.min((CELL - 8) / bitmap.width, (CELL - 8) / bitmap.height);
+				const w = bitmap.width * scale, h = bitmap.height * scale;
+				g.drawImage(bitmap, (n % SHEET_COLS) * CELL + (CELL - w) / 2, Math.floor(n / SHEET_COLS) * CELL + (CELL - h) / 2, w, h);
+			} catch { /* a missing thumbnail leaves its cell blank, numbers never shift */ }
+		};
+		await Promise.all(safe.map((thumb, n) => draw(thumb, n)));
+		g.font = "bold 26px sans-serif";
+		results.forEach((_, n) => {
+			const x = (n % SHEET_COLS) * CELL, y = Math.floor(n / SHEET_COLS) * CELL;
+			g.fillStyle = "#000c";
+			g.fillRect(x + 2, y + 2, n >= 9 ? 46 : 32, 34);
+			g.fillStyle = "#ff0";
+			g.fillText(String(n + 1), x + 7, y + 29);
+		});
+		const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer());
+		if (jobs.has(job.id)) send({ type: "image", id: job.id, n: 0, url: "contact-sheet", mime: "image/png", data: base64(bytes) });
+	} catch (error) { console.warn("Pi contact sheet:", error); } // the numbered list still works without it
+}
+function base64(bytes) {
+	let text = "";
+	for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+	return btoa(text);
+}
+
 // Cross-site navigations are blocked by the rules above; the error names the URL, which Pi then checks (D12).
 chrome.webRequest.onErrorOccurred.addListener(async details => {
 	const job = [...jobs.values()].find(entry => entry.tab === details.tabId);
@@ -160,10 +266,8 @@ async function downloadImages(job, list) {
 			if (!response.ok || !mime.startsWith("image/") || Number(response.headers.get("content-length")) > limit) { await response.body?.cancel(); skipped++; continue; }
 			const bytes = new Uint8Array(await response.arrayBuffer());
 			if (!bytes.length || bytes.length > limit) { skipped++; continue; }
-			let text = "";
-			for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
 			total += bytes.length;
-			send({ type: "image", id: job.id, n: ++n, url, mime, data: btoa(text) });
+			send({ type: "image", id: job.id, n: ++n, url, mime, data: base64(bytes) });
 		} catch { skipped++; }
 	}
 	if (jobs.has(job.id)) send({ type: "images-done", id: job.id, skipped });

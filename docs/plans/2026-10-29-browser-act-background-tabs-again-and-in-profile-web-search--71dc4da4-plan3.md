@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-29
-updated: 2026-10-29T11:14:50.246Z
+updated: 2026-10-29T11:19:39.274Z
 reviewed: 2026-10-29
 started: 2026-10-29T11:11:27.916Z
 ---
@@ -128,7 +128,7 @@ Prompt guidance for the new tools (exact wording settled in P4-05): web search t
 
 ### Phase 3: browser_search [code]
 
-- [ ] **P2-01** Add the add-on side: `fetch` with `extract: "web"`, serial queue with gap and CAPTCHA cooldown, `extractWeb()`, results to Pi.
+- [wip] **P2-01** Add the add-on side: `fetch` with `extract: "web"`, serial queue with gap and CAPTCHA cooldown, `extractWeb()`, results to Pi.
   - Reuses `start`/`settle` tab handling and the pause button; the tab closes after extraction.
   - Queue rules as in Relevant files: queued searches are jobs, released in `finally`, fail at once during cooldown, fail together on a CAPTCHA.
 - [ ] **P2-02** Add `extensions/browser-search.ts` with `browser_search {query}`: grant check for google.com, URL build, log, numbered untrusted output.
@@ -184,7 +184,7 @@ Prompt guidance for the new tools (exact wording settled in P4-05): web search t
 
 ## Resume context
 
-Reviewed (plan3-advisor, 6 findings: 5 accepted, 1 partly; see Amendments). No open questions; awaiting /plan3 finish. Next: P1-01 (active:false revert in control.js, description, README, CHANGELOG, add-on 1.4, plus fake-test assertion of active:false). Then the Phase 2 probe P1-02 needs the user's google.com grant; its Google-originals question gates Phase 4. Run C1 with PI_HUB unset.
+P2-01 wip: background.js has register/queueSearch (2 s gap, CAPTCHA cooldown 5 min doubling to 1 h, fail fast during cooldown), download-only `fetch {download}`, extractWeb/extractImages page functions (D9 method), and sendSheet (OffscreenCanvas, gstatic/data thumbs only, image n=0). C1 still passes; the new paths are not tested yet. Next: (1) browser-fetch.ts: browserFetch gets an optional `extract` param sent in the fetch message, collects `image` messages before `page` (sheet), returns `results`; export `inbox`. (2) new extensions/browser-search.ts: browser_search and image_search (normalizers decodeHref/normalizeWeb/normalizeImages exported, sets Map of 10 cleared on session_shutdown/switch, save = new owned fetch {download:[{url,cookies:false}]} after checkUrl and dnsCheck, errors get "Use web_search instead."), URL https://www.google.com/search?q=…&hl=en (+&udm=2). (3) package.json pi.extensions. (4) C1 tests incl. fake OffscreenCanvas/createImageBitmap and a vm SEARCH_GAP_MS override. P3-01 code is already in background.js.
 
 ## Amendments
 
