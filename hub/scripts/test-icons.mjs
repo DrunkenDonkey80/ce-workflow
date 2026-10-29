@@ -12,5 +12,5 @@ assert.equal(short(n({ working: 5, unseen: 1, waiting: 1, scheduled: 1 })), "wa 
 assert.equal(short(["working", "working", "working", "unseen", "unseen"]), "wo wo un un", "finished beats working for a spare segment");
 assert.equal(barSlots([]).length, 0);
 const svg = hubsIconSvg([{ icon: "pc", states: n({ working: 2, waiting: 1 }) }, { icon: "pc", states: [] }]);
-assert.equal((svg.match(/fill="#ffa94d"/g) ?? []).length, 2, "two working sessions draw two orange segments");
+assert.equal((svg.match(/fill="#ffd43b"/g) ?? []).length, 2, "two working sessions draw two yellow segments");
 console.log("icons ok");

@@ -32,9 +32,9 @@ export const ICONS: Record<string, [string, string, boolean]> = {
 // The tab icon, and the installed app's icon (hub /app-icon.svg): transparent, dark ink, light ink on a dark tab bar.
 const ICON_INK = "#343a40";
 // waiting: asks you; working; unseen: finished, not yet looked at (ready); scheduled: idle, a timer will wake it.
-const DOTS: Record<string, string> = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#339af0" };
+const DOTS: Record<string, string> = { waiting: "#e03131", working: "#fab005", unseen: "#37b24d", scheduled: "#339af0" };
 // The same states on the taskbar's dark tile: brighter, or they sink into the dark; a timer is light grey there (blue read too dim).
-const BRIGHT: Record<string, string> = { waiting: "#ff6b6b", working: "#ffa94d", unseen: "#69db7c", scheduled: "#dee2e6" };
+const BRIGHT: Record<string, string> = { waiting: "#ff6b6b", working: "#ffd43b", unseen: "#69db7c", scheduled: "#dee2e6" };
 // states: any of waiting/working/unseen/scheduled, each drawn once, most urgent first.
 // The icon alone, centred in a 32 box.
 function glyph(name: string) {
