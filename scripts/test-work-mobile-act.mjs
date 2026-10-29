@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { assignRefs, findProfile, flatten, line, mobileAct, mobileActTool, onPath, resetSession, resolveDevice, swipePoints } from "../extensions/mobile-act.ts";
+import { assignRefs, findProfile, flatten, line, matches, mobileAct, mobileActTool, onPath, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -49,14 +49,33 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 		'[e4] Button "⚙, Settings" #nav_settings @(16,546 370x48)',
 	]);
 	const android = [{ type: "android.widget.FrameLayout", identifier: "com.x:id/root", rect: { x: 0, y: 0, width: 360, height: 640 }, children: [
-		{ type: "android.widget.TextView", label: "11:15", identifier: "com.x:id/clock", rect: { x: 4, y: 4, width: 47, height: 16 } },
+		{ type: "android.widget.TextView", label: "11:15", identifier: "com.android.systemui:id/clock", rect: { x: 4, y: 4, width: 47, height: 16 } },
+		{ type: "android.widget.TextView", label: "BELOT", rect: { x: 16, y: 14, width: 200, height: 34 } },
 		{ type: "android.widget.Button", label: "", identifier: "com.x:id/go", rect: { x: 0, y: 100, width: 50, height: 50 } },
 		{ type: "android.widget.EditText", label: "wifi", value: "wifi", rect: { x: 0, y: 200, width: 300, height: 50 } }] }];
-	assert.deepEqual(assignRefs(undefined, flatten(android)).snap.elements.map(line), ['[e1] TextView "11:15" #com.x:id/clock @(4,4 47x16)', '[e2] Button "" #com.x:id/go @(0,100 50x50)', '[e3] EditText "" = "wifi" @(0,200 300x50)'], "Android: short types, bare layouts dropped");
+	assert.deepEqual(assignRefs(undefined, flatten(android)).snap.elements.map(line), ['[e1] TextView "BELOT" @(16,14 200x34)', '[e2] Button "" #com.x:id/go @(0,100 50x50)', '[e3] EditText "" = "wifi" @(0,200 300x50)'], "Android: short types, bare layouts and status bar dropped");
+	const ios = [{ type: "StaticText", label: "1:42\u202fPM", rect: { x: 37, y: 15, width: 34, height: 20 } }, { type: "Other", identifier: "3 of 3 Wi-Fi bars", rect: { x: 312, y: 19, width: 17, height: 12 } },
+		{ type: "Image", label: "Silent Mode", rect: { x: 75, y: 17, width: 15, height: 17 } }, { type: "StaticText", label: "12:30 left", rect: { x: 10, y: 300, width: 80, height: 20 } }];
+	assert.deepEqual(flatten(ios).map(e => e.label), ["12:30 left"], "iOS status bar dropped, the same text lower down kept");
 	assert.deepEqual(swipePoints("down", { x: 0, y: 0, width: 100, height: 200 }), [50, 160, 50, 40], "down moves the finger up");
 	assert.throws(() => swipePoints("sideways", { x: 0, y: 0, width: 1, height: 1 }), /direction/);
 	assert.equal(onPath("node"), true);
 	assert.equal(onPath("surely-not-a-binary-xyz"), false);
+}
+
+// Overlapped elements: tap the visible strip of a fanned card, not the neighbour on top of its center.
+{
+	const card = (x) => ({ type: "Image", label: `c${x}`, identifier: "", rect: { x, y: 700, width: 120, height: 170 } });
+	const els = assignRefs(undefined, flatten([card(10), card(46), card(82), { type: "Other", label: "table", rect: { x: 0, y: 0, width: 400, height: 900 } }])).snap.elements;
+	const [x0, y0] = visiblePoint(els[0], els), [x1] = visiblePoint(els[1], els), [x2] = visiblePoint(els[2], els);
+	assert.ok(x0 >= 10 && x0 < 46 && y0 > 700 && y0 < 870, `first card in its own strip: ${x0}`);
+	assert.ok(x1 >= 46 && x1 < 82, `middle card in its strip: ${x1}`);
+	assert.equal(x2, 142, "top card: center");
+	assert.deepEqual(visiblePoint(els[3], els), [200, 450], "different type never covers");
+	assert.deepEqual(matches(els, "#nope"), []);
+	assert.deepEqual(matches(els, "c4").map(e => e.label), ["c46"], "partial match");
+	assert.deepEqual(matches([...els, { ...els[0], label: "c4", ref: "e9" }], "C4").map(e => e.label), ["c4"], "exact beats partial");
+	assert.deepEqual(matches([{ ...els[0], label: "On line game" }], "Online game").length, 1, "OCR-split words still match");
 }
 
 // Stable refs: unchanged elements keep refs, equal keys match the nearest frame, new ones get fresh refs.
@@ -120,6 +139,28 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 	resetSession();
 	await mobileAct(full.exec, { action: "snapshot" }, opts());
 	assert.match(await mobileAct(full.exec, { action: "tap", ref: "e1" }, opts()), /^Done\. The screen changed:\nUNTRUSTED[^]*\[e5\] Button "Other screen"/, "mostly new screen -> full list");
+}
+
+// Query, OCR fallback, wait and relaunch.
+{
+	resetSession();
+	const bids = [{ text: "Pass", x: 0.1, y: 0.8, w: 0.1, h: 0.02 }, { text: "1:42", x: 0.1, y: 0.01, w: 0.1, h: 0.02 }];
+	const screens = [home, home, home, home, [home[0]], [home[0]]];
+	const f = fake({ screens });
+	const o = opts({ ocr: async () => bids });
+	await mobileAct(f.exec, { action: "tap", query: "#nav_settings", settleMs: 0 }, o);
+	await mobileAct(f.exec, { action: "tap", query: "pass", settleMs: 0 }, o);
+	await assert.rejects(mobileAct(f.exec, { action: "tap", query: "#missing" }, o), /Nothing on screen matches "#missing"/);
+	assert.match(await mobileAct(f.exec, { action: "ocr" }, o), /\[t1\] Text "Pass" @\(40,699 40x17\)$/, "OCR in points, status text dropped");
+	await mobileAct(f.exec, { action: "tap", ref: "t1", settleMs: 0 }, o);
+	assert.match(await mobileAct(f.exec, { action: "wait", query: "Local game" }, o), /^"Local game" appeared after/);
+	assert.match(await mobileAct(f.exec, { action: "wait", query: "Local game", gone: true, timeoutMs: 1 }, o), /is gone/);
+	const empty = fake({ screens: [[]] });
+	await assert.rejects(mobileAct(empty.exec, { action: "wait", query: "Never", timeoutMs: 0 }, opts({ ocr: async () => [] })), /Timed out after 0 ms waiting for "Never" to appear/);
+	await mobileAct(f.exec, { action: "relaunch", appId: "com.demo" }, o);
+	const d = "--device SIM-1";
+	assert.deepEqual(f.acts(), [`io tap 201,570 ${d}`, `io tap 60,708 ${d}`, `io tap 60,708 ${d}`, `apps terminate com.demo ${d}`, `apps launch com.demo ${d}`]);
+	assert.ok(f.calls.some(c => c[1] === "screenshot"), "OCR takes a screenshot");
 }
 
 // D5 installs: mobilecli only after Yes; simulator agent automatic; real iPhone agent only after Yes.

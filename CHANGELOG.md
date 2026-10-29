@@ -5,7 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## 0.1.99 — 2026-10-29
 
 ### Added
-- mobile_act: the agent can read and drive an iOS Simulator, a real iPhone or an Android device through mobilecli. It reads the screen as labelled buttons and fields with positions, taps, long presses, types, swipes and presses hardware buttons, and every action returns what changed on screen. If mobilecli is missing, it asks before installing it.
+- mobile_act: the agent can read and drive an iOS Simulator, a real iPhone or an Android device through mobilecli. It reads the screen as labelled buttons and fields with positions, taps, long presses, types, swipes and presses hardware buttons, and every action returns what changed on screen. It can find and tap by label or id in one call, wait for text to appear or disappear, read on-screen text with OCR when the app hides it from accessibility (Mac), restart an app, and tap the visible part of overlapping cards. Long flows such as a whole game can run as a codemode script with no model turn per step. If mobilecli is missing, it asks before installing it.
 - screen_read target "device" captures any iOS Simulator, iPhone or Android screen through mobilecli.
 
 ## 0.1.98 — 2026-10-28
