@@ -823,7 +823,7 @@ try {
  await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.join() === 'unseen'");
  const line = JSON.parse((await evaluate("document.title")).slice(13));
  assert.deepEqual([typeof line.icon, line.icon.length > 0, line.name, line.states], ["string", true, os.hostname(), ["unseen"]], "icon, hub name (hostname) and own unseen");
- assert.deepEqual([line.latest > 0, line.key], [true, "ctrl+shift+a"], "the newest attention time and the app's attention key");
+ assert.deepEqual([line.latest > 0, line.asks, line.key], [true, false, "ctrl+shift+a"], "the newest attention time, not a question, and the app's attention key");
  // pi-hub progress: a bar under the chat heading, refused without numbers, gone on --clear.
  { const report = body => fetch(`${origin}/api/sessions/${id}/progress`, { method: "POST", headers: { "x-hub-key": hub.config.localKey, "content-type": "application/json" }, body: JSON.stringify(body) });
   assert.equal((await report({ done: "x", total: 5 })).status, 400, "progress needs numbers");

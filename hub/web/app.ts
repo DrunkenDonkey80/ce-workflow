@@ -1436,8 +1436,8 @@ function renderIcon() {
   // attention: how many things need you, for the app's badge on a pinned button.
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
   const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: tones, attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
-   // latest: the newest session needing you, so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
-   latest: attentionList[0]?.attention ?? 0, key: hubSettings.attentionKey ?? "",
+   // latest: the newest session needing you, asks: it is a question (beats any hub's finished run), so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
+   latest: attentionList[0]?.attention ?? 0, asks: attentionList[0]?.tone === "waiting", key: hubSettings.attentionKey ?? "",
    // side: where the strip starts (frameless app); gear: the settings badge the strip's gear repeats ("!" ce-workflow, else a count).
    // shortcut: CSS px equal the app's logical px only at 100% page zoom; scale by the zoom if the app ever allows it.
    ...document.body.classList.contains("app-frame") && { side: $("switcher").hidden ? 0 : Math.round($("switcher").getBoundingClientRect().right), gear: !$("update-badge").hidden ? "!" : $("update-others").hidden ? "" : $("update-others").textContent } });

@@ -140,9 +140,9 @@ function step(dir, sameHub) {
 for (const type of ["mousedown", "mouseup", "auxclick"]) addEventListener(type, event => { if (event.button !== 3 && event.button !== 4) return; event.preventDefault(); if (type === "mouseup") step(event.button === 3 ? -1 : 1, event.ctrlKey); });
 window.select = select;
 window.shortcut = index => { if (tabs[index]) select(tabs[index].id); };
-// The attention key (main.rs already brought the window up): the hub with the newest session that needs you opens that session.
+// The attention key (main.rs already brought the window up): a hub with a question first, then the newest session that needs you.
 window.attention = () => {
- const tab = tabs.filter(t => t.latest).sort((a, b) => b.latest - a.latest)[0]; if (!tab) return;
+ const tab = tabs.filter(t => t.latest).sort((a, b) => Number(!!b.asks) - Number(!!a.asks) || b.latest - a.latest)[0]; if (!tab) return;
  select(tab.id); void invoke("attend", { id: tab.id });
 };
 let attentionKey = null;
@@ -150,7 +150,7 @@ let attentionKey = null;
 window.onTitle = (webview, title) => {
  const tab = tabs.find(t => "hub" + t.id === webview); if (!tab) return;
  const line = /^pi-hub-state (\{.*\})$/.exec(title ?? "");
- if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { side: value.side, gear: value.gear ?? "", icon: value.icon || tab.icon, hubName: value.name || tab.hubName, version: value.version || "", states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0 });
+ if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { side: value.side, gear: value.gear ?? "", icon: value.icon || tab.icon, hubName: value.name || tab.hubName, version: value.version || "", states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0, asks: value.asks === true });
   // This PC's hub holds the attention key setting.
   // A newer "needs you" than this tab has shown flashes the taskbar; the first title after start only sets the mark.
   if (tab.peak !== undefined && tab.latest > tab.peak) void invoke("flash").catch(console.error);
