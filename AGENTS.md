@@ -48,7 +48,7 @@ run only the targeted tests for the pushed changes unless the request asks for t
 
 ## Version Before Push Rule
 
-Before every push, increment the package version in `package.json` (patch by default) and commit it. Keep any tracked lockfile version in sync. Retrying the same failed push does not require another increment.
+Before every push, increment the package version in `package.json` and commit it. Version `x.y.z`: small changes (fixes, tweaks) bump `z`, which never goes past 99; a new module or tool (or `z` would pass 99) bumps `y` and resets `z` to 0; when `y` would pass 9, bump `x` and reset `y` and `z` to 0. Write `z` unpadded (`0.2.0`, not `0.2.00`): npm rejects leading zeros. Keep any tracked lockfile version in sync. Retrying the same failed push does not require another increment.
 
 In the same commit, move `CHANGELOG.md`'s Unreleased bullets (and anything else since the last version's commit) under a new `## <version> — <date>` heading with `### Added` / `### Changed` / `### Fixed`, in plain user words, hub and `/wo` together. For a visible hub change, add a tight crop: `node hub/scripts/changelog-shot.mjs "<selector>" docs/changelog/<version>-<name>.png "<setup JS>"` (throwaway hub with a fake Pi; `--pad=N` keeps some surroundings, `--ask=<ask_user JSON>` shows a dialog, `--size=WxH` for tall ones): shoot the control and the dialog it opens, then put `![what it shows](docs/changelog/<file>.png)` lines right after that bullet.
 
