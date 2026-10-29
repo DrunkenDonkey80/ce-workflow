@@ -245,7 +245,7 @@ export function connect(): Promise<Link> {
 }
 
 /** Messages for one request; `next` waits at most `ms`, and only that waiting counts toward the request deadline. */
-function inbox(handlers: Link["handlers"], id: string, signal?: AbortSignal) {
+export function inbox(handlers: Link["handlers"], id: string, signal?: AbortSignal) {
 	const queue: any[] = [];
 	let wake: (() => void) | undefined;
 	handlers.set(id, message => { queue.push(message); wake?.(); });
@@ -266,11 +266,12 @@ function inbox(handlers: Link["handlers"], id: string, signal?: AbortSignal) {
 	};
 }
 
-type FetchResult = { url: string; finalUrl: string; title: string; text: string; truncated: boolean; links: { text: string; href: string }[]; imageUrls: string[]; images: { url: string; path: string; bytes: number }[]; skipped: number };
+type FetchResult = { url: string; finalUrl: string; title: string; text: string; truncated: boolean; links: { text: string; href: string }[]; imageUrls: string[]; images: { url: string; path: string; bytes: number }[]; skipped: number; results?: any[] };
 
-export async function browserFetch(ctx, params: { url: string; images?: boolean }, signal?: AbortSignal, { resolve = lookup } = {}): Promise<FetchResult> {
+/** `extract` (plan 71dc4da4): the add-on runs a Google results extractor instead of the page reader and returns raw `results`. */
+export async function browserFetch(ctx, params: { url: string; images?: boolean; extract?: "web" | "images" }, signal?: AbortSignal, { resolve = lookup } = {}): Promise<FetchResult> {
 	const id = randomUUID(), hops: string[] = [];
-	const entry: Record<string, unknown> = { id, project: ctx.cwd, url: params.url };
+	const entry: Record<string, unknown> = { id, project: ctx.cwd, url: params.url, ...(params.extract ? { tool: params.extract === "web" ? "browser_search" : "image_search" } : {}) };
 	const refuse = (reason: string): never => { logFetch({ ...entry, hops, outcome: "refused", by: reason }); throw new Error(`browser_fetch refused: ${reason}`); };
 	// Block list, local addresses, DNS and approval for one URL; returns the host approved for this request.
 	const gate = async (url: string) => {
@@ -293,14 +294,16 @@ export async function browserFetch(ctx, params: { url: string; images?: boolean 
 	const next = inbox(connection!.handlers, id, signal);
 	let left = REQUEST_MS;
 	try {
-		connection!.send({ type: "fetch", id, url: params.url, hosts: [...approved], blocked: blockedList(readPolicy()) });
+		connection!.send({ type: "fetch", id, url: params.url, hosts: [...approved], blocked: blockedList(readPolicy()), ...(params.extract ? { extract: params.extract } : {}) });
 		let page;
+		const images: FetchResult["images"] = [];
 		for (;;) {
 			const got = await next(left);
 			left = got.left;
 			const message = got.message;
 			if (message.type === "error") throw new Error(message.error);
 			if (message.type === "page") { page = message; break; }
+			if (message.type === "image") { images.push({ url: message.url, path: message.path, bytes: message.bytes }); continue; } // image_search contact sheet
 			if (message.type !== "navigate") continue;
 			// D12: the extension holds a cross-site navigation until Pi answers.
 			hops.push(String(message.url));
@@ -314,7 +317,6 @@ export async function browserFetch(ctx, params: { url: string; images?: boolean 
 		if (final.refused !== undefined) refuse(`the page ended on ${page.url}: ${final.refused}`);
 		if (!approved.has(grantKey(final.host!))) refuse(`the page ended on ${page.url}, which was not approved`);
 		const imageUrls: string[] = [...new Set<string>((Array.isArray(page.images) ? page.images : []).filter(url => typeof url === "string"))].slice(0, 100);
-		const images: FetchResult["images"] = [];
 		let skipped = 0;
 		if (params.images && imageUrls.length) {
 			// Q-02: the page approval covers its images; other hosts get no cookies. Block list and local addresses still apply.
@@ -339,6 +341,7 @@ export async function browserFetch(ctx, params: { url: string; images?: boolean 
 		const result = {
 			url: params.url, finalUrl: String(page.url), title: String(page.title ?? ""), text: text.slice(0, TEXT_CHARS), truncated: text.length > TEXT_CHARS,
 			links: (Array.isArray(page.links) ? page.links : []).slice(0, 200), imageUrls, images, skipped,
+			...(params.extract ? { results: Array.isArray(page.results) ? page.results : [] } : {}),
 		};
 		logFetch({ ...entry, finalUrl: result.finalUrl, hops, outcome: "ok", images: images.length });
 		return result;

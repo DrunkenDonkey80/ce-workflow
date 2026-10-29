@@ -37,6 +37,7 @@
       "extensions/mobile-act.ts",
       "extensions/browser-fetch.ts",
       "extensions/browser-act.ts",
+      "extensions/browser-search.ts",
       "extensions/enter-runs.ts",
       "extensions/advisor-model.ts",
       "extensions/ask-user/index.ts"

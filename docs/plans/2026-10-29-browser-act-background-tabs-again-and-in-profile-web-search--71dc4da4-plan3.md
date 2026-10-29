@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-10-29
-updated: 2026-10-29T11:19:39.274Z
+updated: 2026-10-29T11:28:26.559Z
 reviewed: 2026-10-29
 started: 2026-10-29T11:11:27.916Z
 ---
@@ -128,28 +128,15 @@ Prompt guidance for the new tools (exact wording settled in P4-05): web search t
 
 ### Phase 3: browser_search [code]
 
-- [wip] **P2-01** Add the add-on side: `fetch` with `extract: "web"`, serial queue with gap and CAPTCHA cooldown, `extractWeb()`, results to Pi.
-  - Reuses `start`/`settle` tab handling and the pause button; the tab closes after extraction.
-  - Queue rules as in Relevant files: queued searches are jobs, released in `finally`, fail at once during cooldown, fail together on a CAPTCHA.
-- [ ] **P2-02** Add `extensions/browser-search.ts` with `browser_search {query}`: grant check for google.com, URL build, log, numbered untrusted output.
-  - Errors on no host manifest, no connection, CAPTCHA or cooldown say to use `web_search`.
-- [ ] **P2-03** Extend C1 for the queue, cooldown, normalizers and output format; register the extension in `package.json`.
-  - Queue: spacing; pause, disconnect and cancel while queued; a CAPTCHA on the first search stops the second before it navigates; cooldown fails fast.
-  - Normalizers on the P1-02 fixtures: `/url?q=` decoding, dates, CAPTCHA URL and text detection, empty results.
-  - Through the real host in the test: another socket's messages for a search id are ignored.
-  - Check: C1 passes; C2 clean.
+- [x] **P2-01** Add-on: fetch {extract} via a serial search queue (2 s gap, CAPTCHA cooldown 5 min doubling to 1 h, fail fast), extractWeb page function, results to Pi.
+- [x] **P2-02** browser_search in extensions/browser-search.ts rides browserFetch (google.com grant, log, final-URL check); numbered untrusted output; every error adds 'Use web_search instead.'
+- [x] **P2-03** C1 covers spacing, cancel/pause/disconnect of queued searches, foreign-socket cancel ignored, CAPTCHA + doubling cooldown, normalizers and exact output; extension registered in package.json.
 
 ### Phase 4: image_search [code]
 
-- [ ] **P3-01** Add `extractImages()` (method from P1-02) and the OffscreenCanvas contact sheet, sent as an `image` message with n = 0.
-- [ ] **P3-02** Add `image_search`: `{query}` gives sheet, numbered list and set id; `{set, save}` downloads originals in a new download-only request.
-  - Last 10 sets per Pi session, cleared on session end or switch; an unknown or evicted set errors with "search again".
-  - Originals: policy re-read, block list, local-address check, no cookies, 8 MB each, 30 per call (D8, Q-01).
-- [ ] **P3-03** Extend C1 for sets, `save` and sheet handling; README and CHANGELOG entries.
-  - Repeated same query gives distinct sets; eviction; session switch clears; save after the search request is done, without searching again.
-  - Refusal of blocked and local original URLs; number-to-URL mapping; a missing thumbnail leaves its number blank, not shifted.
-  - The canvas drawing itself is checked live in P4-03, not in the fake.
-  - Check: C1 passes; C2 clean.
+- [x] **P3-01** extractImages (docid → inline-script original triple, D9) and the OffscreenCanvas numbered contact sheet (gstatic/data thumbs only) sent as image n=0.
+- [x] **P3-02** image_search {query} gives sheet + numbered list + set id (last 10, cleared on session end/switch); {set, save} downloads originals via a download-only request with checkUrl/dnsCheck, no cookies.
+- [x] **P3-03** C1 covers sets, eviction, session switch, save mapping/refusals/no re-search, sheet numbering with missing thumbs, logging; README and CHANGELOG entries added.
 
 ### Phase 5: Live evaluation and tuning [think]
 

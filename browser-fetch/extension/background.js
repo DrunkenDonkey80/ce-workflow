@@ -86,7 +86,7 @@ function queueSearch(m) {
 	searches = searches.then(async () => {
 		if (!jobs.has(m.id)) return;
 		if (Date.now() < cooldownUntil) return fail(m.id, `Google showed a CAPTCHA; browser searches are paused until ${new Date(cooldownUntil).toLocaleTimeString()}.`);
-		await sleep(lastSearch + SEARCH_GAP_MS - Date.now());
+		await sleep(Math.max(0, lastSearch + SEARCH_GAP_MS - Date.now()));
 		if (!jobs.has(m.id)) return;
 		try { await start(m, job); } finally { lastSearch = Date.now(); }
 	});
