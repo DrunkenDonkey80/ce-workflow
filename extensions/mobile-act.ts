@@ -238,7 +238,8 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 		case "type": {
 			if (!args.text && !args.submit) throw new Error("type needs text.");
 			if (args.ref) { await run(exec, ["io", "tap", point(dev, args, "type"), ...d], signal); await (o.sleep ?? (ms => new Promise(res => setTimeout(res, ms))))(300); }
-			if (args.text) await run(exec, ["io", "text", args.text, ...d], signal);
+			// With a ref the field is replaced in one step (io fill); without one the text goes key by key into the focused field.
+			if (args.text) await run(exec, ["io", args.ref ? "fill" : "text", args.text, ...d], signal);
 			if (args.submit) await run(exec, ["io", "keys", "enter", ...d], signal);
 			return changes(exec, dev, settle, o);
 		}
@@ -268,7 +269,7 @@ export const mobileActTool = (exec: Exec) => ({
 	description: [
 		"Operate an iOS Simulator, a real iPhone or an Android emulator/phone through mobilecli (simulators boot headless, no window).",
 		"Actions: list (devices, online first); boot {device}; launch {appId}; snapshot (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh));",
-		"find {query} (searches the last snapshot); tap {ref} or {x, y}; longpress {ref or x, y, durationMs? (1000)}; type {text, ref?, submit?} (ref taps the field first, submit presses Enter);",
+		"find {query} (searches the last snapshot); tap {ref} or {x, y}; longpress {ref or x, y, durationMs? (1000)}; type {text, ref?, submit?} (ref taps the field and replaces its text; without ref the text is typed into the focused field; submit presses Enter);",
 		"swipe {direction, ref?} (down shows content below; ref scrolls inside that element); button {button: home|back|power|volume_up|volume_down} (back is Android only).",
 		"After each action it waits settleMs (default 500) and returns + added, - removed and ~ changed elements, or the full screen when most of it changed; settleMs 0 skips the re-read for fast sequences.",
 		"Refs stay the same while an element stays on screen. device is an id or name; omit it when one device is online. iOS coordinates are points, Android pixels.",

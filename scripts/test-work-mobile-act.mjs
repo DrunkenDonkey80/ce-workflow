@@ -99,7 +99,7 @@ const opts = (extra = {}) => ({ hasCli: () => true, sleep: async () => {}, ...ex
 	const d = "--device SIM-1";
 	assert.deepEqual(f.acts(), [
 		`io tap 201,570 ${d}`, `io tap 201,224 ${d}`, `io tap 10,20 ${d}`, `io longpress 201,224 --duration 1500 ${d}`,
-		`io tap 201,224 ${d}`, `io text XY ${d}`, `io keys enter ${d}`, `io swipe 201,699,201,175 ${d}`, `io button HOME ${d}`, `apps launch com.demo ${d}`,
+		`io tap 201,224 ${d}`, `io fill XY ${d}`, `io keys enter ${d}`, `io swipe 201,699,201,175 ${d}`, `io button HOME ${d}`, `apps launch com.demo ${d}`,
 	]);
 	assert.equal(f.calls.filter(c => c[1] === "agent").length, 1, "agent status is checked once per device per session");
 	assert.equal(f.calls.filter(c => c[1] === "devices").length, 3, "list, one resolve, one more after the failed tap dropped the cached device");
