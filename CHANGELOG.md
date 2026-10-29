@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.1.100 — 2026-10-29
 
 ### Added
 - `browser_search`: Google web search in your own browser profile, as a compact numbered list with real URLs, sites, dates and snippets. If Google shows a CAPTCHA or the browser is closed, the agent falls back to `web_search`.
@@ -10,6 +10,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Changed
 - browser_act works in a background tab again, so it no longer takes over your screen; click the blue "Pi" tab group to watch. Reload the add-on (1.4) in `chrome://extensions`.
+
+### Fixed
+- The hub showed a parked session that still has timers as finished (green); it now shows as scheduled (blue).
 
 ## 0.1.99 — 2026-10-29
 
