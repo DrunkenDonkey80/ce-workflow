@@ -2,8 +2,9 @@
 plan3: true
 status: ready
 created: 2026-10-29
-updated: 2026-10-29T11:11:01.599Z
+updated: 2026-10-29T11:14:50.246Z
 reviewed: 2026-10-29
+started: 2026-10-29T11:11:27.916Z
 ---
 
 # browser_act background tabs again, and in-profile web search via the browser add-on
@@ -74,6 +75,9 @@ Standing user rules from the planning conversation:
 - Browser control stays in the user's own browser through the Pi add-on, with per-site grants of 10, 20 or 30 minutes; keep that grant model for the new tools.
 - Keep browser_act uploads as built: only images (PNG, JPEG, GIF, WebP) from the project folder, files and destination shown, confirmed by the user.
 - Keep the add-on and helper working on macOS and Linux as well as Windows (user asked "is this extension working on macos/linux?"); don't add Windows-only paths.
+- **D9** Extraction method from the P1-02 probe (2026-10-29, user profile). Web: result links are direct (no `/url?q=`); each result has title, site name, display URL, optional date and snippet; "Missing: … | Show results with" lines and "People also search for" are noise to drop. Images (`udm=2`): tiles carry `data-docid`/`data-lpage` (200 on a red-fox page); thumbnails are `encrypted-tbn0.gstatic.com` URLs only for the first ~24 tiles (the rest lazy-load as data: or blank, so the sheet draws from loaded `img` elements or the thumbnail triples); originals are in inline `<script>` text as `["https://…",h,w]` triples (non-gstatic), about 2 per tile in tile order, JSON-escaped (`\u003d`, `\u0026`), so decode with `JSON.parse('"…"')` and dedupe. Google Images originals are readable, so the P1-02 fallback question (Bing / preview click / thumbnails only) is not needed. Basic-HTML `gbv=1` is gone. Source: browser_fetch probes plus the user's DevTools console output.
+- **D10** Never load Google from headless Chromium again in this work: one agent-browser load at 2026-10-29 hit `/sorry/` at once, and the user then got a Google "suspicious activity" CAPTCHA in their own browser on the same IP. This confirms D4.
+
 
 
 
@@ -120,12 +124,7 @@ Prompt guidance for the new tools (exact wording settled in P4-05): web search t
 
 ### Phase 2: Google page probe [think]
 
-- [ ] **P1-02** Probe one Google web and one Google Images page with browser_fetch in the user's profile; record how titles, real URLs, thumbnails and originals can be read.
-  - Needs the user's google.com read grant (asked by browser_fetch). Two page loads, no burst.
-  - browser_fetch returns text, links and image URLs: check whether result links are direct or `/url?q=`, whether thumbnails are reachable URLs, and whether original image URLs appear (for example `imgurl=` links).
-  - If originals are not visible that way, one `agent-browser` load of the same Images page with `eval` may inspect the page scripts; one request, not a fallback (D4 is about repeated searches).
-  - Save trimmed result samples in the research temp folder as fixtures for the node test of the normalizers.
-  - Ask with numbers then: if Google Images originals can't be read, choose Bing Images for originals, opening each picked result's preview, or thumbnails only. D6 and R3 stand until the user decides; Phase 4 waits for that answer.
+- [x] **P1-02** Probed Google web and Images in the user's profile: direct result links; originals readable from inline-script ["url",h,w] triples (D9); headless load caused a CAPTCHA (D10).
 
 ### Phase 3: browser_search [code]
 
