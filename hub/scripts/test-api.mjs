@@ -303,6 +303,10 @@ try {
 	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);
 	const docs = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.name === "Docs");
 	assert.deepEqual([(await docs()).tone, (await docs()).parked], ["unseen", true], "parking keeps a finished run blue until it is looked at");
+	const parkedTimer = await (await fetch(`${origin}/api/sessions/${created.id}/timers`, { method: "POST", headers: { "x-hub-key": localKey, connection: "close", "content-type": "application/json" }, body: JSON.stringify({ kind: "script", command: "exit 0", everyMinutes: 5 }) })).json();
+	assert.deepEqual([(await docs()).tone, (await docs()).parked], ["scheduled", true], "a parked session with a timer shows scheduled, not finished");
+	assert.equal((await post(id, "session", { action: "cancel-timer", id: created.id, timer: parkedTimer.id })).status, 200);
+	assert.equal((await docs()).tone, "unseen");
 	await post(created.id, "seen", {});
 	assert.equal((await tones()).Docs, "parked");
 	assert.equal((await post(id, "session", { action: "unstar", id })).status, 409, "a live session is parked before unstarring");

@@ -177,9 +177,10 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	function tone(id: string) {
 		if (registry.get(id)?.state === "terminal") return "terminal";
 		if (forms(id).length) return "waiting"; // a script's question waits on a parked session too
-		if (!host.live.has(id)) return unseen.has(id) ? "unseen" : "parked"; // auto-park keeps a finished run green; the row's parked flag shows 💤
-		if (host.busyReasons(id).length) return "working";
-		if (scheduler?.list(id).length) return "scheduled"; // D4: idle, a timer will wake it
+		const live = host.live.has(id);
+		if (live && host.busyReasons(id).length) return "working";
+		if (scheduler?.list(id).length) return "scheduled"; // D4: idle, a timer will wake it, parked or not
+		if (!live) return unseen.has(id) ? "unseen" : "parked"; // auto-park keeps a finished run green; the row's parked flag shows 💤
 		return unseen.has(id) ? "unseen" : "seen";
 	}
 	// When an idle live session auto-parks (D16).
