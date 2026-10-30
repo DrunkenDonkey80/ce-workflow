@@ -179,7 +179,7 @@ function open(tab) { if (tab.url) void invoke("open", { id: tab.id, url: tab.url
 const newTab = fields => ({ id: nextId++, icon: DEFAULT_ICON, states: [], ...fields });
 // prompt()/alert() draw inside this 36 px strip and get cut off, so questions are an input in the strip itself.
 let asking = null, notice = "";
-function ask(hint, value = "") {
+function ask(hint, value = "", linkOnPaste = false) {
  return new Promise(done => {
   const text = document.createElement("div"), input = document.createElement("input");
   text.id = "note"; text.style.margin = "0"; text.textContent = hint;
@@ -187,11 +187,14 @@ function ask(hint, value = "") {
   const finish = result => { if (asking !== input) return; asking = null; done(result); render(); };
   input.onkeydown = event => { if (event.key === "Enter") finish(input.value.trim()); else if (event.key === "Escape") finish(null); };
   input.onblur = () => finish(null);
+  input.enterKeyHint = "go";
+  // On a phone the only way to confirm is Return, and "Done" cancels: a pasted link is the answer.
+  if (linkOnPaste) input.onpaste = () => setTimeout(() => { if (/^https?:\/\/\S+$/.test(input.value.trim())) finish(input.value.trim()); });
   asking = input; notice = ""; document.body.replaceChildren(text, input); input.focus(); input.select();
  });
 }
 async function addHub() {
- const link = await ask("Paste the hub's link (http://127.0.0.1:… or https://<pc>.<tailnet>.ts.net:…):");
+ const link = await ask("Paste the hub's link (http://127.0.0.1:… or https://<pc>.<tailnet>.ts.net:…):", "", true);
  if (!link) return;
  let url; try { url = new URL(link); } catch { notice = "That is not a link."; return render(); }
  if (!["http:", "https:"].includes(url.protocol)) { notice = "Hub links start with http:// or https://."; return render(); }
