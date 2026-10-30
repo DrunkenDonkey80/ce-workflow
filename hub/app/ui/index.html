@@ -22,6 +22,12 @@
  button.win.close:hover { background: #e81123; color: #fff }
  button.win.gear { font-size: 19px; width: 40px }
  button.win b { position: absolute; right: 6px; bottom: 6px; min-width: 9px; height: 9px; border-radius: 5px; background: #e03131; font: 600 9px/9px system-ui; color: #fff; padding: 0 }
+ /* D6 (Apple app, config.wrap): tabs wrap onto 36 px rows instead of running off a narrow screen; the strip reports its height. */
+ body.wrap { height: auto; flex-wrap: wrap }
+ body.wrap > * { height: 36px; -webkit-touch-callout: none }
+ body.wrap #note:empty { display: none }
+ body.wrap #note:not(:empty) { flex-basis: 100%; text-align: left; line-height: 36px }
+ body.wrap #ask { flex-basis: calc(100% - 16px); height: 26px }
  button.win b.count { background: #f59f00; padding: 0 3px; min-width: 7px; height: 12px; line-height: 12px; color: #000 }
 </style></head>
 <body data-tauri-drag-region="deep">
@@ -32,6 +38,9 @@ const { invoke } = window.__TAURI__.core;
 const DEFAULT_ICON = Object.keys(ICONS)[0];
 const URGENCY = ["waiting", "working", "unseen", "scheduled"], DOT = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#339af0" };
 let pinned = false;
+// D7: touch screens have no right-click and a long press would start a drag, so a long press opens the tab menu instead.
+const touch = matchMedia("(pointer: coarse)").matches;
+let pressTimer = 0, pressed = false;
 const WORD = { waiting: "asking", working: "working", unseen: "finished", scheduled: "timer" };
 let tabs = [], active = 0, nextId = 0, dark = null, iconKey = "", dragged = null, startupError = "";
 
@@ -59,9 +68,13 @@ function render() {
   button.append(img, text);
   if (tab.version && older(tab.version, newest)) { const mark = document.createElement("small"); mark.className = "behind"; mark.textContent = "\u2191"; mark.title = `ce-workflow ${tab.version}; ${newest} is out`; button.append(mark); }
   if (!tab.url) { const small = document.createElement("small"); small.textContent = "waiting for the hub"; button.append(small); }
-  button.onclick = () => select(tab.id);
+  button.onclick = () => { if (pressed) pressed = false; else select(tab.id); };
+  if (touch) {
+   button.onpointerdown = () => { pressed = false; clearTimeout(pressTimer); pressTimer = setTimeout(() => { pressed = true; void menu(tab); }, 500); };
+   button.onpointerup = button.onpointercancel = button.onpointerleave = () => clearTimeout(pressTimer);
+  }
   button.oncontextmenu = event => { event.preventDefault(); void menu(tab); };
-  button.draggable = true;
+  button.draggable = !touch;
   button.ondragstart = event => { dragged = tab; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(tab.id)); };
   button.ondragend = () => { dragged = null; };
   button.ondragover = event => { event.preventDefault(); button.classList.add("drop"); };
@@ -94,7 +107,7 @@ async function updateIcons() {
  const big = ink(hubsIconSvg(tabs.map(tab => ({ icon: ICONS[tab.icon] ? tab.icon : DEFAULT_ICON, states: tab.states }))));
  const small = ink(iconSvg(ICONS[local?.icon] ? local.icon : DEFAULT_ICON, URGENCY.filter(s => all.includes(s))));
  try {
-  await invoke("set_icons", { big: await pixels(big, 64), bigSize: 64, small: await pixels(small, 32), smallSize: 32, overlay: pinned && urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="${DOT[urgent]}"/>${number}</svg>`, 16) : null });
+  await invoke("set_icons", { big: await pixels(big, config.bigSize ?? 64), bigSize: config.bigSize ?? 64, count, small: await pixels(small, 32), smallSize: 32, overlay: pinned && urgent ? await pixels(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="${DOT[urgent]}"/>${number}</svg>`, 16) : null });
   await invoke("set_tray", { hubs: tabs.map(tab => [tab.id, `${fullName(tab)}: ${stateWord(tab)}`]), tooltip: ["Pi Hub", ...tabs.map(tab => `${fullName(tab)}: ${stateWord(tab)}`)].join("\n") });
  } catch (error) { console.error(error); }
 }
@@ -191,6 +204,7 @@ async function menu(tab) {
   const item = (text, value) => ({ text, action: () => done(value) });
   void window.__TAURI__.menu.Menu.new({ items: [
    item("Rename…", "rename"), ...(tab.name !== undefined ? [item("Reset name", "reset")] : []),
+   ...(touch && tabs.indexOf(tab) > 0 ? [item("Move left", "left")] : []), ...(touch && tabs.indexOf(tab) < tabs.length - 1 ? [item("Move right", "right")] : []),
    ...(tab.url ? [item("Copy link", "copy"), item("Reload", "reload")] : []),
    ...(tab.hidden ? [item("Unhide", "hide")] : tabs.some(other => other !== tab && !other.hidden) ? [item("Hide", "hide")] : []),
    ...(tab.local ? [] : [{ item: "Separator" }, item("Remove", "remove")]),
@@ -198,6 +212,7 @@ async function menu(tab) {
  });
  if (pick === "reset") { delete tab.name; persist(); render(); }
  if (pick === "reload") open(tab);
+ if (pick === "left" || pick === "right") { const current = tabs[active], from = tabs.indexOf(tab); tabs.splice(from, 1); tabs.splice(from + (pick === "left" ? -1 : 1), 0, tab); active = tabs.indexOf(current); persist(); render(); }
  if (pick === "hide") { tab.hidden = !tab.hidden; persist(); render(); }
  if (pick === "copy") {
   try { await navigator.clipboard.writeText(tab.url); notice = "Link copied."; } catch { notice = tab.url; }
@@ -229,15 +244,17 @@ void window.__TAURI__.window.getCurrentWindow().onFocusChanged(({ payload: focus
 let staged = false, config = {};
 config = await invoke("config");
 dark = config.dark; staged = config.staged; startupError = config.error ?? "";
+document.body.classList.toggle("wrap", !!config.wrap);
 const saved = Array.isArray(config.hubs) ? config.hubs : [];
-tabs = saved.filter(h => h?.local || h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, ...(typeof h.name === "string" ? { name: h.name } : {}), ...(h.hidden ? { hidden: true } : {}) }));
-if (!tabs.some(tab => tab.local)) tabs.unshift(newTab({ local: true, url: config.local }));
+// D12: config.local === false (iPhone, iPad) means no hub runs here: no "This PC" tab, nothing to wait for.
+tabs = saved.filter(h => h?.local ? config.local !== false : h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, ...(typeof h.name === "string" ? { name: h.name } : {}), ...(h.hidden ? { hidden: true } : {}) }));
+if (config.local !== false && !tabs.some(tab => tab.local)) tabs.unshift(newTab({ local: true, url: config.local }));
 for (const tab of tabs) open(tab);
-select((tabs.find(tab => !tab.hidden) ?? tabs[0]).id);
+if (tabs.length) select((tabs.find(tab => !tab.hidden) ?? tabs[0]).id); else render();
 // P-01: the app may start at login before the hub: keep the tab and look for hub.json every few seconds.
 const local = tabs.find(tab => tab.local);
 const wait = setInterval(async () => {
- if (local.url) return clearInterval(wait);
+ if (!local || local.url) return clearInterval(wait);
  const url = await invoke("local_url"); if (url) { local.url = url; open(local); render(); clearInterval(wait); }
 }, 3000);
 setInterval(async () => { const now = await invoke("staged"); if (now !== staged) { staged = now; iconKey = ""; render(); } }, 60_000);
