@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- Session files no longer grow to hundreds of MB. When a session parks, and in the daily cleanup, everything from before its latest compaction that the model never reads again is trimmed: screenshots, long tool output (cut to 500 characters), encrypted thinking signatures, reply diagnostics and earlier compactions' copies of the system prompt. Thinking text and every compaction summary stay. A 235 MB session became 11 MB, so it resumes and opens faster.
+- Opening a session with a long history for the first time since the hub started is faster: its log is read once instead of twice, and not at all for a running session (older chat loads when you scroll up).
+
 ## 0.2.4 — 2026-10-30
 
 ### Added

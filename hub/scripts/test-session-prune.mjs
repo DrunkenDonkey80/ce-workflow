@@ -30,17 +30,21 @@ try {
 	for (const line of fs.readFileSync(files.old, "utf8").trim().split("\n")) assert.equal(trimLine(line), line, "trimming twice changes nothing");
 	// Younger files and parked sessions: only the part before the latest compaction's kept entry is trimmed.
 	const kept = JSON.stringify({ type: "message", id: "k", message: { role: "user", content: [{ type: "image", data: "K".repeat(5000), mimeType: "image/png" }] } });
-	const compaction = JSON.stringify({ type: "compaction", id: "c1", firstKeptEntryId: "k", summary: "s" });
-	const compacted = (name, days) => { const file = path.join(dir, name); fs.writeFileSync(file, [user, tool, kept, compaction].join("\n") + "\n"); const at = new Date(now - days * DAY); fs.utimesSync(file, at, at); return file; };
+	const compaction = JSON.stringify({ type: "compaction", id: "c1", firstKeptEntryId: "k", summary: "s", systemMessage: { role: "system", content: "p" } });
+	const earlier = JSON.stringify({ type: "compaction", id: "c0", summary: "first", systemMessage: { role: "system", content: "p" } });
+	const reply = JSON.stringify({ type: "message", id: "a", message: { role: "assistant", content: [{ type: "thinking", thinking: "why", thinkingSignature: "S".repeat(900) }], diagnostics: [{ type: "x" }] } });
+	const compacted = (name, days) => { const file = path.join(dir, name); fs.writeFileSync(file, [user, tool, earlier, reply, kept, compaction].join("\n") + "\n"); const at = new Date(now - days * DAY); fs.utimesSync(file, at, at); return file; };
 	const daily = compacted("daily.jsonl", 3), recent = compacted("recent.jsonl", 0.01), parked = compacted("parked.jsonl", 0.01);
 	assert.equal((await pruneSessions({ byFile: () => true }, root, { now, moveToTrash: async () => {} })).trimmed, 1, "only the 3-day file; the one written minutes ago waits");
 	assert(await trimCompacted(parked) > 0, "a parked session is trimmed right away");
 	for (const file of [daily, parked]) {
-		const [u2, t2, k2, c2] = fs.readFileSync(file, "utf8").trim().split("\n");
+		const [u2, t2, e2, a2, k2, c2] = fs.readFileSync(file, "utf8").trim().split("\n");
 		assert.deepEqual(JSON.parse(u2).message.content[1], { type: "text", text: "[image removed]" }); assert.equal(t2, trimLine(tool));
+		assert.deepEqual(JSON.parse(e2), { type: "compaction", id: "c0", summary: "first" }, "an earlier summary stays, its system prompt copy goes");
+		assert.deepEqual(JSON.parse(a2).message, { role: "assistant", content: [{ type: "thinking", thinking: "why" }] }, "old thinking keeps its text only");
 		assert.equal(k2, kept, "the kept entry and what follows stay whole"); assert.equal(c2, compaction);
 	}
-	assert.equal(fs.readFileSync(recent, "utf8"), [user, tool, kept, compaction].join("\n") + "\n");
+	assert.equal(fs.readFileSync(recent, "utf8"), [user, tool, earlier, reply, kept, compaction].join("\n") + "\n");
 	fs.writeFileSync(files.fresh + ".lock", JSON.stringify({ pid: process.pid, owner: "t", startedAt: Date.now() }));
 	assert.equal(await trimCompacted(files.fresh), 0, "never while Pi holds the file"); fs.rmSync(files.fresh + ".lock");
 	// Linux: the Trash holds the deleted sessions; Empty removes only those, never other trashed files.

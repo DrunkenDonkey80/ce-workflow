@@ -14,10 +14,12 @@ import { holderAlive, readLock } from "./session-lock.ts";
 
 const HOUR = 3_600_000, DAY = 86_400_000, TRIM_DAYS = 14, DELETE_DAYS = 30, KEEP = 500;
 
-function trimContent(content: unknown[], tool: boolean) {
+function trimContent(content: unknown[], tool: boolean, old: boolean) {
 	let changed = false;
 	const parts = content.map((part: any) => {
 		if (part?.type === "image") { changed = true; return { type: "text", text: "[image removed]" }; }
+		// The encrypted reasoning only replays an exact earlier request; the readable thinking stays.
+		if (old && part?.type === "thinking" && "thinkingSignature" in part) { changed = true; const { thinkingSignature: _, ...rest } = part; return rest; }
 		// +100: an already trimmed text (500 plus the note) is left alone.
 		if (tool && part?.type === "text" && typeof part.text === "string" && part.text.length > KEEP + 100) {
 			changed = true; return { ...part, text: `${part.text.slice(0, KEEP)}\n[… ${part.text.length - KEEP} more characters trimmed]` };
@@ -27,17 +29,24 @@ function trimContent(content: unknown[], tool: boolean) {
 	return changed ? parts : null;
 }
 
-/** One JSONL line, trimmed; the same string when there is nothing to trim. */
-export function trimLine(line: string) {
-	if (!line.includes('"image"') && !line.includes('"toolResult"')) return line;
+/**
+ * One JSONL line, trimmed; the same string when there is nothing to trim. `old`: the line is before the latest
+ * compaction, so thinking signatures, reply diagnostics and earlier compactions' system prompt copies go too
+ * (Pi rebuilds context from the latest compaction's own copy).
+ */
+export function trimLine(line: string, old = false) {
+	if (!line.includes('"image"') && !line.includes('"toolResult"') && !(old && /"(thinkingSignature|diagnostics|systemMessage)"/.test(line))) return line;
 	let entry; try { entry = JSON.parse(line); } catch { return line; }
+	if (old && entry?.type === "compaction" && "systemMessage" in entry) { delete entry.systemMessage; return JSON.stringify(entry); }
 	const message = entry?.message;
 	if (!message || !Array.isArray(message.content)) return line;
-	const tool = message.role === "toolResult", content = trimContent(message.content, tool);
+	const tool = message.role === "toolResult", content = trimContent(message.content, tool, old);
 	const details = tool && message.details && !(Object.keys(message.details).length === 1 && typeof message.details.diff === "string" && message.details.diff.length <= 2000);
-	if (!content && !details) return line;
+	const diagnostics = old && "diagnostics" in message;
+	if (!content && !details && !diagnostics) return line;
 	// Only an edit's diff survives from details, clipped: the hub chat shows it.
 	entry.message = { ...message, ...content && { content }, ...details && { details: typeof message.details.diff === "string" ? { diff: message.details.diff.slice(0, 2000) } : undefined } };
+	if (diagnostics) delete entry.message.diagnostics;
 	return JSON.stringify(entry);
 }
 
@@ -52,15 +61,15 @@ async function compactedUpTo(file: string) {
 
 /** Trims the whole file, or with `compacted` only the part before the latest compaction's kept entries. */
 async function trimFile(file: string, compacted = false) {
-	const kept = compacted ? await compactedUpTo(file) : undefined;
+	const kept = await compactedUpTo(file);
 	if (compacted && !kept) return 0;
 	const before = statSync(file), temp = `${file}.${process.pid}.trim`;
 	const out = createWriteStream(temp);
-	let changed = false, trimming = true;
+	let changed = false, old = !!kept;
 	try {
 		for await (const line of lines(file)) {
-			if (kept && trimming && line.includes(`"id":"${kept}"`)) trimming = false;
-			const next = trimming ? trimLine(line) : line; if (next !== line) changed = true;
+			if (old && line.includes(`"id":"${kept}"`)) old = false;
+			const next = old || !compacted ? trimLine(line, old) : line; if (next !== line) changed = true;
 			if (!out.write(next + "\n")) await new Promise<void>(resolve => out.once("drain", () => resolve()));
 		}
 		out.end(); await finished(out);
