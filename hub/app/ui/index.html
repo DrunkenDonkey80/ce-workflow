@@ -267,7 +267,7 @@ config = await invoke("config");
 dark = config.dark; staged = config.staged; startupError = config.error ?? "";
 document.body.classList.toggle("wrap", !!config.wrap);
 const saved = Array.isArray(config.hubs) ? config.hubs : [];
-// D12: config.local === false (iPhone, iPad) means no hub runs here: no "This PC" tab, nothing to wait for.
+// D12: config.local === false (iPhone, iPad, a PC that never had a hub) means no hub runs here: no "This PC" tab, nothing to wait for.
 tabs = saved.filter(h => h?.local ? config.local !== false : h?.url).map(h => newTab({ local: !!h.local, url: h.local ? config.local : h.url, ...(typeof h.name === "string" ? { name: h.name } : {}), ...(h.hidden ? { hidden: true } : {}) }));
 if (config.local !== false && !tabs.some(tab => tab.local)) tabs.unshift(newTab({ local: true, url: config.local }));
 for (const tab of tabs) open(tab);

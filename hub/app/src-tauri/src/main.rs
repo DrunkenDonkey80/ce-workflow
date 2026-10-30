@@ -364,7 +364,7 @@ fn go(app: AppHandle, id: u32, session: String) {
 
 #[tauri::command]
 fn config(state: tauri::State<Startup>) -> Value {
-    json!({ "hubs": app_config()["hubs"], "local": local_hub_url(), "dark": taskbar_dark(), "staged": next_file().exists(), "frame": FRAME, "version": env!("CARGO_PKG_VERSION"), "error": state.error })
+    json!({ "hubs": app_config()["hubs"], "local": if hub_data().exists() { json!(local_hub_url()) } else { json!(false) }, "dark": taskbar_dark(), "staged": next_file().exists(), "frame": FRAME, "version": env!("CARGO_PKG_VERSION"), "error": state.error })
 }
 #[tauri::command]
 fn local_url() -> Option<String> {

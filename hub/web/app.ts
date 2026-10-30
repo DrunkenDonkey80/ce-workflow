@@ -1494,7 +1494,7 @@ async function loadSessions() {
  try {
   const { groups, recents, settings } = await get("sessions") as { groups: Group[]; recents: Recent[]; settings?: HubSettings };
   const uacBefore = !!hubSettings.uac;
-  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); ($("hub-collapse") as HTMLSelectElement).value = String(hubSettings.collapseHours ?? 48); renderUsageProviders(); renderNotify(); renderUpdates(); checkWhatsNew();
+  hubSettings = settings ?? {}; ($("hub-park") as HTMLSelectElement).value = String(hubSettings.idleParkMinutes ?? 10); ($("hub-collapse") as HTMLSelectElement).value = String(hubSettings.collapseHours ?? 48); renderUsageProviders(); renderNotify(); renderUpdates(); renderAppDownload(); checkWhatsNew();
   if (!!hubSettings.uac !== uacBefore) notifyUac(!!hubSettings.uac);
   notifyChanges(groups);
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
@@ -2343,6 +2343,13 @@ function renderApp(app: AppStatus) {
  $("app-uninstall").hidden = !app.installed;
  const start = $("app-start") as HTMLButtonElement;
  start.hidden = !app.installed; start.textContent = app.running ? "Stop" : "Start";
+}
+// A browser on another computer (no key, not the app, not a phone): the app's download, used there only to view hubs.
+function renderAppDownload() {
+ if (token || inApp() || !hubSettings.version || /Android|iPhone|iPad/.test(navigator.userAgent)) return;
+ const base = `https://github.com/DrunkenDonkey80/ce-workflow/releases/download/app-v${hubSettings.version}/`, link = (text: string, file: string) => html("a", { href: base + file, textContent: text, className: "chat-link" });
+ $("app-group").hidden = false; $("app-actions").hidden = true;
+ $("app-status").replaceChildren("View your hubs from this computer: download for ", link("Windows", "pi-hub-app-windows-x64.exe"), " or ", link("Linux", "pi-hub-app-linux-x64.AppImage"), ", add this hub with + and pair it.");
 }
 async function appAction(body: Record<string, unknown>, busy?: string) {
  if (busy) $("app-status").textContent = busy;
