@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- Pi Hub for iPhone, iPad and Apple Silicon Mac (`hub/apple`): the desktop app's tabs in a native app you sign yourself. The Mac app has a live Dock icon with a badge and a menu bar item; iPhone and iPad view your other hubs with an icon badge. Hub notifications become native ones. Build with `hub/apple/build.sh` (see hub/README.md).
+- The desktop tab strip can wrap onto several rows and opens the tab menu on a long press on touch screens (used by the Apple app only).
+
 ## 0.2.7 — 2026-10-30
 
 ### Fixed

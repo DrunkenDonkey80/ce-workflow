@@ -47,6 +47,22 @@ overlay and the tray (asking red, working amber, finished-unseen blue), even wit
   (`.github/workflows/app-release.yml`, which stamps that version into the app).
   Local build: `cargo tauri build --no-bundle` in `hub/app/src-tauri`. To try it in the installed app, `node hub/app/dev-restart.mjs` builds, stages and restarts the app onto it (the next release update replaces it).
 
+## Pi Hub for iPhone, iPad and Mac
+
+`hub/apple` is a native Swift app (one Xcode target, iOS 17+ and macOS 14+) that runs the desktop app's own tab strip
+(`hub/app/ui/index.html`, through `shim.js`) with one WKWebView per hub. Not on the App Store: you build and sign it yourself.
+
+- Build: `hub/apple/build.sh` signs the Mac app with your Apple Development identity and copies it to `~/Applications/Pi Hub.app`,
+  and builds the simulator app. `IOS_PROFILE="<In-House profile name>" hub/apple/build.sh` also builds the signed iPhone/iPad app
+  (an In-House or development profile for `dev.ce-workflow.pi-hub-app`); install it with `xcrun devicectl device install app`.
+  The first launch on a device needs Settings > General > VPN & Device Management > Trust.
+- Mac: this Mac's hub is the first tab. The Dock icon redraws with the hubs' states, its badge counts what needs you, it bounces
+  when something new does, and a menu bar item lists the hubs. Closing the window keeps it running there; Cmd+1…9 switch tabs.
+- iPhone and iPad only view other hubs (no "This PC" tab): `+` adds one by its link, then pair it once on that PC's hub page.
+  The app's icon badge counts what needs you, while the app is open (no push).
+- Tabs wrap onto more rows when they don't fit. On touch screens a long press opens the tab menu, with Move left and Move right.
+- The hub page's notifications (a question waits, a run finished) become native notifications; tapping one opens that hub.
+
 ## Development
 
 Node 24; no install step of its own (ce-workflow's `npm install` covers the imported modules). `npm test` runs `scripts/test-*.mjs`; `scripts/fake-pi.mjs` stands in for `pi --mode rpc`.
