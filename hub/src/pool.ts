@@ -18,8 +18,10 @@ export function findCpool(dir = agentDir()): string | undefined {
 		const source = typeof entry === "string" ? entry : (entry as { source?: unknown })?.source;
 		if (typeof source !== "string") continue;
 		const bare = (value: string) => value.replace(/(?<=.)@[^/@]*$/, ""); // drop a version pin
+		// Pi treats an https:// or ssh:// URL as a git source too, cloned to git/<host>/<path>.
+		const git = source.startsWith("git:") ? source.slice(4) : /^(https?|ssh):\/\//.test(source) ? source.replace(/^[a-z]+:\/\/([^@/]*@)?/, "").replace(/\.git$/, "") : undefined;
 		const folder = source.startsWith("npm:") ? path.join(dir, "npm", "node_modules", bare(source.slice(4)))
-			: source.startsWith("git:") ? path.join(dir, "git", ...bare(source.slice(4)).split("/"))
+			: git ? path.join(dir, "git", ...bare(git).split("/"))
 			: /^[a-z][a-z0-9+.-]+:(?![\\/])/i.test(source) ? undefined : path.resolve(dir, source);
 		if (!folder) continue;
 		try {

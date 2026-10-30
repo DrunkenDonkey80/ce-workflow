@@ -26,6 +26,11 @@ const waitFor = async (test, what) => { for (let i = 0; i < 100 && !test(); i++)
 delete process.env.PI_HUB_CPOOL;
 assert.equal(findCpool(agent), cpool, "relative package path from settings.json");
 assert.equal(findCpool(path.join(root, "nowhere")), undefined);
+// A package installed from an https URL lives under git/<host>/<path>, like git: sources.
+const urlAgent = path.join(root, "url-agent"), urlPkg = path.join(urlAgent, "git", "github.com", "me", "claude-ex");
+fs.mkdirSync(path.join(urlPkg, "bin"), { recursive: true }); fs.copyFileSync(cpool, path.join(urlPkg, "bin", "cpool.mjs")); fs.copyFileSync(path.join(pkg, "package.json"), path.join(urlPkg, "package.json"));
+fs.writeFileSync(path.join(urlAgent, "settings.json"), JSON.stringify({ packages: ["https://github.com/me/claude-ex"] }));
+assert.equal(findCpool(urlAgent), path.join(urlPkg, "bin", "cpool.mjs"), "https package URL");
 
 // Absent claudeex: no view, and actions say so.
 process.env.PI_CODING_AGENT_DIR = path.join(root, "nowhere"); // the default lookup must not find this PC's real claudeex
