@@ -10,6 +10,12 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Fixed
 - The desktop app's taskbar icon no longer counts the session you have open twice while it works: one working session is one yellow segment, not two.
 
+## 0.2.10 — 2026-10-30
+
+### Fixed
+- The hub's memory graph on a Mac shows how full memory really is (the memory pressure Activity Monitor shows) instead of always about 99%. macOS keeps spare RAM filled with cache, which the old count took for used memory.
+- Clicking the Claude usage bar opens the usage window on a hub that has no Claude account pool (such as a Mac). Before, nothing happened.
+
 ## 0.2.9 — 2026-10-30
 
 ### Added
