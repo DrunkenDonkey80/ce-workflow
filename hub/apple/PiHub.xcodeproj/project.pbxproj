@@ -105,6 +105,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Pi Hub";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The hub page's microphone button dictates into a session.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "The hub page's microphone button turns speech into text.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -136,6 +137,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Pi Hub";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "The hub page's microphone button dictates into a session.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "The hub page's microphone button turns speech into text.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
