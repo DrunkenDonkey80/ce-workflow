@@ -2,7 +2,7 @@
 // Plans, diagrams, files and images are read here with ce-workflow's Pi-free modules, so they also work while parked;
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
-import { execFile, spawn } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { mkdirSync, statSync } from "node:fs";
 import os from "node:os";
 import { promisify } from "node:util";
@@ -494,9 +494,15 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 // PC load for the page's CPU/memory graph: CPU is the busy share of all cores since the previous call.
 const cpuTimes = () => os.cpus().reduce((sum, { times }) => ({ idle: sum.idle + times.idle, total: sum.total + times.user + times.nice + times.sys + times.irq + times.idle }), { idle: 0, total: 0 });
 let lastCpu = cpuTimes();
+// macOS keeps RAM full of cache, so os.freemem() reads ~99% used; the kernel's memory-pressure level (as in Activity Monitor) says how full it really is.
+const macUsed = (out: string) => Number(out) > 0 ? 100 - Number(out) : undefined;
+let macMemory: number | undefined;
+if (process.platform === "darwin") try { macMemory = macUsed(execFileSync("sysctl", ["-n", "kern.memorystatus_level"], { encoding: "utf8" })); } catch { /* falls back to os.freemem */ }
+const readMacMemory = () => execFile("sysctl", ["-n", "kern.memorystatus_level"], (error, out) => { if (!error) macMemory = macUsed(out) ?? macMemory; });
 export function systemLoad() {
 	const now = cpuTimes(), total = now.total - lastCpu.total, idle = now.idle - lastCpu.idle; lastCpu = now;
-	return { cpu: total > 0 ? Math.round(100 * (1 - idle / total)) : 0, memory: Math.round(100 * (1 - os.freemem() / os.totalmem())) };
+	if (process.platform === "darwin") readMacMemory(); // answers the next call
+	return { cpu: total > 0 ? Math.round(100 * (1 - idle / total)) : 0, memory: macMemory ?? Math.round(100 * (1 - os.freemem() / os.totalmem())) };
 }
 
 /** The 5 programs using the most CPU (% of all cores) and memory (bytes), same-name processes added up, for the graphs' hover. */
