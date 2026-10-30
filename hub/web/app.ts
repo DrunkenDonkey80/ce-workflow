@@ -1429,13 +1429,13 @@ let hubSettings: HubSettings = {}, appBadge = 0, attentionList: HubSession[] = [
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
  const states = [...sessionStates];
- if (promptView.busy || state.activity.dialog) states.push("waiting");
  // A question replaces this session's working tone: one session asking is red only, not red and orange.
- else if (state.activity.working || state.activity.subagents?.length || ownTone === "working") states.push("working");
+ const own = promptView.busy || state.activity.dialog ? "waiting" : state.activity.working || state.activity.subagents?.length || ownTone === "working" ? "working" : "";
+ if (own) states.push(own);
  // An installed app's taskbar/dock icon is fixed at install; its badge is the only live part (Chromium, Safari): a mark while
  // count of what needs you (questions, finished sessions you haven't opened); colours are impossible there. Working has no badge.
  if (inApp()) {
-  const tones = [...states, ownTone].filter(tone => ["waiting", "working", "unseen", "scheduled"].includes(tone)); // the app has no page in front: own unseen counts
+  const tones = [...states, ...own ? [] : [ownTone]].filter(tone => ["waiting", "working", "unseen", "scheduled"].includes(tone)); // the app has no page in front: own unseen counts
   // attention: how many things need you, for the app's badge on a pinned button.
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
   const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: tones, attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,

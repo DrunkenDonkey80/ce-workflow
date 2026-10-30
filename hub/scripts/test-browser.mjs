@@ -402,7 +402,7 @@ try {
  await browser("click", "#zoom-fit"); await browser("click", "#zoom-in");
  const strokeBefore = await evaluate("document.querySelector(\"[data-node=web_client] path\").getAttribute(\"d\")");
  const panBefore = await evaluate("document.getElementById(\"diagram\").firstElementChild.getAttribute(\"transform\")");
- const canvasTop = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().top)"), canvasLeft = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().left)");
+ const canvasLeft = await evaluate("Math.round(document.getElementById(\"diagram\").getBoundingClientRect().left)");
  // Start the pan on a point no box covers (the tab bar height moves what fit puts at the corner).
  const [panX, panY] = await evaluate("(() => { const r = document.getElementById('diagram').getBoundingClientRect(); for (let y = r.top + 8; y < r.bottom; y += 12) for (let x = r.left + 8; x < r.right; x += 12) { const hit = document.elementFromPoint(x, y); if (hit?.closest('#diagram') && !hit.closest('[data-node]:not(.group-node), [data-edge], [data-note]')) return [Math.round(x), Math.round(y)]; } })()");
  await browser("mouse", "move", String(panX), String(panY)); await browser("mouse", "down", "left");
@@ -819,6 +819,10 @@ try {
  // H-02 (D5): inside the desktop app the title is a machine line; this session's own finished run counts while unfocused.
  assert(!(await evaluate("document.title")).startsWith("pi-hub-state"), "a normal browser keeps its own title");
  await evaluate("(() => { Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 PiHubApp/0.1.0' }); document.hasFocus = () => false; })()");
+ // The open session working is one working tone, not two (its live activity and its sidebar tone are the same session).
+ await hub.host.live.get(id).rpc.send({ type: "prompt", message: "hold" });
+ await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.filter(s => s === 'working').length === 1 && document.title.includes('\"session\"')");
+ await hub.host.live.get(id).rpc.send({ type: "abort" });
  await hub.host.prompt(id, "app");
  await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.join() === 'unseen'");
  const line = JSON.parse((await evaluate("document.title")).slice(13));

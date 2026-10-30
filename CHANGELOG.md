@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+- The desktop app's taskbar icon no longer counts the session you have open twice while it works: one working session is one yellow segment, not two.
+
 ## 0.2.9 — 2026-10-30
 
 ### Added
