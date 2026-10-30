@@ -12,7 +12,8 @@ struct PiHubApp: App {
     #else
     var body: some Scene {
         WindowGroup {
-            HubView().ignoresSafeArea(.container, edges: .bottom)
+            // The web views handle the keyboard themselves (as in Safari); SwiftUI shrinking them too left a blank gap.
+            HubView().ignoresSafeArea([.container, .keyboard], edges: .bottom)
         }.commands { HubCommands() }
     }
     #endif

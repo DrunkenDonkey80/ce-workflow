@@ -18,3 +18,5 @@
  window.Notification = PiHubNotification;
  window.__piHubClicked = key => { const note = notes.get(key); if (!note) return; const event = new Event("click"); note.onclick?.(event); note.dispatchEvent(event); };
 })();
+// iOS zooms the page in when a text box under 16 px gets focus and leaves it cut off at the right; maximum-scale stops that.
+addEventListener("DOMContentLoaded", () => { const meta = document.querySelector('meta[name="viewport"]'); if (meta && !/maximum-scale/.test(meta.content)) meta.content += ", maximum-scale=1"; });
