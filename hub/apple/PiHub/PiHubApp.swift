@@ -65,6 +65,8 @@ final class MacApp: NSObject, NSApplicationDelegate {
         status.menu = menu
     }
 
+    var trayTitles: [String] { status.menu?.items.map(\.title) ?? [] }
+
     func showWindow() {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

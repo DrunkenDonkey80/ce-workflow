@@ -49,7 +49,7 @@ final class Hub: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDelegate
             target?.evaluateJavaScript(lines.count > 1 ? lines[1] : "") { result, error in
                 var out = "\(result ?? error ?? "nil")"
                 #if os(macOS)
-                out += "\nbadge=\(NSApp.dockTile.badgeLabel ?? "") hubs=\(self.hubs.keys.sorted()) shown=\(self.hubs.filter { !$0.value.isHidden }.keys.sorted()) strip=\(self.container.stripHeight)"
+                out += "\ntray=\(MacApp.shared?.trayTitles ?? [])\nbadge=\(NSApp.dockTile.badgeLabel ?? "") hubs=\(self.hubs.keys.sorted()) shown=\(self.hubs.filter { !$0.value.isHidden }.keys.sorted()) strip=\(self.container.stripHeight)"
                 if let tiff = NSApp.applicationIconImage.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
                     try? png.write(to: dir.appendingPathComponent("pihub-dock.png"))
                 }
