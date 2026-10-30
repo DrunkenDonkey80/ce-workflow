@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { pruneSessions, sessionTrash, trash, trimLine } from "../src/session-prune.ts";
+import { pruneSessions, sessionTrash, trash, trimCompacted, trimLine } from "../src/session-prune.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-prune-")), dir = path.join(root, "--C--proj--");
 const now = Date.now(), DAY = 86_400_000;
@@ -28,6 +28,21 @@ try {
 	assert(fs.statSync(files.starred).size < 2000, "a sidebar session is trimmed, never deleted");
 	assert.equal(fs.readFileSync(files.fresh, "utf8").length, [user, tool, edit].join("\n").length + 1, "fresh files are untouched");
 	for (const line of fs.readFileSync(files.old, "utf8").trim().split("\n")) assert.equal(trimLine(line), line, "trimming twice changes nothing");
+	// Younger files and parked sessions: only the part before the latest compaction's kept entry is trimmed.
+	const kept = JSON.stringify({ type: "message", id: "k", message: { role: "user", content: [{ type: "image", data: "K".repeat(5000), mimeType: "image/png" }] } });
+	const compaction = JSON.stringify({ type: "compaction", id: "c1", firstKeptEntryId: "k", summary: "s" });
+	const compacted = (name, days) => { const file = path.join(dir, name); fs.writeFileSync(file, [user, tool, kept, compaction].join("\n") + "\n"); const at = new Date(now - days * DAY); fs.utimesSync(file, at, at); return file; };
+	const daily = compacted("daily.jsonl", 3), recent = compacted("recent.jsonl", 0.01), parked = compacted("parked.jsonl", 0.01);
+	assert.equal((await pruneSessions({ byFile: () => true }, root, { now, moveToTrash: async () => {} })).trimmed, 1, "only the 3-day file; the one written minutes ago waits");
+	assert(await trimCompacted(parked) > 0, "a parked session is trimmed right away");
+	for (const file of [daily, parked]) {
+		const [u2, t2, k2, c2] = fs.readFileSync(file, "utf8").trim().split("\n");
+		assert.deepEqual(JSON.parse(u2).message.content[1], { type: "text", text: "[image removed]" }); assert.equal(t2, trimLine(tool));
+		assert.equal(k2, kept, "the kept entry and what follows stay whole"); assert.equal(c2, compaction);
+	}
+	assert.equal(fs.readFileSync(recent, "utf8"), [user, tool, kept, compaction].join("\n") + "\n");
+	fs.writeFileSync(files.fresh + ".lock", JSON.stringify({ pid: process.pid, owner: "t", startedAt: Date.now() }));
+	assert.equal(await trimCompacted(files.fresh), 0, "never while Pi holds the file"); fs.rmSync(files.fresh + ".lock");
 	// Linux: the Trash holds the deleted sessions; Empty removes only those, never other trashed files.
 	const platform = process.platform; Object.defineProperty(process, "platform", { value: "linux" }); process.env.XDG_DATA_HOME = path.join(root, "data");
 	try {

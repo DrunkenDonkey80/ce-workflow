@@ -1,5 +1,6 @@
-// Daily cleanup of Pi's session files. Untouched for 14 days: images and long tool output are trimmed (the file stays
-// resumable); subagent forks are deleted. Untouched for 30 days: deleted. Sessions in the hub sidebar are only trimmed.
+// Daily cleanup of Pi's session files. Younger files, and each session the hub parks: only the part before the latest
+// compaction is trimmed (the model never reads it again). Untouched for 14 days: images and long tool output are trimmed
+// throughout (the file stays resumable); subagent forks are deleted. Untouched for 30 days: deleted. Sessions in the hub sidebar are only trimmed.
 // Deleted files go to the Recycle Bin (the freedesktop Trash on Linux). Age is the last write, and a trimmed file keeps its old one.
 import { execFile } from "node:child_process";
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
@@ -11,7 +12,7 @@ import { promisify } from "node:util";
 import type { Registry } from "./registry.ts";
 import { holderAlive, readLock } from "./session-lock.ts";
 
-const DAY = 86_400_000, TRIM_DAYS = 14, DELETE_DAYS = 30, KEEP = 500;
+const HOUR = 3_600_000, DAY = 86_400_000, TRIM_DAYS = 14, DELETE_DAYS = 30, KEEP = 500;
 
 function trimContent(content: unknown[], tool: boolean) {
 	let changed = false;
@@ -40,19 +41,33 @@ export function trimLine(line: string) {
 	return JSON.stringify(entry);
 }
 
-async function trimFile(file: string) {
+const lines = (file: string) => createInterface({ input: createReadStream(file), crlfDelay: Infinity });
+
+/** The entry the latest compaction keeps from: everything before it never reaches the model again. */
+async function compactedUpTo(file: string) {
+	let kept: string | undefined;
+	for await (const line of lines(file)) if (line.includes('"compaction"')) try { const entry = JSON.parse(line); if (entry.type === "compaction" && entry.firstKeptEntryId) kept = entry.firstKeptEntryId; } catch { /* a torn line */ }
+	return kept;
+}
+
+/** Trims the whole file, or with `compacted` only the part before the latest compaction's kept entries. */
+async function trimFile(file: string, compacted = false) {
+	const kept = compacted ? await compactedUpTo(file) : undefined;
+	if (compacted && !kept) return 0;
 	const before = statSync(file), temp = `${file}.${process.pid}.trim`;
 	const out = createWriteStream(temp);
-	let changed = false;
+	let changed = false, trimming = true;
 	try {
-		for await (const line of createInterface({ input: createReadStream(file), crlfDelay: Infinity })) {
-			const next = trimLine(line); if (next !== line) changed = true;
+		for await (const line of lines(file)) {
+			if (kept && trimming && line.includes(`"id":"${kept}"`)) trimming = false;
+			const next = trimming ? trimLine(line) : line; if (next !== line) changed = true;
 			if (!out.write(next + "\n")) await new Promise<void>(resolve => out.once("drain", () => resolve()));
 		}
 		out.end(); await finished(out);
 		const now = statSync(file);
-		// Written meanwhile (someone resumed it): keep theirs.
-		if (!changed || now.mtimeMs !== before.mtimeMs || now.size !== before.size) { rmSync(temp, { force: true }); return 0; }
+		// Written meanwhile or opened again (someone resumed it): keep theirs.
+		const lock = readLock(file);
+		if (!changed || now.mtimeMs !== before.mtimeMs || now.size !== before.size || (lock && holderAlive(lock))) { rmSync(temp, { force: true }); return 0; }
 		const saved = before.size - statSync(temp).size;
 		utimesSync(temp, before.atime, before.mtime);
 		renameSync(temp, file);
@@ -93,15 +108,27 @@ function sessionFiles(dir: string): string[] {
 	});
 }
 
+/** A session Pi just closed (the hub parked it): its compacted part, which no model turn reads again, is trimmed now. */
+export async function trimCompacted(file: string) {
+	const lock = readLock(file);
+	return lock && holderAlive(lock) ? 0 : trimFile(file, true);
+}
+
 export async function pruneSessions(registry: Pick<Registry, "byFile">, sessionsDir: string, { now = Date.now(), moveToTrash = trash } = {}) {
 	const doomed: string[] = [];
 	let trimmed = 0, saved = 0;
 	for (const file of sessionFiles(sessionsDir)) {
 		let stats; try { stats = statSync(file); } catch { continue; }
 		const age = (now - stats.mtimeMs) / DAY;
-		if (age < TRIM_DAYS) continue;
 		const lock = readLock(file);
 		if (lock && holderAlive(lock)) continue; // open in Pi right now
+		// Younger files: only their compacted part, and not within the hour (a Pi without the lock may still be writing).
+		if (age < TRIM_DAYS) {
+			if (now - stats.mtimeMs < HOUR) continue;
+			try { const bytes = await trimFile(file, true); if (bytes > 0) { trimmed++; saved += bytes; } }
+			catch (error) { console.error(`session cleanup: ${file}: ${(error as Error).message}`); }
+			continue;
+		}
 		const kept = !!registry.byFile(file), fork = file.split(path.sep).includes("forks");
 		if (!kept && (fork || age >= DELETE_DAYS)) { doomed.push(file); continue; }
 		try { const bytes = await trimFile(file); if (bytes > 0) { trimmed++; saved += bytes; } }

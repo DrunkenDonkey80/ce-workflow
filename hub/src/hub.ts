@@ -28,7 +28,7 @@ import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 import { sendExplored } from "./explore.ts";
-import { pruneSessions, sessionTrash } from "./session-prune.ts";
+import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
 import { createAutoUpdate } from "./auto-update.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string; collapseHours?: number; attentionKey?: string };
@@ -135,7 +135,12 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	}
 	host.on("event", (id: string, event) => views.get(id)?.feed(event));
 	// A child that ends mid-run never sends agent_settled; settle the page's activity so it stops showing work.
-	host.on("exit", (id: string) => views.get(id)?.feed({ type: "agent_settled", aborted: true }));
+	host.on("exit", (id: string) => {
+		views.get(id)?.feed({ type: "agent_settled", aborted: true });
+		// Parked: the compacted part of its file (screenshots, mostly) is trimmed, so resumes and the page read less.
+		const file = registry.get(id)?.sessionFile;
+		if (file) void trimCompacted(file).then(bytes => { if (bytes) console.log(`${new Date().toISOString()} trimmed ${registry.get(id)?.name ?? id}: ${Math.round(bytes / 1e6)} MB`); }, error => console.error(`session trim: ${file}: ${(error as Error).message}`));
+	});
 	// The sidebar shows every session's state: tell all open pages when one changes, instead of waiting for their 5-15 s poll.
 	let sessionsTimer: NodeJS.Timeout | undefined;
 	const sessionsChanged = () => { sessionsTimer ??= setTimeout(() => { sessionsTimer = undefined; for (const value of views.values()) value.publish("sessions", {}); }, 200); };
