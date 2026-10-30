@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+- Screenshots read through the vision model (process_image) no longer come back as a narrow answer that hides the page: every answer now starts with a transcript of all visible text, table rows, form fields and buttons laid out like the screen, then answers the question. Before, a question that expected another page got only "this is not that page", without what was actually on it.
+
 ## 0.2.7 — 2026-10-30
 
 ### Fixed
