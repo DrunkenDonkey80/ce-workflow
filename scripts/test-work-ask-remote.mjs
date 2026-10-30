@@ -16,46 +16,31 @@ const pi = {
 const question = { question: "Ship?", options: [{ title: "Ship" }, { title: "Hold" }], allowMultiple: false, allowFreeform: false };
 const askId = "11111111-2222-3333-4444-555555555555";
 const inbound = (text, from = "monitor", extra = {}) => hooks.get("message_end")?.({ message: { customType: "intercom_message", details: { from: { id: from }, bodyText: text, ...extra } } });
-const old = process.env.PI_ASK_USER_REMOTE_ANSWERS;
-try {
-	delete process.env.PI_ASK_USER_REMOTE_ANSWERS;
-	registerRemoteAskAnswers(pi);
-	assert.equal(bus.listenerCount("ask:pending"), 0, "intercom opt-in remains gated");
-	process.env.PI_ASK_USER_REMOTE_ANSWERS = "1";
-	registerRemoteAskAnswers(pi);
-	bus.on("intercom:outbox-request", event => outbox.push(event));
-	bus.on("ask:answer", event => answers.push(event));
-	bus.emit("ask:pending", { ...question, askId });
-	assert.equal(outbox.length, 0);
-	inbound("hello");
-	assert.equal(outbox.length, 1);
-	assert.equal(outbox[0].to, "monitor");
-	assert(outbox[0].message.includes(`ANSWER ${askId}:`));
-	for (const [from, extra] of [["other", {}], ["monitor", { crossMachine: {} }], ["monitor", { message: { crossMachine: {} } }]]) inbound(`ANSWER ${askId}: Ship`, from, extra);
-	assert.equal(answers.length, 0, "only the forwarded local peer can answer");
-	inbound(`ANSWER ${askId}: Hold`);
-	assert.deepEqual(answers.pop(), { askId, text: "Hold" });
-	bus.emit("ask:closed", { askId });
-	const before = outbox.length;
-	inbound("hello");
-	assert.equal(outbox.length, before);
-	bus.emit("ask:pending", { ...question, askId, allowMultiple: true });
-	inbound(`ANSWER ${askId}: Ship | Hold`);
-	assert.deepEqual(answers.pop(), { askId, selections: ["Ship", "Hold"] });
-	bus.emit("ask:closed", { askId });
-	const batch = [{ status: "answered", response: { kind: "selection", selections: ["Ship"] } }, { status: "skipped" }];
-	bus.emit("ask:pending", { askId, questions: [question, question] });
-	assert(outbox.at(-1).message.includes("answers"));
-	inbound(`ANSWER ${askId}: ${JSON.stringify({ answers: batch })}`);
-	assert.deepEqual(answers.pop(), { askId, answers: batch });
-	hooks.get("session_shutdown")();
-	const afterShutdown = outbox.length;
-	inbound(`ANSWER ${askId}: Ship`);
-	assert.equal(outbox.length, afterShutdown, "shutdown discards pending requests");
-	assert.equal(answers.length, 0);
-} finally {
-	if (old === undefined) delete process.env.PI_ASK_USER_REMOTE_ANSWERS; else process.env.PI_ASK_USER_REMOTE_ANSWERS = old;
-}
+registerRemoteAskAnswers(pi);
+bus.on("intercom:outbox-request", event => outbox.push(event));
+hooks.get("session_start")({}, { sessionManager: { getSessionId: () => "self-session" } });
+bus.emit("ask:pending", { ...question, askId });
+assert.equal(outbox.length, 0, "no peer drives this session: nothing is sent");
+inbound("please check");
+bus.emit("ask:pending", { ...question, askId });
+assert.equal(outbox.length, 1, "on by default, no environment gate");
+assert.equal(outbox[0].to, "monitor");
+assert.ok(outbox[0].message.startsWith("Session self-session is waiting for its user to answer:\nShip?\n- Ship\n- Hold"));
+assert.ok(outbox[0].message.includes('session_dialog {action: "wait", session: "self-session"}'));
+assert.match(outbox[0].message, /ONLY when the user told you to control or fix that session/, "answering for the user is discouraged");
+bus.emit("ask:pending", { askId, kind: "list", title: "Menu", items: [] });
+assert.equal(outbox.length, 1, "menus are not forwarded");
+hooks.get("input")({ source: "interactive" });
+bus.emit("ask:pending", { ...question, askId });
+assert.equal(outbox.length, 1, "the user typing takes the session back");
+inbound("again", "monitor", { crossMachine: {} });
+bus.emit("ask:pending", { ...question, askId });
+assert.equal(outbox.length, 1, "cross-machine peers are never driving peers");
+inbound("again");
+hooks.get("input")({ source: "extension" });
+bus.emit("ask:pending", { askId, questions: [question, question] });
+assert.match(outbox.at(-1).message, /Question 1: Ship\?[\s\S]*Question 2: Ship\?/, "intercom's own wake-up prompt keeps the peer; batches list each question");
+assert.equal(answers.length, 0);
 
 // Exercise the native race directly, without installed-package patches or opt-in flags.
 assert.equal(remoteResponse({ text: "Unknown" }, question, false), undefined);
@@ -98,4 +83,4 @@ assert.equal(races.listenerCount("ask:answer"), 0);
 // A synchronous remote answer before the popup opens must never create a losing dialog.
 races.once("ask:pending", event => races.emit("ask:answer", { askId: event.askId, text: "Ship" }));
 assert.deepEqual(await raceRemoteAsk(remotePi, { ...question, allowComment: false }, undefined, undefined, decode, () => assert.fail("remote already won")), { kind: "selection", selections: ["Ship"] });
-console.log("ok - native ask_user remote channel and intercom forwarding");
+console.log("ok - native ask_user remote channel and forwarding to the driving peer");

@@ -2,11 +2,23 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.9 — 2026-10-30
 
 ### Added
 - Pi Hub for iPhone, iPad and Apple Silicon Mac (`hub/apple`): the desktop app's tabs in a native app you sign yourself. The Mac app has a live Dock icon with a badge and a menu bar item; iPhone and iPad view your other hubs with an icon badge. Hub notifications become native ones. Build with `hub/apple/build.sh` (see hub/README.md).
 - The desktop tab strip can wrap onto several rows and opens the tab menu on a long press on touch screens (used by the Apple app only).
+
+## 0.2.8 — 2026-10-30
+
+### Added
+- A session that messages another one over intercom while that one waits for your answer is no longer left hanging: the message is stopped with the question and its options, and the sending session can wait (it gets told what you picked once you answer), drop it, or, only when you told it to control or fix that session, answer it itself. An answer from another session shows a notice on the page, and the asked session is told it came from that session, not from you.
+- A session another session is driving tells it when it starts waiting for your answer. This used to be off unless a setting was switched on; now it is always on, and stops as soon as you type in that session yourself.
+
+### Changed
+- Agents can now choose how to take in a screenshot: through the vision model to read what it says, or into their own context to judge how it looks (layout, alignment, colours). The first read of an image still points to the vision model and explains both; reading the same image again loads the pixels.
+
+### Fixed
+- Screenshots read through the vision model (process_image) no longer come back as a narrow answer that hides the page: every answer now starts with a transcript of all visible text, table rows, form fields and buttons laid out like the screen, then answers the question. Before, a question that expected another page got only "this is not that page", without what was actually on it.
 
 ## 0.2.7 — 2026-10-30
 

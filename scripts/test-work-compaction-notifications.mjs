@@ -1772,6 +1772,7 @@ try {
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision" } }));
 	assert.equal((await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "vision" } })).messages[0].content.some(part => part.type === "image"), false, "even the vision model gets references in the main context");
 	assert.match((await readBlock("out/shot.PNG"))?.reason ?? "", /process_image with image "out\/shot\.PNG"/, "image reads go to the vision model");
+	assert.equal(await readBlock("out/shot.PNG"), undefined, "reading it again is the deliberate look: the pixels load");
 	assert.equal(await readBlock("notes.md"), undefined, "text files still read normally");
 	const described = await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx);
 	assert.match(described.content[0].text, /Interpretation by test\/vision.*Error code 42/s);
@@ -1831,8 +1832,9 @@ try {
 	let visionParts;
 	const many = await tools.process_image.execute("call", { image: [imageId, "shot.png"], question: "Which differs?" }, undefined, null,
 		{ ...visionCtx, cwd, modelRegistry: { find: () => ({ input: ["text", "image"] }), streamSimple: (_model, request) => { visionParts = request.messages[0].content; return { result: async () => ({ stopReason: "stop", content: [{ type: "text", text: "Same." }] }) }; } } });
-	assert.deepEqual(visionParts.map(part => part.type === "text" ? part.text.slice(0, 8) : part.type), ["Answer t", "Image 1:", "image", "Image 2:", "image"]);
+	assert.deepEqual(visionParts.map(part => part.type === "text" ? part.text.slice(0, 8) : part.type), ["Question", "Image 1:", "image", "Image 2:", "image"]);
 	assert.match(visionParts[0].text, /2 images/);
+	assert.match(visionParts[0].text, /First, under "Visible content:", transcribe each image/, "a transcript before the answer, so a narrow question cannot hide what is there");
 	assert.match(many.content[0].text, new RegExp(`of ${imageId}, shot\\.png`));
 	await assert.rejects(tools.process_image.execute("call", { image: Array(11).fill(imageId), question: "What?" }, undefined, null, visionCtx), /at most 10/);
 	await assert.rejects(tools.process_image.execute("call", { image: [imageId, ""], question: "What?" }, undefined, null, visionCtx), /Pass image/);
