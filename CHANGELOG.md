@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.5 — 2026-10-30
 
 ### Added
 - screen_read target=window can resize the window before capturing it (window.size, Windows and macOS), so the agent can check an app's layout at a given size. A minimized window stays minimized. On macOS the first resize asks for Accessibility permission for Pi Screen Helper.
