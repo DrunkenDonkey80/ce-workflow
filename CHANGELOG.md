@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.13 — 2026-10-31
 
 ### Added
 - A hub page opened in a browser on another computer offers the desktop app (Windows, Linux) under ⚙ → Desktop app, to view your hubs from there.
