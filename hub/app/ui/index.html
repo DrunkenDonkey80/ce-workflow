@@ -24,7 +24,9 @@
  button.win b { position: absolute; right: 6px; bottom: 6px; min-width: 9px; height: 9px; border-radius: 5px; background: #e03131; font: 600 9px/9px system-ui; color: #fff; padding: 0 }
  /* D6 (Apple app, config.wrap): tabs wrap onto 36 px rows instead of running off a narrow screen; the strip reports its height. */
  body.wrap { height: auto; flex-wrap: wrap }
- body.wrap > * { height: 36px; -webkit-touch-callout: none }
+ body.wrap > * { height: 36px; -webkit-touch-callout: none; -webkit-user-select: none }
+ body.wrap #ask { -webkit-user-select: text }
+ body.wrap button.tab { touch-action: none }
  body.wrap #note:empty { display: none }
  body.wrap #note:not(:empty) { flex-basis: 100%; text-align: left; line-height: 36px }
  body.wrap #ask { flex-basis: calc(100% - 16px); height: 26px }
@@ -65,13 +67,26 @@ function render() {
   text.textContent = label(tab); if (!text.textContent) text.hidden = true;
   button.className = "tab" + (i === active ? " on" : "") + (tab.hidden ? " hidden" : ""); button.title = `${fullName(tab)}: ${stateWord(tab)} · Alt+${i + 1} · drag to reorder · right-click for rename, copy link, reload, remove`;
   if (tab.version) button.title += `\nce-workflow ${tab.version}` + (older(tab.version, newest) ? ` (behind: ${newest} runs on another hub)` : "");
-  button.append(img, text);
+  button.append(img, text); button.dataset.id = String(tab.id);
   if (tab.version && older(tab.version, newest)) { const mark = document.createElement("small"); mark.className = "behind"; mark.textContent = "\u2191"; mark.title = `ce-workflow ${tab.version}; ${newest} is out`; button.append(mark); }
   if (!tab.url) { const small = document.createElement("small"); small.textContent = "waiting for the hub"; button.append(small); }
   button.onclick = () => { if (pressed) pressed = false; else select(tab.id); };
   if (touch) {
-   button.onpointerdown = () => { pressed = false; clearTimeout(pressTimer); pressTimer = setTimeout(() => { pressed = true; void menu(tab); }, 500); };
-   button.onpointerup = button.onpointercancel = button.onpointerleave = () => clearTimeout(pressTimer);
+   // Hold 400 ms, then drag onto another tab to move it there; hold and let go opens the menu.
+   let held = false, start = null, over = null;
+   const target = event => document.elementFromPoint(event.clientX, event.clientY)?.closest("button.tab");
+   button.onpointerdown = event => { pressed = false; held = false; over = null; start = event; clearTimeout(pressTimer); pressTimer = setTimeout(() => { held = pressed = true; button.classList.add("drop"); }, 400); };
+   button.onpointermove = event => {
+    if (!held) { if (start && Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) > 10) clearTimeout(pressTimer); return; }
+    const now = target(event); if (now === over) return;
+    over?.classList.remove("drop"); over = now && now !== button ? now : null; over?.classList.add("drop");
+   };
+   button.onpointerup = event => {
+    clearTimeout(pressTimer); button.classList.remove("drop"); over?.classList.remove("drop");
+    if (!held) return; held = false;
+    const to = over && tabs.find(other => String(other.id) === over.dataset.id); if (to) move(tab, to); else void menu(tab);
+   };
+   button.onpointercancel = () => { clearTimeout(pressTimer); held = false; button.classList.remove("drop"); over?.classList.remove("drop"); };
   }
   button.oncontextmenu = event => { event.preventDefault(); void menu(tab); };
   button.draggable = !touch;
@@ -79,13 +94,14 @@ function render() {
   button.ondragend = () => { dragged = null; };
   button.ondragover = event => { event.preventDefault(); button.classList.add("drop"); };
   button.ondragleave = () => button.classList.remove("drop");
-  button.ondrop = event => { event.preventDefault(); if (!dragged || dragged === tab) return; const current = tabs[active], to = tabs.indexOf(tab); tabs.splice(tabs.indexOf(dragged), 1); tabs.splice(to, 0, dragged); dragged = null; active = tabs.indexOf(current); persist(); render(); };
+  button.ondrop = event => { event.preventDefault(); if (!dragged || dragged === tab) return; move(dragged, tab); dragged = null; };
   return button;
  });
  const add = document.createElement("button"); add.id = "add"; add.textContent = "+"; add.title = "Add a hub: paste its link (for example another PC's tailnet address)"; add.onclick = addHub;
  const note = document.createElement("div"); note.id = "note"; note.dataset.tauriDragRegion = ""; note.textContent = notice || startupError || (staged ? "Update ready: click to restart" : "");
  if (!notice && !startupError && staged) { note.className = "update"; note.dataset.tauriDragRegion = "false"; note.title = "Restarts the app on the new version (hubs and sessions keep running)"; note.onclick = () => void invoke("restart_update"); }
- document.body.replaceChildren(...buttons, add, note, ...frameButtons());
+ // Touch screens: + lives in the tab menu, so the strip shows it only when there is no tab to long-press.
+ document.body.replaceChildren(...buttons, ...(touch && tabs.length ? [] : [add]), note, ...frameButtons());
  void updateIcons();
 }
 async function pixels(svg, size) {
@@ -202,12 +218,14 @@ async function addHub() {
 }
 // Names are this PC's own: another PC can show or hide the same hub's name.
 // A native popup menu at the cursor (the 36 px strip cannot draw a dropdown over the hub page below it).
+// The moved tab takes the target's place (as the desktop drag always did).
+function move(tab, to) { const current = tabs[active], at = tabs.indexOf(to); tabs.splice(tabs.indexOf(tab), 1); tabs.splice(at, 0, tab); active = tabs.indexOf(current); persist(); render(); }
 async function menu(tab) {
  const pick = await new Promise(done => {
   const item = (text, value) => ({ text, action: () => done(value) });
   void window.__TAURI__.menu.Menu.new({ items: [
    item("Rename…", "rename"), ...(tab.name !== undefined ? [item("Reset name", "reset")] : []),
-   ...(touch && tabs.indexOf(tab) > 0 ? [item("Move left", "left")] : []), ...(touch && tabs.indexOf(tab) < tabs.length - 1 ? [item("Move right", "right")] : []),
+   ...(touch ? [item("Add hub\u2026", "add")] : []),
    ...(tab.url ? [item("Copy link", "copy"), item("Reload", "reload")] : []),
    ...(tab.hidden ? [item("Unhide", "hide")] : tabs.some(other => other !== tab && !other.hidden) ? [item("Hide", "hide")] : []),
    ...(tab.local ? [] : [{ item: "Separator" }, item("Remove", "remove")]),
@@ -215,7 +233,7 @@ async function menu(tab) {
  });
  if (pick === "reset") { delete tab.name; persist(); render(); }
  if (pick === "reload") open(tab);
- if (pick === "left" || pick === "right") { const current = tabs[active], from = tabs.indexOf(tab); tabs.splice(from, 1); tabs.splice(from + (pick === "left" ? -1 : 1), 0, tab); active = tabs.indexOf(current); persist(); render(); }
+ if (pick === "add") void addHub();
  if (pick === "hide") { tab.hidden = !tab.hidden; persist(); render(); }
  if (pick === "copy") {
   try { await navigator.clipboard.writeText(tab.url); notice = "Link copied."; } catch { notice = tab.url; }
