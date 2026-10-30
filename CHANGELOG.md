@@ -4,6 +4,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Added
+- A session that messages another one over intercom while that one waits for your answer is no longer left hanging: the message is stopped with the question and its options, and the sending session can wait (it gets told what you picked once you answer), drop it, or, only when you told it to control or fix that session, answer it itself. An answer from another session shows a notice on the page, and the asked session is told it came from that session, not from you.
+- A session another session is driving tells it when it starts waiting for your answer. This used to be off unless a setting was switched on; now it is always on, and stops as soon as you type in that session yourself.
+
 ### Changed
 - Agents can now choose how to take in a screenshot: through the vision model to read what it says, or into their own context to judge how it looks (layout, alignment, colours). The first read of an image still points to the vision model and explains both; reading the same image again loads the pixels.
 

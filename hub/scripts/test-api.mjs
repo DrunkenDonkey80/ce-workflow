@@ -182,6 +182,21 @@ try {
 	assert.deepEqual((await post(id, "answer", { askId: channel.askId, text: "again" })).body, { accepted: false }, "first answer wins");
 	assert.equal((await get(id, `dialog?id=${channel.askId}`)).status, 404);
 
+	// Another session answers through the hub (ce-workflow session_dialog): by stays out of the answer, the asked
+	// model is told by a steer that it was not the user, and a waiting session reads what was picked.
+	const peer = await open(`/ask ${JSON.stringify({ id: "p", data: { askId: "own-2", question: "Go?", options: [{ title: "Yes" }, { title: "No" }] } })}`, "answer:");
+	const hubRoute = (route, data) => fetch(`${origin}${route}`, { method: data ? "POST" : "GET", headers: { "x-hub-key": localKey, "content-type": "application/json", connection: "close" }, body: data && JSON.stringify(data) }).then(r => r.json());
+	assert.deepEqual((await hubRoute(`/api/sessions/${id}/dialogs`)).forms.map(form => form.askId), [peer.askId]);
+	const live = hub.host.live.get(id), realPrompt = hub.host.prompt, steered = [];
+	live.running = true; hub.host.prompt = async (sid, message, extra) => { steered.push([sid, message, extra]); return {}; };
+	try {
+		assert.deepEqual(await hubRoute(`/api/sessions/${id}/answer`, { askId: peer.askId, selections: ["Yes"], by: "lead in game" }), { accepted: true });
+	} finally { hub.host.prompt = realPrompt; live.running = false; }
+	assert.deepEqual(JSON.parse(await peer.result), { selections: ["Yes"], askId: "own-2" });
+	assert.deepEqual(steered, [[id, '[Session lead in game answered "Go?" with: Yes. That was the other session, not the user.]', { streamingBehavior: "steer" }]]);
+	assert.deepEqual((await hubRoute(`/api/sessions/${id}/dialogs`)).answered.find(entry => entry.askId === peer.askId), { askId: peer.askId, by: "lead in game", answer: "Yes" });
+	assert.deepEqual((await hubRoute(`/api/sessions/${id}/dialogs`)).answered.find(entry => entry.askId === channel.askId), { askId: channel.askId, answer: "A (comment: ok)" }, "the user's own answers are recorded too, without by");
+
 	// A run button's script asks through pi-hub ask (shim on PATH, PI_HUB_SESSION set) and gets the answer: no model turn.
 	const noticed = [], withDialogs = view.publish;
 	view.publish = (event, value) => { if (event === "notice") noticed.push(value.text); withDialogs(event, value); };

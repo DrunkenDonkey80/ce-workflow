@@ -182,6 +182,9 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		},
 		"POST /api/sessions/([0-9a-f-]{36})/prompt": (data, m) => host.prompt(m[1], String(data.message ?? "")),
 		// S-02: timers of one session; the CLI (and through it the schedule tool) is the only writer.
+		// Another session meeting this one's open question (ce-workflow session_dialog): read the forms, answer one.
+		"GET /api/sessions/([0-9a-f-]{36})/dialogs": (_d, m) => pageApi.dialogs(m[1]),
+		"POST /api/sessions/([0-9a-f-]{36})/answer": (data, m) => pageApi.post(m[1], "answer", data),
 		"GET /api/sessions/([0-9a-f-]{36})/timers": (_d, m) => ({ timers: scheduler.list(m[1]) }),
 		"POST /api/sessions/([0-9a-f-]{36})/timers": (data, m) => scheduler.add(timerInput(m[1], data)),
 		"POST /api/timers/([0-9a-f-]{36})/cancel": (_d, m) => ({ ok: scheduler.cancel(m[1]) }),

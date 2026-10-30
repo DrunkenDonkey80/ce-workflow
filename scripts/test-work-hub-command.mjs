@@ -5,13 +5,25 @@ import os from "node:os";
 import path from "node:path";
 
 process.env.PI_CODING_AGENT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "wo-hub-")); // the CLI child inherits it: no real hub
-const { hubCli, hubMenu, joinedSession, scheduleTool } = await import("../extensions/hub-command.ts");
+const { hubCli, hubMenu, joinedSession, scheduleTool, liveTarget, dialogReason } = await import("../extensions/hub-command.ts");
 // A woken parked session is found by its Pi session id, else (stable/claimed intercom id) as the one new session in its folder.
 const target = { id: 'h1', name: 'game', folder: '/p', sessionId: 'pi-1' };
 assert.equal(joinedSession([{ id: 'pi-1', cwd: '/x', pid: 2, startedAt: 0 }], target, 100, 1)?.id, 'pi-1');
 assert.equal(joinedSession([{ id: 'claimed', cwd: '/p', pid: 2, startedAt: 150 }, { id: 'old', cwd: '/p', pid: 3, startedAt: 50 }], target, 100, 1)?.id, 'claimed');
 assert.equal(joinedSession([{ id: 'a', cwd: '/p', pid: 2, startedAt: 150 }, { id: 'b', cwd: '/p', pid: 3, startedAt: 160 }], target, 100, 1), undefined, 'two new sessions: ambiguous, keep waiting');
 assert.equal(joinedSession([{ id: 'me', cwd: '/p', pid: 1, startedAt: 150 }], target, 100, 1), undefined, 'never itself');
+
+// A send to a live peer sitting in a dialog: found as intercom finds it, and stopped with the question and the three ways on.
+const peers = [{ id: 'abcd1234-x', name: 'Game', cwd: '/p', pid: 2, startedAt: 0 }, { id: 'ffff0000-y', cwd: '/q', pid: 3, startedAt: 0 }, { id: 'me', cwd: '/p', pid: 1, startedAt: 0 }];
+assert.equal(liveTarget(peers, 'game', undefined, 1)?.id, 'abcd1234-x', 'by name, any case');
+assert.equal(liveTarget(peers, 'ffff', undefined, 1)?.id, 'ffff0000-y', 'by id prefix');
+assert.equal(liveTarget(peers, '', '/p', 1)?.id, 'abcd1234-x', 'cwd alone: the sole other peer there');
+assert.equal(liveTarget(peers, 'nobody', undefined, 1), undefined);
+const reason = dialogReason(peers[0], [{ askId: 'r1', question: 'Ship?', options: [{ title: 'Ship' }, { title: 'Hold', description: 'wait a day' }], allowFreeform: false }, { askId: 'r2', kind: 'list', title: 'Menu', items: [{ value: 'a', label: 'Alpha' }] }]);
+assert.ok(reason.startsWith('Not sent: session Game (abcd1234) is waiting for its user'), reason);
+assert.ok(reason.includes('askId: r1\nQuestion: Ship?\n- Ship\n- Hold \u2014 wait a day\nAnswer shape: {"selections"'), reason);
+assert.ok(reason.includes('askId: r2\nMenu: Menu\n- Alpha (value: a)\nAnswer shape: {"action":"select"'), reason);
+assert.match(reason, /Wait \(usual\)[\s\S]*Drop it[\s\S]*Answer it: ONLY when the user told you to control or fix that session/, 'answering for the user is discouraged');
 const values = menu => menu.items.map(item => item.value);
 
 const fresh = hubMenu({ running: false, autostart: false, command: false, remote: { on: false } }, "/p");

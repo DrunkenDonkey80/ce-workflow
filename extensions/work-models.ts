@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
-import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool } from "./hub-command.ts";
+import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
@@ -3492,6 +3492,7 @@ export default function workModelsExtension(pi) {
 	for (const tool of cameraTools(cameraController, pi)) registerConstrainedTool(pi, tool);
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	intercomParkedSessions(pi);
+	registerConstrainedTool(pi, sessionDialogTool(pi)); // a send stopped at a peer's open question points here
 	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, scheduleTool); // hub-started Pi only: nobody else can be woken
 	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, projectCommandsTool); // the buttons show on the hub page
 	registerConstrainedTool(pi, {

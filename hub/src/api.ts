@@ -27,7 +27,12 @@ import type { Scheduler } from "./scheduler.ts";
 import { runCommand, type Commands } from "./commands.ts";
 
 const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-const ANSWER_FIELDS = ["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel"];
+const ANSWER_FIELDS = ["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel", "by"];
+/** One line for what an answer picked, for the session that waited on it or the note to the asked session. */
+export const answerText = (answer: Record<string, unknown>) => answer.cancel === true || answer.action === "back" ? "cancelled"
+	: Array.isArray(answer.selections) ? answer.selections.join(" | ") + (answer.comment ? ` (comment: ${answer.comment})` : "")
+	: typeof answer.text === "string" ? answer.text : Array.isArray(answer.values) ? answer.values.join(" | ")
+	: typeof answer.value === "string" ? answer.value : JSON.stringify(answer.answers ?? answer);
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 const parse = (text: unknown) => { try { return JSON.parse(String(text)); } catch { return undefined; } };
 const only = (data: Record<string, unknown>, fields: string[], message: string) => { if (Object.keys(data).some(key => !fields.includes(key))) throw fail(400, message); };
@@ -136,6 +141,16 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** Open forms for the snapshot (H5-04): every dialog Pi has open, as page forms. */
 	const forms = (id: string) => [...host.pendingDialogs(id).flatMap(dialog => toForm(dialog) ?? []), ...[...scriptAsks.get(id)?.values() ?? []].map(ask => ask.form)];
 	const openDialog = (id: string, askId: unknown) => host.pendingDialogs(id).find(dialog => dialog.id === askId && toForm(dialog));
+	// Recent answers given through the hub, so `pi-hub dialogs --wait` can tell another session what was picked and by whom.
+	const answered = new Map<string, { session: string; by?: string; answer: string }>();
+	function remember(id: string, askId: string, form: Record<string, unknown> | undefined, answer: Record<string, unknown>, by: string | undefined, script: boolean) {
+		const text = answerText(answer);
+		answered.set(askId, { session: id, ...(by ? { by } : {}), answer: text });
+		while (answered.size > 100) answered.delete(answered.keys().next().value!);
+		// The asked model reads the answer as the user's: say who gave it. Steer lands right after ask_user returns.
+		if (by && !script && host.live.get(id)?.running) void host.prompt(id, `[Session ${by} answered "${String(form?.question ?? form?.title ?? "your questions")}" with: ${text}. That was the other session, not the user.]`, { streamingBehavior: "steer" }).catch(() => {});
+	}
+	const dialogs = (id: string) => ({ forms: forms(id), answered: [...answered].filter(([, entry]) => entry.session === id).map(([askId, { session: _s, ...entry }]) => ({ askId, ...entry })) });
 
 	// `pi-hub ask` from a run command's script: an ask_user form the hub holds itself (no Pi, no model turn), parked
 	// sessions too. The CLI's request stays open until the page answers; a script that dies takes its form with it.
@@ -430,10 +445,14 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "answer": {
 				only(data, ANSWER_FIELDS, "Invalid answer fields.");
 				// First answer wins: a second tab (or a closed ask) gets accepted: false, as ce-workflow's dialogs.answer.
-				const script = scriptAsks.get(id)?.get(data.askId as string);
-				if (script) { const { target: _target, askId: _askId, ...answer } = data; closeAsk(id, data.askId as string); script.done(answer); return { accepted: true }; }
-				const dialog = openDialog(id, data.askId);
-				if (!dialog || !host.respond(id, dialog.id as string, toResponse(dialog, data))) return { accepted: false };
+				// by: another session answered (session_dialog), not a person on the page.
+				const { by: rawBy, ...given } = data, by = typeof rawBy === "string" && rawBy.trim() ? rawBy.trim().slice(0, 80) : undefined;
+				const script = scriptAsks.get(id)?.get(given.askId as string);
+				if (script) { const { target: _target, askId: _askId, ...answer } = given; closeAsk(id, given.askId as string); script.done(answer); remember(id, given.askId as string, script.form, answer, by, true); return { accepted: true }; }
+				const dialog = openDialog(id, given.askId);
+				if (!dialog || !host.respond(id, dialog.id as string, toResponse(dialog, given))) return { accepted: false };
+				remember(id, dialog.id as string, toForm(dialog), given, by, false);
+				if (by) views.get(id)?.publish("notice", { text: `Session ${by} answered the question.` });
 				views.get(id)?.publish("dialog_closed", { askId: dialog.id });
 				return { accepted: true };
 			}
@@ -469,7 +488,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	/** Shows changed project commands on every open page of that folder's sessions. */
 	const refresh = (dir: string) => { for (const record of registry.list()) if (views.has(record.id) && path.relative(record.folder, dir) === "") void publishStatus(record.id).catch(() => {}); };
 
-	return { get, post, extras, forms, settings, refresh, scriptAsk, saveImage: savePastedImage };
+	return { get, post, extras, forms, dialogs, settings, refresh, scriptAsk, saveImage: savePastedImage };
 }
 
 // PC load for the page's CPU/memory graph: CPU is the busy share of all cores since the previous call.

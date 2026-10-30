@@ -234,6 +234,22 @@ try {
 		const parked = await Promise.all(all.filter(s => !s.live && s.state !== "terminal" && s.sessionFile).map(async s =>
 			({ id: s.id, name: s.name, folder: s.folder, sessionId: (await readSessionSummary(s.sessionFile!).catch(() => null))?.sessionId })));
 		console.log(JSON.stringify(parked.filter(s => s.sessionId)));
+	} else if ((verb === "dialogs" || verb === "answer") && rest[0]) {
+		// ce-workflow session_dialog, by the Pi session id intercom knows: `dialogs` lists that live session's open questions
+		// (--wait <askId> returns once that one closes); `answer --json <answer> --by <name>` answers one for another session.
+		const all = (await call("/api/status")).sessions as { id: string; name: string; live: boolean; sessionFile?: string }[];
+		const ids = await Promise.all(all.filter(s => s.live && s.sessionFile).map(async s => ({ ...s, sessionId: (await readSessionSummary(s.sessionFile!).catch(() => null))?.sessionId })));
+		const found = ids.find(s => s.sessionId === rest[0]);
+		const option = (name: string) => rest.includes(`--${name}`) ? rest[rest.indexOf(`--${name}`) + 1] : undefined;
+		if (verb === "answer") {
+			if (!found) throw new Error("That session is not live in the hub.");
+			console.log(JSON.stringify(await call(`/api/sessions/${found.id}/answer`, { ...JSON.parse(option("json") ?? "{}"), by: option("by") ?? "another session" })));
+		} else {
+		const at = rest.indexOf("--wait"), wait = at < 0 ? undefined : rest[at + 1];
+		let state = found ? await call(`/api/sessions/${found.id}/dialogs`) as { forms: { askId: string }[]; answered: { askId: string }[] } : { forms: [], answered: [] };
+		while (found && wait && state.forms.some(form => form.askId === wait)) { await new Promise(done => setTimeout(done, 2_000)); state = await call(`/api/sessions/${found.id}/dialogs`); }
+		console.log(JSON.stringify(wait ? { closed: true, answer: state.answered.find(entry => entry.askId === wait) } : { id: found?.id, name: found?.name, ...state }));
+		}
 	} else if (verb === "wake" && rest[0]) {
 		// Resume one parked session (by hub id); never starts a new one.
 		await call(`/api/sessions/${rest[0]}/resume`, {});
