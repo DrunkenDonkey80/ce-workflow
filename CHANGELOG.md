@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Changed
+- Copying a table from a chat message or an opened Markdown file now gives Markdown table rows when pasted as text (chat, terminal, a .md file), instead of tab-separated cells; Excel and Word still get a real table.
+
 ### Fixed
 - The desktop app's taskbar icon no longer counts the session you have open twice while it works: one working session is one yellow segment, not two.
 

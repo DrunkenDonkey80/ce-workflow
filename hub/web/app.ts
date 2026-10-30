@@ -862,6 +862,28 @@ function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) 
  }
  flush();
 }
+// Copying a rendered table (chat or the file viewer): the browser's plain text is tab-separated cells, which fall apart when
+// pasted into a chat or a .md file, so the plain text gets Markdown pipe rows; the HTML copy (Excel, Word) stays as it was.
+document.addEventListener("copy", event => {
+ const selection = getSelection(); if (!selection?.rangeCount || selection.isCollapsed || !event.clipboardData) return;
+ const range = selection.getRangeAt(0), common = range.commonAncestorContainer, within = (common instanceof Element ? common : common.parentElement)?.closest("table.md-table");
+ const box = document.createElement("div"); box.append(range.cloneContents());
+ // Cells of one table come without it, and cells of one row without the row.
+ if (within && !box.querySelector("table")) { const table = document.createElement("table"), row = box.querySelector("tr") ? table : table.appendChild(document.createElement("tr")); row.append(...box.childNodes); box.append(table); }
+ if (!within && !box.querySelector("table.md-table")) return;
+ const html = box.innerHTML;
+ for (const table of box.querySelectorAll("table")) {
+  const rows = [...table.querySelectorAll("tr")].map(row => [...row.cells].map(cell => cell.textContent!.trim().replace(/\s+/g, " ").replace(/\|/g, "\\|")));
+  if (!rows.length) { table.remove(); continue; }
+  const lines = rows.map(cells => "| " + cells.join(" | ") + " |");
+  lines.splice(1, 0, "|" + rows[0].map(() => "---").join("|") + "|");
+  table.replaceWith(Object.assign(document.createElement("pre"), { textContent: lines.join("\n") }));
+ }
+ // innerText needs layout for its line breaks: measure off screen.
+ Object.assign(box.style, { position: "fixed", left: "-10000px", top: "0", whiteSpace: "pre-wrap" }); document.body.append(box);
+ const text = box.innerText; box.remove();
+ event.clipboardData.setData("text/plain", text); event.clipboardData.setData("text/html", html); event.preventDefault();
+});
 // Italic markers need text right inside them, and _x_ word boundaries, so "* item" and snake_case stay as they are.
 // A double-quoted path or a file:/// URL is taken whole, so _ or * in its folder names never splits it.
 const INLINE = new RegExp(/`([^`\n]+)`|\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+?)\*\*|(?<![*\w])\*(?=\S)([^*\n]+?)(?<=\S)\*(?![*\w])|(?<!\w)_(?=\S)([^_\n]+?)(?<=\S)_(?!\w)/.source + '|"(' + QUOTED_PATH + ')"' + String.raw`|(?<!\w)(file:///[^\s"'\x60<>]+)`, "gi");

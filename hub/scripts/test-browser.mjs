@@ -354,6 +354,14 @@ try {
  { const row = { id: "md_row", role: "agent", text: "**Load:** use `Thread.Yield`\n\n| Setup | echo |\n|---|---|\n| RF | **5 ms** |\n\nafter *slow* _fast_ snake_case_name [docs](https://example.com/a) [bad](javascript:alert(1))", streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=md_row] table");
  assert.deepEqual(await evaluate("(() => { const m = document.querySelector('[data-id=md_row]'); return [m.querySelector('b').textContent, m.querySelector('code').textContent, [...m.querySelectorAll('th,td')].map(c => c.textContent), m.textContent.includes('**') || m.textContent.includes('|'), [...m.querySelectorAll('i')].map(i => i.textContent), m.textContent.includes('snake_case_name'), [...m.querySelectorAll('a.chat-link')].map(a => [a.textContent, a.getAttribute('href')]), m.textContent.includes('](')]; })()"), ["Load:", "Thread.Yield", ["Setup", "echo", "RF", "5 ms"], false, ["slow", "fast"], true, [["docs", "https://example.com/a"]], false]);
+ // Copying a rendered table gives Markdown pipe rows as plain text, the HTML table stays for Excel/Word.
+ const copied = "(() => { const d = new DataTransfer(); document.dispatchEvent(new ClipboardEvent('copy', { clipboardData: d, bubbles: true })); return [d.getData('text/plain'), d.getData('text/html').includes('<td>RF</td>')]; })()";
+ await evaluate("(() => { const m = document.querySelector('[data-id=md_row] .bubble') ?? document.querySelector('[data-id=md_row]'); getSelection().selectAllChildren(m); })()");
+ const [plain, keptHtml] = await evaluate(copied);
+ assert.ok(plain.includes("| Setup | echo |\n|---|---|\n| RF | 5 ms |"), plain); assert.ok(plain.includes("Load:") && keptHtml, plain);
+ await evaluate("(() => { const cells = document.querySelectorAll('[data-id=md_row] td'); const r = document.createRange(); r.setStartBefore(cells[0]); r.setEndAfter(cells[1]); getSelection().removeAllRanges(); getSelection().addRange(r); })()");
+ assert.equal((await evaluate(copied))[0].trim(), "| RF | 5 ms |\n|---|---|", "cells inside one table");
+ await evaluate("getSelection().removeAllRanges()");
  // A POSIX folder (/a/b, end of sentence) links as a folder; /wo commands and and/or stay text.
  {
   const dir = join(pasted, "..").replaceAll("\\", "/").replace(/^[A-Za-z]:/, "");
