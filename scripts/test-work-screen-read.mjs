@@ -51,7 +51,7 @@ assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
 	assert.deepEqual([crop.width, crop.height, crop.scale, crop.uniform], [2, 2, 1, true], "crop, no upscaling");
 	assert.throws(() => processPng(encodePng(4, 4, pixels), [3, 3, 2, 2], 1024), /region must lie inside the 4x4/);
 	assert.throws(() => decodePng(Buffer.from("nope")), /not a PNG/);
-	await assert.rejects(screenRead(null, { target: "window" }, undefined, os.tmpdir(), "linux"), /needs Windows/);
+	await assert.rejects(screenRead(null, { target: "window" }, undefined, os.tmpdir(), "linux"), /needs Windows or macOS/);
 
 	// Runner with a fake CLI (node itself) that writes the screenshot and leaves output in log files.
 	const dir = await mkdtemp(path.join(os.tmpdir(), "screen-read-test-")), raw2 = path.join(dir, "x-raw.png"), out = path.join(dir, "x.png");
@@ -124,3 +124,15 @@ if (process.platform === "win32") {
 	}
 }
 console.log("ok - screen_read");
+
+// macOS window capture through Pi Screen Helper.app; opt-in because the first run asks the user for Screen Recording permission.
+if (process.platform === "darwin" && process.env.SCREEN_READ_MAC_LIVE) {
+	const run = promisify(execFile);
+	const exec = (c, a, { timeout }) => run(c, a, { timeout, maxBuffer: 64 << 20 }).then(r => ({ code: 0, ...r }), e => ({ code: e.code ?? 1, stdout: e.stdout, stderr: e.stderr || e.message }));
+	const { matches } = await screenRead(exec, { target: "window" });
+	assert.ok(matches.length > 0 && matches.every(w => w.title && w.handle), "titled windows listed");
+	const shot = await screenRead(exec, { target: "window", window: { handle: matches[0].handle }, region: [0, 0, 64, 32] });
+	assert.equal(shot.window.handle, matches[0].handle);
+	assert.deepEqual([shot.width, shot.height, shot.uniform === undefined], [64, 32, false], "region crop of the window");
+	console.log(`mac window capture ok (${matches.length} windows)`);
+}

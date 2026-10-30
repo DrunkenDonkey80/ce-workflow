@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.4 — 2026-10-30
+
+### Added
+- screen_read target=window works on macOS: list windows and capture one (also covered, in the background or minimized) with region and maxEdge like on Windows. A small Pi Screen Helper app, built on first use and signed with your Apple Development certificate when there is one, does the capture, so macOS asks for Screen Recording permission once for it instead of for the node binary. The grant survives Node upgrades and covers only screenshots.
+
 ## 0.2.3 — 2026-10-29
 
 ### Fixed

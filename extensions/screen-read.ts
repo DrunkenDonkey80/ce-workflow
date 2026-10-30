@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -102,6 +103,109 @@ public class ScreenRead {
  }
 }
 `;
+
+// macOS window capture runs in its own small app, launched through LaunchServices so macOS asks Screen Recording for it
+// rather than for the node binary (whose path changes with every Node upgrade and which runs everything else too).
+const MAC_SWIFT = String.raw`
+import AppKit
+import CoreGraphics
+import ImageIO
+import ScreenCaptureKit
+import UniformTypeIdentifiers
+
+let req = try! JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1]))) as! [String: Any]
+func finish(_ o: [String: Any]) -> Never {
+	try? JSONSerialization.data(withJSONObject: o).write(to: URL(fileURLWithPath: req["out"] as! String))
+	exit(0)
+}
+_ = NSApplication.shared // connects to the window server, which the capture needs
+if !CGPreflightScreenCaptureAccess() {
+	CGRequestScreenCaptureAccess() // shows the system dialog once and lists this app under Screen Recording
+	finish(["error": "permission"])
+}
+let title = (req["title"] as? String ?? "").lowercased(), pid = req["pid"] as? Int ?? 0, handle = req["handle"] as? Int ?? 0
+Task {
+	do {
+		let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
+		let name = { (w: SCWindow) in [w.owningApplication?.applicationName ?? "", w.title ?? ""].filter { !$0.isEmpty }.joined(separator: " - ") }
+		let wins = content.windows.filter { w in
+			w.windowLayer == 0 && w.frame.width > 1 && w.frame.height > 1 && !(w.title ?? "").isEmpty
+				&& (handle == 0 || Int(w.windowID) == handle) && (pid == 0 || Int(w.owningApplication?.processID ?? 0) == pid)
+				&& (title.isEmpty || name(w).lowercased().contains(title))
+		}
+		let info = { (w: SCWindow) -> [String: Any] in ["handle": Int(w.windowID), "pid": Int(w.owningApplication?.processID ?? 0), "title": name(w), "minimized": !w.isOnScreen] }
+		if req["list"] as? Bool == true || wins.count != 1 { finish(["matches": wins.prefix(200).map(info)]) }
+		let filter = SCContentFilter(desktopIndependentWindow: wins[0]), cfg = SCStreamConfiguration()
+		cfg.width = Int(filter.contentRect.width * CGFloat(filter.pointPixelScale))
+		cfg.height = Int(filter.contentRect.height * CGFloat(filter.pointPixelScale))
+		cfg.showsCursor = false
+		cfg.ignoreShadowsSingleWindow = true
+		let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
+		guard let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: req["raw"] as! String) as CFURL, UTType.png.identifier as CFString, 1, nil) else { finish(["error": "cannot write the PNG"]) }
+		CGImageDestinationAddImage(dest, image, nil)
+		if !CGImageDestinationFinalize(dest) { finish(["error": "cannot write the PNG"]) }
+		finish(["window": info(wins[0])])
+	} catch { finish(["error": error.localizedDescription]) }
+}
+dispatchMain()
+`;
+const MAC_ID = "com.drunkendonkey80.ce-workflow.screen-helper";
+const MAC_APP = path.join(os.homedir(), "Library", "Application Support", "ce-workflow", "Pi Screen Helper.app");
+const MAC_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+
+/** Builds the helper app when missing or its source changed. A rebuild can cost an ad-hoc signed app its grant, so it is signed with an Apple Development identity when there is one. */
+async function macHelper(exec: Exec, signal?: AbortSignal) {
+	const hash = createHash("sha256").update(MAC_SWIFT).digest("hex").slice(0, 16), stamp = `${MAC_APP}.version`, bin = path.join(MAC_APP, "Contents", "MacOS", "pi-screen-helper");
+	if (existsSync(bin) && (await readFile(stamp, "utf8").catch(() => "")) === hash) return MAC_APP;
+	await rm(MAC_APP, { recursive: true, force: true });
+	await mkdir(path.dirname(bin), { recursive: true });
+	await writeFile(path.join(MAC_APP, "Contents", "Info.plist"), `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>${MAC_ID}</string>
+<key>CFBundleName</key><string>Pi Screen Helper</string>
+<key>CFBundleExecutable</key><string>pi-screen-helper</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>CFBundleVersion</key><string>${hash}</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSUIElement</key><true/>
+</dict></plist>
+`);
+	const src = path.join(path.dirname(MAC_APP), "pi-screen-helper.swift");
+	await writeFile(src, MAC_SWIFT);
+	const c = await exec("swiftc", ["-O", src, "-o", bin], { timeout: 300_000, signal });
+	if (c.code || c.killed) throw new Error(`Compiling Pi Screen Helper failed; install the Xcode command line tools (xcode-select --install). ${String(c.stderr ?? "").trim().slice(-800)}`);
+	const ids = String((await exec("security", ["find-identity", "-v", "-p", "codesigning"], { timeout: 30_000, signal })).stdout ?? "");
+	const dev = ids.match(/\b([0-9A-F]{40}) "Apple Development:/)?.[1];
+	const sign = (id: string) => exec("codesign", ["--force", "--sign", id, "--identifier", MAC_ID, MAC_APP], { timeout: 60_000, signal });
+	const signed = dev ? await sign(dev) : undefined;
+	if (!signed || signed.code || signed.killed) {
+		const adhoc = await sign("-");
+		if (adhoc.code || adhoc.killed) throw new Error(`Signing Pi Screen Helper failed: ${String(adhoc.stderr ?? "").trim().slice(-800)}`);
+	}
+	await writeFile(stamp, hash);
+	return MAC_APP;
+}
+
+async function macWindow(exec: Exec, plan: ReturnType<typeof screenReadPlan> & { op: "window" }, signal?: AbortSignal) {
+	const app = await macHelper(exec, signal), base = plan.file.replace(/\.png$/, ""), req = `${base}-req.json`, out = `${base}-out.json`, raw = `${base}-raw.png`;
+	await writeFile(req, JSON.stringify({ title: plan.title, pid: plan.pid, handle: plan.handle, list: plan.list, raw, out }));
+	try {
+		const r = await exec("open", ["-W", "-n", "-g", "-a", app, "--args", req], { timeout: 120_000, signal });
+		const res = JSON.parse(await readFile(out, "utf8").catch(() => "null"));
+		if (!res) throw new Error(`Pi Screen Helper gave no answer${r.killed ? " (timed out)" : ""}: ${String(r.stderr || r.stdout || "").trim().slice(-800)}`);
+		if (res.error === "permission") {
+			await exec("open", [MAC_PANE], { timeout: 30_000, signal });
+			throw new Error("macOS needs Screen Recording permission for Pi Screen Helper. Ask the user to turn it on in System Settings > Privacy & Security > Screen & System Audio Recording (now open), then retry.");
+		}
+		if (res.error) throw new Error(`Pi Screen Helper: ${res.error}`);
+		if (res.matches) return { matches: res.matches as { handle: number; pid: number; title: string; minimized: boolean }[] };
+		const { png, ...shot } = processPng(await readFile(raw), plan.region, plan.maxEdge);
+		await writeFile(plan.file, png);
+		return { file: plan.file, window: res.window, ...shot };
+	} finally { for (const f of [req, out, raw]) await rm(f, { force: true }); }
+}
 
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 export type ScreenReadArgs = {
@@ -279,10 +383,11 @@ export async function captureFile(plan: FilePlan, signal?: AbortSignal) {
 }
 
 export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: AbortSignal, dir = path.join(os.tmpdir(), "pi-screen-read"), platform = process.platform) {
-	if (platform !== "win32" && args.target === "window") throw new Error("screen_read target=window needs Windows (PrintWindow); browser and android work on every platform.");
+	if (platform !== "win32" && platform !== "darwin" && args.target === "window") throw new Error("screen_read target=window needs Windows or macOS; browser and android work on every platform.");
 	await mkdir(dir, { recursive: true });
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
+	if (platform === "darwin" && plan.op === "window") return macWindow(exec, plan as ReturnType<typeof screenReadPlan> & { op: "window" }, signal);
 	if (platform !== "win32") return { file, ...await captureFile(plan as FilePlan, signal).catch(e => {
 		throw e?.code === "ENOENT" && (plan as FilePlan).exe === MOBILECLI ? new Error("screen_read target=device needs mobilecli, which ships with ce-workflow on macOS, Linux and Windows (x64, arm64); reinstall ce-workflow or put mobilecli on PATH.") : e;
 	}) };
@@ -309,7 +414,7 @@ export const screenReadTool = (exec: Exec) => ({
 	description: [
 		"Visual read for testing. Returns a PNG downscaled so its longest edge is at most maxEdge (default 1024). Image tokens scale with pixel count, so ask for the least you need: maxEdge 512 shows layout; then zoom with region [x, y, width, height] in SOURCE pixels (reported in every result) for full detail of one area.",
 		"Prefer text when it answers the question: agent-browser snapshot/read for web pages, android layout for devices. Use this for layout, colors, rendering and canvas.",
-		"target=window (Windows only): a Windows app window by title substring, pid or handle; omit all three to list windows. Works on minimized and background windows without focusing or showing them; launch test apps minimized. minimize=true minimizes a window that popped up after capturing it. Capture only the app under test, not the user's own windows.",
+		"target=window (Windows, macOS): an app window by title substring (on macOS also the app name), pid or handle; omit all three to list windows. Windows: works on minimized and background windows without focusing or showing them; launch test apps minimized; minimize=true minimizes a window that popped up after capturing it. macOS: background, covered and minimized windows work too (a minimized window shows what it last drew); minimize is Windows only; the first use asks the user for Screen Recording permission for Pi Screen Helper. Capture only the app under test, not the user's own windows.",
 		"target=browser: the current agent-browser page (headless; never use --headed for checks). url opens it first; selector captures one element; full captures the whole page; session picks an agent-browser session.",
 		"target=android: android screen capture of the device, or `adb exec-out screencap -p` when the android CLI is missing (serial from `adb devices`; omit when only one is attached).",
 		"target=device: any iOS Simulator, real iPhone or Android device through mobilecli, no window needed (device = id from mobile_act list; omit when one is online). Source pixels are points times the screen scale on iOS (3x on most iPhones).",
@@ -333,7 +438,7 @@ export const screenReadTool = (exec: Exec) => ({
 			const text = shot.matches.length ? `${shot.matches.length} window(s); pass handle, pid or a unique title:\n${lines.join("\n")}` : "No matching window.";
 			return { content: [{ type: "text", text }], details: shot };
 		}
-		const what = shot.window ? `Window "${shot.window.title}" (pid ${shot.window.pid}, handle ${shot.window.handle}${shot.window.minimized ? ", minimized" : ""})` : args.target === "browser" ? "Browser" : args.target === "device" ? "Device screen" : "Android screen";
+		const what = shot.window ? `Window "${shot.window.title}" (pid ${shot.window.pid}, handle ${shot.window.handle}${shot.window.minimized ? ", minimized or off screen" : ""})` : args.target === "browser" ? "Browser" : args.target === "device" ? "Device screen" : "Android screen";
 		const text = `${what}: ${shot.width}x${shot.height} PNG${shot.scale < 1 ? `, scaled x${shot.scale}` : ""} from ${args.region ? `region ${args.region.join(",")} of ` : ""}${shot.sourceWidth}x${shot.sourceHeight} source. ${shot.uniform ? "WARNING: the image is one flat color; the app may not render off-screen. " : ""}File: ${shot.file}`;
 		return { content: [{ type: "text", text }, { type: "image", data: (await readFile(shot.file)).toString("base64"), mimeType: "image/png" }], details: shot };
 	},
