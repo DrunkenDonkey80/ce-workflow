@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct PiHubApp: App {
@@ -34,10 +35,20 @@ struct HubView: UIViewRepresentable {
     func updateUIView(_ view: Container, context: Context) {}
 }
 #else
-final class MacApp: NSObject, NSApplicationDelegate {
+final class MacApp: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     static weak var shared: MacApp?
     private var window: NSWindow!
     private var status: NSStatusItem!
+
+    // SwiftUI installs its own notification delegate that forwards only to the app delegate, so this forwards to Hub;
+    // it must be in place before launch finishes, or a click that launches the app is lost.
+    func applicationWillFinishLaunching(_ notification: Notification) { _ = Hub.shared }
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler done: @escaping (UNNotificationPresentationOptions) -> Void) {
+        Hub.shared.userNotificationCenter(center, willPresent: notification, withCompletionHandler: done)
+    }
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler done: @escaping () -> Void) {
+        Hub.shared.userNotificationCenter(center, didReceive: response, withCompletionHandler: done)
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MacApp.shared = self
