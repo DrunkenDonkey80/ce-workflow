@@ -1772,6 +1772,7 @@ try {
 	writeFileSync(path.join(cwd, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { visionModel: "test/vision" } }));
 	assert.equal((await hooks.context({ messages: [imageMessage] }, { ...visionCtx, model: { provider: "test", id: "vision" } })).messages[0].content.some(part => part.type === "image"), false, "even the vision model gets references in the main context");
 	assert.match((await readBlock("out/shot.PNG"))?.reason ?? "", /process_image with image "out\/shot\.PNG"/, "image reads go to the vision model");
+	assert.equal(await readBlock("out/shot.PNG"), undefined, "reading it again is the deliberate look: the pixels load");
 	assert.equal(await readBlock("notes.md"), undefined, "text files still read normally");
 	const described = await tools.process_image.execute("call", { image: imageId, question: "What is the error?" }, undefined, null, visionCtx);
 	assert.match(described.content[0].text, /Interpretation by test\/vision.*Error code 42/s);

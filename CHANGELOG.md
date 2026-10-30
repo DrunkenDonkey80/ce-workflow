@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Changed
+- Agents can now choose how to take in a screenshot: through the vision model to read what it says, or into their own context to judge how it looks (layout, alignment, colours). The first read of an image still points to the vision model and explains both; reading the same image again loads the pixels.
+
 ### Fixed
 - Screenshots read through the vision model (process_image) no longer come back as a narrow answer that hides the page: every answer now starts with a transcript of all visible text, table rows, form fields and buttons laid out like the screen, then answers the question. Before, a question that expected another page got only "this is not that page", without what was actually on it.
 
