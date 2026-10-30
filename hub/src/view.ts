@@ -95,15 +95,21 @@ export class SessionView {
 		if (this.hydrated) return;
 		const entries = messages ? messages.map(message => ({ type: "message" as const, message })) : await this.fileEntries();
 		this.chat.hydrate({ sessionManager: { getBranch: () => entries } });
-		// The file only grows, so once older chat exists it stays offered.
-		this.olderInFile = await this.hasOlder((this.chat.snapshot() as Row[])[0]?.id);
+		// The file only grows, so once older chat exists it stays offered. Reading a long session's file takes ~0.7 s per
+		// 250 MB, so a parked one checks the entries it already read, and a live one offers older chat unchecked: the first
+		// scroll up asks the file, and an empty page turns the offer off on that page.
+		const oldest = (this.chat.snapshot() as Row[])[0]?.id;
+		this.olderInFile = messages ? !!oldest && !!this.session.file() : this.olderIn(entries, oldest);
 		this.hydrated = true;
 	}
 	private olderInFile = false;
 
 	private async hasOlder(id: string | undefined) {
+		return this.olderIn(await this.fileEntries(), id);
+	}
+	private olderIn(entries: { message: any }[], id: string | undefined) {
 		const oldest = stamp(id ?? "");
-		return oldest > 0 && (await this.fileEntries()).some(entry => entry.message.timestamp < oldest && ["user", "assistant"].includes(entry.message.role));
+		return oldest > 0 && entries.some(entry => entry.message.timestamp < oldest && ["user", "assistant"].includes(entry.message.role));
 	}
 
 	private async fileEntries() {
