@@ -32,6 +32,7 @@ public class ScreenRead {
  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out Rect r);
  [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr dc, uint flags);
  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
+ [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
  [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int i);
  [DllImport("user32.dll")] static extern int SetWindowLong(IntPtr h, int i, int v);
  [DllImport("user32.dll")] static extern bool SetLayeredWindowAttributes(IntPtr h, uint key, byte alpha, uint flags);
@@ -50,7 +51,7 @@ public class ScreenRead {
    return list.Count<200; },IntPtr.Zero);
   return list.ToArray();
  }
- public static Shot Capture(long handle, int[] region, int maxEdge, bool minimize, string file) {
+ public static Shot Capture(long handle, int[] region, int[] size, int maxEdge, bool minimize, string file) {
   var h=new IntPtr(handle);
   if(!IsWindow(h) || h==GetDesktopWindow() || h==GetShellWindow()) throw new Exception("Not an application window.");
   SetThreadDpiAwarenessContext(new IntPtr(-4));
@@ -59,6 +60,13 @@ public class ScreenRead {
    if(wasMin) { // restore fully transparent and without activation, so PrintWindow renders current content
     DwmSetWindowAttribute(h,3,ref on,4); SetWindowLong(h,-20,ex|0x80000); SetLayeredWindowAttributes(h,0,0,2);
     ShowWindow(h,4); System.Threading.Thread.Sleep(150);
+   }
+   if(size!=null && size.Length==2) { // the visible frame becomes size source pixels; a minimized window keeps the size when restored
+    Rect p0, e0, l0; GetWindowRect(h,out p0); if(DwmGetWindowAttribute(h,9,out e0,16)!=0) e0=p0;
+    var o=SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(h)); GetWindowRect(h,out l0); SetThreadDpiAwarenessContext(o);
+    double q=(double)(p0.r-p0.l)/Math.Max(1,l0.r-l0.l); // physical pixels per source pixel: 1 unless the window is DPI-unaware
+    SetWindowPos(h,IntPtr.Zero,0,0,(int)Math.Round(size[0]*q)+(p0.r-p0.l)-(e0.r-e0.l),(int)Math.Round(size[1]*q)+(p0.b-p0.t)-(e0.b-e0.t),0x16); // no move, z-order or activation
+    System.Threading.Thread.Sleep(200);
    }
    Rect phys, ext, log; GetWindowRect(h,out phys); if(DwmGetWindowAttribute(h,9,out ext,16)!=0) ext=phys;
    var old=SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(h)); GetWindowRect(h,out log); SetThreadDpiAwarenessContext(old);
@@ -135,7 +143,32 @@ Task {
 		}
 		let info = { (w: SCWindow) -> [String: Any] in ["handle": Int(w.windowID), "pid": Int(w.owningApplication?.processID ?? 0), "title": name(w), "minimized": !w.isOnScreen] }
 		if req["list"] as? Bool == true || wins.count != 1 { finish(["matches": wins.prefix(200).map(info)]) }
-		let filter = SCContentFilter(desktopIndependentWindow: wins[0]), cfg = SCStreamConfiguration()
+		var win = wins[0]
+		// Resizing another app's window goes through Accessibility, a second permission asked only when size is used.
+		if let size = req["size"] as? [Int], size.count == 2 {
+			if !AXIsProcessTrustedWithOptions([kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary) { finish(["error": "accessibility"]) }
+			let scale = CGFloat(SCContentFilter(desktopIndependentWindow: win).pointPixelScale)
+			let app = AXUIElementCreateApplication(pid_t(win.owningApplication?.processID ?? 0))
+			var list: CFTypeRef?
+			AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &list)
+			let axWins = (list as? [AXUIElement]) ?? []
+			func value<T>(_ e: AXUIElement, _ name: String, _ type: AXValueType, _ empty: T) -> T {
+				var v: CFTypeRef?, out = empty
+				if AXUIElementCopyAttributeValue(e, name as CFString, &v) == .success, let v { AXValueGetValue(v as! AXValue, type, &out) }
+				return out
+			}
+			let frame = { (e: AXUIElement) in CGRect(origin: value(e, kAXPositionAttribute, .cgPoint, CGPoint.zero), size: value(e, kAXSizeAttribute, .cgSize, CGSize.zero)) }
+			let titleOf = { (e: AXUIElement) -> String in var v: CFTypeRef?; AXUIElementCopyAttributeValue(e, kAXTitleAttribute as CFString, &v); return v as? String ?? "" }
+			guard let target = axWins.first(where: { frame($0) == win.frame }) ?? axWins.first(where: { titleOf($0) == (win.title ?? "") }) ?? (axWins.count == 1 ? axWins[0] : nil)
+			else { finish(["error": "cannot find this window through Accessibility to resize it"]) }
+			var want = CGSize(width: CGFloat(size[0]) / scale, height: CGFloat(size[1]) / scale)
+			let err = AXUIElementSetAttributeValue(target, kAXSizeAttribute as CFString, AXValueCreate(.cgSize, &want)!)
+			if err != .success { finish(["error": "resizing failed (Accessibility error \(err.rawValue))"]) }
+			try await Task.sleep(nanoseconds: 300_000_000) // let the app lay out and redraw
+			let again = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
+			win = again.windows.first { $0.windowID == win.windowID } ?? win
+		}
+		let filter = SCContentFilter(desktopIndependentWindow: win), cfg = SCStreamConfiguration()
 		cfg.width = Int(filter.contentRect.width * CGFloat(filter.pointPixelScale))
 		cfg.height = Int(filter.contentRect.height * CGFloat(filter.pointPixelScale))
 		cfg.showsCursor = false
@@ -144,7 +177,7 @@ Task {
 		guard let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: req["raw"] as! String) as CFURL, UTType.png.identifier as CFString, 1, nil) else { finish(["error": "cannot write the PNG"]) }
 		CGImageDestinationAddImage(dest, image, nil)
 		if !CGImageDestinationFinalize(dest) { finish(["error": "cannot write the PNG"]) }
-		finish(["window": info(wins[0])])
+		finish(["window": info(win)])
 	} catch { finish(["error": error.localizedDescription]) }
 }
 dispatchMain()
@@ -152,6 +185,7 @@ dispatchMain()
 const MAC_ID = "com.drunkendonkey80.ce-workflow.screen-helper";
 const MAC_APP = path.join(os.homedir(), "Library", "Application Support", "ce-workflow", "Pi Screen Helper.app");
 const MAC_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+const MAC_AX_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
 
 /** Builds the helper app when missing or its source changed. A rebuild can cost an ad-hoc signed app its grant, so it is signed with an Apple Development identity when there is one. */
 async function macHelper(exec: Exec, signal?: AbortSignal) {
@@ -190,7 +224,7 @@ async function macHelper(exec: Exec, signal?: AbortSignal) {
 
 async function macWindow(exec: Exec, plan: ReturnType<typeof screenReadPlan> & { op: "window" }, signal?: AbortSignal) {
 	const app = await macHelper(exec, signal), base = plan.file.replace(/\.png$/, ""), req = `${base}-req.json`, out = `${base}-out.json`, raw = `${base}-raw.png`;
-	await writeFile(req, JSON.stringify({ title: plan.title, pid: plan.pid, handle: plan.handle, list: plan.list, raw, out }));
+	await writeFile(req, JSON.stringify({ title: plan.title, pid: plan.pid, handle: plan.handle, list: plan.list, size: plan.size, raw, out }));
 	try {
 		const r = await exec("open", ["-W", "-n", "-g", "-a", app, "--args", req], { timeout: 120_000, signal });
 		const res = JSON.parse(await readFile(out, "utf8").catch(() => "null"));
@@ -198,6 +232,10 @@ async function macWindow(exec: Exec, plan: ReturnType<typeof screenReadPlan> & {
 		if (res.error === "permission") {
 			await exec("open", [MAC_PANE], { timeout: 30_000, signal });
 			throw new Error("macOS needs Screen Recording permission for Pi Screen Helper. Ask the user to turn it on in System Settings > Privacy & Security > Screen & System Audio Recording (now open), then retry.");
+		}
+		if (res.error === "accessibility") {
+			await exec("open", [MAC_AX_PANE], { timeout: 30_000, signal });
+			throw new Error("Resizing a window on macOS needs Accessibility permission for Pi Screen Helper. Ask the user to turn it on in System Settings > Privacy & Security > Accessibility (now open), then retry.");
 		}
 		if (res.error) throw new Error(`Pi Screen Helper: ${res.error}`);
 		if (res.matches) return { matches: res.matches as { handle: number; pid: number; title: string; minimized: boolean }[] };
@@ -210,7 +248,7 @@ async function macWindow(exec: Exec, plan: ReturnType<typeof screenReadPlan> & {
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 export type ScreenReadArgs = {
 	target: "window" | "browser" | "android" | "device";
-	window?: { title?: string; pid?: number; handle?: number; minimize?: boolean };
+	window?: { title?: string; pid?: number; handle?: number; minimize?: boolean; size?: number[] };
 	device?: { device?: string };
 	browser?: { url?: string; selector?: string; full?: boolean; session?: string };
 	android?: { device?: string };
@@ -225,7 +263,7 @@ $p=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($env:SCREEN_READ_
 if($p.op -eq 'window') {
  $m=@([ScreenRead]::Find([long]$p.handle,[uint32]$p.pid,[string]$p.title))
  if($p.list -or $m.Count -ne 1) { ConvertTo-Json -InputObject @{matches=$m} -Compress -Depth 3 }
- else { ConvertTo-Json -InputObject @{window=$m[0]; shot=[ScreenRead]::Capture($m[0].handle,[int[]]$p.region,[int]$p.maxEdge,[bool]$p.minimize,$p.file)} -Compress -Depth 3 }
+ else { ConvertTo-Json -InputObject @{window=$m[0]; shot=[ScreenRead]::Capture($m[0].handle,[int[]]$p.region,[int[]]$p.size,[int]$p.maxEdge,[bool]$p.minimize,$p.file)} -Compress -Depth 3 }
 } else {
  $name=$p.exe; $runs=$p.runs; $toRaw=$false
  $cmd=@(Get-Command $name -CommandType Application -ErrorAction SilentlyContinue)
@@ -255,22 +293,23 @@ export function screenReadPlan(args: ScreenReadArgs, file: string) {
 	const maxEdge = Math.min(4096, Math.max(64, Math.round(args.maxEdge ?? 1024)));
 	const base = { region, maxEdge, file };
 	if (args.target === "window") {
-		const w = args.window ?? {};
-		return { ...base, op: "window", title: w.title ?? "", pid: w.pid ?? 0, handle: w.handle ?? 0, minimize: !!w.minimize, list: !w.title && !w.pid && !w.handle };
+		const w = args.window ?? {}, size = w.size;
+		if (size !== undefined && (!Array.isArray(size) || size.length !== 2 || size.some(v => !Number.isSafeInteger(v) || v < 100 || v > 8000))) throw new Error("window.size must be [width, height] in source pixels, each 100 to 8000.");
+		return { ...base, op: "window" as const, title: w.title ?? "", pid: w.pid ?? 0, handle: w.handle ?? 0, minimize: !!w.minimize, list: !w.title && !w.pid && !w.handle, ...size && { size } };
 	}
 	const raw = file.replace(/\.png$/, "-raw.png");
 	if (args.target === "browser") {
 		const b = args.browser ?? {}, session = b.session ? ["--session", b.session] : [];
 		if ([b.url, b.selector, b.session].some(v => v?.includes('"'))) throw new Error("browser url/selector/session cannot contain double quotes; use single quotes in selectors.");
 		const runs = [...(b.url ? [[...session, "open", b.url]] : []), [...session, "screenshot", ...(b.selector ? [b.selector] : []), raw, ...(b.full ? ["--full"] : [])]];
-		return { ...base, op: "file", exe: "agent-browser", runs, raw };
+		return { ...base, op: "file" as const, exe: "agent-browser", runs, raw };
 	}
 	if (args.target === "android") {
 		const device = args.android?.device;
 		// alt: plain adb when the android CLI is not installed; screencap writes the PNG to stdout, which goes to raw
-		return { ...base, op: "file", exe: "android", runs: [["screen", "capture", ...(device ? [`--device=${device}`] : []), `--output=${raw}`]], raw, alt: { exe: "adb", runs: [[...(device ? ["-s", device] : []), "exec-out", "screencap", "-p"]] } };
+		return { ...base, op: "file" as const, exe: "android", runs: [["screen", "capture", ...(device ? [`--device=${device}`] : []), `--output=${raw}`]], raw, alt: { exe: "adb", runs: [[...(device ? ["-s", device] : []), "exec-out", "screencap", "-p"]] } };
 	}
-	if (args.target === "device") { const d = args.device?.device; return { ...base, op: "file", exe: MOBILECLI, runs: [["screenshot", ...(d ? ["--device", d] : []), "--output", raw]], raw }; }
+	if (args.target === "device") { const d = args.device?.device; return { ...base, op: "file" as const, exe: MOBILECLI, runs: [["screenshot", ...(d ? ["--device", d] : []), "--output", raw]], raw }; }
 	throw new Error("target must be window, browser, android or device.");
 }
 
@@ -388,7 +427,7 @@ export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: Abor
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
 	if (platform === "darwin" && plan.op === "window") return macWindow(exec, plan as ReturnType<typeof screenReadPlan> & { op: "window" }, signal);
-	if (platform !== "win32") return { file, ...await captureFile(plan as FilePlan, signal).catch(e => {
+	if (platform !== "win32") return { file, window: undefined, ...await captureFile(plan as FilePlan, signal).catch(e => {
 		throw e?.code === "ENOENT" && (plan as FilePlan).exe === MOBILECLI ? new Error("screen_read target=device needs mobilecli, which ships with ce-workflow on macOS, Linux and Windows (x64, arm64); reinstall ce-workflow or put mobilecli on PATH.") : e;
 	}) };
 	// env, not argv: no quoting issues; spawn copies it synchronously, so parallel calls cannot mix it up
@@ -414,7 +453,7 @@ export const screenReadTool = (exec: Exec) => ({
 	description: [
 		"Visual read for testing. Returns a PNG downscaled so its longest edge is at most maxEdge (default 1024). Image tokens scale with pixel count, so ask for the least you need: maxEdge 512 shows layout; then zoom with region [x, y, width, height] in SOURCE pixels (reported in every result) for full detail of one area.",
 		"Prefer text when it answers the question: agent-browser snapshot/read for web pages, android layout for devices. Use this for layout, colors, rendering and canvas.",
-		"target=window (Windows, macOS): an app window by title substring (on macOS also the app name), pid or handle; omit all three to list windows. Windows: works on minimized and background windows without focusing or showing them; launch test apps minimized; minimize=true minimizes a window that popped up after capturing it. macOS: background, covered and minimized windows work too (a minimized window shows what it last drew); minimize is Windows only; the first use asks the user for Screen Recording permission for Pi Screen Helper. Capture only the app under test, not the user's own windows.",
+		"target=window (Windows, macOS): an app window by title substring (on macOS also the app name), pid or handle; omit all three to list windows. Windows: works on minimized and background windows without focusing or showing them; launch test apps minimized; minimize=true minimizes a window that popped up after capturing it. size=[width, height] resizes the window first so the capture's source is that many pixels (test layouts at a given size; the window keeps the new size; the app may refuse sizes below its minimum, so check sourceWidth/sourceHeight). macOS: background, covered and minimized windows work too (a minimized window shows what it last drew); minimize is Windows only; the first use asks the user for Screen Recording permission for Pi Screen Helper, and the first size use for Accessibility permission. Capture only the app under test, not the user's own windows.",
 		"target=browser: the current agent-browser page (headless; never use --headed for checks). url opens it first; selector captures one element; full captures the whole page; session picks an agent-browser session.",
 		"target=android: android screen capture of the device, or `adb exec-out screencap -p` when the android CLI is missing (serial from `adb devices`; omit when only one is attached).",
 		"target=device: any iOS Simulator, real iPhone or Android device through mobilecli, no window needed (device = id from mobile_act list; omit when one is online). Source pixels are points times the screen scale on iOS (3x on most iPhones).",
@@ -423,7 +462,7 @@ export const screenReadTool = (exec: Exec) => ({
 		type: "object", additionalProperties: false, required: ["target"],
 		properties: {
 			target: { type: "string", enum: ["window", "browser", "android", "device"] },
-			window: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, pid: { type: "integer" }, handle: { type: "integer" }, minimize: { type: "boolean" } } },
+			window: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, pid: { type: "integer" }, handle: { type: "integer" }, minimize: { type: "boolean" }, size: { type: "array", items: { type: "integer", minimum: 100, maximum: 8000 }, minItems: 2, maxItems: 2, description: "[width, height]: resize the window first, in source pixels" } } },
 			browser: { type: "object", additionalProperties: false, properties: { url: { type: "string" }, selector: { type: "string" }, full: { type: "boolean" }, session: { type: "string" } } },
 			android: { type: "object", additionalProperties: false, properties: { device: { type: "string" } } },
 			device: { type: "object", additionalProperties: false, properties: { device: { type: "string" } } },
@@ -438,8 +477,9 @@ export const screenReadTool = (exec: Exec) => ({
 			const text = shot.matches.length ? `${shot.matches.length} window(s); pass handle, pid or a unique title:\n${lines.join("\n")}` : "No matching window.";
 			return { content: [{ type: "text", text }], details: shot };
 		}
+		const size = args.target === "window" ? args.window?.size : undefined;
 		const what = shot.window ? `Window "${shot.window.title}" (pid ${shot.window.pid}, handle ${shot.window.handle}${shot.window.minimized ? ", minimized or off screen" : ""})` : args.target === "browser" ? "Browser" : args.target === "device" ? "Device screen" : "Android screen";
-		const text = `${what}: ${shot.width}x${shot.height} PNG${shot.scale < 1 ? `, scaled x${shot.scale}` : ""} from ${args.region ? `region ${args.region.join(",")} of ` : ""}${shot.sourceWidth}x${shot.sourceHeight} source. ${shot.uniform ? "WARNING: the image is one flat color; the app may not render off-screen. " : ""}File: ${shot.file}`;
+		const text = `${what}: ${shot.width}x${shot.height} PNG${shot.scale < 1 ? `, scaled x${shot.scale}` : ""} from ${args.region ? `region ${args.region.join(",")} of ` : ""}${shot.sourceWidth}x${shot.sourceHeight} source. ${shot.uniform ? "WARNING: the image is one flat color; the app may not render off-screen. " : ""}${size && (Math.abs(size[0] - shot.sourceWidth) > 2 || Math.abs(size[1] - shot.sourceHeight) > 2) ? `WARNING: asked for ${size.join("x")}; the app kept ${shot.sourceWidth}x${shot.sourceHeight} (its minimum or maximum size, or the screen). ` : ""}File: ${shot.file}`;
 		return { content: [{ type: "text", text }, { type: "image", data: (await readFile(shot.file)).toString("base64"), mimeType: "image/png" }], details: shot };
 	},
 });

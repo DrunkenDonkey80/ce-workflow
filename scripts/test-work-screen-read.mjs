@@ -12,6 +12,8 @@ const file = "C:/tmp/x.png";
 assert.deepEqual(screenReadPlan({ target: "window" }, file), { region: undefined, maxEdge: 1024, file, op: "window", title: "", pid: 0, handle: 0, minimize: false, list: true });
 assert.equal(screenReadPlan({ target: "window", window: { pid: 5 }, maxEdge: 9 }, file).maxEdge, 64);
 assert.equal(screenReadPlan({ target: "window", window: { title: "x" }, maxEdge: 99999 }, file).list, false);
+assert.deepEqual(screenReadPlan({ target: "window", window: { pid: 5, size: [390, 844] } }, file).size, [390, 844]);
+for (const size of [[390], [99, 500], [500, 8001], [500.5, 500]]) assert.throws(() => screenReadPlan({ target: "window", window: { pid: 5, size } }, file), /window.size/);
 for (const region of [[0, 0, 1], [-1, 0, 1, 1], [0, 0, 0, 1], [0.5, 0, 1, 1]]) assert.throws(() => screenReadPlan({ target: "window", region }, file), /region/);
 assert.deepEqual(screenReadPlan({ target: "browser", browser: { url: "http://x", selector: "#a", full: true, session: "s" } }, file).runs, [["--session", "s", "open", "http://x"], ["--session", "s", "screenshot", "#a", "C:/tmp/x-raw.png", "--full"]]);
 assert.deepEqual(screenReadPlan({ target: "android", android: { device: "emu" } }, file).runs, [["screen", "capture", "--device=emu", "--output=C:/tmp/x-raw.png"]]);
@@ -97,6 +99,11 @@ if (process.platform === "win32") {
 		assert.deepEqual([zoom.width, zoom.height, zoom.scale], [100, 50, 1]);
 		assert.equal(zoom.window.minimized, true, "window re-minimized after the first capture");
 		await assert.rejects(screenRead(exec, { target: "window", window: { pid: child.pid }, region: [0, 0, 5000, 5000] }), /region must lie inside/);
+		// size resizes the minimized window to that source size; it stays minimized and keeps the size.
+		const sized = await screenRead(exec, { target: "window", window: { pid: child.pid, size: [700, 500] }, maxEdge: 128 });
+		assert.deepEqual([sized.sourceWidth, sized.sourceHeight, sized.window.minimized], [700, 500, true], "resized frame");
+		const after = await screenRead(exec, { target: "window", window: { pid: child.pid }, maxEdge: 128 });
+		assert.deepEqual([after.sourceWidth, after.sourceHeight], [700, 500], "the new size stays");
 		const tool = screenReadTool(exec);
 		const result = await tool.execute("t", { target: "window", window: { pid: child.pid }, maxEdge: 128 });
 		assert.equal(result.content[1].type, "image");
