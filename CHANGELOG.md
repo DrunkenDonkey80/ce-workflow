@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.8 — 2026-10-30
 
 ### Added
 - A session that messages another one over intercom while that one waits for your answer is no longer left hanging: the message is stopped with the question and its options, and the sending session can wait (it gets told what you picked once you answer), drop it, or, only when you told it to control or fix that session, answer it itself. An answer from another session shows a notice on the page, and the asked session is told it came from that session, not from you.
