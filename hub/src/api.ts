@@ -12,7 +12,7 @@ import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { explore, viewPage } from "./explore.ts";
+import { ARCHIVE, explore, viewPage } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
@@ -344,8 +344,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				only(data, ["target", "path"], "Invalid fields.");
 				const real = await linkedFile(data.path, folder(id), remote);
 				if (!real) throw fail(404, "File not found or not shared.");
-				// An HTML page: its folder is served live (each file checked like a chat link) instead of unpacked.
-				return /\.html?$/i.test(real) ? viewPage(real, folder(id), remote) : explore(real);
+				// Not an archive: its folder is served live (each file checked like a chat link) and the file shown in the viewer.
+				return ARCHIVE.test(real) ? explore(real) : viewPage(real, folder(id), remote);
 			}
 			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.
 			case "upload": {

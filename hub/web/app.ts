@@ -820,7 +820,7 @@ function renderChat() {
 // An absolute path (C:\x, \\server\share\x, /a/b, ~/a/b) links without an extension too, so folders open (this PC only); trailing .,;!? stay text.
 // A POSIX one needs two parts, so /wo and other slash commands stay text.
 const LINKED_PATH = /(?<![\w:/\\.-])(?:(?:[A-Za-z]:|\\\\[^\s"'`<>|*?()[\]:\\/]+|~?\/[^\s"'`<>|*?()[\]:\\/]+)(?:[\\/][^\s"'`<>|*?()[\]:\\/]+)*[\\/][^\s"'`<>|*?()[\]:\\/]*[^\s"'`<>|*?()[\]:\\/.,;!?]|(?:[A-Za-z]:[\\/]|\\\\|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-]))/gi;
-const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i;
+const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i, ARCHIVE_FILE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
 // Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
 // no colon after that, and a file extension right before the closing quote.
 // An absolute one (C:\x, \\server\x, /a/b, ~/a/b) needs no extension, so quoted folders link too.
@@ -937,9 +937,11 @@ function openFileMenu(link: HTMLElement, path: string, full: string) {
  // A folder (this PC only) can't be sent as it is: open, copy or zip it.
  if ("folder" in link.dataset) return showMenu(link, [["Open", () => void openFile(path, false)], ["Copy path", () => void copyPath(full)], ["Zip and upload", () => void wormhole(path, "zip")]]);
  const uploads: [string, () => void][] = [["Upload", () => void wormhole(path, "")], ["Zip and upload", () => void wormhole(path, "zip")], ...(sevenZip ? [["7z and upload", () => void wormhole(path, "7z")] as [string, () => void]] : [])];
- const explore: [string, () => void][] = /.(zip|7z|rar|tar|tgz|tbz2?|txz|tar.(gz|bz2|xz|zst))$/i.test(path) ? [["Explore", () => void exploreArchive(path)]] : /\.html?$/i.test(path) ? [["View page", () => void exploreArchive(path)]] : [];
+ const archive = ARCHIVE_FILE.test(path), explore: [string, () => void][] = archive ? [["Explore", () => void exploreArchive(path)]] : /\.html?$/i.test(path) ? [["View page", () => void exploreArchive(path)]] : [];
+ // Remotely, Open shows the file in the viewer beside the chat (markdown rendered, pages framed); images and archives open as before.
+ const viewable = !archive && !IMAGE_FILE.test(path);
  showMenu(link, token ? [...explore, ["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]
-  : [...explore, ["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
+  : [...viewable ? [] : explore, ["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => viewable ? void exploreArchive(path) : void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
 }
 // Wormhole upload: the hub packs, encrypts and uploads; the page polls once a second and copies the link (key in its #fragment).
 let sevenZip = false; get("upload").then(value => { sevenZip = value.sevenZip; }, () => undefined);
@@ -957,7 +959,7 @@ async function wormhole(path: string, pack: string) {
 }
 // Explore: the hub unpacks the archive into a temp folder; the Files tab walks it and the chat shrinks to make room.
 async function exploreArchive(path: string) {
- showNotice((/\.html?$/i.test(path) ? "Opening " : "Unpacking ") + path.split(/[\/]/).pop() + "…");
+ showNotice((ARCHIVE_FILE.test(path) ? "Unpacking " : "Opening ") + path.split(/[\/]/).pop() + "…");
  try {
   const value = await post("explore", { path });
   if (!filesView.exploring) {

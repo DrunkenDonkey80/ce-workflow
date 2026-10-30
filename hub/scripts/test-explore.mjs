@@ -48,6 +48,8 @@ try {
 	const old = new Date(Date.now() - 10 * 864e5); await utimes(join(work, "site", "notes.md"), old, old); // recent temp files stay open to remote, like chat links
 	const outside = await viewPage(join(work, "site", "index.html"), join(work, "elsewhere"), true);
 	assert.equal((await fetchLike(`/x/${outside.key}/notes.md`)).status, 404, "remotely, files outside the project stay closed");
-	await assert.rejects(viewPage(join(work, "site", "notes.md"), work, false), /Only HTML/);
+	const md = await viewPage(join(work, "site", "notes.md"), work, false);
+	assert.deepEqual([md.open, md.files.map(file => file.path)], ["notes.md", ["notes.md"]], "any other file: shown alone, its folder not walked");
+	assert.equal((await fetchLike(`/x/${md.key}/notes.md`)).status, 200);
 	console.log("explore ok");
 } finally { await rm(work, { recursive: true, force: true }); }

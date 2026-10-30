@@ -11,7 +11,7 @@ import { basename, dirname, extname, join, relative, resolve, isAbsolute } from 
 import { linkedFile } from "./linked-files.ts";
 import { sevenZip } from "./wormhole.ts";
 
-const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
+export const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
 const TAR_FAMILY = /\.(?:tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i, MAX_ARCHIVE = 2e9, MAX_FILES = 5000;
 const root = join(tmpdir(), "pi-hub-explore");
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
@@ -52,14 +52,16 @@ export async function explore(real: string) {
 	await walk(folders.get(key)!, "", files);
 	return { key, name: basename(real), files: files.slice(0, MAX_FILES).sort((a, b) => a.path.localeCompare(b.path)), truncated: files.length > MAX_FILES };
 }
-/** A chat-linked HTML page (a validated real path): its folder served as is, so relative images, scripts and data load. */
+/**
+ * A chat-linked file (a validated real path) shown in the Files viewer: its folder served live. An HTML page lists the
+ * folder (its relative images, scripts and data load); any other file lists only itself, so a big folder is never walked.
+ */
 export async function viewPage(real: string, project: string, remote: boolean) {
-	if (!/\.html?$/i.test(real)) throw fail(400, "Only HTML pages can be viewed.");
 	const folder = dirname(real), id = `page|${folder}|${project}|${remote}`;
 	let key = unpacked.get(id);
 	if (!key) { key = randomBytes(16).toString("hex"); unpacked.set(id, key); folders.set(key, folder); live.set(key, { project, remote }); }
 	const files: { path: string; size: number }[] = [];
-	await walk(folder, "", files, true);
+	if (/\.html?$/i.test(real)) await walk(folder, "", files, true); else files.push({ path: basename(real), size: (await stat(real)).size });
 	return { key, name: basename(folder), files: files.slice(0, MAX_FILES).sort((a, b) => a.path.localeCompare(b.path)), truncated: files.length > MAX_FILES, open: basename(real) };
 }
 async function walk(base: string, prefix: string, files: { path: string; size: number }[], skipHidden = false) {
