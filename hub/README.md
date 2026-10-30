@@ -53,8 +53,8 @@ overlay and the tray (asking red, working amber, finished-unseen blue), even wit
 (`hub/app/ui/index.html`, through `shim.js`) with one WKWebView per hub. Not on the App Store: you build and sign it yourself.
 
 - Build: `hub/apple/build.sh` signs the Mac app with your Apple Development identity and copies it to `~/Applications/Pi Hub.app`,
-  and builds the simulator app. `IOS_PROFILE="<In-House profile name>" hub/apple/build.sh` also builds the signed iPhone/iPad app
-  (an In-House or development profile for `dev.ce-workflow.pi-hub-app`); install it with `xcrun devicectl device install app`.
+  and builds the simulator app. `IOS_TEAM=<Enterprise team id> hub/apple/build.sh` also exports a signed In-House
+  `hub/apple/build/ipa/Pi Hub.ipa` (Xcode makes its profile); install it with `xcrun devicectl device install app`.
   The first launch on a device needs Settings > General > VPN & Device Management > Trust.
 - Mac: this Mac's hub is the first tab. The Dock icon redraws with the hubs' states, its badge counts what needs you, it bounces
   when something new does, and a menu bar item lists the hubs. Closing the window keeps it running there; Cmd+1…9 switch tabs.

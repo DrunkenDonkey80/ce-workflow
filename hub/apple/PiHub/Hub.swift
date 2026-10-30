@@ -273,6 +273,19 @@ final class Hub: NSObject, WKScriptMessageHandlerWithReply, WKNavigationDelegate
 
     func webViewDidClose(_ webView: WKWebView) { Platform.dismiss(webView) }
 
+    // WKWebView shows a blank page when a hub can't be reached (unlike WebView2): say why, and retry every 10 s.
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        let e = error as NSError
+        guard e.code != NSURLErrorCancelled, let url = (e.userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.absoluteString else { return }
+        let go = "location.replace(\(json(url)))"
+        webView.loadHTMLString("""
+            <meta name=viewport content="width=device-width"><body style="font:15px -apple-system;margin:24px;color:#444">
+            <h3>Can't reach this hub</h3><p>\(e.localizedDescription.replacingOccurrences(of: "<", with: "&lt;"))</p>
+            <p>Its PC must be on and, for a tailnet address, this device connected to Tailscale.</p>
+            <button onclick='\(go)'>Retry</button><script>setTimeout(()=>{\(go)},10000)</script>
+            """, baseURL: nil)
+    }
+
     func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
         let hub = idOf(webView).flatMap { origins[$0] }
         decisionHandler(hub?.hasPrefix("\(origin.protocol)://\(origin.host):") == true ? .grant : .prompt)

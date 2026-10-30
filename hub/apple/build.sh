@@ -1,6 +1,6 @@
 #!/bin/bash
 # AP-10: builds Pi Hub for the Mac (signed, copied to ~/Applications) and the iOS Simulator.
-# With IOS_PROFILE=<In-House profile name> (D9, AP-16) it also builds a signed iPhone/iPad app.
+# With IOS_TEAM=<Enterprise team id> it also exports a signed In-House .ipa for iPhone/iPad (D9).
 set -euo pipefail
 cd "$(dirname "$0")"
 OUT=build
@@ -19,11 +19,15 @@ xcodebuild -quiet -project PiHub.xcodeproj -scheme PiHub -configuration Release 
   -derivedDataPath "$OUT" build
 echo "Simulator: $OUT/Build/Products/Release-iphonesimulator/Pi Hub.app"
 
-if [ -n "${IOS_PROFILE:-}" ]; then
+if [ -n "${IOS_TEAM:-}" ]; then
+  # Enterprise In-House (D9): archive unsigned, then the export signs it; Xcode makes the "iOS Team Inhouse" profile itself.
+  rm -rf "$OUT/PiHub.xcarchive" "$OUT/ipa"
   xcodebuild -quiet -project PiHub.xcodeproj -scheme PiHub -configuration Release -destination 'generic/platform=iOS' \
-    -derivedDataPath "$OUT" DEVELOPMENT_TEAM=SB2F4HT97P CODE_SIGN_IDENTITY="iPhone Distribution: Datecs LTD" \
-    PROVISIONING_PROFILE_SPECIFIER="$IOS_PROFILE" build
-  echo "iPhone/iPad: $OUT/Build/Products/Release-iphoneos/Pi Hub.app"
+    -archivePath "$OUT/PiHub.xcarchive" DEVELOPMENT_TEAM="$IOS_TEAM" CODE_SIGNING_ALLOWED=NO archive
+  printf '%s' "<plist><dict><key>method</key><string>enterprise</string><key>teamID</key><string>$IOS_TEAM</string><key>signingStyle</key><string>automatic</string></dict></plist>" > "$OUT/export.plist"
+  xcodebuild -quiet -exportArchive -archivePath "$OUT/PiHub.xcarchive" -exportOptionsPlist "$OUT/export.plist" \
+    -exportPath "$OUT/ipa" -allowProvisioningUpdates
+  echo "iPhone/iPad: $OUT/ipa/Pi Hub.ipa (install: xcrun devicectl device install app --device <id> \"$OUT/ipa/Pi Hub.ipa\")"
 else
-  echo "iPhone/iPad: skipped (set IOS_PROFILE to the In-House profile's name)"
+  echo "iPhone/iPad: skipped (set IOS_TEAM to your Enterprise team id)"
 fi
