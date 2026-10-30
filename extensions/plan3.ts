@@ -1241,6 +1241,14 @@ export default function plan3(pi) {
 			if (pick?.value?.startsWith("review")) return advise(ctx, "review", pick.value === "review-all", "", plan);
 			if (pick?.value !== "finish") return;
 		}
+		// Ask before changing anything: cancel leaves the plan a draft, research on and the session uncompacted.
+		const fresh = typeof ctx.newSession === "function"; // Session replacement exists only on command contexts (not the browser workspace's).
+		const pick = ctx.hasUI ? await showListDialog(ctx, { title: "Plan ready", purpose: "Mark the plan ready and turn research off, then:", cursorKey: `plan3-ready:${plan.id}`, items: [
+			...(fresh ? [{ value: "new", label: "Start work in a new session", description: "Save your standing requirements into the plan, then start in a fresh session" }] : []),
+			{ value: "resume", label: "Start work here", description: "Compact this session, then start" },
+			{ value: "later", label: "Not yet", description: `Compact now; resume later with /resume3 ${plan.id}` },
+		] }) : undefined;
+		if (ctx.hasUI && !pick) return ctx.ui.notify("Plan3: finish cancelled; nothing changed.", "info");
 		await ensureArchitectureStep(ctx, plan);
 		await mutate(plan, (lines) => {
 			setMeta(lines, "status", "ready");
@@ -1250,13 +1258,6 @@ export default function plan3(pi) {
 		setPointer(plan, false);
 		research(ctx, false);
 		await refresh(ctx);
-		// Session replacement exists only on command contexts (not the browser workspace's).
-		const fresh = typeof ctx.newSession === "function";
-		const pick = ctx.hasUI ? await showListDialog(ctx, { title: "Plan ready", purpose: "Planning is finished and research is off. Start implementation when you choose.", cursorKey: `plan3-ready:${plan.id}`, items: [
-			...(fresh ? [{ value: "new", label: "Start work in a new session", description: "Save your standing requirements into the plan, then start in a fresh session" }] : []),
-			{ value: "resume", label: "Start work here", description: "Compact this session, then start" },
-			{ value: "later", label: "Not yet", description: `Compact now; resume later with /resume3 ${plan.id}` },
-		] }) : undefined;
 		if (pick?.value === "new") return startFresh(ctx, plan);
 		const compacted = await compactFirst(ctx, plan, true); // The plan is ready either way; a failed compaction was already reported.
 		ctx.ui.notify(`Plan ready · /resume3 ${plan.id}\n${plan.file}`, "info");
@@ -1287,6 +1288,8 @@ export default function plan3(pi) {
 	async function reviewItems(ctx, plan) {
 		if (plan.reviewed) return [];
 		const all = await chooseAdvisors(ctx, true);
+		// No other Plan model available: still offer the review, by this agent alone (advise falls back to it).
+		if (!all.length) return [{ value: "review-one", label: "Review with this agent", description: "No other Plan model is available right now" }];
 		if (all.length === 1) return [{ value: "review-all", label: "Review first", description: `Second opinion from ${all[0].model}` }];
 		const one = (await chooseAdvisors(ctx, false))[0];
 		return [

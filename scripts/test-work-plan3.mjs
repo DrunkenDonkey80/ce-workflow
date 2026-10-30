@@ -818,7 +818,7 @@ try {
 	// Finishing from the browser applies to the selected plan, not the session's other current plan.
 	const handoffFile = path.join(directory, "2026-10-08-handoff-45454545-plan3.md"), beforeHandoffEntries = entries.length;
 	await writeFile(handoffFile, validPlan("45454545", "Handoff", "draft", "- [ ] **H-01** Implement"));
-	selectScript = [["Plans3", "Handoff"], ["Handoff", "Finish planning", labels => assert.match(labels[0], /Finish planning/)], ["Plan ready", "Not yet"]];
+	selectScript = [["Plans3", "Handoff"], ["Handoff", "Finish planning", labels => assert.match(labels[0], /Finish planning/)], ["Finish planning", "Finish without review"], ["Plan ready", "Not yet"]];
 	await run("plans3");
 	assert.equal(selectScript.length, 0);
 	assert.match(await readFile(handoffFile, "utf8"), /^status: ready$/m);
@@ -875,6 +875,22 @@ try {
 		await run("plans3");
 		assert.equal(selectScript.length, 0);
 		assert.match(await readFile(reviewFile, "utf8"), /^status: ready$/m, "finishing without review still finishes");
+		// No other Plan model available: the review is still offered, by this agent.
+		await useModels(["anthropic/claude-opus-5-5"]);
+		await writeFile(reviewFile, validPlan("46464646", "Reviewable", "draft", "- [ ] **R-01** Implement"));
+		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Finish planning", "Review with this agent"]];
+		await run("plans3");
+		assert.equal(selectScript.length, 0);
+		assert.match(await readFile(reviewFile, "utf8"), /^reviewed: /m, "self-review marks the plan");
+		// Cancelling the ready dialog changes nothing: still draft, research untouched, no compaction.
+		const [beforeEvents, beforeCompactions] = [events.length, compactions];
+		selectScript = [["Plans3", "Reviewable"], ["Reviewable", "Finish planning"], ["Plan ready", null]];
+		await run("plans3");
+		assert.equal(selectScript.length, 0);
+		assert.match(await readFile(reviewFile, "utf8"), /^status: draft$/m, "cancel keeps the draft");
+		assert.equal(compactions, beforeCompactions, "cancel does not compact");
+		assert(!events.slice(beforeEvents).some((event) => event.name === "plan3:research"), "cancel leaves research mode alone");
+		assert.match(notices.at(-1).message, /finish cancelled; nothing changed/);
 		await writeFile(settingsFile, savedSettings);
 		await rm(reviewFile); entries.splice(beforeReviewEntries);
 	}

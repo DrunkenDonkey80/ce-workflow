@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.7 — 2026-10-30
+
+### Fixed
+- /plan3 finish on a plan that was never reviewed now always offers the review first. When no other Plan model is available, it offers a review by the current agent instead of skipping the question.
+- Cancelling the /plan3 finish dialog changes nothing: the plan stays a draft, research mode stays on and the session is not compacted. The choice of how to start work is now asked before the plan is marked ready.
+
 ## 0.2.6 — 2026-10-30
 
 ### Changed
