@@ -18,6 +18,8 @@
  window.__TAURI__ = { core: { invoke: call }, window: { getCurrentWindow: () => win }, menu };
  // AP-04: the strip is as tall as its rows; Swift sizes the view to it.
  addEventListener("DOMContentLoaded", () => {
+  // Phones lay a page without a viewport out 980 px wide and shrink it; the strip is drawn at device width instead.
+  document.head.append(Object.assign(document.createElement("meta"), { name: "viewport", content: "width=device-width, initial-scale=1, maximum-scale=1" }));
   let last = 0;
   new ResizeObserver(() => { const height = Math.ceil(document.body.getBoundingClientRect().height); if (height !== last) { last = height; void call("height", { height }); } }).observe(document.body);
  });
