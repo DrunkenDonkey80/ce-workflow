@@ -2004,6 +2004,7 @@ async function openUsage(id: string, open = true) {
  if (id === "claude") {
   let pool: { title: string; drain7d: boolean; rows: PoolRow[] } | null = null;
   try { pool = await get("pool"); } catch { pool = null; }
+  if (!Array.isArray(pool?.rows)) pool = null; // a hub without a pool answers {ok: true}
   // Copy/paste the pool's logins (refresh tokens + login-sync key) to set up the pool on another hub.
   const copyPaste = () => {
    const copy = el("button", "", "Copy logins"), paste = el("button", "", "Paste logins");
