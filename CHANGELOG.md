@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## 0.2.10 — 2026-10-30
+## 0.2.11 — 2026-10-30
 
 ### Changed
 - Copying a table from a chat message or an opened Markdown file now gives Markdown table rows when pasted as text (chat, terminal, a .md file), instead of tab-separated cells; Excel and Word still get a real table.
