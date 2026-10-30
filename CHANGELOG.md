@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.12 — 2026-10-30
+
+### Fixed
+- Clicking the Claude usage bar opens the accounts list again when the Claude accounts package was installed from an https:// link (`pi install https://github.com/...`), as on this Mac. The hub only looked for git: and npm: installs, so it missed the pool and the click did nothing.
+
 ## 0.2.11 — 2026-10-30
 
 ### Changed
@@ -14,7 +19,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Fixed
 - The hub's memory graph on a Mac shows how full memory really is (the memory pressure Activity Monitor shows) instead of always about 99%. macOS keeps spare RAM filled with cache, which the old count took for used memory.
-- Clicking the Claude usage bar opens the usage window again, with the accounts list, when the Claude accounts package was installed from an https:// link (`pi install https://github.com/...`). The hub only looked for git: and npm: installs, so it missed the pool and the click did nothing.
+- Clicking the Claude usage bar opens the usage window on a hub that has no Claude account pool (such as a Mac). Before, nothing happened.
 
 ## 0.2.9 — 2026-10-30
 
