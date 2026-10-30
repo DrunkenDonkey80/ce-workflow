@@ -49,8 +49,16 @@ try {
 		registerSelfUpdate(next.pi, { packageFile: file, loaded: "1.0.1", now: () => clock, every: 1e9 });
 		next.fire("session_start", { reason: "reload" });
 		await new Promise(resolve => setTimeout(resolve, 5));
-		assert.match(next.sent[0]?.text ?? "", /Continue the plan where you left off/);
+		assert.match(next.sent[0]?.text ?? "", /Continue where you left off/);
 		next.fire("session_shutdown");
+	}
+	{
+		// A compaction inside a run is a boundary too; an idle /compact is not.
+		const { pi, ctx, fire } = fakePi();
+		registerSelfUpdate(pi, { packageFile: file, loaded: "1.0.0", now: () => clock, every: 1e9, stableMs: 0 });
+		fire("session_start", { reason: "startup" });
+		fire("session_compact"); ctx.idle = false; fire("turn_end"); assert.equal(ctx.aborted, 0, "idle /compact: the next prompt runs on");
+		fire("session_compact"); fire("turn_end"); assert.equal(ctx.aborted, 1, "compaction mid-run stops at the next turn end");
 	}
 	{
 		// Under the hub an idle session reloads from the minute poll; outside it only a run's end does.

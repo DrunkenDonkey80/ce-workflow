@@ -820,6 +820,7 @@ function renderChat() {
 // An absolute path (C:\x, \\server\share\x, /a/b, ~/a/b) links without an extension too, so folders open (this PC only); trailing .,;!? stay text.
 // A POSIX one needs two parts, so /wo and other slash commands stay text.
 const LINKED_PATH = /(?<![\w:/\\.-])(?:(?:[A-Za-z]:|\\\\[^\s"'`<>|*?()[\]:\\/]+|~?\/[^\s"'`<>|*?()[\]:\\/]+)(?:[\\/][^\s"'`<>|*?()[\]:\\/]+)*[\\/][^\s"'`<>|*?()[\]:\\/]*[^\s"'`<>|*?()[\]:\\/.,;!?]|(?:[A-Za-z]:[\\/]|\\\\|\/)?(?:[^\s"'`<>|*?()[\]:\\/]+[\\/])*[^\s"'`<>|*?()[\]:\\/]+\.[A-Za-z][A-Za-z0-9]{0,9}(?![\w-]))/gi;
+const APP_FILE = /\.(?:docx?|xlsx?|pptx?|od[tsp]|rtf|exe|msi|dll|lnk|bat|cmd|ps1|skp|dwg|blend|psd|ai|fbx|glb|stl|3mf)$/i;
 const IMAGE_FILE = /\.(?:png|jpe?g|gif|webp|svg)$/i, ARCHIVE_FILE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
 // Body of a quoted path: a drive, or a first folder without spaces (so "/review docs/plan.md" or "see docs/a.md" are not one path),
 // no colon after that, and a file extension right before the closing quote.
@@ -921,12 +922,16 @@ function checkFileLinks(root: HTMLElement) {
  post("paths", { paths: unknown }).then(({ found, folders = [] }) => { for (const path of folders) folderFound.add(path); for (const path of unknown) fileFound.set(path, found[path] ?? Date.now()); apply(); }).catch(() => undefined);
 }
 const fileSource = (path: string, download: boolean) => "api/download?path=" + encodeURIComponent(path) + (download ? "&download=1" : "") + (token ? "&token=" + token : "");
-// On this PC (key page): click opens the file, Shift copies its path, Ctrl opens its folder. Remotely a click offers Download / Open.
+// The viewer beside the chat (markdown rendered, pages and PDFs framed, text as text) opens every file but images, archives,
+// folders and, on this PC, documents only their own program reads.
+const viewable = (link: HTMLElement, path: string) => !("folder" in link.dataset) && !ARCHIVE_FILE.test(path) && !IMAGE_FILE.test(path) && !(token && APP_FILE.test(path));
+// On this PC (key page): click views or opens the file, Shift copies its path, Ctrl opens its folder. Remotely a click offers Download / Open.
 document.addEventListener("click", event => {
  const link = (event.target as HTMLElement).closest?.<HTMLAnchorElement>("a.file-link[data-full]"); if (!link) return;
  event.preventDefault(); const path = link.dataset.path!, full = link.dataset.full!;
  if (!token) openFileMenu(link, path, full);
  else if (event.shiftKey) void copyPath(full);
+ else if (!(event.ctrlKey || event.metaKey) && viewable(link, path)) void exploreArchive(path);
  else void openFile(path, event.ctrlKey || event.metaKey);
 });
 document.addEventListener("contextmenu", event => {
@@ -938,10 +943,9 @@ function openFileMenu(link: HTMLElement, path: string, full: string) {
  if ("folder" in link.dataset) return showMenu(link, [["Open", () => void openFile(path, false)], ["Copy path", () => void copyPath(full)], ["Zip and upload", () => void wormhole(path, "zip")]]);
  const uploads: [string, () => void][] = [["Upload", () => void wormhole(path, "")], ["Zip and upload", () => void wormhole(path, "zip")], ...(sevenZip ? [["7z and upload", () => void wormhole(path, "7z")] as [string, () => void]] : [])];
  const archive = ARCHIVE_FILE.test(path), explore: [string, () => void][] = archive ? [["Explore", () => void exploreArchive(path)]] : /\.html?$/i.test(path) ? [["View page", () => void exploreArchive(path)]] : [];
- // Remotely, Open shows the file in the viewer beside the chat (markdown rendered, pages framed); images and archives open as before.
- const viewable = !archive && !IMAGE_FILE.test(path);
- showMenu(link, token ? [...explore, ["Open", () => void openFile(path, false)], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]
-  : [...viewable ? [] : explore, ["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => viewable ? void exploreArchive(path) : void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
+ const view = viewable(link, path);
+ showMenu(link, token ? [...view ? [["Open", () => void exploreArchive(path)], ["Open in app", () => void openFile(path, false)]] as [string, () => void][] : [...explore, ["Open", () => void openFile(path, false)] as [string, () => void]], ["Open folder", () => void openFile(path, true)], ["Copy path", () => void copyPath(full)], ...uploads]
+  : [...view ? [] : explore, ["Download", () => Object.assign(document.createElement("a"), { href: fileSource(path, true), download: "" }).click()], ["Open", () => view ? void exploreArchive(path) : void open(fileSource(path, false), "_blank", "noopener")], ["Copy path", () => void copyPath(full)], ...uploads]);
 }
 // Wormhole upload: the hub packs, encrypts and uploads; the page polls once a second and copies the link (key in its #fragment).
 let sevenZip = false; get("upload").then(value => { sevenZip = value.sevenZip; }, () => undefined);

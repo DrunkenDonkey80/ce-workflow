@@ -1,7 +1,8 @@
 // ce-workflow updates running sessions in place. When package.json on disk carries another version than the one this
 // runtime loaded (a release in the developer checkout, or the hub downloading one) and that version has held for a
 // minute (a download is finished), the session runs /wo reload at its first quiet moment: right after a run ends, between
-// two plan steps (the run stops there and continues after the reload), or, under the hub, after 2 idle minutes.
+// two plan steps or after a compaction inside a run (the run stops at the next turn end and continues after the reload),
+// or, under the hub, after 2 idle minutes.
 // Pi itself cannot reload; the hub restarts for that when every session is idle.
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -59,6 +60,9 @@ export function registerSelfUpdate(pi, { packageFile = PACKAGE, loaded = LOADED_
 	pi.on("tool_result", event => {
 		if (event.toolName === "plan3" && !event.isError && (event.input?.action === "next" || (event.input?.action === "step" && event.input?.mark === "done"))) boundary = true;
 	});
+	// A compaction mid-run: the model already works from a summary, so stopping after the next turn loses next to nothing.
+	// An idle /compact is not a boundary: it would stop the next prompt after one turn.
+	pi.on("session_compact", (_event, ctx) => { try { if (!ctx.isIdle()) boundary = true; } catch { /* a stale ctx */ } });
 	pi.on("turn_end", (_event, ctx) => {
 		if (!boundary) return;
 		boundary = false;
@@ -71,8 +75,8 @@ export function registerSelfUpdate(pi, { packageFile = PACKAGE, loaded = LOADED_
 	pi.on("agent_settled", (_event, ctx) => {
 		ctxRef = ctx; lastActivity = now();
 		const version = stopped || ready();
-		const resume = stopped ? `ce-workflow was updated to ${version} and reloaded between two plan steps; the run was stopped on purpose at that step boundary. Continue the plan where you left off.` : undefined;
-		stopped = "";
+		const resume = stopped ? `ce-workflow was updated to ${version} and reloaded; the run was stopped on purpose at a turn boundary (a finished plan step or a compaction). Continue where you left off.` : undefined;
+		stopped = ""; boundary = false;
 		if (version && (resume || quiet(ctx))) reload(ctx, version, resume);
 	});
 }

@@ -5,7 +5,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Changed
-- On a phone or another remote device, Open on a file link now shows the file in the viewer beside the chat instead of a plain-text tab: markdown is rendered, pages and PDFs show in a frame. Escape or Back returns to the chat as it was. Images and archives open as before.
+- Opening a file link now shows the file in the viewer beside the chat, on this PC and on a phone, instead of a plain-text tab or Notepad: markdown is rendered, pages and PDFs show in a frame. Escape or Back returns to the chat as it was. Images, archives, folders and documents such as Word, Excel or SketchUp files open as before; on this PC, right-click → Open in app opens any file in its own program.
+- Sessions also update to a new ce-workflow version after a compaction in the middle of a long run: the run stops at the next turn, reloads, and carries on by itself.
 
 ## 0.2.5 — 2026-10-30
 
