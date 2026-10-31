@@ -5,7 +5,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Added
-- `node scripts/audit-compaction.mjs` checks how well compaction keeps context, from the session logs and without calling a model: files read again, commands run again and requests you had to repeat after each compaction, averaged per compaction mode, plus the worst cases.
+- `node scripts/audit-compaction.mjs` checks how well compaction keeps context, from the session logs and without calling a model: files read again, commands run again, edits redone, questions asked again and requests you had to repeat after each compaction, averaged per compaction mode, plus the worst cases.
+
+### Fixed
+- Compaction no longer keeps hub script-timer output among your last 20 requests kept word for word. Timer output was half of that text and pushed your own requests out; it is now kept, shortened, like other tool output. Summaries already holding timer output fix themselves at the next compaction. On recent sessions that part of the summary shrinks by about a third (8.3k to 5.6k characters).
 
 ## 0.2.17 — 2026-10-31
 

@@ -576,6 +576,13 @@ assert.equal(plan3Records[1].text, longRequest, "typed user requests stay verbat
 assert(plan3Memory.summary.length < longRequest.length + 2000);
 const bloated = protectedMemory.summary.replace(JSON.stringify(longRequest), JSON.stringify("One-time before executing: x\n" + longRequest));
 assert.match(decodeMemory(bloated).records[0].text, /^One-time before executing: x \[generated Plan3 prompt/, "summaries holding old prompts heal");
+// Hub script-timer output is evidence, not a protected request; message timers and older summaries holding timers follow suit.
+const timerText = "\u23f0 Scheduled (script timer a1079f6a): " + "build log line\n".repeat(400);
+const timerRecords = gather([{ role: "user", content: timerText }, { role: "user", content: "\u23f0 Scheduled (message timer b2c3d4e5): check the queue" }]);
+assert.deepEqual(timerRecords.map(r => [r.kind, r.tool]), [["tool-result", "schedule"], ["user-request", undefined]]);
+assert(timerRecords[0].result.omittedChars > 0, "long timer output is cut like other tool output");
+const oldTimer = protectedMemory.summary.replace(JSON.stringify(longRequest), JSON.stringify(timerText));
+assert.equal(decodeMemory(oldTimer).records[0].tool, "schedule", "summaries holding timer output heal");
 let oversizedCalls = 0;
 const oversizedFallback = await compactMemory({ messages: [{ role: "user", content: "z".repeat(300_000) }], model: "test/small",
 	registry: { find: () => ({ contextWindow: 100_000 }), streamSimple: () => { oversizedCalls++; throw new Error("Must not reach ACP"); } } });
