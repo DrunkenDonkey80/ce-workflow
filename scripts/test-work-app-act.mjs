@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { winKeys } from "../extensions/app-act-win.ts";
 import { appAct, appActTool, hotkey, parseKeys, resetSession, risky, toElements } from "../extensions/app-act.ts";
 
 const frame = (y, w = 100) => ({ x: 10, y, width: w, height: 20 });
@@ -51,7 +52,7 @@ const helper = async req => {
 	throw new Error("unexpected op " + req.op);
 };
 const asked = [];
-const o = { helper, confirm: async title => (asked.push(title), true) };
+const o = { helper, platform: "darwin", confirm: async title => (asked.push(title), true) };
 
 assert.match(await appAct(null, { action: "apps" }, o), /Xcode \(com\.apple\.dt\.Xcode, pid 42\)/);
 await assert.rejects(appAct(null, { action: "snapshot", app: "Xcode" }, { helper }), /no dialog to ask/);
@@ -95,6 +96,16 @@ await appAct(null, { action: "menu", app: "Xcode", path: "Product > Build" }, o)
 assert.deepEqual(calls.at(-1).path, ["Product", "Build"]);
 await assert.rejects(appAct(null, { action: "press", app: "Xcode", ref: "e99" }, o), /Unknown ref/);
 await assert.rejects(appAct(null, { action: "press", app: "Xcode", query: "Nothing here" }, o), /Nothing in the last snapshot/);
+
+// Windows: keys in SendKeys form and asked each time (they need the window in front); type needs a field.
+assert.deepEqual([winKeys("ctrl+shift+K"), winKeys("return"), winKeys("alt+f4"), winKeys("shift+(")], ["^+k", "{ENTER}", "%{F4}", "+{(}"]);
+assert.throws(() => winKeys("cmd+b"), /modifier/);
+const w = { ...o, platform: "win32" }, askedBefore = asked.length;
+assert.equal(await appAct(null, { action: "key", app: "Xcode", keys: "ctrl+d", settleMs: 0 }, w), "Done.");
+assert.deepEqual([calls.at(-1).send, asked.at(-1), asked.length], ["^d", "Press ctrl+d in Xcode?", askedBefore + 1]);
+await assert.rejects(appAct(null, { action: "key", app: "Xcode", keys: "delete" }, { ...w, confirm: async () => false }), /did not allow pressing delete/);
+await assert.rejects(appAct(null, { action: "type", app: "Xcode", text: "x" }, w), /type needs ref/);
+assert.equal(await appAct(null, { action: "apps" }, { helper: async () => ({ apps: [{ name: "explorer", bundle: "", pid: 7, windows: ["Downloads"] }] }) }), 'explorer (pid 7): "Downloads"');
 
 resetSession();
 await assert.rejects(appAct(null, { action: "find", app: "Xcode", query: "x" }, o), /No snapshot yet/);
