@@ -144,9 +144,10 @@ async function roundTrip() {
 	const findNode = (tabId, id) => { const n = nodesOf(tabId).find(entry => entry.id === id); if (!n) throw new Error("No node with given id found"); return n; };
 	const ax = n => ({ nodeId: String(n.id), ignored: n.role === "generic", role: { value: n.role }, name: { value: n.name }, backendDOMNodeId: n.id, ...(n.value ? { value: { value: n.value } } : {}) });
 	const at = (tabId, x, y) => nodesOf(tabId).find(n => n.box && n.role !== "generic" && x >= n.box[0] && x <= n.box[0] + n.box[2] && y >= n.box[1] && y <= n.box[1] + n.box[3]);
-	let focused, hang = false, intercept = false;
+	let focused, hang = false, intercept = false, intruder = 0, openDialog;
 	const sendCommand = async ({ tabId }, method, params = {}) => {
 		if (!attached.has(tabId)) throw new Error("Debugger is not attached to the tab");
+		if (intruder) throw new Error("Cannot access a chrome-extension:// URL of different extension");
 		cdpLog.push(method);
 		const objectNode = () => findNode(tabId, Number(String(params.objectId).slice(1)));
 		switch (method) {
@@ -156,7 +157,7 @@ async function roundTrip() {
 			case "DOM.resolveNode": return { object: { objectId: `o${findNode(tabId, params.backendNodeId).id}` } };
 			case "DOM.describeNode": return { node: { backendNodeId: objectNode().id } };
 			case "DOM.getNodeForLocation": { const n = at(tabId, params.x, params.y); if (!n) throw new Error("No node found at given location"); return { backendNodeId: n.id }; }
-			case "Page.handleJavaScriptDialog": dialogsHandled.push(params.accept); return {};
+			case "Page.handleJavaScriptDialog": dialogsHandled.push(params.accept); openDialog?.(); openDialog = undefined; return {};
 			case "Page.setInterceptFileChooserDialog": intercept = params.enabled; return {};
 			case "DOM.setFileInputFiles": uploaded.push([params.backendNodeId, params.files]); return {};
 			case "DOM.focus": focused = params.backendNodeId; return {};
@@ -166,7 +167,11 @@ async function roundTrip() {
 				const n = params.type === "mouseReleased" && at(tabId, params.x, params.y);
 				if (n) typed.push([n.name, "click"]);
 				if (n?.chooser && intercept) listeners.cdpEvent.forEach(f => f({ tabId }, "Page.fileChooserOpened", { backendNodeId: n.chooser, mode: "selectMultiple" }));
-				if (n?.dialog) listeners.cdpEvent.forEach(f => f({ tabId }, "Page.javascriptDialogOpening", { type: n.dialog, message: "Really?" }));
+				if (n?.dialog) { // like Chrome: the click returns only once the dialog is answered
+					const answered = new Promise(resolve => { openDialog = resolve; });
+					listeners.cdpEvent.forEach(f => f({ tabId }, "Page.javascriptDialogOpening", { type: n.dialog, message: "Really?" }));
+					await answered;
+				}
 				if (n?.href) navigate(tabs.get(tabId), n.href);
 				if (n?.opens) { const tab = { id: 900 + tabs.size, url: "", pendingUrl: n.opens, openerTabId: tabId, status: "loading" }; tabs.set(tab.id, tab); listeners.created.forEach(f => f(tab)); }
 				return {};
@@ -224,7 +229,7 @@ async function roundTrip() {
 		},
 		tabGroups: { query: async () => [], update: async () => {} },
 		debugger: {
-			attach: async ({ tabId }) => { attached.add(tabId); },
+			attach: async ({ tabId }) => { if (intruder) throw new Error("Cannot access a chrome-extension:// URL of different extension"); attached.add(tabId); },
 			detach: async ({ tabId }) => { attached.delete(tabId); },
 			sendCommand,
 			onDetach: { addListener: f => listeners.detach.push(f) },
@@ -235,6 +240,7 @@ async function roundTrip() {
 				const tab = tabs.get(target.tabId), host = hostOf(tab.url);
 				if (func.name === "extractWeb" || func.name === "extractImages") { searched.push({ url: tab.url, at: Date.now() }); return [{ result: { url: tab.url, title: "Google", captcha: tab.url.includes("captcha"), results: func.name === "extractWeb" ? webRaw : imageRaw } }]; }
 				if (func.name === "textSize") return [{ result: 42 }];
+				if (func.name === "removeForeignFrames") { intruder = Math.max(0, intruder - 1); return [{ result: undefined }]; }
 				if (func.name !== "extract") return [{ result: `Shop ${host}` }];
 				return [{ result: { url: tab.url, title: `Title ${host}`, text: `Hello from ${host}`, links: [{ text: "Next", href: `https://${host}/next` }],
 					images: ["https://shop.test/a.jpg", "https://cdn.test/b.png", "https://mail.google.com/x.png", "http://127.0.0.1/y.png", "https://cdn.test/page.html"] } }];
@@ -349,12 +355,19 @@ async function roundTrip() {
 			assert.match(await go({ action: "click", ref: refOf(snap, "Away") }), /URL: https:\/\/away\.test\//);
 			assert.ok(requests.includes("https://away.test/"));
 			assert.match(await go({ action: "back" }), /URL: https:\/\/shop\.test\/act/);
-			// Page dialogs: confirm is cancelled and reported; beforeunload (leaving) is accepted.
+			// A confirm the click opens stays open while the user decides, then that same click finishes (sites may ask only once).
 			snap = await go({ action: "snapshot" });
-			assert.match(await go({ action: "click", ref: refOf(snap, "Ask") }), /dialog, which was cancelled \(UNTRUSTED text\): confirm: Really\?/);
-			listeners.cdpEvent.forEach(f => f({ tabId: tab.id }, "Page.javascriptDialogOpening", { type: "beforeunload", message: "" }));
-			await sleep(20);
+			picks = ["Deny"];
+			assert.match(await go({ action: "click", ref: refOf(snap, "Ask") }), /asked \(UNTRUSTED text\): "Really\?"; answered Cancel/);
+			picks = ["Allow this action"];
+			assert.match(await go({ action: "click", ref: refOf(snap, "Ask") }), /"Really\?"; the user allowed OK/);
 			assert.deepEqual(dialogsHandled, [false, true]);
+			// Outside an action: a confirm is cancelled and reported later; beforeunload (leaving) is accepted.
+			listeners.cdpEvent.forEach(f => f({ tabId: tab.id }, "Page.javascriptDialogOpening", { type: "beforeunload", message: "" }));
+			listeners.cdpEvent.forEach(f => f({ tabId: tab.id }, "Page.javascriptDialogOpening", { type: "confirm", message: "Stray?" }));
+			await sleep(20);
+			assert.deepEqual(dialogsHandled, [false, true, true, false]);
+			assert.match(await go({ action: "click", ref: refOf(snap, "Save") }), /dialog, which was cancelled \(UNTRUSTED text\): confirm: Stray\?/);
 			// D19: a spawned tab is closed and reported.
 			snap = await go({ action: "snapshot" });
 			const closedBefore = removed.length;
@@ -366,6 +379,17 @@ async function roundTrip() {
 			listeners.detach.forEach(f => f({ tabId: swapped }, "target_closed"));
 			assert.match(await go({ action: "snapshot" }), /\[e1\] heading "Shop"/);
 			assert.ok(attached.has(swapped), "reattached to the same tab");
+			// Another extension's frame (a password manager) makes Chrome refuse the debugger: it is stripped and the action retried.
+			intruder = 2;
+			assert.match(await go({ action: "snapshot" }), /\[e1\] heading "Shop"/);
+			attached.delete(swapped);
+			listeners.detach.forEach(f => f({ tabId: swapped }, "target_closed"));
+			intruder = 1; // also refuses the reattach itself
+			assert.match(await go({ action: "snapshot" }), /\[e1\] heading "Shop"/);
+			assert.ok(attached.has(swapped) && tabs.has(swapped), "the same tab is reattached, not closed");
+			intruder = 99;
+			await assert.rejects(go({ action: "snapshot" }), /Another browser extension \(a password manager\?\) keeps blocking/);
+			intruder = 0;
 			// wait: until text shows, until it goes, or a timeout that still returns the page.
 			assert.match(await go({ action: "wait", query: "Save" }), /\[e\d+\] button "Save"/);
 			assert.match(await go({ action: "wait", query: "Nope", timeoutMs: 600 }), /^Still missing "Nope" after 1 s/);

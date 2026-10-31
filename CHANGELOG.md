@@ -7,6 +7,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Added
 - `app_act` now works on Windows too, through UI Automation, with nothing to install: snapshot, press, type, key, and menus for apps with a classic menu bar (Notepad++, for example). Tested on File Explorer, OneCommander and Pi Hub; it works with the app in the background. Delete and similar buttons ask you first, even icon buttons that only have an internal name. `key` brings the window to the front for a moment and asks you each time.
 
+### Fixed
+- `browser_act` no longer gets stuck on a site's "Are you sure?" box (Porkbun's nameserver warning, for example). Before, it was always answered Cancel, so the save never happened. Now the box stays open while Pi asks you, then it is answered OK or Cancel and the click finishes. Nothing is repeated, so sites that ask only once work too.
+- `browser_act` keeps working when a password manager (Proton Pass, for example) puts its autofill box into a form page. Chrome then refuses the agent's control, so the tab used to close. The add-on now removes other extensions' boxes from the agent tab only and tries again; if they keep coming back, the error says to turn that extension off for the site. Reload the Pi browser fetch add-on in `chrome://extensions`.
+
 ## 0.2.16 — 2026-10-31
 
 ### Added

@@ -326,6 +326,13 @@ async function runAct(ctx, p: ActParams, signal?: AbortSignal, { resolve = looku
 /** After an action: check where the tab is, handle blocked navigations (D18) and spawned tabs (D19). */
 async function finishPage(ctx, s: Session, result, done, signal: AbortSignal | undefined, resolve: typeof lookup) {
 	const notes: string[] = [];
+	// A site's "are you sure?" confirm, held open by the add-on: the user decides, then the action finishes (no repeat).
+	while (result.question !== undefined) {
+		const text = String(result.question);
+		const ok = await confirmRisk(ctx, s.host, `answer OK to the page's question "${text}"`, false, signal);
+		notes.push(`The page asked (UNTRUSTED text): "${text}"; ${ok ? "the user allowed OK" : "answered Cancel (the user did not allow OK)"}.`);
+		result = await call(s, { action: "dialog", accept: ok }, signal);
+	}
 	const final = checkUrl(String(result.url), blockedList(readPolicy()));
 	if (final.refused !== undefined || !s.hosts.has(grantKey(final.host!))) {
 		closeSession("ended: the tab left the granted sites");
@@ -360,7 +367,7 @@ export const browserActTool = () => ({
 		"click {ref} or {x, y}; type {ref, text, submit?};",
 		"select {ref, value} (dropdowns; checkboxes use click); scroll {direction} or {ref}; screenshot (saves a PNG path to read); back.",
 		"upload {ref, files}: ref is the page's upload button or file field; files are PNG, JPEG, GIF or WebP images inside the project folder (max 10, 20 MB each). The user confirms each upload or grants that folder's image types for a while.",
-		"Refused: password and one-time-code fields, blocked sites (mail, sign-in, password managers, banks, payments), local addresses. Buying, paying, sending, deleting or publishing asks the user first (they can allow such actions until control ends).",
+		"Refused: password and one-time-code fields, blocked sites (mail, sign-in, password managers, banks, payments), local addresses. Buying, paying, sending, deleting or publishing asks the user first (they can allow such actions until control ends). A page's 'are you sure?' box the action opens is shown to the user, who answers it; the action then finishes.",
 		"Links to other sites are stopped before loading and need the user's grant; new tabs are closed and their URL reported. Refs expire when the page changes.",
 	].join("\n"),
 	parameters: {

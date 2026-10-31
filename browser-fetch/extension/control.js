@@ -40,7 +40,37 @@ function pickOption(value) {
 	return "";
 }
 
-const cdp = (s, method, params = {}) => chrome.debugger.sendCommand({ tabId: s.tab }, method, params);
+// Another extension's frame in the tab (a password manager's autofill box) makes Chrome refuse the debugger:
+// remove such frames from the agent tab and retry (the approach of Claude in Chrome).
+const FOREIGN = /chrome-extension:\/\/ URL of different extension/i;
+async function cdp(s, method, params = {}) {
+	for (let attempt = 0; ; attempt++) {
+		try { return await chrome.debugger.sendCommand({ tabId: s.tab }, method, params); }
+		catch (error) {
+			const message = String(error?.message ?? error);
+			if (!FOREIGN.test(message)) throw error;
+			if (attempt >= 3 || !sessions.has(s.id)) throw blocked(message);
+			await stripForeignFrames(s);
+			await sleep(150 * 2 ** attempt);
+		}
+	}
+}
+const blocked = message => new Error(`Another browser extension (a password manager?) keeps blocking control of this tab: turn it off for this site and try again. (${message})`);
+async function stripForeignFrames(s) {
+	await chrome.scripting.executeScript({ target: { tabId: s.tab, allFrames: true }, func: removeForeignFrames, args: [chrome.runtime.id] }).catch(() => {});
+}
+// Runs in the page: removes other extensions' frames, also inside closed shadow roots.
+function removeForeignFrames(own) {
+	const walk = root => {
+		for (const el of root.querySelectorAll("*")) {
+			const src = String(el.src || el.data || "");
+			if (/^(iframe|frame|object|embed)$/i.test(el.tagName) && src.startsWith("chrome-extension://") && !src.startsWith(`chrome-extension://${own}/`)) el.remove();
+			const shadow = chrome.dom?.openOrClosedShadowRoot?.(el) ?? el.shadowRoot;
+			if (shadow) walk(shadow);
+		}
+	};
+	walk(document);
+}
 const call = async (s, objectId, fn, args = [], byValue = true) => (await cdp(s, "Runtime.callFunctionOn", { objectId, functionDeclaration: fn.toString(), arguments: args.map(value => ({ value })), returnByValue: byValue })).result;
 
 async function onControl(m) {
@@ -77,6 +107,13 @@ async function act(s, m) {
 		await openTab(s);
 	}
 	await rules(s);
+	if (m.action === "dialog") {
+		if (!s.held) throw new Error("No page question is waiting.");
+		const { rest, before } = s.held;
+		await answerDialog(s, m.accept === true);
+		return await finishAction(s, rest, before);
+	}
+	if (s.held) await answerDialog(s, false); // Pi never answered (cancelled): the page must not stay blocked
 	// Background tabs get frozen or throttled; wake this one before acting.
 	await cdp(s, "Page.setWebLifecycleState", { state: "active" }).catch(() => {});
 	const before = (await chrome.tabs.get(s.tab)).url;
@@ -106,13 +143,31 @@ async function act(s, m) {
 			const keys = ["node", "tag", "type", "autocomplete", "isSubmit", "formPayment", "role", "name", "url"];
 			if (!m.facts || keys.some(key => JSON.stringify(m.facts[key]) !== JSON.stringify(facts[key])))
 				throw new Error("The element changed since it was checked; take a new snapshot.");
-			if (m.action === "upload") await upload(s, m, target, facts); else await perform(s, m, target);
-			const done = await after(s, 10_000, before);
-			if (done.url !== before) s.refs.clear(); // same page: refs stay, each target is rechecked above
-			return done;
+			// A confirm() the action opens is held open (the click waits on it) and returned to Pi, which asks the user
+			// and answers it with the dialog action: some sites ask only once, so cancelling and repeating would not work.
+			const opened = new Promise(resolve => { s.onConfirm = resolve; });
+			const rest = (async () => {
+				try { if (m.action === "upload") await upload(s, m, target, facts); else await perform(s, m, target); return await after(s, 10_000, before); }
+				finally { s.onConfirm = undefined; }
+			})();
+			return await finishAction(s, rest, before, opened);
 		}
 	}
 	throw new Error(`Unknown action ${m.action}.`);
+}
+async function finishAction(s, rest, before, opened = new Promise(() => {})) {
+	const done = await Promise.race([rest, opened.then(text => ({ text }))]);
+	if ("text" in done) {
+		s.held = { rest, before };
+		rest.catch(() => {}); // awaited by the dialog action; a cancelled question must not surface as unhandled
+		return { ...await page(s), question: done.text };
+	}
+	if (done.url !== before) s.refs.clear(); // same page: refs stay, each target is rechecked above
+	return done;
+}
+async function answerDialog(s, accept) {
+	s.held = undefined;
+	await cdp(s, "Page.handleJavaScriptDialog", { accept });
 }
 
 async function openTab(s) {
@@ -129,7 +184,12 @@ async function openTab(s) {
 	await attach(s);
 }
 async function attach(s) {
-	await chrome.debugger.attach({ tabId: s.tab }, "1.3");
+	try { await chrome.debugger.attach({ tabId: s.tab }, "1.3"); }
+	catch (error) {
+		if (!FOREIGN.test(String(error?.message))) throw error;
+		await stripForeignFrames(s);
+		await chrome.debugger.attach({ tabId: s.tab }, "1.3");
+	}
 	s.inflight = new Map();
 	await cdp(s, "Page.enable");
 	await cdp(s, "Network.enable").catch(() => {}); // only to know when the page stops loading data
@@ -305,15 +365,17 @@ chrome.tabs.onCreated.addListener(tab => {
 	chrome.tabs.remove(tab.id).catch(() => {});
 });
 // Page dialogs block a hidden tab: leaving the page is the agent's own request, anything else is cancelled and reported.
-// shortcut: confirm() is always cancelled, so sites that confirm with a native dialog cannot be completed; accept it after a D16 approval if needed.
+// A confirm opened by a click, type, select or upload stays open for the user's answer (see act).
 chrome.debugger.onEvent.addListener((source, method, params) => {
 	const s = sessionOf(source.tabId);
 	if (s && method === "Network.requestWillBeSent") return s.inflight?.set(params.requestId, Date.now());
 	if (s && (method === "Network.loadingFinished" || method === "Network.loadingFailed")) return s.inflight?.delete(params.requestId);
 	if (s && method === "Page.fileChooserOpened") return s.chooser?.(params);
 	if (!s || method !== "Page.javascriptDialogOpening") return;
+	const message = String(params.message ?? "").slice(0, 300);
+	if (params.type === "confirm" && s.onConfirm) return s.onConfirm(message);
 	const accept = params.type === "beforeunload";
-	if (!accept) s.dialogs.push(`${params.type}: ${String(params.message ?? "").slice(0, 300)}`);
+	if (!accept) s.dialogs.push(`${params.type}: ${message}`);
 	cdp(s, "Page.handleJavaScriptDialog", { accept }).catch(() => {});
 });
 // A replaced tab (prerender, instant pages) keeps the session under its new id.
