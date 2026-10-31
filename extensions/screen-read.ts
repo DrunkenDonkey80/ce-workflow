@@ -184,21 +184,25 @@ dispatchMain()
 `;
 const MAC_ID = "com.drunkendonkey80.ce-workflow.screen-helper";
 const MAC_APP = path.join(os.homedir(), "Library", "Application Support", "ce-workflow", "Pi Screen Helper.app");
+/** A small signed helper app built from Swift source: its own bundle id, so macOS keeps its permissions apart from node's. */
+export type MacHelperSpec = { swift: string; id: string; name: string; exe: string; app: string };
+const SCREEN_HELPER: MacHelperSpec = { swift: MAC_SWIFT, id: MAC_ID, name: "Pi Screen Helper", exe: "pi-screen-helper", app: MAC_APP };
 const MAC_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
 const MAC_AX_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
 
 /** Builds the helper app when missing or its source changed. A rebuild can cost an ad-hoc signed app its grant, so it is signed with an Apple Development identity when there is one. */
-async function macHelper(exec: Exec, signal?: AbortSignal) {
-	const hash = createHash("sha256").update(MAC_SWIFT).digest("hex").slice(0, 16), stamp = `${MAC_APP}.version`, bin = path.join(MAC_APP, "Contents", "MacOS", "pi-screen-helper");
-	if (existsSync(bin) && (await readFile(stamp, "utf8").catch(() => "")) === hash) return MAC_APP;
-	await rm(MAC_APP, { recursive: true, force: true });
+export async function macHelper(exec: Exec, signal?: AbortSignal, spec = SCREEN_HELPER) {
+	const { swift, id, name, exe, app } = spec;
+	const hash = createHash("sha256").update(swift).digest("hex").slice(0, 16), stamp = `${app}.version`, bin = path.join(app, "Contents", "MacOS", exe);
+	if (existsSync(bin) && (await readFile(stamp, "utf8").catch(() => "")) === hash) return app;
+	await rm(app, { recursive: true, force: true });
 	await mkdir(path.dirname(bin), { recursive: true });
-	await writeFile(path.join(MAC_APP, "Contents", "Info.plist"), `<?xml version="1.0" encoding="UTF-8"?>
+	await writeFile(path.join(app, "Contents", "Info.plist"), `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleIdentifier</key><string>${MAC_ID}</string>
-<key>CFBundleName</key><string>Pi Screen Helper</string>
-<key>CFBundleExecutable</key><string>pi-screen-helper</string>
+<key>CFBundleIdentifier</key><string>${id}</string>
+<key>CFBundleName</key><string>${name}</string>
+<key>CFBundleExecutable</key><string>${exe}</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>1.0</string>
 <key>CFBundleVersion</key><string>${hash}</string>
@@ -206,20 +210,20 @@ async function macHelper(exec: Exec, signal?: AbortSignal) {
 <key>LSUIElement</key><true/>
 </dict></plist>
 `);
-	const src = path.join(path.dirname(MAC_APP), "pi-screen-helper.swift");
-	await writeFile(src, MAC_SWIFT);
+	const src = path.join(path.dirname(app), `${exe}.swift`);
+	await writeFile(src, swift);
 	const c = await exec("swiftc", ["-O", src, "-o", bin], { timeout: 300_000, signal });
-	if (c.code || c.killed) throw new Error(`Compiling Pi Screen Helper failed; install the Xcode command line tools (xcode-select --install). ${String(c.stderr ?? "").trim().slice(-800)}`);
+	if (c.code || c.killed) throw new Error(`Compiling ${name} failed; install the Xcode command line tools (xcode-select --install). ${String(c.stderr ?? "").trim().slice(-800)}`);
 	const ids = String((await exec("security", ["find-identity", "-v", "-p", "codesigning"], { timeout: 30_000, signal })).stdout ?? "");
 	const dev = ids.match(/\b([0-9A-F]{40}) "Apple Development:/)?.[1];
-	const sign = (id: string) => exec("codesign", ["--force", "--sign", id, "--identifier", MAC_ID, MAC_APP], { timeout: 60_000, signal });
+	const sign = (identity: string) => exec("codesign", ["--force", "--sign", identity, "--identifier", id, app], { timeout: 60_000, signal });
 	const signed = dev ? await sign(dev) : undefined;
 	if (!signed || signed.code || signed.killed) {
 		const adhoc = await sign("-");
-		if (adhoc.code || adhoc.killed) throw new Error(`Signing Pi Screen Helper failed: ${String(adhoc.stderr ?? "").trim().slice(-800)}`);
+		if (adhoc.code || adhoc.killed) throw new Error(`Signing ${name} failed: ${String(adhoc.stderr ?? "").trim().slice(-800)}`);
 	}
 	await writeFile(stamp, hash);
-	return MAC_APP;
+	return app;
 }
 
 async function macWindow(exec: Exec, plan: ReturnType<typeof screenReadPlan> & { op: "window" }, signal?: AbortSignal) {
