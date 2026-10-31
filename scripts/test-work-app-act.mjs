@@ -77,6 +77,11 @@ await assert.rejects(appAct(null, { action: "press", app: "Xcode", ref: "e2" }, 
 assert.equal(calls.length, before, "a refused press sends nothing");
 await appAct(null, { action: "press", app: "Xcode", ref: "e2" }, o);
 assert.equal(asked.at(-1), 'Press "Upload" in Xcode?');
+// "For this session" stops further risky asks for that app.
+await appAct(null, { action: "press", app: "Xcode", ref: "e2" }, { ...o, confirm: async (title, _m, lasting) => (asked.push(title), assert.match(lasting, /for this session/), "lasting") });
+const asks = asked.length;
+await appAct(null, { action: "press", app: "Xcode", ref: "e2" }, { ...o, confirm: async () => assert.fail("asked again") });
+assert.equal(asked.length, asks);
 
 // type into a field by ref; key and menu pass through.
 await appAct(null, { action: "type", app: "Xcode", ref: "e3", text: "Hello", submit: true }, o);

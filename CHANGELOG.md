@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.16 — 2026-10-31
+
+### Added
+- `app_act` confirm dialogs for Upload, Distribute, Submit, Delete and similar buttons and menu items offer "allow for this session", so an app asks once instead of every time.
+
 ## 0.2.15 — 2026-10-31
 
 Reload the Pi browser fetch add-on in `chrome://extensions` after updating (version 1.5).
