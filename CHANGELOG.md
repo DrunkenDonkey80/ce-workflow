@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.14 — 2026-10-31
+
+### Added
+- `app_act` reads and operates Mac apps through Accessibility. `menus` lists every menu item with its path, hotkey, check mark and whether it is available right now, and `menu` runs one by path. `snapshot`, `press`, `type` and `key` work on a window's labelled elements and return what changed. It works with the app in the background and never moves the mouse. A signed helper, Pi App Helper, asks for the Accessibility permission once. Each app is allowed once per session, Upload, Distribute, Submit, Delete and similar buttons ask every time, and password fields are refused.
+
 ## 0.2.13 — 2026-10-31
 
 ### Added
