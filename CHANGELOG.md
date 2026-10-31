@@ -2,7 +2,9 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.17 — 2026-10-31
+
+Reload the Pi browser fetch add-on in `chrome://extensions` after updating.
 
 ### Added
 - `app_act` now works on Windows too, through UI Automation, with nothing to install: snapshot, press, type, key, and menus for apps with a classic menu bar (Notepad++, for example). Tested on File Explorer, OneCommander and Pi Hub; it works with the app in the background. Delete and similar buttons ask you first, even icon buttons that only have an internal name. `key` brings the window to the front for a moment and asks you each time.
