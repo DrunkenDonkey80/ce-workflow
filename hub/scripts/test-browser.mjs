@@ -530,6 +530,9 @@ try {
  // The turn's final reply loads in full by itself and stands out; the earlier agent text is no longer final.
  await browser("wait", "--fn", "document.getElementById(\"messages\").textContent.includes(\"Full body loaded\")");
  assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2] .row-full\").hidden"), "expanded row drops the excerpt link");
+ // A reconnect (phones do it all the time) brings the final reply back as an excerpt: it loads in full again.
+ publish("snapshot", { ...(await api("snapshot")), chat: [{ ...reply }, { id: "assistant_2", role: "assistant", text: "Short excerpt", streaming: false, excerpt: true }] });
+ await browser("wait", "--fn", "document.querySelector(\"#messages [data-id=assistant_2]\")?.children[2].textContent.includes(\"Full body loaded\")");
  assert(await evaluate("document.querySelector(\"#messages [data-id=assistant_2]\").classList.contains(\"final\") && !document.querySelector(\"#messages [data-id=assistant_1]\").classList.contains(\"final\")"), "only the last reply is final");
  // Compact chat hides in-between agent text but keeps the final reply; the choice is remembered. Full → Thinking → Compact.
  await browser("click", "#chat-compact"); await browser("click", "#chat-compact");

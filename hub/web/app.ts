@@ -359,7 +359,7 @@ async function loadDiagram(tab: DiagramTab, refit = false) {
 const loading = new Set();
 async function loadRow(id) {
  if (loading.has(id)) return; loading.add(id);
- try { chat.set(id, await get("row?id=" + encodeURIComponent(id))); renderChat(); } catch (error) { showNotice(error.message); } finally { loading.delete(id); }
+ try { chat.set(id, await get("row?id=" + encodeURIComponent(id))); renderChat(); } catch (error) { finalLoads.delete(id); showNotice(error.message); } finally { loading.delete(id); }
 }
 async function post(endpoint, body) {
  const response = await fetch("api/" + endpoint, { ...auth, method: "POST", headers: { ...auth.headers, "Content-Type": "application/json" }, body: JSON.stringify({ target, ...body }) });
@@ -2559,7 +2559,8 @@ listen("snapshot", value => {
  state.connected = true; state.plan = value.plan; state.status = value.status ?? null;
  // A plan picked in the menu that isn't Pi's current one: the plan bar names the shown plan, not "New plan".
  if (target && target !== "product" && value.plan?.id !== target) void get("plans").then(({ plans }) => { const shown = plans.find(item => item.id === target); if (shown) { state.plan = shown; renderShell(); } }, () => {}); state.activity = value.activity ?? {}; state.more = !!value.more;
- chat.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
+ // Check-in rows are excerpts again (phones reconnect often): let the newest reply load in full once more.
+ chat.clear(); finalLoads.clear(); for (const row of value.chat ?? []) chat.set(row.id, row);
  // Dialogs over 16 KB arrive brief; fetch their full body.
  promptView.sync((value.dialogs ?? []).filter(ask => !ask.brief));
  for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell();
