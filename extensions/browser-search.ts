@@ -194,6 +194,6 @@ export const imageSearchTool = () => ({
 });
 
 export default function browserSearchExtension(pi) {
-	if (existsSync(hostManifest())) { pi.registerTool?.(browserSearchTool()); pi.registerTool?.(imageSearchTool()); }
+	if (existsSync(hostManifest())) { pi.registerTool?.(browserSearchTool()); pi.registerTool?.({ ...imageSearchTool(), exposure: "deferred" }); } // tools_enable declares image_search
 	for (const event of ["session_shutdown", "session_switch"]) pi.on?.(event, clearSets);
 }

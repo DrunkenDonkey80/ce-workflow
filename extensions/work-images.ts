@@ -259,7 +259,7 @@ export function createImageTools(pi, { visionModel: configured, visionAltModel =
 		if (next === signature) return;
 		signature = next;
 		register({ ...processImage(vision, alt), exposure: vision === NONE ? "hidden" : "direct" });
-		register({ ...generateImage(image), exposure: image === NONE ? "hidden" : "direct" });
+		register({ ...generateImage(image), exposure: image === NONE ? "hidden" : "deferred" }); // tools_enable declares it
 	}
 	// Registered hidden until a session reveals which models are set.
 	register({ ...processImage("the configured vision model"), exposure: "hidden" });

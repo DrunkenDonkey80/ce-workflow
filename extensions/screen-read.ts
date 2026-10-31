@@ -492,5 +492,5 @@ export const screenReadTool = (exec: Exec) => ({
 });
 
 export default function screenReadExtension(pi) {
-	pi.registerTool?.(screenReadTool(pi.exec.bind(pi)));
+	pi.registerTool?.({ ...screenReadTool(pi.exec.bind(pi)), exposure: "deferred" }); // tools_enable declares it
 }

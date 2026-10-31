@@ -469,5 +469,5 @@ export const appActTool = (exec: Exec) => ({
 });
 
 export default function appActExtension(pi) {
-	pi.registerTool?.(appActTool(pi.exec.bind(pi)));
+	pi.registerTool?.({ ...appActTool(pi.exec.bind(pi)), exposure: "deferred" }); // tools_enable declares it
 }

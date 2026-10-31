@@ -13,6 +13,7 @@ import { handleHubCommand, intercomParkedSessions, projectCommandsTool, schedule
 import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
+import { toolsEnableTool } from "./tool-loader.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
@@ -31,7 +32,7 @@ import {
 	runExtensionScout,
 	updateExtensionScoutProgress,
 } from "./work-extension-scout.ts";
-import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, contentText, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
+import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, tightenPreparation, contentText, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
 import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge, splitLevel } from "./work-vision.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
@@ -55,11 +56,14 @@ let copyToClipboard;
 let withFileMutationQueue = async (_file, mutation) => mutation();
 let generateNativeSummary;
 let serializeNativeMessages = (messages) => JSON.stringify(messages);
-let estimateContextMessageTokens = (message) =>
-	Math.ceil(JSON.stringify(message ?? {}).length / 4);
+let estimateContextMessageTokens = replayCost((message) =>
+	Math.ceil(JSON.stringify(message ?? {}).length / 4));
+let entryMessages = (entry) => (entry?.type === "message" && entry.message ? [entry.message] : []);
 try {
 	const sdk = await import("@earendil-works/pi-coding-agent");
-	({ copyToClipboard, withFileMutationQueue, estimateTokens: estimateContextMessageTokens, generateSummaryWithUsage: generateNativeSummary } = sdk);
+	({ copyToClipboard, withFileMutationQueue, generateSummaryWithUsage: generateNativeSummary } = sdk);
+	estimateContextMessageTokens = replayCost(sdk.estimateTokens);
+	if (sdk.sessionEntryToContextMessages) entryMessages = sdk.sessionEntryToContextMessages;
 	serializeNativeMessages = (messages) => sdk.serializeConversation(sdk.convertToLlm(messages));
 } catch {
 	// Local fixture runs do not install Pi peer dependencies.
@@ -218,7 +222,7 @@ const DEFAULT_CONTEXT = {
 	enabled: true,
 	autoCompact: true,
 	compactAtTokens: 150_000,
-	keepRecentTokens: 20_000, // Pi's own default; 30k kept ~10k more of the recent tail after every compaction
+	keepRecentTokens: 30_000, // real cost (replayCost): Pi's 20k by visible text kept ~38k on Claude
 	maxSummaryChars: 32_000,
 };
 const COMPACTION_MODES = [
@@ -1468,6 +1472,18 @@ function resetContextFilter() {
 	contextFilterState.snapshot = null;
 }
 
+// Pi cuts by visible text (its 20k default kept ~38k on Claude); recut to this extension's keep budget by real reply
+// cost, and carry the files of the messages that moved into the summary. It only tightens: Pi's cut is the ceiling.
+export function realCostPreparation(event, ctx) {
+	const preparation = event.preparation;
+	let keep = DEFAULT_CONTEXT.keepRecentTokens;
+	try { keep = Number(contextSettings(readEffectiveSettings(ctx.cwd)).keepRecentTokens) || keep; } catch { /* unreadable settings: the default */ }
+	const tight = tightenPreparation(preparation, event.branchEntries, keep, estimateContextMessageTokens, entryMessages);
+	if (tight === preparation) return preparation;
+	const files = filesFromOps(preparation.fileOps), moved = contextFilterFileOps(tight.moved);
+	return { ...tight, fileOps: { readFiles: [...files.read, ...moved.read], modifiedFiles: [...files.modified, ...moved.modified] } };
+}
+
 function contextFilterFileOps(messages) {
 	const read = [];
 	const modified = [];
@@ -1634,7 +1650,7 @@ export async function buildBoundaryCompaction(event, ctx, mode, summarize = gene
 	const entries = event.context?.contextEntries;
 	if (!messages?.length || !entries?.length) throw new Error("Pi 0.99.1+ compaction boundaries are required");
 	const settings = workExtensionPi?.getSettings?.() ?? {};
-	const native = { reserveTokens: 16_384, keepRecentTokens: 20_000, ...settings.compaction,
+	const native = { reserveTokens: 16_384, keepRecentTokens: DEFAULT_CONTEXT.keepRecentTokens, ...settings.compaction,
 		...settings.compaction?.modelOverrides?.[`${ctx.model?.provider}/${ctx.model?.id}`] };
 	let cut = contextFilterCutIndex(messages, native.keepRecentTokens, native.keepRecentTokens, estimateContextMessageTokens);
 	let offset = 0;
@@ -3493,8 +3509,9 @@ export default function workModelsExtension(pi) {
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	intercomParkedSessions(pi);
 	registerConstrainedTool(pi, sessionDialogTool(pi)); // a send stopped at a peer's open question points here
-	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, scheduleTool); // hub-started Pi only: nobody else can be woken
-	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, projectCommandsTool); // the buttons show on the hub page
+	// Hub-started Pi only: nobody else can be woken, and the buttons show on the hub page. tools_enable declares them.
+	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, { ...scheduleTool, exposure: "deferred" });
+	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, { ...projectCommandsTool, exposure: "deferred" });
 	registerConstrainedTool(pi, {
 		name: "research_note",
 		label: "Research Note",
@@ -3670,6 +3687,8 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 
 	pi.on("session_start", (_event, ctx) => {
 syncCameraTools(pi, ctx.cwd);
+// Every extension has registered its tools by now, so the loader lists only those on this machine.
+if (!loaderRegistered) { const loader = toolsEnableTool(pi); if (loader) { registerConstrainedTool(pi, loader); loaderRegistered = true; } }
 visionBridge.clear();
 resetContextCompaction();
 restoreResearchContext(ctx);
@@ -3772,10 +3791,11 @@ if (blockedInternalBackgroundCompletionTurn) {
 	pi.on("session_before_compact", async (event, ctx) => {
 		pi.events?.emit?.("work:compaction-start", {}); // Plan3 stats time compaction; this handler does the summarizing.
 		if ((researchContext && !forcedUltracompact) || !usesUltraSummary(currentCompactionMode(ctx))) {
-			const preparation = event.preparation;
-			if (!preparation || !generateNativeSummary || !ctx.modelRegistry?.streamSimple) return;
+			if (!event.preparation || !generateNativeSummary || !ctx.modelRegistry?.streamSimple) return;
+			const preparation = realCostPreparation(event, ctx);
 			const messages = [...asArray(preparation.messagesToSummarize), ...asArray(preparation.turnPrefixMessages)];
-			if (nativeSummaryFits(messages, preparation.previousSummary, ctx.model)) return; // Unchanged Pi path when it fits.
+			// Unchanged Pi path when it fits and Pi's cut already holds by real cost.
+			if (preparation === event.preparation && nativeSummaryFits(messages, preparation.previousSummary, ctx.model)) return;
 			try {
 				const result = await summarizeNativeContext(messages, ctx, {
 					reserveTokens: preparation.settings?.reserveTokens, previousSummary: preparation.previousSummary,
@@ -3805,7 +3825,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 		if (!contextCompactState.inFlight) generation = beginContextCompaction(null, "native");
 		const preparation =
 			event.preparation && typeof event.preparation === "object"
-				? event.preparation
+				? realCostPreparation(event, ctx)
 				: {};
 		let compacted;
 		try {
@@ -4069,6 +4089,7 @@ function workSettingsStatus(ctx) {
 }
 
 const SETTINGS_RESET = "__reset__";
+let loaderRegistered = false;
 let cameraController;
 const CAMERA_TOOLS = ["camera_capture", "camera_recover", "camera_watch", "camera_stop"];
 // The camera tools cost ~4k chars on every request: declare them only while this project's camera is ON with a device.

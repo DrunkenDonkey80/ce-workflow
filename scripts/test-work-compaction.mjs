@@ -7,7 +7,37 @@ import {
 	formatCompactionSummary,
 	latestCompactionNote,
 	COMPACTION_NOTE_MAX,
+	replayCost,
+	tightenPreparation,
 } from "../extensions/work-compaction.ts";
+
+{
+	// Kept tail is measured by real reply cost: hidden reasoning (usage.output) counts, visible text alone does not.
+	const visible = (message) => Math.ceil(JSON.stringify(message.content).length / 4);
+	const cost = replayCost(visible);
+	const reply = (output) => ({ role: "assistant", content: [{ type: "thinking", thinking: "short" }], usage: { output } });
+	assert.equal(cost(reply(5000)), 5000, "encrypted reasoning counts at its billed size");
+	assert.equal(cost({ role: "toolResult", content: "x".repeat(400), usage: { output: 9999 } }), visible({ content: "x".repeat(400) }), "only replies count output");
+	assert.equal(cost(reply(0)), visible(reply(0)), "no usage keeps the estimate");
+	const entries = [
+		{ id: "u1", type: "message", message: { role: "user", content: "start" } },
+		{ id: "a1", type: "message", message: reply(8000) },
+		{ id: "t1", type: "message", message: { role: "toolResult", content: "r" } },
+		{ id: "a2", type: "message", message: reply(8000) },
+		{ id: "t2", type: "message", message: { role: "toolResult", content: "r" } },
+		{ id: "a3", type: "message", message: reply(8000) },
+		{ id: "t3", type: "message", message: { role: "toolResult", content: "r" } },
+	];
+	const toMessages = (entry) => [entry.message];
+	const prepared = { firstKeptEntryId: "u1", messagesToSummarize: [{ role: "user", content: "old" }], turnPrefixMessages: [], tokensBefore: 1 };
+	const tight = tightenPreparation(prepared, entries, 12_000, cost, toMessages);
+	assert.equal(tight.firstKeptEntryId, "a2", "keeps ~12k by real cost and never cuts at a tool result");
+	assert.deepEqual(tight.messagesToSummarize.map((message) => message.content), ["old", "start", entries[1].message.content, "r"], "passed messages join the summary in order");
+	assert.equal(tightenPreparation(prepared, entries, 100_000, cost, toMessages), prepared, "a budget the tail fits keeps Pi's cut");
+	assert.equal(tightenPreparation(prepared, entries, 12_000, visible, toMessages), prepared, "by visible text alone the tail fits, the old under-count");
+	assert.equal(tightenPreparation({ ...prepared, firstKeptEntryId: "a3" }, entries, 12_000, cost, toMessages).firstKeptEntryId, "a3", "never moves the cut back");
+	assert.equal(tightenPreparation({ ...prepared, firstKeptEntryId: "gone" }, entries, 12_000, cost, toMessages).firstKeptEntryId, "gone");
+}
 
 assert.equal(latestCompactionNote([]), "");
 assert.equal(

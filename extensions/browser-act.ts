@@ -395,7 +395,7 @@ export const browserActTool = () => ({
 });
 
 export default function browserActExtension(pi) {
-	if (existsSync(hostManifest())) pi.registerTool?.(browserActTool());
+	if (existsSync(hostManifest())) pi.registerTool?.({ ...browserActTool(), exposure: "deferred" }); // tools_enable declares it
 	// D7, D20: the agent tab never outlives the Pi session that drives it.
 	for (const event of ["session_shutdown", "session_switch"]) pi.on?.(event, () => closeSession("ended with the Pi session"));
 }

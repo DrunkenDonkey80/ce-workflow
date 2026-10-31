@@ -208,6 +208,12 @@ try {
  await browser("click", "#wo-commands"); await browser("wait", ".command-option");
  await browser("click", ".command-option"); assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('command-picker').open, document.getElementById('drawer').dataset.open]"), ["/wo share ", false, "false"], "a picked command goes into the composer");
  await browser("fill", "#message-input", "");
+ // Phone: the drawer's Commit and push icon asks which tests to run, and a choice sends that request.
+ await browser("click", "#drawer-toggle"); await browser("click", ".session-git-action[data-git=git-push]");
+ assert(await evaluate("(() => { const menu = document.getElementById('push-menu'), r = menu.getBoundingClientRect(); return !menu.hidden && r.width > 0 && r.left >= 0 && r.bottom <= innerHeight; })()"), "phone: the push test menu shows in the drawer");
+ await browser("click", ".push-choice"); await browser("wait", "--fn", "document.getElementById('push-menu').hidden");
+ assert.match(messages.at(-1).text, /^commit and push; before pushing run only the targeted tests/, "phone: Scoped tests sends commit and push with scoped tests");
+ messages.pop(); await evaluate("document.getElementById('drawer-backdrop').click()"); // later checks read messages from the first one
  // Typing / lists commands above the box; Enter picks, /wo then lists its subcommands.
  await browser("focus", "#message-input"); await browser("press", "/"); await browser("wait", "#slash-menu:not([hidden]) .slash-option");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('.slash-option')].map(o => o.dataset.command)"), ["/plan3"]);

@@ -470,5 +470,5 @@ export const mobileActTool = (exec: Exec) => ({
 });
 
 export default function mobileActExtension(pi) {
-	pi.registerTool?.(mobileActTool(pi.exec.bind(pi)));
+	pi.registerTool?.({ ...mobileActTool(pi.exec.bind(pi)), exposure: "deferred" }); // tools_enable declares it
 }

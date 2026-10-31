@@ -116,6 +116,7 @@ function renderShell() {
  $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead; $("git-pull").hidden = !git?.behind;
  $("git-pull-text").textContent = git?.behind ? `Pull latest (${git.behind})` : "Pull latest";
  for (const id of ["git-pull", "git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
+ for (const button of document.querySelectorAll<HTMLButtonElement>(".session-git-action")) button.disabled = busy; // the sidebar copies (the drawer on phones)
  renderCommands(status?.commands ?? [], busy);
  $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
@@ -247,7 +248,7 @@ for (const name of mobileViews) {
 }
 // Phones: views, status line and sessions move into the drawer so the chat gets the screen; desktop puts them back.
 const phone = matchMedia("(max-width: 899px)"), drawer = $("drawer");
-const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "drawer-sessions"], ["plan-menu", "title-menu"], ["connection", "topbar"], ["settings-button", "drawer-gear"], ["settings-menu", "drawer-gear"]]
+const homes = [["mobile-tabs", "drawer-views"], ["status-line", "drawer-status"], ["session-list", "drawer-sessions"], ["plan-menu", "title-menu"], ["connection", "topbar"], ["settings-button", "drawer-gear"], ["settings-menu", "drawer-gear"], ["push-menu", "drawer"]]
  .map(([id, slot]) => { const node = id === "status-line" || id === "topbar" ? document.querySelector("." + id)! : $(id); return { node, slot: slot === "topbar" ? document.querySelector(".topbar")! : $(slot), parent: node.parentNode!, next: node.nextSibling }; });
 function placeForPhone() {
  for (const home of homes) if (phone.matches) home.slot.append(home.node); else home.parent.insertBefore(home.node, home.next);
@@ -1271,7 +1272,7 @@ function closeMenus(focus = false) {
  for (const [button, menu] of menus) if (!$(menu).hidden) { toggleMenu(button, menu, false); if (focus) $(button).focus(); }
 }
 document.addEventListener("keydown", event => { if (event.key === "Escape" && modelBack && !$("model-menu").hidden) { event.stopPropagation(); modelBack(); return; } if (event.key === "Escape" && menus.some(([, menu]) => !$(menu).hidden)) { event.stopPropagation(); closeMenus(true); } }, true);
-document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions, .commands-more-wrap")) closeMenus(); });
+document.addEventListener("pointerdown", event => { if (!(event.target as Element).closest?.(".status-line, #title, #title-menu, #plan-actions, .commands-more-wrap, #push-menu")) closeMenus(); });
 // The title opens the session picker: a popup on phones, the switcher stripe on desktop.
 // Phones: the title opens the plans with their commands (the plan menu moves under it); sessions live in the drawer.
 async function openTitlePlans() {
@@ -1397,10 +1398,10 @@ function gitLine(git?: GitFiles | null, own = false) {
  const parts = ([["added", "+", "added"], ["untracked", "+", "not in git yet"], ["modified", "+", "modified"], ["deleted", "×", "deleted"]] as const)
   .filter(([kind]) => git?.[kind]).map(([kind, sign, words]) => html("span", { className: "git-" + kind, textContent: sign + git![kind], title: `${git![kind]} ${words}` }));
  const actions = !own || !git ? [] : ([["git-pull", !!git.behind, "Pull latest"], ["git-commit", !!git.changed, "Commit"], ["git-push", !!(git.changed || git.ahead), "Commit and push"]] as const).filter(([, shown]) => shown).map(([id, , label]) => {
-  const button = html("button", { type: "button", className: "session-git-action", title: label }); button.dataset.git = id;
+  const button = html("button", { type: "button", className: "session-git-action", title: label, disabled: ($(id) as HTMLButtonElement).disabled }); button.dataset.git = id;
   button.setAttribute("aria-label", label); button.append($(id).querySelector(".git-icon")!.cloneNode(true));
-  // shortcut: the push test menu opens at the header button, so on phones it sits behind the drawer; fine while the drawer is a peek.
-  button.addEventListener("click", event => { event.stopPropagation(); $(id).click(); });
+  // Phones hide the header, so the push test menu lives in the drawer and opens under this icon.
+  button.addEventListener("click", event => { event.stopPropagation(); if (id === "git-push") $("push-menu").style.top = phone.matches ? button.getBoundingClientRect().bottom + 4 + "px" : ""; $(id).click(); });
   return button;
  });
  if (!parts.length && !actions.length) return [];

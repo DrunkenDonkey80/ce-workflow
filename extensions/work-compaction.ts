@@ -3,7 +3,7 @@ export const COMPACTION_PROFILES = Object.freeze({
 });
 
 const OMITTED = "[... omitted by compaction budget ...]";
-const DEFAULT_KEEP_RECENT_TOKENS = 20_000;
+const DEFAULT_KEEP_RECENT_TOKENS = 30_000;
 const DEFAULT_MAX_SUMMARY_CHARS = 12_000;
 const LATEST_REQUESTS_CHAR_BUDGET = 3_600;
 const MIN_TRIGGER_TOKENS = 30_000;
@@ -86,6 +86,43 @@ export function filesFromOps(fileOps: any = {}) {
 			.filter((file) => !modifiedSet.has(file))
 			.sort(),
 		modified: modifiedFiles,
+	};
+}
+
+// Claude and OpenAI replay a reply's full reasoning (encrypted) while Pi's estimate counts only the visible summary,
+// so a kept assistant message costs at least the output tokens it was billed for.
+export function replayCost(estimate) {
+	return (message) => Math.max(Number(estimate(message)) || 0, message?.role === "assistant" ? Number(message.usage?.output) || 0 : 0);
+}
+
+const CUT_ROLES = new Set(["user", "assistant", "bashExecution", "custom", "branchSummary", "compactionSummary"]);
+
+/**
+ * Pi's preparation keeps `keepRecentTokens` by its own estimate; with real reply costs the same budget ends later.
+ * Moves the cut forward (never back) and summarizes what it passes; split-turn prefixes join the summarized part.
+ */
+export function tightenPreparation(preparation, entries, keepRecentTokens, estimate, toMessages) {
+	const start = entries?.findIndex?.((entry) => entry?.id === preparation?.firstKeptEntryId) ?? -1;
+	if (start < 0 || !(keepRecentTokens > 0)) return preparation;
+	const messagesOf = (index) => (entries[index].type === "compaction" ? [] : toMessages(entries[index]) ?? []);
+	let kept = 0;
+	let cut = start;
+	for (let index = entries.length - 1; index > start; index -= 1) {
+		kept += messagesOf(index).reduce((sum, message) => sum + Math.max(0, Number(estimate(message)) || 0), 0);
+		if (kept < keepRecentTokens) continue;
+		cut = index;
+		while (cut < entries.length && !messagesOf(cut).some((message) => CUT_ROLES.has(message?.role))) cut += 1;
+		break;
+	}
+	if (cut <= start || cut >= entries.length) return preparation;
+	const moved = entries.slice(start, cut).flatMap((_, offset) => messagesOf(start + offset));
+	return {
+		...preparation,
+		firstKeptEntryId: entries[cut].id,
+		messagesToSummarize: [...(preparation.messagesToSummarize ?? []), ...(preparation.turnPrefixMessages ?? []), ...moved],
+		turnPrefixMessages: [],
+		isSplitTurn: false,
+		moved,
 	};
 }
 
