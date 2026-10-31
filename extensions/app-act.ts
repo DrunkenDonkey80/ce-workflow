@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { askConfirm } from "./ask-user/menu.ts";
 import { assignRefs, line, matches, type Element } from "./mobile-act.ts";
-import { macHelper } from "./screen-read.ts";
+import { macHelper, SCREEN_LOCKED } from "./screen-read.ts";
 
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 type Confirm = (title: string, message: string) => Promise<boolean>;
@@ -32,6 +32,7 @@ let op = req["op"] as? String ?? ""
 let running = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
 let info = { (a: NSRunningApplication) -> [String: Any] in ["name": a.localizedName ?? "", "pid": Int(a.processIdentifier), "bundle": a.bundleIdentifier ?? "", "front": a.isActive] }
 if op == "apps" { finish(["apps": running.map(info)]) }
+if (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool == true { finish(["error": "locked"]) }
 
 // The app: a pid, an exact bundle id, or a name (exact before partial, ignoring case).
 let want = (req["app"] as? String ?? "").lowercased()
@@ -71,7 +72,9 @@ func node(_ e: AXUIElement) -> (info: [String: Any], kids: [AXUIElement]) {
 func windows() -> [AXUIElement] { attr(app, kAXWindowsAttribute) as? [AXUIElement] ?? [] }
 func title(_ w: AXUIElement) -> String { text(attr(w, kAXTitleAttribute)) }
 // The window: exact title, else title containing it, else the focused one, else the first.
-func window(_ name: String) -> AXUIElement? {
+func window(_ given: String) -> AXUIElement? {
+	// screen_read names windows "App - Title"; accept that form too.
+	let prefix = "\(target.localizedName ?? "") - ", name = given.hasPrefix(prefix) ? String(given.dropFirst(prefix.count)) : given
 	let all = windows(), low = name.lowercased()
 	if !name.isEmpty { return all.first { title($0) == name } ?? all.first { title($0).lowercased().contains(low) } }
 	if let f = attr(app, kAXFocusedWindowAttribute) { return (f as! AXUIElement) }
@@ -90,6 +93,7 @@ func tree(_ winName: String, _ rootPath: [Int]) -> [String: Any] {
 	func walk(_ e: AXUIElement, _ path: [Int], _ depth: Int) {
 		if out.count >= max || depth > 60 { cut = cut || out.count >= max; return }
 		var (n, children) = node(e)
+		if n["role"] as? String == "AXMenuBar" { return } // menus has the menu bar; in a window it is noise
 		n["path"] = path
 		out.append(n)
 		for (i, c) in children.enumerated() { walk(c, path + [i], depth + 1) }
@@ -185,7 +189,19 @@ case "press":
 	if acts.contains(kAXPressAction) { err = AXUIElementPerformAction(e, kAXPressAction as CFString) }
 	else if settable(e, kAXSelectedAttribute) { err = AXUIElementSetAttributeValue(e, kAXSelectedAttribute as CFString, kCFBooleanTrue) } // table and outline rows
 	else if acts.contains("AXPick") { err = AXUIElementPerformAction(e, "AXPick" as CFString) }
-	if err != .success { finish(["error": "this element cannot be pressed (Accessibility error \(err.rawValue); its actions: \(acts.joined(separator: ", ")))"]) }
+	// Some buttons list AXPress but refuse it: click their middle instead, posted to the app so the pointer does not move.
+	if err != .success || req["click"] as? Bool == true {
+		let v = many(e, [kAXPositionAttribute, kAXSizeAttribute]), p = point(v[0]), sz = size(v[1])
+		if sz.width < 1 || sz.height < 1 { finish(["error": "this element cannot be pressed (Accessibility error \(err.rawValue); its actions: \(acts.joined(separator: ", "))) and has no size to click"]) }
+		let at = CGPoint(x: p.x + sz.width / 2, y: p.y + sz.height / 2)
+		for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+			guard let ev = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: at, mouseButton: .left) else { continue }
+			ev.setIntegerValueField(.mouseEventClickState, value: 1)
+			ev.postToPid(target.processIdentifier)
+			usleep(30000)
+		}
+		after(["did": "click", "at": [at.x, at.y]])
+	}
 	after(["did": "press"])
 case "type":
 	var e: AXUIElement?
@@ -211,7 +227,7 @@ default: finish(["error": "unknown op \(op)"])
 const HELPER = { swift: SWIFT, id: "com.drunkendonkey80.ce-workflow.app-helper", name: "Pi App Helper", exe: "pi-app-helper", app: path.join(os.homedir(), "Library", "Application Support", "ce-workflow", "Pi App Helper.app") };
 const AX_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
 
-async function runHelper(exec: Exec, req: Record<string, unknown>, signal?: AbortSignal) {
+export async function runHelper(exec: Exec, req: Record<string, unknown>, signal?: AbortSignal) {
 	if (process.platform !== "darwin") throw new Error("app_act works on macOS only for now.");
 	const app = await macHelper(exec, signal, HELPER), base = path.join(os.tmpdir(), `app-act-${process.pid}-${Date.now()}`), file = `${base}-req.json`, out = `${base}-out.json`;
 	await writeFile(file, JSON.stringify({ ...req, out }));
@@ -219,6 +235,7 @@ async function runHelper(exec: Exec, req: Record<string, unknown>, signal?: Abor
 		const r = await exec("open", ["-W", "-n", "-g", "-a", app, "--args", file], { timeout: 120_000, signal });
 		const res = JSON.parse(await readFile(out, "utf8").catch(() => "null"));
 		if (!res) throw new Error(`Pi App Helper gave no answer${r.killed ? " (timed out)" : ""}: ${String(r.stderr || r.stdout || "").trim().slice(-800)}`);
+		if (res.error === "locked") throw new Error(SCREEN_LOCKED);
 		if (res.error === "accessibility") {
 			await exec("open", [AX_PANE], { timeout: 30_000, signal });
 			throw new Error("app_act needs Accessibility permission for Pi App Helper. Ask the user to turn it on in System Settings > Privacy & Security > Accessibility (now open), then retry.");
@@ -301,9 +318,10 @@ function render(app: string, res: any, mode: "full" | "changes", root?: number[]
 	const head = `${UNTRUSTED}\nWindow ${JSON.stringify(res.window)}${res.windows?.length > 1 ? ` (others: ${res.windows.filter((w: string) => w !== res.window).map((w: string) => JSON.stringify(w)).join(", ")})` : ""}${res.front ? "" : " · app is in the background"}`;
 	const list = (items: AppElement[], mark = "") => items.slice(0, LIMIT).map(e => mark + show(e)).join("\n") + (items.length > LIMIT ? `\n… ${items.length - LIMIT} more: use find, or snapshot {ref} for one part` : "");
 	const cut = res.cut ? "\n(the window has more elements than one read takes: snapshot {ref} reads one part)" : "";
-	if (mode === "full" || !prev || added.length + removed.length > 0.6 * Math.max(snap.elements.length, 1)) return `${head}\n\n${list(snap.elements as AppElement[]) || "(no accessible elements)"}${cut}`;
-	if (!added.length && !removed.length && !changed.length) return "Done. No visible change.";
-	return `Done. Changes (+ added, - removed, ~ changed):\n${head}\n${[list(added as AppElement[], "+ "), list(removed as AppElement[], "- "), list(changed as AppElement[], "~ ")].filter(Boolean).join("\n")}`;
+	const how = res.did === "click" ? ` (the button refused the Accessibility press, so it was clicked at (${res.at.map(Math.round).join(",")}))` : "";
+	if (mode === "full" || !prev || added.length + removed.length > 0.6 * Math.max(snap.elements.length, 1)) return `${how ? `Done${how}.\n` : ""}${head}\n\n${list(snap.elements as AppElement[]) || "(no accessible elements)"}${cut}`;
+	if (!added.length && !removed.length && !changed.length) return `Done${how}. No visible change.`;
+	return `Done${how}. Changes (+ added, - removed, ~ changed):\n${head}\n${[list(added as AppElement[], "+ "), list(removed as AppElement[], "- "), list(changed as AppElement[], "~ ")].filter(Boolean).join("\n")}`;
 }
 
 export async function appAct(exec: Exec, args: AppActArgs, o: Options = {}): Promise<string> {
@@ -378,7 +396,7 @@ export async function appAct(exec: Exec, args: AppActArgs, o: Options = {}): Pro
 	}
 	throw new Error("action must be apps, snapshot, find, press, type, menus, menu or key.");
 
-	function after(res: any) { return settleMs <= 0 ? "Done." : render(app, res, "changes"); }
+	function after(res: any) { return settleMs <= 0 ? (res.did === "click" ? "Done (clicked: the button refused the Accessibility press)." : "Done.") : render(app, res, "changes"); }
 }
 
 export const appActTool = (exec: Exec) => ({

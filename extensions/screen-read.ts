@@ -127,6 +127,7 @@ func finish(_ o: [String: Any]) -> Never {
 	exit(0)
 }
 _ = NSApplication.shared // connects to the window server, which the capture needs
+if (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool == true { finish(["error": "locked"]) }
 if !CGPreflightScreenCaptureAccess() {
 	CGRequestScreenCaptureAccess() // shows the system dialog once and lists this app under Screen Recording
 	finish(["error": "permission"])
@@ -191,6 +192,7 @@ const MAC_PANE = "x-apple.systempreferences:com.apple.preference.security?Privac
 const MAC_AX_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility";
 
 /** Builds the helper app when missing or its source changed. A rebuild can cost an ad-hoc signed app its grant, so it is signed with an Apple Development identity when there is one. */
+export const SCREEN_LOCKED = "The Mac's screen is locked, so apps show no real windows. Ask the user to unlock it, then retry.";
 export async function macHelper(exec: Exec, signal?: AbortSignal, spec = SCREEN_HELPER) {
 	const { swift, id, name, exe, app } = spec;
 	const hash = createHash("sha256").update(swift).digest("hex").slice(0, 16), stamp = `${app}.version`, bin = path.join(app, "Contents", "MacOS", exe);
@@ -241,6 +243,7 @@ async function macWindow(exec: Exec, plan: ReturnType<typeof screenReadPlan> & {
 			await exec("open", [MAC_AX_PANE], { timeout: 30_000, signal });
 			throw new Error("Resizing a window on macOS needs Accessibility permission for Pi Screen Helper. Ask the user to turn it on in System Settings > Privacy & Security > Accessibility (now open), then retry.");
 		}
+		if (res.error === "locked") throw new Error(SCREEN_LOCKED);
 		if (res.error) throw new Error(`Pi Screen Helper: ${res.error}`);
 		if (res.matches) return { matches: res.matches as { handle: number; pid: number; title: string; minimized: boolean }[] };
 		const { png, ...shot } = processPng(await readFile(raw), plan.region, plan.maxEdge);

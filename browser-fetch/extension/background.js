@@ -107,6 +107,7 @@ async function start(m, job = register(m)) {
 		await chrome.tabs.update(tab.id, { url: m.url, muted: true });
 		await settle(job, LOAD_MS, false);
 		await settle(job, CHALLENGE_MS, true);
+		if (!m.extract) await rendered(job);
 		const [{ result }] = await chrome.scripting.executeScript({ target: { tabId: job.tab }, func: m.extract === "web" ? extractWeb : m.extract === "images" ? extractImages : extract });
 		if (!jobs.has(m.id)) return;
 		if (m.extract) {
@@ -146,6 +147,20 @@ async function settle(job, ms, challenge) {
 	}
 }
 
+// Single-page sites fill the page in by script after the load: wait until its text stops changing (at most 8 s).
+async function rendered(job) {
+	let last = -1, calm = 0;
+	for (const until = Date.now() + 8000; Date.now() < until && jobs.has(job.id);) {
+		const [{ result: size }] = await chrome.scripting.executeScript({ target: { tabId: job.tab }, func: textSize });
+		calm = size > 0 && size === last ? calm + 1 : 0;
+		if (calm >= 2) return;
+		last = size;
+		await sleep(300);
+	}
+}
+
+// Runs in the page.
+function textSize() { return document.body?.innerText.length ?? 0; }
 // Runs in the page.
 function extract() {
 	const abs = value => { try { const url = new URL(value, location.href); return /^https?:$/.test(url.protocol) ? url.href : ""; } catch { return ""; } };

@@ -63,6 +63,7 @@ async function onControl(m) {
 }
 
 async function act(s, m) {
+	if (s.reattaching) await s.reattaching;
 	if (!sessions.has(s.id)) throw new Error("Browser control ended.");
 	if (paused) { endSession(s.id, "paused by the user (the Pi browser fetch toolbar button)"); throw new Error("Paused by the user."); }
 	// D20: the deadline travels with every action; the alarm closes the tab even when Pi goes quiet.
@@ -125,10 +126,37 @@ async function openTab(s) {
 		const id = await chrome.tabs.group({ tabIds: [tab.id], ...(group ? { groupId: group.id } : {}) });
 		if (!group) await chrome.tabGroups.update(id, { title: "Pi", color: "blue" });
 	} catch (error) { console.warn("Pi tab group:", error); }
+	await attach(s);
+}
+async function attach(s) {
 	await chrome.debugger.attach({ tabId: s.tab }, "1.3");
+	s.inflight = new Map();
 	await cdp(s, "Page.enable");
+	await cdp(s, "Network.enable").catch(() => {}); // only to know when the page stops loading data
 	await cdp(s, "Page.addScriptToEvaluateOnNewDocument", { source: SAME_TAB });
 	await cdp(s, "Emulation.setFocusEmulationEnabled", { enabled: true }); // still gets focus and input after the user switches away
+}
+/** Chrome swapped the tab's page (a new process, a prerendered page) and dropped the debugger: attach again to the same or replacing tab. */
+function reattach(s, why) {
+	s.reattaching ??= (async () => {
+		await sleep(300);
+		const tab = await chrome.tabs.get(s.tab).catch(() => undefined);
+		if (!tab) return endSession(s.id, "ended: the agent tab was closed");
+		try { await attach(s); s.refs.clear(); }
+		catch (error) { endSession(s.id, `ended: the browser dropped its debugger connection to the tab (${why}; this was not the user) and attaching again failed: ${error?.message ?? error}`); }
+	})().finally(() => { s.reattaching = undefined; });
+	return s.reattaching;
+}
+/** Wait until the page has had no new or open requests for a moment (open ones older than 5 s, like long polls, do not count). */
+async function quiet(s, ms) {
+	const until = Date.now() + ms;
+	let calm = 0;
+	while (Date.now() < until && sessions.has(s.id)) {
+		const now = Date.now(), busy = [...(s.inflight?.values() ?? [])].some(at => now - at < 5000);
+		calm = busy ? 0 : calm + 1;
+		if (calm >= 3) return;
+		await sleep(150);
+	}
 }
 
 const ref = (s, name) => {
@@ -206,6 +234,7 @@ async function upload(s, m, target, facts) {
 
 /** Accessibility-tree snapshot (D22): visible interactive elements and headings with boxes, sorted by position. */
 async function snapshot(s) {
+	await quiet(s, 5000); // single-page sites fill in after the load; skeletons otherwise
 	const { nodes } = await cdp(s, "Accessibility.getFullAXTree");
 	await cdp(s, "DOM.getDocument", { depth: 0 });
 	const picked = nodes.filter(n => !n.ignored && KEEP.has(n.role?.value) && n.backendDOMNodeId);
@@ -236,9 +265,12 @@ async function page(s) {
 async function after(s, ms, before) {
 	await sleep(400);
 	// Single-page sites change the URL with script after a fetch, not a load; give that a moment.
-	for (const wait = Date.now() + 1500; Date.now() < wait && sessions.has(s.id) && (await chrome.tabs.get(s.tab)).url === before;) await sleep(150);
+	const tab = () => chrome.tabs.get(s.tab).catch(() => ({ url: before, status: "loading" })); // mid-swap the tab id can be gone for a moment
+	for (const wait = Date.now() + 1500; Date.now() < wait && sessions.has(s.id) && (await tab()).url === before;) await sleep(150);
 	const until = Date.now() + ms;
-	while (Date.now() < until && sessions.has(s.id) && (await chrome.tabs.get(s.tab)).status !== "complete") await sleep(200);
+	while (Date.now() < until && sessions.has(s.id) && (await tab()).status !== "complete") await sleep(200);
+	if (s.reattaching) await s.reattaching;
+	if (!sessions.has(s.id)) throw new Error("Browser control ended during the action.");
 	if (s.stopped.length) {
 		const tab = await chrome.tabs.get(s.tab);
 		if (s.stopped.includes(tab.url)) { await chrome.tabs.goBack(s.tab).catch(() => {}); await sleep(400); }
@@ -276,13 +308,26 @@ chrome.tabs.onCreated.addListener(tab => {
 // shortcut: confirm() is always cancelled, so sites that confirm with a native dialog cannot be completed; accept it after a D16 approval if needed.
 chrome.debugger.onEvent.addListener((source, method, params) => {
 	const s = sessionOf(source.tabId);
+	if (s && method === "Network.requestWillBeSent") return s.inflight?.set(params.requestId, Date.now());
+	if (s && (method === "Network.loadingFinished" || method === "Network.loadingFailed")) return s.inflight?.delete(params.requestId);
 	if (s && method === "Page.fileChooserOpened") return s.chooser?.(params);
 	if (!s || method !== "Page.javascriptDialogOpening") return;
 	const accept = params.type === "beforeunload";
 	if (!accept) s.dialogs.push(`${params.type}: ${String(params.message ?? "").slice(0, 300)}`);
 	cdp(s, "Page.handleJavaScriptDialog", { accept }).catch(() => {});
 });
-chrome.tabs.onRemoved.addListener(tabId => { const s = sessionOf(tabId); if (s) endSession(s.id, "ended: the agent tab was closed"); });
-chrome.debugger.onDetach.addListener((source, reason) => { const s = sessionOf(source.tabId); if (s) endSession(s.id, `ended: the browser detached the debugger (${reason}; canceled_by_user is the debugging bar's Cancel)`); });
+// A replaced tab (prerender, instant pages) keeps the session under its new id.
+chrome.tabs.onReplaced?.addListener((added, removedId) => { const s = sessionOf(removedId); if (s) { s.tab = added; reattach(s, "the tab was replaced"); } });
+chrome.tabs.onRemoved.addListener(async tabId => {
+	await sleep(100); // a replacement reports onReplaced around the same time
+	const s = sessionOf(tabId);
+	if (s) endSession(s.id, "ended: the agent tab was closed");
+});
+chrome.debugger.onDetach.addListener((source, reason) => {
+	const s = sessionOf(source.tabId);
+	if (!s) return;
+	if (reason === "canceled_by_user") endSession(s.id, "ended: the user pressed Cancel on the browser's debugging bar");
+	else reattach(s, reason); // target_closed: Chrome swapped the page, the tab is usually still there
+});
 chrome.alarms.onAlarm.addListener(alarm => { if (alarm.name.startsWith("control:")) endSession(alarm.name.slice(8), "ended: the control grant expired"); });
 chrome.action.onClicked.addListener(() => { if (paused) closeAllControl("paused by the user (the Pi browser fetch toolbar button)"); });

@@ -2,6 +2,23 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.15 — 2026-10-31
+
+Reload the Pi browser fetch add-on in `chrome://extensions` after updating (version 1.5).
+
+### Added
+- `browser_act` `wait {query, gone?, timeoutMs?}` waits until text appears or disappears, or until the page stops changing, and returns the snapshot.
+- `browser_act` confirm dialogs for sending, deleting and similar clicks offer "allow until control ends", so a site asks once per grant instead of every time. Payment fields still ask every time; a new grant asks again.
+
+### Fixed
+- `browser_act` keeps its tab when Chrome swaps the page and drops the debugger (`target_closed`), as App Store Connect's TestFlight dialogs do: it attaches again instead of ending. Only the debugging bar's Cancel ends control, and the message now says so.
+- `browser_act` snapshots wait up to 5 s for the page to stop loading data, so single-page sites no longer return skeletons.
+- `browser_act` "no page is open" says why and when the last session ended, and results warn when control ends within 2 minutes.
+- `browser_fetch` waits for a single-page site to fill in its text (up to 8 s) before reading it.
+- `app_act` and `screen_read` refuse with a clear message while the Mac's screen is locked.
+- `app_act` window snapshots leave out the menu bar (`menus` has it), and windows can be named as `screen_read` lists them ("Xcode - Archives").
+- `app_act` clicks a button's middle when the button refuses the Accessibility press.
+
 ## 0.2.14 — 2026-10-31
 
 ### Added

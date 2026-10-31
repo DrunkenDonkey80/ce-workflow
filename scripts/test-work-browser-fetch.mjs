@@ -234,6 +234,7 @@ async function roundTrip() {
 			executeScript: async ({ target, func }) => {
 				const tab = tabs.get(target.tabId), host = hostOf(tab.url);
 				if (func.name === "extractWeb" || func.name === "extractImages") { searched.push({ url: tab.url, at: Date.now() }); return [{ result: { url: tab.url, title: "Google", captcha: tab.url.includes("captcha"), results: func.name === "extractWeb" ? webRaw : imageRaw } }]; }
+				if (func.name === "textSize") return [{ result: 42 }];
 				if (func.name !== "extract") return [{ result: `Shop ${host}` }];
 				return [{ result: { url: tab.url, title: `Title ${host}`, text: `Hello from ${host}`, links: [{ text: "Next", href: `https://${host}/next` }],
 					images: ["https://shop.test/a.jpg", "https://cdn.test/b.png", "https://mail.google.com/x.png", "http://127.0.0.1/y.png", "https://cdn.test/page.html"] } }];
@@ -312,9 +313,11 @@ async function roundTrip() {
 			snap = await go({ action: "snapshot" });
 			picks = ["Deny"];
 			await assert.rejects(go({ action: "click", ref: refOf(snap, "Delete item") }), /did not allow/);
-			picks = ["Allow this action"];
+			picks = ["Allow sending, deleting and similar actions on shop.test until control ends"];
 			await go({ action: "click", x: 20, y: 305 });
-			assert.deepEqual(typed, [["Save", "click"], ["Search", "shoes"], ["Search", "Enter"], ["Delete item", "click"]], "only allowed actions reach the page");
+			await go({ action: "click", x: 20, y: 305 }); // asks nothing: allowed until control ends
+			assert.equal(picks.length, 0);
+			assert.deepEqual(typed, [["Save", "click"], ["Search", "shoes"], ["Search", "Enter"], ["Delete item", "click"], ["Delete item", "click"]], "only allowed actions reach the page");
 			await assert.rejects(go({ action: "click", x: 700, y: 700 }), /Nothing at \(700, 700\)/);
 			// Upload: only real images inside the project folder, each confirmed; a button's file picker is intercepted.
 			mkdirSync(path.join(agent, "img"), { recursive: true });
@@ -357,6 +360,18 @@ async function roundTrip() {
 			const closedBefore = removed.length;
 			assert.match(await go({ action: "click", ref: refOf(snap, "Popup") }), /new tab for https:\/\/pop\.test\/; it was closed/);
 			assert.equal(removed.length, closedBefore + 1);
+			// Chrome swapping the page drops the debugger with target_closed: the session attaches again and goes on.
+			const swapped = agentTab().id;
+			attached.delete(swapped);
+			listeners.detach.forEach(f => f({ tabId: swapped }, "target_closed"));
+			assert.match(await go({ action: "snapshot" }), /\[e1\] heading "Shop"/);
+			assert.ok(attached.has(swapped), "reattached to the same tab");
+			// wait: until text shows, until it goes, or a timeout that still returns the page.
+			assert.match(await go({ action: "wait", query: "Save" }), /\[e\d+\] button "Save"/);
+			assert.match(await go({ action: "wait", query: "Nope", timeoutMs: 600 }), /^Still missing "Nope" after 1 s/);
+			assert.match(await go({ action: "wait", query: "Save", gone: true, timeoutMs: 600 }), /^Still showing "Save"/);
+			assert.match(await go({ action: "wait" }), /^UNTRUSTED/);
+			await assert.rejects(go({ action: "wait", gone: true }), /gone needs query/);
 			// Scroll, stale ref, screenshot saved by the host (D10).
 			assert.match(await go({ action: "scroll", direction: "down" }), /Done/);
 			const shot = (await go({ action: "screenshot" })).match(/saved: (.+\.png)/)[1];
@@ -395,16 +410,16 @@ async function roundTrip() {
 			const ends = [
 				[() => listeners.alarm.forEach(f => f({ name: [...alarms.keys()].find(name => name.startsWith("control:")) })), /grant expired/],
 				[async () => { for (const click of listeners.click) await click(); }, /paused/],
-				[() => listeners.detach.forEach(f => f({ tabId: agentTab().id }, "target_closed")), /detached the debugger \(target_closed/],
+				[() => listeners.detach.forEach(f => f({ tabId: agentTab().id }, "canceled_by_user")), /pressed Cancel on the browser's debugging bar/],
 				[() => listeners.closedTab.forEach(f => f(agentTab().id)), /agent tab was closed/],
 			];
 			for (const [end, why] of ends) {
 				if (!agentTab()) await go({ action: "open", url: "https://shop.test/act" });
 				const id = agentTab().id;
 				await end();
-				await sleep(100);
+				await sleep(400); // tab close waits 100 ms for a replacement tab
 				assert.ok(!attached.has(id) && removed.includes(id), `${why}: tab closed and debugger detached`);
-				await assert.rejects(go({ action: "snapshot" }), /no page is open/);
+				await assert.rejects(go({ action: "snapshot" }), /no page is open \(the last control session closed at \d\d:\d\d: /);
 				assert.match(readFileSync(bf.logFile(), "utf8"), why);
 				if (/paused/.test(String(why))) {
 					await assert.rejects(go({ action: "open", url: "https://shop.test/act" }), /paused/i);
