@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- `node scripts/audit-compaction.mjs` checks how well compaction keeps context, from the session logs and without calling a model: files read again, commands run again and requests you had to repeat after each compaction, averaged per compaction mode, plus the worst cases.
+
 ## 0.2.17 — 2026-10-31
 
 Reload the Pi browser fetch add-on in `chrome://extensions` after updating.

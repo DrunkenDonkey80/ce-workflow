@@ -181,6 +181,8 @@ The lightweight modes' summary size is a rolling target, not a license to clip p
 
 Do not install another automatic compaction extension into the same Pi profile. Native modes use Pi's native summary generator; Ultracompact and Ultrafull use the selected code-first or hybrid formatter. Ultrafull is an alternative for comparison, not a verified fix for post-compaction looping.
 
+To see how well compaction keeps context, `node scripts/audit-compaction.mjs [dirs or .jsonl] [--since=YYYY-MM-DD] [--top=N]` scans session logs (default: all of `~/.pi/agent/sessions`) without calling a model. For each compaction followed by more work, it counts files read again whose earlier read was dropped (in the next 40 tool calls, skipping files edited first and SKILL/AGENTS/CLAUDE.md), dropped commands run again, user messages repeating a dropped one or saying "I already said", and how many paths the summary names get touched afterwards. It prints averages per compaction mode and the worst compactions with their session file.
+
 ## Checks
 
 `npm run verify` checks the package manifest and runs every `scripts/test-work-*.mjs` suite plus the Jev and advisor tests; `npm run verify:quiet` is the compact form. `npm pack --dry-run` verifies the publish surface.
