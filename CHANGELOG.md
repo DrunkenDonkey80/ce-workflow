@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.20 — 2026-11-01
+
+### Fixed
+- The hub no longer opens a Git Credential Manager sign-in window every 5 minutes for a session folder whose repository has no saved login: its background check for new commits now fails quietly instead.
+
 ## 0.2.19 — 2026-11-01
 
 ### Changed

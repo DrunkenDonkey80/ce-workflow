@@ -76,7 +76,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	const readGit = (cwd: string) => new Promise<GitState>(resolve => execFile("git", ["status", "--porcelain=v1", "--branch"], { cwd, timeout: 5000, windowsHide: true }, (error, out) => {
 		if (error) return resolve(null);
 		const [head = "", ...files] = out.split("\n").filter(Boolean), count = (test: (xy: string) => boolean) => files.filter(line => test(line.slice(0, 2))).length;
-		if (Date.now() - (fetched.get(cwd) ?? 0) > 300_000) { fetched.set(cwd, Date.now()); execFile("git", ["fetch", "--quiet"], { cwd, timeout: 60_000, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } }, () => {}); }
+		if (Date.now() - (fetched.get(cwd) ?? 0) > 300_000) { fetched.set(cwd, Date.now()); execFile("git", ["fetch", "--quiet"], { cwd, timeout: 60_000, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" } }, () => {}); } // GCM ignores GIT_TERMINAL_PROMPT and would pop a sign-in window every 5 min
 		const untracked = count(xy => xy === "??"), added = count(xy => xy[0] === "A"), deleted = count(xy => xy[0] !== "A" && xy.includes("D"));
 		// Paths relative to the repository root, for the hover list; a rename lists its new name.
 		const kind = (xy: string) => xy === "??" ? "untracked" : xy[0] === "A" ? "added" : xy.includes("D") ? "deleted" : "modified";
