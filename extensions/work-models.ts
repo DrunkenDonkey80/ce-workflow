@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
-import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool } from "./hub-command.ts";
+import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
@@ -3509,8 +3509,18 @@ export default function workModelsExtension(pi) {
 	jevTools = createJevTools(pi, readEffectiveSettings); // Preserve nulls in caller-supplied JSON state.
 	intercomParkedSessions(pi);
 	registerConstrainedTool(pi, sessionDialogTool(pi)); // a send stopped at a peer's open question points here
-	// Hub-started Pi only: nobody else can be woken, and the buttons show on the hub page. tools_enable declares them.
-	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, { ...scheduleTool, exposure: "deferred" });
+	// Hub-started Pi only: nobody else can be woken, and the buttons show on the hub page. Waiting comes up in any task, so
+	// schedule stays declared and long sleep-waits in bash point to it; tools_enable declares project_commands.
+	pi.on("tool_call", (event) => {
+		if (event.toolName === "bash" && undeclaredBackground(event.input?.command)) return { block: true, reason: BACKGROUND_REASON };
+	});
+	if (process.env.PI_HUB_SESSION) {
+		registerConstrainedTool(pi, scheduleTool);
+		pi.on("tool_call", (event) => {
+			if (event.toolName === "bash" && longSleepWait(event.input?.command, event.input?.timeout))
+				return { block: true, reason: LONG_WAIT_REASON };
+		});
+	}
 	if (process.env.PI_HUB_SESSION) registerConstrainedTool(pi, { ...projectCommandsTool, exposure: "deferred" });
 	registerConstrainedTool(pi, {
 		name: "research_note",

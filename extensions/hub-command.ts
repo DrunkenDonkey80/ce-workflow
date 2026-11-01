@@ -221,6 +221,28 @@ export async function handleHubCommand(args: string, ctx) {
 	notify(result.text, result.ok);
 }
 
+// A bash turn that sleeps 5+ minutes (one long sleep, or a sleep loop with no or a long timeout) holds the session busy
+// and can poll a dead job for an hour; schedule watches at no token cost instead.
+export function longSleepWait(command, timeout) {
+	if (typeof command !== "string") return false;
+	const unit = { "": 1, s: 1, m: 60, h: 3600, d: 86400 };
+	let total = 0;
+	for (const [, n, u] of command.matchAll(/\bsleep\s+(\d+(?:\.\d+)?)([smhd]?)\b/gi)) total += Number(n) * unit[u.toLowerCase()];
+	for (const [, n] of command.matchAll(/\bStart-Sleep\s+(?:-s(?:econds)?\s+)?(\d+)/gi)) total += Number(n);
+	if (total >= 300) return true;
+	const sleeps = /\b(sleep|Start-Sleep)\b/i.test(command), loops = /\b(for|while|until)\b/.test(command);
+	return sleeps && loops && !(Number(timeout) < 300);
+}
+export const LONG_WAIT_REASON = "Blocked: sleep-waits of 5+ minutes keep this session busy and can poll a stuck job for an hour. Start the job in the background, then call schedule with kind script and everyMinutes: a check that exits 0 silently while it runs and prints the result (or an error) when it is done or stuck; end your turn and the hub wakes you. Short waits (a sleep loop with timeout under 300 s) still work.";
+
+// Background starts (`&`, nohup, setsid, cmd start, Start-Process) outlive the turn: 28 forgotten http.servers piled up.
+// They must declare a lifetime: a `timeout <seconds>` that stops them, or `# long-running` when the user needs them up.
+export function undeclaredBackground(command) {
+	if (typeof command !== "string" || /#\s*long-running\b/i.test(command) || /\btimeout\s+(-\S+\s+)*\d/.test(command)) return false;
+	return /(?<![&>|])&(?![&>])\s*(?:$|[;)\n])/m.test(command) || /\b(nohup|setsid|Start-Process)\b/i.test(command) || /\bcmd(\.exe)?\s+[/-]+c\s+start\b/i.test(command);
+}
+export const BACKGROUND_REASON = "Blocked: this starts a background process that would outlive the turn. Declare its lifetime: prefix the program with `timeout <seconds>` (e.g. `timeout 3600 python -m http.server 8781 &`) so it stops itself, or add `# long-running` at the end when the user needs it to keep running (then tell the user it is running and how to stop it).";
+
 // S-04: the agent's timers, through `pi-hub schedule`. Registered only in hub-started Pi (PI_HUB_SESSION), which the hub can wake.
 const nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
 export const scheduleTool = {

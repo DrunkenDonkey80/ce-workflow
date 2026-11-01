@@ -2,6 +2,12 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.19 — 2026-11-01
+
+### Changed
+- No more forgotten background servers: a bash command that starts something in the background (`&`, nohup, Start-Process, `cmd /c start`) must say how long it lives, with `timeout <seconds>` so it stops itself or `# long-running` when you need it to stay up; otherwise it is refused with that hint.
+- Hub sessions no longer sit in hour-long bash wait loops: a bash command that sleeps 5 minutes or more (or loops on sleep with no or a long timeout) is refused and points to `schedule`, which watches for free and wakes the session. `schedule` is again always available instead of waiting behind `tools_enable`.
+
 ## 0.2.18 — 2026-10-31
 
 ### Added

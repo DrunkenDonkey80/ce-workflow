@@ -8,7 +8,6 @@ export const SITUATIONAL_TOOLS = {
 	browser_act: "operate a site in the user's logged-in browser: click, type, select, upload",
 	image_search: "Google Images in the user's browser: contact sheet of results, then save originals",
 	generate_image: "generate or edit a PNG image from a prompt",
-	schedule: "wake this hub session later or when a watch script fires, instead of polling",
 	project_commands: "add/remove/list the user's project command buttons on the hub page",
 };
 
@@ -22,7 +21,7 @@ export function toolsEnableTool(pi) {
 		name: TOOLS_ENABLE,
 		label: "Enable tools",
 		description: `Declare situational tools for your next request; their full parameters and rules arrive with them, and they stay on for this session. Enable only what the task needs (a phone app: mobile_act + screen_read; a desktop app: app_act + screen_read).\n${available.map((name) => `- ${name}: ${SITUATIONAL_TOOLS[name]}`).join("\n")}`,
-		promptSnippet: "Enable situational tools (phone, desktop app, screen capture, logged-in browser, images, hub timers)",
+		promptSnippet: "Enable situational tools (phone, desktop app, screen capture, logged-in browser, images, hub buttons)",
 		parameters: {
 			type: "object",
 			properties: { tools: { type: "array", items: { type: "string", enum: available }, minItems: 1 } },

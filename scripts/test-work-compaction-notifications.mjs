@@ -151,8 +151,8 @@ try {
 	for (const tool of Object.values(tools)) {
 		// Image tools stay hidden until a session shows their model is set.
 		const hidden = ["process_image", "generate_image"].includes(tool.name) && "hidden";
-		// Hub tools wait for tools_enable.
-		const deferred = ["schedule", "project_commands"].includes(tool.name) && "deferred";
+		// Hub buttons wait for tools_enable; schedule stays declared.
+		const deferred = tool.name === "project_commands" && "deferred";
 		assert.equal(tool.exposure, tool.name.startsWith("work_") || tool.name.startsWith("camera_") ? "model-only" : hidden || deferred || undefined);
 	}
 	assert.equal(tools.research_mode, undefined, "agent cannot toggle research mode");

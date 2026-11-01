@@ -5,7 +5,20 @@ import os from "node:os";
 import path from "node:path";
 
 process.env.PI_CODING_AGENT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "wo-hub-")); // the CLI child inherits it: no real hub
-const { hubCli, hubMenu, joinedSession, scheduleTool, liveTarget, dialogReason } = await import("../extensions/hub-command.ts");
+const { hubCli, hubMenu, joinedSession, scheduleTool, liveTarget, dialogReason, longSleepWait, undeclaredBackground } = await import("../extensions/hub-command.ts");
+// Long sleep-waits are blocked (the ainews session polled a finished run for an hour); short waits and real work are not.
+for (const [command, timeout, blocked] of [
+	["sleep 900; cat log", 960, true], ["sleep 5m", undefined, true], ["powershell Start-Sleep -Seconds 600", undefined, true],
+	["for i in $(seq 1 57); do check || break; sleep 60; done", 3500, true], ["while true; do sleep 5; done", undefined, true],
+	["for i in 1 2 3; do curl -s x && break; sleep 2; done", 30, false], ["sleep 2; npm test", 900, false], ["npm run build", 1800, false],
+]) assert.equal(longSleepWait(command, timeout), blocked, command);
+// Background starts need a declared lifetime; foreground commands, && chains and redirects are not background.
+for (const [command, blocked] of [
+	["python -m http.server 8781 &", true], ["cd x && python -m ainews serve > log 2>&1 &", true], ["nohup node server.js", true],
+	['powershell -Command "Start-Process pythonw -ArgumentList x"', true], ["cmd //c start \"\" app.exe", true],
+	["timeout 3600 python -m http.server 8781 &", false], ["pythonw -m ainews serve & # long-running", false],
+	["npm test && git status", false], ["node x.mjs > out.log 2>&1", false], ["cmd &> log", false], ["npm start", false],
+]) assert.equal(undeclaredBackground(command), blocked, command);
 // A woken parked session is found by its Pi session id, else (stable/claimed intercom id) as the one new session in its folder.
 const target = { id: 'h1', name: 'game', folder: '/p', sessionId: 'pi-1' };
 assert.equal(joinedSession([{ id: 'pi-1', cwd: '/x', pid: 2, startedAt: 0 }], target, 100, 1)?.id, 'pi-1');
