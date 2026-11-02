@@ -16,7 +16,9 @@ import workModelsExtension, {
 	isKnowledgeDiscovererCompletionMessage,
 	launchKnowledgeDiscoverer,
 	noteExcludedModels,
+	registerContextHandlers,
 	requestContextFilter,
+	systemSafeContext,
 	researchCompactionTrigger,
 	coldCacheCompactMinutes,
 	resetContextFilter,
@@ -24,6 +26,40 @@ import workModelsExtension, {
 	summarizeNativeContext,
 } from "../extensions/work-models.ts";
 import { fitImage, parseSize, pngSize } from "../extensions/work-images.ts";
+
+// CU-12 (plan fee49985 D7): system messages stay in their slot so tool changes keep the prompt cache.
+{
+	const sys = (content, extra = {}) => ({ role: "system", content, timestamp: 1, ...extra });
+	const msg = (role, text) => ({ role, content: [{ type: "text", text }], timestamp: 2 });
+	const head = sys("base", { toolsAdded: [{ name: "read" }], sections: { a: "A" } });
+	const append = { role: "custom", customType: "work-knowledge", content: "k" };
+	const shape = (list) => list.map((m) => m.role === "system" ? `S:${m.content}` : m.role === "custom" ? `C:${m.customType}` : `${m.role}:${m.content?.[0]?.text ?? m.summary}`);
+	const build = () => [head, msg("user", "u1"), msg("assistant", "a1"), sys("tool", { toolsAdded: [{ name: "word_count" }], sections: { a: null, b: "B" } }), msg("user", "u2")];
+	// Appended message: the mid system message stays where it was; the knowledge goes last.
+	const kept = await systemSafeContext(build(), {}, [(e) => ({ messages: [...e.messages, append] })]);
+	assert.deepEqual(shape(kept.messages), ["S:base", "user:u1", "assistant:a1", "S:tool", "user:u2", "C:work-knowledge"]);
+	assert.equal(JSON.stringify(kept.messages[1]).includes("ce-context-index"), false, "the tag never reaches the wire");
+	// Unchanged list: undefined, so Pi keeps its own transcript.
+	assert.equal(await systemSafeContext(build(), {}, [() => undefined]), undefined);
+	// Replaced anchor (vision-style clone) and removed anchor (internal message): order holds.
+	const cloned = await systemSafeContext(build(), {}, [(e) => ({ messages: e.messages.map((m) => m.role === "assistant" ? { ...m, content: [{ type: "text", text: "A1" }] } : m) })]);
+	assert.deepEqual(shape(cloned.messages), ["S:base", "user:u1", "assistant:A1", "S:tool", "user:u2"]);
+	const removed = await systemSafeContext(build(), {}, [(e) => ({ messages: e.messages.filter((m) => m.content?.[0]?.text !== "a1") })]);
+	assert.deepEqual(shape(removed.messages), ["S:base", "user:u1", "S:tool", "user:u2"]);
+	// Windowing drops the prefix holding the system message: it folds into the head once (section deleted, tool added), never twice.
+	const atBoundary = await systemSafeContext(build(), {}, [(e) => ({ messages: [{ role: "compactionSummary", summary: "sum", timestamp: 3 }, e.messages[2]] })]);
+	assert.deepEqual(shape(atBoundary.messages), ["S:base", "compactionSummary:sum", "S:tool", "user:u2"], "a system message right before the first kept message stays");
+	const early = () => { const list = build(); list.splice(3, 1); list.splice(2, 0, sys("tool", { toolsAdded: [{ name: "word_count" }], sections: { a: null, b: "B" } })); return list; }; // [head, u1, S:tool, a1, u2]
+	const windowed = await systemSafeContext(early(), {}, [(e) => ({ messages: [{ role: "compactionSummary", summary: "sum", timestamp: 3 }, e.messages[2]] })]);
+	assert.deepEqual(shape(windowed.messages), ["S:base\n\ntool", "compactionSummary:sum", "user:u2"]);
+	assert.deepEqual(windowed.messages[0].toolsAdded.map((t) => t.name), ["read", "word_count"]);
+	assert.deepEqual(windowed.messages[0].sections, { b: "B" });
+	assert.equal(windowed.messages.filter((m) => m.role === "system").length, 1);
+	// Pi 0.87+ gets one context_with_system handler; older hosts keep the per-transform context path.
+	const seen = (withSystem) => { const names = []; registerContextHandlers({ on: (name) => names.push(name) }, [() => {}, () => {}], withSystem); return names; };
+	assert.deepEqual(seen(true), ["context_with_system"]);
+	assert.deepEqual(seen(false), ["context", "context"]);
+}
 
 // Cold cache + large context offers compaction before the next message.
 {
@@ -59,7 +95,7 @@ const runId = "43b46a2e-ec06-4f14-b99e-e3f81478d87a";
 let replyRunId = runId;
 const pi = {
 	on: (name, handler) => {
-		if (name === "context") {
+		if (name === "context" || name === "context_with_system") { // CU-12: both hooks chain the same way here
 			contextHooks.push(handler);
 			hooks.context = async (event, ctx) => {
 				let messages = event.messages;

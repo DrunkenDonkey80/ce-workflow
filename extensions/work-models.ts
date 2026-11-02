@@ -59,8 +59,12 @@ let serializeNativeMessages = (messages) => JSON.stringify(messages);
 let estimateContextMessageTokens = replayCost((message) =>
 	Math.ceil(JSON.stringify(message ?? {}).length / 4));
 let entryMessages = (entry) => (entry?.type === "message" && entry.message ? [entry.message] : []);
+let hostVersion = "";
+let getCurrentSystemMessage;
+try { ({ getCurrentSystemMessage } = await import("@earendil-works/pi-ai")); } catch { /* Older hosts and fixture runs keep the context path. */ }
 try {
 	const sdk = await import("@earendil-works/pi-coding-agent");
+	hostVersion = sdk.VERSION ?? "";
 	({ copyToClipboard, withFileMutationQueue, generateSummaryWithUsage: generateNativeSummary } = sdk);
 	estimateContextMessageTokens = replayCost(sdk.estimateTokens);
 	if (sdk.sessionEntryToContextMessages) entryMessages = sdk.sessionEntryToContextMessages;
@@ -1333,6 +1337,57 @@ async function compactSessionMemory(ctx, current, state, preparation, currentMes
 
 function agentHandoff(note) {
 	return note ? `## Agent handoff note (written by the agent before compaction)\n${note}\n\n` : "";
+}
+
+// Plan fee49985 D7: Pi 0.87+ merges every mid-conversation system message into the head when a `context` handler changes the
+// list, so each tool or prompt change rewrites the cached prefix. context_with_system lets us keep them in place instead.
+const CONTEXT_INDEX = Symbol("ce-context-index");
+const versionAtLeast = (version, floor) => {
+	const a = String(version).split(".").map(Number), b = floor.split(".").map(Number);
+	for (let i = 0; i < 3; i++) if ((a[i] || 0) !== b[i]) return (a[i] || 0) > b[i];
+	return true;
+};
+
+export function registerContextHandlers(pi, transforms, withSystem = Boolean(getCurrentSystemMessage) && versionAtLeast(hostVersion, "0.87.0")) {
+	if (withSystem) pi.on("context_with_system", (event, ctx) => systemSafeContext(event.messages, ctx, transforms));
+	else for (const transform of transforms) pi.on("context", transform);
+}
+
+/** Run `context` transforms on the conversation and put each system message back after the message it followed. */
+export async function systemSafeContext(messages, ctx, transforms) {
+	const head = messages[0]?.role === "system" ? messages[0] : undefined;
+	const visible = [], systems = [];
+	for (const message of head ? messages.slice(1) : messages) {
+		if (message?.role === "system") systems.push({ message, anchor: visible.length - 1 });
+		else { visible.push(message); if (message && typeof message === "object") message[CONTEXT_INDEX] = visible.length - 1; } // request-local clones; spread copies the tag, JSON drops it
+	}
+	let current = visible, changed = false;
+	for (const transform of transforms) {
+		const result = await transform({ type: "context", messages: current }, ctx);
+		if (result?.messages) { current = result.messages; changed = true; }
+	}
+	if (!changed) return undefined;
+	if (!head && !systems.length) return { messages: current };
+	const tags = current.map((message) => message?.[CONTEXT_INDEX]);
+	const first = tags.find((tag) => tag !== undefined) ?? visible.length;
+	// A system message whose following message fell before the first kept one was windowed away: fold it into the head as Pi does.
+	const dropped = systems.filter((item) => item.anchor + 1 < first);
+	let pending = systems.filter((item) => item.anchor + 1 >= first);
+	const out = [];
+	if (head) out.push(dropped.length && getCurrentSystemMessage ? getCurrentSystemMessage([head, ...dropped.map((item) => item.message)]) : head);
+	else out.push(...dropped.map((item) => item.message));
+	let afterLastTagged = out.length;
+	current.forEach((message, index) => {
+		const tag = tags[index];
+		if (tag !== undefined) {
+			while (pending.length && pending[0].anchor < tag) out.push(pending.shift().message);
+			out.push(message);
+			afterLastTagged = out.length;
+		} else out.push(message);
+	});
+	// System messages after the last kept message stay before appended ones (knowledge, nudge).
+	out.splice(afterLastTagged, 0, ...pending.map((item) => item.message));
+	return { messages: out };
 }
 
 // Transient nudge near the compaction trigger so the agent writes its own handoff first.
@@ -3793,9 +3848,11 @@ if (blockedInternalBackgroundCompletionTurn) {
 	});
 
 	// Every model gets img- references: pixels replayed each turn cost more than a process_image call. Vision model None opts out.
-	pi.on("context", (event, ctx) => ctx?.cwd && visionModelSettings(ctx.cwd) === NONE_MODEL ? undefined : visionBridge.project(event.messages));
-	pi.on("context", (event, ctx) => filteredContext(event, ctx));
-	pi.on("context", (event, ctx) => compactionNoteNudge(event, ctx));
+	registerContextHandlers(pi, [
+		(event, ctx) => ctx?.cwd && visionModelSettings(ctx.cwd) === NONE_MODEL ? undefined : visionBridge.project(event.messages),
+		(event, ctx) => filteredContext(event, ctx),
+		(event, ctx) => compactionNoteNudge(event, ctx),
+	]);
 	pi.on("agent_end", () => { activePromptBackedAgent = false; });
 
 	pi.on("session_before_compact", async (event, ctx) => {

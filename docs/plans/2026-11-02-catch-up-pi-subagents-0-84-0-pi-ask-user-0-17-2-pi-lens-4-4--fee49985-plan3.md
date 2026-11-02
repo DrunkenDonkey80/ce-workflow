@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-02
 source: catch-up
 catch-up: {"pi-subagents":"0.84.0","pi-ask-user":"0.17.2","pi-lens":"4.4.8"}
-updated: 2026-11-02T07:14:36.041Z
+updated: 2026-11-02T07:17:05.743Z
 reviewed: 2026-11-02
 ---
 
@@ -212,11 +212,7 @@ Commands (referenced by ID):
 
 ### Phase 3 — Cache-safe context handlers: build [code]
 
-- [ ] **CU-12** Implement the CU-10 design in extensions/work-models.ts, keeping the old `context` path for older hosts.
-  - Test in C5 (its mock dispatches handlers at line 62): a mid-conversation system message stays in place when the knowledge message is appended, and is merged into the head when windowing drops it.
-  - Also in C5: a replaced anchor (image message), a removed anchor (internal message), a dropped section update and deletion, and no double replay of kept deltas.
-  - Make the C5 mock chain `context_with_system` handlers, and test both the new hook and the older-host `context` path.
-  - Check: C5, C6 and C7 pass.
+- [x] **CU-12** registerContextHandlers + systemSafeContext: one context_with_system handler on Pi >=0.87 keeps system messages in place (folds only windowed-away ones); older hosts keep the context path; C5 tests added.
 
 ### Phase 4 — Cache-safe context handlers: measure and decide [think]
 
