@@ -81,7 +81,6 @@ const NONE_MODEL = "__none_model__";
 // Vision model value: process_image asks the session's current model (the default when unset).
 const CURRENT_MODEL = "__current_model__";
 const CURRENT_DESCRIPTION = "process_image asks the session's current model in a separate call; pixels stay out of the main context";
-const CHATGPT_WEB_SOURCE = "chatgpt-web";
 
 const SUBAGENT_EXTRA_AGENT_DIRS_ENV = "PI_SUBAGENT_EXTRA_AGENT_DIRS";
 const WORKFLOW_REPO_DIR = resolve(
@@ -208,19 +207,6 @@ const THINKING_LEVELS = [
 // Applying a profile overwrites effort and gates but keeps chosen models.
 
 const SUBMENU_ARROW = "›";
-
-function chatgptConsultAvailable() {
-	try {
-		return Boolean(
-			workExtensionPi?.getAllTools?.().some(
-				(tool) =>
-					(typeof tool === "string" ? tool : tool?.name) === "chatgpt_consult",
-			),
-		);
-	} catch {
-		return false;
-	}
-}
 
 const DEFAULT_CONTEXT = {
 	enabled: true,
@@ -540,7 +526,6 @@ function titleCase(value) {
 function modelDisplayName(model, names = new Map()) {
 	if (!model || model === INHERIT_MODEL) return "Inherit";
 	if (model === NONE_MODEL) return "None";
-	if (model === CHATGPT_WEB_SOURCE) return "ChatGPT Web";
 	return names.get(model) ?? model;
 }
 
@@ -580,7 +565,6 @@ async function modelItems(
 	allowNone = false,
 	projectScope = false,
 	availableModels,
-	includeChatgptWeb = false,
 	inherit = undefined,
 ) {
 	const items = [];
@@ -589,13 +573,6 @@ async function modelItems(
 			value: NONE_MODEL,
 			label: "None",
 			description: "Do not run this advisor",
-		});
-	if (includeChatgptWeb && chatgptConsultAvailable())
-		items.push({
-			value: CHATGPT_WEB_SOURCE,
-			label: "ChatGPT Web",
-			description:
-				"External read-only advisor; sends its assigned question and requested workspace files through chatgpt_consult",
 		});
 	items.push(inherit ? { value: INHERIT_MODEL, ...inherit } : {
 		value: INHERIT_MODEL,
@@ -643,26 +620,22 @@ async function chooseModel(
 	currentModel = INHERIT_MODEL,
 	allowNone = false,
 	projectScope = false,
-	includeChatgptWeb = false,
 	inherit = undefined,
 	{ allow, extra = [], noneDescription, lead = [] }: any = {},
 ) {
 	// allow: optional predicate on "provider/id" (special values always stay); extra: items only the all-models view lists;
 	// lead: special items both views list first.
 	const shape = (items) => [...lead, ...items]
-		.filter((item) => !allow || [NONE_MODEL, INHERIT_MODEL, CHATGPT_WEB_SOURCE].includes(item.value) || allow(item.value))
+		.filter((item) => !allow || [NONE_MODEL, INHERIT_MODEL].includes(item.value) || allow(item.value))
 		.map((item) => item.value === NONE_MODEL && noneDescription ? { ...item, description: noneDescription } : item);
 	const allItems = shape([...await modelItems(
 		ctx,
 		allowNone,
 		projectScope,
 		undefined,
-		includeChatgptWeb,
 		inherit,
 	), ...extra]);
-	const scopedModels = Array.isArray(ctx.scopedModels)
-		? ctx.scopedModels.filter((entry) => entry?.model)
-		: [];
+	const scopedModels = await scopedModelEntries(ctx);
 	if (!scopedModels.length) {
 		const current = allItems.find((item) => item.value === currentModel);
 		return choose(ctx, title, allItems, currentModel, {
@@ -675,7 +648,6 @@ async function chooseModel(
 		allowNone,
 		projectScope,
 		scopedModels,
-		includeChatgptWeb,
 		inherit,
 	));
 	const current = allItems.find((item) => item.value === currentModel);
@@ -710,6 +682,39 @@ async function chooseModel(
 	}
 }
 
+// Pi resolves enabledModels only when a session starts: until then our pickers (and plan3's hub picker) read the list saved here.
+const SCOPED_MODELS = Symbol.for("ce-workflow.scoped-models");
+const modelKey = (model) => `${model.provider}/${model.id}`;
+async function scopedModelEntries(ctx) {
+	const ids = globalThis[SCOPED_MODELS];
+	if (!ids) return Array.isArray(ctx.scopedModels) ? ctx.scopedModels.filter((entry) => entry?.model) : [];
+	const available = await ctx.modelRegistry.getAvailable();
+	return ids.map((id) => available.find((model) => modelKey(model) === id)).filter(Boolean).map((model) => ({ model }));
+}
+
+async function editScopedModels(ctx) {
+	const available = await ctx.modelRegistry.getAvailable();
+	const before = (await scopedModelEntries(ctx)).map((entry) => modelKey(entry.model));
+	const rank = (model) => { const index = before.indexOf(modelKey(model)); return index < 0 ? before.length : index; };
+	const result = await showListDialog(ctx, {
+		title: "Scoped models",
+		purpose: "Checked models come first in every model picker and in Pi's Ctrl+P cycling; saved for all projects.",
+		help: "Type to search \u00b7 Enter check/uncheck \u00b7 Esc clears the search, then saves and goes back",
+		items: [...available].sort((a, b) => rank(a) - rank(b)).map((model) => ({
+			value: modelKey(model), label: model.name ?? modelKey(model), description: model.name ? modelKey(model) : "", preserveCase: true,
+		})),
+		multi: { selected: before },
+		forceCustom: true,
+	});
+	if (result?.action !== "back" || result.values.join() === before.join()) return;
+	const settings = readGlobalSettings();
+	if (result.values.length) settings.enabledModels = result.values;
+	else delete settings.enabledModels;
+	writeScopedSettings(ctx.cwd, "global", settings);
+	globalThis[SCOPED_MODELS] = result.values;
+	ctx.ui.notify(`Scoped models: ${result.values.length || "none (all models)"}. Pi's own Ctrl+P and /model use them from the next session or restart.`, "info");
+}
+
 async function chooseModelAndEffort(
 	ctx,
 	{
@@ -718,7 +723,6 @@ async function chooseModelAndEffort(
 		currentThinking,
 		allowNone = false,
 		projectScope = false,
-		includeChatgptWeb = false,
 		effortItems,
 	},
 ) {
@@ -730,13 +734,9 @@ async function chooseModelAndEffort(
 			model,
 			allowNone,
 			projectScope,
-			includeChatgptWeb,
 		);
 		if (selectedModel === undefined) return;
-		if (
-			selectedModel === NONE_MODEL ||
-			selectedModel === CHATGPT_WEB_SOURCE
-		)
+		if (selectedModel === NONE_MODEL)
 			return { model: selectedModel, thinking: currentThinking };
 		model = selectedModel;
 		const thinking = await choose(
@@ -775,7 +775,7 @@ async function editPlanModels(ctx, scope, names) {
 		selectedIndex = selected.index;
 		if (selected.value === "add") {
 			const picked = await chooseModelAndEffort(ctx, { title: "Plan model", currentThinking: "high", effortItems: efforts });
-			if (!picked || [NONE_MODEL, INHERIT_MODEL, CHATGPT_WEB_SOURCE].includes(picked.model)) continue;
+			if (!picked || [NONE_MODEL, INHERIT_MODEL].includes(picked.model)) continue;
 			list.push({ model: picked.model, thinking: picked.thinking });
 		} else {
 			const index = Number(selected.value.slice(6));
@@ -3550,7 +3550,7 @@ export { resetContextFilter, requestContextFilter, filteredContext, executeUtili
 export default function workModelsExtension(pi) {
 	// Plan3's per-plan Models menu: undefined = cancelled, null = remove the override.
 	setPlanModelPicker(async (ctx, title, current, inheritLabel) => {
-		const model = await chooseModel(ctx, title, current ?? INHERIT_MODEL, false, false, false, { label: inheritLabel, description: "Remove this plan's override" });
+		const model = await chooseModel(ctx, title, current ?? INHERIT_MODEL, false, false, { label: inheritLabel, description: "Remove this plan's override" });
 		return model === undefined ? undefined : model === INHERIT_MODEL ? null : model;
 	});
 	process.env.PI_ASK_USER_CONTEXT_EXPANDED ||= "true";
@@ -4380,6 +4380,11 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				label: `Plan3 → Coding effort: ${settings.workOrchestrator?.plan3?.codingEffort ?? "same as session"} ${SUBMENU_ARROW}`,
 				description: "/resume3 execution switches to this effort when it starts; planning switches back. Each switch re-reads the context uncached once.",
 			},
+{
+				kind: "scopedModels", value: "scopedModels",
+				label: `Set scoped models: ${(await scopedModelEntries(ctx)).length || "all"} ${SUBMENU_ARROW}`,
+				description: "Check the models listed first in every model picker (Tab shows all); Pi's enabledModels, for all projects.",
+			},
 ...[["reviewAfterPlan", "Review after plan finishes", "When a plan completes"], ["reviewBeforeCommit", "Review before commit", "Before the agent runs git commit"]].map(([kind, name, when]) => ({
 				kind, value: kind,
 				label: `${name}: ${settings.workOrchestrator?.[kind] ?? "off"} ${SUBMENU_ARROW}`,
@@ -4521,6 +4526,10 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			await editPlanModels(ctx, scope, names);
 			continue;
 		}
+		if (pick.kind === "scopedModels") {
+			await editScopedModels(ctx);
+			continue;
+		}
 		if (pick.kind === "phaseModel") {
 			const model = await chooseModel(ctx, `Plan3 ${pick.value === "codingModel" ? "coding" : "planning"} model`, settings.workOrchestrator?.plan3?.[pick.value] ?? INHERIT_MODEL, false, scope === "project");
 			if (!model) continue;
@@ -4578,7 +4587,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			let painters = [];
 			if (!vision) try { painters = await ctx.modelRegistry.getAvailableOfType?.("image") ?? []; } catch { /* No image catalog: Codex models only. */ }
 			const selected = await chooseModel(ctx, title,
-				current.model, vision && !alt ? true : scope === "project", scope === "project", false,
+				current.model, vision && !alt ? true : scope === "project", scope === "project",
 				scope === "project" ? undefined : vision && !alt ? { label: "Current model", description: CURRENT_DESCRIPTION } : { label: "None", description: alt ? "No second opinion; process_image uses only the vision model" : "No generate_image tool" },
 				{
 					allow: fits && ((value) => fits.has(value)),

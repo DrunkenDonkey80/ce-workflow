@@ -78,7 +78,6 @@ try {
 	delete process.env.PI_ASK_USER_CONTEXT_EXPANDED;
 	mod.default({
 		on: () => {},
-		getAllTools: () => [{ name: "chatgpt_consult" }],
 		registerCommand: (name, config) => {
 			commands[name] = config;
 		},
@@ -201,8 +200,23 @@ try {
 	assert(/Current model/.test(visionChoices) && /None/.test(visionChoices), "vision picker offers None (images in context) and Current model");
 	assert(mod.visionModelSettings(cwd) === "test/vision:xhigh", "selected vision model and effort persist");
 	assert(mod.visionAltModelSettings(cwd) === "__none_model__", "escaping the effort step saves nothing");
+	// Set scoped models: typing searches, Enter checks, Esc clears the search, then saves; the pickers list it before Pi restarts.
+	let scopedRows = "";
+	await invoke("work-settings", "", {
+		...ctx,
+		modelRegistry: { getAvailable: async () => [{ provider: "test", id: "text-only", name: "Text Only" }, { provider: "test", id: "vision", name: "Vision Test" }] },
+		ui: customUi([
+			{ target: "Set scoped models: all", key: "enter" },
+			{ typeText: "vis", target: "Vision Test", key: "enter", afterKeys: ["escape", "escape"], capture: lines => { scopedRows = lines.join("\n"); } },
+			{ expectText: "Set scoped models: 1", key: "escape" },
+		]),
+	});
+	assert(scopedRows.includes("Vision Test") && !scopedRows.includes("Text Only"), "typing filters the scoped checklist");
+	assert(JSON.stringify(JSON.parse(readFileSync(globalSettingsFile(), "utf8")).enabledModels) === "[\"test/vision\"]", "scoped models persist as Pi enabledModels");
+	delete globalThis[Symbol.for("ce-workflow.scoped-models")];
 	// Return to default so subsequent settings assertions remain independent.
 	writeSettings({});
+	writeGlobalSettings({});
 	// Export/import operates on the selected raw file, never merged defaults.
 	writeGlobalSettings({
 		theme: "dark",

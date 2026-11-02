@@ -21,7 +21,7 @@
  button.win:hover { background: color-mix(in srgb, var(--ink) 12%, transparent) }
  button.win.close:hover { background: #e81123; color: #fff }
  button.win.gear { font-size: 19px; width: 40px }
- button.win b { position: absolute; right: 6px; bottom: 6px; min-width: 9px; height: 9px; border-radius: 5px; background: #e03131; font: 600 9px/9px system-ui; color: #fff; padding: 0 }
+ button.win b { position: absolute; right: 6px; bottom: 6px; min-width: 9px; height: 9px; border-radius: 5px; background: #e80f0f; font: 600 9px/9px system-ui; color: #fff; padding: 0 }
  /* D6 (Apple app, config.wrap): tabs wrap onto 36 px rows instead of running off a narrow screen; the strip reports its height. */
  body.wrap { height: auto; flex-wrap: wrap }
  body.wrap > * { height: 36px; -webkit-touch-callout: none; -webkit-user-select: none }
@@ -38,7 +38,7 @@
 import { ICONS, iconSvg, hubsIconSvg } from "./icons.js";
 const { invoke } = window.__TAURI__.core;
 const DEFAULT_ICON = Object.keys(ICONS)[0];
-const URGENCY = ["waiting", "working", "unseen", "scheduled"], DOT = { waiting: "#e03131", working: "#f59f00", unseen: "#37b24d", scheduled: "#339af0" };
+const URGENCY = ["waiting", "working", "unseen", "scheduled"], DOT = { waiting: "#e80f0f", working: "#f59f00", unseen: "#37b24d", scheduled: "#339af0" };
 let pinned = false;
 // D7: touch screens have no right-click and a long press would start a drag, so a long press opens the tab menu instead.
 const touch = matchMedia("(pointer: coarse)").matches;

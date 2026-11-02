@@ -10,7 +10,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Research without a question per site: when the agent opens a site from its Google results, the browser approval also offers "Allow all Google result sites for 30 minutes / 1 hour / 2 hours". Until then every site those searches listed opens without asking; other sites, and blocked ones, still ask or stay refused. The grant lives only in that Pi and is never saved.
 
 ### Changed
+- Hub icon: the "waiting for you" red is a stronger red, on the tab, the taskbar tile and the app window.
 - Auto-park compacts first when the prompt cache has already run out, then parks. The first message after waking no longer waits for a compaction.
+
+### Removed
+- The unused "ChatGPT Web" advisor choice in the `/wo` model pickers (it needed the separate pi-chatgpt-web package).
 
 ## 0.2.22 — 2026-11-02
 
