@@ -43,3 +43,9 @@ Review A1 applied: all 7 findings accepted and checked against the code. Blocked
   - Define deadlines: how fast a hub counts as offline, and the send and ask timeouts.
   - Record it as a section of this plan with a rule list of what forces a comm bump, since every bump breaks links until all hubs update.
   - check: Checked against hub/src/hub.ts remote branch (lines 240-307), hub/src/remote.ts createPairing/createDeviceRegistry, extensions/hub-command.ts parked resume, and S01 receipt timeout; section "Comm protocol (S02, comm 1)" in the plan
+
+## 2026-11-02T17:44:00.325Z S04 done: hub/src/link.ts: COMM=1 with commMismatch (D6 message), peers.json store failing closed, jiti loader for pi-intercom's client with present/absent/too-old reasons; hub/scripts/test-link.mjs covers them
+
+- [x] **S04** Add `hub/src/link.ts` with the comm version constant, paired-hub store and version check; add `hub/scripts/test-link.mjs`
+  - Load pi-intercom's client at run time through jiti from the installed package; check it supports what S01 needs; without it the hub starts normally and the link menu says why it is unavailable. Test both cases. This local check is separate from the comm number.
+  - check: cd hub && node scripts/test-link.mjs -> "link ok" (installed pi-intercom 0.18.1 loaded through jiti)

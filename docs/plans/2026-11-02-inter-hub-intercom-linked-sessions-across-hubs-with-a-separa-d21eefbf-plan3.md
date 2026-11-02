@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-02
-updated: 2026-11-02T17:42:09.462Z
+updated: 2026-11-02T17:44:00.325Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -189,8 +189,7 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 
 ### Phase 2: Build the link [code]
 
-- [ ] **S04** Add `hub/src/link.ts` with the comm version constant, paired-hub store and version check; add `hub/scripts/test-link.mjs`
-  - Load pi-intercom's client at run time through jiti from the installed package; check it supports what S01 needs; without it the hub starts normally and the link menu says why it is unavailable. Test both cases. This local check is separate from the comm number.
+- [x] **S04** hub/src/link.ts: COMM=1 with commMismatch (D6 message), peers.json store failing closed, jiti loader for pi-intercom's client with present/absent/too-old reasons; hub/scripts/test-link.mjs covers them
 - [ ] **S05** Hub-to-hub pairing using the device registry; approval on the target hub's page
   - Link-scoped credential and its own dispatch path (S02); C4 keeps passing and gains a case that a hub credential cannot open session pages or their API.
 - [ ] **S06** Link and unlink endpoints plus a remote linkable-session list; both hubs store each link (D8)
