@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-02
 source: catch-up
 catch-up: {"pi-subagents":"0.84.0","pi-ask-user":"0.17.2","pi-lens":"4.4.8"}
-updated: 2026-11-02T07:06:42.154Z
+updated: 2026-11-02T07:07:37.557Z
 reviewed: 2026-11-02
 ---
 
@@ -193,10 +193,7 @@ Commands (referenced by ID):
 - [x] **CU-01** ask_user ignores top-level batch entry fields (incl. initialText) sent with questions; test added in C1.
 - [x] **CU-02** single-select wrapText uses pi-tui wrapTextWithAnsi; C1 asserts emoji/CJK rows fit width 24.
 - [x] **CU-03** UPSTREAM.md and ASK_USER_VERSION at 0.17.2 with a 0.17.2 review note (ported #88 and wrapping; Tern/shortLabel not ported).
-- [ ] **CU-04** Hub: set `GIT_OPTIONAL_LOCKS=0` on the hub's periodic git reads (hub/src/api.ts:76 readGit, hub/src/files.ts:10 helper).
-  - Pass `env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }` the way the background fetch at api.ts:79 already passes env.
-  - Both paths share one exported env helper; a test in C3 asserts it gives `"0"` when the parent has `"1"` and keeps other variables.
-  - Check: C3 and C4 pass.
+- [x] **CU-04** Hub git reads (api.ts readGit, files.ts git helper) run with GIT_OPTIONAL_LOCKS=0 via exported gitReadEnv; C3 asserts it.
 
 ### Phase 2 — Cache-safe context handlers: design and baseline [think]
 

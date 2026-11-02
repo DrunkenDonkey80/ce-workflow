@@ -7,7 +7,9 @@ import { captureSource, forbiddenPath, safePath, secret } from "../../extensions
 // D11/D21: read-only project files for the browser Files tab. Hidden paths, secrets and binaries never leave.
 const MAX_FILES = 5000, DIFF_BYTES = 262_144;
 type Git = { code: number; stdout: string };
-const git = (cwd: string, args: string[]) => new Promise<Git>(resolve => execFile("git", args, { cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: 10_000, windowsHide: true },
+/** Env for the hub's background git reads: skip the optional index refresh so they never hold .git/index.lock against a user's commit. */
+export const gitReadEnv = (): NodeJS.ProcessEnv => ({ ...process.env, GIT_OPTIONAL_LOCKS: "0" });
+const git = (cwd: string, args: string[]) => new Promise<Git>(resolve => execFile("git", args, { cwd, encoding: "utf8", maxBuffer: 16 * 1024 * 1024, timeout: 10_000, windowsHide: true, env: gitReadEnv() },
 	(error, stdout) => resolve({ code: error ? (typeof error.code === "number" ? error.code : 1) : 0, stdout: stdout ?? "" })));
 export class FileRefused extends Error {}
 

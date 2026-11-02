@@ -11,6 +11,13 @@ import { saveDiagram } from "../../extensions/plan3-diagram.ts";
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-api-"));
 process.env.PI_CODING_AGENT_DIR = root;
 const { startHub } = await import("../src/hub.ts");
+{ // CU-04: background git reads never take the optional index lock, whatever the parent set.
+	const { gitReadEnv } = await import("../src/files.ts");
+	const saved = process.env.GIT_OPTIONAL_LOCKS; process.env.GIT_OPTIONAL_LOCKS = "1";
+	const env = gitReadEnv();
+	assert.equal(env.GIT_OPTIONAL_LOCKS, "0"); assert.equal(env.PI_CODING_AGENT_DIR, root);
+	if (saved === undefined) delete process.env.GIT_OPTIONAL_LOCKS; else process.env.GIT_OPTIONAL_LOCKS = saved;
+}
 const folder = path.join(root, "proj");
 fs.mkdirSync(path.join(folder, "docs", "plans"), { recursive: true });
 const plan = (id, title, updated, status = "active") => {

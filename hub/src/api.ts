@@ -9,7 +9,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { emptyDiagram, loadDiagram } from "../../extensions/plan3-diagram.ts";
 import { webTarget } from "../../extensions/plan3-web.ts";
-import { FileRefused, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
+import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
 import { ARCHIVE, explore, viewPage } from "./explore.ts";
@@ -73,7 +73,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// next status. Every open page polls the sidebar, so there one git status per folder serves all pages for 4 s; status reads fresh.
 	type GitState = { changed: number; added: number; modified: number; deleted: number; untracked: number; ahead: number; behind: number; files: { kind: string; path: string }[] } | null;
 	const fetched = new Map<string, number>(), gitCache = new Map<string, { at: number; state: Promise<GitState> }>();
-	const readGit = (cwd: string) => new Promise<GitState>(resolve => execFile("git", ["status", "--porcelain=v1", "--branch"], { cwd, timeout: 5000, windowsHide: true }, (error, out) => {
+	const readGit = (cwd: string) => new Promise<GitState>(resolve => execFile("git", ["status", "--porcelain=v1", "--branch"], { cwd, timeout: 5000, windowsHide: true, env: gitReadEnv() }, (error, out) => {
 		if (error) return resolve(null);
 		const [head = "", ...files] = out.split("\n").filter(Boolean), count = (test: (xy: string) => boolean) => files.filter(line => test(line.slice(0, 2))).length;
 		if (Date.now() - (fetched.get(cwd) ?? 0) > 300_000) { fetched.set(cwd, Date.now()); execFile("git", ["fetch", "--quiet"], { cwd, timeout: 60_000, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" } }, () => {}); } // GCM ignores GIT_TERMINAL_PROMPT and would pop a sign-in window every 5 min
@@ -477,6 +477,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		if (request.statusKey === "pi-hub:state") {
 			const state = parse(request.statusText);
 			if (state && "plan" in state) view.publish("plan", state.plan ?? null); // null: the plan finished or was closed
+			if (state) view.publish("activity", { subagents: Array.isArray(state.subagents) ? state.subagents : [] }); // the top bar's Subagents…, like the sidebar
 			void publishStatus(id).catch(() => {});
 		}
 		if (request.statusKey === "pi-hub:diagram") void (async () => {
