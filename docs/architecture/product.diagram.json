@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 20,
+  "revision": 21,
   "nodes": [
     {
       "id": "pi_host",
@@ -148,7 +148,7 @@
       "id": "ask_group",
       "label": "ask_user (vendored)",
       "kind": "group",
-      "summary": "Selective fork of pi-ask-user 0.17.0 (D3)."
+      "summary": "Selective fork of pi-ask-user 0.17.2 (D3)."
     },
     {
       "id": "ask_user",
@@ -186,7 +186,7 @@
       "label": "Workflow hub extension",
       "kind": "service",
       "parent": "workflow_group",
-      "summary": "/wo menus, model phases, compaction profiles, knowledge, images, camera, scout.",
+      "summary": "/wo menus, model phases, compaction profiles, knowledge, images, camera, scout; on Pi >=0.87 one context_with_system handler keeps mid-conversation system messages in place (prompt cache).",
       "tech": "extensions/work-models.ts"
     },
     {

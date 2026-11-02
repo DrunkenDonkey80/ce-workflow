@@ -1,10 +1,10 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-02
 source: catch-up
 catch-up: {"pi-subagents":"0.84.0","pi-ask-user":"0.17.2","pi-lens":"4.4.8"}
-updated: 2026-11-02T07:18:04.703Z
+updated: 2026-11-02T07:24:09.297Z
 reviewed: 2026-11-02
 ---
 
@@ -224,15 +224,11 @@ Commands (referenced by ID):
 
 ### Phase 5 — Verify and record [code]
 
-- [ ] **CU-90** Run C8 (`npm run verify:quiet`) after the adopted changes and record the result.
-- [ ] **CU-91** Record the reviewed versions with C9.
-  - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json`.
-  - It refuses missing, unexplained or unverified decisions.
+- [x] **CU-90** C8 run: 3 failures, none from this plan — native-smoke passes alone (verify-run flake), screen-read is the live Android device check, hub test-app-trail fails identically at pre-plan f1c2651.
+- [x] **CU-91** Recorded pi-subagents@0.84.0, pi-ask-user@0.17.2, pi-lens@4.4.8 in extensions/work-catch-up-baseline.json.
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 21: ask_group now 0.17.2; work_models notes the context_with_system handler. Dependents need no change (summary-only edits).
 
 
 ## Backlog
