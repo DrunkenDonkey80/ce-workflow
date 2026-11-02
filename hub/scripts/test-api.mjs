@@ -339,6 +339,11 @@ try {
 	assert.equal((await post(id, "session", { action: "new", folder: "relative" })).status, 404, "only absolute paths");
 	assert.equal((await post(id, "session", { action: "new", folder: "~/pi-hub-test-missing-" + process.pid })).body.error, "Folder does not exist.", "~ is the home folder (Local uses ~/pi-local)");
 	assert.equal((await post(id, "session", { action: "rename", id: created.id, name: "Docs" })).status, 200);
+	// Plan d21eefbf S08: the session menu's hub links; pairing needs remote access (the tailnet) first.
+	assert.deepEqual((await post(id, "links", { action: "list", session: created.id })).body, { comm: 1, hubs: [], pairing: null, links: [] });
+	assert.equal((await post(id, "links", { action: "list", session: "nope" })).status, 404);
+	assert.match((await post(id, "links", { action: "pair", url: "mac.tail.ts.net:7781" })).body.error, /Turn on remote access first/);
+	assert.equal((await post(id, "links", { action: "sessions", hub: "https://mac.tail.ts.net:7781" })).status, 404, "not paired");
 	await hub.host.prompt(created.id, "hi"); await until(async () => (await tones()).Docs === "unseen" && "ok");
 	assert.equal((await post(id, "session", { action: "park", id: created.id })).status, 200);
 	const docs = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.name === "Docs");

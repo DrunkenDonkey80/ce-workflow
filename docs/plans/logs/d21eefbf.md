@@ -70,3 +70,9 @@ Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the link
 - [x] **S07** Stand-in sessions in the local broker; forward send, ask and reply; offline stand-ins fail fast
   - Refuse messages from any session but the linked one with a readable error, before forwarding (D9).
   - check: hub: node scripts/test-link.mjs -> "link ok" (fake broker per hub: D11 names, fixed id, send receipt after remote take, ask/reply with same id, D9 refusal and nothing crossed, parked wake, unreachable cause + offline + ping reconnect, rename via ping, not-linked cause, stop disconnects); test-remote "remote ok"; test-api "api ok"; live: real pi-intercom broker accepted hublink-<uuid> id and listed probe~mac
+
+## 2026-11-02T17:59:46.863Z S08 done: Session menu "Hub links…": shows the session's links (stand-in name, offline state, unlink), links to a session on each paired hub, pairs a new hub; served through the page API "links" so phones work too
+
+- [x] **S08** Session menu item "Link to another hub's session" (D7); the menu shows the session's links, their state and unlink
+  - A targeted browser test for the link menu that passes on its own, independent of C3's earlier failure.
+  - check: node hub/scripts/test-api.mjs -> "api ok" (links list shape, unknown session 404, pair refused without remote access, unpaired hub 404); LSP: no new errors in hub/web/app.ts or hub/src/api.ts (existing ones at app.ts:120/1944/2002 untouched). Menu not clicked in a browser (C3 fails earlier, pre-existing)

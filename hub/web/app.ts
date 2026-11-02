@@ -1802,6 +1802,7 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
   item("Rename…", () => { const name = prompt("New name:", session.name); if (name?.trim()) void sessionAction({ action: "rename", id: session.id, name }); }),
   item("Copy folder path", () => void copyPath(path)),
   item("Copy intercom id", () => void copyPath(sessionRef(path, session))),
+  item("Hub links…", () => void openHubLinks(anchor, session)),
   ...(session.timers ?? []).map(t => item(`Cancel ⏰ ${t.kind}: ${t.label.slice(0, 40)}`, () => void sessionAction({ action: "cancel-timer", id: session.id, timer: t.id }))),
   item("Open in terminal", () => void sessionAction({ action: "terminal", id: session.id })),
   parked ? item("Resume", () => void sessionAction({ action: "resume", id: session.id })) : item("Park", () => void sessionAction({ action: "park", id: session.id })),
@@ -1814,6 +1815,34 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
   }, "danger"),
  ]);
  placeMenu(anchor);
+}
+// Plan d21eefbf D7: this session's links to sessions on other hubs (their agents see each other over intercom as name~hub).
+async function openHubLinks(anchor: HTMLElement, session: HubSession) {
+ try {
+  const links = (data: Record<string, unknown>) => post("links", { session: session.id, ...data });
+  const state = await links({ action: "list" });
+  if (state.unavailable) showNotice(state.unavailable);
+  showMenu(anchor, [
+   ...state.links.map(link => [`Unlink ${link.standin ?? link.remote.name + "~" + link.hubName}${link.online ? "" : " (offline)"}`, async () => {
+    if (!await confirmBox(`Unlink "${session.name}" from ${link.remote.name} on ${link.hubName}?`)) return;
+    try { const done = await links({ action: "unlink", link: link.id }); showNotice(done.pending ? `Unlinked here; ${link.hubName} hears it when it is back.` : "Unlinked."); } catch (error) { showNotice(error.message); }
+   }] as [string, () => void]),
+   ...state.hubs.map(hub => [`Link to a session on ${hub.name}${hub.online ? "" : " (offline)"}…`, async () => {
+    try {
+     const remote = await links({ action: "sessions", hub: hub.url });
+     if (!remote.sessions.length) return showNotice(`${hub.name} has no sessions.`);
+     showMenu(anchor, remote.sessions.map(other => [`${other.name} · ${other.folder.split(/[\\/]/).filter(Boolean).pop() ?? other.folder}${other.live ? "" : " (parked)"}`, async () => {
+      try { const made = await links({ action: "link", hub: hub.url, record: other.record }); showNotice(`Linked: agents here reach it as ${made.remote.name}~${hub.name}.`); } catch (error) { showNotice(error.message); }
+     }] as [string, () => void]));
+    } catch (error) { showNotice(error.message); }
+   }] as [string, () => void]),
+   ["Pair with another hub…", async () => {
+    const url = prompt("The other hub's address (its Remote access link), e.g. mac.tail1234.ts.net:7781");
+    if (!url?.trim()) return;
+    try { const started = await links({ action: "pair", url: url.trim() }); showNotice(`Approve on that hub if it shows code ${started.code}.`); } catch (error) { showNotice(error.message); }
+   }],
+  ]);
+ } catch (error) { showNotice(error.message); }
 }
 document.addEventListener("pointerdown", event => { if (!sessionMenu.contains(event.target as Node)) sessionMenu.hidden = true; });
 // The clipboard needs a secure page (localhost or the tailnet https link); otherwise show the path to copy by hand.

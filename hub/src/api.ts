@@ -25,6 +25,7 @@ import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { commandMenu, runCommand, type Commands } from "./commands.ts";
+import type { createLinks } from "./link.ts";
 
 const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const ANSWER_FIELDS = ["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel", "by"];
@@ -39,7 +40,7 @@ const only = (data: Record<string, unknown>, fields: string[], message: string) 
 type Target = { kind: "product" } | { kind: "plan"; id: string };
 type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 
-export function createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, progress, settings = () => ({}) }: { progress?: (id: string) => { done: number; total: number; ago: number } | null; host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; commands?: Commands; settings?: () => Record<string, unknown> }) {
+export function createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, links, progress, settings = () => ({}) }: { links?: ReturnType<typeof createLinks>; progress?: (id: string) => { done: number; total: number; ago: number } | null; host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; commands?: Commands; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
 
@@ -281,6 +282,21 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		throw fail(400, "Unknown session action.");
 	}
 
+	/** The session menu's hub links (plan d21eefbf, D7): list, pick a session on a paired hub, link, unlink, pair a hub. */
+	async function hubLinks(data: Record<string, unknown>) {
+		if (!links) throw fail(404, "Hub links are off.");
+		const session = String(data.session ?? ""), hub = String(data.hub ?? "");
+		if (data.action !== "pair" && data.action !== "sessions" && !registry.get(session)) throw fail(404, "Unknown session.");
+		switch (data.action) {
+			case "list": return { ...links.state(), links: links.linksOf(session) };
+			case "sessions": return links.remoteSessions(hub);
+			case "link": return links.link(session, hub, String(data.record ?? ""));
+			case "unlink": if (!links.linksOf(session).some(item => item.id === data.link)) throw fail(404, "Unknown link."); return links.unlink(String(data.link));
+			case "pair": return links.pairWith(String(data.url ?? ""));
+		}
+		throw fail(400, "Unknown links action.");
+	}
+
 	async function get(id: string, endpoint: string, params: URLSearchParams, response: http.ServerResponse, remote = false): Promise<unknown> {
 		switch (endpoint) {
 			case "plans": {
@@ -338,6 +354,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	async function post(id: string, endpoint: string, data: Record<string, unknown>, remote = false): Promise<unknown> {
 		switch (endpoint) {
 			case "session": return session(data);
+			case "links": return hubLinks(data);
 			case "typing": { const live = host.live.get(id); if (live) live.lastActivity = Date.now(); return { ok: true }; } // typing in the chat keeps it from auto-parking
 			case "seen": seen(id); return { ok: true }; // the page showing this session is visible and focused
 			case "message":

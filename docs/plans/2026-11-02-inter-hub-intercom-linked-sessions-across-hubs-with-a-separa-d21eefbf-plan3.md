@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-02
-updated: 2026-11-02T17:57:39.958Z
+updated: 2026-11-02T17:59:46.863Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -194,8 +194,7 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 - [x] **S05** Hub pairing: hub-kind credentials in the device registry (never open session pages; browser cookies never open /link/), /link/ dispatch before Origin/cookie rules, pair-start/status/finish, local /api/hubs and /api/hubs/pair
 - [x] **S06** Links: links.json store (fails closed, pending unlinks for D12), /link/ sessions/link/unlink with the caller known by its credential, local API (hub sessions, session links, link, unlink); both hubs store each link
 - [x] **S07** Stand-ins: one pi-intercom session per link (hublink-<id>, D11 name), forward send/ask/reply via deliver with the 3 s receipt rule, D9 refusal, parked targets resumed, 30 s ping (offline/reconnect, renames, D12 cleanup and unlink retry); hub wires intercom id from the session file and resume
-- [ ] **S08** Session menu item "Link to another hub's session" (D7); the menu shows the session's links, their state and unlink
-  - A targeted browser test for the link menu that passes on its own, independent of C3's earlier failure.
+- [x] **S08** Session menu "Hub links…": shows the session's links (stand-in name, offline state, unlink), links to a session on each paired hub, pairs a new hub; served through the page API "links" so phones work too
 - [ ] **S09** Inbound messages count as intercom runs (unseen, auto-park) like local intercom; test in C1
 
 ### Phase 3: Live check [code]
