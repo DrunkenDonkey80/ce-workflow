@@ -127,7 +127,9 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		const text = a.textFromEnv ? envValue(o.cwd, a.textFromEnv) : a.text;
 		if (a.textFromEnv && text === undefined) throw new Error(`${a.textFromEnv} is not in .env or the environment.`);
 		need(text, "text or textFromEnv");
-		await call(["controlvm", vm, "keyboardputstring", text!]);
+		// one whole keyboardputstring dropped keys at the Windows sign-in box; one call per character (~0.1 s each) keeps them
+		const sleep = o.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
+		for (const ch of text!) { await call(["controlvm", vm, "keyboardputstring", ch]); await sleep(30); }
 		return a.textFromEnv ? `Typed ${a.textFromEnv} (value not shown).` : `Typed ${text!.length} characters.`;
 	}
 	if (a.action === "click") {

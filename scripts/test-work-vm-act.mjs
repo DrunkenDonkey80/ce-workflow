@@ -35,7 +35,7 @@ try {
 	assert.equal(await act({ action: "keys", keys: "alt+y" }), "Sent alt+y.");
 	assert.deepEqual(calls.pop(), ["controlvm", "S46", "keyboardputscancode", "38", "15", "95", "b8"]);
 	assert.equal(await act({ action: "type", textFromEnv: "VM_TEST_PW", vm: "Other" }), "Typed VM_TEST_PW (value not shown).");
-	assert.deepEqual(calls.pop(), ["controlvm", "Other", "keyboardputstring", "secret-pw"]);
+	assert.deepEqual(calls.splice(0).map(c => c.slice(0, 3).join(" ") + " " + c[3]), [..."secret-pw"].map(ch => `controlvm Other keyboardputstring ${ch}`), "one call per character");
 
 	// Guest run and copy: password only in a temp file that is gone afterwards.
 	const out = await act({ action: "run", exe: "C:\\Windows\\System32\\whoami.exe", args: ["/groups"] });
