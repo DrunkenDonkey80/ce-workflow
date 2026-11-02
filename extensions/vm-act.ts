@@ -1,7 +1,7 @@
 // vm_act: drive a VirtualBox VM for installer/UI tests (keys, text, click, guest run, copy, snapshots, USB). Screenshots are screen_read target=vm.
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -113,12 +113,44 @@ export function describeState(vm: string, s: GuestState) {
 	].join("\n");
 }
 
+// Account scripts get $p (the call's parameters) and, with a secret, $secretFile; errors go to stderr as plain text.
+const guestScript = (p: object, body: string) => `$ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'
+try {
+$p='${JSON.stringify(p).replace(/'/g, "''")}'|ConvertFrom-Json
+${body}
+} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
+exit 0`;
+const READ_SECRET = "$secret=[IO.File]::ReadAllText($secretFile); Remove-Item -LiteralPath $secretFile -Force";
+export const ACCOUNT_PS = {
+	list: `$adm=@(Get-LocalGroupMember -SID S-1-5-32-544 | ForEach-Object { $_.SID.Value }); $prof=@(Get-CimInstance Win32_UserProfile | ForEach-Object { $_.SID })
+Get-LocalUser | ForEach-Object { "$($_.Name)|$($_.Enabled)|$($adm -contains $_.SID.Value)|$($prof -contains $_.SID.Value)" }`,
+	// password = username (AGENTS.md); Windows refusing it by policy falls back to "password"
+	create: `${READ_SECRET}
+try { $u=New-LocalUser -Name $p.user -Password (ConvertTo-SecureString $secret -AsPlainText -Force) -PasswordNeverExpires -AccountNeverExpires } catch [Microsoft.PowerShell.Commands.InvalidPasswordException] { $u=New-LocalUser -Name $p.user -Password (ConvertTo-SecureString 'password' -AsPlainText -Force) -PasswordNeverExpires -AccountNeverExpires; 'FALLBACK' }
+try { Add-LocalGroupMember -SID $(if($p.admin){'S-1-5-32-544'}else{'S-1-5-32-545'}) -Member $u } catch { Remove-LocalUser -SID $u.SID; throw }`,
+	delete: `$u=Get-LocalUser -Name $p.user; $pr=Get-CimInstance Win32_UserProfile | Where-Object SID -eq $u.SID.Value
+if($pr.Loaded) { throw "$($p.user) is signed in (profile loaded); sign it out first." }
+Remove-LocalUser -SID $u.SID; if($pr) { $pr | Remove-CimInstance; 'PROFILE' }`,
+	disable: "Disable-LocalUser -Name $p.user",
+	reset: `${READ_SECRET}
+Set-LocalUser -Name $p.user -Password (ConvertTo-SecureString $secret -AsPlainText -Force)`,
+};
+export const envName = (user: string) => `VM_${user.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_PASSWORD`;
+/** Writes NAME=value to <cwd>/.env (replacing an old NAME line); refuses when git would commit .env. */
+export function writeEnvVar(cwd: string, name: string, value: string, comment: string) {
+	// 0 = ignored, 1 = not ignored; 128 (not a repository) or no git: nothing can commit it
+	if (spawnSync("git", ["check-ignore", "-q", "--", ".env"], { cwd, stdio: "ignore" }).status === 1) throw new Error(`.env in ${cwd} is not gitignored; add it to .gitignore before creating accounts.`);
+	const file = path.join(cwd, ".env"), old = existsSync(file) ? readFileSync(file, "utf8") : "";
+	const kept = old.split(/\r?\n/).filter(l => !l.startsWith(`${name}=`) && l !== `# ${comment}`).join("\n").replace(/\n*$/, "");
+	writeFileSync(file, `${kept ? `${kept}\n` : ""}# ${comment}\n${name}=${value}\n`, { mode: 0o600 });
+}
+
 export type VmActArgs = {
-	action: "list" | "status" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
+	action: "list" | "status" | "account" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
 	vm?: string; keys?: string; text?: string; textFromEnv?: string;
 	x?: number; y?: number; button?: "left" | "right" | "middle"; double?: boolean;
 	exe?: string; args?: string[]; user?: string; passwordEnv?: string; timeoutSec?: number;
-	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach"; name?: string; device?: string;
+	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach" | "create" | "delete" | "disable" | "reset"; name?: string; device?: string; admin?: boolean;
 };
 // IMouse.putMouseEventAbsolute counts pixels from 1 (VirtualBox SDK); screenshots count from 0.
 const MOUSE_BASE = 1;
@@ -169,19 +201,65 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		try { return await fn([`--username=${user}`, `--passwordfile=${file}`]); } finally { await rm(file, { force: true }); }
 	};
 	// status/account/session/uac guest work: workOrchestrator.vm {user, passwordEnv}, else the built-in Administrator (D-17)
-	const guestPs = (script: string, seconds = 60) => {
-		const cfg = vmConfig(o.cwd), user = cfg.user ?? "Administrator", passwordEnv = cfg.passwordEnv ?? "VM_ADMIN_PASSWORD";
+	const guestAdmin = () => { const cfg = vmConfig(o.cwd); return { user: cfg.user ?? "Administrator", passwordEnv: cfg.passwordEnv ?? "VM_ADMIN_PASSWORD" }; };
+	// secret (D-03): copied to the guest as a file the script reads and deletes first; the host removes it when the script did not finish
+	const guestPs = (script: string, { seconds = 60, secret }: { seconds?: number; secret?: string } = {}) => {
+		const { user, passwordEnv } = guestAdmin();
 		if (envValue(o.cwd, passwordEnv) === undefined) throw new Error(`${a.action} runs guest commands as the built-in Administrator: put its password in .env as ${passwordEnv}, or set workOrchestrator.vm {user, passwordEnv} in .pi/settings.json.`);
 		return withAuth(user, passwordEnv, async auth => {
-			const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${POWERSHELL}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], seconds * 1000 + 15_000, signal);
-			if (r.code !== 0) throw new Error(`${a.action}: guest command as ${user} ${r.killed ? "timed out" : `failed (${r.code})`}: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
-			return r.stdout;
+			const name = `vm-act-${randomUUID()}.txt`, host = path.join(os.tmpdir(), name), guest = `C:\\Windows\\Temp\\${name}`;
+			let finished = secret === undefined;
+			try {
+				if (secret !== undefined) {
+					await writeFile(host, secret, { mode: 0o600 });
+					await call(["guestcontrol", vm, "copyto", ...auth, "--target-directory=C:\\Windows\\Temp\\", host], 120_000);
+					script = `$secretFile='${guest}'\n${script}`;
+				}
+				const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${POWERSHELL}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], seconds * 1000 + 15_000, signal);
+				if (r.code !== 0) throw new Error(`${a.action}: guest command as ${user} ${r.killed ? "timed out" : `failed (${r.code})`}: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
+				finished = true;
+				return r.stdout;
+			} catch (error) {
+				if (finished) throw error;
+				// no signal: a cancelled call must still clean up
+				const r = await run(["guestcontrol", vm, "rm", ...auth, guest], 60_000).catch(e => ({ code: -1, stdout: "", stderr: String(e) }));
+				if (r.code !== 0 && !/not found|VERR_FILE_NOT_FOUND|VERR_PATH_NOT_FOUND/i.test(r.stderr)) throw new Error(`${(error as Error).message}\nCould not remove the guest password file ${guest}; delete it by hand.`);
+				throw error;
+			} finally { await rm(host, { force: true }); }
 		});
 	};
 	if (a.action === "status") {
 		const power = /^VMState="([^"]*)"/m.exec(await call(["showvminfo", vm, "--machinereadable"], 30_000))?.[1] ?? "unknown";
 		if (power !== "running") return `VM ${vm}: ${power}.`;
 		return `VM ${vm}: running.\n${describeState(vm, parseStatus(await guestPs(STATUS_PS)))}`;
+	}
+	if (a.action === "account") {
+		const op = a.op ?? "list";
+		if (op === "list") {
+			const rows = (await guestPs(guestScript({}, ACCOUNT_PS.list))).trim().split(/\r?\n/).map(l => l.trim().split("|")).filter(r => r.length === 4);
+			return rows.map(([n, on, adm, prof]) => `${n}: ${adm === "True" ? "admin" : "standard"}, ${on === "True" ? "enabled" : "disabled"}, ${prof === "True" ? "has a profile" : "no profile"}`).join("\n") || "No accounts.";
+		}
+		if (!["create", "delete", "disable", "reset"].includes(op)) throw new Error("account op must be list, create, delete, disable or reset.");
+		if (!/^[A-Za-z0-9._-]{1,20}$/.test(a.user ?? "")) throw new Error(`account ${op} needs user: a local account name, 1 to 20 letters, digits, dot, dash or underscore.`);
+		const user = a.user!, p = { user, admin: !!a.admin };
+		if ((op === "delete" || op === "disable") && ["administrator", guestAdmin().user.toLowerCase()].includes(user.toLowerCase())) throw new Error(`account ${op} refuses ${user}: vm_act runs guest commands as that account.`);
+		if (op === "create") {
+			const name = envName(user);
+			writeEnvVar(o.cwd, name, user, `vm_act account ${user} on ${vm}`);
+			const out = await guestPs(guestScript(p, ACCOUNT_PS.create), { secret: user });
+			const fallback = /FALLBACK/.test(out);
+			if (fallback) writeEnvVar(o.cwd, name, "password", `vm_act account ${user} on ${vm}`);
+			return `Created ${a.admin ? "admin" : "standard"} account ${user}; password in .env as ${name} (value not shown${fallback ? "; Windows refused the username as password, so it is the fallback" : ""}).`;
+		}
+		if (op === "reset") {
+			need(a.passwordEnv, "passwordEnv (the .env variable with the new password)");
+			const secret = envValue(o.cwd, a.passwordEnv!);
+			if (secret === undefined) throw new Error(`${a.passwordEnv} is not in .env or the environment.`);
+			await guestPs(guestScript(p, ACCOUNT_PS.reset), { secret });
+			return `Reset the password of ${user} to ${a.passwordEnv} (value not shown).`;
+		}
+		const out = await guestPs(guestScript(p, ACCOUNT_PS[op as "delete" | "disable"]));
+		return op === "delete" ? `Deleted ${user}${/PROFILE/.test(out) ? " and its profile" : ""}.` : `Disabled ${user}.`;
 	}
 	if (a.action === "keys") { need(a.keys, "keys"); await call(["controlvm", vm, "keyboardputscancode", ...scancodes(a.keys!)]); return `Sent ${a.keys}.`; }
 	if (a.action === "type") {
@@ -251,7 +329,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		await call(["controlvm", vm, op === "attach" ? "usbattach" : "usbdetach", a.device!]);
 		return `${op === "attach" ? "Attached" : "Detached"} ${a.device} ${op === "attach" ? "to" : "from"} ${vm}.`;
 	}
-	throw new Error("action must be list, status, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
+	throw new Error("action must be list, status, account, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
 }
 
 export const vmActTool = () => ({
@@ -265,7 +343,7 @@ export const vmActTool = () => ({
 	],
 	description: [
 		"Control a VirtualBox VM (VBoxManage). vm defaults to workOrchestrator.vm in .pi/settings.json ({vm, user, passwordEnv}), else the only running VM. Screenshots: screen_read target=vm.",
-		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD. keys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
+		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD (so do account, session and uac).\naccount: op list (default; admin or standard, enabled, profile); create user (admin: true for an admin; password = the username, else \"password\", written to .env as VM_<USER>_PASSWORD first; .env must be gitignored); delete user (also its profile; sign it out first); disable user; reset user with passwordEnv = the .env variable holding the new password.\nkeys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
 		"click: x,y in screen_read target=vm source pixels; button left (default), right or middle; double.",
 		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); admin rights only as the built-in Administrator (UAC filters every other admin: VERR_PROC_ELEVATION_REQUIRED); waits up to timeoutSec (120) and returns exit code and output. run has no loaded user profile, so MSIX/AppX installs fail (0x80070002); for those, run powershell as Administrator that registers a scheduled task (New-ScheduledTaskPrincipal -UserId Administrator -LogonType S4U -RunLevel Highest), starts it and waits for it. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
 		"snapshot: op list (default), take or restore with name; restore powers off a running configured VM, restores and starts it headless. usb: op list (default), attach or detach with device (UUID or address).",
@@ -273,11 +351,11 @@ export const vmActTool = () => ({
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
-			action: { type: "string", enum: ["list", "status", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
+			action: { type: "string", enum: ["list", "status", "account", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
 			vm: { type: "string" }, keys: { type: "string" }, text: { type: "string" }, textFromEnv: { type: "string" },
 			x: { type: "integer", minimum: 0 }, y: { type: "integer", minimum: 0 }, button: { type: "string", enum: ["left", "right", "middle"] }, double: { type: "boolean" },
 			exe: { type: "string" }, args: { type: "array", items: { type: "string" } }, user: { type: "string" }, passwordEnv: { type: "string" }, timeoutSec: { type: "integer", minimum: 1, maximum: 3600 },
-			source: { type: "string" }, dest: { type: "string" }, op: { type: "string", enum: ["list", "take", "restore", "attach", "detach"] }, name: { type: "string" }, device: { type: "string" },
+			source: { type: "string" }, dest: { type: "string" }, op: { type: "string", enum: ["list", "take", "restore", "attach", "detach", "create", "delete", "disable", "reset"] }, name: { type: "string" }, device: { type: "string" }, admin: { type: "boolean" },
 		},
 	},
 	async execute(_id: string, args: VmActArgs, signal?: AbortSignal, _update?: unknown, ctx?: any) {

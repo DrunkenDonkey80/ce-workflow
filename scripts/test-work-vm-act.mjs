@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import vmActExtension, { CLICK_SCRIPT, parseSessions, parseStatus, scancodes, vmAct, vmActTool } from "../extensions/vm-act.ts";
+import { execFileSync } from "node:child_process";
+import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, vmAct, vmActTool } from "../extensions/vm-act.ts";
 
 // Keys: modifiers pressed first, released in reverse; extended keys keep their e0 prefix.
 assert.deepEqual(scancodes("alt+y"), ["38", "15", "95", "b8"]);
@@ -70,6 +71,62 @@ try {
 	assert.match(Buffer.from(g[13], "base64").toString("utf16le"), /query session[\s\S]*Get-Process LogonUI,consent[\s\S]*PromptOnSecureDesktop/);
 	assert(seen.length === 1 && !existsSync(seen[0].file) && !st.includes("secret-pw"));
 	await assert.rejects(vmAct({ action: "status" }, { cwd: os.tmpdir(), run: fake({ showvminfo: 'VMState="running"\n' }), running: async () => ["S46"] }), /built-in Administrator: put its password in .env as VM_ADMIN_PASSWORD/);
+
+	// account: .env first, password to the guest only as a copied file, host cleanup when the script fails or is cancelled
+	const decode = (c) => Buffer.from(c[c.length - 1], "base64").toString("utf16le");
+	const copied = [];
+	const acct = (a, guest) => vmAct(a, { cwd: dir, running: async () => ["S46"], run: async (args) => {
+		calls.push(args);
+		if (args[2] === "copyto") copied.push(readFileSync(args[args.length - 1], "utf8"));
+		return args[2] === "run" ? guest(args) : { code: 0, stdout: "", stderr: "" };
+	} });
+	assert.equal(envName("test.user-1"), "VM_TEST_USER_1_PASSWORD");
+	calls.length = 0;
+	const created = await acct({ action: "account", op: "create", user: "tester" }, () => ({ code: 0, stdout: "", stderr: "" }));
+	assert.equal(created, "Created standard account tester; password in .env as VM_TESTER_PASSWORD (value not shown).");
+	assert.match(readFileSync(path.join(dir, ".env"), "utf8"), /VM_TEST_PW=secret-pw\n# vm_act account tester on S46\nVM_TESTER_PASSWORD=tester\n$/);
+	assert.deepEqual(calls.map(c => c[2]), ["copyto", "run"]);
+	assert.deepEqual(copied, ["tester"]);
+	const script = decode(calls[1]);
+	assert.match(script, /^\$secretFile='C:\\Windows\\Temp\\vm-act-[0-9a-f-]+\.txt'\n/);
+	assert.match(script, /ReadAllText\(\$secretFile\); Remove-Item -LiteralPath \$secretFile[\s\S]*New-LocalUser[\s\S]*S-1-5-32-545/);
+	assert(!existsSync(calls[0][calls[0].length - 1]), "host copy of the password removed");
+	// Windows refused password = username: the .env line becomes the fallback
+	await acct({ action: "account", op: "create", user: "tester", admin: true }, () => ({ code: 0, stdout: "FALLBACK\r\n", stderr: "" }));
+	const env = readFileSync(path.join(dir, ".env"), "utf8");
+	assert.equal(env.match(/VM_TESTER_PASSWORD=/g).length, 1);
+	assert.equal(env.match(/# vm_act account tester/g).length, 1, "the old comment goes with the old line");
+	assert.match(env, /VM_TESTER_PASSWORD=password\n$/);
+	assert.match(decode(calls.pop()), /S-1-5-32-544/, "admin group");
+	// script fails after the copy: the host removes the guest file, no password in the error
+	calls.length = 0;
+	await writeFile(path.join(dir, ".env"), "VM_TEST_PW=secret-pw\nVM_NEW_PW=n3w-secret\n");
+	await assert.rejects(acct({ action: "account", op: "reset", user: "tester", passwordEnv: "VM_NEW_PW" }, () => ({ code: 33, stdout: "", stderr: "User tester was not found." })), e => /failed \(33\): User tester was not found/.test(e.message) && !e.message.includes("n3w-secret"));
+	assert.deepEqual(calls.map(c => c[2]), ["copyto", "run", "rm"]);
+	assert.match(calls[2][calls[2].length - 1], /^C:\\Windows\\Temp\\vm-act-[0-9a-f-]+\.txt$/);
+	assert.equal(copied.pop(), "n3w-secret");
+	// cancelled run (the runner throws): still cleaned up
+	calls.length = 0;
+	await assert.rejects(acct({ action: "account", op: "reset", user: "tester", passwordEnv: "VM_NEW_PW" }, () => { throw new Error("The operation was aborted"); }), /aborted/);
+	assert.deepEqual(calls.map(c => c[2]), ["copyto", "run", "rm"]);
+	assert(!calls.flat().some(a => a.includes("n3w-secret")), "no password in any VBoxManage argument");
+	// list, delete, disable; refusals before any call
+	const listed = await acct({ action: "account" }, () => ({ code: 0, stdout: "Administrator|True|True|True\r\nGuest|False|False|False\r\n", stderr: "" }));
+	assert.equal(listed, "Administrator: admin, enabled, has a profile\nGuest: standard, disabled, no profile");
+	assert.equal(await acct({ action: "account", op: "delete", user: "tester" }, () => ({ code: 0, stdout: "PROFILE\r\n", stderr: "" })), "Deleted tester and its profile.");
+	assert.equal(await acct({ action: "account", op: "disable", user: "tester" }, () => ({ code: 0, stdout: "", stderr: "" })), "Disabled tester.");
+	calls.length = 0;
+	await assert.rejects(acct({ action: "account", op: "delete", user: "administrator" }, () => ({})), /refuses administrator/);
+	await assert.rejects(acct({ action: "account", op: "create", user: "bad name" }, () => ({})), /1 to 20 letters/);
+	await assert.rejects(acct({ action: "account", op: "reset", user: "tester" }, () => ({})), /needs passwordEnv/);
+	assert.deepEqual(calls, []);
+	// .env tracked by git: create refuses before touching it
+	const repo = await mkdtemp(path.join(os.tmpdir(), "vm-act-git-"));
+	execFileSync("git", ["init", "-q"], { cwd: repo });
+	await assert.rejects(vmAct({ action: "account", op: "create", user: "tester" }, { cwd: repo, running: async () => ["S46"], run: async () => ({ code: 0, stdout: "", stderr: "" }) }), /not gitignored/);
+	assert(!existsSync(path.join(repo, ".env")));
+	await rm(repo, { recursive: true, force: true });
+	await writeFile(path.join(dir, ".env"), "# test\nVM_TEST_PW=secret-pw\n");
 
 	// Restore (D-09): the configured running VM is powered off, waited for, restored and started.
 	calls.length = 0;
