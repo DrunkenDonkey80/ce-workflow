@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-02
-updated: 2026-11-02T17:39:46.862Z
+updated: 2026-11-02T17:42:09.462Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -138,6 +138,40 @@ S01 findings (read from installed pi-intercom 0.18.1 and the hub code, not run; 
 
 Approach (stand-in names shown with `~` because `@` selects pi-intercom's SSH mode; final naming in S03): hub A keeps a broker client per stand-in. When a local agent sends to `reviewer~mac`, the stand-in receives it and A posts it to hub B over the tailnet with its pairing token and comm version. Hub B delivers it through its own broker from a stand-in named `planner~home`, so the receiving agent can reply normally; B forwards the reply back the same way. Asks are held open on A's stand-in until B returns the reply or the ask times out.
 
+## Comm protocol (S02, comm 1)
+
+Transport: HTTPS through each hub's existing `tailscale serve` address, `https://<peer tailnet host>:<peer port>/link/<op>`, POST with a JSON body, no Origin, no cookie. Every request and response body has `"comm": 1`. Receivers ignore unknown fields.
+
+Check order on the receiving hub (D3 refinement, A1 finding 4):
+1. The existing remote checks: tailnet Host, `x-forwarded-proto: https`, `tailscale-user-login` equal to the owner login (all four hubs belong to one owner).
+2. `/link/` paths are dispatched here, before the browser Origin and cookie checks. Any other path keeps today's rules.
+3. Credential: header `x-hub-link: <id>.<secret>`, checked against the device registry with `kind: "hub"` (new optional field; old entries are browser devices). Missing or wrong: 401 `unpaired`. Only `pair-start` and `pair-status` skip this step. A hub credential never opens session pages (the page path refuses `kind: "hub"`), and a browser cookie never opens `/link/`.
+4. Comm: body `comm` not equal to mine: 409 `{ comm: <mine>, error: "comm-mismatch" }`. The caller shows "Mac hub speaks comm 2, this hub comm 1: update this hub" (or "update Mac hub"), per D6.
+5. Payload validation and the operation.
+
+Operations:
+- `pair-start` `{ comm, hub: { name }, offer }` — starts today's pairing (`createPairing`: one pending request, 2-minute code, approval on the target hub's local page) with label `Hub <name>`. `offer` is a credential the calling hub already created in its own registry as `kind: "hub"`, inactive until approval, so one approval gives both directions (D8). Reply `{ comm, id, code }`; the caller shows the code to compare.
+- `pair-status` `{ comm, id }` — waits up to 10 s like today. Reply `{ comm, state, credential? }`; on `approved` the target stores `offer` and the caller activates it and stores `credential`.
+- `sessions` `{ comm }` — for the user's link picker only (D7). Reply `{ comm, hub: <hostname>, sessions: [{ record, name, folder, live }] }`.
+- `link` `{ comm, link: { id, from: { record, name }, to: { record } } }` — the receiver stores the link and starts its stand-in for `from`. Reply `{ comm, name }` (the stand-in name it chose, D11). The caller stores the link only after this succeeds; if storing fails, it sends `unlink`.
+- `unlink` `{ comm, link }` — removes the link and its stand-in. Unknown link ids succeed, so retries are safe (D12).
+- `deliver` `{ comm, link, message: { id, text, expectsReply?, replyTo? } }` — send, ask and reply in one operation; the message id is kept across hubs (S01). The receiver checks the link exists, sends from its stand-in to the linked record's current intercom id (D10) and replies `{ comm, delivered: true }` after its own broker's delivery result. Errors: 404 `not-linked`, 410 `session-gone` (record deleted), 502 `not-delivered` with pi-intercom's reason.
+- `ping` `{ comm }` — reply `{ comm, hub, links: [{ id, name }] }`; carries renames (D11) and lets each side drop links the other no longer has (D12).
+
+Delivery flow and deadlines:
+- A local agent sends to stand-in `reviewer~mac`. The stand-in checks the sender is its linked session (D9). If not, it withholds the receipt (the send fails after 5 s with pi-intercom's generic text) and at once sends the sender a message: "reviewer~mac is linked to planner, not to this session; not forwarded". Nothing crosses.
+- Otherwise it posts `deliver` with a 3 s deadline (inside pi-intercom's 5 s receipt window, S01) and sends the receipt `receiver_received` only on `delivered: true`. On an error or timeout it withholds the receipt and sends the sender a follow-up naming the cause ("Mac hub unreachable", "reviewer on Mac was closed"), per D13.
+- A parked target: the receiving hub starts resuming it and answers `{ comm, delivered: true, resuming: true }` at once, then delivers once it joins intercom (up to 60 s). If that fails, it sends the failure back through `deliver` as a message from its stand-in, so the sender still reads the cause.
+- An ask: the receiving stand-in asks the real session with the same id; the real reply arrives at that stand-in and goes back with `deliver` and `replyTo`, where the first stand-in replies to the asking agent. The ask's overall timeout is the asking agent's own intercom timeout.
+- Offline: a hub with links pings each linked hub every 30 s. Two failed pings or one `deliver` timeout mark it offline and disconnect its stand-ins (D13); pings continue, and the first success reconnects them with the same ids, which delivers pi-intercom's queued mailbox through the normal `deliver` path.
+
+What forces a comm bump (every bump breaks links until all linked hubs update, D6):
+- Removing or renaming an operation, field or error code, or changing its type or meaning.
+- Making a field required, or a new field the receiver must understand to act correctly.
+- Changing the credential header, its format, the check order or the transport.
+
+What does not: adding an optional field older hubs can safely ignore, new error text, UI changes, any change to ce-workflow outside this protocol.
+
 ## Commands
 
 - C1 `node hub/scripts/test-api.mjs` (hub API, existing)
@@ -150,12 +184,7 @@ Approach (stand-in names shown with `~` because `@` selects pi-intercom's SSH mo
 ### Phase 1: Protocol and feasibility [think]
 
 - [x] **S01** pi-intercom 0.18.1 read: stand-ins work (one client each, reply by ask id, hub-driven reconnect); readable post-acceptance failure is impossible without a pi-intercom change, raised Q-06; ids stable except on /new, D10 assumed, Q-04 deferred
-- [ ] **S02** Write the comm protocol: messages, fields, the exact-match comm check (D6), errors, timeouts
-  - Endpoints for pair, list linkable sessions, link, unlink, deliver, reply; each request carries `comm` version and the pairing token.
-  - Order: transport and authentication checks first, then the comm check, then the payload. A hub with a different comm number then always gets the comm mismatch, never a payload error.
-  - Define the link-scoped credential and dispatch path (D3 refinement): how a hub's pairing request starts before it has a token, and that the credential reaches link endpoints only, never session pages.
-  - Define deadlines: how fast a hub counts as offline, and the send and ask timeouts.
-  - Record it as a section of this plan with a rule list of what forces a comm bump, since every bump breaks links until all hubs update.
+- [x] **S02** Comm protocol 1 written: /link/ ops over tailscale serve, hub-kind credential header, check order, deliver flow with 3 s deadline, 30 s ping offline rule, comm bump rules
 - [x] **S03** Naming and identity decided as assumed D11 (name~hub, collision suffix, fixed hublink id) and D12 (offline unlink); ~ names verified with the real intercom tool
 
 ### Phase 2: Build the link [code]
@@ -207,6 +236,7 @@ Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the link
 
 Append material changes and their reasons; preserve the original request and settled decisions.
 
+- **A5 (2026-11-02) S02 done.** Protocol written as section "Comm protocol (S02, comm 1)". Two consequences of S01 recorded there: D9's readable refusal and D13's failure cause reach the sender as an immediate follow-up message (the send itself shows pi-intercom's generic text after 5 s); `reply` folded into `deliver` with `replyTo`, and `ping` added for offline detection and D12 clean-up.
 - **A4 (2026-11-02) S03 done.** D11 naming and D12 offline unlink recorded as assumed defaults; `~` names checked with the real `intercom` tool through a probe stand-in.
 - **A3 (2026-11-02) S01 done (read-only).** The delivery-failure gate fails without a pi-intercom change: raised blocking Q-06 with options; status blocked. Recorded D10 (assumed) and deferred Q-04.
 - **A2 (2026-11-02) Q-05 answered: visible, linked-only delivery.** Added D9; R1 gets a note narrowing "see each other" to "exchange messages"; S07 and the two-hub harness check the refusal.

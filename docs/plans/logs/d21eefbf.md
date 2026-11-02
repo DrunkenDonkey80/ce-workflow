@@ -33,3 +33,13 @@ Review A1 applied: all 7 findings accepted and checked against the code. Blocked
   - Names must not contain `@` (selects SSH mode in pi-intercom); test the real `intercom` tool's send and ask to the chosen form, not only `IntercomClient.send()`.
   - Also decide unlink while the other hub is offline (D8 removes on both): remove locally now and tell the other hub when it is back, or refuse.
   - check: Temp probe %TEMP%/standin-probe.mjs registered probe~mac via pi-intercom IntercomClient (jiti); intercom list showed it, intercom send "Message sent", intercom ask got "pong: S03 probe ask"; silent~mac without receipt: send failed "Delivery ... could not be confirmed: Receiver did not confirm receipt within 5000ms"
+
+## 2026-11-02T17:42:09.462Z S02 done: Comm protocol 1 written: /link/ ops over tailscale serve, hub-kind credential header, check order, deliver flow with 3 s deadline, 30 s ping offline rule, comm bump rules
+
+- [x] **S02** Write the comm protocol: messages, fields, the exact-match comm check (D6), errors, timeouts
+  - Endpoints for pair, list linkable sessions, link, unlink, deliver, reply; each request carries `comm` version and the pairing token.
+  - Order: transport and authentication checks first, then the comm check, then the payload. A hub with a different comm number then always gets the comm mismatch, never a payload error.
+  - Define the link-scoped credential and dispatch path (D3 refinement): how a hub's pairing request starts before it has a token, and that the credential reaches link endpoints only, never session pages.
+  - Define deadlines: how fast a hub counts as offline, and the send and ask timeouts.
+  - Record it as a section of this plan with a rule list of what forces a comm bump, since every bump breaks links until all hubs update.
+  - check: Checked against hub/src/hub.ts remote branch (lines 240-307), hub/src/remote.ts createPairing/createDeviceRegistry, extensions/hub-command.ts parked resume, and S01 receipt timeout; section "Comm protocol (S02, comm 1)" in the plan
