@@ -36,6 +36,7 @@
       "extensions/screen-read.ts",
       "extensions/mobile-act.ts",
       "extensions/app-act.ts",
+      "extensions/vm-act.ts",
       "extensions/browser-fetch.ts",
       "extensions/browser-act.ts",
       "extensions/browser-search.ts",

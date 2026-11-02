@@ -24,6 +24,6 @@ for (const line of Object.values(SITUATIONAL_TOOLS)) assert(line.length <= 110, 
 
 // Every tool the catalog names registers deferred, so it costs nothing until enabled.
 const { readFileSync } = await import("node:fs");
-for (const [file, name] of [["screen-read", "screenReadTool"], ["mobile-act", "mobileActTool"], ["app-act", "appActTool"], ["browser-act", "browserActTool"], ["browser-search", "imageSearchTool"]])
+for (const [file, name] of [["screen-read", "screenReadTool"], ["mobile-act", "mobileActTool"], ["app-act", "appActTool"], ["browser-act", "browserActTool"], ["browser-search", "imageSearchTool"], ["vm-act", "vmActTool"]])
 	assert.match(readFileSync(new URL(`../extensions/${file}.ts`, import.meta.url), "utf8"), new RegExp(`\\{ \\.\\.\\.${name}\\([^)]*\\)\\)?, exposure: "deferred" \\}`), `${name} registers deferred`);
 console.log("ok - tools_enable lists registered situational tools and declares the named ones");
