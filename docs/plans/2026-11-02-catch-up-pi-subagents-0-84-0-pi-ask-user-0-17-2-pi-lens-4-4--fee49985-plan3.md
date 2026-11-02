@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-02
 source: catch-up
 catch-up: {"pi-subagents":"0.84.0","pi-ask-user":"0.17.2","pi-lens":"4.4.8"}
-updated: 2026-11-02T07:09:24.571Z
+updated: 2026-11-02T07:14:36.041Z
 reviewed: 2026-11-02
 ---
 
@@ -161,6 +161,8 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
   - Unchanged output (all transforms return undefined) returns undefined.
   - Host detection: `sdk.VERSION` >= 0.87.0 registers only the `context_with_system` handler; older or unknown hosts keep the three `context` handlers. A shared `useContextWithSystem` value decides it once at load; tests call the exported handler directly for both paths.
   - Known limit: when the first visible message is an internal message that filteredContext removes and a system message follows it, that system message is folded instead of kept (a cache miss, not a wrong prompt).
+- **D8 (assumed, CU-11)**: The benchmark is scripts/benchmark-context-cache-live.mjs (kept in the repo so CU-13 reruns it). It runs 3 fixed prompts in a temp git repo (greet.mjs, then enable_word_count + word_count into count.txt, then farewell + recount), with the user's pool provider extension (pi-provider-claude-ex; without it auth.json's token is revoked), work-models.ts and a probe extension, and no `--tools` allowlist. Runs go in parallel. Completion check: both exports work and count.txt equals the final word count. Tool-change proof: a request's system message adds word_count. The temp repo uses compaction mode `ultracompact`. Finding: Windows and x1600 both run `ultrafull`, where ce-workflow's handlers change the list only for images in history (vision bridge), internal messages or the compaction nudge; ultracompact appends knowledge every turn, so the benchmark exercises the path but overstates how often ultrafull hits it.
+- **CU-11 baseline (HEAD 08e6962+CU-04, 2 runs, anthropic/claude-opus-5-5)**: both completed, tool change proven, knowledge on every request. Mean cost $0.2396, total tokens 150,779, cacheRead 111,426, cacheWrite 37,935, runtime 26.1 s, turns 10.5, tool calls 9.5 (run costs $0.2467 / $0.2326, 6% apart). The request right after the tool change reads 0 and writes ~14.0k in both runs (full miss). Output: .pi/context-cache-benchmark/2026-11-02T07-13-28.000Z-baseline/results.json.
 - **User rules (stated earlier in the session that wrote this plan):**
   - Commits: "I sometimes make changes with other sessions, when I do a commit I want them in too": stage other sessions' dirty files as well (never credentials). Rule also in repo AGENTS.md, not yet committed.
   - Before a push, "run only the targeted tests for the changed code, not the full suite", unless the request says otherwise.
@@ -206,13 +208,7 @@ Commands (referenced by ID):
 ### Phase 2 — Cache-safe context handlers: design and baseline [think]
 
 - [x] **CU-10** Design recorded as D7 (one context_with_system handler, Symbol-tag anchors, fold dropped system messages via pi-ai getCurrentSystemMessage, VERSION>=0.87.0 detection); D2 confirmed.
-- [ ] **CU-11** Define the live cache benchmark and capture the baseline at the current HEAD (D4: default Claude, 2 runs).
-  - A scripted `pi -p` session with ce-workflow loaded that enables one situational tool mid-way and continues a few turns; follow the scripts/benchmark-reasoning-strip-live.mjs pattern. Decide whether it lands in scripts/ or stays in the temp research folder.
-  - Record runtime, total provider tokens, cacheRead, cacheWrite, cost, turns and tool calls, aggregated over every session of the run.
-  - Read every session file of a run, not only the first (the reference script reads one, benchmark-reasoning-strip-live.mjs:313).
-  - Before the baseline, write down the fixed workload, a completion check per run, and proof each run hit a mid-session tool change through the changed handlers.
-  - Apply the D6 regression and inconclusive thresholds; the inconclusive rerun adds 2 runs per side once.
-  - Token-free side count: misses right after a system message in x1600 logs, as the before figure.
+- [x] **CU-11** Benchmark scripts/benchmark-context-cache-live.mjs defined (D8); baseline mean $0.2396, 150.8k tokens, 26.1 s, 10.5 turns, 9.5 tool calls; full cache miss after the tool change confirmed.
 
 ### Phase 3 — Cache-safe context handlers: build [code]
 
@@ -245,6 +241,7 @@ Commands (referenced by ID):
 
 - [ ] **CU-B1** [blocked] After the change is pushed and the x1600 install updates, repeat the token-free count of cache misses after tool changes and of index.lock failures.
   - Prerequisite: the user's push instruction and a WSL ce-workflow update.
+- [ ] **CU-B2** In ultracompact mode the knowledge message appended last moves every turn, so Claude's cache only hits the system prefix and re-writes the whole conversation each turn (CU-11 baseline: cacheRead flat at 13,051 for turns 2–4 while writes grow). Consider placing knowledge where it does not break the per-turn prefix, measured with the CU-11 benchmark.
 
 ## Global acceptance
 
