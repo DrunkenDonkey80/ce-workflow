@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-02
 source: catch-up
 catch-up: {"pi-subagents":"0.84.0","pi-ask-user":"0.17.2","pi-lens":"4.4.8"}
-updated: 2026-11-02T07:07:37.557Z
+updated: 2026-11-02T07:09:24.571Z
 reviewed: 2026-11-02
 ---
 
@@ -153,6 +153,14 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
   - Independent: yes
   - Answer: {"kind":"selection","selections":["Recommended thresholds"]}
   - Source: user via ask_user /plan3 resolve; not independently verified.
+- **D2 confirmed (CU-10)**: extensions get `@earendil-works/pi-ai` as the compat entry (virtual-modules.js:26), which exports `getCurrentSystemMessage` (checked with a dynamic import of 1.4.0 compat.js). `context_with_system` exists since Pi 0.87.0 (CHANGELOG:552).
+- **D7 (CU-10 design)**: One `context_with_system` handler, `systemSafeContext`, runs today's three transforms in order (vision bridge, filteredContext, compactionNoteNudge) on the non-system messages and then puts the system messages back.
+  - Anchors: before the transforms, each non-system message gets an enumerable Symbol tag with its visible index. Object spread copies symbol keys (vision bridge and strip clones keep the tag); JSON drops them, so providers never see it. New messages (knowledge, nudge, compactionSummary) have no tag. Each mid-conversation system message records the visible index `a` of the message before it.
+  - Rebuild: walk the output; after each tagged message emit, in original order, the system messages whose anchor is <= its tag and that have not been emitted. Then removed anchors (internal messages) fall back to the preceding kept message, and appended untagged messages stay after them, so knowledge and nudge go last.
+  - Dropped prefix: a system message with no output tag <= `a` (windowing dropped its part) is folded into index 0 with `getCurrentSystemMessage([messages[0], ...dropped])`, in order; kept ones stay in place, so no delta applies twice. Index 0 stays the (possibly folded) leading system message.
+  - Unchanged output (all transforms return undefined) returns undefined.
+  - Host detection: `sdk.VERSION` >= 0.87.0 registers only the `context_with_system` handler; older or unknown hosts keep the three `context` handlers. A shared `useContextWithSystem` value decides it once at load; tests call the exported handler directly for both paths.
+  - Known limit: when the first visible message is an internal message that filteredContext removes and a system message follows it, that system message is folded instead of kept (a cache miss, not a wrong prompt).
 - **User rules (stated earlier in the session that wrote this plan):**
   - Commits: "I sometimes make changes with other sessions, when I do a commit I want them in too": stage other sessions' dirty files as well (never credentials). Rule also in repo AGENTS.md, not yet committed.
   - Before a push, "run only the targeted tests for the changed code, not the full suite", unless the request says otherwise.
@@ -197,13 +205,7 @@ Commands (referenced by ID):
 
 ### Phase 2 — Cache-safe context handlers: design and baseline [think]
 
-- [ ] **CU-10** Design moving the three `context` handlers (work-models.ts:3796-3798) to `context_with_system`; record the design in Decisions.
-  - Keep each system message in its slot: run today's transforms on the non-system messages and put each system message back after the same anchor message; appended messages (knowledge, nudge) go last.
-  - Define anchors that a transform replaces (the vision bridge clones image messages, work-vision.ts:24-36) or removes alone (filteredContext drops internal messages, work-models.ts:1713-1726); keep delta order.
-  - When filteredContext windows (drops a prefix) that holds system messages, fold that exact prefix as Pi does: content, sections (null deletes) and tool additions and removals.
-  - Prefer pi-ai `getCurrentSystemMessage` (transcript.js:58-85) on the dropped prefix plus messages[0]; check that an extension can import it, else port it. Kept deltas must not apply twice.
-  - Keep index 0 a system message (runner.js:1048 rejects a request without one).
-  - Hosts without `context_with_system` keep the current `context` path; choose how to detect them.
+- [x] **CU-10** Design recorded as D7 (one context_with_system handler, Symbol-tag anchors, fold dropped system messages via pi-ai getCurrentSystemMessage, VERSION>=0.87.0 detection); D2 confirmed.
 - [ ] **CU-11** Define the live cache benchmark and capture the baseline at the current HEAD (D4: default Claude, 2 runs).
   - A scripted `pi -p` session with ce-workflow loaded that enables one situational tool mid-way and continues a few turns; follow the scripts/benchmark-reasoning-strip-live.mjs pattern. Decide whether it lands in scripts/ or stays in the temp research folder.
   - Record runtime, total provider tokens, cacheRead, cacheWrite, cost, turns and tool calls, aggregated over every session of the run.
