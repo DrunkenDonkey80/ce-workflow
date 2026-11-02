@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "product",
   "title": "Product architecture",
-  "revision": 21,
+  "revision": 22,
   "nodes": [
     {
       "id": "pi_host",
@@ -354,7 +354,7 @@
       "id": "pi_control_hub",
       "label": "pi-control-hub",
       "kind": "external",
-      "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms; owns timers (message/script), subscription usage, the Claude pool (cpool) and each session's model, also while parked; installs and hourly stages the desktop app."
+      "summary": "Hosts Pi sessions over RPC; serves the web/phone UI, diagrams, files and ask_user forms; owns timers (message/script), subscription usage, the Claude pool (cpool) and each session's model, also while parked; installs and hourly stages the desktop app; links sessions with paired hubs (hub/src/link.ts, comm protocol 1 over Tailscale /link/)."
     },
     {
       "id": "camera_device",
@@ -862,6 +862,12 @@
       "from": "browser_search",
       "to": "browser_fetch",
       "label": "browserFetch extract, checks, log"
+    },
+    {
+      "id": "pi_control_hub__pi_intercom",
+      "from": "pi_control_hub",
+      "to": "pi_intercom",
+      "label": "stand-ins name~hub for linked sessions on other hubs"
     }
   ],
   "notes": []

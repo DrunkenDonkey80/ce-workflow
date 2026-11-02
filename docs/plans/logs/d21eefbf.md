@@ -81,3 +81,14 @@ Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the link
 
 - [x] **S09** Inbound messages count as intercom runs (unseen, auto-park) like local intercom; test in C1
   - check: hub/src/sessions.ts:83-87 classifies runs by the intercom_message type only (sender-independent); node hub/scripts/test-api.mjs -> "api ok" incl. "an intercom-only run stays seen" (test-api.mjs:319-323); link.ts wakeAndSend calls intercom.wake = host.resume, as cli.ts `wake` does via /api/sessions/<id>/resume
+
+## 2026-11-02T18:01:07.037Z Superseded resume context
+
+S01-S04 done (HEAD 941ef12). Next: S05 hub-to-hub pairing. Design worked out: Device gets optional kind "hub" in hub/src/remote.ts (pair(label, login, kind), check(cookie, login, kind) refuses a kind mismatch, so hub credentials never open session pages and browser cookies never open /link/); createPairing.start takes an optional label/kind for hubs ("Hub <name>"). hub/src/hub.ts remote branch dispatches /link/* right after the owner check (line ~264), before the Missing-Origin and cookie checks. Mutual credential deviates from S02 text: after approval the caller posts authenticated `pair-finish` {comm, offer} with a credential it just issued, instead of an inactive offer in pair-start; pair-start carries hub {name, url}. Update the protocol section and record an amendment. Test in hub/scripts/test-remote.mjs (C4) using its remote() helper with an x-hub-link header. Unverified: tailscale serve sets tailscale-user-login for requests from another user-owned node.
+
+## 2026-11-02T18:01:07.043Z ARCH-RECONCILE done: Product diagram rev 22: pi_control_hub summary names hub links (hub/src/link.ts, comm 1 over Tailscale /link/); new edge pi_control_hub -> pi_intercom "stand-ins name~hub"
+
+- [x] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
+  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
+  - Changed plan elements: none flagged; inspect actual implementation.
+  - check: plan3_diagram apply target=product expectedRevision=21 -> revision 22, changed [pi_control_hub, pi_control_hub__pi_intercom]; dependents unchanged (still accurate)

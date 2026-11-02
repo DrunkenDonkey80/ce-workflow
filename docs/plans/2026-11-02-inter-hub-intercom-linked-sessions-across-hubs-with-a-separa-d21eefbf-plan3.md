@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-02
-updated: 2026-11-02T18:00:36.020Z
+updated: 2026-11-02T18:01:07.041Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -204,9 +204,7 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 - [ ] **S11** Live round trip: send, ask with reply, unlink, and a hub going offline; also that a linked message to a parked session resumes it and its run stays quiet (S09); record results here
 ### P-ARCH [code] Product architecture
 
-- [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
-  - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
-  - Changed plan elements: none flagged; inspect actual implementation.
+- [x] **ARCH-RECONCILE** Product diagram rev 22: pi_control_hub summary names hub links (hub/src/link.ts, comm 1 over Tailscale /link/); new edge pi_control_hub -> pi_intercom "stand-ins name~hub"
 
 
 ## Backlog
@@ -227,7 +225,7 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 
 ## Resume context
 
-S01-S04 done (HEAD 941ef12). Next: S05 hub-to-hub pairing. Design worked out: Device gets optional kind "hub" in hub/src/remote.ts (pair(label, login, kind), check(cookie, login, kind) refuses a kind mismatch, so hub credentials never open session pages and browser cookies never open /link/); createPairing.start takes an optional label/kind for hubs ("Hub <name>"). hub/src/hub.ts remote branch dispatches /link/* right after the owner check (line ~264), before the Missing-Origin and cookie checks. Mutual credential deviates from S02 text: after approval the caller posts authenticated `pair-finish` {comm, offer} with a credential it just issued, instead of an inactive offer in pair-start; pair-start carries hub {name, url}. Update the protocol section and record an amendment. Test in hub/scripts/test-remote.mjs (C4) using its remote() helper with an x-hub-link header. Unverified: tailscale serve sets tailscale-user-login for requests from another user-owned node.
+S01-S09 and ARCH-RECONCILE done; code complete and committed locally (not pushed). Waiting on S10 [human]: on two real hubs running this code (restart each hub after updating), turn on Remote access on both, then in any session menu "Hub links…" > "Pair with another hub…" enter the other hub's address, compare the code and approve it on the other hub's page; then "Hub links…" > "Link to a session on <hub>…" and pick a session. After that S11: live send, ask with reply, D9 refusal from another session, unlink, unplug one hub (stand-ins disappear after two missed 30 s pings; asks fail at once), and a linked message to a parked session resumes it and stays quiet. Unverified so far: that tailscale serve sets tailscale-user-login for requests from another of the user's own nodes (S05 owner check depends on it).
 
 ## Amendments
 
