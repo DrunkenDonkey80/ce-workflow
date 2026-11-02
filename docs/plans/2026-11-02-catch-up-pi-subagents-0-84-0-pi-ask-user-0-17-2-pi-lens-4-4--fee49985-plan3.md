@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-02
 source: catch-up
 catch-up: {"pi-subagents":"0.84.0","pi-ask-user":"0.17.2","pi-lens":"4.4.8"}
-updated: 2026-11-02T07:17:05.743Z
+updated: 2026-11-02T07:18:04.703Z
 reviewed: 2026-11-02
 ---
 
@@ -46,7 +46,8 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
       "title": "Subagent notices moved from the context hook to context_with_system so tool and prompt changes keep the prompt cache (0.83.0, #3058, #3063)",
       "pov": "Trial",
       "status": "adopted",
-      "rationale": "In Pi 1.4, when a `context` handler returns a changed message list, Pi merges every mid-conversation system message (prompt-section and toolsAdded/toolsRemoved updates) into one leading system message (runner.js restoreSystemMessages). Each tool change then rewrites the start of the prompt and the whole cache misses. Without the merge, pi-ai sends the change to Claude as appended tool_addition blocks and the cache holds (anthropic-messages.js:1055-1080). pi-subagents fixed this for itself; the installed 0.84.0 already has the fix. ce-workflow's three `context` handlers (work-models.ts:3796-3798: vision bridge, filteredContext with the durable-knowledge append, compactionNoteNudge) change the list on most turns and so force the merge. In x1600 session 01a19840, 4 of 6 cache misses not explained by idle time or compaction came right after a tool change (about 0.6M cache-write tokens in 86 turns). Trial per D1: CU-10 to CU-13."
+      "rationale": "In Pi 1.4, when a `context` handler returns a changed message list, Pi merges every mid-conversation system message (prompt-section and toolsAdded/toolsRemoved updates) into one leading system message (runner.js restoreSystemMessages). Each tool change then rewrites the start of the prompt and the whole cache misses. Without the merge, pi-ai sends the change to Claude as appended tool_addition blocks and the cache holds (anthropic-messages.js:1055-1080). pi-subagents fixed this for itself; the installed 0.84.0 already has the fix. ce-workflow's three `context` handlers (work-models.ts:3796-3798: vision bridge, filteredContext with the durable-knowledge append, compactionNoteNudge) change the list on most turns and so force the merge. In x1600 session 01a19840, 4 of 6 cache misses not explained by idle time or compaction came right after a tool change (about 0.6M cache-write tokens in 86 turns). Trial per D1: CU-10 to CU-13.",
+      "verification": "node scripts/benchmark-context-cache-live.mjs (2 runs per side, anthropic/claude-opus-5-5, ultracompact): all runs completed with the tool change proven. Mean cost $0.2396 -> $0.1844 (-23%), total tokens 150,779 -> 143,585 (-4.8%), runtime 26.1 s -> 26.5 s (+1.6%), turns 10.5 -> 10, tool calls 9.5 -> 9. Tool-change request: cacheRead/cacheWrite 0/14.0k -> 5.1k/9.0k. The after runs also reused a 5k cached prefix on turn 1 from the baseline runs, which inflates the cost gain. C5, C6, C7 pass. Kept (D6)."
     },
     {
       "title": "subagent:jobs-changed event and asyncStarted/jobsChanged in the RPC ping (0.83.0, #3068)",
@@ -78,13 +79,15 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
       "title": "Top-level context, options, allowMultiple and allowFreeform sent with questions are ignored instead of an error (0.17.2, #88)",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "Upstream dropped the BATCH_ENTRY_FIELDS check because models that echo schema defaults looped on the validation error. Our copy still throws it (extensions/ask-user/index.ts:226, 2619-2623, which also lists initialText). No local or x1600 session hit it yet, but the change is a deletion that removes a retry trap and a divergence from upstream. CU-01."
+      "rationale": "Upstream dropped the BATCH_ENTRY_FIELDS check because models that echo schema defaults looped on the validation error. Our copy still throws it (extensions/ask-user/index.ts:226, 2619-2623, which also lists initialText). No local or x1600 session hit it yet, but the change is a deletion that removes a retry trap and a divergence from upstream. CU-01.",
+      "verification": "node scripts/test-work-ask-user.mjs -> ok (stray top-level context/initialText/allowMultiple with questions runs); node scripts/test-work-ask-remote.mjs -> ok"
     },
     {
       "title": "Single-select rows wrap by terminal columns with pi-tui wrapTextWithAnsi (0.17.2)",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "single-select-layout.ts wrapText counts UTF-16 length, so emoji and CJK options overflow the row width; upstream replaces the 40-line word wrapper with pi-tui's column-aware wrapTextWithAnsi, which index.ts already imports from for truncation. A deletion that fixes wide-character rows. CU-02."
+      "rationale": "single-select-layout.ts wrapText counts UTF-16 length, so emoji and CJK options overflow the row width; upstream replaces the 40-line word wrapper with pi-tui's column-aware wrapTextWithAnsi, which index.ts already imports from for truncation. A deletion that fixes wide-character rows. CU-02.",
+      "verification": "node scripts/test-work-ask-user.mjs -> ok (emoji and CJK option rows <= width 24 by visibleWidth)"
     },
     {
       "title": "Tern sheet docked in the composer, shortLabel tab labels, README wording (0.17.1, 0.17.2)",
@@ -98,7 +101,8 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
       "title": "Background git status reads set GIT_OPTIONAL_LOCKS=0 so they never hold or orphan .git/index.lock (4.4.7, #4930)",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "git status takes .git/index.lock for an optional index refresh; a concurrent git add or commit then fails with \"index.lock: File exists\", and a killed status can leave the lock behind. pi-lens fixed its own reads. The hub polls git status per session folder every 4 s with a 5 s timeout (hub/src/api.ts:76) and in the Files view (hub/src/files.ts:10-18), without that variable. x1600 session logs hold 14 such failures (10 in 01a155ad, 4 in 01a193d1, latest 2026-11-01). The cause of each is unproven; adopted without diagnosis (D5). CU-04."
+      "rationale": "git status takes .git/index.lock for an optional index refresh; a concurrent git add or commit then fails with \"index.lock: File exists\", and a killed status can leave the lock behind. pi-lens fixed its own reads. The hub polls git status per session folder every 4 s with a 5 s timeout (hub/src/api.ts:76) and in the Files view (hub/src/files.ts:10-18), without that variable. x1600 session logs hold 14 such failures (10 in 01a155ad, 4 in 01a193d1, latest 2026-11-01). The cause of each is unproven; adopted without diagnosis (D5). CU-04.",
+      "verification": "node hub/scripts/test-api.mjs -> api ok (gitReadEnv gives \"0\" over a parent \"1\" and keeps other vars); node hub/scripts/test-chat-files.mjs -> ok"
     },
     {
       "title": "tools.lazy \"auto\" and --lens-retain-injections for prompt caches on folding models (4.4.5)",
@@ -216,9 +220,7 @@ Commands (referenced by ID):
 
 ### Phase 4 — Cache-safe context handlers: measure and decide [think]
 
-- [ ] **CU-13** Re-run the CU-11 benchmark on the new code and compare it with the baseline; keep the change only without a material regression (D6).
-  - On a regression, revert CU-12, change the pi-subagents Trial entry to Reject with the numbers, and say so in Decisions.
-  - Otherwise write the numbers into that entry's verification.
+- [x] **CU-13** After-benchmark: cost -23%, tokens -4.8%, runtime +1.6%, turns/tool calls slightly lower; no D6 regression, CU-12 kept; verification written into the Trial entry.
 
 ### Phase 5 — Verify and record [code]
 
