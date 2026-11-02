@@ -74,6 +74,26 @@ assert.equal(bus.listenerCount("ask:answer"), 0);
  assert.deepEqual(prefilledBatch.details.answers[1], { status: "answered", response: { kind: "freeform", text: "Saved, edited" } });
 }
 
+// Top-level entry fields sent with questions are ignored, not an error (upstream 0.17.2 #88).
+{
+ bus.once("ask:pending", event => {
+  assert.equal(event.questions.length, 2);
+  assert.equal(event.questions[0].context, undefined, "top-level context is not copied into entries");
+  assert.equal(event.questions[1].initialText, undefined, "top-level initialText is not copied into entries");
+ });
+ const stray = await tool.execute("stray-top-level", { context: "echoed", initialText: "echoed", allowMultiple: false, questions: [question, { ...question, question: "Deploy?" }] }, undefined, undefined, { hasUI: true, ui: { custom: async () => [{ status: "skipped" }, { status: "skipped" }] } });
+ assert.equal(stray.details.answers.length, 2);
+}
+
+// Wide (emoji/CJK) option titles wrap by terminal columns, so no row exceeds the width (upstream 0.17.2).
+{
+ const { renderSingleSelectRows } = await createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES }).import("../extensions/ask-user/single-select-layout.ts");
+ const { visibleWidth } = await createJiti(import.meta.url, { virtualModules: VIRTUAL_MODULES }).import("@earendil-works/pi-tui");
+ const width = 24;
+ const rows = renderSingleSelectRows({ options: [{ title: "🚀".repeat(30) }, { title: "部署到生产环境并通知所有团队成员" }], selectedIndex: 0, width, allowFreeform: false });
+ for (const row of rows) assert(visibleWidth(row.line) <= width, `row too wide: ${row.line}`);
+}
+
 // A top-level question names the batch without becoming an extra question.
 {
  const heading = "Release choices", args = { question: `  ${heading}  `, questions: [question, { ...question, question: "Deploy?" }] };
