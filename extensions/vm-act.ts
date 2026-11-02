@@ -75,8 +75,46 @@ export function envValue(cwd: string, name: string) {
 	return line?.value ?? process.env[name];
 }
 
+const POWERSHELL = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+// shortcut: parses English `query session` headers and states, upgrade if a localized guest is used
+export const STATUS_PS = `$ProgressPreference='SilentlyContinue'
+"#session"; query session 2>$null
+"#proc"; Get-Process LogonUI,consent -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Name) $($_.SessionId)" }
+"#uac"; $u=Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System; "$($u.ConsentPromptBehaviorAdmin) $($u.ConsentPromptBehaviorUser) $($u.PromptOnSecureDesktop)"
+exit 0`;
+export type Session = { name: string; user: string; id: number; state: string };
+/** `query session` rows; the username column can be blank, so it is cut at the header's USERNAME column. */
+export function parseSessions(text: string): Session[] {
+	const lines = text.split(/\r?\n/), head = lines.findIndex(l => /SESSIONNAME\s+USERNAME\s+ID/.test(l));
+	if (head < 0) return [];
+	const col = lines[head].indexOf("USERNAME");
+	return lines.slice(head + 1).flatMap(l => {
+		const m = l.slice(col).match(/^(.*?)\s*\b(\d+)\s+([A-Za-z]+)/);
+		return m ? [{ name: l.slice(1, col).trim(), user: m[1].trim(), id: Number(m[2]), state: m[3] }] : [];
+	});
+}
+export type GuestState = { console?: Session; others: Session[]; screen: "desktop" | "locked" | "sign-in" | "none"; uac: boolean; policy: { admin?: number; user?: number; secure?: number } };
+/** STATUS_PS output: LogonUI in the console session = locked (query user still says Active, S01); consent.exe there = UAC prompt up. */
+export function parseStatus(out: string): GuestState {
+	const part = (name: string) => out.split(/^#/m).find(s => s.startsWith(name))?.slice(name.length) ?? "";
+	const sessions = parseSessions(part("session")).filter(s => s.id !== 0 && s.state !== "Listen");
+	const procs = part("proc").trim().split(/\r?\n/).map(l => l.trim().split(/\s+/));
+	const con = sessions.find(s => s.name.toLowerCase() === "console");
+	const has = (name: string) => !!con && procs.some(([n, id]) => n === name && Number(id) === con.id);
+	const [admin, user, secure] = part("uac").trim().split(/\s+/).map(v => v === "" ? undefined : Number(v));
+	return { console: con, others: sessions.filter(s => s !== con && s.user), screen: !con ? "none" : !con.user ? "sign-in" : has("LogonUI") ? "locked" : "desktop", uac: has("consent"), policy: { admin, user, secure } };
+}
+export function describeState(vm: string, s: GuestState) {
+	const c = s.console, screen = { desktop: "desktop", locked: "locked (lock curtain or sign-in screen)", "sign-in": "nobody signed in, sign-in screen", none: "" }[s.screen];
+	return [
+		c ? `Console (session ${c.id}): ${c.user ? `${c.user}, ` : ""}${screen}.` : `${vm} has no console session.`,
+		`Other sessions: ${s.others.map(o => `${o.user} (${o.state}, ${o.id})`).join(", ") || "none"}.`,
+		`UAC prompt: ${s.uac ? "up" : "none"}. UAC policy: ConsentPromptBehaviorAdmin ${s.policy.admin ?? "?"}, ConsentPromptBehaviorUser ${s.policy.user ?? "?"}, PromptOnSecureDesktop ${s.policy.secure ?? "?"}.`,
+	].join("\n");
+}
+
 export type VmActArgs = {
-	action: "list" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
+	action: "list" | "status" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
 	vm?: string; keys?: string; text?: string; textFromEnv?: string;
 	x?: number; y?: number; button?: "left" | "right" | "middle"; double?: boolean;
 	exe?: string; args?: string[]; user?: string; passwordEnv?: string; timeoutSec?: number;
@@ -122,6 +160,29 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 	}
 	const vm = await resolveVm(o.cwd, a.vm, running);
 	const need = (value: unknown, what: string) => { if (value === undefined || value === "") throw new Error(`${a.action} needs ${what}.`); };
+	// the password only ever sits in a host temp file passed as --passwordfile, removed after the call
+	const withAuth = async <T>(user: string, passwordEnv: string, fn: (auth: string[]) => Promise<T>) => {
+		const password = envValue(o.cwd, passwordEnv);
+		if (password === undefined) throw new Error(`${passwordEnv} is not in .env or the environment.`);
+		const file = path.join(os.tmpdir(), `vm-act-${randomUUID()}.txt`);
+		await writeFile(file, password, { mode: 0o600 });
+		try { return await fn([`--username=${user}`, `--passwordfile=${file}`]); } finally { await rm(file, { force: true }); }
+	};
+	// status/account/session/uac guest work: workOrchestrator.vm {user, passwordEnv}, else the built-in Administrator (D-17)
+	const guestPs = (script: string, seconds = 60) => {
+		const cfg = vmConfig(o.cwd), user = cfg.user ?? "Administrator", passwordEnv = cfg.passwordEnv ?? "VM_ADMIN_PASSWORD";
+		if (envValue(o.cwd, passwordEnv) === undefined) throw new Error(`${a.action} runs guest commands as the built-in Administrator: put its password in .env as ${passwordEnv}, or set workOrchestrator.vm {user, passwordEnv} in .pi/settings.json.`);
+		return withAuth(user, passwordEnv, async auth => {
+			const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${POWERSHELL}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], seconds * 1000 + 15_000, signal);
+			if (r.code !== 0) throw new Error(`${a.action}: guest command as ${user} ${r.killed ? "timed out" : `failed (${r.code})`}: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
+			return r.stdout;
+		});
+	};
+	if (a.action === "status") {
+		const power = /^VMState="([^"]*)"/m.exec(await call(["showvminfo", vm, "--machinereadable"], 30_000))?.[1] ?? "unknown";
+		if (power !== "running") return `VM ${vm}: ${power}.`;
+		return `VM ${vm}: running.\n${describeState(vm, parseStatus(await guestPs(STATUS_PS)))}`;
+	}
 	if (a.action === "keys") { need(a.keys, "keys"); await call(["controlvm", vm, "keyboardputscancode", ...scancodes(a.keys!)]); return `Sent ${a.keys}.`; }
 	if (a.action === "type") {
 		const text = a.textFromEnv ? envValue(o.cwd, a.textFromEnv) : a.text;
@@ -141,12 +202,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 	if (a.action === "run" || a.action === "copyto" || a.action === "copyfrom") {
 		const cfg = vmConfig(o.cwd), user = a.user ?? cfg.user, passwordEnv = a.passwordEnv ?? cfg.passwordEnv;
 		if (!user || !passwordEnv) throw new Error(`${a.action} needs user and passwordEnv = the NAME of a .env variable holding that user's password (arguments, or workOrchestrator.vm {user, passwordEnv} in .pi/settings.json). Admin rights need user Administrator, e.g. passwordEnv VM_ADMIN_PASSWORD.`);
-		const password = envValue(o.cwd, passwordEnv);
-		if (password === undefined) throw new Error(`${passwordEnv} is not in .env or the environment.`);
-		const file = path.join(os.tmpdir(), `vm-act-${randomUUID()}.txt`);
-		await writeFile(file, password, { mode: 0o600 });
-		try {
-			const auth = [`--username=${user}`, `--passwordfile=${file}`];
+		return withAuth(user, passwordEnv, async auth => {
 			if (a.action === "run") {
 				need(a.exe, "exe");
 				const seconds = a.timeoutSec ?? 120;
@@ -162,7 +218,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 			const dest = /[\\/]$/.test(a.dest!) ? a.dest! : a.dest + (a.dest!.includes("/") && !a.dest!.includes("\\") ? "/" : "\\");
 			await call(["guestcontrol", vm, a.action, ...auth, `--target-directory=${dest}`, a.source!], 600_000);
 			return `Copied ${a.source} to ${a.dest} (${a.action === "copyto" ? "guest" : "host"}).`;
-		} finally { await rm(file, { force: true }); }
+		});
 	}
 	if (a.action === "snapshot") {
 		const op = a.op ?? "list";
@@ -195,7 +251,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		await call(["controlvm", vm, op === "attach" ? "usbattach" : "usbdetach", a.device!]);
 		return `${op === "attach" ? "Attached" : "Detached"} ${a.device} ${op === "attach" ? "to" : "from"} ${vm}.`;
 	}
-	throw new Error("action must be list, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
+	throw new Error("action must be list, status, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
 }
 
 export const vmActTool = () => ({
@@ -209,7 +265,7 @@ export const vmActTool = () => ({
 	],
 	description: [
 		"Control a VirtualBox VM (VBoxManage). vm defaults to workOrchestrator.vm in .pi/settings.json ({vm, user, passwordEnv}), else the only running VM. Screenshots: screen_read target=vm.",
-		"list: VMs, running state. keys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
+		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD. keys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
 		"click: x,y in screen_read target=vm source pixels; button left (default), right or middle; double.",
 		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); admin rights only as the built-in Administrator (UAC filters every other admin: VERR_PROC_ELEVATION_REQUIRED); waits up to timeoutSec (120) and returns exit code and output. run has no loaded user profile, so MSIX/AppX installs fail (0x80070002); for those, run powershell as Administrator that registers a scheduled task (New-ScheduledTaskPrincipal -UserId Administrator -LogonType S4U -RunLevel Highest), starts it and waits for it. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
 		"snapshot: op list (default), take or restore with name; restore powers off a running configured VM, restores and starts it headless. usb: op list (default), attach or detach with device (UUID or address).",
@@ -217,7 +273,7 @@ export const vmActTool = () => ({
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
-			action: { type: "string", enum: ["list", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
+			action: { type: "string", enum: ["list", "status", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
 			vm: { type: "string" }, keys: { type: "string" }, text: { type: "string" }, textFromEnv: { type: "string" },
 			x: { type: "integer", minimum: 0 }, y: { type: "integer", minimum: 0 }, button: { type: "string", enum: ["left", "right", "middle"] }, double: { type: "boolean" },
 			exe: { type: "string" }, args: { type: "array", items: { type: "string" } }, user: { type: "string" }, passwordEnv: { type: "string" }, timeoutSec: { type: "integer", minimum: 1, maximum: 3600 },
