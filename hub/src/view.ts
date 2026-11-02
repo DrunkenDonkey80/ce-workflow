@@ -52,7 +52,7 @@ export class SessionView {
 	private queue: Record<"steering" | "followUp", string[]> = { steering: [], followUp: [] };
 	private sequence = 0;
 	hydrated = false;
-	private readonly session: { file: () => string | undefined; idle: () => boolean; viewers?: (count: number) => void; forms?: () => Record<string, unknown>[] };
+	private readonly session: { file: () => string | undefined; idle: () => boolean; subagents?: () => unknown[]; viewers?: (count: number) => void; forms?: () => Record<string, unknown>[] };
 
 	constructor(session: SessionView["session"]) {
 		this.session = session;
@@ -118,7 +118,8 @@ export class SessionView {
 	}
 
 	snapshot(extra: Record<string, unknown> = {}) {
-		const value = checkIn(this.chat, this.activity.snapshot(this.ctx), this.session.forms?.() ?? [], extra);
+		// The hub's mirror cannot poll pi-subagents (no pi.events); the child's published pi-hub:state has the list.
+		const value = checkIn(this.chat, { ...this.activity.snapshot(this.ctx), subagents: this.session.subagents?.() ?? [] }, this.session.forms?.() ?? [], extra);
 		return { ...value, more: value.more || this.olderInFile };
 	}
 

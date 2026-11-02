@@ -108,6 +108,12 @@ try {
 	const after = (await get(record.id, "snapshot")).body;
 	assert.deepEqual(after.chat.slice(-2).map(row => row.text), ["hi", "echo: hi"], "snapshot endpoint");
 	assert(!JSON.stringify(after).includes("SYSTEM PROMPT"));
+	// Background subagents after the run: the page hears the child's published list live and in snapshots (top bar Subagents…).
+	await hub.host.prompt(record.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: false, subagents: [{ id: "r1", label: "researcher", state: "running" }] })}`);
+	await stream.next(frame => frame.event === "activity" && frame.data.subagents?.[0]?.id === "r1");
+	assert.equal((await get(record.id, "snapshot")).body.activity.subagents[0]?.id, "r1");
+	await hub.host.prompt(record.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: false, subagents: [] })}`);
+	await stream.next(frame => frame.event === "activity" && Array.isArray(frame.data.subagents) && !frame.data.subagents.length);
 
 	// Reconnect: a second stream starts from a fresh snapshot that has the new rows.
 	stream.close();

@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.22 — 2026-11-02
 
 ### Changed
 - Turning a tool on or off mid-session no longer throws away Claude's prompt cache: ce-workflow now leaves Pi's tool and prompt updates where they are instead of folding them into the start of the prompt. In a test session that enabled one tool this cut the cost by about a fifth.
@@ -11,6 +11,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - ask_user no longer fails when a batch call also sends `context`, `options` or similar fields at the top level; they are ignored (pi-ask-user 0.17.2).
 - ask_user option rows with emoji or CJK text now wrap to the terminal width instead of running past it.
 - The hub's background git status checks no longer take git's index lock, so they can no longer make a commit fail with "index.lock: File exists".
+- The hub page now lists the session's running subagents.
+- browser_act no longer loses its tab when a password manager (Proton Pass, 1Password, LastPass, Bitwarden) adds its autofill frame: fields are marked for the password manager to skip, and attaching retries a few times.
 
 ## 0.2.21 — 2026-11-01
 

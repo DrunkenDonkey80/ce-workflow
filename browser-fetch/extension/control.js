@@ -6,7 +6,15 @@ let nextControlRule = 2_000_000;
 let ACT_MS = 45_000; // below Pi's 60 s wait; a hung CDP call must not wedge the session queue
 const KEEP = new Set(["button", "link", "textbox", "searchbox", "checkbox", "radio", "combobox", "listbox", "option", "menuitem", "menuitemcheckbox", "menuitemradio", "tab", "switch", "slider", "spinbutton", "treeitem", "heading"]);
 // D19: links and forms that would open a new tab load in the agent tab instead, where the navigation rules apply.
+// Also marks every form and field with the password managers' own "ignore me" attributes (Proton Pass, 1Password, LastPass, Bitwarden),
+// so they add no autofill frame: Chrome drops the debugger the moment another extension's frame appears (target_closed).
 const SAME_TAB = `(() => {
+	if (window.__piSameTab) return; window.__piSameTab = true;
+	const FIELDS = "form, input, textarea, select";
+	const mark = el => { for (const name of ["data-protonpass-ignore", "data-1p-ignore", "data-lpignore", "data-bwignore"]) if (!el.hasAttribute(name)) el.setAttribute(name, "true"); };
+	const scan = node => { if (node.nodeType !== 1) return; if (node.matches(FIELDS)) mark(node); node.querySelectorAll(FIELDS).forEach(mark); };
+	new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(scan))).observe(document, { childList: true, subtree: true });
+	if (document.documentElement) scan(document.documentElement);
 	window.open = url => { if (url) location.href = new URL(url, location.href).href; return null; };
 	const fix = event => { const el = event.target?.closest?.("a[target], area[target], form[target]"); if (el) el.target = "_self"; };
 	addEventListener("click", fix, true); addEventListener("submit", fix, true);
@@ -184,16 +192,21 @@ async function openTab(s) {
 	await attach(s);
 }
 async function attach(s) {
-	try { await chrome.debugger.attach({ tabId: s.tab }, "1.3"); }
-	catch (error) {
-		if (!FOREIGN.test(String(error?.message))) throw error;
-		await stripForeignFrames(s);
-		await chrome.debugger.attach({ tabId: s.tab }, "1.3");
+	for (let attempt = 0; ; attempt++) {
+		try { await chrome.debugger.attach({ tabId: s.tab }, "1.3"); break; }
+		catch (error) {
+			const message = String(error?.message ?? error);
+			if (!FOREIGN.test(message)) throw error;
+			if (attempt >= 3) throw blocked(message);
+			await stripForeignFrames(s); // a password manager may put its frame straight back: retry a few times
+			if (attempt) await sleep(150 * 2 ** attempt);
+		}
 	}
 	s.inflight = new Map();
 	await cdp(s, "Page.enable");
 	await cdp(s, "Network.enable").catch(() => {}); // only to know when the page stops loading data
 	await cdp(s, "Page.addScriptToEvaluateOnNewDocument", { source: SAME_TAB });
+	await cdp(s, "Runtime.evaluate", { expression: SAME_TAB }).catch(() => {}); // a reattach lands on a page already loaded
 	await cdp(s, "Emulation.setFocusEmulationEnabled", { enabled: true }); // still gets focus and input after the user switches away
 }
 /** Chrome swapped the tab's page (a new process, a prerendered page) and dropped the debugger: attach again to the same or replacing tab. */

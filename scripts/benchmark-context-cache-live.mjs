@@ -53,9 +53,9 @@ function scaffold(cwd) {
 	mkdirSync(cwd, { recursive: true });
 	writeFileSync(path.join(cwd, "package.json"), '{"name":"greet","private":true,"type":"module"}\n');
 	execFileSync("git", ["init", "-q", "-b", "master"], { cwd });
-	// ultracompact: filteredContext appends knowledge every turn (ultrafull changes the list only for images or the compaction nudge).
+	// ultrafull, the default mode going forward: filteredContext changes the list only for images or the compaction nudge.
 	mkdirSync(path.join(cwd, ".pi"), { recursive: true });
-	writeFileSync(path.join(cwd, ".pi", "settings.json"), '{"workOrchestrator":{"context":{"mode":"ultracompact","enabled":true,"autoCompact":true}}}\n');
+	writeFileSync(path.join(cwd, ".pi", "settings.json"), '{"workOrchestrator":{"context":{"mode":"ultrafull","enabled":true,"autoCompact":true}}}\n');
 	// A live project-knowledge claim makes filteredContext append its knowledge message, as in real ce-workflow repos.
 	recordKnowledge(cwd, { claim: "greet.mjs is an ES module; greet(name) and farewell(name) return template strings.", kind: "fact", scope: "project", authority: "observed", paths: ["greet.mjs"] });
 }

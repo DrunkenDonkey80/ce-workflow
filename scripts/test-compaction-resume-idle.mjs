@@ -6,7 +6,7 @@
 // is retired. The single module instance below exercises its dormant ownership
 // guard through real host events, with positive and unknown-child controls.
 //
-// Usage: node scripts/test-compaction-resume-idle.mjs [--model provider/id] [--compaction-mode ultracompact|ultrafull] [--keep]
+// Usage: node scripts/test-compaction-resume-idle.mjs [--model provider/id] [--compaction-mode ultrafull|ultracompact] [--keep]
 import { execSync, spawn } from "node:child_process";
 import {
 	appendFileSync,
@@ -27,7 +27,7 @@ const model =
 		? "openai-codex/gpt-5.6-luna"
 		: argv[argv.indexOf("--model") + 1];
 const compactionMode = argv.includes("--compaction-mode")
-	? argv[argv.indexOf("--compaction-mode") + 1] : "ultracompact";
+	? argv[argv.indexOf("--compaction-mode") + 1] : "ultrafull";
 if (!["ultracompact", "ultrafull"].includes(compactionMode))
 	throw new Error("--compaction-mode must be ultracompact or ultrafull");
 const keep = argv.includes("--keep");

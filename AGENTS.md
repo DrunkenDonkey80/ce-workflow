@@ -38,7 +38,11 @@ non-TUI modes.
 
 ## Fast Commit-and-Push Rule
 
-For direct commit-and-push requests, use this path: one parallel preflight (`status`, `diff --stat`, branch/remote); inspect only unexpected or sensitive untracked files and never stage credentials; run one batched LSP check plus the smallest relevant tests; stage tracked changes with `git add -u`, then commit and push `master`; finish with one status/ahead check. If status and diff disagree, use `git diff-index` once instead of repeated probes. Do not create temporary comparison files.
+For direct commit-and-push requests, use this path: one parallel preflight (`status`, `diff --stat`, branch/remote); inspect only unexpected or sensitive untracked files and never stage credentials; run one batched LSP check plus the smallest relevant tests; stage tracked changes with `git add -u`, then commit and push `master`. Changes made by other sessions belong to the commit too: never leave them out as "not mine" (still never stage credentials). Run their targeted tests as well; finish with one status/ahead check. If status and diff disagree, use `git diff-index` once instead of repeated probes. Do not create temporary comparison files.
+
+## Compaction Mode in Tests Rule
+
+Live tests and benchmarks run the `ultrafull` compaction mode (the coming default). Use `ultracompact` only in tests of behavior that exists only in that mode (rolling stripping, the reasoning-strip benchmark) and in tests that cover every mode.
 
 ## Test Scope Rule
 

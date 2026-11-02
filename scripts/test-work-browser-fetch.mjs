@@ -144,7 +144,7 @@ async function roundTrip() {
 	const findNode = (tabId, id) => { const n = nodesOf(tabId).find(entry => entry.id === id); if (!n) throw new Error("No node with given id found"); return n; };
 	const ax = n => ({ nodeId: String(n.id), ignored: n.role === "generic", role: { value: n.role }, name: { value: n.name }, backendDOMNodeId: n.id, ...(n.value ? { value: { value: n.value } } : {}) });
 	const at = (tabId, x, y) => nodesOf(tabId).find(n => n.box && n.role !== "generic" && x >= n.box[0] && x <= n.box[0] + n.box[2] && y >= n.box[1] && y <= n.box[1] + n.box[3]);
-	let focused, hang = false, intercept = false, intruder = 0, openDialog;
+	let focused, hang = false, intercept = false, intruder = 0, openDialog, pageScript;
 	const sendCommand = async ({ tabId }, method, params = {}) => {
 		if (!attached.has(tabId)) throw new Error("Debugger is not attached to the tab");
 		if (intruder) throw new Error("Cannot access a chrome-extension:// URL of different extension");
@@ -183,6 +183,7 @@ async function roundTrip() {
 				if (fn.startsWith("function pickOption")) { const value = params.arguments[0].value; if (!n.options?.includes(value)) return { result: { value: `no option "${value}"` } }; n.value = value; return { result: { value: "" } }; }
 				return { result: {} };
 			}
+			case "Page.addScriptToEvaluateOnNewDocument": pageScript = params.source; return {};
 			case "Runtime.evaluate": return { result: { value: params.expression.includes("iframe") ? ["https://ads.test/f"] : undefined } };
 			case "Page.captureScreenshot": if (hang) return new Promise(() => {}); return { data: Buffer.from([137, 80, 78, 71]).toString("base64") };
 			default: return {};
@@ -384,9 +385,19 @@ async function roundTrip() {
 			assert.match(await go({ action: "snapshot" }), /\[e1\] heading "Shop"/);
 			attached.delete(swapped);
 			listeners.detach.forEach(f => f({ tabId: swapped }, "target_closed"));
-			intruder = 1; // also refuses the reattach itself
+			intruder = 3; // also refuses the reattach itself, putting its frame back after each strip
 			assert.match(await go({ action: "snapshot" }), /\[e1\] heading "Shop"/);
 			assert.ok(attached.has(swapped) && tabs.has(swapped), "the same tab is reattached, not closed");
+			// The page script marks fields, now and as they appear, so password managers add no frame that drops the debugger.
+			const el = (tag, kids = []) => { const attrs = new Map(); return { nodeType: 1, tag, attrs, kids, hasAttribute: n => attrs.has(n), setAttribute: (n, v) => attrs.set(n, v),
+				matches: sel => sel.split(", ").includes(tag), querySelectorAll: sel => kids.flatMap(k => [k, ...k.querySelectorAll(sel)]).filter(k => k.matches(sel)) }; };
+			const early = el("input"), form = el("form", [el("input")]), later = el("div", [form]);
+			let observer;
+			const win = { document: { documentElement: el("html", [early]) }, MutationObserver: class { constructor(f) { observer = f; } observe() {} }, addEventListener() {} };
+			vm.runInNewContext(pageScript, { window: win, ...win, location: {}, URL });
+			observer([{ addedNodes: [later, { nodeType: 3 }] }]);
+			for (const n of [early, form, form.kids[0]]) assert.equal(n.attrs.get("data-protonpass-ignore"), "true");
+			assert.ok(!later.attrs.size, "other elements stay untouched");
 			intruder = 99;
 			await assert.rejects(go({ action: "snapshot" }), /Another browser extension \(a password manager\?\) keeps blocking/);
 			intruder = 0;

@@ -126,6 +126,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		if (!value) views.set(id, value = new SessionView({
 			file: () => registry.get(id)?.sessionFile,
 			idle: () => !host.live.get(id)?.running,
+			subagents: () => { const list = (host.live.get(id)?.published.state as { subagents?: unknown } | undefined)?.subagents; return Array.isArray(list) ? list : []; },
 			viewers: count => { const live = host.live.get(id); if (live) live.viewers = count; },
 			forms: () => pageApi.forms(id),
 		}));
