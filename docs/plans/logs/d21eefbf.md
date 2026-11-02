@@ -76,3 +76,8 @@ Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the link
 - [x] **S08** Session menu item "Link to another hub's session" (D7); the menu shows the session's links, their state and unlink
   - A targeted browser test for the link menu that passes on its own, independent of C3's earlier failure.
   - check: node hub/scripts/test-api.mjs -> "api ok" (links list shape, unknown session 404, pair refused without remote access, unpaired hub 404); LSP: no new errors in hub/web/app.ts or hub/src/api.ts (existing ones at app.ts:120/1944/2002 untouched). Menu not clicked in a browser (C3 fails earlier, pre-existing)
+
+## 2026-11-02T18:00:36.021Z S09 done: No code needed: a stand-in is an ordinary pi-intercom sender, so its messages wake the target as intercom_message runs (quiet, not unseen, auto-park as usual) and parked targets resume through host.resume, the same path as `pi-hub wake`; S11 confirms the quiet run live
+
+- [x] **S09** Inbound messages count as intercom runs (unseen, auto-park) like local intercom; test in C1
+  - check: hub/src/sessions.ts:83-87 classifies runs by the intercom_message type only (sender-independent); node hub/scripts/test-api.mjs -> "api ok" incl. "an intercom-only run stays seen" (test-api.mjs:319-323); link.ts wakeAndSend calls intercom.wake = host.resume, as cli.ts `wake` does via /api/sessions/<id>/resume
