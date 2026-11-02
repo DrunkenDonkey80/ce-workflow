@@ -3,9 +3,9 @@
 import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import path from "node:path";
-import { blockedList, checkUrl, connect, CONTROL_MINUTES, controlUntil, dnsCheck, grantKey, hostManifest, logFetch, readPolicy, updatePolicy, type Link } from "./browser-fetch.ts";
+import { blockedList, checkUrl, connect, CONTROL_MINUTES, controlUntil, dnsCheck, grantKey, installed, logFetch, readPolicy, updatePolicy, type Link } from "./browser-fetch.ts";
 import { showListDialog } from "./ask-user/menu.ts";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 
 const APPROVAL_MS = 300_000, ACTION_MS = 60_000, SNAPSHOT_CHARS = 8000;
 export const ACTIONS = ["open", "snapshot", "find", "wait", "click", "type", "select", "upload", "scroll", "screenshot", "back"] as const;
@@ -395,7 +395,7 @@ export const browserActTool = () => ({
 });
 
 export default function browserActExtension(pi) {
-	if (existsSync(hostManifest())) pi.registerTool?.({ ...browserActTool(), exposure: "deferred" }); // tools_enable declares it
+	if (installed()) pi.registerTool?.({ ...browserActTool(), exposure: "deferred" }); // tools_enable declares it
 	// D7, D20: the agent tab never outlives the Pi session that drives it.
 	for (const event of ["session_shutdown", "session_switch"]) pi.on?.(event, () => closeSession("ended with the Pi session"));
 }

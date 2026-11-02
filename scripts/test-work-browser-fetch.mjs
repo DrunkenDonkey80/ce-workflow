@@ -12,6 +12,7 @@ import { randomUUID } from "node:crypto";
 delete process.env.PI_HUB; // a hub-hosted Pi routes dialogs to the hub; this test drives them locally
 const agent = mkdtempSync(path.join(os.tmpdir(), "browser-fetch-test-"));
 process.env.PI_CODING_AGENT_DIR = agent;
+process.env.PI_BROWSER_FETCH_PIPE = path.join(agent, "no-host.sock"); // never the real browser, nor WSL's Windows one
 const bf = await import("../extensions/browser-fetch.ts");
 const { checkUrl, privateIp, blockedList, readPolicy, updatePolicy, granted, controlUntil, grantKey, blockEntry, dnsCheck, fetchDir, DEFAULT_BLOCKED, extensionId } = bf;
 

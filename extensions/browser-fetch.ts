@@ -1,6 +1,8 @@
 // browser_fetch (plan d8c5ace2): the agent loads pages in the user's own browser through the Pi browser-fetch extension,
 // so bot checks see a real browser. Pi owns the policy (block list, site grants, approvals, log); the browser only loads.
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { Duplex } from "node:stream";
 import { createHash, randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import net from "node:net";
@@ -219,26 +221,66 @@ async function ask(ctx, key: string, url: string, policy: Policy, signal?: Abort
 export type Link = { send(message: Record<string, unknown>): void; handlers: Map<string, (message: any) => void> };
 let link: Promise<Link> | undefined;
 const NOT_CONNECTED = "The browser is not connected: open Helium (or Chrome/Edge) with the Pi browser fetch extension loaded. Set it up in /wo → Settings → Browser access.";
+
+// WSL: a Linux process cannot open the Windows host's named pipe, so Windows node.exe relays it over stdio.
+// It writes one empty line once connected (an empty line is no message), then copies both ways.
+export const wslInterop = () => process.platform === "linux" && existsSync("/proc/sys/fs/binfmt_misc/WSLInterop");
+const RELAY = "const s=require('net').connect('//./pipe/pi-browser-fetch',()=>{process.stdout.write('\\n');process.stdin.pipe(s);s.pipe(process.stdout)});s.on('error',()=>process.exit(1));s.on('close',()=>process.exit(0));process.stdin.on('end',()=>s.end())";
+// shortcut: Windows node.exe and the Windows install are looked for under /mnt/c (default automount); set PI_BROWSER_FETCH_NODE otherwise.
+const windowsNode = () => process.env.PI_BROWSER_FETCH_NODE || "/mnt/c/Program Files/nodejs/node.exe";
+const windowsInstalled = () => { try { return readdirSync("/mnt/c/Users").some(user => existsSync(path.join("/mnt/c/Users", user, ".pi", "agent", "browser-fetch", "host", `${HOST_NAME}.json`))); } catch { return false; } };
+/** Install ran on this machine, or this is WSL and Install ran in Windows (its browser serves the pipe). */
+export const installed = () => existsSync(hostManifest()) || (wslInterop() && !process.env.PI_BROWSER_FETCH_PIPE && windowsInstalled());
+function relay(): Promise<Duplex> {
+	return new Promise((resolve, reject) => {
+		const child = spawn(windowsNode(), ["-e", RELAY], { stdio: ["pipe", "pipe", "ignore"] });
+		child.once("error", () => reject(new Error(NOT_CONNECTED)));
+		child.once("exit", () => reject(new Error(NOT_CONNECTED))); // no-op once connected
+		child.stdout.once("data", (first: Buffer) => {
+			const stream = Duplex.from({ readable: child.stdout, writable: child.stdin });
+			if (first.length > 1) child.stdout.unshift(first.subarray(1));
+			stream.on("error", () => {}).on("close", () => child.kill()); // destroy() reports an AbortError
+			resolve(stream);
+		});
+	});
+}
+/** The host link: the local pipe or socket; in WSL without a Linux host there, the Windows browser's host through the relay. */
+function dial(): Promise<{ socket: Duplex; wsl: boolean }> {
+	return new Promise((resolve, reject) => {
+		const socket = net.connect(pipePath());
+		socket.once("connect", () => resolve({ socket, wsl: false }));
+		socket.once("error", () => wslInterop() && !process.env.PI_BROWSER_FETCH_PIPE ? relay().then(socket => resolve({ socket, wsl: true }), reject) : reject(new Error(NOT_CONNECTED)));
+	});
+}
+/** WSL paths both ways: the Windows host saves images and screenshots under Windows paths and reads upload files by Windows path. */
+const wslPath = (flag: "-u" | "-w", value: string) => { try { return execFileSync("wslpath", [flag, value], { encoding: "utf8" }).trim() || value; } catch { return value; } };
 export function connect(): Promise<Link> {
-	link ??= new Promise<Link>((resolve, reject) => {
-		const socket = net.connect(pipePath()), handlers = new Map<string, (message: any) => void>();
+	link ??= dial().then(({ socket, wsl }) => {
+		const handlers = new Map<string, (message: any) => void>();
 		let buffer = "";
 		socket.setEncoding("utf8");
-		socket.once("connect", () => resolve({ send: message => socket.write(`${JSON.stringify(message)}\n`), handlers }));
 		socket.on("data", chunk => {
 			buffer += chunk;
 			for (let end; (end = buffer.indexOf("\n")) >= 0;) {
 				const line = buffer.slice(0, end);
 				buffer = buffer.slice(end + 1);
-				try { const message = JSON.parse(line); handlers.get(message.id)?.(message); }
-				catch { continue; } // a malformed line from the host belongs to no request
+				try {
+					const message = JSON.parse(line);
+					if (wsl && typeof message.path === "string") message.path = wslPath("-u", message.path);
+					handlers.get(message.id)?.(message);
+				} catch { continue; } // a malformed line from the host belongs to no request
 			}
 		});
-		socket.on("error", () => reject(new Error(NOT_CONNECTED)));
+		socket.on("error", () => {}); // close follows and fails the open requests
 		socket.on("close", () => {
 			link = undefined;
 			for (const handler of handlers.values()) handler({ type: "error", error: "The connection to the browser closed." });
 		});
+		const send = (message: Record<string, unknown>) => {
+			if (wsl && Array.isArray(message.files)) message = { ...message, files: message.files.map(file => typeof file === "string" ? wslPath("-w", file) : file) };
+			socket.write(`${JSON.stringify(message)}\n`);
+		};
+		return { send, handlers };
 	});
 	link.catch(() => { link = undefined; });
 	return link;
@@ -445,11 +487,9 @@ export async function install(exec: (cmd: string, args: string[]) => Promise<{ c
 
 export function connected() {
 	return new Promise<boolean>(done => {
-		const socket = net.connect(pipePath());
-		const finish = (value: boolean) => { socket.destroy(); done(value); };
-		socket.once("connect", () => finish(true));
-		socket.once("error", () => finish(false));
-		setTimeout(() => finish(false), 1000).unref();
+		const dialing = dial(), finish = (value: boolean) => { dialing.then(({ socket }) => socket.destroy(), () => {}); done(value); };
+		dialing.then(() => finish(true), () => finish(false));
+		setTimeout(() => finish(false), wslInterop() ? 5000 : 1000).unref(); // node.exe starts in a second or two
 	});
 }
 
@@ -458,7 +498,7 @@ const until = (grant: Grant) => grant.until === null ? "always" : `until ${new D
 /** /wo → Settings → Browser access (D7). */
 export async function browserAccessMenu(ctx, pi) {
 	for (;;) {
-		const policy = readPolicy(), isConnected = await connected(), registered = existsSync(hostManifest());
+		const policy = readPolicy(), isConnected = await connected(), registered = installed();
 		const grants = Object.entries(policy.grants).filter(([host]) => granted(policy, host));
 		const controls = Object.entries(policy.control).filter(([host]) => controlUntil(policy, host));
 		let version = "unknown";
@@ -516,8 +556,8 @@ export async function browserAccessMenu(ctx, pi) {
 
 export default function browserFetchExtension(pi) {
 	// Only where Install ran (host manifest written); a closed browser still keeps the tool, its error says to open it.
-	if (!existsSync(hostManifest())) return;
+	if (!installed()) return;
 	// Refresh the launcher on every load: a node upgrade can move node's path, and the browser would silently fail to start the old one.
-	try { writeLauncher(); } catch { /* the old launcher stays */ }
+	if (existsSync(hostManifest())) try { writeLauncher(); } catch { /* the old launcher stays */ }
 	pi.registerTool?.(browserFetchTool());
 }
