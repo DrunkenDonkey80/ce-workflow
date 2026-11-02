@@ -2,6 +2,13 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- The hub's model menu has "Set scoped models" below Default / Work / Think: every model with the scoped ones checked on top; type to search, Enter or a click checks or unchecks, Esc clears the search and then goes back. It saves Pi's scoped models for all projects; the hub's lists follow at once, Pi's own Ctrl+P from the next session.
+- `/wo` settings has the same "Set scoped models" below the Plan3 model roles: a checklist of every model with the scoped ones on top. Type to search, Enter checks or unchecks, Esc clears the search and then saves. The model pickers use the new list right away; Pi's own Ctrl+P and /model pick it up in the next session.
+- Research without a question per site: when the agent opens a site from its Google results, the browser approval also offers "Allow all Google result sites for 30 minutes / 1 hour / 2 hours". Until then every site those searches listed opens without asking; other sites, and blocked ones, still ask or stay refused. The grant lives only in that Pi and is never saved.
+
 ## 0.2.22 — 2026-11-02
 
 ### Changed

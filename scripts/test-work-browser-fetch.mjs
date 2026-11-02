@@ -641,6 +641,16 @@ async function roundTrip() {
 
 		await controlRoundTrip();
 		await searchRoundTrip();
+		// Research grant: one answer opens every site the searches listed (a.test, b.test); other sites still ask.
+		let offered = [];
+		const pick = label => ({ cwd: agent, hasUI: true, ui: { notify() {}, select: async (_title, labels) => { offered = labels; return labels.find(l => l.startsWith(label)); } } });
+		await assert.rejects(run(pick("Deny"), { url: "https://plain.test/" }), /denied/);
+		assert.ok(!offered.some(l => /Google result/.test(l)), "only result sites offer the research grant");
+		await assert.rejects(run(quiet, { url: "https://b.test/y" }), /not approved/, "result sites still ask before the grant");
+		await run(pick("Allow all Google result sites for 30 minutes"), { url: "https://a.test/x" });
+		assert.equal((await run(quiet, { url: "https://b.test/y" })).finalUrl, "https://b.test/y", "another result site opens without asking");
+		await assert.rejects(run(quiet, { url: "https://plain.test/" }), /not approved/);
+		assert.equal(granted(readPolicy(), "a.test"), false, "the research grant is never saved");
 	} finally {
 		toHost.end();
 		await sleep(100);
