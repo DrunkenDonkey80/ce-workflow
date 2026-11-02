@@ -1,5 +1,7 @@
 // Inter-hub links: the comm version check (D6), the paired-hub store and loading pi-intercom's client (present, absent, too old).
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -54,11 +56,40 @@ try {
 		const [status, reply] = await hubs[url].links.serve(op, credential ? { "x-hub-link": credential } : {}, JSON.parse(JSON.stringify(body)), login, new Promise(() => {}));
 		return [status, JSON.parse(JSON.stringify(reply))];
 	};
-	for (const [name, url, sessions] of [["pc", "https://pc.t.ts.net:1", ["alpha"]], ["mac", "https://mac.t.ts.net:2", ["beta", "gamma"]]]) {
-		const dataDir = path.join(root, name), devices = createDeviceRegistry(dataDir), pairing = createPairing(devices);
+	// S07: each hub has its own in-memory broker; a session's intercom id is `pi-<record>`, and agents acknowledge receipts.
+	const broker = () => {
+		const clients = new Map(), pending = new Map();
+		class Client extends EventEmitter {
+			async connect(registration, sessionId) { this.info = { ...registration, id: sessionId ?? registration.name }; clients.set(this.info.id, this); }
+			async listSessions() { return [...clients.values()].map(client => client.info); }
+			async disconnect() { clients.delete(this.info.id); this.emit("disconnected"); }
+			send(to, options) {
+				const target = clients.get(to) ?? [...clients.values()].find(client => client.info.name === to), id = options.messageId ?? randomUUID();
+				if (!target) return Promise.resolve({ id, delivered: false, reason: "not connected" });
+				return new Promise(resolve => {
+					const timer = setTimeout(() => { pending.delete(id); resolve({ id, delivered: false, reason: "no receipt" }); }, 1000);
+					pending.set(id, () => { clearTimeout(timer); resolve({ id, delivered: true }); });
+					target.emit("message", this.info, { id, content: { text: options.text }, expectsReply: options.expectsReply, replyTo: options.replyTo });
+				});
+			}
+			sendMessageReceipt({ messageId }) { pending.get(messageId)?.(); pending.delete(messageId); }
+		}
+		const agent = async record => {
+			const client = new Client(), inbox = [];
+			client.on("message", (from, message) => { inbox.push({ from: from.name, ...message }); client.sendMessageReceipt({ messageId: message.id }); });
+			await client.connect({ name: record }, `pi-${record}`);
+			return Object.assign(client, { inbox });
+		};
+		return { Client, clients, agent };
+	};
+	const state = { alpha: { name: "ALPHA", live: true }, beta: { name: "BETA", live: true }, gamma: { name: "GAMMA", live: true } }, woken = [];
+	for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", ["alpha"]], ["mac", "https://mac.t.ts.net:2", ["beta", "gamma"]]]) {
+		const dataDir = path.join(root, name), devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), fake = broker();
 		fs.mkdirSync(dataDir);
-		hubs[url] = { pairing, devices, links: createLinks({ dataDir, devices, pairing, request, self: () => ({ name, url, login }),
-			sessions: () => sessions.map(record => ({ record, name: record.toUpperCase(), folder: "C:/x", live: true })) }) };
+		hubs[url] = { pairing, devices, broker: fake, links: createLinks({ dataDir, devices, pairing, request, self: () => ({ name, url, login }),
+			sessions: () => records.map(record => ({ record, name: state[record].name, folder: "C:/x", live: state[record].live })),
+			intercom: { intercomId: async record => `pi-${record}`, load: async () => ({ IntercomClient: fake.Client }),
+				wake: async record => { woken.push(record); state[record].live = true; hubs[url].agents[record] = await fake.agent(record); } } }), agents: {} };
 	}
 	const [pc, mac] = Object.values(hubs), macUrl = "https://mac.t.ts.net:2";
 	await assert.rejects(pc.links.link("alpha", macUrl, "beta"), /not paired/);
@@ -86,6 +117,52 @@ try {
 	const second = await mac.links.link("gamma", "https://pc.t.ts.net:1", "alpha");
 	assert.deepEqual(await mac.links.unlink(second.id), { ok: true });
 	assert.deepEqual([mac.links.store.list().map(l => l.id), pc.links.store.list().length, mac.links.store.unlinks()], [[made.id], 0, []], "online unlink removes both sides");
+
+	// S07 stand-ins. The next ping tells mac about the unlink it missed (D12).
+	await pc.links.tick();
+	assert.deepEqual([pc.links.store.unlinks(), mac.links.store.list().length], [[], 0], "pending unlink delivered at the next ping");
+	const until = async (check, what) => { for (let i = 0; i < 100 && !await check(); i++) await new Promise(done => setTimeout(done, 20)); assert.ok(await check(), what); };
+	const alpha = pc.agents.alpha = await pc.broker.agent("alpha"), other = await pc.broker.agent("other"), beta = mac.agents.beta = await mac.broker.agent("beta");
+	const link = await pc.links.link("alpha", macUrl, "beta");
+	await Promise.all([pc.links.sync(), mac.links.sync()]);
+	assert.deepEqual([pc.links.standins(), mac.links.standins()], [[{ id: link.id, name: "beta~mac" }], [{ id: link.id, name: "alpha~pc" }]], "D11 names, one stand-in on each hub");
+	assert.equal(pc.broker.clients.get(`hublink-${link.id}`).info.name, "beta~mac", "fixed id per link");
+	// Send: the receipt comes only after the other hub's session took it.
+	assert.equal((await alpha.send("beta~mac", { text: "hello" })).delivered, true);
+	assert.deepEqual(beta.inbox.map(m => [m.from, m.content.text]), [["alpha~pc", "hello"]]);
+	// Ask and reply: same message id across hubs; the reply comes back to the asker as a reply.
+	const asked = await alpha.send("beta~mac", { text: "ping?", expectsReply: true });
+	assert.deepEqual([beta.inbox[1].id, beta.inbox[1].expectsReply], [asked.id, true]);
+	assert.equal((await beta.send("alpha~pc", { text: "pong", replyTo: asked.id })).delivered, true);
+	assert.deepEqual(alpha.inbox.map(m => [m.from, m.content.text, m.replyTo]), [["beta~mac", "pong", asked.id]]);
+	// D9: another local session sees the stand-in but cannot talk through it.
+	assert.equal((await other.send("beta~mac", { text: "sneak" })).delivered, false);
+	assert.match(other.inbox[0].content.text, /beta~mac is linked to ALPHA, not to this session; not forwarded/);
+	assert.equal(beta.inbox.length, 2, "nothing crossed");
+	// A parked target is resumed and gets the message once it joins intercom.
+	state.beta.live = false; await beta.disconnect();
+	assert.equal((await alpha.send("beta~mac", { text: "wake up" })).delivered, true);
+	await until(() => mac.agents.beta.inbox.some(m => m.content.text === "wake up"), "delivered after resume");
+	assert.deepEqual(woken, ["beta"]);
+	// D13: the other hub is unreachable: the sender is told why and the stand-in disconnects; a good ping brings it back.
+	offline.add(macUrl);
+	assert.equal((await alpha.send("beta~mac", { text: "lost" })).delivered, false);
+	assert.match(alpha.inbox.at(-1).content.text, /Not delivered to beta~mac: mac hub unreachable/);
+	await pc.links.sync();
+	assert.deepEqual([pc.links.standins(), pc.links.linksOf("alpha")[0].online, pc.links.state().hubs[0].online], [[], false, false]);
+	offline.delete(macUrl);
+	await pc.links.tick();
+	assert.deepEqual(pc.links.standins().map(s => s.name), ["beta~mac"], "reconnected with the same name");
+	// D11 rename through ping; the link removed on mac reaches pc's sender as a cause.
+	state.beta.name = "Reviewer";
+	await pc.links.tick();
+	assert.deepEqual(pc.links.standins().map(s => s.name), ["reviewer~mac"]);
+	mac.links.store.remove(link.id); await mac.links.sync();
+	assert.equal((await alpha.send("reviewer~mac", { text: "gone?" })).delivered, false);
+	assert.match(alpha.inbox.at(-1).content.text, /the link was removed on mac/);
+	await Promise.all([pc.links.stop(), mac.links.stop()]);
+	assert.equal(pc.broker.clients.has(`hublink-${link.id}`), false, "stop disconnects stand-ins");
+
 	fs.writeFileSync(pc.links.store.file, "{");
 	assert.throws(() => pc.links.store.list(), /corrupt/, "a corrupt link list fails closed");
 } finally {

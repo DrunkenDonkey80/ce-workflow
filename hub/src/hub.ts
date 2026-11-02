@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { stripTypeScriptTypes } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { Registry, hubDataDir, writeJsonAtomic } from "./registry.ts";
+import { Registry, hubDataDir, readSessionSummary, writeJsonAtomic } from "./registry.ts";
 import { SessionHost } from "./sessions.ts";
 import { SessionView } from "./view.ts";
 import { createPageApi } from "./api.ts";
@@ -112,7 +112,9 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	let tailnet: Tailnet | undefined, serving = false, remoteError: string | undefined, importError: string | undefined;
 	// Inter-hub links (plan d21eefbf): pairing with other hubs over the tailnet; this hub's address exists only while serving.
 	const openApproval = () => { if (Date.now() - lastLocalPoll > 20_000) { lastLocalPoll = Date.now(); openUrl(`http://127.0.0.1:${config.port}/?token=${config.localKey}`); } };
-	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, sessions: () => registry.list().map(record => ({ record: record.id, name: record.name, folder: record.folder, live: host.live.has(record.id) })), self: () => serving && tailnet?.host && tailnet.login ? { name: os.hostname(), url: `https://${tailnet.host}:${config.port}`, login: tailnet.login } : undefined });
+	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, sessions: () => registry.list().map(record => ({ record: record.id, name: record.name, folder: record.folder, live: host.live.has(record.id) })),
+		// A record's intercom id is its Pi session id (D10), read from the session file at each delivery.
+		intercom: { intercomId: async id => { const file = registry.get(id)?.sessionFile; return file ? (await readSessionSummary(file).catch(() => null))?.sessionId : undefined; }, wake: id => host.resume(id) }, self: () => serving && tailnet?.host && tailnet.login ? { name: os.hostname(), url: `https://${tailnet.host}:${config.port}`, login: tailnet.login } : undefined });
 	// H6-02: a corrupt or busy old registry is skipped (nothing imported) and retried at the next start.
 	const imported = await devices.importFrom(path.join(agentDir(), "ce-workflow", "remote", "devices.json")).catch(error => { importError = `Paired devices not imported: ${(error as Error).message}`; return 0; });
 	async function applyRemote() {
@@ -447,6 +449,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	writeJsonAtomic(markerPath(), { pid: process.pid, port: config.port, startedAt: Date.now() } satisfies HubMarker);
 	if (config.remote) await applyRemote().catch(error => { remoteError = (error as Error).message; });
 	host.checkTerminals(); // a terminal closed while the hub was down
+	links.start();
 	const restored = await host.restoreRunning(); // D17
 	void usage?.start().catch(error => console.error(`usage: ${(error as Error).message}`));
 	pool?.start();
@@ -485,6 +488,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		return closing ??= (async () => {
 			clearInterval(timer); clearInterval(ticks); clearInterval(appTimer); clearTimeout(pruneStart); clearInterval(pruneTimer); usage?.stop(); pool?.stop(); updates?.stop();
 			pairing.close();
+			await links.stop();
 			if (serving) await serveRemove(run, config.port); // no forgotten mapping while the hub is down
 			for (const value of views.values()) value.close();
 			await host.shutdown();

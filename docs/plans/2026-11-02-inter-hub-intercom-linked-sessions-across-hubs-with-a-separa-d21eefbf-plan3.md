@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-02
-updated: 2026-11-02T17:51:52.510Z
+updated: 2026-11-02T17:57:39.958Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -154,7 +154,7 @@ Operations:
 - `pair-status` `{ comm, id }` — waits up to 10 s like today. Reply `{ comm, state, credential? }`; the credential arrives once, on `approved`.
 - `pair-finish` `{ comm, offer, hub: { name, url } }` (with the new credential) — `offer` is a hub credential the caller just issued in its own registry, so one approval pairs both directions (D8). The target stores the caller as a paired hub. If this fails, the caller revokes `offer`.
 - `sessions` `{ comm }` — for the user's link picker only (D7). Reply `{ comm, hub: <hostname>, sessions: [{ record, name, folder, live }] }`.
-- `link` `{ comm, link: { id, from: { record, name }, to: { record } } }` — the receiver stores the link and starts its stand-in for `from`. Reply `{ comm, session: { name } }` (the linked session's name, for the caller's stand-in; S07 adds `name`, the stand-in name the receiver chose, D11). The calling hub is the paired hub its credential was issued to (`peers.json` `device`), never a URL in the body; a link id another hub owns is refused. The caller stores the link only after this succeeds; if storing fails, it sends `unlink`.
+- `link` `{ comm, link: { id, from: { record, name }, to: { record } } }` — the receiver stores the link and starts its stand-in for `from`. Reply `{ comm, name, session: { name } }`: `name` is the stand-in name the receiver chose (D11), `session.name` the linked session's name for the caller's stand-in. The calling hub is the paired hub its credential was issued to (`peers.json` `device`), never a URL in the body; a link id another hub owns is refused. The caller stores the link only after this succeeds; if storing fails, it sends `unlink`.
 - `unlink` `{ comm, link }` — removes the link and its stand-in, only when it belongs to the calling hub. Unknown link ids succeed, so retries are safe (D12).
 - `deliver` `{ comm, link, message: { id, text, expectsReply?, replyTo? } }` — send, ask and reply in one operation; the message id is kept across hubs (S01). The receiver checks the link exists, sends from its stand-in to the linked record's current intercom id (D10) and replies `{ comm, delivered: true }` after its own broker's delivery result. Errors: 404 `not-linked`, 410 `session-gone` (record deleted), 502 `not-delivered` with pi-intercom's reason.
 - `ping` `{ comm }` — reply `{ comm, hub, links: [{ id, name }] }`; carries renames (D11) and lets each side drop links the other no longer has (D12).
@@ -193,8 +193,7 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 - [x] **S04** hub/src/link.ts: COMM=1 with commMismatch (D6 message), peers.json store failing closed, jiti loader for pi-intercom's client with present/absent/too-old reasons; hub/scripts/test-link.mjs covers them
 - [x] **S05** Hub pairing: hub-kind credentials in the device registry (never open session pages; browser cookies never open /link/), /link/ dispatch before Origin/cookie rules, pair-start/status/finish, local /api/hubs and /api/hubs/pair
 - [x] **S06** Links: links.json store (fails closed, pending unlinks for D12), /link/ sessions/link/unlink with the caller known by its credential, local API (hub sessions, session links, link, unlink); both hubs store each link
-- [ ] **S07** Stand-in sessions in the local broker; forward send, ask and reply; offline stand-ins fail fast
-  - Refuse messages from any session but the linked one with a readable error, before forwarding (D9).
+- [x] **S07** Stand-ins: one pi-intercom session per link (hublink-<id>, D11 name), forward send/ask/reply via deliver with the 3 s receipt rule, D9 refusal, parked targets resumed, 30 s ping (offline/reconnect, renames, D12 cleanup and unlink retry); hub wires intercom id from the session file and resume
 - [ ] **S08** Session menu item "Link to another hub's session" (D7); the menu shows the session's links, their state and unlink
   - A targeted browser test for the link menu that passes on its own, independent of C3's earlier failure.
 - [ ] **S09** Inbound messages count as intercom runs (unseen, auto-park) like local intercom; test in C1

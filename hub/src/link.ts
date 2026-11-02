@@ -10,6 +10,8 @@ import type { createDeviceRegistry, createPairing } from "./remote.ts";
 import { agentDir } from "./rpc-client.ts";
 
 export const COMM = 1;
+/** S02 deadlines: a forwarded message must be confirmed inside pi-intercom's 5 s receipt window; hubs ping every 30 s. */
+const DELIVER_MS = 3_000, PING_MS = 30_000;
 
 /** null when the peer speaks this hub's comm; otherwise a message naming both numbers and which hub to update. */
 export function commMismatch(theirs: unknown, peer: string, mine = COMM): string | null {
@@ -72,6 +74,8 @@ export function createLinks(options: {
 	sessions: () => { record: string; name: string; folder: string; live: boolean }[];
 	onPairing?: () => void;
 	request?: LinkRequest;
+	/** Stand-ins (S07): a record's current intercom id (D10), resuming a parked record, and the pi-intercom client loader. */
+	intercom?: { intercomId: (record: string) => Promise<string | undefined>; wake?: (record: string) => Promise<unknown>; load?: () => Promise<IntercomLoad> };
 }) {
 	const { devices, pairing, self, sessions, request = fetchRequest } = options, peers = createPeers(options.dataDir), store = createLinkStore(options.dataDir);
 	let outgoing: { url: string; code?: string; state: string; error?: string } | undefined;
@@ -80,7 +84,7 @@ export function createLinks(options: {
 	/** Answers one `/link/<op>` after the hub checked the tailnet owner; credential, then comm, then payload. */
 	async function serve(op: string, headers: Headers, data: unknown, login: string, closed: Promise<unknown>): Promise<Reply> {
 		if (!data || typeof data !== "object" || Array.isArray(data)) return fail(400, "Expected a JSON object.");
-		const body = data as { comm?: unknown; id?: unknown; offer?: unknown; hub?: { name?: unknown; url?: unknown }; link?: unknown }, open = op === "pair-start" || op === "pair-status";
+		const body = data as { comm?: unknown; id?: unknown; offer?: unknown; hub?: { name?: unknown; url?: unknown }; link?: unknown; message?: unknown }, open = op === "pair-start" || op === "pair-status";
 		const credential = headers["x-hub-link"], device = typeof credential === "string" ? credential.split(".")[0] : "";
 		if (!open && !(typeof credential === "string" && await devices.check(credential, login, "hub"))) return fail(401, "unpaired");
 		// After pair-finish the caller is the paired hub its credential was issued to.
@@ -114,13 +118,33 @@ export function createLinks(options: {
 				if (existing && existing.hub !== caller!.url) return fail(409, "link id taken");
 				const target = sessions().find(session => session.record === link.to!.record);
 				if (!target) return fail(410, "session-gone");
-				store.add({ id: link.id, session: target.record, hub: caller!.url, remote: { record: link.from.record, name: cleanName(link.from.name) || "session" }, created: Date.now() });
-				return [200, { comm: COMM, session: { name: target.name } }];
+				const made: Link = { id: link.id, session: target.record, hub: caller!.url, remote: { record: link.from.record, name: cleanName(link.from.name) || "session" }, created: Date.now() };
+				store.add(made);
+				void sync();
+				return [200, { comm: COMM, name: standinName(made), session: { name: target.name } }];
 			}
 			if (op === "unlink") {
 				if (typeof body.link !== "string") return fail(400, "link required.");
-				if (store.list().some(other => other.id === body.link && other.hub === caller!.url)) store.remove(body.link);
+				if (store.list().some(other => other.id === body.link && other.hub === caller!.url)) { store.remove(body.link); void sync(); }
 				return [200, { comm: COMM }];
+			}
+			// A call from a hub proves it is back: its stand-ins reconnect (D13).
+			misses.delete(caller!.url);
+			if (offline.delete(caller!.url)) await sync();
+			if (op === "ping") return [200, { comm: COMM, hub: self()?.name, links: store.list().filter(item => item.hub === caller!.url).map(item => ({ id: item.id, name: sessions().find(s => s.record === item.session)?.name ?? "" })) }];
+			if (op === "deliver") {
+				const message = body.message as { id?: unknown; text?: unknown; expectsReply?: unknown; replyTo?: unknown } | undefined;
+				if (typeof message?.id !== "string" || message.id.length > 100 || typeof message.text !== "string" || (message.replyTo !== undefined && typeof message.replyTo !== "string")) return fail(400, "message.id and message.text required.");
+				const link = store.list().find(item => item.id === body.link && item.hub === caller!.url);
+				if (!link) return fail(404, "not-linked");
+				const local = sessions().find(s => s.record === link.session), standin = standins.get(link.id);
+				if (!local) return fail(410, "session-gone");
+				if (!standin) return fail(502, "not-delivered", { reason: unavailable ?? "its stand-in is not connected" });
+				const send = { text: message.text, messageId: message.id, ...(message.expectsReply === true ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) };
+				if (!local.live) { void wakeAndSend(link, standin, send, local.name); return [200, { comm: COMM, delivered: true, resuming: true }]; }
+				const target = await options.intercom!.intercomId(link.session);
+				const result = target ? await standin.client.send(target, send).catch((error: Error) => ({ delivered: false, reason: error.message })) : { delivered: false, reason: "it has no intercom session" };
+				return result.delivered ? [200, { comm: COMM, delivered: true }] : fail(502, "not-delivered", { reason: result.reason ?? "not delivered" });
 			}
 		} catch (error) {
 			return fail((error as { status?: number }).status ?? 500, (error as Error).message);
@@ -184,6 +208,7 @@ export function createLinks(options: {
 		const made: Link = { id, session, hub: url, remote: { record, name: cleanName((reply[1].session as { name?: unknown } | undefined)?.name) || "session" }, created: Date.now() };
 		// Stored there but not here: take it back there, so no half link stays.
 		try { store.add(made); } catch (failure) { await call(url, "unlink", { link: id }); throw failure; }
+		void sync();
 		return made;
 	}
 
@@ -191,22 +216,128 @@ export function createLinks(options: {
 	async function unlink(id: string) {
 		const removed = store.remove(id, true);
 		if (!removed) return { ok: false };
+		void sync();
 		const { error } = await call(removed.hub, "unlink", { link: id }).catch(failure => ({ error: (failure as Error).message }));
 		if (!error) store.confirmed(id);
 		return { ok: true, ...(error ? { pending: error } : {}) };
+	}
+
+	// S07 stand-ins (D9-D13): one pi-intercom session per link, named for the other side, while that hub is online.
+	type Standin = { link: Link; name: string; client: any };
+	const standins = new Map<string, Standin>(), offline = new Set<string>(), misses = new Map<string, number>();
+	let unavailable: string | undefined, client: Promise<IntercomLoad> | undefined, syncing = Promise.resolve(), ticking = false, timer: NodeJS.Timeout | undefined;
+	const safe = (text: string) => text.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "session";
+	function standinName(link: Link) {
+		const hub = safe(peers.get(link.hub)?.name ?? link.hub.slice(8).split(".")[0]), plain = `${safe(link.remote.name)}~${hub}`;
+		// shortcut: collisions checked against this hub's sessions and stand-ins only, not other intercom sessions on the machine; upgrade if names clash in practice.
+		const taken = new Set([...sessions().map(s => s.name.toLowerCase()), ...[...standins.values()].filter(s => s.link.id !== link.id).map(s => s.name)]);
+		return taken.has(plain) ? `${safe(link.remote.name)}-${link.remote.record.slice(0, 4)}~${hub}` : plain;
+	}
+
+	/** Starts and stops stand-ins to match the links whose hub is online; serialized, never throws. */
+	const sync = () => syncing = syncing.then(async () => {
+		let links: Link[] = [];
+		try { links = store.list(); } catch { /* corrupt list: every stand-in off */ }
+		const wanted = new Map(links.filter(item => !offline.has(item.hub) && peers.get(item.hub)).map(item => [item.id, item]));
+		for (const [id, standin] of standins) if (wanted.get(id)?.remote.name !== standin.link.remote.name) { standins.delete(id); await standin.client.disconnect().catch(() => {}); }
+		if (!wanted.size || !options.intercom) return;
+		const loaded = await (client ??= (options.intercom.load ?? loadIntercom)());
+		unavailable = loaded.unavailable;
+		if (!loaded.IntercomClient) return;
+		for (const link of wanted.values()) if (!standins.has(link.id)) {
+			const standin: Standin = { link, name: standinName(link), client: new loaded.IntercomClient() }, now = Date.now();
+			standin.client.on("message", (from: { id: string }, message: any) => void forward(standin, from, message).catch(() => {}));
+			standin.client.on("error", () => {});
+			standin.client.on("disconnected", () => { if (standins.get(link.id) === standin) standins.delete(link.id); });
+			try {
+				// A fixed id per link: a reconnect gets pi-intercom's mailbox for plain sends made while offline (D11, D13).
+				await standin.client.connect({ cwd: link.hub, model: "hub-link", pid: process.pid, startedAt: now, lastActivity: now, name: standin.name, status: "idle", acknowledgesReceipts: true }, `hublink-${link.id}`);
+				standins.set(link.id, standin);
+			} catch { /* broker not running: the next ping retries */ }
+		}
+	}).catch(() => {});
+
+	/** A local message to a stand-in: only its linked session's crosses (D9); the receipt waits for the other hub (S02). */
+	async function forward({ link, name, client }: Standin, from: { id: string }, message: { id: string; content?: { text?: string }; expectsReply?: boolean; replyTo?: string }) {
+		const local = sessions().find(s => s.record === link.session), tell = (text: string) => client.send(from.id, { text }).catch(() => {});
+		if (!local || from.id !== await options.intercom!.intercomId(link.session)) return void tell(`${name} is linked to ${local?.name ?? "another session"}, not to this session; not forwarded.`);
+		const peer = peers.get(link.hub)?.name ?? link.hub;
+		const sent = await Promise.race([
+			call(link.hub, "deliver", { link: link.id, message: { id: message.id, text: message.content?.text ?? "", ...(message.expectsReply ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) } }),
+			new Promise<undefined>(done => setTimeout(done, DELIVER_MS)),
+		]).catch(() => undefined);
+		if (sent && !sent.error) return client.sendMessageReceipt({ messageId: message.id, status: "receiver_received", timestamp: Date.now() });
+		const code = sent?.reply[1].error, reason = sent?.reply[1].reason;
+		const cause = !sent ? `${peer} hub did not answer within ${DELIVER_MS / 1000} s` : code === "not-linked" ? `the link was removed on ${peer}`
+			: code === "session-gone" ? `${link.remote.name} on ${peer} was closed` : code === "not-delivered" ? `${link.remote.name} on ${peer} did not take it (${reason})` : sent.error!;
+		// The cause first, while this stand-in is still connected; then an unreachable hub takes its stand-ins offline (D13).
+		await tell(`Not delivered to ${name}: ${cause}.`);
+		if (!sent || sent.reply[0] === 502 && code !== "not-delivered") { offline.add(link.hub); void sync(); }
+	}
+
+	/** A parked target: resume it, wait until it joins intercom (60 s), then send; a failure goes back as a message. */
+	async function wakeAndSend(link: Link, standin: Standin, send: Record<string, unknown>, localName: string) {
+		try {
+			await options.intercom!.wake?.(link.session);
+			let target: string | undefined;
+			for (const until = Date.now() + 60_000; Date.now() < until; await new Promise(done => setTimeout(done, 1000))) {
+				const id = await options.intercom!.intercomId(link.session);
+				if (id && (await standin.client.listSessions()).some((s: { id: string }) => s.id === id)) { target = id; break; }
+			}
+			if (!target) throw new Error(`${localName} did not join intercom within 60 s`);
+			const result = await standin.client.send(target, send);
+			if (!result.delivered) throw new Error(result.reason ?? "not delivered");
+		} catch (error) {
+			await call(link.hub, "deliver", { link: link.id, message: { id: randomUUID(), text: `Not delivered to ${localName}: ${(error as Error).message}.` } }).catch(() => {});
+		}
+	}
+
+	/** Every 30 s: ping each linked hub; two misses take its stand-ins offline, a success brings them back, carries renames
+	 * (D11), drops links the other hub no longer has and retries unconfirmed unlinks (D12). */
+	async function tick() {
+		if (ticking) return;
+		ticking = true;
+		try {
+			const links = store.list(), unlinks = store.unlinks();
+			for (const url of new Set([...links.map(item => item.hub), ...unlinks.map(item => item.hub)])) {
+				if (!peers.get(url)) continue;
+				const { reply, error } = await call(url, "ping", {});
+				if (error) { const missed = (misses.get(url) ?? 0) + 1; misses.set(url, missed); if (missed >= 2) offline.add(url); continue; }
+				misses.delete(url); offline.delete(url);
+				const theirs = new Map((Array.isArray(reply[1].links) ? reply[1].links : []).map((item: { id: string; name: unknown }) => [item.id, cleanName(item.name)]));
+				for (const link of links.filter(item => item.hub === url)) {
+					const name = theirs.get(link.id);
+					// A minute's grace: the hub that started a link stores it just after this one.
+					if (name === undefined) { if (Date.now() - link.created > 60_000) store.remove(link.id); }
+					else if (name && name !== link.remote.name) store.add({ ...link, remote: { ...link.remote, name } });
+				}
+				for (const item of unlinks.filter(u => u.hub === url)) if (!(await call(url, "unlink", { link: item.id })).error) store.confirmed(item.id);
+			}
+		} catch { /* corrupt list or unpaired hub: nothing to ping */ } finally { ticking = false; }
+		await sync();
 	}
 
 	return {
 		serve,
 		pairWith,
 		remoteSessions,
+		tick,
+		sync,
+		standins: () => [...standins.values()].map(({ link, name }) => ({ id: link.id, name })),
+		start() { void tick(); timer = setInterval(() => void tick(), PING_MS); timer.unref(); },
+		async stop() {
+			clearInterval(timer);
+			await syncing;
+			await Promise.all([...standins.values()].map(standin => standin.client.disconnect().catch(() => {})));
+			standins.clear();
+		},
 		link,
 		unlink,
 		/** A session's links with their hub names, for its menu (D7). */
-		linksOf: (session: string) => store.list().filter(item => item.session === session).map(item => ({ ...item, hubName: peers.get(item.hub)?.name ?? item.hub })),
+		linksOf: (session: string) => store.list().filter(item => item.session === session).map(item => ({ ...item, hubName: peers.get(item.hub)?.name ?? item.hub, online: !offline.has(item.hub), standin: standins.get(item.id)?.name ?? null })),
 		store,
 		/** For the local page: paired hubs (no credentials) and the pairing in progress. */
-		state: () => ({ comm: COMM, hubs: peers.list().map(({ name, url, paired }) => ({ name, url, paired })), pairing: outgoing ?? null }),
+		state: () => ({ comm: COMM, hubs: peers.list().map(({ name, url, paired }) => ({ name, url, paired, online: !offline.has(url) })), pairing: outgoing ?? null, ...(unavailable ? { unavailable } : {}) }),
 		peers,
 	};
 }

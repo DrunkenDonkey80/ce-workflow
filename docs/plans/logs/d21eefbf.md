@@ -64,3 +64,9 @@ Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the link
 
 - [x] **S06** Link and unlink endpoints plus a remote linkable-session list; both hubs store each link (D8)
   - check: hub: node scripts/test-link.mjs -> "link ok" (two in-process hubs: pairing both ways, remote sessions, refused link stored nowhere, both stores hold the link, wrong-hub unlink 401, offline unlink pending, online unlink both sides, corrupt list fails closed); node hub/scripts/test-remote.mjs -> "remote ok"; node hub/scripts/test-api.mjs -> "api ok"
+
+## 2026-11-02T17:57:39.958Z S07 done: Stand-ins: one pi-intercom session per link (hublink-<id>, D11 name), forward send/ask/reply via deliver with the 3 s receipt rule, D9 refusal, parked targets resumed, 30 s ping (offline/reconnect, renames, D12 cleanup and unlink retry); hub wires intercom id from the session file and resume
+
+- [x] **S07** Stand-in sessions in the local broker; forward send, ask and reply; offline stand-ins fail fast
+  - Refuse messages from any session but the linked one with a readable error, before forwarding (D9).
+  - check: hub: node scripts/test-link.mjs -> "link ok" (fake broker per hub: D11 names, fixed id, send receipt after remote take, ask/reply with same id, D9 refusal and nothing crossed, parked wake, unreachable cause + offline + ping reconnect, rename via ping, not-linked cause, stop disconnects); test-remote "remote ok"; test-api "api ok"; live: real pi-intercom broker accepted hublink-<uuid> id and listed probe~mac
