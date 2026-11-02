@@ -4,6 +4,21 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.27 — 2026-11-02
+
+### Added
+- `vm_act` v2 drives a whole installer test on the VM without your help:
+  - `status`: who is at the console and what is on screen (desktop, locked, signing in), other sessions, whether a UAC prompt is up, and the UAC policy.
+  - `account`: list, create (password = user name, written to the gitignored project `.env` first), delete with its profile, disable, and reset the password. Passwords travel through a guest temp file that is always removed, never on a command line.
+  - `session`: sign in, switch user (the first user stays signed in), sign out and lock, by keyboard on the sign-in screen.
+  - `uac`: answer a consent prompt, answer a credentials prompt (the preselected admin or another one), and set the UAC policy (the reply shows the old values to restore).
+  - `run` as the signed-in console user (`as: "console"`), or elevated with a loaded profile (`via: "task"`); `wait: false` returns a task id to collect the exit code and output later. Programs that need admin rights start through UAC.
+  - Account, session, uac and run results end with the VM's new state.
+
+### Fixed
+- `vm_act type` sends one character at a time; whole strings dropped keys at the sign-in box.
+- Guest exit codes are the program's own, not VirtualBox's 32+N.
+
 ## 0.2.26 — 2026-11-02
 
 ### Changed
