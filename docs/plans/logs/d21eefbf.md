@@ -59,3 +59,8 @@ Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the link
 - [x] **S05** Hub-to-hub pairing using the device registry; approval on the target hub's page
   - Link-scoped credential and its own dispatch path (S02); C4 keeps passing and gains a case that a hub credential cannot open session pages or their API.
   - check: node hub/scripts/test-remote.mjs -> "remote ok" (new d21eefbf S05 block: 405, comm-mismatch before payload, owner first, 401 for missing/browser credential, Hub mac approval label, hub credential refused on session pages, pairWith both directions stored); node hub/scripts/test-api.mjs -> "api ok"; hub node scripts/test-link.mjs -> "link ok"
+
+## 2026-11-02T17:51:52.510Z S06 done: Links: links.json store (fails closed, pending unlinks for D12), /link/ sessions/link/unlink with the caller known by its credential, local API (hub sessions, session links, link, unlink); both hubs store each link
+
+- [x] **S06** Link and unlink endpoints plus a remote linkable-session list; both hubs store each link (D8)
+  - check: hub: node scripts/test-link.mjs -> "link ok" (two in-process hubs: pairing both ways, remote sessions, refused link stored nowhere, both stores hold the link, wrong-hub unlink 401, offline unlink pending, online unlink both sides, corrupt list fails closed); node hub/scripts/test-remote.mjs -> "remote ok"; node hub/scripts/test-api.mjs -> "api ok"

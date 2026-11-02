@@ -112,7 +112,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	let tailnet: Tailnet | undefined, serving = false, remoteError: string | undefined, importError: string | undefined;
 	// Inter-hub links (plan d21eefbf): pairing with other hubs over the tailnet; this hub's address exists only while serving.
 	const openApproval = () => { if (Date.now() - lastLocalPoll > 20_000) { lastLocalPoll = Date.now(); openUrl(`http://127.0.0.1:${config.port}/?token=${config.localKey}`); } };
-	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, self: () => serving && tailnet?.host && tailnet.login ? { name: os.hostname(), url: `https://${tailnet.host}:${config.port}`, login: tailnet.login } : undefined });
+	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, sessions: () => registry.list().map(record => ({ record: record.id, name: record.name, folder: record.folder, live: host.live.has(record.id) })), self: () => serving && tailnet?.host && tailnet.login ? { name: os.hostname(), url: `https://${tailnet.host}:${config.port}`, login: tailnet.login } : undefined });
 	// H6-02: a corrupt or busy old registry is skipped (nothing imported) and retried at the next start.
 	const imported = await devices.importFrom(path.join(agentDir(), "ce-workflow", "remote", "devices.json")).catch(error => { importError = `Paired devices not imported: ${(error as Error).message}`; return 0; });
 	async function applyRemote() {
@@ -169,6 +169,10 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"GET /api/devices": () => ({ devices: devices.list() }),
 		"GET /api/hubs": () => links.state(),
 		"POST /api/hubs/pair": data => links.pairWith(String(data.url ?? "")),
+		"POST /api/hubs/sessions": data => links.remoteSessions(String(data.url ?? "")),
+		"GET /api/sessions/([0-9a-f-]{36})/links": (_d, m) => ({ links: links.linksOf(m[1]) }),
+		"POST /api/sessions/([0-9a-f-]{36})/links": (data, m) => links.link(m[1], String(data.hub ?? ""), String(data.record ?? "")),
+		"POST /api/links/([0-9a-f-]{36})/unlink": (_d, m) => links.unlink(m[1]),
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },
 		"POST /api/sessions": data => host.create(String(data.folder ?? ""), String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/resume": (_d, m) => host.resume(m[1]),
