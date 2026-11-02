@@ -30,12 +30,28 @@ import {
 	];
 	const toMessages = (entry) => [entry.message];
 	const prepared = { firstKeptEntryId: "u1", messagesToSummarize: [{ role: "user", content: "old" }], turnPrefixMessages: [], tokensBefore: 1 };
-	const tight = tightenPreparation(prepared, entries, 12_000, cost, toMessages);
-	assert.equal(tight.firstKeptEntryId, "a2", "keeps ~12k by real cost and never cuts at a tool result");
+	const tight = tightenPreparation(prepared, entries, 20_000, cost, toMessages);
+	assert.equal(tight.firstKeptEntryId, "a2", "keeps up to 20k by real cost and never cuts at a tool result");
+	assert.equal(tightenPreparation(prepared, entries, 12_000, cost, toMessages).firstKeptEntryId, "a3", "the reply that crosses the budget is summarized, not kept");
+	assert.equal(tightenPreparation(prepared, entries, 5_000, cost, toMessages).firstKeptEntryId, "a3", "a last reply over the budget alone is still kept");
+	assert.equal(tightenPreparation({ ...prepared, firstKeptEntryId: "a2" }, entries, 12_000, cost, toMessages).firstKeptEntryId, "a3", "Pi's first kept reply is summarized when it crosses the budget");
 	assert.deepEqual(tight.messagesToSummarize.map((message) => message.content), ["old", "start", entries[1].message.content, "r"], "passed messages join the summary in order");
 	assert.equal(tightenPreparation(prepared, entries, 100_000, cost, toMessages), prepared, "a budget the tail fits keeps Pi's cut");
 	assert.equal(tightenPreparation(prepared, entries, 12_000, visible, toMessages), prepared, "by visible text alone the tail fits, the old under-count");
 	assert.equal(tightenPreparation({ ...prepared, firstKeptEntryId: "a3" }, entries, 12_000, cost, toMessages).firstKeptEntryId, "a3", "never moves the cut back");
+	// Billed prompts show the real tail: tool results that tokenize denser than chars/4 still count in full.
+	const billed = (output, prompt) => ({ ...reply(output), usage: { output, input: 2, cacheRead: prompt, cacheWrite: 0 } });
+	const dense = [
+		{ id: "u1", type: "message", message: { role: "user", content: "start" } },
+		{ id: "a1", type: "message", message: billed(100, 10_000) },
+		{ id: "t1", type: "message", message: { role: "toolResult", content: "r" } },
+		{ id: "a2", type: "message", message: billed(100, 20_000) },
+		{ id: "t2", type: "message", message: { role: "toolResult", content: "r" } },
+		{ id: "a3", type: "message", message: billed(100, 30_000) },
+	];
+	assert.equal(tightenPreparation(prepared, dense, 8_000, cost, toMessages).firstKeptEntryId, "a3", "real prompts, not the tiny estimate, decide the cut");
+	assert.equal(tightenPreparation(prepared, dense, 15_000, cost, toMessages).firstKeptEntryId, "a2", "the tail from a2 is 10.1k real");
+	assert.equal(tightenPreparation(prepared, dense, 25_000, cost, toMessages), prepared, "a 20.1k real tail fits 25k");
 	assert.equal(tightenPreparation({ ...prepared, firstKeptEntryId: "gone" }, entries, 12_000, cost, toMessages).firstKeptEntryId, "gone");
 }
 

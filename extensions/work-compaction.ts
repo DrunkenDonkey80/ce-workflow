@@ -105,13 +105,27 @@ export function tightenPreparation(preparation, entries, keepRecentTokens, estim
 	const start = entries?.findIndex?.((entry) => entry?.id === preparation?.firstKeptEntryId) ?? -1;
 	if (start < 0 || !(keepRecentTokens > 0)) return preparation;
 	const messagesOf = (index) => (entries[index].type === "compaction" ? [] : toMessages(entries[index]) ?? []);
+	// chars/4 undercounts Claude 1.3-1.7x (code ~2x). A reply's billed prompt is everything before it, so the exact tail
+	// from a reply on is the last prompt plus what follows it, minus that reply's prompt. The estimate stays the floor
+	// (a context filter or an earlier compaction between them shrinks the difference).
+	const promptOf = (index) => messagesOf(index).reduce((sum, message) => {
+		const usage = message?.role === "assistant" && message.usage;
+		return sum + (usage ? (Number(usage.input) || 0) + (Number(usage.cacheRead) || 0) + (Number(usage.cacheWrite) || 0) : 0);
+	}, 0);
 	let kept = 0;
 	let cut = start;
-	for (let index = entries.length - 1; index > start; index -= 1) {
+	let total = 0;
+	for (let index = entries.length - 1; index >= start; index -= 1) {
 		kept += messagesOf(index).reduce((sum, message) => sum + Math.max(0, Number(estimate(message)) || 0), 0);
+		const prompt = promptOf(index);
+		if (prompt > 0 && !total) total = prompt + kept;
+		else if (prompt > 0) kept = Math.max(kept, total - prompt);
 		if (kept < keepRecentTokens) continue;
-		cut = index;
-		while (cut < entries.length && !messagesOf(cut).some((message) => CUT_ROLES.has(message?.role))) cut += 1;
+		// The budget is a ceiling: the reply that crosses it is summarized (one 23k write reply once kept 49k of 30k),
+		// unless nothing would be left to keep after it.
+		const cutPointFrom = (from) => { while (from < entries.length && !messagesOf(from).some((message) => CUT_ROLES.has(message?.role))) from += 1; return from; };
+		cut = cutPointFrom(index + 1);
+		if (cut >= entries.length) cut = cutPointFrom(index);
 		break;
 	}
 	if (cut <= start || cut >= entries.length) return preparation;

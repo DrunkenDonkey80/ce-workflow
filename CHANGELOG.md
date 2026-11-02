@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.21 — 2026-11-01
+
+### Fixed
+- Compaction now really keeps at most 30k of recent messages, measured by the tokens the provider billed instead of a characters/4 guess. The guess undercounted Claude by 1.3-1.7x (code about 2x), so "30k" kept 36k-54k, and one very large reply at the edge was kept whole: one session came back at 85k instead of about 60k.
+
 ## 0.2.20 — 2026-11-01
 
 ### Fixed
