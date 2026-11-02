@@ -162,6 +162,21 @@ try {
 	assert.match(await sess({ action: "session", op: "lock" }, [guestOut("", "")]), /^Nobody to lock: nobody is signed in at the console\./);
 	assert.match(await sess({ action: "session", op: "lock" }, [guestOut(CON("relAdmin"), "explorer 1"), "", guestOut(CON("relAdmin"), "LogonUI 1")]), /^Locked relAdmin\./);
 	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /"user":"relAdmin"[\s\S]*LogonType Interactive/);
+	// uac: refuses without a prompt or secure desktop; credentials pick another admin through More choices
+	const uacOut = (procs, pol = "0 3 1") => guestOut(CON("vmt1", 3), procs).replace("0 3 0", pol);
+	await assert.rejects(sess({ action: "uac", op: "consent" }, [uacOut("explorer 3")]), /No UAC prompt is up/);
+	await assert.rejects(sess({ action: "uac", op: "consent" }, [uacOut("explorer 3\r\nconsent 3", "0 3 0")]), /PromptOnSecureDesktop is 0/);
+	assert.match(await sess({ action: "uac", op: "consent" }, [uacOut("explorer 3\r\nconsent 3"), uacOut("explorer 3")]), /^UAC prompt answered \(consent\); it closed\./);
+	assert.deepEqual(calls.find(c => c[2] === "keyboardputscancode").slice(3), scancodes("alt+y"));
+	const cred = await sess({ action: "uac", op: "credentials", user: "relAdmin", passwordEnv: "VM_TEST_PW" }, [uacOut("explorer 3\r\nconsent 3"), "Administrator\r\nrelAdmin\r\n", uacOut("explorer 3")]);
+	assert.match(cred, /^UAC prompt answered \(credentials of relAdmin\)/);
+	assert.deepEqual(calls.filter(c => c[2] === "keyboardputscancode").slice(0, 2).map(c => c.slice(3).join(" ")), [scancodes("tab enter").join(" "), scancodes("down space").join(" ")]);
+	assert.equal(calls.filter(c => c[2] === "keyboardputstring").map(c => c[3]).join(""), "secret-pw");
+	await assert.rejects(sess({ action: "uac", op: "credentials", passwordEnv: "VM_TEST_PW" }, [uacOut("explorer 3\r\nconsent 3")]), /still up 12 s after the credentials answer; the password may be wrong/);
+	const pol = await sess({ action: "uac", op: "policy", policy: { admin: 2, secure: 1 } }, [uacOut(""), "", uacOut("", "2 3 1")]);
+	assert.match(pol, /Previous: admin 0, user 3, secure 1; restore with uac op policy policy \{admin: 0, user: 3, secure: 1\}/);
+	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /"admin":2,"secure":1[\s\S]*ConsentPromptBehaviorAdmin/);
+	await assert.rejects(sess({ action: "uac", op: "policy", policy: { user: 2 } }, []), /uac policy needs policy/);
 	await writeFile(path.join(dir, ".env"), "# test\nVM_TEST_PW=secret-pw\n");
 
 	// Restore (D-09): the configured running VM is powered off, waited for, restored and started.

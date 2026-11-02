@@ -157,11 +157,11 @@ export function writeEnvVar(cwd: string, name: string, value: string, comment: s
 }
 
 export type VmActArgs = {
-	action: "list" | "status" | "account" | "session" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
+	action: "list" | "status" | "account" | "session" | "uac" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
 	vm?: string; keys?: string; text?: string; textFromEnv?: string;
 	x?: number; y?: number; button?: "left" | "right" | "middle"; double?: boolean;
 	exe?: string; args?: string[]; user?: string; passwordEnv?: string; timeoutSec?: number;
-	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach" | "create" | "delete" | "disable" | "reset" | "signin" | "signout" | "lock" | "switch"; name?: string; device?: string; admin?: boolean;
+	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach" | "create" | "delete" | "disable" | "reset" | "signin" | "signout" | "lock" | "switch" | "consent" | "credentials" | "policy"; policy?: { admin?: number; user?: number; secure?: number }; name?: string; device?: string; admin?: boolean;
 };
 // IMouse.putMouseEventAbsolute counts pixels from 1 (VirtualBox SDK); screenshots count from 0.
 const MOUSE_BASE = 1;
@@ -292,6 +292,49 @@ try { Start-ScheduledTask $t; Start-Sleep 2 } finally { Unregister-ScheduledTask
 			if (waited + 3 >= seconds) throw new Error(`Not signed in as ${a.user} after ${seconds} s (picked sign-in tile ${index + 1} of ${tiles.join(", ")}). The password may be wrong or the tile was not ${a.user} (an account made since the last lock or sign-out has no tile yet); look with screen_read target=vm.\n${describeState(vm, now)}`);
 		}
 	}
+	if (a.action === "uac") {
+		const op = a.op, show = (s: GuestState) => describeState(vm, s);
+		if (op === "policy") {
+			const pol = a.policy ?? {}, ok = { admin: [0, 1, 2, 3, 4, 5], user: [0, 1, 3], secure: [0, 1] };
+			const bad = (Object.keys(ok) as (keyof typeof ok)[]).filter(k => pol[k] !== undefined && !ok[k].includes(pol[k]!));
+			if (!Object.keys(pol).length || bad.length || Object.keys(pol).some(k => !(k in ok))) throw new Error("uac policy needs policy {admin: 0-5 (ConsentPromptBehaviorAdmin), user: 0, 1 or 3 (ConsentPromptBehaviorUser), secure: 0 or 1 (PromptOnSecureDesktop)}.");
+			const before = (await state()).policy;
+			await guestPs(guestScript(pol, `$k='HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System'
+if($null -ne $p.admin) { Set-ItemProperty $k ConsentPromptBehaviorAdmin ([int]$p.admin) }
+if($null -ne $p.user) { Set-ItemProperty $k ConsentPromptBehaviorUser ([int]$p.user) }
+if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.secure) }`));
+			const now = await state();
+			return `UAC policy set (applies at once). Previous: admin ${before.admin}, user ${before.user}, secure ${before.secure}; restore with uac op policy policy {admin: ${before.admin}, user: ${before.user}, secure: ${before.secure}}.\n${show(now)}`;
+		}
+		if (op !== "consent" && op !== "credentials") throw new Error("uac op must be consent, credentials or policy.");
+		const s = await state();
+		if (!s.uac) throw new Error(`No UAC prompt is up in the console session.\n${show(s)}`);
+		// D-14: without the secure desktop the prompt did not keep the keyboard focus (S01)
+		if (s.policy.secure === 0) throw new Error(`PromptOnSecureDesktop is 0, so the prompt does not hold the keyboard focus. Cancel this prompt, set uac op policy policy {secure: 1}, then trigger it again.\n${show(s)}`);
+		if (op === "consent") await keys("alt+y");
+		else {
+			need(a.passwordEnv, "passwordEnv (the .env variable holding the admin's password)");
+			const password = envValue(o.cwd, a.passwordEnv!);
+			if (password === undefined) throw new Error(`${a.passwordEnv} is not in .env or the environment.`);
+			if (a.user) {
+				// More choices lists the enabled admins A to Z (S01: Administrator, relAdmin); focus starts on the first
+				const admins = (await guestPs(guestScript({}, "Get-LocalGroupMember -SID S-1-5-32-544 | Where-Object PrincipalSource -eq Local | ForEach-Object { $n=$_.Name -replace '^.*\\\\',''; if((Get-LocalUser $n).Enabled){ $n } }"))).split(/\r?\n/).map(l => l.trim()).filter(Boolean).sort((x, y) => x.localeCompare(y, "en", { sensitivity: "base" }));
+				const index = admins.findIndex(u => u.toLowerCase() === a.user!.toLowerCase());
+				if (index < 0) throw new Error(`${a.user} is not an enabled local admin (admins: ${admins.join(", ")}).`);
+				await keys("tab enter"); await sleep(1500);
+				await keys([...Array(index).fill("down"), "space"].join(" ")); await sleep(1000);
+			}
+			await keys(Array(20).fill("backspace").join(" "));
+			await typeText(password);
+			await keys("enter");
+		}
+		for (let waited = 0; ; waited += 2) {
+			await sleep(2000);
+			const now = await state();
+			if (!now.uac) return `UAC prompt answered (${op === "consent" ? "consent" : `credentials${a.user ? ` of ${a.user}` : " of the preselected admin"}`}); it closed.\n${show(now)}`;
+			if (waited >= 10) throw new Error(`The UAC prompt is still up 12 s after the ${op} answer${op === "credentials" ? "; the password may be wrong or the account not picked. A failed try leaves the prompt on that account with the password box focused: retry without user for the same account; for another one answer No (keys alt+n) and trigger the prompt again" : ""}. Look with screen_read target=vm.\n${show(now)}`);
+		}
+	}
 	if (a.action === "account") {
 		const op = a.op ?? "list";
 		if (op === "list") {
@@ -385,7 +428,7 @@ try { Start-ScheduledTask $t; Start-Sleep 2 } finally { Unregister-ScheduledTask
 		await call(["controlvm", vm, op === "attach" ? "usbattach" : "usbdetach", a.device!]);
 		return `${op === "attach" ? "Attached" : "Detached"} ${a.device} ${op === "attach" ? "to" : "from"} ${vm}.`;
 	}
-	throw new Error("action must be list, status, account, session, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
+	throw new Error("action must be list, status, account, session, uac, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
 }
 
 export const vmActTool = () => ({
@@ -399,7 +442,7 @@ export const vmActTool = () => ({
 	],
 	description: [
 		"Control a VirtualBox VM (VBoxManage). vm defaults to workOrchestrator.vm in .pi/settings.json ({vm, user, passwordEnv}), else the only running VM. Screenshots: screen_read target=vm.",
-		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD (so do account, session and uac).\naccount: op list (default; admin or standard, enabled, profile); create user (admin: true for an admin; password = the username, else \"password\", written to .env as VM_<USER>_PASSWORD first; .env must be gitignored); delete user (also its profile; sign it out first); disable user; reset user with passwordEnv = the .env variable holding the new password.\nsession: op signin with user and passwordEnv (wakes the screen, picks the account tile by keyboard, types the password, waits up to timeoutSec (60) for that user's desktop; reports \"Signed in as X\" or what the console shows); switch (same, but first disconnects the current console user, who stays signed in); signout (user, default the console user); lock.\nkeys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
+		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD (so do account, session and uac).\naccount: op list (default; admin or standard, enabled, profile); create user (admin: true for an admin; password = the username, else \"password\", written to .env as VM_<USER>_PASSWORD first; .env must be gitignored); delete user (also its profile; sign it out first); disable user; reset user with passwordEnv = the .env variable holding the new password.\nsession: op signin with user and passwordEnv (wakes the screen, picks the account tile by keyboard, types the password, waits up to timeoutSec (60) for that user's desktop; reports \"Signed in as X\" or what the console shows); switch (same, but first disconnects the current console user, who stays signed in); signout (user, default the console user); lock.\nuac: op consent (alt+y on an admin's consent prompt); credentials with passwordEnv (types it into the prompt a standard user gets, for the account it shows; user picks another admin via More choices, only on a fresh prompt); both need a prompt up and PromptOnSecureDesktop 1, and report when it closed. op policy with policy {admin (ConsentPromptBehaviorAdmin 0-5), user (ConsentPromptBehaviorUser 0, 1, 3), secure (PromptOnSecureDesktop 0, 1)}: applies at once, result shows the previous values.\nkeys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
 		"click: x,y in screen_read target=vm source pixels; button left (default), right or middle; double.",
 		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); admin rights only as the built-in Administrator (UAC filters every other admin: VERR_PROC_ELEVATION_REQUIRED); waits up to timeoutSec (120) and returns exit code and output. run has no loaded user profile, so MSIX/AppX installs fail (0x80070002); for those, run powershell as Administrator that registers a scheduled task (New-ScheduledTaskPrincipal -UserId Administrator -LogonType S4U -RunLevel Highest), starts it and waits for it. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
 		"snapshot: op list (default), take or restore with name; restore powers off a running configured VM, restores and starts it headless. usb: op list (default), attach or detach with device (UUID or address).",
@@ -407,11 +450,11 @@ export const vmActTool = () => ({
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
-			action: { type: "string", enum: ["list", "status", "account", "session", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
+			action: { type: "string", enum: ["list", "status", "account", "session", "uac", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
 			vm: { type: "string" }, keys: { type: "string" }, text: { type: "string" }, textFromEnv: { type: "string" },
 			x: { type: "integer", minimum: 0 }, y: { type: "integer", minimum: 0 }, button: { type: "string", enum: ["left", "right", "middle"] }, double: { type: "boolean" },
 			exe: { type: "string" }, args: { type: "array", items: { type: "string" } }, user: { type: "string" }, passwordEnv: { type: "string" }, timeoutSec: { type: "integer", minimum: 1, maximum: 3600 },
-			source: { type: "string" }, dest: { type: "string" }, op: { type: "string", enum: ["list", "take", "restore", "attach", "detach", "create", "delete", "disable", "reset", "signin", "signout", "lock", "switch"] }, name: { type: "string" }, device: { type: "string" }, admin: { type: "boolean" },
+			source: { type: "string" }, dest: { type: "string" }, op: { type: "string", enum: ["list", "take", "restore", "attach", "detach", "create", "delete", "disable", "reset", "signin", "signout", "lock", "switch", "consent", "credentials", "policy"] }, policy: { type: "object", properties: { admin: { type: "number" }, user: { type: "number" }, secure: { type: "number" } } }, name: { type: "string" }, device: { type: "string" }, admin: { type: "boolean" },
 		},
 	},
 	async execute(_id: string, args: VmActArgs, signal?: AbortSignal, _update?: unknown, ctx?: any) {
