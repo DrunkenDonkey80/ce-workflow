@@ -82,7 +82,30 @@ export type VmActArgs = {
 	exe?: string; args?: string[]; user?: string; passwordEnv?: string; timeoutSec?: number;
 	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach"; name?: string; device?: string;
 };
-type Options = { cwd: string; run?: Run; running?: () => Promise<string[]>; signal?: AbortSignal; sleep?: (ms: number) => Promise<void> };
+// IMouse.putMouseEventAbsolute counts pixels from 1 (VirtualBox SDK); screenshots count from 0.
+const MOUSE_BASE = 1;
+const BUTTONS = { left: 1, right: 2, middle: 4 };
+export const clickPlan = (vm: string, a: VmActArgs) => ({ vm, x: a.x! + MOUSE_BASE, y: a.y! + MOUSE_BASE, buttons: BUTTONS[a.button ?? "left"], clicks: a.double ? 2 : 1 });
+// VBoxManage has no mouse command: lock the running VM's session shared through COM and send absolute events.
+export const CLICK_SCRIPT = `$ErrorActionPreference='Stop'
+try {
+$p=$env:VM_ACT_CLICK|ConvertFrom-Json
+$c=New-Object -ComObject VirtualBox.VirtualBoxClient; $m=$c.VirtualBox.FindMachine($p.vm); $s=$c.Session
+$m.LockMachine($s,1)
+try {
+ $mouse=$s.Console.Mouse
+ if(-not $mouse.AbsoluteSupported) { throw "$($p.vm) has no absolute mouse (Guest Additions or a USB tablet needed)." }
+ $mouse.PutMouseEventAbsolute($p.x,$p.y,0,0,0); Start-Sleep -Milliseconds 50
+ for($i=0; $i -lt $p.clicks; $i++) { $mouse.PutMouseEventAbsolute($p.x,$p.y,0,0,$p.buttons); Start-Sleep -Milliseconds 50; $mouse.PutMouseEventAbsolute($p.x,$p.y,0,0,0); Start-Sleep -Milliseconds 80 }
+} finally { $s.UnlockMachine() }
+} catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }`;
+type Click = (plan: ReturnType<typeof clickPlan>, signal?: AbortSignal) => Promise<{ code: number; stdout: string; stderr: string }>;
+const runClick: Click = (plan, signal) => process.platform !== "win32" ? Promise.resolve({ code: 1, stdout: "", stderr: "vm_act click needs a Windows host (VirtualBox COM)." }) :
+	new Promise(resolve => execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(CLICK_SCRIPT, "utf16le").toString("base64")],
+		{ timeout: 60_000, signal, windowsHide: true, env: { ...process.env, VM_ACT_CLICK: JSON.stringify(plan) } },
+		(e: any, stdout, stderr) => resolve({ code: e ? (typeof e.code === "number" ? e.code : -1) : 0, stdout: String(stdout ?? ""), stderr: String(stderr || e?.message || "") })));
+
+type Options = { cwd: string; run?: Run; click?: Click; running?: () => Promise<string[]>; signal?: AbortSignal; sleep?: (ms: number) => Promise<void> };
 
 export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 	const run = o.run ?? runVbox, signal = o.signal;
@@ -105,6 +128,12 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		need(text, "text or textFromEnv");
 		await call(["controlvm", vm, "keyboardputstring", text!]);
 		return a.textFromEnv ? `Typed ${a.textFromEnv} (value not shown).` : `Typed ${text!.length} characters.`;
+	}
+	if (a.action === "click") {
+		if (!Number.isSafeInteger(a.x) || !Number.isSafeInteger(a.y) || a.x! < 0 || a.y! < 0) throw new Error("click needs x and y: non-negative integers in screen_read target=vm source pixels.");
+		const r = await (o.click ?? runClick)(clickPlan(vm, a), signal);
+		if (r.code !== 0) throw new Error(`click failed: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
+		return `${a.double ? "Double-clicked" : "Clicked"} ${a.button ?? "left"} at ${a.x},${a.y} in ${vm}.`;
 	}
 	if (a.action === "run" || a.action === "copyto" || a.action === "copyfrom") {
 		const cfg = vmConfig(o.cwd), user = a.user ?? cfg.user, passwordEnv = a.passwordEnv ?? cfg.passwordEnv;

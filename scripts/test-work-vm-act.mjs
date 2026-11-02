@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import vmActExtension, { scancodes, vmAct, vmActTool } from "../extensions/vm-act.ts";
+import vmActExtension, { CLICK_SCRIPT, scancodes, vmAct, vmActTool } from "../extensions/vm-act.ts";
 
 // Keys: modifiers pressed first, released in reverse; extended keys keep their e0 prefix.
 assert.deepEqual(scancodes("alt+y"), ["38", "15", "95", "b8"]);
@@ -65,6 +65,15 @@ try {
 	await act({ action: "usb", op: "attach", device: "{uuid-1}" });
 	assert.deepEqual(calls.pop(), ["controlvm", "S46", "usbattach", "{uuid-1}"]);
 	await assert.rejects(act({ action: "keys" }), /keys needs keys/);
+
+	// Click: screenshot pixels (0-based) become 1-based COM coordinates; buttons and double map to events.
+	const clicks = [];
+	const click = (a) => vmAct(a, { cwd: dir, running: async () => ["S46"], click: async (plan) => { clicks.push(plan); return { code: 0, stdout: "", stderr: "" }; } });
+	assert.equal(await click({ action: "click", x: 0, y: 10 }), "Clicked left at 0,10 in S46.");
+	await click({ action: "click", x: 5, y: 6, button: "right", double: true });
+	assert.deepEqual(clicks, [{ vm: "S46", x: 1, y: 11, buttons: 1, clicks: 1 }, { vm: "S46", x: 6, y: 7, buttons: 2, clicks: 2 }]);
+	await assert.rejects(click({ action: "click", x: -1, y: 0 }), /click needs x and y/);
+	assert.match(CLICK_SCRIPT, /LockMachine\(\$s,1\)[\s\S]*finally \{ \$s\.UnlockMachine\(\) \}/, "shared lock, always released");
 } finally {
 	if (agentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = agentDir;
 	await rm(dir, { recursive: true, force: true });
