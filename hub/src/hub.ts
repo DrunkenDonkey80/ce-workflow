@@ -26,6 +26,7 @@ import { browserExtension, changelogImage, hubVersion, readChangelog, since, VER
 import { agentDir } from "./rpc-client.ts";
 import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
+import { createLinks, type LinkRequest } from "./link.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 import { sendExplored } from "./explore.ts";
 import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
@@ -91,7 +92,7 @@ function envCommand(): string[] | undefined {
 	try { return JSON.parse(value); } catch { throw new Error("PI_HUB_PI_COMMAND must be a JSON array of strings."); }
 }
 
-export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined, app = undefined as ReturnType<typeof createAppInstall> | undefined } = {}) {
+export async function startHub({ command = envCommand(), run = exec as Exec, openUrl = (_url: string) => {}, usage: usageOptions = {} as Partial<UsageOptions> | Usage | false, pool: poolOption = undefined as Pool | false | undefined, models = piModels() as ParkedModels | undefined, updates = undefined as UpdateCheck | undefined, app = undefined as ReturnType<typeof createAppInstall> | undefined, linkRequest = undefined as LinkRequest | undefined } = {}) {
 	const dataDir = hubDataDir();
 	mkdirSync(dataDir, { recursive: true }); // `node src/hub.ts` on a fresh machine, not only through the CLI
 	// One running hub only: the same lock file rule as sessions (D9), on `<data>/hub.lock`.
@@ -109,6 +110,9 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	// H6-01 remote access: the tailnet while serving, paired devices and their open streams (dropped on revoke).
 	const devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), streams = new Map<string, Set<http.ServerResponse>>();
 	let tailnet: Tailnet | undefined, serving = false, remoteError: string | undefined, importError: string | undefined;
+	// Inter-hub links (plan d21eefbf): pairing with other hubs over the tailnet; this hub's address exists only while serving.
+	const openApproval = () => { if (Date.now() - lastLocalPoll > 20_000) { lastLocalPoll = Date.now(); openUrl(`http://127.0.0.1:${config.port}/?token=${config.localKey}`); } };
+	const links = createLinks({ dataDir, devices, pairing, onPairing: openApproval, request: linkRequest, self: () => serving && tailnet?.host && tailnet.login ? { name: os.hostname(), url: `https://${tailnet.host}:${config.port}`, login: tailnet.login } : undefined });
 	// H6-02: a corrupt or busy old registry is skipped (nothing imported) and retried at the next start.
 	const imported = await devices.importFrom(path.join(agentDir(), "ce-workflow", "remote", "devices.json")).catch(error => { importError = `Paired devices not imported: ${(error as Error).message}`; return 0; });
 	async function applyRemote() {
@@ -163,6 +167,8 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"GET /api/pairing": () => { lastLocalPoll = Date.now(); return { pending: pairing.pending() }; },
 		"POST /api/pairing": data => pairing.decide(data.approve === true),
 		"GET /api/devices": () => ({ devices: devices.list() }),
+		"GET /api/hubs": () => links.state(),
+		"POST /api/hubs/pair": data => links.pairWith(String(data.url ?? "")),
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },
 		"POST /api/sessions": data => host.create(String(data.folder ?? ""), String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/resume": (_d, m) => host.resume(m[1]),
@@ -261,6 +267,12 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			let device: string | undefined;
 			if (remote) {
 				if (request.headers["x-forwarded-proto"] !== "https" || request.headers["tailscale-user-login"] !== tailnet!.login) return send(403, { error: "Only the Tailscale owner may connect." });
+				// Another hub: its own path and credential, before the browser Origin and cookie rules (plan d21eefbf, comm protocol).
+				if (url.pathname.startsWith("/link/")) {
+					if (request.method !== "POST") return send(405, { error: "POST only." });
+					const [status, value] = await links.serve(url.pathname.slice(6), request.headers, await body(request, PAGE_BODY), tailnet!.login!, new Promise(done => response.once("close", done)));
+					return send(status, value);
+				}
 				if (request.method === "POST" && origin === undefined) return send(403, { error: "Missing Origin rejected." });
 				// The local key never authorizes remote requests: a leaked link still needs pairing.
 				const [cookie, named] = cookieOf(request.headers.cookie, config.port) ?? [];
@@ -268,7 +280,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					if (request.method === "POST" && url.pathname === "/pair/start") {
 						const started = pairing.start(request.headers, tailnet!.login!);
 						// Approval lives on the local page; open it unless one is already polling (visible pages poll every 5 s, hidden 15 s).
-						if (Date.now() - lastLocalPoll > 20_000) { lastLocalPoll = Date.now(); openUrl(`http://127.0.0.1:${config.port}/?token=${config.localKey}`); }
+						openApproval();
 						return send(200, started);
 					}
 					if (request.method === "GET" && url.pathname === "/pair/status") {
@@ -477,7 +489,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			releaseLock(path.join(dataDir, "hub"), lock);
 		})();
 	}
-	return { config, host, registry, views, server, restored, devices, pairing, imported, remote: remoteStatus, stop };
+	return { config, host, registry, views, server, restored, devices, pairing, links, imported, remote: remoteStatus, stop };
 }
 
 if (import.meta.main) {

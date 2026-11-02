@@ -49,7 +49,8 @@ export async function serveRemove(run: Exec, port: number) {
 	try { return (await run(tailscaleCommand(), ["serve", `--https=${port}`, "off"], { timeout: 15_000 })).code === 0; } catch { return false; }
 }
 
-export type Device = { id: string; hash: string; label: string; login: string; created: number; lastUsed: number; expires: number };
+// kind "hub": another hub's link credential (plan d21eefbf); it reaches /link/ only, and a browser device never does.
+export type Device = { id: string; hash: string; label: string; login: string; created: number; lastUsed: number; expires: number; kind?: "hub" };
 const DEVICE_MS = 90 * 86_400_000, RENEW_MS = 3_600_000, MAX_DEVICES = 50;
 const sha = (secret: string) => createHash("sha256").update(secret).digest("hex");
 /** Paired devices in `<dir>/devices.json`; writes hold a lock file, corrupt state fails closed. */
@@ -60,7 +61,7 @@ export function createDeviceRegistry(directory: string, now = Date.now) {
 		try { text = readFileSync(from, "utf8"); } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return []; throw error; }
 		try {
 			const value = JSON.parse(text);
-			if (value?.version !== 1 || !Array.isArray(value.devices) || !value.devices.every((d: Device) => /^[A-Za-z0-9_-]{12}$/.test(d?.id) && /^[a-f0-9]{64}$/.test(d.hash) && typeof d.label === "string" && typeof d.login === "string" && [d.created, d.lastUsed, d.expires].every(Number.isFinite))) throw new Error("shape");
+			if (value?.version !== 1 || !Array.isArray(value.devices) || !value.devices.every((d: Device) => /^[A-Za-z0-9_-]{12}$/.test(d?.id) && /^[a-f0-9]{64}$/.test(d.hash) && typeof d.label === "string" && typeof d.login === "string" && [d.created, d.lastUsed, d.expires].every(Number.isFinite) && (d.kind === undefined || d.kind === "hub"))) throw new Error("shape");
 			return value.devices;
 		} catch { throw new Error(`Paired-device registry is corrupt; remote access is off until ${from} is fixed or deleted.`); }
 	}
@@ -93,17 +94,17 @@ export function createDeviceRegistry(directory: string, now = Date.now) {
 	return {
 		file,
 		/** Returns the cookie value `<id>.<secret>`; only the secret's hash is stored. */
-		pair: (label: string, login: string) => write((devices, time) => {
+		pair: (label: string, login: string, kind?: "hub") => write((devices, time) => {
 			if (devices.length >= MAX_DEVICES) throw new Error(`At most ${MAX_DEVICES} paired devices; revoke one first.`);
 			const id = randomBytes(9).toString("base64url"), secret = randomBytes(32).toString("base64url");
-			devices.push({ id, hash: sha(secret), label: label.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 120), login, created: time, lastUsed: time, expires: time + DEVICE_MS });
+			devices.push({ id, hash: sha(secret), label: label.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 120), login, created: time, lastUsed: time, expires: time + DEVICE_MS, ...(kind ? { kind } : {}) });
 			return `${id}.${secret}`;
 		}),
 		/** Valid cookie for this owner; renews the 90-day expiry at most hourly. */
-		async check(cookie: string, login: string) {
+		async check(cookie: string, login: string, kind?: "hub") {
 			const [id, secret] = cookie.split("."), time = now();
 			const device = load().find(candidate => candidate.id === id);
-			if (!device || !secret || device.login !== login || device.expires <= time || !timingSafeEqual(Buffer.from(device.hash), Buffer.from(sha(secret)))) return false;
+			if (!device || !secret || device.kind !== kind || device.login !== login || device.expires <= time || !timingSafeEqual(Buffer.from(device.hash), Buffer.from(sha(secret)))) return false;
 			if (time - device.lastUsed >= RENEW_MS) await write((devices, at) => { const current = devices.find(candidate => candidate.id === id); if (current) { current.lastUsed = at; current.expires = at + DEVICE_MS; } });
 			return true;
 		},
@@ -127,7 +128,7 @@ export const cookieOf = (header: string | undefined, port: number): [string, boo
 	return own ? [own, true] : old ? [old, false] : undefined;
 };
 
-type Pairing = { id: string; code: string; label: string; address: string; login: string; state: "pending" | "approved" | "denied" | "expired"; cookie?: string; waiters: Set<() => void> };
+type Pairing = { id: string; code: string; label: string; address: string; login: string; state: "pending" | "approved" | "denied" | "expired"; cookie?: string; waiters: Set<() => void>; kind?: "hub" };
 /** One pending request at a time (the newest wins), 2-minute codes, at most 5 starts per 10 minutes; the local hub approves or rejects it. */
 export function createPairing(devices: ReturnType<typeof createDeviceRegistry>) {
 	let pairing: Pairing | undefined, starts: number[] = [], timer: NodeJS.Timeout | undefined;
@@ -138,7 +139,8 @@ export function createPairing(devices: ReturnType<typeof createDeviceRegistry>) 
 	};
 	const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 	return {
-		start(headers: Record<string, string | string[] | undefined>, login: string) {
+		/** hub: another hub asks (plan d21eefbf); it is labelled "Hub <name>" and gets a hub credential. */
+		start(headers: Record<string, string | string[] | undefined>, login: string, hub?: { name: string }) {
 			const time = Date.now();
 			starts = starts.filter(start => time - start < 600_000);
 			// A newer request replaces a pending one: a reloaded or retried pairing page must not lock itself out for 2 minutes.
@@ -149,8 +151,8 @@ export function createPairing(devices: ReturnType<typeof createDeviceRegistry>) 
 			const agent = clean(headers["user-agent"], 300), kind = ["iPhone", "iPad", "Android", "Windows", "Mac OS X", "Linux"].find(name => agent.includes(name)) ?? "Unknown device";
 			const browser = /(Edg|Firefox|Chrome|Safari)\//.exec(agent)?.[1] ?? "browser";
 			const digits = String(randomInt(0, 1_000_000)).padStart(6, "0");
-			const entry: Pairing = { id: randomBytes(16).toString("hex"), code: `${digits.slice(0, 3)} ${digits.slice(3)}`, label: `${kind} ${browser === "Edg" ? "Edge" : browser}`,
-				address: clean(headers["x-forwarded-for"], 60) || "unknown address", login, state: "pending", waiters: new Set() };
+			const entry: Pairing = { id: randomBytes(16).toString("hex"), code: `${digits.slice(0, 3)} ${digits.slice(3)}`, label: hub ? `Hub ${clean(hub.name, 60)}` : `${kind} ${browser === "Edg" ? "Edge" : browser}`,
+				address: clean(headers["x-forwarded-for"], 60) || "unknown address", login, state: "pending", waiters: new Set(), ...(hub ? { kind: "hub" as const } : {}) };
 			pairing = entry;
 			timer = setTimeout(() => settle(entry, "expired"), 120_000); timer.unref();
 			return { id: entry.id, code: entry.code };
@@ -171,7 +173,7 @@ export function createPairing(devices: ReturnType<typeof createDeviceRegistry>) 
 		async decide(approve: boolean) {
 			const entry = pairing;
 			if (entry?.state !== "pending") throw fail(404, "No device is waiting.");
-			settle(entry, approve ? "approved" : "denied", approve ? await devices.pair(entry.label, entry.login) : undefined);
+			settle(entry, approve ? "approved" : "denied", approve ? await devices.pair(entry.label, entry.login, entry.kind) : undefined);
 			return { ok: true };
 		},
 		close() { if (pairing) settle(pairing, "expired"); },

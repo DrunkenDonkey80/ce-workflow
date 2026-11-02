@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { writeJsonAtomic } from "./registry.ts";
+import type { createDeviceRegistry, createPairing } from "./remote.ts";
 import { agentDir } from "./rpc-client.ts";
 
 export const COMM = 1;
@@ -44,6 +45,105 @@ export function createPeers(dataDir: string) {
 			save([...load().filter(other => other.url !== peer.url), peer]);
 		},
 		remove(url: string) { const peers = load(), kept = peers.filter(peer => peer.url !== url); save(kept); return kept.length < peers.length; },
+	};
+}
+
+type Headers = Record<string, string | string[] | undefined>;
+export type Reply = [status: number, body: Record<string, unknown>];
+/** One hub-to-hub request: `op` on the hub at `url` (its tailscale serve address); tests swap in the fake serve headers. */
+export type LinkRequest = (url: string, op: string, body: Record<string, unknown>, credential?: string) => Promise<Reply>;
+const fetchRequest: LinkRequest = async (url, op, body, credential) => {
+	const response = await fetch(`${url}/link/${op}`, { method: "POST", headers: { "content-type": "application/json", ...(credential ? { "x-hub-link": credential } : {}) }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
+	return [response.status, await response.json().catch(() => ({}))];
+};
+const CREDENTIAL = /^[A-Za-z0-9_-]{12}\.[A-Za-z0-9_-]{43}$/;
+const cleanName = (value: unknown) => typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 60) : "";
+
+/** The `/link/` operations (plan section "Comm protocol") and this hub's side of pairing with another hub. */
+export function createLinks(options: {
+	dataDir: string;
+	devices: ReturnType<typeof createDeviceRegistry>;
+	pairing: ReturnType<typeof createPairing>;
+	/** This hub's name and tailnet address; undefined while remote access is off. */
+	self: () => { name: string; url: string; login: string } | undefined;
+	onPairing?: () => void;
+	request?: LinkRequest;
+}) {
+	const { devices, pairing, self, request = fetchRequest } = options, peers = createPeers(options.dataDir);
+	let outgoing: { url: string; code?: string; state: string; error?: string } | undefined;
+	const fail = (status: number, error: string, extra: Record<string, unknown> = {}): Reply => [status, { comm: COMM, error, ...extra }];
+
+	/** Answers one `/link/<op>` after the hub checked the tailnet owner; credential, then comm, then payload. */
+	async function serve(op: string, headers: Headers, data: unknown, login: string, closed: Promise<unknown>): Promise<Reply> {
+		if (!data || typeof data !== "object" || Array.isArray(data)) return fail(400, "Expected a JSON object.");
+		const body = data as { comm?: unknown; id?: unknown; offer?: unknown; hub?: { name?: unknown; url?: unknown } }, open = op === "pair-start" || op === "pair-status";
+		const credential = headers["x-hub-link"];
+		if (!open && !(typeof credential === "string" && await devices.check(credential, login, "hub"))) return fail(401, "unpaired");
+		if (body.comm !== COMM) return fail(409, "comm-mismatch");
+		try {
+			if (op === "pair-start") {
+				const name = cleanName(body.hub?.name);
+				if (!name) return fail(400, "hub.name required.");
+				const started = pairing.start(headers, login, { name });
+				options.onPairing?.();
+				return [200, { comm: COMM, ...started, hub: self()?.name }];
+			}
+			if (op === "pair-status") {
+				const result = await pairing.status(typeof body.id === "string" ? body.id : null, closed);
+				return [200, { comm: COMM, state: result.state, ...(result.cookie ? { credential: result.cookie } : {}) }];
+			}
+			if (op === "pair-finish") {
+				// The caller's credential for this hub: one approval pairs both directions (D8).
+				const name = cleanName(body.hub?.name), url = body.hub?.url;
+				if (!name || typeof url !== "string" || typeof body.offer !== "string" || !CREDENTIAL.test(body.offer)) return fail(400, "hub.name, hub.url and offer required.");
+				peers.put({ name, url, credential: body.offer, paired: Date.now() });
+				return [200, { comm: COMM, hub: self()?.name }];
+			}
+		} catch (error) {
+			return fail((error as { status?: number }).status ?? 500, (error as Error).message);
+		}
+		return fail(404, "Unknown link operation.");
+	}
+
+	/** A refusal as the user reads it: comm mismatch names both numbers (D6). */
+	const explain = ([status, body]: Reply, peer: string) => status === 409 && body.error === "comm-mismatch"
+		? commMismatch(body.comm, peer) ?? "comm mismatch" : status === 401 ? `${peer} hub no longer trusts this hub; pair again.` : String(body.error ?? `HTTP ${status}`);
+
+	/** Pairs with the hub at `url`: returns the code to compare, then waits for approval on that hub in the background. */
+	async function pairWith(input: string) {
+		const me = self();
+		if (!me) throw Object.assign(new Error("Turn on remote access first: hubs pair over the tailnet."), { status: 409 });
+		let url: string, host: string;
+		try { const parsed = new URL(input.includes("://") ? input : `https://${input}`); url = `https://${parsed.host}`; host = parsed.hostname; } catch { throw Object.assign(new Error("Enter the other hub's address, e.g. mac.tail1234.ts.net:7781."), { status: 400 }); }
+		if (url === me.url) throw Object.assign(new Error("That is this hub."), { status: 400 });
+		const started = await request(url, "pair-start", { comm: COMM, hub: { name: me.name } }).catch(error => fail(502, `Not reachable: ${(error as Error).message}`));
+		if (started[0] !== 200) throw Object.assign(new Error(explain(started, url)), { status: 409 });
+		const peer = cleanName(started[1].hub) || host.split(".")[0];
+		const state = outgoing = { url, code: String(started[1].code), state: "pending" };
+		void (async () => {
+			const until = Date.now() + 130_000;
+			while (Date.now() < until && outgoing === state) {
+				const [status, body] = await request(url, "pair-status", { comm: COMM, id: started[1].id }).catch(error => fail(502, (error as Error).message));
+				if (status !== 200) return Object.assign(state, { state: "failed", error: explain([status, body], peer) });
+				if (body.state === "pending") continue;
+				if (body.state !== "approved" || !CREDENTIAL.test(String(body.credential))) return Object.assign(state, { state: String(body.state) });
+				const offer = await devices.pair(`Hub ${peer}`, me.login, "hub");
+				const finished = await request(url, "pair-finish", { comm: COMM, offer, hub: { name: me.name, url: me.url } }, String(body.credential)).catch(error => fail(502, (error as Error).message));
+				if (finished[0] !== 200) { await devices.revoke(offer.split(".")[0]); return Object.assign(state, { state: "failed", error: explain(finished, peer) }); }
+				peers.put({ name: peer, url, credential: String(body.credential), paired: Date.now() });
+				return Object.assign(state, { state: "paired" });
+			}
+			if (state.state === "pending") Object.assign(state, { state: "expired" });
+		})().catch(error => Object.assign(state, { state: "failed", error: (error as Error).message }));
+		return { url, code: state.code };
+	}
+
+	return {
+		serve,
+		pairWith,
+		/** For the local page: paired hubs (no credentials) and the pairing in progress. */
+		state: () => ({ comm: COMM, hubs: peers.list().map(({ name, url, paired }) => ({ name, url, paired })), pairing: outgoing ?? null }),
+		peers,
 	};
 }
 

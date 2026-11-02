@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-02
-updated: 2026-11-02T17:44:00.325Z
+updated: 2026-11-02T17:48:17.593Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -150,8 +150,9 @@ Check order on the receiving hub (D3 refinement, A1 finding 4):
 5. Payload validation and the operation.
 
 Operations:
-- `pair-start` `{ comm, hub: { name }, offer }` — starts today's pairing (`createPairing`: one pending request, 2-minute code, approval on the target hub's local page) with label `Hub <name>`. `offer` is a credential the calling hub already created in its own registry as `kind: "hub"`, inactive until approval, so one approval gives both directions (D8). Reply `{ comm, id, code }`; the caller shows the code to compare.
-- `pair-status` `{ comm, id }` — waits up to 10 s like today. Reply `{ comm, state, credential? }`; on `approved` the target stores `offer` and the caller activates it and stores `credential`.
+- `pair-start` `{ comm, hub: { name } }` — starts today's pairing (`createPairing`: one pending request, 2-minute code, approval on the target hub's local page) with label `Hub <name>`. Reply `{ comm, id, code, hub }`; the caller shows the code to compare.
+- `pair-status` `{ comm, id }` — waits up to 10 s like today. Reply `{ comm, state, credential? }`; the credential arrives once, on `approved`.
+- `pair-finish` `{ comm, offer, hub: { name, url } }` (with the new credential) — `offer` is a hub credential the caller just issued in its own registry, so one approval pairs both directions (D8). The target stores the caller as a paired hub. If this fails, the caller revokes `offer`.
 - `sessions` `{ comm }` — for the user's link picker only (D7). Reply `{ comm, hub: <hostname>, sessions: [{ record, name, folder, live }] }`.
 - `link` `{ comm, link: { id, from: { record, name }, to: { record } } }` — the receiver stores the link and starts its stand-in for `from`. Reply `{ comm, name }` (the stand-in name it chose, D11). The caller stores the link only after this succeeds; if storing fails, it sends `unlink`.
 - `unlink` `{ comm, link }` — removes the link and its stand-in. Unknown link ids succeed, so retries are safe (D12).
@@ -190,8 +191,7 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 ### Phase 2: Build the link [code]
 
 - [x] **S04** hub/src/link.ts: COMM=1 with commMismatch (D6 message), peers.json store failing closed, jiti loader for pi-intercom's client with present/absent/too-old reasons; hub/scripts/test-link.mjs covers them
-- [ ] **S05** Hub-to-hub pairing using the device registry; approval on the target hub's page
-  - Link-scoped credential and its own dispatch path (S02); C4 keeps passing and gains a case that a hub credential cannot open session pages or their API.
+- [x] **S05** Hub pairing: hub-kind credentials in the device registry (never open session pages; browser cookies never open /link/), /link/ dispatch before Origin/cookie rules, pair-start/status/finish, local /api/hubs and /api/hubs/pair
 - [ ] **S06** Link and unlink endpoints plus a remote linkable-session list; both hubs store each link (D8)
 - [ ] **S07** Stand-in sessions in the local broker; forward send, ask and reply; offline stand-ins fail fast
   - Refuse messages from any session but the linked one with a readable error, before forwarding (D9).
@@ -229,12 +229,13 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 
 ## Resume context
 
-Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the linked session can message through them; others get a readable refusal. All open questions resolved; nothing implemented. Next: S01, read pi-intercom's broker client and protocol to confirm several stand-ins per hub, ask replies, and the delivery-failure and no-mailbox gate.
+S01-S04 done (HEAD 941ef12). Next: S05 hub-to-hub pairing. Design worked out: Device gets optional kind "hub" in hub/src/remote.ts (pair(label, login, kind), check(cookie, login, kind) refuses a kind mismatch, so hub credentials never open session pages and browser cookies never open /link/); createPairing.start takes an optional label/kind for hubs ("Hub <name>"). hub/src/hub.ts remote branch dispatches /link/* right after the owner check (line ~264), before the Missing-Origin and cookie checks. Mutual credential deviates from S02 text: after approval the caller posts authenticated `pair-finish` {comm, offer} with a credential it just issued, instead of an inactive offer in pair-start; pair-start carries hub {name, url}. Update the protocol section and record an amendment. Test in hub/scripts/test-remote.mjs (C4) using its remote() helper with an x-hub-link header. Unverified: tailscale serve sets tailscale-user-login for requests from another user-owned node.
 
 ## Amendments
 
 Append material changes and their reasons; preserve the original request and settled decisions.
 
+- **A6 (2026-11-02) S05: mutual credential moved to `pair-finish`.** S02 put an inactive `offer` in `pair-start`; an authenticated `pair-finish` after approval needs no inactive-credential state. Comm stays 1 (never shipped).
 - **A5 (2026-11-02) S02 done.** Protocol written as section "Comm protocol (S02, comm 1)". Two consequences of S01 recorded there: D9's readable refusal and D13's failure cause reach the sender as an immediate follow-up message (the send itself shows pi-intercom's generic text after 5 s); `reply` folded into `deliver` with `replyTo`, and `ping` added for offline detection and D12 clean-up.
 - **A4 (2026-11-02) S03 done.** D11 naming and D12 offline unlink recorded as assumed defaults; `~` names checked with the real `intercom` tool through a probe stand-in.
 - **A3 (2026-11-02) S01 done (read-only).** The delivery-failure gate fails without a pi-intercom change: raised blocking Q-06 with options; status blocked. Recorded D10 (assumed) and deferred Q-04.

@@ -43,15 +43,17 @@ const spy = name => (...args) => { appCalls.push(name); return { supported: true
 // Issue #6: at hub start a newly staged build restarts the running app once.
 const restarts = [];
 const app = { autoStage: async () => ({ staged: "0.2.0", running: true }), restart: () => restarts.push(1), status: spy("status"), install: spy("install"), stage: spy("stage"), uninstall: spy("uninstall"), setLogin: spy("login") };
-const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url), app });
+// Plan d21eefbf: hub-to-hub requests go to this same hub's /link/ through the fake serve headers, as if from another hub.
+const linkRequest = (_url, op, body, credential) => remote(`/link/${op}`, { method: "POST", origin: null, body, headers: credential ? { "x-hub-link": credential } : {} }).then(r => [r.status, r.json()]);
+const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, run, openUrl: url => opened.push(url), app, linkRequest });
 const { port, localKey } = hub.config, remoteHost = `pc.tail.ts.net:${port}`, remoteOrigin = `https://${remoteHost}`;
 const local = async (route, body) => {
 	const response = await fetch(`http://127.0.0.1:${port}${route}`, { method: body ? "POST" : "GET", headers: { "x-hub-key": localKey, "content-type": "application/json" }, body: body && JSON.stringify(body) });
 	return { status: response.status, body: await response.json() };
 };
 // What tailscale serve forwards: the tailnet Host, https proto and the verified login. fetch cannot set Host, so http.request.
-const remote = (route, { method = "GET", cookie, login = "me@example.com", proto = "https", origin = method === "POST" ? remoteOrigin : undefined, stream = false, body } = {}) => new Promise((resolve, reject) => {
-	const headers = { ...(body ? { "content-type": "application/json" } : {}), host: remoteHost, "x-forwarded-proto": proto, "tailscale-user-login": login, "user-agent": "Mozilla/5.0 (iPhone) Safari/1", ...(cookie ? { cookie: cookie.includes("=") ? cookie : `pi_remote_${port}=${cookie}` } : {}), ...(origin ? { origin } : {}) };
+const remote = (route, { method = "GET", cookie, login = "me@example.com", proto = "https", origin = method === "POST" ? remoteOrigin : undefined, stream = false, body, headers: extra = {} } = {}) => new Promise((resolve, reject) => {
+	const headers = { ...(body ? { "content-type": "application/json" } : {}), host: remoteHost, "x-forwarded-proto": proto, "tailscale-user-login": login, "user-agent": "Mozilla/5.0 (iPhone) Safari/1", ...(cookie ? { cookie: cookie.includes("=") ? cookie : `pi_remote_${port}=${cookie}` } : {}), ...(origin ? { origin } : {}), ...extra };
 	const request = http.request({ host: "127.0.0.1", port, path: route, method, headers }, response => {
 		if (stream) return resolve(response);
 		let text = ""; response.on("data", chunk => text += chunk); response.on("end", () => resolve({ status: response.statusCode, headers: response.headers, text, json: () => JSON.parse(text) }));
@@ -156,8 +158,42 @@ try {
 	assert.equal((await local(`/s/${id}/api/app`, { action: "login", on: "yes" })).status, 400);
 	assert.deepEqual(appCalls, ["status"]);
 
+	// Plan d21eefbf S05: another hub pairs through /link/ with no Origin; its credential is a hub credential.
+	const link = (op, body, credential) => linkRequest("", op, body, credential);
+	assert.equal((await remote("/link/pair-start")).status, 405, "POST only");
+	assert.deepEqual(await link("pair-start", { hub: { name: "mac" } }), [409, { comm: 1, error: "comm-mismatch" }], "comm is checked before the payload");
+	assert.equal((await remote("/link/pair-start", { method: "POST", origin: null, body: { comm: 1, hub: { name: "mac" } }, login: "other@example.com" })).status, 403, "tailnet owner first");
+	assert.deepEqual((await link("pair-finish", { comm: 1 }))[0], 401, "other operations need a hub credential");
+	assert.deepEqual((await link("pair-finish", { comm: 1 }, cookie))[0], 401, "a browser device cookie is no hub credential");
+	const hubStart = await link("pair-start", { comm: 1, hub: { name: "mac" } });
+	assert.equal(hubStart[0], 200); assert.match(hubStart[1].code, /^\d{3} \d{3}$/); assert.equal(hubStart[1].hub, os.hostname());
+	assert.equal((await local("/api/pairing")).body.pending.label, "Hub mac", "approval on this hub's page names the hub");
+	const hubWaiting = link("pair-status", { comm: 1, id: hubStart[1].id });
+	await new Promise(done => setTimeout(done, 100));
+	await local("/api/pairing", { approve: true });
+	const [, hubApproved] = await hubWaiting;
+	assert.equal(hubApproved.state, "approved");
+	const credential = hubApproved.credential;
+	assert.equal((await remote(`/s/${id}/api/snapshot`, { cookie: credential })).status, 401, "a hub credential never opens session pages");
+	assert.equal((await remote(`/s/${id}/api/snapshot`, { headers: { "x-hub-link": credential } })).status, 401);
+	assert.equal((await link("pair-finish", { comm: 2, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 409);
+	assert.equal((await link("pair-finish", { comm: 1, offer: "short", hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 400);
+	assert.equal((await link("pair-finish", { comm: 1, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 200);
+	assert.deepEqual((await local("/api/hubs")).body.hubs.map(h => [h.name, h.url, "credential" in h]), [["mac", "https://mac.tail.ts.net:7781", false]]);
+	// This hub's side: pairing with another hub (here served by itself) returns the code, then finishes after approval there.
+	assert.equal((await local("/api/hubs/pair", { url: "pc.tail.ts.net:" + port })).status, 400, "not with itself");
+	const outgoing = await local("/api/hubs/pair", { url: "wsl.tail.ts.net:7782" });
+	assert.deepEqual([outgoing.status, outgoing.body.url], [200, "https://wsl.tail.ts.net:7782"]);
+	assert.equal((await local("/api/pairing")).body.pending.code, outgoing.body.code);
+	await local("/api/pairing", { approve: true });
+	for (let i = 0; i < 50 && (await local("/api/hubs")).body.pairing.state === "pending"; i++) await new Promise(done => setTimeout(done, 100));
+	const hubs = (await local("/api/hubs")).body;
+	assert.equal(hubs.pairing.state, "paired", JSON.stringify(hubs.pairing));
+	assert.deepEqual(hubs.hubs.map(h => h.url).sort(), [`https://pc.tail.ts.net:${port}`, "https://mac.tail.ts.net:7781", "https://wsl.tail.ts.net:7782"].sort(), "both directions stored");
+	assert.deepEqual((await local("/api/devices")).body.devices.filter(d => d.kind === "hub").length, 3, "approved hubs and the offered credential are hub devices");
+
 	// Revoke: refused at once, and an open event stream is closed.
-	const devices = (await local("/api/devices")).body.devices;
+	const devices = (await local("/api/devices")).body.devices.filter(device => !device.kind);
 	assert.deepEqual(devices.map(device => [device.label, device.login, "hash" in device]), [["iPhone Safari", "me@example.com", false]]);
 	const events = await remote(`/s/${id}/api/events`, { cookie, stream: true });
 	assert.equal(events.statusCode, 200);

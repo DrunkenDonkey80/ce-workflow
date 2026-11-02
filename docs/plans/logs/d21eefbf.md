@@ -49,3 +49,13 @@ Review A1 applied: all 7 findings accepted and checked against the code. Blocked
 - [x] **S04** Add `hub/src/link.ts` with the comm version constant, paired-hub store and version check; add `hub/scripts/test-link.mjs`
   - Load pi-intercom's client at run time through jiti from the installed package; check it supports what S01 needs; without it the hub starts normally and the link menu says why it is unavailable. Test both cases. This local check is separate from the comm number.
   - check: cd hub && node scripts/test-link.mjs -> "link ok" (installed pi-intercom 0.18.1 loaded through jiti)
+
+## 2026-11-02T17:44:48.821Z Superseded resume context
+
+Q-05 settled as D9: stand-ins are visible to every agent on a hub, only the linked session can message through them; others get a readable refusal. All open questions resolved; nothing implemented. Next: S01, read pi-intercom's broker client and protocol to confirm several stand-ins per hub, ask replies, and the delivery-failure and no-mailbox gate.
+
+## 2026-11-02T17:48:17.594Z S05 done: Hub pairing: hub-kind credentials in the device registry (never open session pages; browser cookies never open /link/), /link/ dispatch before Origin/cookie rules, pair-start/status/finish, local /api/hubs and /api/hubs/pair
+
+- [x] **S05** Hub-to-hub pairing using the device registry; approval on the target hub's page
+  - Link-scoped credential and its own dispatch path (S02); C4 keeps passing and gains a case that a hub credential cannot open session pages or their API.
+  - check: node hub/scripts/test-remote.mjs -> "remote ok" (new d21eefbf S05 block: 405, comm-mismatch before payload, owner first, 401 for missing/browser credential, Hub mac approval label, hub credential refused on session pages, pairWith both directions stored); node hub/scripts/test-api.mjs -> "api ok"; hub node scripts/test-link.mjs -> "link ok"
