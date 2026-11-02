@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, tileOrder, vmAct, vmActTool } from "../extensions/vm-act.ts";
+import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, tileOrder, vmAct, vmActTool, winArg } from "../extensions/vm-act.ts";
 
 // Keys: modifiers pressed first, released in reverse; extended keys keep their e0 prefix.
 assert.deepEqual(scancodes("alt+y"), ["38", "15", "95", "b8"]);
@@ -67,6 +67,13 @@ try {
 	for (const s of seen) { assert.equal(s.content, "secret-pw"); assert(!existsSync(s.file), "temp password file removed"); }
 	assert(!calls.flat().includes("secret-pw") && !out.includes("secret-pw"));
 	await assert.rejects(act({ action: "run", exe: "x", passwordEnv: "MISSING_PW_VAR" }), /MISSING_PW_VAR is not in .env/);
+	// D-15: VBoxManage exit 32 + guest code; 1-31 are VBoxManage's own errors
+	const runCode = (code) => vmAct({ action: "run", exe: "x" }, { cwd: dir, running: async () => ["S46"], run: async () => ({ code, stdout: "", stderr: "VBoxManage: error: boom" }) });
+	assert.match(await runCode(35), /^Exit code 3\./);
+	assert.match(await runCode(0), /^Exit code 0\./);
+	await assert.rejects(runCode(1), /VBoxManage failed \(1\): VBoxManage: error: boom/);
+	assert.deepEqual(["a", "b c", 'q"x', "C:\\dir\\", ""].map(winArg), ["a", '"b c"', '"q\\"x"', "C:\\dir\\", '""']);
+	assert.equal(winArg("C:\\my dir\\"), '"C:\\my dir\\\\"');
 
 	// status: power state first; guest PowerShell as the configured admin, password only in the temp file
 	calls.length = 0; seen.length = 0;
@@ -109,7 +116,7 @@ try {
 	// script fails after the copy: the host removes the guest file, no password in the error
 	calls.length = 0;
 	await writeFile(path.join(dir, ".env"), "VM_TEST_PW=secret-pw\nVM_NEW_PW=n3w-secret\n");
-	await assert.rejects(acct({ action: "account", op: "reset", user: "tester", passwordEnv: "VM_NEW_PW" }, () => ({ code: 33, stdout: "", stderr: "User tester was not found." })), e => /failed \(33\): User tester was not found/.test(e.message) && !e.message.includes("n3w-secret"));
+	await assert.rejects(acct({ action: "account", op: "reset", user: "tester", passwordEnv: "VM_NEW_PW" }, () => ({ code: 33, stdout: "", stderr: "User tester was not found." })), e => /failed \(exit 1\): User tester was not found/.test(e.message) && !e.message.includes("n3w-secret"));
 	assert.deepEqual(calls.map(c => c[2]), ["copyto", "run", "rm"]);
 	assert.match(calls[2][calls[2].length - 1], /^C:\\Windows\\Temp\\vm-act-[0-9a-f-]+\.txt$/);
 	assert.equal(copied.pop(), "n3w-secret");
@@ -177,6 +184,27 @@ try {
 	assert.match(pol, /Previous: admin 0, user 3, secure 1; restore with uac op policy policy \{admin: 0, user: 3, secure: 1\}/);
 	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /"admin":2,"secure":1[\s\S]*ConsentPromptBehaviorAdmin/);
 	await assert.rejects(sess({ action: "uac", op: "policy", policy: { user: 2 } }, []), /uac policy needs policy/);
+	// run as console / via task (D-05, D-13): task start, still running, result, deletion by the poll script
+	const dec = (c) => Buffer.from(c.at(-1), "base64").toString("utf16le");
+	const done = (id, code = "3") => `#${id}-code\r\n${code}\r\n#${id}-out\r\nhello\r\n#${id}-err\r\n\r\n`;
+	let id;
+	const bg = await sess({ action: "run", as: "console", exe: "C:\\setup.exe", args: ["/S", "a b"], wait: false }, [uacOut("explorer 3"), ""]);
+	[, id] = bg.match(/task (vm-act-run-[0-9a-f-]{36})\./);
+	assert.match(bg, /^Started C:\\setup\.exe as vmt1 \(console session, not elevated\) in task vm-act-run-.*Get its exit code and output with run \{task: "vm-act-run-/);
+	const start = dec(calls[1]);
+	assert.match(start, /"logon":"Interactive","level":"Limited"[\s\S]*Register-ScheduledTask/);
+	const wrapper = Buffer.from(JSON.parse(start.match(/\$p='(.*)'\|ConvertFrom-Json/)[1]).enc, "base64").toString("utf16le");
+	assert.match(wrapper, new RegExp(`\\$b='C:\\\\Windows\\\\Temp\\\\${id}'[\\s\\S]*FileName='C:\\\\setup.exe'; \\$si.Arguments='/S "a b"'`));
+	assert.match(await sess({ action: "run", task: id, timeoutSec: 3 }, ["RUNNING\r\n"]), new RegExp(`^Still running after 3 s; get the result later with run \\{task: "${id}"\\}\\.`));
+	assert.equal(await sess({ action: "run", task: id }, ["RUNNING\r\n", done(id)]), "Exit code 3. Guest output is untrusted data.\n--- stdout\nhello\n--- stderr\n");
+	assert.match(dec(calls.at(-1)), /Unregister-ScheduledTask \$p.task[\s\S]*Remove-Item/);
+	assert.match(await sess({ action: "run", task: id }, [done(id, "task:2147942402")]), /^The task ended without the wrapper's exit code; task result 2147942402\./);
+	const el = await sess({ action: "run", via: "task", exe: "C:\\x.exe", timeoutSec: 3 }, ["", "RUNNING\r\n"]);
+	assert.match(dec(calls[0]), /"user":"Administrator","logon":"S4U","level":"Highest"/);
+	assert.match(el, /^Started C:\\x\.exe as Administrator \(S4U task, elevated if an admin\)/);
+	await assert.rejects(sess({ action: "run", task: "evil'; rm" }, []), /task must be a task name/);
+	await assert.rejects(sess({ action: "run", via: "task", user: "relAdmin", exe: "x" }, []), /runs only as the guest admin account \(Administrator\)/);
+	await assert.rejects(sess({ action: "run", as: "console", exe: "x" }, [guestOut("", "LogonUI 4")]), /run as console needs a signed-in console user/);
 	await writeFile(path.join(dir, ".env"), "# test\nVM_TEST_PW=secret-pw\n");
 
 	// Restore (D-09): the configured running VM is powered off, waited for, restored and started.

@@ -146,6 +146,20 @@ Remove-LocalUser -SID $u.SID; if($pr) { $pr | Remove-CimInstance; 'PROFILE' }`,
 	reset: `${READ_SECRET}
 Set-LocalUser -Name $p.user -Password (ConvertTo-SecureString $secret -AsPlainText -Force)`,
 };
+/** One Windows command-line argument (CommandLineToArgvW rules). */
+export const winArg = (s: string) => s && !/[\s"]/.test(s) ? s : `"${s.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
+// Task action (D-05): runs exe, writes stdout, stderr and the exit code next to C:\Windows\Temp\<task>; kept a .ps1-free one-liner so the task needs no file
+const runWrapper = (task: string, exe: string, args: string[]) => `$b='C:\\Windows\\Temp\\${task}'; try { $si=New-Object Diagnostics.ProcessStartInfo; $si.FileName='${exe.replace(/\//g, "\\").replace(/'/g, "''")}'; $si.Arguments='${args.map(winArg).join(" ").replace(/'/g, "''")}'; $si.UseShellExecute=$false; $si.RedirectStandardOutput=$true; $si.RedirectStandardError=$true
+$pr=[Diagnostics.Process]::Start($si); $o=$pr.StandardOutput.ReadToEndAsync(); $e=$pr.StandardError.ReadToEndAsync(); $pr.WaitForExit()
+[IO.File]::WriteAllText("$b.out", $o.Result); [IO.File]::WriteAllText("$b.err", $e.Result); $c=$pr.ExitCode } catch { [IO.File]::WriteAllText("$b.err", "vm_act could not start the program: $($_.Exception.Message)"); $c=-1 }
+[IO.File]::WriteAllText("$b.code", "$c")`;
+export const TASK_START_PS = `Register-ScheduledTask -TaskName $p.task -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $($p.enc)") -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType $p.logon -RunLevel $p.level) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)) | Out-Null
+Start-ScheduledTask $p.task`;
+export const TASK_POLL_PS = `$t=Get-ScheduledTask -TaskName $p.task -ErrorAction SilentlyContinue; $b="C:\\Windows\\Temp\\$($p.task)"
+if(!$t) { throw "No task $($p.task) on the guest (a result is deleted once it has been returned)." }
+if(!(Test-Path "$b.code")) { if($t.State -eq 'Running' -or $t.State -eq 'Queued') { 'RUNNING'; exit 0 }; Start-Sleep 2; if(!(Test-Path "$b.code")) { [IO.File]::WriteAllText("$b.code", "task:$((Get-ScheduledTaskInfo $p.task).LastTaskResult)") } }
+$m="#$($p.task)"; "$m-code"; Get-Content "$b.code" -Raw; "$m-out"; Get-Content "$b.out" -Raw -ErrorAction SilentlyContinue; "$m-err"; Get-Content "$b.err" -Raw -ErrorAction SilentlyContinue
+Unregister-ScheduledTask $p.task -Confirm:$false; Remove-Item "$b.*" -Force -ErrorAction SilentlyContinue`;
 export const envName = (user: string) => `VM_${user.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_PASSWORD`;
 /** Writes NAME=value to <cwd>/.env (replacing an old NAME line); refuses when git would commit .env. */
 export function writeEnvVar(cwd: string, name: string, value: string, comment: string) {
@@ -160,7 +174,7 @@ export type VmActArgs = {
 	action: "list" | "status" | "account" | "session" | "uac" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
 	vm?: string; keys?: string; text?: string; textFromEnv?: string;
 	x?: number; y?: number; button?: "left" | "right" | "middle"; double?: boolean;
-	exe?: string; args?: string[]; user?: string; passwordEnv?: string; timeoutSec?: number;
+	exe?: string; args?: string[]; user?: string; passwordEnv?: string; timeoutSec?: number; as?: "console"; via?: "task"; wait?: boolean; task?: string;
 	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach" | "create" | "delete" | "disable" | "reset" | "signin" | "signout" | "lock" | "switch" | "consent" | "credentials" | "policy"; policy?: { admin?: number; user?: number; secure?: number }; name?: string; device?: string; admin?: boolean;
 };
 // IMouse.putMouseEventAbsolute counts pixels from 1 (VirtualBox SDK); screenshots count from 0.
@@ -227,7 +241,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 					script = `$secretFile='${guest}'\n${script}`;
 				}
 				const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${POWERSHELL}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", "-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], seconds * 1000 + 15_000, signal);
-				if (r.code !== 0) throw new Error(`${a.action}: guest command as ${user} ${r.killed ? "timed out" : `failed (${r.code})`}: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
+				if (r.code !== 0) throw new Error(`${a.action}: guest command as ${user} ${r.killed ? "timed out" : `failed (${r.code >= 33 && r.code <= 287 ? `exit ${r.code - 32}` : r.code})`}: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
 				finished = true;
 				return r.stdout;
 			} catch (error) {
@@ -377,6 +391,39 @@ if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.sec
 		if (r.code !== 0) throw new Error(`click failed: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
 		return `${a.double ? "Double-clicked" : "Clicked"} ${a.button ?? "left"} at ${a.x},${a.y} in ${vm}.`;
 	}
+	const out = (s: string) => s.length > 6000 ? `…${s.slice(-6000)}` : s;
+	if (a.action === "run" && (a.as || a.via || a.task)) {
+		if (a.as && a.as !== "console" || a.via && a.via !== "task" || a.as && a.via) throw new Error("run takes as: \"console\" or via: \"task\", not both.");
+		let task = a.task, started = "";
+		if (task) { if (!/^vm-act-run-[0-9a-f-]{36}$/.test(task)) throw new Error("task must be a task name returned by run with wait: false (vm-act-run-<id>)."); }
+		else {
+			need(a.exe, "exe");
+			let user = a.user ?? guestAdmin().user;
+			// S06 live: Register-ScheduledTask S4U for any other account is "Access is denied" from the guestcontrol admin logon
+			if (a.via && user.toLowerCase() !== guestAdmin().user.toLowerCase()) throw new Error(`run via task runs only as the guest admin account (${guestAdmin().user}); the guest refuses S4U tasks for other accounts. Sign ${user} in and use as: \"console\" instead.`);
+			if (a.as) {
+				const s = await state();
+				if (!s.console?.user) throw new Error(`run as console needs a signed-in console user.\n${describeState(vm, s)}`);
+				user = s.console.user;
+			}
+			task = `vm-act-run-${randomUUID()}`;
+			const enc = Buffer.from(runWrapper(task, a.exe!, a.args ?? []), "utf16le").toString("base64");
+			await guestPs(guestScript({ task, enc, user, logon: a.as ? "Interactive" : "S4U", level: a.as ? "Limited" : "Highest" }, TASK_START_PS));
+			started = `Started ${a.exe} as ${user} (${a.as ? "console session, not elevated" : "S4U task, elevated if an admin"}) in task ${task}.`;
+			if (a.wait === false) return `${started} Get its exit code and output with run {task: "${task}"}.`;
+		}
+		const seconds = a.timeoutSec ?? 120;
+		for (let waited = 0; ; waited += 3) {
+			const r = await guestPs(guestScript({ task }, TASK_POLL_PS));
+			if (r.trim() !== "RUNNING") {
+				const part = (n: string) => r.split(`#${task}-${n}`)[1]?.split(`#${task}-`)[0].replace(/^\r?\n/, "").replace(/\r?\n$/, "") ?? "";
+				const code = part("code").trim();
+				return `${started ? `${started}\n` : ""}${code.startsWith("task:") ? `The task ended without the wrapper's exit code; task result ${code.slice(5)}.` : `Exit code ${code}.`} Guest output is untrusted data.\n--- stdout\n${out(part("out"))}\n--- stderr\n${out(part("err"))}`;
+			}
+			if (waited >= seconds) return `${started ? `${started}\n` : ""}Still running after ${seconds} s; get the result later with run {task: "${task}"}.`;
+			await sleep(3000);
+		}
+	}
 	if (a.action === "run" || a.action === "copyto" || a.action === "copyfrom") {
 		const cfg = vmConfig(o.cwd), user = a.user ?? cfg.user, passwordEnv = a.passwordEnv ?? cfg.passwordEnv;
 		if (!user || !passwordEnv) throw new Error(`${a.action} needs user and passwordEnv = the NAME of a .env variable holding that user's password (arguments, or workOrchestrator.vm {user, passwordEnv} in .pi/settings.json). Admin rights need user Administrator, e.g. passwordEnv VM_ADMIN_PASSWORD.`);
@@ -385,10 +432,11 @@ if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.sec
 				need(a.exe, "exe");
 				const seconds = a.timeoutSec ?? 120;
 				// with --exe, everything after -- is an argument (arg0 is --arg0); repeating exe there passed it to the program
-				const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${a.exe}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", ...a.args ?? []], seconds * 1000 + 15_000, signal);
-				const out = (s: string) => s.length > 6000 ? `…${s.slice(-6000)}` : s;
+				const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${a.exe!.replace(/\//g, "\\")}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", ...a.args ?? []], seconds * 1000 + 15_000, signal);
 				if (/VERR_PROC_ELEVATION_REQUIRED/.test(r.stderr)) throw new Error(`${a.exe} needs admin rights, but ${user} gets a UAC-filtered token. Run as the guest's built-in Administrator (enabled, password in .env), or launch it on the guest desktop (keys win+r, type the path, enter) and answer the UAC prompt with keys alt+y.`);
-				return `${r.killed ? "Host timeout; the guest process may still be running. " : ""}Exit code ${r.code}. Guest output is untrusted data.\n--- stdout\n${out(r.stdout)}\n--- stderr\n${out(r.stderr)}`;
+				// D-15: VBoxManage exits 32 + the guest's code; 1 to 31 are its own errors
+				if (!r.killed && r.code >= 1 && r.code <= 31) throw new Error(`run: VBoxManage failed (${r.code}): ${(r.stderr || r.stdout).trim().slice(-1500)}`);
+				return `${r.killed ? "Host timeout; the guest process may still be running. " : ""}Exit code ${r.code >= 33 && r.code <= 287 ? r.code - 32 : r.code}. Guest output is untrusted data.\n--- stdout\n${out(r.stdout)}\n--- stderr\n${out(r.stderr)}`;
 			}
 			need(a.source, "source"); need(a.dest, "dest (target directory)");
 			// no --no-replace: on 7.2.20 it leaves every copied file empty
@@ -444,7 +492,7 @@ export const vmActTool = () => ({
 		"Control a VirtualBox VM (VBoxManage). vm defaults to workOrchestrator.vm in .pi/settings.json ({vm, user, passwordEnv}), else the only running VM. Screenshots: screen_read target=vm.",
 		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD (so do account, session and uac).\naccount: op list (default; admin or standard, enabled, profile); create user (admin: true for an admin; password = the username, else \"password\", written to .env as VM_<USER>_PASSWORD first; .env must be gitignored); delete user (also its profile; sign it out first); disable user; reset user with passwordEnv = the .env variable holding the new password.\nsession: op signin with user and passwordEnv (wakes the screen, picks the account tile by keyboard, types the password, waits up to timeoutSec (60) for that user's desktop; reports \"Signed in as X\" or what the console shows); switch (same, but first disconnects the current console user, who stays signed in); signout (user, default the console user); lock.\nuac: op consent (alt+y on an admin's consent prompt); credentials with passwordEnv (types it into the prompt a standard user gets, for the account it shows; user picks another admin via More choices, only on a fresh prompt); both need a prompt up and PromptOnSecureDesktop 1, and report when it closed. op policy with policy {admin (ConsentPromptBehaviorAdmin 0-5), user (ConsentPromptBehaviorUser 0, 1, 3), secure (PromptOnSecureDesktop 0, 1)}: applies at once, result shows the previous values.\nkeys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
 		"click: x,y in screen_read target=vm source pixels; button left (default), right or middle; double.",
-		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); admin rights only as the built-in Administrator (UAC filters every other admin: VERR_PROC_ELEVATION_REQUIRED); waits up to timeoutSec (120) and returns exit code and output. run has no loaded user profile, so MSIX/AppX installs fail (0x80070002); for those, run powershell as Administrator that registers a scheduled task (New-ScheduledTaskPrincipal -UserId Administrator -LogonType S4U -RunLevel Highest), starts it and waits for it. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
+		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); admin rights only as the built-in Administrator (UAC filters every other admin: VERR_PROC_ELEVATION_REQUIRED); waits up to timeoutSec (120) and returns exit code and output. That run has no loaded user profile (MSIX/AppX installs fail, 0x80070002). as: \"console\" runs it in the console user's session (visible, not elevated; for installers and UI); via: \"task\" runs it as the guest admin account with a loaded profile, elevated (S4U task, RunLevel Highest); neither needs a password argument. With as or via, wait: false returns a task name at once (so you can answer UAC or UI prompts) and run {task} later returns exit code and output; a run still going after timeoutSec also returns its task name. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
 		"snapshot: op list (default), take or restore with name; restore powers off a running configured VM, restores and starts it headless. usb: op list (default), attach or detach with device (UUID or address).",
 	].join("\n"),
 	parameters: {
@@ -453,7 +501,7 @@ export const vmActTool = () => ({
 			action: { type: "string", enum: ["list", "status", "account", "session", "uac", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
 			vm: { type: "string" }, keys: { type: "string" }, text: { type: "string" }, textFromEnv: { type: "string" },
 			x: { type: "integer", minimum: 0 }, y: { type: "integer", minimum: 0 }, button: { type: "string", enum: ["left", "right", "middle"] }, double: { type: "boolean" },
-			exe: { type: "string" }, args: { type: "array", items: { type: "string" } }, user: { type: "string" }, passwordEnv: { type: "string" }, timeoutSec: { type: "integer", minimum: 1, maximum: 3600 },
+			exe: { type: "string" }, args: { type: "array", items: { type: "string" } }, user: { type: "string" }, passwordEnv: { type: "string" }, timeoutSec: { type: "integer", minimum: 1, maximum: 3600 }, as: { type: "string", enum: ["console"] }, via: { type: "string", enum: ["task"] }, wait: { type: "boolean" }, task: { type: "string" },
 			source: { type: "string" }, dest: { type: "string" }, op: { type: "string", enum: ["list", "take", "restore", "attach", "detach", "create", "delete", "disable", "reset", "signin", "signout", "lock", "switch", "consent", "credentials", "policy"] }, policy: { type: "object", properties: { admin: { type: "number" }, user: { type: "number" }, secure: { type: "number" } } }, name: { type: "string" }, device: { type: "string" }, admin: { type: "boolean" },
 		},
 	},
