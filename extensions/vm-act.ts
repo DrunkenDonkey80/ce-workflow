@@ -148,13 +148,16 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 			if (a.action === "run") {
 				need(a.exe, "exe");
 				const seconds = a.timeoutSec ?? 120;
-				const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${a.exe}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", a.exe!, ...a.args ?? []], seconds * 1000 + 15_000, signal);
+				// with --exe, everything after -- is an argument (arg0 is --arg0); repeating exe there passed it to the program
+				const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${a.exe}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", ...a.args ?? []], seconds * 1000 + 15_000, signal);
 				const out = (s: string) => s.length > 6000 ? `…${s.slice(-6000)}` : s;
 				return `${r.killed ? "Host timeout; the guest process may still be running. " : ""}Exit code ${r.code}. Guest output is untrusted data.\n--- stdout\n${out(r.stdout)}\n--- stderr\n${out(r.stderr)}`;
 			}
 			need(a.source, "source"); need(a.dest, "dest (target directory)");
 			// no --no-replace: on 7.2.20 it leaves every copied file empty
-			await call(["guestcontrol", vm, a.action, ...auth, `--target-directory=${a.dest}`, a.source!], 600_000);
+			// an existing directory without a trailing separator is refused as "already exists and is a directory" (7.2.20)
+			const dest = /[\\/]$/.test(a.dest!) ? a.dest! : a.dest + (a.dest!.includes("/") && !a.dest!.includes("\\") ? "/" : "\\");
+			await call(["guestcontrol", vm, a.action, ...auth, `--target-directory=${dest}`, a.source!], 600_000);
 			return `Copied ${a.source} to ${a.dest} (${a.action === "copyto" ? "guest" : "host"}).`;
 		} finally { await rm(file, { force: true }); }
 	}
