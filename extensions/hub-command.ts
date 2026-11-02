@@ -283,7 +283,7 @@ export const scheduleTool = {
 export const projectCommandsTool = {
 	name: "project_commands",
 	label: "Project commands",
-	description: "Add, remove or list the user's project command buttons shown above the hub page's chat for this folder. Use when the user asks to add a (custom/user/project) command or button. kind prompt: clicking sends `text` to the agent as a message (costs a turn), e.g. name \"Run tests\", text \"run the tests and fix failures\". kind run: clicking starts `text` as a shell command line in the project folder on the hub PC with no agent and no captured output, for things that open windows, e.g. name \"Terminal\", text \"start wt -d .\" (Windows) or \"x-terminal-emulator\" (Linux). A run command can be a whole flow with no model turn: its script (put it in a file in the project and run that) may call `pi-hub ask \"Question?\" --option A --option B` (also --context text, --text prefill, --multiple, --no-freeform), which shows an ask_user form on the hub page, waits for the answer, prints the chosen option titles one per line or the typed text, and exits 1 when cancelled; --raw prints JSON {selections, comment} or {text}, and --json '<ask_user JSON>' (or - for stdin) takes option descriptions and questions batches. `pi-hub notice \"text\"` shows a line on the page; the script runs hidden with no captured output, so report results and errors that way. Keep name 1-3 words; help is one short line shown on hover. Adding an existing name replaces it.",
+	description: "Add, remove or list the user's project command buttons shown above the hub page's chat for this folder. Use when the user asks to add a (custom/user/project) command or button. kind prompt: clicking sends `text` to the agent as a message (costs a turn), e.g. name \"Run tests\", text \"run the tests and fix failures\". kind run: clicking starts `text` as a shell command line in the project folder on the hub PC with no agent and no captured output, for things that open windows, e.g. name \"Terminal\", text \"start wt -d .\" (Windows) or \"x-terminal-emulator\" (Linux). A run command can be a whole flow with no model turn: its script (put it in a file in the project and run that) may call `pi-hub ask \"Question?\" --option A --option B` (also --context text, --text prefill, --multiple, --no-freeform), which shows an ask_user form on the hub page, waits for the answer, prints the chosen option titles one per line or the typed text, and exits 1 when cancelled; --raw prints JSON {selections, comment} or {text}, and --json '<ask_user JSON>' (or - for stdin) takes option descriptions and questions batches. `pi-hub notice \"text\"` shows a line on the page; the script runs hidden with no captured output, so report results and errors that way. Keep name 1-3 words; help is one short line shown on hover. Adding an existing name replaces it. Extra clicks: actions [{name, kind, text, click?}] where click middle|ctrl|shift runs that action instead of the button's own; actions without click show only in the button's right-click menu (which also renames and deletes). Every run gets PI_HUB_CLICK=left|middle|ctrl|shift|menu and, when picked from the menu, PI_HUB_ACTION=<action name>, so one script can branch. menu true (run only): on right-click the hub runs `text` with PI_HUB_CLICK=menu and lists each line it prints as an action; picking one runs `text` again with PI_HUB_ACTION set, so the script decides its actions each time.",
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
@@ -293,6 +293,8 @@ export const projectCommandsTool = {
 			text: nullable({ type: "string", description: "prompt: message to send; run: shell command line" }),
 			help: nullable({ type: "string", description: "One short line shown on hover" }),
 			local: nullable({ type: "boolean", description: "Show only on this PC's own hub page, not remote ones (for runs that open windows or act on this desktop)" }),
+			actions: nullable({ type: "array", description: "Extra actions; click binds one to middle, Ctrl+click or Shift+click", items: { type: "object", additionalProperties: false, required: ["name", "kind", "text"], properties: { name: { type: "string" }, kind: { type: "string", enum: ["prompt", "run"] }, text: { type: "string" }, click: { type: "string", enum: ["middle", "ctrl", "shift"] } } } }),
+			menu: nullable({ type: "boolean", description: "run only: the script lists its right-click actions when PI_HUB_CLICK=menu" }),
 		},
 	},
 	async execute(_id, args, _signal, _update, ctx) {
@@ -300,6 +302,8 @@ export const projectCommandsTool = {
 		const cli = ["commands", args.action, "--folder", ctx?.cwd ?? process.cwd()];
 		for (const key of ["name", "kind", "text", "help"]) if (args[key] != null && (args.action === "add" || key === "name")) cli.push(`--${key}`, String(args[key]));
 		if (args.action === "add" && args.local === true) cli.push("--local");
+		if (args.action === "add" && args.menu === true) cli.push("--menu");
+		if (args.action === "add" && args.actions?.length) cli.push("--actions", JSON.stringify(args.actions));
 		const result = await hubCli(cli, 30_000);
 		if (!result.ok) throw new Error(result.text);
 		return { content: [{ type: "text", text: result.text }], details: {} };

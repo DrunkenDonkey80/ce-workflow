@@ -224,6 +224,16 @@ try {
 	assert.deepEqual((await post(id, "answer", { askId: asked.askId, selections: ["prod"] })).body, { accepted: true });
 	await until(() => noticed.includes("Deployed"));
 	assert.equal(fs.readFileSync(path.join(folder, "answer.txt"), "utf8").trim(), "prod");
+	// Extra clicks: a bound Shift action runs instead; a menu script lists actions on right-click and gets the picked one back.
+	const script = "node -e \"const e = process.env; if (e.PI_HUB_CLICK === 'menu' && !e.PI_HUB_ACTION) console.log('Fast\\nSlow'); else require('fs').writeFileSync('click.txt', e.PI_HUB_CLICK + ' ' + (e.PI_HUB_ACTION ?? '-'))\"";
+	await hubPost("/api/commands", { action: "add", folder, name: "Multi", kind: "run", text: script, menu: true, actions: [{ name: "Clean", kind: "run", text: "node -e \"require('fs').writeFileSync('click.txt', 'clean')\"", click: "shift" }] });
+	const clicked = async (data, expected) => { fs.rmSync(path.join(folder, "click.txt"), { force: true }); assert.equal((await post(id, "run", { name: "Multi", ...data })).body.started, true); await until(() => fs.existsSync(path.join(folder, "click.txt")) && fs.readFileSync(path.join(folder, "click.txt"), "utf8") === expected); };
+	await clicked({ click: "ctrl" }, "ctrl -");
+	await clicked({ click: "shift" }, "clean");
+	assert.deepEqual((await post(id, "commandmenu", { name: "Multi" })).body, { actions: ["Fast", "Slow"] });
+	await clicked({ click: "menu", action: "Slow" }, "menu Slow");
+	assert.deepEqual((await post(id, "commands", { rename: "Multi", to: "Many" })).body, { ok: true });
+	assert.equal((await post(id, "run", { name: "Multi" })).status, 404, "renamed");
 	// A script that goes away (killed, timed out) takes its form with it.
 	const gone = new AbortController(), pending = fetch(`${origin}/api/sessions/${id}/ask`, { method: "POST", signal: gone.signal, headers: { "x-hub-key": localKey, "content-type": "application/json" }, body: JSON.stringify({ question: "Left?" }) }).catch(() => {});
 	const left = await until(async () => frames.findLast(frame => frame[0] === "dialog" && frame[1].question === "Left?")?.[1]);

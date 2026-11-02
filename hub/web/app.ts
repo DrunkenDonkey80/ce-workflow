@@ -1338,15 +1338,21 @@ for (const choice of document.querySelectorAll<HTMLButtonElement>(".push-choice"
 for (const id of ["env-var", "drawer-env-var"]) $(id).addEventListener("click", () => void toggleMode("/wo env"));
 // Project commands (the project_commands tool): chips right of >>, folded into Commands ▾ when they no longer fit;
 // the phone drawer lists them. Prompt commands send their text to the agent, run commands start on the hub PC.
-type ProjectCommand = { name: string; kind: "prompt" | "run"; text: string; help?: string };
+// Extra actions: middle, Ctrl+ and Shift+click run a bound one; right-click (long-press) lists them all, then Rename and Delete.
+type CommandAction = { name: string; kind: "prompt" | "run"; text: string; click?: "middle" | "ctrl" | "shift" };
+type ProjectCommand = { name: string; kind: "prompt" | "run"; text: string; help?: string; local?: boolean; actions?: CommandAction[]; menu?: boolean };
+const CLICK_NAMES = { middle: "Middle-click", ctrl: "Ctrl+click", shift: "Shift+click" };
 function commandChip(command: ProjectCommand, withHelp: boolean) {
- const button = html("button", { type: "button", className: "mode-chip project-command", title: (command.help ? command.help + "\n" : "") + (command.kind === "run" ? "Runs on the hub PC: " : "Sends: ") + command.text + "\nRight-click or long-press to delete" });
+ const bound = (command.actions ?? []).filter(action => action.click).map(action => `${CLICK_NAMES[action.click!]}: ${action.name}`);
+ const button = html("button", { type: "button", className: "mode-chip project-command", title: [command.help, (command.kind === "run" ? "Runs on the hub PC: " : "Sends: ") + command.text, ...bound, "Right-click or long-press: actions, rename, delete"].filter(Boolean).join("\n") });
  button.dataset.kind = command.kind; button.append(command.name);
  if (withHelp && command.help) button.append(html("small", { textContent: command.help }));
  let press = 0, pressed = false;
- button.addEventListener("click", event => { if (pressed) { pressed = false; event.preventDefault(); return; } closeMenus(); void runProjectCommand(command); });
- button.addEventListener("contextmenu", event => { event.preventDefault(); void removeProjectCommand(command.name); });
- button.addEventListener("pointerdown", event => { pressed = false; if (event.pointerType === "touch") press = window.setTimeout(() => { pressed = true; void removeProjectCommand(command.name); }, 500); });
+ button.addEventListener("click", event => { if (pressed) { pressed = false; event.preventDefault(); return; } closeMenus(); void runProjectCommand(command, event.ctrlKey || event.metaKey ? "ctrl" : event.shiftKey ? "shift" : "left"); });
+ button.addEventListener("mousedown", event => { if (event.button === 1) event.preventDefault(); }); // no autoscroll
+ button.addEventListener("auxclick", event => { if (event.button === 1) { event.preventDefault(); closeMenus(); void runProjectCommand(command, "middle"); } });
+ button.addEventListener("contextmenu", event => { event.preventDefault(); void openCommandMenu(button, command); });
+ button.addEventListener("pointerdown", event => { pressed = false; if (event.pointerType === "touch") press = window.setTimeout(() => { pressed = true; void openCommandMenu(button, command); }, 500); });
  for (const end of ["pointerup", "pointercancel", "pointermove"]) button.addEventListener(end, () => clearTimeout(press));
  return button;
 }
@@ -1374,9 +1380,22 @@ function fitCommands() {
 }
 new ResizeObserver(fitCommands).observe(document.querySelector(".chat-heading")!);
 $("commands-more").addEventListener("click", () => toggleMenu("commands-more", "commands-menu"));
-async function runProjectCommand(command: ProjectCommand) {
+async function openCommandMenu(anchor: HTMLElement, command: ProjectCommand) {
+ let listed: string[] = [];
+ // A menu script decides its actions on each right-click.
+ if (command.menu) try { listed = (await post("commandmenu", { name: command.name })).actions; } catch (error) { showNotice(error.message); }
+ const own = command.actions ?? [], items: [string, () => void][] = [
+  [command.name, () => void runProjectCommand(command, "left")],
+  ...own.map(action => [action.name + (action.click ? ` (${CLICK_NAMES[action.click]})` : ""), () => void runProjectCommand(command, "menu", action.name)] as [string, () => void]),
+  ...listed.filter(name => !own.some(action => action.name === name)).map(name => [name, () => void runProjectCommand(command, "menu", name)] as [string, () => void]),
+  ["Rename…", () => { const to = prompt("New name:", command.name); if (to?.trim() && to.trim() !== command.name) void post("commands", { rename: command.name, to }).catch(error => showNotice(error.message)); }],
+  ["Delete…", () => void removeProjectCommand(command.name)],
+ ];
+ showMenu(anchor, items);
+}
+async function runProjectCommand(command: ProjectCommand, click: string, action?: string) {
  if (messageSending) return; messageSending = true; renderShell();
- try { await post("run", { name: command.name }); if (command.kind === "run") showNotice("Started on the hub PC: " + command.name, true); }
+ try { const result = await post("run", { name: command.name, click, ...(action !== undefined ? { action } : {}) }); if (result?.started) showNotice("Started on the hub PC: " + (action ?? command.name), true); }
  catch (error) { showNotice(error.message); } finally { messageSending = false; renderShell(); }
 }
 async function removeProjectCommand(name: string) {

@@ -24,7 +24,7 @@ import type { ModelRef, ParkedModels } from "./pi-sdk.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
 import type { Scheduler } from "./scheduler.ts";
-import { runCommand, type Commands } from "./commands.ts";
+import { commandMenu, runCommand, type Commands } from "./commands.ts";
 
 const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 const ANSWER_FIELDS = ["target", "askId", "text", "selections", "comment", "answers", "action", "value", "values", "cancel", "by"];
@@ -385,12 +385,24 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "run": {
 				const command = commands?.list(folder(id)).find(item => item.name === data.name);
 				if (!command) throw fail(404, "That command no longer exists.");
-				if (command.kind === "prompt") return call(id, "/api/message", { text: command.text });
-				runCommand(folder(id), command.text, id); return { ok: true, started: true };
+				// click: which click ran it (a bound action replaces the button's own); action: picked in its right-click menu.
+				const click = ["middle", "ctrl", "shift", "menu"].includes(data.click as string) ? data.click as string : "left";
+				const action = typeof data.action === "string" ? data.action.slice(0, 80) : undefined;
+				const bound = command.actions?.find(item => action !== undefined ? item.name === action : item.click === click);
+				// A menu script's own actions run the button's script again, told which one by PI_HUB_ACTION.
+				if (action !== undefined && !bound && !command.menu) throw fail(404, "That action no longer exists.");
+				const run = bound ?? command;
+				if (run.kind === "prompt") return call(id, "/api/message", { text: run.text });
+				runCommand(folder(id), run.text, id, { PI_HUB_CLICK: click, ...(action !== undefined ? { PI_HUB_ACTION: action } : {}) }); return { ok: true, started: true };
+			}
+			case "commandmenu": {
+				const command = commands?.list(folder(id)).find(item => item.name === data.name);
+				if (!command) throw fail(404, "That command no longer exists.");
+				return { actions: command.menu ? await commandMenu(folder(id), command.text, id) : [] };
 			}
 			case "commands": {
-				only(data, ["target", "remove"], "Invalid fields.");
-				const ok = commands?.remove(folder(id), String(data.remove ?? "")) ?? false;
+				only(data, ["target", "remove", "rename", "to"], "Invalid fields.");
+				const ok = (data.rename !== undefined ? commands?.rename(folder(id), String(data.rename), String(data.to ?? "")) : commands?.remove(folder(id), String(data.remove ?? ""))) ?? false;
 				refresh(folder(id)); return { ok };
 			}
 			// Pi's abort still delivers queued messages, so take them out first and hand them back for editing (rpc-commands.md).

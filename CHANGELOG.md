@@ -4,6 +4,13 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.25 — 2026-11-02
+
+### Added
+- Hub command buttons take more clicks: middle, Ctrl+ and Shift+click can each run their own action, and every run tells its script which click (PI_HUB_CLICK). Right-click (long-press on a phone) opens a menu with all the button's actions, Rename and Delete; a button's script can fill that menu itself each time.
+
+![Right-click on a command button: its actions, Rename and Delete](docs/changelog/0.2.25-command-menu.png)
+
 ## 0.2.24 — 2026-11-02
 
 ### Added
