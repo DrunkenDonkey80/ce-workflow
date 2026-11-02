@@ -138,7 +138,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 	}
 	if (a.action === "run" || a.action === "copyto" || a.action === "copyfrom") {
 		const cfg = vmConfig(o.cwd), user = a.user ?? cfg.user, passwordEnv = a.passwordEnv ?? cfg.passwordEnv;
-		if (!user || !passwordEnv) throw new Error(`${a.action} needs user and passwordEnv (arguments or workOrchestrator.vm in .pi/settings.json).`);
+		if (!user || !passwordEnv) throw new Error(`${a.action} needs user and passwordEnv = the NAME of a .env variable holding that user's password (arguments, or workOrchestrator.vm {user, passwordEnv} in .pi/settings.json). Admin rights need user Administrator, e.g. passwordEnv VM_ADMIN_PASSWORD.`);
 		const password = envValue(o.cwd, passwordEnv);
 		if (password === undefined) throw new Error(`${passwordEnv} is not in .env or the environment.`);
 		const file = path.join(os.tmpdir(), `vm-act-${randomUUID()}.txt`);
@@ -151,6 +151,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 				// with --exe, everything after -- is an argument (arg0 is --arg0); repeating exe there passed it to the program
 				const r = await run(["guestcontrol", vm, "run", ...auth, `--exe=${a.exe}`, "--wait-stdout", "--wait-stderr", `--timeout=${seconds * 1000}`, "--", ...a.args ?? []], seconds * 1000 + 15_000, signal);
 				const out = (s: string) => s.length > 6000 ? `…${s.slice(-6000)}` : s;
+				if (/VERR_PROC_ELEVATION_REQUIRED/.test(r.stderr)) throw new Error(`${a.exe} needs admin rights, but ${user} gets a UAC-filtered token. Run as the guest's built-in Administrator (enabled, password in .env), or launch it on the guest desktop (keys win+r, type the path, enter) and answer the UAC prompt with keys alt+y.`);
 				return `${r.killed ? "Host timeout; the guest process may still be running. " : ""}Exit code ${r.code}. Guest output is untrusted data.\n--- stdout\n${out(r.stdout)}\n--- stderr\n${out(r.stderr)}`;
 			}
 			need(a.source, "source"); need(a.dest, "dest (target directory)");
@@ -208,7 +209,7 @@ export const vmActTool = () => ({
 		"Control a VirtualBox VM (VBoxManage). vm defaults to workOrchestrator.vm in .pi/settings.json ({vm, user, passwordEnv}), else the only running VM. Screenshots: screen_read target=vm.",
 		"list: VMs, running state. keys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
 		"click: x,y in screen_read target=vm source pixels; button left (default), right or middle; double.",
-		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); waits up to timeoutSec (120) and returns exit code and output. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
+		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); admin rights only as the built-in Administrator (UAC filters every other admin: VERR_PROC_ELEVATION_REQUIRED); waits up to timeoutSec (120) and returns exit code and output. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
 		"snapshot: op list (default), take or restore with name; restore powers off a running configured VM, restores and starts it headless. usb: op list (default), attach or detach with device (UUID or address).",
 	].join("\n"),
 	parameters: {

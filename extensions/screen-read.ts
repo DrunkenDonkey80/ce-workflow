@@ -321,7 +321,7 @@ export function screenReadPlan(args: ScreenReadArgs, file: string) {
 	if (args.target === "device") { const d = args.device?.device; return { ...base, op: "file" as const, exe: MOBILECLI, runs: [["screenshot", ...(d ? ["--device", d] : []), "--output", raw]], raw }; }
 	if (args.target === "vm") {
 		if (!args.vm?.vm) throw new Error("target=vm needs vm.vm (resolved by the tool from settings or the only running VM).");
-		return { ...base, op: "file" as const, exe: VBOXMANAGE, runs: [["controlvm", args.vm.vm, "screenshotpng", raw]], raw };
+		return { ...base, op: "file" as const, exe: VBOXMANAGE, runs: [["controlvm", args.vm.vm, "screenshotpng", raw]], raw, wake: ["controlvm", args.vm.vm, "keyboardputscancode", "2a", "aa"] };
 	}
 	throw new Error("target must be window, browser, android, device or vm.");
 }
@@ -396,7 +396,7 @@ export function processPng(input: Buffer, region: number[] | undefined, maxEdge:
 }
 
 // Non-Windows path for browser/android: run the CLI, then crop/scale in Node.
-type FilePlan = { exe: string; runs: string[][]; raw: string; file: string; region?: number[]; maxEdge: number; alt?: { exe: string; runs: string[][] } };
+type FilePlan = { exe: string; runs: string[][]; raw: string; file: string; region?: number[]; maxEdge: number; wake?: string[]; alt?: { exe: string; runs: string[][] } };
 async function runAll(exe: string, runs: string[][], raw: string, toRaw: boolean, signal?: AbortSignal) {
 	for (const [i, args] of runs.entries()) {
 		// Output goes to files: a daemon spawned by the tool (agent-browser, adb) inherits pipes and would block reading them to EOF.
@@ -422,14 +422,20 @@ export async function captureFile(plan: FilePlan, signal?: AbortSignal) {
 	try {
 		try { await runAll(plan.exe, plan.runs, plan.raw, false, signal); }
 		catch (error) {
-			if ((error as NodeJS.ErrnoException).code !== "ENOENT" || !plan.alt) throw error;
-			await runAll(plan.alt.exe, plan.alt.runs, plan.raw, true, signal);
+			// a sleeping VM display fails with E_FAIL: press shift, give it 2 s, try once more
+			if (plan.wake && /E_FAIL/.test(String(error))) {
+				await runAll(plan.exe, [plan.wake], `${plan.raw}.wake`, false, signal).catch(() => {}); // no image is expected from the key press
+				await new Promise((r) => setTimeout(r, 2000));
+				await runAll(plan.exe, plan.runs, plan.raw, false, signal);
+			} else if ((error as NodeJS.ErrnoException).code !== "ENOENT" || !plan.alt) throw error;
+			else await runAll(plan.alt.exe, plan.alt.runs, plan.raw, true, signal);
 		}
 		const { png, ...shot } = processPng(await readFile(plan.raw), plan.region, plan.maxEdge);
 		await writeFile(plan.file, png);
 		return shot;
 	} finally {
 		await rm(plan.raw, { force: true });
+		for (const end of ["out", "err"]) await rm(`${plan.raw}.wake.0.${end}`, { force: true }).catch(() => {});
 		for (const [i] of [...plan.runs, ...plan.alt?.runs ?? []].entries()) for (const end of ["out", "err"]) await rm(`${plan.raw}.${i}.${end}`, { force: true }).catch(() => {});
 	}
 }
