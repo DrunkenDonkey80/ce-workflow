@@ -4,6 +4,12 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.26 — 2026-11-02
+
+### Changed
+- `vm_act run` says how to get admin rights: only the guest's built-in Administrator gets them; other admin accounts now get a clear message instead of a bare VERR_PROC_ELEVATION_REQUIRED. The "needs user and passwordEnv" message explains that passwordEnv is the name of a `.env` variable. The tool description shows the scheduled-task route for installers that need a loaded user profile (MSIX/AppX).
+- `screen_read` target `vm` wakes a sleeping VM display: on E_FAIL it presses Shift, waits 2 s and tries once more.
+
 ## 0.2.25 — 2026-11-02
 
 ### Added
