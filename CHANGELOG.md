@@ -4,6 +4,12 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.24 — 2026-11-02
+
+### Added
+- `vm_act`: agents drive a VirtualBox test VM themselves instead of asking you to install and report back. Keys and typed text (a password can come from the project `.env` without ever showing), mouse clicks at screenshot pixels, snapshot take/restore/list, commands and file copies in the guest, and USB attach/detach. Commands run as the guest's built-in Administrator get admin rights without a UAC prompt. The VM comes from the call, from `workOrchestrator.vm` in settings, or is the only running one. Restore may power off only that configured VM. Off by default: the agent turns it on with `tools_enable` when a task needs a VM.
+- `screen_read` target `vm`: screenshots of a VirtualBox VM, with the same size limits, crop regions and process_image use as the other targets.
+
 ## 0.2.23 — 2026-11-02
 
 ### Added
