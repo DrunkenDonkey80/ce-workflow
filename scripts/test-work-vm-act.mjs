@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, vmAct, vmActTool } from "../extensions/vm-act.ts";
+import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, tileOrder, vmAct, vmActTool } from "../extensions/vm-act.ts";
 
 // Keys: modifiers pressed first, released in reverse; extended keys keep their e0 prefix.
 assert.deepEqual(scancodes("alt+y"), ["38", "15", "95", "b8"]);
@@ -17,8 +17,16 @@ assert.throws(() => scancodes("alt+ü"), /Unknown key "ü". Valid: .*alt/);
 const QS = ` SESSIONNAME               USERNAME                 ID  STATE   TYPE        DEVICE \r\n>services                                            0  Disc                        \r\n                           relAdmin                  1  Disc                        \r\n console                   S22New                    2  Active                      \r\n rdp-tcp                                         65536  Listen                      \r\n`;
 assert.deepEqual(parseSessions(QS).map(s => [s.name, s.user, s.id, s.state]), [["services", "", 0, "Disc"], ["", "relAdmin", 1, "Disc"], ["console", "S22New", 2, "Active"], ["rdp-tcp", "", 65536, "Listen"]]);
 const status = (procs, qs = QS) => parseStatus(`#session\r\n${qs}#proc\r\n${procs}\r\n#uac\r\n0 3 0\r\n`);
-assert.deepEqual(status("LogonUI 1"), { console: { name: "console", user: "S22New", id: 2, state: "Active" }, others: [{ name: "", user: "relAdmin", id: 1, state: "Disc" }], screen: "desktop", uac: false, policy: { admin: 0, user: 3, secure: 0 } }, "LogonUI of a disconnected session does not count");
+assert.deepEqual(status("LogonUI 1\r\nexplorer 2"), { console: { name: "console", user: "S22New", id: 2, state: "Active" }, others: [{ name: "", user: "relAdmin", id: 1, state: "Disc" }], screen: "desktop", uac: false, policy: { admin: 0, user: 3, secure: 0 }, last: undefined, accounts: [] }, "LogonUI of a disconnected session does not count");
+// Tile order (D-16): LastLoggedOnSAMUser, users with a session, the rest A to Z case-insensitive
+const tiles = (last, qs = QS) => tileOrder(parseStatus(`#session\r\n${qs}#proc\r\nLogonUI 2\r\n#uac\r\n0 3 0\r\n#last\r\n${last}\r\n#users\r\nAdministrator\r\nrelAdmin\r\nS22New\r\nTest\r\nb\r\nA\r\n`));
+assert.deepEqual(tiles("WIN11REL\\test"), ["Test", "relAdmin", "S22New", "A", "Administrator", "b"]);
+assert.deepEqual(tiles("relAdmin", ""), ["relAdmin", "A", "Administrator", "b", "S22New", "Test"]);
+assert.deepEqual(tiles("", ""), ["A", "Administrator", "b", "relAdmin", "S22New", "Test"]);
 assert.equal(status("LogonUI 2").screen, "locked");
+assert.equal(status("explorer 1").screen, "starting", "first sign-in: no LogonUI, no explorer yet (Getting things ready)");
+assert.equal(status(`explorer 2
+FirstLogonAnim 2`).screen, "starting", "first sign-in overlay over a running explorer (S04)");
 assert.equal(status("consent 2").uac, true);
 assert.equal(status("LogonUI 3", ` SESSIONNAME               USERNAME                 ID  STATE   TYPE        DEVICE \r\n console                                             3  Conn                        \r\n`).screen, "sign-in");
 assert.equal(status("", "").screen, "none");
@@ -126,6 +134,34 @@ try {
 	await assert.rejects(vmAct({ action: "account", op: "create", user: "tester" }, { cwd: repo, running: async () => ["S46"], run: async () => ({ code: 0, stdout: "", stderr: "" }) }), /not gitignored/);
 	assert(!existsSync(path.join(repo, ".env")));
 	await rm(repo, { recursive: true, force: true });
+	await writeFile(path.join(dir, ".env"), "# test\nVM_TEST_PW=secret-pw\n");
+
+	// session signin: keyboard path of D-16, poll status until the user's desktop
+	const guestOut = (qs, procs, last = "relAdmin") => `#session\r\n${qs}#proc\r\n${procs}\r\n#uac\r\n0 3 0\r\n#last\r\n${last}\r\n#users\r\nAdministrator\r\nrelAdmin\r\nvmt1\r\n`;
+	const CON = (u, id = 1) => `${QS.split("\r\n")[0]}\r\n console                   ${u.padEnd(24)}${String(id).padStart(3)}  Active                      \r\n`;
+	const sess = (a, outs) => { let i = 0; calls.length = 0; return vmAct(a, { cwd: dir, running: async () => ["S46"], sleep: async () => {}, run: async (args) => { calls.push(args); return { code: 0, stdout: args[2] === "run" ? outs[Math.min(i++, outs.length - 1)] : "", stderr: "" }; } }); };
+	await writeFile(path.join(dir, ".env"), "VM_TEST_PW=secret-pw\nVM_VMT1_PASSWORD=vmt1pw\n");
+	const signed = await sess({ action: "session", op: "signin", user: "VMT1", passwordEnv: "VM_VMT1_PASSWORD" }, [guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("vmt1", 3), "explorer 3")]);
+	assert.match(signed, /^Signed in as vmt1 \(console session 3\) after about 6 s\./);
+	const sent = calls.filter(c => c[2] !== "run" && c[0] === "controlvm");
+	const keyCalls = sent.filter(c => c[2] === "keyboardputscancode").map(c => c.slice(3).join(" "));
+	assert.deepEqual(keyCalls.slice(0, 3), [scancodes("shift").join(" "), scancodes("space").join(" "), scancodes("tab tab home down down enter").join(" ")], "relAdmin, Administrator, vmt1: two downs");
+	assert.deepEqual(sent.filter(c => c[2] === "keyboardputstring").map(c => c[3]).join(""), "vmt1pw");
+	assert.equal(keyCalls.at(-1), scancodes("enter").join(" "));
+	// console user on the desktop: signin refuses, switch disconnects first
+	await assert.rejects(sess({ action: "session", op: "signin", user: "vmt1", passwordEnv: "VM_VMT1_PASSWORD" }, [guestOut(CON("relAdmin"), "explorer 1")]), /relAdmin is signed in at the console; use session op switch/);
+	await sess({ action: "session", op: "switch", user: "vmt1", passwordEnv: "VM_VMT1_PASSWORD", timeoutSec: 3 }, [guestOut(CON("relAdmin"), "explorer 1"), "", guestOut(CON("", 4), "LogonUI 4")]).catch(e => assert.match(e.message, /^Not signed in as vmt1 after 3 s \(picked sign-in tile 3 of relAdmin, Administrator, vmt1\)/));
+	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /"id":1[\s\S]*tsdiscon \$p.id/);
+	await sess({ action: "session", op: "signin", user: "relAdmin", passwordEnv: "VM_TEST_PW" }, [guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("relAdmin"), "explorer 1")]);
+	assert.equal(calls.filter(c => c[2] === "keyboardputscancode")[2].slice(3).join(" "), scancodes("tab tab home shift+tab shift+tab").join(" "), "selected tile: back to the password box, not enter");
+	assert.equal(await sess({ action: "session", op: "signin", user: "relAdmin", passwordEnv: "VM_TEST_PW" }, [guestOut(CON("relAdmin"), "explorer 1")]).then(r => r.split("\n")[0]), "Already signed in as relAdmin.");
+	await assert.rejects(sess({ action: "session", op: "signin", user: "nobody", passwordEnv: "VM_TEST_PW" }, [guestOut("", "LogonUI 4")]), /nobody is not an enabled local account/);
+	// signout and lock
+	assert.match(await sess({ action: "session", op: "signout" }, [guestOut(CON("relAdmin"), "explorer 1"), "", guestOut("", "")]), /^Signed out relAdmin\./);
+	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /logoff \$p.id/);
+	assert.match(await sess({ action: "session", op: "lock" }, [guestOut("", "")]), /^Nobody to lock: nobody is signed in at the console\./);
+	assert.match(await sess({ action: "session", op: "lock" }, [guestOut(CON("relAdmin"), "explorer 1"), "", guestOut(CON("relAdmin"), "LogonUI 1")]), /^Locked relAdmin\./);
+	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /"user":"relAdmin"[\s\S]*LogonType Interactive/);
 	await writeFile(path.join(dir, ".env"), "# test\nVM_TEST_PW=secret-pw\n");
 
 	// Restore (D-09): the configured running VM is powered off, waited for, restored and started.

@@ -79,8 +79,10 @@ const POWERSHELL = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.e
 // shortcut: parses English `query session` headers and states, upgrade if a localized guest is used
 export const STATUS_PS = `$ProgressPreference='SilentlyContinue'
 "#session"; query session 2>$null
-"#proc"; Get-Process LogonUI,consent -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Name) $($_.SessionId)" }
+"#proc"; Get-Process LogonUI,consent,explorer,FirstLogonAnim -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Name) $($_.SessionId)" }
 "#uac"; $u=Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System; "$($u.ConsentPromptBehaviorAdmin) $($u.ConsentPromptBehaviorUser) $($u.PromptOnSecureDesktop)"
+"#last"; (Get-ItemProperty HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Authentication\\LogonUI).LastLoggedOnSAMUser
+"#users"; Get-LocalUser | Where-Object Enabled | ForEach-Object Name
 exit 0`;
 export type Session = { name: string; user: string; id: number; state: string };
 /** `query session` rows; the username column can be blank, so it is cut at the header's USERNAME column. */
@@ -93,7 +95,7 @@ export function parseSessions(text: string): Session[] {
 		return m ? [{ name: l.slice(1, col).trim(), user: m[1].trim(), id: Number(m[2]), state: m[3] }] : [];
 	});
 }
-export type GuestState = { console?: Session; others: Session[]; screen: "desktop" | "locked" | "sign-in" | "none"; uac: boolean; policy: { admin?: number; user?: number; secure?: number } };
+export type GuestState = { console?: Session; others: Session[]; screen: "desktop" | "starting" | "locked" | "sign-in" | "none"; uac: boolean; policy: { admin?: number; user?: number; secure?: number }; last?: string; accounts: string[] };
 /** STATUS_PS output: LogonUI in the console session = locked (query user still says Active, S01); consent.exe there = UAC prompt up. */
 export function parseStatus(out: string): GuestState {
 	const part = (name: string) => out.split(/^#/m).find(s => s.startsWith(name))?.slice(name.length) ?? "";
@@ -102,10 +104,19 @@ export function parseStatus(out: string): GuestState {
 	const con = sessions.find(s => s.name.toLowerCase() === "console");
 	const has = (name: string) => !!con && procs.some(([n, id]) => n === name && Number(id) === con.id);
 	const [admin, user, secure] = part("uac").trim().split(/\s+/).map(v => v === "" ? undefined : Number(v));
-	return { console: con, others: sessions.filter(s => s !== con && s.user), screen: !con ? "none" : !con.user ? "sign-in" : has("LogonUI") ? "locked" : "desktop", uac: has("consent"), policy: { admin, user, secure } };
+	const lines = (name: string) => part(name).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+	return { console: con, others: sessions.filter(s => s !== con && s.user), screen: !con ? "none" : !con.user ? "sign-in" : has("LogonUI") ? "locked" : has("explorer") && !has("FirstLogonAnim") ? "desktop" : "starting", uac: has("consent"), policy: { admin, user, secure }, last: lines("last")[0]?.replace(/^.*\\/, ""), accounts: lines("users") };
+}
+/** Sign-in screen tiles as seen on S46 (S01, D-16): LogonUI's selected user (LastLoggedOnSAMUser), then users with a session, then the other enabled accounts; each group A to Z. */
+export function tileOrder(s: GuestState) {
+	const canon = (u?: string) => s.accounts.find(a => a.toLowerCase() === u?.toLowerCase());
+	const az = (x: string[]) => [...new Set(x)].sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+	const first = canon(s.last);
+	const signed = az([s.console, ...s.others].map(x => canon(x?.user)).filter((u): u is string => !!u && u !== first));
+	return [...first ? [first] : [], ...signed, ...az(s.accounts.filter(u => u !== first && !signed.includes(u)))];
 }
 export function describeState(vm: string, s: GuestState) {
-	const c = s.console, screen = { desktop: "desktop", locked: "locked (lock curtain or sign-in screen)", "sign-in": "nobody signed in, sign-in screen", none: "" }[s.screen];
+	const c = s.console, screen = { desktop: "desktop", starting: "signing in or signing out (no desktop yet)", locked: "locked (lock curtain or sign-in screen)", "sign-in": "nobody signed in, sign-in screen", none: "" }[s.screen];
 	return [
 		c ? `Console (session ${c.id}): ${c.user ? `${c.user}, ` : ""}${screen}.` : `${vm} has no console session.`,
 		`Other sessions: ${s.others.map(o => `${o.user} (${o.state}, ${o.id})`).join(", ") || "none"}.`,
@@ -146,11 +157,11 @@ export function writeEnvVar(cwd: string, name: string, value: string, comment: s
 }
 
 export type VmActArgs = {
-	action: "list" | "status" | "account" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
+	action: "list" | "status" | "account" | "session" | "keys" | "type" | "click" | "run" | "copyto" | "copyfrom" | "snapshot" | "usb";
 	vm?: string; keys?: string; text?: string; textFromEnv?: string;
 	x?: number; y?: number; button?: "left" | "right" | "middle"; double?: boolean;
 	exe?: string; args?: string[]; user?: string; passwordEnv?: string; timeoutSec?: number;
-	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach" | "create" | "delete" | "disable" | "reset"; name?: string; device?: string; admin?: boolean;
+	source?: string; dest?: string; op?: "list" | "take" | "restore" | "attach" | "detach" | "create" | "delete" | "disable" | "reset" | "signin" | "signout" | "lock" | "switch"; name?: string; device?: string; admin?: boolean;
 };
 // IMouse.putMouseEventAbsolute counts pixels from 1 (VirtualBox SDK); screenshots count from 0.
 const MOUSE_BASE = 1;
@@ -228,10 +239,58 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 			} finally { await rm(host, { force: true }); }
 		});
 	};
+	const sleep = o.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
+	// one whole keyboardputstring dropped keys at the Windows sign-in box; one call per character (~0.1 s each) keeps them
+	const typeText = async (text: string) => { for (const ch of text) { await call(["controlvm", vm, "keyboardputstring", ch]); await sleep(30); } };
+	const keys = (k: string) => call(["controlvm", vm, "keyboardputscancode", ...scancodes(k)]);
+	const state = async () => parseStatus(await guestPs(STATUS_PS));
 	if (a.action === "status") {
 		const power = /^VMState="([^"]*)"/m.exec(await call(["showvminfo", vm, "--machinereadable"], 30_000))?.[1] ?? "unknown";
 		if (power !== "running") return `VM ${vm}: ${power}.`;
 		return `VM ${vm}: running.\n${describeState(vm, parseStatus(await guestPs(STATUS_PS)))}`;
+	}
+	if (a.action === "session") {
+		const op = a.op, s = await state(), con = s.console, same = (u?: string) => !!u && u.toLowerCase() === a.user?.toLowerCase();
+		if (op === "lock" || op === "signout") {
+			const target = op === "signout" && a.user ? [con, ...s.others].find(x => same(x?.user)) : con?.user ? con : undefined;
+			if (!target) return `Nobody to ${op === "lock" ? "lock" : "sign out"}: ${a.user ? `${a.user} has no session` : "nobody is signed in at the console"}.\n${describeState(vm, s)}`;
+			if (op === "lock") {
+				// LockWorkStation must run in the user's session: an Interactive task does that (S01)
+				await guestPs(guestScript({ user: target.user }, `$t='vm-act-lock-'+[guid]::NewGuid()
+Register-ScheduledTask -TaskName $t -Action (New-ScheduledTaskAction -Execute "$env:windir\\System32\\rundll32.exe" -Argument 'user32.dll,LockWorkStation') -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType Interactive -RunLevel Limited) | Out-Null
+try { Start-ScheduledTask $t; Start-Sleep 2 } finally { Unregister-ScheduledTask $t -Confirm:$false }`));
+			} else await guestPs(guestScript({ id: target.id }, "logoff $p.id"));
+			await sleep(op === "lock" ? 1000 : 5000);
+			return `${op === "lock" ? "Locked" : "Signed out"} ${target.user}.\n${describeState(vm, await state())}`;
+		}
+		if (op !== "signin" && op !== "switch") throw new Error("session op must be signin, signout, lock or switch.");
+		need(a.user, "user (the account to sign in)"); need(a.passwordEnv, "passwordEnv (the .env variable holding that account's password)");
+		const password = envValue(o.cwd, a.passwordEnv!);
+		if (password === undefined) throw new Error(`${a.passwordEnv} is not in .env or the environment.`);
+		if (same(con?.user) && s.screen === "desktop") return `Already signed in as ${con!.user}.\n${describeState(vm, s)}`;
+		let now = s;
+		if (con?.user && !same(con.user) && (op === "switch" || s.screen !== "locked")) {
+			if (op !== "switch") throw new Error(`${con.user} is signed in at the console; use session op switch (keeps ${con.user} signed in) or signout first.\n${describeState(vm, s)}`);
+			await guestPs(guestScript({ id: con.id }, "tsdiscon $p.id"));
+			await sleep(3000);
+			now = await state();
+		}
+		const tiles = tileOrder(now), index = tiles.findIndex(u => same(u));
+		if (index < 0) throw new Error(`${a.user} is not an enabled local account on ${vm} (sign-in tiles: ${tiles.join(", ")}).`);
+		// D-16: shift wakes the display, space lifts the curtain (the first keys after idle only do that)
+		await keys("shift"); await keys("space"); await sleep(2000);
+		// enter on the already-selected first tile keeps the focus in the list, so step back to the password box instead
+		await keys(["tab tab home", ...Array(index).fill("down"), index ? "enter" : "shift+tab shift+tab"].join(" ")); await sleep(1500);
+		await keys(Array(20).fill("backspace").join(" "));
+		await typeText(password);
+		await keys("enter");
+		const seconds = a.timeoutSec ?? 60;
+		for (let waited = 0; ; waited += 3) {
+			await sleep(3000);
+			now = await state();
+			if (same(now.console?.user) && now.screen === "desktop") return `Signed in as ${now.console!.user} (console session ${now.console!.id}) after about ${waited + 3} s.\n${describeState(vm, now)}`;
+			if (waited + 3 >= seconds) throw new Error(`Not signed in as ${a.user} after ${seconds} s (picked sign-in tile ${index + 1} of ${tiles.join(", ")}). The password may be wrong or the tile was not ${a.user} (an account made since the last lock or sign-out has no tile yet); look with screen_read target=vm.\n${describeState(vm, now)}`);
+		}
 	}
 	if (a.action === "account") {
 		const op = a.op ?? "list";
@@ -261,14 +320,12 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		const out = await guestPs(guestScript(p, ACCOUNT_PS[op as "delete" | "disable"]));
 		return op === "delete" ? `Deleted ${user}${/PROFILE/.test(out) ? " and its profile" : ""}.` : `Disabled ${user}.`;
 	}
-	if (a.action === "keys") { need(a.keys, "keys"); await call(["controlvm", vm, "keyboardputscancode", ...scancodes(a.keys!)]); return `Sent ${a.keys}.`; }
+	if (a.action === "keys") { need(a.keys, "keys"); await keys(a.keys!); return `Sent ${a.keys}.`; }
 	if (a.action === "type") {
 		const text = a.textFromEnv ? envValue(o.cwd, a.textFromEnv) : a.text;
 		if (a.textFromEnv && text === undefined) throw new Error(`${a.textFromEnv} is not in .env or the environment.`);
 		need(text, "text or textFromEnv");
-		// one whole keyboardputstring dropped keys at the Windows sign-in box; one call per character (~0.1 s each) keeps them
-		const sleep = o.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
-		for (const ch of text!) { await call(["controlvm", vm, "keyboardputstring", ch]); await sleep(30); }
+		await typeText(text!);
 		return a.textFromEnv ? `Typed ${a.textFromEnv} (value not shown).` : `Typed ${text!.length} characters.`;
 	}
 	if (a.action === "click") {
@@ -310,7 +367,6 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 			// D-09: power off without asking only the configured VM
 			if (vm !== vmConfig(o.cwd).vm) throw new Error(`${vm} is running and is not workOrchestrator.vm; power it off yourself or ask the user before restoring.`);
 			await call(["controlvm", vm, "poweroff"], 60_000);
-			const sleep = o.sleep ?? (ms => new Promise(r => setTimeout(r, ms)));
 			for (let i = 0; !/^VMState="poweroff"/m.test(await call(["showvminfo", vm, "--machinereadable"], 30_000)); i++) {
 				if (i >= 60) throw new Error(`${vm} did not reach poweroff within 30 s.`);
 				await sleep(500);
@@ -329,7 +385,7 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		await call(["controlvm", vm, op === "attach" ? "usbattach" : "usbdetach", a.device!]);
 		return `${op === "attach" ? "Attached" : "Detached"} ${a.device} ${op === "attach" ? "to" : "from"} ${vm}.`;
 	}
-	throw new Error("action must be list, status, account, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
+	throw new Error("action must be list, status, account, session, keys, type, click, run, copyto, copyfrom, snapshot or usb.");
 }
 
 export const vmActTool = () => ({
@@ -343,7 +399,7 @@ export const vmActTool = () => ({
 	],
 	description: [
 		"Control a VirtualBox VM (VBoxManage). vm defaults to workOrchestrator.vm in .pi/settings.json ({vm, user, passwordEnv}), else the only running VM. Screenshots: screen_read target=vm.",
-		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD (so do account, session and uac).\naccount: op list (default; admin or standard, enabled, profile); create user (admin: true for an admin; password = the username, else \"password\", written to .env as VM_<USER>_PASSWORD first; .env must be gitignored); delete user (also its profile; sign it out first); disable user; reset user with passwordEnv = the .env variable holding the new password.\nkeys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
+		"list: VMs, running state. status: VM power state, console session user and screen (desktop, locked, sign-in), other sessions, UAC prompt up, UAC policy; runs guest commands as workOrchestrator.vm {user, passwordEnv}, else Administrator with VM_ADMIN_PASSWORD (so do account, session and uac).\naccount: op list (default; admin or standard, enabled, profile); create user (admin: true for an admin; password = the username, else \"password\", written to .env as VM_<USER>_PASSWORD first; .env must be gitignored); delete user (also its profile; sign it out first); disable user; reset user with passwordEnv = the .env variable holding the new password.\nsession: op signin with user and passwordEnv (wakes the screen, picks the account tile by keyboard, types the password, waits up to timeoutSec (60) for that user's desktop; reports \"Signed in as X\" or what the console shows); switch (same, but first disconnects the current console user, who stays signed in); signout (user, default the console user); lock.\nkeys: combos separated by spaces, e.g. \"win+r\", \"alt+y\", \"ctrl+shift+enter\", \"tab tab enter\" (reach the UAC secure desktop). type: text, or textFromEnv = a variable name from .env (value never shown).",
 		"click: x,y in screen_read target=vm source pixels; button left (default), right or middle; double.",
 		"run: exe (full guest path) with args, as user/passwordEnv (default: settings); admin rights only as the built-in Administrator (UAC filters every other admin: VERR_PROC_ELEVATION_REQUIRED); waits up to timeoutSec (120) and returns exit code and output. run has no loaded user profile, so MSIX/AppX installs fail (0x80070002); for those, run powershell as Administrator that registers a scheduled task (New-ScheduledTaskPrincipal -UserId Administrator -LogonType S4U -RunLevel Highest), starts it and waits for it. copyto/copyfrom: source file and dest directory (copyto: host to guest).",
 		"snapshot: op list (default), take or restore with name; restore powers off a running configured VM, restores and starts it headless. usb: op list (default), attach or detach with device (UUID or address).",
@@ -351,11 +407,11 @@ export const vmActTool = () => ({
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
-			action: { type: "string", enum: ["list", "status", "account", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
+			action: { type: "string", enum: ["list", "status", "account", "session", "keys", "type", "click", "run", "copyto", "copyfrom", "snapshot", "usb"] },
 			vm: { type: "string" }, keys: { type: "string" }, text: { type: "string" }, textFromEnv: { type: "string" },
 			x: { type: "integer", minimum: 0 }, y: { type: "integer", minimum: 0 }, button: { type: "string", enum: ["left", "right", "middle"] }, double: { type: "boolean" },
 			exe: { type: "string" }, args: { type: "array", items: { type: "string" } }, user: { type: "string" }, passwordEnv: { type: "string" }, timeoutSec: { type: "integer", minimum: 1, maximum: 3600 },
-			source: { type: "string" }, dest: { type: "string" }, op: { type: "string", enum: ["list", "take", "restore", "attach", "detach", "create", "delete", "disable", "reset"] }, name: { type: "string" }, device: { type: "string" }, admin: { type: "boolean" },
+			source: { type: "string" }, dest: { type: "string" }, op: { type: "string", enum: ["list", "take", "restore", "attach", "detach", "create", "delete", "disable", "reset", "signin", "signout", "lock", "switch"] }, name: { type: "string" }, device: { type: "string" }, admin: { type: "boolean" },
 		},
 	},
 	async execute(_id: string, args: VmActArgs, signal?: AbortSignal, _update?: unknown, ctx?: any) {
