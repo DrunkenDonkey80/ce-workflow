@@ -38,6 +38,7 @@ export type Live = {
 	intercomRun?: boolean;
 	lastActivity: number;
 	stopping: boolean;
+	autoParking?: boolean; // compacting before an auto-park
 	/** S-15: settles when Pi has started (and parked changes are applied); every delivery awaits it. */
 	ready: Promise<void>;
 };
@@ -315,12 +316,30 @@ export class SessionHost extends EventEmitter {
 	/** D16: park sessions idle for idleParkMinutes with no dialog, even with a page open (posting resumes them); 0 disables. */
 	async autoPark(now = Date.now()): Promise<string[]> {
 		if (!this.idleParkMinutes) return [];
-		const parked = [];
-		for (const live of [...this.live.values()]) {
-			if (this.busyReasons(live.id).length || now - live.lastActivity < this.idleParkMinutes * 60_000) continue;
-			try { await this.park(live.id); parked.push(live.id); } catch { /* turned busy meanwhile; retried next minute */ }
+		const due = [...this.live.values()].filter(live => !live.autoParking && !this.busyReasons(live.id).length && now - live.lastActivity >= this.idleParkMinutes * 60_000);
+		const parked = await Promise.all(due.map(async live => {
+			live.autoParking = true;
+			try {
+				await this.compactBeforePark(live);
+				await this.park(live.id);
+				return live.id;
+			} catch { return undefined; } // turned busy meanwhile; retried next minute
+			finally { live.autoParking = false; }
+		}));
+		return parked.filter((id): id is string => id !== undefined);
+	}
+
+	/**
+	 * A parked session whose prompt cache has expired would compact when the next message is sent, so you wait for it.
+	 * ce-workflow's /wo compact early does it now, only when that holds; park once Pi is quiet for 2 s (at most 15 min).
+	 */
+	private async compactBeforePark(live: Live) {
+		if (!await this.hasHub(live)) return;
+		await this.prompt(live.id, "/wo compact early");
+		for (const end = Date.now() + 15 * 60_000; Date.now() < end && this.live.has(live.id);) {
+			await new Promise(resolve => setTimeout(resolve, 500));
+			if (!this.busyReasons(live.id).length && Date.now() - live.lastActivity >= 2000) return;
 		}
-		return parked;
 	}
 
 	/** Open dialogs, oldest first, so a browser that reconnects mid-ask can show them again. */
@@ -344,10 +363,7 @@ export class SessionHost extends EventEmitter {
 	async call(id: string, endpoint: string, data: Record<string, unknown>): Promise<{ ok: boolean; value?: unknown; status?: number; error?: string }> {
 		const live = this.live.get(id);
 		if (!live) throw new Error("Session is parked.");
-		await live.ready;
-		// Without ce-workflow's /pi-hub, Pi would send the call to the model as an ordinary prompt.
-		live.hubCommand ??= (await live.rpc.send({ type: "get_commands" })).data?.commands?.some((command: { name?: string }) => command.name === "pi-hub") ?? false;
-		if (!live.hubCommand) throw new Error("This session has no ce-workflow hub support.");
+		if (!await this.hasHub(live)) throw new Error("This session has no ce-workflow hub support.");
 		const callId = randomUUID();
 		return new Promise((resolve, reject) => {
 			const done = () => { this.off("ui", onUi); this.off("exit", onExit); };
@@ -361,6 +377,12 @@ export class SessionHost extends EventEmitter {
 			this.on("ui", onUi); this.on("exit", onExit);
 			this.prompt(id, `/pi-hub ${JSON.stringify({ id: callId, endpoint, data })}`).catch(error => { done(); reject(error); });
 		});
+	}
+
+	// Without ce-workflow's /pi-hub (and /wo), Pi would send its commands to the model as an ordinary prompt.
+	private async hasHub(live: Live) {
+		await live.ready;
+		return live.hubCommand ??= (await live.rpc.send({ type: "get_commands" })).data?.commands?.some((command: { name?: string }) => command.name === "pi-hub") ?? false;
 	}
 
 	async prompt(id: string, message: string, extra: Record<string, unknown> = {}): Promise<RpcRecord> {

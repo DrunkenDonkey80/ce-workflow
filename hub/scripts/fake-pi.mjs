@@ -98,6 +98,8 @@ async function handle(cmd) {
 				// Mirrors plan3.ts "Start work in a new session": an extension command replaces the session in-process.
 				if (cmd.message === "/switch") { sessionFile = `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`; header(); messages.length = 0; }
 				if (cmd.message.startsWith("/state ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:state", statusText: cmd.message.slice(7) });
+				// Mirrors ce-workflow work-models.ts startEarlyCompact on a cold cache: compaction starts and ends after the command answers.
+				if (cmd.message === "/wo compact early") { out({ type: "compaction_start" }); setTimeout(() => out({ type: "compaction_end", result: { estimatedTokensAfter: 1000 } }), 300); }
 				if (flags.has("slow-command")) await new Promise(r => setTimeout(r, 300));
 				return reply({ disposition: "handled" });
 			}
