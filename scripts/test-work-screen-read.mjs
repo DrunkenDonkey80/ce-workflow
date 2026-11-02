@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 import { MOBILECLI } from "../extensions/mobile-act.ts";
+import { resolveVm, VBOXMANAGE, vmNames } from "../extensions/vm-act.ts";
 import { captureFile, decodePng, encodePng, processPng, screenRead, screenReadPlan, screenReadTool } from "../extensions/screen-read.ts";
 
 const file = "C:/tmp/x.png";
@@ -22,6 +23,29 @@ assert.deepEqual(screenReadPlan({ target: "device" }, file).runs, [["screenshot"
 assert.deepEqual(screenReadPlan({ target: "device", device: { device: "UDID-1" } }, file).runs, [["screenshot", "--device", "UDID-1", "--output", "C:/tmp/x-raw.png"]]);
 assert.equal(screenReadPlan({ target: "device" }, file).exe, MOBILECLI, "the bundled mobilecli binary");
 assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
+{
+	const vm = screenReadPlan({ target: "vm", vm: { vm: "Win 11" } }, file);
+	assert.deepEqual([vm.exe, vm.runs], [VBOXMANAGE, [["controlvm", "Win 11", "screenshotpng", "C:/tmp/x-raw.png"]]]);
+	if (process.platform === "win32") assert(path.isAbsolute(VBOXMANAGE), "VBoxManage is not on PATH on Windows; screen_read gets its full path");
+	assert.throws(() => screenReadPlan({ target: "vm" }, file), /vm\.vm/);
+	// VM choice: argument, then workOrchestrator.vm, then the only running VM, else an error that lists them.
+	const dir = await mkdtemp(path.join(os.tmpdir(), "vm-resolve-")), agentDir = process.env.PI_CODING_AGENT_DIR;
+	process.env.PI_CODING_AGENT_DIR = dir;
+	try {
+		const running = (names) => async () => names;
+		assert.equal(await resolveVm(dir, "A", running([])), "A");
+		assert.equal(await resolveVm(dir, undefined, running(["B"])), "B");
+		await assert.rejects(resolveVm(dir, undefined, running(["B", "C"])), /Several VMs are running; pass vm \(one of: B, C\)/);
+		await assert.rejects(resolveVm(dir, undefined, running([])), /No VM is running/);
+		await mkdir(path.join(dir, ".pi"));
+		await writeFile(path.join(dir, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { vm: { vm: "S46" } } }));
+		assert.equal(await resolveVm(dir, undefined, running(["B", "C"])), "S46");
+		assert.deepEqual(vmNames('"Win11_VBOX" {0a1b-2c}\r\n"Win 11 S46" {ff-01}\r\n'), ["Win11_VBOX", "Win 11 S46"]);
+	} finally {
+		if (agentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = agentDir;
+		await rm(dir, { recursive: true, force: true });
+	}
+}
 
 // Non-Windows path: pure Node PNG decode (all five filters, RGB and RGBA), crop and downscale.
 {

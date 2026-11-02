@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
 import { MOBILECLI } from "./mobile-act.ts";
+import { resolveVm, VBOXMANAGE } from "./vm-act.ts";
 
 // One PowerShell/C# helper: window enumeration, PrintWindow capture (minimized windows included) and PNG crop/downscale.
 const source = String.raw`
@@ -254,7 +255,8 @@ async function macWindow(exec: Exec, plan: ReturnType<typeof screenReadPlan> & {
 
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 export type ScreenReadArgs = {
-	target: "window" | "browser" | "android" | "device";
+	target: "window" | "browser" | "android" | "device" | "vm";
+	vm?: { vm?: string };
 	window?: { title?: string; pid?: number; handle?: number; minimize?: boolean; size?: number[] };
 	device?: { device?: string };
 	browser?: { url?: string; selector?: string; full?: boolean; session?: string };
@@ -317,7 +319,11 @@ export function screenReadPlan(args: ScreenReadArgs, file: string) {
 		return { ...base, op: "file" as const, exe: "android", runs: [["screen", "capture", ...(device ? [`--device=${device}`] : []), `--output=${raw}`]], raw, alt: { exe: "adb", runs: [[...(device ? ["-s", device] : []), "exec-out", "screencap", "-p"]] } };
 	}
 	if (args.target === "device") { const d = args.device?.device; return { ...base, op: "file" as const, exe: MOBILECLI, runs: [["screenshot", ...(d ? ["--device", d] : []), "--output", raw]], raw }; }
-	throw new Error("target must be window, browser, android or device.");
+	if (args.target === "vm") {
+		if (!args.vm?.vm) throw new Error("target=vm needs vm.vm (resolved by the tool from settings or the only running VM).");
+		return { ...base, op: "file" as const, exe: VBOXMANAGE, runs: [["controlvm", args.vm.vm, "screenshotpng", raw]], raw };
+	}
+	throw new Error("target must be window, browser, android, device or vm.");
 }
 
 const CRC = Array.from({ length: 256 }, (_, n) => { for (let k = 0; k < 8; k++) n = n & 1 ? 0xedb88320 ^ (n >>> 1) : n >>> 1; return n >>> 0; });
@@ -452,7 +458,7 @@ export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: Abor
 export const screenReadTool = (exec: Exec) => ({
 	name: "screen_read",
 	label: "Screen read",
-	promptSnippet: "Capture an app window (even minimized), headless browser page/element, Android screen or iOS Simulator screen as a small cropped image for visual testing",
+	promptSnippet: "Capture an app window (even minimized), headless browser page/element, Android screen, iOS Simulator or VirtualBox VM screen as a small cropped image for visual testing",
 	promptGuidelines: [
 		"For UI testing, launch apps minimized and browsers headless (agent-browser); never put test windows on the user's screen. Read them with screen_read.",
 		"Prefer text first (agent-browser snapshot/read, android layout); use screen_read for visual checks, starting with a small maxEdge and zooming in with region.",
@@ -464,20 +470,23 @@ export const screenReadTool = (exec: Exec) => ({
 		"target=browser: the current agent-browser page (headless; never use --headed for checks). url opens it first; selector captures one element; full captures the whole page; session picks an agent-browser session.",
 		"target=android: android screen capture of the device, or `adb exec-out screencap -p` when the android CLI is missing (serial from `adb devices`; omit when only one is attached).",
 		"target=device: any iOS Simulator, real iPhone or Android device through mobilecli, no window needed (device = id from mobile_act list; omit when one is online). Source pixels are points times the screen scale on iOS (3x on most iPhones).",
+		"target=vm: the screen of a running VirtualBox VM, UAC prompts included (vm = VM name; default: workOrchestrator.vm in settings, else the only running VM). Source pixels are the coordinates vm_act click takes.",
 	].join("\n"),
 	parameters: {
 		type: "object", additionalProperties: false, required: ["target"],
 		properties: {
-			target: { type: "string", enum: ["window", "browser", "android", "device"] },
+			target: { type: "string", enum: ["window", "browser", "android", "device", "vm"] },
 			window: { type: "object", additionalProperties: false, properties: { title: { type: "string" }, pid: { type: "integer" }, handle: { type: "integer" }, minimize: { type: "boolean" }, size: { type: "array", items: { type: "integer", minimum: 100, maximum: 8000 }, minItems: 2, maxItems: 2, description: "[width, height]: resize the window first, in source pixels" } } },
 			browser: { type: "object", additionalProperties: false, properties: { url: { type: "string" }, selector: { type: "string" }, full: { type: "boolean" }, session: { type: "string" } } },
 			android: { type: "object", additionalProperties: false, properties: { device: { type: "string" } } },
 			device: { type: "object", additionalProperties: false, properties: { device: { type: "string" } } },
+			vm: { type: "object", additionalProperties: false, properties: { vm: { type: "string" } } },
 			region: { type: "array", items: { type: "integer" }, minItems: 4, maxItems: 4, description: "[x, y, width, height] crop in source pixels" },
 			maxEdge: { type: "integer", minimum: 64, maximum: 4096, description: "Longest output edge in pixels (default 1024)" },
 		},
 	},
-	async execute(_id: string, args: ScreenReadArgs, signal?: AbortSignal) {
+	async execute(_id: string, args: ScreenReadArgs, signal?: AbortSignal, _update?: unknown, ctx?: any) {
+		if (args.target === "vm") args = { ...args, vm: { vm: await resolveVm(ctx?.cwd ?? process.cwd(), args.vm?.vm) } };
 		const shot = await screenRead(exec, args, signal);
 		if ("matches" in shot) {
 			const lines = shot.matches.map(w => `handle=${w.handle} pid=${w.pid}${w.minimized ? " minimized" : ""} ${w.title}`);
@@ -485,7 +494,7 @@ export const screenReadTool = (exec: Exec) => ({
 			return { content: [{ type: "text", text }], details: shot };
 		}
 		const size = args.target === "window" ? args.window?.size : undefined;
-		const what = shot.window ? `Window "${shot.window.title}" (pid ${shot.window.pid}, handle ${shot.window.handle}${shot.window.minimized ? ", minimized or off screen" : ""})` : args.target === "browser" ? "Browser" : args.target === "device" ? "Device screen" : "Android screen";
+		const what = shot.window ? `Window "${shot.window.title}" (pid ${shot.window.pid}, handle ${shot.window.handle}${shot.window.minimized ? ", minimized or off screen" : ""})` : args.target === "browser" ? "Browser" : args.target === "device" ? "Device screen" : args.target === "vm" ? `VM "${args.vm?.vm}" screen` : "Android screen";
 		const text = `${what}: ${shot.width}x${shot.height} PNG${shot.scale < 1 ? `, scaled x${shot.scale}` : ""} from ${args.region ? `region ${args.region.join(",")} of ` : ""}${shot.sourceWidth}x${shot.sourceHeight} source. ${shot.uniform ? "WARNING: the image is one flat color; the app may not render off-screen. " : ""}${size && (Math.abs(size[0] - shot.sourceWidth) > 2 || Math.abs(size[1] - shot.sourceHeight) > 2) ? `WARNING: asked for ${size.join("x")}; the app kept ${shot.sourceWidth}x${shot.sourceHeight} (its minimum or maximum size, or the screen). ` : ""}File: ${shot.file}`;
 		return { content: [{ type: "text", text }, { type: "image", data: (await readFile(shot.file)).toString("base64"), mimeType: "image/png" }], details: shot };
 	},
