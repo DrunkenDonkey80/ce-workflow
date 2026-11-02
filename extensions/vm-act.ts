@@ -150,8 +150,12 @@ Set-LocalUser -Name $p.user -Password (ConvertTo-SecureString $secret -AsPlainTe
 export const winArg = (s: string) => s && !/[\s"]/.test(s) ? s : `"${s.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
 // Task action (D-05): runs exe, writes stdout, stderr and the exit code next to C:\Windows\Temp\<task>; kept a .ps1-free one-liner so the task needs no file
 const runWrapper = (task: string, exe: string, args: string[]) => `$b='C:\\Windows\\Temp\\${task}'; try { $si=New-Object Diagnostics.ProcessStartInfo; $si.FileName='${exe.replace(/\//g, "\\").replace(/'/g, "''")}'; $si.Arguments='${args.map(winArg).join(" ").replace(/'/g, "''")}'; $si.UseShellExecute=$false; $si.RedirectStandardOutput=$true; $si.RedirectStandardError=$true
-$pr=[Diagnostics.Process]::Start($si); $o=$pr.StandardOutput.ReadToEndAsync(); $e=$pr.StandardError.ReadToEndAsync(); $pr.WaitForExit()
-[IO.File]::WriteAllText("$b.out", $o.Result); [IO.File]::WriteAllText("$b.err", $e.Result); $c=$pr.ExitCode } catch { [IO.File]::WriteAllText("$b.err", "vm_act could not start the program: $($_.Exception.Message)"); $c=-1 }
+try { $pr=[Diagnostics.Process]::Start($si); $o=$pr.StandardOutput.ReadToEndAsync(); $e=$pr.StandardError.ReadToEndAsync(); $pr.WaitForExit()
+[IO.File]::WriteAllText("$b.out", $o.Result); [IO.File]::WriteAllText("$b.err", $e.Result) }
+# 740: a requireAdministrator exe cannot start without the shell; ShellExecute raises the UAC prompt
+catch { if($_.Exception.GetBaseException().NativeErrorCode -ne 740) { throw }; $si.UseShellExecute=$true; $si.RedirectStandardOutput=$false; $si.RedirectStandardError=$false; $pr=[Diagnostics.Process]::Start($si); $pr.WaitForExit()
+[IO.File]::WriteAllText("$b.err", "vm_act: the program requires elevation, so it was started through UAC; no output captured.") }
+$c=$pr.ExitCode } catch { [IO.File]::WriteAllText("$b.err", "vm_act could not start the program: $($_.Exception.Message)"); $c=-1 }
 [IO.File]::WriteAllText("$b.code", "$c")`;
 export const TASK_START_PS = `Register-ScheduledTask -TaskName $p.task -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $($p.enc)") -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType $p.logon -RunLevel $p.level) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)) | Out-Null
 Start-ScheduledTask $p.task`;
@@ -284,6 +288,7 @@ try { Start-ScheduledTask $t; Start-Sleep 2 } finally { Unregister-ScheduledTask
 		const password = envValue(o.cwd, a.passwordEnv!);
 		if (password === undefined) throw new Error(`${a.passwordEnv} is not in .env or the environment.`);
 		if (same(con?.user) && s.screen === "desktop") return `Already signed in as ${con!.user}.\n${describeState(vm, s)}`;
+		if (!s.accounts.some(u => same(u))) throw new Error(`${a.user} is not an enabled local account on ${vm} (sign-in tiles: ${tileOrder(s).join(", ")}).\n${describeState(vm, s)}`);
 		let now = s;
 		if (con?.user && !same(con.user) && (op === "switch" || s.screen !== "locked")) {
 			if (op !== "switch") throw new Error(`${con.user} is signed in at the console; use session op switch (keeps ${con.user} signed in) or signout first.\n${describeState(vm, s)}`);
@@ -291,10 +296,13 @@ try { Start-ScheduledTask $t; Start-Sleep 2 } finally { Unregister-ScheduledTask
 			await sleep(3000);
 			now = await state();
 		}
+		// S08: after a failed sign-in LogonUI keeps that user selected and adds a Reset password tab stop; a fresh LogonUI drops both
+		await guestPs("Get-Process LogonUI -ErrorAction SilentlyContinue | ForEach-Object { tsdiscon $_.SessionId 2>$null }; exit 0");
+		await sleep(3000); now = await state();
 		const tiles = tileOrder(now), index = tiles.findIndex(u => same(u));
 		if (index < 0) throw new Error(`${a.user} is not an enabled local account on ${vm} (sign-in tiles: ${tiles.join(", ")}).`);
 		// D-16: shift wakes the display, space lifts the curtain (the first keys after idle only do that)
-		await keys("shift"); await keys("space"); await sleep(2000);
+		await keys("shift"); await sleep(1000); await keys("space"); await sleep(3000);
 		// enter on the already-selected first tile keeps the focus in the list, so step back to the password box instead
 		await keys(["tab tab home", ...Array(index).fill("down"), index ? "enter" : "shift+tab shift+tab"].join(" ")); await sleep(1500);
 		await keys(Array(20).fill("backspace").join(" "));

@@ -149,8 +149,9 @@ try {
 	const CON = (u, id = 1) => `${QS.split("\r\n")[0]}\r\n console                   ${u.padEnd(24)}${String(id).padStart(3)}  Active                      \r\n`;
 	const sess = (a, outs) => { let i = 0; calls.length = 0; return vmAct(a, { cwd: dir, running: async () => ["S46"], sleep: async () => {}, run: async (args) => { calls.push(args); return { code: 0, stdout: args[2] === "run" ? outs[Math.min(i++, outs.length - 1)] : "", stderr: "" }; } }); };
 	await writeFile(path.join(dir, ".env"), "VM_TEST_PW=secret-pw\nVM_VMT1_PASSWORD=vmt1pw\n");
-	const signed = await sess({ action: "session", op: "signin", user: "VMT1", passwordEnv: "VM_VMT1_PASSWORD" }, [guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("vmt1", 3), "explorer 3")]);
+	const signed = await sess({ action: "session", op: "signin", user: "VMT1", passwordEnv: "VM_VMT1_PASSWORD" }, [guestOut(CON("relAdmin"), "LogonUI 1"), "", guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("vmt1", 3), "explorer 3")]);
 	assert.match(signed, /^Signed in as vmt1 \(console session 3\) after about 6 s\./);
+	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /Get-Process LogonUI[\s\S]*tsdiscon \$_.SessionId/, "fresh LogonUI before the keys (S08)");
 	const sent = calls.filter(c => c[2] !== "run" && c[0] === "controlvm");
 	const keyCalls = sent.filter(c => c[2] === "keyboardputscancode").map(c => c.slice(3).join(" "));
 	assert.deepEqual(keyCalls.slice(0, 3), [scancodes("shift").join(" "), scancodes("space").join(" "), scancodes("tab tab home down down enter").join(" ")], "relAdmin, Administrator, vmt1: two downs");
@@ -160,9 +161,11 @@ try {
 	await assert.rejects(sess({ action: "session", op: "signin", user: "vmt1", passwordEnv: "VM_VMT1_PASSWORD" }, [guestOut(CON("relAdmin"), "explorer 1")]), /relAdmin is signed in at the console; use session op switch/);
 	await sess({ action: "session", op: "switch", user: "vmt1", passwordEnv: "VM_VMT1_PASSWORD", timeoutSec: 3 }, [guestOut(CON("relAdmin"), "explorer 1"), "", guestOut(CON("", 4), "LogonUI 4")]).catch(e => assert.match(e.message, /^Not signed in as vmt1 after 3 s \(picked sign-in tile 3 of relAdmin, Administrator, vmt1\)/));
 	assert.match(Buffer.from(calls[1].at(-1), "base64").toString("utf16le"), /"id":1[\s\S]*tsdiscon \$p.id/);
-	await sess({ action: "session", op: "signin", user: "relAdmin", passwordEnv: "VM_TEST_PW" }, [guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("relAdmin"), "explorer 1")]);
+	await sess({ action: "session", op: "signin", user: "relAdmin", passwordEnv: "VM_TEST_PW" }, [guestOut(CON("relAdmin"), "LogonUI 1"), "", guestOut(CON("relAdmin"), "LogonUI 1"), guestOut(CON("relAdmin"), "explorer 1")]);
 	assert.equal(calls.filter(c => c[2] === "keyboardputscancode")[2].slice(3).join(" "), scancodes("tab tab home shift+tab shift+tab").join(" "), "selected tile: back to the password box, not enter");
 	assert.equal(await sess({ action: "session", op: "signin", user: "relAdmin", passwordEnv: "VM_TEST_PW" }, [guestOut(CON("relAdmin"), "explorer 1")]).then(r => r.split("\n")[0]), "Already signed in as relAdmin.");
+	await assert.rejects(sess({ action: "session", op: "switch", user: "nobody", passwordEnv: "VM_TEST_PW" }, [guestOut(CON("relAdmin"), "explorer 1")]), /nobody is not an enabled local account/);
+	assert.equal(calls.length, 1, "S08: refuse before disconnecting the console user");
 	await assert.rejects(sess({ action: "session", op: "signin", user: "nobody", passwordEnv: "VM_TEST_PW" }, [guestOut("", "LogonUI 4")]), /nobody is not an enabled local account/);
 	// signout and lock
 	assert.match(await sess({ action: "session", op: "signout" }, [guestOut(CON("relAdmin"), "explorer 1"), "", guestOut("", "")]), /^Signed out relAdmin\./);
