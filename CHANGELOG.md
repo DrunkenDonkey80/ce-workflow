@@ -4,6 +4,16 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.28 — 2026-11-02
+
+### Added
+- Hub links: sessions on different hubs (your other computers on the same tailnet) can talk over the normal `intercom` tool. In a session's menu, **Hub links…** pairs this hub with another one (you approve a code on the other hub's page once), links the session to a session there, and unlinks it. The linked session shows up for agents as `name~hub`; send, ask and reply work, and only the linked session can message through it. A hub that is offline shows its links as offline: asks fail at once, plain messages wait until it is back. Hubs keep talking across ce-workflow updates as long as their link protocol ("comm") version is the same. Both hubs need Remote access on.
+
+![Hub links in the session menu](docs/changelog/0.2.28-hub-links.png)
+
+### Fixed
+- Phone: the gear's settings menu opens as a whole panel under the gear instead of a clipped, unscrollable window.
+
 ## 0.2.27 — 2026-11-02
 
 ### Added

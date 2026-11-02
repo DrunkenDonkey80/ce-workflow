@@ -1265,6 +1265,8 @@ function toggleMenu(button: string, menu: string, open = $(menu).hidden) {
  // Under its button, kept inside the window.
  if (open && $(menu).parentElement === $(button).parentElement?.closest(".status-line")) { const own = $(button).getBoundingClientRect(), line = $(menu).parentElement.getBoundingClientRect(); $(menu).style.left = Math.max(0, Math.min($(button).offsetWidth ? own.left : innerWidth, innerWidth - $(menu).offsetWidth - 8) - line.left) + "px"; }
  // Settings grew long: it may use the window's full height below its button.
+ // Phone: the drawer is narrower than settings and clips it, so it is fixed to the window there, right under the gear.
+ if (open && menu === "settings-menu") $(menu).style.top = $(menu).parentElement?.id === "drawer-gear" ? $(button).getBoundingClientRect().bottom + 4 + "px" : "";
  if (open && menu === "settings-menu") $(menu).style.maxHeight = innerHeight - $(menu).getBoundingClientRect().top - 8 + "px";
  if (open) ($(menu).querySelector<HTMLElement>("input, button:not([hidden]):not(:disabled)"))?.focus();
 }
