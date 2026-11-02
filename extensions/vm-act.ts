@@ -161,7 +161,8 @@ export async function vmAct(a: VmActArgs, o: Options): Promise<string> {
 		const op = a.op ?? "list";
 		if (op === "list") return (await call(["snapshot", vm, "list"], 30_000)).trim() || "No snapshots.";
 		need(a.name, "name");
-		if (op === "take") { await call(["snapshot", vm, "take", a.name!, "--live"], 600_000); return `Took snapshot "${a.name}" of ${vm}.`; }
+		// no --live: on a busy 8 GB guest the live save never converged (17 GB .sav and growing); a paused save finishes
+		if (op === "take") { await call(["snapshot", vm, "take", a.name!], 1_800_000); return `Took snapshot "${a.name}" of ${vm}.`; }
 		if (op !== "restore") throw new Error("snapshot op must be list, take or restore.");
 		let note = "";
 		if ((await running()).includes(vm)) {

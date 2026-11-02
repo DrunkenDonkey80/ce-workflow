@@ -61,6 +61,8 @@ try {
 	// Not running: no poweroff, no note.
 	assert.equal(await act({ action: "snapshot", op: "restore", name: "clean", vm: "Other" }, { running: [] }), 'Restored "clean" and started Other headless.');
 
+	await act({ action: "snapshot", op: "take", name: "base" });
+	assert.deepEqual(calls.pop(), ["snapshot", "S46", "take", "base"], "paused save, not --live");
 	calls.length = 0;
 	await act({ action: "usb", op: "attach", device: "{uuid-1}" });
 	assert.deepEqual(calls.pop(), ["controlvm", "S46", "usbattach", "{uuid-1}"]);

@@ -470,7 +470,7 @@ export const screenReadTool = (exec: Exec) => ({
 		"target=browser: the current agent-browser page (headless; never use --headed for checks). url opens it first; selector captures one element; full captures the whole page; session picks an agent-browser session.",
 		"target=android: android screen capture of the device, or `adb exec-out screencap -p` when the android CLI is missing (serial from `adb devices`; omit when only one is attached).",
 		"target=device: any iOS Simulator, real iPhone or Android device through mobilecli, no window needed (device = id from mobile_act list; omit when one is online). Source pixels are points times the screen scale on iOS (3x on most iPhones).",
-		"target=vm: the screen of a running VirtualBox VM, UAC prompts included (vm = VM name; default: workOrchestrator.vm in settings, else the only running VM). Source pixels are the coordinates vm_act click takes.",
+		"target=vm: the screen of a running VirtualBox VM, UAC prompts included (vm = VM name; default: workOrchestrator.vm in settings, else the only running VM). Source pixels are the coordinates vm_act click takes. An E_FAIL from TakeScreenShot means the guest display is asleep: vm_act keys shift, then retry.",
 	].join("\n"),
 	parameters: {
 		type: "object", additionalProperties: false, required: ["target"],
