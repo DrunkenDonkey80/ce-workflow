@@ -757,8 +757,9 @@ export default function plan3(pi) {
 	const webPlan = (plan, bias, text, cwd) => ({ id: plan.id, file: plan.file, title: plan.title, status: plan.status, done: plan.done, total: plan.total, open: plan.open, focus: plan.wip[0] ?? plan.next, bias,
 		planning: isPlanning(plan), finishable: isPlanning(plan) && !plan.open && !finishProblems(text).length && !planDesignGate(cwd, plan).length });
 	async function webModels(ctx) {
-		const scoped = (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => modelRef(entry.model)), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
-		const others = ((await ctx.modelRegistry?.getAvailable?.()) ?? []).map(modelRef).filter(model => !keys.has(model.provider + "/" + model.id));
+		const available = (await ctx.modelRegistry?.getAvailable?.()) ?? [], saved = globalThis[Symbol.for("ce-workflow.scoped-models")]; // /wo Set scoped models
+		const scoped = (saved ? saved.map(id => available.find(model => model.provider + "/" + model.id === id)).filter(Boolean) : (ctx.scopedModels ?? []).filter(entry => entry?.model).map(entry => entry.model)).map(modelRef), keys = new Set(scoped.map(model => model.provider + "/" + model.id));
+		const others = available.map(modelRef).filter(model => !keys.has(model.provider + "/" + model.id));
 		return { scoped, others };
 	}
 	// A message the agent never received must not vanish silently.

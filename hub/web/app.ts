@@ -2096,13 +2096,15 @@ async function changeStatus(endpoint: "model" | "effort", body) {
 // The model menu (D19, sketch C): the list sets this chat's model; below it a Roles summary (default, work, think models,
 // each with its own effort) whose rows open the same list for that role; Escape or ← goes back to this chat's list.
 let modelBack: (() => void) | null = null;
+// Set scoped models keeps its order, search and focused row while clicks toggle models (each click redraws the menu).
+let scopedOrder: string[] = [], scopedQuery = "", scopedFocus = "";
 const effortName = (level: string | null) => !level ? "Session's" : level === "medium" ? "Mid" : level === "xhigh" ? "XHigh" : level[0].toUpperCase() + level.slice(1);
-function modelMenu(menu: HTMLElement, value, mode: "chat" | "default" | "work" | "think" = "chat", all = false) {
+function modelMenu(menu: HTMLElement, value, mode: "chat" | "default" | "work" | "think" | "scoped" = "chat", all = false) {
  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}) => Object.assign(document.createElement(tag), tag === "button" ? { type: "button" } : {}, props);
  const refOf = (model: Model) => model.provider + "/" + model.id, current = value.model;
  const known = [...value.scoped, ...value.others, ...current ? [current] : []];
  const nameOf = (ref: string | null) => !ref ? "—" : known.find(model => refOf(model) === ref)?.name ?? ref.split("/").slice(1).join("/");
- const holds = (ref: string) => mode === "default" ? ref === value.default : mode === "work" ? ref === value.work : mode === "think" ? value.think?.includes(ref) : current && refOf(current) === ref;
+ const holds = (ref: string) => mode === "scoped" ? value.scoped.some(model => refOf(model) === ref) : mode === "default" ? ref === value.default : mode === "work" ? ref === value.work : mode === "think" ? value.think?.includes(ref) : current && refOf(current) === ref;
  const again = (to = mode) => modelMenu(menu, value, to, all);
  // Pi's default model (new sessions start on it) wears a crown, the /wo work model (Plan3 coding) a hammer, think models
  // (Plan models: advisors and review) a thought bubble; one model may wear all three.
@@ -2128,6 +2130,11 @@ function modelMenu(menu: HTMLElement, value, mode: "chat" | "default" | "work" |
    });
    return button;
   }
+  if (mode === "scoped") {
+   const on = !!holds(ref);
+   button.addEventListener("click", () => { scopedFocus = ref; void set(model, { role: "scoped", on: !on }, model.name + (on ? " is no longer scoped." : " is now scoped."))(); });
+   return button;
+  }
   // A role list: clicking picks it (think: toggles it, several allowed); the picked row carries its effort button.
   const role = mode === "default" ? undefined : mode, on = !!holds(ref);
   button.addEventListener("click", set(model, mode === "think" ? { role, on: !on } : { role }, mode === "think" && on ? model.name + " is no longer a think model." : model.name + " is now the " + mode + " model" + (mode === "think" ? " (one of them)." : ".")));
@@ -2139,6 +2146,28 @@ function modelMenu(menu: HTMLElement, value, mode: "chat" | "default" | "work" |
  };
  const models = all || !value.scoped.length ? [...value.scoped, ...value.others] : value.scoped;
  const items: Node[] = [];
+ menu.onkeydown = null;
+ if (mode === "scoped") {
+  // Every model, scoped ones first (in the order on opening); typing searches, Enter toggles, Escape clears the search, then goes back.
+  const pool = [...value.scoped, ...value.others, ...value.available ?? []].filter((model, index, list) => list.findIndex(other => refOf(other) === refOf(model)) === index);
+  const rank = (model: Model) => { const at = scopedOrder.indexOf(refOf(model)); return at < 0 ? scopedOrder.length : at; };
+  const back = el("button", { className: "model-back", textContent: "\u2190 Scoped models" }), search = el("input", { className: "model-search", type: "search", placeholder: "Search models", value: scopedQuery });
+  const options = pool.sort((a, b) => rank(a) - rank(b)).map(option), visible = () => options.filter(button => !button.hidden);
+  const filter = () => { const terms = scopedQuery.toLowerCase().split(/\s+/).filter(Boolean); for (const button of options) button.hidden = !terms.every(term => (button.textContent + " " + button.dataset.ref).toLowerCase().includes(term)); };
+  search.addEventListener("input", () => { scopedQuery = search.value; filter(); });
+  modelBack = () => { if (scopedQuery) { scopedQuery = search.value = ""; filter(); search.focus(); } else again("chat"); };
+  back.addEventListener("click", () => again("chat"));
+  menu.onkeydown = event => {
+   const rows: HTMLElement[] = [search, ...visible()], at = rows.indexOf(document.activeElement as HTMLElement);
+   if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); rows[(at + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length]?.focus(); }
+   else if (event.key === "Enter" && event.target === search) { event.preventDefault(); visible()[0]?.click(); }
+   else if (event.key.length === 1 && event.key !== " " && !event.ctrlKey && !event.metaKey && !event.altKey && event.target !== search) search.focus(); // the key then types into the search
+  };
+  filter();
+  menu.replaceChildren(back, el("p", { className: "model-note", textContent: "Checked models come first in model lists and in Pi's Ctrl+P (from the next session). Saved for all projects." }), search, ...options);
+  (options.find(button => button.dataset.ref === scopedFocus && !button.hidden) ?? search).focus();
+  return;
+ }
  if (mode === "chat") {
   modelBack = null;
   // This chat's thinking level on one line (Low / Mid / High, plus the current one if different).
@@ -2172,6 +2201,10 @@ function modelMenu(menu: HTMLElement, value, mode: "chat" | "default" | "work" |
    row("default", "👑 Default", nameOf(value.default) + (value.default ? " · " + effortName(value.defaultEffort ?? "medium") : "")),
    row("work", "🔨 Work", value.work ? nameOf(value.work) + " · " + effortName(value.workEffort) : "—"),
    row("think", "💭 Think", value.think?.length ? value.think.map(ref => nameOf(ref) + " · " + effortName(value.thinkEffort?.[ref])).join(", ") : "—"));
+  const scoped = el("button", { className: "role-summary set-scoped" });
+  scoped.append(el("span", { textContent: "☑ Set scoped models" }), el("span", { className: "role-value", textContent: value.scoped.length && value.others.length ? String(value.scoped.length) : "all" }), el("span", { textContent: "›" }));
+  scoped.addEventListener("click", () => { scopedOrder = value.scoped.map(refOf); scopedQuery = scopedFocus = ""; again("scoped"); });
+  items.push(scoped);
  }
  menu.replaceChildren(...items);
  (menu.querySelector<HTMLElement>(".model-option[aria-pressed=true]") ?? menu.querySelector<HTMLElement>(".model-option, button"))?.focus();

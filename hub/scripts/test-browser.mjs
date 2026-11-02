@@ -795,7 +795,14 @@ try {
  // Sketch C: a Roles summary under the list; a role row opens that role's list, Escape goes back. (No role is set here:
  // this hub uses the real Pi settings.)
  await browser("click", "#model-button"); await browser("wait", "#model-menu .role-summary");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .role-summary')].map(b => b.dataset.role)"), ["default", "work", "think"], "roles summary under the list");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .role-summary')].map(b => b.dataset.role ?? b.textContent)"), ["default", "work", "think", "\u2611 Set scoped models2\u203a"], "roles summary under the list, then Set scoped models");
+ // Set scoped models: every model, scoped first and checked; typing searches, Escape clears the search, then goes back. (No toggle: real Pi settings.)
+ await browser("click", "#model-menu .set-scoped"); await browser("wait", "#model-menu .model-search");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .model-option')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'))"), ["Fake One:true", "Fake Two:true", "Other:false"]);
+ await browser("press", "t"); await browser("press", "w");
+ assert.deepEqual(await evaluate("[document.activeElement.className, [...document.querySelectorAll('#model-menu .model-option:not([hidden])')].map(b => b.textContent)]"), ["model-search", ["Fake Two"]], "typing searches");
+ await browser("press", "Escape"); assert.equal(await evaluate("document.querySelectorAll('#model-menu .model-option:not([hidden])').length"), 3, "Escape clears the search");
+ await browser("press", "Escape"); assert.equal(await evaluate("!!document.querySelector('#model-menu .effort-row')"), true, "then goes back");
  await browser("click", "#model-menu .model-all");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#model-menu .model-option')].map(b => b.textContent)"), ["Fake One", "Fake Two", "Other"], "show all models adds the unscoped ones");
  await browser("click", "#model-menu [data-role=work]"); await browser("wait", "#model-menu .model-back");

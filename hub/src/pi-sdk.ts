@@ -55,6 +55,10 @@ export type ParkedModels = {
 	/** Sets or clears the work model, or adds (high effort unless given) or removes a think model; one model may hold every
 	 * role. effort: undefined keeps it, null clears the work effort. */
 	setRole(role: "work" | "think", ref: string, on: boolean, effort?: string | null): void;
+	/** Every model with a login, for Set scoped models on a parked session. */
+	available?(): Promise<ModelRef[]>;
+	/** Adds (last) or removes one model in Pi's global enabledModels, written as exact provider/id refs. */
+	setScoped?(folder: string, ref: string, on: boolean): Promise<void>;
 };
 
 function readSettings(dir: string): any {
@@ -106,6 +110,15 @@ export function piModels(dir = agentDir()): ParkedModels {
 			if (!patterns.length) return { models: [], unresolved: [] };
 			const { scopedModels, diagnostics } = await sdk.resolveModelScopeWithDiagnostics(patterns, await piRuntime(dir));
 			return { models: scopedModels.map((entry: any) => ref(entry.model)), unresolved: diagnostics.map((item: any) => item.pattern ?? item.message).filter(Boolean) };
+		},
+		async available() { return (await (await piRuntime(dir)).getAvailable()).map(ref); },
+		async setScoped(folder, target, on) {
+			const sdk = await piSdk(dir), settings = sdk.SettingsManager.create(folder, dir), patterns: string[] = settings.getEnabledModels() ?? [];
+			const { scopedModels, diagnostics } = patterns.length ? await sdk.resolveModelScopeWithDiagnostics(patterns, await piRuntime(dir)) : { scopedModels: [], diagnostics: [] };
+			// Patterns that match nothing now (a provider without a login) stay, as Pi's own scoped-models screen keeps them.
+			const kept = diagnostics.filter((item: any) => item.code === "no-match" && item.pattern).map((item: any) => item.pattern as string);
+			const next = [...kept, ...scopedModels.map((entry: any) => entry.model.provider + "/" + entry.model.id).filter((key: string) => key !== target), ...on ? [target] : []];
+			settings.setEnabledModels(next.length ? next : undefined); await settings.flush();
 		},
 	};
 }

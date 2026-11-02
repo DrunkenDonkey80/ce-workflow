@@ -408,6 +408,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .status-menu .role-summary { display: flex; gap: 8px; white-space: nowrap; } .role-label { flex: none; width: 5.5em; } .role-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .role-row { display: flex; gap: 4px; } .role-row .model-option { flex: 1; min-width: 0; } .status-menu .role-effort { flex: none; border-color: var(--line); }
 .model-back { font-weight: 600; } .model-all { color: var(--muted); }
+.model-search { margin: 2px 0 4px; } .status-menu .set-scoped { margin-top: 4px; }
 .activity:empty { display: none; }
 .activity > * { margin: 8px 16px; }
 .activity details { border-radius: 4px; padding: 4px 8px; background: var(--tool-pending); }

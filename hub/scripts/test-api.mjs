@@ -37,10 +37,13 @@ fs.writeFileSync(path.join(folder, "shot.png"), png);
 let fileReads = 0;
 const models = {
 	fromFile: async () => { fileReads++; return { model: { provider: "fake", id: "fake-2", name: "Fake Two" }, thinking: "high" }; },
-	scoped: async () => ({ models: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], unresolved: ["gone/*"] }),
+	scoped: async () => ({ models: scopedList, unresolved: ["gone/*"] }),
+	available: async () => [...scopedList, { provider: "fake", id: "fake-3", name: "Fake Three" }].filter((model, index, list) => list.findIndex(other => other.id === model.id) === index),
+	setScoped: async (_folder, ref, on) => { scopedList = scopedList.filter(model => model.provider + "/" + model.id !== ref); if (on) scopedList.push({ provider: "fake", id: ref.split("/")[1], name: ref }); },
 	defaultModel: async () => defaultModel, setDefault: async (provider, id, effort) => { defaultModel = provider + "/" + id; defaultEffort = effort; },
 };
 let defaultModel = "fake/fake-2"; let defaultEffort;
+let scopedList = [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }];
 // The /wo roles are real: they edit a settings.json, here a temp one that keeps its other keys.
 const rolesDir = fs.mkdtempSync(path.join(os.tmpdir(), "hub-roles-"));
 fs.writeFileSync(path.join(rolesDir, "settings.json"), JSON.stringify({ theme: "dark", workOrchestrator: { plan3: { models: [{ model: "other/x", thinking: "low" }] } } }));
@@ -127,6 +130,11 @@ try {
 	const tuned = (await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "think", effort: "low" })).body;
 	assert.deepEqual([tuned.think, tuned.thinkEffort], [["other/x", "fake/fake-1", "fake/fake-2"], { "other/x": "low", "fake/fake-1": "low", "fake/fake-2": "high" }], JSON.stringify(tuned));
 	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "fake-1", role: "work", effort: null })).body.workEffort, null, "work back on the session's effort");
+	// Set scoped models: a parked session may scope any model with a login; the answer is the new list.
+	assert.equal((await post(id, "defaultmodel", { provider: "fake", id: "nope", role: "scoped" })).status, 404);
+	const scopedOn = (await post(id, "defaultmodel", { provider: "fake", id: "fake-3", role: "scoped" })).body;
+	assert.deepEqual(scopedOn.scoped.map(model => model.id), ["fake-1", "fake-2", "fake-3"], JSON.stringify(scopedOn));
+	assert.deepEqual((await post(id, "defaultmodel", { provider: "fake", id: "fake-3", role: "scoped", on: false })).body.scoped.map(model => model.id), ["fake-1", "fake-2"]);
 	assert.equal((await post(id, "model", { provider: "fake", id: "fake-1" })).body.model.id, "fake-1");
 	assert.equal((await post(id, "effort", { level: "medium" })).body.effort, "medium");
 	assert.equal(hub.host.live.has(id), false, "a parked pick does not start Pi");

@@ -20,7 +20,7 @@ import { nextName as nextFreeName, type Registry, scanRecents, star } from "./re
 import type { RpcRecord } from "./rpc-client.ts";
 import type { Usage } from "./usage.ts";
 import type { Pool } from "./pool.ts";
-import type { ParkedModels } from "./pi-sdk.ts";
+import type { ModelRef, ParkedModels } from "./pi-sdk.ts";
 import type { SessionHost } from "./sessions.ts";
 import type { SessionView } from "./view.ts";
 import type { Scheduler } from "./scheduler.ts";
@@ -109,11 +109,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		return { target, current: now?.id ?? null, status: await status(id), ...(plan && target.kind === "plan" && plan.id === target.id ? { plan } : {}) };
 	}
 
+	let scopedChanged = false; // Set scoped models was used: running sessions' own scoped lists are out of date
 	async function parkedModels(id: string) {
 		const record = await parkedModel(id);
 		const scoped = models ? await models.scoped(record.folder).catch(() => ({ models: [], unresolved: [] })) : { models: [], unresolved: [] };
 		const note = scoped.models.length ? undefined : "No scoped models in Pi settings; only the session's own model is shown.";
-		return { model: record.model ?? null, effort: record.thinking ?? null, scoped: scoped.models.length ? scoped.models : record.model ? [record.model] : [], others: [], unresolved: scoped.unresolved, parked: true, note };
+		const available = await models?.available?.().catch(() => []) ?? []; // only Set scoped models offers these
+		return { model: record.model ?? null, effort: record.thinking ?? null, scoped: scoped.models.length ? scoped.models : record.model ? [record.model] : [], others: [], available, unresolved: scoped.unresolved, parked: true, note };
 	}
 
 	/** A hub call needs a running Pi; writes start a parked session, reads do not. */
@@ -318,7 +320,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "pool": return pool ? pool.view() : null;
 			// D10: a parked session picks only from Pi settings' scoped models, never from every model.
 			case "models": {
-				const list = host.live.has(id) ? await call(id, `/api/${endpoint}`, {}, { start: false }) as Record<string, unknown> : await parkedModels(id);
+				let list = host.live.has(id) ? await call(id, `/api/${endpoint}`, {}, { start: false }) as { scoped?: ModelRef[]; others?: ModelRef[] } : await parkedModels(id);
+				// A running Pi resolves enabledModels only at session start: after Set scoped models the settings, not the session, say which are scoped.
+				const saved = scopedChanged && host.live.has(id) && models ? await models.scoped(folder(id)).catch(() => null) : null;
+				if (saved) {
+					const all: ModelRef[] = [...list.scoped ?? [], ...list.others ?? []], key = (model: ModelRef) => model.provider + "/" + model.id, keys = new Set(saved.models.map(key));
+					list = { ...list, scoped: saved.models.map(model => all.find(item => key(item) === key(model))).filter((model): model is ModelRef => !!model), others: all.filter(model => !keys.has(key(model))) };
+				}
 				// The list marks the default with a crown, and the /wo work and think models.
 				return { ...list, default: await models?.defaultModel(folder(id)).catch(() => null) ?? null, ...await Promise.resolve().then(() => models?.roles()).catch(() => ({})) };
 			}
@@ -418,13 +426,18 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			}
 			case "defaultmodel": {
 				only(data, ["target", "provider", "id", "role", "on", "effort"], "Invalid model fields.");
-				if (![undefined, "work", "think"].includes(data.role as string) || (data.on !== undefined && typeof data.on !== "boolean")) throw fail(400, "Invalid model role.");
+				if (![undefined, "work", "think", "scoped"].includes(data.role as string) || (data.on !== undefined && typeof data.on !== "boolean")) throw fail(400, "Invalid model role.");
 				// effort: that role's thinking level; null (work only) = use the session's level.
 				if (data.effort !== undefined && !(EFFORTS.includes(data.effort as string) || (data.effort === null && data.role === "work"))) throw fail(400, "Invalid effort level.");
 				if (!models) throw fail(404, "Pi settings are not available.");
-				const list = (await get(id, "models", new URLSearchParams(), undefined as never)) as { scoped?: { provider: string; id: string }[]; others?: { provider: string; id: string }[]; model?: { provider: string; id: string } | null };
-				if (![...list.scoped ?? [], ...list.others ?? [], ...list.model ? [list.model] : []].some(model => model.provider === data.provider && model.id === data.id)) throw fail(404, "That model is not in this session's list.");
+				const list = (await get(id, "models", new URLSearchParams(), undefined as never)) as { scoped?: { provider: string; id: string }[]; others?: { provider: string; id: string }[]; available?: { provider: string; id: string }[]; model?: { provider: string; id: string } | null };
+				if (![...list.scoped ?? [], ...list.others ?? [], ...data.role === "scoped" ? list.available ?? [] : [], ...list.model ? [list.model] : []].some(model => model.provider === data.provider && model.id === data.id)) throw fail(404, "That model is not in this session's list.");
 				const ref = data.provider + "/" + data.id;
+				if (data.role === "scoped") {
+					if (!models.setScoped) throw fail(404, "Pi settings are not available.");
+					await models.setScoped(folder(id), ref, data.on !== false); scopedChanged = true;
+					return get(id, "models", new URLSearchParams(), undefined as never);
+				}
 				// role work/think: the /wo models (on false clears); no role: Pi's default model.
 				if (data.role) models.setRole(data.role as "work" | "think", ref, data.on !== false, data.effort as string | null | undefined);
 				else await models.setDefault(String(data.provider), String(data.id), data.effort as string | undefined);
