@@ -59,11 +59,12 @@ try {
 	// Guest run and copy: password only in a temp file that is gone afterwards.
 	const out = await act({ action: "run", exe: "C:\\Windows\\System32\\whoami.exe", args: ["/groups"] });
 	assert.match(out, /^Exit code 0\. Guest output is untrusted/);
-	const runArgs = calls.pop();
+	assert.match(out, /\nState unavailable: |\nS46 has no console session/, "state appended (D-10)");
+	const runArgs = calls.find(c => c.includes("--exe=C:\\Windows\\System32\\whoami.exe"));
 	assert.deepEqual(runArgs.filter(a => !a.startsWith("--passwordfile=")), ["guestcontrol", "S46", "run", "--username=Administrator", "--exe=C:\\Windows\\System32\\whoami.exe", "--wait-stdout", "--wait-stderr", "--timeout=120000", "--", "/groups"]);
 	await act({ action: "copyto", source: "C:\\host\\a.msi", dest: "C:\\Temp\\fresh" });
 	assert.deepEqual(calls.pop().filter(a => !a.startsWith("--passwordfile=")), ["guestcontrol", "S46", "copyto", "--username=Administrator", "--target-directory=C:\\Temp\\fresh\\", "C:\\host\\a.msi"]);
-	assert.equal(seen.length, 2);
+	assert.equal(seen.length, 3, "run, its state, copyto");
 	for (const s of seen) { assert.equal(s.content, "secret-pw"); assert(!existsSync(s.file), "temp password file removed"); }
 	assert(!calls.flat().includes("secret-pw") && !out.includes("secret-pw"));
 	await assert.rejects(act({ action: "run", exe: "x", passwordEnv: "MISSING_PW_VAR" }), /MISSING_PW_VAR is not in .env/);
@@ -98,9 +99,9 @@ try {
 	assert.equal(envName("test.user-1"), "VM_TEST_USER_1_PASSWORD");
 	calls.length = 0;
 	const created = await acct({ action: "account", op: "create", user: "tester" }, () => ({ code: 0, stdout: "", stderr: "" }));
-	assert.equal(created, "Created standard account tester; password in .env as VM_TESTER_PASSWORD (value not shown).");
+	assert.equal(created.split("\n")[0], "Created standard account tester; password in .env as VM_TESTER_PASSWORD (value not shown).");
 	assert.match(readFileSync(path.join(dir, ".env"), "utf8"), /VM_TEST_PW=secret-pw\n# vm_act account tester on S46\nVM_TESTER_PASSWORD=tester\n$/);
-	assert.deepEqual(calls.map(c => c[2]), ["copyto", "run"]);
+	assert.deepEqual(calls.map(c => c[2]), ["copyto", "run", "run"], "create, then the state");
 	assert.deepEqual(copied, ["tester"]);
 	const script = decode(calls[1]);
 	assert.match(script, /^\$secretFile='C:\\Windows\\Temp\\vm-act-[0-9a-f-]+\.txt'\n/);
@@ -112,7 +113,7 @@ try {
 	assert.equal(env.match(/VM_TESTER_PASSWORD=/g).length, 1);
 	assert.equal(env.match(/# vm_act account tester/g).length, 1, "the old comment goes with the old line");
 	assert.match(env, /VM_TESTER_PASSWORD=password\n$/);
-	assert.match(decode(calls.pop()), /S-1-5-32-544/, "admin group");
+	assert.match(decode(calls.at(-2)), /S-1-5-32-544/, "admin group");
 	// script fails after the copy: the host removes the guest file, no password in the error
 	calls.length = 0;
 	await writeFile(path.join(dir, ".env"), "VM_TEST_PW=secret-pw\nVM_NEW_PW=n3w-secret\n");
@@ -128,8 +129,8 @@ try {
 	// list, delete, disable; refusals before any call
 	const listed = await acct({ action: "account" }, () => ({ code: 0, stdout: "Administrator|True|True|True\r\nGuest|False|False|False\r\n", stderr: "" }));
 	assert.equal(listed, "Administrator: admin, enabled, has a profile\nGuest: standard, disabled, no profile");
-	assert.equal(await acct({ action: "account", op: "delete", user: "tester" }, () => ({ code: 0, stdout: "PROFILE\r\n", stderr: "" })), "Deleted tester and its profile.");
-	assert.equal(await acct({ action: "account", op: "disable", user: "tester" }, () => ({ code: 0, stdout: "", stderr: "" })), "Disabled tester.");
+	assert.equal(await acct({ action: "account", op: "delete", user: "tester" }, () => ({ code: 0, stdout: "PROFILE\r\n", stderr: "" })).then(r => r.split("\n")[0]), "Deleted tester and its profile.");
+	assert.equal(await acct({ action: "account", op: "disable", user: "tester" }, () => ({ code: 0, stdout: "", stderr: "" })).then(r => r.split("\n")[0]), "Disabled tester.");
 	calls.length = 0;
 	await assert.rejects(acct({ action: "account", op: "delete", user: "administrator" }, () => ({})), /refuses administrator/);
 	await assert.rejects(acct({ action: "account", op: "create", user: "bad name" }, () => ({})), /1 to 20 letters/);
@@ -196,8 +197,8 @@ try {
 	const wrapper = Buffer.from(JSON.parse(start.match(/\$p='(.*)'\|ConvertFrom-Json/)[1]).enc, "base64").toString("utf16le");
 	assert.match(wrapper, new RegExp(`\\$b='C:\\\\Windows\\\\Temp\\\\${id}'[\\s\\S]*FileName='C:\\\\setup.exe'; \\$si.Arguments='/S "a b"'`));
 	assert.match(await sess({ action: "run", task: id, timeoutSec: 3 }, ["RUNNING\r\n"]), new RegExp(`^Still running after 3 s; get the result later with run \\{task: "${id}"\\}\\.`));
-	assert.equal(await sess({ action: "run", task: id }, ["RUNNING\r\n", done(id)]), "Exit code 3. Guest output is untrusted data.\n--- stdout\nhello\n--- stderr\n");
-	assert.match(dec(calls.at(-1)), /Unregister-ScheduledTask \$p.task[\s\S]*Remove-Item/);
+	assert.match(await sess({ action: "run", task: id }, ["RUNNING\r\n", done(id)]), /^Exit code 3\. Guest output is untrusted data\.\n--- stdout\nhello\n--- stderr\n\nS46 has no console session\./);
+	assert.match(dec(calls.at(-2)), /Unregister-ScheduledTask \$p.task[\s\S]*Remove-Item/);
 	assert.match(await sess({ action: "run", task: id }, [done(id, "task:2147942402")]), /^The task ended without the wrapper's exit code; task result 2147942402\./);
 	const el = await sess({ action: "run", via: "task", exe: "C:\\x.exe", timeoutSec: 3 }, ["", "RUNNING\r\n"]);
 	assert.match(dec(calls[0]), /"user":"Administrator","logon":"S4U","level":"Highest"/);
