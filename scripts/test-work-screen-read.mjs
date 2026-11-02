@@ -37,6 +37,8 @@ assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
 	assert.equal(shot.sourceWidth, 2);
 	await assert.rejects(captureFile({ exe: process.execPath, runs: [["-e", "console.error('E_FAIL');process.exit(1)", raw]], raw, file: path.join(d, "o2.png"), maxEdge: 64, wake: ["-e", "0"] }), /E_FAIL/);
 	await rm(d, { recursive: true, force: true });
+	// Windows dispatch: vm goes through captureFile (wake retry), not the PowerShell runner (exec is never called)
+	await assert.rejects(screenRead(null, { target: "vm", vm: { vm: `no-such-vm-${process.pid}` } }, undefined, os.tmpdir(), "win32"), e => !(e instanceof TypeError) && /controlvm|ENOENT/.test(e.message));
 	// VM choice: argument, then workOrchestrator.vm, then the only running VM, else an error that lists them.
 	const dir = await mkdtemp(path.join(os.tmpdir(), "vm-resolve-")), agentDir = process.env.PI_CODING_AGENT_DIR;
 	process.env.PI_CODING_AGENT_DIR = dir;

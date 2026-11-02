@@ -446,7 +446,8 @@ export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: Abor
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
 	if (platform === "darwin" && plan.op === "window") return macWindow(exec, plan as ReturnType<typeof screenReadPlan> & { op: "window" }, signal);
-	if (platform !== "win32") return { file, window: undefined, ...await captureFile(plan as FilePlan, signal).catch(e => {
+	// vm too on Windows: only captureFile has the wake retry, and VBoxManage is an absolute .exe path that spawn runs directly
+	if (platform !== "win32" || (plan as FilePlan).wake) return { file, window: undefined, ...await captureFile(plan as FilePlan, signal).catch(e => {
 		throw e?.code === "ENOENT" && (plan as FilePlan).exe === MOBILECLI ? new Error("screen_read target=device needs mobilecli, which ships with ce-workflow on macOS, Linux and Windows (x64, arm64); reinstall ce-workflow or put mobilecli on PATH.") : e;
 	}) };
 	// env, not argv: no quoting issues; spawn copies it synchronously, so parallel calls cannot mix it up
