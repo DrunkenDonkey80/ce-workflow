@@ -28,6 +28,17 @@ assert.throws(() => screenReadPlan({ target: "desktop" }, file), /target/);
 	assert.deepEqual([vm.exe, vm.runs], [VBOXMANAGE, [["controlvm", "Win 11", "screenshotpng", "C:/tmp/x-raw.png"]]]);
 	if (process.platform === "win32") assert(path.isAbsolute(VBOXMANAGE), "VBoxManage is not on PATH on Windows; screen_read gets its full path");
 	assert.throws(() => screenReadPlan({ target: "vm" }, file), /vm\.vm/);
+	assert.deepEqual(vm.wake, ["controlvm", "Win 11", "keyboardputscancode", "2a", "aa"]);
+	// sleeping display: the first shot fails with E_FAIL, the wake key arrives, the retry succeeds
+	const d = await mkdtemp(path.join(os.tmpdir(), "vm-wake-")), raw = path.join(d, "raw.png"), woke = path.join(d, "woke");
+	const png = encodePng(2, 2, Buffer.alloc(16, 255)).toString("base64");
+	const fake = `const fs=require("fs"),a=process.argv.slice(1);if(a[0]==="wake"){fs.writeFileSync(${JSON.stringify(woke)},"");process.exit(0)}if(!fs.existsSync(${JSON.stringify(woke)})){console.error("error: code E_FAIL (0x80004005)");process.exit(1)}fs.writeFileSync(a[0],Buffer.from("${png}","base64"))`;
+	const shot = await captureFile({ exe: process.execPath, runs: [["-e", fake, raw]], raw, file: path.join(d, "out.png"), maxEdge: 64, wake: ["-e", fake, "wake"] });
+	assert.equal(shot.sourceWidth, 2);
+	await assert.rejects(captureFile({ exe: process.execPath, runs: [["-e", "console.error('E_FAIL');process.exit(1)", raw]], raw, file: path.join(d, "o2.png"), maxEdge: 64, wake: ["-e", "0"] }), /E_FAIL/);
+	await rm(d, { recursive: true, force: true });
+	// Windows dispatch: vm goes through captureFile (wake retry), not the PowerShell runner (exec is never called)
+	await assert.rejects(screenRead(null, { target: "vm", vm: { vm: `no-such-vm-${process.pid}` } }, undefined, os.tmpdir(), "win32"), e => !(e instanceof TypeError) && /controlvm|ENOENT/.test(e.message));
 	// VM choice: argument, then workOrchestrator.vm, then the only running VM, else an error that lists them.
 	const dir = await mkdtemp(path.join(os.tmpdir(), "vm-resolve-")), agentDir = process.env.PI_CODING_AGENT_DIR;
 	process.env.PI_CODING_AGENT_DIR = dir;
