@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { assignRefs, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
+import { alertText, assignRefs, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -23,21 +23,24 @@ const home = [
 	btn("⚙, Settings", "nav_settings", 546),
 ];
 
-/** Fake mobilecli: `screens` is the sequence of dump ui results; `agent` says whether the helper app is installed. */
-function fake({ list = [SIM], screens = [home], agent = true } = {}) {
+/** Fake mobilecli: `screens` is the sequence of dump ui results; `agent` says whether the helper app is installed; `launches`/`kills` say whether apps launch/terminate really change the app in front. */
+function fake({ list = [SIM], screens = [home], agent = true, launches = true, kills = true } = {}) {
 	const calls = [];
 	let shown = 0;
+	const f = { front: "com.apple.springboard" };
 	const exec = async (command, args) => {
 		calls.push([command, ...args]);
 		if (command === "npm") return { code: 0, stdout: "added 2 packages" };
 		if (args[0] === "devices") return ok({ devices: list });
 		if (args[0] === "device" && args[1] === "info") return ok({ device: { screenSize: { width: 402, height: 874, scale: 3 } } });
 		if (args[0] === "agent" && args[1] === "status") return agent ? ok({ version: "0.0.35" }) : { code: 1, stdout: JSON.stringify({ status: "error", error: "agent not installed" }) };
-		if (args[0] === "apps" && args[1] === "foreground") return ok({ packageName: "com.apple.springboard" });
+		if (args[0] === "apps" && args[1] === "foreground") return ok({ packageName: f.front });
+		if (args[0] === "apps" && args[1] === "launch" && launches) f.front = args[2];
+		if (args[0] === "apps" && args[1] === "terminate" && kills) f.front = "com.apple.springboard";
 		if (args[0] === "dump") return ok({ elements: screens[Math.min(shown++, screens.length - 1)] });
 		return ok({});
 	};
-	return { exec, calls, acts: () => calls.filter(c => c[1] === "io" || c[1] === "apps" || c[0] === "npm" || (c[1] === "agent" && c[2] === "install")).map(c => c.slice(1).join(" ")) };
+	return { exec, calls, app: f, acts: () => calls.filter(c => c[1] === "io" || (c[1] === "apps" && c[2] !== "foreground") || c[0] === "npm" || (c[1] === "agent" && c[2] === "install")).map(c => c.slice(1).join(" ")) };
 }
 const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 
@@ -150,7 +153,7 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	await mobileAct(f.exec, { action: "type", ref: "e5", text: "XY", submit: true, settleMs: 0 }, opts());
 	await mobileAct(f.exec, { action: "swipe", direction: "down", settleMs: 0 }, opts());
 	assert.equal(await mobileAct(f.exec, { action: "button", button: "home", settleMs: 0 }, opts()), "Done.");
-	assert.match(await mobileAct(f.exec, { action: "launch", appId: "com.demo" }, opts()), /Launched com.demo/);
+	assert.match(await mobileAct(f.exec, { action: "launch", appId: "com.demo" }, opts()), /^Launched com\.demo; it is in front\.\nDone\. The screen changed:\nUNTRUSTED[^\n]*\n[^\n]*app in front: com\.demo\n\n\[e1\]/, "launch checks the app in front and returns its first screen");
 	const d = "--device SIM-1";
 	assert.deepEqual(f.acts(), [
 		`io tap 201,570 ${d}`, `io tap 201,224 ${d}`, `io tap 10,20 ${d}`, `io longpress 201,224 --duration 1500 ${d}`,
@@ -167,6 +170,52 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	resetSession();
 	await mobileAct(full.exec, { action: "snapshot" }, opts());
 	assert.match(await mobileAct(full.exec, { action: "tap", ref: "e1" }, opts()), /^Done\. The screen changed:\nUNTRUSTED[^]*\[e5\] Button "Other screen"/, "mostly new screen -> full list");
+}
+
+// Checking what really happened: launch/relaunch verify the app in front, another app in front and alerts head the result (Viktor feedback).
+{
+	resetSession();
+	const stuck = fake({ launches: false });
+	await assert.rejects(mobileAct(stuck.exec, { action: "launch", appId: "com.demo" }, opts()), /launch did not bring com\.demo to the front: com\.apple\.springboard is in front/);
+	resetSession();
+	const immortal = fake({ kills: false });
+	immortal.app.front = "com.demo";
+	await assert.rejects(mobileAct(immortal.exec, { action: "relaunch", appId: "com.demo" }, opts()), /apps terminate did not close com\.demo: it is still in front/);
+	assert.deepEqual(immortal.acts(), ["apps terminate com.demo --device SIM-1"], "no launch after a failed terminate");
+
+	resetSession();
+	const f = fake({ screens: [home, home] });
+	f.app.front = "com.demo";
+	assert.match(await mobileAct(f.exec, { action: "snapshot" }, opts()), /^UNTRUSTED[^\n]*\niPhone 17 402x874 points \(tap coordinates use points\), app in front: com\.demo\n/);
+	f.app.front = "com.apple.mobilesafari";
+	assert.match(await mobileAct(f.exec, { action: "tap", ref: "e1" }, opts()), /^APP CHANGED: com\.apple\.mobilesafari is in front now, not com\.demo \(did it close or crash\?\)\nDone\. The screen changed:/, "same elements, other app: still flagged, full screen");
+
+	const alert = { type: "Alert", label: "Connection Error!", rect: { x: 50, y: 300, width: 300, height: 200 }, children: [
+		{ type: "StaticText", label: "Connection Error!", rect: { x: 60, y: 310, width: 280, height: 20 } },
+		{ type: "StaticText", label: "Pinpad failed to connect", rect: { x: 60, y: 340, width: 280, height: 40 } },
+		{ type: "Button", label: "OK", rect: { x: 60, y: 450, width: 280, height: 40 } }] };
+	const withAlert = fake({ screens: [home, [...home, alert]] });
+	resetSession();
+	await mobileAct(withAlert.exec, { action: "snapshot" }, opts());
+	assert.match(await mobileAct(withAlert.exec, { action: "tap", ref: "e2" }, opts()), /^ALERT on screen \(untrusted app text\): "Connection Error!" \| "Pinpad failed to connect" \| "OK"\nDone\. Changes/);
+	assert.equal(alertText(assignRefs(undefined, flatten(home)).snap.elements), "", "no alert, no line");
+	const dialog = [{ type: "android.widget.TextView", label: "Error", identifier: "android:id/alertTitle", rect: { x: 0, y: 100, width: 300, height: 30 } },
+		{ type: "android.widget.Button", label: "OK", identifier: "android:id/button1", rect: { x: 0, y: 200, width: 100, height: 40 } }];
+	assert.equal(alertText(assignRefs(undefined, flatten(dialog)).snap.elements), 'ALERT on screen (untrusted app text): "Error" | "OK"');
+
+	// A real iPhone whose helper will not start: no 3x60 s of retries, and a diagnosis.
+	resetSession();
+	const dead = fake({ list: [PHONE] });
+	let dumps = 0, locked = false;
+	const wda = async (c, a) => {
+		if (c === "xcrun") return { code: 0, stdout: `• passcodeRequired: ${locked}\n` };
+		if (a[0] === "dump") { dumps++; return { code: 1, stdout: JSON.stringify({ status: "error", error: "failed to start agent: timed out waiting for WebDriverAgent to be ready" }) }; }
+		return dead.exec(c, a);
+	};
+	await assert.rejects(mobileAct(wda, { action: "snapshot" }, opts()), /WebDriverAgent to be ready\nThe helper app \(com\.mobilenext\.devicekit-iosUITests\.xctrunner\) probably crashes as it starts[^]*devicectl device capture screenshot --device 0000-REAL/);
+	assert.equal(dumps, 1, "real iPhone: no agent-start retries");
+	locked = true;
+	await assert.rejects(mobileAct(wda, { action: "snapshot" }, opts()), /Lorenz’s iPhone is locked or waiting for its passcode/);
 }
 
 // Query, OCR fallback, wait and relaunch.

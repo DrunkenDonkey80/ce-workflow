@@ -42,7 +42,10 @@ const ocrTexts = new Map<string, Element[]>(); // device -> text boxes from the 
 const devices = new Map<string, Device>(); // device arg -> resolved device, dropped when a call fails
 const screens = new Map<string, Frame>();
 const agentOk = new Set<string>();
-export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); }
+const fronts = new Map<string, string>(); // device -> app in front at the last read
+const realIds = new Set<string>(); // real devices: no agent-start retries, their failures are diagnosed instead
+export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); fronts.clear(); realIds.clear(); }
+const pause = (o: Options, ms: number) => (o.sleep ?? (t => new Promise(res => setTimeout(res, t))))(ms);
 
 async function run(exec: Exec, args: string[], signal?: AbortSignal, timeout = 60_000, retries = 2): Promise<string> {
 	const r = await exec(MOBILECLI, args, { timeout, signal });
@@ -52,7 +55,7 @@ async function run(exec: Exec, args: string[], signal?: AbortSignal, timeout = 6
 		let detail = String(r.stderr || out).trim();
 		try { detail = JSON.parse(out).error || detail; } catch { /* plain text error */ }
 		// Right after a simulator boot the helper agent can need more than one start attempt.
-		if (retries && /waiting for WebDriverAgent/i.test(detail)) return run(exec, args, signal, timeout, retries - 1);
+		if (retries && /waiting for WebDriverAgent/i.test(detail) && !args.some(a => realIds.has(a))) return run(exec, args, signal, timeout, retries - 1);
 		throw new Error(`mobilecli ${args.slice(0, 2).join(" ")} failed: ${detail.slice(-1500)}`);
 	}
 	return out;
@@ -203,9 +206,40 @@ async function read(exec: Exec, dev: Device, signal?: AbortSignal) {
 	return result;
 }
 
-async function full(exec: Exec, dev: Device, elements: Element[], signal?: AbortSignal) {
+/** The app in front (bundle id or package); undefined when mobilecli cannot tell (iOS before its agent exists). */
+async function front(exec: Exec, dev: Device, signal?: AbortSignal): Promise<string | undefined> {
+	return run(exec, ["apps", "foreground", "--device", dev.id], signal, 15_000, 0).then(out => data(out)?.packageName || undefined, () => undefined);
+}
+
+/** Polls the app in front until `done` holds or `ms` passes; stops at once when mobilecli cannot tell. */
+async function frontUntil(exec: Exec, dev: Device, done: (app: string) => boolean, ms: number, o: Options) {
+	for (let waited = 0; ; waited += 250) {
+		const app = await front(exec, dev, o.signal);
+		if (app === undefined || done(app) || waited >= ms) return app;
+		await pause(o, 250);
+	}
+}
+
+/** One line naming an open alert and its texts and buttons: iOS nests them in an Alert element, Android dialogs use android:id/alertTitle, message and buttonN. */
+export function alertText(elements: Element[]) {
+	const a = elements.find(e => e.type === "Alert");
+	// The alert's own texts follow it in tree order; earlier elements inside its frame are the screen behind it.
+	const parts = a ? elements.slice(elements.indexOf(a) + 1).filter(e => inside(a.frame, center(e.frame)[0], center(e.frame)[1])) : elements.filter(e => /^android:id\/(alertTitle|message|button\d)$/.test(e.id));
+	const texts = [...new Set([a?.label ?? "", ...parts.map(e => e.label || e.value)].filter(Boolean))];
+	return a || texts.length ? `ALERT on screen (untrusted app text): ${texts.map(t => JSON.stringify(short(t))).join(" | ")}` : "";
+}
+
+/** Reads the app in front and returns the lines that must not drown in an element list: another app came to the front, an alert is open. */
+async function warnings(exec: Exec, dev: Device, elements: Element[], signal?: AbortSignal) {
+	const app = await front(exec, dev, signal), was = fronts.get(dev.id);
+	if (app) fronts.set(dev.id, app);
+	const moved = !!(was && app && was !== app);
+	return { app, moved, head: [moved ? `APP CHANGED: ${app} is in front now, not ${was} (did it close or crash?)` : "", alertText(elements)].filter(Boolean).map(l => `${l}\n`).join("") };
+}
+
+async function full(exec: Exec, dev: Device, elements: Element[], signal?: AbortSignal, app?: string) {
 	const s = await screen(exec, dev, signal), unit = dev.platform === "ios" ? "points" : "pixels";
-	return `${UNTRUSTED}\n${dev.name} ${r(s.width)}x${r(s.height)} ${unit} (tap coordinates use ${unit})\n\n${elements.map(e => line(e, s)).join("\n") || "(no accessible elements; the app may still be starting)"}`;
+	return `${UNTRUSTED}\n${dev.name} ${r(s.width)}x${r(s.height)} ${unit} (tap coordinates use ${unit})${app ? `, app in front: ${app}` : ""}\n\n${elements.map(e => line(e, s)).join("\n") || "(no accessible elements; the app may still be starting)"}`;
 }
 
 /** After an action: what changed since the last read, or the whole screen when most of it changed. */
@@ -213,10 +247,11 @@ async function changes(exec: Exec, dev: Device, settleMs: number, o: Options) {
 	if (settleMs <= 0) return "Done.";
 	await (o.sleep ?? (ms => new Promise(res => setTimeout(res, ms))))(settleMs);
 	const had = snapshots.has(dev.id), { snap, added, removed, changed } = await read(exec, dev, o.signal);
-	if (!had || added.length + removed.length > 0.6 * Math.max(snap.elements.length, 1)) return `Done. The screen changed:\n${await full(exec, dev, snap.elements, o.signal)}`;
-	if (!added.length && !removed.length && !changed.length) return "Done. No visible change.";
+	const { app, moved, head } = await warnings(exec, dev, snap.elements, o.signal);
+	if (!had || moved || added.length + removed.length > 0.6 * Math.max(snap.elements.length, 1)) return `${head}Done. The screen changed:\n${await full(exec, dev, snap.elements, o.signal, app)}`;
+	if (!added.length && !removed.length && !changed.length) return `${head}Done. No visible change.`;
 	const s = screens.get(dev.id);
-	return `Done. Changes (+ added, - removed, ~ changed):\n${UNTRUSTED}\n${[...added.map(e => `+ ${line(e, s)}`), ...removed.map(e => `- ${line(e, s)}`), ...changed.map(e => `~ ${line(e, s)}`)].join("\n")}`;
+	return `${head}Done. Changes (+ added, - removed, ~ changed):\n${UNTRUSTED}\n${[...added.map(e => `+ ${line(e, s)}`), ...removed.map(e => `- ${line(e, s)}`), ...changed.map(e => `~ ${line(e, s)}`)].join("\n")}`;
 }
 
 function element(dev: Device, ref: string) {
@@ -348,12 +383,24 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 	const cacheKey = args.device ?? "";
 	const dev = devices.get(cacheKey) ?? await resolveDevice(exec, args.device, true, signal);
 	devices.set(cacheKey, dev);
+	if (dev.type === "real") realIds.add(dev.id);
 	// One gesture at a time per device: parallel calls queue behind each other.
 	const prev = queues.get(dev.id) ?? Promise.resolve(), mine = prev.then(() => act(exec, dev, args, o));
 	queues.set(dev.id, mine.catch(() => undefined));
 	try {
 		return await mine;
-	} catch (e) { devices.delete(cacheKey); throw e; }
+	} catch (e) {
+		devices.delete(cacheKey);
+		if (dev.platform === "ios" && dev.type === "real" && /WebDriverAgent/.test((e as Error).message)) throw new Error(`${(e as Error).message}\n${await agentHint(exec, dev, signal)}`);
+		throw e;
+	}
+}
+
+/** Why the helper agent does not answer on a real iPhone: the phone wants its passcode, or the helper crashes as it starts. */
+async function agentHint(exec: Exec, dev: Device, signal?: AbortSignal) {
+	const r = await exec("xcrun", ["devicectl", "device", "info", "lockState", "--device", dev.id], { timeout: 30_000, signal }).catch(() => ({ stdout: "" }));
+	if (/passcodeRequired: true/.test(String(r.stdout ?? ""))) return `${dev.name} is locked or waiting for its passcode: ask the user to unlock it, then retry.`;
+	return `The helper app (${AGENT_ID}) probably crashes as it starts: look for devicekit-iosUITests-Runner-*.ips crash reports (idevicecrashreport -e -k -f devicekit <dir>). One that aborts in XCTRunnerDaemonSession means the phone's test service is stuck. The screen can still be captured without the helper: xcrun devicectl device capture screenshot --device ${dev.id} --destination shot.png`;
 }
 const queues = new Map<string, Promise<unknown>>();
 
@@ -361,15 +408,28 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 	const { signal } = o, d = ["--device", dev.id], settle = args.settleMs ?? 500;
 	if (args.action === "launch" || args.action === "relaunch") {
 		if (!args.appId) throw new Error(`${args.action} needs appId (iOS bundle id or Android package).`);
+		const id = args.appId, verb = args.action === "relaunch" ? "Relaunched" : "Launched";
 		// Relaunch escapes screens the app cannot close itself (system sheets such as the Game Center dashboard).
-		if (args.action === "relaunch") await run(exec, ["apps", "terminate", args.appId, ...d], signal).catch(() => undefined);
-		await run(exec, ["apps", "launch", args.appId, ...d], signal);
-		return `${args.action === "relaunch" ? "Relaunched" : "Launched"} ${args.appId}. Wait a moment for the first screen (or use wait), then snapshot.`;
+		if (args.action === "relaunch") {
+			await run(exec, ["apps", "terminate", id, ...d], signal).catch(() => undefined);
+			if (await frontUntil(exec, dev, app => app !== id, 3000, o) === id) throw new Error(`apps terminate did not close ${id}: it is still in front.`);
+		}
+		await run(exec, ["apps", "launch", id, ...d], signal);
+		// mobilecli reports success even when the app stays in the background, so the app in front is checked.
+		const app = await frontUntil(exec, dev, a => a === id, 5000, o);
+		if (app === undefined) return `${verb} ${id}, but could not check that it came to the front (no helper agent yet). Wait for its first screen (or use wait), then snapshot.`;
+		if (app !== id) throw new Error(`${args.action} did not bring ${id} to the front: ${app} is in front. (A real iPhone can start the app in the background; tapping its home-screen icon works there.)`);
+		fronts.set(dev.id, id);
+		snapshots.delete(dev.id); // a fresh start: the whole first screen, not a diff against the app shown before
+		return `${verb} ${id}; it is in front.\n${await changes(exec, dev, args.settleMs ?? 1000, o)}`;
 	}
 	await ensureAgent(exec, dev, o);
 	if (args.query && !args.ref && /^(tap|longpress|type|swipe)$/.test(args.action)) args = { ...args, ref: await resolveQuery(exec, dev, args.query, o) };
 	switch (args.action) {
-		case "snapshot": return full(exec, dev, (await read(exec, dev, signal)).snap.elements, signal);
+		case "snapshot": {
+			const els = (await read(exec, dev, signal)).snap.elements, { app, head } = await warnings(exec, dev, els, signal);
+			return head + await full(exec, dev, els, signal, app);
+		}
 		case "find": {
 			const q = (args.query ?? "").toLowerCase(), snap = snapshots.get(dev.id);
 			if (!snap) throw new Error("No snapshot yet: run snapshot first.");
@@ -433,12 +493,13 @@ export const mobileActTool = (exec: Exec) => ({
 	],
 	description: [
 		"Operate an iOS Simulator, a real iPhone or an Android emulator/phone through mobilecli (simulators boot headless, no window).",
-		"Actions: list (devices, online first); boot {device}; launch {appId}; relaunch {appId} (terminate + launch: escapes system sheets such as Game Center); snapshot (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh));",
+		"Actions: list (devices, online first); boot {device}; launch {appId}; relaunch {appId} (terminate + launch: escapes system sheets such as Game Center); both fail when the app did not close or come to the front, and return its first screen (settleMs, default 1000); snapshot (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh));",
 		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query, gone?, timeoutMs? (10000)};",
 		"tap, longpress, type and swipe take ref, or query (\"#id\" exact, else label/value/id text; read fresh, then OCR text if the tree has none) to find and act in one call; overlapped elements (fanned cards) are touched at their visible part.",
 		"tap {ref} or {x, y}; longpress {ref or x, y, durationMs? (1000)}; type {text, ref?, submit?} (ref taps the field and replaces its text; without ref the text is typed into the focused field; submit presses Enter);",
 		"swipe {direction, ref?} (direction = which side's content to reveal: down shows content below, left the page to the left; ref scrolls inside that element); button {button: home|back|power|volume_up|volume_down} (back is Android only).",
 		"After each action it waits settleMs (default 500) and returns + added, - removed and ~ changed elements, or the full screen when most of it changed; settleMs 0 skips the re-read for fast sequences.",
+		"Results name the app in front; an APP CHANGED line (another app is in front: yours closed or crashed) and an ALERT line (an open alert with its texts and buttons) head the result, so a script can stop on them.",
 		"Refs stay the same while an element stays on screen. device is an id or name; omit it when one device is online. iOS coordinates are points, Android pixels.",
 		"Elements marked offscreen (other pager pages) cannot be tapped until swiped into view.",
 		"Elements without accessibility labels (custom canvases) show only as frames: tap them by query (OCR), by x, y, or look with screen_read target=device.",

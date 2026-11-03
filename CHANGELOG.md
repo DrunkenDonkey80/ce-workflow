@@ -4,6 +4,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Fixed
+- `mobile_act` now notices when things go wrong on the phone. `launch` and `relaunch` used to report success even when the app stayed in the background or never closed; now they check the app in front, fail with what is in front instead, and return the app's first screen. Every result names the app in front, an `APP CHANGED` line heads it when another app took over (the app you drive closed or crashed), and an `ALERT` line shows an open alert's texts and buttons, so a test loop can stop on them instead of looking at "the screen changed".
+- `mobile_act` on a real iPhone whose helper agent will not start: it no longer retries for three minutes; it says whether the phone wants its passcode or the helper crashes as it starts, and how to still capture the screen.
+
 ## 0.2.30 — 2026-11-03
 
 ### Fixed
