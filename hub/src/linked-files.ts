@@ -1,6 +1,6 @@
 // Files named in chat (any path with an extension): the page asks which exist, then opens, reveals, downloads or copies them.
 // Never hidden dot-folders (.ssh, .pi, .git) or secret-shaped names. On this PC any other file works; a remote device
-// (a phone over the tailnet) gets images from anywhere, other files only from the session's project, plus temp and
+// (a phone over the tailnet) gets images from anywhere, other files only from the session's project, plus temp (/tmp too) and
 // Downloads files changed in the last 5 days.
 import type http from "node:http";
 import { spawn } from "node:child_process";
@@ -25,8 +25,12 @@ export async function linkedFile(path: unknown, project: string, remote = false,
 	if (!info?.isFile()) return undefined;
 	if (!remote || IMAGE.test(real) || await inside(real, project)) return real;
 	const recent = Date.now() - info.mtimeMs < RECENT_MS;
-	return recent && (await inside(real, tmpdir()) || await inside(real, join(homedir(), "Downloads"))) ? real : undefined;
+	if (!recent) return undefined;
+	for (const folder of [...TEMP_FOLDERS, join(homedir(), "Downloads")]) if (await inside(real, folder)) return real;
+	return undefined;
 }
+// macOS gives Node a per-user /var/folders/…/T, but tools and agents write to /tmp too, so both count as temp.
+const TEMP_FOLDERS = process.platform === "win32" ? [tmpdir()] : [tmpdir(), "/tmp"];
 const RECENT_MS = 5 * 24 * 3600_000, IMAGE = /\.(?:png|jpe?g|gif|webp|svg|bmp)$/i; // images (other projects' renders) open from anywhere
 /** True when the real file sits under the folder's real path (symlinks resolved on both sides). */
 async function inside(real: string, folder: string) {

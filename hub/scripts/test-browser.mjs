@@ -342,6 +342,10 @@ try {
   assert.deepEqual([!!await linkedFile("top.txt", folder, true), !!await linkedFile(pasted, folder, true), !!await linkedFile(old, folder, true), !!await linkedFile(old, folder, false), !!await linkedFile(process.execPath, folder, true)], [true, true, false, true, false]);
   fs.rmSync(old);
   // Absolute folders link on this PC only, flagged as folders; relative names and remote devices get nothing.
+  if (process.platform !== "win32" && fs.existsSync("/tmp")) { // /tmp counts as temp even where Node's tmpdir is elsewhere (macOS)
+   const slashTmp = `/tmp/hub-recent-${process.pid}.html`; fs.writeFileSync(slashTmp, "x");
+   try { assert(await linkedFile(slashTmp, folder, true), "a recent /tmp file opens remotely"); } finally { fs.rmSync(slashTmp); }
+  }
   const { linkedFiles } = await import("../src/linked-files.ts");
   assert.deepEqual((await linkedFiles([folder, "docs"], folder)).folders, [folder]); assert.deepEqual(await linkedFiles([folder], folder, true), { found: {}, folders: [] });
   // Wormhole upload takes only what Download would serve (no network here: every request is refused before it starts).

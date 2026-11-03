@@ -4,6 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.30 — 2026-11-03
+
+### Fixed
+- Hub: on a phone or another remote device, links to recent files in `/tmp` (pages, logs, reports an agent wrote there) open now. On a Mac they stayed plain text, because only Node's own temp folder (`/var/folders/…`) counted as temp.
+
 ## 0.2.29 — 2026-11-03
 
 ### Added
