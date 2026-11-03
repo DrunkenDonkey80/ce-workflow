@@ -92,3 +92,9 @@ S01-S04 done (HEAD 941ef12). Next: S05 hub-to-hub pairing. Design worked out: De
   - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
   - Changed plan elements: none flagged; inspect actual implementation.
   - check: plan3_diagram apply target=product expectedRevision=21 -> revision 22, changed [pi_control_hub, pi_control_hub__pi_intercom]; dependents unchanged (still accurate)
+
+## 2026-11-03T09:22:09.416Z S10 done: User paired the Windows hub with flexs-macbook-pro and linked belot/1 to the Mac session; agents on both sides talk
+
+- [x] **S10** User pairs two real hubs (for example Home and Mac) and links one session on each
+  - note: Needs the user to approve pairing on a second real hub and pick sessions to link.
+  - check: User report ("inter-hub is currently operational, guys talk each other"); intercom list here shows stand-in 1~flexs-macbook-pro.local (hublink-23ebee73) idle next to belot/1 (01a178b1)

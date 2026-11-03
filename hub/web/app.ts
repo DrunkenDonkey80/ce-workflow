@@ -1134,8 +1134,13 @@ async function updateSlash() {
  const caret = input.selectionStart, word = match ? null : /(?:^|\s)@([^\s@]*)$/.exec(value.slice(0, caret));
  if (word && lastSessions) {
   const query = word[1].toLowerCase(); slashAt = caret - word[1].length - 1;
-  return showSlash(lastSessions[0].flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => [sessionRef(group.folder, session).replace(/ \(.*/, ""), session.pi ? "intercom " + session.pi : "no intercom id yet", sessionRef(group.folder, session)]))
-   .filter(row => row[2].toLowerCase().includes(query)).slice(0, 12));
+  const local = lastSessions[0].flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => [sessionRef(group.folder, session).replace(/ \(.*/, ""), session.pi ? "intercom " + session.pi : "no intercom id yet", sessionRef(group.folder, session)]))
+   .filter(row => row[2].toLowerCase().includes(query));
+  // shortcut: links carry no remote folder, so this session's own folder name also matches (@belot in belot/1 shows its mac link); store the remote folder if links cross projects.
+  const own = ownFolder.split(/[\\/]/).filter(Boolean).pop() ?? "";
+  const linked = (await linkedRows()).filter(row => (row[0] + " " + row[1] + " " + own).toLowerCase().includes(query));
+  if (input.value !== value) return;
+  return showSlash([...linked, ...local].slice(0, 12));
  }
  slashAt = -1;
  if (!match) { menu.hidden = true; return; }
@@ -1145,6 +1150,17 @@ async function updateSlash() {
  const rows = match[1] ? (list.args?.[match[1]] ?? []).filter(item => item.value.startsWith(match[2]) && item.value !== match[2]).map(item => [`/${match[1]} ${item.value}`, item.description])
   : list.pi.filter(item => item.name.startsWith(match[3])).map(item => ["/" + item.name, item.description]);
  showSlash(rows);
+}
+// This session's hub links (plan d21eefbf) for @: only a linked session can reach its name~hub stand-in. Cached 30 s.
+let linkCache: { at: number; rows: string[][] } | undefined;
+async function linkedRows() {
+ if (linkCache && Date.now() - linkCache.at < 30_000) return linkCache.rows;
+ let rows: string[][] = [];
+ try {
+  const list = await post("links", { session: sessionId, action: "list" });
+  rows = list.links.map(link => { const name = link.standin ?? `${link.remote.name}~${link.hubName}`; return [name, `linked: ${link.remote.name} on ${link.hubName}${link.online ? "" : " (offline)"}`, name]; });
+ } catch { /* hub links off */ }
+ linkCache = { at: Date.now(), rows }; return rows;
 }
 function showSlash(rows: string[][]) {
  const menu = $("slash-menu");
@@ -1177,6 +1193,13 @@ $("message-input").addEventListener("keydown", event => {
 // Touch keyboards have no Shift+Enter, so there Enter adds a line and only Send sends.
 const touchKeyboard = matchMedia("(pointer: coarse)");
 $("message-input").addEventListener("keydown", event => {
+ // Tab / Shift+Tab in the chat box: next / previous session on this hub that is not parked (wraps; the @ and / menus take Tab first).
+ if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey && lastSessions && $("slash-menu").hidden) {
+  const order = lastSessions[0].filter(group => !group.archived).flatMap(group => group.sessions.filter(session => session.tone !== "parked" || session.id === sessionId).map(session => session.id));
+  const at = order.indexOf(sessionId);
+  if (order.length > 1) { event.preventDefault(); jumpTo(order[(at + (event.shiftKey ? -1 : 1) + order.length) % order.length]); }
+  return;
+ }
  if (event.key === "Enter" && !event.shiftKey && !event.isComposing && !touchKeyboard.matches) { event.preventDefault(); $("composer").requestSubmit(); }
  // Escape: a recalled prompt goes back to the draft, typed text is cleared (Ctrl+Z brings it back), and only an empty box stops the run.
  if (event.key === "Escape") {

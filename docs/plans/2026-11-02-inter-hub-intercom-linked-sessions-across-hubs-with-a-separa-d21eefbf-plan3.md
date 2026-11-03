@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-02
-updated: 2026-11-02T18:01:07.041Z
+updated: 2026-11-03T09:22:33.122Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -199,9 +199,9 @@ What does not: adding an optional field older hubs can safely ignore, new error 
 
 ### Phase 3: Live check [code]
 
-- [human] **S10** User pairs two real hubs (for example Home and Mac) and links one session on each
-  - note: Needs the user to approve pairing on a second real hub and pick sessions to link.
-- [ ] **S11** Live round trip: send, ask with reply, unlink, and a hub going offline; also that a linked message to a parked session resumes it and its run stays quiet (S09); record results here
+- [x] **S10** User paired the Windows hub with flexs-macbook-pro and linked belot/1 to the Mac session; agents on both sides talk
+- [wip] **S11** Live round trip: send, ask with reply, unlink, and a hub going offline; also that a linked message to a parked session resumes it and its run stays quiet (S09); record results here
+  - note: 2026-11-03 live, Windows hub <-> flexs-macbook-pro: send between belot/1 and the Mac session works (user report). D9 verified: an unlinked ce-workflow session sending to 1~flexs-macbook-pro.local got the 5 s "could not be confirmed" text plus the stand-in's follow-up "linked to 1, not to this session; not forwarded". Still open: ask with reply, unlink, a hub going offline, linked message to a parked session resuming it quietly.
 ### P-ARCH [code] Product architecture
 
 - [x] **ARCH-RECONCILE** Product diagram rev 22: pi_control_hub summary names hub links (hub/src/link.ts, comm 1 over Tailscale /link/); new edge pi_control_hub -> pi_intercom "stand-ins name~hub"

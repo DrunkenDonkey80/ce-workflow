@@ -4,6 +4,16 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.29 — 2026-11-03
+
+### Added
+- Hub: Tab / Shift+Tab in the chat box jumps to the next / previous session on this hub that isn't parked (wraps around; the @ and / menus still take Tab first).
+- Hub: the @ menu in a linked session also lists its sessions on other hubs (`name~hub`), so `@belot` in belot/1 shows the Mac one too.
+
+### Changed
+- `browser_act` upload takes any file now (an app build, a document, a file outside the project), not only images. You still confirm every upload: images in the project folder can be allowed for a while, while any other file asks every time and the dialog says clearly that it isn't a project image.
+- Agents are told to run known multi-step flows in one script instead of spending a model turn on every step: browser control, desktop apps, phones, VM installer tests, and fetching several pages (a whole thread, the top search results).
+
 ## 0.2.28 — 2026-11-02
 
 ### Added

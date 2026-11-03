@@ -327,16 +327,20 @@ async function roundTrip() {
 			assert.equal(picks.length, 0);
 			assert.deepEqual(typed, [["Save", "click"], ["Search", "shoes"], ["Search", "Enter"], ["Delete item", "click"], ["Delete item", "click"]], "only allowed actions reach the page");
 			await assert.rejects(go({ action: "click", x: 700, y: 700 }), /Nothing at \(700, 700\)/);
-			// Upload: only real images inside the project folder, each confirmed; a button's file picker is intercepted.
+			// Upload: each confirmed; only real images inside the project folder can get a folder grant; a button's file picker is intercepted.
 			mkdirSync(path.join(agent, "img"), { recursive: true });
 			const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]), outside = path.join(os.tmpdir(), `outside-${randomUUID()}.png`);
 			writeFileSync(path.join(agent, "img", "a.png"), png); writeFileSync(path.join(agent, "img", "fake.png"), "not an image"); writeFileSync(outside, png);
 			snap = await go({ action: "snapshot" });
 			const add = refOf(snap, "Add image"), image = realpathSync(path.join(agent, "img", "a.png"));
-			await assert.rejects(go({ action: "upload", ref: add, files: [path.relative(agent, outside)] }), /outside the project folder/);
+			picks = ["Allow .png"]; // no folder grant is offered for a file outside the project, so nothing matches: denied
+			await assert.rejects(go({ action: "upload", ref: add, files: [path.relative(agent, outside)] }), /did not allow: upload 1 file/);
+			picks = ["Allow this upload"];
+			await go({ action: "upload", ref: add, files: [outside] });
+			uploaded.pop();
 			rmSync(outside);
 			await assert.rejects(go({ action: "upload", ref: add, files: ["img/fake.png"] }), /does not contain the image/);
-			await assert.rejects(go({ action: "upload", ref: add, files: ["notes.txt"] }), /does not exist|not a PNG/);
+			await assert.rejects(go({ action: "upload", ref: add, files: ["notes.txt"] }), /does not exist/);
 			picks = ["Deny"];
 			await assert.rejects(go({ action: "upload", ref: add, files: ["img/a.png"] }), /did not allow: upload 1 image/);
 			picks = ["Allow this upload"];

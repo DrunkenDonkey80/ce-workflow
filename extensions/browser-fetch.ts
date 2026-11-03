@@ -432,6 +432,7 @@ export const browserFetchTool = () => ({
 	promptGuidelines: [
 		"Use browser_fetch when a plain fetch or web tool is blocked by Cloudflare or another bot check, or a page needs a real browser. Each new site needs the user's approval.",
 		"Set images: true for product or gallery pages when you need to see the pictures; the saved files are then viewed with read.",
+		"Several pages (every page of a thread, the top results of a browser_search): fetch them in one codemode script (tools.browser_search, then tools.browser_fetch in a loop) and return or write only the parts you need, instead of one model turn per page.",
 	],
 	description: [
 		"Load one http(s) page in the user's real browser (their everyday profile, through the Pi browser fetch extension) and return its visible text, links and image URLs. Read-only: no clicking or typing.",
