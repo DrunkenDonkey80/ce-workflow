@@ -289,7 +289,7 @@ async function roundTrip() {
 
 	// browser_act through the real host and the real add-on code (control.js) with the fake debugger (P3-06).
 	async function controlRoundTrip() {
-		const act = await import("../extensions/browser-act.ts");
+		const act = await import("../extensions/browser-act.ts"), { validate, changes } = act;
 		const until = Date.now() + 600_000;
 		await updatePolicy(p => { p.control["shop.test"] = { until }; });
 		let picks = [];
@@ -408,8 +408,19 @@ async function roundTrip() {
 			intruder = 0;
 			// wait: until text shows, until it goes, or a timeout that still returns the page.
 			assert.match(await go({ action: "wait", query: "Save" }), /\[e\d+\] button "Save"/);
-			assert.match(await go({ action: "wait", query: "Nope", timeoutMs: 600 }), /^Still missing "Nope" after 1 s/);
-			assert.match(await go({ action: "wait", query: "Save", gone: true, timeoutMs: 600 }), /^Still showing "Save"/);
+			await assert.rejects(go({ action: "wait", query: "Nope", timeoutMs: 600 }), /^Error: wait timed out: still missing "Nope" after 1 s[^]*\[e\d+\] button "Save"/, "a timeout fails and shows the page");
+			await assert.rejects(go({ action: "wait", query: "Save", gone: true, timeoutMs: 600 }), /still showing "Save"/);
+			await assert.rejects(go({ action: "wait", query: "Shop", failOn: ["Ask"] }), /wait failed: "Ask" is on the page/, "failOn beats success");
+			assert.equal(validate({ action: "wait", failOn: [""] }), "failOn must be a list of texts");
+			// find reads the page now; acting by query needs exactly one match (an exact name wins).
+			assert.match(await go({ action: "find", query: "Save" }), /\[e\d+\] button "Save"/);
+			await assert.rejects(go({ action: "click", query: "Nope" }), /No element matches "Nope" on the page now/);
+			await assert.rejects(go({ action: "click", query: "a" }), /elements match "a": add role/);
+			assert.match(await go({ action: "click", query: "save", role: "button" }), /^Done\. URL: https:\/\/shop\.test\/act[^]*(No visible change|Changes)/, "click by query reports the change list");
+			assert.equal(validate({ action: "click", ref: "e1", query: "Save" }), "click takes ref or query, not both");
+			assert.equal(validate({ action: "type", role: "textbox", text: "x" }), "type: role goes with query");
+			assert.deepEqual(changes([{ role: "button", name: "A" }, { role: "textbox", name: "Q", value: "" }], [{ ref: "e1", role: "textbox", name: "Q", value: "hi", x: 0, y: 0, w: 1, h: 1 }, { ref: "e2", role: "dialog", name: "Done", x: 0, y: 0, w: 1, h: 1 }]),
+				['~ [e1] textbox "Q" = "hi" @(0,0 1x1)', '+ [e2] dialog "Done" @(0,0 1x1)', '- button "A"']);
 			assert.match(await go({ action: "wait" }), /^UNTRUSTED/);
 			await assert.rejects(go({ action: "wait", gone: true }), /gone needs query/);
 			// Scroll, stale ref, screenshot saved by the host (D10).
@@ -709,8 +720,8 @@ async function actPiSide() {
 	const executed = () => got.filter(m => m.phase === "execute").map(m => m.ref ?? `${m.x},${m.y}`);
 	try {
 		// D17 validation before anything reaches the browser.
-		for (const [p, why] of [[{ action: "fly" }, /unknown action/], [{ action: "click" }, /ref, or x and y/], [{ action: "click", ref: "e1", x: 1, y: 2 }, /not both/],
-			[{ action: "type", ref: "e1" }, /ref and text/], [{ action: "snapshot", url: "x" }, /does not take url/], [{ action: "scroll" }, /direction/], [{ action: "find" }, /query/]]) await assert.rejects(run(p), why);
+		for (const [p, why] of [[{ action: "fly" }, /unknown action/], [{ action: "click" }, /ref, query, or x and y/], [{ action: "click", ref: "e1", x: 1, y: 2 }, /not two of them/],
+			[{ action: "type", ref: "e1" }, /ref or query, and text/], [{ action: "snapshot", url: "x" }, /does not take url/], [{ action: "scroll" }, /direction/], [{ action: "find" }, /query/]]) await assert.rejects(run(p), why);
 		assert.equal(got.length, 0);
 		await assert.rejects(run({ action: "snapshot" }), /no page is open/);
 		// Blocked and local sites never ask; no grant without UI; denial; grant choices are 10/20/30 minutes only.
@@ -732,7 +743,7 @@ async function actPiSide() {
 		// Snapshot and find.
 		const snap = await run({ action: "snapshot" });
 		assert.match(snap, /^UNTRUSTED[\s\S]*\[e1\] button "Save" @\(1,2 3x4\)[\s\S]*\[e7\] textbox "Comment" = "hi"[\s\S]*\[frame\] https:\/\/ads\.test\/f/);
-		assert.match(await run({ action: "find", query: "delete" }), /^\[e2\]/);
+		assert.match(await run({ action: "find", query: "delete" }), /^UNTRUSTED[^]*\n\[e2\] button "Delete repository"/);
 		assert.match(await run({ action: "find", query: "save", role: "link" }), /No element matches/);
 		// D16/D23: safe click runs; risky asks and a denial never executes; password refused; risky point click asks.
 		await run({ action: "click", ref: "e1" });
@@ -748,6 +759,10 @@ async function actPiSide() {
 		await run({ action: "click", ref: "e2" });
 		assert.deepEqual(executed(), ["e1", "e2"], "only allowed actions reach execute");
 		assert.equal(got.find(m => m.phase === "execute" && m.ref === "e2").facts.name, "Delete repository", "execute carries the inspected facts");
+		assert.equal(got.at(-1).action, "snapshot"); assert.equal(got.at(-1).quietMs, 1000, "the change list waits at most 1 s for the page to settle");
+		const sent = got.length;
+		assert.match(await run({ action: "click", ref: "e1", settleMs: 0 }), /Done\. URL/);
+		assert.ok(!got.slice(sent).some(m => m.action === "snapshot"), "settleMs 0 skips the re-read");
 		await run({ action: "type", ref: "e7", text: "nice" });
 		// D18: a blocked navigation asks for a grant on the new host and tells the agent to repeat; D19: spawned tab reported.
 		picks = ["Allow control of other.test for 10 minutes"];
@@ -758,7 +773,7 @@ async function actPiSide() {
 		assert.match(await run({ action: "screenshot" }), /saved: shot\.png/);
 		assert.match(await run({ action: "find", query: "x" }), /No element matches/, "refs survive actions on the same page");
 		await run({ action: "open", url: "https://shop.test/other" });
-		await assert.rejects(run({ action: "find", query: "x" }), /no snapshot yet/, "refs expire when the page changes");
+		assert.match(await run({ action: "find", query: "Save" }), /\[e1\] button "Save"/, "find reads the page now, also after navigating");
 		// Revoked grant asks again; denial closes control.
 		await updatePolicy(p => { delete p.control["shop.test"]; });
 		picks = ["Deny"];

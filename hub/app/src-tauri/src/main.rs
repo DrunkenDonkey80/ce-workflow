@@ -296,6 +296,44 @@ fn pin_strip(strip: &tauri::Webview) {
         }
     });
 }
+/// Linux AppImage (#8): the bundled GTK reads GNOME's title-bar button layout from the bundled schemas, which lack the
+/// distro's default (Ubuntu ships ":minimize,maximize,close"), so Wayland windows showed only Close. Ask the host's
+/// gsettings, outside the AppImage's environment, for the effective layout (an explicit user choice included) and use it.
+/// shortcut: read once at start; a layout changed while the app runs applies after a restart.
+#[cfg(target_os = "linux")]
+fn host_button_layout() {
+    use gtk::prelude::*;
+    if std::env::var_os("APPIMAGE").is_none() {
+        return;
+    }
+    let keep = [
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+        "XDG_CONFIG_HOME",
+        "DBUS_SESSION_BUS_ADDRESS",
+    ];
+    let Ok(out) = std::process::Command::new("gsettings")
+        .args(["get", "org.gnome.desktop.wm.preferences", "button-layout"])
+        .env_clear()
+        .envs(
+            keep.iter()
+                .filter_map(|k| std::env::var_os(k).map(|v| (k, v))),
+        )
+        .output()
+    else {
+        return;
+    };
+    let layout = String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .trim_matches('\'')
+        .to_string();
+    if out.status.success() && layout.contains(':') {
+        if let Some(settings) = gtk::Settings::default() {
+            settings.set_property("gtk-decoration-layout", layout.to_value());
+        }
+    }
+}
 fn strip_eval(app: &AppHandle, script: String) {
     if let Some(strip) = app.get_webview("strip") {
         let _ = strip.eval(script);
@@ -734,6 +772,8 @@ fn main() {
                 install_dir().join("app.lock"),
                 std::process::id().to_string(),
             );
+            #[cfg(target_os = "linux")]
+            host_button_layout();
             let window = WindowBuilder::new(app, "main")
                 .title("Pi Hub")
                 .inner_size(1200.0, 800.0)

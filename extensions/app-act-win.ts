@@ -232,7 +232,7 @@ function Norm($s) { ([string]$s).ToLower().Replace([string][char]0x2026, '...').
 switch ($op) {
 	'tree' { Finish (Tree (Arg 'window' '') @(Arg 'root' @())) }
 	'press' {
-		$e = Resolve
+		$e = Resolve; $orig = $e
 		$selectable = 'ListItem', 'TreeItem', 'DataItem', 'TabItem', 'RadioButton'
 		# Text inside a row or cell: press what holds it. Rows select (never open), like a click.
 		for ($i = 0; $i -lt 4; $i++) {
@@ -250,6 +250,9 @@ switch ($op) {
 			if (-not $up -or $Root.Equals($up)) { break }
 			$e = $up
 		}
+		# A classic Win32 button without UIA patterns (a launcher's error box): BM_CLICK clicks it without moving the mouse.
+		$h = $orig.Current.NativeWindowHandle
+		if ($h -ne 0) { $r = $orig.Current.BoundingRectangle; [void][PiWin]::PostMessage([IntPtr]$h, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero); After @{ did = 'click'; at = @(($r.X + $r.Width / 2), ($r.Y + $r.Height / 2)) } }
 		Finish @{ error = 'this element cannot be pressed (it has no invoke, toggle, select or expand action)' }
 	}
 	'type' {

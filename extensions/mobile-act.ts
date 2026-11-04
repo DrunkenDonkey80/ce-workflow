@@ -248,11 +248,13 @@ const exeNames = new Map<string, string>(); // "device app" -> executable name (
 const headers = new Map<string, string>(); // simulator crash report -> its first line, which names the app
 const MUTATING = new Set(["launch", "relaunch", "tap", "longpress", "type", "swipe", "button"]);
 const GRID = 16;
+// Device ids become file names: a Wi-Fi adb id like 192.168.1.189:34141 has a ':' Windows paths refuse.
+const safeId = (dev: Device) => dev.id.replace(/[^\w.-]/g, "-");
 
 /** Latches the device's breaker and saves what the screen showed; returns the error to throw. */
 async function stop(exec: Exec, dev: Device, why: string, o: Options, more?: (dir: string) => Promise<unknown>) {
 	breakers.set(dev.id, why);
-	const dir = path.join(o.dir ?? BASE, "failures", `${new Date().toISOString().replace(/[:.]/g, "-")}-${dev.id}`);
+	const dir = path.join(o.dir ?? BASE, "failures", `${new Date().toISOString().replace(/[:.]/g, "-")}-${safeId(dev)}`);
 	await mkdir(dir, { recursive: true });
 	const shown = await full(exec, dev, snapshots.get(dev.id)?.elements ?? [], o.signal, fronts.get(dev.id)).catch(() => "");
 	await writeFile(path.join(dir, "screen.txt"), `${why}\n\n${shown}\n`);
@@ -348,9 +350,50 @@ async function colorGrid(exec: Exec, dev: Device, o: Options) {
 /** Multiset difference: entries of a not matched by one in b. */
 const minus = (a: string[], b: string[]) => { const left = [...b]; return a.filter(x => { const i = left.indexOf(x); if (i < 0) return true; left.splice(i, 1); return false; }); };
 
+/** wait: a query to appear or go (guarded: fail conditions stop the run), or with no query the screen to stop changing. */
+async function waitFor(exec: Exec, dev: Device, args: MobileActArgs, o: Options, signal?: AbortSignal): Promise<string> {
+	// No query: wait until the screen stops changing (stableMs, default 1000) instead of sleeping.
+	const q = args.query ?? "", start = Date.now(), timeout = args.timeoutMs ?? 10_000, stable = args.stableMs ?? (q ? 0 : 1000);
+	let last: string | undefined;
+	// A guarded wait stops the run (breaker, saved screen) on a failure condition or a timeout.
+	const guarded = !!(args.failOn?.length || args.failOnAlert || args.expectApp);
+	const fail = async (why: string) => { throw guarded ? await stop(exec, dev, `wait for "${q}": ${why}`, o) : new Error(why); };
+	let since: number | undefined;
+	for (;;) {
+		const els = (await read(exec, dev, signal)).snap.elements;
+		// Failure conditions come before success: an error alert next to the awaited text still fails.
+		const bad = (args.failOnAlert && alertText(els)) || (args.failOn ?? []).map(f => matches(els, f).length ? `"${f}" is on screen` : "").find(Boolean);
+		if (bad) await fail(bad);
+		if (args.expectApp) {
+			const app = await front(exec, dev, signal);
+			if (app) fronts.set(dev.id, app);
+			if (app && app !== args.expectApp) await fail(`${app} is in front, not ${args.expectApp} (did it close or crash?)`);
+		}
+		let hits: Element[] = [], ocrError: string | undefined, ok: boolean;
+		if (!q) { const shown = els.map(e => line(e)).join("\n"); ok = shown === last; last = shown; }
+		else {
+			hits = matches(els, q);
+			if (!hits.length && !q.trim().startsWith("#")) try { hits = matches(await ocrRead(exec, dev, o), q); } catch (e) { ocrError = (e as Error).message; }
+			// An OCR that failed has not seen the text go away.
+			ok = args.gone ? !hits.length && !ocrError : !!hits.length;
+		}
+		if (ok) {
+			since ??= Date.now();
+			if (Date.now() - since >= stable) {
+				const took = ((Date.now() - start) / 1000).toFixed(1);
+				if (!q) return `Screen stable after ${took}s.`;
+				return args.gone ? `"${q}" is gone after ${took}s.` : `"${q}" appeared after ${took}s:\n${UNTRUSTED}\n${hits.slice(0, 12).map(e => line(e)).join("\n")}`;
+			}
+		} else since = undefined;
+		if (!q && Date.now() - start >= timeout) return `Waited ${timeout} ms; the screen was still changing.`;
+		if (Date.now() - start >= timeout) await fail(`Timed out after ${timeout} ms waiting for "${q}" to ${args.gone ? "disappear" : "appear"}${stable ? ` and stay ${stable} ms` : ""}.`);
+		await pause(o, 300);
+	}
+}
+
 async function checkpoint(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 	if (!args.name || !/^[\w.-]+$/.test(args.name)) throw new Error("checkpoint needs name (letters, digits, . _ -).");
-	const file = path.join(o.dir ?? BASE, "checkpoints", `${args.name}@${dev.id}.json`);
+	const file = path.join(o.dir ?? BASE, "checkpoints", `${args.name}@${safeId(dev)}.json`);
 	const base = args.save ? undefined : await readFile(file, "utf8").then(JSON.parse, () => undefined);
 	const ignore: string[] = args.ignore ?? base?.ignore ?? [];
 	const els = (await read(exec, dev, o.signal)).snap.elements, app = await front(exec, dev, o.signal) ?? "";
@@ -466,6 +509,8 @@ async function macOcr(exec: Exec, png: string, signal?: AbortSignal): Promise<Oc
 
 /** Screenshot + OCR: on-screen text as t-refs in the same units as taps, for controls the accessibility tree misses. */
 async function ocrRead(exec: Exec, dev: Device, o: Options) {
+	// Fail before the screenshot: off a Mac every missed query or wait poll paid ~1.4 s for nothing.
+	if (!o.ocr && process.platform !== "darwin") throw new Error("OCR needs macOS (Apple Vision).");
 	const png = path.join(os.tmpdir(), `mobile-act-ocr-${process.pid}.png`);
 	await run(exec, ["screenshot", "--device", dev.id, "--output", png, "--format", "png"], o.signal);
 	const s = await screen(exec, dev, o.signal);
@@ -611,37 +656,7 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 			return `${UNTRUSTED}\nOn-screen text (t-refs work with tap, longpress, type and swipe until the next ocr):\n${texts.map(e => line(e)).join("\n") || "(no text found)"}`;
 		}
 		case "checkpoint": return checkpoint(exec, dev, args, o);
-		case "wait": {
-			if (!args.query) throw new Error("wait needs query (text or #id), and gone: true to wait until it disappears.");
-			const q = args.query, start = Date.now(), timeout = args.timeoutMs ?? 10_000, stable = args.stableMs ?? 0;
-			// A guarded wait stops the run (breaker, saved screen) on a failure condition or a timeout.
-			const guarded = !!(args.failOn?.length || args.failOnAlert || args.expectApp);
-			const fail = async (why: string) => { throw guarded ? await stop(exec, dev, `wait for "${q}": ${why}`, o) : new Error(why); };
-			let since: number | undefined;
-			for (;;) {
-				const els = (await read(exec, dev, signal)).snap.elements;
-				// Failure conditions come before success: an error alert next to the awaited text still fails.
-				const bad = (args.failOnAlert && alertText(els)) || (args.failOn ?? []).map(f => matches(els, f).length ? `"${f}" is on screen` : "").find(Boolean);
-				if (bad) await fail(bad);
-				if (args.expectApp) {
-					const app = await front(exec, dev, signal);
-					if (app) fronts.set(dev.id, app);
-					if (app && app !== args.expectApp) await fail(`${app} is in front, not ${args.expectApp} (did it close or crash?)`);
-				}
-				let hits = matches(els, q), ocrError: string | undefined;
-				if (!hits.length && !q.trim().startsWith("#")) try { hits = matches(await ocrRead(exec, dev, o), q); } catch (e) { ocrError = (e as Error).message; }
-				// An OCR that failed has not seen the text go away.
-				if (args.gone ? !hits.length && !ocrError : hits.length) {
-					since ??= Date.now();
-					if (Date.now() - since >= stable) {
-						const took = ((Date.now() - start) / 1000).toFixed(1);
-						return args.gone ? `"${q}" is gone after ${took}s.` : `"${q}" appeared after ${took}s:\n${UNTRUSTED}\n${hits.slice(0, 12).map(e => line(e)).join("\n")}`;
-					}
-				} else since = undefined;
-				if (Date.now() - start >= timeout) await fail(`Timed out after ${timeout} ms waiting for "${q}" to ${args.gone ? "disappear" : "appear"}${stable ? ` and stay ${stable} ms` : ""}.`);
-				await pause(o, 300);
-			}
-		}
+		case "wait": return waitFor(exec, dev, args, o, signal);
 		case "tap":
 			await run(exec, ["io", "tap", point(dev, args, "tap"), ...d], signal);
 			return changes(exec, dev, settle, o);
@@ -683,7 +698,7 @@ export const mobileActTool = (exec: Exec) => ({
 	description: [
 		"Operate an iOS Simulator, a real iPhone or an Android emulator/phone through mobilecli (simulators boot headless, no window).",
 		"Actions: list (devices, online first); boot {device}; launch {appId}; relaunch {appId} (terminate + launch: escapes system sheets such as Game Center); both fail when the app did not close or come to the front, and return its first screen (settleMs, default 1000); snapshot (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh));",
-		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query, gone?, timeoutMs? (10000), stableMs? (the match must hold this long), failOn? [queries], failOnAlert?, expectApp?}: failOn text, an alert or another app in front fail it before success is checked;",
+		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query?, gone?, timeoutMs? (10000), (no query: until the screen stops changing for stableMs, default 1000, never fails on timeout; use instead of sleeping), stableMs? (the match must hold this long), failOn? [queries], failOnAlert?, expectApp?}: failOn text, an alert or another app in front fail it before success is checked;",
 		"tap, longpress, type and swipe take ref, or query (\"#id\" exact, else label/value/id text; read fresh, then OCR text if the tree has none) to find and act in one call; overlapped elements (fanned cards) are touched at their visible part.",
 		"tap {ref} or {x, y}; longpress {ref or x, y, durationMs? (1000)}; type {text, ref?, submit?} (ref taps the field and replaces its text; without ref the text is typed into the focused field; submit presses Enter);",
 		"swipe {direction, ref?} (direction = which side's content to reveal: down shows content below, left the page to the left; ref scrolls inside that element); button {button: home|back|power|volume_up|volume_down} (back is Android only).",

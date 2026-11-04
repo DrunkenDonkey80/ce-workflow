@@ -2,7 +2,23 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.2.34 — 2026-11-04
+
+### Added
+- Hub app: right-clicking this PC's tab offers "Copy local link" and, with remote access on, "Copy remote link" (the tailnet address other PCs pair with); other hubs' tabs keep one "Copy link".
+- `browser_act` acts by text: `click`, `type`, `select` and `upload` take `query` (plus `role`) instead of a ref, picking the one matching element on the page now (an exact name wins; none or several fail and list what was found). Scripts no longer have to dig refs out of snapshot text.
+- `browser_act` actions return what changed on the page (+ added, - removed, ~ changed, with fresh refs), or the whole page after a navigation, so the extra snapshot after every click is gone. It waits at most 1 s for the page to settle (`settleMs`); `settleMs: 0` skips the re-read for fast sequences.
+- `browser_act wait` takes `failOn` texts ("couldn't be saved"), and a wait whose text never shows (or never goes) now fails with the page instead of returning as if it worked.
+- `app_act wait {query, gone?, timeoutMs?, failOn?}`: reads the window until the text shows or goes; an error text or the timeout fails it.
+- `mobile_act wait` without a query waits until the screen stops changing, instead of sleeping.
+
+### Fixed
+- Hub usage: a logged-in provider whose usage poll fails no longer vanishes from the top bar; it shows "usage unavailable" with the reason and the next try, and an older reading that could not be updated says "not updated for …" (#7).
+- Linux app on Wayland: the title bar shows the buttons your desktop uses (Minimize, Maximize, Close on Ubuntu) instead of only Close (#8).
+- `browser_act find` reads the page now; it used to refuse after every navigation ("no snapshot yet") or search an old snapshot.
+- `browser_act screenshot` of a background tab gives up after 10 s and retries once forcing a render, instead of hanging 45 s; "Node is detached" errors now say the page changed under the element. Reload the add-on in `chrome://extensions` (1.7).
+- `app_act` on Windows clicks classic buttons that offer no UI Automation action (a launcher's "Failed to launch JVM" box), without moving the mouse.
+- `mobile_act` on a Wi-Fi Android device (`192.168.1.189:34141`) on Windows: saving a failure or checkpoint no longer breaks on the `:` in the file name. Off a Mac, a query or wait no longer takes a 1.4 s screenshot for an OCR that cannot run.
 
 ## 0.2.33 — 2026-11-04
 
@@ -13,7 +29,6 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Fixed
 - 0.2.31 committed a `node_modules` symlink pointing into the developer's home folder; it is removed, and `.gitignore` now ignores `node_modules` symlinks too.
-
 ## 0.2.31 — 2026-11-04
 
 ### Added

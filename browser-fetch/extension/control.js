@@ -96,7 +96,11 @@ async function onControl(m) {
 	s.queue = s.queue.then(async () => {
 		const timeout = sleep(ACT_MS).then(() => { throw new Error(`The page did not respond within ${ACT_MS / 1000} s (frozen or busy tab); try again or take a screenshot.`); });
 		try { send({ type: "result", id: m.id, seq: m.seq, ...await Promise.race([act(s, m), timeout]) }); }
-		catch (error) { send({ type: "error", id: m.id, seq: m.seq, error: String(error?.message ?? error) }); }
+		catch (error) {
+			const text = String(error?.message ?? error);
+			// Raw CDP node errors mean the page re-rendered under the ref.
+			send({ type: "error", id: m.id, seq: m.seq, error: /Node is detached|No node with given id|Could not find node/i.test(text) ? `The element is gone (the page changed under it): take a new snapshot, or act by query. (${text})` : text });
+		}
 	});
 }
 
@@ -130,7 +134,7 @@ async function act(s, m) {
 			s.refs.clear();
 			await chrome.tabs.update(s.tab, { url: m.url });
 			return await after(s, 30_000, before);
-		case "snapshot": return await snapshot(s);
+		case "snapshot": return await snapshot(s, m.quietMs);
 		case "scroll":
 			if (m.ref) await cdp(s, "DOM.scrollIntoViewIfNeeded", { backendNodeId: ref(s, m.ref) });
 			else await cdp(s, "Runtime.evaluate", { expression: `scrollBy(0, ${m.direction === "up" ? -1 : 1} * innerHeight * 0.8)` });
@@ -140,7 +144,10 @@ async function act(s, m) {
 			await chrome.tabs.goBack(s.tab).catch(() => { throw new Error("There is no previous page."); });
 			return await after(s, 30_000, before);
 		case "screenshot": {
-			const shot = await cdp(s, "Page.captureScreenshot", { format: "png" });
+			// A background tab may never paint the frame a capture waits for: give up after 10 s and retry once forcing a fresh render.
+			const capture = (params, ms) => Promise.race([cdp(s, "Page.captureScreenshot", { format: "png", ...params }), sleep(ms).then(() => undefined)]);
+			const shot = await capture({}, 10_000) ?? await capture({ captureBeyondViewport: true }, 20_000);
+			if (!shot) throw new Error("The tab did not paint a screenshot within 30 s (a background tab the browser throttles); snapshot still works.");
 			return { ...await page(s), png: shot.data }; // the host saves it and replaces png with path (D10)
 		}
 		case "click": case "type": case "select": case "upload": {
@@ -306,8 +313,8 @@ async function upload(s, m, target, facts) {
 }
 
 /** Accessibility-tree snapshot (D22): visible interactive elements and headings with boxes, sorted by position. */
-async function snapshot(s) {
-	await quiet(s, 5000); // single-page sites fill in after the load; skeletons otherwise
+async function snapshot(s, quietMs = 5000) {
+	await quiet(s, Math.min(quietMs, 5000)); // single-page sites fill in after the load; skeletons otherwise
 	const { nodes } = await cdp(s, "Accessibility.getFullAXTree");
 	await cdp(s, "DOM.getDocument", { depth: 0 });
 	const picked = nodes.filter(n => !n.ignored && KEEP.has(n.role?.value) && n.backendDOMNodeId);

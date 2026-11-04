@@ -13,13 +13,14 @@ type Exec = (command: string, args: string[], options: { timeout: number; signal
 // lasting: label of a third choice that allows such actions for the rest of the session; picking it returns "lasting".
 type Confirm = (title: string, message: string, lasting?: string) => Promise<boolean | "lasting">;
 export type AppActArgs = {
-	action: "apps" | "snapshot" | "find" | "press" | "type" | "menus" | "menu" | "key";
+	action: "apps" | "snapshot" | "find" | "wait" | "press" | "type" | "menus" | "menu" | "key";
 	app?: string; window?: string; ref?: string; query?: string; text?: string; submit?: boolean; path?: string; keys?: string; settleMs?: number;
+	gone?: boolean; timeoutMs?: number; failOn?: string[];
 };
 // ax: what the helper saw, sent back so it can check the element at that path is still the same one.
 export type AppElement = Element & { path: number[]; win: string; disabled?: boolean; ax: { role: string; title: string; desc: string; id: string } };
 type Snap = { elements: AppElement[]; next: number };
-export type Options = { signal?: AbortSignal; confirm?: Confirm; helper?: (req: Record<string, unknown>) => Promise<any>; platform?: string };
+export type Options = { signal?: AbortSignal; confirm?: Confirm; helper?: (req: Record<string, unknown>) => Promise<any>; platform?: string; sleep?: (ms: number) => Promise<void> };
 
 const SWIFT = String.raw`
 import AppKit
@@ -382,6 +383,7 @@ export async function appAct(exec: Exec, args: AppActArgs, o: Options = {}): Pro
 			const q = (args.query ?? "").toLowerCase(), hits = snap.elements.filter(e => [e.label, e.value, e.id, e.type].some(s => s.toLowerCase().includes(q)));
 			return hits.length ? `${UNTRUSTED}\n${hits.slice(0, LIMIT).map(show).join("\n")}` : `Nothing in the last snapshot matches "${args.query}".`;
 		}
+		case "wait": return waitFor();
 		case "press": {
 			const e = target("press");
 			if (!e) throw new Error("press needs ref or query.");
@@ -416,8 +418,24 @@ export async function appAct(exec: Exec, args: AppActArgs, o: Options = {}): Pro
 			return after(await call({ op: "key", send, ...act }));
 		}
 	}
-	throw new Error("action must be apps, snapshot, find, press, type, menus, menu or key.");
+	throw new Error("action must be apps, snapshot, find, wait, press, type, menus, menu or key.");
 
+	async function waitFor(): Promise<string> {
+		// Reads the window until query shows (gone: goes); a failOn text or the timeout fails, so a script stops on an error dialog.
+		const q = args.query;
+		if (!q) throw new Error("wait needs query (label, value or #id), and gone: true to wait until it disappears.");
+		const start = Date.now(), timeout = args.timeoutMs ?? 10_000;
+		for (;;) {
+			render(app, await call({ op: "tree", window: scope, root: [] }), "full");
+			const els = snapshots.get(app)?.elements ?? [], list = (hits: Element[]) => `${UNTRUSTED}\n${(hits as AppElement[]).slice(0, 12).map(show).join("\n")}`;
+			const bad = (args.failOn ?? []).find(f => matches(els, f).length);
+			if (bad) throw new Error(`wait for "${q}" failed: "${bad}" is in ${app}:\n${list(matches(els, bad))}`);
+			const hits = matches(els, q), took = ((Date.now() - start) / 1000).toFixed(1);
+			if (args.gone ? !hits.length : hits.length) return args.gone ? `"${q}" is gone after ${took}s.` : `"${q}" appeared after ${took}s:\n${list(hits)}`;
+			if (Date.now() - start >= timeout) throw new Error(`Timed out after ${timeout} ms waiting for "${q}" to ${args.gone ? "disappear" : "appear"} in ${app}.`);
+			await (o.sleep ?? (ms => new Promise(r => setTimeout(r, ms))))(500);
+		}
+	}
 	function after(res: any) { return settleMs <= 0 ? (res.did === "click" ? "Done (clicked: the button refused the Accessibility press)." : "Done.") : render(app, res, "changes"); }
 }
 
@@ -435,7 +453,7 @@ export const appActTool = (exec: Exec) => ({
 		"Operate a running macOS app through Accessibility (a signed Pi App Helper; the first use asks the user for Accessibility permission) or a Windows app through UI Automation. The user allows each app once per session. Works with the app in the background; the mouse is never moved.",
 		"Windows: menus lists only classic menu bars (others show as MenuItem elements in snapshot); type needs ref; key and type submit bring the window to the front briefly, and key asks the user each time.",
 		"Actions: apps (running apps); menus {app, query?} (every menu item as path  [hotkey]  ✓ checked  (disabled) = not available now; query filters); menu {app, path: \"Product > Archive\"} (runs the item);",
-		"snapshot {app, window?, ref?} (window's elements as [ref] Role \"label\" = value #id @(x,y wxh) disabled; window = title or part of it, default the focused one; ref reads only that element's part); find {app, query} (searches the last snapshot);",
+		"snapshot {app, window?, ref?} (window's elements as [ref] Role \"label\" = value #id @(x,y wxh) disabled; window = title or part of it, default the focused one; ref reads only that element's part); find {app, query} (searches the last snapshot); wait {app, query, gone?, timeoutMs? (10000), failOn? [texts]} (reads the window until query shows or goes; a failOn text, e.g. an error dialog, or the timeout fails it);",
 		"press {app, ref or query} (buttons, checkboxes, popups, rows); type {app, text, ref?, submit?} (ref sets that field's text; without ref the text goes as key presses to the focused control; submit presses Return; password fields are refused);",
 		"key {app, keys: \"cmd+shift+k\" | \"return\" | \"escape\" | \"tab\" | \"down\"} (sent to the app; the same form menus prints).",
 		"After press, type, menu and key it waits settleMs (default 500) and returns + added, - removed, ~ changed elements of the focused (or given) window, or the whole window when most of it changed; settleMs 0 skips that.",
@@ -444,11 +462,14 @@ export const appActTool = (exec: Exec) => ({
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
-			action: { type: "string", enum: ["apps", "snapshot", "find", "press", "type", "menus", "menu", "key"] },
+			action: { type: "string", enum: ["apps", "snapshot", "find", "wait", "press", "type", "menus", "menu", "key"] },
+			gone: { type: "boolean", description: "wait: until query disappears" },
+			timeoutMs: { type: "number", description: "wait: give up after this many ms (default 10000)" },
+			failOn: { type: "array", items: { type: "string" }, description: "wait: texts that fail the wait at once, e.g. [\"Failed to launch\"]" },
 			app: { type: "string", description: "App name (exact or part), bundle id or pid" },
 			window: { type: "string", description: "snapshot, and the change list after actions: window title or part of it (default: the focused window)" },
 			ref: { type: "string", description: "Element ref from the last snapshot or change list, e.g. e12" },
-			query: { type: "string", description: "press/type: label, value or #id of one element in the last snapshot; find/menus: text to filter by" },
+			query: { type: "string", description: "press/type: label, value or #id of one element in the last snapshot; find/menus: text to filter by; wait: what to wait for" },
 			text: { type: "string", description: "type: text to enter" },
 			submit: { type: "boolean", description: "type: press Return afterwards" },
 			path: { type: "string", description: "menu: item path as menus prints it, e.g. \"Product > Archive\"" },

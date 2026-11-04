@@ -1491,7 +1491,7 @@ let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
 type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
-type HubSettings = { version?: string; browserExtension?: { version: string; path: string }; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string; waiting?: { action: string; why: string[]; busy: string[] } | null };
+type HubSettings = { version?: string; remote?: string; browserExtension?: { version: string; path: string }; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string; waiting?: { action: string; why: string[]; busy: string[] } | null };
 let hubSettings: HubSettings = {}, appBadge = 0, attentionList: HubSession[] = [];
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
 function renderIcon() {
@@ -1507,7 +1507,7 @@ function renderIcon() {
   // session/nav: the session on screen and a back/forward button press, for the app's visit trail (hub/app/ui).
   const line = "pi-hub-state " + JSON.stringify({ icon: iconName(), name: hubSettings.hostname ?? "", version: hubSettings.version ?? "", states: tones, attention: tones.filter(tone => tone === "waiting" || tone === "unseen").length, session: sessionId, nav: navRequest,
    // latest: the newest session needing you, asks: it is a question (beats any hub's finished run), so the app's attention key picks this hub; key: that hotkey (this PC's hub sets it).
-   latest: attentionList[0]?.attention ?? 0, asks: attentionList[0]?.tone === "waiting", key: hubSettings.attentionKey ?? "",
+   latest: attentionList[0]?.attention ?? 0, asks: attentionList[0]?.tone === "waiting", key: hubSettings.attentionKey ?? "", remote: hubSettings.remote ?? "",
    // side: where the strip starts (frameless app); gear: the settings badge the strip's gear repeats ("!" ce-workflow, else a count).
    // shortcut: CSS px equal the app's logical px only at 100% page zoom; scale by the zoom if the app ever allows it.
    ...document.body.classList.contains("app-frame") && { side: $("switcher").hidden ? 0 : Math.round($("switcher").getBoundingClientRect().right), gear: !$("update-badge").hidden ? "!" : $("update-others").hidden ? "" : $("update-others").textContent } });
@@ -1926,7 +1926,7 @@ void loadSessions();
 // tapping one opens its window: every quota window as a bar, the pool's notes and, for Claude, the account pool.
 type Segment = { text: string; color?: string };
 type UsageBar = { label: string; left: number; color: string; resets?: string; at?: string };
-type Usage = { id: string; label: string; window?: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[]; soon?: { left: number; in: string }[] };
+type Usage = { id: string; label: string; unavailable?: string; window?: string; left: number; color: string; resets?: string; bars?: UsageBar[]; warnings?: Segment[]; notes?: string[]; soon?: { left: number; in: string }[] };
 // The next refills (within 48 h) as dotted marks at the level they bring; the usage window labels them in grey.
 function soonMarks(bar: HTMLElement, item: Usage, labelled: boolean) {
  // Labels stack one line apart, so close refills (75% and 65%) never print over each other; the bar grows to fit.
@@ -1960,7 +1960,7 @@ const topWindows = (item: Usage) => [...new Set(["5h", item.window ?? "7d"])].fi
 const usageKey = (item: Usage, label: string) => item.id + ":" + label;
 function renderUsageBar() {
  const hidden = new Set(hubSettings.usageHidden ?? []);
- $("usage-button").replaceChildren(...usage.flatMap(item => topWindows(item).filter(label => !hidden.has(usageKey(item, label))).map(label => {
+ $("usage-button").replaceChildren(...usage.flatMap(item => item.unavailable ? [unavailableBar(item)] : topWindows(item).filter(label => !hidden.has(usageKey(item, label))).map(label => {
   const bar = item.bars!.find(entry => entry.label === label)!, head = label === item.window, warnings = head ? item.warnings ?? [] : [];
   // The headline keeps the summary's reset (none for a rotating Claude pool) and the warnings.
   const left = head ? item.left : bar.left, resets = head ? item.resets : bar.resets;
@@ -1976,6 +1976,13 @@ function renderUsageBar() {
   return button;
  })));
  $("usage-button").hidden = !$("usage-button").childElementCount;
+}
+// A logged-in provider whose poll failed before any reading: says so instead of vanishing (#7).
+function unavailableBar(item: Usage) {
+ const button = el("button", "bar usage-bar") as HTMLButtonElement; button.type = "button"; button.disabled = true; button.dataset.provider = item.id;
+ button.append(el("span", "usage-item", `${item.label}: usage unavailable`), el("span", "usage-warning tone-warning", " · " + item.unavailable));
+ button.title = `${item.label} usage could not be read (${item.unavailable}). Turn it off under the gear → Usage.`;
+ return button;
 }
 // Hiding every top-bar window of a provider turns the provider off as a whole: unticked in the gear menu and no longer polled.
 async function showUsageWindow(item: Usage, label: string, show: boolean) {
@@ -2485,7 +2492,7 @@ async function remoteAction(on?: boolean) {
  if (on !== undefined) { box.disabled = copy.disabled = true; $("remote-status").textContent = on ? "Turning on\u2026" : "Turning off\u2026"; }
  let remote: RemoteStatus;
  try { remote = on === undefined ? (await hub("status")).remote : await hub("remote", { on }); } catch (error) { showNotice("Remote: " + error.message); remote = (await hub("status").catch(() => ({ remote: { on: false } }))).remote; }
- remoteUrl = remote.url ?? ""; box.checked = remote.on; box.disabled = false; copy.disabled = !remoteUrl;
+ remoteUrl = hubSettings.remote = remote.url ?? ""; box.checked = remote.on; box.disabled = false; copy.disabled = !remoteUrl;
  $("remote-status").textContent = !remote.on ? "Off" : remoteUrl || "Not served: " + (remote.error ?? remote.missing?.join(" ") ?? "starting");
 }
 $("remote-on").addEventListener("change", () => void remoteAction(($("remote-on") as HTMLInputElement).checked));

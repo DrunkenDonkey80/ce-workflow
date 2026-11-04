@@ -366,6 +366,12 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	assert.match(await mobileAct(f.exec, { action: "wait", query: "Local game", gone: true, timeoutMs: 1 }, o), /is gone/);
 	const empty = fake({ screens: [[]] });
 	await assert.rejects(mobileAct(empty.exec, { action: "wait", query: "Never", timeoutMs: 0 }, opts({ ocr: async () => [] })), /Timed out after 0 ms waiting for "Never" to appear/);
+	assert.match(await mobileAct(fake({ screens: [home] }).exec, { action: "wait", stableMs: 0 }, opts()), /^Screen stable after/, "wait without query: until the screen stops changing");
+	if (process.platform !== "darwin") {
+		const noOcr = fake({ screens: [[]] });
+		await assert.rejects(mobileAct(noOcr.exec, { action: "wait", query: "Never", timeoutMs: 0 }, opts()), /Timed out/);
+		assert.ok(!noOcr.calls.some(c => c[1] === "screenshot"), "no screenshot for an OCR that cannot run here");
+	}
 	await mobileAct(f.exec, { action: "relaunch", appId: "com.demo" }, o);
 	const d = "--device SIM-1";
 	assert.deepEqual(f.acts(), [`io tap 201,570 ${d}`, `io tap 60,708 ${d}`, `io tap 60,708 ${d}`, `apps terminate com.demo ${d}`, `apps launch com.demo ${d}`]);

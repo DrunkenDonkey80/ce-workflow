@@ -44,7 +44,7 @@ try {
 	// Expired or revoked token (401): the reading is kept with a failure; backoff, no crash.
 	credential = { auth: { apiKey: jwt("carol") }, source: "OAuth" }; status = 401;
 	await usage.refresh();
-	assert.deepEqual(usage.usage().summary, [], "a new identity whose fetch fails shows nothing old");
+	assert.deepEqual(usage.usage().summary.map(s => [s.id, s.left, s.unavailable?.replace(/\d+h \d+m/, "T")]), [["codex", undefined, "auth rejected, next try in T"]], "a new identity whose fetch fails shows nothing old, but says it failed");
 	assert.equal(usage.states.get("codex").failure, "auth rejected");
 
 	// Logout: the provider disappears.
@@ -79,6 +79,20 @@ try {
 	] });
 	await usage.start();
 	assert.deepEqual(usage.usage().summary.map(s => [s.id, s.window, s.left, s.bars.map(b => b.label).join()]), [["glm", "7d", 70, "5h,7d"], ["copilot", "mo", 50, "mo"]]);
+	usage.stop();
+
+	// Issue #7: a failed poll is shown, not hidden: no reading yet as "unavailable", an old reading marked stale.
+	let clock = Date.now(), healthy = false;
+	const flaky = { id: "flaky", label: "Flaky", piProviderId: "flaky", pollMs: 60_000, fetchQuota: async () => { if (!healthy) throw new Error("503"); return [{ id: "7d", label: "7d", usedPercent: 20, resetsAt: clock + 86_400_000 }]; } };
+	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, hidden: () => hidden, now: () => clock, auth: async () => async () => credential, providers: [flaky] });
+	await usage.start();
+	assert.deepEqual(usage.usage().summary, [{ id: "flaky", label: "Flaky", unavailable: "unavailable, next try in 0h 6m" }]);
+	healthy = true; clock += 360_000; await usage.refresh();
+	assert.equal(usage.usage().summary[0].left, 80); assert.deepEqual(usage.usage().summary[0].warnings, []);
+	healthy = false; clock += 120_000; await usage.refresh();
+	assert.deepEqual(usage.usage().summary[0].warnings, [{ text: "not updated for 0h 2m (unavailable, next try in 0h 6m)", color: "warning" }]);
+	assert.equal(usage.usage().summary[0].left, 80, "the old reading stays");
+	hidden = ["flaky"]; assert.deepEqual(usage.usage().summary, [], "a hidden provider stays hidden"); hidden = [];
 	usage.stop();
 
 	// Issue #5: an npm-installed Pi is found beside the `pi` on PATH when the managed install is absent.

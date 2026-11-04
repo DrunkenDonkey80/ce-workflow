@@ -38,11 +38,13 @@ overlay and the tray (asking red, working amber, finished-unseen blue), even wit
 - Start at login: the row's checkbox (Windows Run key, Linux `~/.config/autostart`); the app then starts hidden in the tray
   and waits for the hub if it starts first.
 - Tabs: the first is this PC's hub; `+` adds another hub by its link (another PC's tailnet address pairs like a phone).
-  Right-click renames (names are per PC; an empty name shows only the icon) or removes, drag reorders, Alt+1…9 switches while the app has focus. Closing hides to the tray; Quit is in the tray menu.
+  Right-click renames (names are per PC; an empty name shows only the icon), copies the link (this PC's tab: the local link, and the remote link other PCs pair with once remote access is on) or removes, drag reorders, Alt+1…9 switches while the app has focus. Closing hides to the tray; Quit is in the tray menu.
 - Updates: the app has the ce-workflow version. After an update the hub (at start, then hourly until CI has published the
   build) downloads the matching build and restarts a running app onto it; drafts and tabs are kept, hubs and sessions keep running.
 - WSL: install from the Windows hub; its app reaches the WSL hub through 127.0.0.1.
 - Linux limits: GNOME shows the tray only with the AppIndicator extension, and live icon changes may not show on Wayland.
+  The title bar takes its buttons from your desktop's layout at start. If it still shows only Close (Wayland, an older app),
+  save the layout your desktop already uses: `gsettings set org.gnome.desktop.wm.preferences button-layout ':minimize,maximize,close'`.
 - Release: automatic. Every push that changes the version in `package.json` builds both files as release `app-v<version>`
   (`.github/workflows/app-release.yml`, which stamps that version into the app).
   Local build: `cargo tauri build --no-bundle` in `hub/app/src-tauri`. To try it in the installed app, `node hub/app/dev-restart.mjs` builds, stages and restarts the app onto it (the next release update replaces it).

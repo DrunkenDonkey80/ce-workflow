@@ -607,7 +607,7 @@ export function resetMoment(resetsAt, now) {
 
 type Auth = { auth?: { apiKey?: string; headers?: Record<string, string> }; source?: string } | undefined;
 type Window = { id: string; label: string; usedPercent: number; resetsAt?: number; text?: string; color?: string };
-type State = { authenticated: boolean; identityKey?: string; windows?: Window[]; fetchedAt?: number; failure?: string; failureCount?: number };
+type State = { authenticated: boolean; identityKey?: string; windows?: Window[]; fetchedAt?: number; failure?: string; failureCount?: number; retryAt?: number };
 
 /** Provider credentials from Pi's own SDK (D14): same auth.json, refresh and lock as a running Pi. */
 export async function piAuth(dir = agentDir()): Promise<(provider: string) => Promise<Auth>> {
@@ -711,7 +711,9 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 			state.failureCount = (state.failureCount ?? 0) + 1;
 			const backoff = Math.min(MAX_BACKOFF_MS, BACKOFF_MS * 2 ** (state.failureCount - 1));
 			const retry = Math.min(MAX_BACKOFF_MS, error instanceof QuotaError ? (error.retryAfterMs ?? 0) : 0);
-			schedule(entry, Math.max(backoff, retry, pollMs));
+			const delay = Math.max(backoff, retry, pollMs);
+			state.retryAt = now() + delay;
+			schedule(entry, delay);
 		} finally {
 			if (aborters.get(entry.id) === controller) aborters.delete(entry.id);
 		}
@@ -739,8 +741,11 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 		/** The page's status bars and usage window: 7d left per shown provider, each window as a bar, warnings in words. */
 		usage() {
 			const at = now();
-			const summary = providers.filter(entry => !isHidden(entry)).flatMap(entry => {
-				const windows = states.get(entry.id)?.windows ?? [];
+			const summary = providers.filter(entry => !isHidden(entry)).flatMap((entry): Record<string, unknown>[] => {
+				const state = states.get(entry.id), windows = state?.windows ?? [];
+				// A failed poll is shown, never hidden (#7): no data yet as an "unavailable" row, old data marked stale.
+				const retry = state?.failure && state.retryAt ? `, next try in ${formatDuration(state.retryAt - at)}` : "";
+				if (!windows.length) return state?.authenticated && state.failure ? [{ id: entry.id, label: entry.label, unavailable: `${state.failure}${retry}` }] : [];
 				// The headline: the week, else the month (Copilot), else the first quota window; labels, since GLM/Kimi ids carry an index.
 				const quota = windows.filter(w => w.text === undefined), week = windows.find(w => w.label === "7d") ?? quota.find(w => w.label === "mo") ?? quota[0];
 				// A served Claude pool rotates accounts, so its 7d has no single reset time.
@@ -755,6 +760,7 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 					: w.id === "5h-full" ? w.text!.replace(/^5h full (.+)$/, "5h full, frees in $1") : w.text!;
 				const text = windows.filter(w => w.text !== undefined && w !== week);
 				const warnings = text.filter(w => w.color).map(w => ({ text: words(w), color: w.color }));
+				if (state?.failure && state.fetchedAt !== undefined) warnings.push({ text: `not updated for ${formatDuration(at - state.fetchedAt)} (${state.failure}${retry})`, color: "warning" });
 				// Refills within 48 h become marks on the 7d bar; the active account shows as the pool's "→" row.
 				const soon = text.filter(w => w.id.startsWith("refill-") && w.resetsAt && w.resetsAt > at && w.resetsAt - at <= 48 * 3_600_000)
 					.map(w => ({ left: Math.round(100 - w.usedPercent), in: formatDuration(w.resetsAt! - at) }));

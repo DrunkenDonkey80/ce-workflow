@@ -179,7 +179,7 @@ let attentionKey = null;
 window.onTitle = (webview, title) => {
  const tab = tabs.find(t => "hub" + t.id === webview); if (!tab) return;
  const line = /^pi-hub-state (\{.*\})$/.exec(title ?? "");
- if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { side: value.side, gear: value.gear ?? "", icon: value.icon || tab.icon, hubName: value.name || tab.hubName, version: value.version || "", states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0, asks: value.asks === true });
+ if (line) { try { const value = JSON.parse(line[1]); Object.assign(tab, { side: value.side, gear: value.gear ?? "", icon: value.icon || tab.icon, hubName: value.name || tab.hubName, version: value.version || "", remote: value.remote || "", states: Array.isArray(value.states) ? value.states : [], attention: Number(value.attention) || 0, latest: Number(value.latest) || 0, asks: value.asks === true });
   // This PC's hub holds the attention key setting.
   // A newer "needs you" than this tab has shown flashes the taskbar; the first title after start only sets the mark.
   if (tab.peak !== undefined && tab.latest > tab.peak) void invoke("flash").catch(console.error);
@@ -226,7 +226,8 @@ async function menu(tab) {
   void window.__TAURI__.menu.Menu.new({ items: [
    item("Rename…", "rename"), ...(tab.name !== undefined ? [item("Reset name", "reset")] : []),
    ...(touch ? [item("Add hub\u2026", "add")] : []),
-   ...(tab.url ? [item("Copy link", "copy"), item("Reload", "reload")] : []),
+   // This PC's link works only here; other PCs need its remote (tailnet) link.
+   ...(tab.url ? [...tab.local ? [item("Copy local link", "copy"), ...tab.remote ? [item("Copy remote link", "copy-remote")] : []] : [item("Copy link", "copy")], item("Reload", "reload")] : []),
    ...(tab.hidden ? [item("Unhide", "hide")] : tabs.some(other => other !== tab && !other.hidden) ? [item("Hide", "hide")] : []),
    ...(tab.local ? [] : [{ item: "Separator" }, item("Remove", "remove")]),
   ] }).then(m => m.popup()).then(() => setTimeout(() => done(null), 500), error => { notice = "Menu: " + error; render(); done(null); });
@@ -235,8 +236,8 @@ async function menu(tab) {
  if (pick === "reload") open(tab);
  if (pick === "add") void addHub();
  if (pick === "hide") { tab.hidden = !tab.hidden; persist(); render(); }
- if (pick === "copy") {
-  try { await navigator.clipboard.writeText(tab.url); notice = "Link copied."; } catch { notice = tab.url; }
+ if (pick === "copy" || pick === "copy-remote") {
+  try { await navigator.clipboard.writeText(pick === "copy" ? tab.url : tab.remote); notice = "Link copied."; } catch { notice = pick === "copy" ? tab.url : tab.remote; }
   render(); setTimeout(() => { if (notice === "Link copied.") { notice = ""; render(); } }, 3000);
  }
  if (pick === "rename") {

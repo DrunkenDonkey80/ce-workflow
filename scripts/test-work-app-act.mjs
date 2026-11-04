@@ -66,6 +66,14 @@ assert.deepEqual(asked, ["Let the agent read and operate Xcode?"], "the app is a
 await appAct(null, { action: "snapshot", app: "Xcode" }, o);
 assert.equal(asked.length, 1);
 
+// wait: until the text shows or goes; a failOn text or the timeout fails.
+const fast = { ...o, sleep: async () => {} };
+assert.match(await appAct(null, { action: "wait", app: "Xcode", query: "Upload" }, fast), /^"Upload" appeared after [\d.]+s:\nUNTRUSTED[^]*\[e2\] Button "Upload"/);
+assert.match(await appAct(null, { action: "wait", app: "Xcode", query: "Nope", gone: true }, fast), /"Nope" is gone/);
+await assert.rejects(appAct(null, { action: "wait", app: "Xcode", query: "Upload", failOn: ["Belot"] }, fast), /wait for "Upload" failed: "Belot" is in Xcode/);
+await assert.rejects(appAct(null, { action: "wait", app: "Xcode", query: "Never", timeoutMs: 0 }, fast), /Timed out after 0 ms waiting for "Never" to appear in Xcode/);
+await assert.rejects(appAct(null, { action: "wait", app: "Xcode" }, fast), /wait needs query/);
+
 // press by query: sends the path and raw attributes, returns only what changed.
 const pressed = await appAct(null, { action: "press", app: "Xcode", query: "Distribute App" }, o);
 assert.deepEqual(calls.at(-1).path, [0]); assert.equal(calls.at(-1).expect.title, "Distribute App"); assert.equal(calls.at(-1).win, "Archives");
