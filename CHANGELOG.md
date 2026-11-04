@@ -4,6 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.32 — 2026-11-04
+
+### Fixed
+- 0.2.31 committed a `node_modules` symlink pointing into the developer's home folder; it is removed, and `.gitignore` now ignores `node_modules` symlinks too.
+
 ## 0.2.31 — 2026-11-04
 
 ### Added
