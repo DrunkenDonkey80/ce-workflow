@@ -82,12 +82,13 @@ try {
 		};
 		return { Client, clients, agent };
 	};
-	const state = { alpha: { name: "ALPHA", live: true }, beta: { name: "BETA", live: true }, gamma: { name: "GAMMA", live: true } }, woken = [];
+	const state = { alpha: { name: "ALPHA", folder: "C:\\w\\emailupload", live: true }, beta: { name: "BETA", folder: "/Users/f/belot", live: true }, gamma: { name: "GAMMA", folder: "/Users/f/belot", live: true } }, woken = [];
+	const OS = { win32: "Windows", darwin: "macOS", linux: "Linux" }[process.platform];
 	for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", ["alpha"]], ["mac", "https://mac.t.ts.net:2", ["beta", "gamma"]]]) {
 		const dataDir = path.join(root, name), devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), fake = broker();
 		fs.mkdirSync(dataDir);
 		hubs[url] = { pairing, devices, broker: fake, links: createLinks({ dataDir, devices, pairing, request, self: () => ({ name, url, login }),
-			sessions: () => records.map(record => ({ record, name: state[record].name, folder: "C:/x", live: state[record].live })),
+			sessions: () => records.map(record => ({ record, name: state[record].name, folder: state[record].folder, live: state[record].live })),
 			intercom: { intercomId: async record => `pi-${record}`, load: async () => ({ IntercomClient: fake.Client }),
 				wake: async record => { woken.push(record); state[record].live = true; hubs[url].agents[record] = await fake.agent(record); } } }), agents: {} };
 	}
@@ -103,7 +104,9 @@ try {
 	await assert.rejects(pc.links.link("alpha", macUrl, "gone"), /no longer exists/);
 	assert.equal(mac.links.store.list().length, 0, "a refused link is stored nowhere");
 	const made = await pc.links.link("alpha", macUrl, "beta");
-	assert.deepEqual([made.remote, pc.links.linksOf("alpha")[0].hubName], [{ record: "beta", name: "BETA" }, "mac"]);
+	assert.deepEqual([made.remote, made.standin, pc.links.linksOf("alpha")[0].hubName], [{ record: "beta", name: "BETA", folder: "/Users/f/belot", os: process.platform }, "belot-beta~mac", "mac"]);
+	assert.equal(pc.links.linksOf("alpha")[0].label, `belot/BETA on mac (${OS})`, "the link names folder, PC and OS");
+	assert.deepEqual(mac.links.store.list()[0].remote, { record: "alpha", name: "ALPHA", folder: "C:\\w\\emailupload", os: process.platform }, "the other side learns them too");
 	assert.deepEqual(mac.links.store.list().map(l => [l.id, l.session, l.hub, l.remote.record, l.remote.name]), [[made.id, "beta", "https://pc.t.ts.net:1", "alpha", "ALPHA"]], "both hubs store the link");
 	// Only the hub a link belongs to may remove it; unknown ids succeed (retries).
 	assert.deepEqual(await mac.links.serve("unlink", {}, { comm: COMM, link: made.id }, login, null), [401, { comm: COMM, error: "unpaired" }]);
@@ -125,40 +128,47 @@ try {
 	const alpha = pc.agents.alpha = await pc.broker.agent("alpha"), other = await pc.broker.agent("other"), beta = mac.agents.beta = await mac.broker.agent("beta");
 	const link = await pc.links.link("alpha", macUrl, "beta");
 	await Promise.all([pc.links.sync(), mac.links.sync()]);
-	assert.deepEqual([pc.links.standins(), mac.links.standins()], [[{ id: link.id, name: "beta~mac" }], [{ id: link.id, name: "alpha~pc" }]], "D11 names, one stand-in on each hub");
-	assert.equal(pc.broker.clients.get(`hublink-${link.id}`).info.name, "beta~mac", "fixed id per link");
+	assert.deepEqual([pc.links.standins(), mac.links.standins()], [[{ id: link.id, name: "belot-beta~mac" }], [{ id: link.id, name: "emailupload-alpha~pc" }]], "D11 names with the folder, one stand-in on each hub");
+	const info = pc.broker.clients.get(`hublink-${link.id}`).info;
+	assert.deepEqual([info.name, info.cwd, info.model], ["belot-beta~mac", `mac (${OS}): /Users/f/belot`, "hub-link for emailupload/ALPHA"], "fixed id per link; intercom shows where it runs and whose it is");
 	// Send: the receipt comes only after the other hub's session took it.
-	assert.equal((await alpha.send("beta~mac", { text: "hello" })).delivered, true);
-	assert.deepEqual(beta.inbox.map(m => [m.from, m.content.text]), [["alpha~pc", "hello"]]);
+	assert.equal((await alpha.send("belot-beta~mac", { text: "hello" })).delivered, true);
+	assert.deepEqual(beta.inbox.map(m => [m.from, m.content.text]), [["emailupload-alpha~pc", "hello"]]);
 	// Ask and reply: same message id across hubs; the reply comes back to the asker as a reply.
-	const asked = await alpha.send("beta~mac", { text: "ping?", expectsReply: true });
+	const asked = await alpha.send("belot-beta~mac", { text: "ping?", expectsReply: true });
 	assert.deepEqual([beta.inbox[1].id, beta.inbox[1].expectsReply], [asked.id, true]);
-	assert.equal((await beta.send("alpha~pc", { text: "pong", replyTo: asked.id })).delivered, true);
-	assert.deepEqual(alpha.inbox.map(m => [m.from, m.content.text, m.replyTo]), [["beta~mac", "pong", asked.id]]);
+	assert.equal((await beta.send("emailupload-alpha~pc", { text: "pong", replyTo: asked.id })).delivered, true);
+	assert.deepEqual(alpha.inbox.map(m => [m.from, m.content.text, m.replyTo]), [["belot-beta~mac", "pong", asked.id]]);
 	// D9: another local session sees the stand-in but cannot talk through it.
-	assert.equal((await other.send("beta~mac", { text: "sneak" })).delivered, false);
-	assert.match(other.inbox[0].content.text, /beta~mac is linked to ALPHA, not to this session; not forwarded/);
+	assert.equal((await other.send("belot-beta~mac", { text: "sneak" })).delivered, false);
+	assert.match(other.inbox[0].content.text, /belot-beta~mac is linked to emailupload\/ALPHA on this hub, not to this session; not forwarded/);
 	assert.equal(beta.inbox.length, 2, "nothing crossed");
 	// A parked target is resumed and gets the message once it joins intercom.
 	state.beta.live = false; await beta.disconnect();
-	assert.equal((await alpha.send("beta~mac", { text: "wake up" })).delivered, true);
+	assert.equal((await alpha.send("belot-beta~mac", { text: "wake up" })).delivered, true);
 	await until(() => mac.agents.beta.inbox.some(m => m.content.text === "wake up"), "delivered after resume");
 	assert.deepEqual(woken, ["beta"]);
 	// D13: the other hub is unreachable: the sender is told why and the stand-in disconnects; a good ping brings it back.
 	offline.add(macUrl);
-	assert.equal((await alpha.send("beta~mac", { text: "lost" })).delivered, false);
-	assert.match(alpha.inbox.at(-1).content.text, /Not delivered to beta~mac: mac hub unreachable/);
+	assert.equal((await alpha.send("belot-beta~mac", { text: "lost" })).delivered, false);
+	assert.match(alpha.inbox.at(-1).content.text, /Not delivered to belot-beta~mac: mac hub unreachable/);
 	await pc.links.sync();
 	assert.deepEqual([pc.links.standins(), pc.links.linksOf("alpha")[0].online, pc.links.state().hubs[0].online], [[], false, false]);
 	offline.delete(macUrl);
 	await pc.links.tick();
-	assert.deepEqual(pc.links.standins().map(s => s.name), ["beta~mac"], "reconnected with the same name");
+	assert.deepEqual(pc.links.standins().map(s => s.name), ["belot-beta~mac"], "reconnected with the same name");
 	// D11 rename through ping; the link removed on mac reaches pc's sender as a cause.
-	state.beta.name = "Reviewer";
+	state.beta.name = "Reviewer"; state.beta.folder = "/Users/f/review";
 	await pc.links.tick();
-	assert.deepEqual(pc.links.standins().map(s => s.name), ["reviewer~mac"]);
+	assert.deepEqual(pc.links.standins().map(s => s.name), ["review-reviewer~mac"]);
+	assert.equal(pc.broker.clients.get(`hublink-${link.id}`).info.cwd, `mac (${OS}): /Users/f/review`, "a moved folder reaches the stand-in");
+	// A link stored by an older hub has no folder or OS: the old name~hub form and the hub address as place.
+	pc.links.store.add({ ...pc.links.store.list()[0], remote: { record: "beta", name: "Reviewer" } }); await pc.links.sync();
+	assert.deepEqual([pc.links.standins().map(s => s.name), pc.broker.clients.get(`hublink-${link.id}`).info.cwd], [["reviewer~mac"], `mac: ${macUrl}`]);
+	await pc.links.tick();
+	assert.deepEqual(pc.links.standins().map(s => s.name), ["review-reviewer~mac"], "the next ping fills them in");
 	mac.links.store.remove(link.id); await mac.links.sync();
-	assert.equal((await alpha.send("reviewer~mac", { text: "gone?" })).delivered, false);
+	assert.equal((await alpha.send("review-reviewer~mac", { text: "gone?" })).delivered, false);
 	assert.match(alpha.inbox.at(-1).content.text, /the link was removed on mac/);
 	await Promise.all([pc.links.stop(), mac.links.stop()]);
 	assert.equal(pc.broker.clients.has(`hublink-${link.id}`), false, "stop disconnects stand-ins");

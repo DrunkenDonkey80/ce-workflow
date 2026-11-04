@@ -1136,9 +1136,8 @@ async function updateSlash() {
   const query = word[1].toLowerCase(); slashAt = caret - word[1].length - 1;
   const local = lastSessions[0].flatMap(group => group.sessions.filter(session => session.id !== sessionId).map(session => [sessionRef(group.folder, session).replace(/ \(.*/, ""), session.pi ? "intercom " + session.pi : "no intercom id yet", sessionRef(group.folder, session)]))
    .filter(row => row[2].toLowerCase().includes(query));
-  // shortcut: links carry no remote folder, so this session's own folder name also matches (@belot in belot/1 shows its mac link); store the remote folder if links cross projects.
-  const own = ownFolder.split(/[\\/]/).filter(Boolean).pop() ?? "";
-  const linked = (await linkedRows()).filter(row => (row[0] + " " + row[1] + " " + own).toLowerCase().includes(query));
+  // Rows name the remote folder, PC and OS, so "@emailupload", "@flexpc" or "@windows" finds a link.
+  const linked = (await linkedRows()).filter(row => (row[0] + " " + row[1]).toLowerCase().includes(query));
   if (input.value !== value) return;
   return showSlash([...linked, ...local].slice(0, 12));
  }
@@ -1158,7 +1157,7 @@ async function linkedRows() {
  let rows: string[][] = [];
  try {
   const list = await post("links", { session: sessionId, action: "list" });
-  rows = list.links.map(link => { const name = link.standin ?? `${link.remote.name}~${link.hubName}`; return [name, `linked: ${link.remote.name} on ${link.hubName}${link.online ? "" : " (offline)"}`, name]; });
+  rows = list.links.map(link => { const name = link.standin ?? `${link.remote.name}~${link.hubName}`; return [name, `linked: ${link.label}${link.online ? "" : " (offline)"}`, name]; });
  } catch { /* hub links off */ }
  linkCache = { at: Date.now(), rows }; return rows;
 }
@@ -1849,7 +1848,7 @@ async function openHubLinks(anchor: HTMLElement, session: HubSession) {
   if (state.unavailable) showNotice(state.unavailable);
   showMenu(anchor, [
    ...state.links.map(link => [`Unlink ${link.standin ?? link.remote.name + "~" + link.hubName}${link.online ? "" : " (offline)"}`, async () => {
-    if (!await confirmBox(`Unlink "${session.name}" from ${link.remote.name} on ${link.hubName}?`)) return;
+    if (!await confirmBox(`Unlink "${session.name}" from ${link.label}?`)) return;
     try { const done = await links({ action: "unlink", link: link.id }); showNotice(done.pending ? `Unlinked here; ${link.hubName} hears it when it is back.` : "Unlinked."); } catch (error) { showNotice(error.message); }
    }] as [string, () => void]),
    ...state.hubs.map(hub => [`Link to a session on ${hub.name}${hub.online ? "" : " (offline)"}…`, async () => {
@@ -1857,7 +1856,7 @@ async function openHubLinks(anchor: HTMLElement, session: HubSession) {
      const remote = await links({ action: "sessions", hub: hub.url });
      if (!remote.sessions.length) return showNotice(`${hub.name} has no sessions.`);
      showMenu(anchor, remote.sessions.map(other => [`${other.name} · ${other.folder.split(/[\\/]/).filter(Boolean).pop() ?? other.folder}${other.live ? "" : " (parked)"}`, async () => {
-      try { const made = await links({ action: "link", hub: hub.url, record: other.record }); showNotice(`Linked: agents here reach it as ${made.remote.name}~${hub.name}.`); } catch (error) { showNotice(error.message); }
+      try { const made = await links({ action: "link", hub: hub.url, record: other.record }); showNotice(`Linked: agents here reach it as ${made.standin}.`); } catch (error) { showNotice(error.message); }
      }] as [string, () => void]));
     } catch (error) { showNotice(error.message); }
    }] as [string, () => void]),

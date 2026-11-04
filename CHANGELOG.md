@@ -2,6 +2,14 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.35 — 2026-11-04
+
+### Changed
+- Hub links say which session they reach. The stand-in for a linked session is now named after its folder too (`emailupload-1~flexpc` instead of `1~flexpc`), and `intercom list` shows where it runs (`FlexPC (Windows): C:\Users\Flex\emailupload`) and which session on this PC may use it (`hub-link for emailupload/1`). Before, every session called "1" looked the same, so an agent could pick the link that belongs to another session.
+- In the hub chat, `@` finds linked sessions by folder, PC or OS (`@emailupload`, `@flexpc`, `@windows`) and lists them as "linked: emailupload/1 on FlexPC (Windows)". The unlink menu and the "Linked" notice use the same names.
+- A message sent through someone else's link now says which session owns it ("linked to belot/1 on this hub").
+- Both hubs need 0.2.35 for the new names; until the other hub updates, its links keep the old `name~hub` form and still work.
+
 ## 0.2.34 — 2026-11-04
 
 ### Added
