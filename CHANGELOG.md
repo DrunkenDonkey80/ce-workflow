@@ -4,6 +4,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.2.33 — 2026-11-04
+
+### Fixed
+- `mobile_act` on a real iPhone whose helper does not answer: it reads the phone's screen without the helper, and when iOS shows its once-per-restart "Enable UI Automation" passcode prompt it says to type the passcode on the phone. Otherwise it restarts the mobilecli daemon, whose link to the helper can stay dead after the phone recovers, and retries once; only then does it blame a crashing helper.
+
 ## 0.2.32 — 2026-11-04
 
 ### Fixed

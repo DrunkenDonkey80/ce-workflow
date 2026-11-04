@@ -527,15 +527,37 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 	devices.set(cacheKey, dev);
 	if (dev.type === "real") realIds.add(dev.id);
 	// One gesture at a time per device: parallel calls queue behind each other.
-	const prev = queues.get(dev.id) ?? Promise.resolve(), mine = prev.then(() => act(exec, dev, args, o));
-	queues.set(dev.id, mine.catch(() => undefined));
+	const queued = () => {
+		const prev = queues.get(dev.id) ?? Promise.resolve(), mine = prev.then(() => act(exec, dev, args, o));
+		queues.set(dev.id, mine.catch(() => undefined));
+		return mine;
+	};
 	try {
-		return await mine;
+		return await queued();
 	} catch (e) {
 		devices.delete(cacheKey);
-		if (dev.platform === "ios" && dev.type === "real" && /WebDriverAgent/.test((e as Error).message)) throw new Error(`${(e as Error).message}\n${await agentHint(exec, dev, signal)}`);
-		throw e;
+		if (dev.platform !== "ios" || dev.type !== "real" || !/WebDriverAgent/.test((e as Error).message)) throw e;
+		const prompt = await agentPrompt(exec, dev, o);
+		if (prompt) throw new Error(`${(e as Error).message}\n${prompt}`);
+		// The daemon keeps its link to the helper across calls; one made while the helper was blocked stays dead after the phone is fixed.
+		await exec(MOBILECLI, ["daemon", "stop"], { timeout: 30_000, signal });
+		try {
+			return `(Restarted the mobilecli daemon: its link to the helper on ${dev.name} had gone stale. Other devices reconnect on their next call.)\n${await queued()}`;
+		} catch (again) {
+			if (!/WebDriverAgent/.test((again as Error).message)) throw again;
+			throw new Error(`${(again as Error).message}\n${await agentHint(exec, dev, signal)}`);
+		}
 	}
+}
+
+/** A system prompt on the iPhone that blocks the helper, read from a screenshot that does not need the helper. */
+async function agentPrompt(exec: Exec, dev: Device, o: Options) {
+	const png = path.join(os.tmpdir(), `mobile-act-prompt-${process.pid}.png`);
+	const r = await exec("xcrun", ["devicectl", "device", "capture", "screenshot", "--device", dev.id, "--destination", png], { timeout: 60_000, signal: o.signal });
+	if (r.code || r.killed) return "";
+	const text = (await (o.ocr ?? (f => macOcr(exec, f, o.signal)))(png).catch(() => [])).map(h => h.text).join(" ");
+	if (/Enable UI Automation|Passcode for/i.test(text)) return `${dev.name} shows "${text.slice(0, 120)}": iOS asks for the passcode once after each restart before UI automation works. Ask the user to type it on the phone, then retry. (The screen is in ${png}.)`;
+	return "";
 }
 
 /** Why the helper agent does not answer on a real iPhone: the phone wants its passcode, or the helper crashes as it starts. */

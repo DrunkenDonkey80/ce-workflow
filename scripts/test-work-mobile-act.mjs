@@ -207,16 +207,32 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	// A real iPhone whose helper will not start: no 3x60 s of retries, and a diagnosis.
 	resetSession();
 	const dead = fake({ list: [PHONE] });
-	let dumps = 0, locked = false;
+	let dumps = 0, locked = false, stops = 0, staleUntilStop = false, healthy = false, screenText = "";
 	const wda = async (c, a) => {
-		if (c === "xcrun") return { code: 0, stdout: `• passcodeRequired: ${locked}\n` };
-		if (a[0] === "dump") { dumps++; return { code: 1, stdout: JSON.stringify({ status: "error", error: "failed to start agent: timed out waiting for WebDriverAgent to be ready" }) }; }
+		if (c === "xcrun") return a.includes("lockState") ? { code: 0, stdout: `• passcodeRequired: ${locked}\n` } : { code: 0 };
+		if (a[0] === "daemon") { stops++; if (staleUntilStop) healthy = true; return { code: 0 }; }
+		if (a[0] === "dump" && !healthy) { dumps++; return { code: 1, stdout: JSON.stringify({ status: "error", error: "failed to start agent: timed out waiting for WebDriverAgent to be ready" }) }; }
 		return dead.exec(c, a);
 	};
-	await assert.rejects(mobileAct(wda, { action: "snapshot" }, opts()), /WebDriverAgent to be ready\nThe helper app \(com\.mobilenext\.devicekit-iosUITests\.xctrunner\) probably crashes as it starts[^]*devicectl device capture screenshot --device 0000-REAL/);
-	assert.equal(dumps, 1, "real iPhone: no agent-start retries");
+	const po = () => opts({ ocr: async () => screenText ? [{ text: screenText, x: 0, y: 0, w: 1, h: 0.1 }] : [] });
+	await assert.rejects(mobileAct(wda, { action: "snapshot" }, po()), /WebDriverAgent to be ready\nThe helper app \(com\.mobilenext\.devicekit-iosUITests\.xctrunner\) probably crashes as it starts[^]*devicectl device capture screenshot --device 0000-REAL/);
+	assert.equal(dumps, 2, "real iPhone: no agent-start retries, one more try after the daemon restart");
+	assert.equal(stops, 1, "the stale daemon is restarted");
 	locked = true;
-	await assert.rejects(mobileAct(wda, { action: "snapshot" }, opts()), /Lorenz’s iPhone is locked or waiting for its passcode/);
+	await assert.rejects(mobileAct(wda, { action: "snapshot" }, po()), /Lorenz’s iPhone is locked or waiting for its passcode/);
+	locked = false;
+
+	// The iOS "Enable UI Automation" passcode prompt after a restart blocks the helper: named, and no daemon restart.
+	screenText = "Enter iPhone Passcode for “XCTest” Enable UI Automation";
+	stops = 0;
+	await assert.rejects(mobileAct(wda, { action: "snapshot" }, po()), /Lorenz’s iPhone shows "Enter iPhone Passcode for “XCTest” Enable UI Automation": iOS asks for the passcode once after each restart/);
+	assert.equal(stops, 0);
+
+	// A daemon whose link to the helper went stale: restarted, and the call goes through.
+	screenText = "";
+	stops = 0; staleUntilStop = true; resetSession();
+	assert.match(await mobileAct(wda, { action: "snapshot" }, po()), /^\(Restarted the mobilecli daemon: its link to the helper on Lorenz’s iPhone had gone stale\. Other devices reconnect on their next call\.\)\nUNTRUSTED/);
+	assert.equal(stops, 1);
 }
 
 // Test loops (Viktor torture run): guarded waits, checkpoints, crash watch, breaker.
