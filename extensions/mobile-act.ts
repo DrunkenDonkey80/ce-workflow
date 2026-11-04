@@ -2,7 +2,7 @@
 // The screen comes from the accessibility tree as labelled elements with frames; every action returns what changed on screen.
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { appendFile, copyFile, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { askConfirm } from "./ask-user/menu.ts";
@@ -10,7 +10,8 @@ import { askConfirm } from "./ask-user/menu.ts";
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 type Confirm = (title: string, message: string) => Promise<boolean>;
 export type MobileActArgs = {
-	action: "list" | "boot" | "launch" | "relaunch" | "snapshot" | "find" | "ocr" | "wait" | "tap" | "longpress" | "type" | "swipe" | "button";
+	action: "list" | "boot" | "launch" | "relaunch" | "snapshot" | "find" | "ocr" | "wait" | "tap" | "longpress" | "type" | "swipe" | "button" | "checkpoint" | "resume";
+	failOn?: string[]; failOnAlert?: boolean; expectApp?: string; stableMs?: number; name?: string; save?: boolean; ignore?: string[]; visual?: boolean;
 	device?: string; appId?: string; gone?: boolean; timeoutMs?: number; ref?: string; x?: number; y?: number; text?: string; submit?: boolean; durationMs?: number;
 	direction?: "up" | "down" | "left" | "right"; button?: "home" | "back" | "power" | "volume_up" | "volume_down"; query?: string; settleMs?: number;
 };
@@ -18,7 +19,9 @@ type Frame = { x: number; y: number; width: number; height: number };
 export type Element = { ref: string; type: string; label: string; value: string; id: string; frame: Frame };
 export type Device = { id: string; name: string; platform: string; type: string; state: string; version: string };
 type Snap = { elements: Element[]; next: number };
-export type Options = { signal?: AbortSignal; confirm?: Confirm; sleep?: (ms: number) => Promise<void>; profileDirs?: string[]; ocr?: (png: string) => Promise<OcrHit[]> };
+export type Options = { signal?: AbortSignal; confirm?: Confirm; sleep?: (ms: number) => Promise<void>; profileDirs?: string[]; ocr?: (png: string) => Promise<OcrHit[]>;
+	/** Where checkpoints and failure evidence go (default ~/.cache/ce-workflow/mobile-act); where simulator crash reports are (default ~/Library/Logs/DiagnosticReports). */
+	dir?: string; reportsDir?: string; grid?: () => Promise<number[]> };
 /** Vision text box, normalized 0..1 from the top left. */
 export type OcrHit = { text: string; x: number; y: number; w: number; h: number };
 
@@ -44,7 +47,7 @@ const screens = new Map<string, Frame>();
 const agentOk = new Set<string>();
 const fronts = new Map<string, string>(); // device -> app in front at the last read
 const realIds = new Set<string>(); // real devices: no agent-start retries, their failures are diagnosed instead
-export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); fronts.clear(); realIds.clear(); }
+export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); fronts.clear(); realIds.clear(); breakers.clear(); crashSeen.clear(); exeNames.clear(); }
 const pause = (o: Options, ms: number) => (o.sleep ?? (t => new Promise(res => setTimeout(res, t))))(ms);
 
 async function run(exec: Exec, args: string[], signal?: AbortSignal, timeout = 60_000, retries = 2): Promise<string> {
@@ -237,6 +240,145 @@ async function warnings(exec: Exec, dev: Device, elements: Element[], signal?: A
 	return { app, moved, head: [moved ? `APP CHANGED: ${app} is in front now, not ${was} (did it close or crash?)` : "", alertText(elements)].filter(Boolean).map(l => `${l}\n`).join("") };
 }
 
+// Checks that stop a test loop: guarded waits, checkpoints against a saved good state, a crash-report watch, and a per-device breaker.
+const BASE = path.join(os.homedir(), ".cache", "ce-workflow", "mobile-act");
+const breakers = new Map<string, string>(); // device -> why it stopped; input waits for action resume
+const crashSeen = new Map<string, Set<string>>(); // "device app" -> crash reports already known
+const exeNames = new Map<string, string>(); // "device app" -> executable name (iOS crash report file names start with it)
+const headers = new Map<string, string>(); // simulator crash report -> its first line, which names the app
+const MUTATING = new Set(["launch", "relaunch", "tap", "longpress", "type", "swipe", "button"]);
+const GRID = 16;
+
+/** Latches the device's breaker and saves what the screen showed; returns the error to throw. */
+async function stop(exec: Exec, dev: Device, why: string, o: Options, more?: (dir: string) => Promise<unknown>) {
+	breakers.set(dev.id, why);
+	const dir = path.join(o.dir ?? BASE, "failures", `${new Date().toISOString().replace(/[:.]/g, "-")}-${dev.id}`);
+	await mkdir(dir, { recursive: true });
+	const shown = await full(exec, dev, snapshots.get(dev.id)?.elements ?? [], o.signal, fronts.get(dev.id)).catch(() => "");
+	await writeFile(path.join(dir, "screen.txt"), `${why}\n\n${shown}\n`);
+	await run(exec, ["screenshot", "--device", dev.id, "--output", path.join(dir, "screen.png"), "--format", "png"], o.signal, 60_000, 0).catch(() => undefined);
+	await more?.(dir).catch(() => undefined);
+	return new Error(`STOPPED: ${why}\nSaved the screen to ${dir}\nBreaker on: ${dev.name} takes no launches, taps or other input until action resume.`);
+}
+
+async function firstLine(file: string) {
+	const h = await open(file);
+	try { const b = Buffer.alloc(2048), { bytesRead } = await h.read(b, 0, 2048, 0); return b.toString("utf8", 0, bytesRead).split("\n")[0]; }
+	finally { await h.close(); }
+}
+
+/** The app's crash reports now (iOS file names, Android crash-log lines) and how to copy one; a string says why they cannot be read. */
+async function crashes(exec: Exec, dev: Device, appId: string, o: Options): Promise<{ ids: string[]; copy: (id: string, dir: string) => Promise<unknown> } | string> {
+	const { signal } = o;
+	if (dev.platform === "android") {
+		const r = await exec("adb", ["-s", dev.id, "logcat", "-b", "crash", "-d"], { timeout: 30_000, signal });
+		if (r.code || r.killed) return `adb logcat failed: ${String(r.stderr ?? "").trim().slice(-300)}`;
+		return { ids: String(r.stdout ?? "").split("\n").filter(l => l.includes(appId) && /Process: |Fatal signal/.test(l)).map(l => l.trim()), copy: (id, dir) => appendFile(path.join(dir, "crash.txt"), `${id}\n`) };
+	}
+	if (dev.type !== "real") {
+		// Simulator apps write their crash reports into the Mac's own folder; the first line names the app.
+		const dir = o.reportsDir ?? path.join(os.homedir(), "Library", "Logs", "DiagnosticReports"), ids: string[] = [];
+		for (const f of await readdir(dir).catch(() => [] as string[])) {
+			if (!f.endsWith(".ips")) continue;
+			const file = path.join(dir, f);
+			if (!headers.has(file)) headers.set(file, await firstLine(file).catch(() => ""));
+			if (headers.get(file)!.includes(`"bundleID":"${appId}"`)) ids.push(file);
+		}
+		return { ids, copy: (id, to) => copyFile(id, path.join(to, path.basename(id))) };
+	}
+	const devicectl = async (args: string[]) => {
+		const out = path.join(os.tmpdir(), `mobile-act-${process.pid}-${Math.random().toString(36).slice(2)}.json`);
+		const r = await exec("xcrun", ["devicectl", ...args, "--device", dev.id, "--json-output", out], { timeout: 60_000, signal });
+		try { return JSON.parse(await readFile(out, "utf8")).result; }
+		catch { throw new Error(`devicectl ${args.slice(0, 3).join(" ")} failed: ${String(r.stderr || r.stdout || "").trim().slice(-300)}`); }
+		finally { await rm(out, { force: true }); }
+	};
+	try {
+		const k = `${dev.id} ${appId}`;
+		if (!exeNames.has(k)) {
+			const app = (await devicectl(["device", "info", "apps", "--bundle-id", appId])).apps?.[0];
+			if (!app) return `${appId} is not installed on ${dev.name}`;
+			exeNames.set(k, decodeURIComponent(String(app.url)).replace(/\/$/, "").split("/").pop()!.replace(/\.app$/, ""));
+		}
+		const exe = exeNames.get(k)!, files: { name: string }[] = (await devicectl(["device", "info", "files", "--domain-type", "systemCrashLogs"])).files ?? [];
+		return {
+			ids: files.map(f => String(f.name)).filter(n => n.endsWith(".ips") && (n.startsWith(`${exe}-`) || n.startsWith(`${exe}.`))),
+			copy: (id, dir) => exec("xcrun", ["devicectl", "device", "copy", "from", "--device", dev.id, "--domain-type", "systemCrashLogs", "--source", id, "--destination", path.join(dir, id)], { timeout: 60_000, signal }),
+		};
+	} catch (e) { return (e as Error).message; }
+}
+
+/** Crash reports of appId that appeared since the device's first check in this session. */
+async function newCrashes(exec: Exec, dev: Device, appId: string, o: Options) {
+	if (!appId) return { note: "Crash watch: no app to watch (pass appId).", fresh: [] as string[] };
+	const c = await crashes(exec, dev, appId, o);
+	if (typeof c === "string") return { note: `Crash watch unavailable: ${c}`, fresh: [] as string[] };
+	const k = `${dev.id} ${appId}`, seen = crashSeen.get(k);
+	crashSeen.set(k, new Set(c.ids));
+	if (!seen) return { note: `Crash watch on for ${appId} (${c.ids.length} earlier crash reports); a new one stops the run.`, fresh: [] as string[] };
+	return { note: "", fresh: c.ids.filter(i => !seen.has(i)), copy: c.copy };
+}
+
+/** Average colors (RGB triples) of a GRID x GRID raster over the screenshot below the top `top` fraction (the status bar). */
+export function gridOf({ width, height, rgba }: { width: number; height: number; rgba: Buffer }, top: number) {
+	const y0 = Math.round(height * top), out: number[] = [];
+	for (let gy = 0; gy < GRID; gy++) for (let gx = 0; gx < GRID; gx++) {
+		const ys = y0 + Math.floor((height - y0) * gy / GRID), ye = y0 + Math.floor((height - y0) * (gy + 1) / GRID), xs = Math.floor(width * gx / GRID), xe = Math.floor(width * (gx + 1) / GRID);
+		const sum = [0, 0, 0];
+		let n = 0;
+		for (let y = ys; y < ye; y += 2) for (let x = xs; x < xe; x += 2, n++) for (let c = 0; c < 3; c++) sum[c] += rgba[(y * width + x) * 4 + c];
+		out.push(...sum.map(v => Math.round(v / Math.max(n, 1))));
+	}
+	return out;
+}
+/** Tiles whose average color moved by more than 40 in a channel, as [column, row]. */
+export function gridDiff(a: number[], b: number[]) {
+	const tiles: number[][] = [];
+	for (let t = 0; t < GRID * GRID; t++) if ([0, 1, 2].some(c => Math.abs(a[t * 3 + c] - b[t * 3 + c]) > 40)) tiles.push([t % GRID, Math.floor(t / GRID)]);
+	return tiles;
+}
+async function colorGrid(exec: Exec, dev: Device, o: Options) {
+	if (o.grid) return o.grid();
+	const png = path.join(os.tmpdir(), `mobile-act-grid-${process.pid}.png`), s = await screen(exec, dev, o.signal);
+	await run(exec, ["screenshot", "--device", dev.id, "--output", png, "--format", "png"], o.signal);
+	const { decodePng } = await import("./screen-read.ts"); // loaded late: screen-read imports this module
+	return gridOf(decodePng(await readFile(png)), s.height ? STATUS_BAND / s.height : 0.07);
+}
+
+/** Multiset difference: entries of a not matched by one in b. */
+const minus = (a: string[], b: string[]) => { const left = [...b]; return a.filter(x => { const i = left.indexOf(x); if (i < 0) return true; left.splice(i, 1); return false; }); };
+
+async function checkpoint(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
+	if (!args.name || !/^[\w.-]+$/.test(args.name)) throw new Error("checkpoint needs name (letters, digits, . _ -).");
+	const file = path.join(o.dir ?? BASE, "checkpoints", `${args.name}@${dev.id}.json`);
+	const base = args.save ? undefined : await readFile(file, "utf8").then(JSON.parse, () => undefined);
+	const ignore: string[] = args.ignore ?? base?.ignore ?? [];
+	const els = (await read(exec, dev, o.signal)).snap.elements, app = await front(exec, dev, o.signal) ?? "";
+	if (app) fronts.set(dev.id, app);
+	// Type, label and id only: values, positions and refs move without the screen being wrong.
+	const sig = els.filter(e => !ignore.some(q => matches([e], q).length)).map(e => `${e.type} ${JSON.stringify(short(e.label))}${e.id ? ` #${short(e.id)}` : ""}`).sort();
+	const grid = (args.visual ?? !!base?.grid) ? await colorGrid(exec, dev, o) : undefined;
+	const crash = await newCrashes(exec, dev, args.appId ?? base?.app ?? app, o), diffs: string[] = [];
+	if (crash.fresh.length) diffs.push(`NEW CRASH REPORT: ${crash.fresh.map(f => path.basename(f)).join(", ")}`);
+	if (base) {
+		if (base.app && app && base.app !== app) diffs.push(`${app} is in front, not ${base.app}`);
+		const gone = minus(base.elements, sig), extra = minus(sig, base.elements);
+		if (gone.length || extra.length) diffs.push(`${UNTRUSTED}\n${[...gone.map(l => `- ${l} (missing)`), ...extra.map(l => `+ ${l} (new)`)].join("\n")}`);
+		const tiles = base.grid && grid ? gridDiff(base.grid, grid) : [];
+		if (tiles.length) {
+			const s = await screen(exec, dev, o.signal);
+			const top = STATUS_BAND, h = (s.height - top) / GRID, w = s.width / GRID, xs = tiles.map(t => t[0]), ys = tiles.map(t => t[1]);
+			diffs.push(`colors changed in ${tiles.length} of ${GRID * GRID} grid tiles, within @(${r(Math.min(...xs) * w)},${r(top + Math.min(...ys) * h)} ${r((Math.max(...xs) - Math.min(...xs) + 1) * w)}x${r((Math.max(...ys) - Math.min(...ys) + 1) * h)})`);
+		}
+	}
+	if (diffs.length) throw await stop(exec, dev, `checkpoint "${args.name}" differs from its good state:\n${diffs.join("\n")}`, o, async dir => { for (const f of crash.fresh) await crash.copy?.(f, dir); });
+	const tail = crash.note ? `\n${crash.note}` : "";
+	if (base) return `Checkpoint "${args.name}" matches its good state: ${sig.length} elements, ${app || "unknown app"} in front${grid ? ", same colors" : ""}.${tail}`;
+	await mkdir(path.dirname(file), { recursive: true });
+	await writeFile(file, JSON.stringify({ app, ignore, elements: sig, grid }));
+	return `Saved checkpoint "${args.name}" as the good state on ${dev.name}: ${sig.length} elements, ${app || "unknown app"} in front${grid ? `, a ${GRID}x${GRID} color grid` : ""}. Later checkpoint calls with this name compare against it; save: true replaces it. (${file})${tail}`;
+}
+
 async function full(exec: Exec, dev: Device, elements: Element[], signal?: AbortSignal, app?: string) {
 	const s = await screen(exec, dev, signal), unit = dev.platform === "ios" ? "points" : "pixels";
 	return `${UNTRUSTED}\n${dev.name} ${r(s.width)}x${r(s.height)} ${unit} (tap coordinates use ${unit})${app ? `, app in front: ${app}` : ""}\n\n${elements.map(e => line(e, s)).join("\n") || "(no accessible elements; the app may still be starting)"}`;
@@ -373,7 +515,7 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 	const { signal } = o;
 	if (args.action === "list") {
 		const list = await listDevices(exec, signal);
-		return list.length ? list.map(d => `${d.id} ${d.state === "online" ? "ONLINE " : ""}${d.name} (${d.platform} ${d.type} ${d.version})`).join("\n") : "No devices: create a simulator in Xcode or an emulator in Android Studio, or plug in a phone.";
+		return list.length ? list.map(d => `${d.id} ${d.state === "online" ? "ONLINE " : ""}${breakers.has(d.id) ? "BREAKER ON " : ""}${d.name} (${d.platform} ${d.type} ${d.version})`).join("\n") : "No devices: create a simulator in Xcode or an emulator in Android Studio, or plug in a phone.";
 	}
 	if (args.action === "boot") {
 		const dev = await resolveDevice(exec, args.device, false, signal);
@@ -406,6 +548,12 @@ const queues = new Map<string, Promise<unknown>>();
 
 async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 	const { signal } = o, d = ["--device", dev.id], settle = args.settleMs ?? 500;
+	if (args.action === "resume") {
+		const why = breakers.get(dev.id);
+		breakers.delete(dev.id);
+		return why ? `Breaker off for ${dev.name}; it had stopped on: ${why.split("\n")[0]}` : `${dev.name} had no breaker on.`;
+	}
+	if (MUTATING.has(args.action) && breakers.has(dev.id)) throw new Error(`BREAKER ON for ${dev.name}, which stopped on: ${breakers.get(dev.id)!.split("\n")[0]}\nNo input until action resume: look at the saved screen first.`);
 	if (args.action === "launch" || args.action === "relaunch") {
 		if (!args.appId) throw new Error(`${args.action} needs appId (iOS bundle id or Android package).`);
 		const id = args.appId, verb = args.action === "relaunch" ? "Relaunched" : "Launched";
@@ -440,17 +588,36 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 			const texts = await ocrRead(exec, dev, o);
 			return `${UNTRUSTED}\nOn-screen text (t-refs work with tap, longpress, type and swipe until the next ocr):\n${texts.map(e => line(e)).join("\n") || "(no text found)"}`;
 		}
+		case "checkpoint": return checkpoint(exec, dev, args, o);
 		case "wait": {
 			if (!args.query) throw new Error("wait needs query (text or #id), and gone: true to wait until it disappears.");
-			const start = Date.now(), timeout = args.timeoutMs ?? 10_000;
+			const q = args.query, start = Date.now(), timeout = args.timeoutMs ?? 10_000, stable = args.stableMs ?? 0;
+			// A guarded wait stops the run (breaker, saved screen) on a failure condition or a timeout.
+			const guarded = !!(args.failOn?.length || args.failOnAlert || args.expectApp);
+			const fail = async (why: string) => { throw guarded ? await stop(exec, dev, `wait for "${q}": ${why}`, o) : new Error(why); };
+			let since: number | undefined;
 			for (;;) {
-				const { hits } = await lookup(exec, dev, args.query, o);
-				if (args.gone ? !hits.length : hits.length) {
-					const took = ((Date.now() - start) / 1000).toFixed(1);
-					return args.gone ? `"${args.query}" is gone after ${took}s.` : `"${args.query}" appeared after ${took}s:\n${UNTRUSTED}\n${hits.slice(0, 12).map(e => line(e)).join("\n")}`;
+				const els = (await read(exec, dev, signal)).snap.elements;
+				// Failure conditions come before success: an error alert next to the awaited text still fails.
+				const bad = (args.failOnAlert && alertText(els)) || (args.failOn ?? []).map(f => matches(els, f).length ? `"${f}" is on screen` : "").find(Boolean);
+				if (bad) await fail(bad);
+				if (args.expectApp) {
+					const app = await front(exec, dev, signal);
+					if (app) fronts.set(dev.id, app);
+					if (app && app !== args.expectApp) await fail(`${app} is in front, not ${args.expectApp} (did it close or crash?)`);
 				}
-				if (Date.now() - start >= timeout) throw new Error(`Timed out after ${timeout} ms waiting for "${args.query}" to ${args.gone ? "disappear" : "appear"}.`);
-				await (o.sleep ?? (ms => new Promise(res => setTimeout(res, ms))))(300);
+				let hits = matches(els, q), ocrError: string | undefined;
+				if (!hits.length && !q.trim().startsWith("#")) try { hits = matches(await ocrRead(exec, dev, o), q); } catch (e) { ocrError = (e as Error).message; }
+				// An OCR that failed has not seen the text go away.
+				if (args.gone ? !hits.length && !ocrError : hits.length) {
+					since ??= Date.now();
+					if (Date.now() - since >= stable) {
+						const took = ((Date.now() - start) / 1000).toFixed(1);
+						return args.gone ? `"${q}" is gone after ${took}s.` : `"${q}" appeared after ${took}s:\n${UNTRUSTED}\n${hits.slice(0, 12).map(e => line(e)).join("\n")}`;
+					}
+				} else since = undefined;
+				if (Date.now() - start >= timeout) await fail(`Timed out after ${timeout} ms waiting for "${q}" to ${args.gone ? "disappear" : "appear"}${stable ? ` and stay ${stable} ms` : ""}.`);
+				await pause(o, 300);
 			}
 		}
 		case "tap":
@@ -479,7 +646,7 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 			return changes(exec, dev, settle, o);
 		}
 	}
-	throw new Error("action must be list, boot, launch, relaunch, snapshot, find, ocr, wait, tap, longpress, type, swipe or button.");
+	throw new Error("action must be list, boot, launch, relaunch, snapshot, find, ocr, wait, tap, longpress, type, swipe, button, checkpoint or resume.");
 }
 
 export const mobileActTool = (exec: Exec) => ({
@@ -494,12 +661,14 @@ export const mobileActTool = (exec: Exec) => ({
 	description: [
 		"Operate an iOS Simulator, a real iPhone or an Android emulator/phone through mobilecli (simulators boot headless, no window).",
 		"Actions: list (devices, online first); boot {device}; launch {appId}; relaunch {appId} (terminate + launch: escapes system sheets such as Game Center); both fail when the app did not close or come to the front, and return its first screen (settleMs, default 1000); snapshot (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh));",
-		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query, gone?, timeoutMs? (10000)};",
+		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query, gone?, timeoutMs? (10000), stableMs? (the match must hold this long), failOn? [queries], failOnAlert?, expectApp?}: failOn text, an alert or another app in front fail it before success is checked;",
 		"tap, longpress, type and swipe take ref, or query (\"#id\" exact, else label/value/id text; read fresh, then OCR text if the tree has none) to find and act in one call; overlapped elements (fanned cards) are touched at their visible part.",
 		"tap {ref} or {x, y}; longpress {ref or x, y, durationMs? (1000)}; type {text, ref?, submit?} (ref taps the field and replaces its text; without ref the text is typed into the focused field; submit presses Enter);",
 		"swipe {direction, ref?} (direction = which side's content to reveal: down shows content below, left the page to the left; ref scrolls inside that element); button {button: home|back|power|volume_up|volume_down} (back is Android only).",
 		"After each action it waits settleMs (default 500) and returns + added, - removed and ~ changed elements, or the full screen when most of it changed; settleMs 0 skips the re-read for fast sequences.",
 		"Results name the app in front; an APP CHANGED line (another app is in front: yours closed or crashed) and an ALERT line (an open alert with its texts and buttons) head the result, so a script can stop on them.",
+		"Test loops: checkpoint {name, save?, ignore? [queries], visual?, appId?} saves the screen as the good state on first use (types, labels, ids and the app in front; visual adds a 16x16 color grid without the status bar) and compares later calls with that name against it;",
+		"it also watches the app's crash reports (from the first checkpoint on). A checkpoint difference, a new crash report, or a guarded wait that fails (failOn, failOnAlert, expectApp, including its timeout) STOPS: the screen is saved, and the device's breaker refuses launches and input until resume.",
 		"Refs stay the same while an element stays on screen. device is an id or name; omit it when one device is online. iOS coordinates are points, Android pixels.",
 		"Elements marked offscreen (other pager pages) cannot be tapped until swiped into view.",
 		"Elements without accessibility labels (custom canvases) show only as frames: tap them by query (OCR), by x, y, or look with screen_read target=device.",
@@ -508,9 +677,17 @@ export const mobileActTool = (exec: Exec) => ({
 	parameters: {
 		type: "object", additionalProperties: false, required: ["action"],
 		properties: {
-			action: { type: "string", enum: ["list", "boot", "launch", "relaunch", "snapshot", "find", "ocr", "wait", "tap", "longpress", "type", "swipe", "button"] },
+			action: { type: "string", enum: ["list", "boot", "launch", "relaunch", "snapshot", "find", "ocr", "wait", "tap", "longpress", "type", "swipe", "button", "checkpoint", "resume"] },
+			failOn: { type: "array", items: { type: "string" }, description: "wait: queries that fail the wait at once when on screen, e.g. [\"Connection Error\"]" },
+			failOnAlert: { type: "boolean", description: "wait: fail when an alert is open" },
+			expectApp: { type: "string", description: "wait: fail when another app is in front (bundle id or package)" },
+			stableMs: { type: "number", description: "wait: the match must hold this long (default 0)" },
+			name: { type: "string", description: "checkpoint: name of the good state (letters, digits, . _ -)" },
+			save: { type: "boolean", description: "checkpoint: save the current screen as the good state, replacing a saved one" },
+			ignore: { type: "array", items: { type: "string" }, description: "checkpoint: queries for elements left out of the comparison (clocks, counters); saved with the good state" },
+			visual: { type: "boolean", description: "checkpoint: also compare a 16x16 color grid of the screenshot (default: when the good state has one)" },
 			device: { type: "string", description: "Device id or name (default: the only online device)" },
-			appId: { type: "string", description: "launch/relaunch: iOS bundle id or Android package" },
+			appId: { type: "string", description: "launch/relaunch: iOS bundle id or Android package; checkpoint: the app whose crash reports to watch (default: the app in front of the good state)" },
 			ref: { type: "string", description: "Element ref from the last snapshot or change list, e.g. e12" },
 			x: { type: "number", description: "tap/longpress: x (points on iOS, pixels on Android)" },
 			y: { type: "number", description: "tap/longpress: y" },

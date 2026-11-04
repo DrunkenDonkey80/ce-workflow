@@ -4,7 +4,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
-## 0.2.31 — 2026-11-03
+## 0.2.31 — 2026-11-04
+
+### Added
+- `mobile_act` test loops that stop on the first thing that goes wrong. `checkpoint {name}` saves the screen as the good state the first time, then compares each later call against it: which elements are there and which app is in front (positions, values and `ignore`d elements do not count), and with `visual: true` a coarse color grid for drawn screens. It also watches the app's crash reports, so a new crash report stops the run even when the screen looks fine. `wait` can now fail as well as succeed: `failOn` texts, `failOnAlert`, `expectApp`, and `stableMs` for a match that must hold. When a check fails, the screen and the new crash report are saved and the device's breaker refuses launches and input until `resume`.
 
 ### Fixed
 - `mobile_act` now notices when things go wrong on the phone. `launch` and `relaunch` used to report success even when the app stayed in the background or never closed; now they check the app in front, fail with what is in front instead, and return the app's first screen. Every result names the app in front, an `APP CHANGED` line heads it when another app took over (the app you drive closed or crashed), and an `ALERT` line shows an open alert's texts and buttons, so a test loop can stop on them instead of looking at "the screen changed".

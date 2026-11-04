@@ -5,7 +5,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { alertText, assignRefs, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
+import { readdir } from "node:fs/promises";
+import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -216,6 +217,121 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	assert.equal(dumps, 1, "real iPhone: no agent-start retries");
 	locked = true;
 	await assert.rejects(mobileAct(wda, { action: "snapshot" }, opts()), /Lorenz’s iPhone is locked or waiting for its passcode/);
+}
+
+// Test loops (Viktor torture run): guarded waits, checkpoints, crash watch, breaker.
+{
+	const dir = await mkdtemp(path.join(os.tmpdir(), "mobile-act-cp-")), reports = path.join(dir, "reports");
+	await run("mkdir", ["-p", reports]);
+	const o = (extra = {}) => opts({ dir, reportsDir: reports, ...extra });
+	const alert = { type: "Alert", label: "Connection Error!", rect: { x: 50, y: 300, width: 300, height: 200 }, children: [{ type: "Button", label: "OK", rect: { x: 60, y: 450, width: 280, height: 40 } }] };
+	const connected = [...home, { type: "StaticText", label: "Beep upon scan", rect: { x: 16, y: 600, width: 200, height: 20 } }];
+
+	// failOn and alerts are checked before success; the breaker then refuses input until resume.
+	resetSession();
+	let f = fake({ screens: [home, [...connected, alert]] });
+	await assert.rejects(mobileAct(f.exec, { action: "wait", query: "Beep upon scan", failOnAlert: true }, o()), e => {
+		assert.match(e.message, /^STOPPED: wait for "Beep upon scan": ALERT on screen \(untrusted app text\): "Connection Error!" \| "OK"\nSaved the screen to (.+)\nBreaker on: iPhone 17 takes no launches/);
+		assert.ok(existsSync(path.join(e.message.match(/Saved the screen to (.+)/)[1], "screen.txt")), "evidence saved");
+		return true;
+	});
+	await assert.rejects(mobileAct(f.exec, { action: "tap", ref: "e1" }, o()), /BREAKER ON for iPhone 17, which stopped on: wait for "Beep upon scan": ALERT/);
+	assert.equal(f.acts().filter(a => a.startsWith("io")).length, 0, "no tap while the breaker is on");
+	assert.match(await mobileAct(f.exec, { action: "list" }, o()), /SIM-1 ONLINE BREAKER ON iPhone 17/);
+	assert.match(await mobileAct(f.exec, { action: "snapshot" }, o()), /ALERT on screen/, "reading still works");
+	assert.match(await mobileAct(f.exec, { action: "resume" }, o()), /^Breaker off for iPhone 17; it had stopped on: wait for "Beep upon scan"/);
+	assert.match(await mobileAct(f.exec, { action: "tap", ref: "e1", settleMs: 0 }, o()), /^Done\.$/);
+
+	resetSession();
+	f = fake({ screens: [[...home, { type: "StaticText", label: "Connection Error: init failed", rect: { x: 0, y: 700, width: 300, height: 20 } }]] });
+	await assert.rejects(mobileAct(f.exec, { action: "wait", query: "Beep upon scan", failOn: ["Connection Error"] }, o()), /STOPPED: wait for "Beep upon scan": "Connection Error" is on screen/);
+
+	resetSession();
+	f = fake({ screens: [home] });
+	f.app.front = "com.apple.mobilesafari";
+	await assert.rejects(mobileAct(f.exec, { action: "wait", query: "Beep upon scan", expectApp: "com.datecs.LibDemo" }, o()), /STOPPED: wait for "Beep upon scan": com\.apple\.mobilesafari is in front, not com\.datecs\.LibDemo/);
+
+	// A guarded timeout stops too; an unguarded one is a plain error.
+	resetSession();
+	f = fake({ screens: [home] });
+	await assert.rejects(mobileAct(f.exec, { action: "wait", query: "#nope", timeoutMs: 0, expectApp: "com.apple.springboard" }, o()), /STOPPED: wait for "#nope": Timed out after 0 ms/);
+	resetSession();
+	await assert.rejects(mobileAct(f.exec, { action: "wait", query: "#nope", timeoutMs: 0 }, o()), /Timed out after 0 ms waiting for "#nope" to appear\.$/);
+	assert.match(await mobileAct(f.exec, { action: "tap", ref: "e1", settleMs: 0 }, o()), /^Done\.$/, "no breaker after an unguarded wait");
+
+	// stableMs: a match that flickers away starts over.
+	resetSession();
+	f = fake({ screens: [connected, home, connected, connected, connected, connected, connected] });
+	const slow = { sleep: ms => new Promise(res => setTimeout(res, ms / 30)) };
+	assert.match(await mobileAct(f.exec, { action: "wait", query: "#play", stableMs: 15 }, o(slow)), /appeared after/);
+	resetSession();
+	f = fake({ screens: [connected, home, connected, connected, connected, connected, connected] });
+	await mobileAct(f.exec, { action: "wait", query: "Beep upon scan", stableMs: 15 }, o(slow));
+	assert.ok(f.calls.filter(c => c[1] === "dump").length >= 4, "held over several reads after the flicker");
+
+	// Checkpoints: saved on first use, then compared by type, label and id; values, positions and ignored elements do not count.
+	resetSession();
+	const moved = home.map(n => ({ ...n, value: n.value ? "ZZ99" : n.value, rect: { ...n.rect, y: n.rect.y + 5 } }));
+	f = fake({ screens: [connected, [...moved, { type: "StaticText", label: "Beep upon scan", rect: { x: 0, y: 610, width: 200, height: 20 } }], home, [...connected, alert]] });
+	f.app.front = "com.datecs.LibDemo";
+	assert.match(await mobileAct(f.exec, { action: "checkpoint", name: "connected" }, o()), /^Saved checkpoint "connected" as the good state on iPhone 17: 5 elements, com\.datecs\.LibDemo in front\.[^]*\nCrash watch on for com\.datecs\.LibDemo \(0 earlier crash reports\)/);
+	assert.match(await mobileAct(f.exec, { action: "checkpoint", name: "connected" }, o()), /^Checkpoint "connected" matches its good state: 5 elements, com\.datecs\.LibDemo in front\.$/);
+	await assert.rejects(mobileAct(f.exec, { action: "checkpoint", name: "connected" }, o()), /STOPPED: checkpoint "connected" differs from its good state:\nUNTRUSTED[^\n]*\n- StaticText "Beep upon scan" \(missing\)\nSaved/);
+	await mobileAct(f.exec, { action: "resume" }, o());
+	await assert.rejects(mobileAct(f.exec, { action: "checkpoint", name: "connected" }, o()), /\+ Alert "Connection Error!" \(new\)\n\+ Button "OK" \(new\)/);
+	await mobileAct(f.exec, { action: "resume" }, o());
+	f.app.front = "com.apple.springboard";
+	await assert.rejects(mobileAct(f.exec, { action: "checkpoint", name: "connected", ignore: ["Connection Error", "OK"] }, o()), /differs from its good state:\ncom\.apple\.springboard is in front, not com\.datecs\.LibDemo\nSaved/, "ignored elements leave only the app change");
+	await mobileAct(f.exec, { action: "resume" }, o());
+	assert.match(await mobileAct(f.exec, { action: "checkpoint", name: "connected", save: true }, o()), /^Saved checkpoint "connected"/, "save replaces the good state");
+
+	// Visual grid: averages below the status bar, and a changed tile is reported where it is.
+	const img = { width: 32, height: 40, rgba: Buffer.alloc(32 * 40 * 4, 255) };
+	const g = gridOf(img, 0.2);
+	assert.equal(g.length, 16 * 16 * 3);
+	assert.ok(g.every(v => v === 255));
+	for (let y = 8; y < 10; y++) for (let x = 0; x < 2; x++) img.rgba.fill(0, (y * 32 + x) * 4, (y * 32 + x) * 4 + 3);
+	assert.deepEqual(gridDiff(g, gridOf(img, 0.2)), [[0, 0]], "the status bar rows above 20% are not in the grid; the first tile below is");
+	resetSession();
+	f = fake({ screens: [home] });
+	let colors = g;
+	const vo = o({ grid: async () => colors });
+	assert.match(await mobileAct(f.exec, { action: "checkpoint", name: "colors", visual: true }, vo), /a 16x16 color grid/);
+	assert.match(await mobileAct(f.exec, { action: "checkpoint", name: "colors" }, vo), /same colors/, "a saved grid is compared without visual: true");
+	colors = g.map((v, i) => i === 3 * 17 ? 0 : v);
+	await assert.rejects(mobileAct(f.exec, { action: "checkpoint", name: "colors" }, vo), /colors changed in 1 of 256 grid tiles, within @\(25,111 25x51\)/);
+
+	// Crash watch on a simulator: a new report of the app stops the run and is copied next to the saved screen.
+	resetSession();
+	f = fake({ screens: [home] });
+	f.app.front = "com.datecs.LibDemo";
+	await writeFile(path.join(reports, "LibraryDemo-old.ips"), '{"app_name":"LibraryDemo","bundleID":"com.datecs.LibDemo"}\n{}');
+	assert.match(await mobileAct(f.exec, { action: "checkpoint", name: "crash" }, o()), /Crash watch on for com\.datecs\.LibDemo \(1 earlier crash reports\)/);
+	await writeFile(path.join(reports, "Other-new.ips"), '{"app_name":"Other","bundleID":"com.other"}\n{}');
+	assert.match(await mobileAct(f.exec, { action: "checkpoint", name: "crash" }, o()), /matches/, "other apps' crashes do not count");
+	await writeFile(path.join(reports, "LibraryDemo-new.ips"), '{"app_name":"LibraryDemo","bundleID":"com.datecs.LibDemo"}\n{}');
+	await assert.rejects(mobileAct(f.exec, { action: "checkpoint", name: "crash" }, o()), e => {
+		assert.match(e.message, /differs from its good state:\nNEW CRASH REPORT: LibraryDemo-new\.ips\nSaved/);
+		assert.ok(existsSync(path.join(e.message.match(/Saved the screen to (.+)/)[1], "LibraryDemo-new.ips")), "crash report copied");
+		return true;
+	});
+
+	// Crash watch on a real iPhone: devicectl lists the crash logs, file names start with the app's executable.
+	resetSession();
+	const phone = fake({ list: [PHONE], screens: [home] });
+	phone.app.front = "com.datecs.LibDemo";
+	let logs = ["LibraryDemo-2026-10-19.ips", "Belot-2026-11-03.ips", "JetsamEvent-1.ips"];
+	const real = async (c, a) => {
+		if (c !== "xcrun") return phone.exec(c, a);
+		const out = a[a.indexOf("--json-output") + 1];
+		if (a.includes("apps")) await writeFile(out, JSON.stringify({ result: { apps: [{ url: "file:///private/var/containers/Bundle/Application/X/LibraryDemo.app/" }] } }));
+		if (a.includes("files")) await writeFile(out, JSON.stringify({ result: { files: logs.map(name => ({ name })) } }));
+		return { code: 0 };
+	};
+	assert.match(await mobileAct(real, { action: "checkpoint", name: "real" }, o()), /Crash watch on for com\.datecs\.LibDemo \(1 earlier crash reports\)/);
+	logs = [...logs, "LibraryDemo.cpu_resource-2026-11-04.ips", "Belot-2026-11-04.ips"];
+	await assert.rejects(mobileAct(real, { action: "checkpoint", name: "real" }, o()), /NEW CRASH REPORT: LibraryDemo\.cpu_resource-2026-11-04\.ips\nSaved/);
+	await rm(dir, { recursive: true, force: true });
 }
 
 // Query, OCR fallback, wait and relaunch.
