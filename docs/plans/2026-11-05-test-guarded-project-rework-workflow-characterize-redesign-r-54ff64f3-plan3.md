@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T20:51:02.134Z
+updated: 2026-11-05T20:59:09.627Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -119,9 +119,7 @@ Cutover and rollback (recipe text): each design option states whether persisted 
 ### Phase 1: Recipe draft [think]
 
 - [x] **RW-01** Recipe written at docs/proposals/2026-11-05-rework-recipe.md (loop, corpus format, comparison rules, two-SHA replay, scorecard, rollback, gates, skeleton, retro questions).
-- [human] **RW-02** Get a second opinion on the recipe with `/plan3 review`; record dispositions in Amendments.
-  - Check: Amendments lists each finding with accepted or rejected.
-  - note: User runs /plan3 review in this ce-workflow session (chosen 2026-11-05); the advisor must review the recipe docs/proposals/2026-11-05-rework-recipe.md.
+- [x] **RW-02** Recipe reviewed by plan3-advisor (run 661d6254); all 6 findings accepted and applied to the recipe and plan, dispositions in Amendments.
 
 ### Phase 2: DealFinder warm-up pilot [think]
 
@@ -129,7 +127,7 @@ Cutover and rollback (recipe text): each design option states whether persisted 
   - Before `/plan3` (which writes the plan file into the repo), the session inspects `git status`, makes the D-08 pre-rework commit or records HEAD when clean, and passes that SHA in the request.
   - Check: a new Plan3 plan exists in `C:\SOFT\git\DealFinder\docs\plans\` with the skeleton phases, `needs:` gates and the pre-rework SHA.
 - [human] **RW-04** Drive the DealFinder pilot plan through Map, Characterize, Design, Pick, Build, Replay, Switch and Retire.
-  - Acceptance from Goal: stable old-versus-old corpus, planted bug caught, scorecard with baseline and candidate per dimension, rollback rules recorded, old code retired after the watch window, C-df green on master.
+  - Acceptance from Goal: stable old-versus-old corpus, planted bug caught, scorecard with baseline and candidate per dimension, rollback rules recorded, old code retired after the watch window, C-df green on master. Any intentional behavior change replays through the recipe's approved-delta file; if none occurs, the plan says so.
   - Check: `git log` in DealFinder shows the pre-rework commit before the plan file; corpus SHA recorded; pilot plan complete or an explicit stop reason.
   - When done, the user turns on R-df-pilot-done (Alt+A) if the evidence is acceptable.
 - [ ] **RW-05** Retro: compare the pilot plan, its stats file and git log with the recipe; list what was missing, noisy or unused.
@@ -150,8 +148,9 @@ needs: R-df-pilot-done
 - [human] **RW-08** Work the PhotoBook plan through Map, Characterize and Design, and pick an option (or "no rewrite").
   - Acceptance: as-is map tied to files, change scenarios, 2–3 options with contracts and costs, committed corpus and baseline numbers, C-pb green.
   - Check: `git log` shows the pre-rework commit first; Decisions in the PhotoBook plan records the chosen option.
+  - If the pick is stop (no change built): RW-17 is marked done as "not run: stopped at Pick", and the user turns on R-pb-pilot-done after accepting the stop evidence (map, corpus, design).
 - [human] **RW-17** Work the PhotoBook plan through Build, Replay, Switch and Retire for the chosen option.
-  - Acceptance: as RW-04 (stable corpus, planted bug caught, scorecard per dimension, rollback rules rehearsed where stored state changes, human-approved switch, retire after the watch window), C-pb green.
+  - Acceptance: as RW-04 (stable corpus, planted bug caught, scorecard per dimension, rollback rules rehearsed where stored state changes, human-approved switch, retire after the watch window), C-pb green. Any intentional behavior change replays through the recipe's approved-delta file; if none occurs, the plan says so.
   - When done, the user turns on R-pb-pilot-done if the evidence is acceptable.
   - Check: PhotoBook pilot plan complete or an explicit stop reason; scorecard committed. Skipped when RW-08 picks "no rewrite".
 - [ ] **RW-09** Retro on PhotoBook as in RW-05 (TS, larger codebase, harness CLIs); apply edits to the recipe.
@@ -175,7 +174,7 @@ needs: R-pb-pilot-done
 
 - [ ] **RW-13** Add `extensions/plan3-rework.ts` with the recipe prompt and plan skeleton; route `/plan3 rework <request>` in `extensions/plan3.ts`.
   - Creates the plan through the existing template writer; gates per RW-10; planning starts like `/plan3`.
-  - Check: C-p3 with new assertions: routing, `"re"` completions include `rework`, and on a generated plan with the gate requirements off the plan3 tool's next step is never Build, Replay, Switch or Retire; C-types.
+  - Check: C-p3 with new assertions: routing, `"re"` completions include `rework`, and on a generated plan with the gate requirements off the plan3 tool's next step is never Build, Replay, Switch or Retire (also after a stop at Pick); the generated skeleton needs no phase-tagging turn (`needsThinkTags` false); C-types.
 - [ ] **RW-14** Document `/plan3 rework` in `README.md` (Plan3 section) and add an Unreleased bullet in `CHANGELOG.md`.
   - Check: manual read; README lists limits (no auto switch, device steps blocked, corpus only covers chosen scenarios).
 - [ ] **RW-15** Run C-verify once.
@@ -187,7 +186,8 @@ needs: R-pb-pilot-done
 
 - [ ] **RW-16** From a ce-workflow session, run `/plan3 rework` on `C:\SOFT\git\ipc\AI-Wedge` read-only (D-10): Map, proposed corpus, Design, Pick.
   - Acceptance: plan created by the command needs no manual skeleton edits; its Build, Replay, Switch and Retire phases stay gated off; device checks appear as separate [blocked] steps.
-  - Check: `git -C "C:\SOFT\git\ipc\AI-Wedge" status --short` is identical before and after the run.
+  - Check, primary: an audit of the session's tool calls shows only reads under the AI-Wedge path (read, grep, `git log`, `git show`, `git diff`), with no writes, builds, Gradle runs or commits.
+  - Check, supporting: `git -C "C:\SOFT\git\ipc\AI-Wedge" rev-parse HEAD`, `status --short --ignored` and `diff` output are identical before and after the run (saved in a temp dir outside AI-Wedge). Another session editing AI-Wedge at the same time can change these; the audit decides.
 ### P-ARCH [code] Product architecture
 
 - [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
@@ -213,7 +213,7 @@ needs: R-pb-pilot-done
 
 ## Resume context
 
-RW-01 done (recipe docs/proposals/2026-11-05-rework-recipe.md, commit 32c7b62). RW-02 [human]: user runs /plan3 review in this session to review the recipe, then dispositions go in Amendments and the recipe is fixed. Next after that: RW-03 (open DealFinder Pi session; it commits current state, then /plan3 with the recipe). Stop reason: waiting for the user's /plan3 review.
+RW-01 and RW-02 done: recipe at docs/proposals/2026-11-05-rework-recipe.md, reviewed (run 661d6254, 6 findings applied: stop outcome at Pick, approved-delta replay rule, read-only audit for RW-16, phase tags, night wording). Next: RW-03, open a Pi session in C:\SOFT\git\DealFinder via intercom; it records or commits the pre-rework state, then starts /plan3 with the recipe. No blockers.
 
 ## Amendments
 
@@ -230,3 +230,10 @@ Append material changes and their reasons; preserve the original request and set
   - (later) 2026-11-05 chat: Q-01 answered as D-10, AI-Wedge read-only analysis. RW-16 rewritten as read-only; RW-18 moved to Backlog; Global validation updated.
   - F6 RW-16 blocked as a whole: accepted. RW-16 is runnable at unit level; device qualification moved to new [blocked] RW-18. Also found while applying it: AI-Wedge's dirty release tree conflicts with D-08, added as Q-01.
 - 2026-11-05: Added final architecture reconciliation because a product diagram exists.
+- 2026-11-05 recipe review (plan3-advisor, openai-codex/gpt-6-astra:high, run 661d6254), each finding checked against the code:
+  - F1 "no rewrite" still turned on the Build gate: accepted. Recipe Pick has two outcomes: build an option, including local repair (gate on), or stop (gates stay off, Build to Retire marked "not run: stopped at Pick"). RW-08 says how the stop unlocks R-pb-pilot-done; RW-13 tests the stop case.
+  - F2 intentional changes had no replay rule: accepted. Baseline expectations at the corpus SHA never change. An approved-delta file keyed by case ID holds approved new expectations. Old side matches the baseline; new side matches the baseline plus the delta. BLD-01, RW-04 and RW-17 updated. A forced intentional change in each pilot was rejected as artificial; the pilot records "none" instead.
+  - F3 review-before-pilot not enforced: accepted. Resolved by finishing RW-02 with these fixes applied before RW-03 runs; no extra gate needed.
+  - F4 RW-16 status check cannot prove read-only: accepted. The primary check is now an audit of tool calls; HEAD, `status --ignored` and diff are supporting.
+  - F5 `[human]` used as a phase tag: accepted. Verified that `needsThinkTags` (`extensions/plan3.ts:413-416`) only accepts `[think]`/`[code]`. Pick and Switch phases are now `[think]` with `[human]` steps; RW-13 asserts no tagging turn.
+  - F6 night-mode wording: accepted. Verified that `nightSet` copies the day set and `setBoth` sets both (`extensions/plan3-needs.ts:27-31`). The recipe now says approved gates stay on at night.

@@ -25,10 +25,12 @@ One loop per rework target (a module or a group of modules, never "the whole pro
    - whether stored state or file formats change (section 5).
 
    Run one small experiment on the riskiest assumption, and record the result in the plan.
-4. **Pick** [human]. The human picks an option, or "no rewrite", and turns on `R-design-approved`.
+4. **Pick** (human step). The human picks one of two outcomes:
+   - **an option to build**, including "local repair": the human turns on `R-design-approved`.
+   - **stop**, meaning no change is built: `R-design-approved` stays off. Mark Build, Replay, Switch and Retire done with the summary "not run: stopped at Pick". Commit the Map, corpus and Design as the outcome.
 5. **Build** [code]. The new part sits next to the old one behind one seam (section 3). Tests can select either side. Only one side does real writes (R6).
 6. **Replay** [think]. Run the same corpus against old and new, then fill in the scorecard that was fixed before Build started.
-7. **Switch** [human]. The human reads the scorecard and the rollback rules, then turns on `R-cutover-approved` and sets a watch window. Switching means flipping the one selection at the seam.
+7. **Switch** (human step). The human reads the scorecard and the rollback rules, then turns on `R-cutover-approved` and sets a watch window. Switching means flipping the one selection at the seam.
 8. **Retire** [code]. After the watch window passes with its evidence recorded, the human turns on `R-retire-approved`. Then delete the old code and remove the seam if it is no longer needed.
 
 "Inconclusive" and "do not rewrite" are valid outcomes at Design, Replay and Switch.
@@ -51,7 +53,15 @@ Every observed behavior gets one of three classes, recorded next to the case:
 - **intentional change**: the human approved a different result; record the approval (date, quote) in the plan's Decisions.
 - **unresolved**: not yet decided; it blocks Switch.
 
-A bug that is found is not preserved automatically: it becomes unresolved until the human classifies it. Agents never edit expected observations themselves. After the corpus SHA, any change to the corpus shows up in `git diff <corpus sha> -- <corpus paths>` and needs human approval.
+A bug that is found is not preserved automatically: it becomes unresolved until the human classifies it. Agents never edit expected observations themselves.
+
+The baseline expectations committed at the corpus SHA never change. An intentional change is written as a separate **approved delta**: one file (for example `tests/rework/approved-delta.*`) keyed by case ID, giving the new expectation and the approval reference. During replay:
+
+- **old side**: every case must match its baseline expectation.
+- **new side**: preserve cases must match the baseline, and intentional-change cases must match their approved delta. Matching the baseline instead of the delta is a failure, because the change did not happen.
+- **unresolved cases**: these block Switch.
+
+After the corpus SHA, `git diff <corpus sha> -- <corpus paths>` may show only the approved-delta file. Any other change to the corpus needs human approval.
 
 Before any old-versus-new result counts, the corpus must pass two checks:
 
@@ -120,13 +130,13 @@ Plan3 runs pending steps past an unanswered `[human]` step. It skips only steps 
 - `R-cutover-approved`: the human approved the switch after Replay; gates Switch.
 - `R-retire-approved`: the watch window passed with its evidence; gates Retire.
 
-The human turns each one on with Alt+A. In night mode they stay off.
+The human turns each one on with Alt+A. Until the human does, a gate is off by day and in night mode, so unattended runs cannot pass it. Once a gate is approved it stays on at night too: night mode does not take back an approval.
 
 Code-only and device projects (R7): device checks are separate `[blocked]` steps with the device as a prerequisite. Unit-level characterization runs without them.
 
 ## 7. Plan skeleton
 
-The pilot session fills in this skeleton in its target repo's plan (Plan3 syntax). Replace `<...>` placeholders and step texts with the target's real files and commands.
+The pilot session fills in this skeleton in its target repo's plan (Plan3 syntax). Replace `<...>` placeholders and step texts with the target's real files and commands. Phase headings take only the `[think]` or `[code]` tag; `[human]` is a step marker, never a phase tag.
 
 ```markdown
 ## Requirements
@@ -153,15 +163,15 @@ The pilot session fills in this skeleton in its target repo's plan (Plan3 syntax
 - [ ] **DES-01** 2–3 options including "local repair, no rewrite": module map, contracts, libraries, benefit, risk, reversibility, stored-state change.
 - [ ] **DES-02** Thin experiment on the riskiest assumption; fix the scorecard thresholds.
 
-### Phase 4: Pick [human]
+### Phase 4: Pick [think]
 
-- [human] **PICK-01** Human picks an option or "no rewrite", records it in Decisions, and turns on R-design-approved.
+- [human] **PICK-01** Human picks an option (including local repair) and turns on R-design-approved, or picks stop: gates stay off and Build to Retire are marked "not run: stopped at Pick". Recorded in Decisions.
 
 ### Phase 5: Build [code]
 
 needs: R-design-approved
 
-- [ ] **BLD-01** Seam with old and new selectable; new part built; corpus green on both sides.
+- [ ] **BLD-01** Seam with old and new selectable; new part built; old side green against the baseline, new side green against the baseline plus the approved delta.
 
 ### Phase 6: Replay [think]
 
@@ -169,7 +179,7 @@ needs: R-design-approved
 
 - [ ] **RPL-01** Replay the corpus on the corpus-SHA worktree and on the main checkout; fill in the scorecard; write down the rollback rules.
 
-### Phase 7: Switch [human]
+### Phase 7: Switch [think]
 
 needs: R-cutover-approved
 
