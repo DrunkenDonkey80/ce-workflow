@@ -95,18 +95,19 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
  }
  // Archive files: images (click zooms), HTML and PDF in a frame (sandboxed by the hub), markdown rendered, text as text,
  // anything else offered for download. Download and Open (new tab) for every file.
- async function showExplored(from: Archive, file: ProjectFile) {
-  const url = `/x/${from.key}/${file.path.split("/").map(encodeURIComponent).join("/")}`;
+ // quiet: a live reload (the file changed): no Loading…, and frames and images refetch.
+ async function showExplored(from: Archive, file: ProjectFile, quiet = false) {
+  const url = `/x/${from.key}/${file.path.split("/").map(encodeURIComponent).join("/")}`, src = quiet ? url + "?v=" + Date.now() : url;
   const link = (text: string, href: string, extra: Record<string, string>) => Object.assign(document.createElement("a"), { textContent: text, href, ...extra });
   const actions = Object.assign(document.createElement("span"), { className: "files-actions" });
   actions.append(link("Download", url + "?download=1", { download: file.path.split("/").pop()! }), link("Open", url, { target: "_blank", rel: "noopener" }));
   heading.replaceChildren(`${file.path} · ${size(file.size)}`, actions);
   body.className = "files-body rich";
-  if (IMAGE.test(file.path)) { const img = Object.assign(document.createElement("img"), { src: url, alt: file.path, className: "files-image" }); img.addEventListener("click", () => image(url)); return body.replaceChildren(img); }
-  if (FRAME.test(file.path)) return body.replaceChildren(Object.assign(document.createElement("iframe"), { src: url, className: "files-frame", title: file.path }));
-  if (MEDIA.test(file.path)) return body.replaceChildren(Object.assign(document.createElement(/.mp[34]$|.wav$/i.test(file.path) && !/.mp4$/i.test(file.path) ? "audio" : "video"), { src: url, controls: true, className: "files-image" }));
+  if (IMAGE.test(file.path)) { const img = Object.assign(document.createElement("img"), { src, alt: file.path, className: "files-image" }); img.addEventListener("click", () => image(url)); return body.replaceChildren(img); }
+  if (FRAME.test(file.path)) return body.replaceChildren(Object.assign(document.createElement("iframe"), { src, className: "files-frame", title: file.path }));
+  if (MEDIA.test(file.path)) return body.replaceChildren(Object.assign(document.createElement(/.mp[34]$|.wav$/i.test(file.path) && !/.mp4$/i.test(file.path) ? "audio" : "video"), { src, controls: true, className: "files-image" }));
   if ((file.size ?? 0) > TEXT_BYTES) return body.replaceChildren(`Too large to show here (${size(file.size)}); use Download.`);
-  body.replaceChildren("Loading…");
+  if (!quiet) body.replaceChildren("Loading…");
   try {
    const response = await fetch(url); if (!response.ok) throw new Error(await response.text());
    const text = await response.text(); if (selected !== file.path || archive !== from) return;
@@ -124,6 +125,14 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
   /** Back to the project's files (the page restores its layout through closed). */
   close() { archive = null; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); },
   get exploring() { return !!archive; },
+  /** The viewer's key, so the page can close it on the hub. */
+  get key() { return archive?.key; },
+  /** Live preview: the hub saw a file this viewer showed change; show it again where it was scrolled. */
+  reload(key: string) {
+   const file = archive?.key === key && archive.files.find(item => item.path === selected); if (!file) return;
+   const at = [viewer.scrollTop, body.scrollTop];
+   void showExplored(archive!, file, true).then(() => { [viewer.scrollTop, body.scrollTop] = at; });
+  },
   /** First show loads; later file changes refresh only while visible, otherwise on next show. */
   shown() { if (!loaded) void refresh(); },
   open(path: string) { linked = path; void show({ path }); },

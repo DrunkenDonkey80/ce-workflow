@@ -993,6 +993,7 @@ async function exploreArchive(path: string) {
    beforeExplore = { left: workspace.dataset.left!, tab: $("files").hidden ? diagramTab : "files", width: splitter.getAttribute("aria-valuenow")!, mobile: workspace.dataset.mobile === "chat" ? "chat" : "files" };
    history.pushState({ explore: true }, "");
   }
+  const was = filesView.key; if (was) void post("unview", { key: was }).catch(() => undefined); // the hub stops watching what it showed
   filesView.explore(value);
   if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
   showNotice(value.open ? "" : `${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
@@ -1003,6 +1004,7 @@ let beforeExplore: { left: string; tab: string; width: string; mobile: string } 
 function closeExplore() {
  if (history.state?.explore) return history.back(); // popstate comes back here
  if (!filesView.exploring) return;
+ const key = filesView.key; if (key) void post("unview", { key }).catch(() => undefined);
  filesView.close();
  const was = beforeExplore; beforeExplore = null; if (!was) return;
  if (phone.matches) setMobile(was.mobile); else { setTab(was.tab); setLeft(was.left); resizeChat(Number(was.width)); }
@@ -2636,6 +2638,7 @@ function renderProgress() {
 setInterval(renderProgress, 30_000);
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
+listen("file-changed", value => filesView.reload(value.key));
 listen("status", value => {
  state.status = value;
  // Woken by typing: a compaction the message would wait for starts now, while you finish typing (ce-workflow /wo compact early).

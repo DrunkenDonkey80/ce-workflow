@@ -356,6 +356,27 @@ try {
  await evaluate("document.querySelector('[data-id=img_row] .file-link').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))");
  assert.deepEqual((await evaluate("[...document.querySelectorAll('.session-menu:not([hidden]) button')].map(b => b.textContent)")).filter(text => text !== "7z and upload"), ["Open", "Open folder", "Copy path", "Upload", "Zip and upload"]);
  await evaluate("document.querySelector('.session-menu').hidden = true");
+ // Live preview (S01, S02): a viewed Markdown file re-renders where it was scrolled; a viewed page reloads when its stylesheet changes.
+ {
+  write("docs/live.md", "# One\n\n" + "line\n\n".repeat(300)); write("docs/live.html", "<link rel=stylesheet href=live.css><p>page</p>"); write("docs/live.css", "p{color:red}");
+  const row = { id: "live_row", role: "agent", text: "see docs/live.md and docs/live.html", streaming: false }; chatRows.set(row.id, row); publish("message", row);
+  await browser("wait", "[data-id=live_row]"); await verified("live_row");
+  const view = async index => {
+   await evaluate(`document.querySelectorAll('[data-id=live_row] .file-link')[${index}].dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+   await evaluate("[...document.querySelectorAll('.session-menu:not([hidden]) button')].find(b => b.textContent === 'Open').click()");
+  };
+  await view(0); await browser("wait", "--fn", "document.querySelector('.files-body .md-heading')?.textContent === 'One'");
+  await evaluate("document.querySelector('.files-viewer').scrollTop = 400");
+  write("docs/live.md", "# Two\n\n" + "line\n\n".repeat(300));
+  await browser("wait", "--fn", "document.querySelector('.files-body .md-heading')?.textContent === 'Two'");
+  assert.equal(await evaluate("document.querySelector('.files-viewer').scrollTop"), 400, "the changed file re-renders where it was scrolled");
+  await view(1); await browser("wait", ".files-frame");
+  const first = await evaluate("document.querySelector('.files-frame').src");
+  write("docs/live.css", "p{color:blue}");
+  await browser("wait", "--fn", `document.querySelector('.files-frame')?.src !== ${JSON.stringify(first)}`);
+  assert.match(await evaluate("document.querySelector('.files-frame').src"), /live\.html\?v=\d+$/, "the page reloads when its stylesheet changes");
+  await evaluate("document.querySelector('.files-archive button').click()"); await browser("wait", "--fn", "!document.querySelector('.files-archive')");
+ }
  // Web addresses link too, without the Markdown bold around them.
  { const row = { id: "url_row", role: "agent", text: "Here's the link: **http://127.0.0.1:8768/index.html** (it's running now).", streaming: false }; chatRows.set(row.id, row); publish("message", row); }
  await browser("wait", "[data-id=url_row] a.chat-link");

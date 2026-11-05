@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T22:08:24.065Z
+updated: 2026-11-05T22:14:43.339Z
 reviewed: 2026-11-05
 ---
 
@@ -134,8 +134,7 @@ None.
 ### Phase 1: Live preview [code]
 
 - [x] **S01** Hub gives each View page its own key, watches the folders of the files it served, and sends a debounced file-changed {key} on the session's event stream; unview closes a key, and a session with no page for a minute closes its viewers
-- [ ] **S02** Files viewer reloads the shown item on `file-changed`, keeping scroll (iframe reload for pages, re-render for Markdown and text, cache-busted src for images)
-  - Check: C5 with a page test, or a manual check on this PC: edit a viewed `.md` and a viewed page's CSS and see both update.
+- [x] **S02** Files viewer reloads the shown file on file-changed for its own key (quiet re-render keeping the viewer's scroll; frames, images and media refetch with ?v=); the page closes the hub key when it closes or replaces the viewer
 
 ### Phase 2: Session second line [code]
 
@@ -188,6 +187,9 @@ None.
 ## Backlog
 
 - Folder links for the subtitle (clicking the brief opens the starting session).
+- A reloaded page frame starts at its top: the frame is sandboxed to an opaque origin, so the hub page cannot read or restore its scroll (Markdown and text keep theirs).
+- Images opened in the chat's lightbox (not the Files viewer) do not live-reload yet.
+
 
 ## Resume context
 
