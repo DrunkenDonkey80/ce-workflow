@@ -153,7 +153,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	const sessionsChanged = () => { sessionsTimer ??= setTimeout(() => { sessionsTimer = undefined; for (const value of views.values()) value.publish("sessions", {}); }, 200); };
 	host.on("event", (_id: string, event) => { if (["agent_start", "agent_settled", "compaction_start", "compaction_end"].includes(event.type)) sessionsChanged(); });
 	host.on("ui", (_id: string, request) => { if (["select", "confirm", "input", "editor"].includes(request.method) || request.statusKey === "pi-hub:state") sessionsChanged(); });
-	for (const name of ["closed", "answered", "exit", "switched", "terminals"]) host.on(name, sessionsChanged);
+	for (const name of ["closed", "answered", "exit", "switched", "terminals", "subtitle"]) host.on(name, sessionsChanged);
 
 	const scheduler = new Scheduler({ dataDir, registry, host });
 	// Until the gear menu saves its own list, keep what the old terminal footer hid (Pi settings.json).
@@ -182,6 +182,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/sessions/([0-9a-f-]{36})/restart": (_d, m) => host.restart(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/terminal": (_d, m) => host.openTerminal(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/rename": (data, m) => host.rename(m[1], String(data.name ?? "")),
+		"POST /api/sessions/([0-9a-f-]{36})/subtitle": (data, m) => host.setSubtitle(m[1], String(data.text ?? "")),
 		// pi-hub notice: a run command's script reports back on the session's open pages (no model turn).
 		"POST /api/sessions/([0-9a-f-]{36})/notice": (data, m) => { if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 }); views.get(m[1])?.publish("notice", { text: String(data.text ?? "").slice(0, 2000) }); return { ok: true }; },
 		// pi-hub progress: a long job's done/total bar above the chat; the page hides it once finished or stale.

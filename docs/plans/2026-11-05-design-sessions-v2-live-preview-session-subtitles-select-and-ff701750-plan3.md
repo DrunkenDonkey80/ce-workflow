@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T22:14:43.339Z
+updated: 2026-11-05T22:19:02.357Z
 reviewed: 2026-11-05
 ---
 
@@ -138,10 +138,7 @@ None.
 
 ### Phase 2: Session second line [code]
 
-- [ ] **S03** Hub stores a per-session subtitle: `pi-hub subtitle <id> <text>` and a hub-channel status key; session list returns it
-  - One validate-and-store path for both sources, saved on the session record (`registry.ts`) and announced to open pages (`hub.ts`).
-  - Empty text clears it; length capped (about 80 characters) and plain text only.
-  - Check: C2, C3 extended: set by CLI with no page open, set by publication, clear, still shown after parking and after a hub restart.
+- [x] **S03** Hub stores a per-session subtitle on the registry record (one setSubtitle path: plain, 80 chars, empty clears), set by `pi-hub subtitle <id> [text]` or the pi-hub:subtitle status key; session list returns it and open pages refresh
 - [ ] **S04** Session row shows the subtitle on a second line; plan progress keeps its bar beside it; styles for narrow and folded lists
   - Check: C5 or a changelog-shot crop of a row with subtitle and plan bar.
 

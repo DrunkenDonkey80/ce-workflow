@@ -313,6 +313,17 @@ try {
 	assert.notEqual(hub.registry.get(id).sessionFile, oldFile, "registry follows Pi's new session file");
 	assert.deepEqual((await get(id, "snapshot")).body.chat, [], "the page reconnects to an empty chat");
 
+	// S03: the line under the name, set through the hub (pi-hub subtitle) or published by an extension; plain, capped, empty clears.
+	const subtitle = async () => (await get(id, "sessions")).body.groups.flatMap(group => group.sessions).find(session => session.id === id).subtitle;
+	assert.deepEqual(await hubRoute(`/api/sessions/${id}/subtitle`, { text: " Home\npage \u0007 " }), { ok: true, subtitle: "Home page" });
+	assert.equal(await subtitle(), "Home page", "the session list returns it");
+	assert.equal((await hubRoute(`/api/sessions/${id}/subtitle`, { text: "x".repeat(200) })).subtitle.length, 80, "capped");
+	await hub.host.prompt(id, `/subtitle ${JSON.stringify("Published ★")}`);
+	assert.equal(await until(async () => await subtitle() === "Published ★" && "ok"), "ok", "an extension publishes it through the hub channel");
+	await hubRoute(`/api/sessions/${id}/subtitle`, { text: "" });
+	assert.equal(await subtitle(), undefined, "empty clears it");
+	assert.equal((await hubRoute(`/api/sessions/${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}/subtitle`, { text: "x" })).error, "Unknown session.");
+
 	// H5-05 session bar: folder groups with state tones, actions, Recents with Star/Unstar (D18).
 	const tones = async () => Object.fromEntries((await get(id, "sessions")).body.groups.flatMap(group => group.sessions.map(session => [session.name, session.tone])));
 	await post(id, "seen", {}); assert.equal((await tones())["1"], "seen");

@@ -22,6 +22,8 @@ export type SessionRecord = {
 	order?: number;
 	/** S-11: picked while parked; Pi gets them on resume, before any message. */
 	pending?: { model?: { provider: string; id: string; name: string }; thinking?: string };
+	/** A short plain line under the name in the session list (pi-hub subtitle, or published by an extension). */
+	subtitle?: string;
 	/** The session modes (research, night, bias) ce-workflow last published, shown while parked. */
 	modes?: Record<string, unknown>;
 	createdAt: number;

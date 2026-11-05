@@ -104,8 +104,12 @@ try {
 	const status = await api("/api/status");
 	assert.equal(status.body.sessions.find(s => s.id === id).live, true, "running session restored");
 	await api(`/api/sessions/${id}/park`, {});
+	assert.match(cli("subtitle", id, "Home", "page").out, /Subtitle: Home page/, "pi-hub subtitle sets it, parked and with no page open");
 	assert.match(cli("restart").out, /Stopped\.[\s\S]*Started/);
 	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).live, false, "parked session stays parked");
+	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).subtitle, "Home page", "the subtitle survives parking and a hub restart");
+	assert.match(cli("subtitle", id).out, /Subtitle cleared/);
+	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).subtitle, undefined);
 
 	// Updates use a fake managed launcher; success and failure both bring the hub back.
 	const updateArgs = path.join(root, "update-args.json");

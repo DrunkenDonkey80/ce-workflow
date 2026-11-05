@@ -104,6 +104,7 @@ export class SessionHost extends EventEmitter {
 				if (Array.isArray(state?.subagents) && state.subagents.length) live.busyExtra.add("subagents running");
 				if (state?.compacting && !live.compacting) live.busyExtra.add("compacting");
 			}
+			if (request.method === "setStatus" && request.statusKey === "pi-hub:subtitle") this.setSubtitle(record.id, parseJson(request.statusText) ?? "");
 			if (request.method === "setStatus" && request.statusKey === "pi-hub:closed") {
 				const askId = parseJson(request.statusText)?.id;
 				for (const [requestId, dialog] of live.dialogs) if (askId && channelId(dialog) === askId) { live.dialogs.delete(requestId); this.emit("closed", record.id, requestId); }
@@ -223,6 +224,15 @@ export class SessionHost extends EventEmitter {
 		const live = this.live.get(id);
 		if (live) await live.rpc.send({ type: "set_session_name", name: record.name });
 		return record;
+	}
+
+	/** D5: the line under a session's name, from pi-hub subtitle or an extension; plain text, up to 80 characters, empty clears it. */
+	setSubtitle(id: string, text: unknown) {
+		const record = this.registry.get(id);
+		if (!record) throw Object.assign(new Error("Unknown session."), { status: 404 });
+		const subtitle = typeof text === "string" ? text.replace(/[\x00-\x1f\x7f\s]+/g, " ").trim().slice(0, 80) : "";
+		if (subtitle !== (record.subtitle ?? "")) { this.registry.update(id, { subtitle: subtitle || undefined }); this.emit("subtitle", id); }
+		return { ok: true, subtitle };
 	}
 
 	/** /new from the page: Pi starts a fresh session file in the same process; the hub lock moves with it. */
