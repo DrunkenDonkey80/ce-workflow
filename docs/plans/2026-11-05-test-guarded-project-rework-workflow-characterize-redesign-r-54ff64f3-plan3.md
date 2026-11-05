@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T10:39:25.505Z
+updated: 2026-11-05T20:51:02.134Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -119,8 +119,9 @@ Cutover and rollback (recipe text): each design option states whether persisted 
 ### Phase 1: Recipe draft [think]
 
 - [x] **RW-01** Recipe written at docs/proposals/2026-11-05-rework-recipe.md (loop, corpus format, comparison rules, two-SHA replay, scorecard, rollback, gates, skeleton, retro questions).
-- [wip] **RW-02** Get a second opinion on the recipe with `/plan3 review`; record dispositions in Amendments.
+- [human] **RW-02** Get a second opinion on the recipe with `/plan3 review`; record dispositions in Amendments.
   - Check: Amendments lists each finding with accepted or rejected.
+  - note: User runs /plan3 review in this ce-workflow session (chosen 2026-11-05); the advisor must review the recipe docs/proposals/2026-11-05-rework-recipe.md.
 
 ### Phase 2: DealFinder warm-up pilot [think]
 
@@ -212,7 +213,7 @@ needs: R-pb-pilot-done
 
 ## Resume context
 
-Planning draft, no open questions. D-01 to D-10 recorded; review run 41f2e6a2 applied (pilot gates, all skeleton phases gated, two-SHA replay, commit before /plan3, rollback rules). D-10: AI-Wedge is read-only analysis from a ce-workflow session (RW-16); device qualification RW-18 in Backlog. No product code written. Next: user runs /plan3 finish; execution starts at RW-01.
+RW-01 done (recipe docs/proposals/2026-11-05-rework-recipe.md, commit 32c7b62). RW-02 [human]: user runs /plan3 review in this session to review the recipe, then dispositions go in Amendments and the recipe is fixed. Next after that: RW-03 (open DealFinder Pi session; it commits current state, then /plan3 with the recipe). Stop reason: waiting for the user's /plan3 review.
 
 ## Amendments
 
