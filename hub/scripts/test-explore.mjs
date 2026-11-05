@@ -1,10 +1,10 @@
 // Explore: an archive unpacks once into a temp folder, its files serve under /x/<key>/, nothing outside it does.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, rm, utimes, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { explore, sendExplored, viewPage } from "../src/explore.ts";
+import { explore, sendExplored, unview, viewers, viewPage } from "../src/explore.ts";
 
 const work = await mkdtemp(join(tmpdir(), "pi-hub-explore-test-"));
 try {
@@ -51,5 +51,30 @@ try {
 	const md = await viewPage(join(work, "site", "notes.md"), work, false);
 	assert.deepEqual([md.open, md.files.map(file => file.path)], ["notes.md", ["notes.md"]], "any other file: shown alone, its folder not walked");
 	assert.equal((await fetchLike(`/x/${md.key}/notes.md`)).status, 200);
+
+	// Live preview (S01): each viewer has its own key; the files it served are watched, a change notifies that key once.
+	const live = join(work, "live"); await mkdir(live);
+	for (const [name, text] of [["a.html", "<link href=a.css>"], ["a.css", "a{}"], ["b.html", "<link href=b.css>"], ["b.css", "b{}"], ["other.txt", "x"]]) await writeFile(join(live, name), text);
+	const events = [], sleep = ms => new Promise(done => setTimeout(done, ms));
+	const notify = key => events.push(key);
+	const a = await viewPage(join(live, "a.html"), live, false, { owner: "s1", notify }), b = await viewPage(join(live, "b.html"), live, false, { owner: "s1", notify });
+	assert.notEqual(a.key, b.key, "two viewers of one folder get their own keys");
+	for (const path of [`/x/${a.key}/a.html`, `/x/${a.key}/a.css`, `/x/${b.key}/b.html`, `/x/${b.key}/b.css`]) assert.equal((await fetchLike(path)).status, 200);
+	const settle = async () => { await sleep(500); const got = events.splice(0); return got; };
+	await settle();
+	await writeFile(join(live, "a.css"), "a{color:red}");
+	assert.deepEqual(await settle(), [a.key], "a's stylesheet changed: only a's viewer, once");
+	await writeFile(join(live, "other.txt"), "y");
+	assert.deepEqual(await settle(), [], "a file no viewer served: nothing");
+	for (const round of [1, 2]) { await writeFile(join(live, "b.css.tmp"), `b{${round}}`); await rename(join(live, "b.css.tmp"), join(live, "b.css")); assert.deepEqual(await settle(), [b.key], `atomic save ${round}: one notice`); }
+	await rm(join(live, "a.css")); await sleep(50); await writeFile(join(live, "a.css"), "a{}");
+	assert.deepEqual(await settle(), [a.key], "delete then recreate: one notice");
+	assert.equal(unview(a.key, "s2"), false, "another session cannot close it");
+	assert.equal(unview(a.key, "s1"), true);
+	await writeFile(join(live, "a.css"), "a{x}");
+	assert.deepEqual(await settle(), [], "a closed viewer gets nothing");
+	assert.equal((await fetchLike(`/x/${a.key}/a.css`)).status, 404, "and its key no longer serves");
+	viewers("s1", 0, 10); await sleep(50);
+	assert.equal((await fetchLike(`/x/${b.key}/b.css`)).status, 404, "no page left for the session: its viewers close");
 	console.log("explore ok");
 } finally { await rm(work, { recursive: true, force: true }); }

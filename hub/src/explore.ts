@@ -4,7 +4,7 @@
 import type http from "node:http";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, type FSWatcher, watch } from "node:fs";
 import { mkdir, readdir, realpath, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, isAbsolute } from "node:path";
@@ -18,7 +18,12 @@ const fail = (status: number, message: string) => Object.assign(new Error(messag
 // archive real path + mtime + size → key, for this hub run; the first explore clears earlier runs' folders.
 const unpacked = new Map<string, string>(), folders = new Map<string, string>();
 // A viewed page's live folder: each file served must pass the same check as a chat link for that project and device.
-const live = new Map<string, { project: string; remote: boolean }>();
+// One key per open viewer (D3): the real files it served are watched, and a change tells that viewer (notify) to reload.
+type View = { project: string; remote: boolean; owner?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout> };
+const live = new Map<string, View>();
+// Folders, not files, are watched: an atomic save (temp file + rename) or delete-and-recreate replaces the file's inode.
+const watched = new Map<string, { watcher: FSWatcher; keys: Set<string> }>();
+const idle = new Map<string, ReturnType<typeof setTimeout>>();
 let cleared: Promise<unknown> | undefined;
 
 const run = (command: string, args: string[]) => new Promise<void>((done, failed) => execFile(command, args, { timeout: 300_000, windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
@@ -56,13 +61,46 @@ export async function explore(real: string) {
  * A chat-linked file (a validated real path) shown in the Files viewer: its folder served live. An HTML page lists the
  * folder (its relative images, scripts and data load); any other file lists only itself, so a big folder is never walked.
  */
-export async function viewPage(real: string, project: string, remote: boolean) {
-	const folder = dirname(real), id = `page|${folder}|${project}|${remote}`;
-	let key = unpacked.get(id);
-	if (!key) { key = randomBytes(16).toString("hex"); unpacked.set(id, key); folders.set(key, folder); live.set(key, { project, remote }); }
+export async function viewPage(real: string, project: string, remote: boolean, watcher?: { owner: string; notify: (key: string) => void }) {
+	const folder = dirname(real), key = randomBytes(16).toString("hex");
+	folders.set(key, folder); live.set(key, { project, remote, ...watcher, served: new Set() });
 	const files: { path: string; size: number }[] = [];
 	if (/\.html?$/i.test(real)) await walk(folder, "", files, true); else files.push({ path: basename(real), size: (await stat(real)).size });
 	return { key, name: basename(folder), files: files.slice(0, MAX_FILES).sort((a, b) => a.path.localeCompare(b.path)), truncated: files.length > MAX_FILES, open: basename(real) };
+}
+/** The viewer closed: its key stops serving and its watches close. */
+export function unview(key: string, owner?: string) {
+	const view = live.get(key);
+	if (!view || owner !== undefined && view.owner !== owner) return false;
+	clearTimeout(view.timer); live.delete(key); folders.delete(key);
+	for (const [dir, entry] of watched) if (entry.keys.delete(key) && !entry.keys.size) { entry.watcher.close(); watched.delete(dir); }
+	return true;
+}
+/** A session's page count: with no page open for a minute (not a reconnect), its viewers close. */
+export function viewers(owner: string, count: number, grace = 60_000) {
+	clearTimeout(idle.get(owner)); idle.delete(owner);
+	if (!count) idle.set(owner, setTimeout(() => { idle.delete(owner); for (const [key, view] of live) if (view.owner === owner) unview(key); }, grace));
+}
+function track(key: string, view: View, real: string) {
+	if (!view.notify || view.served.has(real)) return;
+	view.served.add(real);
+	const dir = dirname(real);
+	let entry = watched.get(dir);
+	if (!entry) {
+		try {
+			const watcher = watch(dir, (_event, name) => {
+				const file = name ? join(dir, String(name)) : undefined;
+				for (const id of watched.get(dir)?.keys ?? []) {
+					const at = live.get(id);
+					// One notice per save: a save is often several events (truncate, write, rename).
+					if (at && (!file || at.served.has(file))) { clearTimeout(at.timer); at.timer = setTimeout(() => at.notify?.(id), 150); }
+				}
+			});
+			watcher.on("error", () => { watcher.close(); watched.delete(dir); });
+			watched.set(dir, entry = { watcher, keys: new Set() });
+		} catch { return; } // folder gone or out of watch handles: that file just won't live-reload
+	}
+	entry.keys.add(key);
 }
 async function walk(base: string, prefix: string, files: { path: string; size: number }[], skipHidden = false) {
 	if (files.length > MAX_FILES) return;
@@ -87,6 +125,7 @@ export async function sendExplored(pathname: string, download: boolean, origin: 
 	const info = rest && !rest.startsWith("..") && !isAbsolute(rest) ? await stat(real!).catch(() => undefined) : undefined;
 	const access = live.get(match[1]);
 	if (!info?.isFile() || access && !await linkedFile(real, access.project, access.remote)) { response.writeHead(404, { "content-type": "text/plain" }); response.end("Not found (the hub restarted? Explore the archive again)."); return true; }
+	if (access) track(match[1], access, real!);
 	const type = TYPES[extname(real!).toLowerCase()] ?? "text/plain; charset=utf-8"; // unknown: plain text, never sniffed into a page
 	response.writeHead(200, {
 		"content-type": download ? "application/octet-stream" : type, "content-length": info.size, "cache-control": "private, no-store", "x-content-type-options": "nosniff",

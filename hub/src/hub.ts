@@ -28,7 +28,7 @@ import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
 import { createLinks, type LinkRequest } from "./link.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
-import { sendExplored } from "./explore.ts";
+import { sendExplored, viewers } from "./explore.ts";
 import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
 import { createAutoUpdate } from "./auto-update.ts";
 
@@ -133,7 +133,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			file: () => registry.get(id)?.sessionFile,
 			idle: () => !host.live.get(id)?.running,
 			subagents: () => { const list = (host.live.get(id)?.published.state as { subagents?: unknown } | undefined)?.subagents; return Array.isArray(list) ? list : []; },
-			viewers: count => { const live = host.live.get(id); if (live) live.viewers = count; },
+			viewers: count => { const live = host.live.get(id); if (live) live.viewers = count; viewers(id, count); },
 			forms: () => pageApi.forms(id),
 		}));
 		const live = host.live.get(id);

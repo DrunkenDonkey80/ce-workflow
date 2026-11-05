@@ -12,7 +12,7 @@ import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { ARCHIVE, explore, viewPage } from "./explore.ts";
+import { ARCHIVE, explore, unview, viewPage } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
@@ -385,8 +385,9 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				const real = await linkedFile(data.path, folder(id), remote);
 				if (!real) throw fail(404, "File not found or not shared.");
 				// Not an archive: its folder is served live (each file checked like a chat link) and the file shown in the viewer.
-				return ARCHIVE.test(real) ? explore(real) : viewPage(real, folder(id), remote);
+				return ARCHIVE.test(real) ? explore(real) : viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) });
 			}
+			case "unview": only(data, ["target", "key"], "Invalid fields."); return { ok: unview(String(data.key), id) }; // the page closed or replaced its viewer
 			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.
 			case "upload": {
 				only(data, ["target", "path", "pack"], "Invalid fields.");

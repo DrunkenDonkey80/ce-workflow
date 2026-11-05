@@ -107,6 +107,15 @@ try {
 	assert.equal((await post(id, "paste", Buffer.from("not an image"), { "content-type": "image/png" })).status, 415);
 	fs.rmSync(pasted.body.path, { force: true });
 
+	// Live preview (S01): every View page gets its own key; only this session can close it.
+	fs.writeFileSync(path.join(folder, "page.html"), "<p>hi</p>");
+	const [view1, view2] = [(await post(id, "explore", { path: "page.html" })).body, (await post(id, "explore", { path: "page.html" })).body];
+	assert.match(view1.key, /^[0-9a-f]{32}$/); assert.notEqual(view1.key, view2.key, "one key per viewer");
+	assert.equal((await post(id, "unview", { key: view1.key, extra: 1 })).status, 400);
+	assert.deepEqual((await post(id, "unview", { key: view1.key })).body, { ok: true });
+	assert.deepEqual((await post(id, "unview", { key: view1.key })).body, { ok: false }, "already closed");
+	fs.rmSync(path.join(folder, "page.html"));
+
 	// S-11: model and effort picked while parked are kept and set on resume, before the message.
 	assert.equal((await post(id, "model", { provider: "fake", id: "nope" })).status, 404, "parked picks come from the scoped list only");
 	assert.equal((await get(id, "models")).body.default, "fake/fake-2", "the list names Pi's default model");
