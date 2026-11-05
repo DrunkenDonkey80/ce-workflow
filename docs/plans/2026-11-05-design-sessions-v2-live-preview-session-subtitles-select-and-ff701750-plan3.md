@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T22:19:02.357Z
+updated: 2026-11-05T22:22:10.928Z
 reviewed: 2026-11-05
 ---
 
@@ -139,8 +139,7 @@ None.
 ### Phase 2: Session second line [code]
 
 - [x] **S03** Hub stores a per-session subtitle on the registry record (one setSubtitle path: plain, 80 chars, empty clears), set by `pi-hub subtitle <id> [text]` or the pi-hub:subtitle status key; session list returns it and open pages refresh
-- [ ] **S04** Session row shows the subtitle on a second line; plan progress keeps its bar beside it; styles for narrow and folded lists
-  - Check: C5 or a changelog-shot crop of a row with subtitle and plan bar.
+- [x] **S04** Session row shows the subtitle as the second line (ellipsis, full text in the title), with the plan's done/total and bar beside it when a plan runs; hidden in the folded stripe
 
 ### Phase 3: Design sessions v2 [code]
 

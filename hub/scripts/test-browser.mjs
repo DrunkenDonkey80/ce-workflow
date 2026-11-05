@@ -844,6 +844,11 @@ try {
  const tones = "[...document.querySelectorAll('.session:not(.recent)')].map(s => s.querySelector('.session-letter').textContent + ':' + s.dataset.tone).join()";
  await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${tones} === "1:seen,2:parked,3:working"`);
  assert.equal(await evaluate("document.querySelector('.session-group-label').textContent"), "ce-workflow (3)");
+ // S04: the subtitle is a second line under the name; folded, only letters show.
+ hub.host.setSubtitle(third.id, "Home page");
+ await browser("wait", "--fn", "[...document.querySelectorAll('.session-subtitle')].some(s => s.textContent === 'Home page' && s.closest('.session').querySelector('.session-label').textContent === '3')");
+ assert(await evaluate("(() => { const sub = [...document.querySelectorAll('.session-subtitle')].find(s => s.textContent === 'Home page'); return sub.getBoundingClientRect().top >= sub.closest('.session').querySelector('.session-label').getBoundingClientRect().bottom - 1 && !sub.closest('.session-progress').querySelector('i'); })()"), "below the name, no plan bar without a plan");
+ hub.host.setSubtitle(third.id, ""); await browser("wait", "--fn", "!document.querySelector('.session-subtitle')");
  // @ lists the other sessions by folder/name; picking one writes its reference in place of the word.
  await browser("fill", "#message-input", "ask @CE-workflow/2"); await browser("wait", "#slash-menu:not([hidden])");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#slash-menu .slash-option')].map(o => o.dataset.command)"), ["ce-workflow/2"], "this session is not listed");

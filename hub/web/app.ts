@@ -1434,7 +1434,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // blue waiting for a timer, grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; attention?: number; parked?: boolean; plan?: { done: number; total: number }; job?: number; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
+type HubSession = { id: string; name: string; tone: Tone; subtitle?: string; attention?: number; parked?: boolean; plan?: { done: number; total: number }; job?: number; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1801,11 +1801,14 @@ link.addEventListener("click", () => sessionStorage.setItem("focus-chat", "1"));
   line.addEventListener("click", () => link.click());
   row.prepend(line);
  }
- // A plan in progress: steps done/total, then a line filled left to right.
- if (session.plan) {
-  const line = html("span", { className: "session-progress", title: `Plan: ${session.plan.done}/${session.plan.total} steps` });
-  line.style.setProperty("--fill", Math.round(session.plan.done / session.plan.total * 100) + "%");
-  line.append(html("small", { textContent: `${session.plan.done}/${session.plan.total}` }), html("i"));
+ // The second line: the session's subtitle (pi-hub subtitle), then a plan in progress: steps done/total and a line filled left to right.
+ if (session.plan || session.subtitle) {
+  const plan = session.plan, line = html("span", { className: "session-progress" + (plan ? "" : " session-subline"), title: [session.subtitle, plan && `Plan: ${plan.done}/${plan.total} steps`].filter(Boolean).join("\n") });
+  if (session.subtitle) line.append(html("span", { className: "session-subtitle", textContent: session.subtitle }));
+  if (plan) {
+   line.style.setProperty("--fill", Math.round(plan.done / plan.total * 100) + "%");
+   line.append(html("small", { textContent: `${plan.done}/${plan.total}` }), html("i"));
+  }
   line.addEventListener("click", () => link.click()); // the whole row selects the session
   row.append(line);
  }
