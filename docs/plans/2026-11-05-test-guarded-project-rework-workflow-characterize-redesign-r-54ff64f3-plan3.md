@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T20:59:09.627Z
+updated: 2026-11-05T21:11:38.935Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -123,13 +123,12 @@ Cutover and rollback (recipe text): each design option states whether persisted 
 
 ### Phase 2: DealFinder warm-up pilot [think]
 
-- [ ] **RW-03** Open a Pi session in `C:\SOFT\git\DealFinder` via intercom (cwd, openProjectPaneIfMissing) and start `/plan3` with the recipe as the request.
-  - Before `/plan3` (which writes the plan file into the repo), the session inspects `git status`, makes the D-08 pre-rework commit or records HEAD when clean, and passes that SHA in the request.
-  - Check: a new Plan3 plan exists in `C:\SOFT\git\DealFinder\docs\plans\` with the skeleton phases, `needs:` gates and the pre-rework SHA.
-- [human] **RW-04** Drive the DealFinder pilot plan through Map, Characterize, Design, Pick, Build, Replay, Switch and Retire.
+- [x] **RW-03** DealFinder pilot plan b8ad3205 created by the DealFinder session (pre-rework SHA 27221be, skeleton with three gates); Map not started.
+- [wip] **RW-04** Drive the DealFinder pilot plan through Map, Characterize, Design, Pick, Build, Replay, Switch and Retire.
   - Acceptance from Goal: stable old-versus-old corpus, planted bug caught, scorecard with baseline and candidate per dimension, rollback rules recorded, old code retired after the watch window, C-df green on master. Any intentional behavior change replays through the recipe's approved-delta file; if none occurs, the plan says so.
   - Check: `git log` in DealFinder shows the pre-rework commit before the plan file; corpus SHA recorded; pilot plan complete or an explicit stop reason.
   - When done, the user turns on R-df-pilot-done (Alt+A) if the evidence is acceptable.
+  - note: 2026-11-05: user approved; go sent to DealFinder session 01a17e92 (Map to Design, stop at PICK-01). Pre-rework SHA 27221be, pilot plan b8ad3205.
 - [ ] **RW-05** Retro: compare the pilot plan, its stats file and git log with the recipe; list what was missing, noisy or unused.
   - Inputs: the pilot plan's Amendments, questions asked and git log; its stats file only for failed tools and stuck steps.
   - needs: R-df-pilot-done
@@ -191,8 +190,10 @@ needs: R-pb-pilot-done
 ### P-ARCH [code] Product architecture
 
 - [ ] **ARCH-RECONCILE** Reconcile the product architecture diagram with this plan's actual changes.
+  - needs: R-pb-pilot-done
   - Compare actual code and git history; update through plan3_diagram target product, or mark done with no architecture change.
   - Changed plan elements: none flagged; inspect actual implementation.
+  - note: Assumed: gated on R-pb-pilot-done, since product code only changes in Phase 5 (2026-11-05).
 
 
 ## Global validation
@@ -213,7 +214,7 @@ needs: R-pb-pilot-done
 
 ## Resume context
 
-RW-01 and RW-02 done: recipe at docs/proposals/2026-11-05-rework-recipe.md, reviewed (run 661d6254, 6 findings applied: stop outcome at Pick, approved-delta replay rule, read-only audit for RW-16, phase tags, night wording). Next: RW-03, open a Pi session in C:\SOFT\git\DealFinder via intercom; it records or commits the pre-rework state, then starts /plan3 with the recipe. No blockers.
+RW-01 to RW-03 done. RW-04 wip: the DealFinder session (01a17e92, plan C:\SOFT\git\DealFinder\docs\plans\...-b8ad3205-plan3.md, pre-rework SHA 27221be) is running Map, Characterize and Design and will stop at PICK-01 for the user, then send a status via intercom. Every other step waits on R-df-pilot-done or R-pb-pilot-done (ARCH-RECONCILE too, assumed). Next: on the DealFinder status, check its corpus SHA, stable and sensitive results, and help the user pick; the pilot continues to Retire in that pane; the user turns on R-df-pilot-done, then RW-05.
 
 ## Amendments
 
