@@ -878,9 +878,10 @@ try {
  await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.filter(s => s === 'working').length === 1 && document.title.includes('\"session\"')");
  await hub.host.live.get(id).rpc.send({ type: "abort" });
  await hub.host.prompt(id, "app");
- await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.join() === 'unseen'");
+ await browser("wait", "--fn", "document.title.startsWith('pi-hub-state {') && JSON.parse(document.title.slice(13)).states.join() === 'unseen,unseen'");
  const line = JSON.parse((await evaluate("document.title")).slice(13));
- assert.deepEqual([typeof line.icon, line.icon.length > 0, line.name, line.states], ["string", true, os.hostname(), ["unseen"]], "icon, hub name (hostname) and own unseen");
+ assert.deepEqual([typeof line.icon, line.icon.length > 0, line.name, line.states], ["string", true, os.hostname(), ["unseen", "unseen"]], "icon, hub name (hostname), the parked third's unseen and own unseen");
+ assert.equal(await evaluate(tones), "1:unseen,2:parked,3:unseen", "own finished run is unseen while unfocused");
  assert.deepEqual([line.latest > 0, line.asks, line.key], [true, false, "ctrl+shift+a"], "the newest attention time, not a question, and the app's attention key");
  // pi-hub progress: a bar under the chat heading, refused without numbers, gone on --clear.
  { const report = body => fetch(`${origin}/api/sessions/${id}/progress`, { method: "POST", headers: { "x-hub-key": hub.config.localKey, "content-type": "application/json" }, body: JSON.stringify(body) });
