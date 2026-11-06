@@ -1,0 +1,120 @@
+{
+ "version": 1,
+ "activeMs": 0,
+ "runs": 0,
+ "waitingMs": 0,
+ "toolWallMs": 22974,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 10,
+   "thinkingMs": 29938,
+   "actingMs": 10803,
+   "input": 22,
+   "output": 3801,
+   "cacheRead": 777326,
+   "cacheWrite": 90152,
+   "cost": 0.6823332000000001,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 9,
+   "ms": 11578,
+   "maxMs": 7547,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "edit": {
+   "count": 1,
+   "ms": 4,
+   "maxMs": 4,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 9,
+   "ms": 11578,
+   "maxMs": 7547,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short package.json package-lock.json; rg -n \"pi-coding-agent\" package.json; git ls-files package-lock.json": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff package.json": {
+   "count": 1,
+   "ms": 62,
+   "maxMs": 62,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm install --save-dev --save-exact \"@earendil-works/pi-coding-agent@1.5.0\" 2>&1 | tail -5; git diff --stat package.json package-lock.json": {
+   "count": 1,
+   "ms": 7547,
+   "maxMs": 7547,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff package.json | rg \"^[+-] \"; node -e \"const l=require('./package-lock.json');console.log(l.packages['node_modules/@earendil-works/pi-coding-agent'].version, l.packages[''].devDepende": {
+   "count": 1,
+   "ms": 404,
+   "maxMs": 404,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const {execSync}=require('child_process');const old=JSON.parse(execSync('git show HEAD:package-lock.json',{maxBuffer:1e8})).packages;const now=require('./package-lock.json').packag": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD:package-lock.json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const p=JSON.parse(s).packages[''];console.log(JSON.stringify({peer:p.peerDependencies,meta": {
+   "count": 1,
+   "ms": 1150,
+   "maxMs": 1150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"from \\\"pi-subagents|import\\(\\\"pi-subagents|resolve\\(\\\"pi-subagents|require\\(\\\"pi-subagents\" extensions scripts hub/src | head; sed -n 88,94p scripts/test-work-native-smoke.mjs | cut -": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U1 package.json": {
+   "count": 1,
+   "ms": 248,
+   "maxMs": 248,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U1 package.json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const [head,...h]=s.split(/^(?=@@)/m);process.stdout.write(head+h[1].replace('+72,3','+71,3'))})\"": {
+   "count": 1,
+   "ms": 1770,
+   "maxMs": 1770,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "CU-01": {
+   "ms": 52450,
+   "testMs": 0,
+   "replies": 10,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 10
+   }
+  }
+ },
+ "spans": [],
+ "hints": []
+}
