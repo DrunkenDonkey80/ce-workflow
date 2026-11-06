@@ -58,7 +58,8 @@ try {
 	const packed = JSON.parse(
 		npmRun(["pack", "--json", "--pack-destination", temp]),
 	);
-	const tarball = path.join(temp, packed[0].filename);
+	// npm 12 keys pack --json by package name; older npm returns an array.
+	const tarball = path.join(temp, (Array.isArray(packed) ? packed[0] : Object.values(packed)[0]).filename);
 	const host = path.join(temp, "host");
 	mkdirSync(host);
 	npmRun(
