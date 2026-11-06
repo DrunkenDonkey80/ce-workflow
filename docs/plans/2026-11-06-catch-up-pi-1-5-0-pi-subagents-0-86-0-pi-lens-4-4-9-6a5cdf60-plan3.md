@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-06
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.0","pi-subagents":"0.86.0","pi-lens":"4.4.9"}
-updated: 2026-11-06T10:09:42.908Z
+updated: 2026-11-06T10:11:07.221Z
 reviewed: 2026-11-06
 ---
 
@@ -178,12 +178,7 @@ None.
 ### Phase 1 — Apply adopted changes [code]
 
 - [x] **CU-01** Pinned the @earendil-works/pi-coding-agent devDependency to 1.5.0 in package.json and package-lock.json.
-- [ ] **CU-02** Keep fitImage output in the source format: when resize returns another mimeType, convert it back with `convertToPng`.
-  - Import `convertToPng` next to `resizeImage` in extensions/work-images.ts; pass `jpegQuality: 100` to the resize call; on a failed conversion return the unscaled image.
-  - Let fitImage take the converter as a parameter (as it already takes resize), so the test can stub it.
-  - Test in scripts/test-work-compaction-notifications.mjs (fitImage asserts, around line 1920): a fake resize returning `image/jpeg` and a stub converter.
-  - Assert success returns the converter's PNG at the resized size; a failed conversion returns the original; resize received `jpegQuality: 100`.
-  - Check: `node scripts/test-work-compaction-notifications.mjs` passes.
+- [x] **CU-02** fitImage asks for jpegQuality 100 and converts a non-PNG resize of a PNG back with an injectable convertToPng; a failed conversion keeps the original.
 - [ ] **CU-03** Plan3 startFresh: when `ctx.newSession` returns `{ cancelled: true }`, notify that the plan is ready and name `/resume3 <id>`.
   - Extend the newSession stub in scripts/test-work-plan3.mjs (around line 724) with a cancelled case asserting the notice.
   - Check: `node scripts/test-work-plan3.mjs` passes.

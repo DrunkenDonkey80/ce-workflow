@@ -1909,6 +1909,15 @@ try {
 	assert.equal(await fitImage(wide, "600x600", fakeResize), wide, "never change the aspect ratio");
 	assert.equal(await fitImage(wide, undefined, fakeResize), wide);
 	assert.deepEqual(resizes.map((o) => [o.maxWidth, o.maxHeight]), [[800, 600]]);
+	// Pi 1.5 resize may answer JPEG; generated PNGs are converted back at the resized size, or kept whole when that fails.
+	const jpegResize = async (_bytes, _mimeType, options) => { resizes.push(options); return { data: `jpeg${options.maxWidth}`, mimeType: "image/jpeg" }; };
+	const toPng = async (data, mimeType) => mimeType === "image/jpeg" && data === "jpeg800" ? { data: png(800, 600), mimeType: "image/png" } : null;
+	const converted = await fitImage(wide, "800x600", jpegResize, toPng);
+	assert.equal(converted.mimeType, "image/png");
+	assert.equal(pngSize(converted.data), "800x600");
+	assert.equal(resizes.at(-1).jpegQuality, 100, "a JPEG candidate is near lossless before conversion");
+	assert.equal(await fitImage(wide, "800x600", jpegResize, async () => null), wide, "a failed conversion keeps the original PNG");
+	assert.equal(await fitImage(wide, "800x600", jpegResize, async () => { throw new Error("no photon"); }), wide);
 	paintCtx.modelRegistry.generateImages = async () => ({ stopReason: "stop", output: [{ type: "image", data: png(1254, 1254), mimeType: "image/png" }] });
 	assert.match((await tools.generate_image.execute("call", { prompt: "fox", path: "sq.png", size: "1024x1536" }, undefined, null, paintCtx)).content[0].text,
 		/sq\.png \(1254x1254\).*Requested 1024x1536; this is what the model drew.*Regenerating gives the same size/s, "a size miss is reported, not silently regenerated");

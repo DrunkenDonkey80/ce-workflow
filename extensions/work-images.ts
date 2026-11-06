@@ -9,9 +9,9 @@ const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
 const EXT = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif" };
 const NONE = "__none_model__";
 const CODEX_HOSTS = new Set(["chatgpt.com", "api.openai.com"]);
-let resizeImage;
+let resizeImage, convertToPng;
 try {
-	({ resizeImage } = await import("@earendil-works/pi-coding-agent"));
+	({ resizeImage, convertToPng } = await import("@earendil-works/pi-coding-agent"));
 } catch {
 	// Local fixture runs do not install Pi peer dependencies.
 }
@@ -112,12 +112,14 @@ export function pngSize(data) {
 }
 
 // Scale a larger image with the requested aspect ratio (within 2%) down to the requested size; never upscale or crop.
-export async function fitImage(image, size, resize = resizeImage) {
+// Pi 1.5 resize may pick JPEG when smaller; a PNG stays PNG so the saved .png path and size check hold.
+export async function fitImage(image, size, resize = resizeImage, toPng = convertToPng) {
 	const wanted = parseSize(size), got = pngSize(image.data)?.split("x").map(Number);
 	if (!wanted || !got || !resize || got[0] < wanted[0] || got[1] < wanted[1]) return image;
 	if (Math.abs(got[0] / got[1] / (wanted[0] / wanted[1]) - 1) > 0.02 || `${got[0]}x${got[1]}` === size) return image;
-	const resized = await resize(Buffer.from(image.data, "base64"), image.mimeType, { maxWidth: wanted[0], maxHeight: wanted[1], maxBytes: Number.MAX_SAFE_INTEGER });
-	return resized ? { ...image, data: resized.data, mimeType: resized.mimeType } : image;
+	const resized = await resize(Buffer.from(image.data, "base64"), image.mimeType, { maxWidth: wanted[0], maxHeight: wanted[1], maxBytes: Number.MAX_SAFE_INTEGER, jpegQuality: 100 });
+	const fitted = resized && image.mimeType === "image/png" && resized.mimeType !== "image/png" ? await toPng?.(resized.data, resized.mimeType).catch(() => null) : resized;
+	return fitted ? { ...image, data: fitted.data, mimeType: fitted.mimeType } : image;
 }
 
 // Pi's resize, or the original when Pi is absent or cannot fit it (the provider then reports the size).
