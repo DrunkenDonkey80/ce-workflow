@@ -20,6 +20,13 @@ export function compactionInputBytes(model: any = {}) {
 	return Math.max(1, Math.floor(Number(model.contextWindow ?? model.context_window) || 200_000));
 }
 
+// Sum two usage costs: money adds up; Pi 1.5 totalFromProvider holds only when every part was provider-billed.
+export function addCost(sum = {}, cost) {
+	for (const [key, value] of Object.entries(cost)) if (typeof value === "number") sum[key] = (sum[key] ?? 0) + value;
+	sum.totalFromProvider = (sum.totalFromProvider ?? true) && cost.totalFromProvider === true;
+	return sum;
+}
+
 export function contentText(content) {
 	if (!content) return "";
 	if (typeof content === "string") return content;

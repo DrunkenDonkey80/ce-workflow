@@ -1669,13 +1669,14 @@ try {
 			assert(!/[\uD800-\uDBFF]$/.test(text), "never split a Unicode surrogate pair");
 			nativeChunks.push(text);
 			assert.equal(previous, nativeChunks.length === 1 ? "Prior decisions" : "Merged native checkpoint");
-			return { text: "Merged native checkpoint", usage: { input: 10, output: 5, cost: { total: 0.2 } } };
+			return { text: "Merged native checkpoint", usage: { input: 10, output: 5, cost: { total: 0.2, totalFromProvider: true } } };
 		} });
 	assert(nativeChunks.length > 1, "single-message overflow is split before ACP sees it");
 	assert(nativeChunks.join("").includes(giantNativeMessages[0].content), "every original request character participates");
 	assert.equal(JSON.stringify(giantNativeMessages), originalGiantNative);
 	assert.equal(boundedSummary.usage.output, nativeChunks.length * 5);
 	assert(Math.abs(boundedSummary.usage.cost.total - nativeChunks.length * 0.2) < 1e-9);
+	assert.equal(boundedSummary.usage.cost.totalFromProvider, true, "chunked usage keeps the provider-billed flag a boolean");
 	const hugePrior = "Earlier approved scope. ".repeat(20_000);
 	const priorChunks = [];
 	await summarizeNativeContext([{ role: "user", content: "Newest request" }], boundedCtx, { previousSummary: hugePrior,

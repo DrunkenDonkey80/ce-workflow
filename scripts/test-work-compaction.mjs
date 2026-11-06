@@ -9,6 +9,7 @@ import {
 	COMPACTION_NOTE_MAX,
 	replayCost,
 	tightenPreparation,
+	addCost,
 } from "../extensions/work-compaction.ts";
 
 {
@@ -637,7 +638,7 @@ async function retryCase(primary, secondary = "valid", options = {}) {
 				const response = registry.streamSimple(selected, context, request);
 				return { result: async () => {
 					const value = await response.result();
-					value.usage.cost = { input: 0.1, output: 0.2, total: 0.3 };
+					value.usage.cost = { input: 0.1, output: 0.2, total: 0.3, totalFromProvider: true };
 					if (outcome === "aborted") value.stopReason = "aborted";
 					if (outcome === "cancel") options.controller.abort();
 					return value;
@@ -657,7 +658,12 @@ for (const reason of ["invalid", "large", "citation", "throw", "unavailable", "a
 	const responses = ["throw", "unavailable"].includes(reason) ? 1 : 2;
 	assert.equal(result.usage.output, 20 * responses);
 	assert.equal(result.usage.cost.total, 0.3 * responses);
+	assert.equal(result.usage.cost.totalFromProvider, true, "a Pi 1.5 boolean stays a boolean when summed");
 }
+// Combined cost is provider-billed only when every part is; money still adds up.
+assert.deepEqual(addCost(addCost(undefined, { total: 1, totalFromProvider: true }), { total: 2, totalFromProvider: true }), { total: 3, totalFromProvider: true });
+assert.deepEqual(addCost(addCost(undefined, { total: 1, totalFromProvider: true }), { total: 2 }), { total: 3, totalFromProvider: false });
+assert.deepEqual(addCost(addCost(undefined, { input: 1, total: 1 }), { input: 2, total: 2 }), { input: 3, total: 3, totalFromProvider: false });
 const doubleFailure = await retryCase("invalid", "invalid");
 assert.equal(doubleFailure.result.mode, "fallback");
 assert.deepEqual(doubleFailure.attempted, ["summary", "current"]);

@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-06
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.0","pi-subagents":"0.86.0","pi-lens":"4.4.9"}
-updated: 2026-11-06T10:12:45.350Z
+updated: 2026-11-06T10:14:18.505Z
 reviewed: 2026-11-06
 ---
 
@@ -180,10 +180,7 @@ None.
 - [x] **CU-01** Pinned the @earendil-works/pi-coding-agent devDependency to 1.5.0 in package.json and package-lock.json.
 - [x] **CU-02** fitImage asks for jpegQuality 100 and converts a non-PNG resize of a PNG back with an injectable convertToPng; a failed conversion keeps the original.
 - [x] **CU-03** Plan3 startFresh warns "Pi kept this session; the plan is ready · /resume3 <id>" when ctx.newSession returns cancelled.
-- [ ] **CU-04** Summed compaction usage: add only numeric cost fields; set `totalFromProvider` true only when every part has it true.
-  - Fix both loops: extensions/work-models.ts (around line 1694) and extensions/work-compaction-memory.ts (around line 251).
-  - Extend scripts/test-work-compaction.mjs (around line 640) and scripts/test-work-compaction-notifications.mjs (around line 1685): all true, mixed, and absent.
-  - Check: both test scripts pass.
+- [x] **CU-04** New addCost (work-compaction.ts) sums only numeric cost fields and ANDs totalFromProvider; used by the work-models chunk loop and work-compaction-memory attempts.
 
 ### Phase 2 — Verify and record [code]
 

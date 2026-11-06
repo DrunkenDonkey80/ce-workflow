@@ -32,7 +32,7 @@ import {
 	runExtensionScout,
 	updateExtensionScoutProgress,
 } from "./work-extension-scout.ts";
-import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, tightenPreparation, contentText, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
+import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, contextFilterCutIndex, replayCost, tightenPreparation, contentText, addCost, filesFromOps, formatCompactionSummary, COMPACTION_NOTE_TOOL, COMPACTION_NOTE_MAX, latestCompactionNote } from "./work-compaction.ts";
 import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge, splitLevel } from "./work-vision.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
@@ -1689,10 +1689,7 @@ export async function summarizeNativeContext(messages, ctx, { reserveTokens = 16
 			usage ??= {};
 			for (const key of ["input", "output", "cacheRead", "cacheWrite", "totalTokens"])
 				usage[key] = (usage[key] ?? 0) + (result.usage[key] ?? 0);
-			if (result.usage.cost) {
-				usage.cost ??= {};
-				for (const [key, value] of Object.entries(result.usage.cost)) usage.cost[key] = (usage.cost[key] ?? 0) + value;
-			}
+			if (result.usage.cost) usage.cost = addCost(usage.cost, result.usage.cost);
 		}
 		transcript = transcript.slice(end);
 	}
