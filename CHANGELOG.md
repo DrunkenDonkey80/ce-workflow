@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.36 — 2026-11-06
+
+### Added
+- Hub gear menu: an Install button next to the browser extension's Copy path registers its native host for Helium, Chrome, Edge and Chromium on this PC (same as /wo → Settings → Browser access → Install). It fixes the extension's "Specified native messaging host not found" error; reload the extension afterwards.
+
 ## 0.2.35 — 2026-11-04
 
 ### Changed

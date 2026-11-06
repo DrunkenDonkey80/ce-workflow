@@ -31,6 +31,7 @@ import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serv
 import { sendExplored } from "./explore.ts";
 import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
 import { createAutoUpdate } from "./auto-update.ts";
+import { install as installBrowserFetch } from "../../extensions/browser-fetch.ts";
 
 export type HubConfig = { version: 1; port: number; localKey: string; idleParkMinutes: number; remote?: boolean; icon?: string; usageHidden?: string[]; notify?: { question: boolean; done: boolean }; seenVersion?: string; collapseHours?: number; attentionKey?: string };
 export type HubMarker = { pid: number; port: number; startedAt: number };
@@ -376,6 +377,13 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 					if (data.action === "check-updates") { if (updates) await updates.check(); return send(200, pageApi.settings()); }
 					// Running sessions keep the extension loaded until they restart; the list drops it now.
 					if (data.action === "remove-package" && typeof data.source === "string") { try { await updates?.remove(data.source); } catch (error) { return send(409, { error: (error as Error).message }); } return send(200, pageApi.settings()); }
+					// Gear → Browser extension → Install: the same native-host registration as /wo → Settings → Browser access.
+					if (data.action === "browser-install") {
+						try {
+							const done = await installBrowserFetch(exec);
+							return send(200, { message: `${done.failed.length ? `Registration failed for ${done.failed.join("; ")}. ` : ""}${done.registered.length ? `Registered the native host for ${done.registered.join(", ")}. ` : "No supported browser found. "}Now reload the extension in chrome://extensions (or Load unpacked ${done.extension}).` });
+						} catch (error) { return send(409, { error: (error as Error).message }); }
+					}
 					// Linux keeps old sessions in the Trash, which nobody empties on a server; the settings offer it.
 					if (data.action === "trash") return send(200, sessionTrash(path.join(agentDir(), "sessions"), data.empty === true));
 					if (data.action !== "restart" && data.action !== "update") return send(400, { error: "Unknown hub action." });

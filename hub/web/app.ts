@@ -2437,6 +2437,11 @@ function updateMenu(anchor: HTMLElement) {
 $("update-button").addEventListener("click", event => { event.stopPropagation(); updateMenu($("update-button")); });
 for (const badge of ["update-badge", "update-others"]) { $(badge).title = "Update now"; $(badge).addEventListener("click", event => { event.stopPropagation(); updateMenu($("settings-button")); }); }
 $("browser-ext-copy").addEventListener("click", async () => { const path = hubSettings.browserExtension?.path ?? ""; try { await navigator.clipboard.writeText(path); showNotice(`Copied ${path}`); } catch { prompt("Path:", path); } });
+$("browser-ext-install").addEventListener("click", async () => {
+ ($("browser-ext-install") as HTMLButtonElement).disabled = true;
+ try { showNotice((await post("hub", { action: "browser-install" }) as { message: string }).message); } catch (error) { showNotice(error.message); }
+ ($("browser-ext-install") as HTMLButtonElement).disabled = false;
+});
 $("update-check").addEventListener("click", async () => {
  ($("update-check") as HTMLButtonElement).disabled = true; $("update-list").textContent = "Checking…";
  try { hubSettings = await post("hub", { action: "check-updates" }) as HubSettings; } catch (error) { showNotice(error.message); }
