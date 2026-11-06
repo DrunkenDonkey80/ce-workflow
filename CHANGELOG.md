@@ -6,6 +6,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ### Fixed
 - mobile_act no longer asks to install its helper on an iPhone that already has it. When `mobilecli agent status` hung or failed, it was read as "not installed", so every call asked to reinstall (and the install failed). It now checks the phone's app list through devicectl and reports that the helper does not answer instead.
+- mobile_act on iPhones: a call that times out now restarts the mobilecli daemon once, like a helper start failure already did. When the phone's connection to the Mac drops and comes back under a new address, the daemon kept dialling the old one and every call hung.
 
 ## 0.2.37 — 2026-11-06
 

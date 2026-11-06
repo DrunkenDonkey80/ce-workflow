@@ -230,6 +230,20 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	await assert.rejects(mobileAct(wda, { action: "snapshot" }, po()), /Lorenz’s iPhone is locked or waiting for its passcode/);
 	locked = false;
 
+	// A timed-out call (the daemon dialling the phone's old tunnel address) also restarts the daemon, once.
+	{
+		resetSession();
+		let stuck = true, restarts = 0;
+		const t = async (c, a) => {
+			if (c === "xcrun") return { code: 0 };
+			if (a[0] === "daemon") { restarts++; stuck = false; return { code: 0 }; }
+			if (a[0] === "dump" && stuck) return { code: 1, killed: true, stdout: "" };
+			return dead.exec(c, a);
+		};
+		assert.match(await mobileAct(t, { action: "snapshot" }, po()), /Restarted the mobilecli daemon/);
+		assert.equal(restarts, 1);
+	}
+
 	// The iOS "Enable UI Automation" passcode prompt after a restart blocks the helper: named, and no daemon restart.
 	screenText = "Enter iPhone Passcode for “XCTest” Enable UI Automation";
 	stops = 0;

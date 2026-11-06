@@ -598,7 +598,9 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 		return await queued();
 	} catch (e) {
 		devices.delete(cacheKey);
-		if (dev.platform !== "ios" || dev.type !== "real" || !/WebDriverAgent/.test((e as Error).message)) throw e;
+		// A timeout is the same dead link: after the phone's tunnel changes, the daemon keeps dialling the old address.
+		const dead = /WebDriverAgent|^mobilecli \w+ timed out/;
+		if (dev.platform !== "ios" || dev.type !== "real" || !dead.test((e as Error).message)) throw e;
 		const prompt = await agentPrompt(exec, dev, o);
 		if (prompt) throw new Error(`${(e as Error).message}\n${prompt}`);
 		// The daemon keeps its link to the helper across calls; one made while the helper was blocked stays dead after the phone is fixed.
@@ -606,7 +608,7 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 		try {
 			return `(Restarted the mobilecli daemon: its link to the helper on ${dev.name} had gone stale. Other devices reconnect on their next call.)\n${await queued()}`;
 		} catch (again) {
-			if (!/WebDriverAgent/.test((again as Error).message)) throw again;
+			if (!dead.test((again as Error).message)) throw again;
 			throw new Error(`${(again as Error).message}\n${await agentHint(exec, dev, signal)}`);
 		}
 	}
