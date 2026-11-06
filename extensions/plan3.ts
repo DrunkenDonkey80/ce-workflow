@@ -1274,7 +1274,9 @@ export default function plan3(pi) {
 		if (await settled) return ctx.ui.notify(`Plan3: handoff stopped; the plan is ready · /resume3 ${plan.id}`, "warning");
 		await ctx.waitForIdle();
 		// This instance is stale after the switch; the new session's own /resume3 starts the work.
-		await ctx.newSession({ parentSession: ctx.sessionManager.getSessionFile?.(), withSession: (next) => next.sendUserMessage(`/resume3 ${plan.id}`, { expandPromptTemplates: true }) });
+		const switched = await ctx.newSession({ parentSession: ctx.sessionManager.getSessionFile?.(), withSession: (next) => next.sendUserMessage(`/resume3 ${plan.id}`, { expandPromptTemplates: true }) });
+		// A session_before_switch guard (pi-subagents background work) can refuse or time out the switch.
+		if (switched?.cancelled) ctx.ui.notify(`Plan3: Pi kept this session; the plan is ready · /resume3 ${plan.id}`, "warning");
 	}
 	// Starting an unreviewed ready plan offers the review first; true = handled (review sent or cancelled).
 	async function offerReview(ctx, plan) {

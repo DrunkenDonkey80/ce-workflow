@@ -826,11 +826,11 @@ try {
 	assert.equal(messages.length, beforeViewMessages, "Not yet never starts implementation");
 	await rm(handoffFile); entries.splice(beforeHandoffEntries);
 	// "Start work in a new session": the agent first copies standing requirements into Decisions; after that run the
-	// session is replaced and the new one runs /resume3. A stopped handoff run keeps this session.
-	for (const aborted of [false, true]) {
+	// session is replaced and the new one runs /resume3. A stopped handoff run, or a switch Pi cancels, keeps this session.
+	for (const [aborted, cancelled] of [[false, false], [true, false], [false, true]]) {
 		const freshFile = path.join(directory, "2026-10-08-fresh-47474747-plan3.md"), beforeFresh = entries.length, switches = [];
 		await writeFile(freshFile, validPlan("47474747", "Newstart", "draft", "- [ ] **F-01** Implement", "reviewed: 2026-10-01\n"));
-		Object.assign(ctx, { waitForIdle: async () => {}, newSession: async (options) => { switches.push(options); return { cancelled: false }; } });
+		Object.assign(ctx, { waitForIdle: async () => {}, newSession: async (options) => { switches.push(options); return { cancelled }; } });
 		ctx.sessionManager.getSessionFile = () => "old.jsonl";
 		selectScript = [["Plans3", "Newstart"], ["Newstart", "Finish planning"], ["Plan ready", "Start work in a new session"]];
 		const beforeMessages = messages.length, beforeCompactions = compactions, finishing = run("plans3");
@@ -849,6 +849,7 @@ try {
 			const sent = [];
 			await switches[0].withSession({ sendUserMessage: async (text, options) => sent.push([text, options]) });
 			assert.deepEqual(sent, [["/resume3 47474747", { expandPromptTemplates: true }]]);
+			if (cancelled) assert.match(notices.at(-1)?.message ?? "", /Pi kept this session; the plan is ready · \/resume3 47474747/, "a cancelled switch says how to continue");
 		}
 		delete ctx.waitForIdle; delete ctx.newSession; delete ctx.sessionManager.getSessionFile;
 		await rm(freshFile); entries.splice(beforeFresh);
