@@ -1,10 +1,10 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-06
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.0","pi-subagents":"0.86.0","pi-lens":"4.4.9"}
-updated: 2026-11-06T10:34:59.327Z
+updated: 2026-11-06T11:57:35.608Z
 reviewed: 2026-11-06
 ---
 
@@ -188,7 +188,7 @@ None.
 
 ### Phase 2 — Verify and record [code]
 
-- [ ] **CU-90** Run `npm run verify:quiet` after the adopted changes and record the result.
+- [x] **CU-90** Full suite passes after the adopted changes, with four test-harness fixes (npm 12 pack shape, app-trail stub, two hub browser races).
 - [x] **CU-91** Recorded Pi 1.5.0, pi-subagents 0.86.0 and pi-lens 4.4.9 with their decisions in extensions/work-catch-up-baseline.json.
 
 ## Acceptance
@@ -213,3 +213,7 @@ Planned and reviewed: 4 adopted changes (CU-01 devDependency pin, CU-02 PNG-pres
   - Accepted (major): asserting only `image/png` would pass when conversion fails; CU-02 now stubs the converter and asserts resized PNG, the failure fallback and `jpegQuality: 100`. D1 unchanged.
   - Accepted (minor): acceptance mixed the Pi pin, the suite and the baseline; split into separate bullets (the suite does not prove plugin versions).
   - Accepted (minor): the pi-lens rationale wrongly said no handler guards write; plan3.ts guards write for new plans. Rationale corrected, no-action kept.
+- 2026-11-06: CU-90 needed suite fixes outside the catch-up code; the user chose to fix the flaky hub browser test in this plan:
+  - bce0cc2: test-work-native-smoke reads npm 12's `pack --json` object shape; test-app-trail stubs `placeStrip` (added to the app strip in d92e692).
+  - 2ef8f4f: the H-02 title check waits for both unseen tones (the parked third and this session's own); it raced against the sidebar refresh.
+  - 3ddb6ee: the Compact now check waits for the click's command instead of reading the list at once.
