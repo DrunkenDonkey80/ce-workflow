@@ -421,6 +421,12 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 		assert.deepEqual(agent.acts().filter(a => !a.startsWith("apps foreground")), [`agent install --device 0000-REAL --provisioning-profile ${path.join(dir, "d.mobileprovision")}`]);
 		await rm(dir, { recursive: true });
 	}
+	// Helper installed but agent status hangs: no install question (it was asked again and again on Viktor's phone).
+	resetSession();
+	const hung = fake({ list: [PHONE], agent: false });
+	const listed = async (c, a) => c === "xcrun" && a.includes("apps") ? { code: 0, stdout: "Device Kit   com.mobilenext.devicekit-iosUITests.xctrunner   0.0.35" } : hung.exec(c, a);
+	await assert.rejects(mobileAct(listed, { action: "snapshot" }, opts({ confirm: async () => assert.fail("no install question") })), /installed on Lorenz’s iPhone but does not answer[^]*Not reinstalling/);
+	assert.deepEqual(hung.acts(), [], "nothing installed");
 	resetSession();
 	const pixel = fake({ list: [PIXEL], agent: false });
 	await mobileAct(pixel.exec, { action: "button", button: "back", settleMs: 0 }, opts());

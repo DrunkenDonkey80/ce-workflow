@@ -85,10 +85,18 @@ export async function findProfile(exec: Exec, udid: string, signal?: AbortSignal
 	return wildcard;
 }
 
+/** Whether the helper app is on the iPhone, asked through devicectl (works when the mobilecli link does not). */
+export async function helperListed(exec: Exec, dev: Device, signal?: AbortSignal) {
+	const r = await exec("xcrun", ["devicectl", "device", "info", "apps", "--device", dev.id], { timeout: 60_000, signal }).catch(() => ({ code: 1, stdout: "" }));
+	return String(r.stdout ?? "").includes("com.mobilenext.devicekit-iosUITests.xctrunner");
+}
+
 /** The DeviceKit helper agent must be on an iOS device before reading or touching it: automatic on simulators, asked on real iPhones. */
 async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 	if (dev.platform !== "ios" || agentOk.has(dev.id)) return;
 	const installed = await run(exec, ["agent", "status", "--device", dev.id], o.signal).then(out => JSON.parse(out).status === "ok", () => false);
+	// A hung or failing status call is not a missing helper: asking to reinstall then repeats on every call and fails anyway.
+	if (!installed && dev.type === "real" && await helperListed(exec, dev, o.signal)) throw new Error(`The mobilecli helper is installed on ${dev.name} but does not answer (agent status failed). Not reinstalling.\n${await agentHint(exec, dev, o.signal)}`);
 	if (!installed) {
 		const install = async (extra: string[]) => {
 			await run(exec, ["agent", "install", "--device", dev.id, ...extra], o.signal, 300_000);
