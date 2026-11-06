@@ -1,6 +1,6 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
-import { confined, read, atomic, withPlanDesignLock } from "./plan3-design.ts";
+import { confined, read, atomic, withPlanLock } from "./plan3-files.ts";
 
 export type DiagramStatus = "new" | "changed" | "removed" | "existing";
 // User edits not yet taken in by the agent (D3); separate from the plan-only status.
@@ -119,7 +119,7 @@ export function emptyDiagram(target: DiagramTarget): Diagram {
 }
 export async function saveDiagram(cwd: string, target: DiagramTarget, value: unknown, expectedRevision: number): Promise<Diagram> {
 	const file = diagramPath(cwd, target);
-	return withPlanDesignLock(file, () => {
+	return withPlanLock(file, () => {
 		const before = loadDiagram(cwd, target);
 		if (!Number.isSafeInteger(expectedRevision) || expectedRevision !== (before?.revision ?? 0)) throw new Error("Stale diagram revision; reload before editing.");
 		const candidate = validateDiagram(value); identity(candidate, target);

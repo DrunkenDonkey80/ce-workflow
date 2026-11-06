@@ -1,6 +1,6 @@
 {
   "name": "pi-work-orchestrator",
-  "version": "0.2.38",
+  "version": "0.3.0",
   "description": "Plan3 planning and execution, research mode, compaction and utility tools for Pi.",
   "type": "module",
   "license": "MIT",
@@ -33,6 +33,7 @@
     "extensions": [
       "extensions/work-models.ts",
       "extensions/plan3.ts",
+      "extensions/design.ts",
       "extensions/screen-read.ts",
       "extensions/mobile-act.ts",
       "extensions/app-act.ts",

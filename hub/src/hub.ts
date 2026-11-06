@@ -143,8 +143,9 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 	}
 	host.on("event", (id: string, event) => views.get(id)?.feed(event));
 	// A child that ends mid-run never sends agent_settled; settle the page's activity so it stops showing work.
-	host.on("exit", (id: string) => {
-		views.get(id)?.feed({ type: "agent_settled", aborted: true });
+	// An idle park is no interruption: the page said "Run interrupted" under every parked session's finished reply.
+	host.on("exit", (id: string, exit?: { running?: boolean }) => {
+		if (exit?.running) views.get(id)?.feed({ type: "agent_settled", aborted: true });
 		// Parked: the compacted part of its file (screenshots, mostly) is trimmed, so resumes and the page read less.
 		const file = registry.get(id)?.sessionFile;
 		if (file) void trimCompacted(file).then(bytes => { if (bytes) console.log(`${new Date().toISOString()} trimmed ${registry.get(id)?.name ?? id}: ${Math.round(bytes / 1e6)} MB`); }, error => console.error(`session trim: ${file}: ${(error as Error).message}`));
@@ -183,6 +184,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/sessions/([0-9a-f-]{36})/restart": (_d, m) => host.restart(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/terminal": (_d, m) => host.openTerminal(m[1]),
 		"POST /api/sessions/([0-9a-f-]{36})/rename": (data, m) => host.rename(m[1], String(data.name ?? "")),
+		"POST /api/sessions/([0-9a-f-]{36})/fork": (data, m) => host.fork(m[1], String(data.name ?? "")),
 		"POST /api/sessions/([0-9a-f-]{36})/subtitle": (data, m) => host.setSubtitle(m[1], String(data.text ?? "")),
 		// pi-hub notice: a run command's script reports back on the session's open pages (no model turn).
 		"POST /api/sessions/([0-9a-f-]{36})/notice": (data, m) => { if (!registry.get(m[1])) throw Object.assign(new Error("Unknown session."), { status: 404 }); views.get(m[1])?.publish("notice", { text: String(data.text ?? "").slice(0, 2000) }); return { ok: true }; },
@@ -317,13 +319,13 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 			const asset = request.method === "GET" && /^\/a\/([0-9a-f]{12})\/(.+)$/.exec(url.pathname);
 			if (asset) return ASSETS[asset[2]] || asset[1] !== currentBuild() ? serveAsset(asset[1], asset[2]) : send(404, { error: "Unknown asset." });
 			if (appIcon) return appIcon();
-			// The bare address opens a session page: a live one first.
-			if (request.method === "GET" && url.pathname === "/") {
+			const page = /^\/s\/([0-9a-f-]{36})(\/.*)?$/.exec(url.pathname);
+			// The bare address, and the page of a session that is gone (deleted, then refreshed), open a session page: a live one first.
+			if (request.method === "GET" && (url.pathname === "/" || page && (page[2] ?? "/") === "/" && !registry.get(page[1]))) {
 				// A new hub has no sessions; start one in the home folder so the page (pairing approval, New folder) has somewhere to open.
 				const first = registry.list().find(record => host.live.has(record.id)) ?? registry.list()[0] ?? await host.create(os.homedir(), "1");
 				response.writeHead(302, { location: `/s/${first.id}/${remote ? "" : url.search}` }); return response.end();
 			}
-			const page = /^\/s\/([0-9a-f-]{36})(\/.*)?$/.exec(url.pathname);
 			if (remote && !page) return send(403, { error: "Remote devices reach session pages only." });
 			const endpoint = page && /^\/api\/([a-z]+)$/.exec(page[2] ?? "")?.[1];
 			if (page && endpoint && request.method === "POST") {

@@ -1,4 +1,5 @@
-// Changelog screenshots: node hub/scripts/changelog-shot.mjs "<css selector>" docs/changelog/<name>.png [setup JS] [--size=1280x800] [--pad=12] [--ask=<ask_user JSON>] [--prompt=<chat text>]
+// Changelog screenshots: node hub/scripts/changelog-shot.mjs "<css selector>" docs/changelog/<name>.png [setup JS] [--size=1280x800] [--pad=12] [--ask=<ask_user JSON>] [--prompt=<chat text>] [--design]
+// --design: the session is a design session ("Calm", ★ Home page, a mirrored sample page in its preview).
 // Starts a throwaway hub (temp PI_CODING_AGENT_DIR, fake Pi, a git folder named ce-workflow with one open plan),
 // opens the page headless, optionally shows an ask_user form (--ask, e.g. a command's dialog) or a chat turn (--prompt: the fake agent echoes it), runs the optional setup JS
 // in the page (open a menu, click a tab...), then crops the selector plus --pad pixels of what surrounds it.
@@ -13,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const [selector, out, setup = ""] = process.argv.slice(2).filter(arg => !arg.startsWith("--"));
 const flag = name => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
-const pad = Number(flag("pad") ?? 12), ask = flag("ask"), chatPrompt = flag("prompt"), [width, height] = (flag("size") ?? "1280x800").split("x");
+const design = process.argv.includes("--design"), pad = Number(flag("pad") ?? 12), ask = flag("ask"), chatPrompt = flag("prompt"), [width, height] = (flag("size") ?? "1280x800").split("x");
 if (!selector || !out || !/\.png$/i.test(out)) { console.error('Usage: changelog-shot.mjs "<selector>" <out.png> [setup JS] [--size=WxH] [--pad=N] [--ask=JSON]'); process.exit(2); }
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `hub-shot-${process.pid}`, execute = promisify(execFile);
@@ -43,7 +44,12 @@ const updates = createUpdateCheck({ find: async () => ({ pi: null, packages: ["p
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, pool: false, models: undefined, updates });
 try {
 	const { id } = await hub.host.create(folder, "1"), rpc = hub.host.live.get(id).rpc;
-	await rpc.send({ type: "prompt", message: "/state " + JSON.stringify({ plan: { id: "12345678", title: "Sample plan", status: "active", done: 1, total: 2, focus: "S02", bias: 0 }, modes: { research: "off", night: "off" } }) });
+	if (design) {
+		fs.mkdirSync(join(folder, ".pi/designs/design-1"), { recursive: true });
+		fs.writeFileSync(join(folder, ".pi/designs/design-1/index.html"), '<!doctype html><meta name=viewport content="width=device-width"><body style="margin:0;font-family:Georgia,serif;background:#eef3ef;color:#23362c"><header style="padding:56px 8%;background:#dbe8df"><p style="letter-spacing:.2em;font:12px sans-serif">QUIET HOURS</p><h1 style="font-size:44px;margin:8px 0">Slow mornings, made simple.</h1><p style="max-width:32em;line-height:1.6">Plan your week in one calm list. No streaks, no noise.</p><a style="display:inline-block;margin-top:16px;padding:12px 22px;border-radius:24px;background:#3d6b52;color:#fff;font:15px sans-serif;text-decoration:none">Start free</a></header><section style="display:flex;flex-wrap:wrap;gap:20px;padding:40px 8%"><div style="flex:1 1 180px;padding:20px;border-radius:14px;background:#fff">One list</div><div style="flex:1 1 180px;padding:20px;border-radius:14px;background:#fff">Gentle reminders</div><div style="flex:1 1 180px;padding:20px;border-radius:14px;background:#fff">Weekly review</div></section></body>');
+		hub.registry.update(id, { name: "Calm" }); hub.host.setSubtitle(id, "★ Home page");
+	}
+	await rpc.send({ type: "prompt", message: "/state " + JSON.stringify(design ? { plan: null, modes: { design: "design-1" } } : { plan: { id: "12345678", title: "Sample plan", status: "active", done: 1, total: 2, focus: "S02", bias: 0 }, modes: { research: "off", night: "off" } }) });
 	if (chatPrompt) { await rpc.send({ type: "prompt", message: chatPrompt }); for (let n = 0; n < 100 && hub.host.live.get(id).running; n++) await new Promise(done => setTimeout(done, 50)); }
 	await browser("set", "viewport", width, height);
 	await browser("open", `http://127.0.0.1:${hub.config.port}/s/${id}/?token=${hub.config.localKey}`);

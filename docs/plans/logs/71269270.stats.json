@@ -1,0 +1,1479 @@
+{
+ "version": 1,
+ "activeMs": 7617641,
+ "runs": 16,
+ "waitingMs": 181184,
+ "toolWallMs": 1386412,
+ "compactions": {
+  "count": 4,
+  "ms": 50170
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 233,
+   "thinkingMs": 1004664,
+   "actingMs": 272886,
+   "input": 560,
+   "output": 110261,
+   "cacheRead": 29536173,
+   "cacheWrite": 1713667,
+   "cost": 16.683029599999994,
+   "errors": 0
+  },
+  "openai-codex/gpt-6.1-sol:medium": {
+   "replies": 300,
+   "thinkingMs": 3365010,
+   "actingMs": 1085349,
+   "input": 1480682,
+   "output": 76870,
+   "cacheRead": 36292096,
+   "cacheWrite": 0,
+   "cost": 7.359273599999998,
+   "errors": 2
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 292,
+   "ms": 657633,
+   "maxMs": 117005,
+   "failures": 26
+  },
+  "plan3": {
+   "count": 25,
+   "ms": 1661,
+   "maxMs": 573,
+   "failures": 0
+  },
+  "read": {
+   "count": 203,
+   "ms": 7227,
+   "maxMs": 1240,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 67,
+   "ms": 562412,
+   "maxMs": 114127,
+   "failures": 4
+  },
+  "read_symbol": {
+   "count": 34,
+   "ms": 23815,
+   "maxMs": 2419,
+   "failures": 1
+  },
+  "write": {
+   "count": 23,
+   "ms": 255,
+   "maxMs": 32,
+   "failures": 0
+  },
+  "edit": {
+   "count": 150,
+   "ms": 28288,
+   "maxMs": 7760,
+   "failures": 5
+  },
+  "lens_diagnostics": {
+   "count": 7,
+   "ms": 54232,
+   "maxMs": 12740,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 3,
+   "ms": 2,
+   "maxMs": 2,
+   "failures": 0
+  },
+  "read_enclosing": {
+   "count": 4,
+   "ms": 272,
+   "maxMs": 91,
+   "failures": 2
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 241,
+   "ms": 258545,
+   "maxMs": 60195,
+   "failures": 15
+  },
+  "test": {
+   "count": 51,
+   "ms": 399088,
+   "maxMs": 117005,
+   "failures": 11
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -30; git log --oneline -3; cat package.json | head -60": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls; echo ---; ls agents utility-agents skills prompts benchmarks docs extensions | head -120; echo; wc -l extensions/*.ts | sort -n | tail -30": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && for f in *.mjs; do imps=$(grep -o \"\\.\\./extensions/[a-z0-9-]*\\|\\./[a-z0-9-]*\\.mjs\" \"$f\" | sed 's#\\.\\./extensions/##;s#\\./##' | sort -u | tr '\\n' ' '); echo \"$f: $imps\"; done; ls ui-g": {
+   "count": 1,
+   "ms": 10884,
+   "maxMs": 10884,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for k in work-design-handoff context-knowledge-discoverer work-compound-inventory work-compound-source-policy work-catch-up-baseline \"work-images.ts\" \"work-quality-policy.ts\" \"workflow-telem": {
+   "count": 1,
+   "ms": 1702,
+   "maxMs": 1702,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"context-knowledge-discoverer\" extensions/work-models.ts | cut -c1-200; grep -n \"workflow-telemetry\\|from \\\"./work-images\\|from \\\"./work-quality\" extensions/work-models.ts; grep -n \"": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && for f in test-work-telemetry test-work-usage test-compaction-resume-idle benchmark-context-continuity test-work-native-smoke test-work-prompt-commands test-work-child-auth-live test-": {
+   "count": 1,
+   "ms": 1193,
+   "maxMs": 1193,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && grep -o \"mod\\.[a-zA-Z]*\\|work-telemetry\\|/wo [a-z]*\" test-work-telemetry.mjs | sort | uniq -c | sort -rn | head -20; grep -c \"\" ../extensions/workflow-telemetry.ts; grep -n \"^export\"": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && sed -n 1,40p test-work-telemetry.mjs | cut -c1-150; grep -o \"\\b[a-zA-Z]*Telemetry[a-zA-Z]*\\b\\|build[A-Z][a-zA-Z]*\" test-work-telemetry.mjs | sort | uniq -c | sort -rn | head": {
+   "count": 1,
+   "ms": 229,
+   "maxMs": 229,
+   "failures": 0
+  },
+  "bash\u0000sleep 60; cat \"$TEMP/vp-baseline.txt\" | grep -v \"^skip\" | tail -15; cat \"$TEMP/vp-baseline-time.txt\"": {
+   "count": 1,
+   "ms": 60195,
+   "maxMs": 60195,
+   "failures": 0
+  },
+  "bash\u0000grep -n \"failed:\" -A20 \"$TEMP/vp-baseline.txt\" | grep \"^[0-9]*-- \" | cut -c1-200": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000grep -n \"verification check\" -A10 \"$TEMP/vp-baseline.txt\" | cut -c1-200 | grep -v \"^ *at \"": {
+   "count": 1,
+   "ms": 151,
+   "maxMs": 151,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs 2>&1 | grep -v \"^ at\" | tail -12": {
+   "count": 1,
+   "ms": 10375,
+   "maxMs": 10375,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && PI_CODING_AGENT_DIR=\"./.pi-test-empty-agent\" CE_WORKFLOW_ENABLED=0 node scripts/test-work-plan3.mjs 2>&1 | grep -v \"^ at\" | tail -5; ls -a .pi-test-empty-agent 2>&1 | head": {
+   "count": 1,
+   "ms": 11018,
+   "maxMs": 11018,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for k in \"fixtures/opendesign\" \"fixtures/capabilities\" \"fixtures/ui-gate\" \"camera-parent\" \"context-continuity\" \"session-knowledge\" \"work-slice-adoption\" \"benchmarks/workflow-evaluation\" \"cal": {
+   "count": 1,
+   "ms": 1405,
+   "maxMs": 1405,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71269270-plan3.md\" \"docs/plans/logs/71269270.md\" && git commit -m \"E1: inventory legacy code for removal\"": {
+   "count": 1,
+   "ms": 162,
+   "maxMs": 162,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"[Mm]onitor\" \"./extensions/work-models.ts\" > \"$TEMP/monitor-refs.txt\"": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000node -e \"try { console.log(require.resolve('typescript')) } catch {console.log('not installed')}\"; ls \"./node_modules\"": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000npm install --prefix \"$TEMP/ce-legacy-sweep\" --no-package-lock --no-audit --no-fund typescript": {
+   "count": 1,
+   "ms": 1956,
+   "maxMs": 1956,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/monitor.cjs\"": {
+   "count": 2,
+   "ms": 506,
+   "maxMs": 394,
+   "failures": 1
+  },
+  "bash\u0000npm install --prefix \"$TEMP/ce-legacy-sweep\" --no-package-lock --no-audit --no-fund typescript@5.9.3 && node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/monitor.cjs\"": {
+   "count": 1,
+   "ms": 1537,
+   "maxMs": 1537,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --check \"extensions/work-models.ts\" && node \"scripts/test-work-settings.mjs\" && node \"scripts/test-work-plan3.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 10677,
+   "maxMs": 10677,
+   "failures": 1
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/whitespace.cjs\"": {
+   "count": 3,
+   "ms": 258,
+   "maxMs": 94,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --check; rg -n \"monitor|Monitor\" \"extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --check \"extensions/work-models.ts\" && git diff --check && rg -n \"export default|workflowOn|workflowEnabled\" \"extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"extensions/work-models.ts\" \"scripts/test-work-wo-control.mjs\" \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71269270-plan3.md\" \"docs/plans/logs/712692": {
+   "count": 1,
+   "ms": 681,
+   "maxMs": 681,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"kind: \\\"workflow\\\"|item.kind === \\\"workflow\\\"|case \\\"workflow\\\"|workflow:|workflowEnabled\\(|async function executeOrchestratorAction|function executeOrchestratorAction\" \"./extensions/work-model": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/entrypoints.cjs\"": {
+   "count": 1,
+   "ms": 441,
+   "maxMs": 441,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/outline.cjs\"": {
+   "count": 1,
+   "ms": 451,
+   "maxMs": 451,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/hooks.cjs\"": {
+   "count": 1,
+   "ms": 384,
+   "maxMs": 384,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"work-models|from.*plan3|^export\" \"./extensions/advisor-model.ts\"; rg -n \"finalizeSettledAgent|function resetSessionContextFilter|activeCompactionWorkflowAuthorization\\(\" \"./extensions/work-mode": {
+   "count": 1,
+   "ms": 187,
+   "maxMs": 187,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/root-clean.cjs\"": {
+   "count": 1,
+   "ms": 434,
+   "maxMs": 434,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"work-settings|work-context|work-catch-up|work-telemetry|work-usage\" \"./extensions/work-models.ts\" | tail -20; rg -n \"async function handleWorkMenuCommand|executeOrchestratorAction\\(\" \"./extensi": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/settings.cjs\" && node --check \"./extensions/work-models.ts\" && cd \".\" && node \"scripts/test-work-wo-control.mjs\"": {
+   "count": 1,
+   "ms": 667,
+   "maxMs": 667,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/unused.cjs\"": {
+   "count": 10,
+   "ms": 13537,
+   "maxMs": 2160,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --check \"extensions/work-models.ts\" && node \"scripts/test-work-wo-control.mjs\" && node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-compaction-notifications.mjs\"": {
+   "count": 1,
+   "ms": 13955,
+   "maxMs": 13955,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-compaction-notifications.mjs\"": {
+   "count": 3,
+   "ms": 2602,
+   "maxMs": 1198,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git diff --check && node --check \"extensions/work-models.ts\" && git add -- \"extensions/work-models.ts\" \"scripts/test-work-wo-control.mjs\" \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow": {
+   "count": 1,
+   "ms": 278,
+   "maxMs": 278,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -o \"mod\\.[A-Za-z_][A-Za-z_0-9]*\" \"scripts/test-work-settings.mjs\" | sort -u; rg -n \"^import|} = await import|} from\" \"scripts/test-work-compaction-notifications.mjs\" \"scripts/test-work-mi": {
+   "count": 1,
+   "ms": 215,
+   "maxMs": 215,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/exports.cjs\"": {
+   "count": 1,
+   "ms": 418,
+   "maxMs": 418,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"workSubagentToolCall\" \"./scripts/test-work-compaction-notifications.mjs\"": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000wc -l \"./extensions/work-models.ts\"; rg -n \"workflowEnabled|workflowOn|^export|async function handleWorkMenuCommand|async function executeOrchestratorAction\" \"./extensions/work-models.ts\" | tail -45": {
+   "count": 1,
+   "ms": 197,
+   "maxMs": 197,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"scriptPath|workflowContext|workSubagentToolCall|WORKFLOW|legacy\" \"./scripts/test-work-compaction-notifications.mjs\" | head -20": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-wo-control.mjs\" && node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-compaction-notifications.mjs\"": {
+   "count": 1,
+   "ms": 10111,
+   "maxMs": 10111,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/whitespace.cjs\" && cd \".\" && git diff --check": {
+   "count": 1,
+   "ms": 141,
+   "maxMs": 141,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"extensions/work-models.ts\" \"scripts/test-work-wo-control.mjs\" \"scripts/test-work-compaction-notifications.mjs\" \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-": {
+   "count": 1,
+   "ms": 214,
+   "maxMs": 214,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"executeOrchestratorAction\" \"./scripts/test-work-extension-scout.mjs\"; rg -n \"executeOrchestratorAction\" \"./extensions/work-models.ts\" | tail -10; node --check \"./extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 1008,
+   "maxMs": 1008,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/scout-test.cjs\"": {
+   "count": 1,
+   "ms": 885,
+   "maxMs": 885,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-extension-scout.mjs\" && node \"scripts/test-work-wo-control.mjs\"": {
+   "count": 1,
+   "ms": 1361,
+   "maxMs": 1361,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --check \"extensions/work-models.ts\" && node \"scripts/test-work-wo-control.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 1240,
+   "maxMs": 1240,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"extensions/work-models.ts\" \"scripts/test-work-wo-control.mjs\" \"scripts/test-work-extension-scout.mjs\" \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71": {
+   "count": 1,
+   "ms": 220,
+   "maxMs": 220,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-plan3.mjs\" && git diff --check": {
+   "count": 5,
+   "ms": 30212,
+   "maxMs": 10491,
+   "failures": 4
+  },
+  "bash\u0000cd \".\" && git diff --stat -- \"extensions/plan3.ts\" \"extensions/plan3-needs.ts\" && node \"scripts/test-work-plan3.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 9376,
+   "maxMs": 9376,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"scripts/test-work-plan3.mjs\" \"scripts/fixtures/legacy-work-items.json\" \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71269270-plan3.md\" \"docs/plans/lo": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"workOrchSettings|executeUtilityAction|from .*work-models\" \"./extensions\" \"./scripts/test-work-settings.mjs\" \"./scripts/test-work-native-smoke.mjs\"; rg -n \"activeWorkGoal|goalContextBlock|active": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"activeWorkGoal|workGoal|orchestratorPauseRequest\" \"./extensions/work-models.ts\" | head -48; rg -n \"activeWorkGoal|workGoal|orchestratorPauseRequest\" \"./extensions/work-models.ts\" | awk \"$1+0 < ": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/compaction-clean.cjs\"": {
+   "count": 1,
+   "ms": 402,
+   "maxMs": 402,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --check \"extensions/work-models.ts\" && node \"scripts/test-work-compaction-notifications.mjs\"": {
+   "count": 1,
+   "ms": 528,
+   "maxMs": 528,
+   "failures": 1
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\"": {
+   "count": 5,
+   "ms": 6681,
+   "maxMs": 1608,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\" && wc -l \"./extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 1186,
+   "maxMs": 1186,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --check \"extensions/work-models.ts\" && node \"scripts/test-work-wo-control.mjs\" && node \"scripts/test-work-extension-scout.mjs\" && node \"scripts/test-work-compaction-notifications.mjs\" &": {
+   "count": 1,
+   "ms": 1477,
+   "maxMs": 1477,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/labels.cjs\"": {
+   "count": 1,
+   "ms": 242,
+   "maxMs": 242,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"work-planner|work-advisor|ideate|workflowPromptMetadata|\\bmonitor\\b|SLOTS|EFFORT_PROFILES\" \"./extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 423,
+   "maxMs": 423,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node --check \"extensions/work-models.ts\" && node \"scripts/test-work-wo-control.mjs\" && node \"scripts/test-work-compaction-notifications.mjs\" && node \"scripts/test-work-knowledge.mjs\" && git ": {
+   "count": 1,
+   "ms": 1822,
+   "maxMs": 1822,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\" && rg -n \"CHATGPT_WEB_SOURCE|chatgptConsultAvailable|hideBackgroundVerifierAbort|background verifier|work-orchestrator|work goal|r": {
+   "count": 1,
+   "ms": 1034,
+   "maxMs": 1034,
+   "failures": 0
+  },
+  "bash\u0000rg -c \"^\\s*$\" \"./extensions/work-models.ts\"; rg -n \"^function buildWorkCatchUpState|work-orchestrator|workflowAuthorization|orchestrator|background-verifier\" \"./extensions/work-models.ts\" | head -30": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000wc -l \"./extensions/work-models.ts\" && node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\" && cd \".\" && node \"scripts/test-work-wo-control.mjs\" && node \"scripts/test-work-compaction-": {
+   "count": 1,
+   "ms": 1790,
+   "maxMs": 1790,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"extensions/work-models.ts\" \"scripts/test-work-compaction-notifications.mjs\" \"scripts/test-work-wo-control.mjs\" \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-": {
+   "count": 1,
+   "ms": 174,
+   "maxMs": 174,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\" \"./extensions/work-design.ts\" \"canonicalDesignJson,hashDesignValue,inspectUserDesignReference,validateDesignHandoff,writeConfinedD": {
+   "count": 1,
+   "ms": 807,
+   "maxMs": 807,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\" \"./extensions/work-compound-source.ts\" \"normalizeSourcePath,readConfinedFile\"": {
+   "count": 1,
+   "ms": 2005,
+   "maxMs": 2005,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/unused.cjs\" \"./extensions/work-compound-source.ts\"": {
+   "count": 1,
+   "ms": 495,
+   "maxMs": 495,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/unused.cjs\" \"./extensions/work-design.ts\"": {
+   "count": 1,
+   "ms": 753,
+   "maxMs": 753,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-extension-scout.mjs\"": {
+   "count": 1,
+   "ms": 10015,
+   "maxMs": 10015,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-extension-scout.mjs\"": {
+   "count": 2,
+   "ms": 1406,
+   "maxMs": 711,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"work-store|work-verification-contract|work-compound-source|work-design\" \"./extensions\" | head -70; node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\" \"./extensions/work-store": {
+   "count": 1,
+   "ms": 767,
+   "maxMs": 767,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/unused.cjs\" \"./extensions/work-store.ts\"": {
+   "count": 1,
+   "ms": 682,
+   "maxMs": 682,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"extensions/work-models.ts\" \"extensions/work-design.ts\" \"extensions/work-compound-source.ts\" \"extensions/work-store.ts\" \"scripts/test-work-plan3.mjs\" \"docs/plans/2026-10-12-remove": {
+   "count": 1,
+   "ms": 203,
+   "maxMs": 203,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/compaction-tests.cjs\"": {
+   "count": 1,
+   "ms": 208,
+   "maxMs": 208,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-compaction.mjs\" && node \"scripts/test-work-compaction-notifications.mjs\" && git diff --check": {
+   "count": 2,
+   "ms": 807,
+   "maxMs": 484,
+   "failures": 2
+  },
+  "bash\u0000rg -n \"modernizeLegacyAgentOverrides|WORK_ORCH_AGENT_DIR|SUBAGENT_EXTRA_AGENT_DIRS_ENV\" \"./extensions/work-models.ts\"; rg -n \"modernizeLegacyAgentOverrides\" \"./extensions/legacy-beads-migration.ts\"": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-compaction-notifications.mjs\" && node \"scripts/test-work-wo-control.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 683,
+   "maxMs": 683,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"work-verification-contract|work-domain|work-store\" \"./extensions/work-store.ts\" \"./extensions/work-design.ts\"; rg -n \"^export|^import\" \"./extensions/work-verification-contract.ts\" \"./extensions": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/reachable.cjs\" \"./extensions/work-verification-contract.ts\" \"validateVerificationContract\"": {
+   "count": 1,
+   "ms": 706,
+   "maxMs": 706,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/unused.cjs\" \"./extensions/work-verification-contract.ts\"": {
+   "count": 1,
+   "ms": 551,
+   "maxMs": 551,
+   "failures": 0
+  },
+  "bash\u0000ls \"./extensions\"": {
+   "count": 1,
+   "ms": 273,
+   "maxMs": 273,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/closure.cjs\"": {
+   "count": 1,
+   "ms": 360,
+   "maxMs": 360,
+   "failures": 0
+  },
+  "bash\u0000ls \"./extensions/private-workflows\"; rg -n \"work-action-leases|work-capability-adapters|work-compound-catch-up|work-fleet|work-improvement-reporting|work-initiatives|work-private-workflows|work-qualit": {
+   "count": 1,
+   "ms": 576,
+   "maxMs": 576,
+   "failures": 1
+  },
+  "bash\u0000rm -- \"./extensions/background-verifiers.ts\" \"./extensions/legacy-beads-migration.ts\" \"./extensions/read-only-lanes.ts\" \"./extensions/work-action-leases.ts\" \"./extensions/work-capability-adapters.ts\" ": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-compaction.mjs\" && node \"scripts/test-work-compaction-notifications.mjs\" && node \"scripts/test-work-wo-control.mjs\" && git diff ": {
+   "count": 1,
+   "ms": 12754,
+   "maxMs": 12754,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"^import|work-compound|private-workflows|legacy|work-store|execFile|spawn\" \"./extensions/work-extension-scout.ts\" \"./extensions/work-knowledge.ts\"; ls \"./scripts\" | grep \"scout\"; node \"C:/Users/": {
+   "count": 1,
+   "ms": 405,
+   "maxMs": 405,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-knowledge.mjs\"": {
+   "count": 1,
+   "ms": 1317,
+   "maxMs": 1317,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -A -- extensions scripts/test-work-compaction.mjs \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71269270-plan3.md\" \"docs/plans/logs/71269270.md\" && git co": {
+   "count": 1,
+   "ms": 337,
+   "maxMs": 337,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"work-compound-inventory|work-compound-source-policy|work-catch-up-baseline\" extensions/plan3-catch-up.ts extensions/work-models.ts README.md; rg -l \"test-work-opendesign-client|test-w": {
+   "count": 1,
+   "ms": 141,
+   "maxMs": 141,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-design-fidelity test-work-opendesign-client test-work-store test-work-verification-contract test-work-compound-source test-work-settings test-work-native-smoke test-work-m": {
+   "count": 1,
+   "ms": 13176,
+   "maxMs": 13176,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp && for t in test-work-design-fidelity test-work-store test-work-compound-source test-work-settings test-work-native-smoke test-compaction-resume-idle test-work-opendesign-client test-work-desi": {
+   "count": 1,
+   "ms": 471,
+   "maxMs": 471,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && wc -l test-work-settings.mjs test-work-native-smoke.mjs test-work-opendesign-client.mjs && rg -n \"designLifecycleTelemetry|designReviewChoices\" test-work-opendesign-client.mjs && rg ": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^export (async )?(function|const|let) (\\w+)\" -o -r \"\\$2\" extensions/work-models.ts | tr \"\\n\" \" \"; echo; rg -n \"compactionModeSettings|setCompactionMode|compactionModelSettings|setComp": {
+   "count": 1,
+   "ms": 352,
+   "maxMs": 352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg \"^export (async )?(function|const|let) (\\w+)\" -or \"\\$3\" extensions/work-models.ts | tr \"\\n\" \" \"; echo; rg -n \"^(\\S.*)$\" scripts/test-work-settings.mjs | head -60": {
+   "count": 1,
+   "ms": 178,
+   "maxMs": 178,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"build\" scripts/test-work-wo-control.mjs | head; sed -n \"580,605p;1530,1545p;1995,2080p\" scripts/test-work-settings.mjs": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"const (customUi|invoke|ctx|notices|loadExtension|registered)\\b|function (customUi|invoke|loadExtension)\" scripts/test-work-settings.mjs; rg -n \"exportSettings|importSettings\" scripts/": {
+   "count": 1,
+   "ms": 202,
+   "maxMs": 202,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && awk \"NR>=580&&NR<=584{print NR\\\": \\\"\\$0}\" test-work-settings.mjs && node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/settings-test.cjs\"": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep\" && sed -i \"s/let vision=L(583,601)/let vision=L(582,601)/\" settings-test.cjs && node settings-test.cjs && grep -n \"workOrch\" test-work-settings.ne": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/test-work-settings.new.mjs\" scripts/test-work-settings.mjs && PI_CODING_AGENT_DIR=\"$PWD/.pi-test-empty-agent\" timeout 200 node scripts/te": {
+   "count": 1,
+   "ms": 438,
+   "maxMs": 438,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"restore the|/reload\" extensions/work-models.ts | rg -i \"footer\" | head; rg -n \"setFooter\\(\" extensions/*.ts | head": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"4120,4175p\" extensions/work-models.ts; rg -n \"export function (disable|uninstall)|setFooter\" extensions/subscription-footer.ts": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -3 && git show HEAD:extensions/work-models.ts | rg -n \"footer restor|Subscription footer: off|reclaim\" | head; git grep -n \"reload\" HEAD~0 -- extensions/subscription-footer": {
+   "count": 1,
+   "ms": 171,
+   "maxMs": 171,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat && git diff extensions/subscription-footer.ts scripts/test-work-subscription-footer.mjs | head -80": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && PI_CODING_AGENT_DIR=\"$PWD/.pi-test-empty-agent\" timeout 200 node scripts/test-work-settings.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 437,
+   "maxMs": 437,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && tail -5 /tmp/ce-test-work-verification-contract.log; ls scripts | wc -l; ls scripts | tr \"\\n\" \" \"": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls extensions prompts skills agents utility-agents 2>&1 | head -80; cat package.json": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for f in work-catch-up-baseline work-compound-inventory work-compound-source-policy opendesign-client context-knowledge-discoverer work-design-handoff work-orchestrator \"\\\"agents\\\"\" WORK_ORC": {
+   "count": 1,
+   "ms": 673,
+   "maxMs": 673,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"work-orchestrator\" extensions/work-ask-remote.ts; rg -n \"\\\"agents\\\"|WORK_ORCH_AGENT_DIR|work-catch-up-baseline\" extensions/work-models.ts extensions/plan3-catch-up.ts; rg -n \"\\\"prompt": {
+   "count": 1,
+   "ms": 360,
+   "maxMs": 360,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && for f in *.mjs; do miss=\"\"; for m in $(rg -o \"\\.\\./extensions/[\\w./-]+\\.(ts|js|json)|\\./[\\w-]+\\.mjs\" \"$f\" | sort -u); do case $m in ../*) [ -e \"$m\" ] || miss=\"$miss $m\";; ./*) [ -e \"": {
+   "count": 1,
+   "ms": 9839,
+   "maxMs": 9839,
+   "failures": 1
+  },
+  "bash\u0000cd \"./scripts\" && for f in audit-payload-strip benchmark-context-continuity benchmark-image-strip-live benchmark-jev-live benchmark-reasoning-strip-live patch-ask-user-remote-answer probe-work-compoun": {
+   "count": 1,
+   "ms": 2857,
+   "maxMs": 2857,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && mkdir -p /tmp/cet && for f in scripts/test-*.mjs; do n=$(basename $f .mjs); (PI_CODING_AGENT_DIR=\"$PWD/.pi-test-empty-agent\" timeout 300 node \"$f\" > \"/tmp/cet/$n.log\" 2>&1; echo \"$? $n\") & d": {
+   "count": 1,
+   "ms": 41135,
+   "maxMs": 41135,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp/cet && for n in test-work-screen-read test-work-plan-open-questions test-work-dirt-tolerance test-work-store-performance test-work-native-smoke test-work-verification-contract test-work-optimi": {
+   "count": 1,
+   "ms": 362,
+   "maxMs": 362,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for m in work-store work-verification-contract work-compound-source work-design opendesign-client; do echo \"== $m exports: $(rg \"^export (async )?(function\\*?|const|let|class) (\\w+)\" -or \"\\$": {
+   "count": 1,
+   "ms": 974,
+   "maxMs": 974,
+   "failures": 0
+  },
+  "bash\u0000cd \"./scripts\" && sed -n \"1,40p\" test-work-design-fidelity.mjs | rg -n \"import|from|^\\s+\\w+,$\"; wc -l test-work-native-smoke.mjs; rg -n \"assert|^// \" test-work-native-smoke.mjs | head -60": {
+   "count": 1,
+   "ms": 241,
+   "maxMs": 241,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/smoke-trim.cjs\" && ls benchmarks benchmarks/* docs | head -40; ls scripts/fixtures scripts/ui-gate; git ls-files docs | rg -v \"^docs/pl": {
+   "count": 1,
+   "ms": 244,
+   "maxMs": 244,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"session-knowledge|context-continuity|work-slice-adoption|fixtures/opendesign|fixtures/capabilities|fixtures/ui-gate|scripts/ui-gate\" --glob \"!docs/**\" . | head -30": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"session-knowledge|context-continuity|fixtures/opendesign|fixtures\\\", \\\"opendesign|\\\"opendesign\\\"\" scripts/test-work-knowledge-retrieval.mjs scripts/test-work-plan3.mjs scripts/test-wo": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import|await import\" benchmarks/context-continuity scripts/benchmark-context-continuity.mjs scripts/audit-payload-strip.mjs scripts/benchmark-image-strip-live.mjs scripts/benchmark-r": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"export (function|const) (filteredContext|requestContextFilter|resetContextFilter|contextFilterCutIndex|formatCompactionSummary|contentText)\\b\" extensions": {
+   "count": 1,
+   "ms": 262,
+   "maxMs": 262,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git rm -rq agents prompts skills/work-orchestrator skills/work-design-handoff benchmarks/workflow-evaluation benchmarks/work-slice-adoption.json benchmarks/context-continuity/v1 benchmarks/c": {
+   "count": 2,
+   "ms": 208,
+   "maxMs": 202,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git status --short --ignored scripts/ui-gate | head; head -30 scripts/test-work-prompt-commands.mjs; rg -n \"WORK_ORCH_AGENT_DIR\" extensions/work-models.ts": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.description='Plan3 planning and execution, research mode, compaction and utility tools for Pi.'": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep\" && sed -i \"s/^const start=1, explicitImp=.*$//\" verify-trim.cjs && node verify-trim.cjs && cd \".\" && wc -l scripts/verify-package.mjs && node --ch": {
+   "count": 1,
+   "ms": 255,
+   "maxMs": 255,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rm -rf /tmp/cet && mkdir -p /tmp/cet && for f in scripts/test-jev-tools.mjs scripts/test-advisor-model.mjs scripts/test-work-*.mjs; do n=$(basename $f .mjs); (PI_CODING_AGENT_DIR=\"$PWD/.pi-t": {
+   "count": 1,
+   "ms": 13356,
+   "maxMs": 13356,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat /tmp/cet/test-work-screen-read.log | head -20; git stash list | head -3; git log --oneline -1 -- scripts/test-work-screen-read.mjs extensions/screen-read.ts": {
+   "count": 1,
+   "ms": 189,
+   "maxMs": 189,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"95,110p\" scripts/test-work-screen-read.mjs; git diff HEAD --stat -- extensions/screen-read.ts scripts/test-work-screen-read.mjs": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"source-policy|policy\\.json\" extensions scripts | head; sed -n \"40,60p\" extensions/work-knowledge.ts; sed -n \"425,450p\" scripts/test-work-knowledge.mjs": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"compound-source-policy\" . --glob \"!docs/**\" | head -3; git rm -q extensions/work-compound-source-policy.json && git add -u extensions scripts package.json benchmarks docs/orchestrator": {
+   "count": 1,
+   "ms": 299,
+   "maxMs": 299,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git commit -qm \"P1/P2: delete legacy agents, prompts, skills, scripts, benchmarks and tests; slim verify-package\" && git log --oneline -1 && git status --short": {
+   "count": 1,
+   "ms": 172,
+   "maxMs": 172,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rm -rf scripts/fixtures/capabilities && git add extensions/work-models.ts package.json scripts/test-work-native-smoke.mjs scripts/test-work-opendesign-client.mjs scripts/test-work-settings.m": {
+   "count": 1,
+   "ms": 334,
+   "maxMs": 334,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"knowledge discoverer|discoverer\\b\" extensions/work-models.ts | head -8; rg -n \"label: \\\"|title: \\\"\" extensions/work-models.ts | rg -i \"settings|utility|scout|catch|context|fact|cam": {
+   "count": 1,
+   "ms": 234,
+   "maxMs": 234,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"verify|\\\"test\" package.json; rg -n \"readdir|test-|jev|advisor\" scripts/verify-package.mjs | head -15": {
+   "count": 1,
+   "ms": 156,
+   "maxMs": 156,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"C:/Users/Flex/AppData/Local/Temp/ce-legacy-sweep/readme.cjs\" && rg -n -i \"orchestrator|/wo goal|ideate|work-items|work_|legacy|verifier|goal|simple|complicated|ui-gate|redesign|telemet": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Knowledge discoverer|launchKnowledgeDiscoverer\\(\" extensions | head; rg -n -i \"orchestrator|/wo goal|ideate|simple|complicated|ui-gate|redesign|telemetry|usage|evaluation|workflow tog": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git rm -q \".ce-workflow/work-items.json\" && rg -n \"0\\.1\\.37\" package.json package-lock.json 2>&1; git ls-files package-lock.json": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/verify-package.mjs --quiet 2>&1 | tail -25": {
+   "count": 1,
+   "ms": 43221,
+   "maxMs": 43221,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add README.md package.json \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71269270-plan3.md\" docs/plans/logs/71269270.md && git commit -q -m \"Remove legacy doc": {
+   "count": 1,
+   "ms": 208,
+   "maxMs": 208,
+   "failures": 0
+  },
+  "bash\u0000git add -u -- \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71269270-plan3.md\" \"docs/plans/logs/71269270.md\" && git add \"docs/plans/done/2026-10-12-remove-the-legacy-ce-wor": {
+   "count": 1,
+   "ms": 263,
+   "maxMs": 263,
+   "failures": 0
+  },
+  "bash\u0000git diff -- \"extensions/subscription-footer.ts\" \"scripts/test-work-subscription-footer.mjs\"": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-subscription-footer.mjs\"": {
+   "count": 1,
+   "ms": 227,
+   "maxMs": 227,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent\" && rg -n -i \"agents\\.md\" README.md docs | head -20; rg -n \"\\\"tool_result\\\"|tool_result\" docs/extensions": {
+   "count": 1,
+   "ms": 193,
+   "maxMs": 193,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && rg -n \"followMode|registerShortcut|alt\\+[a-z]|phaseKind|\\[think\\]|codingModel|planningModel\" extensions/*.ts | rg -v \"^\\S+test\" | head -80": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"stepMode|applyMode|setStatus\\(|lastMode|switchModel|execMode\" extensions/plan3.ts | head -60": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function runPhase|function lastRun|const lastRun|setStatus\\(\\\"plan3|statusText|function refresh\" extensions/plan3.ts extensions/plan3-night.ts; rg -n \"alt\\+|\\\"=\\\"|minus|equal\" \"C:/Use": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"executingPlan =|function executingPlan|const RUN|function currentPlan|availOf =|function availOf|export \\{|^export function stepMode|stepMode\" extensions/plan3.ts | head; ls scripts |": {
+   "count": 1,
+   "ms": 207,
+   "maxMs": 207,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"registerShortcut|shortcuts\\.|alt\\+a|getThinkingLevel|setModel\" scripts/test-work-plan3.mjs | head -20; sed -n \"750,760p\" extensions/plan3.ts": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -15 && node \"scripts/test-work-subscription-footer.mjs\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 1125,
+   "maxMs": 1125,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"398,406p\" scripts/test-work-plan3.mjs && node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -4": {
+   "count": 1,
+   "ms": 798,
+   "maxMs": 798,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash -q && (node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -2); git stash pop -q && git status --short": {
+   "count": 1,
+   "ms": 968,
+   "maxMs": 968,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -3 && git stash -q && (node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -m3 \"Error|test-work-plan3.mjs:\"); git stash pop -q": {
+   "count": 1,
+   "ms": 284,
+   "maxMs": 284,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git status --short && git stash list | head -3 && git diff --stat && git stash show --stat stash@{0}": {
+   "count": 1,
+   "ms": 198,
+   "maxMs": 198,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --quiet stash@{0} -- extensions/plan3.ts && echo \"plan3 same\" && git checkout stash@{0} -- extensions/subscription-footer.ts scripts/test-work-plan3.mjs && git reset -q && git diff ": {
+   "count": 1,
+   "ms": 279,
+   "maxMs": 279,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && rg -c \"BIAS|shortcuts\" extensions/plan3.ts scripts/test-work-plan3.mjs && rg -n \"keeps Plan3\" extensions/subscription-footer.ts": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git worktree add -q --detach \"%TEMP%/ce-head\" HEAD 2>nul || git worktree add -q --detach \"$TEMP/ce-head\" HEAD; cd \"$TEMP/ce-head\" && cmd /c mklink /J node_modules \".\\node_modules\" >/dev/null": {
+   "count": 1,
+   "ms": 33027,
+   "maxMs": 33027,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git worktree remove --force \"%TEMP%/ce-head\" && rmdir \"%TEMP%\" 2>/dev/null; W=\"C:/Users/Flex/AppData/Local/Temp/ce-head\"; git worktree add -q --detach \"$W\" HEAD && cd \"$W\" && cmd //c mklink ": {
+   "count": 1,
+   "ms": 30693,
+   "maxMs": 30693,
+   "failures": 1
+  },
+  "\u0000(other)": {
+   "count": 68,
+   "ms": 6081,
+   "maxMs": 117,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/ce-head\" && ls node_modules | head -3; node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 12876,
+   "maxMs": 12876,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -m3 \"passed|^Error|test-work-plan3.mjs:\"; done": {
+   "count": 1,
+   "ms": 23369,
+   "maxMs": 23369,
+   "failures": 0
+  },
+  "bash\u0000for d in \".\" \"C:/Users/Flex/AppData/Local/Temp/ce-head\"; do cd \"$d\"; ok=0; for i in 1 2 3 4 5 6; do node \"scripts/test-work-plan3.mjs\" >/dev/null 2>&1 && ok=$((ok+1)); done; echo \"$d $ok/6\"; done": {
+   "count": 1,
+   "ms": 117005,
+   "maxMs": 117005,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cmd //c rmdir \"C:\\Users\\Flex\\AppData\\Local\\Temp\\ce-head\\node_modules\" && git worktree remove --force \"C:/Users/Flex/AppData/Local/Temp/ce-head\" && git worktree list && git status --short": {
+   "count": 1,
+   "ms": 906,
+   "maxMs": 906,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rm -f \"./nul\" 2>/dev/null; cmd //c \"del \\\\\\\\?\\\\C:\\\\SOFT\\\\git\\\\ce-workflow\\\\nul\" 2>/dev/null; git status --short | rg nul; echo done": {
+   "count": 1,
+   "ms": 318,
+   "maxMs": 318,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git branch --show-current && git ls-files package-lock.json && rg -n \"\\\"version\\\"\" package.json && rg -n -m2 \"\\\"version\\\"\" package-lock.json": {
+   "count": 1,
+   "ms": 174,
+   "maxMs": 174,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sed -i \"s/\\\"version\\\": \\\"0.1.39\\\"/\\\"version\\\": \\\"0.1.40\\\"/\" package.json && git add -u && git commit -q -m \"Plan3 alt+=/alt+- model bias (Think/Work Task/Plan) with colored footer label; bum": {
+   "count": 1,
+   "ms": 2590,
+   "maxMs": 2590,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"4578,4600p;4384,4396p;4166,4172p;4045,4056p\" extensions/work-models.ts && rg -n \"function chooseModelAndEffort\" -A30 extensions/work-models.ts | head -45 && sed -n \"205,240p\" extensi": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works\" && ls && rg -n \"reasoning\\?:\" */dist/types.d.ts 2>/dev/null | head; rg -ln \"interface SimpleStreamOptions\" --glob \"*.d.": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-ai/dist\" && sed -n \"240,250p\" types.d.ts && rg -n \"type ThinkingLevel\" types.d.ts; cd \".\" && rg -n \"THINKING_LEVELS =": {
+   "count": 1,
+   "ms": 194,
+   "maxMs": 194,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -ln \"process_image|createVisionBridge|visionModel\" scripts/ && rg -n \"visionModel|inspect\\(\" scripts/test-*.mjs | head -30": {
+   "count": 1,
+   "ms": 466,
+   "maxMs": 466,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"736,760p;185,195p\" extensions/work-models.ts && rg -n \"^async function chooseModel\\(|^export async function chooseModel\\(\" -A12 extensions/work-models.ts | head -16 && rg -n \"functio": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^\\thooks.before_agent_start \\&\\& await hooks.before_agent_start({ prompt: \\\"x\\\" }, levelCtx);/\\tawait hooks.before_agent_start({ prompt: \\\"x\\\" }, levelCtx);/\" scripts/test-work-com": {
+   "count": 1,
+   "ms": 459,
+   "maxMs": 459,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -4 && node scripts/test-work-settings.mjs 2>&1 | tail -6": {
+   "count": 1,
+   "ms": 672,
+   "maxMs": 672,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-settings.mjs 2>&1 | rg -m6 \"Error|expected|target\"; rg -n \"function customUi\" -A25 scripts/test-work-settings.mjs | head -35": {
+   "count": 1,
+   "ms": 299,
+   "maxMs": 299,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^async function choose\\(\" -A25 extensions/work-models.ts | head -40; rg -n \"missing settings choice\" -B25 scripts/test-work-settings.mjs | head -50": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/{ target: \\\"low\\\", key: \\\"enter\\\" },/{ target: \\\"xhigh\\\", key: \\\"enter\\\" },/; s/\\\"test\\/vision:low\\\", \\\"selected vision model and effort persist\\\"/\\\"test\\/vision:xhigh\\\", \\\"selecte": {
+   "count": 1,
+   "ms": 291,
+   "maxMs": 291,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-settings.mjs 2>&1 | rg -A30 \"missing settings choice\" | head -40": {
+   "count": 1,
+   "ms": 268,
+   "maxMs": 268,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"4574s/^\\t\\t\\tlet value = selected;/\\t\\t\\tlet value = selected; console.error(\\\"DBG\\\", pick.kind, selected, scope);/\" extensions/work-models.ts && node scripts/test-work-settings.mjs ": {
+   "count": 1,
+   "ms": 488,
+   "maxMs": 488,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^\\t\\t\\t\\tif (level === undefined) continue;/\\t\\t\\t\\tconsole.error(\\\"DBG level\\\", level); if (level === undefined) continue;/\" extensions/work-models.ts && node scripts/test-work-se": {
+   "count": 1,
+   "ms": 359,
+   "maxMs": 359,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sed -i \"s/description: \\\"Reasoning effort for image questions\\\" })), current.level ?? \\\"medium\\\");/description: \\\"Reasoning effort for image questions\\\" })), current.level ?? \\\"medium\\\", { f": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -c \"image questions\\\" \\}\\)\\), current.level \\?\\? \\\"medium\\\", \\{ forceCustom\" extensions/work-models.ts; node scripts/test-work-settings.mjs 2>&1 | rg -m6 \"^ok|passed|Error|actual|expected": {
+   "count": 1,
+   "ms": 303,
+   "maxMs": 303,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-settings.mjs 2>&1 | rg -A22 \"missing settings choice\" | head -26": {
+   "count": 1,
+   "ms": 287,
+   "maxMs": 287,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/{ target: \\\"xhigh\\\", key: \\\"enter\\\" },/{ target: \\\"Xhigh\\\", key: \\\"enter\\\" },/\" scripts/test-work-settings.mjs && node scripts/test-work-settings.mjs 2>&1 | rg -m6 \"^ok|passed|Erro": {
+   "count": 1,
+   "ms": 284,
+   "maxMs": 284,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/\\tassert.equal(mod.visionModelSettings(cwd), \\\"test\\/vision:xhigh\\\", /\\tassert(mod.visionModelSettings(cwd) === \\\"test\\/vision:xhigh\\\", /; s/\\tassert.equal(mod.visionAltModelSettin": {
+   "count": 1,
+   "ms": 395,
+   "maxMs": 395,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git diff --stat && git branch --show-current && git ls-files package-lock.json && rg -n \"\\\"version\\\"\" package.json": {
+   "count": 1,
+   "ms": 184,
+   "maxMs": 184,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"3s/0.1.40/0.1.41/\" package.json && git add -u && git commit -q -m \"Vision: per-model effort and optional alternative vision model for second opinions\" && git push -q origin master &&": {
+   "count": 1,
+   "ms": 2221,
+   "maxMs": 2221,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Tagging run settled\" -A12 extensions/plan3.ts | head -14; rg -n \"resolveQuestions|showAskDialog|agent_settled\" scripts/test-work-plan3.mjs | head -20": {
+   "count": 1,
+   "ms": 156,
+   "maxMs": 156,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"resolve\" scripts/test-work-plan3.mjs | head -30": {
+   "count": 1,
+   "ms": 162,
+   "maxMs": 162,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"dialogs.shift|popupCount\\+\\+|let dialogs|const answered\" -A6 scripts/test-work-plan3.mjs | head -40; sed -n \"1170,1180p\" scripts/test-work-plan3.mjs; rg -n \"directPlan =\" -A25 scripts": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 10186,
+   "maxMs": 10186,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works\" && rg -n \"executionMode\" --glob \"*.d.ts\" -m3 . | head; rg -n \"executionMode\" docs ../@earendil-works/pi-coding-agent/do": {
+   "count": 1,
+   "ms": 199,
+   "maxMs": 199,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-agent-core/dist\" && sed -n \"425,440p\" types.d.ts; rg -n \"executionMode\" --glob \"*.js\" . | head": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git apply \"C:/Users/Flex/Downloads/process-image-sequential.diff\" && node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 6389,
+   "maxMs": 6389,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent\" && rg -ln \"codemode\" dist | head; rg -n \"tool_execution_start\" dist --glob \"*.d.ts\" | head -5": {
+   "count": 1,
+   "ms": 261,
+   "maxMs": 261,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,40p\" extensions/work-images.ts; rg -n \"readImageFile|executionMode|pi\\.on|execute: async|export function createImageTools|async execute\" extensions/work-images.ts; rg -n \"readImage": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"tool_execution_(start|end)\\\"\" extensions | head; rg -n \"createImageTools\\(pi\" extensions/work-models.ts": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -12": {
+   "count": 1,
+   "ms": 2393,
+   "maxMs": 2393,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/inspect: async () => ({ content: \\[{ type: \\\"text\\\", text: \\\"Seen.\\\" }\\] })/inspect: async () => \\\"Seen.\\\"/\" scripts/test-work-compaction-notifications.mjs && sed -i \"s/visionAltMo": {
+   "count": 1,
+   "ms": 2245,
+   "maxMs": 2245,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-compaction-notifications.mjs 2>&1 | rg -B2 -A10 \"Error\" | head -30": {
+   "count": 1,
+   "ms": 2157,
+   "maxMs": 2157,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/inspect: async () => \\\"Seen.\\\"/inspect: async () => ({ text: \\\"Seen.\\\" })/\" scripts/test-work-compaction-notifications.mjs && node scripts/test-work-compaction-notifications.mjs 2>": {
+   "count": 1,
+   "ms": 2224,
+   "maxMs": 2224,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "E1": {
+   "ms": 191720,
+   "testMs": 22586,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   }
+  },
+  "E4": {
+   "ms": 414835,
+   "testMs": 10677,
+   "replies": 33,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 33
+   },
+   "failures": 4
+  },
+  "E2": {
+   "ms": 1304481,
+   "testMs": 15820,
+   "replies": 68,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 68
+   },
+   "failures": 1
+  },
+  "E3": {
+   "ms": 301176,
+   "testMs": 885,
+   "replies": 17,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 17
+   }
+  },
+  "E5": {
+   "ms": 153622,
+   "testMs": 1206,
+   "replies": 13,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 13
+   },
+   "failures": 2
+  },
+  "S1": {
+   "ms": 1371179,
+   "testMs": 3226,
+   "replies": 75,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 75
+   },
+   "failures": 1
+  },
+  "S2": {
+   "ms": 1274055,
+   "testMs": 10363,
+   "replies": 71,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 71
+   },
+   "failures": 5
+  },
+  "S3": {
+   "ms": 80506,
+   "testMs": 2012,
+   "replies": 5,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 5
+   }
+  },
+  "P1": {
+   "ms": 517915,
+   "testMs": 72566,
+   "replies": 83,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 83
+   },
+   "failures": 5
+  },
+  "P3": {
+   "ms": 110263,
+   "testMs": 43221,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
+   },
+   "failures": 1
+  },
+  "(none)": {
+   "ms": 1214127,
+   "testMs": 154923,
+   "replies": 135,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 18,
+    "anthropic/claude-opus-5-5:high": 117
+   },
+   "failures": 9
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-10-12T07:34:27.789Z",
+   "ms": 891155
+  },
+  {
+   "start": "2026-10-12T07:49:18.964Z",
+   "ms": 773851
+  },
+  {
+   "start": "2026-10-12T08:02:12.827Z",
+   "ms": 4429876
+  },
+  {
+   "start": "2026-10-12T10:01:07.464Z",
+   "ms": 130149
+  },
+  {
+   "start": "2026-10-12T10:10:54.874Z",
+   "ms": 5101
+  },
+  {
+   "start": "2026-10-12T12:07:42.945Z",
+   "ms": 28119
+  },
+  {
+   "start": "2026-10-12T12:18:42.293Z",
+   "ms": 22054
+  },
+  {
+   "start": "2026-10-12T20:51:54.702Z",
+   "ms": 646203
+  },
+  {
+   "start": "2026-10-12T22:00:00.513Z",
+   "ms": 12823
+  },
+  {
+   "start": "2026-10-13T08:20:03.783Z",
+   "ms": 28176
+  },
+  {
+   "start": "2026-10-13T08:23:47.829Z",
+   "ms": 8153
+  },
+  {
+   "start": "2026-10-13T08:24:16.981Z",
+   "ms": 296975
+  },
+  {
+   "start": "2026-10-13T10:45:57.135Z",
+   "ms": 10556
+  },
+  {
+   "start": "2026-10-13T13:38:32.660Z",
+   "ms": 93560
+  },
+  {
+   "start": "2026-10-14T09:03:16.161Z",
+   "ms": 36152
+  },
+  {
+   "start": "2026-10-14T09:17:13.933Z",
+   "ms": 154568
+  }
+ ],
+ "hints": []
+}

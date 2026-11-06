@@ -2,6 +2,34 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.3.0 — 2026-11-06
+
+### Added
+- Hub: the file viewer follows the file it shows. Markdown, images, text, PDF and pages reload when the file changes, and a page also when a style, script, image or font it loaded changes, keeping your scroll position.
+- Hub: sessions can show a second line under their name (`pi-hub subtitle <id> <text>`, or from an extension); plan progress stays beside it.
+
+### Changed
+- New `design` tool replaces the Plan3 design phase: the agent starts one OpenDesign session per direction, you refine each by chat or in the OpenDesign app, and status follows every run there, including ones you start yourself. A failed or empty session can be retried. Source files go along as read-only inputs (up to 200 KB each, never ones that look like they hold credentials). `/plan3 design` and its approval steps are gone; plans in the middle of the old design phase finish by hand.
+- Each design variant is its own hub session, named by its direction (`Calm`) with the brief below, a 🎨 icon, and always at the bottom of its folder, so idle ones fold away with the rest. Its page shows the design live beside the chat, in desktop or phone (390 px) width: say what to change and the preview updates when OpenDesign's run ends. Pick a model and effort for these sessions in `/wo` → Settings → Design session model (a cheap, fast one is enough).
+
+![A design session row: palette icon, name Calm, starred brief Home page below](docs/changelog/0.3.0-design-row.png)
+![A design session page: the design live beside the chat, Phone and Desktop width buttons](docs/changelog/0.3.0-design-page.png)
+
+- Select a design ("select this") to export it to `docs/designs/<name>/` with its conversation, star it, and hand it to the session it was started from or a new one. Selecting it again later updates the same folder and tells that session what changed since the last selection.
+- Clone a design to try another approach: give it a name and you get a new design with a copy of its files and of its chat.
+- OpenDesign design runs: ce-workflow finds the newest installed OpenDesign and its daemon port from the app's log (0.24+ changed how it announces it), relaunches it when it was closed, and continues. Remove any pinned openDesignCommand so this works.
+- When Pi runs as OpenDesign's own generation agent, ce-workflow stays out of the way: no plan3 and no questions, so the run builds the pages instead of writing a plan.
+- A session left idle compacts as soon as its prompt cache runs out (when its context is large enough that the next message would compact anyway), in the terminal and the hub alike, instead of only when the hub parks it; the next message no longer waits for it.
+- Once a design is picked, the hub hides the other designs in its folder. Click the folder name to show them again.
+- New design runs keep the project's fonts, or use fonts that look the same on every device (no Windows-only fonts like Bahnschrift).
+- Tested against Pi 1.5.0.
+
+### Fixed
+- A generated image you asked for at a size stays a PNG (Pi 1.5 can shrink it to JPEG).
+- Plan3 tells you when Pi refuses the switch to a fresh session, with the /resume3 command to continue.
+- Compaction cost totals with Pi 1.5's provider-billed costs.
+- Hub: an open question (ask_user) keeps what you typed and ticked when you switch to another session or tab and come back; it used to come back empty.
+
 ## 0.2.38 — 2026-11-06
 
 ### Fixed

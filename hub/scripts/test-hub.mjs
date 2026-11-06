@@ -75,7 +75,9 @@ try {
 		assert.equal((await get(`${base}/`)).status, 401, "the page needs the key");
 		const moved = await get(`${base}?token=${localKey}`);
 		assert.deepEqual([moved.status, moved.headers.get("location")], [301, `/s/${id}/?token=${localKey}`]);
-		assert.equal((await get(`http://127.0.0.1:${port}/s/00000000-0000-0000-0000-000000000000/?token=${localKey}`)).status, 404);
+		const gone = await get(`http://127.0.0.1:${port}/s/00000000-0000-0000-0000-000000000000/?token=${localKey}`);
+		assert.deepEqual([gone.status, gone.headers.get("location")], [302, `/s/${id}/?token=${localKey}`], "a deleted session's page opens one that exists");
+		assert.equal((await get(`http://127.0.0.1:${port}/s/00000000-0000-0000-0000-000000000000/api/snapshot?token=${localKey}`)).status, 404, "its API calls still fail");
 		const html = await (await get(`${base}/?token=${localKey}`)).text();
 		const [, build] = /src="\.\.\/\.\.\/a\/([0-9a-f]{12})\/app\.js\?token=([0-9a-f]+)"/.exec(html) ?? [];
 		assert(build && html.includes(`?token=${localKey}`), "relative asset URLs carrying the key");
@@ -109,7 +111,21 @@ try {
 	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).live, false, "parked session stays parked");
 	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).subtitle, "Home page", "the subtitle survives parking and a hub restart");
 	assert.match(cli("subtitle", id).out, /Subtitle cleared/);
+	assert.equal(JSON.parse(cli("session", id).out).id, id, "pi-hub session names one session");
+	assert.equal(cli("session", "00000000-0000-0000-0000-000000000000").code, 1, "and fails for one the hub does not have");
 	assert.equal((await api("/api/status")).body.sessions.find(s => s.id === id).subtitle, undefined);
+	// pi-hub fork: a new session in the same folder whose history starts with the source's messages; the source is untouched.
+	const sessions = async () => (await api("/api/status")).body.sessions, source = (await sessions()).find(s => s.id === id);
+	fs.appendFileSync(source.sessionFile, JSON.stringify({ type: "message", message: { role: "user", content: "make it calm" } }) + "\n"); // parked: its history on disk
+	const before = fs.readFileSync(source.sessionFile, "utf8");
+	const forked = /\/s\/([0-9a-f-]{36})\//.exec(cli("fork", id, "Twin").out)?.[1], twin = (await sessions()).find(s => s.id === forked);
+	const messages = file => fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line)).filter(entry => entry.type === "message");
+	assert.deepEqual([twin?.name, twin?.folder, twin?.live, twin?.sessionFile === source.sessionFile], ["Twin", source.folder, true, false]);
+	assert(messages(source.sessionFile).length > 0, "the source has history");
+	assert.deepEqual(messages(twin.sessionFile).slice(0, messages(source.sessionFile).length), messages(source.sessionFile));
+	assert.equal(fs.readFileSync(source.sessionFile, "utf8"), before, "the source file is untouched");
+	assert.equal(cli("fork", "00000000-0000-0000-0000-000000000000", "x").code, 1);
+	await api(`/api/sessions/${forked}/park`, {});
 
 	// Updates use a fake managed launcher; success and failure both bring the hub back.
 	const updateArgs = path.join(root, "update-args.json");

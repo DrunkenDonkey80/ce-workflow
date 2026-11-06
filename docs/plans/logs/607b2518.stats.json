@@ -1,0 +1,1520 @@
+{
+ "version": 1,
+ "activeMs": 7057516,
+ "runs": 30,
+ "waitingMs": 2134326,
+ "toolWallMs": 2494310,
+ "compactions": {
+  "count": 4,
+  "ms": 66323
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 274,
+   "thinkingMs": 1266028,
+   "actingMs": 410968,
+   "input": 696,
+   "output": 142280,
+   "cacheRead": 28765891,
+   "cacheWrite": 2537708,
+   "cost": 21.2901022,
+   "errors": 0
+  },
+  "anthropic/claude-opus-5-5:medium": {
+   "replies": 60,
+   "thinkingMs": 364251,
+   "actingMs": 325071,
+   "input": 166,
+   "output": 73769,
+   "cacheRead": 6847643,
+   "cacheWrite": 1260757,
+   "cost": 9.1493576,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 204,
+   "ms": 1518799,
+   "maxMs": 85575,
+   "failures": 8
+  },
+  "plan3": {
+   "count": 30,
+   "ms": 20206,
+   "maxMs": 8084,
+   "failures": 0
+  },
+  "write": {
+   "count": 5,
+   "ms": 20,
+   "maxMs": 8,
+   "failures": 0
+  },
+  "edit": {
+   "count": 55,
+   "ms": 4253,
+   "maxMs": 684,
+   "failures": 3
+  },
+  "read": {
+   "count": 39,
+   "ms": 3071,
+   "maxMs": 993,
+   "failures": 2
+  },
+  "lens_diagnostics": {
+   "count": 8,
+   "ms": 29121,
+   "maxMs": 6600,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 10,
+   "ms": 110913,
+   "maxMs": 32783,
+   "failures": 1
+  },
+  "compaction_note": {
+   "count": 1,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "browser_act": {
+   "count": 37,
+   "ms": 634355,
+   "maxMs": 300021,
+   "failures": 11
+  },
+  "plan3_diagram": {
+   "count": 2,
+   "ms": 8,
+   "maxMs": 6,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 160,
+   "ms": 439293,
+   "maxMs": 75207,
+   "failures": 5
+  },
+  "test": {
+   "count": 39,
+   "ms": 1057627,
+   "maxMs": 85575,
+   "failures": 2
+  },
+  "build": {
+   "count": 5,
+   "ms": 21879,
+   "maxMs": 8687,
+   "failures": 1
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && cat browser-fetch/extension/manifest.json && git status --short | head -20 && git log --oneline -3": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 0
+  },
+  "bash\u0000cygpath -w \"$TMP\" ; echo \"$TMP\"": {
+   "count": 1,
+   "ms": 908,
+   "maxMs": 908,
+   "failures": 0
+  },
+  "bash\u0000d=\"/c/Users/Flex/AppData/Local/Temp/pi-browser-act-proto\"; mkdir -p \"$d\" && cp \"./browser-fetch/extension/icon.png\" \"$d/\" && cat > \"$d/manifest.json\" <<'EOF' { \"manifest_version\": 3, \"name\": \"Pi brows": {
+   "count": 1,
+   "ms": 194,
+   "maxMs": 194,
+   "failures": 0
+  },
+  "bash\u0000node --check \"C:/Users/Flex/AppData/Local/Temp/pi-browser-act-proto/background.js\" && node -e \"new Function('return '+JSON.parse(JSON.stringify(1)))\" && node -e \"const s=require('fs').readFileSync('C:": {
+   "count": 1,
+   "ms": 516,
+   "maxMs": 516,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp && node -e \"const s=require('fs').readFileSync('C:/Users/Flex/AppData/Local/Temp/pi-browser-act-proto/background.js','utf8');const m=s.match(/const DOM_WALK = \\`([\\s\\S]*?)\\`;/);require('fs').w": {
+   "count": 1,
+   "ms": 10019,
+   "maxMs": 10019,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"extension\\b|extensionDir|Load unpacked|unpacked\" extensions/browser-fetch.ts | head -20; ls \"$APPDATA/../Local\" 2>/dev/null | rg -i \"helium|imput\";": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"packageDir\" extensions/browser-fetch.ts | head -3; p=\"$LOCALAPPDATA/imput/Helium/User Data\"; ls \"$p\" 2>/dev/null | head; rg -l \"Pi browser fetch\" \"$p\"/*/Preferences \"$p\"/*/\"Secure Pre": {
+   "count": 1,
+   "ms": 343,
+   "maxMs": 343,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,19p browser-fetch/extension/background.js; rg -n \"importScripts|onInstalled|onStartup|action.onClicked\" browser-fetch/extension/background.js; rg -n \"manifest|permissions\" scripts/t": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \"./browser-fetch/extension\" && node -e \" const fs=require('fs');let s=fs.readFileSync('C:/Users/Flex/AppData/Local/Temp/pi-browser-act-proto/background.js','utf8'); s=s.replace('// Temporary read-o": {
+   "count": 1,
+   "ms": 2661,
+   "maxMs": 2661,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git checkout -- browser-fetch/extension/manifest.json && sed -i \"s/\\\"storage\\\", \\\"alarms\\\"\\]/\\\"storage\\\", \\\"alarms\\\", \\\"debugger\\\", \\\"tabGroups\\\", \\\"downloads\\\", \\\"contextMenus\\\"]/\" browser-": {
+   "count": 1,
+   "ms": 2580,
+   "maxMs": 2580,
+   "failures": 0
+  },
+  "bash\u0000d=\"$USERPROFILE/Downloads/pi-proto\"; ls -la \"$d\" 2>&1; cd \"$d\" 2>/dev/null && for f in *.json; do node -e \"const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));const {domLines,axLine": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \"$USERPROFILE/Downloads/pi-proto\" && node -e \"const r=JSON.parse(require('fs').readFileSync('dash.cloudflare.com.json','utf8'));console.log(r.domLines.slice(0,45).join('\\n'));console.log('...');con": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \"$USERPROFILE/Downloads/pi-proto\" && ls -la && for f in *.json; do node -e \"const r=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));const {domLines,axLines,...rest}=r;console.log('==": {
+   "count": 1,
+   "ms": 478,
+   "maxMs": 478,
+   "failures": 0
+  },
+  "bash\u0000cd \"$USERPROFILE/Downloads/pi-proto\" && node -e \" const fs=require('fs');const p=JSON.parse(fs.readFileSync('github.com (1).json','utf8')); console.log(p.domLines.filter(l=>/\\\"\\\" /.test(l)).slice(0,8)": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git checkout -- browser-fetch/extension/manifest.json browser-fetch/extension/background.js && rm browser-fetch/extension/proto.js && git status --short -- browser-fetch && node \"scripts/tes": {
+   "count": 1,
+   "ms": 2519,
+   "maxMs": 2519,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\*\\*P1-0\" \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\"": {
+   "count": 1,
+   "ms": 72,
+   "maxMs": 72,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" \"docs/plans/logs/607b2518.md\" && git commit -q -m \"Plan 607b2518 P1-04, P1-0": {
+   "count": 1,
+   "ms": 1945,
+   "maxMs": 1945,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" \"docs/plans/logs/607b2518.md\" && git commit -q -m \"Plan 607b2518: checkpoint": {
+   "count": 1,
+   "ms": 382,
+   "maxMs": 382,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/browser-fetch.ts scripts/test-work-browser-fetch.mjs && sed -n 1,205p extensions/browser-fetch.ts": {
+   "count": 1,
+   "ms": 72,
+   "maxMs": 72,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 205,474p extensions/browser-fetch.ts && rg -n \"grants|readPolicy|updatePolicy\" --glob \"!extensions/browser-fetch.ts\" extensions scripts hub/src | head -20": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const p=require('./package.json');console.log(JSON.stringify(p.pi,null,1).slice(0,800));console.log(Object.keys(p.scripts).filter(k=>/browser|verify/.test(k)).map(k=>k+': '+p.script": {
+   "count": 1,
+   "ms": 383,
+   "maxMs": 383,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-browser-fetch.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('assert.deepEqual(readPolicy(), { blocked: [], grants: {} });','assert.d": {
+   "count": 1,
+   "ms": 2398,
+   "maxMs": 2398,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -c \"e-fibank|control is never always\" scripts/test-work-browser-fetch.mjs": {
+   "count": 1,
+   "ms": 1029,
+   "maxMs": 1029,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"e-fibank|never always|ABV\" scripts/test-work-browser-fetch.mjs | cut -c1-200; npx tsc --noEmit -p . 2>&1 | rg \"browser-fetch\" | head": {
+   "count": 1,
+   "ms": 6211,
+   "maxMs": 6211,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -3; rg -n \"tsc|typecheck\" package.json | head -3": {
+   "count": 1,
+   "ms": 3033,
+   "maxMs": 3033,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- extensions/browser-fetch.ts scripts/test-work-browser-fetch.mjs \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" docs/plans/l": {
+   "count": 1,
+   "ms": 313,
+   "maxMs": 313,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 70,257p scripts/test-work-browser-fetch.mjs": {
+   "count": 1,
+   "ms": 81,
+   "maxMs": 81,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"export (async )?function showListDialog|export function askConfirm|detail\\?|purpose\\?|signal\\?\" extensions/ask-user/menu.ts | head; node -e \"console.log(require('./package.json').file": {
+   "count": 1,
+   "ms": 296,
+   "maxMs": 296,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s# \\\"extensions/browser-fetch.ts\\\",# \\\"extensions/browser-fetch.ts\\\",\\n \\\"extensions/browser-act.ts\\\",#\" package.json && git diff package.json | rg \"^[+-] \"": {
+   "count": 1,
+   "ms": 346,
+   "maxMs": 346,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs'),f='scripts/test-work-browser-fetch.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('\\tawait roundTrip();\\n\\tconsole.log(\"round trip ok\");','\\tawait ro": {
+   "count": 1,
+   "ms": 469,
+   "maxMs": 469,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -15": {
+   "count": 2,
+   "ms": 10858,
+   "maxMs": 8237,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 316p scripts/test-work-browser-fetch.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 138,
+   "maxMs": 138,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -12": {
+   "count": 1,
+   "ms": 2220,
+   "maxMs": 2220,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/\\t\\tassert.equal(got.at(-1).type, \\\"control-close\\\");/\\t\\tawait sleep(50);\\n\\t\\tassert.equal(got.at(-1).type, \\\"control-close\\\");/\" scripts/test-work-browser-fetch.mjs && rg -c \"aw": {
+   "count": 1,
+   "ms": 2781,
+   "maxMs": 2781,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | rg -m3 \"message|actual\" ; sed -n 218,222p extensions/browser-act.ts": {
+   "count": 1,
+   "ms": 2625,
+   "maxMs": 2625,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s#/evil\\\\\\\\.test, which was not approved#/evil\\\\\\\\.test\\\\\\\\/, which was not approved#\" scripts/test-work-browser-fetch.mjs && rg -n \"which was not approved; control\" scripts/test-wor": {
+   "count": 1,
+   "ms": 2734,
+   "maxMs": 2734,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 2841,
+   "maxMs": 2841,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-browser-fetch.mjs';let s=fs.readFileSync(f,'utf8'); const a='\\t\\tassert.deepEqual(tools, [\\\"browser_act\\\"]);\\n';if(!s.includes(a))throw ": {
+   "count": 1,
+   "ms": 2732,
+   "maxMs": 2732,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- extensions/browser-act.ts extensions/browser-fetch.ts scripts/test-work-browser-fetch.mjs package.json \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own": {
+   "count": 1,
+   "ms": 255,
+   "maxMs": 255,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" docs/plans/logs/607b2518.md && git commit -q -m \"Plan 607b2518: checkpoint a": {
+   "count": 1,
+   "ms": 472,
+   "maxMs": 472,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat browser-fetch/host.mjs | sed -n 1,49p; sed -n 80,140p browser-fetch/host.mjs": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 0
+  },
+  "bash\u0000cd \"./browser-fetch/extension\" && node -e \" const fs=require('fs');let s=fs.readFileSync('background.js','utf8'); const r=(a,b)=>{if(!s.includes(a))throw a;s=s.replace(a,b)}; r('async function onMessa": {
+   "count": 1,
+   "ms": 304,
+   "maxMs": 304,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 46,80p browser-fetch/host.mjs": {
+   "count": 1,
+   "ms": 248,
+   "maxMs": 248,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"importScripts|runInContext|chrome = |const chrome|alarms|onRemoved|webRequest|tabs: \\{|action:\" scripts/test-work-browser-fetch.mjs | cut -c1-220": {
+   "count": 1,
+   "ms": 312,
+   "maxMs": 312,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"PIPE|pipePath|net.connect|export function|export async|snapshot = |refs\" extensions/browser-act.ts | cut -c1-180; rg -n \"control\\b|control\\[|controlUntil\" extensions/browser-fetch.ts ": {
+   "count": 1,
+   "ms": 168,
+   "maxMs": 168,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"async function connect|let link|link = |on\\(\\\"close\\\"\" extensions/browser-act.ts": {
+   "count": 1,
+   "ms": 76,
+   "maxMs": 76,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"connect\" extensions/browser-act.ts extensions/browser-fetch.ts | head;": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -12 | cut -c1-400": {
+   "count": 1,
+   "ms": 10346,
+   "maxMs": 10346,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -8 | cut -c1-400": {
+   "count": 3,
+   "ms": 138986,
+   "maxMs": 64869,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"background.js|cpSync|copyFile|\\\"files\\\"\" extensions/browser-fetch.ts package.json | head": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 13,30p package.json; rg -n \"extension\\b|extensionDir|installed.extension|extension:\" extensions/browser-fetch.ts | head": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- browser-fetch/extension/control.js browser-fetch/extension/background.js browser-fetch/extension/manifest.json browser-fetch/host.mjs extensions/browser-act.ts scripts/test-work-b": {
+   "count": 1,
+   "ms": 781,
+   "maxMs": 781,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Unknown ref|refs\\.(clear|delete)|s\\.refs =\" browser-fetch/extension/ extensions/browser-act.ts": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000sleep 75": {
+   "count": 1,
+   "ms": 75207,
+   "maxMs": 75207,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- browser-fetch/extension/control.js scripts/test-work-browser-fetch.mjs extensions/browser-act.ts && git commit -q -m \"browser_act: per-action timeout frees a hung session, wake fr": {
+   "count": 1,
+   "ms": 335,
+   "maxMs": 335,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"items: \\[\\]|items: Item|s!?\\.items = |type Session\" extensions/browser-act.ts": {
+   "count": 1,
+   "ms": 73,
+   "maxMs": 73,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const r=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(!s.includes(a))throw f+': '+a;fs.writeFileSync(f,s.replace(a,b))}; const pi='extensions/browser-act.ts';": {
+   "count": 1,
+   "ms": 63308,
+   "maxMs": 63308,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -6 | cut -c1-300 && git add -- extensions/browser-act.ts browser-fetch/extension/control.js scripts/test-work-browser-fetch.mjs && git co": {
+   "count": 1,
+   "ms": 63101,
+   "maxMs": 63101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const r=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(!s.includes(a))throw f+': '+a;fs.writeFileSync(f,s.replace(a,b))}; const ad='browser-fetch/extension/con": {
+   "count": 1,
+   "ms": 230,
+   "maxMs": 230,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- browser-fetch/extension/control.js extensions/browser-act.ts scripts/test-work-browser-fetch.mjs && git commit -q -m \"browser_act: handle page dialogs (accept leave-page, cancel a": {
+   "count": 1,
+   "ms": 1011,
+   "maxMs": 1011,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Browser access|grants\\b|revoke|Revoke\" extensions --type ts -l | head; rg -n \"Browser access\" extensions -g \"*.ts\" | head": {
+   "count": 1,
+   "ms": 360,
+   "maxMs": 360,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"browserAccessMenu|function until\" scripts extensions -g \"*.mjs\" -g \"*.ts\" | head": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"const until|until = \\(|controlUntil\" extensions/browser-fetch.ts | head -5": {
+   "count": 1,
+   "ms": 276,
+   "maxMs": 276,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/browser_fetch loads pages in your own browser. \\${/browser_fetch reads and browser_act operates pages in your own browser. \\${/\" extensions/browser-fetch.ts && rg -c \"browser_act o": {
+   "count": 1,
+   "ms": 65002,
+   "maxMs": 65002,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"browser_fetch|Browser access\" README.md | head; sed -n 1,25p CHANGELOG.md": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- extensions/browser-fetch.ts README.md CHANGELOG.md \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" docs/plans/logs/607b2518.": {
+   "count": 1,
+   "ms": 2078,
+   "maxMs": 2078,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- docs/architecture/product.diagram.json \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" docs/plans/logs/607b2518.md && git co": {
+   "count": 1,
+   "ms": 414,
+   "maxMs": 414,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -6 | cut -c1-300": {
+   "count": 1,
+   "ms": 65223,
+   "maxMs": 65223,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-browser-fetch.mjs';let s=fs.readFileSync(f,'utf8'); const a='run({ action: \\\"open\\\", url: \\\"https://shop.test/\\\" }), run({ action: \\\"sna": {
+   "count": 1,
+   "ms": 232,
+   "maxMs": 232,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git stash list | head -5; git status --short | head -30": {
+   "count": 1,
+   "ms": 167,
+   "maxMs": 167,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash show --name-status \"stash@{0}\"; git ls-files -u | head; git log --oneline -1 -- scripts/work-helper.mjs; git cat-file -e HEAD:scripts/work-helper.mjs && echo \"in HEAD\" || echo \"not": {
+   "count": 1,
+   "ms": 237,
+   "maxMs": 237,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git rm -q --cached scripts/work-helper.mjs && rm scripts/work-helper.mjs && git status --short | rg -v \"stats.json|NUL\"; git stash list | head -3": {
+   "count": 1,
+   "ms": 230,
+   "maxMs": 230,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp extensions/browser-act.ts \"$TEMP/browser-act.fixed.ts\" && git show HEAD:extensions/browser-act.ts > extensions/browser-act.ts && (node scripts/test-work-browser-fetch.mjs 2>&1 | rg -m3 \"t": {
+   "count": 1,
+   "ms": 85575,
+   "maxMs": 85575,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && test ! -e scripts/work-helper.mjs && git add -- extensions/browser-act.ts scripts/test-work-browser-fetch.mjs && git commit -q -m \"browser_act: run calls one at a time so parallel tool calls": {
+   "count": 1,
+   "ms": 180,
+   "maxMs": 180,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- \"docs/plans/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" docs/plans/logs/607b2518.md && git commit -q -m \"browser_act plan complete: ": {
+   "count": 1,
+   "ms": 455,
+   "maxMs": 455,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat package.json | rg -n \"\\\"(typecheck|verify|lint|check)[^\\\"]*\\\"\" ; ls tsconfig*.json hub/tsconfig*.json 2>/dev/null": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -n \"tsc|typecheck\" scripts/verify-package.mjs | head; npx tsc --noEmit -p tsconfig.json 2>&1 | rg \"diagram.ts|work-extension-scout.ts\" | head -20; echo ---; npx tsc --noEmit -p tsconfig.j": {
+   "count": 1,
+   "ms": 10507,
+   "maxMs": 10507,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit -p tsconfig.json 2>&1 | rg -c \"error TS\"; npx tsc --noEmit -p tsconfig.json 2>&1 | rg -o \"^[^(]+\" | sort | uniq -c | sort -rn | head; git log --oneline origin/master..HEAD |": {
+   "count": 1,
+   "ms": 11467,
+   "maxMs": 11467,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat origin/master..HEAD | tail -3; git diff --name-only origin/master..HEAD | rg \"diagram.ts|scout|work-store|plan3-stats\"; git stash list | head -1; git status --short | rg -v \"": {
+   "count": 1,
+   "ms": 467,
+   "maxMs": 467,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"210,240p;315,325p\" extensions/work-extension-scout.ts | cut -c1-260; ls docs/plans/*607b2518* docs/plans/done/*607b2518*": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -n \"discovered\\b.*=\" extensions/work-extension-scout.ts | head; git status --short -- docs/plans | rg 607b2518": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"296,304p\" extensions/work-extension-scout.ts; rg -n \"function parseRecentExtensions\" -A3 extensions/work-extension-scout.ts": {
+   "count": 1,
+   "ms": 98,
+   "maxMs": 98,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/work-extension-scout.ts';let s=fs.readFileSync(f,'utf8'); const r=[['return new Promise((resolve, reject) => execFile(\\\"git\\\"','return new Prom": {
+   "count": 1,
+   "ms": 5362,
+   "maxMs": 5362,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && ls; find . -maxdepth 2 -name \"tsconfig*.json\" -not -path \"*/node_modules/*\"": {
+   "count": 1,
+   "ms": 542,
+   "maxMs": 542,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit --strict false --target es2022 --module esnext --moduleResolution bundler --lib es2022,dom,dom.iterable --allowImportingTsExtensions --skipLibCheck hub/web/diagram.ts 2>&1 |": {
+   "count": 1,
+   "ms": 2024,
+   "maxMs": 2024,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts | rg -i scout; for t in scripts/test-*scout*.mjs; do node \"$t\" 2>&1 | tail -2; done": {
+   "count": 1,
+   "ms": 7728,
+   "maxMs": 7728,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-extension-scout.mjs 2>&1 | rg -v \"^\\s+at \" | head -15; git stash -q push -- extensions/work-extension-scout.ts && node scripts/test-work-extension-scout.mjs >/dev/null": {
+   "count": 1,
+   "ms": 1756,
+   "maxMs": 1756,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash list | head -3 && git ls-files -u && git rm -q --cached scripts/work-helper.mjs && rm scripts/work-helper.mjs && git status --short | rg -v \"stats.json|NUL\"": {
+   "count": 1,
+   "ms": 1860,
+   "maxMs": 1860,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit --strict --target es2022 --module esnext --moduleResolution bundler --lib es2022,dom,dom.iterable --allowImportingTsExtensions --skipLibCheck hub/web/diagram.ts 2>&1 | rg -o": {
+   "count": 1,
+   "ms": 1798,
+   "maxMs": 1798,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc -p hub/tsconfig.json 2>&1 | rg -o \"^[^(]+\" | sort | uniq -c | sort -rn | head; npx tsc -p hub/tsconfig.json 2>&1 | rg \"diagram.ts\"": {
+   "count": 1,
+   "ms": 8687,
+   "maxMs": 8687,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && npx tsc -p hub/tsconfig.json 2>&1 | rg \"^hub/\" | cut -c1-220": {
+   "count": 1,
+   "ms": 4008,
+   "maxMs": 4008,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- extensions/work-extension-scout.ts hub/tsconfig.json \"docs/plans/done/2026-10-28-browser-act-agent-controls-a-granted-site-in-your-own-browse-607b2518-plan3.md\" && git commit -q -": {
+   "count": 1,
+   "ms": 287,
+   "maxMs": 287,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | rg -v \"stats.json|NUL\"; git branch --show-current; git remote -v | head -2; git diff --stat origin/master..HEAD | cat; rg -n \"\\\"version\\\"\" package.json; ls package-lock.": {
+   "count": 1,
+   "ms": 1416,
+   "maxMs": 1416,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls docs/changelog | tail -5; git log --oneline origin/master..HEAD | cat; rg -n \"Hide files\" hub/web/*.ts | head -5": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (node scripts/test-work-browser-fetch.mjs > \"$TEMP/t1.log\" 2>&1; echo \"bf rc=$?\" >> \"$TEMP/t1.log\") & (node scripts/test-work-extension-scout.mjs > \"$TEMP/t2.log\" 2>&1; echo \"scout rc=$?\" >>": {
+   "count": 1,
+   "ms": 65121,
+   "maxMs": 65121,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -v \"^\\s+at \" \"$TEMP/t2.log\" | rg -v \"^ok\" | head -20; rg -n \"\\\"version\\\"\" browser-fetch/extension/manifest.json": {
+   "count": 1,
+   "ms": 720,
+   "maxMs": 720,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp extensions/work-extension-scout.ts \"$TEMP/scout.fixed.ts\" && git show origin/master:extensions/work-extension-scout.ts > extensions/work-extension-scout.ts && node scripts/test-work-exten": {
+   "count": 1,
+   "ms": 1677,
+   "maxMs": 1677,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-extension-scout.mjs 2>&1 | rg -c \"^ok\"; env -u PI_HUB node scripts/test-work-extension-scout.mjs >/dev/null 2>&1; echo \"rc=$?\"": {
+   "count": 1,
+   "ms": 3455,
+   "maxMs": 3455,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.1.91 --no-git-tag-version >/dev/null && sed -i \"s/\\\"version\\\": \\\"1.0\\\"/\\\"version\\\": \\\"1.1\\\"/\" browser-fetch/extension/manifest.json && sed -i \"s/^## Unreleased$/## 0.1.91 — 202": {
+   "count": 1,
+   "ms": 1447,
+   "maxMs": 1447,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Files\\\"|files\\b.*addEventListener|\\\"files\\\"\" hub/web/app.ts | head -8; sed -n \"1,25p\" hub/scripts/changelog-shot.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 325,
+   "maxMs": 325,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \".files-head\" docs/changelog/0.1.91-hide-files.png \"document.getElementById('tab-files').click()\" --pad=16 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 2855,
+   "maxMs": 2855,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"183,198p\" hub/web/app.ts | cut -c1-220; rg -n \"data-left|dataset.left =\" hub/web/app.ts | head -5": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"165,175p\" hub/web/app.ts | cut -c1-200; rg -n \"setLeft\\(\\\"\" hub/web/app.ts | head -5": {
+   "count": 1,
+   "ms": 316,
+   "maxMs": 316,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \"#files\" docs/changelog/0.1.91-hide-files.png \"document.getElementById('expand-left').click(); document.getElementById('tab-files').click()\"": {
+   "count": 1,
+   "ms": 2376,
+   "maxMs": 2376,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"setup|wait\" hub/scripts/changelog-shot.mjs | cut -c1-220 | head -12": {
+   "count": 1,
+   "ms": 89,
+   "maxMs": 89,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"48,75p\" hub/scripts/changelog-shot.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 72,
+   "maxMs": 72,
+   "failures": 0
+  },
+  "bash\u0000cygpath -w \"$TEMP/hub-full.png\"": {
+   "count": 1,
+   "ms": 244,
+   "maxMs": 244,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \"body\" \"$TEMP/hub-full.png\" \"document.getElementById('expand-left').click(); document.getElementById('tab-files').click()\" --pad=0 2>&1 | ta": {
+   "count": 1,
+   "ms": 3841,
+   "maxMs": 3841,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \".files-head\" docs/changelog/0.1.91-hide-files.png \"document.getElementById('expand-left').click(); document.getElementById('tab-files').cli": {
+   "count": 1,
+   "ms": 2557,
+   "maxMs": 2557,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls -la docs/changelog/0.1.91-hide-files.png && cp docs/changelog/0.1.91-hide-files.png \"$TEMP/shotcheck-$$.png\" && cygpath -w \"$TEMP/shotcheck-$$.png\"": {
+   "count": 1,
+   "ms": 102,
+   "maxMs": 102,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git add -- docs/changelog/0.1.91-hide-files.png && git status --short | rg -v \"^\\?\\?\"; git commit -q -m \"0.1.91: browser_act, Hide files, scout type fixes; browser extension 1.": {
+   "count": 1,
+   "ms": 4099,
+   "maxMs": 4099,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"showListDialog|title:|Install|extension folder|extensionDir|copyToClipboard|clipboard\" extensions/browser-fetch.ts | head -40; rg -n \"clipboard\" extensions/*.ts | head -5": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"440,466p\" extensions/browser-fetch.ts; sed -n \"4150,4160p\" extensions/work-models.ts; rg -n \"copyToClipboard\" extensions/*.ts | head -3": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"54,62p\" extensions/work-models.ts | cut -c1-200; f=$(rg -l \"export (async )?function copyToClipboard\" \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-": {
+   "count": 1,
+   "ms": 978,
+   "maxMs": 978,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"async function connected|function connected\" -A12 extensions/browser-fetch.ts; rg -n \"ping|hello|getManifest\" browser-fetch/host.mjs browser-fetch/extension/*.js | head": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,20p\" extensions/browser-fetch.ts | cut -c1-160": {
+   "count": 1,
+   "ms": 64,
+   "maxMs": 64,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -4; node --input-type=module -e \"import('./extensions/browser-fetch.ts').then(()=>console.log('loads'))\" 2>&1 | tail -1; no": {
+   "count": 1,
+   "ms": 65874,
+   "maxMs": 65874,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- extensions/browser-fetch.ts CHANGELOG.md && git commit -q -m \"Browser access: show extension version, copy its folder path\" && git log --oneline -1": {
+   "count": 1,
+   "ms": 191,
+   "maxMs": 191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | rg -v \"^\\?\\?\"; npm version 0.1.92 --no-git-tag-version >/dev/null && sed -i \"0,/^## Unreleased$/s//## 0.1.92 — 2026-10-28/\" CHANGELOG.md && rg -n \"^## \" CHANGELOG.md | h": {
+   "count": 1,
+   "ms": 3371,
+   "maxMs": 3371,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Version: |\\\"Pi and extensions\\\"|Pi and extensions|Restart hub\" hub/web/*.ts hub/web/*.html hub/src/*.ts | head; rg -n \"navigator.clipboard\" hub/web/*.ts | head -3": {
+   "count": 1,
+   "ms": 700,
+   "maxMs": 700,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"56,64p\" hub/web/index.html | cut -c1-260; sed -n \"2258,2270p\" hub/web/app.ts | cut -c1-240; rg -n \"^const version|version =|packageDir|import\\.meta\\.url\" hub/src/hub.ts | head; rg -n": {
+   "count": 1,
+   "ms": 908,
+   "maxMs": 908,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function hubVersion\" -A6 hub/src/*.ts; rg -n \"^import .*node:(fs|path|url)\" hub/src/hub.ts; rg -n \"update-check\\\"\\)\\.addEventListener|\\\\\\$\\(\\\"update-check\\\"\\)\" hub/web/app.ts | head -": {
+   "count": 1,
+   "ms": 213,
+   "maxMs": 213,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,9p\" hub/src/changelog.ts; rg -n \"import .*changelog\" hub/src/hub.ts": {
+   "count": 1,
+   "ms": 93,
+   "maxMs": 93,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"import \\{ changelogImage|version, seenVersion\" hub/src/hub.ts && rg -n \"^\\.update-list\" hub/web/styles.css": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \"#browser-ext\" docs/changelog/0.1.93-browser-extension.png \"document.getElementById('settings-button').click()\" --pad=10 2>&1 | tail -1 && c": {
+   "count": 1,
+   "ms": 2587,
+   "maxMs": 2587,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \"#browser-ext\" \"$TEMP/bx.png\" \"document.getElementById('settings-button').click()\" --pad=10 2>&1 | rg -v \"^\\s+at \" | tail -8": {
+   "count": 1,
+   "ms": 3234,
+   "maxMs": 3234,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"id=\\\"settings-button\\\"|id=\\\"hub-version\\\"\" hub/web/index.html | cut -c1-200; env -u PI_HUB node hub/scripts/changelog-shot.mjs \"#set-pi\" \"$TEMP/bx2.png\" \"document.getElementById('sett": {
+   "count": 1,
+   "ms": 6498,
+   "maxMs": 6498,
+   "failures": 0
+  },
+  "bash\u0000cp \"$TEMP/bx2.png\" \"$TEMP/bx2v.png\"; cygpath -w \"$TEMP/bx2v.png\"": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \"#browser-ext\" docs/changelog/0.1.93-browser-extension.png \"document.getElementById('settings-button').click(); await new Promise(r=>setTime": {
+   "count": 2,
+   "ms": 7621,
+   "maxMs": 4001,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"settings\\(\\)\" hub/src/*.ts | head -5; rg -n \"renderUpdates\\(\\)\" hub/web/app.ts | head -5": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"browser-ext\" hub/web/index.html hub/web/app.ts | cut -c1-160; rg -n \"\\[hidden\\]\" hub/web/styles.css | head -3; env -u PI_HUB node hub/scripts/changelog-shot.mjs \"#browser-ext\" \"$TEMP/": {
+   "count": 1,
+   "ms": 2947,
+   "maxMs": 2947,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node hub/scripts/changelog-shot.mjs \"#hub-version\" \"$TEMP/bx6.png\" \"document.getElementById('settings-button').click(); await new Promise(r=>setTimeout(r,800)); const e=documen": {
+   "count": 1,
+   "ms": 4257,
+   "maxMs": 4257,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -- CHANGELOG.md | cat": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -- CHANGELOG.md | cat; cd hub && env -u PI_HUB node scripts/test-browser.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 41435,
+   "maxMs": 41435,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- hub/src/changelog.ts hub/src/hub.ts hub/web/app.ts hub/web/index.html hub/web/styles.css CHANGELOG.md docs/changelog/0.1.93-browser-extension.png && git commit -q -m \"Hub gear men": {
+   "count": 1,
+   "ms": 480,
+   "maxMs": 480,
+   "failures": 1
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | Where-Object { $_.Name -notin '_Total','Idle' } | Sort-Object PercentProcessorTime -Descending | Select-Objec": {
+   "count": 1,
+   "ms": 9715,
+   "maxMs": 9715,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\Flex\\AppData\\Local\\Temp\\cpu-top.ps1\" 2>&1 | head -60": {
+   "count": 1,
+   "ms": 1670,
+   "maxMs": 1670,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Rebuild app\" hub/web hub/src | cut -c1-220; rg -n \"rebuild\" hub/src/*.ts | cut -c1-200 | head -20": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"rebuild\" --glob \"!node_modules\" -g \"*.{json,ts,mjs,ps1,cmd,bat,sh}\" . \"C:/Users/Flex/.pi/agent\" 2>/dev/null | rg -v \"node_modules|\\.log\" | cut -c1-260 | head -20": {
+   "count": 1,
+   "ms": 368,
+   "maxMs": 368,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"8,22p\" \"C:/Users/Flex/.pi/agent/pi-control-hub/commands.json\"; cat hub/app/dev-restart.mjs; ls -la hub/app/src-tauri/target/release/*.exe 2>/dev/null; tail -5 \"$TEMP\"/*tauri*.log 2>/": {
+   "count": 1,
+   "ms": 1160,
+   "maxMs": 1160,
+   "failures": 0
+  },
+  "bash\u0000date \"+%H:%M:%S\"; tasklist //FI \"IMAGENAME eq pi-hub-app.exe\" //FO CSV //NH; tasklist //FO CSV //NH | rg -i \"cargo|rustc|link.exe\" | head": {
+   "count": 1,
+   "ms": 979,
+   "maxMs": 979,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"version\\\"\" hub/app/src-tauri/tauri.conf.json; rg -n \"^version\" hub/app/src-tauri/Cargo.toml; rg -n \"version\" hub/src/app-install.ts | cut -c1-220 | head -30": {
+   "count": 1,
+   "ms": 1088,
+   "maxMs": 1088,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"40,140p\" hub/src/app-install.ts; d=$(node -e \"import('./hub/src/registry.ts').then(m=>console.log(m.hubDataDir()))\"); echo \"$d\"; ls -la \"$d\" | rg -i \"app\"; cat \"$d\"/*app*.json 2>/dev": {
+   "count": 1,
+   "ms": 473,
+   "maxMs": 473,
+   "failures": 1
+  },
+  "bash\u0000d=\"$LOCALAPPDATA/Programs/pi-hub-app\"; ls -la --time-style=+%H:%M \"$d\"; cat \"$d/installed.json\"; echo; cd \".\" && rg -n \"app\\.version|status\\(\\)\\.version|appStatus.*version|\\.version \\?\\?\" hub/web/app.": {
+   "count": 1,
+   "ms": 382,
+   "maxMs": 382,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"paths|restart\\(\\)|function restart\" hub/src/app-install.ts | cut -c1-220; sed -n \"2305,2315p\" hub/web/app.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l hub/src/app-install.ts hub/app/dev-restart.mjs && git diff --stat && git diff -- hub/src/app-install.ts | cat": {
+   "count": 1,
+   "ms": 324,
+   "maxMs": 324,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -ln \"app-install|dev-restart\" hub/scripts scripts | head; printf \"%s\" \"{\\\"version\\\":\\\"0.1.92\\\"}\" > \"$LOCALAPPDATA/Programs/pi-hub-app/installed.json\" && cat \"$LOCALAPPDATA/Programs/pi-hub": {
+   "count": 1,
+   "ms": 293,
+   "maxMs": 293,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && env -u PI_HUB node scripts/test-app-install.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 1356,
+   "maxMs": 1356,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- hub/src/app-install.ts hub/app/dev-restart.mjs && git commit -q -m \"Rebuild app: record the checkout's version so the hub shows it and does not stage a release over the local buil": {
+   "count": 1,
+   "ms": 221,
+   "maxMs": 221,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='node.exe'\\\" | Where-Object CommandLine -match 'hub' | Select-Object -ExpandProperty CommandLine\" 2>&1 | cut -c1-250 | head": {
+   "count": 1,
+   "ms": 565,
+   "maxMs": 565,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.1.93 --no-git-tag-version >/dev/null && sed -i \"0,/^## Unreleased$/s//## 0.1.93 — 2026-10-28/\" CHANGELOG.md && rg -n \"^## \" CHANGELOG.md | head -2 && git add -- package.json pa": {
+   "count": 1,
+   "ms": 4746,
+   "maxMs": 4746,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"export async function install\" -A40 extensions/browser-fetch.ts | cut -c1-230; rg -n \"hostManifest =|function hostManifest|launcher\" extensions/browser-fetch.ts | cut -c1-200 | head": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"BROWSER_KEYS =\" extensions/browser-fetch.ts | cut -c1-220; for k in \"ImputNet\\\\Helium\" \"Google\\\\Chrome\"; do reg query \"HKCU\\\\Software\\\\$k\\\\NativeMessagingHosts\\\\pi.browser_fetch\" //ve": {
+   "count": 1,
+   "ms": 766,
+   "maxMs": 766,
+   "failures": 0
+  },
+  "bash\u0000for k in \"imput\\\\Helium\" \"Google\\\\Chrome\" \"Microsoft\\\\Edge\" \"Chromium\"; do echo \"== $k\"; reg query \"HKCU\\\\Software\\\\$k\\\\NativeMessagingHosts\\\\pi.browser_fetch\" //ve 2>&1 | rg \"REG_SZ|ERROR\"; done": {
+   "count": 1,
+   "ms": 2265,
+   "maxMs": 2265,
+   "failures": 0
+  },
+  "bash\u0000reg query \"HKCU\\\\Software\" //s //f \"pi.browser_fetch\" //k 2>&1 | head; reg query \"HKLM\\\\Software\" //s //f \"pi.browser_fetch\" //k 2>&1 | head -3; ls \"$USERPROFILE/.pi/agent/browser-fetch/host/\"": {
+   "count": 1,
+   "ms": 13045,
+   "maxMs": 13045,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"install\\(|\\.registered\" extensions hub/src scripts -g \"*.{ts,mjs}\" | rg -i \"browser|registered\" | cut -c1-180": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | rg -v \"^\\?\\?\"; git pull --rebase origin master 2>&1 | tail -2; git log --oneline -4; git status -sb | head -1": {
+   "count": 1,
+   "ms": 1903,
+   "maxMs": 1903,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -3; rg -n \"^## \" CHANGELOG.md | head -2": {
+   "count": 1,
+   "ms": 64809,
+   "maxMs": 64809,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"403,425p\" extensions/browser-fetch.ts; rg -n \"existsSync\\(hostManifest\\(\\)\\)\" extensions/browser-fetch.ts; rg -n \"^export default|registerTool\" extensions/browser-fetch.ts | head": {
+   "count": 1,
+   "ms": 347,
+   "maxMs": 347,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -2 && node --input-type=module -e \"import('./extensions/browser-fetch.ts').then(m=>{m.default({registerTool(){console.log('": {
+   "count": 1,
+   "ms": 64978,
+   "maxMs": 64978,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.1.95 --no-git-tag-version >/dev/null && sed -i \"0,/^## 0.1.94/s//## 0.1.95 — 2026-10-28\\n\\n### Fixed\\n- The browser helper keeps working after a node upgrade: Pi points it at t": {
+   "count": 1,
+   "ms": 3554,
+   "maxMs": 3554,
+   "failures": 0
+  },
+  "bash\u0000cd \"./browser-fetch\" && rg -n \"active:|tabs.create|tabGroups|group\\(|highlight|outline|log\\(\" extension/*.js host.mjs | cut -c1-200 | head -30; wc -l extension/*.js": {
+   "count": 1,
+   "ms": 161,
+   "maxMs": 161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n -i \"background tab|hidden tab\" --glob \"!docs/plans/**\" --glob \"!node_modules\" --glob \"!CHANGELOG.md\" . | cut -c1-220; rg -n \"\\\"version\\\"\" browser-fetch/extension/manifest.json": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"73p\" README.md | cut -c200-700; sed -n \"75,82p\" browser-fetch/extension/control.js": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/through the Pi browser fetch add-on, in a background tab in a \\\\\\\\\\\"Pi\\\\\\\\\\\" tab group/through the Pi browser fetch add-on, in a tab it brings to the front in a \\\\\\\\\\\"Pi\\\\\\\\\\\" tab ": {
+   "count": 1,
+   "ms": 1399,
+   "maxMs": 1399,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -2 && sed -i \"0,/^## 0.1.95/s//## Unreleased\\n\\n### Changed\\n- browser_act opens its tab in front so you watch every click ": {
+   "count": 1,
+   "ms": 19641,
+   "maxMs": 19641,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | rg -v \"^\\s+at \" | tail -15": {
+   "count": 1,
+   "ms": 19376,
+   "maxMs": 19376,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"debugger was detached\" scripts browser-fetch extensions | cut -c1-200": {
+   "count": 1,
+   "ms": 297,
+   "maxMs": 297,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"349s#f({ tabId: agentTab().id })), /debugger was detached/#f({ tabId: agentTab().id }, \\\"target_closed\\\")), /detached the debugger \\\\\\\\(target_closed/#\" scripts/test-work-browser-fet": {
+   "count": 1,
+   "ms": 405,
+   "maxMs": 405,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs > \"$TEMP/bf-test.log\" 2>&1; echo \"exit $?\"; tail -2 \"$TEMP/bf-test.log\"": {
+   "count": 1,
+   "ms": 64996,
+   "maxMs": 64996,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -- scripts/test-work-browser-fetch.mjs && git commit -q --amend --no-edit && git log --oneline -1 && git status --short | rg -v \"^\\?\\?\"; git status -sb | head -1": {
+   "count": 1,
+   "ms": 633,
+   "maxMs": 633,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.1.96 --no-git-tag-version >/dev/null && sed -i \"0,/^## Unreleased$/s//## 0.1.96 — 2026-10-28/\" CHANGELOG.md && rg -n \"^## \" CHANGELOG.md | head -2 && git add -- package.json pa": {
+   "count": 1,
+   "ms": 3825,
+   "maxMs": 3825,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/browser-act.ts && rg -n \"phase|inspect|confirm|askConfirm|approve|action ===|case \\\"|enum|StringEnum|Type\\.|parameters\" extensions/browser-act.ts | cut -c1-200 | head -60": {
+   "count": 1,
+   "ms": 1053,
+   "maxMs": 1053,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"sendCommand|Input.dispatchMouseEvent|phase: \\\"inspect\\\"|act.validate|act.judge|browserAct\\(|insertText|onEvent\" scripts/test-work-browser-fetch.mjs | cut -c1-220 | head -40": {
+   "count": 1,
+   "ms": 279,
+   "maxMs": 279,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import|writeFileSync|mkdtempSync|const agent\" scripts/test-work-browser-fetch.mjs | head -12": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"typed|elements\\\":|cdpLog\" scripts/test-work-browser-fetch.mjs | sed -n \"1,30p\" | cut -c1-160": {
+   "count": 1,
+   "ms": 282,
+   "maxMs": 282,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs > \"$TEMP/bf-test.log\" 2>&1; echo \"exit $?\"; rg -v \"^\\s+at \" \"$TEMP/bf-test.log\" | tail -12 | cut -c1-300": {
+   "count": 1,
+   "ms": 68880,
+   "maxMs": 68880,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"4s/\\\"1.2\\\"/\\\"1.3\\\"/\" browser-fetch/extension/manifest.json && sed -i \"73s/$/ It can upload images too: only PNG, JPEG, GIF or WebP files inside the project folder, and you confirm ev": {
+   "count": 1,
+   "ms": 2453,
+   "maxMs": 2453,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"tmpdir|\\.sock|config/|NativeMessagingHosts|XDG\" extensions/browser-fetch.ts browser-fetch/host.mjs | cut -c1-220": {
+   "count": 1,
+   "ms": 236,
+   "maxMs": 236,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && env -u PI_HUB node scripts/test-work-browser-fetch.mjs > \"$TEMP/bf-test.log\" 2>&1; echo \"exit $?\"; tail -1 \"$TEMP/bf-test.log\"": {
+   "count": 1,
+   "ms": 69106,
+   "maxMs": 69106,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.1.97 --no-git-tag-version >/dev/null && sed -i \"0,/^## Unreleased$/s//## 0.1.97 — 2026-10-28/\" CHANGELOG.md && rg -n \"^## \" CHANGELOG.md | head -2 && git add -- package.json pa": {
+   "count": 1,
+   "ms": 4143,
+   "maxMs": 4143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"image|thumbnail|detail\" extensions/ask-user/menu.ts | head -30; rg -ln \"purpose\" hub/src hub/*.js hub/web 2>/dev/null | head; ls hub": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"purpose|detail\" hub/web/prompts.ts | head -30; rg -n \"purpose|\\.detail|form-detail|overflow-wrap|word-break\" hub/web/styles.css | head -30": {
+   "count": 1,
+   "ms": 418,
+   "maxMs": 418,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"detail\" hub/src/forms.ts hub/src/hub.ts extensions/ask-user/*.ts | rg -v \"menu.ts:(4|5)\" | cut -c1-200 | head -30; rg -n \"maxPayload|MAX_BODY|limit:|1024 \\* 1024\" hub/src/hub.ts | hea": {
+   "count": 1,
+   "ms": 352,
+   "maxMs": 352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"export (async )?function hubAsk\" -A25 extensions/ask-user/*.ts | cut -c1-200 | head -40; sed -n 40,60p extensions/ask-user/remote.ts": {
+   "count": 1,
+   "ms": 109,
+   "maxMs": 109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function hubAsk\" -A20 extensions | cut -c1-220 | head -30": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"hubAsk\\b\" extensions -g \"*.ts\" | rg \"import|const hubAsk|function\" | head -5": {
+   "count": 1,
+   "ms": 269,
+   "maxMs": 269,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"export (async )?function ask|setStatus|setWidget|JSON.stringify|notify\" extensions/hub-channel.ts | head -15": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"img-src|Content-Security\" hub/web/index.html hub/src/*.ts | cut -c1-250": {
+   "count": 1,
+   "ms": 104,
+   "maxMs": 104,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"compact|\\.detail\" hub/src/*.ts | head; rg -n \"preserveCase\" extensions/ask-user/menu.ts | head -3": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs > \"$TEMP/bf-test.log\" 2>&1; echo \"exit $?\"; rg -v \"^\\s+at \" \"$TEMP/bf-test.log\" | tail -6 | cut -c1-300; cat hub/package.json | rg \"\\\"(": {
+   "count": 1,
+   "ms": 71082,
+   "maxMs": 71082,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"299,302p\" extensions/work-camera.ts | cut -c1-200; git log -1 --format=%h -- extensions/work-camera.ts": {
+   "count": 1,
+   "ms": 373,
+   "maxMs": 373,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | rg -v \"^\\?\\?\"; rg -l \"listSubject|prompts\\.ts|dialog-detail\" scripts hub/scripts | head": {
+   "count": 1,
+   "ms": 356,
+   "maxMs": 356,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"createPromptView|showListDialog|\\\"ask\\\".*kind: \\\"list\\\"\" scripts hub/scripts | head; sed -n 1,30p hub/scripts/changelog-shot.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 141,
+   "maxMs": 141,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"ask\\b|askJson|kind\" hub/scripts/changelog-shot.mjs | sed -n 1,30p | cut -c1-250": {
+   "count": 1,
+   "ms": 263,
+   "maxMs": 263,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"hubask\" -A6 hub/scripts/*.mjs hub/src scripts 2>/dev/null | rg -v changelog-shot.mjs:51 | head -20 | cut -c1-250": {
+   "count": 1,
+   "ms": 411,
+   "maxMs": 411,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-browser-fetch test-work-ask-compact test-work-dialogs; do env -u PI_HUB node scripts/$t.mjs > \"$TEMP/$t.log\" 2>&1; echo \"$t exit $?\"; done; ls -S docs/changelog/*.png | ta": {
+   "count": 1,
+   "ms": 71381,
+   "maxMs": 71381,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && B64=$(base64 -w0 docs/changelog/0.1.61-update-badge.png) && ASK=\"{\\\"kind\\\":\\\"list\\\",\\\"title\\\":\\\"Browser control: upload\\\",\\\"purpose\\\":\\\"The agent wants to upload 1 image through \\\\\\\"Choose F": {
+   "count": 1,
+   "ms": 3791,
+   "maxMs": 3791,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 1,
+   "ms": 59,
+   "maxMs": 59,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.1.98 --no-git-tag-version >/dev/null && sed -i \"0,/^## 0.1.97/s//## 0.1.98 — 2026-10-28\\n\\n### Changed\\n- The browser_act upload confirmation shows a thumbnail of each image in": {
+   "count": 1,
+   "ms": 4303,
+   "maxMs": 4303,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "P1-02": {
+   "ms": 154263,
+   "testMs": 2855,
+   "replies": 13,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 13
+   }
+  },
+  "P1-04": {
+   "ms": 65749,
+   "testMs": 110,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   }
+  },
+  "P1-03": {
+   "ms": 26198,
+   "testMs": 0,
+   "replies": 3,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 3
+   }
+  },
+  "P2-01": {
+   "ms": 85418,
+   "testMs": 5814,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 11
+   }
+  },
+  "P2-07": {
+   "ms": 4878,
+   "testMs": 0,
+   "replies": 1,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 1
+   }
+  },
+  "P2-02": {
+   "ms": 291838,
+   "testMs": 13508,
+   "replies": 17,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 17
+   },
+   "failures": 1
+  },
+  "P3-01": {
+   "ms": 416425,
+   "testMs": 29256,
+   "replies": 25,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 25
+   }
+  },
+  "P4-01": {
+   "ms": 1647705,
+   "testMs": 405932,
+   "replies": 71,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 6,
+    "anthropic/claude-opus-5-5:high": 65
+   },
+   "failures": 12
+  },
+  "(none)": {
+   "ms": 1969389,
+   "testMs": 600152,
+   "replies": 185,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 185
+   },
+   "failures": 9
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-10-28T19:26:00.759Z",
+   "ms": 1248738
+  },
+  {
+   "start": "2026-10-28T19:46:49.519Z",
+   "ms": 998597
+  },
+  {
+   "start": "2026-10-28T20:03:56.823Z",
+   "ms": 1895124
+  },
+  {
+   "start": "2026-10-28T20:35:31.970Z",
+   "ms": 198677
+  },
+  {
+   "start": "2026-10-28T20:38:50.666Z",
+   "ms": 2498
+  },
+  {
+   "start": "2026-10-28T20:39:55.915Z",
+   "ms": 334598
+  },
+  {
+   "start": "2026-10-28T20:52:07.855Z",
+   "ms": 12314
+  },
+  {
+   "start": "2026-10-28T20:53:58.421Z",
+   "ms": 189740
+  },
+  {
+   "start": "2026-10-28T20:58:04.128Z",
+   "ms": 220863
+  },
+  {
+   "start": "2026-10-28T21:08:48.589Z",
+   "ms": 128785
+  },
+  {
+   "start": "2026-10-28T21:13:35.090Z",
+   "ms": 14446
+  },
+  {
+   "start": "2026-10-28T21:15:26.201Z",
+   "ms": 254986
+  },
+  {
+   "start": "2026-10-28T21:25:49.642Z",
+   "ms": 32386
+  },
+  {
+   "start": "2026-10-28T21:26:36.777Z",
+   "ms": 22121
+  },
+  {
+   "start": "2026-10-28T21:28:19.636Z",
+   "ms": 72806
+  },
+  {
+   "start": "2026-10-28T21:32:11.850Z",
+   "ms": 27559
+  },
+  {
+   "start": "2026-10-28T21:33:11.373Z",
+   "ms": 19351
+  },
+  {
+   "start": "2026-10-28T21:38:51.840Z",
+   "ms": 58429
+  },
+  {
+   "start": "2026-10-28T21:41:27.233Z",
+   "ms": 11150
+  },
+  {
+   "start": "2026-10-28T21:48:26.195Z",
+   "ms": 23972
+  },
+  {
+   "start": "2026-10-28T21:51:54.181Z",
+   "ms": 85316
+  },
+  {
+   "start": "2026-10-28T21:53:43.059Z",
+   "ms": 7900
+  },
+  {
+   "start": "2026-10-28T21:54:02.641Z",
+   "ms": 115948
+  },
+  {
+   "start": "2026-10-28T22:06:54.787Z",
+   "ms": 310291
+  },
+  {
+   "start": "2026-10-28T22:23:49.072Z",
+   "ms": 12039
+  },
+  {
+   "start": "2026-10-28T22:46:39.681Z",
+   "ms": 241963
+  },
+  {
+   "start": "2026-10-29T06:22:00.654Z",
+   "ms": 25344
+  },
+  {
+   "start": "2026-10-29T06:23:25.446Z",
+   "ms": 86437
+  },
+  {
+   "start": "2026-10-29T06:44:10.157Z",
+   "ms": 218991
+  },
+  {
+   "start": "2026-10-29T07:22:28.154Z",
+   "ms": 119824
+  }
+ ],
+ "hints": []
+}

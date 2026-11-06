@@ -1,0 +1,1546 @@
+{
+ "version": 1,
+ "activeMs": 8505572,
+ "runs": 61,
+ "waitingMs": 1132111,
+ "toolWallMs": 2205258,
+ "compactions": {
+  "count": 6,
+  "ms": 85370
+ },
+ "models": {
+  "openai-codex/gpt-6.1-sol:medium": {
+   "replies": 217,
+   "thinkingMs": 1965292,
+   "actingMs": 1063493,
+   "input": 1346280,
+   "output": 85401,
+   "cacheRead": 25670912,
+   "cacheWrite": 0,
+   "cost": 6.113661200000008,
+   "errors": 0
+  },
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 245,
+   "thinkingMs": 1356124,
+   "actingMs": 439970,
+   "input": 640,
+   "output": 136860,
+   "cacheRead": 25888212,
+   "cacheWrite": 4559242,
+   "cost": 30.713612400000006,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 188,
+   "ms": 1854020,
+   "maxMs": 300419,
+   "failures": 22
+  },
+  "read": {
+   "count": 104,
+   "ms": 1058,
+   "maxMs": 287,
+   "failures": 2
+  },
+  "module_report": {
+   "count": 1,
+   "ms": 78,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 35,
+   "ms": 448080,
+   "maxMs": 307057,
+   "failures": 3
+  },
+  "write": {
+   "count": 9,
+   "ms": 60,
+   "maxMs": 15,
+   "failures": 0
+  },
+  "edit": {
+   "count": 100,
+   "ms": 2927,
+   "maxMs": 607,
+   "failures": 4
+  },
+  "lens_diagnostics": {
+   "count": 12,
+   "ms": 79312,
+   "maxMs": 11135,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 61,
+   "ms": 2002,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "intercom": {
+   "count": 1,
+   "ms": 32,
+   "maxMs": 32,
+   "failures": 0
+  },
+  "resolve-library-id": {
+   "count": 1,
+   "ms": 1124,
+   "maxMs": 1124,
+   "failures": 0
+  },
+  "query-docs": {
+   "count": 2,
+   "ms": 3160,
+   "maxMs": 1785,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 2,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "read_symbol": {
+   "count": 3,
+   "ms": 2352,
+   "maxMs": 2343,
+   "failures": 0
+  },
+  "camera_capture": {
+   "count": 9,
+   "ms": 42764,
+   "maxMs": 13999,
+   "failures": 2
+  },
+  "camera_watch": {
+   "count": 10,
+   "ms": 65793,
+   "maxMs": 12582,
+   "failures": 0
+  },
+  "web_enable": {
+   "count": 1,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "web_search": {
+   "count": 1,
+   "ms": 28613,
+   "maxMs": 28613,
+   "failures": 0
+  },
+  "get_search_content": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "fetch_content": {
+   "count": 1,
+   "ms": 10615,
+   "maxMs": 10615,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 138,
+   "ms": 109562,
+   "maxMs": 15262,
+   "failures": 13
+  },
+  "test": {
+   "count": 50,
+   "ms": 1744458,
+   "maxMs": 300419,
+   "failures": 9
+  }
+ },
+ "commands": {
+  "bash\u0000git status --short; git diff --stat; git diff -- \"docs/plans/logs/83ec1441.md\"": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"cameraController|createCameraController|attachStop|worker\\(\" \"extensions/work-models.ts\" \"extensions/work-camera-state.ts\"; ls \"scripts/fixtures\"; ls \"extensions\" | grep \"process\\|camera\\|super": {
+   "count": 1,
+   "ms": 192,
+   "maxMs": 192,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-camera-state.mjs\"": {
+   "count": 1,
+   "ms": 4367,
+   "maxMs": 4367,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-settings.mjs\" && node \"scripts/test-work-dialogs.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 1471,
+   "maxMs": 1471,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && git diff --check -- \"extensions/work-camera-process.ts\" \"extensions/work-camera-worker.ts\" \"scripts/test-work-camera.mjs\" \"scripts/fixtures/camera-parent.mjs\"": {
+   "count": 1,
+   "ms": 2041,
+   "maxMs": 2041,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera-process.ts\" \"extensions/work-camera-worker.ts\" \"scripts/test-work-camera.mjs\" \"scripts/fixtures/camera-parent.mjs\" \"docs/plans/2026-10-08-camera-snapshots-and-change": {
+   "count": 1,
+   "ms": 213,
+   "maxMs": 213,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat; git status --short; git log -3 --oneline": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-camera-state.mjs\" && git diff --check -- \"extensions/work-camera.ts\" \"extensions/work-camera-images.ts\" \"scripts/test-work-camera.mjs\"": {
+   "count": 1,
+   "ms": 4318,
+   "maxMs": 4318,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && git diff --check -- \"extensions/work-camera.ts\" \"extensions/work-camera-images.ts\" \"scripts/test-work-camera.mjs\"": {
+   "count": 1,
+   "ms": 2010,
+   "maxMs": 2010,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera-images.ts\" \"extensions/work-camera.ts\" \"scripts/test-work-camera.mjs\" \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/logs/83": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"setWidget|theme.fg\\(\\\"error\\\"|showResearchContext\" \"extensions/work-models.ts\" \"extensions/work-dialogs.ts\" \"scripts/test-work-subscription-footer.mjs\"": {
+   "count": 1,
+   "ms": 95,
+   "maxMs": 95,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"pi-tui|truncateToWidth|\\bText\\b\" \"extensions/work-dialogs.ts\" | head -12; rg -n \"setWidget\\(\" \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent/dist/c": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-subscription-footer.mjs\" && node \"scripts/test-work-dialogs.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 2520,
+   "maxMs": 2520,
+   "failures": 0
+  },
+  "bash\u0000CE_WORKFLOW_ENABLED=0 npm run verify && CE_WORKFLOW_ENABLED=1 npm run verify": {
+   "count": 1,
+   "ms": 300419,
+   "maxMs": 300419,
+   "failures": 1
+  },
+  "bash\u0000git status --short; rg -n -A14 -B4 \"FAIL|AssertionError|Error:\" \"C:/Users/Flex/AppData/Local/Temp/pi-bash-fd6dd4486733e226.log\"": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera.ts\" \"extensions/work-camera-process.ts\" \"scripts/test-work-camera.mjs\" \"scripts/fixtures/camera-parent.mjs\" \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-": {
+   "count": 1,
+   "ms": 189,
+   "maxMs": 189,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"registerTool\\(|type: \\\"image\\\"|imageDropPlaceholder|stripProcessedPayloads\" \"extensions/work-models.ts\" | head -25": {
+   "count": 1,
+   "ms": 91,
+   "maxMs": 91,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/logs/83ec1441.md\" && git commit -m \"CAM-05 checkpoint capture integration work\"": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000rg -n -A4 -B4 \"createCameraController\\(pi\" \"extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 78,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\"": {
+   "count": 1,
+   "ms": 2110,
+   "maxMs": 2110,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"stripProcessedPayloads\\(\" \"scripts\" | head -12": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-settings.mjs\" && node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-native-smoke.mjs\"": {
+   "count": 1,
+   "ms": 17184,
+   "maxMs": 17184,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-camera-state.mjs\" && git diff --check": {
+   "count": 7,
+   "ms": 41852,
+   "maxMs": 7328,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && git diff --check": {
+   "count": 4,
+   "ms": 19012,
+   "maxMs": 6989,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera.ts\" \"extensions/work-camera-process.ts\" \"extensions/work-camera-images.ts\" \"extensions/work-camera-capture.ts\" \"extensions/work-camera-tools.ts\" \"extensions/work-mod": {
+   "count": 1,
+   "ms": 218,
+   "maxMs": 218,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && git add -- \"extensions/work-camera-detect.ts\" \"extensions/work-camera-process.ts\" \"extensions/work-camera-worker.ts\" \"scripts/test-work-camera.mjs\" \"docs/plans/2": {
+   "count": 1,
+   "ms": 2727,
+   "maxMs": 2727,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera-retain.ts\" \"extensions/work-camera-detect.ts\" \"scripts/test-work-camera.mjs\" \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/": {
+   "count": 1,
+   "ms": 200,
+   "maxMs": 200,
+   "failures": 0
+  },
+  "bash\u0000rg -n -A18 \"sendMessage\\(|deliverAs|getSessionId\\(|session_before_switch|session_before_tree|session_before_fork|agent_start\" \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-wor": {
+   "count": 1,
+   "ms": 61,
+   "maxMs": 61,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/logs/83ec1441.md\" && git commit -m \"Checkpoint verified camera acquisition and retention\"": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000git status --short && git branch --show-current && rg -n \"sendMessage|agent_before_settle|isIdle\" \"extensions/work-camera.ts\" \"extensions/work-camera-tools.ts\"": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 1
+  },
+  "bash\u0000rg -n -A24 \"interface AgentBeforeSettleEvent|interface ExtensionContext|sendMessage<T|triggerTurn|isIdle\" \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent/d": {
+   "count": 1,
+   "ms": 56,
+   "maxMs": 56,
+   "failures": 0
+  },
+  "bash\u0000rg -n -A35 \"interface BoundaryState\" \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/types.d.ts\"": {
+   "count": 1,
+   "ms": 58,
+   "maxMs": 58,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-camera-state.mjs\" && node \"scripts/test-work-settings.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 8187,
+   "maxMs": 8187,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Camera|camera|C-FULL|C-CAMERA|C-STATE\" \"README.md\" \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\"": {
+   "count": 1,
+   "ms": 69,
+   "maxMs": 69,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera-watch.ts\" \"extensions/work-camera-tools.ts\" \"extensions/work-camera.ts\" \"extensions/work-camera-detect.ts\" \"extensions/work-models.ts\" \"scripts/test-work-camera.mjs\"": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"workflow off|workflow-off|CE_WORKFLOW_ENABLED =|getAllTools|camera_capture|registeredTools\" \"scripts/test-work-settings.mjs\" \"scripts/verify-package.mjs\"": {
+   "count": 1,
+   "ms": 63,
+   "maxMs": 63,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera-watch.ts\" \"extensions/work-camera-tools.ts\" \"scripts/test-work-camera.mjs\" \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/lo": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-camera-state.mjs\" && node \"scripts/test-work-settings.mjs\" && node \"scripts/test-work-dialogs.mjs\" && node \"scripts/test-work-subscriptio": {
+   "count": 1,
+   "ms": 8814,
+   "maxMs": 8814,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"tool.exposure|startsWith\\(\\\"work_\\\"\\).*model-only\" \"scripts\"": {
+   "count": 1,
+   "ms": 92,
+   "maxMs": 92,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-compaction-notifications.mjs\" && git diff --check && powershell -NoProfile -Command \"Set-Item Env:CE_WORKFLOW_ENABLED 0; npm run verify; exit (Get-Variable LASTEXITCODE -ValueO": {
+   "count": 1,
+   "ms": 46782,
+   "maxMs": 46782,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Set-Item Env:CE_WORKFLOW_ENABLED 1; npm run verify; exit (Get-Variable LASTEXITCODE -ValueOnly)\"": {
+   "count": 1,
+   "ms": 235430,
+   "maxMs": 235430,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-goal.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 4812,
+   "maxMs": 4812,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-goal.mjs\" && git diff --check && powershell -NoProfile -Command \"Set-Item Env:CE_WORKFLOW_ENABLED 1; npm run verify -- --quiet; exit (Get": {
+   "count": 1,
+   "ms": 5606,
+   "maxMs": 5606,
+   "failures": 1
+  },
+  "bash\u0000powershell -NoProfile -Command \"Set-Item Env:CE_WORKFLOW_ENABLED 1; npm run verify -- --quiet; exit (Get-Variable LASTEXITCODE -ValueOnly)\"": {
+   "count": 1,
+   "ms": 242904,
+   "maxMs": 242904,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"mode:|saved|remote|settings/session|device\" \"scripts/test-work-camera.mjs\" && git status --short": {
+   "count": 1,
+   "ms": 82,
+   "maxMs": 82,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-camera-state.mjs\" && node \"scripts/test-work-settings.mjs\" && node \"scripts/test-work-compaction-notifications.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 9061,
+   "maxMs": 9061,
+   "failures": 0
+  },
+  "bash\u0000git diff --check && git add -- \"README.md\" \"scripts/test-work-camera.mjs\" \"scripts/test-work-compaction-notifications.mjs\" \"scripts/test-work-goal.mjs\" \"scripts/test-work-settings.mjs\" \"scripts/verify": {
+   "count": 1,
+   "ms": 233,
+   "maxMs": 233,
+   "failures": 0
+  },
+  "bash\u0000where.exe ffmpeg && ffmpeg -hide_banner -version && ffmpeg -hide_banner -list_devices true -f dshow -i dummy": {
+   "count": 1,
+   "ms": 962,
+   "maxMs": 962,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 start camera calibration\"": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Camera \\(project|camera.*project only|cameraSettingRow|label: \\\"Camera\" \"extensions/work-models.ts\" \"extensions/work-camera.ts\" | head -20": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Camera \\(project only\\)|camera\" \"scripts/test-work-settings.mjs\" | head -20": {
+   "count": 1,
+   "ms": 96,
+   "maxMs": 96,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"item.local|\\.local \\?|function chooseWorkSetting|function hasProjectOverride|masked locally\" \"extensions/work-models.ts\" | head -20": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"action === \\\"clear\\\"|item\\.local|\\.local\\b\" \"extensions/work-models.ts\" \"extensions/work-dialogs.ts\" | head": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-settings.mjs\" && node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-dialogs.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 6551,
+   "maxMs": 6551,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-models.ts\" \"scripts/test-work-settings.mjs\" && git commit -m \"Show project-only camera row in global settings\" && git status --short": {
+   "count": 1,
+   "ms": 224,
+   "maxMs": 224,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 record first live camera trials\"": {
+   "count": 1,
+   "ms": 209,
+   "maxMs": 209,
+   "failures": 0
+  },
+  "bash\u0000ffmpeg -hide_banner -list_devices true -f dshow -i dummy 2>&1 | findstr /i \"C310 Alternative\"": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 1
+  },
+  "bash\u0000ffmpeg -hide_banner -list_devices true -f dshow -i dummy 2>&1 | rg -i \"c310|alternative\"": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 1
+  },
+  "bash\u0000ffmpeg -hide_banner -list_devices true -f dshow -i dummy": {
+   "count": 4,
+   "ms": 521,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Start-Sleep 5; Get-PnpDevice -PresentOnly -Class Camera,Image -ErrorAction SilentlyContinue | Select-Object Status,Class,FriendlyName | ConvertTo-Json -Compress\" && ffm": {
+   "count": 1,
+   "ms": 5580,
+   "maxMs": 5580,
+   "failures": 1
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -like '*VID_046D*' } | Select-Object Status,Class,FriendlyName,InstanceId | ConvertTo-Json -Compress\"": {
+   "count": 1,
+   "ms": 565,
+   "maxMs": 565,
+   "failures": 1
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-PnpDevice -PresentOnly -InstanceId 'USB\\VID_046D*' -ErrorAction SilentlyContinue | Select-Object Status,Class,FriendlyName,InstanceId | ConvertTo-Json -Compress\"": {
+   "count": 1,
+   "ms": 510,
+   "maxMs": 510,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 record same-port reconnect identity\"": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Start-Sleep 15\" && ffmpeg -hide_banner -list_devices true -f dshow -i dummy": {
+   "count": 1,
+   "ms": 15262,
+   "maxMs": 15262,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-PnpDevice -InstanceId 'USB\\VID_046D&PID_081B*' -ErrorAction SilentlyContinue | Select-Object Status,Present,FriendlyName,InstanceId | ConvertTo-Json -Compress\"": {
+   "count": 1,
+   "ms": 476,
+   "maxMs": 476,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 record port-change identity and absent refusal\"": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"ready|baseline|warm|stable|settl\" \"extensions/work-camera-detect.ts\" | head -60": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"createCameraDetector|type === \\\"ready\\\"|\\\"ready\\\"|readiness\" \"scripts/test-work-camera.mjs\" \"extensions/work-camera-watch.ts\" | head -40": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"possibleExposureShift|maxChange|changedTiles\" \"extensions/work-camera-watch.ts\" \"extensions/work-camera-retain.ts\" \"extensions/work-camera-tools.ts\"": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"sampling|type === \\\"change\\\"|sample.type\" \"extensions/work-camera-watch.ts\" \"extensions/work-camera-retain.ts\"": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"let latest\" \"extensions/work-camera-watch.ts\"": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"latest\" \"extensions/work-camera-watch.ts\"": {
+   "count": 1,
+   "ms": 69,
+   "maxMs": 69,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && git diff --check && git add -- \"extensions/work-camera-detect.ts\" \"extensions/work-camera-watch.ts\" \"scripts/test-work-camera.mjs\" && git commit -m \"CAM-02 wait ": {
+   "count": 1,
+   "ms": 5790,
+   "maxMs": 5790,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 record false-trigger finding\"": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && git diff --check && git add -- \"extensions/work-camera-detect.ts\" \"extensions/work-camera-watch.ts\" \"scripts/test-work-camera.mjs\" && git commit -m \"CAM-02 repor": {
+   "count": 1,
+   "ms": 5833,
+   "maxMs": 5833,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 correct false-trigger diagnosis\"": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 record sustained-load result\"": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 record blink trial, keep step open\"": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000git status --short && git log --oneline -1": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"docs/plans/logs/83ec1441.md\"": {
+   "count": 1,
+   "ms": 55,
+   "maxMs": 55,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/logs/83ec1441.md\" && git commit -m \"CAM-02 keep step text to measured results\"": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000git diff --check && git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 checkpoint for full Pi restart trial\"": {
+   "count": 1,
+   "ms": 200,
+   "maxMs": 200,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-02 record restart identity\"": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/logs/83ec1441.md\" && git commit -m \"CAM-02 done under D-32; CAM-14 live warning trial 1\"": {
+   "count": 1,
+   "ms": 173,
+   "maxMs": 173,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"revoke|onRevoke|invalidate|cancelAll|stopAll|abortAll\" \"extensions/work-camera.ts\" \"extensions/work-camera-watch.ts\" \"extensions/work-camera-state.ts\" \"extensions/work-camera-tools.ts\" \"extensi": {
+   "count": 1,
+   "ms": 211,
+   "maxMs": 211,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera-watch.ts\" \"scripts/test-work-camera.mjs\" \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" && git commit -m \"CAM-14 notify model when a wat": {
+   "count": 1,
+   "ms": 196,
+   "maxMs": 196,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-camera.mjs\" && node \"scripts/test-work-dialogs.mjs\" && node \"scripts/test-work-subscription-footer.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 5493,
+   "maxMs": 5493,
+   "failures": 0
+  },
+  "bash\u0000CE_WORKFLOW_ENABLED=0 npm run verify": {
+   "count": 1,
+   "ms": 49323,
+   "maxMs": 49323,
+   "failures": 0
+  },
+  "bash\u0000CE_WORKFLOW_ENABLED=1 npm run verify": {
+   "count": 1,
+   "ms": 257764,
+   "maxMs": 257764,
+   "failures": 1
+  },
+  "bash\u0000git status --short": {
+   "count": 3,
+   "ms": 176,
+   "maxMs": 61,
+   "failures": 0
+  },
+  "bash\u0000git diff --check && git add -- \"docs/plans/2026-10-08-camera-snapshots-and-change-watch-83ec1441-plan3.md\" \"docs/plans/logs/83ec1441.md\" && git commit -m \"CAM-14 record live acceptance and refreshed v": {
+   "count": 1,
+   "ms": 229,
+   "maxMs": 229,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000git branch --show-current && git remote -v": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000git ls-files \"*lock*\" && git diff -- \"extensions/plan3.ts\" \"scripts/test-work-plan3.mjs\"": {
+   "count": 1,
+   "ms": 102,
+   "maxMs": 102,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-camera.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 17821,
+   "maxMs": 17821,
+   "failures": 0
+  },
+  "bash\u0000git add -u && git commit -m \"Release 0.1.26 with camera qualification and Plan3 updates\" && git push origin master && git status --short && git rev-list --left-right --count \"HEAD...origin/master\"": {
+   "count": 1,
+   "ms": 2356,
+   "maxMs": 2356,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"powershell|win32|process.platform|PrintWindow|user32|adb|agent-browser|spawn|execFile\" \"extensions/screen-read.ts\" | head -60; wc -l \"extensions/screen-read.ts\"; ls extensions | rg -i \"screen\"": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules\" | rg -i \"photon|sharp|jimp|pngjs|image\"; rg -l \"photon\" \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent\"; cat \"$D/dist/utils/image-convert.d.ts\"; rg -n \"photon\" \"$D/dist/utils/image-convert.js\" | head; rg -n \"": {
+   "count": 1,
+   "ms": 186,
+   "maxMs": 186,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent\"; sed -n 14,40p \"$D/package.json\"; cat \"$D/dist/utils/photon.js\" | head -60; cat \"$D/dist/utils/image-res": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-screen-read.mjs\" && git diff --check": {
+   "count": 2,
+   "ms": 187510,
+   "maxMs": 97228,
+   "failures": 0
+  },
+  "bash\u0000agent-browser open \"data:text/html,<h1 style='color:red'>Hello</h1><p>linux check</p>\" && agent-browser screenshot \"C:/tmp/sr-real.png\" && node -e \"import('./extensions/screen-read.ts').then(async m=>": {
+   "count": 1,
+   "ms": 771,
+   "maxMs": 771,
+   "failures": 0
+  },
+  "bash\u0000rm -f \"C:/tmp/sr-real.png\" \"C:/tmp/sr-out.png\"; rg -n -i \"screen_read|screen-read\" README.md docs | rg -i \"windows|linux|platform\"": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-screen-read.mjs\" && git diff --check && git add -- \"extensions/screen-read.ts\" \"scripts/test-work-screen-read.mjs\" \"README.md\" && git commit -m \"screen_read: browser and androi": {
+   "count": 1,
+   "ms": 90375,
+   "maxMs": 90375,
+   "failures": 0
+  },
+  "bash\u0000where android adb 2>&1; adb devices 2>&1 | head -5": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/screen-read.ts\" \"scripts/test-work-screen-read.mjs\" && git commit -m \"screen_read android: fall back to adb exec-out screencap when the android CLI is missing\"": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"busy or crash-locked\" extensions; rg -n \"storage.*lock|lockPath|\\.lock\" \"extensions/work-camera.ts\" | head -40": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000D=\"$(node -e \"console.log(require('os').tmpdir())\")/ce-workflow-camera-images\"; ls -la \"$D\" | head; stat \"$D/images.lock\" 2>&1 | head -8; rg -n \"cameraImages|\\.start\\(|onError|cleanup\\(\" extensions/wo": {
+   "count": 1,
+   "ms": 284,
+   "maxMs": 284,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"busy|images.lock|cleanup\\(\" scripts/test-work-camera*.mjs | head": {
+   "count": 1,
+   "ms": 175,
+   "maxMs": 175,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-camera-images.ts\" \"scripts/test-work-camera.mjs\" && git commit -m \"camera: background image sweep skips quietly when another session holds the storage lock\"": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Keep open for now|Discuss with agent\" extensions scripts | head; rg -n -i \"night\" extensions/plan3.ts | head -30; git log --oneline -8 -- extensions/plan3.ts": {
+   "count": 1,
+   "ms": 186,
+   "maxMs": 186,
+   "failures": 0
+  },
+  "bash\u0000git show 619d101 --stat; git show 619d101 -- extensions/plan3.ts extensions/plan3-night.ts | head -150; rg -n \"questionFormat\\s*=\" extensions/plan3.ts": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/sketchup\" && ls docs/plans; rg -n -B2 -A6 \"Q-02\" docs/plans/*.md | head -40": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"inlineOptions|questionChoices\" scripts/test-work-plan3.mjs extensions/plan3.ts": {
+   "count": 1,
+   "ms": 109,
+   "maxMs": 109,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 10236,
+   "maxMs": 10236,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && git diff --check && git add -- \"extensions/plan3.ts\" \"scripts/test-work-plan3.mjs\" && git commit -m \"Plan3 resolve: offer the Recommendation as an answer when a q": {
+   "count": 1,
+   "ms": 9629,
+   "maxMs": 9629,
+   "failures": 0
+  },
+  "bash\u0000git status --short; git log --oneline origin/master..master; node -p \"require('./package.json').version\"; git ls-files \"package-lock.json\"": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000git branch -r --contains d37d784; git branch -r --contains 0f51625; head -c 400 \"docs/plans/2026-10-12-remove-the-legacy-ce-workflow-orchestration-system-71269270-plan3.md\"": {
+   "count": 1,
+   "ms": 151,
+   "maxMs": 151,
+   "failures": 0
+  },
+  "bash\u0000npm version patch --no-git-tag-version && git add -u && git commit -m \"0.1.36\" && git push origin master && git status -sb | head -1": {
+   "count": 1,
+   "ms": 2986,
+   "maxMs": 2986,
+   "failures": 0
+  },
+  "bash\u0000rg -n -o \".{0,200}[Aa]ssum.{0,200}\" extensions/plan3*.ts | head -30": {
+   "count": 1,
+   "ms": 176,
+   "maxMs": 176,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"A-01\" \"C:/SOFT/git/sketchup/docs/plans/2026-10-12-house-import-wizard-all-floors-roof-site-and-facades-as-tabs-35649658-plan3.md\" | head; rg -n \"^## |Assumptions\" extensions/plan3-template* ext": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"\\\\$\\\\{clarification\\\\}|Label assumptions\" extensions scripts | head": {
+   "count": 1,
+   "ms": 117,
+   "maxMs": 117,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"clarification\\b\" extensions/plan3.ts | head": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && git diff --check && git add -- \"extensions/plan3.ts\" && git commit -m \"Plan3: unconfirmed assumptions the plan relies on become Open questions so /plan3 resolve p": {
+   "count": 1,
+   "ms": 10207,
+   "maxMs": 10207,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && git add -- \"extensions/plan3.ts\" && git commit -m \"Plan3: near-certain assumptions stay labelled; only uncertain ones become Open questions\"": {
+   "count": 1,
+   "ms": 907,
+   "maxMs": 907,
+   "failures": 1
+  },
+  "bash\u0000git status --short; git diff --stat; node \"scripts/test-work-plan3.mjs\"": {
+   "count": 1,
+   "ms": 9396,
+   "maxMs": 9396,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/plan3.ts\" && git commit -m \"Plan3: near-certain assumptions stay labelled; only uncertain ones become Open questions\"": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000git status --short; git log --oneline origin/master..master; node -p \"require('./package.json').version\"": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000npm version patch --no-git-tag-version && git add -u && git commit -m \"0.1.37\" && git push origin master && git status -sb | head -1": {
+   "count": 1,
+   "ms": 2502,
+   "maxMs": 2502,
+   "failures": 0
+  },
+  "bash\u0000rg -l \"process_image\" extensions | head; rg -n \"name: \\\"process_image\\\"\" -A3 extensions | head": {
+   "count": 1,
+   "ms": 208,
+   "maxMs": 208,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"import|complete\\(|completeSimple|getApiKey|modelRegistry|export\" extensions/work-vision.ts | head -40; rg -n \"import|vision|complete\" extensions/work-images.ts | head -30": {
+   "count": 1,
+   "ms": 171,
+   "maxMs": 171,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"inspect|complete|registry|getApiKey|fetch\\(\" extensions/work-vision.ts | head -20": {
+   "count": 1,
+   "ms": 95,
+   "maxMs": 95,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works\"; ls \"$P\"; rg -n \"coerceTypes|new Ajv|validateToolArguments\" \"$P\" -g \"*.js\" | head; rg -rn \"resizeImage|maxWidth|2000|com": {
+   "count": 1,
+   "ms": 229,
+   "maxMs": 229,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent\"; wc -c \"$D/dist/utils/image-resize.js\" \"$D/dist/utils/image-resize-core.js\" \"$D/dist/utils/image-process": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"autoResize|resizeImage\\(|processImage\\(\" \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent/dist\" -g \"*.js\" -g \"!bundle/**\" | head -30; rg -n \"images\" ": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 1
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works\"; F=$(rg -l \"function validateToolArguments\" \"$D\" -g \"*.js\" -g \"!**/bundle/**\" | head -1); echo \"$F\"; rg -n -A25 \"functio": {
+   "count": 1,
+   "ms": 224,
+   "maxMs": 224,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-ai\" && node --input-type=module -e \"import { validateToolArguments } from './dist/utils/validation.js'; const tool={n": {
+   "count": 2,
+   "ms": 849,
+   "maxMs": 428,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"\\.inspect\\(|process_image|processImage\" extensions scripts --glob \"!extensions/work-images.ts\" | rg -v \"^extensions/work-vision.ts:28\" | head -20": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | tail -5 && git diff --check": {
+   "count": 1,
+   "ms": 720,
+   "maxMs": 720,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | tail -3 && git diff --check": {
+   "count": 2,
+   "ms": 1052,
+   "maxMs": 550,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-vision.ts\" \"extensions/work-images.ts\" \"scripts/test-work-compaction-notifications.mjs\" && git commit -m \"process_image: up to 10 images per question, sent together and num": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"resizeImage|readImageFile|remember\\(\" extensions/work-images.ts extensions/work-vision.ts extensions/screen-read.ts | head; ls \"C:/Users/Flex/.pi/agent/sessions\" | rg -i \"photo|sketch|furn\"": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-PhotoBook--\" && ls | head -3 && ls | wc -l && f=$(ls -t | head -1) && head -c 1500 \"$f\"": {
+   "count": 1,
+   "ms": 5993,
+   "maxMs": 5993,
+   "failures": 0
+  },
+  "bash\u0000cat > \"$TEMP/sniff.mjs\" <<'EOF' import { readdirSync, readFileSync } from \"node:fs\"; const root = \"C:/Users/Flex/.pi/agent/sessions/\"; const dims = d => { const b = Buffer.from(d.slice(0, 64), \"base64": {
+   "count": 1,
+   "ms": 522,
+   "maxMs": 522,
+   "failures": 1
+  },
+  "bash\u0000sed -i \"s|for (const f of readdirSync(root + dir)) {|for (const f of readdirSync(root + dir, { recursive: true }).filter(x => String(x).endsWith(\\\".jsonl\\\"))) {|\" \"$TEMP/sniff.mjs\" && node \"$TEMP/snif": {
+   "count": 1,
+   "ms": 13760,
+   "maxMs": 13760,
+   "failures": 0
+  },
+  "bash\u0000cat > \"$TEMP/sniff2.mjs\" <<'EOF' import { readdirSync, readFileSync } from \"node:fs\"; const root = \"C:/Users/Flex/.pi/agent/sessions/\"; const dims = d => { const b = Buffer.from(d.slice(0, 400), \"base": {
+   "count": 1,
+   "ms": 117,
+   "maxMs": 117,
+   "failures": 1
+  },
+  "bash\u0000sed -i \"s|replace(/\\\\\\\\/g, \\\"/\\\")|replaceAll(String.fromCharCode(92), \\\"/\\\")|\" \"$TEMP/sniff2.mjs\" && grep -n \"replaceAll\\|fromCharCode\" \"$TEMP/sniff2.mjs\" | head -2; node \"$TEMP/sniff2.mjs\"": {
+   "count": 1,
+   "ms": 165,
+   "maxMs": 165,
+   "failures": 1
+  },
+  "bash\u0000node -e \"const f=process.env.TEMP+'/sniff2.mjs';const fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace('.replace(/\\\\\\\\/g, \\\"/\\\")','.replaceAll(String.fromCharCode(92), \\\"/\\\")'))\" ": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 1
+  },
+  "bash\u0000node \"$TEMP/sniff2.mjs\"": {
+   "count": 1,
+   "ms": 12815,
+   "maxMs": 12815,
+   "failures": 0
+  },
+  "bash\u0000cat > \"$TEMP/sniff3.mjs\" <<'EOF' import { readdirSync, readFileSync } from \"node:fs\"; const root = \"C:/Users/Flex/.pi/agent/sessions/\"; for (const dir of [\"--C--SOFT-git-PhotoBook--\", \"--C--SOFT-git-s": {
+   "count": 1,
+   "ms": 13336,
+   "maxMs": 13336,
+   "failures": 1
+  },
+  "bash\u0000P=\"C:/Users/Flex/.pi/agent/install/releases/1.1.0/node_modules/@earendil-works/pi-coding-agent/dist/utils/image-resize.js\"; F=$(ls -S \"C:/SOFT/git/sketchup/tmp\"/*.png 2>/dev/null | head -1); echo \"$F\"": {
+   "count": 1,
+   "ms": 1547,
+   "maxMs": 1547,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | tail -2 && git add -- \"extensions/work-images.ts\" \"scripts/test-work-compaction-notifications.mjs\" && git commit -q -m \"process_image: fit ": {
+   "count": 1,
+   "ms": 565,
+   "maxMs": 565,
+   "failures": 0
+  },
+  "bash\u0000rg -n -i \"rolling.?image|maxImages|imageAge|keepImages\" extensions --glob \"*.ts\" | head -8; rg -n \"nonVision|input\\?\\.includes\\('image'\\)\" extensions/work-vision.ts | head -8": {
+   "count": 1,
+   "ms": 151,
+   "maxMs": 151,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"rollingImages|stripImages|largeImagePart =|function largeImagePart|images ===|const images\\b|images: \" extensions/work-models.ts | head -15; rg -n \"\\\"(rollingImages|stripImages|images)\\\"\" \"C:/U": {
+   "count": 1,
+   "ms": 189,
+   "maxMs": 189,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"largeImagePart\\(part\\) \\{\" -A6 extensions/work-models.ts; rg -n -B3 -A8 \"images: true,\" extensions/work-models.ts | head -30; rg -n \"images\\b.*=.*(settings|config|strip)\" extensions/work-models": {
+   "count": 1,
+   "ms": 193,
+   "maxMs": 193,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"stripProcessedPayloads\\(\" extensions/work-models.ts | head; rg -n \"STRIP_LARGE_IMAGE_BYTES =|rollingImage|\\\"large\\\"\" extensions/work-models.ts | head": {
+   "count": 1,
+   "ms": 194,
+   "maxMs": 194,
+   "failures": 0
+  },
+  "bash\u0000rg -n -i \"compactionMode|\\\"mode\\\"\" \"C:/Users/Flex/.pi/agent/settings.json\" | head -5; rg -n \"function currentCompactionMode\" -A6 extensions/work-models.ts": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"visionBridge\\.project|nonVisionModels\" extensions --glob \"*.ts\" | head; rg -n \"nonVisionModels\" -A6 \"C:/Users/Flex/.pi/agent/settings.json\"": {
+   "count": 1,
+   "ms": 113,
+   "maxMs": 113,
+   "failures": 0
+  },
+  "bash\u0000rg -n -l \"nonVisionModels|Models without vision\" --glob \"!node_modules\" . ; rg -n \"project\\(|STRIP_IMAGES|image payload dropped\" scripts | head -20": {
+   "count": 1,
+   "ms": 217,
+   "maxMs": 217,
+   "failures": 0
+  },
+  "bash\u0000sed -n \"348,362p;515,528p\" scripts/test-work-camera.mjs; echo ----; sed -n \"370,440p;530,550p\" scripts/test-work-compaction-notifications.mjs; rg -n \"nonVisionModels|visionBridge\" scripts/test-work-co": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000sed -n \"1100,1110p;3755,3762p;4172,4182p;4400,4412p\" extensions/work-models.ts; rg -n \"nonVisionModels\" -B2 -A12 extensions/work-models.ts | sed -n \"1,200p\" | rg -n \"kind === \\\"nonVisionModels\\\"|toggl": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000sed -n \"4550,4580p\" extensions/work-models.ts; rg -n \"nonVisionModelsSettings|nonVision\" extensions/work-models.ts": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 0
+  },
+  "bash\u0000sed -n \"1690,1700p\" scripts/test-work-compaction-notifications.mjs; sed -n \"175,186p\" scripts/test-work-settings.mjs": {
+   "count": 1,
+   "ms": 61,
+   "maxMs": 61,
+   "failures": 0
+  },
+  "bash\u0000for t in compaction-notifications settings camera; do node \"scripts/test-work-$t.mjs\" 2>&1 | tail -2; done; rg -n \"nonVisionModels\" extensions scripts README.md; git diff --check": {
+   "count": 1,
+   "ms": 6595,
+   "maxMs": 6595,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-vision.ts\" \"extensions/work-models.ts\" \"README.md\" \"scripts/test-work-compaction-notifications.mjs\" \"scripts/test-work-settings.mjs\" \"scripts/test-work-camera.mjs\" && git c": {
+   "count": 1,
+   "ms": 263,
+   "maxMs": 263,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"Answer the user's image question|Describe only what is visible|Specific question to ask\" scripts extensions | head": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-compaction-notifications.mjs\" 2>&1 | tail -2 && git add -- \"extensions/work-vision.ts\" \"extensions/work-images.ts\" && git commit -q -m \"process_image: ask with expectations; vi": {
+   "count": 1,
+   "ms": 540,
+   "maxMs": 540,
+   "failures": 0
+  },
+  "bash\u0000git status --short; git diff --stat; git branch --show-current; git log --oneline origin/master..HEAD; node -p \"require('./package.json').version\"; git ls-files package-lock.json": {
+   "count": 1,
+   "ms": 234,
+   "maxMs": 234,
+   "failures": 0
+  },
+  "bash\u0000git diff -- extensions/plan3.ts extensions/screen-read.ts extensions/subscription-footer.ts | head -120": {
+   "count": 1,
+   "ms": 83,
+   "maxMs": 83,
+   "failures": 0
+  },
+  "bash\u0000for t in plan3 screen-read subscription-footer; do node \"scripts/test-work-$t.mjs\" 2>&1 | tail -1; done; npm version patch --no-git-tag-version >/dev/null && node -p \"require('./package.json').version": {
+   "count": 1,
+   "ms": 115920,
+   "maxMs": 115920,
+   "failures": 0
+  },
+  "bash\u0000git add -u && git commit -q -m \"Plan3 soft-miss step view, screen_read empty-capture error, footer shows quota left; bump 0.1.39\" && git push origin master 2>&1 | tail -2 && git status --short -b | he": {
+   "count": 1,
+   "ms": 2850,
+   "maxMs": 2850,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "CAM-04": {
+   "ms": 221718,
+   "testMs": 6408,
+   "replies": 14,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 14
+   }
+  },
+  "CAM-06": {
+   "ms": 207978,
+   "testMs": 2010,
+   "replies": 17,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 17
+   }
+  },
+  "CAM-08": {
+   "ms": 496051,
+   "testMs": 2520,
+   "replies": 19,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 19
+   },
+   "failures": 2
+  },
+  "CAM-05": {
+   "ms": 545089,
+   "testMs": 9037,
+   "replies": 36,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 36
+   },
+   "failures": 1
+  },
+  "CAM-07": {
+   "ms": 381278,
+   "testMs": 4877,
+   "replies": 18,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 18
+   },
+   "failures": 1
+  },
+  "CAM-11": {
+   "ms": 201032,
+   "testMs": 8721,
+   "replies": 10,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 10
+   }
+  },
+  "CAM-12": {
+   "ms": 442284,
+   "testMs": 8187,
+   "replies": 26,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 26
+   },
+   "failures": 2
+  },
+  "CAM-13": {
+   "ms": 162857,
+   "testMs": 7328,
+   "replies": 11,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 11
+   }
+  },
+  "CAM-09": {
+   "ms": 848476,
+   "testMs": 544348,
+   "replies": 25,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 25
+   },
+   "failures": 5
+  },
+  "(none)": {
+   "ms": 2474757,
+   "testMs": 746836,
+   "replies": 167,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 41,
+    "anthropic/claude-opus-5-5:high": 126
+   },
+   "failures": 9
+  },
+  "CAM-02": {
+   "ms": 729183,
+   "testMs": 25163,
+   "replies": 95,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 95
+   },
+   "failures": 8
+  },
+  "CAM-14": {
+   "ms": 199444,
+   "testMs": 5734,
+   "replies": 24,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 24
+   }
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-10-11T08:40:02.048Z",
+   "ms": 2359083
+  },
+  {
+   "start": "2026-10-11T09:19:21.140Z",
+   "ms": 1464028
+  },
+  {
+   "start": "2026-10-11T09:43:45.175Z",
+   "ms": 503850
+  },
+  {
+   "start": "2026-10-11T09:52:09.040Z",
+   "ms": 4745
+  },
+  {
+   "start": "2026-10-11T09:55:48.199Z",
+   "ms": 21043
+  },
+  {
+   "start": "2026-10-11T09:57:52.524Z",
+   "ms": 57431
+  },
+  {
+   "start": "2026-10-11T09:58:49.964Z",
+   "ms": 2167
+  },
+  {
+   "start": "2026-10-11T10:03:12.675Z",
+   "ms": 82677
+  },
+  {
+   "start": "2026-10-11T10:04:40.281Z",
+   "ms": 33537
+  },
+  {
+   "start": "2026-10-11T10:05:13.828Z",
+   "ms": 5324
+  },
+  {
+   "start": "2026-10-11T10:06:03.423Z",
+   "ms": 61174
+  },
+  {
+   "start": "2026-10-11T10:07:04.609Z",
+   "ms": 7015
+  },
+  {
+   "start": "2026-10-11T10:14:54.672Z",
+   "ms": 69026
+  },
+  {
+   "start": "2026-10-11T10:16:03.707Z",
+   "ms": 2421
+  },
+  {
+   "start": "2026-10-11T10:16:09.922Z",
+   "ms": 4055
+  },
+  {
+   "start": "2026-10-11T10:16:13.986Z",
+   "ms": 14312
+  },
+  {
+   "start": "2026-10-11T10:16:34.940Z",
+   "ms": 157975
+  },
+  {
+   "start": "2026-10-11T10:19:12.927Z",
+   "ms": 6234
+  },
+  {
+   "start": "2026-10-11T10:19:53.372Z",
+   "ms": 12902
+  },
+  {
+   "start": "2026-10-11T10:20:06.286Z",
+   "ms": 31383
+  },
+  {
+   "start": "2026-10-11T10:20:37.682Z",
+   "ms": 3270
+  },
+  {
+   "start": "2026-10-11T10:22:10.669Z",
+   "ms": 19450
+  },
+  {
+   "start": "2026-10-11T10:22:37.264Z",
+   "ms": 30691
+  },
+  {
+   "start": "2026-10-11T10:23:07.964Z",
+   "ms": 2650
+  },
+  {
+   "start": "2026-10-11T10:29:57.650Z",
+   "ms": 8949
+  },
+  {
+   "start": "2026-10-11T10:30:06.620Z",
+   "ms": 161848
+  },
+  {
+   "start": "2026-10-11T10:32:48.478Z",
+   "ms": 2726
+  },
+  {
+   "start": "2026-10-11T10:32:59.072Z",
+   "ms": 77188
+  },
+  {
+   "start": "2026-10-11T10:34:16.270Z",
+   "ms": 121572
+  },
+  {
+   "start": "2026-10-11T10:36:17.854Z",
+   "ms": 40601
+  },
+  {
+   "start": "2026-10-11T10:37:13.727Z",
+   "ms": 386936
+  },
+  {
+   "start": "2026-10-11T10:43:40.672Z",
+   "ms": 4016
+  },
+  {
+   "start": "2026-10-11T10:43:44.892Z",
+   "ms": 81171
+  },
+  {
+   "start": "2026-10-11T10:45:06.077Z",
+   "ms": 3711
+  },
+  {
+   "start": "2026-10-11T10:46:19.089Z",
+   "ms": 118320
+  },
+  {
+   "start": "2026-10-11T10:48:17.419Z",
+   "ms": 3210
+  },
+  {
+   "start": "2026-10-11T10:48:57.134Z",
+   "ms": 43906
+  },
+  {
+   "start": "2026-10-11T10:49:55.050Z",
+   "ms": 525899
+  },
+  {
+   "start": "2026-10-11T10:59:35.015Z",
+   "ms": 4804
+  },
+  {
+   "start": "2026-10-11T11:06:59.720Z",
+   "ms": 10661
+  },
+  {
+   "start": "2026-10-11T11:07:25.782Z",
+   "ms": 203497
+  },
+  {
+   "start": "2026-10-11T12:43:09.722Z",
+   "ms": 20697
+  },
+  {
+   "start": "2026-10-11T12:44:47.781Z",
+   "ms": 319053
+  },
+  {
+   "start": "2026-10-11T12:58:37.697Z",
+   "ms": 169749
+  },
+  {
+   "start": "2026-10-11T14:32:24.838Z",
+   "ms": 57989
+  },
+  {
+   "start": "2026-10-12T07:06:21.521Z",
+   "ms": 82240
+  },
+  {
+   "start": "2026-10-12T07:13:36.850Z",
+   "ms": 19016
+  },
+  {
+   "start": "2026-10-12T07:16:25.949Z",
+   "ms": 39733
+  },
+  {
+   "start": "2026-10-12T07:20:27.209Z",
+   "ms": 38445
+  },
+  {
+   "start": "2026-10-12T07:23:32.593Z",
+   "ms": 13538
+  },
+  {
+   "start": "2026-10-12T07:50:05.091Z",
+   "ms": 22107
+  },
+  {
+   "start": "2026-10-12T08:04:29.044Z",
+   "ms": 15794
+  },
+  {
+   "start": "2026-10-12T09:18:10.783Z",
+   "ms": 23012
+  },
+  {
+   "start": "2026-10-12T09:31:20.380Z",
+   "ms": 151522
+  },
+  {
+   "start": "2026-10-12T09:40:49.255Z",
+   "ms": 272399
+  },
+  {
+   "start": "2026-10-12T09:49:56.278Z",
+   "ms": 5861
+  },
+  {
+   "start": "2026-10-12T09:52:12.323Z",
+   "ms": 35472
+  },
+  {
+   "start": "2026-10-12T09:58:44.714Z",
+   "ms": 177266
+  },
+  {
+   "start": "2026-10-12T10:05:51.092Z",
+   "ms": 19044
+  },
+  {
+   "start": "2026-10-12T10:09:35.802Z",
+   "ms": 34617
+  },
+  {
+   "start": "2026-10-12T10:21:30.146Z",
+   "ms": 147190
+  }
+ ],
+ "hints": []
+}

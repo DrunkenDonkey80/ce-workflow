@@ -1,0 +1,1614 @@
+{
+ "version": 1,
+ "activeMs": 25071570,
+ "runs": 43,
+ "waitingMs": 8021965,
+ "toolWallMs": 10049505,
+ "compactions": {
+  "count": 15,
+  "ms": 220141
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 919,
+   "thinkingMs": 4044366,
+   "actingMs": 1830594,
+   "input": 2048,
+   "output": 479037,
+   "cacheRead": 155906256,
+   "cacheWrite": 9178104,
+   "cost": 86.66070320000011,
+   "errors": 2
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 664,
+   "ms": 9204334,
+   "maxMs": 600589,
+   "failures": 26
+  },
+  "plan3": {
+   "count": 37,
+   "ms": 4548,
+   "maxMs": 1090,
+   "failures": 0
+  },
+  "resolve-library-id": {
+   "count": 1,
+   "ms": 351,
+   "maxMs": 351,
+   "failures": 0
+  },
+  "write": {
+   "count": 16,
+   "ms": 171,
+   "maxMs": 50,
+   "failures": 0
+  },
+  "edit": {
+   "count": 68,
+   "ms": 2610,
+   "maxMs": 932,
+   "failures": 12
+  },
+  "screen_read": {
+   "count": 21,
+   "ms": 21396,
+   "maxMs": 2504,
+   "failures": 0
+  },
+  "read": {
+   "count": 103,
+   "ms": 5013,
+   "maxMs": 1044,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 19,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 3
+  },
+  "lens_diagnostics": {
+   "count": 2,
+   "ms": 15938,
+   "maxMs": 9571,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 6,
+   "ms": 5079,
+   "maxMs": 2377,
+   "failures": 0
+  },
+  "plan3_diagram": {
+   "count": 4,
+   "ms": 12,
+   "maxMs": 6,
+   "failures": 0
+  },
+  "schedule": {
+   "count": 9,
+   "ms": 4437,
+   "maxMs": 856,
+   "failures": 0
+  },
+  "knowledge": {
+   "count": 1,
+   "ms": 27,
+   "maxMs": 27,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 604,
+   "ms": 5138567,
+   "maxMs": 475369,
+   "failures": 22
+  },
+  "test": {
+   "count": 59,
+   "ms": 4003215,
+   "maxMs": 600589,
+   "failures": 4
+  },
+  "build": {
+   "count": 1,
+   "ms": 62552,
+   "maxMs": 62552,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000winget install --id Rustlang.Rustup -e --silent --accept-package-agreements --accept-source-agreements 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 21996,
+   "maxMs": 21996,
+   "failures": 0
+  },
+  "bash\u0000cd . && cat >> /dev/null; powershell.exe -NoProfile -Command \"Start-Process -FilePath 'C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\setup.exe' -ArgumentList 'modify','--installPath','\\\"C:\\": {
+   "count": 1,
+   "ms": 475369,
+   "maxMs": 475369,
+   "failures": 0
+  },
+  "bash\u0000export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; cargo install tauri-cli --version \"^2\" --locked 2>&1 | tail -4; cargo tauri --version": {
+   "count": 1,
+   "ms": 139451,
+   "maxMs": 139451,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p ./hub/app/src-tauri/src ./hub/app/ui && cd ./hub/app/src-tauri && cat > Cargo.toml <<'EOF' [package] name = \"pi-hub-app\" version = \"0.1.0\" edition = \"2021\" [build-dependencies] tauri-build = ": {
+   "count": 1,
+   "ms": 15215,
+   "maxMs": 15215,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.cargo/registry/src/*/tauri-2.12.5/src && sed -n 1200,1260p window/mod.rs; grep -n \"pub fn set_icon\\|pub fn set_overlay_icon\\|pub fn set_badge\" window/mod.rs; grep -n \"pub fn new\\|pub fn from_rgb": {
+   "count": 1,
+   "ms": 897,
+   "maxMs": 897,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.cargo/registry/src/*/ && sed -n 50,90p tauri-plugin-global-shortcut-2.4.1/README.md; grep -n \"pub fn new\\|pub fn new_owned\\|pub fn from_bytes\" tauri-2.12.5/src/image/mod.rs; grep -n \"pub fn new\\": {
+   "count": 1,
+   "ms": 1334,
+   "maxMs": 1334,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.cargo/registry/src/*/tauri-2.12.5/src && grep -n \"fn new\\|fn new_owned\" image/mod.rs; grep -n \"fn new\" tray/mod.rs | head -3; sed -n 19,30p menu/normal.rs; grep -n \"pub fn unregister\\b\\|pub fn r": {
+   "count": 1,
+   "ms": 919,
+   "maxMs": 919,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && curl -s http://127.0.0.1:52227/app-icon.svg -o /tmp/app-icon.svg && head -c 300 /tmp/app-icon.svg; echo; export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; cargo tauri icon /tmp/ap": {
+   "count": 1,
+   "ms": 972,
+   "maxMs": 972,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && node -e \"import('./web/icons.ts').then(m=>{const s=m.iconSvg(Object.keys(m.ICONS)[0]);require('fs').writeFileSync(process.env.TEMP+'/app-icon.svg',s);console.log(s.slice(0,200))})\" && cd a": {
+   "count": 1,
+   "ms": 462,
+   "maxMs": 462,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && printf 'target/\\ngen/\\n' > .gitignore && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && time cargo tauri build --no-bundle 2>&1 | grep -E \"^(error|warning)|-->|Finished|Built": {
+   "count": 1,
+   "ms": 142023,
+   "maxMs": 142023,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && cargo tauri build --no-bundle 2>&1 | grep -E \"^error|Finished\" ; K=$(node -p \"require(process.env.USERPROFILE+'/.pi/agent/pi-co": {
+   "count": 1,
+   "ms": 78717,
+   "maxMs": 78717,
+   "failures": 0
+  },
+  "bash\u0000taskkill //IM pi-hub-app.exe //F >/dev/null 2>&1; cd ./hub/app/src-tauri && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && cargo tauri build --no-bundle 2>&1 | grep -E \"^error|-->|Finished\"": {
+   "count": 1,
+   "ms": 87862,
+   "maxMs": 87862,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && K=$(node -p \"require(process.env.USERPROFILE+'/.pi/agent/pi-control-hub/config.json').localKey\"); U1=\"http://127.0.0.1:52227/s/$PI_HUB_SESSION/?token=$K\"; U2=\"http://127.0.0.": {
+   "count": 1,
+   "ms": 5446,
+   "maxMs": 5446,
+   "failures": 0
+  },
+  "bash\u0000cd . && rm hub/app/ui/icons.js && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && (cd hub/app/src-tauri && cargo tauri build --no-bundle 2>&1 | grep -E \"wrote|^error|Finished|Error\") ; ls hub/app/ui; P": {
+   "count": 1,
+   "ms": 60692,
+   "maxMs": 60692,
+   "failures": 0
+  },
+  "bash\u0000cd . && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && (cd hub/app/src-tauri && touch src/main.rs && cargo tauri build --no-bundle 2>&1 | grep -E \"Running beforeBuild|wrote|^error|Finished|Error\") ; l": {
+   "count": 1,
+   "ms": 69197,
+   "maxMs": 69197,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > scripts/e.tmp.mjs <<'EOF' import fs from \"node:fs\"; const f = \"scripts/test-browser.mjs\"; let s = fs.readFileSync(f, \"utf8\"); const rep = (a, b) => { if (s.split(a).length !== 2) thr": {
+   "count": 1,
+   "ms": 56783,
+   "maxMs": 56783,
+   "failures": 0
+  },
+  "bash\u0000cd . && PI_HUB= PI_HUB_SESSION= node hub/scripts/test-api.mjs 2>&1 | grep -v Experimental | head -30": {
+   "count": 1,
+   "ms": 1947,
+   "maxMs": 1947,
+   "failures": 0
+  },
+  "bash\u0000cd . && PI_HUB= PI_HUB_SESSION= node hub/scripts/test-api.mjs 2>&1 | grep -v Experimental | head -20": {
+   "count": 1,
+   "ms": 2219,
+   "maxMs": 2219,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && grep -ln \"unseen\" scripts/*.mjs": {
+   "count": 1,
+   "ms": 854,
+   "maxMs": 854,
+   "failures": 0
+  },
+  "bash\u0000cd . && git add hub/web/app.ts hub/src/api.ts hub/src/hub.ts hub/scripts/test-api.mjs hub/scripts/test-browser.mjs docs/plans/2026-10-22-hub-tray-icon-and-desktop-app-with-live-status-dots-installe-d5": {
+   "count": 1,
+   "ms": 558,
+   "maxMs": 558,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-app-install.mjs 2>&1 | grep -v Experimental | tail -20": {
+   "count": 1,
+   "ms": 781,
+   "maxMs": 781,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > e.tmp.mjs <<'EOF' import fs from \"node:fs\"; let f = \"src/hub.ts\", s = fs.readFileSync(f, \"utf8\"); const crlf = s.includes(\"\\r\\n\"); s = s.replaceAll(\"\\r\\n\", \"\\n\"); const rep = (a, b) ": {
+   "count": 2,
+   "ms": 1566,
+   "maxMs": 1445,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > e.tmp.mjs <<'EOF' import fs from \"node:fs\"; const f = \"scripts/test-remote.mjs\"; let s = fs.readFileSync(f, \"utf8\"); const rep = (a, b) => { if (s.split(a).length !== 2) throw new Er": {
+   "count": 1,
+   "ms": 745,
+   "maxMs": 745,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > e.tmp.mjs <<'EOF' import fs from \"node:fs\"; const f = \"scripts/test-browser.mjs\"; let s = fs.readFileSync(f, \"utf8\"); const rep = (a, b) => { if (s.split(a).length !== 2) throw new E": {
+   "count": 1,
+   "ms": 67625,
+   "maxMs": 67625,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && cat > ../e.tmp.mjs <<'EOF' import fs from \"node:fs\"; const f = \"src/main.rs\"; let s = fs.readFileSync(f, \"utf8\"); const rep = (a, b) => { if (s.split(a).length !== 2) throw n": {
+   "count": 1,
+   "ms": 5276,
+   "maxMs": 5276,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && cargo tauri build --no-bundle 2>&1 | grep -E \"^(error|warning)|-->|Finished|Built\" -A3 | head -60": {
+   "count": 1,
+   "ms": 97320,
+   "maxMs": 97320,
+   "failures": 0
+  },
+  "bash\u0000D=\"$LOCALAPPDATA/Temp/pihubapp-try\"; mkdir -p \"$D\" && cp ./hub/app/src-tauri/target/release/pi-hub-app.exe \"$D/\" && (cd \"$D\" && ./pi-hub-app.exe > out.log 2>&1 &) ; sleep 6; cat \"$D/app.lock\"; echo; t": {
+   "count": 1,
+   "ms": 6471,
+   "maxMs": 6471,
+   "failures": 0
+  },
+  "bash\u0000D=\"$LOCALAPPDATA/Temp/pihubapp-try\"; cat \"$D/out.log\" | tail -5; ls \"$D\"; \"$D/pi-hub-app.exe\" & sleep 3; tasklist //FI \"IMAGENAME eq pi-hub-app.exe\" //NH": {
+   "count": 1,
+   "ms": 3401,
+   "maxMs": 3401,
+   "failures": 0
+  },
+  "bash\u0000D=\"$LOCALAPPDATA/Temp/pihubapp-try\"; cd \"$D\"; taskkill //PID 34672 //F >/dev/null; sleep 1; cp pi-hub-app.exe pi-hub-app.next.exe; echo marker >> pi-hub-app.next.exe; ./pi-hub-app.exe & sleep 5; ls -l": {
+   "count": 1,
+   "ms": 6771,
+   "maxMs": 6771,
+   "failures": 0
+  },
+  "bash\u0000D=\"$LOCALAPPDATA/Temp/pihubapp-try\"; cd \"$D\"; taskkill //PID 31208 //F >/dev/null; H=\"$USERPROFILE/.pi/agent/pi-control-hub\"; URL=$(node -e \"const fs=require('fs');const h=JSON.parse(fs.readFileSync(p": {
+   "count": 1,
+   "ms": 7637,
+   "maxMs": 7637,
+   "failures": 0
+  },
+  "bash\u0000taskkill //IM pi-hub-app.exe //F >/dev/null; cd . && git status --short hub | head": {
+   "count": 1,
+   "ms": 523,
+   "maxMs": 523,
+   "failures": 0
+  },
+  "bash\u0000cd . && for t in update api; do PI_HUB= PI_HUB_SESSION= node hub/scripts/test-$t.mjs 2>&1 | grep -v -i \"experimental\\|trace-warn\" | tail -1; done": {
+   "count": 1,
+   "ms": 2176,
+   "maxMs": 2176,
+   "failures": 0
+  },
+  "bash\u0000cd . && git status --short | grep -v \"stats.json\\|needs.json\"; git log origin/master..HEAD --oneline | wc -l; node -p \"require('./package.json').version\"; git ls-files | grep -i \"lock\"; sed -n 1,25p C": {
+   "count": 1,
+   "ms": 995,
+   "maxMs": 995,
+   "failures": 0
+  },
+  "bash\u0000cd . && PI_HUB= PI_HUB_SESSION= node hub/scripts/changelog-shot.mjs \"#app-group\" docs/changelog/0.1.64-desktop-app-row.png \"document.getElementById('settings-button').click(); await new Promise(r=>set": {
+   "count": 2,
+   "ms": 72552,
+   "maxMs": 36357,
+   "failures": 0
+  },
+  "bash\u0000cd . && PI_HUB= PI_HUB_SESSION= node hub/scripts/changelog-shot.mjs \"#app-group\" docs/changelog/0.1.64-desktop-app-row.png \"const f=window.fetch; window.fetch=(u,o)=>String(u).includes('api/app')?Prom": {
+   "count": 1,
+   "ms": 39237,
+   "maxMs": 39237,
+   "failures": 0
+  },
+  "bash\u0000cd . && npm version patch --no-git-tag-version >/dev/null && node -p \"require('./package.json').version+' '+require('./package-lock.json').version\" && for t in app-install update; do PI_HUB= PI_HUB_SE": {
+   "count": 1,
+   "ms": 2203,
+   "maxMs": 2203,
+   "failures": 1
+  },
+  "bash\u0000cd . && for t in usage changelog browser; do PI_HUB= PI_HUB_SESSION= node hub/scripts/test-$t.mjs 2>&1 | grep -v -i \"experimental\\|trace-warn\" | tail -1; echo \"[$t exit ${PIPESTATUS[0]}]\"; done": {
+   "count": 1,
+   "ms": 68706,
+   "maxMs": 68706,
+   "failures": 0
+  },
+  "bash\u0000cd . && git add -u && git add docs/changelog/0.1.64-desktop-app-row.png docs/changelog/0.1.64-desktop-app-tabs.png && git commit -qm \"Release 0.1.64: Pi Hub desktop app\" && git push origin master 2>&1": {
+   "count": 1,
+   "ms": 5341,
+   "maxMs": 5341,
+   "failures": 0
+  },
+  "bash\u0000sleep 20; gh run list --repo DrunkenDonkey80/ce-workflow --workflow app-release.yml --limit 1": {
+   "count": 1,
+   "ms": 20793,
+   "maxMs": 20793,
+   "failures": 0
+  },
+  "bash\u0000gh run view 39919710459 --repo DrunkenDonkey80/ce-workflow --json status,conclusion,jobs -q \"{status,conclusion,jobs:[.jobs[]|{name,status,conclusion}]}\"": {
+   "count": 1,
+   "ms": 1663,
+   "maxMs": 1663,
+   "failures": 0
+  },
+  "bash\u0000gh run watch 39919710459 --repo DrunkenDonkey80/ce-workflow --exit-status >/dev/null 2>&1; echo \"exit $?\"; gh run view 39919710459 --repo DrunkenDonkey80/ce-workflow --json conclusion,jobs -q \"[.concl": {
+   "count": 1,
+   "ms": 33088,
+   "maxMs": 33088,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/app/pin-release.mjs app-v0.1.0 2>&1 | tail -1 && cat hub/app/release.json | grep -c sha256 && ls -la \"$TMP\" >/dev/null; D=$(mktemp -d) && gh release download app-v0.1.0 --repo Drunken": {
+   "count": 1,
+   "ms": 28150,
+   "maxMs": 28150,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep sha256 hub/app/release.json && PI_HUB= PI_HUB_SESSION= node hub/scripts/test-app-install.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 2645,
+   "maxMs": 2645,
+   "failures": 0
+  },
+  "bash\u0000cd . && npm version patch --no-git-tag-version >/dev/null && git add -u && git commit -qm \"Release 0.1.65: pin desktop app app-v0.1.0\" && git push origin master 2>&1 | tail -1 && git status -sb | head": {
+   "count": 1,
+   "ms": 4258,
+   "maxMs": 4258,
+   "failures": 0
+  },
+  "bash\u0000cd . && npm version patch --no-git-tag-version >/dev/null && git add hub/app/release.json && git add -u && git commit -qm \"Release 0.1.66: commit the desktop app release pin\" && git push origin master": {
+   "count": 1,
+   "ms": 2869,
+   "maxMs": 2869,
+   "failures": 1
+  },
+  "bash\u0000cd . && PI_HUB= PI_HUB_SESSION= node hub/scripts/test-app-install.mjs 2>&1 | tail -2; export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; cd hub/app/src-tauri && cargo tauri build --no-bundle 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 74104,
+   "maxMs": 74104,
+   "failures": 0
+  },
+  "bash\u0000cd . && PI_HUB= PI_HUB_SESSION= node hub/scripts/test-app-install.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 741,
+   "maxMs": 741,
+   "failures": 0
+  },
+  "bash\u0000D=\"$LOCALAPPDATA/Temp/pihubapp-try\"; mkdir -p \"$D\" && cp ./hub/app/src-tauri/target/release/pi-hub-app.exe \"$D/\" && printf '{\"hubData\":\"%s\"}' \"$(cygpath -m \"$USERPROFILE/.pi/agent/pi-control-hub\")\" > ": {
+   "count": 1,
+   "ms": 6680,
+   "maxMs": 6680,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/ui && T=\"$LOCALAPPDATA/Temp/strip-try\" && rm -rf \"$T\" && mkdir -p \"$T\" && cp icons.js \"$T/\" && node -e \" const fs=require('fs');const t=fs.readFileSync('index.html','utf8'); const mock='<": {
+   "count": 1,
+   "ms": 5822,
+   "maxMs": 5822,
+   "failures": 0
+  },
+  "bash\u0000agent-browser fill \"#ask\" \"not a link\" >/dev/null; agent-browser press Enter >/dev/null; agent-browser snapshot; agent-browser click \"#add\" >/dev/null; agent-browser fill \"#ask\" \"https://work.ts.net:5": {
+   "count": 1,
+   "ms": 1449,
+   "maxMs": 1449,
+   "failures": 0
+  },
+  "bash\u0000agent-browser fill \"#ask\" \"\" >/dev/null; agent-browser press Enter >/dev/null; agent-browser snapshot; agent-browser eval \"JSON.stringify(calls.filter(c=>c[0]==='close'||c[0]==='save').slice(-2))\"; ag": {
+   "count": 1,
+   "ms": 1320,
+   "maxMs": 1320,
+   "failures": 0
+  },
+  "bash\u0000cd . && (PI_HUB= PI_HUB_SESSION= timeout 300 node hub/scripts/test-browser.mjs 2>&1 | tail -3) ; grep -n \"\\\"version\\\"\" hub/app/src-tauri/tauri.conf.json package.json; grep -n \"^version\" hub/app/src-ta": {
+   "count": 1,
+   "ms": 81535,
+   "maxMs": 81535,
+   "failures": 0
+  },
+  "bash\u0000cd . && PI_HUB= PI_HUB_SESSION= node hub/scripts/changelog-shot.mjs \"#app-group\" docs/changelog/0.1.67-desktop-app-start.png \"document.getElementById('settings-button').click(); await new Promise(r=>s": {
+   "count": 2,
+   "ms": 223063,
+   "maxMs": 180167,
+   "failures": 1
+  },
+  "bash\u0000cd . && sed -i '2521s/0.1.0/0.1.1/' hub/app/src-tauri/Cargo.lock && npm version patch --no-git-tag-version >/dev/null && node -p \"require('./package.json').version\" && git ls-files | grep -x \"package-": {
+   "count": 1,
+   "ms": 755,
+   "maxMs": 755,
+   "failures": 0
+  },
+  "bash\u0000cd . && git push -q origin master 2>&1 | tail -2 && git tag app-v0.1.1 && git push -q origin app-v0.1.1 2>&1 | tail -2; sleep 15; gh run list --workflow app-release.yml --limit 1 --json databaseId,sta": {
+   "count": 1,
+   "ms": 20446,
+   "maxMs": 20446,
+   "failures": 0
+  },
+  "bash\u0000gh run view 39925549237 --json status,conclusion": {
+   "count": 1,
+   "ms": 726,
+   "maxMs": 726,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/app/pin-release.mjs app-v0.1.1 2>&1 | tail -3 && git add hub/app/release.json && git commit -qm \"Pin desktop app release app-v0.1.1\" && git push -q origin master 2>&1 | tail -2; git l": {
+   "count": 1,
+   "ms": 7762,
+   "maxMs": 7762,
+   "failures": 0
+  },
+  "bash\u0000export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; cd ./hub/app/src-tauri && cargo tauri build --no-bundle 2>&1 | grep -E \"^(error|warning: unused)|-->|Built application\" | head -20": {
+   "count": 1,
+   "ms": 65993,
+   "maxMs": 65993,
+   "failures": 0
+  },
+  "bash\u0000D=\"$LOCALAPPDATA/Temp/pihubapp-try\"; cp ./hub/app/src-tauri/target/release/pi-hub-app.exe \"$D/\" && (cd \"$D\" && ./pi-hub-app.exe --hidden >/dev/null 2>&1 &); sleep 8; P=$(tasklist //FI \"IMAGENAME eq pi": {
+   "count": 1,
+   "ms": 8855,
+   "maxMs": 8855,
+   "failures": 0
+  },
+  "bash\u0000D=\"$LOCALAPPDATA/Temp/pihubapp-try\"; rm -f \"$D/app.lock\"; printf '{\"hubData\":\"C:/Users/Flex/.pi/agent/pi-control-hub\",\"hubs\":[{\"local\":true},{\"url\":\"https://example.com/\"}]}' > \"$D/app.json\"; (cd \"$D\"": {
+   "count": 1,
+   "ms": 10898,
+   "maxMs": 10898,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -i \"0,/\\\"version\\\": \\\"0.1.1\\\"/s//\\\"version\\\": \\\"0.1.2\\\"/\" hub/app/src-tauri/tauri.conf.json && sed -i \"0,/^version = \\\"0.1.1\\\"/s//version = \\\"0.1.2\\\"/\" hub/app/src-tauri/Cargo.toml && L=$(": {
+   "count": 1,
+   "ms": 585,
+   "maxMs": 585,
+   "failures": 0
+  },
+  "bash\u0000cd . && git push -q origin master 2>&1 | tail -2 && git tag app-v0.1.2 && git push -q origin app-v0.1.2 2>&1 | tail -2; sleep 15; gh run list --workflow app-release.yml --limit 1 --json databaseId,sta": {
+   "count": 1,
+   "ms": 19550,
+   "maxMs": 19550,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/app/pin-release.mjs app-v0.1.2 2>&1 | tail -2 && npm version patch --no-git-tag-version": {
+   "count": 1,
+   "ms": 8483,
+   "maxMs": 8483,
+   "failures": 0
+  },
+  "bash\u0000cd . && git diff CHANGELOG.md | head -16 && git add hub/app/release.json package.json package-lock.json CHANGELOG.md && git commit -qm \"Pin desktop app release app-v0.1.2 (0.1.69)\" && git push -q orig": {
+   "count": 1,
+   "ms": 2707,
+   "maxMs": 2707,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 459,
+   "ms": 62334,
+   "maxMs": 425,
+   "failures": 17
+  },
+  "bash\u0000cd ./hub && git diff --stat && file src/hub.ts && ls scripts | grep -i \"app-install\\|usage\" && node scripts/test-app-install.mjs 2>&1 | tail -3 && node scripts/test-usage.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 990,
+   "maxMs": 990,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs'),f='hub/scripts/test-scheduler.mjs';let s=fs.readFileSync(f,'utf8'); s=s.replace('assert.ok(s.add({ session: a.id, kind: \\\"script\\\", command: \\\"x\\\", everyMinute": {
+   "count": 1,
+   "ms": 5542,
+   "maxMs": 5542,
+   "failures": 0
+  },
+  "bash\u0000ls \"$LOCALAPPDATA/Temp/pihubapp-try\" 2>/dev/null; ls -t \"$LOCALAPPDATA/Temp\" | grep -i \"icon\\|geticon\\|bigicon\" | head": {
+   "count": 1,
+   "ms": 694,
+   "maxMs": 694,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp/pihubapp-try\" && (powershell -NoProfile -Command \"Start-Process -FilePath '.\\pi-hub-app.exe' -WindowStyle Minimized\" ) && sleep 12 && cat app.lock && powershell -NoProfile -Exec": {
+   "count": 1,
+   "ms": 12657,
+   "maxMs": 12657,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/pi-control-hub && node -e \" const h=require('./hub.json'),s=require('./sessions.json');const id=(s.sessions??s)[0].id; fetch('http://127.0.0.1:52227/s/'+id+'/api/hub',{method:'POST',hea": {
+   "count": 1,
+   "ms": 25477,
+   "maxMs": 25477,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/pi-control-hub && node -e \" const c=require('./config.json'),s=require('./sessions.json');const id=(s.sessions??s)[0].id; fetch('http://127.0.0.1:52227/s/'+id+'/api/hub',{method:'POST',": {
+   "count": 2,
+   "ms": 30896,
+   "maxMs": 30508,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/changelog-shot.mjs \"[aria-labelledby=set-pi]\" \"$LOCALAPPDATA/Temp/set-pi.png\" \"document.getElementById('settings-button').click()\" --pad=6 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 31526,
+   "maxMs": 31526,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/changelog-shot.mjs \"#settings-menu\" \"$LOCALAPPDATA/Temp/set-pi.png\" \"document.getElementById('settings-button').click(); await new Promise(r=>setTimeout(r,800)); document.getE": {
+   "count": 1,
+   "ms": 32358,
+   "maxMs": 32358,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-scheduler.mjs 2>&1 | tail -1 && node hub/scripts/test-app-install.mjs 2>&1 | tail -1 && node hub/scripts/test-usage.mjs 2>&1 | tail -1 && git add -u && git commit -qm \"Hu": {
+   "count": 1,
+   "ms": 6487,
+   "maxMs": 6487,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && cat > shot.ps1 <<'EOF' Add-Type -AssemblyName System.Windows.Forms,System.Drawing Add-Type 'using System.Runtime.InteropServices; public class D { [DllImport(\"user32.dll\")] ": {
+   "count": 1,
+   "ms": 455,
+   "maxMs": 455,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp/pihubapp-try\" && powershell -NoProfile -Command \"Start-Process -FilePath '.\\pi-hub-app.exe' -WindowStyle Minimized\" && sleep 15 && cd .. && powershell -NoProfile -ExecutionPolic": {
+   "count": 1,
+   "ms": 16254,
+   "maxMs": 16254,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && T=\"$APPDATA/Microsoft/Windows/Start Menu/Programs/Pi Hub Try.lnk\" && powershell -NoProfile -Command \"\\$s=(New-Object -ComObject WScript.Shell).CreateShortcut('$(cygpath -w \"": {
+   "count": 1,
+   "ms": 19222,
+   "maxMs": 19222,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && cargo build --release 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 62552,
+   "maxMs": 62552,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && cargo tauri build --no-bundle 2>&1 | tail -3 && cd \"$LOCALAPPDATA/Temp\" && taskkill //PID $(cat pihubapp-try/app.lock) //F >/de": {
+   "count": 1,
+   "ms": 71616,
+   "maxMs": 71616,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/pi-control-hub && cat > \"$LOCALAPPDATA/Temp/seticon.js\" <<'EOF' const c=require(process.env.USERPROFILE+'/.pi/agent/pi-control-hub/config.json'),s=require(process.env.USERPROFILE+'/.pi/": {
+   "count": 1,
+   "ms": 20838,
+   "maxMs": 20838,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && node seticon.js house && sleep 20 && powershell -NoProfile -ExecutionPolicy Bypass -File shot.ps1 >/dev/null && powershell -NoProfile -ExecutionPolicy Bypass -File crop.ps1 ": {
+   "count": 1,
+   "ms": 20783,
+   "maxMs": 20783,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && node -e \" const fs=require('fs');let m=fs.readFileSync('src/main.rs','utf8'); const rep=(a,b)=>{if(!m.includes(a))throw a;m=m.replace(a,b);}; rep('fn save(hubs: Value) -> Res": {
+   "count": 1,
+   "ms": 56745,
+   "maxMs": 56745,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && cat > win.ps1 <<'EOF' param([int]$procId,[int]$cmd) Add-Type @\" using System; using System.Runtime.InteropServices; using System.Text; public class W2 { public delegate bool": {
+   "count": 1,
+   "ms": 23770,
+   "maxMs": 23770,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && powershell -NoProfile -ExecutionPolicy Bypass -File win.ps1 -procId $(cat pihubapp-try/app.lock) -cmd 9 && taskkill //PID $(cat pihubapp-try/app.lock) //F >/dev/null && slee": {
+   "count": 1,
+   "ms": 11734,
+   "maxMs": 11734,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/changelog-shot.mjs \".topbar\" \"$LOCALAPPDATA/Temp/mtop.png\" \"const b=document.getElementById('title-plan'); b.children[0].textContent='Hub tray icon and desktop app with live s": {
+   "count": 1,
+   "ms": 31560,
+   "maxMs": 31560,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -i 's/ .title-plan:not(\\[hidden\\]) { order: 9; flex: 1 0 100%; display: flex;/ .title-plan:not([hidden]) { order: 9; flex: 1 0 100%; min-width: 0; max-width: 100%; display: flex;/' hub/web": {
+   "count": 1,
+   "ms": 31592,
+   "maxMs": 31592,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && sed -i 's/^.prompt-option input { margin-top: 4px; }/.prompt-option input { margin-top: 4px; flex: none; }\\n.prompt-option > span { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }/' ": {
+   "count": 1,
+   "ms": 31617,
+   "maxMs": 31617,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/changelog-shot.mjs \"#prompt\" \"$LOCALAPPDATA/Temp/mprompt.png\" \"\" --size=300x800 --ask=\"{\\\"question\\\":\\\"Which worked?\\\",\\\"allowMultiple\\\":true,\\\"options\\\":[{\\\"title\\\":\\\"Taskbar": {
+   "count": 1,
+   "ms": 40365,
+   "maxMs": 40365,
+   "failures": 0
+  },
+  "bash\u0000cd . && d=$(date +%F) && sed -i \"s/## 0.1.70 — 2026-10-24/## 0.1.70 — $d/\" CHANGELOG.md && node hub/scripts/test-scheduler.mjs 2>&1 | tail -1 && node hub/scripts/test-app-install.mjs 2>&1 | tail -1 &&": {
+   "count": 1,
+   "ms": 6987,
+   "maxMs": 6987,
+   "failures": 1
+  },
+  "bash\u0000cd . && git add -u && git add docs/changelog/0.1.70-*.png && git commit -qm \"0.1.70: mobile plan line and wrapped ask_user options; changelog\" && git push -q origin master && git tag app-v0.1.3 && git": {
+   "count": 1,
+   "ms": 20388,
+   "maxMs": 20388,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/app/pin-release.mjs app-v0.1.3 2>&1 | tail -3 && git add hub/app/release.json && git commit -qm \"Pin desktop app release app-v0.1.3\" && git push -q origin master && git log --oneline ": {
+   "count": 1,
+   "ms": 6669,
+   "maxMs": 6669,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app && sed -i 's/^const URGENCY = \\[\"waiting\", \"working\", \"unseen\"\\], DOT = { waiting: \"#e03131\", working: \"#f59f00\", unseen: \"#1c7ed6\" };/const URGENCY = [\"waiting\", \"working\", \"unseen\"];/' ": {
+   "count": 1,
+   "ms": 75959,
+   "maxMs": 75959,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && cp /c/SOFT/git/ce-workflow/hub/app/src-tauri/target/release/pi-hub-app.exe pihubapp-try/ && powershell -NoProfile -Command \"Start-Process -FilePath '$(cygpath -w \"$LOCALAPPD": {
+   "count": 1,
+   "ms": 13508,
+   "maxMs": 13508,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && taskkill //PID $(cat pihubapp-try/app.lock) //F >/dev/null; cd /c/SOFT/git/ce-workflow/hub/app/src-tauri && sed -i 's/\"version\": \"0.1.3\"/\"version\": \"0.1.4\"/' tauri.conf.json": {
+   "count": 1,
+   "ms": 814,
+   "maxMs": 814,
+   "failures": 0
+  },
+  "bash\u0000node \"$LOCALAPPDATA/Temp/patch-strip.cjs\" && cd ./hub/app/src-tauri && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && cargo tauri build --no-bundle 2>&1 | grep -E \"^(error|warning)|Built\" | head": {
+   "count": 1,
+   "ms": 85537,
+   "maxMs": 85537,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && P=\"$APPDATA/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/zz-pihub-test.bin\" && node -e \"require('fs').writeFileSync(process.argv[1], Buffer.from('dev.ce-work": {
+   "count": 1,
+   "ms": 30218,
+   "maxMs": 30218,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs');let c=fs.readFileSync('CHANGELOG.md','utf8'); c=c.replace(/- Desktop app 0\\.1\\.4: the taskbar button no longer gets a big extra dot.*\\n/,'- Desktop app 0.1.4: ": {
+   "count": 1,
+   "ms": 71694,
+   "maxMs": 71694,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && cargo tauri build --no-bundle 2>&1 | grep -E \"^error|Built\" ; cd \"$LOCALAPPDATA/Temp\" && cp /c/SOFT/git/ce-workflow/hub/app/src": {
+   "count": 1,
+   "ms": 68018,
+   "maxMs": 68018,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs');let c=fs.readFileSync('CHANGELOG.md','utf8');const a='(questions and finished sessions you haven\\'t opened).\\n';if(!c.includes(a))throw 1; c=c.replace(a,a+'- D": {
+   "count": 1,
+   "ms": 71270,
+   "maxMs": 71270,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > \"$LOCALAPPDATA/Temp/patch-git.cjs\" <<'EOF' const fs = require(\"fs\"), p = s => \"./hub/web/\" + s; const rep = (f, a, b) => { const c = fs.readFileSync(p(f), \"utf8\"); if (!c.includes(a)": {
+   "count": 1,
+   "ms": 1528,
+   "maxMs": 1528,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && node -e \" const fs=require('fs'),f='scripts/test-api.mjs';let c=fs.readFileSync(f,'utf8'); const a='assert.deepEqual((await get(id, \\\"snapshot\\\")).body.status.git, { changed: fs.readdirSyn": {
+   "count": 1,
+   "ms": 86065,
+   "maxMs": 86065,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && sed -i \"79s/const files = /const loose = /; 80s/changed: files, untracked: files,/changed: loose, untracked: loose,/\" scripts/test-api.mjs && sed -n 79,80p scripts/test-api.mjs | cut -c1-1": {
+   "count": 1,
+   "ms": 2902,
+   "maxMs": 2902,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/changelog-shot.mjs \"#git-actions\" docs/changelog/0.1.71-git-buttons.png \"const p = document.getElementById('git-pull'); p.hidden = false; p.textContent = 'Pull latest (3)'; co": {
+   "count": 1,
+   "ms": 33389,
+   "maxMs": 33389,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs');let c=fs.readFileSync('CHANGELOG.md','utf8');const a='with one hub the dots are bigger.\\n';if(!c.includes(a))throw 1; c=c.replace(a,'with one hub the dots are ": {
+   "count": 1,
+   "ms": 96545,
+   "maxMs": 96545,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && sed -i \"80s/untracked: loose, modified: 0,/added: 0, modified: 0, deleted: 0, untracked: loose,/\" scripts/test-api.mjs && sed -n 80p scripts/test-api.mjs | cut -c60-200 && node scripts/tes": {
+   "count": 1,
+   "ms": 69895,
+   "maxMs": 69895,
+   "failures": 0
+  },
+  "bash\u0000cd . && rm -f docs/changelog/0.1.71-git-buttons.png && node hub/scripts/changelog-shot.mjs \".session-folder\" docs/changelog/0.1.71-git-files.png \"await new Promise(r => setTimeout(r, 800)); const line": {
+   "count": 1,
+   "ms": 240251,
+   "maxMs": 240251,
+   "failures": 1
+  },
+  "bash\u0000cd . && ls docs/changelog/0.1.71-git-pull.png 2>&1; timeout 120 node hub/scripts/changelog-shot.mjs \"#git-actions\" docs/changelog/0.1.71-git-pull.png \"const p = document.getElementById('git-pull'); p.": {
+   "count": 1,
+   "ms": 120149,
+   "maxMs": 120149,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > \"$LOCALAPPDATA/Temp/patch-git3.cjs\" <<'EOF' const fs = require(\"fs\"), p = s => \"./hub/\" + s; const rep = (f, a, b) => { const c = fs.readFileSync(p(f), \"utf8\"); if (!c.includes(a)) t": {
+   "count": 1,
+   "ms": 120173,
+   "maxMs": 120173,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-browser.mjs 2>&1 | tail -1 && node -e \" const fs=require('fs');let c=fs.readFileSync('CHANGELOG.md','utf8');const a='- A Pull latest button appears';if(!c.includes(a))thr": {
+   "count": 1,
+   "ms": 74265,
+   "maxMs": 74265,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && node -e \" const fs=require('fs'),f='web/app.ts';let c=fs.readFileSync(f,'utf8'); const a=' if (actions.length) line.append(Object.assign(html(\\\"span\\\", { className: \\\"session-git-actions\\\"": {
+   "count": 1,
+   "ms": 120189,
+   "maxMs": 120189,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-browser.mjs 2>&1 | tail -1 && node -e \" const fs=require('fs');let c=fs.readFileSync('CHANGELOG.md','utf8');const a='modified ~n and deleted ×n (red).\\n';if(!c.includes(a": {
+   "count": 1,
+   "ms": 71515,
+   "maxMs": 71515,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -n 5,14p CHANGELOG.md | cut -c1-160; grep -n \"\\\"version\\\"\" hub/app/src-tauri/tauri.conf.json hub/app/src-tauri/Cargo.toml hub/app/package.json 2>/dev/null; grep -n \"^version\" hub/app/src-t": {
+   "count": 1,
+   "ms": 573,
+   "maxMs": 573,
+   "failures": 0
+  },
+  "bash\u0000cd . && git show origin/master:CHANGELOG.md | sed -n 1,6p | cut -c1-80; cd hub && node scripts/test-app-install.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 792,
+   "maxMs": 792,
+   "failures": 0
+  },
+  "bash\u0000cd . && git add -u && git commit -qm \"0.1.71\" && git push -q origin master 2>&1 | tail -2 && git tag app-v0.1.4 && git push -q origin app-v0.1.4 2>&1 | tail -2; sleep 8; gh run list --workflow app-rel": {
+   "count": 1,
+   "ms": 14768,
+   "maxMs": 14768,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/app/pin-release.mjs app-v0.1.4 2>&1 | tail -3 && git add hub/app/release.json && git commit -qm \"Pin desktop app release app-v0.1.4\" && git push -q origin master 2>&1 | tail -2; git l": {
+   "count": 1,
+   "ms": 7355,
+   "maxMs": 7355,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-browser.mjs 2>&1 | tail -1 | cut -c1-40 && node -e \" const fs=require('fs');let c=fs.readFileSync('CHANGELOG.md','utf8');c=c.replace('## 0.1.71','## Unreleased\\n\\n### Cha": {
+   "count": 1,
+   "ms": 55205,
+   "maxMs": 55205,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep -c \"ui-icon\\|icon(\" hub/web/app.ts && timeout 120 node hub/scripts/changelog-shot.mjs \".status-line\" \"$LOCALAPPDATA/Temp/icons-status.png\" \"await new Promise(r => setTimeout(r, 1000));\" -": {
+   "count": 1,
+   "ms": 125083,
+   "maxMs": 125083,
+   "failures": 0
+  },
+  "bash\u0000cd . && timeout 120 node hub/scripts/changelog-shot.mjs \".status-line\" \"$(cygpath -w \"$LOCALAPPDATA/Temp\")\\\\icons-status.png\" \"await new Promise(r => setTimeout(r, 1000));\" --pad=6 2>&1 | grep -v \"^\\s": {
+   "count": 1,
+   "ms": 78965,
+   "maxMs": 78965,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -n 44,50p hub/web/app.ts | cut -c1-120; T=\"$(cygpath -w \"$LOCALAPPDATA/Temp\")\"; timeout 120 node hub/scripts/changelog-shot.mjs \".status-line\" \"$T\\\\icons-status.png\" \"await new Promise(r =": {
+   "count": 1,
+   "ms": 132725,
+   "maxMs": 132725,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-browser.mjs 2>&1 | grep -v \"^\\s*at \" | tail -8 | cut -c1-400": {
+   "count": 1,
+   "ms": 61265,
+   "maxMs": 61265,
+   "failures": 0
+  },
+  "bash\u0000cd . && T=\"$(cygpath -w \"$LOCALAPPDATA/Temp\")\"; timeout 120 node hub/scripts/changelog-shot.mjs \".status-line\" \"$T\\\\icons-status.png\" \"await new Promise(r => setTimeout(r, 1000));\" --pad=6 2>&1 | tail": {
+   "count": 1,
+   "ms": 84492,
+   "maxMs": 84492,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && node -e \" const fs=require('fs'),f='scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); const r=(a,b)=>{if(!c.includes(a))throw a;c=c.replace(a,b)}; r('const answers = [], messages ": {
+   "count": 1,
+   "ms": 40124,
+   "maxMs": 40124,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-browser.mjs 2>&1 | grep -v \"^\\s*at \" | grep -B2 -A12 \"AssertionError\" | cut -c1-300": {
+   "count": 1,
+   "ms": 39845,
+   "maxMs": 39845,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs'),f='hub/scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); const a=' await browser(\\\"press\\\", \\\"ArrowDown\\\"); assert.equal(';if(!c.includes(a))throw 1; ": {
+   "count": 1,
+   "ms": 69157,
+   "maxMs": 69157,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; grep -v \"^\\s*at \" \"$LOCALAPPDATA/Temp/tb.log\" | tail -5 | cut -c1-300": {
+   "count": 1,
+   "ms": 65154,
+   "maxMs": 65154,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs'),f='hub/scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); const d=' if (endpoint === \\\"/api/drop\\\") { drops.push(body.text); return { ok: true }; }\\n';": {
+   "count": 1,
+   "ms": 65666,
+   "maxMs": 65666,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs'),f='hub/scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); c=c.replace(' if (endpoint === \\\"/api/drop\\\") { drops.push(body.text); return { ok: true }; }": {
+   "count": 1,
+   "ms": 500257,
+   "maxMs": 500257,
+   "failures": 1
+  },
+  "bash\u0000taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; cd . && timeout 420 node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; grep -n \"cmd:\\|Assertion\\|^ok\" \"$": {
+   "count": 1,
+   "ms": 65259,
+   "maxMs": 65259,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs'),f='hub/scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); const r=(a,b)=>{if(!c.includes(a))throw a;c=c.replace(a,b)}; r(' const dropLast = hub.host.dr": {
+   "count": 1,
+   "ms": 517,
+   "maxMs": 517,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs'),f='hub/scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); c=c.replace('new Response(\\'{\\\"ok\\\":true}\\')','new Response(JSON.stringify({ ok: true }))');f": {
+   "count": 1,
+   "ms": 46290,
+   "maxMs": 46290,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && sed -i \"s/💡 //g\" scripts/test-browser.mjs web/index.html && cd .. && timeout 420 node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; grep -v \"^\\s*at \\|Expe": {
+   "count": 1,
+   "ms": 55969,
+   "maxMs": 55969,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -i 's/Right-click renames or removes, drag reorders, Ctrl+1…9 switches while the app has focus./Right-click renames (names are per PC; an empty name shows only the icon) or removes, drag r": {
+   "count": 1,
+   "ms": 91971,
+   "maxMs": 91971,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp/strip-try\" && node -e \" const fs=require('fs');const src=fs.readFileSync('./hub/app/ui/index.html','utf8');const old=fs.readFileSync('index.html','utf8'); const stub=old.match(/": {
+   "count": 1,
+   "ms": 6562,
+   "maxMs": 6562,
+   "failures": 0
+  },
+  "bash\u0000S=\"--session strip9\"; agent-browser $S eval \"(() => { document.querySelectorAll('button.tab')[0].dispatchEvent(new MouseEvent('contextmenu',{bubbles:true})); return [...document.querySelectorAll('butt": {
+   "count": 1,
+   "ms": 10690,
+   "maxMs": 10690,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && node -e \" const fs=require('fs');let f='scripts/test-api.mjs',c=fs.readFileSync(f,'utf8'); const a='assert.deepEqual((await get(id, \\\"snapshot\\\")).body.status.git, { changed: loose, added:": {
+   "count": 1,
+   "ms": 420502,
+   "maxMs": 420502,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && sed -i 's/const { files, ...counts } = (await get(id, \"snapshot\")).body.status.git;/const { files: gitFiles, ...counts } = (await get(id, \"snapshot\")).body.status.git;/; s/assert.deepEqual": {
+   "count": 1,
+   "ms": 2272,
+   "maxMs": 2272,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && node scripts/test-api.mjs > \"$LOCALAPPDATA/Temp/ta.log\" 2>&1; echo exit $?; tail -3 \"$LOCALAPPDATA/Temp/ta.log\" | cut -c1-200": {
+   "count": 1,
+   "ms": 2364,
+   "maxMs": 2364,
+   "failures": 0
+  },
+  "bash\u0000taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; agent-browser --session k1 open \"data:text/html,<textarea id=t></textarea><script>addEventListener('keydown',e=>window.k=[e.code,e.ctrlKe": {
+   "count": 1,
+   "ms": 2475,
+   "maxMs": 2475,
+   "failures": 0
+  },
+  "bash\u0000taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; cd . && time (timeout 600 node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?); grep -v \"^\\s*at \\|Experime": {
+   "count": 1,
+   "ms": 40810,
+   "maxMs": 40810,
+   "failures": 0
+  },
+  "bash\u0000cd . && node -e \" const fs=require('fs'),f='hub/scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); const a='assert.equal(await evaluate(\\\"document.querySelector(\\\\'.session-git-files\\\\')?.text": {
+   "count": 1,
+   "ms": 590,
+   "maxMs": 590,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -i '455s#/Modified.\\*src/app.ts/#/Modified.*src\\\\/app\\\\.ts/#' hub/scripts/test-browser.mjs && sed -n 455p hub/scripts/test-browser.mjs | cut -c80-200; taskkill //F //IM agent-browser-win32": {
+   "count": 1,
+   "ms": 540,
+   "maxMs": 540,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 600 node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; grep -v \"^\\s*at \\|Experimental\\|t": {
+   "count": 2,
+   "ms": 1201062,
+   "maxMs": 600589,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; BROWSER_TRACE=1 timeout 300 node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; grep -v \"^\\s*at \\": {
+   "count": 1,
+   "ms": 40790,
+   "maxMs": 40790,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep -n \"click\\\", \\\"#chat-compact\\\"\" hub/scripts/test-browser.mjs | head -2; taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; BROWSER_TRACE=1 timeout 300 node hub/scripts/test-br": {
+   "count": 1,
+   "ms": 44530,
+   "maxMs": 44530,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -i '453s/await browser(\"click\", \"#bookmarks-close\");/await evaluate(\"document.getElementById(\\x27bookmarks\\x27).close()\");/' hub/scripts/test-browser.mjs && sed -n 453p hub/scripts/test-br": {
+   "count": 1,
+   "ms": 56408,
+   "maxMs": 56408,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep -rn \"Think:Plan\\|Think:Task\\|Work:Plan\" --include=*.ts --include=*.mjs --include=*.md . 2>/dev/null | grep -v node_modules | grep -v \"docs/plans\\|CHANGELOG\" | cut -c1-200": {
+   "count": 1,
+   "ms": 30452,
+   "maxMs": 30452,
+   "failures": 1
+  },
+  "bash\u0000cd ./hub && grep -n 'user_(' web/app.ts | cut -c1-120; cat > \"$LOCALAPPDATA/Temp/patch-icons.cjs\" <<'EOF' const fs = require(\"fs\"), p = s => \"./hub/\" + s; const rep = (f, a, b) => { const c = fs.readF": {
+   "count": 1,
+   "ms": 533,
+   "maxMs": 533,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; BROWSER_TRACE=1 timeout 600 node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; grep -v \"^\\s*at \\": {
+   "count": 2,
+   "ms": 121261,
+   "maxMs": 70207,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -i '648s/\"Normal\", sample.title/\"Default\", sample.title/' hub/scripts/test-browser.mjs && grep -n \"'Normal'\\|\\\"Normal\\\"\\|'Think'\\|'Work'\" hub/scripts/test-browser.mjs | cut -c1-200; taskki": {
+   "count": 1,
+   "ms": 60132,
+   "maxMs": 60132,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 200 node hub/scripts/changelog-shot.mjs \".topbar\" docs/changelog/0.1.72-icons.png --size=1400x700 2>&1 | tail -2; timeout": {
+   "count": 1,
+   "ms": 63537,
+   "maxMs": 63537,
+   "failures": 0
+  },
+  "bash\u0000cd . && cp \"$LOCALAPPDATA/Temp/pi-screen-read/1792766418081-b96b0faa.png\" docs/changelog/0.1.72-icons.png && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 200 node hub/scripts": {
+   "count": 1,
+   "ms": 31920,
+   "maxMs": 31920,
+   "failures": 0
+  },
+  "bash\u0000cd . && cat > \"$LOCALAPPDATA/Temp/p3.cjs\" <<'EOF' const fs = require(\"fs\"), f = \"./scripts/test-work-plan3.mjs\"; let c = fs.readFileSync(f, \"utf8\"); const r = (a, b) => { if (!c.includes(a)) throw new": {
+   "count": 1,
+   "ms": 12851,
+   "maxMs": 12851,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 200 node hub/scripts/changelog-shot.mjs \".topbar\" \"$LOCALAPPDATA/Temp/top.png\" --size=1400x700 2>&1 | tail -1; timeout 20": {
+   "count": 1,
+   "ms": 63344,
+   "maxMs": 63344,
+   "failures": 0
+  },
+  "bash\u0000cd . && cp \"$LOCALAPPDATA/Temp/pi-screen-read/1792767335919-64173323.png\" docs/changelog/0.1.72-icons.png && cat > \"$LOCALAPPDATA/Temp/cl2.cjs\" <<'EOF' const fs = require(\"fs\"), f = \"./CHANGELOG.md\"; ": {
+   "count": 1,
+   "ms": 56303,
+   "maxMs": 56303,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -i '2521s/\"0.1.4\"/\"0.1.5\"/' hub/app/src-tauri/Cargo.lock && sed -i 's/^## Unreleased$/## 0.1.72 — 2026-10-23/' CHANGELOG.md && git diff --stat && timeout 300 node hub/scripts/test-api.mjs ": {
+   "count": 1,
+   "ms": 2315,
+   "maxMs": 2315,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && C=\"$USERPROFILE/.cargo/bin/cargo.exe\"; ls \"$C\" && timeout 400 \"$C\" check -q 2>&1 | tail -5; echo cargo ${PIPESTATUS[0]}": {
+   "count": 1,
+   "ms": 18896,
+   "maxMs": 18896,
+   "failures": 0
+  },
+  "bash\u0000cd . && git add -u && git commit -qm \"0.1.72; desktop app 0.1.5\" && git tag app-v0.1.5 && git push -q origin master && git push -q origin app-v0.1.5 && git status -sb | head -1 && sleep 8 && gh run li": {
+   "count": 1,
+   "ms": 15118,
+   "maxMs": 15118,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && timeout 400 \"$USERPROFILE/.cargo/bin/cargo.exe\" check -q 2>&1 | tail -20; echo cargo ${PIPESTATUS[0]}": {
+   "count": 1,
+   "ms": 930,
+   "maxMs": 930,
+   "failures": 0
+  },
+  "bash\u0000cd . && gh run view 39974216236 --json status,conclusion -q \".status+\\\" \\\"+.conclusion\"; git log --oneline -3; git status --short | grep -v \"^??\"": {
+   "count": 1,
+   "ms": 871,
+   "maxMs": 871,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri && timeout 900 \"$USERPROFILE/.cargo/bin/cargo.exe\" build -q 2>&1 | tail -5; ls -la target/debug/pi-hub-app.exe": {
+   "count": 1,
+   "ms": 56093,
+   "maxMs": 56093,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/app/src-tauri/target/debug && ls app.json 2>/dev/null; (WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9333 ./pi-hub-app.exe > /dev/null 2>&1 &) ; sleep 8; curl -s http://127.0": {
+   "count": 1,
+   "ms": 8320,
+   "maxMs": 8320,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp && agent-browser --session cdpt connect 9333 2>&1 | tail -2; agent-browser --session cdpt tab list 2>&1 | head -5; agent-browser --session cdpt get url 2>&1 | head -2": {
+   "count": 1,
+   "ms": 60491,
+   "maxMs": 60491,
+   "failures": 1
+  },
+  "bash\u0000taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; cat > \"$LOCALAPPDATA/Temp/cdp.mjs\" <<'EOF' const list = async () => (await (await fetch(\"http://127.0.0.1:9333/json\")).json()).filter(t =": {
+   "count": 1,
+   "ms": 8534,
+   "maxMs": 8534,
+   "failures": 0
+  },
+  "bash\u0000tasklist //NH | grep -ic \"brave.exe\"; reg query \"HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice\" //v ProgId 2>&1 | grep ProgId": {
+   "count": 1,
+   "ms": 483,
+   "maxMs": 483,
+   "failures": 0
+  },
+  "bash\u0000tasklist //NH | grep -i \"helium\" | head -2; taskkill //F //IM pi-hub-app.exe >/dev/null 2>&1; echo done": {
+   "count": 1,
+   "ms": 816,
+   "maxMs": 816,
+   "failures": 0
+  },
+  "bash\u0000reg query \"HKCR\\HeliumHTM.2CD4FYSKTETWWO47PLALO2ZZRM\\shell\\open\\command\" //ve 2>&1 | tail -2 | cut -c1-160; tasklist //NH | awk '{print $1}' | sort | uniq -c | grep -i \"chrome\\|helium\"": {
+   "count": 1,
+   "ms": 454,
+   "maxMs": 454,
+   "failures": 0
+  },
+  "bash\u0000cd . && cat > \"$LOCALAPPDATA/Temp/cl3.cjs\" <<'EOF' const fs = require(\"fs\"), f = \"./CHANGELOG.md\"; let c = fs.readFileSync(f, \"utf8\"); const a = \"## 0.1.72 — 2026-10-23\"; if (!c.includes(a)) throw 1; ": {
+   "count": 1,
+   "ms": 1188,
+   "maxMs": 1188,
+   "failures": 0
+  },
+  "bash\u0000cd . && timeout 120 node hub/app/pin-release.mjs app-v0.1.5 2>&1 | tail -3 && git add hub/app/release.json && git commit -qm \"Pin desktop app release app-v0.1.5\" && git log --oneline origin/master..HE": {
+   "count": 1,
+   "ms": 4780,
+   "maxMs": 4780,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 200 node hub/scripts/changelog-shot.mjs \"#composer\" \"$LOCALAPPDATA/Temp/comp.png\" \"document.getElementById('stop').hidden": {
+   "count": 1,
+   "ms": 32319,
+   "maxMs": 32319,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && sed -i 's|^ .composer-actions { justify-content: flex-end; margin-top: 4px; }$| .composer-actions { justify-content: flex-end; margin-top: 4px; gap: 4px; }\\n /* Six buttons (💾 🎤 EN ★ Sto": {
+   "count": 1,
+   "ms": 32018,
+   "maxMs": 32018,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 600 node hub/scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; grep \"^ok\\|Error\" \"$LOCALAPPDATA/": {
+   "count": 1,
+   "ms": 72750,
+   "maxMs": 72750,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/web && sed -i '230a /* Next to the diagram the chat header is cramped; the sidebar folder box keeps the same git buttons. */\\n@media (min-width: 900px) { .workspace:not([data-left=collapsed])": {
+   "count": 1,
+   "ms": 56443,
+   "maxMs": 56443,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && grep -rn \"function hubsIconSvg\" --include=*.js --include=*.ts --include=*.html . | grep -v node_modules | cut -c1-120; f=$(grep -rln \"function hubsIconSvg\" --include=*.js --include=*.ts --": {
+   "count": 1,
+   "ms": 489,
+   "maxMs": 489,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && grep -rn \"icons.js\" --include=*.mjs --include=*.ts --include=*.json --include=*.rs . 2>/dev/null | grep -v node_modules | cut -c1-200 | head; sed -n 30,52p web/icons.ts | cut -c1-220; grep": {
+   "count": 1,
+   "ms": 791,
+   "maxMs": 791,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > \"$LOCALAPPDATA/Temp/fu.mjs\" <<'EOF' import { findUpdatesHidden } from \"file:///./hub/src/update-check.ts\"; const r = await findUpdatesHidden(); console.log(r.pi, r.packages); console": {
+   "count": 1,
+   "ms": 3435,
+   "maxMs": 3435,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > \"$LOCALAPPDATA/Temp/ext6.cjs\" <<'EOF' const fs = require(\"fs\"), f = \"./hub/scripts/changelog-shot.mjs\"; let c = fs.readFileSync(f, \"utf8\"); const a = `const hub = await startHub({ co": {
+   "count": 1,
+   "ms": 31881,
+   "maxMs": 31881,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 300 node hub/scripts/changelog-shot.mjs \"#settings-menu\" \"$LOCALAPPDATA/Temp/sm.png\" \"document.getElementById('settings-b": {
+   "count": 1,
+   "ms": 31961,
+   "maxMs": 31961,
+   "failures": 0
+  },
+  "bash\u0000cd . && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 300 node hub/scripts/changelog-shot.mjs \"#extension-list\" docs/changelog/0.1.73-extensions.png \"document.getElementById('": {
+   "count": 1,
+   "ms": 31810,
+   "maxMs": 31810,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub/web && sed -i \"s/^\\.extension-remove { grid-column: 4;.*$/.status-menu .extension-remove { grid-column: 4; display: grid; place-items: center; width: 22px; height: 20px; min-height: 0; paddin": {
+   "count": 1,
+   "ms": 32110,
+   "maxMs": 32110,
+   "failures": 0
+  },
+  "bash\u0000cd . && cat > \"$LOCALAPPDATA/Temp/cl7.cjs\" <<'EOF' const fs = require(\"fs\"), f = \"./CHANGELOG.md\"; let c = fs.readFileSync(f, \"utf8\"); const a = \"## 0.1.73 — 2026-10-23\\n\\n\"; if (!c.includes(a)) throw": {
+   "count": 1,
+   "ms": 56584,
+   "maxMs": 56584,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && cat > \"$LOCALAPPDATA/Temp/pk.cjs\" <<'EOF' const fs = require(\"fs\"); const edit = (f, pairs) => { let c = fs.readFileSync(f, \"utf8\"); for (const [a, b] of pairs) { if (!c.includes(a)) throw": {
+   "count": 1,
+   "ms": 2250,
+   "maxMs": 2250,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 600 node --no-warnings scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; tail -15 \"$LOCALAPP": {
+   "count": 1,
+   "ms": 61152,
+   "maxMs": 61152,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 600 node --no-warnings scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; tail -6 \"$LOCALAPPD": {
+   "count": 1,
+   "ms": 56388,
+   "maxMs": 56388,
+   "failures": 0
+  },
+  "bash\u0000cd . && cat > \"$LOCALAPPDATA/Temp/shot-setup.js\" <<'EOF' const c = Object.assign(document.createElement(\"canvas\"), { width: 800, height: 450 }), g = c.getContext(\"2d\"); g.fillStyle = \"#f4f6fa\"; g.fill": {
+   "count": 1,
+   "ms": 32452,
+   "maxMs": 32452,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 600 node --no-warnings scripts/test-browser.mjs > \"$LOCALAPPDATA/Temp/tb.log\" 2>&1; echo exit $?; tail -4 \"$LOCALAPPD": {
+   "count": 1,
+   "ms": 36136,
+   "maxMs": 36136,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && sed -i \"s/note = el(\\\"input\\\", { className: \\\"annotate-note\\\", type: \\\"text\\\",/note = el(\\\"input\\\", { className: \\\"annotate-note\\\", type: \\\"text\\\", hidden: true,/\" web/annotate.ts && grep ": {
+   "count": 1,
+   "ms": 36532,
+   "maxMs": 36532,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && grep -n \"editing = -1; note.hidden = true; render();\" web/annotate.ts && sed -i \"s/editing = -1; note.hidden = true; render();/editing = -1; note.hidden = true; dialog.focus({ preventScrol": {
+   "count": 1,
+   "ms": 56929,
+   "maxMs": 56929,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -n 1,12p package-lock.json | grep -n version; cd hub && node --no-warnings scripts/test-annotate.mjs && node --no-warnings --test scripts/test-api.mjs scripts/test-update.mjs 2>&1 | grep -": {
+   "count": 1,
+   "ms": 2346,
+   "maxMs": 2346,
+   "failures": 1
+  },
+  "bash\u0000cd ./hub && node --no-warnings --test scripts/test-api.mjs scripts/test-update.mjs > \"$LOCALAPPDATA/Temp/tu.log\" 2>&1; echo exit $?; grep -nE \"^# |not ok|Error\" \"$LOCALAPPDATA/Temp/tu.log\" | head -20 ": {
+   "count": 1,
+   "ms": 2349,
+   "maxMs": 2349,
+   "failures": 0
+  },
+  "bash\u0000tail -5 \"$LOCALAPPDATA/Temp/tu.log\" | cut -c1-200; cd . && git push origin master 2>&1 | tail -2 && git tag app-v0.1.6 01f4661 && git push origin app-v0.1.6 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 4149,
+   "maxMs": 4149,
+   "failures": 0
+  },
+  "bash\u0000cd . && sleep 8; gh run list --workflow app-release.yml --limit 1 --json databaseId,headBranch,status -q \".[0]\"": {
+   "count": 1,
+   "ms": 10167,
+   "maxMs": 10167,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/app/pin-release.mjs app-v0.1.6 2>&1 | tail -3 && git add hub/app/release.json && git commit -qm \"Pin desktop app release app-v0.1.6\" && git push origin master 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 7672,
+   "maxMs": 7672,
+   "failures": 0
+  },
+  "bash\u0000cd . && node hub/scripts/changelog-shot.mjs \"#settings-menu\" \"$LOCALAPPDATA/Temp/settings.png\" \"document.getElementById('settings-button').click(); await new Promise(r => setTimeout(r, 500));\" --size=": {
+   "count": 1,
+   "ms": 32131,
+   "maxMs": 32131,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && grep -n \"review-menu\\|session-git-files\" scripts/test-browser.mjs | cut -c1-200 | head; taskkill //F //IM agent-browser-win32-x64.exe >/dev/null 2>&1; timeout 600 node --no-warnings script": {
+   "count": 1,
+   "ms": 36254,
+   "maxMs": 36254,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && node -e \" const fs=require('fs'),f='scripts/test-browser.mjs';let c=fs.readFileSync(f,'utf8'); const w='await browser(\\\"wait\\\", \\\"--fn\\\", \\\"document.activeElement?.className === \\\\'annotat": {
+   "count": 1,
+   "ms": 57235,
+   "maxMs": 57235,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp\" && npm view @ziuchen/wormhole-client name version description license dependencies bin time.modified repository.url 2>&1 | head -30; where 7z tar 2>&1 | head": {
+   "count": 1,
+   "ms": 1401,
+   "maxMs": 1401,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"$LOCALAPPDATA/Temp/wh\" && cd \"$LOCALAPPDATA/Temp/wh\" && npm init -y >/dev/null && npm i @ziuchen/wormhole-client@0.0.0-b081b13 2>&1 | tail -2; echo \"hello wormhole test $(date)\" > test.txt; ": {
+   "count": 1,
+   "ms": 8184,
+   "maxMs": 8184,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp/wh\" && mkdir -p dl && timeout 120 npx wormhole download \"https://wormhole.app/Q5NqPl#Ro91YyqUK_3Rzob7Lj3aiQ\" --output dl 2>&1 | tail -2; cat dl/* ; ls node_modules | wc -l; du -": {
+   "count": 1,
+   "ms": 2811,
+   "maxMs": 2811,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp/wh\" && npm view wormhole-crypto license version 2>&1; gh api repos/ZiuChen/wormhole-client --jq \".license.spdx_id, .stargazers_count, .pushed_at\" 2>&1; ls node_modules/@ziuchen/": {
+   "count": 1,
+   "ms": 1192,
+   "maxMs": 1192,
+   "failures": 0
+  },
+  "bash\u0000cd ./hub && grep -n \"^async function get\\|^function get\" -A3 web/app.ts | cut -c1-200; grep -n \"async function get(\\|function only\\|async get(\" src/api.ts | head; sed -n 200,215p src/api.ts | cut -c1-": {
+   "count": 1,
+   "ms": 193,
+   "maxMs": 193,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "A-01": {
+   "ms": 680993,
+   "testMs": 0,
+   "replies": 9,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 9
+   }
+  },
+  "A-02": {
+   "ms": 550953,
+   "testMs": 0,
+   "replies": 27,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 27
+   }
+  },
+  "A-03": {
+   "ms": 157845,
+   "testMs": 0,
+   "replies": 27,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 27
+   },
+   "failures": 2
+  },
+  "H-01": {
+   "ms": 174793,
+   "testMs": 60692,
+   "replies": 10,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 10
+   },
+   "failures": 1
+  },
+  "H-02": {
+   "ms": 191718,
+   "testMs": 4166,
+   "replies": 18,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 18
+   },
+   "failures": 1
+  },
+  "H-03": {
+   "ms": 125200,
+   "testMs": 781,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 11
+   },
+   "failures": 1
+  },
+  "H-04": {
+   "ms": 213863,
+   "testMs": 0,
+   "replies": 16,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 16
+   }
+  },
+  "H-05": {
+   "ms": 50096,
+   "testMs": 0,
+   "replies": 5,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 5
+   }
+  },
+  "P-01": {
+   "ms": 448730,
+   "testMs": 0,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   }
+  },
+  "R-01": {
+   "ms": 74018,
+   "testMs": 0,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
+   },
+   "failures": 2
+  },
+  "ARCH-RECONCILE": {
+   "ms": 46923,
+   "testMs": 0,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   }
+  },
+  "(none)": {
+   "ms": 11687565,
+   "testMs": 3781196,
+   "replies": 698,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 698
+   },
+   "failures": 28
+  },
+  "L-01": {
+   "ms": 732389,
+   "testMs": 156380,
+   "replies": 57,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 57
+   },
+   "failures": 6
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-10-23T05:51:13.452Z",
+   "ms": 3451369
+  },
+  {
+   "start": "2026-10-23T06:48:44.839Z",
+   "ms": 1184169
+  },
+  {
+   "start": "2026-10-23T07:08:29.023Z",
+   "ms": 2145604
+  },
+  {
+   "start": "2026-10-23T07:44:14.646Z",
+   "ms": 448851
+  },
+  {
+   "start": "2026-10-23T07:51:43.514Z",
+   "ms": 14042
+  },
+  {
+   "start": "2026-10-23T07:57:02.392Z",
+   "ms": 28538
+  },
+  {
+   "start": "2026-10-23T07:57:30.952Z",
+   "ms": 2214591
+  },
+  {
+   "start": "2026-10-23T08:34:25.562Z",
+   "ms": 6984
+  },
+  {
+   "start": "2026-10-23T08:35:40.095Z",
+   "ms": 11527
+  },
+  {
+   "start": "2026-10-23T08:40:21.792Z",
+   "ms": 25374
+  },
+  {
+   "start": "2026-10-23T08:40:47.186Z",
+   "ms": 3617
+  },
+  {
+   "start": "2026-10-23T09:57:52.840Z",
+   "ms": 83529
+  },
+  {
+   "start": "2026-10-23T10:00:07.791Z",
+   "ms": 468410
+  },
+  {
+   "start": "2026-10-23T10:14:15.782Z",
+   "ms": 59413
+  },
+  {
+   "start": "2026-10-23T10:15:51.416Z",
+   "ms": 46493
+  },
+  {
+   "start": "2026-10-23T10:19:25.066Z",
+   "ms": 168458
+  },
+  {
+   "start": "2026-10-23T10:25:46.993Z",
+   "ms": 359194
+  },
+  {
+   "start": "2026-10-23T10:37:25.376Z",
+   "ms": 525543
+  },
+  {
+   "start": "2026-10-23T10:48:28.679Z",
+   "ms": 273750
+  },
+  {
+   "start": "2026-10-23T11:00:15.093Z",
+   "ms": 16566
+  },
+  {
+   "start": "2026-10-23T11:07:53.821Z",
+   "ms": 955265
+  },
+  {
+   "start": "2026-10-23T11:23:49.104Z",
+   "ms": 3622478
+  },
+  {
+   "start": "2026-10-23T12:34:17.285Z",
+   "ms": 21663
+  },
+  {
+   "start": "2026-10-23T13:09:42.419Z",
+   "ms": 167415
+  },
+  {
+   "start": "2026-10-23T13:16:12.499Z",
+   "ms": 1820534
+  },
+  {
+   "start": "2026-10-23T13:48:19.721Z",
+   "ms": 1735679
+  },
+  {
+   "start": "2026-10-23T14:21:24.764Z",
+   "ms": 1235539
+  },
+  {
+   "start": "2026-10-23T14:53:17.590Z",
+   "ms": 218564
+  },
+  {
+   "start": "2026-10-23T14:57:21.278Z",
+   "ms": 88883
+  },
+  {
+   "start": "2026-10-23T15:01:53.873Z",
+   "ms": 412994
+  },
+  {
+   "start": "2026-10-23T15:53:54.198Z",
+   "ms": 211745
+  },
+  {
+   "start": "2026-10-23T17:24:59.461Z",
+   "ms": 45837
+  },
+  {
+   "start": "2026-10-23T18:14:46.144Z",
+   "ms": 109851
+  },
+  {
+   "start": "2026-10-23T18:22:17.203Z",
+   "ms": 349843
+  },
+  {
+   "start": "2026-10-23T19:28:28.659Z",
+   "ms": 435594
+  },
+  {
+   "start": "2026-10-23T19:51:01.202Z",
+   "ms": 711736
+  },
+  {
+   "start": "2026-10-23T21:07:40.600Z",
+   "ms": 222490
+  },
+  {
+   "start": "2026-10-23T21:11:45.257Z",
+   "ms": 76843
+  },
+  {
+   "start": "2026-10-23T21:20:12.618Z",
+   "ms": 15411
+  },
+  {
+   "start": "2026-10-23T21:35:44.950Z",
+   "ms": 253266
+  },
+  {
+   "start": "2026-10-23T21:40:26.718Z",
+   "ms": 51279
+  },
+  {
+   "start": "2026-10-23T21:42:04.144Z",
+   "ms": 504867
+  },
+  {
+   "start": "2026-10-23T21:52:45.997Z",
+   "ms": 47631
+  }
+ ],
+ "hints": []
+}

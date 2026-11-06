@@ -668,7 +668,8 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-option a')].map(a => a.getAttribute('href'))"), ["https://example.com/a"], "links in options work like in chat");
  assert.equal(await evaluate("document.querySelectorAll('#prompt-form textarea').length"), 1, "one text box, like the terminal");
- await browser("click", "#prompt-form input[value=Blue]"); await browser("fill", "#prompt-form textarea", "Matches the boxes"); await browser("click", "#prompt-form button[type=submit]");
+ await browser("click", "#prompt-form input[value=Blue]"); await browser("fill", "#prompt-form textarea", "Matches the boxes");
+ await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).selections, ["Blue"]); assert.equal(answers.at(-1).comment, "Matches the boxes", "with an option chosen the text is the comment");
  ask({ question: "Pick a colour", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
@@ -852,6 +853,19 @@ try {
  await browser("wait", "--fn", "[...document.querySelectorAll('.session-subtitle')].some(s => s.textContent === 'Home page' && s.closest('.session').querySelector('.session-label').textContent === '3')");
  assert(await evaluate("(() => { const sub = [...document.querySelectorAll('.session-subtitle')].find(s => s.textContent === 'Home page'); return sub.getBoundingClientRect().top >= sub.closest('.session').querySelector('.session-label').getBoundingClientRect().bottom - 1 && !sub.closest('.session-progress').querySelector('i'); })()"), "below the name, no plan bar without a plan");
  hub.host.setSubtitle(third.id, ""); await browser("wait", "--fn", "!document.querySelector('.session-subtitle')");
+ // S05: a design session shows a palette instead of its letter and names its handle on hover.
+ const painted = hub.registry.add({ name: "Bold", folder, sessionFile: join(root, "paint.jsonl"), state: "parked" }); hub.registry.update(painted.id, { modes: { design: "design-1" } });
+ await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `document.querySelector('.session[data-id=\"${painted.id}\"] .session-letter')?.textContent === '🎨'`);
+ assert.match(await evaluate(`document.querySelector('.session[data-id=\"${painted.id}\"] .session-link').title`), /design design-1/);
+ assert.equal(await evaluate("document.querySelectorAll('.session-design').length"), 0, "no text badge");
+ // Once a design is picked, the other designs in that folder hide; the folder name shows them again.
+ const calm = hub.registry.add({ name: "Calm", folder, sessionFile: join(root, "calm.jsonl"), state: "parked" }); hub.registry.update(calm.id, { modes: { design: "design-2" } });
+ write(".pi/designs/sessions.json", JSON.stringify({ version: 1, next: 3, sessions: [{ handle: "design-1" }, { handle: "design-2", selected: true }] }));
+ const designRows = "[...document.querySelectorAll('.session-emoji')].map(e => e.closest('.session').querySelector('.session-label').textContent).join()";
+ await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `${designRows} === "Calm"`);
+ await browser("click", ".session-group-label"); await browser("wait", "--fn", `${designRows} === "Bold,Calm"`);
+ hub.registry.remove(calm.id); fs.rmSync(join(folder, ".pi/designs/sessions.json"));
+ hub.registry.remove(painted.id); await evaluate("document.dispatchEvent(new Event('visibilitychange'))"); await browser("wait", "--fn", `!document.querySelector('.session[data-id=\"${painted.id}\"]')`);
  // @ lists the other sessions by folder/name; picking one writes its reference in place of the word.
  await browser("fill", "#message-input", "ask @CE-workflow/2"); await browser("wait", "#slash-menu:not([hidden])");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#slash-menu .slash-option')].map(o => o.dataset.command)"), ["ce-workflow/2"], "this session is not listed");
@@ -1154,6 +1168,22 @@ try {
  assert.deepEqual((await browser("errors")).errors ?? [], []); assert.equal(await evaluate("document.getElementById(\"switcher\").hidden"), false);
  await browser("wait", "--fn", "[...document.querySelectorAll(\"#messages li\")].some(item => item.textContent.includes(\"Earlier question\") && item.offsetParent)");
  await evaluate("localStorage.setItem(\"plan3-chat\", \"expanded\")");
+ // Leaving the page (switching sessions) keeps what you typed and ticked in the open ask; answering drops it.
+ ask({ question: "Pick a colour", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ await browser("click", "#prompt-form input[value=Pink]"); await browser("fill", "#prompt-form textarea", "Kept across pages");
+ await browser("reload"); await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ assert.deepEqual(await evaluate("[document.querySelector('#prompt-form input[value=Pink]').checked, document.querySelector('#prompt-form textarea').value]"), [true, "Kept across pages"], "the ask draft survives a reload");
+ await browser("click", "#prompt-form button[type=submit]"); await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
+ assert.deepEqual([answers.at(-1).selections, answers.at(-1).comment], [["Pink"], "Kept across pages"]);
+ assert.equal(await evaluate("Object.keys(localStorage).filter(k => k.startsWith('ask-draft:')).length"), 0, "an answered ask drops its draft");
+ // S07: a design session's page opens its mirrored design beside the chat: no file tree, Desktop and Phone (390 px) widths.
+ const designDir = join(folder, ".pi", "designs", "design-1"); fs.mkdirSync(designDir, { recursive: true }); fs.writeFileSync(join(designDir, "index.html"), "<h1>Calm</h1>");
+ await rpc().send({ type: "prompt", message: "/state " + JSON.stringify({ plan: null, modes: { design: "design-1" }, compacting: false, subagents: [] }) });
+ await browser("wait", "--fn", "document.getElementById('files').classList.contains('tree-hidden') && !!document.querySelector('#files .files-frame')");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#files .files-width')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'))"), ["Phone:false", "Desktop:true"]);
+ await evaluate("[...document.querySelectorAll('#files .files-width')].find(b => b.textContent === 'Phone').click()");
+ assert(Math.abs(await evaluate("document.querySelector('#files .files-frame').getBoundingClientRect().width") - 390) <= 2, "Phone shows the page 390 px wide");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

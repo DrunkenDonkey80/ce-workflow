@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T21:11:38.935Z
+updated: 2026-11-06T08:44:03.853Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -124,11 +124,14 @@ Cutover and rollback (recipe text): each design option states whether persisted 
 ### Phase 2: DealFinder warm-up pilot [think]
 
 - [x] **RW-03** DealFinder pilot plan b8ad3205 created by the DealFinder session (pre-rework SHA 27221be, skeleton with three gates); Map not started.
-- [wip] **RW-04** Drive the DealFinder pilot plan through Map, Characterize, Design, Pick, Build, Replay, Switch and Retire.
+- [wip] **RW-18** Lab driver `scripts/rework-lab.mjs`: fresh full clone of DealFinder at pre-rework SHA 27221be in C:\SOFT\git\rework-lab\<run> (no origin remote, later commits pruned, data/ copied, .env left out), project .pi/settings.json sets planningModel opus and codingModel gpt-6.1-sol, then drives Pi over RPC: /plan3 with the recipe request, /resume3, answers dialogs with the recommended option, turns gates on in order when the run stalls on them, and stops when the plan is complete or makes no progress. Check: a smoke run reaches plan creation in a clone with the real DealFinder repo unchanged.
+- [ ] **RW-19** Lab iterations: run the driver, then evaluate the clone (diff against 27221be, full test suite, corpus replay, and a review of code improvement, readability, security and performance, plus time and cost from the stats file). Strengthen the recipe and prompts, then repeat on a fresh clone. Record each run's scorecard under docs/proposals/rework-lab/. Check: the latest run's evaluation shows no regression on any dimension and a clear improvement, or names the blocker; the user agrees to move to a more serious project.
+- [ ] **RW-04** Drive the DealFinder pilot plan through Map, Characterize, Design, Pick, Build, Replay, Switch and Retire.
   - Acceptance from Goal: stable old-versus-old corpus, planted bug caught, scorecard with baseline and candidate per dimension, rollback rules recorded, old code retired after the watch window, C-df green on master. Any intentional behavior change replays through the recipe's approved-delta file; if none occurs, the plan says so.
   - Check: `git log` in DealFinder shows the pre-rework commit before the plan file; corpus SHA recorded; pilot plan complete or an explicit stop reason.
   - When done, the user turns on R-df-pilot-done (Alt+A) if the evidence is acceptable.
   - note: 2026-11-05: user approved; go sent to DealFinder session 01a17e92 (Map to Design, stop at PICK-01). Pre-rework SHA 27221be, pilot plan b8ad3205.
+  - note: Paused 2026-11-05 at the DealFinder Pick (plan b8ad3205, R-design-approved off) in favour of the clone lab RW-18/RW-19, per the user.
 - [ ] **RW-05** Retro: compare the pilot plan, its stats file and git log with the recipe; list what was missing, noisy or unused.
   - Inputs: the pilot plan's Amendments, questions asked and git log; its stats file only for failed tools and stuck steps.
   - needs: R-df-pilot-done
@@ -214,7 +217,7 @@ needs: R-pb-pilot-done
 
 ## Resume context
 
-RW-01 to RW-03 done. RW-04 wip: the DealFinder session (01a17e92, plan C:\SOFT\git\DealFinder\docs\plans\...-b8ad3205-plan3.md, pre-rework SHA 27221be) is running Map, Characterize and Design and will stop at PICK-01 for the user, then send a status via intercom. Every other step waits on R-df-pilot-done or R-pb-pilot-done (ARCH-RECONCILE too, assumed). Next: on the DealFinder status, check its corpus SHA, stable and sensitive results, and help the user pick; the pilot continues to Retire in that pane; the user turns on R-df-pilot-done, then RW-05.
+RW-18 wip. photobook-01 complete (docs/proposals/rework-lab/photobook-01.md): projectRepository split into store/normalizer/facade, no new test failures (same 8 pre-existing failures at 5cb626e), gates held, $10.99, 2h24 incl ~1h driver gate loop (fixed: [human] steps pass, marker-based gate stalls, --resume). Recipe §3 test-only seam note added. All lab work (recipe, driver, run-03/04/05/photobook-01 reports) uncommitted in ce-workflow. Next: user decides — commit lab work, codify /plan3 rework (RW-19+), or another lab run.
 
 ## Amendments
 
@@ -238,3 +241,4 @@ Append material changes and their reasons; preserve the original request and set
   - F4 RW-16 status check cannot prove read-only: accepted. The primary check is now an audit of tool calls; HEAD, `status --ignored` and diff are supporting.
   - F5 `[human]` used as a phase tag: accepted. Verified that `needsThinkTags` (`extensions/plan3.ts:413-416`) only accepts `[think]`/`[code]`. Pick and Switch phases are now `[think]` with `[human]` steps; RW-13 asserts no tagging turn.
   - F6 night-mode wording: accepted. Verified that `nightSet` copies the day set and `setBoth` sets both (`extensions/plan3-needs.ts:27-31`). The recipe now says approved gates stay on at night.
+- 2026-11-05: Added RW-18, RW-19 after RW-03: 2026-11-05 user direction: run the recipe autonomously on throwaway full clones of DealFinder (thinker anthropic/claude-opus-5-5, worker openai-codex/gpt-6.1-sol), evaluate each result (code improvement, readability, security, performance), strengthen the prompts and repeat until good; then move to a more serious project. The real-repo pilot RW-04 is paused at its Pick.

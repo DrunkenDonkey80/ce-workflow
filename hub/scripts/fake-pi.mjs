@@ -11,9 +11,12 @@ const flags = new Set((process.env.FAKE_PI ?? "").split(",").filter(Boolean));
 const args = process.argv.slice(2);
 const sessionArg = args[args.indexOf("--session") + 1];
 let sessionFile = args.includes("--session") ? sessionArg : `${process.cwd()}/fake-${crypto.randomUUID()}.jsonl`;
+const forkArg = args.includes("--fork") ? args[args.indexOf("--fork") + 1] : undefined;
 // Like Pi, a new session file starts with its header (the session id intercom uses).
 const header = () => { if (!fs.existsSync(sessionFile)) fs.writeFileSync(sessionFile, JSON.stringify({ type: "session", id: crypto.randomUUID(), cwd: process.cwd() }) + "\n"); };
 header();
+// --fork: a new file whose history is the source's messages.
+if (forkArg) fs.appendFileSync(sessionFile, fs.readFileSync(forkArg, "utf8").split("\n").filter(line => line && JSON.parse(line).type === "message").map(line => line + "\n").join(""));
 let sessionName = args.includes("--name") ? args[args.indexOf("--name") + 1] : undefined;
 let model = { provider: "fake", id: "fake-1" }, thinkingLevel = "low", streaming = false; const queued = [];
 const messages = fs.existsSync(sessionFile)

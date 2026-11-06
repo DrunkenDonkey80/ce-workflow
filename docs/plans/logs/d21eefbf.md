@@ -98,3 +98,8 @@ S01-S04 done (HEAD 941ef12). Next: S05 hub-to-hub pairing. Design worked out: De
 - [x] **S10** User pairs two real hubs (for example Home and Mac) and links one session on each
   - note: Needs the user to approve pairing on a second real hub and pick sessions to link.
   - check: User report ("inter-hub is currently operational, guys talk each other"); intercom list here shows stand-in 1~flexs-macbook-pro.local (hublink-23ebee73) idle next to belot/1 (01a178b1)
+
+## 2026-11-05T21:00:14.642Z ARCH-RECONCILE done: No architecture update: the user had all project diagrams deleted (they were a test); product.diagram.json and the two done-plan diagrams removed with git rm
+
+- [x] **ARCH-RECONCILE** Product diagram rev 22: pi_control_hub summary names hub links (hub/src/link.ts, comm 1 over Tailscale /link/); new edge pi_control_hub -> pi_intercom "stand-ins name~hub"
+  - check: git rm -f docs/architecture/product.diagram.json and 2 docs/plans/done/*.diagram.json -> removed; ls docs/architecture -> gone

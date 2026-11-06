@@ -1647,6 +1647,19 @@ try {
 		assert.equal(finish, undefined, "a warm cache does not compact early");
 		delete pi.sendUserMessage;
 	}
+	{ // Idle: a session left alone compacts once its prompt cache runs out (the next message would anyway); a new turn cancels it.
+		const realTimeout = globalThis.setTimeout, timers = []; let compacted = 0;
+		globalThis.setTimeout = (run, ms) => { timers.push({ run, ms }); return { unref() {} }; };
+		try {
+			const idleCtx = { ...lastAsk(10 * 60_000), hasUI: true, isIdle: () => true, model: { promptCache: { short: 300 } }, compact: () => { compacted++; } };
+			hooks.agent_end({}, idleCtx);
+			assert.equal(timers.at(-1)?.ms, 315_000, "armed for just after the cache runs out");
+			timers.at(-1).run(); assert.equal(compacted, 1, "a cold, large idle session compacts");
+			hooks.agent_end({}, { ...idleCtx, hasUI: false }); assert.equal(timers.length, 1, "print-mode runs never arm it");
+			hooks.agent_end({}, { ...lastAsk(60_000), hasUI: true, isIdle: () => true, compact: () => { compacted++; } }); timers.at(-1).run();
+			assert.equal(compacted, 1, "a still-warm cache does not compact");
+		} finally { globalThis.setTimeout = realTimeout; }
+	}
 	const nativeDraft = await buildBoundaryCompaction(boundary, nativeCtx, "native-200k", async (...args) => {
 		assert(args[0].some(message => message.content?.some?.(part => part.thinking === "Full retained reasoning")), "native summary gets unstripped reasoning");
 		assert(args[0].some(message => message.role === "toolResult" && message.toolCallId === "old" && message.content[0].text.length > 300_000));

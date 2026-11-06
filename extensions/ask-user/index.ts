@@ -2856,6 +2856,11 @@ function formatBatchResult(theme: Theme, details: AskBatchDetails, expanded: boo
 }
 
 export default function(pi: ExtensionAPI) {
+   // As OpenDesign's generation agent nobody answers: a question would end the run with nothing made.
+   if (process.env.OD_PROJECT_DIR || "OD_STOCK_RUN_ID" in process.env) {
+      pi.on("tool_call", (event) => event.toolName === "ask_user" ? { block: true, reason: "No user is present in this OpenDesign run. Decide from the brief and the inputs/ files, state your assumptions in the handoff, and build the pages." } : undefined);
+      return;
+   }
    let registered = false, warned = false;
    // All extension factories have run by session_start, independent of package load order.
    pi.on("session_start", (_event, ctx) => {

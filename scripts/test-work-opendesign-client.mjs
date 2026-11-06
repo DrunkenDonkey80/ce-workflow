@@ -6,11 +6,14 @@ import path from "node:path";
 import { createServer } from "node:net";
 import { pathToFileURL } from "node:url";
 import {
+	allowCloneWrites,
 	OpenDesignClient,
 	OpenDesignError,
 	callOpenDesignTool,
 	closePersistentOpenDesignClients,
+	discoverLoggedDaemonUrl,
 	openDesignPayloadDigest,
+	readOpenDesignApi,
 	reconcileCreatedProject,
 	redactOpenDesignText,
 	resolveOpenDesignCommand,
@@ -105,6 +108,26 @@ try {
 	assert.equal(installed.env.OD_MCP_BOOTSTRAP_COMMAND, launcherExe);
 	assert.equal(installed.env.OD_MCP_BOOTSTRAP_ARGS, "[]");
 	assert.equal(installed.env.ELECTRON_RUN_AS_NODE, "1");
+	// An older install left beside a newer one: the newest appVersion wins, whatever the folder order.
+	const newerRoot = path.join(openDesignRoot, "en", "0newer");
+	fs.cpSync(activeRoot, newerRoot, { recursive: true });
+	fs.writeFileSync(path.join(newerRoot, "resources", "open-design-config.json"), JSON.stringify({ namespace: "release-stable-win", appVersion: "0.24.1" }));
+	fs.writeFileSync(path.join(activeRoot, "resources", "open-design-config.json"), JSON.stringify({ namespace: "release-stable-win", appVersion: "0.9.0" }));
+	const newest = resolveOpenDesignCommand({ env: { APPDATA: appData, PATH: gitBin, PATHEXT: ".EXE" }, platform: "win32" });
+	assert.equal(newest.command, path.join(newerRoot, "Open Design.exe"));
+	assert.equal(newest.env.OD_DESKTOP_LOG, path.join(openDesignRoot, "namespaces", "release-stable-win", "logs", "desktop", "latest.log"));
+	fs.rmSync(newerRoot, { recursive: true });
+	{ // 0.24+ has no daemon pipe: the desktop log's latest port counts only when /api/health answers.
+		const { createServer: createHttp } = await import("node:http");
+		const health = createHttp((req, res) => { res.statusCode = req.url === "/api/health" ? 200 : 404; res.end("{}"); });
+		await new Promise((resolve) => health.listen(0, "127.0.0.1", resolve));
+		const port = health.address().port, log = path.join(root, "latest.log");
+		fs.writeFileSync(log, `{"target":"http://127.0.0.1:1/old"}\n{"target":"http://127.0.0.1:${port}/api"}\n`);
+		assert.equal(await discoverLoggedDaemonUrl(log), `http://127.0.0.1:${port}`);
+		health.close();
+		assert.equal(await discoverLoggedDaemonUrl(log, 500), "", "a closed app's port does not count");
+		assert.equal(await discoverLoggedDaemonUrl(path.join(root, "missing.log")), "");
+	}
 	assert.throws(
 		() =>
 			resolveOpenDesignCommand({
@@ -204,6 +227,42 @@ try {
 			}),
 		(failure) => failure.category === "invalid-input",
 	);
+	// Mapped source files go along as inputs/<hash>-<name>: hash-bound, bounded, never credentials.
+	const source = (text, name = "welcome.html") => ({ project: "project-1", path: `inputs/${crypto.createHash("sha256").update(text).digest("hex").slice(0, 16)}-${name}`, content: Buffer.from(text).toString("base64"), encoding: "base64" });
+	assert.ok(validateOpenDesignToolCall("write_file", source("<h1>Find a name you can still take.</h1>")));
+	assert.throws(() => validateOpenDesignToolCall("write_file", { ...source("<h1>a</h1>"), path: `inputs/${"0".repeat(16)}-welcome.html` }), (failure) => failure.category === "invalid-input");
+	assert.throws(() => validateOpenDesignToolCall("write_file", source("x".repeat(200_001))), (failure) => failure.category === "invalid-input");
+	assert.throws(() => validateOpenDesignToolCall("write_file", source("fetch(url, { headers: { Authorization: 'Bearer abcdefgh12345678' } });", "login.js")), (failure) => failure.category === "credentials-forbidden");
+	// D12 clone copies: any safe path, but only into the project allowed for the clone and only while allowed.
+	{
+		const copy = (project, file, text) => ({ project, path: file, content: Buffer.from(text).toString("base64"), encoding: "base64" });
+		const refused = (args, category = "invalid-input") => assert.throws(() => validateOpenDesignToolCall("write_file", args), (failure) => failure.category === category);
+		refused(copy("clone-1", "index.html", "<h1>x</h1>"));
+		const release = allowCloneWrites("clone-1");
+		assert.ok(validateOpenDesignToolCall("write_file", copy("clone-1", "assets/site.css", "h1{}")));
+		assert.ok(validateOpenDesignToolCall("write_file", { ...copy("clone-1", "logo.png", ""), content: Buffer.from([137, 0, 1, 2]).toString("base64") }));
+		refused(copy("project-1", "index.html", "<h1>x</h1>"), "invalid-input");
+		refused(copy("clone-1", "../index.html", "x"));
+		refused(copy("clone-1", "a/./b.html", "x"));
+		refused(copy("clone-1", "a\\b.html", "x"));
+		refused({ ...copy("clone-1", "big.bin", ""), content: Buffer.alloc(10_000_001, 1).toString("base64") });
+		refused(copy("clone-1", "app.js", "fetch(u, { headers: { Authorization: 'Bearer abcdefgh12345678' } })"), "credentials-forbidden");
+		release();
+		refused(copy("clone-1", "index.html", "<h1>x</h1>"));
+	}
+	{ // readOpenDesignApi reads the local daemon's HTTP API: JSON or bytes, local addresses and /api paths only.
+		const http = await import("node:http");
+		const server = http.createServer((request, response) => request.url === "/api/projects/p1/runs" ? response.end(JSON.stringify({ runs: [{ id: "r1" }] })) : request.url === "/api/projects/p1/files/index.html" ? response.end("<h1>x</h1>") : (response.statusCode = 404, response.end()));
+		await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+		try {
+			const options = { command: command("success", { OD_DAEMON_URL: `http://127.0.0.1:${server.address().port}` }), timeoutMs: 1_000 };
+			assert.deepEqual(await readOpenDesignApi(options, "/api/projects/p1/runs"), { runs: [{ id: "r1" }] });
+			assert.equal(String(await readOpenDesignApi(options, "/api/projects/p1/files/index.html", "bytes")), "<h1>x</h1>");
+			await assert.rejects(readOpenDesignApi(options, "/api/projects/p1/missing"), (failure) => failure.category === "tool-failed");
+			await assert.rejects(readOpenDesignApi(options, "/api/../secret"), (failure) => failure.category === "invalid-input");
+			await assert.rejects(readOpenDesignApi({ command: command("success"), timeoutMs: 1_000 }, "/api/projects/p1/runs"), (failure) => failure.category === "daemon-unavailable");
+		} finally { server.close(); closePersistentOpenDesignClients(); }
+	}
 	const sandboxed = await callOpenDesignTool({
 		command: command("report-cwd"),
 		tool: "get_project",

@@ -10,7 +10,7 @@ import { agentDir } from "./rpc-client.ts";
 
 /** One user-scope Pi package as the gear lists it; update comes from the same hourly check. */
 export type Installed = { source: string; name: string; version: string; update: boolean };
-export type Found = { pi: { current: string; latest: string } | null; packages: string[]; installed?: Installed[] };
+export type Found = { pi: { current: string; latest: string } | null; piVersion?: string; packages: string[]; installed?: Installed[] };
 export type UpdateState = Found & { checkedAt: number | null; checking: boolean; error?: string };
 export type UpdateCheck = { state(): UpdateState; check(): Promise<UpdateState>; quick(): Promise<UpdateState>; remove(source: string): Promise<UpdateState>; start(): void; stop(): void };
 
@@ -42,7 +42,7 @@ export async function findUpdates(dir = agentDir()): Promise<Found> {
 		let version = ""; try { version = String(JSON.parse(readFileSync(path.join(item.installedPath ?? "", "package.json"), "utf8")).version ?? ""); } catch { /* no package.json */ }
 		return { source: item.source, name: update?.displayName ?? packageName(item.source), version, update: !!update };
 	});
-	return { pi: latest && newer(latest, current) ? { current, latest } : null, packages: updates.map(u => u.displayName), installed };
+	return { pi: latest && newer(latest, current) ? { current, latest } : null, piVersion: current, packages: updates.map(u => u.displayName), installed };
 }
 /** True when the remote HEAD commit is already in the local clone's history (nothing to pull). */
 export async function remoteIsBehind(dir: string) {

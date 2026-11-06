@@ -89,6 +89,8 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-body.rich { font: inherit; white-space: normal; flex: 1; display: flex; flex-direction: column; } .files-body.rich > :is(div, p) { white-space: pre-wrap; }
 .files-image { max-width: 100%; max-height: 70dvh; object-fit: contain; align-self: flex-start; cursor: zoom-in; border: 1px solid var(--line); }
 .files-frame { flex: 1; min-height: 60dvh; width: 100%; border: 1px solid var(--line); background: #fff; }
+.files[data-width=phone] .files-frame { flex: 1 0 auto; width: 390px; max-width: 100%; align-self: center; }
+.files-width[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
 @media (max-width: 899px) { .files { grid-template-columns: none; grid-template-rows: minmax(120px, 40%) minmax(0, 1fr); } .files-tree { border-right: 0; border-bottom: 1px solid var(--line); } }
 .canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); }
 /* The diagram stays a light sketch, inverted like Excalidraw's dark mode. */
@@ -239,7 +241,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .splitter::after { content: "⋮"; position: relative; top: 45%; color: var(--group); }
 .chat { background: var(--chat); display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-heading h2 { margin-right: auto; }
-.chat-heading { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); }
+.chat-heading { display: flex; flex-wrap: wrap; min-width: 0; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 12px; border-bottom: 1px solid var(--line); }
 /* pi-hub progress: a long job's thin bar under the chat heading. */
 .job-progress { display: flex; align-items: center; gap: 8px; padding: 2px 12px; border-bottom: 1px solid var(--line); font-size: 11px; color: var(--muted); }
 .job-progress[hidden] { display: none; }
@@ -350,6 +352,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .extension-update { color: var(--accent); font-weight: 700; text-align: center; }
 .extension-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .extension-version { color: var(--muted); font-variant-numeric: tabular-nums; }
+.extension-unreviewed { color: var(--accent); font-weight: 600; }
 .status-menu .extension-remove { grid-column: 4; display: grid; place-items: center; width: 22px; height: 20px; min-height: 0; padding: 0; border: 1px solid var(--error); border-radius: 5px; background: var(--error); color: #fff; font-weight: 700; line-height: 1; text-align: center; cursor: pointer; }
 .status-menu .extension-remove:hover { filter: brightness(1.15); }
 @media (hover: hover) { .extension-row:not(:hover, :focus-within) .extension-remove { visibility: hidden; } } /* touch screens have no hover: keep it shown */
@@ -573,11 +576,12 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 #switcher:has(#session-filter:focus) .session.picked { outline: 1px dashed var(--focus); outline-offset: 1px; }
 .session-fold { flex: none; display: grid; place-items: center; width: 13px; height: 13px; margin-right: 5px; padding: 0; border: 1px solid var(--muted); border-radius: 2px; background: none; color: var(--muted); font: 600 11px/1 ui-monospace, Consolas, monospace; }
 .session-group-label { cursor: pointer; }
-.session-list { display: flex; flex-direction: column; gap: 4px; overflow: auto; }
+.session-list { display: flex; flex-direction: column; gap: 4px; overflow: auto; overflow-x: hidden; }
 .session { display: flex; gap: 8px; align-items: center; color: inherit; text-decoration: none; border-radius: 6px; font-size: 13px; }
 .session-letter { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; font-weight: 700; color: #fff; }
 /* A solid edge on the circle itself (no gap ring), darker than its fill, so it never blends into the row. */
 .session-letter { box-shadow: inset 0 0 0 2px rgb(0 0 0 / .28); }
+.session-emoji { font-size: 18px; font-weight: 400; line-height: 1; }
 /* With a plan line under it, the circle sits centred across both lines (shifted, so the label stays on top). */
 .session:has(.session-progress:not(.session-job)) .session-link .session-letter { position: relative; top: 5px; }
 .session[data-tone=working] .session-letter { background: #fab005; color: #1e1e1e; }
@@ -593,7 +597,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .session-folder { display: flex; flex-direction: column; gap: 4px; border: 1px solid transparent; border-radius: 8px; padding: 0 3px 3px; cursor: pointer; }
 .session-folder[data-tone] { --box: var(--focus); border-color: color-mix(in srgb, var(--box) 45%, transparent); background: color-mix(in srgb, var(--box) 7%, transparent); }
 .session-folder[data-tone=working] { --box: #fab005; } .session-folder[data-tone=waiting] { --box: var(--error); }
-.session-progress { flex-basis: 100%; display: flex; align-items: center; gap: 6px; padding: 0 6px 3px 34px; margin-top: -4px; font-size: 10px; line-height: 1; color: var(--muted); cursor: pointer; }
+.session-progress { flex-basis: 100%; min-width: 0; overflow: hidden; display: flex; align-items: center; gap: 6px; padding: 0 6px 3px 34px; margin-top: -4px; font-size: 10px; line-height: 1; color: var(--muted); cursor: pointer; }
 .session-subtitle { flex: 0 1 auto; min-width: 0; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 13px; }
 .session-subline .session-subtitle { max-width: none; }
 .switcher[data-open=false] :is(.session-subtitle, .session-subline) { display: none; }

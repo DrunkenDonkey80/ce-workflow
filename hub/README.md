@@ -14,13 +14,15 @@ session runs in):
 In Pi, `/wo hub` shows the hub's status and addresses with Install, Start, Open, Restart and remote/login options
 (Windows and Linux; Node 24+). `/wo hub <command>` runs any command below. From a terminal: `node hub/src/cli.ts install`.
 
-`pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | remote on|off | autostart on|off|status`
+`pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | fork <id> <name> | session <id> | subtitle <id> [text] | remote on|off | autostart on|off|status`
 
 - `install` adds the `pi-hub` command (`npm link`, best effort), starts the hub at login and starts it now.
 
 - `update` stops the hub, runs `pi update --all` (Pi and extensions) and starts it again with the sessions that were running. It refuses while a session is busy (never interrupts) and warns about Pi windows outside the hub, which keep the old version and can lock extension files.
 - The ⚙ button on the page has Restart hub (same busy rule as `restart`), so the phone can do it too.
-- `start` runs the hub; `open` opens its page on this PC; `new` adds a folder's first session (later ones from the page).
+- `start` runs the hub; `open` opens its page on this PC; `new` adds a folder's first session (later ones from the page); `fork` starts a new session from a copy of another's history.
+- `subtitle <id> [text]` sets a session's second line in the list (80 characters, no text clears it; extensions publish it through the `pi-hub:subtitle` status key). `session <id>` prints one session as JSON (exit 1 when the hub has none).
+- The file viewer follows the file it shows: Markdown, images, text, PDF and pages reload when they change, a page also when a style, script, image or font it loaded changes.
 - `remote on` adds a tailnet-only `tailscale serve` on the hub's port (never Funnel); new devices pair with a code approved on the hub page → Devices.
 - `autostart on` starts the hub at login: Windows per-user Run key (no admin rights), Linux `~/.config/autostart` (desktop logins).
 - WSL2: links open in the Windows default browser (`wslview`, else `rundll32`), and `open`/`new` always print a signed link to click. The hub binds 127.0.0.1, which WSL2 forwards to Windows. `pi-hub` found only under `/mnt/` (the Windows PATH) counts as not installed. `autostart on` writes a systemd user unit (`~/.config/systemd/user/pi-control-hub.service`; the hub starts when WSL starts for you) and needs `[boot] systemd=true` in `/etc/wsl.conf`; without systemd there is no login start, so run `pi-hub start`.

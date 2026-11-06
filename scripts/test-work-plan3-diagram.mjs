@@ -7,7 +7,7 @@ import { createJiti } from "jiti";
 import { spawn } from "node:child_process";
 
 const { validateDiagram, diagramPath, loadDiagram, emptyDiagram, saveDiagram, applyDiagramOperations, applyDiagram, diagramDependents, DIAGRAM_BYTES } = await createJiti(import.meta.url).import("../extensions/plan3-diagram.ts");
-const { movePlanWithDiagram } = await createJiti(import.meta.url).import("../extensions/plan3-design.ts");
+const { movePlanWithDiagram } = await createJiti(import.meta.url).import("../extensions/plan3-files.ts");
 for (const name of ["upload-service", "ce-workflow"]) {
  const sample = JSON.parse(readFileSync(new URL(`./fixtures/diagrams/${name}.diagram.json`, import.meta.url), "utf8"));
  assert.equal(validateDiagram(sample), sample);
@@ -139,7 +139,7 @@ try {
  assert.throws(() => diagramPath(dir, product), /symlink/);
  // H4-01: the hub and a Pi save the same diagram from different processes; the lock covers both.
  {
- 	const { withPlanDesignLock } = await import("../extensions/plan3-design.ts");
+ 	const { withPlanLock: withPlanDesignLock } = await import("../extensions/plan3-files.ts");
  	const lockFile = path.join(dir, "docs", "plans", "lock-87654321-plan3.md");
  	await writeFile(lockFile, "---\nplan3: true\n---\n\n# Lock\n");
  	const lockTarget = { kind: "plan", plan: { id: "87654321", file: lockFile, title: "Lock" } };
@@ -160,7 +160,7 @@ try {
 } finally { await rm(dir, { recursive: true, force: true }); }
 // H4-01 (D14): pi-control-hub imports these with plain Node; none may pull in a Pi package.
 {
-	const modules = ["plan3.ts", "plan3-diagram.ts", "plan3-design.ts"].map(name => new URL(`../extensions/${name}`, import.meta.url).href);
+	const modules = ["plan3.ts", "plan3-diagram.ts", "plan3-files.ts"].map(name => new URL(`../extensions/${name}`, import.meta.url).href);
 	const code = `import { registerHooks } from "node:module"; const seen = []; registerHooks({ resolve(s, c, n) { if (/^@earendil-works|^@sinclair|^typebox/.test(s)) seen.push(s); return n(s, c); } }); for (const m of ${JSON.stringify(modules)}) await import(m); console.log(JSON.stringify(seen));`;
 	const out = await new Promise((resolve, reject) => { const proc = spawn(process.execPath, ["--no-warnings", "--input-type=module", "-e", code]); let text = ""; proc.stdout.on("data", chunk => text += chunk); proc.on("exit", status => status ? reject(new Error(`import failed (${status})`)) : resolve(text.trim())); });
 	assert.equal(out, "[]", "hub-shared modules stay Pi-free");

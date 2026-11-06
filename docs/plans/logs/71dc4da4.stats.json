@@ -1,0 +1,1547 @@
+{
+ "version": 1,
+ "activeMs": 7409654,
+ "runs": 27,
+ "waitingMs": 690705,
+ "toolWallMs": 3059148,
+ "compactions": {
+  "count": 6,
+  "ms": 62182
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:medium": {
+   "replies": 69,
+   "thinkingMs": 356445,
+   "actingMs": 203800,
+   "input": 198,
+   "output": 55798,
+   "cacheRead": 8291876,
+   "cacheWrite": 931893,
+   "cost": 7.434592199999999,
+   "errors": 0
+  },
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 353,
+   "thinkingMs": 1885759,
+   "actingMs": 557305,
+   "input": 870,
+   "output": 218684,
+   "cacheRead": 38112428,
+   "cacheWrite": 2506071,
+   "cost": 24.53000059999999,
+   "errors": 1
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 321,
+   "ms": 2615715,
+   "maxMs": 106621,
+   "failures": 13
+  },
+  "edit": {
+   "count": 70,
+   "ms": 9329,
+   "maxMs": 3450,
+   "failures": 9
+  },
+  "codemode": {
+   "count": 18,
+   "ms": 135509,
+   "maxMs": 23056,
+   "failures": 1
+  },
+  "read": {
+   "count": 35,
+   "ms": 1515,
+   "maxMs": 1147,
+   "failures": 1
+  },
+  "lens_diagnostics": {
+   "count": 5,
+   "ms": 45092,
+   "maxMs": 11809,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 26,
+   "ms": 9968,
+   "maxMs": 3166,
+   "failures": 0
+  },
+  "browser_fetch": {
+   "count": 3,
+   "ms": 28292,
+   "maxMs": 24175,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 3,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 1
+  },
+  "write": {
+   "count": 5,
+   "ms": 30,
+   "maxMs": 10,
+   "failures": 0
+  },
+  "browser_search": {
+   "count": 5,
+   "ms": 14939,
+   "maxMs": 3729,
+   "failures": 0
+  },
+  "web_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "web_search": {
+   "count": 10,
+   "ms": 40844,
+   "maxMs": 10620,
+   "failures": 0
+  },
+  "get_search_content": {
+   "count": 10,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 5
+  },
+  "image_search": {
+   "count": 4,
+   "ms": 13124,
+   "maxMs": 6635,
+   "failures": 0
+  },
+  "plan3_diagram": {
+   "count": 3,
+   "ms": 50,
+   "maxMs": 43,
+   "failures": 0
+  },
+  "intercom": {
+   "count": 2,
+   "ms": 10,
+   "maxMs": 9,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 268,
+   "ms": 993065,
+   "maxMs": 106621,
+   "failures": 12
+  },
+  "test": {
+   "count": 50,
+   "ms": 1606309,
+   "maxMs": 88859,
+   "failures": 1
+  },
+  "build": {
+   "count": 3,
+   "ms": 16341,
+   "maxMs": 6195,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -20 && git log --oneline -3 && grep -n \"active\" browser-fetch/extension/control.js | head; grep -n \"\\\"version\\\"\" browser-fetch/extension/manifest.json; grep -n \"fro": {
+   "count": 1,
+   "ms": 701,
+   "maxMs": 701,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 114,128p browser-fetch/extension/control.js; sed -n 200,225p scripts/test-work-browser-fetch.mjs; grep -n \"Unreleased\" -A4 CHANGELOG.md | head; grep -n \"controlTab\\|tabs\\.\\|groupId\" s": {
+   "count": 1,
+   "ms": 273,
+   "maxMs": 273,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"tabs.create\" browser-fetch/extension/*.js; sed -n 262,285p scripts/test-work-browser-fetch.mjs; sed -n 1,12p CHANGELOG.md": {
+   "count": 1,
+   "ms": 353,
+   "maxMs": 353,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"Unreleased\" CHANGELOG.md | head -3; env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -6; echo EXIT $?": {
+   "count": 1,
+   "ms": 71042,
+   "maxMs": 71042,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -5; echo EXIT ${PIPESTATUS[0]}": {
+   "count": 1,
+   "ms": 71942,
+   "maxMs": 71942,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add CHANGELOG.md README.md browser-fetch/extension/control.js browser-fetch/extension/manifest.json extensions/browser-act.ts scripts/test-work-browser-fetch.mjs \"docs/plans/2026-10-29-b": {
+   "count": 2,
+   "ms": 555,
+   "maxMs": 359,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sleep 3; ls .git/index.lock 2>&1; tasklist 2>/dev/null | grep -i \"git.exe\" | head": {
+   "count": 1,
+   "ms": 3517,
+   "maxMs": 3517,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && agent-browser open \"https://www.google.com/search?q=red+fox&udm=2&hl=en\" 2>&1 | tail -3; agent-browser eval \"(() => { const html = document.documentElement.outerHTML; const m = [...html.": {
+   "count": 1,
+   "ms": 2381,
+   "maxMs": 2381,
+   "failures": 0
+  },
+  "bash\u0000agent-browser close >/dev/null 2>&1; cd \"./browser-fetch/extension\" && wc -l *.js && grep -n \"executeScript\\|func:\\|function extract\\|world\" background.js | head -20": {
+   "count": 1,
+   "ms": 731,
+   "maxMs": 731,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -4; echo EXIT ${PIPESTATUS[0]}": {
+   "count": 3,
+   "ms": 213100,
+   "maxMs": 71356,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add browser-fetch/extension/background.js \"docs/plans/2026-10-29-browser-act-background-tabs-again-and-in-profile-web-search--71dc4da4-plan3.md\" docs/plans/logs/71dc4da4.md && git commit": {
+   "count": 1,
+   "ms": 355,
+   "maxMs": 355,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && sleep 4; git add browser-fetch/extension/background.js \"docs/plans/2026-10-29-browser-act-background-tabs-again-and-in-profile-web-search--71dc4da4-plan3.md\" docs/plans/logs/71dc4da4.md && g": {
+   "count": 1,
+   "ms": 4562,
+   "maxMs": 4562,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -25; echo EXIT ${PIPESTATUS[0]}": {
+   "count": 4,
+   "ms": 154936,
+   "maxMs": 70777,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 170 npx --no-install tsc --noEmit -p tsconfig.json 2>&1 | grep -E \"browser-(search|fetch)\\.ts\" | head -20; echo done": {
+   "count": 1,
+   "ms": 6195,
+   "maxMs": 6195,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 170 npx --no-install tsc --noEmit -p tsconfig.json 2>&1 | tail -3; echo \"exit ${PIPESTATUS[0]}\"": {
+   "count": 1,
+   "ms": 5784,
+   "maxMs": 5784,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sleep 2; git add browser-fetch/extension/background.js extensions/browser-fetch.ts extensions/browser-search.ts package.json scripts/test-work-browser-fetch.mjs README.md CHANGELOG.md \"docs/": {
+   "count": 1,
+   "ms": 2327,
+   "maxMs": 2327,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node -e \"const bf=require('jiti')(process.cwd())('./extensions/browser-fetch.ts');const fs=require('fs');const l=fs.readFileSync(bf.logFile(),'utf8').trim().split('\\n').slice(-12).map(JSON.p": {
+   "count": 1,
+   "ms": 607,
+   "maxMs": 607,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sleep 1; git add -u extensions/browser-search.ts scripts/test-work-browser-fetch.mjs docs/architecture/product.diagram.json \"docs/plans/2026-10-29-browser-act-background-tabs-again-and-in-pr": {
+   "count": 1,
+   "ms": 2736,
+   "maxMs": 2736,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -rn \"green\\|timerWaiting\\|waiting.*timer\\|hasTimer\" src web --include=*.ts -il | head -20; grep -rn \"\\\"waiting\\\"\\|'waiting'\\|state === \\\"idle\\\"\\|dotState\\|stateDot\" src web --includ": {
+   "count": 1,
+   "ms": 551,
+   "maxMs": 551,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"idleParkMinutes\\|busyReasons\" src/*.ts | grep -v \"^src/api.ts\" | head -20; grep -n \"scheduled\\|parked\" web/app.ts | grep -i \"color\\|class\\|tone\" | head -15": {
+   "count": 1,
+   "ms": 699,
+   "maxMs": 699,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -rn \"data-tone=\\\"\\(scheduled\\|parked\\|seen\\)\\\"\\|tone=scheduled\\|\\[data-tone\" web/*.css | head; grep -n \"iconTone\" web/*.ts | head; ls ~/.pi/agent/hub 2>/dev/null | head; grep -rln \"": {
+   "count": 1,
+   "ms": 726,
+   "maxMs": 726,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"\\\"test\\|test-api\" package.json | head -3; env -u PI_HUB node scripts/test-api.mjs 2>&1 | tail -15; echo EXIT ${PIPESTATUS[0]}": {
+   "count": 1,
+   "ms": 3698,
+   "maxMs": 3698,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git fetch -q 2>&1 | tail -3; git status -sb | head -3; git log --oneline HEAD..@{u} | head; echo ---; git log --oneline -8; git worktree list": {
+   "count": 1,
+   "ms": 957,
+   "maxMs": 957,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git rebase origin/master 2>&1 | tail -8; git status --short | grep -v \"^??\" | head": {
+   "count": 1,
+   "ms": 336,
+   "maxMs": 336,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n -A12 \"^<<<<<<<\" CHANGELOG.md": {
+   "count": 1,
+   "ms": 722,
+   "maxMs": 722,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const fs=require('fs');let t=fs.readFileSync('CHANGELOG.md','utf8');t=t.replace(/<<<<<<< HEAD\\n([\\s\\S]*?)=======\\n([\\s\\S]*?)>>>>>>> [^\\n]*\\n/,(m,ours,theirs)=>theirs+'\\n'+ours);fs.w": {
+   "count": 1,
+   "ms": 641,
+   "maxMs": 641,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status -sb | head -1; git log --oneline -3; grep -n \"browser-search\\|mobile\" package.json | head; env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -4; echo EXIT ${PIPES": {
+   "count": 1,
+   "ms": 70762,
+   "maxMs": 70762,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.1.100 --no-git-tag-version >/dev/null && grep -n \"\\\"version\\\": \\\"0.1.100\\\"\" package.json package-lock.json | head -3 && node -e \"const fs=require('fs');let t=fs.readFileSync('C": {
+   "count": 1,
+   "ms": 867,
+   "maxMs": 867,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && env -u PI_HUB node scripts/test-work-browser-fetch.mjs 2>&1 | tail -2; echo EXIT1 ${PIPESTATUS[0]}; cd hub && env -u PI_HUB node scripts/test-api.mjs 2>&1 | tail -1; echo EXIT2 ${PIPESTATUS[": {
+   "count": 1,
+   "ms": 74541,
+   "maxMs": 74541,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git status --short | grep -v \"^??\" && git commit -qm \"0.1.100: browser_search and image_search, browser_act background tab, hub scheduled tone for parked sessions\" && git push ": {
+   "count": 1,
+   "ms": 3234,
+   "maxMs": 3234,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/mobile-act.ts; grep -n \"mobilecli\\|install\\|registerTool\\|askConfirm\\|available\\|which\\|ENOENT\\|activeTools\\|setActiveTools\" extensions/mobile-act.ts | head -60": {
+   "count": 1,
+   "ms": 316,
+   "maxMs": 316,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm view mobilecli version bin os cpu dependencies optionalDependencies scripts 2>&1 | head -30; grep -n \"\\\"dependencies\\\"\" -A12 package.json": {
+   "count": 1,
+   "ms": 1273,
+   "maxMs": 1273,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm install mobilecli@1.0.21 --save-exact 2>&1 | tail -3; cat node_modules/mobilecli/index.js | head -60; du -sh node_modules/@mobilenext/* 2>/dev/null": {
+   "count": 1,
+   "ms": 2245,
+   "maxMs": 2245,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"mobile-act\" scripts extensions hub/src | head; grep -n \"hasCli\\|INSTALL_CMD\\|onPath\\|Install mobilecli\\|npm install -g\" scripts/*.mjs extensions/*.ts README.md docs/*.md 2>/dev/nu": {
+   "count": 1,
+   "ms": 301,
+   "maxMs": 301,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 55,65p scripts/test-work-mobile-act.mjs; echo ----; sed -n 165,180p scripts/test-work-mobile-act.mjs; echo ----; sed -n 210,222p scripts/test-work-mobile-act.mjs; echo ----; grep -n \"": {
+   "count": 1,
+   "ms": 313,
+   "maxMs": 313,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 8,40p scripts/test-work-mobile-act.mjs | grep -n \"command\\|mobilecli\\|npm\"": {
+   "count": 1,
+   "ms": 982,
+   "maxMs": 982,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,8p scripts/test-work-mobile-act.mjs | grep -n \"existsSync\\|D5\"; grep -n \"D5 installs\" scripts/test-work-mobile-act.mjs; grep -n \"mobilecli\" scripts/test-work-mobile-act.mjs | head": {
+   "count": 1,
+   "ms": 329,
+   "maxMs": 329,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD:extensions/screen-read.ts | grep -c \"const what = shot.window\"; git show HEAD:extensions/mobile-act.ts | grep -c \"const data = (out: string) => JSON.parse(out).data\"; for t in ": {
+   "count": 1,
+   "ms": 11263,
+   "maxMs": 11263,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"4{/import { existsSync } from \\\"node:fs\\\";/d}\" scripts/test-work-screen-read.mjs; for t in scripts/test-work-mobile-act.mjs scripts/test-work-screen-read.mjs; do env -u PI_HUB node \"": {
+   "count": 1,
+   "ms": 15341,
+   "maxMs": 15341,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && head -3 scripts/test-work-mobile-act.mjs; env -u PI_HUB node scripts/test-work-mobile-act.mjs 2>&1 | grep -v \"^ at \" | tail -6; echo EXIT ${PIPESTATUS[0]}; env -u PI_HUB node scripts/test-wo": {
+   "count": 1,
+   "ms": 8439,
+   "maxMs": 8439,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 105,116p scripts/test-work-screen-read.mjs | cut -c1-160; grep -n \"mobilecli\" package.json; git status --short | grep -v \"^??\"": {
+   "count": 1,
+   "ms": 352,
+   "maxMs": 352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,6p CHANGELOG.md": {
+   "count": 1,
+   "ms": 917,
+   "maxMs": 917,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -qm \"mobile_act: mobilecli as a bundled npm dependency instead of an install prompt\" && git log --oneline -1": {
+   "count": 1,
+   "ms": 649,
+   "maxMs": 649,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"iconSvg\" -A25 web/*.ts | grep -v \"^web/icons.ts-[0-9]*-\\s*\\[\\|ICONS = \" | head -50; ls app 2>/dev/null; grep -rn \"states\" app/ui/*.rs app/src/*.rs 2>/dev/null | head -20": {
+   "count": 1,
+   "ms": 356,
+   "maxMs": 356,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"export function iconSvg\" -A25 web/icons.ts; grep -rn \"\\\"working\\\"\\|states\" app/src-tauri/src/*.rs | head -30": {
+   "count": 1,
+   "ms": 289,
+   "maxMs": 289,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n 1,30p build-icons.mjs 2>/dev/null | head -5; ls app/build-icons.mjs scripts | grep -i \"icon\"; grep -n \"icons\" package.json | head": {
+   "count": 1,
+   "ms": 608,
+   "maxMs": 608,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && head -20 app/build-icons.mjs; grep -rn \"build-icons\\|hubsIconSvg\\|iconSvg\" scripts/*.mjs app/package.json 2>/dev/null | head": {
+   "count": 1,
+   "ms": 301,
+   "maxMs": 301,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node app/build-icons.mjs && grep -rln \"icons\\.\\(ts\\|js\\)\" scripts | head; git diff --stat": {
+   "count": 1,
+   "ms": 688,
+   "maxMs": 688,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-icons.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 279,
+   "maxMs": 279,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U0 hub/web/app.ts | grep \"^@@\"; node -e \"const fs=require('fs');let t=fs.readFileSync('CHANGELOG.md','utf8');t=t.replace('## Unreleased\\n\\n### Changed\\n','## Unreleased\\n\\n### Chan": {
+   "count": 1,
+   "ms": 425,
+   "maxMs": 425,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | grep -v \"^??\"; git status -sb | head -1; env -u PI_HUB node scripts/test-work-mobile-act.mjs 2>&1 | tail -1; echo E1 ${PIPESTATUS[0]}; (cd hub && node scripts/test-icons": {
+   "count": 1,
+   "ms": 14513,
+   "maxMs": 14513,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.2.0 --no-git-tag-version >/dev/null && grep -c \"\\\"version\\\": \\\"0.2.0\\\"\" package.json package-lock.json && sed -i \"0,/^## Unreleased$/s//## 0.2.0 — 2026-10-29/\" CHANGELOG.md && ": {
+   "count": 1,
+   "ms": 4736,
+   "maxMs": 4736,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -rln \"attention()\\|\\.latest\\|piHubAttention\" scripts app/*.mjs 2>/dev/null | head": {
+   "count": 1,
+   "ms": 311,
+   "maxMs": 311,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"attention()\\|\\.latest\\|piHubAttention\\|latest:\" scripts/test-app-install.mjs scripts/test-browser.mjs | head": {
+   "count": 1,
+   "ms": 272,
+   "maxMs": 272,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && time (env -u PI_HUB node scripts/test-browser.mjs 2>&1 | tail -5; echo EXIT ${PIPESTATUS[0]})": {
+   "count": 1,
+   "ms": 62222,
+   "maxMs": 62222,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const fs=require('fs');let t=fs.readFileSync('CHANGELOG.md','utf8');t=t.replace('One version covers both.\\n\\n','One version covers both.\\n\\n## Unreleased\\n\\n### Fixed\\n- The desktop": {
+   "count": 1,
+   "ms": 571,
+   "maxMs": 571,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | grep -v \"^??\"; npm version 0.2.1 --no-git-tag-version >/dev/null && sed -i \"0,/^## Unreleased$/s//## 0.2.1 — 2026-10-29/\" CHANGELOG.md && sed -n 5p CHANGELOG.md && git a": {
+   "count": 1,
+   "ms": 3930,
+   "maxMs": 3930,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | grep -v \"^??\"; git pull --ff-only origin master 2>&1 | tail -5; git log --oneline -5; git status -sb | head -1": {
+   "count": 1,
+   "ms": 1094,
+   "maxMs": 1094,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/sessions 2>/dev/null && ls -t */*01a17eae* 2>/dev/null | head; ls -t | head -3": {
+   "count": 1,
+   "ms": 303,
+   "maxMs": 303,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/sessions && ls -t \"--C--soft-git-ce-workflow--\" | head -5; grep -l \"01a17eae\" \"--C--soft-git-ce-workflow--\"/* 2>/dev/null | head -3": {
+   "count": 1,
+   "ms": 934,
+   "maxMs": 934,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/sessions/./--C--soft-git-ce-workflow-- && ls -t | head -4; ls | grep -i \"01a17eae\"": {
+   "count": 1,
+   "ms": 2235,
+   "maxMs": 2235,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/sessions/./--C--soft-git-ce-workflow-- && F=2026-10-27T18-45-21-197Z_01a17eae-66ad-77d5-b836-61c428e24fa3.jsonl && ls -la \"$F\" && node -e \" const L=require('fs').readFileSync(process.ar": {
+   "count": 1,
+   "ms": 319,
+   "maxMs": 319,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/sessions/./--C--soft-git-ce-workflow-- && F=2026-10-27T18-45-21-197Z_01a17eae-66ad-77d5-b836-61c428e24fa3.jsonl && node -e \" const L=require('fs').readFileSync(process.argv[1],'utf8').t": {
+   "count": 13,
+   "ms": 2466,
+   "maxMs": 382,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"estimateContextMessageTokens\\b\" extensions/*.ts | head -5; grep -rn \"estimateContextMessageTokens =\\|function estimateContextMessageTokens\" -A15 extensions/ | head -30; D=\"C:/Users": {
+   "count": 1,
+   "ms": 3084,
+   "maxMs": 3084,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"ultrafull\" extensions/*.ts | head -20; grep -n \"estimateContextMessageTokens\" extensions/*.ts | head -3": {
+   "count": 1,
+   "ms": 695,
+   "maxMs": 695,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"more characters trimmed\" extensions/ hub/src 2>/dev/null | head -3; D=\"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -rln ": {
+   "count": 1,
+   "ms": 4692,
+   "maxMs": 4692,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && D=\"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -rn \"export function estimateTokens\" -A45 \"$D\" | head -60; grep -n \"buildBoundaryCo": {
+   "count": 1,
+   "ms": 475,
+   "maxMs": 475,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -rln \"function estimateTokens\" \"$D\" ; F=$(grep -rln \"function estimateTokens\" \"$D\" | head -1)": {
+   "count": 1,
+   "ms": 878,
+   "maxMs": 878,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 3800,3860p extensions/work-models.ts; grep -n \"\\\"hybrid\\\"\\|'hybrid'\\|mode: \\\"hybrid\\|hybrid\\\"\" extensions/*.ts | head": {
+   "count": 1,
+   "ms": 299,
+   "maxMs": 299,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent\"; grep -rn \"session_before_compact\" docs/*.md | head; grep -n \"SessionBeforeCompactEvent\" -A15 dist/core": {
+   "count": 1,
+   "ms": 331,
+   "maxMs": 331,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent\"; grep -n \"sessionEntryToContextMessages\\|buildSessionContext\" dist/index.d.ts | head; cd \".\"; grep -n \"": {
+   "count": 1,
+   "ms": 268,
+   "maxMs": 268,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"function mergedCompactionPreparation\" -A30 extensions/work-models.ts; sed -n 1280,1300p extensions/work-models.ts; sed -n 50,66p extensions/work-models.ts": {
+   "count": 1,
+   "ms": 295,
+   "maxMs": 295,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn \"web_enable\\|subagents_enable\\|setActiveTools\" extensions/*.ts extensions/**/*.ts 2>/dev/null | grep -v \"^.*test\" | head -20; grep -rln \"name: \\\"\\(mobile_act\\|screen_read\\|app_act\\|br": {
+   "count": 1,
+   "ms": 308,
+   "maxMs": 308,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent\"; grep -n \"setActiveTools\\|promptGuidelines\\|promptSnippet\\|getAllTools\" docs/extensions.md | head -30": {
+   "count": 1,
+   "ms": 658,
+   "maxMs": 658,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 4060,4085p extensions/work-models.ts; grep -n \"registerTool(\" extensions/*.ts extensions/*/*.ts | head -60; grep -n \"\\\"extensions\\\"\" -A30 package.json | head -40": {
+   "count": 1,
+   "ms": 323,
+   "maxMs": 323,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in schedule project_commands session_dialog goal_wait generate_image chatgpt_consult research_note knowledge compaction_note camera_capture jev_triage; do echo \"== $t: $(grep -rln \"name:": {
+   "count": 1,
+   "ms": 2511,
+   "maxMs": 2511,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; cat > \"$TEMP/toolsizes.mjs\" <<'EOF' import { createJiti } from \"jiti\"; const jiti = createJiti(import.meta.url); const tools = []; const noop = () => {}; const handler = { get(t, k) { if (k ==": {
+   "count": 1,
+   "ms": 3919,
+   "maxMs": 3919,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"scheduleTool\\|projectCommandsTool\\|sessionDialogTool\\|imageTools\\|chatgpt_consult\\|processImageTool\\|generateImageTool\\|createJevTools\\|registerTool\" extensions/work-models.ts | head ": {
+   "count": 1,
+   "ms": 305,
+   "maxMs": 305,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; ls scripts | head -100; sed -n 1,60p scripts/benchmark-reasoning-strip-live.mjs": {
+   "count": 1,
+   "ms": 1425,
+   "maxMs": 1425,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"spawn(\\|\\\"--mode\\\"\\|--no-\\|\\\"-e\\\"\\|\\\"-p\\\"\\|--session\\|PI_\" scripts/benchmark-reasoning-strip-live.mjs | head -20; which pi; pi --help 2>&1 | grep -E \"^\\s+--(mode|print|model|tools|no-": {
+   "count": 1,
+   "ms": 2256,
+   "maxMs": 2256,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"function contextFilterFileOps\" -A25 extensions/work-models.ts; sed -n 55,80p extensions/work-compaction.ts; grep -n \"^const\\|^export const\\|^import\" extensions/work-compaction.ts | he": {
+   "count": 1,
+   "ms": 715,
+   "maxMs": 715,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in test-work-compaction test-work-compaction-notifications test-work-settings test-work-mobile-act test-work-app-act test-work-screen-read test-work-hub-command test-work-native-smoke; d": {
+   "count": 1,
+   "ms": 30608,
+   "maxMs": 30608,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; python - <<'EOF' p=\"scripts/test-work-compaction.mjs\"; s=open(p,encoding=\"utf8\").read() s=s.replace(\"\"\" COMPACTION_NOTE_MAX, } from \"../extensions/work-compaction.ts\"; \"\"\",\"\"\" COMPACTION_NOTE_": {
+   "count": 1,
+   "ms": 312,
+   "maxMs": 312,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in test-work-compaction-notifications test-work-native-smoke test-compaction-resume-idle test-work-microcompact-agent; do timeout 900 node scripts/$t.mjs > \"$TEMP/new-$t.log\" 2>&1; echo ": {
+   "count": 1,
+   "ms": 25731,
+   "maxMs": 25731,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 1,20p \"$TEMP/new-test-work-compaction-notifications.log\"; head -5 \"$TEMP/new-test-compaction-resume-idle.log\"; git stash -q; timeout 600 node scripts/test-compaction-resume-idle.mjs > \"": {
+   "count": 1,
+   "ms": 2328,
+   "maxMs": 2328,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff --stat; file extensions/work-models.ts scripts/test-work-compaction.mjs; git show HEAD:extensions/work-models.ts | file -": {
+   "count": 1,
+   "ms": 274,
+   "maxMs": 274,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; timeout 600 node scripts/test-work-compaction-notifications.mjs > \"$TEMP/n.log\" 2>&1; echo \"exit $?\"; grep -n \"at file\\|AssertionError\\|message:\" \"$TEMP/n.log\" | head -5; tail -1 \"$TEMP/n.log\"": {
+   "count": 1,
+   "ms": 3075,
+   "maxMs": 3075,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"pi.on(\\\"session_start\\\"\" extensions/work-models.ts | head -3; sed -n 3500,3512p extensions/work-models.ts; grep -n \"promptSnippet\" extensions/mobile-act.ts extensions/screen-read.ts e": {
+   "count": 1,
+   "ms": 351,
+   "maxMs": 351,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-tool-loader.mjs; for t in test-work-mobile-act test-work-app-act test-work-hub-command test-work-compaction test-work-compaction-notifications test-work-camera-state tes": {
+   "count": 1,
+   "ms": 85870,
+   "maxMs": 85870,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; timeout 600 node scripts/test-work-compaction-notifications.mjs > \"$TEMP/n.log\" 2>&1; echo \"exit $?\"; grep -n \"AssertionError\" -A8 \"$TEMP/n.log\" | head -12; tail -1 \"$TEMP/n.log\"": {
+   "count": 1,
+   "ms": 2842,
+   "maxMs": 2842,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 185,240p scripts/benchmark-reasoning-strip-live.mjs; pi list 2>&1 | head -20": {
+   "count": 1,
+   "ms": 1803,
+   "maxMs": 1803,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"$TEMP/sol-live/t0\" && cd \"$TEMP/sol-live/t0\" && git init -q 2>/dev/null; s=$(date +%s); timeout 300 pi -p --mode json --model \"openai-codex/gpt-6.1-sol:low\" \"Reply with just: ok\" > out.jsonl": {
+   "count": 1,
+   "ms": 6036,
+   "maxMs": 6036,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash -q -u -- extensions scripts && cd \"$TEMP/sol-live/t0\" && timeout 300 pi -p --mode json --model \"openai-codex/gpt-6.1-sol:low\" \"Reply with just: ok\" > base.jsonl 2>/dev/null; cd \".\"": {
+   "count": 1,
+   "ms": 5386,
+   "maxMs": 5386,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"$TEMP/sol-live\" && cat > \"$TEMP/sol-live/run.mjs\" <<'EOF' // node run.mjs <dir> <prompt> [extra pi args...]: runs pi -p with sol, prints tool calls/results and usage. import { spawnSync } fr": {
+   "count": 1,
+   "ms": 94097,
+   "maxMs": 94097,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && sed -i 's#spawnSync(\"pi\", \\[#spawnSync(process.execPath, [process.env.HOME + \"/.pi/agent/bin/pi-launcher.js\", #; s#, shell: true##' run.mjs && grep -n spawnSync run.mjs | head -": {
+   "count": 1,
+   "ms": 13087,
+   "maxMs": 13087,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && echo \"=== T2 desktop\" && node run.mjs \"$TEMP/sol-live/t2\" \"List the running desktop apps on this computer with the right tool (just names, no need to operate any).\" ; echo \"=== ": {
+   "count": 1,
+   "ms": 35434,
+   "maxMs": 35434,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && echo \"=== T4 resume\" && node run.mjs \"$TEMP/sol-live/t1\" \"List the devices again.\" -c": {
+   "count": 1,
+   "ms": 9464,
+   "maxMs": 9464,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && for m in native ultracompact; do d=\"$TEMP/sol-live/c-$m\"; rm -rf \"$d\"; mkdir -p \"$d/.pi\"; echo \"{\\\"compaction\\\":{\\\"keepRecentTokens\\\":3000},\\\"workOrchestrator\\\":{\\\"context\\\":{\\\"": {
+   "count": 1,
+   "ms": 42807,
+   "maxMs": 42807,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && cat > compact-check.mjs <<'EOF' // node compact-check.mjs <dir>: copies the session, compacts it with pi, and compares the kept tail with Pi's own cut. import { spawnSync } from": {
+   "count": 1,
+   "ms": 329,
+   "maxMs": 329,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && sed -i '/^const sdk = /d' compact-check.mjs && sed -i 's#dir.replace(/\\\\\\?/g, \"/\")#dir.split(path.sep).join(\"/\")#' compact-check.mjs && grep -n \"includes(dir\" compact-check.mjs ": {
+   "count": 1,
+   "ms": 463,
+   "maxMs": 463,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && node compact-check.mjs \"$TEMP/sol-live/c-native\"": {
+   "count": 1,
+   "ms": 29657,
+   "maxMs": 29657,
+   "failures": 1
+  },
+  "bash\u0000cd ~/.pi/agent/sessions && grep -l \"sol-live\" -r . | xargs ls -lt | head; for f in $(grep -l \"c-native\" -r . ); do echo \"$f\"; grep -c '\"type\":\"compaction\"' \"$f\"; done": {
+   "count": 1,
+   "ms": 12643,
+   "maxMs": 12643,
+   "failures": 1
+  },
+  "bash\u0000env | grep -i \"PI_SESSION\\|PI_HUB\" | cut -c1-150; f=~/.pi/agent/sessions/--C--soft-git-ce-workflow--/2026-10-29T11-07-15-803Z_01a18757-b9db-73cf-b042-9bcbdf6360da.jsonl; tail -4 \"$f\" | cut -c1-300": {
+   "count": 1,
+   "ms": 315,
+   "maxMs": 315,
+   "failures": 0
+  },
+  "bash\u0000f=~/.pi/agent/sessions/--C--soft-git-ce-workflow--/2026-10-29T11-07-15-803Z_01a18757-b9db-73cf-b042-9bcbdf6360da.jsonl; node -e \" const L=require('fs').readFileSync(process.argv[1],'utf8').trim().spli": {
+   "count": 2,
+   "ms": 320,
+   "maxMs": 178,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && node compact-check.mjs \"$TEMP/sol-live/c-native\" 2>&1 | grep -v DEP0190 | tail -20": {
+   "count": 1,
+   "ms": 374,
+   "maxMs": 374,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && sed -i 's#dir.replace(/\\[:\\\\\\\\/\\]+/g, \"-\")#dir.replace(/[\\\\\\\\/]/g, \"-\").replace(\":\", \"-\")#' compact-check.mjs && grep -n \"const sessions\" compact-check.mjs && node compact-check": {
+   "count": 1,
+   "ms": 906,
+   "maxMs": 906,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && node compact-check.mjs \"$TEMP/sol-live/c-native\" 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 2557,
+   "maxMs": 2557,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && P=\"Work through these one at a time. For each: think it through carefully on your own first, then verify your answer with exactly one node -e bash call, then move on. 1) How man": {
+   "count": 1,
+   "ms": 88759,
+   "maxMs": 88759,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && for m in native ultracompact; do echo \"== $m\"; node compact-check.mjs \"$TEMP/sol-live/c2-$m\" 2>&1 | tail -12; done": {
+   "count": 1,
+   "ms": 3371,
+   "maxMs": 3371,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/sessions/--C--Users-Flex-AppData-Local-Temp-sol-live-c2-native--/ && node -e \" const L=require('fs').readFileSync(require('fs').readdirSync('.').filter(f=>f.endsWith('.jsonl'))[0],'utf8": {
+   "count": 1,
+   "ms": 421,
+   "maxMs": 421,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && for m in native ultracompact; do d=\"$TEMP/sol-live/c2-$m\"; echo \"{\\\"compaction\\\":{\\\"keepRecentTokens\\\":500},\\\"workOrchestrator\\\":{\\\"context\\\":{\\\"mode\\\":\\\"$m\\\"}}}\" > \"$d/.pi/sett": {
+   "count": 1,
+   "ms": 3477,
+   "maxMs": 3477,
+   "failures": 0
+  },
+  "bash\u0000pi --help 2>&1 | grep -i -E \"trust|settings|config\" | head": {
+   "count": 1,
+   "ms": 1429,
+   "maxMs": 1429,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && sed -i 's#\"--mode\", \"rpc\", \"--model\"#\"--mode\", \"rpc\", \"-a\", \"--model\"#' compact-check.mjs && for m in native ultracompact; do d=\"$TEMP/sol-live/c2-$m\"; echo \"== $m\"; node compac": {
+   "count": 1,
+   "ms": 14826,
+   "maxMs": 14826,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && d=\"$TEMP/sol-live/c2-ultracompact\"; echo \"{\\\"compaction\\\":{\\\"keepRecentTokens\\\":300},\\\"workOrchestrator\\\":{\\\"context\\\":{\\\"mode\\\":\\\"ultracompact\\\"}}}\" > \"$d/.pi/settings.json\"; n": {
+   "count": 1,
+   "ms": 4812,
+   "maxMs": 4812,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && for m in native ultracompact; do echo \"== $m\"; SOL_MODEL=\"openai-codex/gpt-6.1-sol:low\" node run.mjs \"$TEMP/sol-live/c2-$m\" \"From memory only, no tools: give the six answers you": {
+   "count": 1,
+   "ms": 11572,
+   "maxMs": 11572,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"setContextSettings(\\|compaction.keepRecentTokens\\|compaction ??=\" extensions/work-models.ts | head; grep -rn \"keepRecentTokens\" ~/.pi/agent/settings.json .pi/settings.json 2>/dev/null": {
+   "count": 1,
+   "ms": 304,
+   "maxMs": 304,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; python - <<'EOF' def rep(p,a,b): s=open(p,encoding=\"utf8\",newline=\"\").read(); assert s.count(a)==1,(p,a); open(p,\"w\",encoding=\"utf8\",newline=\"\").write(s.replace(a,b)) p=\"extensions/work-models": {
+   "count": 2,
+   "ms": 3780,
+   "maxMs": 3597,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && sed -i 's#\\.compaction\\.keepRecentTokens;#.workOrchestrator.context.keepRecentTokens;#' compact-check.mjs && grep -n \"const budget\" compact-check.mjs | cut -c1-160; P=\"Work thro": {
+   "count": 1,
+   "ms": 106621,
+   "maxMs": 106621,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/sol-live\" && for m in native ultracompact; do echo \"== $m\"; SOL_MODEL=\"openai-codex/gpt-6.1-sol:low\" node run.mjs \"$TEMP/sol-live/c3-$m\" \"From memory only, no tools: give the six answers you": {
+   "count": 1,
+   "ms": 11283,
+   "maxMs": 11283,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn -i \"commit and push\\|commit-push\\|commitPush\" --include=*.ts --include=*.js --include=*.mjs --include=*.html --include=*.json --include=*.css . 2>/dev/null | grep -v node_modules | gr": {
+   "count": 1,
+   "ms": 33798,
+   "maxMs": 33798,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rln -i \"commit and push\" hub extensions 2>/dev/null | grep -v node_modules; grep -rn -i \"commit and push\" hub extensions 2>/dev/null | grep -v node_modules | cut -c1-260 | head -30": {
+   "count": 1,
+   "ms": 60368,
+   "maxMs": 60368,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; git grep -n -i \"commit and push\\|scoped test\\|targeted test\" -- \":!docs/plans\" \":!CHANGELOG.md\" | cut -c1-260 | head -30": {
+   "count": 1,
+   "ms": 422,
+   "maxMs": 422,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -o \"<[^>]*push-menu[^>]*>.\\{0,900\\}\" hub/web/index.html | head -3; echo; grep -n \"drawer\" hub/web/index.html | cut -c1-400 | head -20": {
+   "count": 1,
+   "ms": 535,
+   "maxMs": 535,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 1390,1415p hub/web/app.ts | cut -c1-600; grep -n \"session-git-action\\|push-choice\\|toggleMode = \\|function toggleMode\\|function toggleMenu\" hub/web/app.ts | cut -c1-300": {
+   "count": 1,
+   "ms": 393,
+   "maxMs": 393,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"^\\.status-menu\\|\\.status-menu {\\|\\.commands-menu {\\|\\.session-git\\b\\|\\.session-git {\\|\\.session-git-actions\" hub/web/styles.css | cut -c1-300; sed -n 245,266p hub/web/app.ts | cut -c1": {
+   "count": 1,
+   "ms": 383,
+   "maxMs": 383,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"<dialog\" hub/web/index.html | cut -c1-200; grep -n \"showModal()\" hub/web/app.ts | cut -c1-200 | head": {
+   "count": 1,
+   "ms": 452,
+   "maxMs": 452,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"^ *\\.drawer {\\|\\.drawer\\[data-open\\|^\\.drawer \" hub/web/styles.css | cut -c1-300; grep -o \"<span[^>]*><button id=\\\"git-push\\\"\" hub/web/index.html": {
+   "count": 1,
+   "ms": 280,
+   "maxMs": 280,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 195,215p hub/scripts/test-browser.mjs | cut -c1-400; grep -n \"git:\\|\\\"git\\\"\\|ahead\" hub/scripts/test-browser.mjs | cut -c1-200 | head": {
+   "count": 1,
+   "ms": 331,
+   "maxMs": 331,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"session-git\\|git-commit\\|git-pull\" hub/scripts/test-browser.mjs | cut -c1-400 | head": {
+   "count": 1,
+   "ms": 304,
+   "maxMs": 304,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 95,
+   "ms": 13047,
+   "maxMs": 264,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; python - <<'EOF' def rep(p,a,b): s=open(p,encoding=\"utf8\",newline=\"\").read(); assert s.count(a)==1,(p,a); open(p,\"w\",encoding=\"utf8\",newline=\"\").write(s.replace(a,b)) p=\"hub/web/app.ts\" rep(p,": {
+   "count": 1,
+   "ms": 314,
+   "maxMs": 314,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; timeout 900 node scripts/test-browser.mjs > \"$TEMP/hb.log\" 2>&1; echo \"exit $?\"; tail -15 \"$TEMP/hb.log\" | cut -c1-400": {
+   "count": 1,
+   "ms": 41411,
+   "maxMs": 41411,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 830,837p hub/scripts/test-browser.mjs | cut -c1-300; git stash push -q -- hub/web/app.ts hub/web/styles.css hub/scripts/test-browser.mjs && (cd hub; timeout 900 node scripts/test-browse": {
+   "count": 1,
+   "ms": 39585,
+   "maxMs": 39585,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; rm -f NUL; node -e \"const fs=require('fs');const s=fs.readFileSync('scripts/test-browser.mjs','utf8').split('\\n');s[836]='// '+s[836];fs.writeFileSync('scripts/_tmp-tb.mjs',s.join('\\n'))\";": {
+   "count": 1,
+   "ms": 72260,
+   "maxMs": 72260,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; node -e \"const fs=require('fs');const s=fs.readFileSync('scripts/test-browser.mjs','utf8').split('\\n');s[836]='// '+s[836];const i=s.findIndex(l=>l.includes('the push test menu shows in th": {
+   "count": 6,
+   "ms": 442381,
+   "maxMs": 88859,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; sed -n 108,119p web/app.ts | cut -c1-300": {
+   "count": 1,
+   "ms": 300,
+   "maxMs": 300,
+   "failures": 0
+  },
+  "bash\u0000grep -n \"Error\\|at file\" \"$TEMP/hb.log\" | head -5 | cut -c1-300": {
+   "count": 1,
+   "ms": 493,
+   "maxMs": 493,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; node -e \"const fs=require('fs');const s=fs.readFileSync('scripts/test-browser.mjs','utf8').split('\\n');for(const k of [834,835,836]) s[k]='// '+s[k];const i=s.findIndex(l=>l.includes('the ": {
+   "count": 1,
+   "ms": 60313,
+   "maxMs": 60313,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; node -e \"const fs=require('fs');const s=fs.readFileSync('scripts/test-browser.mjs','utf8').split('\\n');for(const k of [834,835,836,837]) s[k]='// '+s[k];const i=s.findIndex(l=>l.includes('": {
+   "count": 1,
+   "ms": 60109,
+   "maxMs": 60109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"^function html\\|const html\" hub/web/*.ts | cut -c1-250; python - <<'EOF' p=\"hub/web/styles.css\"; s=open(p,encoding=\"utf8\",newline=\"\").read() a=\".session-git-action:hover { border-colo": {
+   "count": 1,
+   "ms": 9082,
+   "maxMs": 9082,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff -U0 hub/web/app.ts | grep \"^@@\"; cd hub; node -e \"const fs=require('fs');const s=fs.readFileSync('scripts/test-browser.mjs','utf8').split('\\n');const i=s.findIndex(l=>l.includes('the ": {
+   "count": 1,
+   "ms": 6621,
+   "maxMs": 6621,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; node -e \"const fs=require('fs');const s=fs.readFileSync('scripts/test-browser.mjs','utf8').split('\\n');for(let k=830;k<845;k++) if(/states.join\\(\\) === 'unseen'|const line = JSON|line.icon": {
+   "count": 1,
+   "ms": 29845,
+   "maxMs": 29845,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; python - <<'EOF' p=\"hub/scripts/test-browser.mjs\"; s=open(p,encoding=\"utf8\",newline=\"\").read() a=\"\"\" await evaluate(\"document.getElementById('drawer-backdrop').click()\"); // Typing / lists\"\"\" ": {
+   "count": 1,
+   "ms": 58455,
+   "maxMs": 58455,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; awk \"/^## Unreleased/,/^## [0-9]/\" CHANGELOG.md | grep -n \"^###\"; ls hub/tsconfig*.json 2>/dev/null && (cd hub && timeout 300 npx tsc --noEmit -p . 2>&1 | grep \"web/app.ts\" | head -5)": {
+   "count": 1,
+   "ms": 7215,
+   "maxMs": 7215,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\"; timeout 300 npx tsc --noEmit -p . 2>&1 | grep -E \"web/app.ts\\((119|251|1275|140[1-4]),\"; echo \"mine: none above\"": {
+   "count": 1,
+   "ms": 4362,
+   "maxMs": 4362,
+   "failures": 0
+  },
+  "bash\u0000d=\"$HOME/.pi/agent/sessions\"; f=$(ls -t \"$d\"/*ainews*/*01a196ee* 2>/dev/null | head -1); [ -z \"$f\" ] && f=$(grep -l \"01a196ee\" \"$d\"/*ainews*/*.jsonl 2>/dev/null | head -1); echo \"$f\"; node -e \" const ": {
+   "count": 1,
+   "ms": 545,
+   "maxMs": 545,
+   "failures": 0
+  },
+  "bash\u0000f=\"/c/Users/Flex/.pi/agent/sessions/--c--SOFT-git-ainews--/2026-11-01T11-46-30-926Z_01a196ee-bd8d-7187-b69e-fe91aae5edd0.jsonl\"; node -e \" const lines=require('fs').readFileSync(process.argv[1],'utf8'": {
+   "count": 1,
+   "ms": 312,
+   "maxMs": 312,
+   "failures": 0
+  },
+  "bash\u0000cd \"c:/SOFT/git/ainews\"; python -c \" import sqlite3;c=sqlite3.connect('file:data/ainews.sqlite3?mode=ro',uri=True) print(c.execute('select id,status,datetime(started,\\\"unixepoch\\\",\\\"localtime\\\") from ": {
+   "count": 1,
+   "ms": 1155,
+   "maxMs": 1155,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name like 'python%'\\\" | Select-Object ProcessId,ParentProcessId,CreationDate,@{n='cmd';e={\\$_.CommandLine.Substring(0,[Math]::Mi": {
+   "count": 1,
+   "ms": 686,
+   "maxMs": 686,
+   "failures": 0
+  },
+  "bash\u0000ls -la --time-style=+%H:%M \"$TEMP\"/ainews*.log; for f in \"$TEMP\"/ainews*.log; do echo \"== $f\"; tail -4 \"$f\" | cut -c1-160; done; powershell -NoProfile -Command \"Get-Process -Id 40176 | Select-Object C": {
+   "count": 1,
+   "ms": 2457,
+   "maxMs": 2457,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { \\$_.ParentProcessId -eq 40176 -or \\$_.ParentProcessId -in (Get-CimInstance Win32_Process -Filter 'ParentProcessId=40176')": {
+   "count": 1,
+   "ms": 60478,
+   "maxMs": 60478,
+   "failures": 1
+  },
+  "bash\u0000powershell -NoProfile -Command \"\\$all = Get-CimInstance Win32_Process; \\$kids = \\$all | Where-Object ParentProcessId -eq 40176; \\$kids + (\\$all | Where-Object { \\$_.ParentProcessId -in \\$kids.ProcessI": {
+   "count": 1,
+   "ms": 760,
+   "maxMs": 760,
+   "failures": 1
+  },
+  "bash\u0000powershell -NoProfile -Command \"\\$all = Get-CimInstance Win32_Process; \\$kids = @(\\$all | Where-Object ParentProcessId -eq 40176); @(\\$kids) + @(\\$all | Where-Object { \\$_.ParentProcessId -in \\$kids.P": {
+   "count": 1,
+   "ms": 768,
+   "maxMs": 768,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rln \"\\\"bash\\\"\" extensions/*.ts | head; grep -rn \"timeout\" extensions/*.ts | grep -i \"bash\\|clamp\\|max.*timeout\" | head -8 | cut -c1-200; f=\"/c/Users/Flex/.pi/agent/sessions/--c--SOFT-git": {
+   "count": 1,
+   "ms": 2024,
+   "maxMs": 2024,
+   "failures": 0
+  },
+  "bash\u0000f=\"/c/Users/Flex/.pi/agent/sessions/--c--SOFT-git-ainews--/2026-11-01T11-46-30-926Z_01a196ee-bd8d-7187-b69e-fe91aae5edd0.jsonl\"; grep -o \"\\\"name\\\":\\\"tools_enable\\\",\\\"arguments\\\":{[^}]*}\" \"$f\"; grep -o": {
+   "count": 1,
+   "ms": 381,
+   "maxMs": 381,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='python.exe'\\\" | Where-Object { \\$_.CommandLine -like '*-m http.server*' } | ForEach-Object { Stop-Process -Id \\$_.ProcessI": {
+   "count": 1,
+   "ms": 1788,
+   "maxMs": 1788,
+   "failures": 1
+  },
+  "bash\u0000cd \"c:/SOFT/git/ainews\"; python -c \" import sqlite3;c=sqlite3.connect('file:data/ainews.sqlite3?mode=ro',uri=True) print(c.execute('select id,status,datetime(finished,\\\"unixepoch\\\",\\\"localtime\\\") from": {
+   "count": 1,
+   "ms": 678,
+   "maxMs": 678,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; cat extensions/tool-loader.ts | head -40; grep -rn \"\\\"schedule\\\"\\|name: \\\"schedule\\\"\\|exposure\" hub/src/*.ts extensions/*.ts | grep -v \"^extensions/tool-loader\" | cut -c1-200 | head; sed -n 15": {
+   "count": 1,
+   "ms": 447,
+   "maxMs": 447,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"scheduleTool\" extensions/*.ts | cut -c1-250; grep -n \"schedule\" scripts/test-*.mjs | grep -i \"defer\\|exposure\" | cut -c1-200": {
+   "count": 1,
+   "ms": 416,
+   "maxMs": 416,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"matchAll\" extensions/hub-command.ts; python - <<'EOF' p=\"scripts/test-work-hub-command.mjs\"; s=open(p,encoding=\"utf8\",newline=\"\").read() a='const { hubCli, hubMenu, joinedSession, sch": {
+   "count": 1,
+   "ms": 4257,
+   "maxMs": 4257,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 226,236p extensions/hub-command.ts | cat -A | cut -c1-160 | head -11; node scripts/test-work-hub-command.mjs 2>&1 | grep -m3 \"Error\\|at file\\|actual\\|message\" | cut -c1-200": {
+   "count": 1,
+   "ms": 481,
+   "maxMs": 481,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const f='extensions/hub-command.ts',fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replaceAll('\\b','\\\\\\\\b'))\"; grep -c $'\\b' extensions/hub-command.ts; sed -n 230,233p ": {
+   "count": 1,
+   "ms": 3492,
+   "maxMs": 3492,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; cat > \"$TEMP/lsw.txt\" <<'EOF' for (const [, n, u] of command.matchAll(/\\bsleep\\s+(\\d+(?:\\.\\d+)?)([smhd]?)\\b/gi)) total += Number(n) * unit[u.toLowerCase()]; for (const [, n] of command.matchAl": {
+   "count": 1,
+   "ms": 4313,
+   "maxMs": 4313,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; python - <<'PYEOF' def rep(p,a,b): s=open(p,encoding=\"utf8\",newline=\"\").read(); assert s.count(a)==1,(p,a); open(p,\"w\",encoding=\"utf8\",newline=\"\").write(s.replace(a,b)) p=\"extensions/work-mode": {
+   "count": 1,
+   "ms": 3399,
+   "maxMs": 3399,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const fs=require('fs'),f='extensions/hub-command.ts';let s=fs.readFileSync(f,'utf8');const a='(?<![&>|\\\\\\\\])';if(s.split(a).length!==2)throw 'nf';fs.writeFileSync(f,s.replace(a,'(?<![": {
+   "count": 1,
+   "ms": 3687,
+   "maxMs": 3687,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in test-work-hub-command test-work-tool-loader test-work-compaction-notifications; do node \"scripts/$t.mjs\" 2>&1 | grep -m2 \"^ok\\|Error\\|actual\" | cut -c1-200; done": {
+   "count": 1,
+   "ms": 4512,
+   "maxMs": 4512,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git status --short; git diff --stat | tail -1; git branch --show-current; git log -1 --oneline; grep -m1 \"\\\"version\\\"\" package.json; git ls-files | grep -i \"lock\"; sed -n 1,30p CHANGELOG.md | ": {
+   "count": 1,
+   "ms": 770,
+   "maxMs": 770,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git log -4 --format=\"%h %ad %s\" --date=format:%H:%M; git log -1 --format=%h -- hub/web/app.ts; git show --stat HEAD~1 | head -20; git diff CHANGELOG.md | head -30; git status -sb | head -1; rm": {
+   "count": 1,
+   "ms": 512,
+   "maxMs": 512,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; python - <<'PYEOF' p=\"CHANGELOG.md\"; s=open(p,encoding=\"utf8\",newline=\"\").read() lines=[l for l in s.split(\"\\n\") if l.startswith(\"- No more forgotten background servers\") or l.startswith(\"- Hu": {
+   "count": 1,
+   "ms": 5693,
+   "maxMs": 5693,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add -u && git commit -qm \"0.2.19: bash refuses undeclared background starts and 5+ minute sleep-waits (use schedule); schedule always declared\" && git push -q origin master 2>&1 | tail -2;": {
+   "count": 1,
+   "ms": 3602,
+   "maxMs": 3602,
+   "failures": 0
+  },
+  "bash\u0000wsl -l -q 2>/dev/null | tr -d '\\0'; wsl -e bash -lc \"ls -d ~/.pi/agent/sessions/* | head -30; grep -rl x1600 ~/.pi/agent/sessions --include=*.jsonl -l 2>/dev/null | head -5\" 2>&1 | tr -d '\\0' | head -": {
+   "count": 1,
+   "ms": 328,
+   "maxMs": 328,
+   "failures": 0
+  },
+  "bash\u0000wsl -e bash -lc \"cd ~/.pi/agent/sessions/--home-flex-x1600--; ls -lt --time-style=+%m-%d_%H:%M *.jsonl | head -5; cat ~/x1600/.pi/settings.json 2>/dev/null; grep -o '\\\"compaction\\\"[^}]*}' ~/.pi/agent/": {
+   "count": 1,
+   "ms": 457,
+   "maxMs": 457,
+   "failures": 0
+  },
+  "bash\u0000cat > \"$TEMP/cmp.js\" <<'EOF' const fs=require('fs'); for (const f of process.argv.slice(2)) { const E=fs.readFileSync(f,'utf8').trim().split('\\n').map(l=>{try{return JSON.parse(l)}catch{return null}})": {
+   "count": 1,
+   "ms": 379,
+   "maxMs": 379,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 1,30p scripts/audit-compaction.mjs | grep -E \"^//|argv|Usage|--\" | head -20": {
+   "count": 1,
+   "ms": 292,
+   "maxMs": 292,
+   "failures": 0
+  },
+  "bash\u0000wsl -e bash -lc \"cd /mnt/c/SOFT/git/ce-workflow && node scripts/audit-compaction.mjs ~/.pi/agent/sessions/--home-flex-x1600-- --since=2026-10-25 --top=8\" 2>&1 | tr -d '\\0' | cut -c1-260 | head -60": {
+   "count": 1,
+   "ms": 1131,
+   "maxMs": 1131,
+   "failures": 0
+  },
+  "bash\u0000wsl -e bash -lc \"cd ~/.pi/agent/sessions/--home-flex-x1600--; node /mnt/c/Users/Flex/cmp.js 2026-10-19T19-39-29-322Z_01a155ad-16a9-7392-9299-f1ca65d40c33.jsonl | tail -9 | cut -c1-200; cd ~/.pi/agent/": {
+   "count": 1,
+   "ms": 414,
+   "maxMs": 414,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"tightenPreparation\\|realCost\\|replyCost\" extensions/*.ts | grep -v \"^extensions/work-compaction.ts:10[0-9]\" | head": {
+   "count": 1,
+   "ms": 319,
+   "maxMs": 319,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"estimateContextMessageTokens\\s*=\\|function estimateContextMessageTokens\" extensions/*.ts; sed -n 1460,1500p extensions/work-models.ts": {
+   "count": 1,
+   "ms": 342,
+   "maxMs": 342,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -rn \"export function estimateTokens\" . | head; f=$(grep -rl \"export function estimateTokens\"": {
+   "count": 1,
+   "ms": 3511,
+   "maxMs": 3511,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent/dist\"; f=$(grep -rl \"^export function estimateTokens\" --include=*.js . | head -1); echo $f; awk 'NR>=195": {
+   "count": 1,
+   "ms": 503,
+   "maxMs": 503,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent/dist\"; awk 'NR>=175 && NR<=196' core/compaction/compaction.js; grep -n \"IMAGE\\|image\" core/compaction/co": {
+   "count": 1,
+   "ms": 321,
+   "maxMs": 321,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"/c/Users/Flex/AppData/Local/Temp/cmpx\"; cat > \"/c/Users/Flex/AppData/Local/Temp/cmpx/m.mjs\" <<'EOF' import fs from \"node:fs\"; const { estimateTokens } = await import(process.env.HOME + \"/.pi": {
+   "count": 1,
+   "ms": 901,
+   "maxMs": 901,
+   "failures": 0
+  },
+  "bash\u0000wsl -e bash -lc \"cd ~/.pi/agent/sessions/--home-flex-x1600--; node /mnt/c/Users/Flex/AppData/Local/Temp/cmpx/m.mjs 2026-11-01T17-55-35-143Z_01a19840-a265-73c7-ad06-534a4a1bbf8e.jsonl 1 | head -40\" 2>&": {
+   "count": 1,
+   "ms": 354,
+   "maxMs": 354,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn \"tightenPreparation\\|realCostPreparation\" scripts/*.mjs | head": {
+   "count": 1,
+   "ms": 513,
+   "maxMs": 513,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in test-work-compaction test-work-compaction-notifications; do node \"scripts/$t.mjs\" 2>&1 | grep -m2 \"^ok\\|Error\\|message:\" | cut -c1-200; done": {
+   "count": 2,
+   "ms": 7786,
+   "maxMs": 4314,
+   "failures": 0
+  },
+  "bash\u0000cat > \"/c/Users/Flex/AppData/Local/Temp/cmpx/r.mjs\" <<'EOF' import fs from \"node:fs\"; const { estimateTokens } = await import(process.env.HOME + \"/.pi/agent/install/releases/1.4.0/node_modules/@earend": {
+   "count": 1,
+   "ms": 470,
+   "maxMs": 470,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in test-work-compaction test-work-compaction-notifications; do node \"scripts/$t.mjs\" 2>&1 | grep -m2 \"^ok\\|Error\\|message:\" | cut -c1-200; done; wsl -e bash -lc \"cd ~/.pi/agent/sessions/": {
+   "count": 1,
+   "ms": 3947,
+   "maxMs": 3947,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"/c/Users/Flex/AppData/Local/Temp/cmpx\"; cat > \"/c/Users/Flex/AppData/Local/Temp/cmpx/o.mjs\" <<'EOF' import fs from \"node:fs\"; const { estimateTokens } = await import(process.env.HOME + \"/.pi": {
+   "count": 1,
+   "ms": 531,
+   "maxMs": 531,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn \"before_provider_request\\|context_with_system\" extensions/*.ts | head; ls ~/.pi/agent 2>/dev/null | head -0; wsl -e bash -lc \"ls -t ~/.pi/agent/*.log ~/.pi/agent/logs 2>/dev/null | he": {
+   "count": 1,
+   "ms": 285,
+   "maxMs": 285,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 3775,3795p extensions/work-models.ts; grep -n \"before_agent_start\" extensions/*.ts | head -20": {
+   "count": 1,
+   "ms": 364,
+   "maxMs": 364,
+   "failures": 0
+  },
+  "bash\u0000cat > \"/c/Users/Flex/AppData/Local/Temp/cmpx/d.mjs\" <<'EOF' import fs from \"node:fs\"; const { estimateTokens } = await import(process.env.HOME + \"/.pi/agent/install/releases/1.4.0/node_modules/@earend": {
+   "count": 1,
+   "ms": 919,
+   "maxMs": 919,
+   "failures": 0
+  },
+  "bash\u0000cd \"/c/Users/Flex/AppData/Local/Temp/cmpx\"; python - <<'EOF' s=open(\"d.mjs\",encoding=\"utf8\").read() s=s.replace('rows.push({ delta, vis, out, user });','rows.push({ delta, vis, out, user, what: betwee": {
+   "count": 1,
+   "ms": 674,
+   "maxMs": 674,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn \"more characters trimmed\" extensions/ hub/src 2>/dev/null | head -5; grep -rln \"more characters trimmed\" \"C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/p": {
+   "count": 1,
+   "ms": 7226,
+   "maxMs": 7226,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; sed -n 1,60p hub/src/session-prune.ts; grep -rn \"session-prune\\|pruneSession\" hub/src/*.ts | grep -v \"^hub/src/session-prune\" | head": {
+   "count": 1,
+   "ms": 324,
+   "maxMs": 324,
+   "failures": 0
+  },
+  "bash\u0000wsl -e bash -lc \"cd ~/.pi/agent/sessions/--home-flex-x1600--; node -e \\\" const E=require('fs').readFileSync('2026-11-01T17-55-35-143Z_01a19840-a265-73c7-ad06-534a4a1bbf8e.jsonl','utf8').trim().split('": {
+   "count": 2,
+   "ms": 367,
+   "maxMs": 198,
+   "failures": 0
+  },
+  "bash\u0000cat > \"/c/Users/Flex/AppData/Local/Temp/cmpx/u.mjs\" <<'EOF' import fs from \"node:fs\"; const { estimateTokens } = await import(process.env.HOME + \"/.pi/agent/install/releases/1.4.0/node_modules/@earend": {
+   "count": 1,
+   "ms": 556,
+   "maxMs": 556,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in test-work-compaction test-work-compaction-notifications; do node \"scripts/$t.mjs\" 2>&1 | grep -m2 \"^ok\\|Error\\|message:\" | cut -c1-200; done cat > \"/c/Users/Flex/AppData/Local/Temp/cm": {
+   "count": 1,
+   "ms": 3385,
+   "maxMs": 3385,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8');fs.writeFileSync('CHANGELOG.md',s.replace('## Unreleased','## 0.2.21 — 2026-11-01'));let p=fs.readFileSync('package": {
+   "count": 1,
+   "ms": 3500,
+   "maxMs": 3500,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const fs=require('fs');const j=JSON.parse(fs.readFileSync('package-lock.json','utf8'));j.version='0.2.21';if(j.packages&&j.packages['']) j.packages[''].version='0.2.21';fs.writeFileSy": {
+   "count": 1,
+   "ms": 2279,
+   "maxMs": 2279,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add package-lock.json && git commit -q -m \"0.2.21: restore package-lock formatting\" && git push -q origin master; git status -sb | head -1; git log --oneline -2; git diff HEAD~2 --stat": {
+   "count": 1,
+   "ms": 2101,
+   "maxMs": 2101,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "P1-01": {
+   "ms": 210353,
+   "testMs": 0,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 8
+   },
+   "failures": 1
+  },
+  "P1-02": {
+   "ms": 120321,
+   "testMs": 2381,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 11
+   },
+   "failures": 1
+  },
+  "P2-01": {
+   "ms": 742930,
+   "testMs": 297017,
+   "replies": 33,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 33
+   },
+   "failures": 2
+  },
+  "P4-01": {
+   "ms": 17831,
+   "testMs": 2327,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   },
+   "failures": 1
+  },
+  "P4-02": {
+   "ms": 156222,
+   "testMs": 71019,
+   "replies": 10,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 10
+   },
+   "failures": 1
+  },
+  "P4-03": {
+   "ms": 43963,
+   "testMs": 0,
+   "replies": 5,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 5
+   }
+  },
+  "P4-05": {
+   "ms": 13166,
+   "testMs": 0,
+   "replies": 3,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 3
+   }
+  },
+  "ARCH-RECONCILE": {
+   "ms": 34170,
+   "testMs": 2736,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 6
+   }
+  },
+  "(none)": {
+   "ms": 4490425,
+   "testMs": 1230829,
+   "replies": 342,
+   "models": {
+    "anthropic/claude-opus-5-5:medium": 22,
+    "anthropic/claude-opus-5-5:high": 320
+   },
+   "failures": 13
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-10-29T11:07:18.742Z",
+   "ms": 1864173
+  },
+  {
+   "start": "2026-10-29T11:38:34.970Z",
+   "ms": 321479
+  },
+  {
+   "start": "2026-10-29T12:02:59.670Z",
+   "ms": 73402
+  },
+  {
+   "start": "2026-10-29T12:06:56.160Z",
+   "ms": 139589
+  },
+  {
+   "start": "2026-10-29T12:09:32.884Z",
+   "ms": 123476
+  },
+  {
+   "start": "2026-10-29T12:14:58.647Z",
+   "ms": 23174
+  },
+  {
+   "start": "2026-10-29T13:37:18.059Z",
+   "ms": 12185
+  },
+  {
+   "start": "2026-10-29T13:37:55.857Z",
+   "ms": 231039
+  },
+  {
+   "start": "2026-10-29T14:47:55.360Z",
+   "ms": 123479
+  },
+  {
+   "start": "2026-10-29T14:50:57.228Z",
+   "ms": 41704
+  },
+  {
+   "start": "2026-10-29T14:53:02.590Z",
+   "ms": 135917
+  },
+  {
+   "start": "2026-10-29T14:56:11.135Z",
+   "ms": 12705
+  },
+  {
+   "start": "2026-10-29T16:11:15.137Z",
+   "ms": 6829
+  },
+  {
+   "start": "2026-10-31T11:28:33.009Z",
+   "ms": 220222
+  },
+  {
+   "start": "2026-10-31T11:37:54.378Z",
+   "ms": 25471
+  },
+  {
+   "start": "2026-10-31T11:53:26.530Z",
+   "ms": 1667655
+  },
+  {
+   "start": "2026-10-31T12:46:42.196Z",
+   "ms": 1254720
+  },
+  {
+   "start": "2026-10-31T13:07:36.940Z",
+   "ms": 23588
+  },
+  {
+   "start": "2026-11-01T16:55:31.755Z",
+   "ms": 151601
+  },
+  {
+   "start": "2026-11-01T17:24:24.169Z",
+   "ms": 178383
+  },
+  {
+   "start": "2026-11-01T17:29:57.287Z",
+   "ms": 90518
+  },
+  {
+   "start": "2026-11-01T17:35:20.503Z",
+   "ms": 51869
+  },
+  {
+   "start": "2026-11-01T21:35:36.101Z",
+   "ms": 78894
+  },
+  {
+   "start": "2026-11-01T22:03:11.520Z",
+   "ms": 179787
+  },
+  {
+   "start": "2026-11-01T22:07:24.937Z",
+   "ms": 261758
+  },
+  {
+   "start": "2026-11-02T06:22:56.902Z",
+   "ms": 41785
+  },
+  {
+   "start": "2026-11-02T06:26:39.239Z",
+   "ms": 12070
+  }
+ ],
+ "hints": []
+}

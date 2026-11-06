@@ -24,9 +24,9 @@ One loop per rework target (a module or a group of modules, never "the whole pro
    - expected benefit, risk and reversibility;
    - whether stored state or file formats change (section 5).
 
-   Run one small experiment on the riskiest assumption, and record the result in the plan.
+   Run one small experiment on the riskiest assumption, and record the result in the plan. End with one recommendation judged against the request's goal (what should get easier, safer or faster; ask for it at planning when the request has none). Recommend local repair or stop only when it meets that goal better than the structural options, and mark the recommended option "(Recommended)" in the Pick question.
 4. **Pick** (human step). The human picks one of two outcomes:
-   - **an option to build**, including "local repair": the human turns on `R-design-approved`.
+   - **an option to build**, including "local repair": the human turns on `R-design-approved`. The gate counts only after the pick is recorded in Decisions; if it was turned on earlier, Build still waits for that record.
    - **stop**, meaning no change is built: `R-design-approved` stays off. Mark Build, Replay, Switch and Retire done with the summary "not run: stopped at Pick". Commit the Map, corpus and Design as the outcome.
 5. **Build** [code]. The new part sits next to the old one behind one seam (section 3). Tests can select either side. Only one side does real writes (R6).
 6. **Replay** [think]. Run the same corpus against old and new, then fill in the scorecard that was fixed before Build started.
@@ -77,7 +77,7 @@ Before any old-versus-new result counts, the corpus must pass two checks:
 
 ## 3. Seam, SHAs and replay worktree (D-03, R6)
 
-Seam: the new part sits next to the old one behind one entry point (branch-by-abstraction), on the project's current branch. The selection is one config value, an environment variable or a single call site. Tests can choose either side. Use a long-lived rewrite worktree only when Design shows that no seam exists and the human approves it.
+Seam: the new part sits next to the old one behind one entry point (branch-by-abstraction), on the project's current branch. The selection is one config value, an environment variable or a single call site. Tests can choose either side. A test-only selection (a test-runner or bundler alias) proves replay but not runtime rollback: the rollback rules then say that switching back is a `git revert`. Use a long-lived rewrite worktree only when Design shows that no seam exists and the human approves it.
 
 Record two SHAs in the pilot plan:
 
@@ -130,13 +130,13 @@ Plan3 runs pending steps past an unanswered `[human]` step. It skips only steps 
 - `R-cutover-approved`: the human approved the switch after Replay; gates Switch.
 - `R-retire-approved`: the watch window passed with its evidence; gates Retire.
 
-The human turns each one on with Alt+A. Until the human does, a gate is off by day and in night mode, so unattended runs cannot pass it. Once a gate is approved it stays on at night too: night mode does not take back an approval.
+The human turns each one on with Alt+A. Agents never remove, edit or bypass a `needs:` line, and never propose chat approval in place of Alt+A: when the next phase waits on a gate, stop and name the gate. Until the human does, a gate is off by day and in night mode, so unattended runs cannot pass it. Once a gate is approved it stays on at night too: night mode does not take back an approval.
 
 Code-only and device projects (R7): device checks are separate `[blocked]` steps with the device as a prerequisite. Unit-level characterization runs without them.
 
 ## 7. Plan skeleton
 
-The pilot session fills in this skeleton in its target repo's plan (Plan3 syntax). Replace `<...>` placeholders and step texts with the target's real files and commands. Phase headings take only the `[think]` or `[code]` tag; `[human]` is a step marker, never a phase tag.
+Planning writes this plan only; Map and every later phase run after `/plan3 finish`, so each phase runs on its tagged model. The pilot session fills in this skeleton in its target repo's plan (Plan3 syntax). Replace `<...>` placeholders and step texts with the target's real files and commands. Phase headings take only the `[think]` or `[code]` tag; `[human]` is a step marker, never a phase tag.
 
 ```markdown
 ## Requirements

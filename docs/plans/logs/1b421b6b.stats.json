@@ -1,0 +1,1771 @@
+{
+ "version": 1,
+ "activeMs": 20922499,
+ "runs": 33,
+ "waitingMs": 2322507,
+ "toolWallMs": 10656927,
+ "compactions": {
+  "count": 5,
+  "ms": 66594
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 987,
+   "thinkingMs": 4757428,
+   "actingMs": 2186434,
+   "input": 2468,
+   "output": 615513,
+   "cacheRead": 137954729,
+   "cacheWrite": 7103906,
+   "cost": 75.43060780000008,
+   "errors": 1
+  },
+  "openai-codex/gpt-6.1-sol:medium": {
+   "replies": 55,
+   "thinkingMs": 213715,
+   "actingMs": 134351,
+   "input": 158342,
+   "output": 12515,
+   "cacheRead": 6050432,
+   "cacheWrite": 0,
+   "cost": 1.0468772000000004,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 805,
+   "ms": 10027102,
+   "maxMs": 228685,
+   "failures": 23
+  },
+  "intercom": {
+   "count": 1,
+   "ms": 25,
+   "maxMs": 25,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 72,
+   "ms": 3231,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "write": {
+   "count": 14,
+   "ms": 196,
+   "maxMs": 55,
+   "failures": 0
+  },
+  "read": {
+   "count": 163,
+   "ms": 1514,
+   "maxMs": 165,
+   "failures": 2
+  },
+  "codemode": {
+   "count": 201,
+   "ms": 2474014,
+   "maxMs": 178308,
+   "failures": 8
+  },
+  "edit": {
+   "count": 293,
+   "ms": 5073,
+   "maxMs": 133,
+   "failures": 6
+  },
+  "lens_diagnostics": {
+   "count": 15,
+   "ms": 84375,
+   "maxMs": 9378,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 14,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 2
+  },
+  "plan3_diagram": {
+   "count": 4,
+   "ms": 4,
+   "maxMs": 3,
+   "failures": 0
+  },
+  "process_image": {
+   "count": 14,
+   "ms": 65465,
+   "maxMs": 8953,
+   "failures": 0
+  },
+  "screen_read": {
+   "count": 3,
+   "ms": 3026,
+   "maxMs": 1168,
+   "failures": 0
+  },
+  "knowledge": {
+   "count": 2,
+   "ms": 33,
+   "maxMs": 22,
+   "failures": 1
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 552,
+   "ms": 2370738,
+   "maxMs": 100339,
+   "failures": 16
+  },
+  "test": {
+   "count": 253,
+   "ms": 7656364,
+   "maxMs": 228685,
+   "failures": 7
+  }
+ },
+ "commands": {
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/p1-02-probe\" && for i in 1 2 3; do node probe.mjs | rg -c \"\\\"gen\\\": 2\" ; done": {
+   "count": 1,
+   "ms": 4876,
+   "maxMs": 4876,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/p1-05-probe\"; (node server.mjs 48731 > server.log 2>&1 &); sleep 1; tailscale serve --bg --https=48731 http://127.0.0.1:48731 2>&1; tailscale serve status 2>&1; sl": {
+   "count": 1,
+   "ms": 28321,
+   "maxMs": 28321,
+   "failures": 0
+  },
+  "bash\u0000curl -sv --max-time 15 https://flexpc.tailaee9f8.ts.net:48731/x 2>&1 | tail -25; cat \"C:/Users/Flex/AppData/Local/Temp/p1-05-probe/server.log\"": {
+   "count": 1,
+   "ms": 5689,
+   "maxMs": 5689,
+   "failures": 0
+  },
+  "bash\u0000curl -s --max-time 10 -H \"Tailscale-User-Login: evil@x\" -H \"X-Forwarded-Host: evil\" https://flexpc.tailaee9f8.ts.net:48731/x | rg -i \"login|forwarded-host\"; curl -sN --max-time 10 https://flexpc.taila": {
+   "count": 1,
+   "ms": 3443,
+   "maxMs": 3443,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\"": {
+   "count": 2,
+   "ms": 1993,
+   "maxMs": 1003,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" && node \"scripts/test-work-plan3.mjs\"": {
+   "count": 4,
+   "ms": 41974,
+   "maxMs": 11000,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\"; git diff -- \"extensions/plan3.ts\" | python -c \"import sys,re,subprocess; s=sys.stdin.read(); p=re.split(r'(?=^@@ )',s,flags=re.M); wanted=[h for h in p[1:] if not a": {
+   "count": 1,
+   "ms": 9479,
+   "maxMs": 9479,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\"; git diff --stat; git diff -- \"extensions/plan3.ts\"": {
+   "count": 1,
+   "ms": 9778,
+   "maxMs": 9778,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-wo-control.mjs\"": {
+   "count": 1,
+   "ms": 10524,
+   "maxMs": 10524,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-wo-control.mjs\" && node \"scripts/test-work-settings.mjs\"": {
+   "count": 1,
+   "ms": 1735,
+   "maxMs": 1735,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v Experimental; node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 36807,
+   "maxMs": 36807,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s*at \" | tail -30; git stash list | head -2": {
+   "count": 1,
+   "ms": 35880,
+   "maxMs": 35880,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s*at |Experimental|trace-warnings\" | tail -25": {
+   "count": 1,
+   "ms": 32552,
+   "maxMs": 32552,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s*at |Experimental|trace-warnings\" | tail -12": {
+   "count": 1,
+   "ms": 57837,
+   "maxMs": 57837,
+   "failures": 0
+  },
+  "bash\u0000git stash push -m \"p2-06-tmp\" -- \"extensions/plan3-web.ts\" \"extensions/plan3-web/app.ts\" \"scripts/test-work-plan3-web.mjs\" && (node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s*at |Experime": {
+   "count": 1,
+   "ms": 36516,
+   "maxMs": 36516,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg \"DEBUG|^ok|AssertionError|timed out\"": {
+   "count": 4,
+   "ms": 144746,
+   "maxMs": 36369,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg \"^ok|AssertionError|timed out\"": {
+   "count": 1,
+   "ms": 36488,
+   "maxMs": 36488,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -12": {
+   "count": 1,
+   "ms": 9621,
+   "maxMs": 9621,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s*at \" | rg \"^ok|AssertionError|timed out|Error\"": {
+   "count": 2,
+   "ms": 90407,
+   "maxMs": 57883,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s*at \" | rg \"^ok|AssertionError|timed out\"": {
+   "count": 3,
+   "ms": 177568,
+   "maxMs": 59259,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg \"Command failed|DEBUG\" | head -3": {
+   "count": 1,
+   "ms": 59240,
+   "maxMs": 59240,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg \"^ok|AssertionError|Command failed\"": {
+   "count": 12,
+   "ms": 418545,
+   "maxMs": 36980,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -2; node \"scripts/test-work-wo-control.mjs\" 2>&1 | tail -2; node \"scripts/test-work-plan3-web.mjs\" 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 11645,
+   "maxMs": 11645,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg \"^ok|Assertion|actual|expected|Error\" | head": {
+   "count": 2,
+   "ms": 2058,
+   "maxMs": 1510,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -1; node \"scripts/test-work-wo-control.mjs\" 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 10579,
+   "maxMs": 10579,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg \"^ok|Assertion|actual|expected|Error|bytes\" | head": {
+   "count": 1,
+   "ms": 1771,
+   "maxMs": 1771,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | tail -1 && node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -1 && node \"scripts/test-work-wo-control.mjs\" 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 13383,
+   "maxMs": 13383,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | tail -1": {
+   "count": 8,
+   "ms": 46093,
+   "maxMs": 7037,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -8": {
+   "count": 4,
+   "ms": 23078,
+   "maxMs": 8749,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 11064,
+   "maxMs": 11064,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -6": {
+   "count": 1,
+   "ms": 1762,
+   "maxMs": 1762,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -12": {
+   "count": 2,
+   "ms": 15216,
+   "maxMs": 11464,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-wo-control.mjs\" 2>&1 | tail -1": {
+   "count": 4,
+   "ms": 4544,
+   "maxMs": 1764,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 5355,
+   "maxMs": 5355,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -12": {
+   "count": 1,
+   "ms": 4761,
+   "maxMs": 4761,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at |Experimental|trace-warnings\" | tail -8": {
+   "count": 1,
+   "ms": 1840,
+   "maxMs": 1840,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -6": {
+   "count": 4,
+   "ms": 59351,
+   "maxMs": 22293,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -6": {
+   "count": 6,
+   "ms": 28615,
+   "maxMs": 5007,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at |Experimental|trace-warnings\" | tail -12": {
+   "count": 2,
+   "ms": 7925,
+   "maxMs": 3968,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at |Experimental|trace-warnings\" | tail -14": {
+   "count": 6,
+   "ms": 30706,
+   "maxMs": 6679,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -10": {
+   "count": 2,
+   "ms": 22543,
+   "maxMs": 12324,
+   "failures": 0
+  },
+  "bash\u0000cp \"extensions/plan3-remote.ts\" \"%TEMP%/plan3-remote.bak\" 2>nul || cp \"extensions/plan3-remote.ts\" \"/tmp/plan3-remote.bak\"; python -c \"f='extensions/plan3-remote.ts';s=open(f,encoding='utf8',newline='": {
+   "count": 1,
+   "ms": 2055,
+   "maxMs": 2055,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"token:|\\.token\\b\" \"extensions/plan3-web.ts\" | head -5; node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at |Experimental|trace-warnings\" | tail -14": {
+   "count": 1,
+   "ms": 4154,
+   "maxMs": 4154,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -A12 \"DBG\" | head -30": {
+   "count": 1,
+   "ms": 3449,
+   "maxMs": 3449,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -A24 \"DBG\" | tail -14": {
+   "count": 1,
+   "ms": 3396,
+   "maxMs": 3396,
+   "failures": 0
+  },
+  "bash\u0000python -c \"f='extensions/plan3.ts';s=open(f,encoding='utf8',newline='').read();s=s.replace('\\tfunction publishSession() {\\n','\\tfunction publishSession() {\\n\\t\\tconsole.log(\\\"PUBDBG\\\", !!webInstance, ": {
+   "count": 1,
+   "ms": 3824,
+   "maxMs": 3824,
+   "failures": 0
+  },
+  "bash\u0000python -c \"f='scripts/test-work-plan3.mjs';s=open(f,encoding='utf8',newline='').read();s=s.replace('hooks.get(\\\"ui_prompt_start\\\")({ title: \\\"Pick\\\", kind: \\\"select\\\" }); console.log(\\\"DBG\\\", notices.": {
+   "count": 1,
+   "ms": 3455,
+   "maxMs": 3455,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 523,
+   "ms": 88382,
+   "maxMs": 1707,
+   "failures": 21
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -12": {
+   "count": 3,
+   "ms": 97886,
+   "maxMs": 34018,
+   "failures": 0
+  },
+  "bash\u0000python -c \"f='scripts/test-work-plan3-browser.mjs';s=open(f,encoding='utf8',newline='').read();s=s.replace('await browser(\\\"press\\\", \\\"ArrowRight\\\");\\n assert.equal(await width(\\\"left-panel\\\"), 650,',": {
+   "count": 1,
+   "ms": 30815,
+   "maxMs": 30815,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg \"test-work-plan3-browser.mjs:\\d+\" -o | head -2; rg -n \"\\\"near\\\"\" \"scripts/test-work-plan3-browser.mjs\" | head": {
+   "count": 1,
+   "ms": 34103,
+   "maxMs": 34103,
+   "failures": 0
+  },
+  "bash\u0000for i in 1 2 3; do node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg \"^ok|AssertionError\" | head -1; done": {
+   "count": 1,
+   "ms": 106457,
+   "maxMs": 106457,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 10171,
+   "maxMs": 10171,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at |Experimental|trace-warnings\" | tail -16": {
+   "count": 1,
+   "ms": 4215,
+   "maxMs": 4215,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -8": {
+   "count": 1,
+   "ms": 3546,
+   "maxMs": 3546,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg \"AssertionError\" | head -3": {
+   "count": 1,
+   "ms": 3218,
+   "maxMs": 3218,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg \"AssertionError|TypeError|passed\" | head -3": {
+   "count": 1,
+   "ms": 3197,
+   "maxMs": 3197,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -B2 -A8 \"TypeError\" | head -20": {
+   "count": 1,
+   "ms": 2936,
+   "maxMs": 2936,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg \"AssertionError|passed\" | head -3": {
+   "count": 4,
+   "ms": 19762,
+   "maxMs": 10221,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -12": {
+   "count": 1,
+   "ms": 4546,
+   "maxMs": 4546,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at \" | tail -3": {
+   "count": 2,
+   "ms": 11533,
+   "maxMs": 6805,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -3; node \"scripts/test-jev-tools.mjs\" 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 5637,
+   "maxMs": 5637,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg -B3 -A10 \"Error\" | head -30": {
+   "count": 1,
+   "ms": 4548,
+   "maxMs": 4548,
+   "failures": 0
+  },
+  "bash\u0000for i in 1 2; do node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg \"^ok|Error|actual|expected\" | head -4; done": {
+   "count": 3,
+   "ms": 256000,
+   "maxMs": 111087,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg \"AssertionError|passed\" | head -2": {
+   "count": 5,
+   "ms": 45427,
+   "maxMs": 11486,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -5; sed -n \"/@media (max-width: 899px) {$/,/^}/p\" \"extensions/plan3-web/styles.css\"": {
+   "count": 1,
+   "ms": 4484,
+   "maxMs": 4484,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -1": {
+   "count": 4,
+   "ms": 19108,
+   "maxMs": 5316,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 4412,
+   "maxMs": 4412,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg \"Error|passed|actual|expected\" | head -5": {
+   "count": 4,
+   "ms": 42504,
+   "maxMs": 26053,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-types.mjs\" 2>&1 | rg -v \"^\\s+at \" | head -12": {
+   "count": 1,
+   "ms": 4620,
+   "maxMs": 4620,
+   "failures": 0
+  },
+  "bash\u0000for i in 1 2; do node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg \"^ok|Error|actual|expected|browser.mjs:\" | head -5; done": {
+   "count": 2,
+   "ms": 151860,
+   "maxMs": 76814,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg -A16 \"AssertionError\" | head -24": {
+   "count": 1,
+   "ms": 37268,
+   "maxMs": 37268,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg -A12 \"AssertionError\" | head -20": {
+   "count": 1,
+   "ms": 3114,
+   "maxMs": 3114,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg -B2 -A10 \"Error\" | head -20": {
+   "count": 1,
+   "ms": 6914,
+   "maxMs": 6914,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 7028,
+   "maxMs": 7028,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg -A12 \"^ok|Error\" | head -20": {
+   "count": 1,
+   "ms": 30797,
+   "maxMs": 30797,
+   "failures": 0
+  },
+  "bash\u0000for i in 1 2; do node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg -A12 \"^ok|Error\" | head -16; done": {
+   "count": 1,
+   "ms": 77664,
+   "maxMs": 77664,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | rg -A12 \"^ok|Error\" | head -16": {
+   "count": 1,
+   "ms": 39165,
+   "maxMs": 39165,
+   "failures": 0
+  },
+  "bash\u0000npm run verify:quiet 2>&1 | tail -30": {
+   "count": 1,
+   "ms": 211740,
+   "maxMs": 211740,
+   "failures": 0
+  },
+  "bash\u0000npm run verify:quiet 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 198046,
+   "maxMs": 198046,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at \" | head -20": {
+   "count": 1,
+   "ms": 38859,
+   "maxMs": 38859,
+   "failures": 0
+  },
+  "bash\u0000for t in test-work-plan3-web test-work-plan3-types test-work-plan3; do node \"scripts/$t.mjs\" 2>&1 | rg \"^ok|Error|failed\" | head -3; done": {
+   "count": 1,
+   "ms": 22002,
+   "maxMs": 22002,
+   "failures": 0
+  },
+  "bash\u0000node scripts/test-work-plan3-types.mjs 2>&1 | tail -3; echo \"---\"; node scripts/test-work-plan3.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 14529,
+   "maxMs": 14529,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at |ExperimentalWarning|trace-warnings\" | head -20": {
+   "count": 1,
+   "ms": 34326,
+   "maxMs": 34326,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-browser.mjs\" 2>&1 | rg -v \"^\\s+at |ExperimentalWarning|trace-warnings\" | head -12": {
+   "count": 1,
+   "ms": 38851,
+   "maxMs": 38851,
+   "failures": 0
+  },
+  "bash\u0000node scripts/test-work-subscription-footer.mjs 2>&1 | tail -3; for t in test-work-plan3-web test-work-plan3-types test-work-plan3; do node \"scripts/$t.mjs\" 2>&1 | tail -1; done": {
+   "count": 1,
+   "ms": 23432,
+   "maxMs": 23432,
+   "failures": 0
+  },
+  "bash\u0000npm run verify:quiet 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 203453,
+   "maxMs": 203453,
+   "failures": 0
+  },
+  "bash\u0000node scripts/test-work-plan3-browser.mjs 2>&1 | rg -v \"^\\s+at |ExperimentalWarning|trace-warnings\" | head -12; node scripts/test-work-plan3-web.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 41092,
+   "maxMs": 41092,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash push -q extensions/work-dialogs.ts && node scripts/test-work-plan3-web.mjs 2>&1 | rg \"AssertionError|message|^ok\" | head -3; git stash pop -q && node scripts/test-work-plan3-web.mj": {
+   "count": 1,
+   "ms": 14219,
+   "maxMs": 14219,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -v \"^\\s+at |ExperimentalWarning|trace-warnings\" | head -12": {
+   "count": 1,
+   "ms": 39250,
+   "maxMs": 39250,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -v \"^\\s+at |ExperimentalWarning|trace-warnings\" | head -14": {
+   "count": 1,
+   "ms": 34090,
+   "maxMs": 34090,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"^ok|AssertionError\" | head -2; done": {
+   "count": 1,
+   "ms": 71913,
+   "maxMs": 71913,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A8 \"AssertionError\" | head -12; rg -n \"#send|message-input\\\", \\\"\" scripts/test-work-plan3-browser.mjs | head -5": {
+   "count": 1,
+   "ms": 36079,
+   "maxMs": 36079,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A8 \"^ok|AssertionError\" | head -9; done": {
+   "count": 1,
+   "ms": 78416,
+   "maxMs": 78416,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-dialogs test-work-camera test-work-plan3-types; do node \"scripts/$t.mjs\" 2>&1 | tail -1; done; npm run verify:quiet 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 211969,
+   "maxMs": 211969,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A8 \"^ok|AssertionError\" | head -9; done; node scripts/test-work-plan3-types.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 70850,
+   "maxMs": 70850,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A3 \"^ok|AssertionError|Error:\" | head -5; done": {
+   "count": 1,
+   "ms": 93373,
+   "maxMs": 93373,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | tail -1 && npm run verify:quiet 2>&1 | tail -1 && git add extensions/plan3-web/prompts.ts scripts/test-work-plan3-browser.mjs && git commit -qm \"B": {
+   "count": 1,
+   "ms": 228685,
+   "maxMs": 228685,
+   "failures": 0
+  },
+  "bash\u0000cd \"./\" && rg -n \"prepared = |const prepared\" extensions/plan3-web.ts | head -3 && node scripts/test-work-plan3-web.mjs 2>&1 | tail -1 && rg -n \"woSubcommands|wo: \\[|\\.wo\\b\" scripts/*.mjs | head -5": {
+   "count": 1,
+   "ms": 7437,
+   "maxMs": 7437,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-wo-control.mjs 2>&1 | tail -3 && npm run verify:quiet 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 214435,
+   "maxMs": 214435,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -3; node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A10 \"^ok|AssertionError|Error:\" | head -14": {
+   "count": 1,
+   "ms": 60387,
+   "maxMs": 60387,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"78s/textContent === \\\\\\\\\\\"Upload service\\\\\\\\\\\"/textContent === \\\\\\\\\\\"ce-workflow - 1: Upload service\\\\\\\\\\\"/\" scripts/test-work-plan3-browser.mjs && sed -n \"78p\" scripts/test-work-pla": {
+   "count": 1,
+   "ms": 38722,
+   "maxMs": 38722,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"523s/menu.querySelector<HTMLElement>(\\\"\\[aria-pressed=true\\], button\\\")?.focus();/(menu.querySelector<HTMLElement>(\\\".model-option[aria-pressed=true]\\\") ?? menu.querySelector<HTMLEle": {
+   "count": 1,
+   "ms": 42677,
+   "maxMs": 42677,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | tail -1; node scripts/test-work-plan3-types.mjs 2>&1 | tail -1; sed -i \"s/vendored Rough.js and Virgil/vendored Rough.js/\" docs/architecture/produ": {
+   "count": 1,
+   "ms": 11311,
+   "maxMs": 11311,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A10 \"^ok|AssertionError|Error:\" | head -14; node scripts/test-work-plan3-types.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 51812,
+   "maxMs": 51812,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | tail -1 && git add extensions/plan3-web.ts extensions/plan3-web/app.ts extensions/plan3-web/styles.css scripts/test-work-plan3-browser.mjs && git ": {
+   "count": 1,
+   "ms": 7007,
+   "maxMs": 7007,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"earlier\" extensions/plan3-web README.md | head; node scripts/test-work-plan3-types.mjs 2>&1 | tail -1; node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A8 \"^ok|AssertionError|Error": {
+   "count": 1,
+   "ms": 51516,
+   "maxMs": 51516,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A8 \"^ok|AssertionError|Error:\" | head -10": {
+   "count": 1,
+   "ms": 62315,
+   "maxMs": 62315,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"revision === \\\\\\\\\\\"3\\\\\\\\\\\"\" scripts/test-work-plan3-browser.mjs | head -3; node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A3 \"^ok|AssertionError|Error:\" | head -5": {
+   "count": 1,
+   "ms": 61921,
+   "maxMs": 61921,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"409|Stale|reload\" extensions/plan3-web/app.ts | head; git stash -q && node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"^ok|Error:\" | head -2; git stash pop -q && git status --short": {
+   "count": 1,
+   "ms": 47526,
+   "maxMs": 47526,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"219s|^ await shiftDrag(stalePoint);| console.log(\\\"DBG\\\", stalePoint, await evaluate(\\`(() => { const e = document.elementFromPoint(\\${stalePoint.x}, \\${stalePoint.y}); return e.tagN": {
+   "count": 1,
+   "ms": 61937,
+   "maxMs": 61937,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A6 \"^ok|AssertionError|Error:\" | head -8": {
+   "count": 2,
+   "ms": 101500,
+   "maxMs": 61645,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"DBG|^ok\" | head": {
+   "count": 1,
+   "ms": 63326,
+   "maxMs": 63326,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/box-shadow: 0 1px 4px #0003; pointer-events: auto; }/box-shadow: 0 1px 4px #0003; }/\" extensions/plan3-web/styles.css && rg -n \"^\\.notice\" extensions/plan3-web/styles.css && node s": {
+   "count": 1,
+   "ms": 40262,
+   "maxMs": 40262,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"assistant_2\\] .row-full\" -B4 scripts/test-work-plan3-browser.mjs | head -12; node scripts/test-work-plan3-browser.mjs 2>&1 | rg -i \"message|stderr|covered|intercept|not visible\" | hea": {
+   "count": 1,
+   "ms": 39842,
+   "maxMs": 39842,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A6 \"^ok|AssertionError|\\\"error\\\"\" | head -8": {
+   "count": 1,
+   "ms": 39705,
+   "maxMs": 39705,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|dataset.revision === \\\\\\\\\\\"3\\\\\\\\\\\"\\\"); await browser(\\\"mouse\\\", \\\"move\\\", \\\"2\\\", \\\"2\\\");|dataset.revision === \\\\\\\\\\\"3\\\\\\\\\\\"\\\"); await browser(\\\"mouse\\\", \\\"move\\\", \\\"2\\\", \\\"2\\\"); aw": {
+   "count": 1,
+   "ms": 39845,
+   "maxMs": 39845,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"221s|await browser(\\\"mouse\\\", \\\"move\\\", \\\"2\\\", \\\"2\\\"); await browser(\\\"press\\\", \\\"Escape\\\");|await browser(\\\"mouse\\\", \\\"move\\\", \\\"2\\\", \\\"2\\\"); await browser(\\\"focus\\\", \\\"#zoom-fit\\\")": {
+   "count": 1,
+   "ms": 40124,
+   "maxMs": 40124,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"221s| await browser(\\\"mouse\\\", \\\"move\\\", \\\"2\\\", \\\"2\\\"); await browser(\\\"focus\\\", \\\"#zoom-fit\\\"); await browser(\\\"press\\\", \\\"Escape\\\");||\" scripts/test-work-plan3-browser.mjs && sed -": {
+   "count": 1,
+   "ms": 47490,
+   "maxMs": 47490,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A12 \"^ok|AssertionError|\\\"error\\\"\" | head -16": {
+   "count": 1,
+   "ms": 30967,
+   "maxMs": 30967,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"95s|assert.deepEqual(\\[await width(\\\"left-panel\\\"), await width(\\\"chat\\\")\\], \\[640, 628\\]);|assert.deepEqual([await width(\\\"left-panel\\\"), await width(\\\"chat\\\")], [640, await width(\\": {
+   "count": 1,
+   "ms": 31011,
+   "maxMs": 31011,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"102s|assert(await width(\\\"chat\\\") > 1200, \\\"collapsed: chat takes the width\\\");|assert(await width(\\\"chat\\\") > await width(\\\"workspace\\\") - 60, \\\"collapsed: chat takes the width\\\");|": {
+   "count": 1,
+   "ms": 31587,
+   "maxMs": 31587,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|^ body.has-switcher { padding-left: 0; }| body.has-switcher, body.has-switcher.switcher-open { padding-left: 0; }|\" extensions/plan3-web/styles.css && rg -n \"has-switcher\" extensio": {
+   "count": 1,
+   "ms": 33275,
+   "maxMs": 33275,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A10 \"^ok|AssertionError|\\\"error\\\"\" | head -12; done": {
+   "count": 1,
+   "ms": 66328,
+   "maxMs": 66328,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"236s|await browser(\\\"mouse\\\", \\\"move\\\", \\\"8\\\", String(commentCanvasTop + 8));|await browser(\\\"mouse\\\", \\\"move\\\", String(canvasLeft + 8), String(commentCanvasTop + 8));|\" scripts/test": {
+   "count": 1,
+   "ms": 39153,
+   "maxMs": 39153,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"399s|^ assert(|console.log(\\\"DBG\\\", await evaluate(\\\"JSON.stringify([document.getElementById('switcher').dataset.open, document.querySelector('.session-label').textContent, document.": {
+   "count": 1,
+   "ms": 39053,
+   "maxMs": 39053,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"/^console.log(\\\"DBG\\\"/d\" scripts/test-work-plan3-browser.mjs && sed -i \"s|document.querySelector('.session-label').getBoundingClientRect().width > 100 \\&\\& document.querySelector('.s": {
+   "count": 1,
+   "ms": 39989,
+   "maxMs": 39989,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | tail -1; node scripts/test-work-plan3-types.mjs 2>&1 | tail -1; node scripts/test-work-plan3.mjs 2>&1 | tail -1; git add extensions/plan3.ts exten": {
+   "count": 1,
+   "ms": 12905,
+   "maxMs": 12905,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"768,777p\" scripts/test-work-plan3.mjs | cut -c1-250; git show HEAD~1:extensions/plan3.ts > \"$TEMP/plan3-prev.ts\"; cp extensions/plan3.ts \"$TEMP/plan3-now.ts\"; cp \"$TEMP/plan3-prev.ts": {
+   "count": 1,
+   "ms": 1716,
+   "maxMs": 1716,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^const pin = () => { const list = \\$(\\\"messages\\\"); if (stick)/const pinChat = () => { const list = \\$(\\\"messages\\\"); if (stick)/; s/^new ResizeObserver(pin).observe(\\$(\\\"messages\\": {
+   "count": 1,
+   "ms": 4839,
+   "maxMs": 4839,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A10 \"^ok|AssertionError|\\\"error\\\"\" | head -12": {
+   "count": 1,
+   "ms": 35927,
+   "maxMs": 35927,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A6 \"^ok|AssertionError|\\\"error\\\"\" | head -4; done": {
+   "count": 1,
+   "ms": 106786,
+   "maxMs": 106786,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -B3 -A6 \"^ok|AssertionError|\\\"error\\\"\" | head -10; done": {
+   "count": 1,
+   "ms": 95811,
+   "maxMs": 95811,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp extensions/plan3-web/app.ts \"$TEMP/app-now.ts\" && sed -i \"s/^new ResizeObserver(pinChat).observe(\\$(\\\"messages\\\"));//; s/ const list = \\$(\\\"messages\\\"), follow = stick;/ const list = \\$(\\": {
+   "count": 7,
+   "ms": 716177,
+   "maxMs": 165441,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp extensions/plan3-web/app.ts \"$TEMP/app-now.ts\" && cp scripts/test-work-plan3-browser.mjs \"$TEMP/test-now.mjs\" && sed -i \"s/^new ResizeObserver(pinChat).observe(\\$(\\\"messages\\\"));//; s/ co": {
+   "count": 1,
+   "ms": 48782,
+   "maxMs": 48782,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat extensions/plan3-web/app.ts && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -v ExperimentalWarning | tail -15": {
+   "count": 1,
+   "ms": 71567,
+   "maxMs": 71567,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|await browser(\\\"wait\\\", \\\"--fn\\\", \\\"document.getElementById('activity').offsetHeight === 0\\\");|await browser(\\\"wait\\\", \\\"--fn\\\", \\\"document.querySelectorAll('#activity details').le": {
+   "count": 1,
+   "ms": 68207,
+   "maxMs": 68207,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat extensions/plan3-web/app.ts; for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"^ok|AssertionError|cmd:\" | head -2; done": {
+   "count": 1,
+   "ms": 100339,
+   "maxMs": 100339,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|^ activity = { working: false }; server.publish(\\\"activity\\\", activity); await browser(\\\"wait\\\", \\\"--fn\\\", \\\"document.querySelectorAll('#activity details').length === 0\\\");| activi": {
+   "count": 1,
+   "ms": 99695,
+   "maxMs": 99695,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warnings\" | tail -8 | cut -c1-300": {
+   "count": 1,
+   "ms": 48692,
+   "maxMs": 48692,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1 && git add extensions/plan3-web/app.ts scripts/test-work-plan3-browser.mjs && git commit -qm \"Web chat: stay pinned to the newest output": {
+   "count": 1,
+   "ms": 4602,
+   "maxMs": 4602,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && echo NEW; node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"^ok|AssertionError|cmd:\" | head -1 | cut -c1-200; cp extensions/plan3-web/app.ts \"$TEMP/app-now.ts\" && sed -i \"s/^new ResizeObse": {
+   "count": 2,
+   "ms": 194467,
+   "maxMs": 97474,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && echo NEW; node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"^ok|AssertionError|cmd:\" | head -1 | cut -c1-200; cp extensions/plan3-web/app.ts \"$TEMP/app-now.ts\" && sed -i \"s/if (atBottom(li": {
+   "count": 1,
+   "ms": 96745,
+   "maxMs": 96745,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1 && git add extensions/plan3-web/app.ts scripts/test-work-plan3-browser.mjs && git commit -qm \"Web chat: only scrolling up unpins the cha": {
+   "count": 1,
+   "ms": 4473,
+   "maxMs": 4473,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"scrollHeight|scrollTop\" extensions/plan3-web/app.ts | cut -c1-170 && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 4418,
+   "maxMs": 4418,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3-browser.mjs';const L=fs.readFileSync(f,'utf8').split('\\n'); const a=L.findIndex(l=>l.includes('Sending from a scrolled-up chat')),": {
+   "count": 1,
+   "ms": 33287,
+   "maxMs": 33287,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"142s|document.getElementById('messages').getBoundingClientRect()|document.getElementById('feed').getBoundingClientRect()|\" scripts/test-work-plan3-browser.mjs && for i in 1 2; do nod": {
+   "count": 1,
+   "ms": 97769,
+   "maxMs": 97769,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | tail -1 && git add extensions/plan3-web/app.ts extensions/plan3-web/index.html extensions/plan3-web/styles.css scripts/test-work-plan3-browser.mjs": {
+   "count": 1,
+   "ms": 7526,
+   "maxMs": 7526,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat extensions/plan3-web && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1 && rg -n \"zoom-controls|pin-note|zoom-fit\" scripts/test-work-plan3-browser.mjs | cut -c1-180": {
+   "count": 1,
+   "ms": 4480,
+   "maxMs": 4480,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"^ok|AssertionError|cmd:|at file\" | head -2 | cut -c1-250": {
+   "count": 1,
+   "ms": 31158,
+   "maxMs": 31158,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"stdout:|at file|cmd:\" | head -3 | cut -c1-350; rg -n \"#collapse-left\" scripts/test-work-plan3-browser.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 31426,
+   "maxMs": 31426,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^\\.left-tabs { display: flex; align-items: center; gap: 6px; padding: 6px 12px;/.left-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 6px 12px;/\"": {
+   "count": 1,
+   "ms": 96896,
+   "maxMs": 96896,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1; rg -n \"comment-cancel\" extensions/plan3-web/app.ts | cut -c1-160": {
+   "count": 1,
+   "ms": 4528,
+   "maxMs": 4528,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg \"^ok|AssertionError|stdout:|at file|actual|expected\" | head -4 | cut -c1-300; done": {
+   "count": 1,
+   "ms": 97914,
+   "maxMs": 97914,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"note @\" extensions README.md docs/*.md 2>/dev/null | cut -c1-200 | head; node scripts/test-work-plan3-web.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 6864,
+   "maxMs": 6864,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD:scripts/test-work-plan3.mjs > scripts/_head-plan3.mjs && node scripts/_head-plan3.mjs 2>&1 | rg \"AssertionError|passed|ok|at file\" | head -4; rm scripts/_head-plan3.mjs": {
+   "count": 1,
+   "ms": 1740,
+   "maxMs": 1740,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && HERDR_TAB_ID= node scripts/test-work-plan3.mjs 2>&1 | rg \"AssertionError|passed|^ok|at file\" | head -4": {
+   "count": 1,
+   "ms": 4241,
+   "maxMs": 4241,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && HERDR_TAB_ID= node scripts/test-work-plan3.mjs 2>&1 | rg -A16 \"AssertionError\" | head -24; sed -n \"1215,1222p\" scripts/test-work-plan3.mjs | cut -c1-300": {
+   "count": 1,
+   "ms": 3010,
+   "maxMs": 3010,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"1221s|effort: \\\"low\\\", context: null });|effort: \\\"low\\\", context: null, folder: \\\"web-command-unit\\\", tab: \\\"\\\" });|\" scripts/test-work-plan3.mjs && sed -i \"0,/^import os from \\\"nod": {
+   "count": 1,
+   "ms": 11457,
+   "maxMs": 11457,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"$TEMP/patch-share-test.mjs\" && node scripts/test-work-plan3.mjs 2>&1 | rg -A14 \"AssertionError|passed|Error:\" | head -20": {
+   "count": 1,
+   "ms": 11751,
+   "maxMs": 11751,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -3; rg -n \"usage-menu|usage-line|status-menu|session-letter|aria-current|plan-option\" scripts/test-work-plan3-browser.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 4605,
+   "maxMs": 4605,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"$TEMP/patch-browser.mjs\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A12 \"^ok|AssertionError|stdout:\" | head -16 | cut -c1-300": {
+   "count": 1,
+   "ms": 40636,
+   "maxMs": 40636,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 6996,
+   "maxMs": 6996,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/🧠/💡/g\" extensions/plan3-web/index.html extensions/plan3-web/app.ts scripts/test-work-plan3-browser.mjs && sed -i \"s/^\\.session\\[data-tone=working\\] \\.session-letter { background:": {
+   "count": 1,
+   "ms": 41016,
+   "maxMs": 41016,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node \"$TEMP/patch-links.mjs\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A14 \"^ok|AssertionError|Error\" | head -20 | cut -c1-300": {
+   "count": 1,
+   "ms": 33441,
+   "maxMs": 33441,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|\\\"docs/notes.md\\\"\\], \\\"a .md link opens in the Files tab\\\");|\\\"docs/notes.md\\\"], \\\"a .md link opens in the Files tab\\\");\\n await browser(\\\"click\\\", \\\"#tab-diagram\\\");|\" scripts/tes": {
+   "count": 1,
+   "ms": 40910,
+   "maxMs": 40910,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"962,966p\" extensions/plan3.ts | cut -c1-120; node scripts/test-work-plan3-types.mjs 2>&1 | tail -2; node scripts/test-work-plan3-web.mjs 2>&1 | tail -1; node scripts/test-work-plan3.": {
+   "count": 1,
+   "ms": 26477,
+   "maxMs": 26477,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | rg -v \"^\\s*$\" | head -12 | cut -c1-250": {
+   "count": 1,
+   "ms": 5011,
+   "maxMs": 5011,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"962s/let settings = {};/let settings: any = {};/\" extensions/plan3.ts && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1 && node scripts/test-work-plan3.mjs 2>&1 | rg \"passed|A": {
+   "count": 1,
+   "ms": 15088,
+   "maxMs": 15088,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^let noticeTimer = 0;/let noticeTimer: ReturnType<typeof setTimeout> | undefined;/\" extensions/plan3-web/app.ts && sed -i \"167s|^const splitter = \\$(\\\"splitter\\\"); let resize;|cons": {
+   "count": 1,
+   "ms": 5100,
+   "maxMs": 5100,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'); let w=fs.readFileSync('scripts/test-work-plan3-web.mjs','utf8'); const a='assert.equal(mirror.row(brief.id).blocks[1].result, \\\"Edited\\\", \\\"full row on expa": {
+   "count": 1,
+   "ms": 61761,
+   "maxMs": 61761,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let w=fs.readFileSync('scripts/test-work-plan3-web.mjs','utf8'); w=w.replace('content: \\\"one\\ntwo\\\"','content: \\\"one\\\\\\\\ntwo\\\"').replace('diff, \\\"+one\\n+two\\": {
+   "count": 1,
+   "ms": 61771,
+   "maxMs": 61771,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | rg \"^ok|AssertionError|Error\" | head -3; node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A6 \"^ok|AssertionError\" | cut -c1-200": {
+   "count": 1,
+   "ms": 68053,
+   "maxMs": 68053,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"567s/: resolve(JSON.parse(stdout))));/: (() => { try { resolve(JSON.parse(stdout)); } catch (parseError) { reject(parseError); } })()));/\" scripts/test-work-plan3-web.mjs && node scr": {
+   "count": 1,
+   "ms": 68415,
+   "maxMs": 68415,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A3 \"^ok|AssertionError|Command failed\" | cut -c1-200": {
+   "count": 1,
+   "ms": 59472,
+   "maxMs": 59472,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A2 \"^ok|AssertionError|Command failed\" | cut -c1-260; done": {
+   "count": 1,
+   "ms": 122953,
+   "maxMs": 122953,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp scripts/test-work-plan3-browser.mjs \"$TEMP/b.mjs.bak\" && sed -i \"s|^ await browser(\\\"wait\\\", \\\"#messages \\[data-id=assistant_4\\] .block-tool\\\");| await new Promise(r => setTimeout(r, 1500": {
+   "count": 2,
+   "ms": 182696,
+   "maxMs": 123134,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|^ await browser(\\\"wait\\\", \\\"#messages \\[data-id=assistant_4\\] .block-tool\\\");| await new Promise(r => setTimeout(r, 1500)); console.log(\\\"DBG\\\", JSON.stringify(await evaluate(\\\"[do": {
+   "count": 2,
+   "ms": 68861,
+   "maxMs": 34575,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A1 \"^ok|AssertionError \\[|Command failed\" | cut -c1-200; done; tasklist 2>/dev/null | rg -c -i \"chrome|agent-browser\"": {
+   "count": 1,
+   "ms": 121356,
+   "maxMs": 121356,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash push -q -- extensions/plan3-web.ts extensions/plan3-web/app.ts scripts/test-work-plan3-browser.mjs scripts/test-work-plan3-web.mjs && node scripts/test-work-plan3-browser.mjs 2>&1 ": {
+   "count": 2,
+   "ms": 75382,
+   "maxMs": 40952,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp extensions/plan3-web/app.ts \"$TEMP/app.bak\" && sed -i \"/^queueMicrotask(() => { try { const saved = Number(localStorage.getItem(\\\"plan3-chat-width\\\"))/d\" extensions/plan3-web/app.ts && no": {
+   "count": 1,
+   "ms": 61737,
+   "maxMs": 61737,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/item.open = opened.has(key) || (!known.has(key) \\&\\& block.type === \\\"tool\\\" \\&\\& (block.name === \\\"edit\\\" || block.name === \\\"write\\\")); \\/\\/ file changes start open/item.open = o": {
+   "count": 1,
+   "ms": 34314,
+   "maxMs": 34314,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/if (brief \\&\\& text) noticeTimer = setTimeout(() => showNotice(\\\"\\\"), 1500); }/}/\" extensions/plan3-web/app.ts && git diff extensions/plan3-web/app.ts | rg \"^\\+.*showNotice\\(text\" ": {
+   "count": 1,
+   "ms": 62230,
+   "maxMs": 62230,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|^ await browser(\\\"wait\\\", \\\"#messages \\[data-id=assistant_4\\] .block-tool\\\");| await new Promise(r => setTimeout(r, 1500)); console.log(\\\"DBG\\\", JSON.stringify(await evaluate(\\\"[..": {
+   "count": 1,
+   "ms": 63114,
+   "maxMs": 63114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s| (block.name === \\\"edit\\\" \\|\\| block.name === \\\"write\\\")); // file changes start open item.className| (block.name === \\\"edit\\\" \\|\\| block.name === \\\"write\\\")); item.className|\" ext": {
+   "count": 1,
+   "ms": 40442,
+   "maxMs": 40442,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1 && git add extensions/plan3-web.ts extensions/plan3-web/app.ts scripts/test-work-plan3-browser.mjs scripts/test-work-plan3-web.mjs && gi": {
+   "count": 1,
+   "ms": 4857,
+   "maxMs": 4857,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1": {
+   "count": 2,
+   "ms": 10756,
+   "maxMs": 5703,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3-browser.mjs';let s=fs.readFileSync(f,'utf8'); const a=' await browser(\\\"fill\\\", \\\"#message-input\\\", \\\"\\\");\\n await browser(\\\"click": {
+   "count": 1,
+   "ms": 59663,
+   "maxMs": 59663,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A3 \"^ok|AssertionError \\[|Command failed\" | cut -c1-220": {
+   "count": 1,
+   "ms": 40589,
+   "maxMs": 40589,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3-browser.mjs';let s=fs.readFileSync(f,'utf8'); const a='wo: [{ value: \\\"share\\\", description: \\\"Toggle sharing\\\" }] };';if(!s.inclu": {
+   "count": 1,
+   "ms": 53035,
+   "maxMs": 53035,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm run verify:quiet 2>&1 | tail -15 | cut -c1-300": {
+   "count": 1,
+   "ms": 199000,
+   "maxMs": 199000,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-web.mjs 2>&1 | rg -A10 \"^ok|AssertionError\" | head -14 | cut -c1-250; node scripts/test-work-plan3-types.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 12189,
+   "maxMs": 12189,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs 2>&1 | rg -A12 \"passed|AssertionError\" | head -14 | cut -c1-250; node scripts/test-work-plan3-types.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 10420,
+   "maxMs": 10420,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s#/^Shared local\\\\\\\\. Connected now: nobody\\\\\\\\. This PC: http/#/^Shared (local|public)\\\\\\\\. Connected now: nobody\\\\\\\\. This PC: http/#\" scripts/test-work-plan3.mjs && rg -n \"never s": {
+   "count": 1,
+   "ms": 4164,
+   "maxMs": 4164,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs 2>&1 | rg -A8 \"passed|AssertionError\" | head -10 | cut -c1-250": {
+   "count": 1,
+   "ms": 12823,
+   "maxMs": 12823,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs 2>&1 | rg -A6 \"passed|AssertionError\" | head -8 | cut -c1-200 && git add extensions/plan3.ts && git commit -q -m \"Web / completion lists /reload (Pi's getCom": {
+   "count": 1,
+   "ms": 12819,
+   "maxMs": 12819,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | tail -1; node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A4 \"^ok|AssertionError|Command failed\" | head -6 | cut -c1-250": {
+   "count": 1,
+   "ms": 40064,
+   "maxMs": 40064,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A4 \"^ok|AssertionError|Command failed\" | head -6 | cut -c1-250": {
+   "count": 2,
+   "ms": 89191,
+   "maxMs": 47918,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"/PLAN3_FAR_SHOT/d\" scripts/test-work-plan3-browser.mjs && node scripts/test-work-plan3-browser.mjs 2>&1 | rg -A4 \"^ok|AssertionError|Command failed\" | head -6 | cut -c1-250": {
+   "count": 1,
+   "ms": 59750,
+   "maxMs": 59750,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/plan3-web/diagram.ts extensions/plan3-web/styles.css scripts/test-work-plan3-browser.mjs && git commit -q -m \"Diagram overview: top-level boxes show two lines of summary i": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "P1-01": {
+   "ms": 24544,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
+  },
+  "P1-02": {
+   "ms": 54176,
+   "testMs": 0,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   },
+   "failures": 2
+  },
+  "P1-03": {
+   "ms": 34120,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
+  },
+  "P1-05": {
+   "ms": 67515,
+   "testMs": 0,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   },
+   "failures": 1
+  },
+  "P2-01": {
+   "ms": 80077,
+   "testMs": 1003,
+   "replies": 11,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 11
+   }
+  },
+  "P2-02": {
+   "ms": 131686,
+   "testMs": 20686,
+   "replies": 17,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 17
+   },
+   "failures": 1
+  },
+  "P2-03": {
+   "ms": 56124,
+   "testMs": 10454,
+   "replies": 7,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 7
+   }
+  },
+  "P2-04": {
+   "ms": 118470,
+   "testMs": 20076,
+   "replies": 14,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 14
+   }
+  },
+  "P2-05": {
+   "ms": 117565,
+   "testMs": 286,
+   "replies": 15,
+   "models": {
+    "openai-codex/gpt-6.1-sol:medium": 6,
+    "anthropic/claude-opus-5-5:high": 9
+   },
+   "failures": 1
+  },
+  "P2-06": {
+   "ms": 523416,
+   "testMs": 94042,
+   "replies": 27,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 27
+   }
+  },
+  "P2-07": {
+   "ms": 106830,
+   "testMs": 36488,
+   "replies": 13,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 13
+   },
+   "failures": 1
+  },
+  "P2-09": {
+   "ms": 722886,
+   "testMs": 107311,
+   "replies": 32,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 32
+   },
+   "failures": 1
+  },
+  "P2-10": {
+   "ms": 389168,
+   "testMs": 49390,
+   "replies": 22,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 22
+   },
+   "failures": 1
+  },
+  "P2-11": {
+   "ms": 489918,
+   "testMs": 38741,
+   "replies": 24,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 24
+   },
+   "failures": 1
+  },
+  "P2-08": {
+   "ms": 122232,
+   "testMs": 387,
+   "replies": 14,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 14
+   },
+   "failures": 1
+  },
+  "P3-01": {
+   "ms": 300094,
+   "testMs": 334,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   },
+   "failures": 2
+  },
+  "P3-02": {
+   "ms": 241297,
+   "testMs": 69513,
+   "replies": 14,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 14
+   }
+  },
+  "P3-03": {
+   "ms": 392219,
+   "testMs": 37319,
+   "replies": 23,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 23
+   },
+   "failures": 3
+  },
+  "P3-04": {
+   "ms": 64275,
+   "testMs": 0,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   },
+   "failures": 1
+  },
+  "P3-06": {
+   "ms": 69041,
+   "testMs": 4621,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   },
+   "failures": 1
+  },
+  "P3-07": {
+   "ms": 55615,
+   "testMs": 0,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   }
+  },
+  "P3-05": {
+   "ms": 284729,
+   "testMs": 10801,
+   "replies": 36,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 36
+   }
+  },
+  "P4-01": {
+   "ms": 427573,
+   "testMs": 269689,
+   "replies": 25,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 25
+   },
+   "failures": 2
+  },
+  "P4-02": {
+   "ms": 311947,
+   "testMs": 20927,
+   "replies": 35,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 35
+   },
+   "failures": 1
+  },
+  "P4-03": {
+   "ms": 300052,
+   "testMs": 0,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
+   },
+   "failures": 1
+  },
+  "P4-04": {
+   "ms": 173112,
+   "testMs": 0,
+   "replies": 13,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 13
+   }
+  },
+  "P4-08": {
+   "ms": 186334,
+   "testMs": 548,
+   "replies": 24,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 24
+   },
+   "failures": 2
+  },
+  "P4-05": {
+   "ms": 392496,
+   "testMs": 42288,
+   "replies": 18,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 18
+   },
+   "failures": 1
+  },
+  "P4-07": {
+   "ms": 238071,
+   "testMs": 0,
+   "replies": 14,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 14
+   }
+  },
+  "P4-06": {
+   "ms": 284419,
+   "testMs": 211904,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   }
+  },
+  "P5-01": {
+   "ms": 257318,
+   "testMs": 198046,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 11
+   }
+  },
+  "ARCH-RECONCILE": {
+   "ms": 25296,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
+  },
+  "(none)": {
+   "ms": 736426,
+   "testMs": 326188,
+   "replies": 39,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 39
+   }
+  },
+  "P6-01": {
+   "ms": 9951555,
+   "testMs": 4041912,
+   "replies": 508,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 508
+   },
+   "failures": 9
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-10-14T10:44:20.623Z",
+   "ms": 4653045
+  },
+  {
+   "start": "2026-10-14T12:01:53.680Z",
+   "ms": 2688743
+  },
+  {
+   "start": "2026-10-14T12:46:42.444Z",
+   "ms": 671042
+  },
+  {
+   "start": "2026-10-14T12:57:53.498Z",
+   "ms": 4507
+  },
+  {
+   "start": "2026-10-14T13:02:42.754Z",
+   "ms": 6245
+  },
+  {
+   "start": "2026-10-14T13:03:26.783Z",
+   "ms": 5992
+  },
+  {
+   "start": "2026-10-14T14:17:56.171Z",
+   "ms": 199663
+  },
+  {
+   "start": "2026-10-14T14:21:15.847Z",
+   "ms": 3564
+  },
+  {
+   "start": "2026-10-14T14:31:43.854Z",
+   "ms": 677920
+  },
+  {
+   "start": "2026-10-14T14:43:01.790Z",
+   "ms": 3711
+  },
+  {
+   "start": "2026-10-14T14:56:34.912Z",
+   "ms": 3071635
+  },
+  {
+   "start": "2026-10-14T15:47:46.560Z",
+   "ms": 5996
+  },
+  {
+   "start": "2026-10-14T16:29:22.238Z",
+   "ms": 14223
+  },
+  {
+   "start": "2026-10-14T16:31:00.701Z",
+   "ms": 316757
+  },
+  {
+   "start": "2026-10-14T16:36:17.471Z",
+   "ms": 2314
+  },
+  {
+   "start": "2026-10-14T16:45:53.852Z",
+   "ms": 269055
+  },
+  {
+   "start": "2026-10-14T16:50:22.921Z",
+   "ms": 1495349
+  },
+  {
+   "start": "2026-10-14T17:15:18.283Z",
+   "ms": 3169
+  },
+  {
+   "start": "2026-10-14T17:49:19.596Z",
+   "ms": 3230904
+  },
+  {
+   "start": "2026-10-14T18:43:10.513Z",
+   "ms": 2962
+  },
+  {
+   "start": "2026-10-14T20:14:01.994Z",
+   "ms": 921078
+  },
+  {
+   "start": "2026-10-14T20:29:23.086Z",
+   "ms": 3088
+  },
+  {
+   "start": "2026-10-14T20:40:22.948Z",
+   "ms": 1458674
+  },
+  {
+   "start": "2026-10-14T21:04:41.637Z",
+   "ms": 2522
+  },
+  {
+   "start": "2026-10-14T21:09:21.250Z",
+   "ms": 306331
+  },
+  {
+   "start": "2026-10-14T21:14:27.593Z",
+   "ms": 2930
+  },
+  {
+   "start": "2026-10-14T21:17:42.364Z",
+   "ms": 9911
+  },
+  {
+   "start": "2026-10-14T21:18:03.820Z",
+   "ms": 64387
+  },
+  {
+   "start": "2026-10-14T21:19:08.220Z",
+   "ms": 2178
+  },
+  {
+   "start": "2026-10-14T21:21:02.632Z",
+   "ms": 216548
+  },
+  {
+   "start": "2026-10-14T21:28:02.949Z",
+   "ms": 260688
+  },
+  {
+   "start": "2026-10-14T21:34:04.768Z",
+   "ms": 32224
+  },
+  {
+   "start": "2026-10-14T21:38:28.936Z",
+   "ms": 248550
+  }
+ ],
+ "hints": [
+  {
+   "at": "2026-10-14T18:23:43.800Z",
+   "step": "P6-01",
+   "shape": "cp extensions/plan3-web/app.ts"
+  },
+  {
+   "at": "2026-10-14T20:54:11.196Z",
+   "step": "P6-01",
+   "shape": "for i"
+  }
+ ]
+}

@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-02
-updated: 2026-11-03T09:22:33.122Z
+updated: 2026-11-05T21:00:46.992Z
 reviewed: 2026-11-02
 started: 2026-11-02T17:35:04.527Z
 ---
@@ -205,7 +205,7 @@ What does not: adding an optional field older hubs can safely ignore, new error 
   - note: 2026-11-03 live, Windows hub <-> flexs-macbook-pro: send between belot/1 and the Mac session works (user report). D9 verified: an unlinked ce-workflow session sending to 1~flexs-macbook-pro.local got the 5 s "could not be confirmed" text plus the stand-in's follow-up "linked to 1, not to this session; not forwarded". Still open: ask with reply, unlink, a hub going offline, linked message to a parked session resuming it quietly.
 ### P-ARCH [code] Product architecture
 
-- [x] **ARCH-RECONCILE** Product diagram rev 22: pi_control_hub summary names hub links (hub/src/link.ts, comm 1 over Tailscale /link/); new edge pi_control_hub -> pi_intercom "stand-ins name~hub"
+- [x] **ARCH-RECONCILE** No architecture update: the user had all project diagrams deleted (they were a test); product.diagram.json and the two done-plan diagrams removed with git rm
 
 
 ## Backlog
@@ -246,3 +246,4 @@ Append material changes and their reasons; preserve the original request and set
   - Finding 6, pi-intercom is an optional peer with no hub integration: accepted. Confirmed in `package.json` and by grep (no `IntercomClient` use). Run-time loading and the without-pi-intercom case added to S04.
   - Finding 7, validation lacks remote-security, link-menu and two-hub coverage: accepted. Added C4, a standalone link-menu test, and a two-hub harness; the version-strings check now runs in the harness instead of a unit test alone.
 - 2026-11-02: Added final architecture reconciliation because a product diagram exists.
+- 2026-11-05: Force-finished by the user with unfinished steps: S11.

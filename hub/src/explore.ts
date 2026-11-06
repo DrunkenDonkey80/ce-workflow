@@ -19,7 +19,8 @@ const fail = (status: number, message: string) => Object.assign(new Error(messag
 const unpacked = new Map<string, string>(), folders = new Map<string, string>();
 // A viewed page's live folder: each file served must pass the same check as a chat link for that project and device.
 // One key per open viewer (D3): the real files it served are watched, and a change tells that viewer (notify) to reload.
-type View = { project: string; remote: boolean; owner?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout> };
+// own: a design session's mirror (designPage), confined to its folder instead of the chat-link check (which refuses .pi).
+type View = { project: string; remote: boolean; own?: boolean; owner?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout> };
 const live = new Map<string, View>();
 // Folders, not files, are watched: an atomic save (temp file + rename) or delete-and-recreate replaces the file's inode.
 const watched = new Map<string, { watcher: FSWatcher; keys: Set<string> }>();
@@ -61,12 +62,22 @@ export async function explore(real: string) {
  * A chat-linked file (a validated real path) shown in the Files viewer: its folder served live. An HTML page lists the
  * folder (its relative images, scripts and data load); any other file lists only itself, so a big folder is never walked.
  */
-export async function viewPage(real: string, project: string, remote: boolean, watcher?: { owner: string; notify: (key: string) => void }) {
+export async function viewPage(real: string, project: string, remote: boolean, watcher?: { owner: string; notify: (key: string) => void }, own = false) {
 	const folder = dirname(real), key = randomBytes(16).toString("hex");
-	folders.set(key, folder); live.set(key, { project, remote, ...watcher, served: new Set() });
+	folders.set(key, folder); live.set(key, { project, remote, own, ...watcher, served: new Set() });
 	const files: { path: string; size: number }[] = [];
 	if (/\.html?$/i.test(real)) await walk(folder, "", files, true); else files.push({ path: basename(real), size: (await stat(real)).size });
 	return { key, name: basename(folder), files: files.slice(0, MAX_FILES).sort((a, b) => a.path.localeCompare(b.path)), truncated: files.length > MAX_FILES, open: basename(real) };
+}
+/**
+ * D7: a design session's page, <project>/.pi/designs/<handle>/index.html, only when both really are there (no symlinked
+ * folder or page); viewPage(own) then serves only that folder. Any other .pi file stays refused.
+ */
+export async function designPage(project: string, handle: string) {
+	if (!/^design-\d+$/.test(handle)) return undefined;
+	const base = await realpath(project).catch(() => undefined), dir = base && await realpath(join(base, ".pi", "designs", handle)).catch(() => undefined);
+	const page = dir && await realpath(join(dir, "index.html")).catch(() => undefined);
+	return base && dir && page && relative(base, dir) === join(".pi", "designs", handle) && dirname(page) === dir ? page : undefined;
 }
 /** The viewer closed: its key stops serving and its watches close. */
 export function unview(key: string, owner?: string) {
@@ -124,7 +135,7 @@ export async function sendExplored(pathname: string, download: boolean, origin: 
 	const real = base && rel && await realpath(resolve(base, rel)).catch(() => undefined), rest = real && relative(await realpath(base!), real);
 	const info = rest && !rest.startsWith("..") && !isAbsolute(rest) ? await stat(real!).catch(() => undefined) : undefined;
 	const access = live.get(match[1]);
-	if (!info?.isFile() || access && !await linkedFile(real, access.project, access.remote)) { response.writeHead(404, { "content-type": "text/plain" }); response.end("Not found (the hub restarted? Explore the archive again)."); return true; }
+	if (!info?.isFile() || access && !access.own && !await linkedFile(real, access.project, access.remote)) { response.writeHead(404, { "content-type": "text/plain" }); response.end("Not found (the hub restarted? Explore the archive again)."); return true; }
 	if (access) track(match[1], access, real!);
 	const type = TYPES[extname(real!).toLowerCase()] ?? "text/plain; charset=utf-8"; // unknown: plain text, never sniffed into a page
 	response.writeHead(200, {

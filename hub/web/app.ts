@@ -988,16 +988,24 @@ async function wormhole(path: string, pack: string) {
 async function exploreArchive(path: string) {
  showNotice((ARCHIVE_FILE.test(path) ? "Unpacking " : "Opening ") + path.split(/[\/]/).pop() + "…");
  try {
-  const value = await post("explore", { path });
-  if (!filesView.exploring) {
-   beforeExplore = { left: workspace.dataset.left!, tab: $("files").hidden ? diagramTab : "files", width: splitter.getAttribute("aria-valuenow")!, mobile: workspace.dataset.mobile === "chat" ? "chat" : "files" };
-   history.pushState({ explore: true }, "");
-  }
-  const was = filesView.key; if (was) void post("unview", { key: was }).catch(() => undefined); // the hub stops watching what it showed
-  filesView.explore(value);
-  if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
-  showNotice(value.open ? "" : `${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
+  showExplored(await post("explore", { path }));
  } catch (error) { showNotice(error.message); }
+}
+// S07: a design session opens with its design beside the chat, once it has one (retried with each session list until then).
+let designPreview = false;
+async function showDesign() {
+ designPreview = true;
+ try { showExplored(await post("designpreview", {})); } catch { designPreview = false; }
+}
+function showExplored(value) {
+ if (!filesView.exploring) {
+  beforeExplore = { left: workspace.dataset.left!, tab: $("files").hidden ? diagramTab : "files", width: splitter.getAttribute("aria-valuenow")!, mobile: workspace.dataset.mobile === "chat" ? "chat" : "files" };
+  history.pushState({ explore: true }, "");
+ }
+ const was = filesView.key; if (was) void post("unview", { key: was }).catch(() => undefined); // the hub stops watching what it showed
+ filesView.explore(value);
+ if (phone.matches) setMobile("files"); else { setTab("files"); setLeft("full"); resizeChat(280); }
+ showNotice(value.open ? "" : `${value.name}: ${value.files.length} files` + (value.truncated ? " (first 5000 shown)" : ""));
 }
 // Close (or Back: the browser's, the mouse's) puts the chat back the way it was.
 let beforeExplore: { left: string; tab: string; width: string; mobile: string } | null = null;
@@ -1129,6 +1137,7 @@ async function attach(file: File, input: HTMLTextAreaElement) {
 type SlashItem = { value: string; description: string };
 let slashAt = -1; // where an @session word starts, -1 for a /command
 // Typing "@" and part of folder/name (or the intercom id) lists the other hub sessions; picking one writes its intercom reference.
+let reviewed: Record<string, string> = {}; // catch-up's last reviewed version per package, shown as reviewed/installed
 let slashCommands: Promise<{ pi: { name: string; description: string }[]; wo: SlashItem[]; args?: Record<string, SlashItem[]> }> | undefined, slashPick = 0;
 async function updateSlash() {
  const input = $("message-input") as HTMLTextAreaElement, menu = $("slash-menu"), value = input.value;
@@ -1434,7 +1443,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 // blue waiting for a timer, grey seen idle, dim parked), plus Recents (D18) closed by default. One hub, so links are plain /s/<id>/ pages.
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
-type HubSession = { id: string; name: string; tone: Tone; subtitle?: string; attention?: number; parked?: boolean; plan?: { done: number; total: number }; job?: number; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
+type HubSession = { id: string; name: string; tone: Tone; subtitle?: string; design?: string; picked?: boolean; attention?: number; parked?: boolean; plan?: { done: number; total: number }; job?: number; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
 type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
@@ -1491,7 +1500,7 @@ const sessionUrl = (id: string) => `/s/${id}/` + (token ? "?token=" + encodeURIC
 let sessionsTimer = 0, sessionOrder: string[] = [], ownFolder = "";
 // Tab icon over every shared session: red when any asks something, yellow while any works.
 // The hub's icon (gear → Tab icon, default the first) fills the tab icon, dark on white; a corner dot shows the state (none when idle).
-type Updates = { pi: { current: string; latest: string } | null; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
+type Updates = { pi: { current: string; latest: string } | null; piVersion?: string; packages: string[]; installed?: { source: string; name: string; version: string; update: boolean }[]; checkedAt: number | null; checking: boolean; error?: string };
 type HubSettings = { version?: string; remote?: string; browserExtension?: { version: string; path: string }; seenVersion?: string; updates?: Updates; idleParkMinutes?: number; icon?: string; usageHidden?: string[]; usageProviders?: { id: string; label: string }[]; notify?: { question: boolean; done: boolean }; hostname?: string; uac?: boolean; collapseHours?: number; attentionKey?: string; waiting?: { action: string; why: string[]; busy: string[] } | null };
 let hubSettings: HubSettings = {}, appBadge = 0, attentionList: HubSession[] = [];
 const iconName = () => ICONS[hubSettings.icon ?? ""] ? hubSettings.icon! : Object.keys(ICONS)[0];
@@ -1546,6 +1555,7 @@ async function loadSessions() {
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
   // Looking at it also drops it from the attention key's list.
   const own = groups.flatMap(group => group.sessions).find(session => session.id === sessionId);
+  if (own?.design && !designPreview && !filesView.exploring) void showDesign();
   if (seenNow() && own && (own.tone === "unseen" || own.attention)) { void post("seen", {}).catch(() => {}); delete own.attention; }
   // Questions first, then the newest: a question blocks work, a finished run can wait.
   attentionList = groups.flatMap(group => group.sessions).filter(session => session.attention).sort((a, b) => Number(b.tone === "waiting") - Number(a.tone === "waiting") || b.attention! - a.attention!);
@@ -1632,10 +1642,11 @@ let folds: Record<string, { open?: number; closed?: boolean }> = {};
 try { folds = JSON.parse(localStorage.getItem("hub-folds") ?? "{}"); } catch { /* private mode or bad JSON */ }
 let lastSessions: [Group[], Recent[]] | undefined, filterPick = "";
 const rerenderSessions = () => { if (lastSessions) renderSessions(...lastSessions); };
-function folded(session: HubSession, folder: string, now = Date.now()) {
+function folded(session: HubSession, folder: string, now = Date.now(), designPicked = false) {
  if (session.id === sessionId || session.tone === "working" || session.tone === "waiting") return false;
  const fold = folds[folder], hours = hubSettings.collapseHours ?? 48;
  if (fold?.open && fold.open > now) return false;
+ if (designPicked && session.design && !session.picked) return true; // once a design is picked, the others stay out of the way
  if (fold?.closed) return true;
  return !!hours && (session.tone === "seen" || session.tone === "parked") && !!session.worked && now - session.worked > hours * 3_600_000;
 }
@@ -1698,7 +1709,8 @@ function renderSessions(groups: Group[], recents: Recent[]) {
  try { if (ownFolder) localStorage.setItem("hub-last:" + ownFolder, sessionId); } catch { /* private mode */ }
  const open = $("session-list").querySelector<HTMLDetailsElement>(".session-recents")?.open ?? false;
  const folderBox = (group: Group) => {
-  const shown = group.sessions.filter(session => query ? `${group.label} ${session.name}`.toLowerCase().includes(query) : !folded(session, group.folder, now));
+  const designPicked = group.sessions.some(session => session.picked);
+  const shown = group.sessions.filter(session => query ? `${group.label} ${session.name}`.toLowerCase().includes(query) : !folded(session, group.folder, now, designPicked));
   if (query && !shown.length) return [];
   const hidden = query ? 0 : group.sessions.length - shown.length;
   const head = html("div", { className: "session-group" });
@@ -1771,12 +1783,12 @@ function renderSessions(groups: Group[], recents: Recent[]) {
 }
 function sessionRow(session: HubSession, folder: string, path: string) {
  const row = html("div", { className: "session" }); row.dataset.tone = session.tone; row.dataset.id = session.id; row.toggleAttribute("data-parked", session.parked ?? session.tone === "parked");
- const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}${session.park ? " · " + session.park : ""}` });
+ const link = html("a", { className: "session-link", href: sessionUrl(session.id), title: `${folder} - ${session.name} · ${words[session.tone]}${session.park ? " · " + session.park : ""}${session.design ? " · design " + session.design : ""}` });
 link.addEventListener("click", () => sessionStorage.setItem("focus-chat", "1")); // the next page starts with the chat box focused
  link.draggable = false; // the row drags instead of the browser's link drag
  link.setAttribute("aria-label", `${session.name} in ${folder}, ${words[session.tone]}${session.id === sessionId ? ", this session" : ""}`);
  if (session.id === sessionId) row.setAttribute("aria-current", "page");
- link.append(html("span", { className: "session-letter", textContent: (session.name.trim()[0] ?? "?").toUpperCase() }), html("span", { className: "session-label", textContent: session.name }), html("small", { className: "session-state", textContent: words[session.tone] + (session.park ? " · " + session.park : "") }));
+ link.append(html("span", { className: session.design ? "session-letter session-emoji" : "session-letter", textContent: session.design ? "🎨" : (session.name.trim()[0] ?? "?").toUpperCase() }), html("span", { className: "session-label", textContent: session.name }), html("small", { className: "session-state", textContent: words[session.tone] + (session.park ? " · " + session.park : "") }));
  const more = html("button", { type: "button", className: "session-more", textContent: "⋯", title: "Session actions" });
  more.setAttribute("aria-haspopup", "true"); more.setAttribute("aria-label", `Actions for ${session.name}`);
  more.addEventListener("click", event => { event.stopPropagation(); openSessionMenu(more, session, path); });
@@ -2321,7 +2333,10 @@ $("settings-button").addEventListener("click", () => {
  toggleMenu("settings-button", "settings-menu");
  // Catch up exists only in a session of the ce-workflow checkout itself (/wo lists it there).
  slashCommands ??= get("commands").catch(error => { slashCommands = undefined; throw error; });
- slashCommands.then(list => { $("hub-catchup").hidden = !list.wo.some(item => item.value === "catch-up"); }, () => {});
+ slashCommands.then(async list => {
+  $("hub-catchup").hidden = !list.wo.some(item => item.value === "catch-up");
+  if (!$("hub-catchup").hidden) { try { reviewed = await get("catchup") as Record<string, string>; renderUpdates(); } catch { /* an older hub has no endpoint */ } }
+ }, () => {});
 });
 $("hub-catchup").addEventListener("click", async () => {
  closeMenus(); setDrawer(false);
@@ -2413,10 +2428,14 @@ function renderUpdates() {
  const names = updates ? [...updates.pi ? [`Pi ${updates.pi.current} → ${updates.pi.latest}`] : [], ...updates.installed ? [] : updates.packages] : []; // the extension rows below mark their own updates
  $("update-list").textContent = !updates ? "Not checked by this hub." : updates.checking ? "Checking…" : (names.length ? names.join(", ") : when ? `Last checked ${when}` : "Not checked yet") + (updates.error ? ` · check failed: ${updates.error}` : "");
  // Installed extensions: ⟳ in front when an update is waiting (Update all installs it), red × uninstalls (not ce-workflow: the hub runs from it).
- $("extension-list").replaceChildren(...(updates?.installed ?? []).map(item => {
-  const row = html("div", { className: "extension-row", title: item.source });
-  row.append(html("span", { className: "extension-update", textContent: item.update ? "⟳" : "", title: item.update ? "Update available; Update all installs it" : "" }), html("span", { className: "extension-name", textContent: item.name }), html("span", { className: "extension-version", textContent: item.version }));
-  if (!/ce-workflow/i.test(item.source)) {
+ // Pi first; where catch-up runs, a watched package shows reviewed/installed, highlighted when catch-up has something new to review.
+ const pi = updates?.piVersion ? [{ source: "@earendil-works/pi-coding-agent", name: "Pi", version: updates.piVersion, update: !!updates.pi }] : [];
+ $("extension-list").replaceChildren(...[...pi, ...updates?.installed ?? []].map(item => {
+  const row = html("div", { className: "extension-row", title: item.source }), seen = reviewed[item.source === pi[0]?.source ? item.source : item.name];
+  const version = html("span", { className: "extension-version", textContent: seen ? `${seen}/${item.version}` : item.version, title: seen ? `Catch-up reviewed ${seen}; installed ${item.version}` : "" });
+  version.classList.toggle("extension-unreviewed", !!seen && seen !== item.version);
+  row.append(html("span", { className: "extension-update", textContent: item.update ? "⟳" : "", title: item.update ? "Update available; Update all installs it" : "" }), html("span", { className: "extension-name", textContent: item.name }), version);
+  if (item !== pi[0] && !/ce-workflow/i.test(item.source)) {
    const remove = html("button", { type: "button", className: "extension-remove", textContent: "×", title: `Uninstall ${item.name}` });
    remove.addEventListener("click", async () => {
     if (!await confirmBox(`Uninstall ${item.name}? Pi removes it (pi remove ${item.source}); running sessions keep it until they restart.`)) return;
@@ -2690,7 +2709,7 @@ listen("snapshot", value => {
  for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell();
  void Promise.all([loadDiagram("project"), loadDiagram("plan")]).then(() => {
   // A session with no diagrams opens with the chat expanded; not remembered, so sessions with diagrams keep the reader's layout.
-  if (firstSnapshot && !Object.values(diagrams).some(item => item?.nodes?.length || item?.notes?.length)) { setLeft("collapsed"); remember("plan3-left", leftChoice); }
+  if (firstSnapshot && !filesView.exploring && !Object.values(diagrams).some(item => item?.nodes?.length || item?.notes?.length)) { setLeft("collapsed"); remember("plan3-left", leftChoice); }
   firstSnapshot = false;
  });
 });

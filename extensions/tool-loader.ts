@@ -10,6 +10,7 @@ export const SITUATIONAL_TOOLS = {
 	image_search: "Google Images in the user's browser: contact sheet of results, then save originals",
 	generate_image: "generate or edit a PNG image from a prompt",
 	project_commands: "add/remove/list the user's project command buttons on the hub page",
+	design: "OpenDesign design sessions: start variants, track them, pick one and export it",
 };
 
 export const TOOLS_ENABLE = "tools_enable";

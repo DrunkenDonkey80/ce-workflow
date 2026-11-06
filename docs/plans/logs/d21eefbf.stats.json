@@ -1,0 +1,1656 @@
+{
+ "version": 1,
+ "activeMs": 16312589,
+ "runs": 59,
+ "waitingMs": 5922492,
+ "toolWallMs": 3386437,
+ "compactions": {
+  "count": 10,
+  "ms": 355956
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 823,
+   "thinkingMs": 3617246,
+   "actingMs": 2082448,
+   "input": 2230,
+   "output": 527343,
+   "cacheRead": 100193032,
+   "cacheWrite": 5683866,
+   "cost": 59.013716399999865,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "plan3": {
+   "count": 28,
+   "ms": 6155,
+   "maxMs": 3776,
+   "failures": 0
+  },
+  "bash": {
+   "count": 619,
+   "ms": 2525095,
+   "maxMs": 114104,
+   "failures": 16
+  },
+  "read": {
+   "count": 47,
+   "ms": 340,
+   "maxMs": 57,
+   "failures": 0
+  },
+  "edit": {
+   "count": 96,
+   "ms": 1103,
+   "maxMs": 190,
+   "failures": 3
+  },
+  "write": {
+   "count": 10,
+   "ms": 37,
+   "maxMs": 7,
+   "failures": 0
+  },
+  "intercom": {
+   "count": 21,
+   "ms": 11331,
+   "maxMs": 5008,
+   "failures": 3
+  },
+  "lens_diagnostics": {
+   "count": 15,
+   "ms": 123044,
+   "maxMs": 25161,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 8,
+   "ms": 2,
+   "maxMs": 1,
+   "failures": 3
+  },
+  "plan3_diagram": {
+   "count": 15,
+   "ms": 36,
+   "maxMs": 8,
+   "failures": 2
+  },
+  "browser_fetch": {
+   "count": 10,
+   "ms": 204212,
+   "maxMs": 51601,
+   "failures": 7
+  },
+  "codemode": {
+   "count": 10,
+   "ms": 16435,
+   "maxMs": 8849,
+   "failures": 3
+  },
+  "subagents_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "subagent": {
+   "count": 1,
+   "ms": 509,
+   "maxMs": 509,
+   "failures": 0
+  },
+  "session_dialog": {
+   "count": 2,
+   "ms": 413,
+   "maxMs": 405,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 527,
+   "ms": 1022184,
+   "maxMs": 96267,
+   "failures": 11
+  },
+  "test": {
+   "count": 90,
+   "ms": 1499928,
+   "maxMs": 114104,
+   "failures": 5
+  },
+  "build": {
+   "count": 2,
+   "ms": 2983,
+   "maxMs": 1716,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -20; git diff --stat hub/web/app.ts; cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-intercom\" && ls broker; wc -l broker/*.ts cli.ts index.ts; grep -n \"\\\"version\\\"": {
+   "count": 1,
+   "ms": 1736,
+   "maxMs": 1736,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp\" && (timeout 130 node standin-probe.mjs \"probe~mac\" 120000 > standin-probe.log 2>&1 &); sleep 5; cat standin-probe.log": {
+   "count": 1,
+   "ms": 5120,
+   "maxMs": 5120,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp\" && cat standin-probe.log; sed -i \"s/\\tclient.sendMessageReceipt(/\\tif (process.argv[4] !== \\\"noreceipt\\\") client.sendMessageReceipt(/\" standin-probe.mjs; grep -n ": {
+   "count": 1,
+   "ms": 4171,
+   "maxMs": 4171,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"agentDir\" hub/src/rpc-client.ts | head -3 | cut -c1-200; grep -rn \"from \\\"jiti\\\"\" hub extensions | head -3 | cut -c1-150": {
+   "count": 1,
+   "ms": 20215,
+   "maxMs": 20215,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && timeout 120 node hub/scripts/test-remote.mjs 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 1310,
+   "maxMs": 1310,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (timeout 120 node hub/scripts/test-api.mjs 2>&1 | tail -3) ; (cd hub && timeout 60 node scripts/test-link.mjs 2>&1 | tail -2)": {
+   "count": 1,
+   "ms": 3298,
+   "maxMs": 3298,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 90 node scripts/test-link.mjs 2>&1 | tail -15": {
+   "count": 2,
+   "ms": 5711,
+   "maxMs": 5398,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (timeout 120 node hub/scripts/test-remote.mjs 2>&1 | tail -2); (timeout 120 node hub/scripts/test-api.mjs 2>&1 | tail -1)": {
+   "count": 1,
+   "ms": 3840,
+   "maxMs": 3840,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/src/link.ts hub/src/hub.ts hub/scripts/test-link.mjs \"docs/plans/2026-11-02-inter-hub-intercom-linked-sessions-across-hubs-with-a-separa-d21eefbf-plan3.md\" \"docs/plans/logs/d21ee": {
+   "count": 2,
+   "ms": 430,
+   "maxMs": 233,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (timeout 120 node hub/scripts/test-remote.mjs 2>&1 | tail -1); (timeout 120 node hub/scripts/test-api.mjs 2>&1 | tail -1)": {
+   "count": 1,
+   "ms": 4140,
+   "maxMs": 4140,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (timeout 120 node hub/scripts/test-api.mjs 2>&1 | tail -1); grep -n \"links\\|Hub links\" hub/scripts/test-browser.mjs | head -3; grep -n \"openSessionMenu\\|session-menu\\|Copy intercom id\" hub/s": {
+   "count": 1,
+   "ms": 2937,
+   "maxMs": 2937,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 150 node hub/scripts/test-api.mjs 2>&1 | grep -v \"timer \\|ExperimentalWarning\\|trace-warnings\" | tail -8": {
+   "count": 1,
+   "ms": 3075,
+   "maxMs": 3075,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff hub/web/app.ts > \"$TEMP/app-all.patch\" && node -e \" const fs=require('fs');const p=fs.readFileSync(process.argv[1],'utf8'); const [head,...hunks]=p.split(/^(?=@@ )/m);const keep=hun": {
+   "count": 1,
+   "ms": 1818,
+   "maxMs": 1818,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/architecture/product.diagram.json \"docs/plans/2026-11-02-inter-hub-intercom-linked-sessions-across-hubs-with-a-separa-d21eefbf-plan3.md\" \"docs/plans/logs/d21eefbf.md\" && git com": {
+   "count": 1,
+   "ms": 338,
+   "maxMs": 338,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git config pull.rebase; git fetch -q origin && git log --oneline HEAD..origin/master | cat && git diff --stat HEAD...origin/master | tail -3": {
+   "count": 1,
+   "ms": 810,
+   "maxMs": 810,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --name-only HEAD...origin/master | cat && git pull --autostash --no-edit origin master 2>&1 | tail -4 && git status -sb | head -4 && git log --oneline -3 | cat": {
+   "count": 1,
+   "ms": 1142,
+   "maxMs": 1142,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (cd hub && timeout 90 node scripts/test-link.mjs 2>&1 | tail -1); (timeout 150 node hub/scripts/test-remote.mjs 2>&1 | tail -1); (timeout 150 node hub/scripts/test-api.mjs 2>&1 | tail -1); (": {
+   "count": 1,
+   "ms": 56701,
+   "maxMs": 56701,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 200 node hub/scripts/test-browser.mjs 2>&1 | grep -v ExperimentalWarning | grep -m3 -i \"assert\\|message\\|Error\" | cut -c1-300": {
+   "count": 1,
+   "ms": 51256,
+   "maxMs": 51256,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 150 node hub/scripts/changelog-shot.mjs \".session-menu:not([hidden])\" docs/changelog/0.2.28-hub-links.png \"document.querySelector('.session-row .session-more:not([title^=Star])')?.cl": {
+   "count": 1,
+   "ms": 3236,
+   "maxMs": 3236,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.2.28 --no-git-tag-version 2>&1 | tail -1 && grep -m2 -n \"\\\"version\\\": \\\"0.2.2\" package.json package-lock.json": {
+   "count": 1,
+   "ms": 588,
+   "maxMs": 588,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git add docs/changelog/0.2.28-hub-links.png && git status --short | grep -v \"^??\" && git commit -q -m \"0.2.28: hub links (sessions across hubs over intercom, comm protocol 1); ": {
+   "count": 1,
+   "ms": 2501,
+   "maxMs": 2501,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | head; rg -l \"upload\" --glob \"!node_modules\" --glob \"!docs/**\" -t ts -t js . | head -30": {
+   "count": 1,
+   "ms": 899,
+   "maxMs": 899,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 95363,
+   "maxMs": 95363,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-app-act.mjs 2>&1 | tail -3; node scripts/test-work-browser-fetch.mjs 2>&1 | tail -3; sed -n \"1,15p\" CHANGELOG.md": {
+   "count": 1,
+   "ms": 95887,
+   "maxMs": 95887,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts | rg \"mobile|vm-act|browser-fetch|browser-search\"; for t in scripts/test-work-mobile-act.mjs scripts/test-work-vm-act.mjs scripts/test-work-browser-fetch.mjs scripts/test-work-bro": {
+   "count": 1,
+   "ms": 96267,
+   "maxMs": 96267,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"app.ts|esbuild|tsc\" package.json src/hub.ts | head -5; npx tsc --noEmit -p . 2>&1 | rg \"web/app.ts\" | head; rg -n \"@\\w|slash-option|Alt\\+ArrowDown|ArrowDown.*alt\" scripts/test-bro": {
+   "count": 1,
+   "ms": 3935,
+   "maxMs": 3935,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git stash push -q -- web/app.ts && npx tsc --noEmit -p . 2>&1 | rg \"web/app.ts\"; git stash pop -q && git diff --stat -- web/app.ts": {
+   "count": 1,
+   "ms": 4325,
+   "maxMs": 4325,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"no intercom id|intercom \\\"|Alt\\+|altKey|ArrowDown\" scripts/test-browser.mjs scripts/test-sessions.mjs | head; timeout 300 node scripts/test-browser.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 50464,
+   "maxMs": 50464,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"const own = ownFolder\" web/app.ts; npx tsc --noEmit -p . 2>&1 | rg \"web/app.ts\" | wc -l; timeout 300 node scripts/test-browser.mjs 2>&1 | tail -1 | cut -c1-60": {
+   "count": 1,
+   "ms": 52830,
+   "maxMs": 52830,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"118,121p;1967p;2025p;2027p\" web/app.ts | cut -c1-260; rg -n \"^const state\\b|^let state\\b|^const state:\" web/app.ts | head -3; rg -n \"^function html|^const html\" -A3 web/app.ts | ": {
+   "count": 1,
+   "ms": 373,
+   "maxMs": 373,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in browser-fetch app-act mobile-act vm-act; do node \"scripts/test-work-$t.mjs\" > \"$TEMP/t-$t.log\" 2>&1; echo \"$t exit $?\"; tail -2 \"$TEMP/t-$t.log\" | cut -c1-160; done": {
+   "count": 1,
+   "ms": 97203,
+   "maxMs": 97203,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.2.29 --no-git-tag-version > /dev/null && node -e \"const f='CHANGELOG.md',fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace('## Unreleased\\n\\n','## Unrelease": {
+   "count": 1,
+   "ms": 3041,
+   "maxMs": 3041,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git pull --ff-only 2>&1 | tail -5 && git status -sb | head -1 && git log -1 --format=\"%h %s\"": {
+   "count": 1,
+   "ms": 1878,
+   "maxMs": 1878,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline HEAD..origin/master && git diff --stat HEAD origin/master | tail -5 && git status --short | rg -v \"stats.json|needs.json\" | head; tasklist | rg -i \"mobilecli\"": {
+   "count": 1,
+   "ms": 855,
+   "maxMs": 855,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git ls-tree origin/master node_modules && git show origin/master:node_modules; git log --format=\"%h %an %s\" -1 origin/master -- node_modules; git diff --stat | tail -3": {
+   "count": 1,
+   "ms": 818,
+   "maxMs": 818,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git reset -q --mixed origin/master && git update-index --skip-worktree node_modules && git checkout -- . \":(exclude)node_modules\" && git status -sb | rg -v \"stats.json|needs.json\" && git log": {
+   "count": 1,
+   "ms": 423,
+   "maxMs": 423,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/agents\" 2>/dev/null; ls \"./.pi/agents\" 2>/dev/null; rg -il \"astra\" \"C:/Users/Flex/.pi/agent/settings.json\" \"C:/Users/Flex/.pi/agent/agents\" 2>/dev/null | head; ls \"C:/Users": {
+   "count": 1,
+   "ms": 879,
+   "maxMs": 879,
+   "failures": 0
+  },
+  "bash\u0000rg -n -i \"astra\" \"C:/Users/Flex/.pi/agent/settings.json\" | cut -c1-300; ls -t \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-belot--\" | head -5; cd \"C:/Users/Flex/.pi/agent/sessions\" && rg -l \"\\\"mobi": {
+   "count": 1,
+   "ms": 2687,
+   "maxMs": 2687,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && node \"$TEMP/act-digest.mjs\" \"--C--SOFT-git-belot--/2026-10-26T14-50-49-600Z_01a178b1-537f-7632-82ae-beff19c97134.jsonl\" \"--C--SOFT-git-DomainCheck--/2026-10-14": {
+   "count": 2,
+   "ms": 1008,
+   "maxMs": 552,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"wait\" extensions/mobile-act.ts | rg -v \"await\" | head -20; rg -n \"wait|ocr|OCR\" scripts/test-work-mobile-act.mjs | rg -v \"await \" | head -20": {
+   "count": 1,
+   "ms": 519,
+   "maxMs": 519,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/mobile-act.ts';let s=fs.readFileSync(f,'utf8'); const a=s.indexOf('\\t\\tcase \\\"wait\\\": {\\n'), b=s.indexOf('\\t\\tcase \\\"tap\\\":',a); const body=s.s": {
+   "count": 1,
+   "ms": 609,
+   "maxMs": 609,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-mobile-act.mjs 2>&1 | tail -4": {
+   "count": 1,
+   "ms": 2486,
+   "maxMs": 2486,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warnings\" | tail -15": {
+   "count": 2,
+   "ms": 154130,
+   "maxMs": 106173,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warnings\" | rg -B3 -A8 \"Error|assert\" | head -40": {
+   "count": 1,
+   "ms": 47948,
+   "maxMs": 47948,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|const act = await import(\\\"../extensions/browser-act.ts\\\");\\n|&|\" scripts/test-work-browser-fetch.mjs && sed -i \"s|^\\t\\tconst act = await import(\\\"../extensions/browser-act.ts\\\");$": {
+   "count": 1,
+   "ms": 65527,
+   "maxMs": 65527,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"724s|/ref, or x and y/|/ref, query, or x and y/|\" scripts/test-work-browser-fetch.mjs && node scripts/test-work-browser-fetch.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warnings\" | ": {
+   "count": 1,
+   "ms": 65679,
+   "maxMs": 65679,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"/ref, or x and y/\" scripts/test-work-browser-fetch.mjs | cut -c1-80; sed -i \"s|/ref, or x and y/|/ref, query, or x and y/|\" scripts/test-work-browser-fetch.mjs && node scripts/test-wo": {
+   "count": 1,
+   "ms": 65803,
+   "maxMs": 65803,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"723s|y: 2 }, /not both/\\]|y: 2 }, /not two of them/]|\" scripts/test-work-browser-fetch.mjs && node scripts/test-work-browser-fetch.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warning": {
+   "count": 1,
+   "ms": 65967,
+   "maxMs": 65967,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"724s|/ref and text/|/ref or query, and text/|\" scripts/test-work-browser-fetch.mjs && node scripts/test-work-browser-fetch.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warnings\" | rg ": {
+   "count": 1,
+   "ms": 65449,
+   "maxMs": 65449,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-browser-fetch.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warnings\" | rg -A10 \"Error|ok$\" | head -34": {
+   "count": 1,
+   "ms": 106373,
+   "maxMs": 106373,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 410,
+   "ms": 61043,
+   "maxMs": 314,
+   "failures": 9
+  },
+  "bash\u0000cd \".\" && sed -n \"99,104p\" CHANGELOG.md | cut -c1-120; git diff -U0 CHANGELOG.md | rg \"^@@\"": {
+   "count": 1,
+   "ms": 353,
+   "maxMs": 353,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in browser-fetch app-act mobile-act vm-act tool-loader; do node \"scripts/test-work-$t.mjs\" > \"$TEMP/t-$t.log\" 2>&1; echo \"$t exit $? : $(tail -1 \"$TEMP/t-$t.log\" | cut -c1-80)\"; done; ": {
+   "count": 1,
+   "ms": 108741,
+   "maxMs": 108741,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"225,242p;314,320p\" browser-fetch/extension/control.js; sed -n \"366,400p\" extensions/browser-act.ts; rg -n \"case \\\"snapshot\\\"|action: \\\"snapshot\\\"|settle\" extensions/browser-act.ts | ": {
+   "count": 1,
+   "ms": 331,
+   "maxMs": 331,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function validate\" -A12 extensions/browser-act.ts | cut -c1-200; rg -n \"Changes \\(UNTRUSTED|No visible change|action: \\\"click\\\"\" scripts/test-work-browser-fetch.mjs | head": {
+   "count": 1,
+   "ms": 472,
+   "maxMs": 472,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && ls scripts | rg -i \"app|api|remote|strip\" ; for t in test-api test-remote; do node \"scripts/$t.mjs\" > \"$TEMP/h-$t.log\" 2>&1; echo \"$t exit $? : $(tail -1 \"$TEMP/h-$t.log\" | cut -c1-100)\"": {
+   "count": 1,
+   "ms": 6432,
+   "maxMs": 6432,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git fetch -q origin && git log --oneline HEAD..origin/master && git diff --stat HEAD origin/master | tail -3": {
+   "count": 1,
+   "ms": 838,
+   "maxMs": 838,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat HEAD origin/master && git restore --staged node_modules 2>&1; git update-index --skip-worktree node_modules 2>/dev/null; git stash push -q -m \"act fixes + copy links\" -- CHAN": {
+   "count": 1,
+   "ms": 964,
+   "maxMs": 964,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git update-index --no-skip-worktree node_modules && git pull --ff-only origin master 2>&1 | tail -4; ls -d node_modules && git stash pop 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 790,
+   "maxMs": 790,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash push -q -m \"act fixes + copy links\" -- CHANGELOG.md README.md browser-fetch extensions hub scripts && git rm --cached -q node_modules && git pull --ff-only origin master 2>&1 | tai": {
+   "count": 1,
+   "ms": 1934,
+   "maxMs": 1934,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,45p\" CHANGELOG.md | cut -c1-140": {
+   "count": 1,
+   "ms": 830,
+   "maxMs": 830,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8'); s=s.replace(/<<<<<<< Updated upstream\\n([^]*?)=======\\n([^]*?)>>>>>>> Stashed changes\\n/,(m,up,ours)=>ours+'\\n'": {
+   "count": 1,
+   "ms": 3056,
+   "maxMs": 3056,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (gh issue list --limit 20 2>&1 | head -25); ls -t \"$TEMP\" 2>/dev/null | rg -i \"linux\" | head": {
+   "count": 1,
+   "ms": 37772,
+   "maxMs": 37772,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh issue view 8 --comments; echo =====; gh issue view 7 --comments": {
+   "count": 1,
+   "ms": 1913,
+   "maxMs": 1913,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh issue view 8 --json title,body,comments,author > \"$TEMP/i8.json\" 2>&1; gh issue view 7 --json title,body,comments,author > \"$TEMP/i7.json\" 2>&1; cat \"$TEMP/i8.json\"; echo; echo =====; cat": {
+   "count": 1,
+   "ms": 1151,
+   "maxMs": 1151,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"690,775p\" src/usage.ts; rg -n \"BACKOFF_MS =|POLL_MS =|MAX_BACKOFF\" src/usage.ts | head": {
+   "count": 1,
+   "ms": 865,
+   "maxMs": 865,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"2066,2085p\" web/app.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 326,
+   "maxMs": 326,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-usage.mjs 2>&1 | rg -v \"ExperimentalWarning|trace-warnings\" | tail -12; node scripts/test-usage-providers.mjs 2>&1 | tail -1; node scripts/test-api.mjs 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 4296,
+   "maxMs": 4296,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app/src-tauri\" && (rustup target list --installed 2>&1; cargo --version) | head -5": {
+   "count": 1,
+   "ms": 546,
+   "maxMs": 546,
+   "failures": 0
+  },
+  "bash\u0000wsl.exe -l -q 2>&1 | tr -d \"\\0\" | head -3; wsl.exe -e sh -c \"command -v cargo pkg-config; pkg-config --modversion gtk+-3.0 webkit2gtk-4.1\" 2>&1 | tr -d \"\\0\" | head": {
+   "count": 1,
+   "ms": 609,
+   "maxMs": 609,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | rg -v \"stats.json|needs.json\"; cd hub/app/src-tauri && cargo check -q 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 18266,
+   "maxMs": 18266,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | rg -v \"stats.json|needs.json\"; git diff HEAD --stat; git log -1 --oneline; git fetch -q && git status -sb | head -1; node -p \"require('./package.json').version\"; git ls-": {
+   "count": 1,
+   "ms": 1001,
+   "maxMs": 1001,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version 0.2.34 --no-git-tag-version >/dev/null && node -e \" const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8');s=s.replace('## Unreleased\\n','## 0.2.34 — '+new Date().to": {
+   "count": 1,
+   "ms": 114104,
+   "maxMs": 114104,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs'),f='web/app.ts';let s=fs.readFileSync(f,'utf8');const a=' const button = el(\\\"button\\\", \\\"bar usage-bar\\\"); button.type = \\\"button\\\"; button.disabled = tr": {
+   "count": 1,
+   "ms": 2837,
+   "maxMs": 2837,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git pull --ff-only 2>&1 | tail -5; git log -3 --oneline; git status -sb | head -1": {
+   "count": 1,
+   "ms": 898,
+   "maxMs": 898,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh issue list --limit 10 2>&1 | head": {
+   "count": 1,
+   "ms": 583,
+   "maxMs": 583,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh issue list --state all --limit 12 2>&1 | head -15; git remote -v | head -2": {
+   "count": 1,
+   "ms": 645,
+   "maxMs": 645,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh pr list --state all --limit 5 2>&1; for n in 4 5 6 7 8; do echo \"== #$n\"; gh issue view $n --json comments,closedAt,stateReason -q \"[.stateReason, .closedAt, (.comments|length), (.comment": {
+   "count": 1,
+   "ms": 4390,
+   "maxMs": 4390,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh search issues --owner DrunkenDonkey80 --state open --limit 10 --json repository,number,title,createdAt -q \".[]|[.repository.nameWithOwner,.number,.title,.createdAt]|@tsv\" 2>&1 | head; gh ": {
+   "count": 1,
+   "ms": 2318,
+   "maxMs": 2318,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh api \"/repos/DrunkenDonkey80/ce-workflow/issues/events?per_page=10\" -q \".[]|[.issue.number,.event,.actor.login,.created_at]|@tsv\" 2>&1 | head; gh api /user -q .login": {
+   "count": 1,
+   "ms": 657,
+   "maxMs": 657,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && gh issue view 6 --json comments -q \".comments[-1].body\"": {
+   "count": 1,
+   "ms": 705,
+   "maxMs": 705,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -5 -- extensions/browser-act.ts browser-fetch/extension; git show d92e692 -- browser-fetch/extension/control.js | rg \"^[+-]\" | cut -c1-160 | head -30": {
+   "count": 1,
+   "ms": 386,
+   "maxMs": 386,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"settleMs|function finishPage\" extensions/browser-act.ts | cut -c1-200 | head -12; rg -n \"version\" browser-fetch/extension/manifest.json": {
+   "count": 1,
+   "ms": 429,
+   "maxMs": 429,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; rg -v \"ExperimentalWarning|trace-warnings\" \"$TEMP/tb.log\" | tail -15": {
+   "count": 1,
+   "ms": 41299,
+   "maxMs": 41299,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git stash push -q -- web/prompts.ts scripts/test-browser.mjs && node scripts/test-browser.mjs > \"$TEMP/tb0.log\" 2>&1; echo \"exit $?\"; git stash pop -q; git status --short | rg -v \"stats.": {
+   "count": 1,
+   "ms": 30884,
+   "maxMs": 30884,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -v \"ExperimentalWarning|trace-warnings\" \"$TEMP/tb0.log\" | head -8 | cut -c1-250; node scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit $?\"; rg -n \"test-browser.mjs:\\d+|^Asse": {
+   "count": 1,
+   "ms": 41924,
+   "maxMs": 41924,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git stash push -q -- web/prompts.ts scripts/test-browser.mjs && node scripts/test-browser.mjs > \"$TEMP/tb0.log\" 2>&1; echo \"exit $?\"; git stash pop -q; git status --short web scripts; rg": {
+   "count": 1,
+   "ms": 55399,
+   "maxMs": 55399,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs'),f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!s.includes(a))throw new Error('miss '+a);s=s.replace(a,b)}; const block=": {
+   "count": 1,
+   "ms": 54151,
+   "maxMs": 54151,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent/docs\" && rg -n -i \"stale|after the handler|outlive\" extensions.md | cut -c1-220 | head -15; cd \".\" && rg": {
+   "count": 1,
+   "ms": 353,
+   "maxMs": 353,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/work-models.ts';let s=fs.readFileSync(f,'utf8');const a='\\tpi.on(\\\"session_shutdown\\\", async (_event, ctx) => {\\n';if(!s.includes(a))throw 1; s": {
+   "count": 1,
+   "ms": 315,
+   "maxMs": 315,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff HEAD -- extensions/work-models.ts | rg \"^[+-].*import\" ; git show HEAD:extensions/work-models.ts | sed -n \"64p\" | cut -c1-120; git stash push -q -- extensions/work-models.ts scripts": {
+   "count": 1,
+   "ms": 832,
+   "maxMs": 832,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let u=fs.readFileSync('scripts/test-work-compaction-notifications.mjs','utf8').split('\\n');u[53]='//'+u[53];u[54]='//'+u[54];u[55]='//'+u[55];fs.writeFileSyn": {
+   "count": 1,
+   "ms": 2137,
+   "maxMs": 2137,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log -1 --format=\"%h %s\" | cut -c1-80; wc -l extensions/opendesign*.ts; rg -n \"function discoverWindowsOpenDesign\" -A40 extensions/opendesign-client.ts | cut -c1-200; rg -n \"pnpm tools-de": {
+   "count": 1,
+   "ms": 555,
+   "maxMs": 555,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"344,420p\" extensions/opendesign-client.ts; rg -n \"did not register|OD_DAEMON_URL|tools-dev|cannot reach\" extensions/*.ts | cut -c1-200; wc -l extensions/plan3-design.ts": {
+   "count": 1,
+   "ms": 514,
+   "maxMs": 514,
+   "failures": 0
+  },
+  "bash\u0000cd \"$APPDATA/Open Design\" && ls; ls en; for d in en/*; do ls -la \"$d/Open Design.exe\" 2>/dev/null; cat \"$d/resources/open-design-config.json\" 2>/dev/null; echo; done; ls namespaces; powershell -NoProf": {
+   "count": 1,
+   "ms": 2560,
+   "maxMs": 2560,
+   "failures": 0
+  },
+  "bash\u0000cd \"$APPDATA/Open Design/en/a76f67ff937c9cda/resources/app/prebundled\" && rg -l \"sidecar-\" -g \"*.mjs\" -g \"*.js\" . | head; rg -o -N \".{150}\\\\\\\\\\\\\\\\pipe.{200}\" -g \"*.mjs\" -g \"*.js\" . | head -5 | cut -c1": {
+   "count": 1,
+   "ms": 360,
+   "maxMs": 360,
+   "failures": 0
+  },
+  "bash\u0000cd \"$APPDATA/Open Design/en/a76f67ff937c9cda/resources/app/prebundled\" && rg -o -N \".{0,200}pipe.{0,250}\" packaged-main.mjs | rg -i \"sidecar|ipc\" | head -6 | cut -c1-450; rg -o -N \".{0,250}OD_SIDECAR_": {
+   "count": 1,
+   "ms": 350,
+   "maxMs": 350,
+   "failures": 0
+  },
+  "bash\u0000cd \"$APPDATA/Open Design/en/a76f67ff937c9cda/resources/app/prebundled\" && rg -n \"pipe\" packaged-main.mjs | rg -iv \"pipeline|pipeTo|\\.pipe\\(\" | head -12 | cut -c1-300": {
+   "count": 1,
+   "ms": 414,
+   "maxMs": 414,
+   "failures": 0
+  },
+  "bash\u0000cd \"$APPDATA/Open Design/en/a76f67ff937c9cda/resources/app/prebundled\" && rg -n -F \"pipe\" daemon/chunks/chunk-SFFCHNUA.mjs | head; rg -n \"PIPE|namedPipe|sidecar-\\$|\\\"sidecar\\\"\" packaged-main.mjs | hea": {
+   "count": 1,
+   "ms": 907,
+   "maxMs": 907,
+   "failures": 0
+  },
+  "bash\u0000cd \"$APPDATA/Open Design/en/a76f67ff937c9cda/resources/app/prebundled\" && rg -n -o \".{0,160}-sidecar-.{0,160}\" packaged-main.mjs | head -6 | cut -c1-360; powershell -NoProfile -c \"Get-ChildItem \\\\\\\\.\\": {
+   "count": 1,
+   "ms": 321,
+   "maxMs": 321,
+   "failures": 1
+  },
+  "bash\u0000node -e \"console.log(require('fs').readdirSync('\\\\\\\\\\\\\\\\.\\\\\\\\pipe\\\\\\\\').filter(n=>/open-design/i.test(n)).join('\\n')||'none')\"; curl -s -m 3 http://127.0.0.1:62333/api/health | head -c 200": {
+   "count": 1,
+   "ms": 345,
+   "maxMs": 345,
+   "failures": 0
+  },
+  "bash\u0000node -e \"console.log(require('fs').readdirSync('//./pipe/').filter(n=>/open-design/i.test(n)).join(' ')||'none')\"; curl -s -m 3 http://127.0.0.1:62333/api/health | head -c 200; echo; tasklist | rg -i ": {
+   "count": 1,
+   "ms": 568,
+   "maxMs": 568,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/opendesign-client.ts';let s=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,60));s=s.replace(a,b)": {
+   "count": 1,
+   "ms": 830,
+   "maxMs": 830,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -n \"OD_DESKTOP_LOG|OD_DATA_DIR\" scripts/test-work-opendesign-client.mjs extensions/*.ts | cut -c1-200 | head; node scripts/test-work-opendesign-client.mjs > \"$TEMP/od.log\" 2>&1; echo \"exi": {
+   "count": 1,
+   "ms": 4778,
+   "maxMs": 4778,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-opendesign-client.mjs > \"$TEMP/od.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error.*|test-work-opendesign-client.mjs:\\d+\" -o \"$TEMP/od.log\" | cut -c1-200 | hea": {
+   "count": 1,
+   "ms": 4755,
+   "maxMs": 4755,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/probe.mjs\" <<'EOF' import { createConnection } from \"node:net\"; import fs from \"node:fs\"; const names = fs.readdirSync(\"//./pipe/\").filter(n => n.startsWith(\"open-design\")); for": {
+   "count": 1,
+   "ms": 368,
+   "maxMs": 368,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"plan3-design|reconcileCreatedProject\" scripts/*.mjs; for t in scripts/test-work-opendesign-client.mjs; do node $t > \"$TEMP/t.log\" 2>&1; echo \"$t $?\"; tail -1 \"$TEMP/t.log\"; done": {
+   "count": 1,
+   "ms": 4235,
+   "maxMs": 4235,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-plan3.mjs:\\d+\" -o \"$TEMP/p3.log\" | cut -c1-220 | head -4; tail -1 \"$TEMP/p": {
+   "count": 1,
+   "ms": 14555,
+   "maxMs": 14555,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const r=(s,a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,50));return s.replace(a,b)}; let d=fs.readFileSync('extensions/plan3-design.ts','utf8')": {
+   "count": 1,
+   "ms": 928,
+   "maxMs": 928,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let p=fs.readFileSync('extensions/plan3.ts','utf8');const r=(a,b)=>{if(!p.includes(a))throw new Error('miss '+a.slice(0,60));p=p.replace(a,b)}; const start=p": {
+   "count": 1,
+   "ms": 12756,
+   "maxMs": 12756,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time (node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"exit $?\"); rg -n \"AssertionError.*|Error: .*|test-work-plan3.mjs:\\d+\" -o \"$TEMP/p3.log\" | cut -c1-220 | head -4": {
+   "count": 1,
+   "ms": 19378,
+   "maxMs": 19378,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8');s=s.split('\\\"Confirm recharge / resume\\\"').join('\\\"Recharge done: resume the run\\\"').split('\\": {
+   "count": 1,
+   "ms": 19209,
+   "maxMs": 19209,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const r=(s,a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,60));return s.replace(a,b)}; let d=fs.readFileSync('extensions/plan3-design.ts','utf8')": {
+   "count": 1,
+   "ms": 12656,
+   "maxMs": 12656,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-plan3.mjs:\\d+\" -o \"$TEMP/p3.log\" | cut -c1-220 | head -4; sed -n \"6,8p\" \"$": {
+   "count": 1,
+   "ms": 11414,
+   "maxMs": 11414,
+   "failures": 0
+  },
+  "bash\u0000cd \"$APPDATA/Open Design/en/34a695aa86ef3ff4/resources/app/prebundled/daemon/chunks\" && rg -n -o \".{0,200}OD_PROJECT_ID:.{0,200}\" server-THMNTGHL.mjs | head -4 | cut -c1-420; ls \"$APPDATA/Open Design/": {
+   "count": 1,
+   "ms": 589,
+   "maxMs": 589,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const p=require('./package.json');console.log(JSON.stringify(p.pi,null,1))\" | head -40; rg -n \"PI_SUBAGENT|isSubagentChild|PI_HUB_CHILD|passive\" extensions/index.ts 2>/dev/null | he": {
+   "count": 1,
+   "ms": 327,
+   "maxMs": 327,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff extensions/ask-user/index.ts | rg \"^[+-].*import\" ; git show HEAD:extensions/ask-user/index.ts | sed -n \"42p\" | cut -c1-100": {
+   "count": 1,
+   "ms": 446,
+   "maxMs": 446,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in scripts/test-work-opendesign-client.mjs scripts/test-work-plan3.mjs; do node $t > \"$TEMP/t.log\" 2>&1; echo \"$t exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-[a-z0-9-]+\\.mjs:": {
+   "count": 1,
+   "ms": 12222,
+   "maxMs": 12222,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs > \"$TEMP/t.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-[a-z0-9-]+\\.mjs:\\d+\" -o \"$TEMP/t.log\" | cut -c1-220 | head -3; sed -n \"6,8p": {
+   "count": 2,
+   "ms": 18949,
+   "maxMs": 12279,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-opendesign-client.mjs > \"$TEMP/t.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-[a-z0-9-]+\\.mjs:\\d+\" -o \"$TEMP/t.log\" | cut -c1-220 | head -3; ": {
+   "count": 1,
+   "ms": 656,
+   "maxMs": 656,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-opendesign-client.mjs';let s=fs.readFileSync(f,'utf8');const a='source(\\\"const key = \\\\'sk-ant-api03-\\\" + \\\"A\\\".repeat(90) + \\\"\\\\';\\\", \\": {
+   "count": 1,
+   "ms": 3686,
+   "maxMs": 3686,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let p=fs.readFileSync('extensions/plan3.ts','utf8');const a='reason map; describe only, never send source bodies';if(!p.includes(a))throw 1;p=p.replace(a,'re": {
+   "count": 1,
+   "ms": 335,
+   "maxMs": 335,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs > \"$TEMP/t.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-[a-z0-9-]+\\.mjs:\\d+\" -o \"$TEMP/t.log\" | cut -c1-220 | head -3": {
+   "count": 2,
+   "ms": 18808,
+   "maxMs": 12563,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8');const a='const sentPrompt = localPlanDesign(cwd, visualPlan).lastStart';if(!s.includes(a))thr": {
+   "count": 1,
+   "ms": 11293,
+   "maxMs": 11293,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let p=fs.readFileSync('extensions/plan3.ts','utf8');const r=(a,b)=>{if(!p.includes(a))throw new Error('miss '+a.slice(0,50));p=p.replace(a,b)}; r('\\\"check\\\",": {
+   "count": 1,
+   "ms": 495,
+   "maxMs": 495,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs > \"$TEMP/t.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-[a-z0-9-]+\\.mjs:\\d+\" -o \"$TEMP/t.log\" | cut -c1-220 | head -3; sed -n \"6,9p": {
+   "count": 2,
+   "ms": 19864,
+   "maxMs": 12360,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && OD_STOCK_RUN_ID=x node -e \" const {createJiti}=require('jiti');const j=createJiti(process.cwd()+'/'); Promise.all([j.import('./extensions/plan3.ts'),j.import('./extensions/ask-user/index.ts'": {
+   "count": 1,
+   "ms": 865,
+   "maxMs": 865,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"omits required screen|artifact type|requiredScreenIds\" extensions/work-design.ts extensions/plan3-design.ts | cut -c1-220": {
+   "count": 1,
+   "ms": 375,
+   "maxMs": 375,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"normalizeRemoteFingerprint\\(|handoff\\.variants|\\.variants\\b\" extensions/ hub/ --glob \"!*.test.*\" | rg -v \"^extensions/work-design.ts:(18|19|20)\" | cut -c1-200; rg -n \"\\\"retry\\\"|Retry ": {
+   "count": 1,
+   "ms": 863,
+   "maxMs": 863,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"sendMessage\\(\" extensions/plan3.ts | head -4 | cut -c1-220; rg -n \"name: \\\"plan3_design\\\"\" -A3 extensions/plan3.ts | cut -c1-120; rg -n \"async execute\\(_id, args, signal\" extensions/p": {
+   "count": 1,
+   "ms": 667,
+   "maxMs": 667,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/plan3.ts';let s=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,60));s=s.replace(a,b)}; r('\\tcons": {
+   "count": 1,
+   "ms": 1118,
+   "maxMs": 1118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts | rg \"work-design|opendesign\" ; for t in scripts/test-work-opendesign-client.mjs scripts/test-work-plan3.mjs; do node $t > \"$TEMP/t.log\" 2>&1; echo \"$t exit $?\"; rg -n \"AssertionE": {
+   "count": 1,
+   "ms": 21681,
+   "maxMs": 21681,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,60));s=s.replace(a,b)}; r": {
+   "count": 1,
+   "ms": 32135,
+   "maxMs": 32135,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|} catch { /\\* shortcut: a failed look|} catch (e) { if (process.env.PLAN3_DEBUG_WATCH) console.error(\\\"WATCH\\\", e); /* shortcut: a failed look|\" extensions/plan3.ts && PLAN3_DEBUG_": {
+   "count": 1,
+   "ms": 31226,
+   "maxMs": 31226,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|\\t\\tlet busy = false; const stopAt|\\t\\tif (process.env.PLAN3_DEBUG_WATCH) console.error(\\\"WATCH armed\\\", plan.id);\\n\\t\\tlet busy = false; const stopAt|; s|\\t\\t\\tif (busy) return; b": {
+   "count": 1,
+   "ms": 30619,
+   "maxMs": 30619,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"2135s|clearInterval(designWatch);|clearInterval(designWatch); if (process.env.PLAN3_DEBUG_WATCH) console.error(\\\"WATCH shutdown\\\");|\" extensions/plan3.ts && sed -i \"s|console.error(\\": {
+   "count": 1,
+   "ms": 527,
+   "maxMs": 527,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/plan3.ts';let s=fs.readFileSync(f,'utf8'); const i=s.indexOf('\\t\\tif (process.env.PLAN3_DEBUG_WATCH) console.error(\\\"WATCH armed\\\"');const j=s.": {
+   "count": 1,
+   "ms": 336,
+   "maxMs": 336,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cp extensions/plan3.ts \"$TEMP/plan3.bak\" && node -e \" const fs=require('fs'),f='extensions/plan3.ts';let s=fs.readFileSync(f,'utf8'); s=s.replace('\\t\\t\\tif (busy) return; busy = true;','\\t\\t": {
+   "count": 2,
+   "ms": 43057,
+   "maxMs": 30740,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8');const a='\\tprocess.env.PLAN3_DESIGN_POLL_MS = \\\"20\\\";\\n';if(!s.includes(a))throw 1;s=s.replac": {
+   "count": 1,
+   "ms": 33596,
+   "maxMs": 33596,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8');const a='\\tawait setPeer({ forcedStatus: \\\"succeeded\\\" });\\n\\t{ // Nobody asks';if(!s.include": {
+   "count": 1,
+   "ms": 31123,
+   "maxMs": 31123,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,50));s=s.replace(a,b)}; r": {
+   "count": 1,
+   "ms": 13345,
+   "maxMs": 13345,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"WATCH (tick|err|shutdown)\" extensions/plan3.ts; node scripts/test-work-opendesign-client.mjs 2>&1 | tail -1; node -e \" const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf": {
+   "count": 1,
+   "ms": 3739,
+   "maxMs": 3739,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"list_runs|\\\"get_run\\\"|start_run\\b\" extensions/opendesign-client.ts | head -10 | cut -c1-200; rg -n \"export function renderDesignRevisionPrompt\" -A12 extensions/*.ts | cut -c1-220; rg ": {
+   "count": 1,
+   "ms": 438,
+   "maxMs": 438,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=plan3-cf60d09b-cfe96b98-57b7-4cf0-91f8-2a245f7e7c94; for u in \"/api/runs?projectId=$P\" \"/api/projects/$P/runs\" \"/api/projects/$P/conversations\" \"/api/projects/$P\"; do echo \"== $u\"; curl -s": {
+   "count": 1,
+   "ms": 833,
+   "maxMs": 833,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"tools/list\" extensions/opendesign-client.ts | head -3 | cut -c1-200; ls \"$LOCALAPPDATA/Programs\" 2>/dev/null | rg -i \"open\" ; rg -l \"list_runs|listRuns\" \"$LOCALAPPDATA/Programs/Open D": {
+   "count": 1,
+   "ms": 860,
+   "maxMs": 860,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Programs\" && rg -l \"\\\"get_run\\\"\" -g \"*.mjs\" -g \"*.js\" -g \"*.cjs\" . 2>/dev/null | head -5": {
+   "count": 1,
+   "ms": 2807,
+   "maxMs": 2807,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/plan3.ts';let s=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,60));s=s.replace(a,b)}; r('enum: ": {
+   "count": 1,
+   "ms": 338,
+   "maxMs": 338,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='extensions/plan3-design.ts';let s=fs.readFileSync(f,'utf8');const r=(a,b)=>{if(!s.includes(a))throw new Error('miss '+a.slice(0,60));s=s.replace(a,b)}; r(": {
+   "count": 1,
+   "ms": 360,
+   "maxMs": 360,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-opendesign-client.mjs > \"$TEMP/t.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-[a-z0-9-]+\\.mjs:\\d+\" -o \"$TEMP/t.log\" | cut -c1-250 | head -4; ": {
+   "count": 1,
+   "ms": 4060,
+   "maxMs": 4060,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs > \"$TEMP/t.log\" 2>&1; echo \"exit $?\"; rg -n \"AssertionError.*|Error: .*|test-work-[a-z0-9-]+\\.mjs:\\d+\" -o \"$TEMP/t.log\" | cut -c1-300 | head -4": {
+   "count": 1,
+   "ms": 12650,
+   "maxMs": 12650,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|\\t\\t\\tassert.deepEqual(\\[followed.runId, followed.phase\\], \\[\\\"od-continued\\\", \\\"review\\\"\\], \\\"the newer run is tracked and synced\\\");|\\t\\t\\tassert.deepEqual([followed.runId, follo": {
+   "count": 1,
+   "ms": 10559,
+   "maxMs": 10559,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'),f='scripts/test-work-plan3.mjs';let s=fs.readFileSync(f,'utf8');const a='\\t\\t\\tawait writeFile(settingsFile, JSON.stringify(withDaemon));\\n';if(!s.includes(a": {
+   "count": 1,
+   "ms": 15524,
+   "maxMs": 15524,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/plan3-design.ts extensions/work-design.ts extensions/opendesign-client.ts && rg -n \"^export (async )?function \\w+|^(async )?function \\w+\" extensions/plan3-design.ts | cut -c": {
+   "count": 1,
+   "ms": 708,
+   "maxMs": 708,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Programs/Open Design release-stable-win/resources/app/prebundled/daemon/chunks\" && for r in \"/api/projects/:id/files\\\"\" \"/api/projects/:id/files/*\" \"/api/projects/:id/raw\" \"/api/proj": {
+   "count": 1,
+   "ms": 667,
+   "maxMs": 667,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Programs/Open Design release-stable-win/resources/app/prebundled/daemon/chunks\" && rg -n \"app\\.get\\(/\\^\\\\\\\\/api\\\\\\\\/projects|app\\.(get|use)\\([^\\\"]*projects[^\\\"]*files\" server-H22RVNP": {
+   "count": 1,
+   "ms": 602,
+   "maxMs": 602,
+   "failures": 0
+  },
+  "bash\u0000P=plan3-cf60d09b-cfe96b98-57b7-4cf0-91f8-2a245f7e7c94; C=24112836-fa71-4daa-a49d-b26c9b4cfa7f; curl -s \"http://127.0.0.1:58929/api/projects/$P/conversations/$C/messages\" | node -e \"let s='';process.st": {
+   "count": 1,
+   "ms": 380,
+   "maxMs": 380,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"493,512p;556,625p\" extensions/plan3-design.ts | cut -c1-400": {
+   "count": 1,
+   "ms": 527,
+   "maxMs": 527,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"case \\\"create_project\\\"|case \\\"start_run\\\"|case \\\"write_file\\\"|export function validateOpenDesignToolCall|READ_TOOLS =|WRITE_TOOLS =\" extensions/opendesign-client.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 538,
+   "maxMs": 538,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for r in \"328,333\" \"708,720\" \"755,762\" \"940,965\" \"1232,1240\" \"1525,1535\" \"1625,1632\" \"1663,1710\" \"1798,1830\" \"2125,2145\" \"2160,2180\"; do echo \"=== $r\"; sed -n \"${r}p\" extensions/plan3.ts | c": {
+   "count": 1,
+   "ms": 1494,
+   "maxMs": 1494,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit --allowJs false --skipLibCheck --target es2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --noUnusedLocals extensions/plan3.ts extensions/des": {
+   "count": 1,
+   "ms": 1716,
+   "maxMs": 1716,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npx tsc --noEmit --skipLibCheck --target es2022 --module nodenext --moduleResolution nodenext --allowImportingTsExtensions --noUnusedLocals extensions/plan3.ts extensions/design.ts extension": {
+   "count": 1,
+   "ms": 1267,
+   "maxMs": 1267,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s#import { confined, read, atomic, withPlanDesignLock } from \\\"./plan3-design.ts\\\";#import { confined, read, atomic, withPlanLock } from \\\"./plan3-files.ts\\\";#; s/return withPlanDesi": {
+   "count": 1,
+   "ms": 1371,
+   "maxMs": 1371,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^import { askText, progressBar, showAskDialog, showListDialog } from \\\".\\/ask-user\\/menu.ts\\\";/import { progressBar, showAskDialog, showListDialog } from \\\".\\/ask-user\\/menu.ts\\\";/": {
+   "count": 1,
+   "ms": 548,
+   "maxMs": 548,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s#const { movePlanWithDiagram } = await createJiti(import.meta.url).import(\\\"../extensions/plan3-design.ts\\\");#const { movePlanWithDiagram } = await createJiti(import.meta.url).impor": {
+   "count": 1,
+   "ms": 2603,
+   "maxMs": 2603,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for r in \"95,100\" \"190,200\" \"1040,1065\" \"1233,1250\" \"1455,1500\" \"1537,1541\" \"1622,1626\" \"1785,1800\" \"2430,2445\"; do echo \"=== $r\"; sed -n \"${r}p\" scripts/test-work-plan3.mjs | cut -c1-220; d": {
+   "count": 1,
+   "ms": 321,
+   "maxMs": 321,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"list_runs|listRuns|readOpenDesignApi|^import|daemonUrl\" scripts/test-work-opendesign-client.mjs | cut -c1-200; rg -n \"export async function readOpenDesignApi\" -A 22 extensions/opendes": {
+   "count": 1,
+   "ms": 333,
+   "maxMs": 333,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/fix-client-test.cjs\" <<'EOF' const fs = require(\"fs\"), f = \"scripts/test-work-opendesign-client.mjs\"; let s = fs.readFileSync(f, \"utf8\"); const a = s.indexOf(\"\\t{ // OD's MCP ha": {
+   "count": 1,
+   "ms": 4326,
+   "maxMs": 4326,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (node scripts/test-work-plan3.mjs > \"$TEMP/p.log\" 2>&1; echo \"plan3 exit $?\"; tail -5 \"$TEMP/p.log\" | cut -c1-400) ; (node scripts/test-work-plan3-types.mjs 2>&1 | tail -15 | cut -c1-300); w": {
+   "count": 1,
+   "ms": 9537,
+   "maxMs": 9537,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs 2>&1 | rg \"error TS\" | sed \"s/\\x1b\\[[0-9;]*m//g\" | cut -c1-220": {
+   "count": 1,
+   "ms": 1646,
+   "maxMs": 1646,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-plan3-types.mjs > \"$TEMP/ty.log\" 2>&1; sed \"s/\\x1b\\[[0-9;]*m//g\" \"$TEMP/ty.log\" | rg \"^extensions|^[a-z-]+\\.ts|TS[0-9]+\" | cut -c1-220 | head -30": {
+   "count": 1,
+   "ms": 1734,
+   "maxMs": 1734,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in test-work-design test-work-opendesign-client test-work-plan3 test-work-plan3-diagram; do node \"scripts/$t.mjs\" > \"$TEMP/$t.log\" 2>&1; echo \"$t exit $? : $(tail -1 \"$TEMP/$t.log\" | c": {
+   "count": 1,
+   "ms": 11722,
+   "maxMs": 11722,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-tool-loader.mjs 2>&1 | tail -3 | cut -c1-200; rg -n \"\\\"extensions/\" scripts/test-*.mjs | rg -i \"manifest|pi.extensions\" | head -5 | cut -c1-200": {
+   "count": 1,
+   "ms": 359,
+   "maxMs": 359,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"Sessions\\\"|title: \\\"Sessions|sessions menu|utilityModel|subagentModel|chooseModel\\(\" extensions/work-models.ts | cut -c1-200 | head -30; rg -n \"pending|model\" hub/src/hub.ts | rg -i": {
+   "count": 1,
+   "ms": 577,
+   "maxMs": 577,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"value: \\\"[a-z-]+\\\", label: \\\"[A-Z][^\\\"]*\\\"\" extensions/work-models.ts | cut -c1-170 | head -60; rg -n \"async function chooseModel\" -A 30 extensions/work-models.ts | cut -c1-170 | head": {
+   "count": 1,
+   "ms": 1031,
+   "maxMs": 1031,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"async function modelItems\" -A 30 extensions/work-models.ts | cut -c1-180 | head -40; rg -n \"^const (INHERIT_MODEL|NONE_MODEL|CURRENT_MODEL|SETTINGS_RESET)|function splitLevel\" -A 3 ex": {
+   "count": 1,
+   "ms": 489,
+   "maxMs": 489,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"wo:modes-changed|modes:|\\\"modes\\\"\" extensions hub/src --glob \"*.ts\" | cut -c1-200 | head -20; rg -n \"setModel\\(|setThinkingLevel\\(\" extensions/work-models.ts extensions/plan3.ts | hea": {
+   "count": 1,
+   "ms": 1131,
+   "maxMs": 1131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function webModes|const webModes\" -A 8 extensions/plan3.ts | cut -c1-200; sed -n \"90,100p\" hub/src/api.ts | cut -c1-260; rg -n \"modes\" hub/web/*.ts | cut -c1-200 | head -20": {
+   "count": 1,
+   "ms": 316,
+   "maxMs": 316,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"POST /api/sessions/\\(\\[0-9a-f-\\]\\{36\\}\\)/[a-z-]+\\\"\" hub/src/hub.ts | rg -o \"/\\)/[a-z-]+\" | sort -u | tr \"\\n\" \" \"; echo; rg -n \"/model\\\"|setModel|set_model\" hub/src/*.ts | cut -c1-20": {
+   "count": 1,
+   "ms": 357,
+   "maxMs": 357,
+   "failures": 0
+  },
+  "bash\u0000agent-browser --help 2>&1 | rg -i \"viewport|screenshot|open|session|set |close|full\" | head -25": {
+   "count": 1,
+   "ms": 405,
+   "maxMs": 405,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^export|agent-browser|function .*[Bb]rowser\" extensions/screen-read.ts | cut -c1-200 | head -30": {
+   "count": 1,
+   "ms": 1013,
+   "maxMs": 1013,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import\" extensions/ask-user/menu.ts; rg -n \"\\\"POST /api/sessions/\\(\\[0-9a-f-\\]\\{36\\}\\)/prompt\\\"\" -A 3 hub/src/hub.ts | cut -c1-200; rg -n \"async prompt\\(\" -A 10 hub/src/sessions.ts |": {
+   "count": 1,
+   "ms": 339,
+   "maxMs": 339,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/w2.cjs\" <<'EOF' const fs = require(\"fs\"); const edit = (f, a, b) => { let s = fs.readFileSync(f, \"utf8\"); if (!s.includes(a)) throw new Error(f + \" missing: \" + a.slice(0, 80));": {
+   "count": 1,
+   "ms": 1385,
+   "maxMs": 1385,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | tail -15 | cut -c1-300": {
+   "count": 3,
+   "ms": 9335,
+   "maxMs": 8714,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/src/cli.ts status --json 2>&1 | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(JSON.stringify((j.sessions||[]).filt": {
+   "count": 1,
+   "ms": 768,
+   "maxMs": 768,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/src/cli.ts status --json > \"$TEMP/hs.json\" 2>&1; node -e \"const j=require(process.argv[1]);console.log(Object.keys(j));const all=JSON.stringify(j);const m=all.match(/d": {
+   "count": 1,
+   "ms": 827,
+   "maxMs": 827,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const j=require(process.argv[1]);const s=j.sessions;console.log(Array.isArray(s)?'arr':typeof s, JSON.stringify(s).slice(0,300)); console.log(JSON.stringify(j).match(/Temp[^\\\"]{0,60": {
+   "count": 1,
+   "ms": 355,
+   "maxMs": 355,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/pi-control-hub\" && node -e \"const j=require('./sessions.json');const list=Array.isArray(j)?j:(j.sessions||Object.values(j));console.log(JSON.stringify(list.filter(x=>/desig": {
+   "count": 1,
+   "ms": 324,
+   "maxMs": 324,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const cfg=require('C:/Users/Flex/.pi/agent/pi-control-hub/config.json'), hub=require('C:/Users/Flex/.pi/agent/pi-control-hub/hub.json'); (async()=>{for(const id of ['5e280e5d-76ed-": {
+   "count": 1,
+   "ms": 417,
+   "maxMs": 417,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/redactOpenDesignText(made.text.replace(\\/token=\\\\\\\\w+\\/g, \\\"token=…\\\"), 300)/redactOpenDesignText(made.text, 300)/\" extensions/design.ts && rg -n \"redactOpenDesignText\\(made.text\" ": {
+   "count": 1,
+   "ms": 568,
+   "maxMs": 568,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | tail -8 | cut -c1-300; for t in test-work-plan3 test-work-tool-loader; do node \"scripts/$t.mjs\" > \"$TEMP/$t.log\" 2>&1; echo \"$t exit $?\"; done; ls hu": {
+   "count": 1,
+   "ms": 5372,
+   "maxMs": 5372,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for t in test-api test-hub; do node --no-warnings \"scripts/$t.mjs\" > \"$TEMP/$t.log\" 2>&1; echo \"$t exit $? : $(tail -1 \"$TEMP/$t.log\" | cut -c1-150)\"; done": {
+   "count": 1,
+   "ms": 26739,
+   "maxMs": 26739,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/d2.cjs\" <<'EOF' const fs = require(\"fs\"); let c = fs.readFileSync(\"CHANGELOG.md\", \"utf8\"); const at = c.indexOf(\"- OpenDesign design runs: ce-workflow finds\"); c = c.slice(0, at": {
+   "count": 1,
+   "ms": 448,
+   "maxMs": 448,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && find docs -name \"*.diagram.json\" | xargs -I{} sh -c 'echo \"{} $(wc -c < \"{}\") $(git log --oneline -1 -- \"{}\" | cut -c1-60)\"'; git status --short -- \"*.diagram.json\"": {
+   "count": 1,
+   "ms": 552,
+   "maxMs": 552,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"ARCH-RECONCILE\" extensions/plan3.ts | head -15 | cut -c1-200; rg -n \"product.diagram\" extensions/*.ts | head -10 | cut -c1-200": {
+   "count": 1,
+   "ms": 351,
+   "maxMs": 351,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -ln \"docs/architecture/product.diagram.json|product\\.diagram\" scripts | head": {
+   "count": 1,
+   "ms": 980,
+   "maxMs": 980,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"product\\.diagram|docs/architecture\" scripts/test-work-plan3-diagram.mjs scripts/test-work-plan3.mjs | cut -c1-180 | head": {
+   "count": 1,
+   "ms": 1444,
+   "maxMs": 1444,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"viewer|preview\" web/app.ts | rg -i \"function|watch|reload|iframe\" | head -20 | cut -c1-180; rg -n \"fs.watch|watchFile|chokidar\" src/*.ts | head | cut -c1-160": {
+   "count": 1,
+   "ms": 358,
+   "maxMs": 358,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"\\.md|markdown|text/html|iframe\" web/app.ts | head -20 | cut -c1-170; rg -n \"/api/file|/files/|linked\" src/api.ts | head -10 | cut -c1-170": {
+   "count": 1,
+   "ms": 322,
+   "maxMs": 322,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 988,1010p hub/web/app.ts | cut -c1-220; sed -n 40,60p hub/src/api.ts | cut -c1-200; rg -n \"explore\" hub/src/api.ts | head -8 | cut -c1-180": {
+   "count": 1,
+   "ms": 371,
+   "maxMs": 371,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"export (async )?function|key|serve\" src/explore.ts | head -25 | cut -c1-170; sed -n 260,275p src/hub.ts | cut -c1-200; rg -n \"setStatus|published\" src/host.ts ../extensions/hub-ch": {
+   "count": 1,
+   "ms": 222,
+   "maxMs": 222,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "S01": {
+   "ms": 185540,
+   "testMs": 0,
+   "replies": 23,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 23
+   }
+  },
+  "S02": {
+   "ms": 189783,
+   "testMs": 0,
+   "replies": 25,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 25
+   },
+   "failures": 2
+  },
+  "S04": {
+   "ms": 93172,
+   "testMs": 266,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 11
+   },
+   "failures": 1
+  },
+  "S05": {
+   "ms": 215157,
+   "testMs": 4608,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   }
+  },
+  "S06": {
+   "ms": 167617,
+   "testMs": 4153,
+   "replies": 16,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 16
+   }
+  },
+  "S07": {
+   "ms": 312715,
+   "testMs": 9538,
+   "replies": 23,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 23
+   }
+  },
+  "S08": {
+   "ms": 103621,
+   "testMs": 6012,
+   "replies": 14,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 14
+   }
+  },
+  "S09": {
+   "ms": 42127,
+   "testMs": 0,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   }
+  },
+  "S11": {
+   "ms": 7236862,
+   "testMs": 1475351,
+   "replies": 676,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 676
+   },
+   "failures": 31
+  },
+  "(none)": {
+   "ms": 41529,
+   "testMs": 0,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   }
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-02T17:34:58.991Z",
+   "ms": 1594113
+  },
+  {
+   "start": "2026-11-02T18:01:33.131Z",
+   "ms": 3593
+  },
+  {
+   "start": "2026-11-02T18:03:02.425Z",
+   "ms": 5739
+  },
+  {
+   "start": "2026-11-02T18:03:23.634Z",
+   "ms": 20563
+  },
+  {
+   "start": "2026-11-02T18:03:44.215Z",
+   "ms": 8909
+  },
+  {
+   "start": "2026-11-02T18:07:17.432Z",
+   "ms": 191332
+  },
+  {
+   "start": "2026-11-02T18:10:28.778Z",
+   "ms": 2518
+  },
+  {
+   "start": "2026-11-02T21:43:05.332Z",
+   "ms": 241463
+  },
+  {
+   "start": "2026-11-02T21:48:52.396Z",
+   "ms": 5867
+  },
+  {
+   "start": "2026-11-03T06:32:02.330Z",
+   "ms": 370776
+  },
+  {
+   "start": "2026-11-03T06:38:13.121Z",
+   "ms": 3546
+  },
+  {
+   "start": "2026-11-03T07:12:01.802Z",
+   "ms": 174879
+  },
+  {
+   "start": "2026-11-03T07:14:56.709Z",
+   "ms": 3208
+  },
+  {
+   "start": "2026-11-03T09:16:42.982Z",
+   "ms": 363624
+  },
+  {
+   "start": "2026-11-03T09:22:46.635Z",
+   "ms": 6805
+  },
+  {
+   "start": "2026-11-03T12:14:25.400Z",
+   "ms": 124952
+  },
+  {
+   "start": "2026-11-03T12:16:30.367Z",
+   "ms": 8228
+  },
+  {
+   "start": "2026-11-03T12:16:38.616Z",
+   "ms": 182338
+  },
+  {
+   "start": "2026-11-04T06:34:19.363Z",
+   "ms": 56758
+  },
+  {
+   "start": "2026-11-04T06:35:16.136Z",
+   "ms": 2196
+  },
+  {
+   "start": "2026-11-04T06:35:48.939Z",
+   "ms": 68893
+  },
+  {
+   "start": "2026-11-04T06:40:53.523Z",
+   "ms": 1647984
+  },
+  {
+   "start": "2026-11-04T07:08:21.527Z",
+   "ms": 2860
+  },
+  {
+   "start": "2026-11-04T07:14:35.811Z",
+   "ms": 209747
+  },
+  {
+   "start": "2026-11-04T07:18:05.572Z",
+   "ms": 1960
+  },
+  {
+   "start": "2026-11-04T09:31:44.170Z",
+   "ms": 3415
+  },
+  {
+   "start": "2026-11-04T09:32:34.678Z",
+   "ms": 85854
+  },
+  {
+   "start": "2026-11-04T09:34:00.548Z",
+   "ms": 2855
+  },
+  {
+   "start": "2026-11-04T09:48:07.972Z",
+   "ms": 124817
+  },
+  {
+   "start": "2026-11-04T09:50:12.808Z",
+   "ms": 3715
+  },
+  {
+   "start": "2026-11-04T11:31:56.357Z",
+   "ms": 359534
+  },
+  {
+   "start": "2026-11-04T11:37:55.958Z",
+   "ms": 8095
+  },
+  {
+   "start": "2026-11-04T11:45:18.755Z",
+   "ms": 208239
+  },
+  {
+   "start": "2026-11-04T11:48:47.009Z",
+   "ms": 2487
+  },
+  {
+   "start": "2026-11-04T18:50:49.352Z",
+   "ms": 10014
+  },
+  {
+   "start": "2026-11-04T18:50:59.397Z",
+   "ms": 1929
+  },
+  {
+   "start": "2026-11-05T07:56:59.908Z",
+   "ms": 45134
+  },
+  {
+   "start": "2026-11-05T07:58:41.373Z",
+   "ms": 7747
+  },
+  {
+   "start": "2026-11-05T08:01:35.685Z",
+   "ms": 17978
+  },
+  {
+   "start": "2026-11-05T09:16:20.924Z",
+   "ms": 416914
+  },
+  {
+   "start": "2026-11-05T09:23:17.854Z",
+   "ms": 8869
+  },
+  {
+   "start": "2026-11-05T12:09:16.659Z",
+   "ms": 164048
+  },
+  {
+   "start": "2026-11-05T12:12:00.723Z",
+   "ms": 2599
+  },
+  {
+   "start": "2026-11-05T17:56:05.822Z",
+   "ms": 1045958
+  },
+  {
+   "start": "2026-11-05T18:13:31.815Z",
+   "ms": 2767
+  },
+  {
+   "start": "2026-11-05T18:21:25.792Z",
+   "ms": 703054
+  },
+  {
+   "start": "2026-11-05T18:33:08.865Z",
+   "ms": 2623
+  },
+  {
+   "start": "2026-11-05T18:45:45.071Z",
+   "ms": 377525
+  },
+  {
+   "start": "2026-11-05T18:52:02.616Z",
+   "ms": 2777
+  },
+  {
+   "start": "2026-11-05T18:58:30.561Z",
+   "ms": 1261211
+  },
+  {
+   "start": "2026-11-05T19:19:31.793Z",
+   "ms": 3695
+  },
+  {
+   "start": "2026-11-05T19:25:58.690Z",
+   "ms": 66146
+  },
+  {
+   "start": "2026-11-05T19:27:20.910Z",
+   "ms": 5377663
+  },
+  {
+   "start": "2026-11-05T20:56:58.588Z",
+   "ms": 4517
+  },
+  {
+   "start": "2026-11-05T20:58:39.396Z",
+   "ms": 124617
+  },
+  {
+   "start": "2026-11-05T21:00:44.029Z",
+   "ms": 2883
+  },
+  {
+   "start": "2026-11-05T21:09:54.646Z",
+   "ms": 46189
+  },
+  {
+   "start": "2026-11-05T21:19:43.307Z",
+   "ms": 49855
+  },
+  {
+   "start": "2026-11-05T21:36:32.882Z",
+   "ms": 108059
+  }
+ ],
+ "hints": []
+}

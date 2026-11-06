@@ -103,6 +103,7 @@ export class SessionHost extends EventEmitter {
 				live.busyExtra.clear();
 				if (Array.isArray(state?.subagents) && state.subagents.length) live.busyExtra.add("subagents running");
 				if (state?.compacting && !live.compacting) live.busyExtra.add("compacting");
+				if (typeof state?.busy === "string" && state.busy.trim()) live.busyExtra.add(state.busy.trim().slice(0, 80));
 			}
 			if (request.method === "setStatus" && request.statusKey === "pi-hub:subtitle") this.setSubtitle(record.id, parseJson(request.statusText) ?? "");
 			if (request.method === "setStatus" && request.statusKey === "pi-hub:closed") {
@@ -116,17 +117,17 @@ export class SessionHost extends EventEmitter {
 			if (live.lock) releaseLock(live.lock.file, live.lock.info); // only after the child has exited (D9)
 			this.live.delete(record.id);
 			if (this.registry.get(record.id)) this.registry.update(record.id, { state: "parked" });
-			this.emit("exit", record.id, { ...exit, unexpected });
+			this.emit("exit", record.id, { ...exit, unexpected, running: live.running });
 		});
 		this.live.set(record.id, live);
 		rpc.start();
 		return live;
 	}
 
-	/** Start a new session in a folder; Pi chooses the session file and reports it through get_state. */
-	async create(folder: string, name: string): Promise<SessionRecord> {
+	/** Start a new session in a folder; Pi chooses the session file and reports it through get_state. fork: a session file whose history it starts from. */
+	async create(folder: string, name: string, fork?: string): Promise<SessionRecord> {
 		const record = this.registry.add({ name, folder, state: "running" });
-		const live = this.spawn(record, ["--name", record.name]);
+		const live = this.spawn(record, [...fork ? ["--fork", fork] : [], "--name", record.name]);
 		try {
 			const pending = live.rpc.send({ type: "get_state" });
 			live.ready = pending.then(() => {});
@@ -145,6 +146,14 @@ export class SessionHost extends EventEmitter {
 	}
 
 	/** Lock first, then start Pi on the file (D9: Pi loads the file before extensions run). */
+	/** A new session in the same folder whose history is a copy of this one's (Pi --fork); the source is untouched. */
+	fork(id: string, name: string) {
+		const record = this.registry.get(id);
+		if (!record) throw new Error("Unknown session.");
+		if (!record.sessionFile) throw new Error("This session has no file yet.");
+		return this.create(record.folder, name.trim() || `${record.name} copy`, record.sessionFile);
+	}
+
 	async resume(id: string): Promise<SessionRecord> {
 		const record = this.registry.get(id);
 		if (!record) throw new Error("Unknown session.");

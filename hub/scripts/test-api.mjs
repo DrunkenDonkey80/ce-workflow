@@ -116,6 +116,25 @@ try {
 	assert.deepEqual((await post(id, "unview", { key: view1.key })).body, { ok: false }, "already closed");
 	fs.rmSync(path.join(folder, "page.html"));
 
+	// S07 design preview: only the session's own .pi/designs/<handle>/ (handle from its published modes); no path is taken.
+	assert.equal((await post(id, "designpreview", {})).status, 404, "not a design session");
+	const designs = path.join(folder, ".pi", "designs"), mine = path.join(designs, "design-1");
+	fs.mkdirSync(path.join(mine, "css"), { recursive: true }); fs.writeFileSync(path.join(mine, "index.html"), "<link href=css/a.css>"); fs.writeFileSync(path.join(mine, "css", "a.css"), "p{}");
+	fs.writeFileSync(path.join(designs, "sessions.json"), "{}"); fs.writeFileSync(path.join(folder, "secret.txt"), "s");
+	fs.symlinkSync(folder, path.join(mine, "out"), "junction");
+	const preview = async handle => { hub.registry.update(id, { modes: { design: handle } }); return post(id, "designpreview", {}); };
+	const designView = (await preview("design-1")).body;
+	assert.deepEqual([designView.design, designView.open, designView.files.map(file => file.path).filter(file => !file.startsWith("out/"))], [true, "index.html", ["css/a.css", "index.html"]]);
+	const fetchX = async rel => (await fetch(`${origin}/x/${designView.key}/${rel}`)).status;
+	assert.deepEqual([await fetchX("index.html"), await fetchX("css/a.css")], [200, 200], "its page and resources load");
+	assert.deepEqual([await fetchX("..%2Fsessions.json"), await fetchX("out/secret.txt"), await fetchX("out/.pi/designs/sessions.json")], [404, 404, 404], "no escape from the handle folder, by .. or a link out");
+	assert.equal((await preview("design-2")).status, 404, "another handle with no design yet");
+	assert.equal((await preview("../..")).status, 404, "a handle is design-N only");
+	assert.equal((await post(id, "designpreview", { path: "x" })).status, 400, "names no path");
+	assert.equal((await post(id, "explore", { path: ".pi/designs/design-1/index.html" })).status, 404, "other .pi files stay refused for chat links");
+	await post(id, "unview", { key: designView.key }); hub.registry.update(id, { modes: undefined });
+	fs.rmSync(path.join(folder, ".pi"), { recursive: true, force: true }); fs.rmSync(path.join(folder, "secret.txt"));
+
 	// S-11: model and effort picked while parked are kept and set on resume, before the message.
 	assert.equal((await post(id, "model", { provider: "fake", id: "nope" })).status, 404, "parked picks come from the scoped list only");
 	assert.equal((await get(id, "models")).body.default, "fake/fake-2", "the list names Pi's default model");
@@ -323,6 +342,13 @@ try {
 	await hubRoute(`/api/sessions/${id}/subtitle`, { text: "" });
 	assert.equal(await subtitle(), undefined, "empty clears it");
 	assert.equal((await hubRoute(`/api/sessions/${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}/subtitle`, { text: "x" })).error, "Unknown session.");
+
+	// S05: a design session (ce-workflow publishes modes.design) sits last in its folder, whatever its order in the registry.
+	const painted = hub.registry.add({ name: "Bold", folder, sessionFile: path.join(folder, "d.jsonl"), state: "parked" }); hub.registry.update(painted.id, { modes: { design: "design-1" } });
+	const trailing = hub.registry.add({ name: "after", folder, sessionFile: path.join(folder, "a.jsonl"), state: "parked" });
+	const folderRows = (await get(id, "sessions")).body.groups.find(group => group.sessions.some(session => session.id === painted.id)).sessions;
+	assert.deepEqual([folderRows.at(-1).id, folderRows.at(-1).design, folderRows.at(-2).id], [painted.id, "design-1", trailing.id]);
+	hub.registry.remove(painted.id); hub.registry.remove(trailing.id);
 
 	// H5-05 session bar: folder groups with state tones, actions, Recents with Star/Unstar (D18).
 	const tones = async () => Object.fromEntries((await get(id, "sessions")).body.groups.flatMap(group => group.sessions.map(session => [session.name, session.tone])));

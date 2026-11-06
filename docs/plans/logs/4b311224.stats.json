@@ -1,0 +1,1804 @@
+{
+ "version": 1,
+ "activeMs": 21605777,
+ "runs": 109,
+ "waitingMs": 735835,
+ "toolWallMs": 8914254,
+ "compactions": {
+  "count": 22,
+  "ms": 465020
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 1588,
+   "thinkingMs": 7939562,
+   "actingMs": 2423563,
+   "input": 3850,
+   "output": 830475,
+   "cacheRead": 169062919,
+   "cacheWrite": 7732776,
+   "cost": 89.10136379999994,
+   "errors": 2
+  }
+ },
+ "tools": {
+  "read": {
+   "count": 135,
+   "ms": 3497,
+   "maxMs": 266,
+   "failures": 2
+  },
+  "bash": {
+   "count": 1244,
+   "ms": 7553940,
+   "maxMs": 601358,
+   "failures": 53
+  },
+  "codemode": {
+   "count": 9,
+   "ms": 615863,
+   "maxMs": 601538,
+   "failures": 1
+  },
+  "edit": {
+   "count": 134,
+   "ms": 5724,
+   "maxMs": 862,
+   "failures": 10
+  },
+  "plan3": {
+   "count": 9,
+   "ms": 496,
+   "maxMs": 72,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 18,
+   "ms": 143817,
+   "maxMs": 17601,
+   "failures": 0
+  },
+  "plan3_diagram": {
+   "count": 6,
+   "ms": 39,
+   "maxMs": 28,
+   "failures": 0
+  },
+  "intercom": {
+   "count": 4,
+   "ms": 9,
+   "maxMs": 4,
+   "failures": 0
+  },
+  "screen_read": {
+   "count": 17,
+   "ms": 15575,
+   "maxMs": 1924,
+   "failures": 0
+  },
+  "write": {
+   "count": 12,
+   "ms": 74,
+   "maxMs": 23,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 2,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "project_commands": {
+   "count": 1,
+   "ms": 471,
+   "maxMs": 471,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 1067,
+   "ms": 2818959,
+   "maxMs": 86200,
+   "failures": 37
+  },
+  "test": {
+   "count": 167,
+   "ms": 4610149,
+   "maxMs": 601358,
+   "failures": 15
+  },
+  "build": {
+   "count": 10,
+   "ms": 124832,
+   "maxMs": 75493,
+   "failures": 1
+  }
+ },
+ "commands": {
+  "bash\u0000wsl.exe -e sh -c \"printf '#!/bin/sh\\nexec /tmp/whz/root/usr/lib/7zip/7z \\\"\\$@\\\"\\n' > /tmp/whz/bin/7z && chmod +x /tmp/whz/bin/7z && cd /tmp/zt && PATH=/tmp/whz/bin:\\$PATH; 7z l -ba o1.zip; echo ---; 7": {
+   "count": 1,
+   "ms": 60352,
+   "maxMs": 60352,
+   "failures": 1
+  },
+  "bash\u0000wsl.exe -e sh -c \"cd /tmp/zt && export PATH=/tmp/whz/bin:\\$PATH; timeout 10 7z l -ba o1.zip </dev/null; echo rc=\\$?; timeout 10 7z l -ba o2.zip </dev/null; echo rc=\\$?\" 2>&1": {
+   "count": 1,
+   "ms": 20175,
+   "maxMs": 20175,
+   "failures": 0
+  },
+  "bash\u0000wsl.exe -e sh -c \"cd /tmp/zt && timeout 10 /tmp/whz/root/usr/lib/7zip/7z l -ba o1.zip </dev/null; echo rc=\\$?; ls -la /tmp/whz/root/usr/lib/7zip/\" 2>&1": {
+   "count": 1,
+   "ms": 10126,
+   "maxMs": 10126,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-wormhole.mjs 2>&1 | rg \"^. (pass|fail|skipped)|✖|✔|actual|expected\"": {
+   "count": 1,
+   "ms": 1704,
+   "maxMs": 1704,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-wormhole.mjs scripts/test-api.mjs scripts/test-browser.mjs 2>&1 | rg \"^. (tests|pass|fail|skipped)|✖\"": {
+   "count": 1,
+   "ms": 601358,
+   "maxMs": 601358,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && time (node --test scripts/test-api.mjs 2>&1 | rg \"^. (tests|pass|fail)|✖\" | head)": {
+   "count": 1,
+   "ms": 2358,
+   "maxMs": 2358,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && (time timeout 420 node --test scripts/test-browser.mjs) > \"$TEMP/tb.log\" 2>&1; echo exit=$?; tail -40 \"$TEMP/tb.log\"": {
+   "count": 1,
+   "ms": 62924,
+   "maxMs": 62924,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/plans\" && for f in *.md done/*4b311224*.md; do t=$(rg -c \"^\\s*- \\[.\\] \\*\\*\" \"$f\"); d=$(rg -c \"^\\s*- \\[x\\] \\*\\*\" \"$f\"); s=$(rg -m1 \"^status:\" \"$f\"); echo \"$d/$t $s $f\"; done; cat logs/4b3112": {
+   "count": 1,
+   "ms": 3678,
+   "maxMs": 3678,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#remote-group\" \"%TEMP%/remote.png\" \"document.getElementById('settings-button').click(); await new Promise(r=>setTimeout(r,1500));\" --pad=40 2>&1 | tail -": {
+   "count": 1,
+   "ms": 33768,
+   "maxMs": 33768,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rm -rf \"%TEMP%\" && node hub/scripts/changelog-shot.mjs \"#settings-menu\" \"$TEMP/remote.png\" \"document.getElementById('settings-button').click()\" --size=1280x1400 2>&1 | rg -v \"Experimental|tr": {
+   "count": 1,
+   "ms": 31755,
+   "maxMs": 31755,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-browser.mjs 2>&1 | rg \"^. (tests|pass|fail)|✖|Error\" | head": {
+   "count": 1,
+   "ms": 57864,
+   "maxMs": 57864,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const fs=require('fs');for(const f of ['package.json','package-lock.json']){const j=JSON.parse(fs.readFileSync(f,'utf8'));j.version='0.1.75';if(j.packages&&j.packages['']) j.package": {
+   "count": 1,
+   "ms": 31746,
+   "maxMs": 31746,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-changelog.mjs 2>&1 | rg \"^. (tests|pass|fail)|✖\" && cd .. && git add -u && git add docs/changelog/0.1.75-remote-access.png && git commit -q -m \"0.1.75: hub setti": {
+   "count": 1,
+   "ms": 2363,
+   "maxMs": 2363,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --no-warnings -e \"import('./src/platform.ts').then(async m=>{console.log(m.uacPending());await new Promise(r=>setTimeout(r,1500));console.log(m.uacPending(Date.now()+4000))})\" && no": {
+   "count": 1,
+   "ms": 4525,
+   "maxMs": 4525,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-browser.mjs 2>&1 | rg \"^. (tests|pass|fail)|✖\"": {
+   "count": 1,
+   "ms": 62486,
+   "maxMs": 62486,
+   "failures": 0
+  },
+  "bash\u0000export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; rustup target add x86_64-unknown-linux-gnu 2>&1 | tail -2; mkdir -p \"$TEMP/fakepc\" && cat > \"$TEMP/fakepc/pkg-config.cmd\" <<'EOF' @node \"%~dp0pc.js\" %* EOF": {
+   "count": 1,
+   "ms": 3853,
+   "maxMs": 3853,
+   "failures": 0
+  },
+  "bash\u0000export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; cd \"./hub/app/src-tauri\" && PKG_CONFIG=\"$(cygpath -w \"$TEMP/fakepc/pkg-config.cmd\")\" PKG_CONFIG_ALLOW_CROSS=1 CARGO_TARGET_DIR=\"$TEMP/pihub-linux-check\" ca": {
+   "count": 1,
+   "ms": 75493,
+   "maxMs": 75493,
+   "failures": 0
+  },
+  "bash\u0000export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; cd \"./hub/app/src-tauri\" && cargo check 2>&1 | tail -3; git -C \".\" status --short | rg -v \"plans/logs\"": {
+   "count": 1,
+   "ms": 13442,
+   "maxMs": 13442,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -- extensions hub | head -200; ls scripts | rg -i \"catch|work-models|update\" ; ls hub/scripts | rg \"^test-\"": {
+   "count": 1,
+   "ms": 3312,
+   "maxMs": 3312,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in scripts/test-work-plan3.mjs hub/scripts/test-scheduler.mjs hub/scripts/test-sessions.mjs hub/scripts/test-api.mjs hub/scripts/test-platform.mjs hub/scripts/test-browser.mjs; do node": {
+   "count": 1,
+   "ms": 86840,
+   "maxMs": 86840,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node --test hub/scripts/test-changelog.mjs 2>&1 | rg \"^. (pass|fail) \" && git add -u && git commit -q -m \"0.1.76: UAC notice, no git files popup on touch, Linux app strip height, /new keeps ": {
+   "count": 1,
+   "ms": 2916,
+   "maxMs": 2916,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for t in test-browser test-api test-hub; do node --test \"scripts/$t.mjs\" > \"$TEMP/t.log\" 2>&1; echo \"$t exit=$? $(rg \"^. (pass|fail) \" \"$TEMP/t.log\" | tr '\\n' ' ')\"; rg -m8 \"✖|Error|expe": {
+   "count": 1,
+   "ms": 72707,
+   "maxMs": 72707,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"Not a hub session\" scripts/test-hub.mjs src/*.ts | head; git stash -q && node --test scripts/test-hub.mjs 2>&1 | rg \"^. (pass|fail) \"; git stash pop -q && git status --short | rg ": {
+   "count": 1,
+   "ms": 6636,
+   "maxMs": 6636,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#switcher\" \"$TEMP/sw.png\" \"const f=document.getElementById('session-filter'); f.focus(); f.value='ce'; f.dispatchEvent(new Event('input')); await new Pro": {
+   "count": 1,
+   "ms": 32261,
+   "maxMs": 32261,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for t in test-registry test-api test-sessions test-browser; do node --test \"scripts/$t.mjs\" > \"$TEMP/t.log\" 2>&1; echo \"$t exit=$? $(rg \"^. (pass|fail) \" \"$TEMP/t.log\" | tr '\\n' ' ')\"; r": {
+   "count": 1,
+   "ms": 53587,
+   "maxMs": 53587,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short | rg -v \"plans/\"; cd hub && node --test scripts/test-browser.mjs 2>&1 | rg \"^. (pass|fail) |AssertionError\"": {
+   "count": 1,
+   "ms": 50687,
+   "maxMs": 50687,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; rg -n -A12 \"AssertionError\" \"$TEMP/tb.log\" | head -30": {
+   "count": 1,
+   "ms": 50409,
+   "maxMs": 50409,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"s|assert.equal(await evaluate(\\\"document.querySelector('.session-group-label').textContent\\\"), \\\"ce-workflow\\\");|assert.equal(await evaluate(\\\"document.querySelector('.session-gr": {
+   "count": 1,
+   "ms": 57838,
+   "maxMs": 57838,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"body\" \"$TEMP/sw2.png\" \"document.querySelector('.session-group').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true})); await new Pr": {
+   "count": 1,
+   "ms": 33748,
+   "maxMs": 33748,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --test scripts/test-browser.mjs > \"$TEMP/t.log\" 2>&1; echo \"exit=$? $(rg \"^. (pass|fail) \" \"$TEMP/t.log\" | tr '\\n' ' ')\"; rg -m2 -A8 \"AssertionError\" \"$TEMP/t.log\"": {
+   "count": 1,
+   "ms": 58932,
+   "maxMs": 58932,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"piModels\\(\" src/*.ts; for t in test-api test-browser; do node --test \"scripts/$t.mjs\" > \"$TEMP/t.log\" 2>&1; echo \"$t exit=$? $(rg \"^. (pass|fail) \" \"$TEMP/t.log\" | tr '\\n' ' ')\"; ": {
+   "count": 1,
+   "ms": 59694,
+   "maxMs": 59694,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"s|\\\"default-model\\\"|\\\"defaultmodel\\\"|g\" src/api.ts web/app.ts scripts/test-api.mjs && rg -c \"defaultmodel\" src/api.ts web/app.ts scripts/test-api.mjs && for t in test-api test-br": {
+   "count": 1,
+   "ms": 61848,
+   "maxMs": 61848,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"body\" \"$TEMP/m1.png\" \"document.getElementById('model-button').click(); await new Promise(r=>setTimeout(r,800)); const o=document.querySelector('.model-op": {
+   "count": 1,
+   "ms": 32482,
+   "maxMs": 32482,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -u && git commit -q -m \"0.1.77: hub default model crown and right-click Set as default; sidebar fold, filter, archive, drag order, counts; typing keeps sessions awake\" && git push -q": {
+   "count": 1,
+   "ms": 2466,
+   "maxMs": 2466,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app/src-tauri\" && \"$USERPROFILE/.cargo/bin/cargo.exe\" check -q 2>&1 | tail -8; echo exit=$?": {
+   "count": 1,
+   "ms": 5173,
+   "maxMs": 5173,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for t in test-registry test-api test-browser; do node --test \"scripts/$t.mjs\" > \"$TEMP/t.log\" 2>&1; echo \"$t exit=$? $(rg \"^. (pass|fail) \" \"$TEMP/t.log\" | tr '\\n' ' ')\"; rg -m2 -A8 \"Ass": {
+   "count": 1,
+   "ms": 70282,
+   "maxMs": 70282,
+   "failures": 1
+  },
+  "\u0000(other)": {
+   "count": 1025,
+   "ms": 255491,
+   "maxMs": 1558,
+   "failures": 35
+  },
+  "bash\u0000cd \"./hub\" && cat > \"$TEMP/ed.js\" <<'EOF' const fs=require('fs');const ed=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(!s.includes(a))throw new Error(f+': '+a.slice(0,60));fs.writeFileSync(f,s.replace": {
+   "count": 5,
+   "ms": 131439,
+   "maxMs": 69149,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#settings-menu\" \"$TEMP/s1.png\" \"document.getElementById('settings-button')?.click(); await new Promise(r=>setTimeout(r,800)); document.getElementById('at": {
+   "count": 1,
+   "ms": 32771,
+   "maxMs": 32771,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git diff src/api.ts | rg \"^[+-]\" ; node --test \"scripts/test-api.mjs\" > \"$TEMP/t.log\" 2>&1; echo \"exit=$? $(rg \"^. (pass|fail) \" \"$TEMP/t.log\" | tr '\\n' ' ')\"; rg -m1 -A14 \"AssertionErro": {
+   "count": 1,
+   "ms": 2583,
+   "maxMs": 2583,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && for t in test-api test-browser; do node --test \"scripts/$t.mjs\" > \"$TEMP/t.log\" 2>&1; echo \"$t exit=$? $(rg \"^. (pass|fail) \" \"$TEMP/t.log\" | tr '\\n' ' ')\"; rg -m1 -A12 \"AssertionError|E": {
+   "count": 1,
+   "ms": 61360,
+   "maxMs": 61360,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#model-menu\" \"$TEMP/m1.png\" \"document.getElementById('model-button').click(); await new Promise(r=>setTimeout(r,1200)); const b=[...document.querySelecto": {
+   "count": 1,
+   "ms": 32919,
+   "maxMs": 32919,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app/src-tauri\" && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && timeout 1700 npx --yes @tauri-apps/cli@2 build --no-bundle > \"$TEMP/tb.log\" 2>&1; echo exit=$?; tail -5 \"$TEMP/tb.log\"; ls -l": {
+   "count": 1,
+   "ms": 78634,
+   "maxMs": 78634,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Programs/pi-hub-app\" && taskkill //IM pi-hub-app.exe //F > /dev/null 2>&1; sleep 2; cp pi-hub-app.exe pi-hub-app-0.1.6.bak.exe && cp \"./hub/app/src-tauri/target/release/pi-hub-app.ex": {
+   "count": 1,
+   "ms": 8844,
+   "maxMs": 8844,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app/src-tauri\" && export PATH=\"$USERPROFILE/.cargo/bin:$PATH\" && timeout 1700 npx --yes @tauri-apps/cli@2 build --no-bundle > \"$TEMP/tb.log\" 2>&1; echo build=$?; cd \"$LOCALAPPDATA/Programs/p": {
+   "count": 2,
+   "ms": 154127,
+   "maxMs": 86200,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"\\\"test|browser\" package.json | head -5; export PATH=\"$USERPROFILE/.cargo/bin:$PATH\"; (cd app/src-tauri && cargo check -q 2>&1 | tail -5; echo cargo=$?); node scripts/test-browser.": {
+   "count": 1,
+   "ms": 70938,
+   "maxMs": 70938,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-api.mjs';let s=fs.readFileSync(f,'utf8'); const a='setDefault: async (provider, id) => { defaultModel = provider + \\\"/\\\" + id; },';": {
+   "count": 1,
+   "ms": 2648,
+   "maxMs": 2648,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -v \"ExperimentalWarning|trace-warnings\" \"$TEMP/tbr.log\" | tail -15 | cut -c1-600": {
+   "count": 1,
+   "ms": 56467,
+   "maxMs": 56467,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"ce-workflow - 1\" scripts/test-browser.mjs | head -3 | cut -c1-200; node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -v \"ExperimentalWarning|trace-warnings": {
+   "count": 1,
+   "ms": 56035,
+   "maxMs": 56035,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -v \"ExperimentalWarning|trace-warnings\" \"$TEMP/tbr.log\" | rg -n \"cmd:|AssertionError|message|actual|expected|^ok": {
+   "count": 1,
+   "ms": 62378,
+   "maxMs": 62378,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#model-menu\" \"$TEMP/mm1.png\" \"document.getElementById('model-button').click(); await new Promise(r => setTimeout(r, 800));\" --pad=8 2>&1 | rg -v Warn | t": {
+   "count": 1,
+   "ms": 65245,
+   "maxMs": 65245,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"DEFAULT_THINKING_LEVEL\\s*=\" C:/Users/Flex/.pi/agent/install/releases/1.4.0/node_modules/@earendil-works/pi-coding-agent/dist -g \"*.js\" | head -3; cd \".\" && node hub/scripts/changelog-shot.mjs \"": {
+   "count": 1,
+   "ms": 67570,
+   "maxMs": 67570,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='web/app.ts';let s=fs.readFileSync(f,'utf8');const a='(value.default && value.defaultEffort ? \\\" · \\\" + effortName(value.defaultEffort) : \\\"\\\")';": {
+   "count": 1,
+   "ms": 49408,
+   "maxMs": 49408,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?": {
+   "count": 1,
+   "ms": 62752,
+   "maxMs": 62752,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"body\" \"$TEMP/mm3.png\" \"document.getElementById('model-button').click(); await new Promise(r => setTimeout(r, 800)); document.querySelector('[data-role=wo": {
+   "count": 1,
+   "ms": 34632,
+   "maxMs": 34632,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const g='scripts/test-browser.mjs';let t=fs.readFileSync(g,'utf8'); const k='assert.equal(await evaluate(\\\"document.querySelector(\\'.session-group-label\\": {
+   "count": 1,
+   "ms": 58878,
+   "maxMs": 58878,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \"const r=JSON.parse(require('fs').readFileSync(process.env.USERPROFILE+'/.pi/agent/pi-control-hub/sessions.json','utf8'));const l=(r.sessions??r).slice?.(0,4)??Object.values(r).s": {
+   "count": 1,
+   "ms": 3009,
+   "maxMs": 3009,
+   "failures": 0
+  },
+  "bash\u0000rg -l \"does not match a pending ask\" C:/Users/Flex/.pi/agent . -g \"*.ts\" -g \"*.js\" -g \"*.mjs\" 2>/dev/null | head -5": {
+   "count": 1,
+   "ms": 1857,
+   "maxMs": 1857,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const g='scripts/test-browser.mjs';let t=fs.readFileSync(g,'utf8'); const k='[\\\"\\\", \\\"message-input\\\"], \\\"filter cleared, chat focused\\\");';if(t.split(k)": {
+   "count": 1,
+   "ms": 59974,
+   "maxMs": 59974,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -v \"ExperimentalWarning|trace-warnings\" \"$TEMP/tbr.log\" | rg -n \"cmd:|AssertionError|actual|expected\" | head -6 ": {
+   "count": 3,
+   "ms": 190188,
+   "maxMs": 66432,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/mock.js\" <<'EOF' const el = (tag, cls, text) => Object.assign(document.createElement(tag), { className: cls ?? \"\", textContent: text ?? \"\" }); const bar = (name, pct, text, tone": {
+   "count": 1,
+   "ms": 31846,
+   "maxMs": 31846,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');let c=fs.readFileSync('web/styles.css','utf8');const a=' .pool-actions { margin-top: 6px; }\\n .pool-pick { flex-basis: 100%; max-width: none; }';if(!c.in": {
+   "count": 1,
+   "ms": 31814,
+   "maxMs": 31814,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8'); const start=s.indexOf('## Unreleased'),end=s.indexOf('\\n## 0.1.77');let sec=s.slice(start,end); const lines=sec": {
+   "count": 1,
+   "ms": 2558,
+   "maxMs": 2558,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');let h=fs.readFileSync('web/index.html','utf8'); const a=' <div id=\\\"remote-status\\\" class=\\\"update-list\\\"></div>\\n <div class=\\\"settings-actions\\\"><butto": {
+   "count": 1,
+   "ms": 31668,
+   "maxMs": 31668,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#remote-group\" \"$TEMP/r1.png\" \"document.getElementById('settings-menu').hidden=false; document.getElementById('remote-group').hidden=false; document.getE": {
+   "count": 2,
+   "ms": 63375,
+   "maxMs": 31841,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \"#remote-group\" \"$TEMP/r1.png\" \"document.getElementById('settings-button')?.click(); await new Promise(r=>setTimeout(r,500)); document.getElementById('rem": {
+   "count": 1,
+   "ms": 32347,
+   "maxMs": 32347,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s|#remote-copy { flex: none; padding: 2px 10px; font-size: 12px; }|.settings-panel #remote-copy { flex: none; width: auto; padding: 2px 10px; font-size: 12px; border: 1px solid var(-": {
+   "count": 1,
+   "ms": 32229,
+   "maxMs": 32229,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const g='scripts/test-browser.mjs';let t=fs.readFileSync(g,'utf8'); const a='{ id: \\\"codex\\\", label: \\\"Codex\\\", window: \\\"7d\\\", left: 12, color: \\\"error\\": {
+   "count": 1,
+   "ms": 47717,
+   "maxMs": 47717,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -v \"ExperimentalWarning|trace-warnings\" \"$TEMP/tbr.log\" | rg -n \"AssertionError|actual|expected\" | head -6 | cut": {
+   "count": 4,
+   "ms": 216719,
+   "maxMs": 61426,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app/src-tauri\" && \"$USERPROFILE/.cargo/bin/cargo.exe\" check 2>&1 | tail -2; cd ../.. && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -v \"ExperimentalWarning|trac": {
+   "count": 1,
+   "ms": 65145,
+   "maxMs": 65145,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const f='scripts/test-work-compaction-notifications.mjs';let t=fs.readFileSync(f,'utf8'); const a='\\\"a cold cache at 65% compacts first\\\");\\n';if(t.split(a).": {
+   "count": 1,
+   "ms": 13793,
+   "maxMs": 13793,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const g='scripts/test-browser.mjs';let t=fs.readFileSync(g,'utf8'); const a='const resumes = []; const resume = hub.host.resume.bind(hub.host); hub.host.": {
+   "count": 1,
+   "ms": 59684,
+   "maxMs": 59684,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-app-trail.mjs 2>&1 | tail -2 && npm version patch --no-git-tag-version >/dev/null && v=$(node -p \"require('./package.json').version\") && node -e \" const fs=require('fs'": {
+   "count": 1,
+   "ms": 2967,
+   "maxMs": 2967,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs'); let a=fs.readFileSync('src/api.ts','utf8');const x='const typed = typeof data.folder === \\\"string\\\" ? data.folder.trim().replace(/^\\\"(.*)\\\"\\$/, \\\"\\$1\\\")": {
+   "count": 1,
+   "ms": 4013,
+   "maxMs": 4013,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');let a=fs.readFileSync('src/api.ts','utf8');a=a.replace('/^~(\\$|[\\\\\\\\/])/','/^~(\\$|[\\\\\\\\\\\\\\\\/])/');fs.writeFileSync('src/api.ts',a);\" && sed -n 203p src/a": {
+   "count": 1,
+   "ms": 69161,
+   "maxMs": 69161,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 203p hub/src/api.ts && node hub/scripts/test-api.mjs 2>&1 | tail -1 && node -e \" const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8');const a='## Unreleased\\n\\n';if(!s.": {
+   "count": 1,
+   "ms": 2980,
+   "maxMs": 2980,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8');const a=' // H6-03 (D19): a phone asks to pair;';if(s.split(a).length!==2)throw 1; s=s": {
+   "count": 1,
+   "ms": 67438,
+   "maxMs": 67438,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8');const a=' // A sidebar click marks the next page';if(s.split(a).length!==2)throw 1; s=": {
+   "count": 1,
+   "ms": 61315,
+   "maxMs": 61315,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); const a='assert.equal(await evaluate(\\\"document.getElementById(\\'switcher\\').dataset.": {
+   "count": 1,
+   "ms": 61827,
+   "maxMs": 61827,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/changelog-shot.mjs \".load\" \"$TEMP/load-shot.png\" \"document.querySelectorAll('.load').forEach(b => { b.querySelector('polyline').setAttribute('points', '0,10 8,4 16,12 24,6 3": {
+   "count": 1,
+   "ms": 31733,
+   "maxMs": 31733,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');let s=fs.readFileSync('web/styles.css','utf8');const lines=s.split('\\n'); const i=lines.findIndex(l=>l.startsWith('.load span {'));const j=lines.findInde": {
+   "count": 1,
+   "ms": 2170,
+   "maxMs": 2170,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const rep=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(s.split(a).length!==2)throw new Error(f);fs.writeFileSync(f,s.replace(a,b));}; rep('web/app.ts','b": {
+   "count": 1,
+   "ms": 2370,
+   "maxMs": 2370,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|actual|expected\" \"$TEMP/tbr.log\" | head -6 | cut -c1-260": {
+   "count": 2,
+   "ms": 78288,
+   "maxMs": 50413,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');let s=fs.readFileSync('web/app.ts','utf8');const a='session.tone === \\\"scheduled\\\" && session.timers?.some(';if(s.split(a).length!==2)throw 1; s=s.replac": {
+   "count": 1,
+   "ms": 27968,
+   "maxMs": 27968,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const rep=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(s.split(a).length!==2)throw new Error(f+a.slice(0,40));fs.writeFileSync(f,s.replace(a,b));}; rep('hub/": {
+   "count": 1,
+   "ms": 6538,
+   "maxMs": 6538,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');let s=fs.readFileSync('web/app.ts','utf8');const a='\\$(\\\"update-check\\\").addEventListener(\\\"click\\\", async () => {';if(s.split(a).length!==2)throw 1; s=s": {
+   "count": 1,
+   "ms": 50635,
+   "maxMs": 50635,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app\" && node -e \" const fs=require('fs');const rep=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(s.split(a).length!==2)throw new Error(f+a.slice(0,40));fs.writeFileSync(f,s.replace(a,b));}; r": {
+   "count": 1,
+   "ms": 13257,
+   "maxMs": 13257,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && ls scripts | rg \"test-(command|cli|api)\"; node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let t=fs.readFileSync(f,'utf8');const b=' // A parked session whose check ti": {
+   "count": 1,
+   "ms": 6963,
+   "maxMs": 6963,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-commands.mjs 2>&1 | tail -2; (cd .. && node scripts/test-work-hub-command.mjs 2>&1 | tail -2); node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg": {
+   "count": 1,
+   "ms": 53195,
+   "maxMs": 53195,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='../extensions/hub-command.ts';let s=fs.readFileSync(f,'utf8');const a='printed output becomes your next message and ends the timer';if(s.split(a": {
+   "count": 1,
+   "ms": 4827,
+   "maxMs": 4827,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-hub.mjs 2>&1 | rg -n \"Error|actual|expected|at file\" | head -8 | cut -c1-260": {
+   "count": 1,
+   "ms": 3843,
+   "maxMs": 3843,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"s|/got done=NaN total=NaN/|/got done=null total=null/|\" scripts/test-hub.mjs && node scripts/test-hub.mjs 2>&1 | tail -1 && cd .. && node -e \" const fs=require('fs');let s=fs.rea": {
+   "count": 1,
+   "ms": 14596,
+   "maxMs": 14596,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh issue list --limit 5 2>&1 | head;": {
+   "count": 1,
+   "ms": 1809,
+   "maxMs": 1809,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-remote.mjs';let s=fs.readFileSync(f,'utf8');const a='const app = { autoStage: async () => ({}), status:';if(s.split(a).length!==2)t": {
+   "count": 1,
+   "ms": 2377,
+   "maxMs": 2377,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8');const a='\\\"label, count, percent and bar\\\");';if(s.split(a).length!==2)throw 1; s=s.re": {
+   "count": 1,
+   "ms": 52761,
+   "maxMs": 52761,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-update-npm-pi.mjs 2>&1 | rg -v \"^\\s+at \" | tail -4 | cut -c1-300; git stash -q -- src/update-check.ts && node scripts/test-update-npm-pi.mjs 2>&1 | rg -m1 \"Error\" | cut": {
+   "count": 1,
+   "ms": 1612,
+   "maxMs": 1612,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"576s|\\$| .switcher[data-open=false] .session-job { padding: 2px 2px 0; }|\" web/styles.css && cd .. && node hub/scripts/changelog-shot.mjs \".session\" \"$TEMP/job-shot.png\" \"const r": {
+   "count": 1,
+   "ms": 3133,
+   "maxMs": 3133,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8');const rep=(a,b)=>{if(s.split(a).length!==2)throw new Error(a.slice(0,50));s=s.replace(": {
+   "count": 2,
+   "ms": 82988,
+   "maxMs": 51081,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node --input-type=module -e \" import { hubsIconSvg, ICONS } from './web/icons.ts'; import fs from 'node:fs'; const k = Object.keys(ICONS)[0]; const two = hubsIconSvg([{ icon: k, states: ": {
+   "count": 1,
+   "ms": 2621,
+   "maxMs": 2621,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-remote.mjs > \"$TEMP/tr.log\" 2>&1; echo rc=$?; rg -n \"Error|expected|actual\" \"$TEMP/tr.log\" | head -5 | cut -c1-200; git stash -q && npx tsc --noEmit -p . 2>&1 | rg -c \"": {
+   "count": 1,
+   "ms": 3220,
+   "maxMs": 3220,
+   "failures": 1
+  },
+  "bash\u0000cd \"$USERPROFILE/.pi/agent/sessions\" && rg -l --max-count 1 \"\\\"stopReason\\\":\\\"aborted\\\"\" -g \"*.jsonl\" . 2>/dev/null | head -50 | xargs -d '\\n' rg -o --no-filename \"\\\"stopReason\\\":\\\"aborted\\\"[^}]{0,0}|": {
+   "count": 1,
+   "ms": 10699,
+   "maxMs": 10699,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|actual|expected|Error:\" \"$TEMP/tbr.log\" | head -8 | cut -c1-300": {
+   "count": 2,
+   "ms": 78824,
+   "maxMs": 39805,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs --keep-browser > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|actual|expected|Error|error\" \"$TEMP/tbr.log\" | head -10 | cut -c1-400": {
+   "count": 1,
+   "ms": 51923,
+   "maxMs": 51923,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for t in api app-install hub maintenance remote scheduler update-npm-pi update commands changelog; do node scripts/test-$t.mjs > \"$TEMP/t-$t.log\" 2>&1; echo \"$t=$?\"; done; cd .. && node ": {
+   "count": 1,
+   "ms": 36919,
+   "maxMs": 36919,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,12p \"$TEMP/t-ws.log\" | cut -c1-200; git worktree add -q \"$TEMP/wt-base\" origin/master 2>&1 | tail -1; cd \"$TEMP/wt-base\" && ln -s \"./node_modules\" node_modules 2>/dev/null; node scr": {
+   "count": 1,
+   "ms": 18159,
+   "maxMs": 18159,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git worktree remove --force \"$TEMP/wt-base\" && git add -u && git commit -qm \"Release 0.1.81\" && git push origin master 2>&1 | tail -2; git status -sb | head -1": {
+   "count": 1,
+   "ms": 4584,
+   "maxMs": 4584,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/app/dev-restart.mjs > \"$TEMP/devr.log\" 2>&1; echo rc=$?; tail -4 \"$TEMP/devr.log\" | cut -c1-200; sleep 3; tasklist | rg -i \"pi-hub-app\"; ls -la --time-style=+%F_%T \"$LOCALAPPDATA/Pr": {
+   "count": 1,
+   "ms": 82755,
+   "maxMs": 82755,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='web/app.ts';let s=fs.readFileSync(f,'utf8');const a='(orange working, red waiting, blue unseen idle,\\n// grey seen idle, dim parked)';if(s.split": {
+   "count": 1,
+   "ms": 27277,
+   "maxMs": 27277,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8');const a='## Unreleased\\n\\n### Changed\\n';if(!s.includes(a))throw 1; s=s.replace(a,a+'- A fourth session state: b": {
+   "count": 1,
+   "ms": 63061,
+   "maxMs": 63061,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='app/dev-restart.mjs';let s=fs.readFileSync(f,'utf8');const a='execFileSync(\\\"cargo\\\", [\\\"tauri\\\", \\\"build\\\", \\\"--no-bundle\\\"], { cwd: tauri, std": {
+   "count": 1,
+   "ms": 72541,
+   "maxMs": 72541,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git diff HEAD --stat -- src/scheduler.ts; git stash -q && (npx tsc --noEmit -p . 2>&1 | rg -c \"scheduler.ts\"); git stash pop -q; npx tsc --noEmit -p . 2>&1 | rg -c \"scheduler.ts\"": {
+   "count": 1,
+   "ms": 2952,
+   "maxMs": 2952,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs --keep-browser > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|actual|expected|Error:\" \"$TEMP/tbr.log\" | head -8 | cut -c1-300; node scripts/": {
+   "count": 1,
+   "ms": 51344,
+   "maxMs": 51344,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm version patch --no-git-tag-version >/dev/null && v=$(node -p \"require('./package.json').version\") && node -e \"const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8');s=s.repl": {
+   "count": 1,
+   "ms": 3860,
+   "maxMs": 3860,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > \"$TEMP/ed.cjs\" << 'EOF' const fs=require('fs');const files={};const rep=(f,a,b)=>{let s=files[f]??fs.readFileSync(f,'utf8');if(s.split(a).length!==2)throw new Error(f+' :: '+a.slic": {
+   "count": 5,
+   "ms": 57209,
+   "maxMs": 54376,
+   "failures": 2
+  },
+  "bash\u0000cd \"./hub\" && npx tsc --noEmit -p . 2>&1 | rg \"web/app|styles\" | head; node scripts/test-browser.mjs > \"$TEMP/tbr.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|Error:\" \"$TEMP/tbr.log\" | head -5 | ": {
+   "count": 1,
+   "ms": 52262,
+   "maxMs": 52262,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/app/dev-restart.mjs > \"$TEMP/dev.log\" 2>&1; echo exit=$?; tail -3 \"$TEMP/dev.log\" | cut -c1-200; rg -n \"function webFile|function currentBuild\" -A4 hub/src/hub.ts | cut -c1-200 | he": {
+   "count": 1,
+   "ms": 13775,
+   "maxMs": 13775,
+   "failures": 0
+  },
+  "bash\u0000sleep 8": {
+   "count": 1,
+   "ms": 8070,
+   "maxMs": 8070,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; node scripts/test-app-install.mjs > \"$TEMP/t2.log\" 2>&1; echo appinstall=$?; tail -2 \"$TEMP/t2.log\" | cut -c1-200; c": {
+   "count": 1,
+   "ms": 5544,
+   "maxMs": 5544,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && node hub/app/dev-restart.mjs > \"$TEMP/dev.log\" 2>&1; echo exit=$?; tail -1 \"$TEMP/dev.log\"": {
+   "count": 2,
+   "ms": 37610,
+   "maxMs": 24674,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i 's/unseen: \"#69db7c\", scheduled: \"#4dabf7\" };/unseen: \"#69db7c\", scheduled: \"#dee2e6\" };/; s|// The same states on the taskbar.s dark tile: brighter, or the blue and green sink in": {
+   "count": 1,
+   "ms": 9695,
+   "maxMs": 9695,
+   "failures": 0
+  },
+  "bash\u0000sleep 6": {
+   "count": 1,
+   "ms": 6125,
+   "maxMs": 6125,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i 's#from \"C:/SOFT#from \"file:///C:/SOFT#' \"$TEMP/xt.mjs\" && cp -r \"$TEMP/pi-hub-explore/facb98a54b43fead704c8cf0fb2f05f9\" \"$TEMP/xt-src\" && node \"$TEMP/xt.mjs\" \"$TEMP/xt-src\"": {
+   "count": 1,
+   "ms": 1789,
+   "maxMs": 1789,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app/src-tauri\" && cargo check 2>&1 | rg \"^(error|warning)\" -A8 | head -30": {
+   "count": 1,
+   "ms": 16904,
+   "maxMs": 16904,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > \"$TEMP/ed2.cjs\" << 'EOF' const fs=require('fs');const files={};const rep=(f,a,b)=>{let s=files[f]??fs.readFileSync(f,'utf8');if(s.split(a).length!==2)throw new Error(f+' :: '+a.sli": {
+   "count": 1,
+   "ms": 1777,
+   "maxMs": 1777,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > \"$TEMP/ed3.cjs\" << 'EOF' const fs=require('fs');const f='scripts/test-chat-files.mjs';let s=fs.readFileSync(f,'utf8'); const r=[[`{ files: [{ path: \"src/a.ts\" }], truncated: false,": {
+   "count": 1,
+   "ms": 57676,
+   "maxMs": 57676,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 180 node hub/scripts/changelog-shot.mjs \".files-tree\" docs/changelog/0.1.83-file-sizes.png \"document.getElementById('tab-files').click(); await new Promise(r => setTimeout(r, 1500));": {
+   "count": 2,
+   "ms": 8397,
+   "maxMs": 4353,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 180 node hub/scripts/changelog-shot.mjs \"#files\" docs/changelog/0.1.83-file-sizes.png \"document.getElementById('expand-left')?.click(); document.getElementById('tab-files').click(); ": {
+   "count": 1,
+   "ms": 5654,
+   "maxMs": 5654,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's/^\\.file-mark { margin-left: auto;/.file-mark { flex: none; white-space: nowrap; margin-left: auto;/' hub/web/styles.css && rg -n \"^\\.file-mark \\{\" hub/web/styles.css | cut -c1-120 ": {
+   "count": 1,
+   "ms": 5611,
+   "maxMs": 5611,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's/^\\.file-mark { flex: none; white-space: nowrap;/.file-mark { flex: none; align-self: flex-start; white-space: nowrap;/' hub/web/styles.css && timeout 180 node hub/scripts/changelog": {
+   "count": 1,
+   "ms": 6360,
+   "maxMs": 6360,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's/^\\.file { display: flex; gap: 6px;/.file { display: flex; align-items: flex-start; gap: 6px;/; s/^\\.file-mark { flex: none; align-self: flex-start; white-space: nowrap;/.file-mark ": {
+   "count": 1,
+   "ms": 6387,
+   "maxMs": 6387,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node hub/scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$? && git add -u && git add docs/changelog/0.1.83-file-sizes.png && git commit -qm \"Hub 0.1.83: file sizes, Explore clos": {
+   "count": 1,
+   "ms": 59897,
+   "maxMs": 59897,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/git/github.com/DrunkenDonkey80/pi-provider-claude-ex\" && cat > \"$TEMP/cx.cjs\" << 'EOF' const fs=require('fs');const files={};const rep=(f,a,b)=>{let s=files[f]??fs.readFile": {
+   "count": 1,
+   "ms": 4491,
+   "maxMs": 4491,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/git/github.com/DrunkenDonkey80/pi-provider-claude-ex\" && file commands.ts; npm test 2>&1 | rg -v \"^ok \" | tail -8; npx tsc --noEmit -p . 2>&1 | head -5": {
+   "count": 1,
+   "ms": 6489,
+   "maxMs": 6489,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/git/github.com/DrunkenDonkey80/pi-provider-claude-ex\" && sed -i 's|/Imported 1 account(s): pasted/|/Imported 1 account\\\\(s\\\\): pasted/|' test.ts && rg -n \"Imported 1 accoun": {
+   "count": 1,
+   "ms": 5275,
+   "maxMs": 5275,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/git/github.com/DrunkenDonkey80/pi-provider-claude-ex\" && file test.ts commands.ts bin/cpool.ts; git diff --stat; npm test 2>&1 | tail -1": {
+   "count": 1,
+   "ms": 5079,
+   "maxMs": 5079,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > \"$TEMP/tp.cjs\" << 'EOF' const fs=require('fs');const files={};const rep=(f,a,b)=>{let s=files[f]??fs.readFileSync(f,'utf8');if(s.split(a).length!==2)throw new Error(f+' :: '+a.slic": {
+   "count": 1,
+   "ms": 28743,
+   "maxMs": 28743,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|Error:|message:\" \"$TEMP/t1.log\" | head -5 | cut -c1-300": {
+   "count": 1,
+   "ms": 26700,
+   "maxMs": 26700,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n 1,30p \"$TEMP/t1.log\" | cut -c1-300; git stash -q && node scripts/test-browser.mjs > \"$TEMP/t0.log\" 2>&1; echo base=$?; git stash pop -q && git status --short | head": {
+   "count": 1,
+   "ms": 55320,
+   "maxMs": 55320,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git diff web/app.ts | cut -c1-200; npx esbuild web/app.ts --bundle --outfile=\"$TEMP/x.js\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 2000,
+   "maxMs": 2000,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|Error:|message:|expected|actual\" \"$TEMP/t1.log\" | head -8 | cut -c1-300; node scripts/test-poo": {
+   "count": 1,
+   "ms": 59064,
+   "maxMs": 59064,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/git/github.com/DrunkenDonkey80/pi-provider-claude-ex\" && npm test 2>&1 | tail -1 && git add -u && git commit -qm \"cpool export/import: copy the pool's logins as JSON and me": {
+   "count": 1,
+   "ms": 12622,
+   "maxMs": 12622,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > \"$TEMP/tb.cjs\" << 'EOF' const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); const a=` await browser(\"click\", \"#generate\"); await browser(\"wai": {
+   "count": 1,
+   "ms": 54917,
+   "maxMs": 54917,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|Error|message:\" \"$TEMP/t1.log\" | head -6 | cut -c1-300; git stash -q && node scripts/test-brow": {
+   "count": 1,
+   "ms": 114804,
+   "maxMs": 114804,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cp web/app.ts \"$TEMP/app.new.ts\" && git show HEAD:hub/web/app.ts > web/app.ts && node scripts/test-browser.mjs > \"$TEMP/t0.log\" 2>&1; echo old=$?; cp \"$TEMP/app.new.ts\" web/app.ts; rg -n": {
+   "count": 1,
+   "ms": 56101,
+   "maxMs": 56101,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-app-trail.mjs 2>&1 | tail -2; node app/dev-restart.mjs > \"$TEMP/dr.log\" 2>&1; echo rebuild=$?; tail -3 \"$TEMP/dr.log\"": {
+   "count": 1,
+   "ms": 9166,
+   "maxMs": 9166,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-chat-files.mjs 2>&1 | tail -2; node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; rg -n \"AssertionError|Error:|message:\" \"$TEMP/t1.log\" | head -6 | c": {
+   "count": 1,
+   "ms": 55059,
+   "maxMs": 55059,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); const start=s.indexOf(' // \\`!cmd\\` runs through Pi');const end=s.indexOf(' await bro": {
+   "count": 1,
+   "ms": 56090,
+   "maxMs": 56090,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-chat-files.mjs 2>&1 | tail -1; npx tsc --noEmit -p . 2>&1 | rg \"src/(api|chat)\" | head -5": {
+   "count": 1,
+   "ms": 3855,
+   "maxMs": 3855,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const s=require('fs').readFileSync('app/ui/index.html','utf8');const js=s.slice(s.indexOf('<script type=\\\"module\\\">')+22,s.lastIndexOf('</script>')); require('fs').writeFileSyn": {
+   "count": 1,
+   "ms": 26981,
+   "maxMs": 26981,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-chat-files.mjs 2>&1 | tail -1 && node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; node --check \"$TEMP/strip.mjs\" && echo strip-ok; npx tsc --noEmit": {
+   "count": 1,
+   "ms": 59396,
+   "maxMs": 59396,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let s=fs.readFileSync('CHANGELOG.md','utf8');const line=s.split('\\n').find(l=>l.startsWith('- Desktop app: hide a hub'));s=s.replace(line+'\\n','');s=s.replac": {
+   "count": 1,
+   "ms": 2924,
+   "maxMs": 2924,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git remote get-url origin; gh --version 2>&1 | head -1; gh run list --limit 3 2>&1 | head -5": {
+   "count": 1,
+   "ms": 2366,
+   "maxMs": 2366,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && gh release list --limit 2 2>&1; gh release view \"$(gh release list --limit 1 --json tagName -q \".[0].tagName\")\" --json tagName,assets -q \"[.tagName, (.assets[].name)] | join(\\\" \\\")\"": {
+   "count": 1,
+   "ms": 2473,
+   "maxMs": 2473,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-app-install.mjs 2>&1 | tail -1; node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; grep -n \"AssertionError\" -A4 \"$TEMP/t1.log\" | head -6 | cut -c1-25": {
+   "count": 1,
+   "ms": 57748,
+   "maxMs": 57748,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='web/app.ts';let s=fs.readFileSync(f,'utf8');const a='sessionStorage.setItem(\\\"hub-sessions\\\", JSON.stringify([groups, recents]));';if(s.split(a)": {
+   "count": 1,
+   "ms": 56031,
+   "maxMs": 56031,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='web/app.ts';let s=fs.readFileSync(f,'utf8');const a='if (last) renderSessions(last[0], last[1]); } catch { /* none yet */ }';if(s.split(a).lengt": {
+   "count": 1,
+   "ms": 46150,
+   "maxMs": 46150,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; grep -n \"AssertionError\\|Command failed\" -A6 \"$TEMP/t1.log\" | head -8 | cut -c1-250": {
+   "count": 1,
+   "ms": 33034,
+   "maxMs": 33034,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8');const a='await browser(\\\"close\\\");\\n}';if(s.split(a).length!==2)throw 1;s=s.replace(a,": {
+   "count": 1,
+   "ms": 55451,
+   "maxMs": 55451,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8');const a=' await browser(\\\"reload\\\");\\n await browser(\\\"wait\\\", \\\"--fn\\\", \\\"document.do": {
+   "count": 1,
+   "ms": 55547,
+   "maxMs": 55547,
+   "failures": 0
+  },
+  "bash\u0000f=\"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-PhotoBook--/2026-10-03T09-21-13-351Z_01a10111-4c86-7075-abc5-15f59124c5b7.jsonl\"; ls -la \"$f\"; wc -l < \"$f\"; node -e \" const lines=require('fs').readF": {
+   "count": 1,
+   "ms": 6076,
+   "maxMs": 6076,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/pi-control-hub && key=$(node -p \"require('./config.json').localKey\"); port=$(node -p \"require('./config.json').port\"); timeout 20 curl -s -N \"http://127.0.0.1:$port/s/62fdaad6-38fd-42f8": {
+   "count": 1,
+   "ms": 20618,
+   "maxMs": 20618,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"readFile\" src/view.ts; cat > \"$TEMP/bm.mjs\" << 'EOF' import { branchMessages } from \"../SOFT/git/ce-workflow/hub/src/view.ts\"; EOF cat > scripts/_bm.mjs << 'EOF' import { branch": {
+   "count": 1,
+   "ms": 1596,
+   "maxMs": 1596,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"compacted\\|older\" scripts/test-hub.mjs | head -3 | cut -c1-160; node scripts/test-hub.mjs > \"$TEMP/th.log\" 2>&1; echo hub=$?; grep -v Warning \"$TEMP/th.log\" | tail -3 | cut -c1-": {
+   "count": 1,
+   "ms": 22019,
+   "maxMs": 22019,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-view.mjs 2>&1 | grep -v Warning | tail -3 | cut -c1-250": {
+   "count": 1,
+   "ms": 1896,
+   "maxMs": 1896,
+   "failures": 0
+  },
+  "bash\u0000cd ~/.pi/agent/sessions && du -sh . 2>/dev/null; echo total files: $(find . -name \"*.jsonl\" | wc -l); for d in 14 30; do echo \"older than $d days: $(find . -name '*.jsonl' -mtime +$d | wc -l) files, $": {
+   "count": 1,
+   "ms": 76787,
+   "maxMs": 76787,
+   "failures": 0
+  },
+  "bash\u0000cat > \"$TEMP/slim.mjs\" << 'EOF' import fs from \"node:fs\"; import path from \"node:path\"; import readline from \"node:readline\"; const root = process.argv[2], cutoff = Date.now() - 14 * 864e5; const t = ": {
+   "count": 1,
+   "ms": 22167,
+   "maxMs": 22167,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n 415,440p src/hub.ts | cut -c1-220; sed -n 1,60p src/session-lock.ts | cut -c1-180; grep -n \"byFile\\|^export class Registry\\|^export function\\|list()\" src/registry.ts | head | cut ": {
+   "count": 1,
+   "ms": 2189,
+   "maxMs": 2189,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-session-prune.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | tail -2; node scripts/test-hub.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | tail -1": {
+   "count": 1,
+   "ms": 24579,
+   "maxMs": 24579,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > scripts/_trash.mjs << 'EOF' import fs from \"node:fs\"; import os from \"node:os\"; import path from \"node:path\"; import { trash } from \"../src/session-prune.ts\"; const a = path.join(o": {
+   "count": 1,
+   "ms": 3396,
+   "maxMs": 3396,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-session-prune.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | head -8 | cut -c1-250; node scripts/test-hub.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | tail -1; node scripts/t": {
+   "count": 1,
+   "ms": 79853,
+   "maxMs": 79853,
+   "failures": 0
+  },
+  "bash\u0000time powershell.exe -NoProfile -NonInteractive -Command \"Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Property Name,PercentProcessorTime,WorkingSetPrivate | ForEach-Object { \\$_.Name + [c": {
+   "count": 1,
+   "ms": 7322,
+   "maxMs": 7322,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node scripts/test-session-prune.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | tail -1; node scripts/test-api.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | tail -1; node scripts/test-browser.mj": {
+   "count": 1,
+   "ms": 51991,
+   "maxMs": 51991,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && mkdir -p \"$TEMP/rpc-reload\" && cat > scripts/_rpc.mjs << 'EOF' import { RpcChild } from \"../src/rpc-client.ts\"; const env = { ...process.env }; delete env.PI_HUB; delete env.PI_HUB_SESSI": {
+   "count": 1,
+   "ms": 11728,
+   "maxMs": 11728,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-self-update.mjs 2>&1 | tail -1; node scripts/test-work-env.mjs 2>&1 | tail -1; ls scripts | grep -i \"ask-user\\|menu\\|plan3\\b\" | head; cd hub && for t in auto-update se": {
+   "count": 1,
+   "ms": 82782,
+   "maxMs": 82782,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in work-ask-user work-plan3 work-plan3-web; do timeout 900 node scripts/test-$t.mjs > \"$TEMP/t-$t.log\" 2>&1; echo \"$t=$?\"; tail -2 \"$TEMP/t-$t.log\" | cut -c1-200; done; ls scripts | gr": {
+   "count": 1,
+   "ms": 20088,
+   "maxMs": 20088,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in work-wo-control work-settings work-compaction-notifications work-hub-channel; do timeout 900 node scripts/test-$t.mjs > \"$TEMP/t-$t.log\" 2>&1; echo \"$t=$?\"; grep -v \"^\\s*$\" \"$TEMP/t": {
+   "count": 1,
+   "ms": 9315,
+   "maxMs": 9315,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in work-wo-control work-settings; do env -u PI_HUB -u PI_HUB_SESSION timeout 900 node scripts/test-$t.mjs > \"$TEMP/t-$t.log\" 2>&1; echo \"$t=$?\"; grep -v \"^\\s*$\" \"$TEMP/t-$t.log\" | tail": {
+   "count": 1,
+   "ms": 4215,
+   "maxMs": 4215,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"0,/\\\"version\\\": \\\"0.1.85\\\"/s//\\\"version\\\": \\\"0.1.86\\\"/\" package.json && sed -i \"0,/\\\"version\\\": \\\"0.1.85\\\"/s//\\\"version\\\": \\\"0.1.86\\\"/\" package-lock.json && sed -n 1,12p package-lock": {
+   "count": 1,
+   "ms": 2398,
+   "maxMs": 2398,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"9s/\\\"version\\\": \\\"0.1.85\\\"/\\\"version\\\": \\\"0.1.86\\\"/\" package-lock.json && sed -n 9p package-lock.json && git add -u && git add extensions/work-self-update.ts hub/scripts/test-auto-up": {
+   "count": 1,
+   "ms": 3609,
+   "maxMs": 3609,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-browser.mjs > \"$TEMP/t1.log\" 2>&1; echo browser=$?; grep -n \"AssertionError\\|Error\" -A8 \"$TEMP/t1.log\" | head -14 | cut -c1-250": {
+   "count": 1,
+   "ms": 58762,
+   "maxMs": 58762,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && K=$(node -e \"console.log(require(process.env.USERPROFILE+'/.pi/agent/pi-control-hub/config.json').localKey)\"); AB=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe": {
+   "count": 1,
+   "ms": 4765,
+   "maxMs": 4765,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i 's|const \\[, build\\] = /src=\"a\\\\/(\\[0-9a-f\\]{12})|const [, build] = /src=\"..\\\\/..\\\\/a\\\\/([0-9a-f]{12})|' scripts/test-hub.mjs && sed -n 80p scripts/test-hub.mjs && grep -rn \"src=\\": {
+   "count": 1,
+   "ms": 1682,
+   "maxMs": 1682,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"showModal()\" web/*.ts | head | cut -c1-160; grep -n \"^import\\|await import\" web/app.ts web/annotate.ts | cut -c1-200; for l in 748 1280 1281 1346 1755 1782 1882 1889 2176 2252 2": {
+   "count": 1,
+   "ms": 2711,
+   "maxMs": 2711,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for l in 748 1280 1346 1755 1782 1882 1889 2176 2252 2300 2417; do echo \"== $l\"; awk -v l=$l 'NR>=l-6 && NR<=l' web/app.ts | grep -n \"async\\|=>\\|function\" | tail -2 | cut -c1-170; done": {
+   "count": 1,
+   "ms": 1766,
+   "maxMs": 1766,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git stash -q && npx tsc --noEmit --allowJs false --target es2022 --module esnext --moduleResolution bundler --lib es2023,dom --allowImportingTsExtensions web/app.ts 2>/dev/null | wc -l; ": {
+   "count": 1,
+   "ms": 5947,
+   "maxMs": 5947,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git stash list | head -2; grep -c \"await confirmBox\" web/app.ts; npx tsc --noEmit --target es2022 --module esnext --moduleResolution bundler --lib es2023,dom --allowImportingTsExtensions": {
+   "count": 1,
+   "ms": 3330,
+   "maxMs": 3330,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for t in hub remote; do env -u PI_HUB -u PI_HUB_SESSION node scripts/test-$t.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | tail -2 | cut -c1-250; done; env -u PI_HUB -u PI_HUB_SESSION node ": {
+   "count": 1,
+   "ms": 82727,
+   "maxMs": 82727,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-hub.mjs 2>&1 | grep -v \"Warning\\|trace-warn\" | tail -1; cd .. && git add -u && git commit -q -m \"Hub: Ctrl+wheel page size, in-page conf": {
+   "count": 1,
+   "ms": 19455,
+   "maxMs": 19455,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && (node \"$TEMP/view-probe.mjs\" > \"$TEMP/probe.log\" 2>&1 &) ; sleep 2; AB=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; S=\"--session viewprobe\"; \"$AB\" $S open \"": {
+   "count": 1,
+   "ms": 23362,
+   "maxMs": 23362,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && AB=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; S=\"--session viewprobe\"; \"$AB\" $S eval \"document.getElementById('s').contentDocument ? 'same' : 'opaque'\" | ": {
+   "count": 1,
+   "ms": 3253,
+   "maxMs": 3253,
+   "failures": 0
+  },
+  "bash\u0000AB=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; S=\"--session viewprobe\"; \"$AB\" $S open \"http://127.0.0.1:47811/\" > /dev/null; sleep 8; \"$AB\" $S eval \"document.getElementB": {
+   "count": 1,
+   "ms": 9572,
+   "maxMs": 9572,
+   "failures": 0
+  },
+  "bash\u0000AB=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; S=\"--session viewprobe\"; \"$AB\" $S eval \"document.body.innerHTML='<iframe style=\\\"width:900px;height:500px\\\" src=\\\"/x/fe1e8": {
+   "count": 1,
+   "ms": 6095,
+   "maxMs": 6095,
+   "failures": 0
+  },
+  "bash\u0000AB=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; \"$AB\" --session viewprobe close >/dev/null 2>&1; for p in $(netstat -ano | grep \":47811 .*LISTEN\" | awk '{print $5}' | sor": {
+   "count": 1,
+   "ms": 80804,
+   "maxMs": 80804,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"337s|/default-src 'none'/;|/default-src 'none'/);|\" scripts/test-api.mjs && sed -n 337p scripts/test-api.mjs && git diff -U0 src/api.ts | grep \"^@@\"; for t in api browser explore": {
+   "count": 1,
+   "ms": 58966,
+   "maxMs": 58966,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-browser.mjs > \"$TEMP/t-browser.log\" 2>&1; echo \"browser=$?\"; grep -v \"Warning\\|trace-warn\" \"$TEMP/t-browser.log\" | grep -n \"Error\\|actua": {
+   "count": 1,
+   "ms": 26935,
+   "maxMs": 26935,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && env -u PI_HUB -u PI_HUB_SESSION node scripts/test-browser.mjs > \"$TEMP/t-browser.log\" 2>&1; echo \"browser=$?\"; grep -v \"Warning\\|trace-warn\" \"$TEMP/t-browser.log\" | grep -n \"AssertionErr": {
+   "count": 1,
+   "ms": 26544,
+   "maxMs": 26544,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs');const p='web/app.ts';let s=fs.readFileSync(p,'utf8'); const bad='\\\"\\n\\nTop programs:\\n\\\" + topProcs[key].map(item => \\`\\${key === \\\"cpu\\\" ? \\`\\${item.val": {
+   "count": 1,
+   "ms": 27215,
+   "maxMs": 27215,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -n \"Top programs\" web/app.ts | cut -c1-110; env -u PI_HUB -u PI_HUB_SESSION node scripts/test-browser.mjs > \"$TEMP/t-browser.log\" 2>&1; echo \"browser=$?\"; grep -v \"Warning\\|trace-wa": {
+   "count": 1,
+   "ms": 62463,
+   "maxMs": 62463,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && ls -d */ | grep -i furn; ls FurnitureDB 2>/dev/null | head -30; grep -rli \"chrome.runtime\\|manifest_version\" --include=manifest.json FurnitureDB 2>/dev/null | grep -v node_modules ": {
+   "count": 1,
+   "ms": 5859,
+   "maxMs": 5859,
+   "failures": 0
+  },
+  "bash\u0000cd \"./extensions\" && grep -n \"cameraTools(\\|registerTool\" work-models.ts | head; sed -n 4335,4400p work-models.ts | cut -c1-240; grep -n \"screenReadTool\\|export default\" screen-read.ts | head": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "S6": {
+   "ms": 204803,
+   "testMs": 2153,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   },
+   "failures": 3
+  },
+  "S7": {
+   "ms": 62291,
+   "testMs": 2729,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   }
+  },
+  "S8": {
+   "ms": 689666,
+   "testMs": 65282,
+   "replies": 5,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 5
+   }
+  },
+  "ARCH-RECONCILE": {
+   "ms": 31961,
+   "testMs": 0,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   },
+   "failures": 1
+  },
+  "(none)": {
+   "ms": 17101156,
+   "testMs": 3938627,
+   "replies": 1548,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 1548
+   },
+   "failures": 61
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-10-24T06:18:49.805Z",
+   "ms": 1039997
+  },
+  {
+   "start": "2026-10-24T06:49:15.332Z",
+   "ms": 81847
+  },
+  {
+   "start": "2026-10-24T11:04:30.904Z",
+   "ms": 152827
+  },
+  {
+   "start": "2026-10-24T12:46:55.321Z",
+   "ms": 237554
+  },
+  {
+   "start": "2026-10-24T13:04:47.488Z",
+   "ms": 83975
+  },
+  {
+   "start": "2026-10-24T14:04:32.522Z",
+   "ms": 30747
+  },
+  {
+   "start": "2026-10-24T14:41:39.304Z",
+   "ms": 162279
+  },
+  {
+   "start": "2026-10-24T21:00:54.591Z",
+   "ms": 241772
+  },
+  {
+   "start": "2026-10-24T21:11:18.922Z",
+   "ms": 136983
+  },
+  {
+   "start": "2026-10-24T21:40:27.927Z",
+   "ms": 329131
+  },
+  {
+   "start": "2026-10-24T22:01:19.319Z",
+   "ms": 497991
+  },
+  {
+   "start": "2026-10-24T22:11:41.118Z",
+   "ms": 86860
+  },
+  {
+   "start": "2026-10-24T22:18:55.140Z",
+   "ms": 400962
+  },
+  {
+   "start": "2026-10-25T09:22:27.319Z",
+   "ms": 265531
+  },
+  {
+   "start": "2026-10-25T09:35:24.543Z",
+   "ms": 511726
+  },
+  {
+   "start": "2026-10-25T10:05:53.212Z",
+   "ms": 500536
+  },
+  {
+   "start": "2026-10-25T10:23:08.241Z",
+   "ms": 173216
+  },
+  {
+   "start": "2026-10-25T10:27:24.024Z",
+   "ms": 111892
+  },
+  {
+   "start": "2026-10-25T13:54:35.914Z",
+   "ms": 353494
+  },
+  {
+   "start": "2026-10-25T14:04:14.354Z",
+   "ms": 885491
+  },
+  {
+   "start": "2026-10-25T14:20:26.067Z",
+   "ms": 90210
+  },
+  {
+   "start": "2026-10-25T14:31:26.785Z",
+   "ms": 237821
+  },
+  {
+   "start": "2026-10-25T14:39:59.222Z",
+   "ms": 84614
+  },
+  {
+   "start": "2026-10-25T15:28:10.730Z",
+   "ms": 115381
+  },
+  {
+   "start": "2026-10-25T15:31:04.654Z",
+   "ms": 314367
+  },
+  {
+   "start": "2026-10-25T15:38:44.222Z",
+   "ms": 27674
+  },
+  {
+   "start": "2026-10-25T15:40:59.894Z",
+   "ms": 288423
+  },
+  {
+   "start": "2026-10-25T15:47:24.593Z",
+   "ms": 181116
+  },
+  {
+   "start": "2026-10-25T17:21:33.161Z",
+   "ms": 113543
+  },
+  {
+   "start": "2026-10-25T18:41:44.456Z",
+   "ms": 355562
+  },
+  {
+   "start": "2026-10-25T19:09:43.926Z",
+   "ms": 13080
+  },
+  {
+   "start": "2026-10-25T19:10:27.854Z",
+   "ms": 409872
+  },
+  {
+   "start": "2026-10-25T20:26:15.757Z",
+   "ms": 20789
+  },
+  {
+   "start": "2026-10-25T20:51:40.477Z",
+   "ms": 167718
+  },
+  {
+   "start": "2026-10-25T20:56:01.496Z",
+   "ms": 166794
+  },
+  {
+   "start": "2026-10-25T20:59:14.972Z",
+   "ms": 108944
+  },
+  {
+   "start": "2026-10-25T21:01:44.624Z",
+   "ms": 114198
+  },
+  {
+   "start": "2026-10-25T21:03:48.350Z",
+   "ms": 66359
+  },
+  {
+   "start": "2026-10-25T21:05:03.178Z",
+   "ms": 16392
+  },
+  {
+   "start": "2026-10-26T06:34:14.940Z",
+   "ms": 135396
+  },
+  {
+   "start": "2026-10-26T06:46:42.464Z",
+   "ms": 120626
+  },
+  {
+   "start": "2026-10-26T07:42:49.115Z",
+   "ms": 138028
+  },
+  {
+   "start": "2026-10-26T07:49:11.066Z",
+   "ms": 25690
+  },
+  {
+   "start": "2026-10-26T07:51:10.326Z",
+   "ms": 91358
+  },
+  {
+   "start": "2026-10-26T07:54:17.158Z",
+   "ms": 59229
+  },
+  {
+   "start": "2026-10-26T07:59:11.394Z",
+   "ms": 298497
+  },
+  {
+   "start": "2026-10-26T08:11:46.715Z",
+   "ms": 209984
+  },
+  {
+   "start": "2026-10-26T08:17:23.725Z",
+   "ms": 393539
+  },
+  {
+   "start": "2026-10-26T08:27:15.733Z",
+   "ms": 126168
+  },
+  {
+   "start": "2026-10-26T08:29:58.650Z",
+   "ms": 86445
+  },
+  {
+   "start": "2026-10-26T08:32:59.577Z",
+   "ms": 103859
+  },
+  {
+   "start": "2026-10-26T08:39:26.899Z",
+   "ms": 268493
+  },
+  {
+   "start": "2026-10-26T08:45:29.832Z",
+   "ms": 43250
+  },
+  {
+   "start": "2026-10-26T08:48:41.011Z",
+   "ms": 431730
+  },
+  {
+   "start": "2026-10-26T08:57:10.861Z",
+   "ms": 8534
+  },
+  {
+   "start": "2026-10-26T08:57:21.483Z",
+   "ms": 18548
+  },
+  {
+   "start": "2026-10-26T08:58:00.281Z",
+   "ms": 14654
+  },
+  {
+   "start": "2026-10-26T08:58:24.335Z",
+   "ms": 115260
+  },
+  {
+   "start": "2026-10-26T09:08:19.901Z",
+   "ms": 9696
+  },
+  {
+   "start": "2026-10-26T09:12:16.180Z",
+   "ms": 15861
+  },
+  {
+   "start": "2026-10-26T09:13:51.770Z",
+   "ms": 37584
+  },
+  {
+   "start": "2026-10-26T09:16:31.918Z",
+   "ms": 54933
+  },
+  {
+   "start": "2026-10-26T09:19:03.668Z",
+   "ms": 164054
+  },
+  {
+   "start": "2026-10-26T09:23:43.735Z",
+   "ms": 28923
+  },
+  {
+   "start": "2026-10-26T09:25:42.110Z",
+   "ms": 240976
+  },
+  {
+   "start": "2026-10-26T09:32:30.529Z",
+   "ms": 19660
+  },
+  {
+   "start": "2026-10-26T09:33:27.489Z",
+   "ms": 281211
+  },
+  {
+   "start": "2026-10-26T09:48:39.976Z",
+   "ms": 530937
+  },
+  {
+   "start": "2026-10-26T10:47:36.612Z",
+   "ms": 24007
+  },
+  {
+   "start": "2026-10-26T10:51:13.937Z",
+   "ms": 503526
+  },
+  {
+   "start": "2026-10-26T11:09:15.195Z",
+   "ms": 28569
+  },
+  {
+   "start": "2026-10-26T11:10:02.152Z",
+   "ms": 11964
+  },
+  {
+   "start": "2026-10-26T11:11:04.133Z",
+   "ms": 67179
+  },
+  {
+   "start": "2026-10-26T11:12:54.272Z",
+   "ms": 29289
+  },
+  {
+   "start": "2026-10-26T11:14:36.824Z",
+   "ms": 90384
+  },
+  {
+   "start": "2026-10-26T11:18:58.909Z",
+   "ms": 75931
+  },
+  {
+   "start": "2026-10-26T12:05:07.330Z",
+   "ms": 42807
+  },
+  {
+   "start": "2026-10-26T13:23:19.426Z",
+   "ms": 419642
+  },
+  {
+   "start": "2026-10-26T13:34:09.128Z",
+   "ms": 195257
+  },
+  {
+   "start": "2026-10-26T13:51:32.173Z",
+   "ms": 479361
+  },
+  {
+   "start": "2026-10-26T14:01:32.526Z",
+   "ms": 35764
+  },
+  {
+   "start": "2026-10-26T14:02:08.309Z",
+   "ms": 11823
+  },
+  {
+   "start": "2026-10-26T14:10:57.932Z",
+   "ms": 395765
+  },
+  {
+   "start": "2026-10-26T14:35:34.918Z",
+   "ms": 123498
+  },
+  {
+   "start": "2026-10-26T15:29:41.752Z",
+   "ms": 382920
+  },
+  {
+   "start": "2026-10-26T15:36:13.554Z",
+   "ms": 107079
+  },
+  {
+   "start": "2026-10-26T15:39:07.767Z",
+   "ms": 94341
+  },
+  {
+   "start": "2026-10-26T15:47:48.681Z",
+   "ms": 15236
+  },
+  {
+   "start": "2026-10-26T15:55:33.034Z",
+   "ms": 174157
+  },
+  {
+   "start": "2026-10-26T16:10:07.214Z",
+   "ms": 382871
+  },
+  {
+   "start": "2026-10-26T21:57:50.232Z",
+   "ms": 188249
+  },
+  {
+   "start": "2026-10-26T22:13:34.951Z",
+   "ms": 117710
+  },
+  {
+   "start": "2026-10-27T05:31:30.716Z",
+   "ms": 484171
+  },
+  {
+   "start": "2026-10-27T05:41:09.832Z",
+   "ms": 30422
+  },
+  {
+   "start": "2026-10-27T05:43:27.168Z",
+   "ms": 342620
+  },
+  {
+   "start": "2026-10-27T09:20:19.016Z",
+   "ms": 36616
+  },
+  {
+   "start": "2026-10-27T09:25:49.295Z",
+   "ms": 69049
+  },
+  {
+   "start": "2026-10-27T09:47:05.833Z",
+   "ms": 82068
+  },
+  {
+   "start": "2026-10-27T09:50:07.177Z",
+   "ms": 938796
+  },
+  {
+   "start": "2026-10-27T11:14:28.263Z",
+   "ms": 47770
+  },
+  {
+   "start": "2026-10-27T12:07:18.891Z",
+   "ms": 156180
+  },
+  {
+   "start": "2026-10-27T12:25:16.463Z",
+   "ms": 379444
+  },
+  {
+   "start": "2026-10-27T13:22:56.245Z",
+   "ms": 51075
+  },
+  {
+   "start": "2026-10-27T13:51:19.022Z",
+   "ms": 428300
+  },
+  {
+   "start": "2026-10-27T14:00:52.535Z",
+   "ms": 169507
+  },
+  {
+   "start": "2026-10-27T14:32:17.985Z",
+   "ms": 286183
+  },
+  {
+   "start": "2026-10-27T14:37:10.645Z",
+   "ms": 30193
+  },
+  {
+   "start": "2026-10-27T18:19:42.200Z",
+   "ms": 37036
+  },
+  {
+   "start": "2026-10-27T18:26:05.910Z",
+   "ms": 323207
+  }
+ ],
+ "hints": []
+}

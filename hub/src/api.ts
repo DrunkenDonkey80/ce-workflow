@@ -3,7 +3,7 @@
 // what only Pi knows goes through RPC or a hub call (ce-workflow /pi-hub).
 import type http from "node:http";
 import { execFile, execFileSync, spawn } from "node:child_process";
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync } from "node:fs";
 import os from "node:os";
 import { promisify } from "node:util";
 import path from "node:path";
@@ -12,7 +12,7 @@ import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { ARCHIVE, explore, unview, viewPage } from "./explore.ts";
+import { ARCHIVE, designPage, explore, unview, viewPage } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
@@ -84,10 +84,17 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		const list = files.slice(0, 200).map(line => ({ kind: kind(line.slice(0, 2)), path: line.slice(3).split(" -> ").at(-1)!.replace(/^"(.*)"$/, "$1") }));
 		resolve({ files: list, changed: files.length, added, modified: files.length - untracked - added - deleted, deleted, untracked, ahead: Number(/\bahead (\d+)/.exec(head)?.[1] ?? 0), behind: Number(/\bbehind (\d+)/.exec(head)?.[1] ?? 0) });
 	}));
+	// Each git spawn blocks the hub ~20 ms on Windows. The sidebar gets a folder's last counts at once and it refreshes behind them,
+	// one spawn at a time (a folder's first read still waits).
+	let gitQueue: Promise<unknown> = Promise.resolve();
+	const gitLast = new Map<string, GitState>();
 	const gitState = (cwd: string) => {
 		const hit = gitCache.get(cwd);
-		if (hit && Date.now() - hit.at < 4000) return hit.state;
-		const state = readGit(cwd); gitCache.set(cwd, { at: Date.now(), state }); return state;
+		if (!hit || Date.now() - hit.at >= 4000) {
+			const state = gitQueue.then(() => readGit(cwd)).then(value => { gitLast.set(cwd, value); return value; });
+			gitQueue = state; gitCache.set(cwd, { at: Date.now(), state });
+		}
+		return gitLast.has(cwd) ? Promise.resolve(gitLast.get(cwd)!) : gitCache.get(cwd)!.state;
 	};
 	const contextTokens = (tokens?: number | null, compacted?: number) => typeof tokens === "number" ? { tokens } : typeof compacted === "number" ? { tokens: compacted, estimated: true } : { tokens: null };
 	/** ce-workflow webStatus; context needs a running Pi, model and effort come from the record while parked. */
@@ -220,8 +227,16 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	const intercomId = (file?: string) => /_([0-9a-f]{8})[0-9a-f-]{28}\.jsonl$/i.exec(file ?? "")?.[1];
 	// pi-hub progress for the sidebar row, by the page bar's rule: gone 1 min after done reaches total or 15 min after the last report.
 	const job = (id: string) => { const value = progress?.(id); return !value || value.ago > 900_000 || (value.done >= value.total && value.ago > 60_000) ? undefined : Math.min(100, Math.floor(value.done / value.total * 100)); };
-	async function sessions() {
-		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: await gitState(group.folder), sessions: group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), attention: attentionAt(record.id, tone(record.id)), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), job: job(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile), subtitle: record.subtitle, pi: intercomId(record.sessionFile), quiet: host.live.get(record.id)?.intercomRun || undefined })) })));
+	// The designs the user selected (ce-workflow's .pi/designs/sessions.json): the page folds that folder's other designs away.
+	const markPicked = <T extends { design?: string }>(folder: string, list: T[]) => {
+		if (!list.some(item => item.design)) return list;
+		let picked = new Set<string>();
+		try { picked = new Set(JSON.parse(readFileSync(path.join(folder, ".pi", "designs", "sessions.json"), "utf8")).sessions.filter((item: { selected?: boolean }) => item?.selected).map((item: { handle: string }) => item.handle)); } catch { /* no store or unreadable: nothing picked */ }
+		return list.map(item => item.design && picked.has(item.design) ? { ...item, picked: true } : item);
+	};
+	// Only the asking page's folder shows its git line, so only that folder is read.
+	async function sessions(own: string) {
+		const groups = await Promise.all(registry.groups().map(async group => ({ ...group, git: group.folder === own ? await gitState(group.folder) : null, sessions: markPicked(group.folder, group.sessions.map(record => ({ id: record.id, name: record.name, tone: tone(record.id), attention: attentionAt(record.id, tone(record.id)), parked: !host.live.has(record.id) && record.state !== "terminal", plan: planProgress(record.id), job: job(record.id), park: parkNote(record.id), timers: timers(record.id), worked: worked(record.sessionFile), subtitle: record.subtitle, pi: intercomId(record.sessionFile), design: ((published(record.id)?.modes ?? record.modes) as { design?: string } | undefined)?.design, quiet: host.live.get(record.id)?.intercomRun || undefined })).sort((a, b) => Number(!!a.design) - Number(!!b.design))) }))); // design sessions sit last in their folder
 		const recents = (await scanRecents(registry)).map(recent => ({ file: recent.file, folder: recent.cwd, label: path.basename(recent.cwd) || recent.cwd, name: recent.name ?? null, modified: recent.modified }));
 		return { groups, recents, settings: settings() };
 	}
@@ -327,7 +342,9 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return job;
 			}
 			case "dialog": { const script = scriptAsks.get(id)?.get(params.get("id") ?? ""); if (script) return script.form; const dialog = openDialog(id, params.get("id")); if (!dialog) throw fail(404, "That question is no longer open."); return toForm(dialog); }
-			case "sessions": return sessions();
+			case "sessions": return sessions(folder(id));
+			// The versions /wo catch-up last reviewed, from this session's checkout; {} outside the ce-workflow checkout.
+			case "catchup": try { return Object.fromEntries((JSON.parse(readFileSync(path.join(folder(id), "extensions", "work-catch-up-baseline.json"), "utf8")).packages as { name: string; version: string }[]).map(item => [item.name, item.version])); } catch { return {}; }
 			case "system": return systemLoad();
 			case "processes": return topProcesses();
 			// D6: usage comes from the hub's own poller, so it shows with every session parked.
@@ -386,6 +403,15 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				if (!real) throw fail(404, "File not found or not shared.");
 				// Not an archive: its folder is served live (each file checked like a chat link) and the file shown in the viewer.
 				return ARCHIVE.test(real) ? explore(real) : viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) });
+			}
+			// D7: a design session's own mirrored page; it names no path, so no other folder or session can be asked for.
+			case "designpreview": {
+				only(data, ["target"], "Invalid fields.");
+				const handle = ((published(id)?.modes ?? registry.get(id)?.modes) as { design?: string } | undefined)?.design;
+				if (!handle) throw fail(404, "Not a design session.");
+				const real = await designPage(folder(id), handle);
+				if (!real) throw fail(404, "No design yet: its first run has not ended.");
+				return { ...await viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) }, true), design: true };
 			}
 			case "unview": only(data, ["target", "key"], "Invalid fields."); return { ok: unview(String(data.key), id) }; // the page closed or replaced its viewer
 			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.

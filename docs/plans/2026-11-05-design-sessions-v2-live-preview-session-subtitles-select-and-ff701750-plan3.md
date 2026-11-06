@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-05T22:22:10.928Z
+updated: 2026-11-06T06:37:50.408Z
 reviewed: 2026-11-05
 ---
 
@@ -143,32 +143,16 @@ None.
 
 ### Phase 3: Design sessions v2 [code]
 
-- [ ] **S05** Design rows: 🎨 instead of the letter, name = direction, handle in the hover title, sorted last in their folder; drop the v1 "design" text badge
-  - Check: C2 (sort order), C5 or a crop.
-- [ ] **S06** design tool: sessions named by direction, subtitle = brief (★ when selected), starting session id remembered, output mirrored to `.pi/designs/<handle>/` after each run
-  - Mirror per D7 refinement: built in a temp folder, swapped in whole, removed files deleted, last mirrored run id stored; a run that ended while parked is mirrored on open, resume or the watcher's first pass.
-  - The v1 `show` screenshots go; `show` returns the change summary and file list only.
-  - Check: C1 extended (with fake hub tools): a run removing an asset removes it from the mirror; a failed fetch keeps the old mirror; a run finishing while parked (watcher restarted) is mirrored and reported once.
-- [ ] **S07** Design session page opens with the chat beside the live preview of its `index.html`, with desktop and 390 px toggles and no files list
-  - Uses S01 and S02 through the session-scoped design-preview call (D7 refinement), locally and on a remote page; other `.pi` files stay refused.
-  - The page learns it is a design session from the session list's design field.
-  - Check: C2 for the preview call (own handle served; a path escaping the handle folder, a symlink out, or another session's id refused); C5 or a manual check: send a change in a design session and watch the preview update.
-- [ ] **S08** `select`: export to `docs/designs/<name>/`, star, ask "starting session or new session" (first only if it exists), message the choice; reselect overwrites the same folder
-  - Folder naming per Q-01 (slug plus suffix): lowercase slug of the name, `-2`, `-3` on a clash with a folder another handle owns; `DESIGN.json` in the folder names the owning handle, so a reselect after a rename reuses its own folder.
-  - Check also: two designs with the same name get `x` and `x-2`; a renamed design reselects into its old folder.
-  - Export and delta per D10 and D11: temp build then swap, copy kept in `.pi/designs/<handle>/selected/`, reselect lists added, changed and removed files.
-  - Check: C1: export paths, star, ask options with and without the starting session; message names the folder; reselect after removing an asset deletes it and lists it as removed; an added file shows as added though untracked; a failed export keeps the previous one; a folder owned by another handle is never written.
-- [ ] **S09** `clone`: ask a name, new OpenDesign project with the files copied one by one, hub session forked from this one with that name (D12)
-  - Validator: clone writes allowed only into the recorded clone project, at safe relative paths, size-capped, text credential-checked.
-  - Hub: `fork <id> <name>` starts Pi with `--fork <session file>`, records the new session, and the design tool sends it its new handle, name and project.
-  - Check: C7 through the real validator: a clone write into the recorded project passes; the same write into any other project, a `..` path, an oversize file or a file with a credential is refused. C1: new handle and project, every source file copied, original untouched, fork called with the source session. C3: a forked hub session has a new session file whose history starts with the source's messages.
+- [x] **S05** Design rows show 🎨 instead of the letter, the handle in the hover title, and sort last in their folder (api.ts stable sort on design); v1 text badge and its CSS removed
+- [x] **S06** design tool: hub sessions named by direction (names arg, else first words), subtitle = title (brief's first line, ★ when selected), starting hub session kept as from; ended runs mirrored to .pi/designs/<handle>/ (fetch all first, then per-file replace and delete removed, mirroredRun and changes stored); watcher pass extracted as checkRuns; show returns folder, files, changes; screenshots removed
+- [x] **S07** Design session page: page API `designpreview` (no path; handle from the session's published/saved modes, design-N only) serves only <folder>/.pi/designs/<handle>/ via explore.ts designPage + viewPage(own) with live reload; the page opens it beside the chat once it exists (retried on each session poll) with the file tree hidden and Desktop/Phone (390 px) buttons
+- [x] **S08** design select (replaces v1 pick): catches up the mirror, syncs it plus CONVERSATION.md/COMMENTS.json/DESIGN.json into docs/designs/<slug>/ (DESIGN.json owner keeps renamed designs in their folder; foreign folders get -2…), stars it (★ subtitle, selected), keeps .pi/designs/selected/<handle>/ (+ .before/ for git diff), asks via showListDialog "starting session" (only if new `pi-hub session <id>` finds it) or "new session", wakes and prompts it with the folder or the added/changed/removed delta
+- [x] **S09** design clone: name from args or askText; new handle + OD project, every source file copied through validateOpenDesignToolCall's new clone path (allowCloneWrites(project) only while copying: safe segments, 10 MB/file, NUL-free text credential-checked), mirror copied, hub session forked (new hub `fork <id> <name>` → POST /api/sessions/<id>/fork → Pi --fork <source file>) and told its new handle/project; failures recorded on the new handle
 
 ### Phase 4: Docs and live check [code]
 
-- [ ] **S10** README and CHANGELOG (Unreleased) for live preview, session subtitles, design sessions v2; changelog-shot crops of a design row and the design page
-  - Check: files updated; crops render.
-- [ ] **S11** [human] Live run on the real hub with OpenDesign: start a design, chat until it changes, select into the starting session, reopen later, reselect and see the diff, clone with a name
-  - Needs the user to restart the hub and OpenDesign running; also tell DomainCheck (intercom 01a13a71) to wait for this instead of the v1 screenshots version.
+- [x] **S10** README design section rewritten for v2 (names, 🎨, bottom sort/fold, live page, select, clone), hub/README verbs fork/session/subtitle + live viewer line, CHANGELOG Unreleased Added (live preview, second line) and v1 design bullets updated plus select/clone; changelog-shot.mjs --design flag made docs/changelog/0.2.36-design-row.png and 0.2.36-design-page.png
+- [x] **S11** Live run on the real hub + OpenDesign in a throwaway folder (Temp/design-live) passed: start, chat with live preview reload, select into the starting session, reselect with delta, clone with a name; reopening a parked design was not exercised live (unit-tested only); fixed "1 files" wording found on the way
 
 ## Global validation
 
@@ -189,7 +173,7 @@ None.
 
 ## Resume context
 
-Draft, reviewed (A1 findings accepted), no open questions: Q-01 slug plus suffix, Q-02 clone = file-by-file copy through a clone-only write path plus a Pi --fork of the design session (D12). Nothing implemented. Design sessions v1 (hub session per design, prompt verb, screenshots, designModel setting, v1 badge) is uncommitted in the tree and is the base this plan changes. Next: /plan3 finish starting at S01.
+S01-S04 committed (06a4034, 5f7be33, e76d989, 583e6ab). S05-S10 done and tested but uncommitted: they build on design sessions v1, which is still uncommitted and mixed with other sessions' changes (extensions/design.ts untracked; v1 hunks in api.ts, cli.ts, app.ts, styles.css, opendesign-client.ts, README, CHANGELOG), so they stay in the working tree until the user asks for a commit. Changelog crops are named 0.2.36-* (the next version); rename if the push gets another version. Next: S11 [human] live run with OpenDesign on the real hub (needs a hub restart to load the new routes, and OpenDesign running).
 
 ## Amendments
 
@@ -205,3 +189,6 @@ Append material changes and their reasons; preserve the original request and set
   - 7 Overwrite leaves stale files or loses the old export: accepted (`exportPages` writes only current files). D11 and S06, S08 checks.
   - 8 git diff is not the last-selection delta: accepted. D10 keeps a copy of the last selection and reports file changes; R7's "the delta is the git diff" reads through D10.
 - 2026-11-05: Q-02 answered "Widen write_file for clones" with a request to fork the chat too. Recorded as D12; S09 now copies files through a clone-only write path and forks the hub session with Pi's `--fork`; files list and checks (C1, C3, C7) updated. OpenDesign's in-project chat cannot be copied (read-only daemon API); the forked Pi chat carries the conversation.
+- 2026-11-05 (S06): the mirror is not swapped in as a whole folder. On Windows the hub's folder watcher (S01) blocks renaming a watched folder and would keep watching the old one. Instead every file is fetched first (a failed fetch changes nothing), then files are replaced one by one and removed files are deleted. The folder stays, so live preview keeps working. Because the mirror owns `.pi/designs/<handle>/`, S08 keeps its selection copy at `.pi/designs/selected/<handle>/` (not `<handle>/selected/`).
+- 2026-11-05 (S05 on): Phase 3 builds on uncommitted design-sessions v1 code that is mixed with other sessions' changes, so these steps stay in the working tree until the user asks for a commit.
+- 2026-11-05 (S07): the page API call is `designpreview`, not `design-preview`: page endpoints only match `[a-z]+` (hub.ts line ~327).

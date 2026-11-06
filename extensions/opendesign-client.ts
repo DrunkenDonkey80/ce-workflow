@@ -21,6 +21,7 @@ const WRITE_TOOLS = new Set([
 ]);
 const MAX_MESSAGE_BYTES = 1_000_000;
 const MAX_REFERENCE_BYTES = 700_000;
+const MAX_INPUT_BYTES = 200_000;
 const MAX_STDERR_BYTES = 32_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
 const persistentClients = new Map();
@@ -138,6 +139,24 @@ function discoverRegisteredDaemonUrl(socketPath, timeoutMs = 5_000) {
 	});
 }
 
+// OpenDesign 0.24+ no longer answers on the namespace pipe; its desktop log names the daemon port of the current launch.
+// The port changes per launch, so only a port that answers /api/health counts.
+export async function discoverLoggedDaemonUrl(logFile, timeoutMs = 1_500) {
+	let text = "";
+	try { text = fs.readFileSync(logFile ?? "", "utf8").slice(-256_000); } catch { return ""; }
+	const port = [...text.matchAll(/"target":"http:\/\/127\.0\.0\.1:(\d{2,5})\//g)].at(-1)?.[1];
+	if (!port) return "";
+	const origin = `http://127.0.0.1:${port}`;
+	try {
+		const response = await fetch(origin + "/api/health", { signal: AbortSignal.timeout(timeoutMs) });
+		return response.ok ? origin : "";
+	} catch { return ""; }
+}
+
+async function discoverDaemonUrl(env, ipcPath, timeoutMs) {
+	return (await discoverRegisteredDaemonUrl(ipcPath, timeoutMs)) || (await discoverLoggedDaemonUrl(env.OD_DESKTOP_LOG, timeoutMs));
+}
+
 function parseBootstrapArgs(value) {
 	try {
 		const args = JSON.parse(value ?? "");
@@ -186,7 +205,7 @@ async function bootstrapRegisteredDaemon(env, ipcPath) {
 	const deadline = Date.now() + 60_000;
 	while (Date.now() < deadline) {
 		await new Promise((resolve) => setTimeout(resolve, 250));
-		const daemonUrl = await discoverRegisteredDaemonUrl(ipcPath, 500);
+		const daemonUrl = await discoverDaemonUrl(env, ipcPath, 500);
 		if (daemonUrl) return daemonUrl;
 	}
 	throw error(
@@ -205,6 +224,15 @@ function explicitDaemonArgs(command, daemonUrl) {
 	return [...args, "--daemon-url", daemonUrl];
 }
 
+// D12 design clone: a design's own files may be copied only into the project this process created for the clone, while it copies.
+const cloneTargets = new Set<string>();
+const MAX_CLONE_FILE_BYTES = 10_000_000;
+/** Allows clone copies into project until the returned function is called. */
+export function allowCloneWrites(project: string) {
+	cloneTargets.add(project);
+	return () => { cloneTargets.delete(project); };
+}
+
 export function validateOpenDesignToolCall(name, args: any = {}) {
 	if (![...READ_TOOLS, ...WRITE_TOOLS].includes(name))
 		throw error("tool-forbidden", `OpenDesign tool is not allowlisted: ${name}`);
@@ -219,8 +247,30 @@ export function validateOpenDesignToolCall(name, args: any = {}) {
 	if (name === "write_file") {
 		safeToken(args.project, "project", 128);
 		const file = safeToken(args.path, "path", 128);
+		// inputs/: mapped reuse/restyle source text (copy, styles) the OD agent cannot otherwise read; credential-checked as text.
+		const input = /^inputs\/([a-f0-9]{16})-[A-Za-z0-9._-]{1,80}$/.exec(file);
+		if (input) {
+			if (args.encoding !== "base64" || typeof args.content !== "string" || !/^[A-Za-z0-9+/]*={0,2}$/.test(args.content))
+				throw error("invalid-input", "write_file requires base64 content");
+			const bytes = Buffer.from(args.content, "base64");
+			if (bytes.length > MAX_INPUT_BYTES) throw error("invalid-input", "source input is too large");
+			if (crypto.createHash("sha256").update(bytes).digest("hex").slice(0, 16) !== input[1])
+				throw error("invalid-input", "source input hash does not match its path");
+			assertNoCredentials(bytes.toString("utf8"), "source input");
+			return args;
+		}
+		if (cloneTargets.has(args.project) && !file.startsWith("references/")) {
+			if (file.split("/").some(part => !/^[A-Za-z0-9._-]{1,100}$/.test(part) || /^\.+$/.test(part)))
+				throw error("invalid-input", "clone path is unsafe");
+			if (args.encoding !== "base64" || typeof args.content !== "string" || args.content.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(args.content))
+				throw error("invalid-input", "write_file requires base64 content");
+			const bytes = Buffer.from(args.content, "base64");
+			if (bytes.length > MAX_CLONE_FILE_BYTES) throw error("invalid-input", "cloned file is too large");
+			if (!bytes.includes(0)) assertNoCredentials(bytes.toString("utf8"), "cloned file"); // text (no NUL byte) is credential-checked
+			return args;
+		}
 		if (!/^references\/[a-f0-9]{64}\.(?:png|jpe?g|webp)$/i.test(file))
-			throw error("invalid-input", "write_file is confined to hashed references");
+			throw error("invalid-input", "write_file is confined to hashed references and inputs/");
 		if (args.encoding !== "base64" || typeof args.content !== "string")
 			throw error("invalid-input", "write_file requires base64 content");
 		if (
@@ -314,6 +364,9 @@ function discoverWindowsOpenDesign(env) {
 	} catch {
 		return null;
 	}
+	// Old versions stay installed beside the new one: try the newest appVersion first.
+	const version = (entry) => { try { return JSON.parse(fs.readFileSync(path.join(aliases, entry, "resources", "open-design-config.json"), "utf8")).appVersion ?? ""; } catch { return ""; } };
+	entries = entries.map((entry) => [entry, version(entry)]).sort((a, b) => b[1].localeCompare(a[1], undefined, { numeric: true })).map(([entry]) => entry);
 	for (const entry of entries) {
 		const activeRoot = path.join(aliases, entry);
 		const command = path.join(activeRoot, "Open Design.exe");
@@ -362,6 +415,7 @@ function discoverWindowsOpenDesign(env) {
 			args: [cli, "mcp"],
 			env: {
 				OD_DATA_DIR: path.join(root, "namespaces", namespace, "data"),
+				OD_DESKTOP_LOG: path.join(root, "namespaces", namespace, "logs", "desktop", "latest.log"),
 				OD_SIDECAR_IPC_PATH: `\\\\.\\pipe\\open-design-${namespace}-daemon`,
 				OD_MCP_BOOTSTRAP_COMMAND: bootstrap,
 				OD_MCP_BOOTSTRAP_ARGS: "[]",
@@ -601,7 +655,7 @@ export class OpenDesignClient {
 		if (!env.OD_DAEMON_URL && ipcPath) {
 			const cached = registeredDaemonUrls.get(ipcPath);
 			const daemonUrl =
-				cached ?? (await discoverRegisteredDaemonUrl(ipcPath, 800));
+				cached ?? (await discoverDaemonUrl(env, ipcPath, 800));
 			if (daemonUrl) {
 				env.OD_DAEMON_URL = daemonUrl;
 				registeredDaemonUrls.set(ipcPath, daemonUrl);
@@ -963,6 +1017,31 @@ export async function callOpenDesignTool(options) {
 	throw lastError;
 }
 
+// OD's MCP cannot list runs, messages or comments, and OD starts runs by itself (strategy continuations): read them from the daemon's local HTTP API.
+export async function readOpenDesignApi(options, apiPath, as = "json") {
+	if (!/^\/api\/[A-Za-z0-9._~/?=&%-]+$/.test(apiPath) || apiPath.includes("..")) throw error("invalid-input", "OpenDesign API path is invalid");
+	const command = options.command ?? resolveOpenDesignCommand(options);
+	for (let attempt = 1; ; attempt += 1) {
+		const { entry, key } = await persistentOpenDesignClient(command, options);
+		const base = entry.client.daemonUrl;
+		if (!/^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(base)) throw error("daemon-unavailable", "No local OpenDesign daemon address.");
+		try {
+			const response = await fetch(base + apiPath, { redirect: "error", signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS) });
+			if (!response.ok) throw error("tool-failed", `OpenDesign ${apiPath.split("?")[0]} failed: HTTP ${response.status}`);
+			if (as !== "bytes") return await response.json();
+			const bytes = Buffer.from(await response.arrayBuffer());
+			if (bytes.length > 20_000_000) throw error("invalid-input", "OpenDesign file is too large");
+			return bytes;
+		} catch (failure) {
+			if (failure instanceof OpenDesignError || attempt > 1) throw failure;
+			// The daemon went away (OD closed or updated): drop this connection so the next one rediscovers or relaunches it.
+			releasePersistentClient(key, entry);
+			const ipcPath = command.env?.OD_SIDECAR_IPC_PATH ?? process.env.OD_SIDECAR_IPC_PATH;
+			if (ipcPath) registeredDaemonUrls.delete(ipcPath);
+		}
+	}
+}
+
 export async function reconcileCreatedProject(options) {
 	const callTool = options.callTool
 		? (tool, args) => options.callTool(tool, args)
@@ -978,12 +1057,20 @@ export async function reconcileCreatedProject(options) {
 			)
 		)
 			throw failure;
-		return options.callTool
+		const get = () => options.callTool
 			? options.callTool("get_project", { project: options.projectId })
 			: callOpenDesignTool({
 					...options,
 					tool: "get_project",
 					args: { project: options.projectId },
 				});
+		// A create that timed out may still land a moment later: look again briefly before calling it missing.
+		for (let attempt = 1; ; attempt++) {
+			try { return await get(); }
+			catch (missing) {
+				if (attempt >= 4 || missing?.category !== "tool-failed" || !/^no project matches/.test(missing.message ?? "")) throw missing;
+				await new Promise((resolve) => setTimeout(resolve, options.retryDelayMs ?? 1_000));
+			}
+		}
 	}
 }

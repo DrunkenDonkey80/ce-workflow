@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status
+// pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | prompt <id> <text> | session <id> | fork <id> <name> | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync, execSync, spawn } from "node:child_process";
 import http from "node:http";
@@ -250,6 +250,18 @@ try {
 		while (found && wait && state.forms.some(form => form.askId === wait)) { await new Promise(done => setTimeout(done, 2_000)); state = await call(`/api/sessions/${found.id}/dialogs`); }
 		console.log(JSON.stringify(wait ? { closed: true, answer: state.answered.find(entry => entry.askId === wait) } : { id: found?.id, name: found?.name, ...state }));
 		}
+	} else if (verb === "prompt" && rest[0] && rest[1]) {
+		// A message to a live session as if typed there (ce-workflow's design sessions get their first message this way).
+		await call(`/api/sessions/${rest[0]}/prompt`, { message: rest.slice(1).join(" ") });
+		console.log("Sent.");
+	} else if (verb === "fork" && rest[0]) {
+		// A copy of one session's history as a new session in its folder (ce-workflow's design clone).
+		const record = await call(`/api/sessions/${rest[0]}/fork`, { name: rest.slice(1).join(" ") });
+		console.log(`New session ${record.name} in ${record.folder}: http://127.0.0.1:${marker()!.port}/s/${record.id}/?token=${readConfig()!.localKey}`);
+	} else if (verb === "session" && rest[0]) {
+		// One session by hub id as JSON, or exit 1 when the hub has none (ce-workflow's design select offers only sessions that exist).
+		const found = ((await call("/api/status")).sessions as { id: string; name: string; folder: string; live: boolean }[]).find(s => s.id === rest[0]);
+		if (!found) { console.log("Unknown session."); process.exitCode = 1; } else console.log(JSON.stringify({ id: found.id, name: found.name, folder: found.folder, live: found.live }));
 	} else if (verb === "subtitle" && rest[0]) {
 		// The line under a session's name in the list; no text clears it.
 		const { subtitle } = await call(`/api/sessions/${rest[0]}/subtitle`, { text: rest.slice(1).join(" ") });
@@ -321,7 +333,7 @@ try {
 		console.log(rest[0] === "approve" ? "Device paired." : "Device rejected.");
 	} else if (verb === "autostart" && ["on", "off", "status"].includes(rest[0] ?? "status")) console.log(autostart(rest[0] ?? "status"));
 	else {
-		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status");
+		console.log("Usage: pi-hub install | start | stop [--force] | restart | update [--yes] | status [--json] | open [remote] | new [folder] [name] | parked | prompt <id> <text> | session <id> | fork <id> <name> | subtitle <id> [text] | wake <id> | schedule add message|script --text|--command <s> [--in m|--at time] [--every m] [--until time] [--runs n] | schedule list | schedule cancel <id> | commands add|list|remove [--folder f] [--name n] [--kind prompt|run] [--text t] [--help h] [--local] [--menu] [--actions <json>] | ask <question> [--option o]... [--context c] [--text t] [--multiple] [--no-freeform] [--raw] | ask --json <ask_user json|-> | notice <text> | progress <done> <total> [label] | progress --clear | remote on|off | pair approve|reject | autostart on|off|status");
 		process.exitCode = verb === "help" || verb === "--help" ? 0 : 2;
 	}
 } catch (error) {

@@ -2270,6 +2270,7 @@ function runNativeMicrocompact(ctx, customInstructions = undefined, force = fals
 
 // Cold-cache compaction: the next request re-bills the whole prompt anyway, so a large context is cheapest
 // to compact right before it. Returns idle minutes when it applies, else undefined.
+const cacheTtlMs = ctx => (ctx.model?.promptCache?.[process.env.PI_CACHE_RETENTION === "long" ? "long" : "short"] ?? 300) * 1000;
 export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), share = 0.6) {
 	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
@@ -2281,7 +2282,7 @@ export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), share = 
 		if (entry.type === "message" && entry.message?.role === "assistant") last = Number(entry.message.timestamp) || Date.parse(entry.timestamp);
 		else if (entry.type === "usage" && entry.kind === "cache_warm") last = Date.parse(entry.timestamp);
 	}
-	const ttl = (ctx.model?.promptCache?.[process.env.PI_CACHE_RETENTION === "long" ? "long" : "short"] ?? 300) * 1000;
+	const ttl = cacheTtlMs(ctx);
 	return last && now - last > ttl ? Math.round((now - last) / 60_000) : undefined;
 }
 
@@ -2294,16 +2295,26 @@ function compactColdCache(event, ctx, pi) {
 // The hub page resumes a parked session when you start typing (/wo compact early): a cold cache would be compacted when the
 // message is sent, so start now and let the message wait for it (startColdCompact).
 let earlyCompact = null;
-function startEarlyCompact(ctx) {
+function startEarlyCompact(ctx, why = "while you type") {
 	if (earlyCompact || ctx.isIdle?.() === false || typeof ctx.compact !== "function") return false;
 	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
 	if (minutes === undefined) return false;
-	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens while you type.`, "info");
+	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens ${why}.`, "info");
 	earlyCompact = new Promise<void>((resolve) => ctx.compact({
 		onComplete: () => resolve(),
 		onError: (error: unknown) => { ctx.ui.notify(`Compaction failed (${formatError(error)}); your message goes without it.`, "warning"); resolve(); },
 	})).finally(() => { earlyCompact = null; });
 	return true;
+}
+
+// An idle session compacts once its prompt cache runs out, not only when parked or on the next message: that message would
+// compact anyway (same condition), so do it while nobody waits. Any new turn or input cancels the timer.
+let idleCompactTimer;
+function armIdleCompact(ctx) {
+	clearTimeout(idleCompactTimer);
+	if (!ctx?.hasUI || typeof ctx.compact !== "function") return; // print-mode runs (subagents) exit instead
+	idleCompactTimer = setTimeout(() => { try { startEarlyCompact(ctx, "while idle"); } catch { /* the session was replaced */ } }, cacheTtlMs(ctx) + 15_000);
+	idleCompactTimer.unref?.();
 }
 
 // Starts compaction and sends the message after it; false = send it now. Also used for hub page messages (wo:cold-cache).
@@ -3772,6 +3783,7 @@ sessionCwd = ctx.cwd;
 });
 
 	pi.on("session_shutdown", async (_event, ctx) => {
+clearTimeout(idleCompactTimer);
 const scoutRuntime = extensionScoutRuns.get(resolve(ctx.cwd));
 if (scoutRuntime) {
 			scoutRuntime.detached = true;
@@ -3789,6 +3801,7 @@ showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps
 });
 
 	pi.on("input", async (event, ctx) => {
+		clearTimeout(idleCompactTimer);
 		const coldCache = await compactColdCache(event, ctx, pi);
 		if (coldCache) return coldCache;
 		return;
@@ -3807,6 +3820,7 @@ showResearchContext(ctx, false); // no "off" for the hub: a parked session keeps
 });
 
 	pi.on("agent_start", (_event,ctx)=>{
+clearTimeout(idleCompactTimer);
 activePromptBackedAgent = pendingPromptBackedAgentStart;
 internalBackgroundWakeEligible = !activePromptBackedAgent;
 pendingPromptBackedAgentStart = false;
@@ -3850,7 +3864,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 		(event, ctx) => filteredContext(event, ctx),
 		(event, ctx) => compactionNoteNudge(event, ctx),
 	]);
-	pi.on("agent_end", () => { activePromptBackedAgent = false; });
+	pi.on("agent_end", (_event, ctx) => { activePromptBackedAgent = false; armIdleCompact(ctx); });
 
 	pi.on("session_before_compact", async (event, ctx) => {
 		pi.events?.emit?.("work:compaction-start", {}); // Plan3 stats time compaction; this handler does the summarizing.
@@ -4181,6 +4195,7 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "visionAltModel") return owns(block, "visionAltModel");
 	if (item.kind === "imageModel") return owns(block, "imageModel");
 	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
+	if (item.kind === "designModel") return owns(block, "designModel");
 	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit") return owns(block, item.kind);
 	return false;
 }
@@ -4420,6 +4435,11 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				description: "generate_image: a Codex subscription model (e.g. Sol) or an OpenRouter image model draws and saves PNG files.",
 			},
 {
+				kind: "designModel", value: "designModel",
+				label: `Design session model: [${settings.workOrchestrator?.designModel ? (names.get(splitLevel(settings.workOrchestrator.designModel).model) ?? splitLevel(settings.workOrchestrator.designModel).model) + (splitLevel(settings.workOrchestrator.designModel).level ? ": " + splitLevel(settings.workOrchestrator.designModel).level : "") : "same as session"}] ${SUBMENU_ARROW}`,
+				description: "Model and effort of the hub sessions the design tool opens (design-1, design-2, ...); they relay chat to OpenDesign, so a cheap fast model is enough.",
+			},
+{
 				kind: "openDesignCommand",
 				value: "openDesignCommand",
 				label: `OpenDesign executable: ${openDesignCommand ? "Configured" : "Auto"} ${SUBMENU_ARROW}`,
@@ -4643,6 +4663,24 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			continue;
 		}
 
+		if (pick.kind === "designModel") {
+			const current = splitLevel(settings.workOrchestrator?.designModel ?? INHERIT_MODEL);
+			const selected = await chooseModel(ctx, "Design session model", current.model, false, scope === "project",
+				scope === "project" ? undefined : { label: "Same as session", description: "Design sessions keep the hub's default model" });
+			if (selected === undefined) continue;
+			let value = selected;
+			if (selected !== INHERIT_MODEL) {
+				const level = await choose(ctx, "Design session model: choose effort", THINKING_LEVELS.map((item) => ({ value: item, label: item, description: "Effort of design sessions" })), current.level ?? "low", { forceCustom: true });
+				if (level === undefined) continue;
+				value = `${selected}:${level}`;
+			}
+			settings = readScopedSettings(ctx.cwd, scope);
+			settings.workOrchestrator ??= {};
+			if (selected === INHERIT_MODEL) delete settings.workOrchestrator.designModel;
+			else settings.workOrchestrator.designModel = value;
+			writeScopedSettings(ctx.cwd, scope, settings);
+			continue;
+		}
 		if (pick.kind === "openDesignCommand") {
 			const mode = await choose(
 				ctx,

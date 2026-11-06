@@ -2,7 +2,11 @@
 function node<K extends keyof HTMLElementTagNameMap>(tag: K, properties = {}, text = undefined) { const item = document.createElement(tag); Object.assign(item, properties); if (text !== undefined) item.textContent = text; return item; }
 export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElement, post, notice, attachTo: (text: HTMLTextAreaElement) => void, links: (target: HTMLElement, text: string) => void) {
  const pending = new Map(), cursors = new Map(); let active, sending = false;
- function remove(id) { pending.delete(id); if (active?.askId === id) { active = null; dialog.close(); } show(); }
+ // What you typed or ticked survives leaving the page (switching sessions reloads it), per ask, until it is answered or closed.
+ const draftKey = id => "ask-draft:" + id; let saveDraft = () => {};
+ const forget = id => { try { localStorage.removeItem(draftKey(id)); } catch { /* private mode */ } };
+ addEventListener("pagehide", () => saveDraft());
+ function remove(id) { forget(id); pending.delete(id); if (active?.askId === id) { active = null; dialog.close(); } show(); }
  async function answer(payload) {
   if (!active || sending) return;
   const id = active.askId; sending = true;
@@ -132,10 +136,17 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
   };
   form.onsubmit = event => { event.preventDefault(); try { answer(collect()); } catch (failure) { error.textContent = failure.message; error.hidden = false; } };
   dialog.oncancel = event => { event.preventDefault(); answer({ cancel: true }); };
+  const fields = [...form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("textarea, input[type=radio], input[type=checkbox]")], key = draftKey(ask.askId);
+  try {
+   const saved = JSON.parse(localStorage.getItem(key) ?? "null");
+   if (Array.isArray(saved) && saved.length === fields.length) for (const [i, field] of fields.entries()) { if (field instanceof HTMLTextAreaElement) field.value = String(saved[i]); else { field.checked = !!saved[i]; field.dataset.on = field.checked ? "1" : ""; } }
+  } catch { /* private mode or an old draft */ }
+  saveDraft = () => { if (active?.askId !== ask.askId) return; try { localStorage.setItem(key, JSON.stringify(fields.map(field => field instanceof HTMLTextAreaElement ? field.value : field.checked))); } catch { /* private mode */ } };
+  form.oninput = form.onchange = form.onclick = () => saveDraft();
   dialog.show(); form.querySelector<HTMLElement>("input,textarea,button")?.focus();
  }
  return {
-  sync(asks) { for (const id of pending.keys()) if (!asks.some(ask => ask.askId === id)) pending.delete(id); for (const ask of asks) pending.set(ask.askId, ask); if (active && !pending.has(active.askId)) { active = null; dialog.close(); } show(); },
+  sync(asks) { for (const id of pending.keys()) if (!asks.some(ask => ask.askId === id)) { forget(id); pending.delete(id); } for (const ask of asks) pending.set(ask.askId, ask); if (active && !pending.has(active.askId)) { active = null; dialog.close(); } show(); },
   pending(ask) { pending.set(ask.askId, ask); show(); },
   closed: remove,
   get busy() { return !!active; },
