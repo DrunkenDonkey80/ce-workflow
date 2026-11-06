@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-11-02T07:23:25.181Z",
+  "capturedAt": "2026-11-06T10:34:49.123Z",
   "verification": {
     "command": "npm run verify:quiet",
     "fullRuns": 1,
@@ -15,80 +15,75 @@
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "1.4.0",
-      "reviewedAt": "2026-10-24T22:11:18.499Z",
-      "reviewedVersion": "1.4.0",
+      "version": "1.5.0",
+      "reviewedAt": "2026-11-06T10:34:49.123Z",
+      "reviewedVersion": "1.5.0",
       "decisions": [
         {
-          "title": "Pin the devDependency to the reviewed release 1.4.0",
+          "title": "Pin the devDependency to the reviewed release 1.5.0",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "package.json pins @earendil-works/pi-coding-agent 1.3.0 for type checks and tests, while the managed host already runs 1.4.0 (~/.pi/agent/install/current-version). The extension API types are unchanged between the installed 1.3.0 and 1.4.0 releases (only agent-session, compaction, model-config, provider-composer, interactive-mode and pi-user-agent .d.ts files differ), so the bump is low risk. Same step as CU-04 of the 1.3.0 catch-up (ffd99fd1). CU-01.",
-          "verification": "npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.4.0 succeeded; package and both lockfile entries read 1.4.0. node scripts/test-work-ask-user.mjs, node scripts/test-work-compaction.mjs and node scripts/test-work-compaction-notifications.mjs passed. Full verification authored-source TypeScript passed; unrelated limitations accepted in D5.",
-          "version": "1.4.0"
+          "rationale": "package.json still pins @earendil-works/pi-coding-agent 1.4.0 for type checks and tests, while the host now runs 1.5.0 (summary.json installedVersion). The 1.4.0 catch-up adopted the same pin rule. Step CU-01.",
+          "verification": "CU-01: npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.5.0 -> package.json devDependency and package-lock.json both 1.5.0 (commit d09de12)",
+          "version": "1.5.0"
         },
         {
-          "title": "Compaction and branch summaries use the model's output limit; generateSummary(WithUsage) ignore reserveTokens (#9512)",
+          "title": "Image resizing now picks the smaller of PNG and JPEG: keep generate_image output PNG",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "1.5.0 'Fixed resized photos being sent as multi-megabyte PNGs': resizeImage now tries the smaller encoding first (dist/utils/image-resize-core.js `const preferred`); 1.4.0 always took PNG first when no byte budget applied. extensions/work-images.ts fitImage scales every sized generate_image result (Codex draws about 1448x1086 for 800x600) with maxBytes MAX_SAFE_INTEGER, and execute() names the file by the returned mimeType, so a requested out.png can now be saved as out.jpg, and pngSize() then skips the size check. shrinkImage (process_image input) benefits from smaller JPEGs and stays as is. Step CU-02.",
+          "verification": "CU-02: node scripts/test-work-compaction-notifications.mjs -> ok; a JPEG resize with a stub converter returns image/png at 800x600, jpegQuality 100 is passed, and a failed conversion keeps the original",
+          "version": "1.5.0"
+        },
+        {
+          "title": "Tool argument validation moved to pi-schema (breaking change)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Pi no longer sets a fixed maxTokens on summary requests, so long reasoning cannot cut a summary at the cap. work-models.ts summarizeNativeContext passes reserveTokens positionally to generateSummaryWithUsage; 1.4.0 keeps that parameter as _reserveTokens (compaction.d.ts:114) and the later positions (signal, customInstructions, previousSummary, streamFn, retry) are unchanged, so the call stays valid and the native and default modes get the fix for free. Keeping the argument keeps older Pi hosts (peerDependency \"*\") working.",
-          "version": "1.4.0"
+          "rationale": "Pi now validates tool arguments as plain JSON Schema and coerces loosely typed values for every tool, and drops a null in an optional property whose schema rejects null (pi-schema dist/coerce.js). rg finds no Type.Refine, BigInt, Undefined, Codec or Format.Set in extensions, scripts or hub/src, and no test asserts TypeBox error wording. extensions/ask-user imports @sinclair/typebox, which the 1.5.0 loader still maps (core/extensions/loader.js). Required nullable fields use type unions that accept null; jev_triage state has an empty schema, so coercion passes it through.",
+          "version": "1.5.0"
         },
         {
-          "title": "Same fixed-cap pattern in ce-workflow's own hybrid compaction and vision calls",
+          "title": "Extension update changelogs shown by Pi after a package update",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Pi reads CHANGELOG.md from an extension package and shows entries newer than the last seen version on the next fresh TUI launch (docs/packages.md 'Show a changelog'). Its parser (dist/utils/changelog.js) matches our `## x.y.z — date` headings and skips `## Unreleased`; every push bumps package.json version, so ce-workflow notes appear once per update. Hub sessions run in RPC mode, where the interactive notice does not show, and the hub keeps its own changelog. Default kept.",
+          "version": "1.5.0"
+        },
+        {
+          "title": "ctx.ui.custom() `blocked` option for inline dialogs",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "work-compaction-memory.ts:236 (maxTokens 16384) and work-vision.ts:56 (maxTokens 4096) still cap output while reasoning, the failure class Pi fixed. A search of every session log found no \"Compaction response stopped: length\" or \"Vision model failed (length)\" outside this review, and both paths fail safely (the next compaction model or local memory; a clear vision error). Raising the caps could raise cost with no observed failure. Revisit if a length stop appears.",
-          "version": "1.4.0"
+          "rationale": "The option only makes Pi report OSC 7501 program status `blocked` (Rex, iTerm2; docs/terminal-setup.md 'Program status'). The vendored ask-user defaults to overlays, which ignore it; inline list menus in extensions/ask-user/menu.ts could pass it, but this setup is Windows plus the hub, which tracks open questions itself.",
+          "version": "1.5.0"
         },
         {
-          "title": "Concurrent extension dialogs form a stack instead of replacing each other (#11166)",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "Pi now stacks select, confirm, input, editor and inline custom() dialogs so no promise is left pending. plan3.ts:690-697 serialUI works around exactly the old bug, but it stays: Pi's stack does not cover overlay custom() components, which ask_user uses by default; serialUI keeps first-in-first-out order for parallel requirement asks instead of newest-first; and it still protects older Pi hosts. Other concurrent dialogs benefit without changes.",
-          "version": "1.4.0"
-        },
-        {
-          "title": "Resume and /tree keep extension tools active unless registered with defaultActive: false (#11062, #11075)",
+          "title": "pi.exec, setActiveTools order, tool_search ranking, Windows path case and session-write fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "The restore applies only to direct and model-only tools (agent-session.js _isActivatedOnRegistration). The opt-in camera tools (model-only) are re-synced by syncCameraTools on session_start and before_agent_start (work-models.ts:3651, 3697), so a restored camera tool is removed before the next request. plan3_design is deferred and unaffected. Every other ce-workflow tool is meant to be active.",
-          "version": "1.4.0"
+          "rationale": "Host fixes that help without code changes: pi.exec output cap and SIGKILL after timeout (plan3.ts and browser-fetch.ts call pi.exec for short commands), no redundant system prompt update when the exposure manager re-sets the same tools in another order, better tool_search and searchTools ranking for tools_enable and codemode, case-insensitive Windows path comparison in Pi, and no lost history after a failed session write.",
+          "version": "1.5.0"
         },
         {
-          "title": "Codemode waits for a free worker; PI_CODEMODE_MAX_WORKERS raises the limit (#11184)",
+          "title": "selfUpdateCommand, keyHint/keyText injection, MarkdownTransformContext ids, responseModel",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Parallel codemode scripts and in-process subagents now queue for up to 60 s instead of failing. ce-workflow has no workaround to delete (no busy-worker handling or PI_CODEMODE references). The process_image wait in work-images.ts:137 handles a different race (a screenshot file not written yet).",
-          "version": "1.4.0"
+          "rationale": "rg finds no use of keyHint, keyText, markdown transforms or responseModel in extensions or hub/src. The hub's Update all runs pi update --all on the pi.dev installer, which needs no custom update command.",
+          "version": "1.5.0"
         },
         {
-          "title": "Provider attribution headers come from pi-ai's client identity; before_provider_headers no longer sees them",
+          "title": "Usage.cost.totalFromProvider: keep summed compaction usage correct",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "1.5.0 adds the boolean Usage.cost.totalFromProvider, true when the total is the provider's billed amount; combined usage counts as provider-reported only when every part is. Two loops add every cost field as a number: extensions/work-models.ts (chunked native summary, around line 1694) and extensions/work-compaction-memory.ts (hybrid memory attempts, around line 251). A true flag becomes 1, and mixed parts stay truthy. Sum only numeric fields and AND the flag. Step CU-04 (found by the plan review).",
+          "verification": "CU-04: node scripts/test-work-compaction.mjs -> ok (all-true, mixed and absent addCost cases); node scripts/test-work-compaction-notifications.mjs -> ok (chunked usage keeps the flag true)",
+          "version": "1.5.0"
+        },
+        {
+          "title": "Model catalog v2: image-only models are no longer chat models",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "ce-workflow registers no before_provider_headers handler and sets no User-Agent or attribution header.",
-          "version": "1.4.0"
-        },
-        {
-          "title": "Codemode models.classify() accepts images for Jev and Clef",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "jev-tools.ts sends typed questions about JSON and file text through registry.classify; image questions already go through process_image and the configured vision model. Nobody asked for image classification.",
-          "version": "1.4.0"
-        },
-        {
-          "title": "Extension loader exposes @earendil-works/pi-ai/models (#11156)",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "No ce-workflow extension imports @earendil-works/pi-ai.",
-          "version": "1.4.0"
-        },
-        {
-          "title": "Other 1.4.0 runtime fixes and additions",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "Recovery from responses cut at the output limit (#11227), grep --no-config, Windows shell detection, BOM-tolerant managed-install.json and mcp.json, terminal teardown, clipboard on Ctrl+Z, /compact instructions on split turns, retries, prompt-cache fix, Markdown and HTML rendering, Rex terminal, models.json reference, new and default models. None has a ce-workflow code path or workaround; the extension types.d.ts is identical between 1.3.0 and 1.4.0.",
-          "version": "1.4.0"
+          "rationale": "generateImages() in extensions/work-images.ts finds image models with registry.findOfType('image', ...) and only draws with chat models of api openai-codex-responses, so removing image-only models from the chat list changes nothing here.",
+          "version": "1.5.0"
         }
       ]
     },
@@ -113,45 +108,45 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.84.0",
-      "reviewedAt": "2026-11-02T07:23:25.181Z",
-      "reviewedVersion": "0.84.0",
+      "version": "0.86.0",
+      "reviewedAt": "2026-11-06T10:34:49.123Z",
+      "reviewedVersion": "0.86.0",
       "decisions": [
         {
-          "title": "Subagent notices moved from the context hook to context_with_system so tool and prompt changes keep the prompt cache (0.83.0, #3058, #3063)",
-          "pov": "Trial",
+          "title": "Session switches with background work now ask stay, take or leave: report a cancelled Plan3 handoff",
+          "pov": "Adopt",
           "status": "adopted",
-          "rationale": "In Pi 1.4, when a `context` handler returns a changed message list, Pi merges every mid-conversation system message (prompt-section and toolsAdded/toolsRemoved updates) into one leading system message (runner.js restoreSystemMessages). Each tool change then rewrites the start of the prompt and the whole cache misses. Without the merge, pi-ai sends the change to Claude as appended tool_addition blocks and the cache holds (anthropic-messages.js:1055-1080). pi-subagents fixed this for itself; the installed 0.84.0 already has the fix. ce-workflow's three `context` handlers (work-models.ts:3796-3798: vision bridge, filteredContext with the durable-knowledge append, compactionNoteNudge) change the list on most turns and so force the merge. In x1600 session 01a19840, 4 of 6 cache misses not explained by idle time or compaction came right after a tool change (about 0.6M cache-write tokens in 86 turns). Trial per D1: CU-10 to CU-13.",
-          "verification": "node scripts/benchmark-context-cache-live.mjs (2 runs per side, anthropic/claude-opus-5-5, ultracompact): all runs completed with the tool change proven. Mean cost $0.2396 -> $0.1844 (-23%), total tokens 150,779 -> 143,585 (-4.8%), runtime 26.1 s -> 26.5 s (+1.6%), turns 10.5 -> 10, tool calls 9.5 -> 9. Tool-change request: cacheRead/cacheWrite 0/14.0k -> 5.1k/9.0k. The after runs also reused a 5k cached prefix on turn 1 from the baseline runs, which inflates the cost gain. C5, C6, C7 pass. Kept (D6).",
-          "version": "0.84.0"
+          "rationale": "0.85.0 adds a session_before_switch guard (src/extension/session-switch.js): with queued or running runs, undelivered results or open supervisor questions it asks via ctx.ui.select, and in RPC mode a 60 s timeout cancels the switch. The hub's new_session path already reports `Pi kept the current session.` (hub/src/sessions.ts). Plan3 startFresh (extensions/plan3.ts) ignores ctx.newSession's `{ cancelled }` result, so a refused or timed-out switch leaves the user with no message after the handoff. Step CU-03.",
+          "verification": "CU-03: node scripts/test-work-plan3.mjs -> Plan3 command self-checks passed; a cancelled newSession shows \"Pi kept this session; the plan is ready · /resume3 <id>\"",
+          "version": "0.86.0"
         },
         {
-          "title": "subagent:jobs-changed event and asyncStarted/jobsChanged in the RPC ping (0.83.0, #3068)",
-          "pov": "Reject",
-          "status": "no-action",
-          "rationale": "The event tells host views to re-read status on any background run change. plan3-web.ts:155-171 already re-reads on async-started, async-complete and child-status, and polls every 3 s while a run is active; the peer floor (>=0.75.0) keeps that poll needed. The event would only shorten a 3 s delay on chain-step changes nobody reported.",
-          "version": "0.84.0"
-        },
-        {
-          "title": "Workflow script sandbox fix GHSA-6v8j-6w28-2w8r; runs.run single-object form rejected (0.84.0, 0.83.1)",
+          "title": "Workflow children go through a nested subagent_launch tool call",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Workflow scripts can no longer set Error.prepareStackTrace or call import(). ce-workflow's only script is built by spawnSubagentRpc (work-models.ts:2458-2479, used by the retired knowledge discoverer): runs.run(\"main\", task), with no import() and no stack hooks. The Windows and x1600 Pi installs run 0.84.0. The repo's 0.79.1 is a peer auto-install that is never loaded as an extension (test-work-native-smoke.mjs:90 prefers the Pi install), so no lockfile bump and no peer-floor raise.",
-          "version": "0.84.0"
+          "rationale": "0.85.0 runs a deferred, model-hidden subagent_launch tool before each workflow child so tool_call handlers can block it (src/extension/subagent-launch-tool.js). Every ce-workflow tool_call handler filters on its own tool names (bash, read, intercom, ask_user, subagent), so none blocks it. Changing event.input does not reach the child, because pi-subagents launches from its own args object, so advisor-model.ts cannot pin the oracle model there and keeps its prompt guideline for workflow scripts.",
+          "version": "0.86.0"
         },
         {
-          "title": "Agent frontmatter: blank lines inside indented blocks, quoted names, +name/-name tool entries and thinking levels validated (0.82.0 to 0.83.1)",
+          "title": "Subagent tools restored after compaction once pi-subagents was reloaded",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "utility-agents/context-knowledge-discoverer.md, diff-reviewer.md and plan3-advisor.md use plain comma tool lists, thinking low or high, and no blank lines inside blocks, so every file parses the same as before.",
-          "version": "0.84.0"
+          "rationale": "0.86.0 fix (#3198). Idle sessions in the hub reload onto updated extensions by themselves, so this upstream fix removes a case where subagent and subagents_enable disappeared after a later compaction; nothing to change here.",
+          "version": "0.86.0"
         },
         {
-          "title": "Other 0.82.0 to 0.84.0 changes",
+          "title": "structured_output checked strictly against outputSchema",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Workflow auto-resume after a Pi exit, foreground run history and resume by id, Rex and Herdr placement, boot-id process liveness, bg_wait matching by session id, interrupt without id refused, mission completion needing a checked result, capability ceilings keyed by session id, background runs deleted after 90 days, a missing-provider diagnostic, final-reply drain fixes, a smaller bundled skill and an undici update. ce-workflow spawns with mission:false, registers no capability ceilings, uses no machine placement and never calls interrupt (rg over extensions/ and hub/src/), so nothing changes here; the fixes help users without code changes.",
-          "version": "0.84.0"
+          "rationale": "0.85.0 validates the model's raw structured_output before Pi coercion. The context-knowledge-discoverer schema (KNOWLEDGE_DISCOVERER_SCHEMA in work-models.ts) uses plain strings, enums and string arrays; a wrong type now fails validation and the child calls again, which is correct.",
+          "version": "0.86.0"
+        },
+        {
+          "title": "Resume hardening, waitTool.name, requireLauncher, workflow script sandbox, Herdr and Rex placement fixes",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "ce-workflow registers no bg_wait, sets no launcher or placement, and starts its subagents through spawnSubagentRpc or the subagent tool. Runs started before 0.85.0 cannot be resumed, which only affects runs that were already interrupted.",
+          "version": "0.86.0"
         }
       ]
     },
@@ -225,38 +220,16 @@
     },
     {
       "name": "pi-lens",
-      "version": "4.4.8",
-      "reviewedAt": "2026-11-02T07:23:25.181Z",
-      "reviewedVersion": "4.4.8",
+      "version": "4.4.9",
+      "reviewedAt": "2026-11-06T10:34:49.123Z",
+      "reviewedVersion": "4.4.9",
       "decisions": [
         {
-          "title": "Background git status reads set GIT_OPTIONAL_LOCKS=0 so they never hold or orphan .git/index.lock (4.4.7, #4930)",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "git status takes .git/index.lock for an optional index refresh; a concurrent git add or commit then fails with \"index.lock: File exists\", and a killed status can leave the lock behind. pi-lens fixed its own reads. The hub polls git status per session folder every 4 s with a 5 s timeout (hub/src/api.ts:76) and in the Files view (hub/src/files.ts:10-18), without that variable. x1600 session logs hold 14 such failures (10 in 01a155ad, 4 in 01a193d1, latest 2026-11-01). The cause of each is unproven; adopted without diagnosis (D5). CU-04.",
-          "verification": "node hub/scripts/test-api.mjs -> api ok (gitReadEnv gives \"0\" over a parent \"1\" and keeps other vars); node hub/scripts/test-chat-files.mjs -> ok",
-          "version": "4.4.8"
-        },
-        {
-          "title": "tools.lazy \"auto\" and --lens-retain-injections for prompt caches on folding models (4.4.5)",
+          "title": "4.4.9 tool output and guard changes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "User options in pi-lens config. They work around the same merge as the pi-subagents Trial entry, which ce-workflow's own context handlers trigger; that trial fixes it at the source.",
-          "version": "4.4.8"
-        },
-        {
-          "title": "Tool surface: path is the one single-file parameter, ast_grep_outline and symbol_search return compact text, lens_diagnostics says inconclusive instead of clean (4.4.5 to 4.4.8)",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "ce-workflow only classifies lens tools by name and reads args.path and args.paths (work-compaction.ts:281-290, 356-359; work-models.ts:1828-1834); it parses no lens output. The tool names did not change, and inconclusive-not-clean matches the 4.3.0 decision.",
-          "version": "4.4.8"
-        },
-        {
-          "title": "Other 4.4.5 to 4.4.8 changes",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "Commit-gate (--lens-guard) record ownership and quoting, per-session blockers and read guards for in-process subagents, LSP root, cascade and freshness fixes, trust-gated command lookup, dispatch.disabledRunners, opt-in fallow and effect-tsgo servers, formatter and linter no-fix flags, and the pi 0.86.1 host floor (the host runs 1.4.0). None has a ce-workflow code path.",
-          "version": "4.4.8"
+          "rationale": "4.4.9 changes lsp_navigation's default output to text, rejects unknown severity and read_symbol kind values, routes partial edit applies through Pi's edit tool, and repeats unresolved blockers at the next prompt. ce-workflow calls none of these tools from code: work-compaction.ts and work-models.ts only list the names read_symbol, read_enclosing, module_report and lens_diagnostics, and these names are unchanged. The only ce-workflow write guard (extensions/plan3.ts, around line 1900) handles the write tool for new Plan3 files; the upstream change concerns partial edit batches, and no ce-workflow handler guards edit, so it has nothing to reach.",
+          "version": "4.4.9"
         }
       ]
     }

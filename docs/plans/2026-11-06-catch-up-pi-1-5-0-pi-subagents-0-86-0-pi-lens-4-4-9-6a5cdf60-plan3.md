@@ -4,7 +4,7 @@ status: ready
 created: 2026-11-06
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.0","pi-subagents":"0.86.0","pi-lens":"4.4.9"}
-updated: 2026-11-06T10:14:18.505Z
+updated: 2026-11-06T10:34:59.327Z
 reviewed: 2026-11-06
 ---
 
@@ -43,13 +43,15 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
       "title": "Pin the devDependency to the reviewed release 1.5.0",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "package.json still pins @earendil-works/pi-coding-agent 1.4.0 for type checks and tests, while the host now runs 1.5.0 (summary.json installedVersion). The 1.4.0 catch-up adopted the same pin rule. Step CU-01."
+      "rationale": "package.json still pins @earendil-works/pi-coding-agent 1.4.0 for type checks and tests, while the host now runs 1.5.0 (summary.json installedVersion). The 1.4.0 catch-up adopted the same pin rule. Step CU-01.",
+      "verification": "CU-01: npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.5.0 -> package.json devDependency and package-lock.json both 1.5.0 (commit d09de12)"
     },
     {
       "title": "Image resizing now picks the smaller of PNG and JPEG: keep generate_image output PNG",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "1.5.0 'Fixed resized photos being sent as multi-megabyte PNGs': resizeImage now tries the smaller encoding first (dist/utils/image-resize-core.js `const preferred`); 1.4.0 always took PNG first when no byte budget applied. extensions/work-images.ts fitImage scales every sized generate_image result (Codex draws about 1448x1086 for 800x600) with maxBytes MAX_SAFE_INTEGER, and execute() names the file by the returned mimeType, so a requested out.png can now be saved as out.jpg, and pngSize() then skips the size check. shrinkImage (process_image input) benefits from smaller JPEGs and stays as is. Step CU-02."
+      "rationale": "1.5.0 'Fixed resized photos being sent as multi-megabyte PNGs': resizeImage now tries the smaller encoding first (dist/utils/image-resize-core.js `const preferred`); 1.4.0 always took PNG first when no byte budget applied. extensions/work-images.ts fitImage scales every sized generate_image result (Codex draws about 1448x1086 for 800x600) with maxBytes MAX_SAFE_INTEGER, and execute() names the file by the returned mimeType, so a requested out.png can now be saved as out.jpg, and pngSize() then skips the size check. shrinkImage (process_image input) benefits from smaller JPEGs and stays as is. Step CU-02.",
+      "verification": "CU-02: node scripts/test-work-compaction-notifications.mjs -> ok; a JPEG resize with a stub converter returns image/png at 800x600, jpegQuality 100 is passed, and a failed conversion keeps the original"
     },
     {
       "title": "Tool argument validation moved to pi-schema (breaking change)",
@@ -85,7 +87,8 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
       "title": "Usage.cost.totalFromProvider: keep summed compaction usage correct",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "1.5.0 adds the boolean Usage.cost.totalFromProvider, true when the total is the provider's billed amount; combined usage counts as provider-reported only when every part is. Two loops add every cost field as a number: extensions/work-models.ts (chunked native summary, around line 1694) and extensions/work-compaction-memory.ts (hybrid memory attempts, around line 251). A true flag becomes 1, and mixed parts stay truthy. Sum only numeric fields and AND the flag. Step CU-04 (found by the plan review)."
+      "rationale": "1.5.0 adds the boolean Usage.cost.totalFromProvider, true when the total is the provider's billed amount; combined usage counts as provider-reported only when every part is. Two loops add every cost field as a number: extensions/work-models.ts (chunked native summary, around line 1694) and extensions/work-compaction-memory.ts (hybrid memory attempts, around line 251). A true flag becomes 1, and mixed parts stay truthy. Sum only numeric fields and AND the flag. Step CU-04 (found by the plan review).",
+      "verification": "CU-04: node scripts/test-work-compaction.mjs -> ok (all-true, mixed and absent addCost cases); node scripts/test-work-compaction-notifications.mjs -> ok (chunked usage keeps the flag true)"
     },
     {
       "title": "Model catalog v2: image-only models are no longer chat models",
@@ -99,7 +102,8 @@ Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-problem", "status": "ad
       "title": "Session switches with background work now ask stay, take or leave: report a cancelled Plan3 handoff",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "0.85.0 adds a session_before_switch guard (src/extension/session-switch.js): with queued or running runs, undelivered results or open supervisor questions it asks via ctx.ui.select, and in RPC mode a 60 s timeout cancels the switch. The hub's new_session path already reports `Pi kept the current session.` (hub/src/sessions.ts). Plan3 startFresh (extensions/plan3.ts) ignores ctx.newSession's `{ cancelled }` result, so a refused or timed-out switch leaves the user with no message after the handoff. Step CU-03."
+      "rationale": "0.85.0 adds a session_before_switch guard (src/extension/session-switch.js): with queued or running runs, undelivered results or open supervisor questions it asks via ctx.ui.select, and in RPC mode a 60 s timeout cancels the switch. The hub's new_session path already reports `Pi kept the current session.` (hub/src/sessions.ts). Plan3 startFresh (extensions/plan3.ts) ignores ctx.newSession's `{ cancelled }` result, so a refused or timed-out switch leaves the user with no message after the handoff. Step CU-03.",
+      "verification": "CU-03: node scripts/test-work-plan3.mjs -> Plan3 command self-checks passed; a cancelled newSession shows \"Pi kept this session; the plan is ready · /resume3 <id>\""
     },
     {
       "title": "Workflow children go through a nested subagent_launch tool call",
@@ -185,10 +189,7 @@ None.
 ### Phase 2 — Verify and record [code]
 
 - [ ] **CU-90** Run `npm run verify:quiet` after the adopted changes and record the result.
-- [ ] **CU-91** Record the reviewed versions: `node scripts/work-catch-up-record.mjs <this plan's id>`.
-  - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json`.
-  - It refuses missing, unexplained or unverified decisions.
-  - Before running it, add each adopted decision's `verification` (command and result from CU-01 to CU-03) to the JSON above.
+- [x] **CU-91** Recorded Pi 1.5.0, pi-subagents 0.86.0 and pi-lens 4.4.9 with their decisions in extensions/work-catch-up-baseline.json.
 
 ## Acceptance
 
