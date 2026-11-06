@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { readdir } from "node:fs/promises";
-import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
+import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -93,6 +93,14 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	};
 	await Promise.all([1, 2, 3].map(() => mobileAct(gate, { action: "swipe", direction: "left", settleMs: 0 }, opts())));
 	assert.equal(overlap, false, "parallel swipes run one after another");
+}
+
+// On-screen keyboard: found by its container ids; a hidden keyboard (below the screen) does not count.
+{
+	const el = (type, id, y, h) => ({ type, label: "", identifier: id, rect: { x: 0, y, width: 393, height: h } });
+	const els = assignRefs(undefined, flatten([el("StaticText", "", 673, 44), el("Other", "SystemInputAssistantView", 516, 45), el("Other", "UIKeyboardLayoutStar Preview", 561, 233)])).snap.elements;
+	assert.deepEqual(keyboard(els, 852), { index: 1, top: 516 }, "keyboard top and index");
+	assert.equal(keyboard(assignRefs(undefined, flatten([el("Other", "SystemInputAssistantView", 852, 45)])).snap.elements, 852), undefined, "offscreen keyboard ignored");
 }
 
 // Overlapped elements: tap the visible strip of a fanned card, not the neighbour on top of its center.
@@ -221,6 +229,20 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	locked = true;
 	await assert.rejects(mobileAct(wda, { action: "snapshot" }, po()), /Lorenz’s iPhone is locked or waiting for its passcode/);
 	locked = false;
+
+	// A timed-out call (the daemon dialling the phone's old tunnel address) also restarts the daemon, once.
+	{
+		resetSession();
+		let stuck = true, restarts = 0;
+		const t = async (c, a) => {
+			if (c === "xcrun") return { code: 0 };
+			if (a[0] === "daemon") { restarts++; stuck = false; return { code: 0 }; }
+			if (a[0] === "dump" && stuck) return { code: 1, killed: true, stdout: "" };
+			return dead.exec(c, a);
+		};
+		assert.match(await mobileAct(t, { action: "snapshot" }, po()), /Restarted the mobilecli daemon/);
+		assert.equal(restarts, 1);
+	}
 
 	// The iOS "Enable UI Automation" passcode prompt after a restart blocks the helper: named, and no daemon restart.
 	screenText = "Enter iPhone Passcode for “XCTest” Enable UI Automation";
@@ -413,6 +435,12 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 		assert.deepEqual(agent.acts().filter(a => !a.startsWith("apps foreground")), [`agent install --device 0000-REAL --provisioning-profile ${path.join(dir, "d.mobileprovision")}`]);
 		await rm(dir, { recursive: true });
 	}
+	// Helper installed but agent status hangs: no install question (it was asked again and again on Viktor's phone).
+	resetSession();
+	const hung = fake({ list: [PHONE], agent: false });
+	const listed = async (c, a) => c === "xcrun" && a.includes("apps") ? { code: 0, stdout: "Device Kit   com.mobilenext.devicekit-iosUITests.xctrunner   0.0.35" } : hung.exec(c, a);
+	await assert.rejects(mobileAct(listed, { action: "snapshot" }, opts({ confirm: async () => assert.fail("no install question") })), /installed on Lorenz’s iPhone but does not answer[^]*Not reinstalling/);
+	assert.deepEqual(hung.acts(), [], "nothing installed");
 	resetSession();
 	const pixel = fake({ list: [PIXEL], agent: false });
 	await mobileAct(pixel.exec, { action: "button", button: "back", settleMs: 0 }, opts());

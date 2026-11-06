@@ -85,10 +85,18 @@ export async function findProfile(exec: Exec, udid: string, signal?: AbortSignal
 	return wildcard;
 }
 
+/** Whether the helper app is on the iPhone, asked through devicectl (works when the mobilecli link does not). */
+export async function helperListed(exec: Exec, dev: Device, signal?: AbortSignal) {
+	const r = await exec("xcrun", ["devicectl", "device", "info", "apps", "--device", dev.id], { timeout: 60_000, signal }).catch(() => ({ code: 1, stdout: "" }));
+	return String(r.stdout ?? "").includes("com.mobilenext.devicekit-iosUITests.xctrunner");
+}
+
 /** The DeviceKit helper agent must be on an iOS device before reading or touching it: automatic on simulators, asked on real iPhones. */
 async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 	if (dev.platform !== "ios" || agentOk.has(dev.id)) return;
 	const installed = await run(exec, ["agent", "status", "--device", dev.id], o.signal).then(out => JSON.parse(out).status === "ok", () => false);
+	// A hung or failing status call is not a missing helper: asking to reinstall then repeats on every call and fails anyway.
+	if (!installed && dev.type === "real" && await helperListed(exec, dev, o.signal)) throw new Error(`The mobilecli helper is installed on ${dev.name} but does not answer (agent status failed). Not reinstalling.\n${await agentHint(exec, dev, o.signal)}`);
 	if (!installed) {
 		const install = async (extra: string[]) => {
 			await run(exec, ["agent", "install", "--device", dev.id, ...extra], o.signal, 300_000);
@@ -469,9 +477,18 @@ export function visiblePoint(e: Element, all: Element[]) {
 	}
 	return best ?? [cx, cy];
 }
+/** Top edge and list index of the on-screen iOS keyboard (its parts follow it in the tree), or undefined. */
+export function keyboard(all: Element[], screenHeight: number) {
+	const parts = all.filter(e => (e.type === "Keyboard" || /^(SystemInputAssistantView|UIKeyboardLayoutStar)/.test(e.id)) && e.frame.y < screenHeight && e.frame.height > 0);
+	return parts.length ? { index: all.indexOf(parts[0]), top: Math.min(...parts.map(e => e.frame.y)) } : undefined;
+}
 const point = (dev: Device, a: MobileActArgs, what: string) => {
 	const e = a.ref ? element(dev, a.ref) : undefined;
-	const [x, y] = e ? visiblePoint(e, snapshots.get(dev.id)?.elements ?? []) : [a.x, a.y];
+	const all = snapshots.get(dev.id)?.elements ?? [];
+	const [x, y] = e ? visiblePoint(e, all) : [a.x, a.y];
+	const kb = e && all.includes(e) ? keyboard(all, screens.get(dev.id)?.height || Infinity) : undefined;
+	// a tap there would hit a key instead (it typed stray letters into a form)
+	if (kb && all.indexOf(e!) < kb.index && typeof y === "number" && y >= kb.top) throw new Error(`${a.ref} is under the on-screen keyboard; dismiss the keyboard or scroll it into view (swipe without ref stays above the keyboard) first.`);
 	if (typeof x !== "number" || typeof y !== "number") throw new Error(`${what} needs ref, or x and y.`);
 	return `${num(x)},${num(y)}`;
 };
@@ -581,7 +598,9 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 		return await queued();
 	} catch (e) {
 		devices.delete(cacheKey);
-		if (dev.platform !== "ios" || dev.type !== "real" || !/WebDriverAgent/.test((e as Error).message)) throw e;
+		// A timeout is the same dead link: after the phone's tunnel changes, the daemon keeps dialling the old address.
+		const dead = /WebDriverAgent|^mobilecli \w+ timed out/;
+		if (dev.platform !== "ios" || dev.type !== "real" || !dead.test((e as Error).message)) throw e;
 		const prompt = await agentPrompt(exec, dev, o);
 		if (prompt) throw new Error(`${(e as Error).message}\n${prompt}`);
 		// The daemon keeps its link to the helper across calls; one made while the helper was blocked stays dead after the phone is fixed.
@@ -589,7 +608,7 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 		try {
 			return `(Restarted the mobilecli daemon: its link to the helper on ${dev.name} had gone stale. Other devices reconnect on their next call.)\n${await queued()}`;
 		} catch (again) {
-			if (!/WebDriverAgent/.test((again as Error).message)) throw again;
+			if (!dead.test((again as Error).message)) throw again;
 			throw new Error(`${(again as Error).message}\n${await agentHint(exec, dev, signal)}`);
 		}
 	}
@@ -672,7 +691,9 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 			return changes(exec, dev, settle, o);
 		}
 		case "swipe": {
-			const f = args.ref ? element(dev, args.ref).frame : await screen(exec, dev, signal);
+			let f = args.ref ? element(dev, args.ref).frame : await screen(exec, dev, signal);
+			const kb = args.ref ? undefined : keyboard(snapshots.get(dev.id)?.elements ?? [], f.height || Infinity);
+			if (kb && kb.top > f.y) f = { ...f, height: kb.top - f.y }; // a swipe starting on the keyboard types instead of scrolling
 			if (!f.width) throw new Error("Screen size unknown: snapshot first or pass ref.");
 			await run(exec, ["io", "swipe", swipePoints(args.direction ?? "down", f).map(num).join(","), ...d], signal);
 			return changes(exec, dev, settle, o);

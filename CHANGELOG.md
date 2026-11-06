@@ -2,6 +2,22 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.38 — 2026-11-06
+
+### Fixed
+- mobile_act no longer asks to install its helper on an iPhone that already has it. When `mobilecli agent status` hung or failed, it was read as "not installed", so every call asked to reinstall (and the install failed). It now checks the phone's app list through devicectl and reports that the helper does not answer instead.
+- mobile_act on iPhones: a call that times out now restarts the mobilecli daemon once, like a helper start failure already did. When the phone's connection to the Mac drops and comes back under a new address, the daemon kept dialling the old one and every call hung.
+
+## 0.2.37 — 2026-11-06
+
+### Fixed
+- mobile_act on iPhones: a tap on an element hidden under the on-screen keyboard is refused with a hint instead of hitting a key (it typed a stray letter into a form), and a swipe without ref stays above the keyboard (it started on the space bar and typed a space instead of scrolling).
+
+## 0.2.36 — 2026-11-06
+
+### Added
+- Hub gear menu: an Install button next to the browser extension's Copy path registers its native host for Helium, Chrome, Edge and Chromium on this PC (same as /wo → Settings → Browser access → Install). It fixes the extension's "Specified native messaging host not found" error; reload the extension afterwards.
+
 ## 0.2.35 — 2026-11-04
 
 ### Changed
