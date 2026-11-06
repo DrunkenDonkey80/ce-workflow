@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.2.37 — 2026-11-06
+
+### Fixed
+- mobile_act on iPhones: a tap on an element hidden under the on-screen keyboard is refused with a hint instead of hitting a key (it typed a stray letter into a form), and a swipe without ref stays above the keyboard (it started on the space bar and typed a space instead of scrolling).
+
 ## 0.2.36 — 2026-11-06
 
 ### Added

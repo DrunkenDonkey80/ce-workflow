@@ -469,9 +469,18 @@ export function visiblePoint(e: Element, all: Element[]) {
 	}
 	return best ?? [cx, cy];
 }
+/** Top edge and list index of the on-screen iOS keyboard (its parts follow it in the tree), or undefined. */
+export function keyboard(all: Element[], screenHeight: number) {
+	const parts = all.filter(e => (e.type === "Keyboard" || /^(SystemInputAssistantView|UIKeyboardLayoutStar)/.test(e.id)) && e.frame.y < screenHeight && e.frame.height > 0);
+	return parts.length ? { index: all.indexOf(parts[0]), top: Math.min(...parts.map(e => e.frame.y)) } : undefined;
+}
 const point = (dev: Device, a: MobileActArgs, what: string) => {
 	const e = a.ref ? element(dev, a.ref) : undefined;
-	const [x, y] = e ? visiblePoint(e, snapshots.get(dev.id)?.elements ?? []) : [a.x, a.y];
+	const all = snapshots.get(dev.id)?.elements ?? [];
+	const [x, y] = e ? visiblePoint(e, all) : [a.x, a.y];
+	const kb = e && all.includes(e) ? keyboard(all, screens.get(dev.id)?.height || Infinity) : undefined;
+	// a tap there would hit a key instead (it typed stray letters into a form)
+	if (kb && all.indexOf(e!) < kb.index && typeof y === "number" && y >= kb.top) throw new Error(`${a.ref} is under the on-screen keyboard; dismiss the keyboard or scroll it into view (swipe without ref stays above the keyboard) first.`);
 	if (typeof x !== "number" || typeof y !== "number") throw new Error(`${what} needs ref, or x and y.`);
 	return `${num(x)},${num(y)}`;
 };
@@ -672,7 +681,9 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 			return changes(exec, dev, settle, o);
 		}
 		case "swipe": {
-			const f = args.ref ? element(dev, args.ref).frame : await screen(exec, dev, signal);
+			let f = args.ref ? element(dev, args.ref).frame : await screen(exec, dev, signal);
+			const kb = args.ref ? undefined : keyboard(snapshots.get(dev.id)?.elements ?? [], f.height || Infinity);
+			if (kb && kb.top > f.y) f = { ...f, height: kb.top - f.y }; // a swipe starting on the keyboard types instead of scrolling
 			if (!f.width) throw new Error("Screen size unknown: snapshot first or pass ref.");
 			await run(exec, ["io", "swipe", swipePoints(args.direction ?? "down", f).map(num).join(","), ...d], signal);
 			return changes(exec, dev, settle, o);

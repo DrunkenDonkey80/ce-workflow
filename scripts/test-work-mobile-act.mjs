@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { readdir } from "node:fs/promises";
-import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint } from "../extensions/mobile-act.ts";
+import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -93,6 +93,14 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	};
 	await Promise.all([1, 2, 3].map(() => mobileAct(gate, { action: "swipe", direction: "left", settleMs: 0 }, opts())));
 	assert.equal(overlap, false, "parallel swipes run one after another");
+}
+
+// On-screen keyboard: found by its container ids; a hidden keyboard (below the screen) does not count.
+{
+	const el = (type, id, y, h) => ({ type, label: "", identifier: id, rect: { x: 0, y, width: 393, height: h } });
+	const els = assignRefs(undefined, flatten([el("StaticText", "", 673, 44), el("Other", "SystemInputAssistantView", 516, 45), el("Other", "UIKeyboardLayoutStar Preview", 561, 233)])).snap.elements;
+	assert.deepEqual(keyboard(els, 852), { index: 1, top: 516 }, "keyboard top and index");
+	assert.equal(keyboard(assignRefs(undefined, flatten([el("Other", "SystemInputAssistantView", 852, 45)])).snap.elements, 852), undefined, "offscreen keyboard ignored");
 }
 
 // Overlapped elements: tap the visible strip of a fanned card, not the neighbour on top of its center.
