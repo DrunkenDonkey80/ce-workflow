@@ -760,7 +760,10 @@ try {
  await browser("wait", "--fn", "document.getElementById('bias-button').textContent.startsWith('Thinker (Plan)')");
  await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { code: "Minus", key: "-", altKey: true, bubbles: true }))`);
  await browser("wait", "--fn", "document.getElementById('bias-button').textContent === 'Thinker (Task)'");
- await browser("click", "#context-button"); await browser("click", "#compact-now"); assert.equal(commands.at(-1), "/wo compact"); commands.length = 0;
+ commands.length = 0; await browser("click", "#context-button"); await browser("click", "#compact-now");
+ // The click's post lands after agent-browser returns; wait for it instead of reading the list at once.
+ for (let i = 0; i < 100 && !commands.length; i++) await new Promise(r => setTimeout(r, 20));
+ assert.deepEqual(commands, ["/wo compact"]); commands.length = 0;
  // Clicking a provider opens its window: every quota window as a bar; Claude adds the account pool with its actions.
  await browser("click", "#usage-button [data-provider=codex]"); await browser("wait", "--fn", "document.getElementById('usage-window').open");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#usage-body .usage-window-bar')].map(b => b.textContent)"), ["5h 80% left · resets in 2h 3m", "7d 12% left · resets in 1d 14h (Tue 10:00)18h 19m · 75%1d 9m · 65%"], "codex window: 5h and 7d bars");
