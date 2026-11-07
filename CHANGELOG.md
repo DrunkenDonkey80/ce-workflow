@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.3.1 — 2026-11-07
+
+### Fixed
+- `app_act` asks once per program. It used to ask again whenever the agent named the same program differently (`releases`, `releases-app`, its pid), and asked even for names that matched no program or several; those now fail with the list of running apps without a prompt.
+
 ## 0.3.0 — 2026-11-06
 
 ### Added

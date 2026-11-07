@@ -118,4 +118,13 @@ assert.equal(await appAct(null, { action: "apps" }, { helper: async () => ({ app
 resetSession();
 await assert.rejects(appAct(null, { action: "find", app: "Xcode", query: "x" }, o), /No snapshot yet/);
 assert.equal(appActTool(() => {}).name, "app_act");
+
+// One app named three ways (exact name, window title, pid) asks once; an unknown or ambiguous name fails without asking.
+resetSession();
+const winApps = { apps: [{ name: "releases-app", bundle: "", pid: 26596, windows: ["Releases"] }, { name: "OneCommander", bundle: "", pid: 2900, windows: ["Releases"] }, { name: "explorer", bundle: "", pid: 7, windows: ["Start"] }] };
+const once = [], wh = { platform: "win32", confirm: async title => (once.push(title), true), helper: async req => req.op === "apps" ? winApps : { window: "Releases", windows: ["Releases"], front: false, nodes: [] } };
+await assert.rejects(appAct(null, { action: "snapshot", app: "48172" }, wh), /no app with a window matches "48172"/);
+await assert.rejects(appAct(null, { action: "snapshot", app: "releases" }, wh), /several apps match "releases"[\s\S]*OneCommander/);
+for (const app of ["releases-app", "26596", "Releases-App"]) await appAct(null, { action: "snapshot", app }, wh);
+assert.deepEqual(once, ["Let the agent read and operate releases-app?"], "one prompt per app, none for names that match nothing or several");
 console.log("app-act ok");
