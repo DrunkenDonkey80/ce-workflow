@@ -36,18 +36,19 @@ const tsv = (pages) => ["level\tpage_num\tblock_num\tpar_num\tline_num\tword_num
 	...pages.flatMap((tokens, p) => [`1\t${p + 1}\t0\t0\t0\t0\t0\t0\t608\t1080\t-1\t`, ...tokens.map((t, i) => `5\t${p + 1}\t1\t1\t1\t${i + 1}\t0\t0\t9\t9\t${t === "blurry" ? 40 : 91}\t${t}`)])].join("\n");
 assert.deepEqual(ocrTokens(tsv([["const", "x", "=", "42;", "blurry"], []]), 3), [["const", "x", "=", "42;"], [], []]);
 
-// D-11 candidate selection.
+// D-11/D-13 candidate selection.
 const code = words(20, "tok");
 const fixed = [...code.slice(0, 19), "43"]; // one changed token, a number
 const scrollA = words(20, "line"), scrollB = [...words(10, "line").map((_, i) => `line${i + 10}`), ...words(10, "more")];
 const pages = [
 	["so", "the", "idea", "is"], // 0 caption-only: dropped
-	code, code, code, // 1-3 identical run → keep 3
-	fixed, // 4 corrected line: same run, the corrected last page wins
-	scrollA, scrollB, // 5, 6 overlapping scroll positions: both kept
+	code, code, code, // 1-3 exact repeats → keep 1 (before)
+	fixed, // 4 corrected line: same run, kept as the after state
+	[...fixed.slice(0, 18), "x", "43"], // 5 another edit in the run: replaces 4 as the last state
+	scrollA, scrollB, // 6, 7 overlapping scroll positions: both kept
 ];
 assert(similarity(code, fixed) > 0.9 && similarity(scrollA, scrollB) < 0.5);
-assert.deepEqual(selectCandidates(pages), [4, 5, 6]);
+assert.deepEqual(selectCandidates(pages), [1, 5, 6, 7]);
 
 // D-08 sampling.
 assert.equal(sampleInterval(1199), 1);

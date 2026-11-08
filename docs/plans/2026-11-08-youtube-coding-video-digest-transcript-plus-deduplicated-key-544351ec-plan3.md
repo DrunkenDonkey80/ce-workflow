@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T13:08:26.461Z
+updated: 2026-11-08T13:43:21.009Z
 reviewed: 2026-11-08
 started: 2026-11-08T12:59:02.498Z
 ---
@@ -76,6 +76,7 @@ Acceptance examples:
 - **D-10 Reruns keep takeaways; collisions get the video id.** If the folder exists for the same video id (read from the digest header), the tool rewrites the generated sections and images and copies the existing `## Takeaways for ce-workflow` section verbatim; `digest.md` is written to a temp file and renamed. If the folder holds another video, the folder name gets `-<videoId>` appended. Source: plan review 2026-11-08 (advisor finding 4); design choice inside approved scope, not a user decision.
 - **D-11 Candidate selection keeps the last frame of each run of similar frames.** Similarity is Jaccard on the multiset of OCR tokens, numbers and symbol tokens included, against the previous candidate-text frame only; the last frame of a run is the most complete state (typed code, a fixed line). Repeated screens later in the video become separate candidates and Luna merges them. Replaces the spike's "Jaccard below 0.5 against every kept frame, keep first". Source: plan review 2026-11-08 (advisor finding 1); thresholds are tuned in VD-08.
 - **D-12 Luna's reply is validated in code.** Each batch returns `{artifacts: [...]}`; an item with an existing `id` updates that artifact, an item without `id` is new, omitted artifacts stay unchanged (stable ids, not cumulative replacement). Fields are checked: `kind` is text or image, `start` and `end` within the video and ordered, `frame` must be a timestamp label from this call's frame map (never a path), markdown length bounded. Invalid items are dropped and counted in the result. The slug is `[a-z0-9-]`, at most 60 characters, and the resolved folder must stay inside `docs/research/videos/`. Source: plan review 2026-11-08 (advisor findings 2 and 3); trust-boundary validation.
+- **D-13 Live code edits keep before and after.** Amends D-11: each run of similar frames keeps its first and last frame (exact repeats are skipped), and Luna shows a Before and an After block when the video changes code to make a point. Accepted cost: about 2x candidates and Luna calls. Source: user via ask_user 2026-11-08 (VD-08), after VD-07 lost the `traceId?:` before state.
 
 ## Open questions
 
@@ -118,15 +119,9 @@ Commands:
 
 ### Phase 2: Calibrate on real videos [think]
 
-- [ ] **VD-06** Run C3 on `https://www.youtube.com/shorts/k2zgcTDq4aQ` and compare with the first acceptance example.
-  - Record frames, candidates, Luna calls, tool runtime, Luna tokens and cost, and the session's total provider tokens, cost, turns and tool calls (all continuation sessions); judge whether the flowchart matches the frames.
-- [ ] **VD-07** Run C3 on one 10 to 20 minute landscape screen-share coding video (pick a public Matt Pocock video) and record the same numbers.
-  - Judge: each sampled distinct code or diagram state appears once; no talking-head artifacts.
-  - Runtime target (assumption): tool runtime at most the video's length. If missed, ask the user with the numbers then.
-  - VD-06 and VD-07 numbers are the calibration baseline.
-- [ ] **VD-08** Tune only what the numbers show (OCR confidence, token minimum, similarity threshold, batch size, Luna reasoning level); rerun C1 and both videos.
-  - Keep a change only if neither video regresses materially in quality, runtime, tokens, cost, turns or tool calls (AGENTS.md Optimization Regression Rule); otherwise revert it.
-  - If tuning trades quality against cost, ask the user with the numbers then.
+- [x] **VD-06** Matt short via headless Pi: tools_enable → video_digest → digest at the D-09 path with the full 7-node flowchart (all notes), 2,032-char transcript, 0 images, 1 Luna call, takeaways appended; Mermaid syntax defect (labels starting with "/", literal \n) left for VD-08.
+- [x] **VD-07** Matt's 15:55 "6 TypeScript tips" (lraHlXpuhKs): 10 clean code artifacts, no talking-head ones, runtime under video length; D-11 last-of-run drops "before" states of live edits (e.g. traceId?: at 1:00 shown only as the 1:54 fixed version).
+- [x] **VD-08** Tuned per numbers: Mermaid labels quoted with <br> (short's flowchart now valid syntax); D-13 first+last of each run and Before/After blocks for live edits (user-approved cost); thresholds unchanged; reruns kept takeaways.
 - [human] **VD-09** User reviews the Matt short digest with the agent's takeaways and confirms the loop is useful.
   - note: User judgment on the digest and takeaways.
 
