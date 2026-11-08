@@ -252,8 +252,11 @@ try {
 	// Failures and cancellation remove the temp dir.
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ failing: "ffmpeg" }).exec, model, tmpRoot }), /ffmpeg could not sample frames/);
 	tmpEmpty();
-	// A transient 403 on the download is retried once; two in a row fail with yt-dlp's error.
-	await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ flaky: 1 }).exec, model, tmpRoot });
+	// A transient 403 on the download is retried once from the page URL (fresh format URLs); two in a row fail with yt-dlp's error.
+	const flaky = fake({ flaky: 1 });
+	await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: flaky.exec, model, tmpRoot });
+	const downloads = flaky.calls.filter((call) => call.includes("bv*[height<=720]/b"));
+	assert(downloads.length === 2 && downloads[0].includes("--load-info-json") && !downloads[1].includes("--load-info-json") && downloads[1].at(-1) === "https://youtu.be/k2zgcTDq4aQ");
 	tmpEmpty();
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ flaky: 2 }).exec, model, tmpRoot }), /could not download the video: HTTP Error 403/);
 	tmpEmpty();
