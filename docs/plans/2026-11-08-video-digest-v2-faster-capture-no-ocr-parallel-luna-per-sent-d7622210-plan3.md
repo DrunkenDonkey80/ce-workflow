@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T16:09:50.391Z
+updated: 2026-11-08T16:10:43.740Z
 reviewed: 2026-11-08
 ---
 
@@ -118,7 +118,7 @@ Commands (referenced by steps):
 
 - [x] **V2-05** sentences(json3) replaces captionLines/captionParagraphs: word times from event start plus offsets (previous word's time when missing), split at . ? !, unpunctuated tracks also at 1.5 s pauses or 40 words; transcript is one [m:ss] line per sentence and feeds the batch prompts.
 - [x] **V2-06** One "Transcript and visuals" section: [m:ss] sentence paragraphs with each visual after the last sentence at or before its start (leading visuals first, no-captions note when none); up to 12 frames per visual copied to frames/<m-ss>.jpg and linked with a YouTube t= link; image visuals embed their frame; v1 images/ folder removed on rerun.
-- [ ] **V2-07** Update README and CHANGELOG (Unreleased): no Tesseract (D-08), faster runs, per-sentence transcript, kept frames.
+- [x] **V2-07** README video_digest paragraph and the Unreleased CHANGELOG bullet describe v2: per-sentence lines with visuals woven in, kept JPEG frames with YouTube links, 720p, pixel filter, 8 parallel Luna calls plus merge, needs only yt-dlp and ffmpeg.
 
 ### Phase 4: Calibrate [think]
 

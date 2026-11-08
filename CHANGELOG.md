@@ -11,7 +11,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - `/plan3 finish` offers the plan's settled project terms and key decisions for `GLOSSARY.md` and `docs/adr/`, written only for the items you tick.
 - Two skills from Matt Pocock's collection: `two-axis-review` (reviews a diff against the repo's rules and against what was asked, side by side) and `diagnosing-bugs` (reproduce first, prove the cause, regression test before the fix).
 - `/plan3 rework [target]` plans a safe rework of one messy part of a project into a deeper module. It maps the code, records the current behavior as tests, compares designs, and waits for you before building, switching over and deleting the old code.
-- `video_digest` (in the ce-workflow checkout only): give the agent a YouTube coding video and it saves the transcript plus the code, diagrams and tables shown on screen, rebuilt as text, to `docs/research/videos/`, then notes what ce-workflow could adopt.
+- `video_digest` (in the ce-workflow checkout only): give the agent a YouTube coding video and it saves the transcript plus the code, diagrams and tables shown on screen, rebuilt as text, to `docs/research/videos/`, then notes what ce-workflow could adopt. Each spoken sentence gets its own timestamp, and every visual sits right after the sentence being said when it appears, with links to the original frames (kept as JPEG next to the digest) and to that second on YouTube. Needs only yt-dlp and ffmpeg, no Tesseract; frames are sorted by a quick pixel check and read by Luna 8 at a time, so a 16-minute video takes a fraction of the time and CPU.
 
 ## 0.3.1 — 2026-11-07
 
