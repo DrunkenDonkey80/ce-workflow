@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T16:07:31.680Z
+updated: 2026-11-08T16:09:50.391Z
 reviewed: 2026-11-08
 ---
 
@@ -117,11 +117,7 @@ Commands (referenced by steps):
 ### Phase 3: Transcript and rendering [code]
 
 - [x] **V2-05** sentences(json3) replaces captionLines/captionParagraphs: word times from event start plus offsets (previous word's time when missing), split at . ? !, unpunctuated tracks also at 1.5 s pauses or 40 words; transcript is one [m:ss] line per sentence and feeds the batch prompts.
-- [ ] **V2-06** Interleave visuals after the sentence spoken at their start; save cited frames as JPEG and link them plus a YouTube `t=` link (D-02, D-09).
-  - At most 12 frames per visual from its `frames` list (V2-03, V2-04): first and last always, the rest evenly spread; each saved as `frames/<m-ss>.jpg`, shared when two visuals cite the same frame.
-  - Placement: a visual goes after the last sentence starting at or before its start; one starting before the first sentence goes before it; one after the last sentence goes at the end; a visual inside a caption gap goes after the sentence before the gap.
-  - Captions missing: visuals only, in time order, with the existing note. Takeaways still kept on rerun.
-  - Check: C1 render snapshot with leading, trailing and gap visuals, two visuals after one sentence, the 12-frame cap and links that point at written JPEG files.
+- [x] **V2-06** One "Transcript and visuals" section: [m:ss] sentence paragraphs with each visual after the last sentence at or before its start (leading visuals first, no-captions note when none); up to 12 frames per visual copied to frames/<m-ss>.jpg and linked with a YouTube t= link; image visuals embed their frame; v1 images/ folder removed on rerun.
 - [ ] **V2-07** Update README and CHANGELOG (Unreleased): no Tesseract (D-08), faster runs, per-sentence transcript, kept frames.
 
 ### Phase 4: Calibrate [think]

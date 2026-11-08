@@ -7,7 +7,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
 	isYouTubeUrl, pickCaptionTrack, sentences, screenFrames, sampleInterval,
-	digestFolder, digestOwner, keepTakeaways, batchArtifacts, finalArtifacts, mapLimit, renderDigest, digestVideo, NO_CAPTIONS, TAKEAWAYS,
+	digestFolder, digestOwner, keepTakeaways, batchArtifacts, finalArtifacts, mapLimit, keptFrames, renderDigest, digestVideo, NO_CAPTIONS, TAKEAWAYS,
 } from "../extensions/video-digest.ts";
 
 // URLs
@@ -141,7 +141,20 @@ try {
 	await assert.rejects(mapLimit([...Array(20).keys()], 4, async (n) => { if (n === 2) cancel.abort(); await sleep(2); }, cancel.signal), /cancelled/);
 
 	// D-07 rendering.
-	const page = renderDigest({ id: "vid", title: "T", url: "u", duration: 97 }, "", [{ id: "a1", start: 11, end: 57, title: "Flow", kind: "text", markdown: "m", frames: [] }]);
+	// D-01 placement: before the first sentence, after the last sentence at or before the start (gaps too), at the end.
+	const visual = (title, start, extra = {}) => ({ id: title, start, end: start, title, kind: "text", markdown: `md ${title}`, frames: [], ...extra });
+	const woven = renderDigest({ id: "vid", title: "T", url: "u", duration: 97 }, [{ t: 5, text: "One." }, { t: 10, text: "Two." }, { t: 40, text: "Three." }],
+		[visual("Trail", 50), visual("Gap", 20), visual("B", 8), visual("A", 6), visual("Lead", 1), visual("UI", 10, { kind: "image", frames: [10, 12], frame: 12 })], 2);
+	const order = [...woven.matchAll(/^(\[\d:\d\d\] \w+\.|### \S+ \w+)/gm)].map((m) => m[1].replace(/^### \S+ /, ""));
+	assert.deepEqual(order, ["Lead", "[0:05] One.", "A", "B", "[0:10] Two.", "UI", "Gap", "[0:40] Three.", "Trail"]);
+	assert(woven.includes("[▶ 0:20 on YouTube](https://www.youtube.com/watch?v=vid&t=20s)"));
+	assert(woven.includes("![UI](frames/0-24.jpg)") && woven.includes("frames [0:20](frames/0-20.jpg) [0:24](frames/0-24.jpg)"), "frame times use the sampling interval");
+	// D-09: at most 12 frames, first and last kept, evenly spread; an image's own frame always.
+	const many = { frames: [...Array(30).keys()] };
+	const picks = keptFrames(many);
+	assert(picks.length === 12 && picks[0] === 0 && picks[11] === 29);
+	assert(keptFrames({ ...many, frame: 1 }).includes(1));
+	const page = renderDigest({ id: "vid", title: "T", url: "u", duration: 97 }, [], [{ id: "a1", start: 11, end: 57, title: "Flow", kind: "text", markdown: "m", frames: [] }]);
 	assert.match(page, /^<!-- video_digest: vid -->/);
 	assert(page.includes(NO_CAPTIONS) && page.includes("### [0:11–0:57] Flow") && /Untrusted source material/.test(page));
 
@@ -220,6 +233,10 @@ try {
 	assert(digest.includes("A-->B-->C") && digest.includes("```ts\nx\n```") && !digest.includes("A-->B\n"));
 	assert(digest.includes("[0:00] A lot of people\n") && digest.includes("[0:12] ask me") && digest.includes("Captions: en-orig (auto)"));
 	assert.equal(digestOwner(path.dirname(digestFile)), "k2zgcTDq4aQ");
+	// D-02: every frame link points at a written JPEG; the merged visual keeps the frames of both batches.
+	const links = [...digest.matchAll(/\(frames\/([\d-]+\.jpg)\)/g)].map((m) => m[1]);
+	assert(links.includes("0-01.jpg") && links.includes("0-11.jpg") && links.every((name) => existsSync(path.join(path.dirname(digestFile), "frames", name))));
+	assert.equal(result.framesKept, 4);
 
 	// Rerun keeps the agent's takeaways and rewrites the generated sections.
 	writeFileSync(digestFile, `${digest}\n${TAKEAWAYS}\n\n- Plan3 already sizes requests.\n`);
