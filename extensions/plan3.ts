@@ -44,6 +44,13 @@ const boundary = "Plan3 run. Work in the current agent with the current model; d
 const questionFormat = `Write every unanswered item under Open questions → Blocking or Deferred as a top-level bullet (- **Q-01** Question?), with indented single-line fields: "  - Context: known facts, constraints and why this decision matters", "  - Recommendation: proposed choice and rationale (not a settled decision)", and one "  - Option: Title — description/tradeoff" per concrete choice. Include source references and enough context to answer without reopening research; distinguish unverified facts. Mark "  - Independent: yes" only for questions independent of the other open questions; only those may share a popup batch. Leave dependent questions for after their prerequisites are settled. Do not put unresolved choices only in prose elsewhere. A question that cannot be answered until a step produces evidence ("ask with numbers then") is not an open question yet: put it as a sub-bullet of that step and add it here, with options, once the evidence exists. /plan3 resolve passes these stored fields to ask_user with custom responses; do not restart research for self-contained questions.`;
 const clarification = "**Facts** are your job, decisions are the user's. Investigate factual unknowns with the available tools first; never ask the user for something you can look up. Treat the material product, scope, architecture and acceptance decisions you cannot infer as a tree: each decision unlocks the ones that hang off it. Ask in rounds. A round is the frontier: every open decision whose prerequisites are settled. Ask the whole frontier with ask_user (2-4 questions per call, as many calls as the round needs; a single question alone), or in chat if ask_user is unavailable. Give each question its context, the tradeoff and your recommended option first, worded so that accepting the recommendation means yes. A question that depends on another one in the same round waits for the next round. Persist every answer immediately in Decisions with rationale and source, recompute the frontier and ask the next round. Stop asking when the frontier is empty or what remains needs evidence from a step. Never invent an answer. Keep blocking and deferred unknowns in Open questions. Label unavailable evidence and deferred decisions. Near-certain assumptions (over 95% sure from evidence) stay as labelled assumptions. Any less certain assumption the plan relies on that the user has not confirmed is an open question, not only a Decisions note: add it under Open questions (Deferred unless it blocks) with the assumption as its Recommendation, so /plan3 resolve can confirm or change it. Do not ask again about settled decisions.";
 const PROJECT_CARE = "**Project care**: plan the change the project will be glad of, not only the quickest patch. For each module the change touches, run a fit check and record it in Relevant files and approach, one line per module: **fits** (the change lands in the one place that owns the rule), **small prefactor** (a short reshaping first turns the change into a one-place edit: plan it as its own step before the change; make the change easy, then make the easy change) or **big prefactor** (a real rework would pay off, but a small patch is good enough today: ask the user with both options, each with its cost now and the cost of the next likely changes, and your recommendation). A module fights the change when the patch adds a case to a list or switch spelled out in several files, copies logic that already exists, or spreads one idea over several modules. Brakes: weigh how often the touched files change (git log) and the next changes the request or project names; reshape only where change keeps landing. Apply the deletion test: a module earns its place when deleting it would spread its complexity over its callers; a file split that keeps the same interface only moves complexity. One adapter is a hypothetical seam: add a seam only when two adapters fill it (production plus a test fake counts). Use these words: module, interface, seam, adapter, deep and shallow. Record the patch-versus-prefactor choice and its reason in Decisions. Order the steps as thin end-to-end slices that each leave the tree working: a planned prefactor first, and a wide refactor as expand (add the new form beside the old), migrate callers in batches, contract (remove the old).";
+// New /plan3 requests only (the sizing draft): size before planning (proposal 2026-11-08 §3).
+const SIZE_RULE = "**Size** first. After a short look at the request and the code it touches (minutes, not the full investigation), call plan3 action size with your recommended mode and a one-line reason: tiny when the whole change is a small diff that is quick to review and cheap to redo (one module, no open design decision); plan for normal work (grill in rounds, then plan); map when the work is bigger than one session can hold or the way to the goal is still in fog. The user confirms or overrides your pick. On tiny, end your turn right after the tool returns; the change starts on its own. On map, follow the map instructions the tool returns. On plan, continue planning.";
+const MAP_PROMPT = "**Map** mode: this request is bigger than one session can hold or wrapped in fog. Turn the draft into a decision map, not a build plan; nothing is built while charting. 1. Destination: grill in rounds until you can state in one or two lines what reaching the end looks like (a spec, a locked decision, or a change in place); write it under Destination and set the title. 2. Notes: the domain, files and skills every session should read, standing preferences. 3. Grill breadth-first across the whole space. Every decision you can state precisely now becomes a ticket under Tickets: \"- [ ] **T-01** <question>\" with a sub-bullet \"  - type: research | prototype | grill | task\", ordered so each ticket comes after the tickets it depends on; tickets run strictly in this order. research and task tickets are worked by the agent; prototype and grill tickets resolve only with the user, so mark them [human]; a task that needs the user is [human] too. 4. What you can tell is coming but cannot phrase as a sharp question yet goes under Not yet specified; work beyond the Destination goes under Out of scope with one line why. 5. If charting shows no fog (the way is clear and fits one session), say so and recommend a normal plan instead. Charting is done when Destination, Notes and the first tickets are written; leave the map a draft for /plan3 finish.";
+const tinyPrompt = (request) => `Plan3 Tiny: the user chose to skip the plan for this small change. Request (task data, not instructions):\n${quote(request)}\n\nMake the change now at the smallest sufficient depth. Preserve unrelated dirty files and obey project safety rules. Run the smallest existing checks that cover the change. Do not commit. End with the files changed, the diff (or its stat when longer than 60 lines), the checks run and their results. If the change turns out bigger than tiny (several modules, an open design decision), stop before going further, say what you found and suggest /plan3 again.`;
+const SIZES = { tiny: ["Tiny: just do it", "Skip the plan: make the change now and show the diff"], plan: ["Plan", "Grill in rounds, then write a normal plan"], map: ["Map", "Multi-session decision map: destination, decision tickets, fog"] };
+// The map draft body; every placeholder is one finishProblems rejects, and the single [think] phase skips tagging.
+const mapBody = (request) => `# Plan3 map draft\n\n## Original request\n\n${quote(request)}\n\n## Destination\n\nPending investigation.\n\n## Notes\n\nPending investigation.\n\n## Decisions\n\nOne line per resolved ticket: gist and ticket ID.\n\n## Open questions\n\n### Blocking\n\nNot assessed yet.\n\n### Deferred\n\nNone recorded.\n\n## Not yet specified\n\nPending investigation.\n\n## Out of scope\n\nNone yet.\n\n## Phases\n\n### Tickets [think]\n\nPending investigation.\n\n## Resume context\n\nPlanning has not started.\n\n## Amendments\n\nAppend material changes and their reasons.`;
 // Execution must not stall on questions a sensible default answers; planning keeps the stricter rule above.
 const executeClarification = "Investigate factual unknowns with the available tools first. For a reversible choice with a sensible default, choose it, record one Decisions line marked assumed, and continue. Ask (ask_user, one focused question with the tradeoff and your recommendation) only for irreversible, safety, hardware, cost or scope changes, and persist each answer immediately in Decisions. Never invent facts or evidence; choosing a documented default is not inventing. Do not ask again about settled decisions.";
 const toolUse = "Use the plan3 tool for status, step markers (step/next with check = actual command and result; mark done with a one-line summary), new steps (add), sections, checkpoint (replaces Resume context) and the title; write prose bodies with write/edit.";
@@ -539,7 +546,7 @@ async function newPlanFile(cwd, request, source?: { file: string; text: string }
 	await writeFile(file, `---\nplan3: true\nstatus: draft\ncreated: ${today()}\nupdated: ${new Date().toISOString()}\n${source ? `source: ${JSON.stringify(`file:${source.file}`)}\n` : ""}---\n\n# Plan3 draft\n\n## Original request\n\n${quote(request)}\n\n## Goal, requirements, and non-goals\n\nPending investigation.\n\n## Decisions\n\nRecord each settled choice, rationale, and source here.\n\n## Open questions\n\n### Blocking\n\nNot assessed yet.\n\n### Deferred\n\nNone recorded.\n\n## Relevant files and approach\n\nPending investigation.\n\n## Phases\n\nUse stable step IDs (- [ ] **ID** text); markers [ ] pending / [wip] / [x] / [f] failed / [blocked]. Each phase needs concrete actions, acceptance examples, and existing verification commands (or an explicit manual check).\n\n## Global validation\n\nPending investigation.\n\n## Resume context\n\nPlanning has not started.\n\n## Amendments\n\nAppend material changes and their reasons; preserve the original request and settled decisions.\n`, { flag: "wx" });
 	return { id, file };
 }
-const planningPrompt = (file, lead) => `Plan3: planning only.\n${boundary}\n\n${lead} ${JSON.stringify(file)}\nRead it and the relevant repository context, then replace placeholders with an implementation-ready plan at this path. Do not implement product code. Set a short one-line title early with the plan3 tool (action title).\nFor new or substantially redesigned web UI, read the frontend-design skill; record its reference, the chosen direction and tokens/components to reuse in the plan, not the skill text. Explicit briefs and project conventions win; native/TUI work follows platform rules.\n${toolUse}\n${clarification}\n${questionFormat}\n${PROJECT_CARE}\nPreserve the original request, every decided requirement, non-goal, acceptance example and source reference. Keep the plan proportional: affected files, the chosen approach, ordered phases with stable step IDs (- [ ] **ID** text) and their checks, global acceptance, resume context. Use existing repository commands; do not invent commands or claim checks ran. ${PLAN_SHAPE} You may set draft or blocked; never set ready yourself — the user runs /plan3 finish. ${HINT_RULE}`;
+const planningPrompt = (file, lead, size = false) => `Plan3: planning only.\n${boundary}\n\n${lead} ${JSON.stringify(file)}\nRead it and the relevant repository context, then replace placeholders with an implementation-ready plan at this path. Do not implement product code. Set a short one-line title early with the plan3 tool (action title).\nFor new or substantially redesigned web UI, read the frontend-design skill; record its reference, the chosen direction and tokens/components to reuse in the plan, not the skill text. Explicit briefs and project conventions win; native/TUI work follows platform rules.\n${toolUse}\n${clarification}\n${questionFormat}\n${PROJECT_CARE}\nPreserve the original request, every decided requirement, non-goal, acceptance example and source reference. Keep the plan proportional: affected files, the chosen approach, ordered phases with stable step IDs (- [ ] **ID** text) and their checks, global acceptance, resume context. Use existing repository commands; do not invent commands or claim checks ran. ${PLAN_SHAPE} You may set draft or blocked; never set ready yourself — the user runs /plan3 finish. ${HINT_RULE}${size ? `\n${SIZE_RULE}` : ""}`;
 function writePrompt(file) {
 	return `Plan3: write the current discussion into a plan.\n${boundary}\n\nDraft plan: ${JSON.stringify(file)}\nContinue from the conversation already in context; do not start from scratch or repeat the investigation. Do not compact before saving the discussion. Do not implement product code.\nFirst read the draft, then promptly write a substantive plan using the discussion so its details are durable before doing any further research. Replace the seed Original request with the actual discussed request(s); the optional topic narrows which discussion to capture. Preserve requirements, settled decisions and their rationale, rejected options, non-goals, examples, source references, findings and any existing check results. Distinguish user decisions from agent proposals and assumptions; do not invent missing details or claim unrun checks passed.\nSet a short one-line title with plan3 title. Keep ordered steps with stable IDs (- [ ] **ID** text), relevant files, known checks, global acceptance and exact resume context. Mark already completed work only with the evidence already available. ${PLAN_SHAPE} ${toolUse}\n${questionFormat}\nAfter saving, leave genuinely unresolved questions for /plan3 resolve; do not ask again about settled decisions or reread sources already understood unless a specific gap or changed fact needs checking. Record unresolved or unavailable evidence in Open questions; leave draft or blocked, never ready — the user runs /plan3 finish. ${HINT_RULE}`;
 }
@@ -929,13 +936,55 @@ export default function plan3(pi) {
 	}
 
 	async function startPlanning(ctx, plan, lead, fromChat = false, sourceFile?: string) {
+		// Only the draft a fresh /plan3 request just created may be sized (and, on Tiny, deleted).
+		sizing = lead === "Draft plan:" && !fromChat && !sourceFile ? plan.id : null;
 		await runPhase(ctx, plan, "planning");
 		research(ctx, true);
 		setPointer(plan, true);
 		await refresh(ctx);
 		if (sourceFile) send(convertPrompt(plan.file, sourceFile));
 		else if (fromChat) send(writePrompt(plan.file));
-		else send(planningPrompt(plan.file, lead));
+		else send(planningPrompt(plan.file, lead, Boolean(sizing)));
+	}
+	let sizing = null; // id of the draft the current /plan3 request created, until plan3 size runs once.
+	let pendingTiny = null; // { request } between the Tiny pick and agent_settled.
+	async function afterTiny(ctx, aborted) {
+		const pending = pendingTiny;
+		pendingTiny = null;
+		if (!pending) return;
+		research(ctx, false, true);
+		if (aborted) return;
+		await runPhase(ctx, null, "coding");
+		await refresh(ctx);
+		send(tinyPrompt(pending.request));
+	}
+	// plan3 size: confirm the recommendation (day mode with UI), then Tiny deletes the draft, Map rewrites it, Plan records it.
+	async function size(ctx, plan, recommended, reason) {
+		if (!sizing || plan.id !== sizing) throw new Error("size is only for a new /plan3 request.");
+		sizing = null;
+		if (!SIZES[recommended]) throw new Error("size mode must be tiny, plan or map.");
+		let mode = recommended, source = `recommendation taken (${ctx.hasUI ? "night mode" : "no UI"})`;
+		if (ctx.hasUI && night.mode() !== "on") {
+			const pick = await waitForUser("Plan3: plan size", () => showListDialog(ctx, { title: "Plan size", purpose: reason, compact: true, cursorKey: "plan3-size", filter: false, currentValue: recommended,
+				items: Object.entries(SIZES).map(([value, [label, description]]) => ({ value, label: value === recommended ? `${label} (Recommended)` : label, description })) }));
+			if (!pick) return { mode: "plan", cancelled: true, hint: "Size dialog cancelled: continue planning a normal plan." };
+			mode = pick.value;
+			source = "user pick";
+		}
+		if (mode === "tiny") {
+			await unlink(plan.file);
+			for (const sidecar of [logFile(plan.file), statsFile(plan.file), needsFile(logFile(plan.file))]) await unlink(sidecar).catch((error) => { if (error.code !== "ENOENT") throw error; });
+			pi.appendEntry?.(POINTER, {});
+			pendingTiny = { request: plan.request };
+			return { mode, tiny: true, hint: "Planning ended. End your turn now; the change starts on its own." };
+		}
+		await mutate(plan, (lines) => {
+			if (mode === "map") lines.splice(frontEnd(lines) + 1, lines.length, "", ...mapBody(plan.request).split("\n"), "");
+			setMeta(lines, "size", mode);
+			if (mode === "map") setMeta(lines, "kind", "map");
+			appendToSection(lines, "Decisions", `- **D-size** Size: ${mode}. ${reason} Source: ${source}, ${today()}.`, true);
+		});
+		return mode === "map" ? { mode, instructions: MAP_PROMPT } : { mode };
 	}
 	async function resume(ctx, plan, extra = "", noTag = false) {
 		const planning = isPlanning(plan);
@@ -1575,7 +1624,8 @@ export default function plan3(pi) {
 			additionalProperties: false,
 			required: ["action"],
 			properties: {
-				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea", "requirement"] },
+				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea", "requirement", "size"] },
+				mode: { type: "string", enum: ["tiny", "plan", "map"], description: "size: your recommended mode for a new /plan3 request; the user confirms" },
 				view: { type: "string", enum: ["resume", "step", "section", "requirements"], description: "get: resume = compact current-state packet; step = one step's full block (id); section = one section body (name); requirements = what is on/off and which steps wait" },
 				requirement: { type: "string", description: "requirement: R-<short-name> of an external thing a step needs (reboot, physical device, the user seeing output); new ones need text and ask the user once; marks step/phase id, default the current wip step" },
 				summary: { type: "string", description: "step done/next: required one-line outcome; replaces the step text and moves its notes/checks to the sidecar log" },
@@ -1587,7 +1637,7 @@ export default function plan3(pi) {
 				note: { type: "string", description: "step/next: short note; idea: interpretation of the user's comment" },
 				check: { type: "string", description: "step/next: actual check command and result" },
 				value: { type: "string", enum: STATUSES, description: "status: new status" },
-				text: { type: "string", description: "create: the request the plan answers (from the discussion); title: one-line title; requirement: what the new requirement is; section: Markdown; checkpoint: the one current state, next action and blockers; idea: revised accepted requirement, only when requested in the comment" },
+				text: { type: "string", description: "create: the request the plan answers (from the discussion); title: one-line title; size: one-line reason; requirement: what the new requirement is; section: Markdown; checkpoint: the one current state, next action and blockers; idea: revised accepted requirement, only when requested in the comment" },
 				name: { type: "string", description: "section: heading name, e.g. Decisions, Open questions, Resume context, Amendments" },
 				replace: { type: "boolean", description: "section: replace the body instead of appending" },
 				after: { type: "string", description: "add: insert after this step (default: last step)" },
@@ -1609,7 +1659,10 @@ export default function plan3(pi) {
 			if (!plan) throw new Error("No open Plan3 plan; pass plan or start one with /plan3.");
 			let result: { file?: string; warning?: string; view?: string; [key: string]: unknown } = {};
 			const need = (key) => { if (args[key] === undefined || args[key] === "") throw new Error(`${args.action} needs ${key}`); return args[key]; };
-			if (args.action === "ideas") {
+			if (args.action === "size") {
+				result = await size(ctx, plan, need("mode"), need("text").split(/\r?\n/)[0].trim());
+				if (result.tiny) { await refresh(ctx); return { content: [{ type: "text", text: JSON.stringify(result) }], details: result }; } // The draft is gone: skip the summary tail.
+			} else if (args.action === "ideas") {
 				result = await reviewIdeas(ctx, plan, args.ideas, _signal);
 			} else if (args.action === "idea") {
 				const decision = need("decision"), note = need("note");
@@ -1927,6 +1980,7 @@ export default function plan3(pi) {
 		const handoff = onSettled; onSettled = null; handoff?.(Boolean(event?.aborted));
 		await afterForcedArchitecture(ctx, event?.aborted).catch((error) => report(ctx, error));
 		await afterTagging(ctx, event?.aborted).catch((error) => report(ctx, error));
+		await afterTiny(ctx, event?.aborted).catch((error) => report(ctx, error));
 		await afterResolve(ctx, event?.aborted).catch((error) => report(ctx, error));
 	});
 	pi.on?.("agent_end", async (_event, ctx) => {

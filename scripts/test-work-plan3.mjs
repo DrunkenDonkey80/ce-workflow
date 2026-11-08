@@ -1682,6 +1682,78 @@ try {
 	entries.push({ type: "custom", customType: "plan3-current", data: { id: "deadbeef", planning: true } });
 	assert.equal(await input("finish"), undefined, "stale pointers cannot target an unrelated plan");
 
+	// PC-04 sizing: only a fresh /plan3 draft is sized; the recommendation is preselected; Tiny deletes just that draft and codes after settle.
+	{
+		const sizeDraft = async (request) => {
+			const before = new Set(await files());
+			await run("plan3", request);
+			const name = (await files()).find((candidate) => !before.has(candidate));
+			return { file: path.join(directory, name), id: name.match(/-([0-9a-f]{8})-plan3\.md$/)[1] };
+		};
+		const others = Object.fromEntries(await Promise.all((await files()).map(async (name) => [name, await readFile(path.join(directory, name), "utf8")])));
+		ctx.hasUI = true; ctx.mode = "rpc"; tokens = 0;
+		const tiny = await sizeDraft("Zebra footer typo xylophone");
+		assert.match(messages.at(-1).message, /\*\*Size\*\* first\. [\s\S]*call plan3 action size[\s\S]*On tiny, end your turn right after the tool returns/);
+		await mkdir(path.join(directory, "logs"), { recursive: true });
+		for (const ext of [".md", ".stats.json", ".needs.json"]) await writeFile(path.join(directory, "logs", `${tiny.id}${ext}`), "x");
+		let sizeLabels;
+		selectScript = [["Plan size", "Tiny", (labels) => { sizeLabels = labels; }]];
+		const tinyResult = await tool({ action: "size", mode: "tiny", text: "One-line footer fix." });
+		assert.match(sizeLabels[0], /Tiny: just do it \(Recommended\)/, "recommendation preselected first");
+		assert.deepEqual(tinyResult, { mode: "tiny", tiny: true, hint: "Planning ended. End your turn now; the change starts on its own." });
+		assert(!existsSync(tiny.file) && ![".md", ".stats.json", ".needs.json"].some((ext) => existsSync(path.join(directory, "logs", `${tiny.id}${ext}`))), "draft and sidecars deleted");
+		for (const [name, text] of Object.entries(others)) assert.equal(await readFile(path.join(directory, name), "utf8"), text, `${name} untouched`);
+		assert.deepEqual(entries.at(-1).data, {}, "planning pointer cleared");
+		await assert.rejects(tool({ action: "size", mode: "plan", text: "again", plan: firstId }), /only for a new \/plan3 request/);
+		const sent = messages.length;
+		await hooks.get("agent_settled")({ aborted: false }, ctx);
+		assert.deepEqual(events.at(-1), { name: "plan3:research", enabled: false, force: true }, "research off at settle");
+		assert.equal(messages.length, sent + 1);
+		assert.match(messages.at(-1).message, /^Plan3 Tiny: [\s\S]*> Zebra footer typo xylophone\n\nMake the change now[\s\S]*Do not commit\./);
+		await hooks.get("agent_settled")({ aborted: false }, ctx);
+		assert.equal(messages.length, sent + 1, "Tiny prompt sent once");
+
+		// Cancel keeps the draft unsized; a second call is refused (one call per draft).
+		const cancel = await sizeDraft("Quokka cache warmup oscilloscope");
+		selectScript = [["Plan size", null]];
+		assert.deepEqual(await tool({ action: "size", mode: "plan", text: "Normal work." }).then(({ mode, cancelled, hint }) => ({ mode, cancelled, hint })), { mode: "plan", cancelled: true, hint: "Size dialog cancelled: continue planning a normal plan." });
+		assert(existsSync(cancel.file) && !/^size:/m.test(await readFile(cancel.file, "utf8")));
+		await assert.rejects(tool({ action: "size", mode: "plan", text: "again" }), /only for a new \/plan3 request/);
+
+		// The user overrides tiny with plan: recorded in frontmatter and Decisions.
+		const planned = await sizeDraft("Narwhal retry budget lighthouse");
+		selectScript = [["Plan size", "Plan"]];
+		assert.equal((await tool({ action: "size", mode: "tiny", text: "Looks small." })).mode, "plan");
+		const plannedText = await readFile(planned.file, "utf8");
+		assert.match(plannedText, /^size: plan$/m);
+		assert.match(plannedText, /- \*\*D-size\*\* Size: plan\. Looks small\. Source: user pick, \d{4}-\d\d-\d\d\./);
+
+		// Night mode takes the recommendation without a dialog; map rewrites the draft and returns the map instructions.
+		entries.push({ type: "custom", customType: "plan3-night", data: { plan: planned.id, rules: "" } });
+		await hooks.get("session_start")({ reason: "resume" }, ctx);
+		const mapped = await sizeDraft("Walrus billing migration aurora");
+		selectScript = [];
+		const mapResult = await tool({ action: "size", mode: "map", text: "Foggy, several sessions." });
+		entries.push({ type: "custom", customType: "plan3-night", data: null });
+		await hooks.get("session_start")({ reason: "resume" }, ctx);
+		assert.equal(mapResult.mode, "map");
+		assert.match(mapResult.instructions, /^\*\*Map\*\* mode: [\s\S]*type: research \| prototype \| grill \| task[\s\S]*recommend a normal plan instead/);
+		const mapText = await readFile(mapped.file, "utf8");
+		assert.match(mapText, /^size: map$/m);
+		assert.match(mapText, /^kind: map$/m);
+		assert.match(mapText, /# Plan3 map draft\n\n## Original request\n\n> Walrus billing migration aurora\n\n## Destination\n/);
+		assert.match(mapText, /## Not yet specified[\s\S]*## Out of scope[\s\S]*### Tickets \[think\]/);
+		assert.match(mapText, /Source: recommendation taken \(night mode\), /);
+
+		// Headless: the recommendation is taken (no UI).
+		ctx.hasUI = false;
+		const headless = await sizeDraft("Ocelot schema linter tangerine");
+		assert.equal((await tool({ action: "size", mode: "plan", text: "Normal." })).mode, "plan");
+		assert.match(await readFile(headless.file, "utf8"), /Source: recommendation taken \(no UI\), /);
+		assert.equal(selectScript.length, 0);
+		for (const made of [cancel, planned, mapped, headless]) await rm(made.file);
+	}
+
 	// Runtime test/build guidance belongs only to execution, never planning/capture/resolve/advisors.
 	const testGuidance = /Prefer running independent work in parallel|individual assertions|temporary\/build\/output|Await every result|checks affected by fixes/;
 	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
