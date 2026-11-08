@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T13:07:58.317Z
+updated: 2026-11-08T13:08:26.461Z
 reviewed: 2026-11-08
 started: 2026-11-08T12:59:02.498Z
 ---
@@ -114,8 +114,7 @@ Commands:
 - [x] **VD-02** Pure helpers (URL, caption track, json3 paragraphs, OCR tokens, D-11 selection, D-08 interval, D-09/D-10 folder and takeaways, D-12 merge, render) in extensions/video-digest.ts with fixtures in scripts/test-work-video-digest.mjs.
 - [x] **VD-03** digestVideo pipeline (injected exec/model, PATH then WinGet/Tesseract fallbacks, temp cleanup in finally), lunaModel via ctx.modelRegistry (300 s timeout, assumed: 10 frames at medium exceed the bridge's 120 s), and videoDigestTool.
 - [x] **VD-04** video_digest registered deferred in work-models session_start only when maintenanceCheckout(ctx.cwd), before the tools_enable loader; listed in SITUATIONAL_TOOLS.
-- [ ] **VD-05** Add the README paragraph and the CHANGELOG Unreleased bullet.
-  - Check: read both diffs.
+- [x] **VD-05** README paragraph after screen_read's and CHANGELOG Unreleased → Added bullet.
 
 ### Phase 2: Calibrate on real videos [think]
 
