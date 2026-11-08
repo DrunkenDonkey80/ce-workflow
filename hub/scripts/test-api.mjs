@@ -91,10 +91,10 @@ try {
 	assert.deepEqual(snapshot.target, { kind: "plan", id: "bbbbbbbb" });
 	assert.equal(snapshot.current, "bbbbbbbb");
 	assert.deepEqual(snapshot.status, { folder: "proj", tab: "1", modes: { research: "off", night: "off" }, git: null, commands: [], model: { provider: "fake", id: "fake-2", name: "Fake Two" }, effort: "high", context: null, parked: true });
-	execFileSync("git", ["init", "-q"], { cwd: folder });
+	execFileSync("git", ["init", "-q", "-b", "work"], { cwd: folder });
 	const loose = fs.readdirSync(folder).filter(name => name !== ".git").length;
 	const { files: gitFiles, ...counts } = (await get(id, "snapshot")).body.status.git;
-	assert.deepEqual(counts, { changed: loose, added: 0, modified: 0, deleted: 0, untracked: loose, ahead: 0, behind: 0 }, "Commit buttons: new files counted as untracked, none ahead or behind");
+	assert.deepEqual(counts, { changed: loose, added: 0, modified: 0, deleted: 0, untracked: loose, ahead: 0, behind: 0, branch: "work" }, "Commit buttons: new files counted as untracked, none ahead or behind; a branch off master is named");
 	assert.deepEqual(gitFiles.map(file => file.kind), Array(loose).fill("untracked"), "the hover list names each untracked file");
 	fs.rmSync(path.join(folder, ".git"), { recursive: true, force: true });
 	assert.equal(fileReads, 1, "the file is read once, then the record keeps it");

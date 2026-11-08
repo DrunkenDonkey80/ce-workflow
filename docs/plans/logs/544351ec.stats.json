@@ -1,0 +1,632 @@
+{
+ "version": 1,
+ "activeMs": 6012348,
+ "runs": 3,
+ "waitingMs": 2168310,
+ "toolWallMs": 2612628,
+ "compactions": {
+  "count": 1,
+  "ms": 26084
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 107,
+   "thinkingMs": 644908,
+   "actingMs": 375474,
+   "input": 252,
+   "output": 96025,
+   "cacheRead": 12130516,
+   "cacheWrite": 339549,
+   "cost": 6.0453562,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 76,
+   "ms": 2453020,
+   "maxMs": 602709,
+   "failures": 3
+  },
+  "plan3": {
+   "count": 16,
+   "ms": 9667,
+   "maxMs": 5307,
+   "failures": 0
+  },
+  "read": {
+   "count": 11,
+   "ms": 1014,
+   "maxMs": 835,
+   "failures": 0
+  },
+  "write": {
+   "count": 3,
+   "ms": 6,
+   "maxMs": 3,
+   "failures": 0
+  },
+  "edit": {
+   "count": 11,
+   "ms": 4431,
+   "maxMs": 1387,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 2,
+   "ms": 18332,
+   "maxMs": 13753,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 1,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 64,
+   "ms": 1829732,
+   "maxMs": 602709,
+   "failures": 2
+  },
+  "test": {
+   "count": 12,
+   "ms": 623288,
+   "maxMs": 355949,
+   "failures": 1
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -20; git log --oneline -3; yt-dlp --version 2>&1 | head -2; ffmpeg -version 2>&1 | head -1; tesseract --version 2>&1 | head -1; ls \"C:/Program Files/Tesseract-OCR/t": {
+   "count": 1,
+   "ms": 1644,
+   "maxMs": 1644,
+   "failures": 0
+  },
+  "bash\u0000winget install --id yt-dlp.yt-dlp -e --accept-source-agreements --accept-package-agreements --disable-interactivity 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 25262,
+   "maxMs": 25262,
+   "failures": 0
+  },
+  "bash\u0000L=\"$LOCALAPPDATA/Microsoft/WinGet/Links\"; ls \"$L\"; \"$L/yt-dlp.exe\" --version; \"$L/ffmpeg.exe\" -version | head -1; powershell -NoProfile -Command \"[Environment]::GetEnvironmentVariable('Path','User') -": {
+   "count": 1,
+   "ms": 11906,
+   "maxMs": 11906,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"$env:Path=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User'); yt-dlp --version; (Get-Command ffmpeg).Sourc": {
+   "count": 1,
+   "ms": 580,
+   "maxMs": 580,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"\\$env:Path=[Environment]::GetEnvironmentVariable('Path','Machine')+';'+[Environment]::GetEnvironmentVariable('Path','User'); yt-dlp --version; (Get-Command ffmpeg).Sour": {
+   "count": 1,
+   "ms": 1497,
+   "maxMs": 1497,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat extensions/tool-loader.ts | head -80; grep -n \"maintenanceCheckout\\|sameCheckout\\|toolsEnableTool\\|registerScreenRead\\|screen-read\\|session_start\" extensions/work-models.ts | head -30": {
+   "count": 1,
+   "ms": 482,
+   "maxMs": 482,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"3750,3775p\" extensions/work-models.ts | cut -c1-400; sed -n \"2553,2565p\" extensions/work-models.ts; grep -n \"registerScreenRead\\|screenRead\\|registerTool(\" extensions/work-models.ts ": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"export function screenReadTool\" -A40 extensions/screen-read.ts | cut -c1-300 | head -60; sed -n \"490,515p\" extensions/screen-read.ts": {
+   "count": 1,
+   "ms": 338,
+   "maxMs": 338,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"type Exec\\|exec(\\|pi.exec\" extensions/screen-read.ts | head -8; grep -n \"inspect\\|streamSimple\\|registry.find\\|cacheRetention\\|reasoning\\|for await\\|getApiKey\\|usage\" extensions/wor": {
+   "count": 1,
+   "ms": 1560,
+   "maxMs": 1560,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,20p;50,95p\" scripts/test-work-plan3.mjs | cut -c1-250": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -ln \"session_start\" scripts/test-*.mjs | xargs grep -ln \"work-models\" ; grep -n \"work-models\\|session_start\\|getAllTools\" scripts/test-work-settings.mjs | head -12": {
+   "count": 1,
+   "ms": 389,
+   "maxMs": 389,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"work-models\\|session_start\\|getAllTools\\|registerTool\\|const pi\\b\\|const api\\b\" scripts/test-work-plan3-web.mjs | head -20": {
+   "count": 1,
+   "ms": 701,
+   "maxMs": 701,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"1,30p\" scripts/test-work-settings.mjs | cut -c1-250; grep -n \"mod.default\\|default(\" scripts/test-work-settings.mjs | head": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"70,130p\" scripts/test-work-settings.mjs | cut -c1-250": {
+   "count": 1,
+   "ms": 87,
+   "maxMs": 87,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"function registerConstrainedTool\" -A8 extensions/*.ts | cut -c1-250; D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent\"; grep -n \"exec(c": {
+   "count": 1,
+   "ms": 291,
+   "maxMs": 291,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent/dist/core\"; cat \"$D/exec.d.ts\" | sed -n \"14,40p\"; grep -n \"on(\\\"error\\\"\\|reject\\|resolve({\" \"$D/exec.js\" ": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent/dist/core\"; grep -n \"error\\|code:\" \"$D/exec.js\" | head -20": {
+   "count": 1,
+   "ms": 83,
+   "maxMs": 83,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-uw3GPp\" && ls; ls short | head -20": {
+   "count": 1,
+   "ms": 91,
+   "maxMs": 91,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-uw3GPp/short\" && head -3 outf.tsv; awk -F\"\\t\" \"NR>1 && \\$1==1 {print \\$2}\" outf.tsv | head -3; awk -F\"\\t\" \"NR>1 && \\$1==1\" outf.tsv | wc -l; grep -c \"^": {
+   "count": 1,
+   "ms": 921,
+   "maxMs": 921,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-uw3GPp/short\" && python -c \"import json;d=json.load(open('k2zgcTDq4aQ.info.json',encoding='utf8'));print(d['id'],d['title'],d.get('channel'),d.get('dur": {
+   "count": 1,
+   "ms": 238,
+   "maxMs": 238,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-uw3GPp/short\" && python -c \"import json;d=json.load(open('k2zgcTDq4aQ.info.json',encoding='utf8'));print(d.get('language'), d.get('upload_date'), d.get": {
+   "count": 1,
+   "ms": 185,
+   "maxMs": 185,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-video-digest.mjs 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 633,
+   "maxMs": 633,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"\\\"typecheck\\|\\\"lint\\|\\\"verify\\|tsc\" package.json | head": {
+   "count": 1,
+   "ms": 80,
+   "maxMs": 80,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/video-digest.ts scripts/test-work-video-digest.mjs docs/plans/2026-11-08-youtube-coding-video-digest-transcript-plus-deduplicated-key-544351ec-plan3.md docs/plans/logs/544": {
+   "count": 1,
+   "ms": 811,
+   "maxMs": 811,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"^let loaderRegistered\\|loaderRegistered =\" extensions/work-models.ts | head -3; grep -n \"WORKFLOW_REPO_DIR =\" extensions/*.ts | head -2": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TMPDIR/reg-probe.mjs\" <<'EOF' import path from \"node:path\"; import { pathToFileURL } from \"node:url\"; const repo = \".\"; for (const [cwd, tag] of [[repo, \"a\"], [\"C:/SOFT/git\", \"b\"]]) ": {
+   "count": 1,
+   "ms": 2974,
+   "maxMs": 2974,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-video-digest.mjs 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 3222,
+   "maxMs": 3222,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-video-digest.mjs 2>&1 | tail -3; grep -ln \"SITUATIONAL_TOOLS\\|tool-loader\" scripts/*.mjs": {
+   "count": 1,
+   "ms": 1807,
+   "maxMs": 1807,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-tool-loader.mjs 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 358,
+   "maxMs": 358,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/work-models.ts extensions/tool-loader.ts scripts/test-work-video-digest.mjs docs/plans/2026-11-08-youtube-coding-video-digest-transcript-plus-deduplicated-key-544351ec-pla": {
+   "count": 1,
+   "ms": 935,
+   "maxMs": 935,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"58,62p\" README.md | cut -c1-120": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add README.md CHANGELOG.md docs/plans/2026-11-08-youtube-coding-video-digest-transcript-plus-deduplicated-key-544351ec-plan3.md docs/plans/logs/544351ec.md && git commit -q -m \"plan3 544": {
+   "count": 1,
+   "ms": 495,
+   "maxMs": 495,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (npm run verify:quiet > \"C:/Users/Flex/AppData/Local/Temp/vd-verify.log\" 2>&1; echo \"EXIT $?\" >> \"C:/Users/Flex/AppData/Local/Temp/vd-verify.log\") & which pi; pi --help 2>&1 | grep -n \"\\-p\\b": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && (timeout 2400 npm run verify:quiet > \"C:/Users/Flex/AppData/Local/Temp/vd-verify.log\" 2>&1; echo \"EXIT $?\" >> \"C:/Users/Flex/AppData/Local/Temp/vd-verify.log\") & which pi; pi --help 2>&1 | g": {
+   "count": 1,
+   "ms": 2292,
+   "maxMs": 2292,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls \"C:/Users/Flex/AppData/Local/Temp\" | grep -c \"^video-digest-\"; time timeout 1500 pi -p --mode json \"digest https://www.youtube.com/shorts/k2zgcTDq4aQ\" > \"C:/Users/Flex/AppData/Local/Temp/": {
+   "count": 1,
+   "ms": 103850,
+   "maxMs": 103850,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp\" && node -e \" const lines=require('fs').readFileSync('vd06.jsonl','utf8').split('\\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(": {
+   "count": 1,
+   "ms": 549,
+   "maxMs": 549,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp\" && node -e \" const L=require('fs').readFileSync('vd06.jsonl','utf8').split('\\n').filter(Boolean).map(l=>JSON.parse(l)); const s=L.find(e=>e.type==='tool_execution": {
+   "count": 1,
+   "ms": 138,
+   "maxMs": 138,
+   "failures": 0
+  },
+  "bash\u0000Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; timeout 120 \"$Y\" --flat-playlist --print \"%(id)s|%(duration)s|%(title)s\" \"https://www.youtube.com/@mattpocockuk/videos\" --playlist-end 40 2>&1 | aw": {
+   "count": 1,
+   "ms": 4138,
+   "maxMs": 4138,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && tail -3 \"C:/Users/Flex/AppData/Local/Temp/vd-verify.log\"; time timeout 3600 pi -p --mode json \"digest https://www.youtube.com/watch?v=lraHlXpuhKs\" > \"C:/Users/Flex/AppData/Local/Temp/vd07.js": {
+   "count": 1,
+   "ms": 501248,
+   "maxMs": 501248,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp\" && cat > vdstats.cjs <<'EOF' const f=process.argv[2];const L=require('fs').readFileSync(f,'utf8').split('\\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}cat": {
+   "count": 1,
+   "ms": 422,
+   "maxMs": 422,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && D=\"docs/research/videos/2025-05-16-6-typescript-tips-to-turn-you-into-a-wizard/digest.md\"; grep -n \"^### \\|^## \" \"$D\"; awk \"/^## Visuals/,/^## Transcript/\" \"$D\" | wc -l; tail -5 \"C:/Users/Fl": {
+   "count": 1,
+   "ms": 1307,
+   "maxMs": 1307,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp\" && mkdir -p vd07chk && Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; U=$(timeout 120 \"$Y\" -g -f \"bv*[height<=720]\" \"https://www.youtube.com/watch?v=lraHlXp": {
+   "count": 1,
+   "ms": 25480,
+   "maxMs": 25480,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vd07chk\" && ffmpeg -hide_banner -loglevel error -i t20.png -i t60.png -i t100.png -i t200.png -i t500.png -i t900.png -filter_complex \"[0][1][2]hstack=3[a];[3][4][": {
+   "count": 1,
+   "ms": 1069,
+   "maxMs": 1069,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-video-digest.mjs 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 4578,
+   "maxMs": 4578,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && T=\"C:/Users/Flex/AppData/Local/Temp\"; cp \"docs/research/videos/2026-10-16-when-should-you-not-use-grill-me/digest.md\" \"$T/vd06-base.md\"; cp \"docs/research/videos/2025-05-16-6-typescript-tips": {
+   "count": 1,
+   "ms": 602709,
+   "maxMs": 602709,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && awk \"/^## Visuals/,/^## Transcript/\" \"docs/research/videos/2026-10-16-when-should-you-not-use-grill-me/digest.md\"; D=\"docs/research/videos/2025-05-16-6-typescript-tips-to-turn-you-into-a-wiz": {
+   "count": 1,
+   "ms": 283,
+   "maxMs": 283,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -c \"^## Takeaways for ce-workflow\" docs/research/videos/*/digest.md; git status --short docs/research": {
+   "count": 1,
+   "ms": 1038,
+   "maxMs": 1038,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/video-digest.ts scripts/test-work-video-digest.mjs docs/research/videos docs/plans/2026-11-08-youtube-coding-video-digest-transcript-plus-deduplicated-key-544351ec-plan3.m": {
+   "count": 1,
+   "ms": 3068,
+   "maxMs": 3068,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && timeout 300 pi -p \"Does your tools_enable tool list a tool named video_digest? Reply with only yes or no.\" 2>&1 | tail -3; cd \".\" && timeout 300 pi -p \"Does your tools_enable tool ": {
+   "count": 1,
+   "ms": 13226,
+   "maxMs": 13226,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 2400 npm run verify:quiet 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 355949,
+   "maxMs": 355949,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-*.mjs 2>&1 | grep -E \"^not ok|# (pass|fail)|failureType|error:\" | head -20": {
+   "count": 1,
+   "ms": 121290,
+   "maxMs": 121290,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 900 node --test scripts/test-*.mjs > \"C:/Users/Flex/AppData/Local/Temp/hubtest.log\" 2>&1; echo \"exit $?\"; grep -nE \"not ok|^# (pass|fail)\" \"C:/Users/Flex/AppData/Local/Temp/hubte": {
+   "count": 1,
+   "ms": 131635,
+   "maxMs": 131635,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -A docs/plans/2026-11-08-youtube-coding-video-digest-transcript-plus-deduplicated-key-544351ec-plan3.md docs/plans/done/2026-11-08-youtube-coding-video-digest-transcript-plus-dedupli": {
+   "count": 1,
+   "ms": 451,
+   "maxMs": 451,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff CHANGELOG.md | head -20": {
+   "count": 1,
+   "ms": 298,
+   "maxMs": 298,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l extensions/video-digest.ts && grep -nE \"ffmpeg|tesseract|fps|BATCH|batch|concurren|Promise.all|json3|vtt|paragraph|30|keep|images\" extensions/video-digest.ts | head -60": {
+   "count": 1,
+   "ms": 710,
+   "maxMs": 710,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rlE \"ModelRegistry|createAgentSession|AuthStorage\" scripts/*.mjs | head; nproc": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -nE \"ModelRegistry|AuthStorage|import .*pi-coding-agent|streamSimple|registry\\.|createJiti\" scripts/benchmark-jev-live.mjs | head -20": {
+   "count": 1,
+   "ms": 488,
+   "maxMs": 488,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -nE \"ModelRegistry|AuthStorage|from \\\"@earendil|streamSimple|modelRegistry\" scripts/test-work-native-smoke.mjs scripts/test-work-microcompact-agent.mjs | head -20": {
+   "count": 1,
+   "ms": 297,
+   "maxMs": 297,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent\"; grep -nE \"ModelRegistry|AuthStorage\\.(create|)\" \"$D/docs/sdk.md\" | head -15": {
+   "count": 1,
+   "ms": 322,
+   "maxMs": 322,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent\"; ls \"$D/docs\" | head -40; grep -rn \"ModelRegistry\" \"$D/docs\" | head -8; grep -n \"ModelRegistry\\|AuthStor": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent\"; grep -n \"modelRegistry\\|ModelRuntime\\|AuthStorage\\|createModelRuntime\" \"$D/docs/sdk.md\" | head -20; gre": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent/dist\"; grep -n \"interface AgentSessionServices\" -A 25 \"$D/core/sdk.d.ts\" | head -40; grep -n \"static crea": {
+   "count": 1,
+   "ms": 116,
+   "maxMs": 116,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent/dist/core\"; sed -n \"1,120p\" \"$D/model-runtime.d.ts\" | grep -nE \"find|streamSimple|registry|create|class\"": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent/dist/core\"; sed -n \"36,100p\" \"$D/model-runtime.d.ts\"": {
+   "count": 1,
+   "ms": 45,
+   "maxMs": 45,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/vdm\"; rm -rf \"$T\"; mkdir -p \"$T/f1080\" \"$T/f720\"; cd \"$T\"; Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; U=\"https://www.youtube.com/watch?v=lraHlXpuhKs\" t(){": {
+   "count": 1,
+   "ms": 231040,
+   "maxMs": 231040,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/vdm\"; cd \"$T\"; rm -rf f1080 f720 v1080.* v720.* ocr.tsv thumbs.raw; mkdir -p f1080 f720; Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; U=\"https://www.youtube": {
+   "count": 1,
+   "ms": 211653,
+   "maxMs": 211653,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && cat > dedupe.cjs <<'EOF' const W=320,H=180,P=W*H,buf=require('fs').readFileSync('thumbs.raw'),N=buf.length/P; const fr=i=>buf.subarray(i*P,(i+1)*P); const ": {
+   "count": 1,
+   "ms": 512,
+   "maxMs": 512,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && cat > look.cjs <<'EOF' const fs=require('fs');const W=320,H=180,P=W*H,buf=fs.readFileSync('thumbs.raw'),N=buf.length/P,fr=i=>buf.subarray(i*P,(i+1)*P),PIX=": {
+   "count": 1,
+   "ms": 1626,
+   "maxMs": 1626,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && cat > dedupe2.cjs <<'EOF' const fs=require('fs');const W=320,H=180,P=W*H,buf=fs.readFileSync('thumbs.raw'),N=buf.length/P,fr=i=>buf.subarray(i*P,(i+1)*P),P": {
+   "count": 1,
+   "ms": 3012,
+   "maxMs": 3012,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && in=\"\"; for i in 0091 0094 0096 0098 0099 0100; do in=\"$in -i f720/f$i.png\"; done; ffmpeg -hide_banner -loglevel error -y $in -filter_complex \"[0]scale=640:": {
+   "count": 1,
+   "ms": 277,
+   "maxMs": 277,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && cat > flat.cjs <<'EOF' const fs=require('fs');const W=320,H=180,P=W*H,buf=fs.readFileSync('thumbs.raw'),N=buf.length/P,fr=i=>buf.subarray(i*P,(i+1)*P); con": {
+   "count": 1,
+   "ms": 308,
+   "maxMs": 308,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && cat > combo.cjs <<'EOF' const fs=require('fs');const W=320,H=180,P=W*H,buf=fs.readFileSync('thumbs.raw'),N=buf.length/P,fr=i=>buf.subarray(i*P,(i+1)*P),PIX": {
+   "count": 1,
+   "ms": 729,
+   "maxMs": 729,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && cat > why.cjs <<'EOF' const fs=require('fs');const W=320,H=180,P=W*H,buf=fs.readFileSync('thumbs.raw'),fr=i=>buf.subarray(i*P,(i+1)*P),PIX=20; const pairs=": {
+   "count": 1,
+   "ms": 408,
+   "maxMs": 408,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"const LUNA\" -A 2 extensions/video-digest.ts && grep -n \"^export\\|^const MAX\\|function sampleInterval\" extensions/video-digest.ts | head -30": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && cat > luna.mjs <<'EOF' import { readFileSync } from \"node:fs\"; const { ModelRuntime } = await import(\"file:///C:/Users/Flex/.pi/agent/install/releases/1.5.": {
+   "count": 1,
+   "ms": 64959,
+   "maxMs": 64959,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/vdm\" && Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; \"$Y\" --skip-download --write-auto-subs --sub-langs \"en-orig\" --sub-format json3 -o \"cap.%(ext)s\" \"http": {
+   "count": 1,
+   "ms": 2659,
+   "maxMs": 2659,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "VD-02": {
+   "ms": 354397,
+   "testMs": 633,
+   "replies": 26,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 26
+   }
+  },
+  "VD-01": {
+   "ms": 29139,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
+  },
+  "VD-04": {
+   "ms": 74654,
+   "testMs": 5387,
+   "replies": 9,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 9
+   }
+  },
+  "VD-05": {
+   "ms": 12963,
+   "testMs": 0,
+   "replies": 3,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 3
+   }
+  },
+  "VD-06": {
+   "ms": 160926,
+   "testMs": 2509,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   },
+   "failures": 2
+  },
+  "VD-07": {
+   "ms": 590070,
+   "testMs": 1307,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   },
+   "failures": 1
+  },
+  "VD-08": {
+   "ms": 687395,
+   "testMs": 4578,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   }
+  },
+  "(none)": {
+   "ms": 1597308,
+   "testMs": 608874,
+   "replies": 43,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 43
+   }
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-08T12:58:23.443Z",
+   "ms": 5055422
+  },
+  {
+   "start": "2026-11-08T14:29:08.250Z",
+   "ms": 83236
+  },
+  {
+   "start": "2026-11-08T14:37:09.932Z",
+   "ms": 847606
+  }
+ ],
+ "hints": [
+  {
+   "at": "2026-11-08T13:54:21.301Z",
+   "shape": "timeout 900"
+  },
+  {
+   "at": "2026-11-08T14:45:55.681Z",
+   "shape": "T=C:/Users/Flex/AppData/Local/Temp/vdm"
+  }
+ ]
+}

@@ -28,7 +28,7 @@ const auth: RequestInit = token ? { credentials: "omit", headers: { Authorizatio
 let target = new URLSearchParams(location.search).get("target") ?? undefined;
 type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
-const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
+const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
 const chat = new Map();
 
@@ -1446,7 +1446,7 @@ $("mode-night").addEventListener("click", () => void toggleMode("/night " + ($("
 type Tone = "working" | "waiting" | "scheduled" | "unseen" | "seen" | "parked" | "terminal";
 type HubTimer = { id: string; kind: string; dueAt: number; every?: number; lastRun?: number; label: string };
 type HubSession = { id: string; name: string; tone: Tone; subtitle?: string; design?: string; picked?: boolean; attention?: number; parked?: boolean; plan?: { done: number; total: number }; job?: number; park?: string; timers?: HubTimer[]; worked?: number; pi?: string; quiet?: boolean };
-type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; files?: { kind: string; path: string }[] };
+type GitFiles = { changed: number; added?: number; modified?: number; deleted?: number; untracked?: number; ahead: number; behind?: number; branch?: string; files?: { kind: string; path: string }[] };
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
 // The open session's folder also gets the header's Pull / Commit / Commit and push as icons on the right; they click the header buttons.
@@ -1460,7 +1460,9 @@ function gitLine(git?: GitFiles | null, own = false) {
   button.addEventListener("click", event => { event.stopPropagation(); if (id === "git-push") $("push-menu").style.top = phone.matches ? button.getBoundingClientRect().bottom + 4 + "px" : ""; $(id).click(); });
   return button;
  });
- if (!parts.length && !actions.length) return [];
+ // Off master/main, the branch shows on its own line under the counts.
+ const branch = git?.branch ? [html("div", { className: "session-git-branch", textContent: "⎇ " + git.branch, title: `On branch ${git.branch}, not master` })] : [];
+ if (!parts.length && !actions.length) return branch;
  const line = html("div", { className: "session-git" }); line.append(...parts);
  // Hovering the counts lists the files, grouped like the counts.
  if (git?.files?.length) {
@@ -1481,7 +1483,7 @@ function gitLine(git?: GitFiles | null, own = false) {
   line.append(list); for (const part of parts) part.removeAttribute("title");
  }
  if (actions.length) { const right = html("span", { className: "session-git-actions" }); right.append(...actions); line.append(right); }
- return [line];
+ return [line, ...branch];
 }
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
@@ -1958,7 +1960,7 @@ function soonMarks(bar: HTMLElement, item: Usage, labelled: boolean) {
  }
 }
 let usage: Usage[] = [], usageAccounts: Segment[] = [], usageTimer = 0, usageShown = "";
-const el = (tag: string, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = "") => Object.assign(document.createElement(tag), { className, textContent: text });
 // Usage as % left (default) or % used, per device (gear → Usage shows); fills follow the shown number.
 const usageUsed = () => { try { return localStorage.getItem("hub-usage") === "used"; } catch { return false; } };
 const shownLeft = (left: number) => usageUsed() ? 100 - left : left, usageWord = () => usageUsed() ? "used" : "left";
@@ -2059,8 +2061,33 @@ function poolActions(row: PoolRow) {
  bar.append(level);
  button(row.weekend ? "Weekend: on" : "Weekend: off", "Weekend account: drained over the weekend", () => void poolAct("weekend", row.label), row.weekend ? "on" : "");
  button(row.disabled ? "Enable" : "Disable", row.disabled ? "Put back in rotation" : "Take out of rotation", () => void poolAct("toggle", row.label));
+ button("Re-login", "Sign this account in again (for a dead or ending login)", () => void poolLogin(row.label), row.dead ? "primary" : "");
  button("Delete", "Remove from the pool", () => void poolAct("remove", row.label), "danger");
  return bar;
+}
+// Re-login runs cpool's copy-code sign-in: the hub shows Anthropic's link, the user pastes the code it shows,
+// and cpool puts the new login on this very account (two accounts may share one mail).
+async function poolLogin(label: string) {
+ let start: { login: { url: string; email?: string } };
+ try { start = await post("pool", { act: "login", label }) as typeof start; } catch (error) { showNotice("Re-login failed: " + (error as Error).message); return; }
+ const dialog = el("dialog", "compact"), form = document.createElement("form");
+ const link = Object.assign(document.createElement("a"), { href: start.login.url, target: "_blank", rel: "noopener", textContent: "Open the sign-in page" });
+ const code = Object.assign(document.createElement("input"), { type: "text", placeholder: "code#state", required: true, autocomplete: "off" });
+ const cancel = Object.assign(document.createElement("button"), { type: "button", textContent: "Cancel" }), save = Object.assign(document.createElement("button"), { type: "submit", textContent: "Save login", className: "primary" });
+ const actions = el("div", "dialog-actions"); actions.append(cancel, save);
+ code.setAttribute("aria-label", "Code from Anthropic"); code.style.width = "100%";
+ form.append(el("h3", "", `Re-login ${label}`), el("p", "dialog-purpose", `Sign in${start.login.email ? " as " + start.login.email : ""}, pick the subscription that belongs to ${label}, then paste the code Anthropic shows.`), link, code, actions);
+ dialog.append(form); document.body.append(dialog);
+ let saving = false;
+ cancel.onclick = () => dialog.close();
+ dialog.addEventListener("close", () => { dialog.remove(); if (!saving) void post("pool", { act: "login-cancel" }).catch(() => {}); });
+ form.addEventListener("submit", async event => {
+  event.preventDefault(); saving = true; save.disabled = cancel.disabled = code.disabled = true; save.textContent = "Saving…";
+  try { const result = await post("pool", { act: "login-code", text: code.value }) as { message?: string }; showNotice(result.message ?? "Logged in again."); }
+  catch (error) { showNotice("Re-login failed: " + (error as Error).message); }
+  dialog.close(); void loadUsage();
+ });
+ dialog.showModal(); code.focus();
 }
 function poolRowBox(row: PoolRow, select: () => void) {
  const box = el("div", "pool-row" + (row.active ? " active" : "") + (row.favorite ? " forced" : "") + (row.disabled || row.dead ? " off" : "") + (row.label === poolPick ? " picked" : ""));

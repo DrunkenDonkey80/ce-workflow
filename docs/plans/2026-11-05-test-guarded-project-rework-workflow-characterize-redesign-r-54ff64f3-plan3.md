@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-08T14:36:35.749Z
+updated: 2026-11-08T14:40:31.411Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -219,7 +219,7 @@ needs: R-pb-pilot-done
 
 ## Resume context
 
-RW-18 wip. photobook-02 complete with the merged recipe (Matt Pocock's §0 vocabulary, deletion test, churn-scoped Map, corpus above the interface, Design It Twice): report docs/proposals/rework-lab/photobook-02.md. Result is clearly better than photobook-01 (write interface narrowed, lost-update bug proven and fixed, field table, 1160/1160 tests, build green), $15.24. Recipe §4 now uses relative interleaved performance thresholds. All lab work uncommitted in ce-workflow. Next: user decides — commit lab work, carry the deepening ideas into normal /plan3 planning, or codify /plan3 rework.
+Lab work committed (6bfa35b). /plan3 rework [target] shipped in 3124dfc: extensions/plan3-rework.ts (reworkRequest, REWORK_RECIPE), routing in plan3.ts, recipe in package.json files, lab driver reuses reworkRequest, README and CHANGELOG updated; C-p3 and C-types pass on HEAD. Per D-11, the lab runs replace RW-04..RW-12, and RW-13/RW-14 are done in code, though the plan's step marks were not updated. Remaining: RW-15 (C-verify once before a push), RW-16 (AI-Wedge read-only via /plan3 rework), ARCH-RECONCILE. Normal-planning project care belongs to 79614d24 (Skills); recipe §0 is the single vocabulary source, no plan3-care.ts. Nothing pushed.
 
 ## Amendments
 

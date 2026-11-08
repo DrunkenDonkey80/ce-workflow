@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.4.0 — 2026-11-09
 
 ### Added
 - The agent can show you a plan's requirements checklist (the Alt+A one) as a question, so you can switch approvals from the hub or your phone. Only your ticks change it; the agent still cannot.
@@ -13,8 +13,11 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - `/wo → Catch up packages` also watches Matt Pocock's skills repo. When he changes a skill we adopted or adds a new one, the catch-up plan reviews it against `docs/upstream/mattpocock-skills.md` (what we took, what we rejected and why) and offers each finding to test, adopt or reject.
 - Two skills from Matt Pocock's collection: `two-axis-review` (reviews a diff against the repo's rules and against what was asked, side by side) and `diagnosing-bugs` (reproduce first, prove the cause, regression test before the fix).
 - `/plan3 rework [target]` plans a safe rework of one messy part of a project into a deeper module. It maps the code, records the current behavior as tests, compares designs, and waits for you before building, switching over and deleting the old code.
+- Hub sidebar: when the open project is on a branch other than master/main, its name shows on its own line under the git status line.
+- Hub Claude accounts window: a Re-login button signs the picked account in again. It shows Anthropic's sign-in link and the account's mail, and you paste back the code Anthropic shows. The new login always goes to that same account, even when two accounts share one mail; signing in with the wrong mail or subscription is refused. Needs pi-provider-claude-ex with `cpool login`.
 - `video_digest` (in the ce-workflow checkout only): give the agent a YouTube coding video and it saves the transcript plus the code, diagrams and tables shown on screen, rebuilt as text, to `~/Downloads/video-digests/` (outside the repo), then notes what ce-workflow could adopt. Each spoken sentence gets its own timestamp, and every visual sits right after the sentence being said when it appears, with links to the original frames (kept as JPEG next to the digest) and to that second on YouTube. Needs only yt-dlp and ffmpeg, no Tesseract; frames are sorted by a quick pixel check and read by Luna 8 at a time, so a 16-minute video takes a fraction of the time and CPU.
 - Hub **Videos** button (ce-workflow checkout): shows the YouTube channels you watch (Matt Pocock to start), how many new shorts and full videos each has, and how many digests still lack ideas (a Takeaways section). It can digest all new videos or the ones you tick (3 at a time, headless), mark the rest seen, write missing takeaways, and add or remove channels. The list lives in `~/Downloads/video-digests/feeds.json`, next to the digests. `video_digest` now also reads code from vertical shorts that split the screen with the camera.
+![The Videos dialog: new videos per feed and what to do with them](docs/changelog/0.4.0-videos-dialog.png)
 
 ## 0.3.1 — 2026-11-07
 

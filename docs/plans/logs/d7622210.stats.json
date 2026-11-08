@@ -1,23 +1,23 @@
 {
  "version": 1,
- "activeMs": 7305947,
- "runs": 2,
- "waitingMs": 115011,
- "toolWallMs": 5934696,
+ "activeMs": 7833457,
+ "runs": 4,
+ "waitingMs": 219288,
+ "toolWallMs": 6132206,
  "compactions": {
   "count": 1,
   "ms": 29955
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 135,
-   "thinkingMs": 706876,
-   "actingMs": 460184,
-   "input": 348,
-   "output": 117310,
-   "cacheRead": 16023754,
-   "cacheWrite": 443796,
-   "cost": 7.771322800000002,
+   "replies": 167,
+   "thinkingMs": 848863,
+   "actingMs": 512289,
+   "input": 430,
+   "output": 134712,
+   "cacheRead": 19766402,
+   "cacheWrite": 593502,
+   "cost": 9.616750399999997,
    "errors": 1
   }
  },
@@ -29,14 +29,14 @@
    "failures": 0
   },
   "bash": {
-   "count": 96,
-   "ms": 5755904,
+   "count": 124,
+   "ms": 5931576,
    "maxMs": 2504663,
-   "failures": 12
+   "failures": 14
   },
   "read": {
-   "count": 19,
-   "ms": 1352,
+   "count": 20,
+   "ms": 1379,
    "maxMs": 1090,
    "failures": 0
   },
@@ -75,20 +75,26 @@
    "ms": 50,
    "maxMs": 50,
    "failures": 0
+  },
+  "intercom": {
+   "count": 1,
+   "ms": 8,
+   "maxMs": 8,
+   "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 82,
-   "ms": 3236935,
+   "count": 103,
+   "ms": 3366376,
    "maxMs": 668341,
    "failures": 8
   },
   "test": {
-   "count": 14,
-   "ms": 2518969,
+   "count": 21,
+   "ms": 2565200,
    "maxMs": 2504663,
-   "failures": 4
+   "failures": 6
   }
  },
  "commands": {
@@ -601,6 +607,174 @@
    "ms": 88,
    "maxMs": 88,
    "failures": 1
+  },
+  "bash\u0000cd \".\" && export CLLINE='- Hub **Videos** button (ce-workflow checkout): shows the YouTube channels you watch (Matt Pocock to start), how many new shorts and full videos each has, and how many digests": {
+   "count": 1,
+   "ms": 1183,
+   "maxMs": 1183,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"research/videos\\|research\\\", \\\"videos\\|\\\"videos\\\"\" extensions scripts README.md CHANGELOG.md AGENTS.md hub/src 2>/dev/null | grep -v \"^docs\" | cut -c1-200; git fetch -q 2>/dev/null": {
+   "count": 1,
+   "ms": 1857,
+   "maxMs": 1857,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git ls-tree -r --name-only origin/master docs/research/videos | wc -l; git diff --cached --stat | tail -1; D=\"$USERPROFILE/Downloads/video-digests\"; mkdir -p \"$D\" && cp -r docs/research/vide": {
+   "count": 1,
+   "ms": 2109,
+   "maxMs": 2109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && OLD=$(git rev-parse HEAD) && echo \"old $OLD\" && git branch -f video-purge-backup \"$OLD\" && W=\"$TEMP/purge-wt\" && rm -rf \"$W\" && git worktree add -q --detach \"$W\" \"$OLD\" && cd \"$W\" && git che": {
+   "count": 1,
+   "ms": 53331,
+   "maxMs": 53331,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --name-only ef28a99 9c590ef | grep -v \"^docs/research/videos/\" | head; echo \"non-video changes: $(git diff --name-only ef28a99 9c590ef | grep -vc \"^docs/research/videos/\")\"; git log": {
+   "count": 1,
+   "ms": 449,
+   "maxMs": 449,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --porcelain | grep -v \"docs/research/videos\" | sort > \"$TEMP/st-before.txt\"; git update-ref -m \"drop docs/research/videos from unpushed history\" refs/heads/master 9c590efe75e7afc6": {
+   "count": 1,
+   "ms": 1010,
+   "maxMs": 1010,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 470,480p extensions/video-digest.ts; sed -n 505,535p extensions/video-digest.ts; sed -n 76,84p scripts/test-work-video-digest.mjs; sed -n 222,240p scripts/test-work-video-digest.mjs; ": {
+   "count": 1,
+   "ms": 332,
+   "maxMs": 332,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && awk \"NR>=365 && NR<=495\" extensions/video-digest.ts | grep -n \"cwd\"; grep -n \"cwd\\|project =\" scripts/test-work-video-digest.mjs | head": {
+   "count": 1,
+   "ms": 974,
+   "maxMs": 974,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 61p README.md": {
+   "count": 1,
+   "ms": 51,
+   "maxMs": 51,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const sub=(f,pairs)=>{let t=fs.readFileSync(f,'utf8');for(const [a,b] of pairs){if(!t.includes(a))throw new Error(f+': '+a);t=t.split(a).join(b)}fs.writeFile": {
+   "count": 1,
+   "ms": 3375,
+   "maxMs": 3375,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const fix=(t)=>{const a=['saves the transcript plus the code, diagrams and tables shown on screen, rebuilt as text, to \\`docs/research/videos/\\`','The list l": {
+   "count": 1,
+   "ms": 875,
+   "maxMs": 875,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git status --short && git diff --stat | tail -1 && git branch --show-current && git log --oneline origin/master..HEAD | wc -l && grep -n \"\\\"version\\\"\" package.json && git diff --name-only or": {
+   "count": 1,
+   "ms": 354,
+   "maxMs": 354,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const p=require('./package.json');console.log(JSON.stringify(p.scripts,null,1))\" | head -40; ls package-lock.json hub/package.json 2>/dev/null; grep -n \"\\\"version\\\"\" hub/package.jso": {
+   "count": 1,
+   "ms": 182,
+   "maxMs": 182,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 5,21p CHANGELOG.md | cut -c1-120; grep -n \"\\\"version\\\"\" package-lock.json | head -3; git diff hub/web/app.ts | head -60": {
+   "count": 1,
+   "ms": 379,
+   "maxMs": 379,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"console.log(JSON.stringify(require('./hub/package.json').scripts,null,1))\" | head -30; grep -n \"hub/scripts\\|test-work-\\(plan3\\|lens\\|lab\\)\" scripts/verify-package.mjs | head -20": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in video-digest plan3 lens-format lab-metrics; do timeout 300 node \"scripts/test-work-$t.mjs\" > \"$TEMP/t-$t.log\" 2>&1; echo \"test-work-$t exit $? $(tail -1 \"$TEMP/t-$t.log\" | cut -c1-1": {
+   "count": 1,
+   "ms": 37462,
+   "maxMs": 37462,
+   "failures": 1
+  },
+  "bash\u0000tail -40 \"$TEMP/t-hub.log\" | cut -c1-250": {
+   "count": 1,
+   "ms": 83,
+   "maxMs": 83,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 600 node \"scripts/test-browser.mjs\" > \"$TEMP/t-br.log\" 2>&1; echo \"exit $?\"; tail -4 \"$TEMP/t-br.log\" | cut -c1-200": {
+   "count": 1,
+   "ms": 2148,
+   "maxMs": 2148,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -m2 \"Error\\|assert\" \"$TEMP/t-br.log\" | cut -c1-200; git stash list | head -2; git stash push -q -- web/app.ts web/styles.css scripts/test-browser.mjs src/api.ts src/pool.ts src/usag": {
+   "count": 1,
+   "ms": 2960,
+   "maxMs": 2960,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short; git stash list | head -3; git diff --stat | tail -1": {
+   "count": 1,
+   "ms": 1082,
+   "maxMs": 1082,
+   "failures": 0
+  },
+  "bash\u0000grep -B2 -A14 \"AssertionError\" \"$TEMP/t-br2.log\" | cut -c1-220 | head -30": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD:hub/scripts/test-browser.mjs | sed -n 125,135p | cut -c1-260; git log --oneline -3 origin/master..HEAD -- hub/scripts/test-browser.mjs hub/web/app.ts | cat": {
+   "count": 1,
+   "ms": 572,
+   "maxMs": 572,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && W=\"$TEMP/origin-wt\" && rm -rf \"$W\" && git worktree add -q --detach \"$W\" origin/master && cd \"$W/hub\" && (ls node_modules >/dev/null 2>&1 || cmd //c mklink //J node_modules \"C:\\\\SOFT\\\\git\\\\ce": {
+   "count": 1,
+   "ms": 1044,
+   "maxMs": 1044,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,40p hub/scripts/changelog-shot.mjs | grep \"^//\\|^ \\*\" | head -30; ls docs/changelog | tail -5": {
+   "count": 1,
+   "ms": 512,
+   "maxMs": 512,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log -S\"changelog-shot\" --format=\"%h %s\" -5 -- CHANGELOG.md | cat; git log --all --format=%B -200 | grep -m5 \"changelog-shot\"; grep -n \"ask-\\|\\.ask\\b\\|#ask\" hub/scripts/changelog-shot.mjs": {
+   "count": 1,
+   "ms": 325,
+   "maxMs": 325,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"ask\" hub/scripts/changelog-shot.mjs | head; grep -n \"className: \\\"ask\\|id=\\\"ask\\|\\\"ask-\" hub/web/app.ts hub/web/*.html 2>/dev/null | head -5": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ASK='{\"question\":\"Video feeds\",\"context\":\"Matt Pocock (https://www.youtube.com/@mattpocockuk): 2 new shorts, 1 new full videos\\n\\n46 videos digested, 46 analyzed for ideas (Takeaways). Newes": {
+   "count": 1,
+   "ms": 62463,
+   "maxMs": 62463,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --format=\"%h %s\" -1 -S\"## 0.3.1\" -- CHANGELOG.md | cat; git show $(git log --format=%h -1 -S\"## 0.3.1\" -- CHANGELOG.md) -- CHANGELOG.md | head -20": {
+   "count": 1,
+   "ms": 230,
+   "maxMs": 230,
+   "failures": 0
   }
  },
  "steps": {
@@ -683,13 +857,13 @@
    }
   },
   "(none)": {
-   "ms": 2125216,
-   "testMs": 2526,
-   "replies": 47,
+   "ms": 2495015,
+   "testMs": 48757,
+   "replies": 79,
    "models": {
-    "anthropic/claude-opus-5-5:high": 47
+    "anthropic/claude-opus-5-5:high": 79
    },
-   "failures": 4
+   "failures": 6
   }
  },
  "spans": [
@@ -700,6 +874,14 @@
   {
    "start": "2026-11-08T16:01:35.977Z",
    "ms": 3889919
+  },
+  {
+   "start": "2026-11-08T21:48:11.578Z",
+   "ms": 232819
+  },
+  {
+   "start": "2026-11-08T22:06:16.157Z",
+   "ms": 294691
   }
  ],
  "hints": []

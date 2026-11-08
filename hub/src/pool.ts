@@ -4,6 +4,7 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import { agentDir } from "./rpc-client.ts";
 
 const ACTS = new Set(["switch", "favorite", "weekend", "mode", "refresh", "toggle", "remove", "up", "down", "priority"]);
@@ -46,6 +47,42 @@ export function createPool({ cpool = findCpool(), retryMs = 300_000, log = (line
 		child.stdin?.end(input ?? "");
 	});
 
+	// Re-login: one `cpool login <label> --json` at a time. It prints the sign-in link, reads the pasted code from stdin
+	// and prints the result; the account it updates is always <label>, never one picked by email.
+	type Login = { child: ChildProcess; lines: string[]; closed: boolean; wake?: () => void };
+	let login: Login | undefined;
+	const endLogin = () => { login?.child.kill(); login = undefined; };
+	async function nextLine(state: Login, ms: number) {
+		const deadline = Date.now() + ms;
+		while (!state.lines.length && !state.closed && Date.now() < deadline) await new Promise<void>(resolve => { state.wake = resolve; setTimeout(resolve, deadline - Date.now()).unref(); });
+		const line = state.lines.shift();
+		if (line === undefined) throw fail(502, state.closed ? "cpool login ended without an answer." : "cpool login did not answer in time.");
+		let result: any;
+		try { result = JSON.parse(line); } catch { throw fail(502, line.startsWith("cpool ") ? "This pi-provider-claude-ex has no cpool login yet; update it (pi update) and restart the hub." : "cpool login printed no JSON."); }
+		if (result?.error) throw fail(502, String(result.error));
+		return result;
+	}
+	function startLogin(label: string) {
+		if (!cpool) throw fail(404, "The Claude pool (pi-provider-claude-ex) is not installed.");
+		endLogin();
+		const child = spawn(process.execPath, [cpool, "login", label, "--json"], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+		const state: Login = { child, lines: [], closed: false };
+		let err = "";
+		const wake = () => { const resolve = state.wake; state.wake = undefined; resolve?.(); };
+		createInterface({ input: child.stdout! }).on("line", line => { if (line.trim()) { state.lines.push(line); wake(); } });
+		child.stderr!.on("data", chunk => { err = (err + chunk).slice(-2000); });
+		child.stdin!.on("error", () => {}); // the child may exit before reading
+		const close = () => {
+			if (state.closed) return;
+			state.closed = true;
+			if (!state.lines.length && err.trim()) state.lines.push(JSON.stringify({ error: err.trim().split("\n").pop() }));
+			wake(); if (login === state) login = undefined;
+		};
+		child.on("error", error => { err ||= error.message; close(); });
+		child.on("close", close);
+		return login = state;
+	}
+
 	// D13: one daemon refreshes the pool while the hub runs. cpool itself refuses a second daemon, so a
 	// standalone one wins; the hub retries later and only ever stops the child it started.
 	function startDaemon() {
@@ -78,6 +115,28 @@ export function createPool({ cpool = findCpool(), retryMs = 300_000, log = (line
 				const result = await run(["import"], data.text);
 				return { message: result?.text as string | undefined, view: await run(["view", "--json"]) };
 			}
+			if (data.act === "login") {
+				const label = typeof data.label === "string" ? data.label : "";
+				if (!label || label.startsWith("-")) throw fail(400, "Unknown account.");
+				const state = startLogin(label);
+				try {
+					const first = await nextLine(state, 30_000);
+					if (typeof first?.url !== "string" || !first.url.startsWith("https://")) throw fail(502, "cpool login gave no sign-in link.");
+					return { login: { url: first.url, label, email: typeof first.email === "string" ? first.email : undefined } };
+				} catch (error) { if (login === state) endLogin(); throw error; }
+			}
+			if (data.act === "login-code") {
+				const state = login;
+				if (!state || state.closed) throw fail(409, "The sign-in has ended; press Re-login again.");
+				const code = typeof data.text === "string" ? data.text.trim() : "";
+				if (!code || code.length > 4000 || /[\r\n]/.test(code)) throw fail(400, "Paste the code Anthropic shows.");
+				state.child.stdin!.write(code + "\n");
+				try {
+					const done = await nextLine(state, 60_000);
+					return { message: `Logged in again: ${done?.label ?? "account"}${done?.email ? ` (${done.email})` : ""}.`, view: await run(["view", "--json"]) };
+				} finally { if (login === state) endLogin(); }
+			}
+			if (data.act === "login-cancel") { endLogin(); return {}; }
 			if (!ACTS.has(data.act as string) || typeof (data.label ?? "") !== "string") throw fail(400, "Unknown pool action.");
 			if (data.act === "priority" && !(Number.isInteger(data.value) && Math.abs(data.value as number) <= 2)) throw fail(400, "Priority is -2..2.");
 			if (data.value !== undefined && !Number.isInteger(data.value)) throw fail(400, "Value must be an integer.");
@@ -87,6 +146,6 @@ export function createPool({ cpool = findCpool(), retryMs = 300_000, log = (line
 			return { message: result?.text as string | undefined, view: await run(["view", "--json"]) };
 		},
 		start() { if (!stopped) return; stopped = false; startDaemon(); },
-		stop() { stopped = true; clearTimeout(retry); daemon?.kill(); daemon = undefined; },
+		stop() { stopped = true; clearTimeout(retry); daemon?.kill(); daemon = undefined; endLogin(); },
 	};
 }

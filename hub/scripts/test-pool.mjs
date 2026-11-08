@@ -17,6 +17,11 @@ if (args[0] === "view") console.log(JSON.stringify({ title: "Claude accounts", d
 else if (args[0] === "action") args[1] === "explode" ? (console.error("no such act"), process.exit(1)) : console.log(JSON.stringify({ text: "did " + args[1] }));
 else if (args[0] === "export") console.log(JSON.stringify({ accounts: [{ label: "a", refresh: "r" }] }));
 else if (args[0] === "import") { const text = fs.readFileSync(0, "utf8"); text.startsWith("{") ? console.log(JSON.stringify({ text: "Imported " + JSON.parse(text).accounts.length })) : (console.error("Import failed: not valid JSON"), process.exit(1)); }
+else if (args[0] === "login") { if (args[1] === "gone") { console.log(JSON.stringify({ error: "No account gone" })); process.exit(1); }
+ console.log(JSON.stringify({ url: "https://claude.ai/oauth/authorize?x=1", label: args[1], email: "flex@datecs.bg" }));
+ let input = ""; process.stdin.on("data", c => { input += c; if (input.includes("\\n")) { const code = input.trim(); fs.appendFileSync(${JSON.stringify(log)}, "code " + code + "\\n");
+  console.log(JSON.stringify(code === "bad#s" ? { error: "Signed in as other@x, not flex@datecs.bg" } : { ok: true, label: args[1], email: "flex@datecs.bg" })); process.exit(code === "bad#s" ? 1 : 0); } });
+ process.stdin.on("end", () => process.exit(1)); }
 else if (args[0] === "daemon") { if (fs.existsSync(${JSON.stringify(path.join(root, "alive"))})) { console.error("cpool daemon already running (pid 1)"); process.exit(1); } setInterval(() => {}, 1000); }`);
 fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "claudeex", bin: { cpool: "bin/cpool.mjs" } }));
 fs.writeFileSync(path.join(agent, "settings.json"), JSON.stringify({ packages: ["npm:pi-lens", { source: "npm:other@1.0.0" }, path.relative(agent, pkg)] }));
@@ -53,6 +58,22 @@ await assert.rejects(pool.action({ act: "import", text: "junk" }), error => erro
 for (const bad of [{ act: "import" }, { act: "import", text: "  " }]) await assert.rejects(pool.action(bad), error => error.status === 400);
 for (const bad of [{ act: "explode" }, { act: "priority", label: "a", value: 5 }, { act: "switch", label: "--help" }, { act: "up", label: 3 }, { act: "up", label: "a", value: 1.5 }])
 	await assert.rejects(pool.action(bad), error => error.status === 400, JSON.stringify(bad));
+
+// Re-login: the link and the account's mail come first; the pasted code goes to that same process and account.
+const started = await pool.action({ act: "login", label: "datecs:home" });
+assert.deepEqual(started, { login: { url: "https://claude.ai/oauth/authorize?x=1", label: "datecs:home", email: "flex@datecs.bg" } });
+assert(calls().includes("login datecs:home --json"));
+const relogged = await pool.action({ act: "login-code", text: " abc#s " });
+assert.equal(relogged.message, "Logged in again: datecs:home (flex@datecs.bg)."); assert.equal(relogged.view.title, "Claude accounts");
+assert(calls().includes("code abc#s"));
+await assert.rejects(pool.action({ act: "login-code", text: "abc#s" }), error => error.status === 409, "no sign-in running");
+await pool.action({ act: "login", label: "datecs:datecs" });
+await assert.rejects(pool.action({ act: "login-code", text: "bad#s" }), error => error.status === 502 && /not flex@datecs.bg/.test(error.message));
+await assert.rejects(pool.action({ act: "login", label: "gone" }), error => error.status === 502 && /No account gone/.test(error.message));
+for (const bad of [{ act: "login" }, { act: "login", label: "--help" }]) await assert.rejects(pool.action(bad), error => error.status === 400);
+await pool.action({ act: "login", label: "a" });
+await pool.action({ act: "login-cancel" });
+await assert.rejects(pool.action({ act: "login-code", text: "abc#s" }), error => error.status === 409, "cancel ends the sign-in");
 
 // D13: a daemon already alive wins; the hub's own refuses, retries, and takes over once that one is gone.
 fs.writeFileSync(path.join(root, "alive"), "");

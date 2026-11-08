@@ -124,7 +124,7 @@ await writeMulti(
 	},
 );
 const drain = (await poolFetch(poolDir)).find((w) => w.id === "drain");
-assert.match(drain?.text ?? "", /^7d: \d+h \d+m \(17%\)$/, "soonest dying account with >15% left");
+assert.match(drain?.text ?? "", /^7d: \d+h \d+m \(17%\) low$/, "soonest dying account with >15% left, named");
 assert.equal(drain.color, "error");
 await writeMulti(
 	[{ label: "a" }, { label: "b" }],

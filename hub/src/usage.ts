@@ -306,11 +306,13 @@ function poolWindows(store, accounts, entries, used, t) {
 			const week = used(e.seven_day);
 			const login = accounts.find((a) => a.label === e.label)?.refreshExpires;
 			const end = Math.min(week.at ?? Infinity, finite(login) ? login : Infinity);
-			return { left: end - t - upcomingNightMs(t, end), free: 100 - (week.pct ?? 100) };
+			// Name the account and the cause: a login ending early strands quota whose 7d reset is days away.
+			const cause = finite(login) && login < (week.at ?? Infinity) ? "login" : "7d";
+			return { left: end - t - upcomingNightMs(t, end), free: 100 - (week.pct ?? 100), label: e.label, cause };
 		})
 		.filter((d) => d.left > 0 && d.left < DRAIN_WARN_MS && d.free > 15)
 		.sort((a, b) => a.left - b.left)[0];
-	if (dying) windows.push(text("drain", `7d: ${formatDuration(dying.left)} (${Math.round(dying.free)}%)`, "error"));
+	if (dying) windows.push(text("drain", `${dying.cause}: ${formatDuration(dying.left)} (${Math.round(dying.free)}%) ${short(dying.label)}`, "error"));
 	const ending = accounts
 		.filter((a) => !a.dead && finite(a.refreshExpires) && a.refreshExpires - t < LOGIN_WARN_MS)
 		.sort((a, b) => a.refreshExpires - b.refreshExpires)[0];
@@ -755,7 +757,7 @@ export function createUsage({ dataDir, hidden = () => [], auth = () => piAuth(),
 					resets: w.resetsAt ? formatDuration(w.resetsAt - at) : undefined,
 					at: w.resetsAt && w.label !== "5h" ? resetMoment(w.resetsAt, at) : undefined,
 				}));
-				const words = (w: Window) => w.id === "drain" ? w.text!.replace(/^7d: (.*) \((\d+%)\)$/, "expiring in $1 ($2 unused)")
+				const words = (w: Window) => w.id === "drain" ? w.text!.replace(/^(7d|login): (.*) \((\d+%)\) (.+)$/, (_m, cause, left, pct, name) => `${name}: ${pct} unused, ${cause === "login" ? "login ends" : "weekly reset"} in ${left}`)
 					: w.id === "login" ? w.text!.replace(/^ER:expired/, "login expired").replace(/^ER:/, "login ends in ")
 					: w.id === "5h-full" ? w.text!.replace(/^5h full (.+)$/, "5h full, frees in $1") : w.text!;
 				const text = windows.filter(w => w.text !== undefined && w !== week);

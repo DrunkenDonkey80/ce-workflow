@@ -72,7 +72,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	// Commit / Commit and push / Pull latest buttons and the sidebar's per-folder file line: changed files by kind, unpushed and unpulled
 	// commits; null outside a git repository. "behind" needs a fetch: one quiet background fetch per folder every 5 minutes, seen on the
 	// next status. Every open page polls the sidebar, so there one git status per folder serves all pages for 4 s; status reads fresh.
-	type GitState = { changed: number; added: number; modified: number; deleted: number; untracked: number; ahead: number; behind: number; files: { kind: string; path: string }[] } | null;
+	type GitState = { changed: number; added: number; modified: number; deleted: number; untracked: number; ahead: number; behind: number; branch?: string; files: { kind: string; path: string }[] } | null;
 	const fetched = new Map<string, number>(), gitCache = new Map<string, { at: number; state: Promise<GitState> }>();
 	const readGit = (cwd: string) => new Promise<GitState>(resolve => execFile("git", ["status", "--porcelain=v1", "--branch"], { cwd, timeout: 5000, windowsHide: true, env: gitReadEnv() }, (error, out) => {
 		if (error) return resolve(null);
@@ -82,7 +82,9 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		// Paths relative to the repository root, for the hover list; a rename lists its new name.
 		const kind = (xy: string) => xy === "??" ? "untracked" : xy[0] === "A" ? "added" : xy.includes("D") ? "deleted" : "modified";
 		const list = files.slice(0, 200).map(line => ({ kind: kind(line.slice(0, 2)), path: line.slice(3).split(" -> ").at(-1)!.replace(/^"(.*)"$/, "$1") }));
-		resolve({ files: list, changed: files.length, added, modified: files.length - untracked - added - deleted, deleted, untracked, ahead: Number(/\bahead (\d+)/.exec(head)?.[1] ?? 0), behind: Number(/\bbehind (\d+)/.exec(head)?.[1] ?? 0) });
+		// "## work...origin/work [ahead 1]"; the branch shows only off master/main.
+		const branch = head.slice(3).replace(/^No commits yet on /, "").split("...")[0].split(" [")[0];
+		resolve({ ...(/^(master|main)$/.test(branch) ? {} : { branch }), files: list, changed: files.length, added, modified: files.length - untracked - added - deleted, deleted, untracked, ahead: Number(/\bahead (\d+)/.exec(head)?.[1] ?? 0), behind: Number(/\bbehind (\d+)/.exec(head)?.[1] ?? 0) });
 	}));
 	// Each git spawn blocks the hub ~20 ms on Windows. The sidebar gets a folder's last counts at once and it refreshes behind them,
 	// one spawn at a time (a folder's first read still waits).
