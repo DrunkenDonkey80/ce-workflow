@@ -26,6 +26,7 @@ import workModelsExtension, {
 	summarizeNativeContext,
 } from "../extensions/work-models.ts";
 import { fitImage, parseSize, pngSize } from "../extensions/work-images.ts";
+import { searchKnowledge } from "../extensions/work-knowledge.ts";
 
 // CU-12 (plan fee49985 D7): system messages stay in their slot so tool changes keep the prompt cache.
 {
@@ -2005,6 +2006,14 @@ try {
 	for (const file of manualNotebooks) rmSync(path.dirname(file), { recursive: true, force: true });
 	console.log("ok - compaction fallback, manual research and on-demand non-vision image bridge");
 } finally {
+	// B3: a compaction promotes only observed facts project-wide; one task's decision stays in its session checkpoint.
+	await hooks.session_compact({ compactionEntry: { id: "leak-test", details: { knowledgeCandidates: [
+		{ claim: "User wants teal buttons in the zebra export dialog.", status: "decision", sources: ["s:1"] },
+		{ claim: "The zebra exporter writes CSV through scripts/export-zebra.mjs.", status: "observed", sources: ["s:2"] },
+	] } } }, ctx);
+	const zebra = searchKnowledge(cwd, "zebra export dialog buttons exporter").map((hit) => hit.claim ?? hit.record?.claim ?? JSON.stringify(hit)).join("\n");
+	assert.match(zebra, /export-zebra\.mjs/, "observed fact stored project-wide");
+	assert.doesNotMatch(zebra, /teal buttons/, "a task decision does not leak into project knowledge");
 	await hooks.session_shutdown?.({}, ctx);
 	if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
 	else process.env.PI_CODING_AGENT_DIR = previousAgentDir;

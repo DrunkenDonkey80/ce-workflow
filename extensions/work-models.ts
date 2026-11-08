@@ -1407,7 +1407,8 @@ function storeCompactionKnowledge(ctx, claims, bucket) {
 	let stored = 0;
 	for (const fact of claims ?? []) {
 		if (stored >= 3) break;
-		if (!["observed", "decision", "inferred"].includes(fact.status)) continue;
+		// Only observed facts go project-wide: decisions and preferences from one task stay in that session's checkpoint, so they cannot steer unrelated work (proposal 2026-11-09 B3).
+		if (fact.status !== "observed") continue;
 		try {
 			const result = recordKnowledge(ctx.cwd, {
 				claim: fact.claim, kind: "fact", scope: "project", authority: "inferred",
