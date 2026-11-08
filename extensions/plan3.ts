@@ -1083,7 +1083,7 @@ export default function plan3(pi) {
 		return avail;
 		});
 		const on = isOn(avail, id);
-		return { requirement: id, on, ...marked, ...(on ? {} : { hint: `${id} is off: continue with runnable work; the user switches it on with Alt+A.` }) };
+		return { requirement: id, on, ...marked, ...(on ? {} : { hint: `${id} is off: continue with runnable work; the user switches it on with Alt+A, or call plan3 needs to show them the checklist.` }) };
 	}
 	// Alt+A / /plan3 needs: the user's checklist for the active set; a running agent gets the changes as a steer.
 	async function editNeeds(ctx, plan) {
@@ -1635,7 +1635,7 @@ export default function plan3(pi) {
 	pi.registerTool?.({
 		name: "plan3",
 		label: "Plan3",
-		description: "Create a Plan3 plan (create, text = the request; writes the standard template with a stable id), then read and update the current Plan3 plan: get (view resume/step/section for compact reads), title, status, step marks (done with summary moves notes to the sidecar log), next, sections, checkpoint (replaces Resume context), add steps; ideas saves full-detail proposals and reviews each through ask_user; idea reconciles a commented response. Prose bodies stay with write/edit.",
+		description: "Create a Plan3 plan (create, text = the request; writes the standard template with a stable id), then read and update the current Plan3 plan: get (view resume/step/section for compact reads), title, status, step marks (done with summary moves notes to the sidecar log), next, sections, checkpoint (replaces Resume context), add steps; ideas saves full-detail proposals and reviews each through ask_user; idea reconciles a commented response; needs shows the user the requirements checklist (the Alt+A one, also on the hub/phone) and returns what they changed; only the user can flip requirements. Prose bodies stay with write/edit.",
 		promptSnippet: "Structured Plan3 plan updates (status, step markers with check evidence, next step, sections, new steps, title)",
 		promptGuidelines: ["Create every new plan with plan3 action create, then fill that file in place; never hand-write a new plan file.", "Use plan3 instead of hand-editing step markers or status in a Plan3 plan; record the actual command and result as check when completing a step.", "Mark a finished Plan3 step done with a one-line summary, and keep one current Resume context via plan3 checkpoint instead of appending history."],
 		parameters: {
@@ -1643,7 +1643,7 @@ export default function plan3(pi) {
 			additionalProperties: false,
 			required: ["action"],
 			properties: {
-				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea", "requirement", "size"] },
+				action: { type: "string", enum: ["create", "get", "title", "status", "step", "next", "section", "checkpoint", "add", "ideas", "idea", "requirement", "needs", "size"] },
 				mode: { type: "string", enum: ["tiny", "plan", "map"], description: "size: your recommended mode for a new /plan3 request; the user confirms" },
 				view: { type: "string", enum: ["resume", "step", "section", "requirements"], description: "get: resume = compact current-state packet; step = one step's full block (id); section = one section body (name); requirements = what is on/off and which steps wait" },
 				requirement: { type: "string", description: "requirement: R-<short-name> of an external thing a step needs (reboot, physical device, the user seeing output); new ones need text and ask the user once; marks step/phase id, default the current wip step" },
@@ -1656,7 +1656,7 @@ export default function plan3(pi) {
 				note: { type: "string", description: "step/next: short note; idea: interpretation of the user's comment" },
 				check: { type: "string", description: "step/next: actual check command and result" },
 				value: { type: "string", enum: STATUSES, description: "status: new status" },
-				text: { type: "string", description: "create: the request the plan answers (from the discussion); title: one-line title; size: one-line reason; requirement: what the new requirement is; section: Markdown; checkpoint: the one current state, next action and blockers; idea: revised accepted requirement, only when requested in the comment" },
+				text: { type: "string", description: "create: the request the plan answers (from the discussion); title: one-line title; size: one-line reason; requirement: what the new requirement is; needs: one line telling the user why you ask; section: Markdown; checkpoint: the one current state, next action and blockers; idea: revised accepted requirement, only when requested in the comment" },
 				name: { type: "string", description: "section: heading name, e.g. Decisions, Open questions, Resume context, Amendments" },
 				replace: { type: "boolean", description: "section: replace the body instead of appending" },
 				after: { type: "string", description: "add: insert after this step (default: last step)" },
@@ -1757,6 +1757,12 @@ export default function plan3(pi) {
 				});
 			} else if (args.action === "requirement") {
 				result = await requirement(ctx, plan, need("requirement"), args.text, args.id);
+			} else if (args.action === "needs") {
+				// The user's Alt+A checklist as a dialog (works from the hub/phone); only the user's ticks write needs.json.
+				if (!ctx.hasUI) throw new Error("needs shows the user's checklist and needs a UI; ask the user to press Alt+A.");
+				const defs = requirementDefs(split(await readFile(plan.file, "utf8")).lines);
+				const { avail, changes } = await waitForUser("Plan3: requirements", () => chooseAvail(ctx, needsFile(logFile(plan.file)), defs, undefined, args.text?.split(/\r?\n/)[0].trim()));
+				result = { changes, view: availLine(avail, defs) };
 			} else if (args.action === "checkpoint") {
 				await mutate(plan, (lines) => replaceCheckpoint(lines, need("text")));
 			} else if (args.action === "get" && args.view) {

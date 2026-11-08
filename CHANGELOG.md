@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Added
+- The agent can show you a plan's requirements checklist (the Alt+A one) as a question, so you can switch approvals from the hub or your phone. Only your ticks change it; the agent still cannot.
 - On a machine with pi-lens, ce-workflow asks once whether to turn off pi-lens auto-format, which otherwise reformats every file the agent writes. The answer is saved in pi-lens's own config, so it is not asked again.
 - `/plan3 <request>` sizes the request first and asks you to confirm: **Tiny** skips the plan and makes the change at once, **Plan** plans as before, **Map** charts big or foggy work as a decision map with ordered tickets that ends in a list of plans to start.
 - Planning asks in rounds of independent decisions and looks facts up itself, checks whether each touched module fits the change (prefactor or quick patch, recorded with a reason), and orders steps as thin slices that keep the project working.

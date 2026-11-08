@@ -43,12 +43,12 @@ export const changeMessage = (changes: string[], line: string) =>
 	`Plan3 requirements changed by the user: ${changes.join(", ")}. ${line} Do not start steps that need a requirement that is off; finish or safely park the current one and continue with runnable work.`;
 
 // Checklist for the active set (or the set night mode is switching to); Esc saves. Returns "R-x on" style changes.
-export async function chooseAvail(ctx, file: string, defs: Map<string, string>, avail = readAvail(file)) {
+export async function chooseAvail(ctx, file: string, defs: Map<string, string>, avail = readAvail(file), why = "") {
 	if (!ctx.hasUI || defs.size <= 1) return { avail, changes: [] as string[] };
 	const ids = [...defs.keys()];
 	const picked = await showListDialog(ctx, {
 		title: `Requirements · ${mode(avail) === "night" ? "night" : "day"}`,
-		purpose: "Checked = available to the agent now. Esc saves and tells the agent what changed.",
+		purpose: `${why ? `${why} — ` : ""}Checked = available to the agent now. Esc saves and tells the agent what changed.`,
 		cursorKey: `plan3-needs:${file}`, filter: false,
 		multi: { selected: ids.filter((id) => isOn(avail, id)) },
 		items: ids.map((id) => ({ value: id, label: id, description: defs.get(id), preserveCase: true })),

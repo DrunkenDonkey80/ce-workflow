@@ -371,6 +371,16 @@ try {
 		needPlan = (await listPlans(ctx.cwd)).find((plan) => plan.id === "8c8c8c8c");
 		assert.deepEqual([needPlan.wip, needPlan.waiting], [["N-02"], []]);
 		assert.deepEqual(JSON.parse(await readFile(path.join(directory, "logs", "8c8c8c8c.needs.json"), "utf8")).night, { human: false, "R-reboot": false, "R-printer": true }, "the night set copies first answers, user away");
+		// The agent can show the same checklist (hub/phone); only the user's ticks change it.
+		selectScript = [["Requirements", "R-printer"], ["Requirements", null]];
+		const asked = await tool({ action: "needs", plan: "8c8c8c8c", text: "Build waits for the printer" });
+		assert.deepEqual([asked.changes, selectScript.length], [["R-printer off"], 0]);
+		assert.match(asked.view, /off: R-printer/);
+		selectScript = [["Requirements", null]];
+		assert.deepEqual((await tool({ action: "needs", plan: "8c8c8c8c" })).changes, [], "no ticks, no change");
+		ctx.hasUI = false;
+		await assert.rejects(tool({ action: "needs", plan: "8c8c8c8c" }), /needs a UI/);
+		ctx.hasUI = true;
 		ctx.hasUI = false;
 		await rm(needFile);
 		assert.doesNotMatch(resumeMessage, /hard limit/);
