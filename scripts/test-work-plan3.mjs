@@ -1796,6 +1796,17 @@ try {
 		hooks.get("tool_call")(mapRewrite, ctx);
 		assert.match(mapRewrite.input.content, /^kind: map$/m, "a rewrite keeps the map a map");
 		assert.equal(selectScript.length, 0);
+		// B1: a planning draft turns into a map mid-grill in place; what was settled stays.
+		await writeFile(planned.file, (await readFile(planned.file, "utf8")).replace("## Decisions", "## Decisions\n\n- **D-01** Keep the ledger format."));
+		const switched = await tool({ action: "size", mode: "map", text: "Grilling found more fog.", plan: planned.id });
+		assert.equal(switched.switched, true);
+		assert.match(switched.instructions, /^This draft was a normal plan and is now a map\. [\s\S]*\*\*Map\*\* mode: /);
+		const switchedText = await readFile(planned.file, "utf8");
+		assert.match(switchedText, /^kind: map$/m);
+		assert.match(switchedText, /^size: map$/m);
+		assert.match(switchedText, /- \*\*D-01\*\* Keep the ledger format\.[\s\S]*- \*\*D-map\*\* Plan → Map\. Grilling found more fog\. Source: recommendation taken \(no UI\)/);
+		for (const name of ["Destination", "Notes", "Not yet specified", "Out of scope"]) assert.equal(switchedText.split(`\n## ${name}\n`).length, 2, `${name} added once`);
+		await assert.rejects(tool({ action: "size", mode: "map", text: "again", plan: planned.id }), /only for a new \/plan3 request/, "a map is not switched twice");
 		for (const made of [cancel, planned, mapped, headless]) await rm(made.file);
 
 		// PC-05 map plans: the template passes finish once filled, needs no tagging turn and runs tickets strictly in order.
