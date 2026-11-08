@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T14:35:55.001Z
+updated: 2026-11-08T14:36:34.322Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -163,9 +163,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ### Phase 3: Skill A/B runs and verdicts [think]
 
-- [wip] **SK-07** Run every shortlisted skill task: 2 arms by 3 repeats on Sol 6.1 (C-lab), B arm forced, plus one unforced B run per skill (Q-02).
-  - Check: results file has 7 runs per skill (3 off, 3 forced, 1 unforced, with whether the skill was read); failed runs are rerun or reported, never dropped.
-  - note: Batch running (sk07.sh); writing-for-agents phase 1 complete (7 runs), diagnosing-bugs 5/7. only-agents-md fails in all 7 because pi-lens probe logs land in the cwd (fixed for later runs in 73a1dbd); rescore that check from the diffs, excluding .pi-lens-probe-home/.
+- [x] **SK-07** SK-07 batch complete: 6 skill tasks (off/forced x3 + unforced x1; retro off/forced x3) and 10 writing-for-agents replays, all in runs/sk07/results.jsonl; no runner failures.
 - [ ] **SK-08** Judge blind with Astra and fill the scorecard: per skill, per-arm medians for every R3 metric and a verdict (adopt, reject, inconclusive).
   - Judge: read-only `reviewer` on gpt-6-astra:high gets both diffs and transcripts with arm labels shuffled, plus the rubric; the agent checks each judgment against the evidence.
   - Check: results.md has a scorecard and verdict per tested skill; no verdict rests on a single weighted score.

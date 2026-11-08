@@ -40,6 +40,19 @@ Phase 1 (write AGENTS.md) judged; the verdict waits for the replay phase (a fres
 
 No run named every shop-list location (`report.SHOP_NAMES` and the normalize shop tuple were missed by all). The `only-agents-md` check was rescored without pi-lens probe logs (lab noise, fixed in 73a1dbd).
 
+Phase 2 replay (a fresh Sol session adds the Laptop.bg source, no skill; each phase-1 AGENTS.md replayed once, plus 3 controls without AGENTS.md):
+
+| Replay with | Hidden test | All shop lists | Tokens (median, range) | Cost $ | Runtime s | Turns | Tool calls |
+|---|---|---|---|---|---|---|---|
+| no AGENTS.md (control) | 3/3 | 3/3 | 661,716 (651k-1.18M) | 0.4747 | 290 | 15 | 14 |
+| off AGENTS.md | 2/3 | 2/3 | 782,527 (778k-1.31M) | 0.3846 | 323 | 15 | 14 |
+| forced AGENTS.md | 3/3 | 3/3 | 780,244 (636k-1.10M) | 0.4757 | 275 | 15 | 14 |
+| unforced AGENTS.md | 1/1 | 1/1 | 1,109,885 | 0.3973 | 316 | 22 | 21 |
+
+The one failure (off rep 3, judge rank 4) missed `report.SHOP_NAMES` and the hidden test, the place no AGENTS.md named.
+
+**Verdict: no measurable effect; do not adopt.** The control without any AGENTS.md passed 3/3 at the lowest token median; no AGENTS.md, forced or not, made the next task cheaper or more correct. Forced docs had fewer no-op lines and no false claims (phase 1) and all their replays passed, but one off failure in 3 is inside the noise.
+
 ## SK-06 Plan3 baseline (current prompts, before PC-03)
 
 Env: Pi 1.5.0, ce-workflow 9268ac3 (dirty, `git diff` sha1 063de4c77d74), DealFinder 27221be clones in `C:\SOFT\git\skills-lab\plan-runs\sk06-*`, `scripts/rework-lab.mjs` (planner `openai-codex/gpt-6.1-sol`, Plan3 work models as configured, auto-answering the recommended option). Runs logged in `skills-lab/sk06.log`, per-run `sk06-<req>-<n>.lab.jsonl`. P1-P3 and F are plan-only (first `/plan3` turn until Plan ready), T and P1e2e run to completion. T-2 and T-3 finished their work, but the runner crashed while writing the result line (an agent's `2>NUL` left a `NUL` file git cannot add; fixed in `rework-lab.mjs`); their result lines were recomputed from the session logs, with wall time taken as first to last log line.
