@@ -22,13 +22,13 @@ Confirm first that the ref resolves (`git rev-parse <fixed-point>`) and the diff
 In this order:
 
 1. A path or request text the user passed.
-2. The Plan3 plan the change belongs to (`docs/plans/*-plan3.md`: Original request, Decisions and the steps), or issue references in the commit messages.
+2. The Plan3 plan the change belongs to (`docs/plans/*-plan3.md`: Original request, Decisions and the steps), or issue references in the commit messages. Given one step or ticket, follow it to its parent plan or map; a final review checks the plan's whole outcome, not only the steps marked done (agents drop things between tickets).
 3. A spec under `docs/`, `specs/` or `.scratch/` matching the branch or feature.
 4. Otherwise ask the user. If there is none, skip the Spec axis and report "no spec available".
 
 ## 3. Find the standards
 
-Every file that documents how code is written here: `AGENTS.md`, `CLAUDE.md`, `CODING_STANDARDS.md`, `CONTRIBUTING.md`, style or architecture docs. When `CODING_STANDARDS.md` or `CONTRIBUTING.md` exists, it must be on the list.
+Every file that documents how code is written here: `AGENTS.md`, `CLAUDE.md`, `CODING_STANDARDS.md`, `CONTRIBUTING.md`, style or architecture docs. When `CODING_STANDARDS.md` or `CONTRIBUTING.md` exists, it must be on the list. Give both axes `GLOSSARY.md` and the ADRs in the area, when present, as context for the project's words and past decisions (not as new requirements).
 
 On top of what the repo documents, the Standards axis always carries this **smell baseline** (Fowler, _Refactoring_, ch. 3). Two rules bind it:
 
@@ -58,7 +58,7 @@ Each smell reads *what it is* → *how to fix*:
 
 ## 5. Report
 
-Show the two reports under `## Standards` and `## Spec`, verbatim or lightly cleaned. Do **not** merge or rerank findings across axes. End with one line: findings per axis and the worst issue within each axis. Do not pick one winner across axes; that is the reranking the separation prevents.
+Show the two reports under `## Standards` and `## Spec`, verbatim or lightly cleaned. Do **not** merge or rerank findings across axes. End with one line: findings per axis and the worst issue within each axis. Do not pick one winner across axes; that is the reranking the separation prevents. When no fresh-context reviewer ran and you wrote the change yourself, say so in that line ("same-context self-review"): an agent reviewing code it just wrote misses more.
 
 ## Why two axes
 

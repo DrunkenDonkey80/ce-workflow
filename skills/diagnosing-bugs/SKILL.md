@@ -1,6 +1,6 @@
 ---
 name: diagnosing-bugs
-description: Diagnosis loop for hard bugs and performance regressions; reproduce with one command before theorizing, prove the cause one change at a time, regression test red before the fix. Use when the user says "diagnose" or "debug this", or reports something broken, throwing, failing or slow.
+description: "Diagnosis loop for hard bugs and performance regressions; reproduce with one command before theorizing, prove the cause one change at a time, regression test red before the fix. Use when the user says \"diagnose\" or \"debug this\", when the cause of a failure or slowdown is unclear, a fix already failed, or the bug is flaky. An obvious few-line fix does not need it: make it and add the regression check."
 license: Complete terms in LICENSE.txt
 ---
 

@@ -2901,7 +2901,7 @@ export function registerAskUser(pi: ExtensionAPI) {
       promptGuidelines: [
          "Before calling ask_user, gather context with tools (read/web/ref) and pass a short summary via the context field.",
          "Use ask_user when the user's intent is ambiguous, when a decision requires explicit user input, or when multiple valid options exist.",
-         "Ask one focused question per ask_user call by default.",
+         "Ask one focused question per ask_user call by default; when planning, ask the current frontier of independent decisions together.",
          "Use questions (2-4 entries) only for independent decisions whose prerequisites are already settled; ask anything that depends on another answer in a later ask_user call.",
          "With questions, put every question inside questions. A top-level question is only shown as the batch heading and is never asked or answered.",
          "Do not combine multiple numbered, multipart, or unrelated questions into one question's text.",

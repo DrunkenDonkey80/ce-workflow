@@ -1728,6 +1728,7 @@ try {
 		ctx.hasUI = true; ctx.mode = "rpc"; tokens = 0;
 		const tiny = await sizeDraft("Zebra footer typo xylophone");
 		assert.match(messages.at(-1).message, /\*\*Size\*\* first\. [\s\S]*call plan3 action size[\s\S]*On tiny, end your turn right after the tool returns/);
+		assert.match(messages.at(-1).message, /plan for normal work whose way is known, even when building it takes several sessions[\s\S]*map only when the way to the goal is still in fog/, "Map is chosen for fog, not size");
 		await mkdir(path.join(directory, "logs"), { recursive: true });
 		for (const ext of [".md", ".stats.json", ".needs.json"]) await writeFile(path.join(directory, "logs", `${tiny.id}${ext}`), "x");
 		let sizeLabels;
@@ -1869,6 +1870,7 @@ try {
 	const planning = messages.find(entry => entry.message.startsWith("Plan3: planning only."))?.message;
 	assert.match(planning, /For new or substantially redesigned web UI, read the frontend-design skill/);
 	assert.match(planning, /\*\*Project care\*\*: plan the change[\s\S]*fit check[\s\S]*One adapter is a hypothetical seam[\s\S]*thin end-to-end slices[\s\S]*expand \(add the new form beside the old\), migrate callers in batches, contract[\s\S]*Keep the plan proportional: affected files, the chosen approach/);
+	assert.match(planning, /talking cannot settle[\s\S]*plan a throwaway prototype step naming the question/, "ungrillable questions become a prototype step");
 	assert.match(planning, /record its reference, the chosen direction and tokens\/components to reuse in the plan, not the skill text/);
 	assert.match(planning, /Explicit briefs and project conventions win; native\/TUI work follows platform rules/);
 	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
