@@ -5,6 +5,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Added
+- `/plan3 <request>` sizes the request first and asks you to confirm: **Tiny** skips the plan and makes the change at once, **Plan** plans as before, **Map** charts big or foggy work as a decision map with ordered tickets that ends in a list of plans to start.
+- Planning asks in rounds of independent decisions and looks facts up itself, checks whether each touched module fits the change (prefactor or quick patch, recorded with a reason), and orders steps as thin slices that keep the project working.
+- `/plan3 finish` offers the plan's settled project terms and key decisions for `GLOSSARY.md` and `docs/adr/`, written only for the items you tick.
+- Two skills from Matt Pocock's collection: `two-axis-review` (reviews a diff against the repo's rules and against what was asked, side by side) and `diagnosing-bugs` (reproduce first, prove the cause, regression test before the fix).
 - `/plan3 rework [target]` plans a safe rework of one messy part of a project into a deeper module. It maps the code, records the current behavior as tests, compares designs, and waits for you before building, switching over and deleting the old code.
 - `video_digest` (in the ce-workflow checkout only): give the agent a YouTube coding video and it saves the transcript plus the code, diagrams and tables shown on screen, rebuilt as text, to `docs/research/videos/`, then notes what ce-workflow could adopt.
 

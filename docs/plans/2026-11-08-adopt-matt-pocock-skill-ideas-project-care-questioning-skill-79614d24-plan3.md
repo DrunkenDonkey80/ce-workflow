@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T15:11:38.864Z
+updated: 2026-11-08T15:13:38.251Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -203,7 +203,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 - [x] **PC-03** clarification now asks in frontier rounds (facts are the agent's job); PROJECT_CARE fit check in planningPrompt; executePrompt asks patch-vs-prefactor on unforeseen friction; C-p3 asserts updated (6eb96eb).
 - [x] **PC-04** plan3 size (fresh drafts only): compact dialog with recommendation preselected, night/headless take it, Plan/Map record D-size, Map writes the map template, Tiny deletes draft+sidecars and sends the Tiny prompt at agent_settled with research off (271109e).
 - [x] **PC-05** Map plans: template rejected by finishProblems until filled, single [think] phase (no tagging), MAP_PROMPT on continue, MAP_EXECUTE in execute, linear ticket order in workState, wip/complete refusals incl. fog (cdc3be9).
-- [x] **PC-06** PROJECT_LANGUAGE in planning and convert prompts; finish shows a Project docs checklist and writes picked terms/ADRs only after Plan ready via extensions/plan3-docs.ts (lazy, merged, numbered, idempotent) (20fe4d6).
+- [x] **PC-06** PROJECT_LANGUAGE in planning and convert prompts; finish shows a Project docs checklist and writes picked terms/ADRs only after Plan ready via extensions/plan3-docs.ts (lazy, merged, numbered, idempotent) (505282c).
 - [ ] **PC-07** Document sizing, map plans, project care, grilling rounds and glossary/ADR in README's Plan3 section; add CHANGELOG Unreleased bullets.
   - Check: manual read; README states limits (map order is linear, Tiny skips planning entirely).
 - [ ] **PC-08** Run C-types and C-verify once.
@@ -218,8 +218,8 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
   - Check: results.md has baseline versus candidate tables and a keep, tune or revert verdict.
 - [human] **PC-10** Live trial: the user runs /plan3 on one real request in a real project and judges sizing, grilling rounds and the fit check.
   - Check: the user's verdict and any follow-ups recorded in Decisions or Backlog.
-- [ ] **PC-11** Add skills/two-axis-review/SKILL.md adapted from mattpocock code-review (Standards and Spec passes via pi-subagents, side-by-side report), with credit and MIT notice; register in package.json pi.skills; README line.
-- [ ] **PC-12** Add skills/diagnosing-bugs/SKILL.md, a shortened adaptation (repro command first, one-factor experiment, ranked hypotheses, regression test red before the fix, cleanup), credit and MIT notice; register in package.json pi.skills; README line.
+- [x] **PC-11** skills/two-axis-review (SKILL.md, MIT LICENSE.txt, UPSTREAM.md), registered in pi.skills, verify-package checks, README line (09b7a78).
+- [x] **PC-12** skills/diagnosing-bugs shortened adaptation (repro command first, ranked falsifiable hypotheses, one variable at a time, test red before fix, cleanup) with MIT LICENSE.txt and UPSTREAM.md, registered (09b7a78).
 - [x] **PC-13** planningPrompt orders steps as thin end-to-end slices, prefactor first, wide refactors as expand/migrate/contract; asserted in C-p3 (8f948a2).
 
 ## Global validation
