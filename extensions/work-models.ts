@@ -12,6 +12,7 @@ import { publish } from "./hub-channel.ts";
 import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
+import { registerLensFormatCheck } from "./work-lens-format.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { toolsEnableTool } from "./tool-loader.ts";
 import { videoDigestTool } from "./video-digest.ts";
@@ -3565,6 +3566,7 @@ export default function workModelsExtension(pi) {
 	process.env.PI_ASK_USER_CONTEXT_EXPANDED ||= "true";
 	workExtensionPi = pi;
 	registerSelfUpdate(pi);
+	registerLensFormatCheck(pi);
 	// Read once at load; the Settings toggle reloads the runtime (D10).
 
 	const visionBridge = createVisionBridge();
