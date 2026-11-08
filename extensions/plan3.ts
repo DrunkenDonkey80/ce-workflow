@@ -517,9 +517,13 @@ export const setPlanModelPicker = (picker) => { pickModel = picker; };
 function keepOverrides(file, input) {
 	try {
 		const old = split(readFileSync(file, "utf8")).lines, next = split(String(input.content));
-		const missing = OVERRIDES.filter((key) => getMeta(old, key) && !getMeta(next.lines, key));
+		const missing = [...OVERRIDES, "size", "kind"].filter((key) => getMeta(old, key) && !getMeta(next.lines, key));
 		for (const key of missing) setMeta(next.lines, key, getMeta(old, key));
-		if (missing.length) input.content = next.lines.join(next.eol);
+		// Planners rewrite the whole draft right after sizing: keep the code-recorded size decision.
+		const sized = old.find((line) => line.startsWith("- **D-size** "));
+		const lost = sized && !next.lines.some((line) => line.startsWith("- **D-size** "));
+		if (lost) appendToSection(next.lines, "Decisions", sized, true);
+		if (missing.length || lost) input.content = next.lines.join(next.eol);
 	} catch { /* Unclosed front matter: leave the write alone. */ }
 }
 // Per-phase model/effort; each key: plan override, then project, then global; unset keeps the session's own value.

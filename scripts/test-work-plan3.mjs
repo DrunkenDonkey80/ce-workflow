@@ -1767,6 +1767,14 @@ try {
 		const headless = await sizeDraft("Ocelot schema linter tangerine");
 		assert.equal((await tool({ action: "size", mode: "plan", text: "Normal." })).mode, "plan");
 		assert.match(await readFile(headless.file, "utf8"), /Source: recommendation taken \(no UI\), /);
+		// The planner then rewrites the whole plan with write (every lab run did): size, kind and D-size survive.
+		const rewrite = { toolName: "write", input: { path: headless.file, content: "---\nplan3: true\nstatus: draft\n---\n\n# Linter\n\n## Decisions\n\n- **D-01** Own decision.\n\n## Steps\n" } };
+		hooks.get("tool_call")(rewrite, ctx);
+		assert.match(rewrite.input.content, /^size: plan$/m);
+		assert.match(rewrite.input.content, /## Decisions\n\n- \*\*D-01\*\* Own decision\.\n- \*\*D-size\*\* Size: plan\. Normal\./);
+		const mapRewrite = { toolName: "write", input: { path: mapped.file, content: "---\nplan3: true\nstatus: draft\n---\n\n# Map\n\n## Decisions\n" } };
+		hooks.get("tool_call")(mapRewrite, ctx);
+		assert.match(mapRewrite.input.content, /^kind: map$/m, "a rewrite keeps the map a map");
 		assert.equal(selectScript.length, 0);
 		for (const made of [cancel, planned, mapped, headless]) await rm(made.file);
 
