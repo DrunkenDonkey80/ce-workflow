@@ -79,7 +79,7 @@ One loop per rework target (a module or a group of modules, never "the whole pro
 
    Run one small experiment on the riskiest assumption, and record the result in the plan. End with one recommendation judged against the request's goal (what should get easier, safer or faster; ask for it at planning when the request has none). Recommend local repair or stop only when it meets that goal better than the structural options, and mark the recommended option "(Recommended)" in the Pick question.
 4. **Pick** (human step). The human picks one of two outcomes:
-   - **an option to build**, including "local repair": the human turns on `R-design-approved`. The gate counts only after the pick is recorded in Decisions; if it was turned on earlier, Build still waits for that record.
+   - **an option to build**, including "local repair": the human turns on `R-design-approved`. The gate counts only after the pick is recorded in Decisions; if it was turned on earlier, Build still waits for that record. When the human picks an option other than the recommended one, re-check that option's call-site, delta and future-change claims before Build, and record any correction.
    - **stop**, meaning no change is built: `R-design-approved` stays off. Mark Build, Replay, Switch and Retire done with the summary "not run: stopped at Pick". Commit the Map, corpus and Design as the outcome.
 5. **Build** [code]. The new part sits next to the old one behind one seam (section 3). Tests can select either side. Only one side does real writes (R6).
 6. **Replay** [think]. Run the same corpus against old and new, then fill in the scorecard that was fixed before Build started.
@@ -107,6 +107,8 @@ Every observed behavior gets one of three classes, recorded next to the case:
 - **unresolved**: not yet decided; it blocks Switch.
 
 A bug that is found is not preserved automatically: it becomes unresolved until the human classifies it. Agents never edit expected observations themselves.
+
+Record baselines once from the old code with a record switch (for example `REWORK_RECORD=1` writes `expected/*.json` keyed by case ID); normal runs only compare. Any later commit to the corpus or its probes before Build (such as a narrowed performance probe) moves the corpus SHA: record the new SHA in Decisions.
 
 The baseline expectations committed at the corpus SHA never change. An intentional change is written as a separate **approved delta**: one file (for example `tests/rework/approved-delta.*`) keyed by case ID, giving the new expectation and the approval reference. During replay:
 
@@ -186,6 +188,8 @@ Plan3 runs pending steps past an unanswered `[human]` step. It skips only steps 
 
 The human turns each one on with Alt+A. Agents never remove, edit or bypass a `needs:` line, and never propose chat approval in place of Alt+A: when the next phase waits on a gate, stop and name the gate. Until the human does, a gate is off by day and in night mode, so unattended runs cannot pass it. Once a gate is approved it stays on at night too: night mode does not take back an approval.
 
+Gates are chained: each gated phase also needs every earlier gate (Switch needs `R-design-approved, R-cutover-approved`; Retire needs all three). Plan3 runs any step whose requirements are on, so without the chain a gate turned on early (for example in the first "set requirements" checklist) lets Retire run before Build. Approval gates start off: leave them unchecked in that first checklist.
+
 Code-only and device projects (R7): device checks are separate `[blocked]` steps with the device as a prerequisite. Unit-level characterization runs without them. When the target has several real callers (a CLI and a GUI), the device smoke goes through each of them.
 
 ## 7. Plan skeleton
@@ -235,13 +239,13 @@ needs: R-design-approved
 
 ### Phase 7: Switch [think]
 
-needs: R-cutover-approved
+needs: R-design-approved, R-cutover-approved
 
 - [human] **SW-01** Flip the seam; human sets the watch window.
 
 ### Phase 8: Retire [code]
 
-needs: R-retire-approved
+needs: R-design-approved, R-cutover-approved, R-retire-approved
 
 - [ ] **RET-01** Delete old code and the seam if no longer needed; remove the replay worktree; corpus green.
 - [ ] **RET-02** Only when the repo tracks built artifacts (installers, executables, firmware images): rebuild them from the final source with the project's own build command and commit them, so the shipped files match the reworked code. Skip with the note "no tracked artifacts" otherwise.
