@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T16:02:53.735Z
+updated: 2026-11-08T16:06:12.762Z
 reviewed: 2026-11-08
 ---
 
@@ -111,15 +111,8 @@ Commands (referenced by steps):
 
 ### Phase 2: Parallel Luna and merge [code]
 
-- [ ] **V2-03** Run batches of 10 frames with at most 8 Luna calls at once (D-06); progress shows done of total.
-  - Each batch starts from an empty artifact list; its artifact ids get a batch prefix (`b3-a1`) so ids never collide across batches.
-  - Every artifact, text or image, carries a validated `frames` list of its batch's labels; unknown or path-like labels are dropped (trust boundary, as `mergeArtifacts` does for `frame` today). The prompt asks for the cited frames of every artifact, not only images.
-  - A failed or cancelled call stops new scheduling; the pipeline waits for every running call to settle before the `finally` cleanup removes the frames. User cancellation throws "Video digest cancelled." and writes nothing; a failed batch fails the run with its error, as today.
-  - Check: C1 with an injected model recording the peak calls in flight (at most 8), colliding local ids from two batches, text artifacts with frame lists, cancellation during batches, one failing call while others run (no later call starts, cleanup after all settle), and usage totals.
-- [ ] **V2-04** Add the final text-only merge call with validation and the fail-soft fallback (D-07).
-  - Input: all batch artifacts with their prefixed ids, times and markdown, no images. Reply: the complete final list, each item naming the batch ids it replaces (`from`). The final list replaces the batch list; a batch artifact named by no `from` stays as is, so nothing is lost silently. Frame lists of merged items are the union of their sources, then deduplicated and sorted by time.
-  - An unusable reply (invalid JSON, unknown `from` ids, invalid items) keeps the batch artifacts for every item that failed validation; a reply that fails as a whole, or a failed call, writes the batch artifacts in time order plus a one-line note. User cancellation during the merge throws, as in V2-03, instead of writing the fallback.
-  - Check: C1 cases for duplicates merged, a scrolled artifact combined across batches, an unrelated artifact surviving, frame-list union, a malformed reply, a failed merge call (fallback plus note) and cancellation during the merge (no digest written).
+- [x] **V2-03** Batches of 10 run through mapLimit (at most 8 at once, first failure or cancel aborts running calls and stops scheduling, all settle before cleanup); batchArtifacts validates each reply with b<k>- prefixed ids and a validated frames list for every artifact.
+- [x] **V2-04** Text-only merge call (skipped for a single batch) applied by finalArtifacts: items replace their `from` sources, unnamed sources stay, frames unioned; invalid items dropped; unusable reply or failed call keeps batch artifacts with a note under Visuals; cancel throws.
 
 ### Phase 3: Transcript and rendering [code]
 

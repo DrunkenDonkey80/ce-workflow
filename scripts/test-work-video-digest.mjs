@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // video_digest (plan 544351ec): pure helpers, the pipeline with a fake runner and model, and the checkout-only registration.
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
 	isYouTubeUrl, pickCaptionTrack, captionLines, captionParagraphs, screenFrames, sampleInterval,
-	digestFolder, digestOwner, keepTakeaways, mergeArtifacts, renderDigest, digestVideo, NO_CAPTIONS, TAKEAWAYS,
+	digestFolder, digestOwner, keepTakeaways, batchArtifacts, finalArtifacts, mapLimit, renderDigest, digestVideo, NO_CAPTIONS, TAKEAWAYS,
 } from "../extensions/video-digest.ts";
 
 // URLs
@@ -77,27 +77,63 @@ try {
 	assert.equal(keepTakeaways(undefined, "# New\n"), "# New\n");
 	assert.equal(keepTakeaways(`# Old\n\n${TAKEAWAYS}\n\n- adopt X\n\n## Later\n`, "# New\n"), `# New\n\n${TAKEAWAYS}\n\n- adopt X\n`);
 
-	// D-12 merge and validation.
-	const frames = new Map([["0:11", "/tmp/f0012.png"], ["0:57", "/tmp/f0058.png"]]);
-	const state = [{ id: "a1", start: 11, end: 20, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B\n```" }, { id: "a2", start: 30, end: 40, title: "Code", kind: "text", markdown: "x" }];
+	// D-12 batch validation (V2-03): labels resolve only through the batch map, ids get the batch prefix.
+	const frames = new Map([["0:11", 11], ["0:57", 57]]);
 	const reply = JSON.stringify({ artifacts: [
-		{ id: "a1", start: 11, end: 57, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B-->C\n```" }, // update by id
-		{ start: 57, end: 57, title: "UI", kind: "image", markdown: "dark editor", frame: "0:57" }, // new image
+		{ start: 11, end: 57, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B-->C\n```", frames: ["0:57", "0:11", "C:\\Windows\\win.ini", "9:99", 3] }, // text with cited frames, bad labels dropped
+		{ start: 57, end: 57, title: "UI", kind: "image", markdown: "dark editor", frame: "0:57" }, // image
 		{ start: 1, end: 2, title: "Bad", kind: "image", markdown: "x", frame: "C:\\Windows\\win.ini" }, // a path
 		{ start: 1, end: 2, title: "Bad", kind: "image", markdown: "x", frame: "9:99" }, // unknown label
 		{ start: 1, end: 500, title: "Bad", kind: "text", markdown: "x" }, // beyond the duration
 		{ start: 5, end: 2, title: "Bad", kind: "text", markdown: "x" }, // reversed
 		{ start: 1, end: 2, title: "Bad", kind: "script", markdown: "x" }, // unknown kind
 	] });
-	const merged = mergeArtifacts(state, `Sure:\n\`\`\`json\n${reply}\n\`\`\``, frames, 97);
-	assert.equal(merged.dropped, 5);
-	assert.deepEqual(merged.artifacts.map((a) => [a.id, a.end, a.file]), [["a1", 57, undefined], ["a2", 40, undefined], ["a3", 57, "/tmp/f0058.png"]]);
-	assert.match(merged.artifacts[0].markdown, /A-->B-->C/);
-	assert.equal(state[0].end, 20, "the input state is not mutated");
-	assert.deepEqual(mergeArtifacts(state, "no json here", frames, 97), { artifacts: state, dropped: 1, invalidReply: true });
+	const parsed = batchArtifacts(`Sure:\n\`\`\`json\n${reply}\n\`\`\``, frames, 97, "b2");
+	assert.equal(parsed.dropped, 5);
+	assert.deepEqual(parsed.artifacts.map((a) => [a.id, a.frames, a.frame]), [["b2-a1", [11, 57], undefined], ["b2-a2", [57], 57]]);
+	assert.deepEqual(batchArtifacts("no json here", frames, 97, "b1"), { artifacts: [], dropped: 1, invalidReply: true });
+	// Colliding local ids from two batches stay distinct.
+	const one = JSON.stringify({ artifacts: [{ id: "a1", start: 1, end: 2, title: "T", kind: "text", markdown: "m" }] });
+	assert.notEqual(batchArtifacts(one, frames, 97, "b1").artifacts[0].id, batchArtifacts(one, frames, 97, "b2").artifacts[0].id);
+
+	// D-07 final merge (V2-04): from replaces named sources, unnamed ones survive, frames are unioned.
+	const batch = [
+		{ id: "b1-a1", start: 10, end: 20, title: "File top", kind: "text", markdown: "```ts\nconst a = 1;\n```", frames: [10, 12] },
+		{ id: "b1-a2", start: 15, end: 16, title: "Unrelated", kind: "text", markdown: "list", frames: [15] },
+		{ id: "b2-a1", start: 30, end: 40, title: "File bottom", kind: "text", markdown: "```ts\nconst b = 2;\n```", frames: [30, 12] },
+		{ id: "b3-a1", start: 50, end: 50, title: "Dup", kind: "text", markdown: "```ts\nconst b = 2;\n```", frames: [50] },
+	];
+	const at = (index) => `0:${String(index).padStart(2, "0")}`;
+	const final = finalArtifacts(batch, JSON.stringify({ artifacts: [
+		{ from: ["b1-a1", "b2-a1", "b3-a1"], start: 10, end: 50, title: "File", kind: "text", markdown: "```ts\nconst a = 1;\nconst b = 2;\n```" }, // scrolled file plus a duplicate
+		{ from: ["b9-a9"], start: 1, end: 2, title: "Bad", kind: "text", markdown: "x" }, // unknown source
+		{ from: ["b1-a2"], start: 1, end: 2, title: "Bad", kind: "image", markdown: "x", frame: "0:99" }, // frame outside its sources
+		{ start: 1, end: 2, title: "Bad", kind: "text", markdown: "x" }, // no from
+	] }), 97, at);
+	assert.equal(final.dropped, 3);
+	assert.deepEqual(final.artifacts.map((a) => [a.id, a.title, a.frames]), [["m1", "File", [10, 12, 30, 50]], ["b1-a2", "Unrelated", [15]]]);
+	assert.deepEqual(finalArtifacts(batch, "not json", 97, at), { artifacts: batch, dropped: 0, invalidReply: true });
+
+	// D-06 parallel runner: at most 8 at once; a failure stops scheduling and waits for running calls.
+	let active = 0, peak = 0;
+	const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+	assert.deepEqual(await mapLimit([...Array(20).keys()], 8, async (n) => { peak = Math.max(peak, ++active); await sleep(5); active--; return n * 2; }), [...Array(20).keys()].map((n) => n * 2));
+	assert.equal(peak, 8);
+	const started = [];
+	let settled = 0;
+	await assert.rejects(mapLimit([...Array(20).keys()], 4, async (n, _i, callSignal) => {
+		started.push(n);
+		if (n === 1) { await sleep(2); throw new Error("Luna failed (error)."); }
+		await new Promise((resolve) => { const t = setTimeout(resolve, 50); callSignal.addEventListener("abort", () => { clearTimeout(t); resolve(); }); });
+		settled++;
+	}), /Luna failed/);
+	assert.deepEqual(started, [0, 1, 2, 3], "no call starts after the failure");
+	assert.equal(settled, 3, "running calls settled before the rejection");
+	const cancel = new AbortController();
+	await assert.rejects(mapLimit([...Array(20).keys()], 4, async (n) => { if (n === 2) cancel.abort(); await sleep(2); }, cancel.signal), /cancelled/);
 
 	// D-07 rendering.
-	const page = renderDigest({ id: "vid", title: "T", url: "u", duration: 97 }, "", [{ id: "a1", start: 11, end: 57, title: "Flow", kind: "text", markdown: "m" }]);
+	const page = renderDigest({ id: "vid", title: "T", url: "u", duration: 97 }, "", [{ id: "a1", start: 11, end: 57, title: "Flow", kind: "text", markdown: "m", frames: [] }]);
 	assert.match(page, /^<!-- video_digest: vid -->/);
 	assert(page.includes(NO_CAPTIONS) && page.includes("### [0:11–0:57] Flow") && /Untrusted source material/.test(page));
 
@@ -135,15 +171,18 @@ try {
 		return f;
 	}));
 	const prompts = [];
-	const model = async (content) => {
+	const usage = { input: 100, output: 10, cost: { total: 0.01 } };
+	const fakeModel = (merge = async () => ({ text: JSON.stringify({ artifacts: [{ from: ["b1-a1", "b2-a1"], start: 0, end: 11, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B-->C\n```" }] }), usage })) => async (content, callSignal) => {
 		prompts.push(content);
+		if (content.length === 1) return merge(content, callSignal); // the text-only merge call
 		const labels = content.filter((part) => part.type === "text" && part.text.startsWith("Frame ")).map((part) => part.text.slice(6, -1));
 		assert(content.filter((part) => part.type === "image").length === labels.length && labels.length <= 10);
-		const artifacts = prompts.length === 1
-			? [{ start: 0, end: 9, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B\n```" }, { start: 2, end: 3, title: "Code", kind: "text", markdown: "```ts\nx\n```" }]
-			: [{ id: "a1", start: 0, end: 11, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B-->C\n```" }];
-		return { text: JSON.stringify({ artifacts }), usage: { input: 100, output: 10, cost: { total: 0.01 } } };
+		const artifacts = labels[0] === "0:00"
+			? [{ start: 0, end: 9, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B\n```", frames: ["0:01", "0:03"] }, { start: 2, end: 3, title: "Code", kind: "text", markdown: "```ts\nx\n```", frames: ["0:02"] }]
+			: [{ id: "a1", start: 10, end: 11, title: "Flow", kind: "text", markdown: "```mermaid\nA-->B-->C\n```", frames: ["0:11"] }];
+		return { text: JSON.stringify({ artifacts }), usage };
 	};
+	const model = fakeModel();
 
 	// A missing program fails before any download; Tesseract is no longer needed (D-08).
 	const noFfmpeg = fake({ missing: "ffmpeg" });
@@ -151,13 +190,15 @@ try {
 	assert(!noFfmpeg.calls.some((call) => call.includes("--write-info-json")), "nothing is downloaded");
 	assert(!noFfmpeg.calls.some((call) => /tesseract/.test(call[0])));
 
-	// Full run: two batches, an artifact spanning both is updated, the earlier unrelated one survives.
+	// Full run: two parallel batches, then the merge joins the artifact spanning both; the unrelated one survives.
 	const ok = fake();
 	const result = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", cwd: project, exec: ok.exec, model, tmpRoot });
 	tmpEmpty();
-	assert.equal(result.calls, 2);
+	assert.equal(result.calls, 3);
+	assert.equal(result.usage.input, 300);
 	assert.equal(result.candidates, 12);
-	assert.match(prompts[1][0].text, /"id":"a1"/, "the second batch sees earlier artifacts with ids");
+	assert(prompts.slice(0, 2).every((content) => !/b1-a1|already rebuilt/.test(content[0].text)), "batches do not see each other's artifacts");
+	assert(prompts[2].length === 1 && prompts[2][0].text.includes('"id":"b1-a1"') && prompts[2][0].text.includes('"id":"b2-a1"'));
 	assert(!ok.calls.some((call) => call.includes("--write-subs") || call.includes("en")), "only the original-language track is requested");
 	// D-04: 720p download, one ffmpeg pass writing JPEG frames plus gray thumbnails.
 	assert(ok.calls.some((call) => call.includes("bv*[height<=720]/b")));
@@ -187,6 +228,23 @@ try {
 	tmpEmpty();
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: async () => { throw new Error("Luna failed (error)."); }, tmpRoot }), /Luna failed/);
 	tmpEmpty();
+	// A failed or unusable merge keeps the batch artifacts, with a note.
+	for (const merge of [async () => { throw new Error("Luna failed (length)."); }, async () => ({ text: "sorry", usage })]) {
+		await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: fakeModel(merge), tmpRoot });
+		digest = readFileSync(digestFile, "utf8");
+		assert(digest.includes("A-->B\n") && digest.includes("A-->B-->C") && /> The merge (call failed \(Luna failed \(length\)\.\)|reply was unusable); visuals from separate batches are listed unmerged\./.test(digest));
+		tmpEmpty();
+	}
+	// Cancel during the batches or the merge: no digest written, temp removed after every call settles.
+	for (const during of ["batch", "merge"]) {
+		const stopper = new AbortController();
+		rmSync(digestFile, { force: true });
+		const cancelling = fakeModel(async () => { stopper.abort(); throw new Error("Video digest cancelled."); });
+		const cancelModel = during === "merge" ? cancelling : async (_content, callSignal) => { stopper.abort(); await sleep(5); assert(callSignal.aborted); throw new Error("Video digest cancelled."); };
+		await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: cancelModel, signal: stopper.signal, tmpRoot }), /cancelled/);
+		assert(!existsSync(digestFile), `no digest after a cancel during the ${during}`);
+		tmpEmpty();
+	}
 	const controller = new AbortController();
 	const aborting = fake({ onCall: (_command, args) => { if (args.includes("-f")) controller.abort(); } });
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: aborting.exec, model, signal: controller.signal, tmpRoot }), /cancelled/);
