@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T13:21:17.083Z
+updated: 2026-11-08T13:30:17.584Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -174,18 +174,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ### Phase 4: Plan3 care and questioning design [think]
 
-- [ ] **PC-01** Write docs/proposals/2026-11-08-plan3-care-and-questioning.md with the exact prompt text and dialog contracts for D-01, D-05, D-06, D-07 and grilling rounds.
-  - Project care (D-01, R5): fit check per touched module: fits as is; small prefactor planned first; or big prefactor versus one-liner asked as a question. Brakes: churn weight, named upcoming changes, deletion test, no single-adapter seam. Vocabulary from rework recipe §0.
-  - Grilling rounds: ask the whole frontier (questions whose prerequisites are settled) as ask_user batches of 2-4, each with a recommendation worded so yes accepts it; facts are the agent's job; repeat until the frontier is empty or the rest needs step evidence; then write.
-  - Sizing (D-05): `plan3` action `size` (mode tiny, plan or map; reason); compact dialog, recommendation preselected; night mode and headless take the recommendation; Plan may switch to Map later when fog grows.
-  - Tiny lifecycle: `size` returns early without rereading the deleted draft, clears the planning pointer and sets a pending flag; at `agent_settled` code leaves research (forced) and sends the implementation prompt with the original request, like `afterTagging` (`extensions/plan3.ts:1092`). A mid-run research off is only deferred (`extensions/work-models.ts:1482`), hence the settled handoff.
-  - Map (D-06): template sections, ticket types (research AFK, prototype and grill as [human], task either), handoff to normal plans when tickets and fog are empty.
-  - Map order: `workState` skips [human] steps and picks later pending ones (`extensions/plan3.ts:166`), so linear order needs enforcement. Default design: in a map plan, only the first open ticket (including [human]) is runnable; PC-01 confirms or picks requirements instead.
-  - Glossary and ADR (D-07, D-10): plan `## Glossary` section, "(ADR candidate)" marker, one-paragraph ADR format, numbering from the highest existing file.
-  - Finish export: checklist Esc saves selections (`extensions/ask-user/menu.ts:440`), so ticks stay provisional; files are written only after the Plan ready pick succeeds (the last cancellable dialog, `extensions/plan3.ts:1243`). Idempotent: skip terms already in GLOSSARY.md and ADRs whose source line names the same plan and decision ID.
-  - Freeze the PC-09 rubric here, before the baseline runs.
-  - Apply writing-for-agents levers (leading words, positive phrasing, sharp completion criteria) and state the prompt size change in tokens.
-  - Check: the doc gives final text for every prompt change and every dialog's items, purpose line and outcomes.
+- [x] **PC-01** docs/proposals/2026-11-08-plan3-care-and-questioning.md: final text for grilling rounds, project care (plan and execute), size action and Tiny lifecycle, map template, prompts and linear order, glossary and ADR finish checklist; frozen PC-09 rubric; prompt growth about 850 tokens per new plan.
 - [ ] **PC-02** Astra review: plan3-advisor reviews this plan with the PC-01 proposal as its named reference (review job, D-08); validate findings, record dispositions in Amendments.
   - Check: Amendments lists every finding as accepted or rejected with reason; the proposal reflects the accepted ones.
 
@@ -242,7 +231,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ## Resume context
 
-Executing. SK-01..SK-03 done. Next SK-04: scripts/skills-lab.mjs (C-lab) per docs/proposals/skills-lab/design.md: fresh-history copy of DealFinder 27221be (export C:\SOFT\git\skills-lab\df-base), task setup patch, pi -p --mode json run per arm (A off, B forced /skill:, C unforced; deps via --skill), hidden test check, one result line per run with R3 metrics (all sessions incl. subagents). SK-04 still has to build: code-review seeded patch + standards/spec files, laptopbg_list.html fixture + replay hidden test, prototype hidden scenario test.
+SK-01..SK-05 done. SK-07 batch running (C:\SOFT\git\skills-lab\sk07.sh → sk07.log, runs/sk07/results.jsonl; timer watches for "SK07 ALL DONE"). SK-06 baseline also running early (sk06.sh → sk06.log, plan-runs/sk06-*; env line recorded: ce-workflow 9268ac3, pi 1.5.0) — no Plan3 code edits (PC-03+) until both finish. Next: write PC-01 proposal docs/proposals/2026-11-08-plan3-care-and-questioning.md (doc only), then PC-02 Astra review; after SK-07 finishes, SK-08 judging.
 
 ## Amendments
 
@@ -256,3 +245,5 @@ Append material changes and their reasons; preserve the original request and set
   - F5 checklist Esc saves, not cancels: accepted. Verified `back` closes with the selected values (`extensions/ask-user/menu.ts:440`). Export runs only after the Plan ready pick, idempotent; PC-06 tests cancel after ticking and a second finish.
   - F6 baseline not right before the build: accepted. SK-06 moved into a new Phase 5 Baseline after PC-02; the rubric is frozen in PC-01; the record includes a diff hash for the dirty checkout. Phases renumbered (Build 6, Measure 7); step IDs unchanged.
   - F7 plan3-advisor contract: accepted. SK-02 and SK-08 use the builtin read-only `reviewer` on Astra; PC-02 has plan3-advisor review this plan with the proposal as its reference.
+- 2026-11-08: SK-06 baseline runs started before PC-01 and PC-02 (right after SK-05), in parallel with SK-07, to save wall time. The runs do not see the rubric, which PC-01 froze before any scoring; no Plan3 code changed before them (ce-workflow 9268ac3, recorded in sk06.log). PC-03 waits until SK-06 and SK-07 finish so neither batch sees changed prompts.
+- 2026-11-08: SK-07 workspaces moved to their own %TEMP%\skl-* folders after the smoke showed agents listing sibling run folders (commit 9268ac3).
