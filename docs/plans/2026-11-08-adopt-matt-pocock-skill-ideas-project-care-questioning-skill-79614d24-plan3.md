@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T12:45:36.529Z
+updated: 2026-11-08T12:50:43.772Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -154,13 +154,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 - [x] **SK-01** Desk review of all 39 skills in docs/proposals/2026-11-08-mattpocock-skills-review.md; desk A/B shortlist: diagnosing-bugs, tdd, code-review, retro.
 - [x] **SK-02** Astra (reviewer, gpt-6-astra:high) verdicts merged: agrees on 27/39; final A/B shortlist diagnosing-bugs, tdd, code-review, retro, writing-for-agents, prototype; SK-09 desk ideas to-tickets, pr evidence+reversibility, git guard.
-- [ ] **SK-03** Design the experiments in docs/proposals/skills-lab/design.md: one task per shortlisted skill, rubric, metrics, judge protocol, planning requests.
-  - Per task: source and SHA, setup (planted bug patch and fresh history where needed), prompt, check command, rubric naming what the skill should change (for example a red regression test before the fix).
-  - Arms per D-03 and Q-02; 3 repeats per arm (D-04); environment identical in both arms, recorded (Pi version, extensions, ponytail on).
-  - Upstream skills that chain others ("Call the Skill tool with X") get every dependency passed with `--skill`; note any wording that does not fit Pi.
-  - Planning requests for SK-06 and PC-09: 3 with a hack-versus-prefactor tension (start from the DealFinder "adding a source edits several modules" scenario), 1 tiny, 1 foggy.
-  - Endpoints per request: hack-versus-prefactor and foggy requests compare the first planning turn (plan only); one hack-versus-prefactor request and the tiny request also run end to end (plan, finish, execute to complete, then C-df), because Tiny executes and the execution prompt changes too.
-  - Check: design doc and one task file per shortlisted skill exist; each rubric item is observable in a diff, check output or transcript.
+- [x] **SK-03** Experiment design in docs/proposals/skills-lab/design.md: 6 task files (DealFinder offline tasks, photobook-01 retro), arms A/B/C, Pi adaptations, R3 incl. subagent sessions, blind Astra judge, 5 planning requests with endpoints; hidden tests for diagnosing-bugs and tdd verified red.
 
 ### Phase 2: Lab harness [code]
 
@@ -255,7 +249,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ## Resume context
 
-Executing. SK-01, SK-02 done. Next SK-03: write docs/proposals/skills-lab/design.md + task files for 6 shortlisted skills (diagnosing-bugs, tdd, code-review, retro, writing-for-agents, prototype) and the 5 planning requests. Lab base: C:\SOFT\git\skills-lab\df-base (DealFinder 27221be export, 119 tests ~4 s). Mutation probe: sync.py/normalize.py mutations M2 (history days→hours in load_references), M8, M10 (touch dropped from same_machine exact), M11 (gone listings as references) survive the suite → candidate planted bugs.
+Executing. SK-01..SK-03 done. Next SK-04: scripts/skills-lab.mjs (C-lab) per docs/proposals/skills-lab/design.md: fresh-history copy of DealFinder 27221be (export C:\SOFT\git\skills-lab\df-base), task setup patch, pi -p --mode json run per arm (A off, B forced /skill:, C unforced; deps via --skill), hidden test check, one result line per run with R3 metrics (all sessions incl. subagents). SK-04 still has to build: code-review seeded patch + standards/spec files, laptopbg_list.html fixture + replay hidden test, prototype hidden scenario test.
 
 ## Amendments
 
