@@ -18,7 +18,7 @@ assert.deepEqual(inlineOptions("- **Q-07** Fix it with v3 or let Luna override?"
 assert.deepEqual(questionChoices("- **Q-02** Which plants?\n  - Context: two files.\n  - Recommendation: S-06 inspects them.").options, [{ label: "Accept recommendation", description: "S-06 inspects them." }]);
 assert.deepEqual(questionChoices("- **Q-05** Which?\n  - Recommendation: A.\n  - Option: A \u2014 first\n  - Option: B \u2014 second").options.map(o => o.label), ["A", "B"]);
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
-import { catchUpPlanText, changelogExcerpt, recordCatchUp } from "../extensions/plan3-catch-up.ts";
+import { catchUpPlanText, changelogExcerpt, gitLatestCommit, recordCatchUp, writeGitCatchUpDiff } from "../extensions/plan3-catch-up.ts";
 import { REWORK_RECIPE } from "../extensions/plan3-rework.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
@@ -965,6 +965,25 @@ try {
 	assert.match(askCatchUpText, /native single\/batch remote-answer race/);
 	assert.match(askCatchUpText, /Do not patch or overwrite the installed upstream package/);
 	assert(!catchUpText.includes("extensions/ask-user/"), "vendored review only appears for an ask_user target");
+	// Upstream skill repos (kind git): commit targets, a name-status diff that shows new skills, and the ledger-driven review.
+	const upstream = path.join(cwd, "upstream-skills");
+	const gitIn = (...args) => execFileSync("git", ["-C", upstream, "-c", "core.autocrlf=false", "-c", "user.name=t", "-c", "user.email=t@t", ...args], { encoding: "utf8" }).trim();
+	await mkdir(path.join(upstream, "skills", "old"), { recursive: true });
+	execFileSync("git", ["init", "-q", upstream]);
+	await writeFile(path.join(upstream, "skills", "old", "SKILL.md"), "old\n");
+	gitIn("add", "-A"); gitIn("commit", "-qm", "one");
+	const fromSha = gitIn("rev-parse", "HEAD");
+	await mkdir(path.join(upstream, "skills", "fresh"));
+	await writeFile(path.join(upstream, "skills", "fresh", "SKILL.md"), "fresh\n");
+	gitIn("add", "-A"); gitIn("commit", "-qm", "two");
+	const toSha = await gitLatestCommit(upstream);
+	assert.equal(toSha, gitIn("rev-parse", "HEAD"), "ls-remote HEAD is the target commit");
+	const skillsDiff = await writeGitCatchUpDiff(cwd, upstream, "mattpocock/skills", fromSha, toSha);
+	assert.match(await readFile(skillsDiff, "utf8"), /^A\tskills\/fresh\/SKILL\.md$/m, "a new skill shows in the name-status head");
+	const skillsText = catchUpPlanText({ packages: [{ name: "mattpocock/skills", kind: "git", ledger: "docs/upstream/mattpocock-skills.md", baselineVersion: fromSha, targetVersion: toSha, needsReview: true, diffPath: skillsDiff }] });
+	assert(skillsText.includes(`catch-up: {"mattpocock/skills":"${toSha}"}`) && skillsText.includes(`${fromSha.slice(0, 7)}→${toSha.slice(0, 7)}`), "full commit recorded, short one shown");
+	assert(/docs\/upstream\/mattpocock-skills\.md/.test(skillsText) && /plan3 ideas/.test(skillsText) && /New skills/.test(skillsText), "skills review reads the ledger and offers ideas");
+	assert(!catchUpText.includes("plan3 ideas"), "skills review only appears for a git target");
 	const catchUpFile = path.join(directory, "2026-10-06-catch-up-pi-packages-cafe0001-plan3.md");
 	await writeFile(catchUpFile, catchUpText);
 	idle = true;

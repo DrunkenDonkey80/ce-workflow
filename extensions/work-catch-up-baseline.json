@@ -232,6 +232,102 @@
           "version": "4.4.9"
         }
       ]
+    },
+    {
+      "name": "mattpocock/skills",
+      "kind": "git",
+      "url": "https://github.com/mattpocock/skills",
+      "ledger": "docs/upstream/mattpocock-skills.md",
+      "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "reviewedAt": "2026-11-08T19:00:00.000Z",
+      "reviewedVersion": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "decisions": [
+        {
+          "title": "grilling: question rounds",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Plan3 planning asks the answerable frontier in rounds with recommendations; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-03 6eb96eb; PC-09 blind judge keep (docs/proposals/skills-lab/results.md)",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "ask-matt sizing branch: Tiny/Plan/Map",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "plan3 size action; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-04 271109e, fixes 38e8baa 8ac7ff0; PC-09 keep",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "wayfinder: map plans",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Plan3 map plan template and ticket steps; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-05 cdc3be9; node scripts/test-work-plan3.mjs passes",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "codebase-design: project-care fit check",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Patch versus prefactor per touched module; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-03 6eb96eb; PC-09 Q2 up on P2/P3",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "to-tickets: vertical slices, expand-migrate-contract",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Plan3 planning prompt; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-13 8f948a2; asserted in test-work-plan3.mjs",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "domain-modeling / grill-with-docs: lazy GLOSSARY.md and ADRs",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Project-language prompt and finish checklist; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-06 505282c; test-work-plan3.mjs passes",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "code-review: two-axis-review skill",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Adapted copy in skills/two-axis-review; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-11 09b7a78; lab 8/9 planted defects vs 5.5-6",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "diagnosing-bugs: debugging skill",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Adapted copy in skills/diagnosing-bugs; see docs/upstream/mattpocock-skills.md",
+          "verification": "PC-12 09b7a78; lab better process and tests",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "tdd, retro, prototype and writing-for-agents as skills",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Tested in the skills lab: no gain or a material cost regression; see docs/upstream/mattpocock-skills.md",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "git-guardrails-claude-code and pr",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Rejected at idea review; see docs/upstream/mattpocock-skills.md",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        },
+        {
+          "title": "Other 25 skills: already covered or out of scope",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "Desk review docs/proposals/2026-11-08-mattpocock-skills-review.md; lists in docs/upstream/mattpocock-skills.md",
+          "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
+        }
+      ]
     }
   ]
 }

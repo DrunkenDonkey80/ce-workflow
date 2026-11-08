@@ -38,7 +38,7 @@ import { COMPACTION_PROFILES, compactionThreshold, compactionInputBytes, context
 import { compactMemory } from "./work-compaction-memory.ts";
 import { createVisionBridge, splitLevel } from "./work-vision.ts";
 import { createJevTools, jevStatus } from "./jev-tools.ts";
-import { catchUpPlanText, catchUpReviewBlocker, PLAN3_CATCH_UP_PACKAGES } from "./plan3-catch-up.ts";
+import { catchUpPlanText, catchUpReviewBlocker, gitLatestCommit, PLAN3_CATCH_UP_PACKAGES, writeGitCatchUpDiff } from "./plan3-catch-up.ts";
 import { listPlans, setPlanModelPicker } from "./plan3.ts";
 import {
 	buildKnowledgeQuery,
@@ -2679,20 +2679,19 @@ async function buildWorkCatchUpState(cwd, names, progress = (_text) => {}) {
 	const packages = await Promise.all(baseline.packages.filter((item) => !names || names.includes(item.name)).map(async (item) => {
 		const name = String(item.name ?? "").trim();
 		const baselineVersion = String(item.version ?? "").trim();
-		const latestVersion = await npmLatestVersion(name);
-		const installedVersion = installedPackageVersion(name);
+		const isGit = item.kind === "git";
+		const latestVersion = isGit ? await gitLatestCommit(item.url) : await npmLatestVersion(name);
+		const installedVersion = isGit ? "" : installedPackageVersion(name);
 		const targetVersion = latestVersion || installedVersion || baselineVersion;
 		const changed = Boolean(baselineVersion && targetVersion !== baselineVersion);
 		progress(changed ? `Catch-up: ${name} ${baselineVersion} → ${targetVersion}, downloading the diff…` : `Catch-up: ${name} ${baselineVersion} unchanged.`);
-		const diffPath = await writeWorkCatchUpDiff(
-			cwd,
-			dir,
-			name,
-			baselineVersion,
-			targetVersion,
-		);
+		const diffPath = isGit
+			? await writeGitCatchUpDiff(dir, item.url, name, baselineVersion, targetVersion)
+			: await writeWorkCatchUpDiff(cwd, dir, name, baselineVersion, targetVersion);
 		return {
 			name,
+			kind: item.kind,
+			ledger: item.ledger,
 			baselineVersion,
 			installedVersion,
 			latestVersion,
@@ -2742,7 +2741,7 @@ async function startPlan3CatchUp(args, pi, ctx) {
 	}
 	// The hub page drops plain notify, so each step is also published as a page notice.
 	const progress = (text) => { notify(ctx, text, "info"); publish(ctx.ui, "notice", { text }); };
-	progress(`Catch-up: checking ${PLAN3_CATCH_UP_PACKAGES.join(", ")} against their last reviewed versions (npm view + npm diff; can take a few minutes)…`);
+	progress(`Catch-up: checking ${PLAN3_CATCH_UP_PACKAGES.join(", ")} against their last reviewed versions (npm/git; can take a few minutes)…`);
 	const state = await buildWorkCatchUpState(ctx.cwd, PLAN3_CATCH_UP_PACKAGES, progress);
 	notify(ctx, renderWorkCatchUpText(state), "info");
 	const pending = state.packages.filter((pkg) => pkg.needsReview).map((pkg) => pkg.name);
@@ -2771,7 +2770,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 		{ value: "work-settings", label: "Settings", description: "Configure Plan3 models, compaction, images and camera. Global and project scopes are available." },
 		...(maintenanceCheckout(ctx.cwd) ? [
 			{ value: "work-context", label: "Context guard", description: "Inspect or tune proactive context compaction.", argumentTitle: "Context action", placeholder: "Blank shows status; compact / on / off / set <tokens>" },
-			{ value: "work-catch-up", label: "Catch up packages", description: "Review the Pi/plugin packages ce-workflow still uses in a Plan3 plan." },
+			{ value: "work-catch-up", label: "Catch up packages", description: "Review the Pi/plugin packages and upstream skill repos ce-workflow still uses in a Plan3 plan." },
 		] : []),
 		...(extensionScoutEnabled() ? [
 			{ value: "work-extension-scout", label: "Scout Pi extensions", description: "Scan catalog pages with live progress. Review candidates; nothing is installed automatically." },

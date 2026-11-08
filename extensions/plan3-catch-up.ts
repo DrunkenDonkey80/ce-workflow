@@ -1,9 +1,12 @@
 // Catch-up as a Plan3 plan (used when the legacy workflow is off): generate the review plan for the
 // Pi packages ce-workflow still depends on, and record the reviewed versions from that plan.
+import { execFile } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 
-export const PLAN3_CATCH_UP_PACKAGES = ["@earendil-works/pi-coding-agent", "pi-subagents", "pi-ask-user", "pi-intercom", "pi-lens"];
+// Baseline entries with kind "git" (upstream skill repos) are tracked by commit instead of npm version.
+export const PLAN3_CATCH_UP_PACKAGES = ["@earendil-works/pi-coding-agent", "pi-subagents", "pi-ask-user", "pi-intercom", "pi-lens", "mattpocock/skills"];
 const BASELINE = path.join(import.meta.dirname, "work-catch-up-baseline.json");
 const DECISIONS = "Catch-up decisions";
 
@@ -41,16 +44,48 @@ export function changelogExcerpt(diffPath) {
 	return file;
 }
 
+const git = (args, options = {}) => promisify(execFile)("git", args, { encoding: "utf8", env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }, ...options }).then((result) => String(result.stdout));
+
+export async function gitLatestCommit(url) {
+	if (process.env.WORK_CATCH_UP_OFFLINE === "1") return "";
+	try { return (await git(["ls-remote", url, "HEAD"], { timeout: 15_000 })).split(/\s/)[0]; } catch { return ""; }
+}
+
+// `--name-status` first (a new skill shows as `A <dir>/SKILL.md`), then the full diff; skill repos are small Markdown.
+export async function writeGitCatchUpDiff(dir, url, name, from, to) {
+	if (!from || !to || from === to) return undefined;
+	const safe = name.replace(/[^\w.-]+/g, "-");
+	const file = path.join(dir, `${safe}-${from.slice(0, 7)}-to-${to.slice(0, 7)}.diff`);
+	const repo = path.join(dir, safe);
+	try {
+		await git(["clone", "--quiet", "--filter=blob:none", "--no-checkout", url, repo], { timeout: 180_000 });
+		const inRepo = (args) => git(["-C", repo, ...args], { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
+		writeFileSync(file, `${await inRepo(["diff", "--name-status", from, to])}\n${await inRepo(["diff", from, to])}`);
+	} catch (error) {
+		writeFileSync(file, `${[error?.stdout, error?.stderr].filter(Boolean).join("\n").trim() || String(error)}\n`);
+	}
+	return file;
+}
+
 const short = (name) => name.replace(/^@[^/]+\//, "");
+const ver = (version) => (/^[0-9a-f]{40}$/.test(version ?? "") ? version.slice(0, 7) : version);
 
 export function catchUpPlanText(state, focus = "", today = new Date().toISOString().slice(0, 10)) {
 	const targets = state.packages.filter((pkg) => pkg.needsReview);
-	const span = (pkg) => `${pkg.baselineVersion || "?"}→${pkg.targetVersion}`;
+	const span = (pkg) => `${ver(pkg.baselineVersion) || "?"}→${ver(pkg.targetVersion)}`;
 	const code = (file) => (file ? `\`${file}\`` : "none");
-	const rows = targets.map((pkg) => `| ${pkg.name} | ${pkg.baselineVersion || "none"} | ${pkg.targetVersion} | ${pkg.installedVersion || "not installed"} | ${code(pkg.diffPath && changelogExcerpt(pkg.diffPath))} | ${pkg.diffPath ? code(pkg.diffPath) : "none (same version: earlier review evidence is incomplete)"} |`);
+	const rows = targets.map((pkg) => `| ${pkg.name} | ${ver(pkg.baselineVersion) || "none"} | ${ver(pkg.targetVersion)} | ${pkg.kind === "git" ? "git repo" : pkg.installedVersion || "not installed"} | ${code(pkg.diffPath && changelogExcerpt(pkg.diffPath))} | ${pkg.diffPath ? code(pkg.diffPath) : "none (same version: earlier review evidence is incomplete)"} |`);
 	const skeleton = JSON.stringify(Object.fromEntries(targets.map((pkg) => [pkg.name, []])), null, 2);
 	const vendoredAskReview = targets.some(pkg => pkg.name === "pi-ask-user")
 		? "\n   For pi-ask-user, compare the target release index.ts and single-select-layout.ts with extensions/ask-user/. Read extensions/ask-user/UPSTREAM.md; port relevant changes into our vendored copy, preserve the native single/batch remote-answer race and D12 coexistence behavior, update its pinned version/provenance, and verify terminal popup and remote-answer tests. Do not patch or overwrite the installed upstream package."
+		: "";
+	const skillSources = targets.filter((pkg) => pkg.kind === "git");
+	const skillsReview = skillSources.length
+		? `\n   For an upstream skills repo (${skillSources.map((pkg) => `${pkg.name}: ledger ${pkg.ledger ? `\`${pkg.ledger}\`` : "none"}`).join("; ")}), read its ledger first: what we adopted, where it lives here and the commit we tested. The diff starts with \`git diff --name-status\`.
+   - Adopted skills: diff each one's upstream path. For every real change (a new rule, technique or fix, not rewording), say what it would change in our copy or prompt.
+   - New skills (\`A <dir>/SKILL.md\`): desk-review each like \`docs/proposals/2026-11-08-mattpocock-skills-review.md\` (summary, overlap here, verdict adopt idea / A/B test / already covered / skip, reason).
+   - Rejected or skipped skills: only when a change removes the recorded reason.
+   Offer every finding through plan3 ideas so the user accepts or rejects each one: test first (skills-lab A/B per \`docs/proposals/skills-lab/design.md\`, graded Trial), adopt directly, or reject. Accepted ones become Phase 1 steps. Update the ledger (tested commit, adopted and rejected lists) as a Phase 1 step.`
 		: "";
 	return `---
 plan3: true
@@ -64,7 +99,7 @@ catch-up: ${JSON.stringify(Object.fromEntries(targets.map((pkg) => [pkg.name, pk
 
 ## Original request
 
-> Catch ce-workflow up with the new releases of the Pi packages it still uses: review every release after the last reviewed version up to the target, decide what helps or breaks this repository, apply what is adopted, then record the reviewed versions.${focus ? `\n> User focus: ${focus}` : ""}
+> Catch ce-workflow up with the new releases of the Pi packages and upstream skill repos it still uses: review every release after the last reviewed version up to the target, decide what helps or breaks this repository, apply what is adopted, then record the reviewed versions.${focus ? `\n> User focus: ${focus}` : ""}
 
 ## Review targets
 
@@ -78,7 +113,7 @@ Several releases may lie between the last reviewed version and the target; revie
 
 1. For each target, list the changes in every release since the last reviewed version that could affect ce-workflow: Pi extension hooks/events/context, tool registration and exposure, commands, settings, SDK, TUI, model runtime; for plugins their tool schemas, lifecycle and skills. Skip unrelated trivia.
 2. Understand before judging. When a change touches a feature or term you cannot explain from this repository (for example "codemode can now do X"), research it first: the package's README/docs/examples (Pi docs live in the installed package's docs/), its source in node_modules, context7, or the web. Put a one-line explanation of the feature in the decision rationale. Never grade a change you could not explain.
-3. Map each change to this repository: search extensions/ and scripts/ for the affected API or feature and state what it would fix, delete, simplify or enable here — or why it does not apply.${vendoredAskReview}
+3. Map each change to this repository: search extensions/ and scripts/ for the affected API or feature and state what it would fix, delete, simplify or enable here — or why it does not apply.${vendoredAskReview}${skillsReview}
 4. Grade it: Adopt or Trial → status "adopted"; Reject or Not-our-problem → status "no-action". Hold is not allowed: when you cannot decide, ask the user with the tradeoff and your recommendation, and record the answer in Decisions.
 5. Record every graded change in the ${DECISIONS} JSON below (a package with nothing relevant gets one Not-our-problem decision saying so). For each adopted change, add a step to Phase 1 with its focused check; when nothing is adopted, replace the Phase 1 placeholder with "None — nothing adopted."
 
