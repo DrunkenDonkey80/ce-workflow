@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
-import { existsSync } from "node:fs";
+import { existsSync, renameSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -1712,11 +1712,13 @@ try {
 		await mkdir(path.join(directory, "logs"), { recursive: true });
 		for (const ext of [".md", ".stats.json", ".needs.json"]) await writeFile(path.join(directory, "logs", `${tiny.id}${ext}`), "x");
 		let sizeLabels;
-		selectScript = [["Plan size", "Tiny", (labels) => { sizeLabels = labels; }]];
+		// A parallel title call renames the draft while the dialog waits (lab run sk06c-T-2).
+		const renamed = path.join(directory, `2026-11-08-renamed-by-title-${tiny.id}-plan3.md`);
+		selectScript = [["Plan size", "Tiny", (labels) => { sizeLabels = labels; renameSync(tiny.file, renamed); }]];
 		const tinyResult = await tool({ action: "size", mode: "tiny", text: "One-line footer fix." });
 		assert.match(sizeLabels[0], /Tiny: just do it \(Recommended\)/, "recommendation preselected first");
 		assert.deepEqual(tinyResult, { mode: "tiny", tiny: true, hint: "Planning ended. End your turn now; the change starts on its own." });
-		assert(!existsSync(tiny.file) && ![".md", ".stats.json", ".needs.json"].some((ext) => existsSync(path.join(directory, "logs", `${tiny.id}${ext}`))), "draft and sidecars deleted");
+		assert(!existsSync(tiny.file) && !existsSync(renamed) && ![".md", ".stats.json", ".needs.json"].some((ext) => existsSync(path.join(directory, "logs", `${tiny.id}${ext}`))), "draft and sidecars deleted");
 		for (const [name, text] of Object.entries(others)) assert.equal(await readFile(path.join(directory, name), "utf8"), text, `${name} untouched`);
 		assert.deepEqual(entries.at(-1).data, {}, "planning pointer cleared");
 		await assert.rejects(tool({ action: "size", mode: "plan", text: "again", plan: firstId }), /only for a new \/plan3 request/);

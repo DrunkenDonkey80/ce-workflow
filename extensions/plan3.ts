@@ -977,6 +977,7 @@ export default function plan3(pi) {
 			if (!pick) return { mode: "plan", cancelled: true, hint: "Size dialog cancelled: continue planning a normal plan." };
 			mode = pick.value;
 			source = "user pick";
+			plan = await resolvePlan(ctx.cwd, plan.id, await listPlans(ctx.cwd)); // a parallel title call may have renamed the draft meanwhile
 		}
 		if (mode === "tiny") {
 			await unlink(plan.file);
