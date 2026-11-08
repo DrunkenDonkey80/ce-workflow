@@ -75,16 +75,17 @@ One loop per rework target (a module or a group of modules, never "the whole pro
    - the future-changes counts from Map;
    - any library or platform changes: what they remove and what migration costs;
    - expected benefit, risk and reversibility;
-   - whether stored state or file formats change (section 5).
+   - whether stored state or file formats change (section 5);
+   - each caller's intermediate states the interface must accept (drafts, a value cleared mid-typing, a new item not yet filled in). A contract that rejects them breaks preserve cases at Build (BarcodeDisplay D-15).
 
    Run one small experiment on the riskiest assumption, and record the result in the plan. End with one recommendation judged against the request's goal (what should get easier, safer or faster; ask for it at planning when the request has none). Recommend local repair or stop only when it meets that goal better than the structural options, and mark the recommended option "(Recommended)" in the Pick question.
 4. **Pick** (human step). The human picks one of two outcomes:
-   - **an option to build**, including "local repair": the human turns on `R-design-approved`. The gate counts only after the pick is recorded in Decisions; if it was turned on earlier, Build still waits for that record. When the human picks an option other than the recommended one, re-check that option's call-site, delta and future-change claims before Build, and record any correction.
+   - **an option to build**, including "local repair": the human turns on `R-design-approved`. The gate counts only after the pick is recorded in Decisions; if it was turned on earlier, Build still waits for that record. When the human picks an option other than the recommended one, re-check that option's call-site, delta and future-change claims before Build, and record any correction. Re-derive the scorecard baselines and thresholds for the picked option (count what its added scope replaces in the baseline), never loosening them, and record the scope it added.
    - **stop**, meaning no change is built: `R-design-approved` stays off. Mark Build, Replay, Switch and Retire done with the summary "not run: stopped at Pick". Commit the Map, corpus and Design as the outcome.
 5. **Build** [code]. The new part sits next to the old one behind one seam (section 3). Tests can select either side. Only one side does real writes (R6).
 6. **Replay** [think]. Run the same corpus against old and new, then fill in the scorecard that was fixed before Build started.
-7. **Switch** (human step). The human reads the scorecard and the rollback rules, then turns on `R-cutover-approved` and sets a watch window. Switching means flipping the one selection at the seam.
-8. **Retire** [code]. After the watch window passes with its evidence recorded, the human turns on `R-retire-approved`. Then delete the old code and remove the seam if it is no longer needed.
+7. **Switch** (human step). The human reads the scorecard and the rollback rules, then turns on `R-cutover-approved` and sets a watch window. Switching means flipping the one selection at the seam. With no runtime seam (only a test-side selection), Switch means the human merges the work to the main line, and the watch window starts at the merge: a window on an unmerged branch nobody uses observes nothing.
+8. **Retire** [code]. After the watch window passes with its evidence recorded, the human turns on `R-retire-approved`. Then delete the old code and remove the seam if it is no longer needed. With no runtime seam, Retire runs on the main line after the merge.
 
 "Inconclusive" and "do not rewrite" are valid outcomes at Design, Replay and Switch.
 
@@ -137,7 +138,9 @@ Seam: the new part sits next to the old one behind one entry point (branch-by-ab
 Record two SHAs in the pilot plan:
 
 - **pre-rework SHA**: before `/plan3` runs, the session checks `git status`. If there are uncommitted changes, it makes a local commit of the current state; if the tree is clean, it records HEAD. This SHA is the rollback point. The commit never stages credentials or junk files (such as stray `nul` files), never pushes, and follows the target's AGENTS.md commit rules where they are stricter.
-- **corpus SHA**: the commit that ends Characterize, containing the old code plus the committed corpus, fixtures and baseline records. This is the replay baseline, so the same tests run on both sides.
+- **corpus SHA**: the commit that ends Characterize, containing the old code plus the committed corpus, fixtures and baseline records. This is the replay baseline and the old side, so the same tests run on both sides. Prove its source equals the pre-rework source (`git diff <pre-rework sha> <corpus sha> -- <src paths>` is empty) and record that.
+
+The corpus stays frozen after Characterize: at every gate (end of Build, Replay, Retire), `git diff <corpus sha> -- <corpus paths>` shows only the approved-delta file. Exclude the corpus paths from formatters (`ruff format` rewrote three corpus files at Retire in BarcodeDisplay).
 
 Replay procedure:
 
@@ -166,6 +169,8 @@ Rules:
 - An improvement claim names the metric, workload, baseline, threshold and repetitions.
 - A material regression in one dimension is never offset by gains in another; report it, and it needs the human at Switch.
 - "Inconclusive" (spread larger than the difference) is a valid result.
+- Commit an interleaved paired runner with the performance probe in Characterize (old worktree and main checkout alternating, N pairs), and report the paired ratio for every round, not only the last.
+- Stability also requires no new lint findings against the corpus SHA, using the project's own linter.
 - Performance thresholds are relative: old and new runs interleaved in pairs on the same machine, not an absolute number from an earlier session. Machine load changes absolute timings (photobook-02: the unchanged old code itself missed its absolute threshold at Replay).
 
 ## 5. Cutover and rollback
@@ -175,7 +180,8 @@ Rules:
   - rollback triggers (what observation means "switch back");
   - how the old code handles state the new code wrote;
   - when formats change, a restore or migration rehearsed on disposable state, with its result.
-- Switch flips the seam selection. Rolling back flips it again, plus a restore when formats changed.
+- Switch flips the seam selection. Rolling back flips it again, plus a restore when formats changed. With no runtime seam, rollback is `git revert` of the Build commits (name them), plus how each side reads state the other wrote.
+- Write these under a `## Rollback` section in the plan.
 - Retire runs only after the watch window the human set at Switch has passed, with evidence recorded (what ran, what was observed).
 
 ## 6. Gate requirements (R5)
@@ -190,7 +196,7 @@ The human turns each one on with Alt+A. Agents never remove, edit or bypass a `n
 
 Gates are chained: each gated phase also needs every earlier gate (Switch needs `R-design-approved, R-cutover-approved`; Retire needs all three). Plan3 runs any step whose requirements are on, so without the chain a gate turned on early (for example in the first "set requirements" checklist) lets Retire run before Build. Approval gates start off: leave them unchecked in that first checklist.
 
-Code-only and device projects (R7): device checks are separate `[blocked]` steps with the device as a prerequisite. Unit-level characterization runs without them. When the target has several real callers (a CLI and a GUI), the device smoke goes through each of them.
+Code-only and device projects (R7): device checks are separate `[blocked]` steps with the device as a prerequisite. Unit-level characterization runs without them. When the target has several real callers (a CLI and a GUI), the device smoke goes through each of them. Skip the device smoke only when both hold, and record both as the step's check: (a) every changed caller's bytes to the device are pinned byte-for-byte by corpus wire cases, and (b) `git diff <pre-rework sha> -- <send path files>` is empty. "The target does not touch the send path" alone is not enough: the device sees the bytes the target produces.
 
 ## 7. Plan skeleton
 
@@ -229,26 +235,26 @@ Planning writes this plan only; Map and every later phase run after `/plan3 fini
 
 needs: R-design-approved
 
-- [ ] **BLD-01** Seam with old and new selectable; new part built; old side green against the baseline, new side green against the baseline plus the approved delta.
+- [ ] **BLD-01** Seam with old and new selectable; new part built; old side green against the baseline, new side green against the baseline plus the approved delta; the new side checked against the plain baseline fails exactly the approved-delta case IDs (compared as sets), proving the delta complete and minimal.
 
 ### Phase 6: Replay [think]
 
 needs: R-design-approved
 
-- [ ] **RPL-01** Replay the corpus on the corpus-SHA worktree and on the main checkout; fill in the scorecard; write down the rollback rules.
+- [ ] **RPL-01** Replay the corpus on the corpus-SHA worktree and on the main checkout; fill in the scorecard; write the rollback rules under `## Rollback`.
 
 ### Phase 7: Switch [think]
 
 needs: R-design-approved, R-cutover-approved
 
-- [human] **SW-01** Flip the seam; human sets the watch window.
+- [human] **SW-01** Flip the seam, or with no runtime seam the human merges to the main line; human sets the watch window, starting then.
 
 ### Phase 8: Retire [code]
 
 needs: R-design-approved, R-cutover-approved, R-retire-approved
 
-- [ ] **RET-01** Delete old code and the seam if no longer needed; remove the replay worktree; corpus green.
-- [ ] **RET-02** Only when the repo tracks built artifacts (installers, executables, firmware images): rebuild them from the final source with the project's own build command and commit them, so the shipped files match the reworked code. Skip with the note "no tracked artifacts" otherwise.
+- [ ] **RET-01** Delete old code and the seam if no longer needed; delete unit tests of absorbed shallow modules (often already gone at Build, when they failed: then note it); remove the replay worktree; corpus green and frozen.
+- [ ] **RET-02** Only when the repo tracks built artifacts (installers, executables, firmware images): rebuild them from the final source with the project's own build command and commit them (a tracked file in an ignored folder needs `git add -f`), so the shipped files match the reworked code. Skip with the note "no tracked artifacts" otherwise.
 ```
 
 The plan also records the pre-rework SHA in Resume context before MAP-01 starts.
