@@ -1,0 +1,20 @@
+{
+	"source": "C:/SOFT/git/DealFinder",
+	"sha": "27221be",
+	"skill": "engineering/diagnosing-bugs",
+	"setupPatch": "plant.patch",
+	"prompt": "After my last refactor, `scan` finds far fewer deals than before. The candidates it still finds only use Bulgarian ads that are online right now; ads that sold last week never show up as references anymore. `history_window_days` is still 90 in config.toml. Find and fix it.",
+	"checks": [
+		{
+			"name": "suite",
+			"run": "python -m pytest -q -p no:cacheprovider"
+		},
+		{
+			"name": "hidden",
+			"hidden": [
+				"hidden_test_history.py"
+			],
+			"run": "python -m pytest -q -p no:cacheprovider tests/hidden_test_history.py"
+		}
+	]
+}

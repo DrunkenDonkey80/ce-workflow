@@ -1,0 +1,25 @@
+{
+	"copy": "C:/SOFT/git/rework-lab/photobook-01",
+	"skill": "engineering/retro",
+	"deps": [
+		"productivity/writing-for-agents"
+	],
+	"noUnforced": true,
+	"inputs": [
+		{
+			"src": "C:/SOFT/git/skills-lab/retro-input",
+			"dest": "retro-input"
+		}
+	],
+	"prompt": "Do a retrospective on the coding session in `retro-input/` (session logs, driver log and lab log, and the rework recipe it followed). It reworked this project unattended, driven by a script that played the human. Suggest improvements to the agent's environment, ranked by severity, each with the evidence that shows it. Write the report to `retro-input/RETRO.md`; change nothing else.",
+	"checks": [
+		{
+			"name": "report",
+			"run": "test -s retro-input/RETRO.md"
+		},
+		{
+			"name": "only-report",
+			"run": "test -z \"$(git status --porcelain -- . ':!retro-input')\" && test -z \"$(git diff HEAD --name-only -- retro-input | grep -v RETRO.md)\""
+		}
+	]
+}

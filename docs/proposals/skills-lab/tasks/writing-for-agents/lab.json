@@ -1,0 +1,16 @@
+{
+	"source": "C:/SOFT/git/DealFinder",
+	"sha": "27221be",
+	"skill": "productivity/writing-for-agents",
+	"prompt": "Write `AGENTS.md` for this repository: what a coding agent needs to make changes here correctly and quickly. Change nothing else.",
+	"checks": [
+		{
+			"name": "agents-md",
+			"run": "test -s AGENTS.md"
+		},
+		{
+			"name": "only-agents-md",
+			"run": "test -z \"$(git status --porcelain | grep -v ' AGENTS.md$')\""
+		}
+	]
+}

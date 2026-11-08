@@ -1,6 +1,5 @@
 # Hidden acceptance test for the tdd task: copied into tests/ only after the run ends.
 import pytest
-
 from dealfinder.normalize import clean, normalize, ram, storage
 
 

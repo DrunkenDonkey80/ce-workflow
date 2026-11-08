@@ -13,7 +13,7 @@
 > - a candidate that disappears and comes back within 3 days is not new;
 > - a verified candidate that verify drops gets no alert.
 >
-> Put the policy in `dealfinder/alerts.py` as `alerts(previous_state, candidates, now) -> (alert_list, new_state)`, where `candidates` are rows of the `candidates` table as dicts plus `listing_id`, and `new_state` is JSON-serializable. Wire it into the `scan`/`verify` CLI flow so alerts are printed.
+> Put the policy in `dealfinder/alerts.py` as `alerts(previous_state, candidates, now) -> (alert_list, new_state)`, where `previous_state` is None on the first run, `candidates` are rows of the `candidates` table as dicts (including `listing_id`, `margin_eur` and `state`), each alert is a dict with at least `listing_id` and `reason`, and `new_state` is JSON-serializable. Wire it into the `scan`/`verify` CLI flow so alerts are printed.
 >
 > Unattended run: no one will answer questions; decide yourself and say what you decided.
 
@@ -26,7 +26,7 @@
 ## Check
 
 1. `python -m pytest -q` green.
-2. Hidden scenario test (SK-04 writes it against the stated interface): first verified appearance alerts once; same state next cycle does not; provisional never alerts; a verified → provisional → verified cycle at the same margin does not re-alert; disappear-and-return within 3 days does not alert as new; +€25 margin alerts, +€10 does not; a dropped candidate yields no alert.
+2. Hidden scenario test `hidden_test_alerts.py`: first verified appearance alerts once; same state next cycle does not; provisional never alerts; a verified → provisional → verified cycle at the same margin does not re-alert; disappear-and-return within 3 days does not alert as new; +€25 margin alerts, +€10 does not; a dropped candidate yields no alert.
 
 ## Rubric
 

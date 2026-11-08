@@ -11,11 +11,11 @@ Measures the document by what it does to a later agent, not by its length (Astra
 >
 > Unattended run: no one will answer questions; decide yourself and say what you decided.
 
-## Phase 2 (replay, identical for all arms, no skill)
+## Phase 2 (replay, identical for all arms, no skill; task `writing-for-agents-replay`, arm off, `--add <phase-1 run>/AGENTS.md=AGENTS.md`)
 
-A new fresh-history copy gets the phase-1 `AGENTS.md` (or none, for the control) and the fixture `tests/fixtures/laptopbg_list.html` (a synthetic product list page for a new Bulgarian refurbisher "Laptop.bg", built by SK-04 in the Izot card format with different class names). A fresh `pi -p` session on Sol, without any skill:
+A new fresh-history copy gets the phase-1 `AGENTS.md` (or none, for the control) and the fixture `tests/fixtures/laptopbg_list.html` (a synthetic product list page for a new Bulgarian refurbisher "Laptop.bg", in `../writing-for-agents-replay/`, with its own markup: 2 in-stock ThinkPads, one sold-out ThinkPad, one Dell). A fresh `pi -p` session on Sol, without any skill:
 
-> Add Laptop.bg (https://laptop.bg/used-laptops) as a new Bulgarian refurbisher source. A saved list page is at `tests/fixtures/laptopbg_list.html`. It is a trusted shop like Kvant, Ardes and Izot.
+> Add Laptop.bg (https://laptop.bg/used-laptops) as a new Bulgarian refurbisher source with source id `laptopbg`. A saved list page is at `tests/fixtures/laptopbg_list.html`; it has every spec on the list page. It is a trusted shop like Kvant, Ardes and Izot.
 >
 > Unattended run: no one will answer questions; decide yourself and say what you decided.
 

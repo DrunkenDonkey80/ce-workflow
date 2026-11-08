@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T12:50:43.772Z
+updated: 2026-11-08T13:13:01.476Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -158,9 +158,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ### Phase 2: Lab harness [code]
 
-- [ ] **SK-04** Add scripts/skills-lab.mjs (C-lab): clone or fresh-history copy, task setup, one pi json run per arm, check, one result line per run.
-  - Raw runs under `C:\SOFT\git\skills-lab\`; never touches the source repo (R6). Independent runs may go in parallel (up to 5), each in its own clone and session dir.
-  - Check: a smoke run of one task in both arms writes two result lines with nonzero tokens and a check result, and `git -C C:\SOFT\git\DealFinder status --short` is unchanged.
+- [x] **SK-04** scripts/skills-lab.mjs runs each arm in a fresh-history copy (or clone) with its own session dir, up to 5 in parallel, checks with hidden tests copied in only for the check, and records metrics, skillRead and outside-path audit per run; lab.json plus fixtures for all six tasks and the writing-for-agents replay.
 - [ ] **SK-05** rework-lab.mjs: add `--plan-only`, R3 metrics for every run, and a no-plan (Tiny) outcome instead of throwing.
   - `--plan-only` stops after the first planning turn settles and copies the draft plan into the run dir.
   - Metrics: one shared event parser with skills-lab (wall time, tokens, cost, turns, tool calls) summed over every prompt and continuation of the run, written to the `done` line. Plan3 stats cover execution only (`extensions/plan3.ts:1070`), so they are not the source.

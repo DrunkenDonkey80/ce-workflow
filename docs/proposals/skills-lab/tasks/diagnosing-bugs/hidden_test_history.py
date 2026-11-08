@@ -1,6 +1,6 @@
 # Hidden acceptance test for the diagnosing-bugs task: copied into tests/ only after the run ends.
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from dealfinder.db import open_db
@@ -8,7 +8,7 @@ from dealfinder.sources import olx
 from dealfinder.sync import load_references, store
 
 FIXTURES = Path(__file__).parent / "fixtures"
-NOW = datetime(2026, 10, 10, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 10, tzinfo=UTC)
 
 
 def records():

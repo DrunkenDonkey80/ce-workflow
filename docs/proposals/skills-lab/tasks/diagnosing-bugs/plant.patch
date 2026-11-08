@@ -1,0 +1,11 @@
+--- a/dealfinder/sync.py
++++ b/dealfinder/sync.py
+@@ -111,7 +111,7 @@ def load_references(db, now, history_days):
+             "SELECT l.id, l.source, l.url, l.title, o.time, o.price_eur, o.spec_key, o.spec_snapshot, "
+             "o.verified_state FROM observations o JOIN listings l ON l.id = o.listing_id "
+             "WHERE l.source != 'ebay' AND o.time >= ?",
+-            ((now - timedelta(days=history_days)).isoformat(),)):
++            ((now - timedelta(hours=history_days)).isoformat(),)):
+         references.append({**dict(row), "spec": json.loads(row["spec_snapshot"]), "historical": True})
+     return references
+ 

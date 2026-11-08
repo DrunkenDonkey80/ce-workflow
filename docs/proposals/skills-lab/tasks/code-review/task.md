@@ -1,6 +1,6 @@
 # Task: code-review (seeded change with a spec and standards)
 
-- Source: DealFinder `27221be`, fresh-history copy with two commits: base ("DealFinder" + the standards file below), then the seeded change "Skip low-feedback eBay sellers". Fixed point = base commit.
+- Source: DealFinder `27221be`, fresh-history copy with two commits: base ("DealFinder" plus `files/`), then `change.patch` as "Skip low-feedback eBay sellers". Fixed point = base commit.
 - Skill: `engineering/code-review` (no skill dependencies; it spawns two subagents).
 - Review only: no repair. Repair would mix review quality with fixing quality.
 
@@ -17,20 +17,23 @@
 - `scan` returns the number skipped as `"skipped_sellers"` in its result dict.
 - A test covers a skipped, a kept and an unknown-feedback listing.
 
-## Seeded change (built by SK-04 as a patch; each planted item is independent)
+## Seeded change (`change.patch`, suite still green: 120 passed)
 
-| ID | Axis | Planted defect |
+Base commit = `files/` (`CODING_STANDARDS.md`, `docs/specs/seller-feedback.md`) on top of `27221be`. Each planted item is independent:
+
+| ID | Axis | Planted defect (in `change.patch`) |
 |---|---|---|
-| S1 | Spec, missing | `"skipped_sellers"` is not added to the `scan` result |
-| S2 | Spec, wrong | unknown feedback (`None`) is skipped instead of kept |
-| S3 | Spec, scope creep | also changes the report subtitle text in `report.py` |
-| S4 | Standards, documented | `min_seller_feedback_pct` read as `config["min_seller_feedback_pct"]` (no default) and not documented in `config.toml` |
-| S5 | Standards, documented | margin pre-check compares `float(price)` values in the new filter |
-| S6 | Smell | the feedback check is copy-pasted in `scan` and in `worth_detail` (Duplicated Code) |
+| S1 | Spec, missing | `skipped` is computed in `scan` but never returned as `"skipped_sellers"` |
+| S2 | Spec, wrong | unknown feedback (`None`) is skipped instead of kept, both in `chk2` and in the `scan` loop |
+| S3 | Spec, scope creep | report subtitle in `report.py` gains "Sellers below the feedback threshold are hidden." |
+| S4 | Standards, documented | `config["min_seller_feedback_pct"]` read without a default; not documented in `config.toml` (the change patches the test CONFIG instead) |
+| S5 | Standards, documented | the percentage is compared as `float`, not `Decimal` through `pricing.money` |
+| S6 | Smell | the feedback check exists twice: `chk2` and an inline copy in the `scan` loop (Duplicated Code) |
 | S7 | Smell | new `filters=None` parameter on `scan` that no caller passes (Speculative Generality) |
 | S8 | Smell | helper named `chk2` (Mysterious Name) |
-| N1 | Decoy, fine | the new test builds listings with a small local dict factory instead of the fixtures (allowed: it is still fixture-free and offline) |
-| N2 | Decoy, fine | uses a generator expression with `sum(...)` to count skips (unusual but clear) |
+| S9 | Spec, missing | the new test has no unknown-feedback case |
+| N1 | Decoy, fine | the test builds listings with a small local `seller()` factory instead of fixtures (still offline) |
+| N2 | Decoy, fine | skips counted with `sum(1 for ...)` (unusual but clear) |
 
 ## Prompt
 
@@ -46,8 +49,8 @@ None beyond the report (the tree must be unchanged: `git status --porcelain` emp
 
 | # | Item | How |
 |---|---|---|
-| 1-8 | S1..S8 each found (finding names the file/line or behavior) | judge, one item each |
-| 9 | N1 and N2 not reported as defects (a "judgement call" note is fine, a defect is a false positive) | judge |
-| 10 | Other false positives: count of reported defects that are not real | judge (count; reported separately, lower is better) |
-| 11 | Spec and standards findings kept apart (no single merged severity ranking across axes) | judge |
-| 12 | Tree unchanged | script |
+| 1-9 | S1..S9 each found (finding names the file/line or behavior) | judge, one item each |
+| 10 | N1 and N2 not reported as defects (a "judgement call" note is fine, a defect is a false positive) | judge |
+| 11 | Other false positives: count of reported defects that are not real | judge (count; reported separately, lower is better) |
+| 12 | Spec and standards findings kept apart (no single merged severity ranking across axes) | judge |
+| 13 | Tree unchanged | script |

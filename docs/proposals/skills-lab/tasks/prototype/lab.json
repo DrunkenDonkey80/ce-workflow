@@ -1,0 +1,19 @@
+{
+	"source": "C:/SOFT/git/DealFinder",
+	"sha": "27221be",
+	"skill": "engineering/prototype",
+	"prompt": "Add deal alerts. After each scan and verify, DealFinder should tell me about deals worth my attention:\n- alert a new verified deal once;\n- alert it again when its margin grows by at least €20;\n- never alert provisional candidates;\n- a candidate that disappears and comes back within 3 days is not new;\n- a verified candidate that verify drops gets no alert.\n\nPut the policy in `dealfinder/alerts.py` as `alerts(previous_state, candidates, now) -> (alert_list, new_state)`, where `previous_state` is None on the first run, `candidates` are rows of the `candidates` table as dicts (including `listing_id`, `margin_eur` and `state`), each alert is a dict with at least `listing_id` and `reason`, and `new_state` is JSON-serializable. Wire it into the `scan`/`verify` CLI flow so alerts are printed.",
+	"checks": [
+		{
+			"name": "suite",
+			"run": "python -m pytest -q -p no:cacheprovider"
+		},
+		{
+			"name": "hidden",
+			"hidden": [
+				"hidden_test_alerts.py"
+			],
+			"run": "python -m pytest -q -p no:cacheprovider tests/hidden_test_alerts.py"
+		}
+	]
+}

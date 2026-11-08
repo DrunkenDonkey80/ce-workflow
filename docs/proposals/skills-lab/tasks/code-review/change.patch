@@ -1,0 +1,84 @@
+diff --git a/dealfinder/report.py b/dealfinder/report.py
+index 4ddd566..f1de3eb 100644
+--- a/dealfinder/report.py
++++ b/dealfinder/report.py
+@@ -310,7 +310,7 @@ def write_report(candidates, path=Path("reports/latest.html"), *, generated=None
+     content = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1"><title>Laptop deal intake</title>
+ <style>{CSS}</style></head><body><main><header><h1>Laptop deal intake</h1>
+-<p class="subtle">Business-laptop deals against Bulgarian prices. Margin = quick-sale price (lowest Bulgarian price, adjusted to this unit's RAM and SSD, minus 10%, €20–50) − price − €20 transport; at least the configured minimum.</p>
++<p class="subtle">Business-laptop deals against Bulgarian prices. Margin = quick-sale price (lowest Bulgarian price, adjusted to this unit's RAM and SSD, minus 10%, €20–50) − price − €20 transport; at least the configured minimum. Sellers below the feedback threshold are hidden.</p>
+ <p class="legend"><span class="check pass">Good</span><span class="check warn">Warning</span><span class="check fail">Problem</span><span class="check claim pass">?value = seller's claim, not verified</span><span class="check unknown">Unknown</span><span class="subtle">\u2605 active worldwide warranty</span></p>
+ <p class="subtle">Generated {escape(generated)}. Asking prices and current bids are not guaranteed sale prices.</p></header>
+ {''.join(tickets) if tickets else '<section class="empty"><h2>No eligible deals yet</h2><p>Run a scan after configuring eBay access. Candidates appear only when a matching Bulgarian reference supports the margin.</p></section>'}
+diff --git a/dealfinder/sync.py b/dealfinder/sync.py
+index 388dc0b..cf5c674 100644
+--- a/dealfinder/sync.py
++++ b/dealfinder/sync.py
+@@ -116,7 +116,12 @@ def load_references(db, now, history_days):
+     return references
+ 
+ 
+-def scan(db, client, config, now=None):
++def chk2(listing, config):
++    pct = listing.get("seller_feedback_pct")
++    return pct is not None and float(pct) >= float(config["min_seller_feedback_pct"])
++
++
++def scan(db, client, config, now=None, filters=None):
+     """Fetch eBay listings, store them and replace the provisional candidate list."""
+     now = now or datetime.now(timezone.utc)
+     days, transport, margin = config["history_window_days"], config["transport_eur"], config["min_margin_eur"]
+@@ -149,6 +154,8 @@ def scan(db, client, config, now=None):
+                for r in db.execute("SELECT o.listing_id, o.time, o.price_eur, o.spec_snapshot FROM observations o "
+                                    "JOIN listings l ON l.id = o.listing_id WHERE l.source = 'ebay'")]
+     found = {}
++    rows = db.execute("SELECT seller_feedback_pct FROM listings WHERE source = 'ebay' AND status = 'active'").fetchall()
++    skipped = sum(1 for row in rows if not chk2(dict(row), config))
+     for row in db.execute("SELECT l.id, l.price_eur, l.buying_option, l.end_time, l.status, s.fields, "
+                           "l.seller_feedback_score, l.seller_feedback_pct FROM listings l "
+                           "JOIN specs s ON s.listing_id = l.id AND s.origin = 'advertised' "
+@@ -156,6 +163,11 @@ def scan(db, client, config, now=None):
+         listing = {**dict(row), "spec": json.loads(row["fields"])}
+         if (cpu_year(listing["spec"]) or 9999) < config.get("min_year", 0):
+             continue  # nobody buys a decade-old laptop; an unknown year is kept
++        pct = listing["seller_feedback_pct"]
++        if pct is None or float(pct) < float(config["min_seller_feedback_pct"]):
++            continue  # low-feedback seller
++        if any(not keep(listing) for keep in filters or ()):
++            continue
+         reference = reference_for(listing["spec"], by_model.get(listing["spec"].get("model"), []), now, days,
+                                   provisional=True,
+                                   min_listings=config.get("min_reference_listings", 2))
+diff --git a/tests/test_ebay.py b/tests/test_ebay.py
+index d6d76f4..c99254c 100644
+--- a/tests/test_ebay.py
++++ b/tests/test_ebay.py
+@@ -17,7 +17,7 @@ NOW = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
+ CONFIG = {"EBAY_ENV": "sandbox", "EBAY_CLIENT_ID": "id", "EBAY_CLIENT_SECRET": "secret", "watchlist": ["thinkpad"],
+           "ebay_marketplaces": ["EBAY_GB"], "price_min": 200, "price_max": 400, "condition_ids": [2500, 3000],
+           "ebay_daily_call_limit": 50, "history_window_days": 90, "min_reference_listings": 1,
+-          "transport_eur": 20, "min_margin_eur": 150, "ebay_baseline_min_samples": 5}
++          "transport_eur": 20, "min_margin_eur": 150, "ebay_baseline_min_samples": 5, "min_seller_feedback_pct": 98}
+ SPEC = "Lenovo ThinkPad T490 i5-8365U 16GB 512GB SSD 14\" FHD 1920x1080"
+ 
+ 
+diff --git a/tests/test_seller_feedback.py b/tests/test_seller_feedback.py
+new file mode 100644
+index 0000000..239cfa2
+--- /dev/null
++++ b/tests/test_seller_feedback.py
+@@ -0,0 +1,13 @@
++from dealfinder.sync import chk2
++
++CONFIG = {"min_seller_feedback_pct": 98}
++
++
++def seller(pct):
++    return {"seller_feedback_pct": pct, "price_eur": 100.0}
++
++
++def test_low_feedback_seller_skipped_and_good_seller_kept():
++    listings = [seller(97.9), seller(98.0), seller(99.5)]
++    assert sum(1 for listing in listings if chk2(listing, CONFIG)) == 2
++    assert not chk2(seller(90), CONFIG)

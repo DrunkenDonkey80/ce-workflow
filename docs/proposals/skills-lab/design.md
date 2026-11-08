@@ -27,6 +27,10 @@ Same model `openai-codex/gpt-6.1-sol`, thinking `high`, same copy, same prompt b
 
 Pi version (`pi --version`, 1.5.0 at design time), model id, the user's global extensions as installed (ce-workflow live checkout, ponytail, pi-subagents, pi-lens), compaction mode `ultrafull`, global `AGENTS.md` files that Pi loads for `C:\SOFT\git\skills-lab\runs\...` (user `~/.pi/agent/AGENTS.md` and `C:\SOFT\git\AGENTS.md`). The runner writes these into each result line. A Pi or model update between runs of one skill voids that skill's batch.
 
+## Runner (SK-04)
+
+`node scripts/skills-lab.mjs <run> --task <name> --arm off,forced[,unforced] --reps N` builds each run in `C:\SOFT\git\skills-lab\runs\<run>\<task>-<arm>-<rep>` (fresh history from `git archive`, or `git clone` for retro), with its own session dir, up to 5 at a time, and appends one line per run to `results.jsonl`: environment, metrics (lab-metrics.mjs), `skillRead` (a read of the skill file; forced runs get it inline, so it matters for unforced), `outside` (tool calls naming other lab paths, e.g. a sibling run; the judge reviews them), check results and diff stat. Hidden tests are copied in only for the check and removed after. Task config is `tasks/<name>/lab.json` (`source`+`sha` or `copy`, `skill`, `deps`, `prompt` with `{base}`, `inputs`, `setupPatch`, `changePatch`, `checks`). `--no-pi` sets up and checks only: on the untouched base every hidden test fails and every suite passes (validated `fixture-01`).
+
 ## Pi adaptations of upstream wording (applied by flags, never by editing the skill text)
 
 | Skill | Upstream wording | Pi handling |

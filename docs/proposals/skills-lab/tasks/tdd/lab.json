@@ -1,0 +1,22 @@
+{
+	"source": "C:/SOFT/git/DealFinder",
+	"sha": "27221be",
+	"skill": "engineering/tdd",
+	"deps": [
+		"engineering/codebase-design"
+	],
+	"prompt": "Listings often write RAM as modules: \"2x8GB DDR4\", \"8+8GB RAM\", \"2 x 16 GB RAM\", \"8GB + 8GB RAM\". DealFinder should read these as the total (16, 16, 32, 16). When a listing states the total and the modules (\"16GB (2x8GB)\"), the total is 16, not 32. Storage modules (\"2x512GB SSD\") and graphics memory are not RAM. Add this.",
+	"checks": [
+		{
+			"name": "suite",
+			"run": "python -m pytest -q -p no:cacheprovider"
+		},
+		{
+			"name": "hidden",
+			"hidden": [
+				"hidden_test_ram_modules.py"
+			],
+			"run": "python -m pytest -q -p no:cacheprovider tests/hidden_test_ram_modules.py"
+		}
+	]
+}

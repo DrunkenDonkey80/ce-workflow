@@ -1,0 +1,29 @@
+{
+	"source": "C:/SOFT/git/DealFinder",
+	"sha": "27221be",
+	"note": "Phase 2 of writing-for-agents: arm off only; pass the phase-1 document with --add <run dir>/AGENTS.md=AGENTS.md (none for the control).",
+	"inputs": [
+		{
+			"src": "C:/SOFT/git/ce-workflow/docs/proposals/skills-lab/tasks/writing-for-agents-replay/laptopbg_list.html",
+			"dest": "tests/fixtures/laptopbg_list.html"
+		}
+	],
+	"prompt": "Add Laptop.bg (https://laptop.bg/used-laptops) as a new Bulgarian refurbisher source with source id `laptopbg`. A saved list page is at `tests/fixtures/laptopbg_list.html`; it has every spec on the list page. It is a trusted shop like Kvant, Ardes and Izot.",
+	"checks": [
+		{
+			"name": "suite",
+			"run": "python -m pytest -q -p no:cacheprovider"
+		},
+		{
+			"name": "hidden",
+			"hidden": [
+				"hidden_test_laptopbg.py"
+			],
+			"run": "python -m pytest -q -p no:cacheprovider tests/hidden_test_laptopbg.py"
+		},
+		{
+			"name": "shop-lists",
+			"run": "grep -q laptopbg dealfinder/normalize.py && grep -q laptopbg dealfinder/pricing.py && grep -q laptopbg dealfinder/report.py && grep -q laptopbg dealfinder/sync.py && grep -q laptopbg tests/test_sync.py"
+		}
+	]
+}

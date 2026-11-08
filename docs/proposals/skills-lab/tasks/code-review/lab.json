@@ -1,0 +1,14 @@
+{
+	"source": "C:/SOFT/git/DealFinder",
+	"sha": "27221be",
+	"skill": "engineering/code-review",
+	"changePatch": "change.patch",
+	"changeMessage": "Skip low-feedback eBay sellers",
+	"prompt": "Review the changes since {base} against the spec in `docs/specs/seller-feedback.md` and the project's standards. Report findings; do not change code. You may use subagents.",
+	"checks": [
+		{
+			"name": "unchanged",
+			"run": "test -z \"$(git status --porcelain)\""
+		}
+	]
+}
