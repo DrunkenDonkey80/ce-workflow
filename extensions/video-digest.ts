@@ -45,28 +45,39 @@ export function pickCaptionTrack(info: any): { lang: string; auto: boolean } | u
 	return lang ? { lang, auto: true } : undefined;
 }
 
-/** json3 caption events → timed lines. */
-export function captionLines(json3: any): { t: number; text: string }[] {
-	return (json3?.events ?? []).flatMap((event: any) => {
-		const text = (event.segs ?? []).map((seg: any) => seg.utf8 ?? "").join("").replace(/\s+/g, " ").trim();
-		return text ? [{ t: (event.tStartMs ?? 0) / 1000, text }] : [];
+const SENTENCE_END = /[.?!]["')\]]*$/;
+
+/**
+ * D-01: json3 caption events → timed sentences. A word's time is its event start plus its segment offset; a segment
+ * without an offset takes the previous word's time (the event start for the first). Tracks without punctuation
+ * (fewer than one sentence end per 40 words) also split at a pause of 1.5 s or after 40 words.
+ */
+export function sentences(json3: any): { t: number; text: string }[] {
+	const words: { t: number; word: string }[] = [];
+	for (const event of json3?.events ?? []) {
+		const start = (event.tStartMs ?? 0) / 1000;
+		let t = start;
+		for (const seg of event.segs ?? []) {
+			if (seg.tOffsetMs != null) t = start + seg.tOffsetMs / 1000;
+			for (const word of String(seg.utf8 ?? "").split(/\s+/).filter(Boolean)) words.push({ t, word });
+		}
+	}
+	const punctuated = words.filter(({ word }) => SENTENCE_END.test(word)).length * 40 >= words.length;
+	const result: { t: number; text: string; count: number }[] = [];
+	let open = false;
+	words.forEach(({ t, word }, i) => {
+		const current = result[result.length - 1];
+		if (open && !punctuated && (t - words[i - 1].t >= 1.5 || current.count >= 40)) open = false;
+		if (open) {
+			current.text += ` ${word}`;
+			current.count++;
+		} else result.push({ t, text: word, count: 1 });
+		open = !SENTENCE_END.test(word);
 	});
+	return result.map(({ t, text }) => ({ t, text }));
 }
 
 export const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
-
-/** Paragraphs of about 30 s, each starting with a [m:ss] marker. */
-export function captionParagraphs(lines: { t: number; text: string }[]) {
-	const paragraphs: string[] = [];
-	let start = -Infinity;
-	for (const line of lines) {
-		if (line.t - start >= 30) {
-			start = line.t;
-			paragraphs.push(`[${clock(line.t)}] ${line.text}`);
-		} else paragraphs[paragraphs.length - 1] += ` ${line.text}`;
-	}
-	return paragraphs.join("\n\n");
-}
 
 /** Share of 8x8 blocks whose grey range is at most FLAT_RANGE: screens have flat areas, camera shots almost none. */
 function flatShare(frame: Uint8Array, width: number, height: number) {
@@ -361,7 +372,7 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 			const subs = await run("yt-dlp", ["--load-info-json", infoFile, "--skip-download", track.auto ? "--write-auto-subs" : "--write-subs", "--sub-langs", track.lang, "--sub-format", "json3", "-o", path.join(tmp, "v.%(ext)s")], 120_000);
 			const file = path.join(tmp, `v.${track.lang}.json3`);
 			if (subs.code === 0 && existsSync(file)) {
-				lines = captionLines(JSON.parse(await readFile(file, "utf8")));
+				lines = sentences(JSON.parse(await readFile(file, "utf8")));
 				captionNote = `${track.lang}${track.auto ? " (auto)" : ""}`;
 			} else captionNote = `download failed: ${tail(subs)}`;
 		}
@@ -443,7 +454,7 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 		const images = artifacts.filter((artifact) => artifact.kind === "image");
 		if (images.length) await mkdir(path.join(dir, "images"));
 		for (const artifact of images) await copyFile(frames[artifact.frame!], path.join(dir, "images", imageName(artifact)));
-		const transcript = captionParagraphs(lines);
+		const transcript = lines.map((line) => `[${clock(line.t)}] ${line.text}`).join("\n");
 		await writeFile(`${digestFile}.tmp`, keepTakeaways(previous, renderDigest(meta, transcript, artifacts)));
 		await rename(`${digestFile}.tmp`, digestFile);
 		return { file: digestFile, meta, frames: frames.length, candidates: candidates.length, calls, usage, artifacts: artifacts.length, images: images.length, dropped, transcriptChars: transcript.length, keptTakeaways: !!previous?.includes(TAKEAWAYS) };

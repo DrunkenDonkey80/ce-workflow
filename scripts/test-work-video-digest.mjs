@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-	isYouTubeUrl, pickCaptionTrack, captionLines, captionParagraphs, screenFrames, sampleInterval,
+	isYouTubeUrl, pickCaptionTrack, sentences, screenFrames, sampleInterval,
 	digestFolder, digestOwner, keepTakeaways, batchArtifacts, finalArtifacts, mapLimit, renderDigest, digestVideo, NO_CAPTIONS, TAKEAWAYS,
 } from "../extensions/video-digest.ts";
 
@@ -24,11 +24,19 @@ assert.deepEqual(pickCaptionTrack({ language: "en-US", automatic_captions: { "ar
 assert.deepEqual(pickCaptionTrack({ language: "de", automatic_captions: { "de-orig": [], en: [] } }), { lang: "de-orig", auto: true });
 assert.equal(pickCaptionTrack({ automatic_captions: { en: [] } }), undefined);
 
-// json3 → [m:ss] paragraphs of about 30 s.
+// D-01 json3 → timed sentences. Unpunctuated track: split at pauses of 1.5 s or more.
 const json3 = { events: [{ tStartMs: 0, dDurationMs: 99400 }, { tStartMs: 0, segs: [{ utf8: "A" }, { utf8: " lot of people" }] }, { tStartMs: 1670, segs: [{ utf8: "\n" }] }, { tStartMs: 12000, segs: [{ utf8: "ask me" }] }, { tStartMs: 31000, segs: [{ utf8: "when to grill" }] }] };
-const lines = captionLines(json3);
-assert.deepEqual(lines, [{ t: 0, text: "A lot of people" }, { t: 12, text: "ask me" }, { t: 31, text: "when to grill" }]);
-assert.equal(captionParagraphs(lines), "[0:00] A lot of people ask me\n\n[0:31] when to grill");
+assert.deepEqual(sentences(json3), [{ t: 0, text: "A lot of people" }, { t: 12, text: "ask me" }, { t: 31, text: "when to grill" }]);
+// Word offsets where present, the previous word's time where not; two sentences in one event; a caption gap.
+assert.deepEqual(sentences({ events: [
+	{ tStartMs: 1000, segs: [{ utf8: "Hello" }, { utf8: " world.", tOffsetMs: 500 }, { utf8: " This", tOffsetMs: 900 }, { utf8: " is" }] },
+	{ tStartMs: 3000, aAppend: 1, segs: [{ utf8: "\n" }] },
+	{ tStartMs: 5000, segs: [{ utf8: "fine." }] },
+	{ tStartMs: 20000, segs: [{ utf8: "Next one? Yes!" }] },
+] }), [{ t: 1, text: "Hello world." }, { t: 1.9, text: "This is fine." }, { t: 20, text: "Next one?" }, { t: 20, text: "Yes!" }]);
+// Unpunctuated and no pause: split after 40 words.
+const long = sentences({ events: [{ tStartMs: 0, segs: Array.from({ length: 45 }, (_, i) => ({ utf8: ` w${i}`, tOffsetMs: i * 100 })) }] });
+assert.deepEqual(long.map((s) => [s.t, s.text.split(" ").length]), [[0, 40], [4, 5]]);
 
 // D-05 pixel filter on synthetic 64x32 gray thumbnails.
 let seed = 7;
@@ -210,7 +218,7 @@ try {
 	assert.equal(result.file, digestFile);
 	let digest = readFileSync(digestFile, "utf8");
 	assert(digest.includes("A-->B-->C") && digest.includes("```ts\nx\n```") && !digest.includes("A-->B\n"));
-	assert(digest.includes("[0:00] A lot of people ask me") && digest.includes("Captions: en-orig (auto)"));
+	assert(digest.includes("[0:00] A lot of people\n") && digest.includes("[0:12] ask me") && digest.includes("Captions: en-orig (auto)"));
 	assert.equal(digestOwner(path.dirname(digestFile)), "k2zgcTDq4aQ");
 
 	// Rerun keeps the agent's takeaways and rewrites the generated sections.

@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T16:06:12.762Z
+updated: 2026-11-08T16:07:31.680Z
 reviewed: 2026-11-08
 ---
 
@@ -116,10 +116,7 @@ Commands (referenced by steps):
 
 ### Phase 3: Transcript and rendering [code]
 
-- [ ] **V2-05** Build timed sentences from json3 word offsets (D-01).
-  - Split at `.`, `?` and `!`; for captions without punctuation, also split at a pause of 1.5 s or more or after 40 words (agent proposal).
-  - Word time: event `tStartMs` plus the segment's `tOffsetMs`; a segment without an offset takes the previous word's time, or the event start for the first segment. A sentence's time is its first word's time; several sentences in one event each get their own time.
-  - Check: C1 with a json3 fixture mixing events with and without offsets, two sentences in one event, a caption gap, and an unpunctuated track.
+- [x] **V2-05** sentences(json3) replaces captionLines/captionParagraphs: word times from event start plus offsets (previous word's time when missing), split at . ? !, unpunctuated tracks also at 1.5 s pauses or 40 words; transcript is one [m:ss] line per sentence and feeds the batch prompts.
 - [ ] **V2-06** Interleave visuals after the sentence spoken at their start; save cited frames as JPEG and link them plus a YouTube `t=` link (D-02, D-09).
   - At most 12 frames per visual from its `frames` list (V2-03, V2-04): first and last always, the rest evenly spread; each saved as `frames/<m-ss>.jpg`, shared when two visuals cite the same frame.
   - Placement: a visual goes after the last sentence starting at or before its start; one starting before the first sentence goes before it; one after the last sentence goes at the end; a visual inside a caption gap goes after the sentence before the gap.
