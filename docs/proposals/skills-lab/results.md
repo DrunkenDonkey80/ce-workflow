@@ -39,3 +39,18 @@ Phase 1 (write AGENTS.md) judged; the verdict waits for the replay phase (a fres
 | unforced (read it) | 1/1 | partial | 0 | 1 | 7 | 380,854 | 0.1904 | 145 | 9 | 8 |
 
 No run named every shop-list location (`report.SHOP_NAMES` and the normalize shop tuple were missed by all). The `only-agents-md` check was rescored without pi-lens probe logs (lab noise, fixed in 73a1dbd).
+
+## SK-06 Plan3 baseline (current prompts, before PC-03)
+
+Env: Pi 1.5.0, ce-workflow 9268ac3 (dirty, `git diff` sha1 063de4c77d74), DealFinder 27221be clones in `C:\SOFT\git\skills-lab\plan-runs\sk06-*`, `scripts/rework-lab.mjs` (planner `openai-codex/gpt-6.1-sol`, Plan3 work models as configured, auto-answering the recommended option). Runs logged in `skills-lab/sk06.log`, per-run `sk06-<req>-<n>.lab.jsonl`. P1-P3 and F are plan-only (first `/plan3` turn until Plan ready), T and P1e2e run to completion. T-2 and T-3 finished their work, but the runner crashed while writing the result line (an agent's `2>NUL` left a `NUL` file git cannot add; fixed in `rework-lab.mjs`); their result lines were recomputed from the session logs, with wall time taken as first to last log line.
+
+| Request | Runs | Dialogs | Runtime s (median, range) | Turns | Tool calls | Tokens (median, range) | Cost $ (median, range) | Check |
+|---|---|---|---|---|---|---|---|---|
+| P1 laptop.bg plan | 3 | 2, 2, 2 | 402 (389-444) | 36 | 37 | 2,627,312 (2.16M-2.65M) | 1.3936 (1.19-1.42) | plan-only |
+| P2 eBay.pl plan | 3 | 4, 6, 2 | 341 (284-351) | 21 | 23 | 1,405,120 (1.02M-2.44M) | 1.0358 (0.82-1.48) | plan-only |
+| P3 quick-sale cut plan | 3 | 8, 4, 8 | 248 (224-292) | 16 | 17 | 847,335 (0.72M-0.97M) | 0.7249 (0.60-0.76) | plan-only |
+| F deal alerts plan | 3 | 4, 2, 6 | 354 (327-388) | 19 | 23 | 1,449,357 (1.29M-2.04M) | 1.2022 (1.07-1.30) | plan-only |
+| T CLI description, end to end | 3 | 2, 2, 2 | 425 (394-451) | 27 | 30 | 1,090,475 (0.99M-1.10M) | 1.1868 (0.87-1.23) | 3/3 pass |
+| P1 end to end | 1 | 6 | 4,070 | 113 | 127 | 10,107,703 | 5.3611 | pass (suite + hidden laptopbg) |
+
+Runtime, turns, tool calls and tokens sum every session of the run (T and P1e2e have 2: plan plus execution). The PC-09 rubric (Q1-Q8) is scored blind later on baseline and candidate runs mixed together, so the judge cannot tell which arm a plan came from.
