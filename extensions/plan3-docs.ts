@@ -11,14 +11,30 @@ const body = (text, name) => {
 	const end = lines.findIndex((line, i) => i > start && /^## /.test(line));
 	return lines.slice(start + 1, end < 0 ? undefined : end);
 };
+// GLOSSARY.md entries: "**Term**:" (definition inline or on the following lines, optional _Avoid_ line) up to a blank line.
+function glossaryEntries(lines) {
+	const entries = new Map();
+	lines.forEach((line, start) => {
+		const head = line.match(/^\*\*([^*]+?)\*\*:\s*(.*)$/);
+		if (!head) return;
+		let end = start + 1;
+		while (end < lines.length && lines[end].trim() && !/^(\*\*|## )/.test(lines[end])) end++;
+		const definition = [head[2], ...lines.slice(start + 1, end).filter((rest) => !/^_Avoid_:/.test(rest))].join(" ").replace(/\s+/g, " ").trim();
+		entries.set(head[1].trim().toLowerCase(), { start, end, definition });
+	});
+	return entries;
+}
+const termBlock = (term) => [`**${term.term}**:`, term.definition, ...(term.avoid ? [`_Avoid_: ${term.avoid}`] : [])];
 const adrFiles = (dir) => existsSync(dir) ? readdirSync(dir).filter((name) => /^\d{4}-.*\.md$/.test(name)) : [];
 
-// Terms missing from GLOSSARY.md and ADR candidates not exported yet; other "(ADR candidate)" lines are not exportable.
+// Terms missing from GLOSSARY.md (or defined differently there: old holds that definition) and ADR candidates not exported yet; other "(ADR candidate)" lines are not exportable.
 export function docCandidates(cwd, planText, planId) {
-	const glossary = existsSync(path.join(cwd, "GLOSSARY.md")) ? readFileSync(path.join(cwd, "GLOSSARY.md"), "utf8").toLowerCase() : "";
+	const glossary = glossaryEntries(existsSync(path.join(cwd, "GLOSSARY.md")) ? readFileSync(path.join(cwd, "GLOSSARY.md"), "utf8").split(/\r?\n/) : []);
 	const terms = body(planText, "Glossary").flatMap((line) => {
 		const match = line.match(TERM);
-		return match && !glossary.includes(`**${match[1].trim().toLowerCase()}**:`) ? [{ term: match[1].trim(), definition: match[2].trim(), avoid: match[3]?.trim().replace(/\.$/, "") }] : [];
+		if (!match) return [];
+		const term = { term: match[1].trim(), definition: match[2].trim(), avoid: match[3]?.trim().replace(/\.$/, "") }, old = glossary.get(term.term.toLowerCase())?.definition;
+		return old === undefined ? [term] : old === term.definition ? [] : [{ ...term, old }];
 	});
 	const dir = path.join(cwd, "docs", "adr");
 	const exported = adrFiles(dir).map((name) => readFileSync(path.join(dir, name), "utf8")).join("\n");
@@ -38,12 +54,16 @@ export function writeDocs(cwd, planId, candidates, picked) {
 	if (terms.length) {
 		const file = path.join(cwd, "GLOSSARY.md");
 		const lines = (existsSync(file) ? readFileSync(file, "utf8") : `# ${path.basename(cwd)}\n\n## Language`).trimEnd().split(/\r?\n/);
+		// Redefinitions replace their entry in place, bottom-up so earlier ranges stay valid; new terms are appended.
+		const entries = glossaryEntries(lines), entry = (term) => entries.get(term.term.toLowerCase());
+		for (const term of terms.filter(entry).sort((a, b) => entry(b).start - entry(a).start)) lines.splice(entry(term).start, entry(term).end - entry(term).start, ...termBlock(term));
+		const added = terms.filter((term) => !entry(term));
 		let at = lines.findIndex((line) => /^## Language\s*$/.test(line));
 		if (at < 0) at = lines.push("", "## Language") - 1;
 		let end = lines.findIndex((line, i) => i > at && /^## /.test(line));
 		if (end < 0) end = lines.length;
 		while (end > at + 1 && !lines[end - 1].trim()) end--;
-		lines.splice(end, 0, ...terms.flatMap((term) => ["", `**${term.term}**:`, term.definition, ...(term.avoid ? [`_Avoid_: ${term.avoid}`] : [])]), ...(end < lines.length ? [""] : []));
+		if (added.length) lines.splice(end, 0, ...added.flatMap((term) => ["", ...termBlock(term)]), ...(end < lines.length ? [""] : []));
 		writeFileSync(file, `${lines.join("\n")}\n`);
 		written.push(file);
 	}

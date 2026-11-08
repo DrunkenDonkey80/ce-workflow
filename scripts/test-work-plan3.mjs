@@ -1866,6 +1866,14 @@ try {
 		assert.equal(selectScript.length, 0, "a second finish offers nothing already written");
 		assert.deepEqual(await readdir(adrDir), ["0001-use-sqlite.md"]);
 		assert.equal((await readFile(glossaryFile, "utf8")).match(/\*\*Widget\*\*/g).length, 1);
+		// A settled redefinition is offered as old → new, unticked, and replaces the entry in place.
+		await writeFile(glossaryFile, (await readFile(glossaryFile, "utf8")) + "\n**Gadget**: A tool.\n");
+		await writeFile(docsFile, (await readFile(docsFile, "utf8")).replace("A priced item shown in the report.", "A priced or free item."));
+		let redefineLabels;
+		selectScript = [["Project docs", "Glossary: redefine Widget", (labels) => { redefineLabels = labels; }], ["Project docs", null], ["Plan ready", "Not yet"]];
+		await run("plan3", "finish");
+		assert(redefineLabels.some((label) => /Glossary: redefine Widget — A priced item shown in the report\. → A priced or free item\./.test(label)), redefineLabels.join("\n"));
+		assert.equal(await readFile(glossaryFile, "utf8"), `# ${path.basename(cwd)}\n\n## Language\n\n**Widget**:\nA priced or free item.\n_Avoid_: product, thing\n\n**Gadget**: A tool.\n`);
 		ctx.hasUI = false;
 		await rm(docsFile); await rm(glossaryFile); await rm(adrDir, { recursive: true });
 	}

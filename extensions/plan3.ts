@@ -1326,9 +1326,9 @@ export default function plan3(pi) {
 		const docs = docCandidates(ctx.cwd, await readFile(plan.file, "utf8"), plan.id);
 		let docPicks = [];
 		if (ctx.hasUI && (docs.terms.length || docs.adrs.length)) {
-			const items = [...docs.terms.map((term) => ({ value: `term:${term.term}`, label: `Glossary: ${term.term}`, description: term.definition, preserveCase: true })),
+			const items = [...docs.terms.map((term) => ({ value: `term:${term.term}`, label: `Glossary: ${term.old === undefined ? "" : "redefine "}${term.term}`, description: term.old === undefined ? term.definition : `${term.old} → ${term.definition}`, preserveCase: true })),
 				...docs.adrs.map((adr) => ({ value: `adr:${adr.id}`, label: `ADR: ${adr.title}`, description: `docs/adr/NNNN-${docSlug(adr.title)}.md`, preserveCase: true }))];
-			const ticked = await showListDialog(ctx, { title: "Project docs", purpose: "Checked items are written when you confirm Plan ready.", cursorKey: `plan3-docs:${plan.id}`, filter: false, multi: { selected: items.map((item) => item.value) }, items });
+			const ticked = await showListDialog(ctx, { title: "Project docs", purpose: "Checked items are written when you confirm Plan ready.", cursorKey: `plan3-docs:${plan.id}`, filter: false, multi: { selected: items.filter((item) => !item.label.startsWith("Glossary: redefine ")).map((item) => item.value) }, items }); // replacing a definition is never preselected
 			docPicks = ticked?.values ?? [];
 		}
 		if (docs.skipped.length) ctx.ui.notify(`Plan3: not exportable, rewrite as a D line:\n- ${docs.skipped.join("\n- ")}`, "warning");
