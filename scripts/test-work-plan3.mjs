@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices } from "../extensions/plan3.ts";
+import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
 // Prose "Options:" lists become resolve choices when a question has no "- Option:" lines.
 assert.deepEqual(inlineOptions("- **Q-03** Pick. Options: (a) freeze v1, keep hashes; (b) snapshots; (c) leave it. Picked (a).").map(o => o.label), ["(a) freeze v1, keep hashes", "(b) snapshots", "(c) leave it"]);
 assert.deepEqual(inlineOptions("- **Q-04** Cap? Options: accept as incomplete (current), raise the cap, or send smaller. Any change needs a version.").map(o => o.label), ["accept as incomplete (current)", "raise the cap", "send smaller"]);
@@ -1752,6 +1752,36 @@ try {
 		assert.match(await readFile(headless.file, "utf8"), /Source: recommendation taken \(no UI\), /);
 		assert.equal(selectScript.length, 0);
 		for (const made of [cancel, planned, mapped, headless]) await rm(made.file);
+
+		// PC-05 map plans: the template passes finish once filled, needs no tagging turn and runs tickets strictly in order.
+		ctx.hasUI = true;
+		const map = await sizeDraft("Yak telemetry rebuild meridian");
+		selectScript = [["Plan size", "Map"]];
+		await tool({ action: "size", mode: "tiny", text: "Fog." });
+		ctx.hasUI = false;
+		let mapDraft = await readFile(map.file, "utf8");
+		assert(finishProblems(mapDraft).includes('placeholder "# Plan3 map draft" remains'));
+		const tickets = "- [ ] **T-01** Which sink formats exist?\n  - type: research\n- [human] **T-02** Pick the schema shape\n  - type: grill\n- [ ] **T-03** Spike the exporter\n  - type: task";
+		for (const fill of ["A locked telemetry spec.", "Read src/telemetry.", "None.", tickets]) mapDraft = mapDraft.replace("Pending investigation.", fill);
+		mapDraft = mapDraft.replace("# Plan3 map draft", "# Yak map").replace("Not assessed yet.", "None.");
+		assert.deepEqual(finishProblems(mapDraft), []);
+		assert.equal(needsThinkTags(mapDraft.split("\n")), false, "the single [think] phase needs no tagging turn");
+		await writeFile(map.file, mapDraft.replace("status: draft", "status: ready"));
+		await run("resume3", map.id);
+		assert.match(messages.at(-1).message, /^Plan3: execute\/resume[\s\S]*This plan is a decision map\. Resolve one ticket at a time, in order/);
+		assert.equal((await tool({ action: "get", plan: map.id })).next, "T-01");
+		await assert.rejects(tool({ action: "step", plan: map.id, id: "T-03", mark: "wip" }), /map tickets run in order: T-01 first/);
+		assert.equal((await tool({ action: "step", plan: map.id, id: "T-01", mark: "done", summary: "CSV and JSON sinks." })).next, undefined, "an open [human] ticket keeps later tickets unrunnable");
+		entries.push({ type: "custom", customType: "plan3-night", data: { plan: map.id, rules: "" } });
+		await hooks.get("session_start")({ reason: "resume" }, ctx);
+		assert.equal((await tool({ action: "get", plan: map.id })).next, undefined, "night mode too");
+		entries.push({ type: "custom", customType: "plan3-night", data: null });
+		await hooks.get("session_start")({ reason: "resume" }, ctx);
+		await assert.rejects(tool({ action: "status", plan: map.id, value: "complete" }), /Map ticket T-02 is still open/);
+		for (const id of ["T-02", "T-03"]) await tool({ action: "step", plan: map.id, id, mark: "done", summary: "Resolved." });
+		await writeFile(map.file, (await readFile(map.file, "utf8")).replace("## Not yet specified\n\nNone.", "## Not yet specified\n\nExporter batching."));
+		await assert.rejects(tool({ action: "status", plan: map.id, value: "complete" }), /resolve the fog first/);
+		await rm(map.file);
 	}
 
 	// Runtime test/build guidance belongs only to execution, never planning/capture/resolve/advisors.
