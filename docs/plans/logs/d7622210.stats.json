@@ -1,0 +1,706 @@
+{
+ "version": 1,
+ "activeMs": 7305947,
+ "runs": 2,
+ "waitingMs": 115011,
+ "toolWallMs": 5934696,
+ "compactions": {
+  "count": 1,
+  "ms": 29955
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 135,
+   "thinkingMs": 706876,
+   "actingMs": 460184,
+   "input": 348,
+   "output": 117310,
+   "cacheRead": 16023754,
+   "cacheWrite": 443796,
+   "cost": 7.771322800000002,
+   "errors": 1
+  }
+ },
+ "tools": {
+  "plan3": {
+   "count": 12,
+   "ms": 846,
+   "maxMs": 217,
+   "failures": 0
+  },
+  "bash": {
+   "count": 96,
+   "ms": 5755904,
+   "maxMs": 2504663,
+   "failures": 12
+  },
+  "read": {
+   "count": 19,
+   "ms": 1352,
+   "maxMs": 1090,
+   "failures": 0
+  },
+  "write": {
+   "count": 3,
+   "ms": 356,
+   "maxMs": 348,
+   "failures": 0
+  },
+  "edit": {
+   "count": 31,
+   "ms": 1423,
+   "maxMs": 722,
+   "failures": 1
+  },
+  "codemode": {
+   "count": 1,
+   "ms": 82,
+   "maxMs": 82,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 3,
+   "ms": 6153,
+   "maxMs": 2995,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "read_symbol": {
+   "count": 1,
+   "ms": 50,
+   "maxMs": 50,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 82,
+   "ms": 3236935,
+   "maxMs": 668341,
+   "failures": 8
+  },
+  "test": {
+   "count": 14,
+   "ms": 2518969,
+   "maxMs": 2504663,
+   "failures": 4
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -20 && git log --oneline -3 && cat \"$TEMP/vdstats.cjs\" && ls docs/research/videos/": {
+   "count": 1,
+   "ms": 674,
+   "maxMs": 674,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && ls -la *.jsonl 2>/dev/null | tail -5; f=$(ls -t *.jsonl 2>/dev/null | head -1); [ -n \"$f\" ] && node -e \"const L=require('fs').readFileSync(process.argv[1],'utf8').split('\\n').filter(Bool": {
+   "count": 1,
+   "ms": 916,
+   "maxMs": 916,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP\" && node -e \"const L=require('fs').readFileSync(process.argv[1],'utf8').split('\\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}catch{return null}}).filter(Boolean);console.log([...new ": {
+   "count": 1,
+   "ms": 521,
+   "maxMs": 521,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && node vdstats.cjs vd07b.jsonl | head -40; node -e \"const L=require('fs').readFileSync('vd07b.jsonl','utf8').split('\\n').filter(Boolean).map(l=>JSON.parse(l));const u=L.find(e=>e.type==='t": {
+   "count": 1,
+   "ms": 262,
+   "maxMs": 262,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && for f in vd06b vd07b; do node -e \"const L=require('fs').readFileSync('$f.jsonl','utf8').split('\\n').filter(Boolean).map(l=>JSON.parse(l));const u=L.find(e=>e.type==='message_end'&&e.mess": {
+   "count": 1,
+   "ms": 633,
+   "maxMs": 633,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 3600 pi -p --mode json \"digest https://www.youtube.com/shorts/k2zgcTDq4aQ\" > \"$TEMP/v2base-short.jsonl\" 2> \"$TEMP/v2base-short.err\"; echo \"exit $?\"; node \"$TEMP/vdstats.cjs\" \"$TEMP/v": {
+   "count": 1,
+   "ms": 86392,
+   "maxMs": 86392,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 3600 pi -p --mode json \"digest https://www.youtube.com/watch?v=lraHlXpuhKs\" > \"$TEMP/v2base-long.jsonl\" 2> \"$TEMP/v2base-long.err\"; echo \"exit $?\"; node \"$TEMP/vdstats.cjs\" \"$TEMP/v2": {
+   "count": 1,
+   "ms": 524479,
+   "maxMs": 524479,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat docs/research && git checkout -- docs/research/videos && ls \"$TEMP\" | grep -c \"^video-digest-\"": {
+   "count": 1,
+   "ms": 1465,
+   "maxMs": 1465,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git add docs/plans/2026-11-08-video-digest-v2-faster-capture-no-ocr-parallel-luna-per-sent-d7622210-plan3.md docs/plans/logs/d7622210.md && git commit -q -m \"plan3 d7622210 V2-00: video_dige": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l scripts/test-work-video-digest.mjs && cat scripts/test-work-video-digest.mjs": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/vdm\" && ls && cat combo.cjs && grep -l \"split\" *.cjs *.mjs *.sh 2>/dev/null": {
+   "count": 1,
+   "ms": 860,
+   "maxMs": 860,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP/vdm\" && cat flat.cjs; cat err.txt | head -5; ls f720 | head -3; ls f720 | wc -l": {
+   "count": 1,
+   "ms": 186,
+   "maxMs": 186,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/vdm\" && rm -rf t2 && mkdir t2 && time ffmpeg -hide_banner -loglevel error -i v720.mp4 -filter_complex \"[0:v]fps=1/1,split=2[a][b];[a]scale=1280:1280:force_original_aspect_ratio=decrease[f];[": {
+   "count": 1,
+   "ms": 8801,
+   "maxMs": 8801,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-video-digest.mjs": {
+   "count": 1,
+   "ms": 736,
+   "maxMs": 736,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/video-digest.ts scripts/test-work-video-digest.mjs docs/plans/2026-11-08-video-digest-v2-faster-capture-no-ocr-parallel-luna-per-sent-d7622210-plan3.md docs/plans/logs/d76": {
+   "count": 5,
+   "ms": 3934,
+   "maxMs": 1785,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"MIN_TOKENS\\|SIMILAR\\|MIN_CONF\\|tesseract\\|Tesseract\\|OCR\\|ocr\" extensions/video-digest.ts": {
+   "count": 1,
+   "ms": 49,
+   "maxMs": 49,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"import('./extensions/video-digest.ts').then(m=>{const b=require('fs').readFileSync(process.env.TEMP+'/vdm/thumbs.raw');const t=Date.now();const k=m.screenFrames(b,320,180,1);const r": {
+   "count": 1,
+   "ms": 1087,
+   "maxMs": 1087,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' 2>/dev/null || echo nopython EOF grep -n \"ocrTokens\\|similarity\\|selectCandidates\\|tesseract\\|tsv\\|pageTokens\\|words(\" scripts/test-work-video-digest.mjs": {
+   "count": 1,
+   "ms": 2504663,
+   "maxMs": 2504663,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && grep -n \"ocrTokens\\|similarity\\|selectCandidates\\|tesseract\\|tsv\\|pageTokens\\|words(\" scripts/test-work-video-digest.mjs": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 120 node scripts/test-work-video-digest.mjs": {
+   "count": 7,
+   "ms": 5695,
+   "maxMs": 1170,
+   "failures": 2
+  },
+  "bash\u0000cd \".\" && timeout 120 node scripts/test-work-video-digest.mjs; grep -n \"existsSync\\|writeFile\\b\" extensions/video-digest.ts | head -3": {
+   "count": 1,
+   "ms": 2338,
+   "maxMs": 2338,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"selectCandidates\\|ocrTokens\\|screenFrames\" --include=*.ts --include=*.mjs . 2>/dev/null | grep -v node_modules": {
+   "count": 1,
+   "ms": 3551,
+   "maxMs": 3551,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls node_modules/.bin | grep -i \"^tsc\" | head -2; timeout 120 npx tsc --noEmit --strict false --skipLibCheck --allowImportingTsExtensions --target es2022 --module nodenext --moduleResolution ": {
+   "count": 1,
+   "ms": 1591,
+   "maxMs": 1591,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/vdm\" && timeout 30 node -e \"const j=JSON.parse(require('fs').readFileSync('cap.en-orig.json3','utf8'));const ev=j.events;console.log(ev.length);console.log(JSON.stringify(ev.slice(0,6)));con": {
+   "count": 1,
+   "ms": 111,
+   "maxMs": 111,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 120 node scripts/test-work-video-digest.mjs; cd \"$TEMP/vdm\" && timeout 30 node -e \"import('file:///./extensions/video-digest.ts').then(m=>{const s=m.sentences(JSON.parse(require('fs'": {
+   "count": 1,
+   "ms": 880,
+   "maxMs": 880,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"imageName\\|renderDigest\\|images\" extensions/video-digest.ts scripts/test-work-video-digest.mjs README.md | head -30": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 120 node scripts/test-work-video-digest.mjs && timeout 120 npx tsc --noEmit --skipLibCheck --allowImportingTsExtensions --target es2022 --module nodenext --moduleResolution nodenext ": {
+   "count": 2,
+   "ms": 4569,
+   "maxMs": 2438,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n -i \"video_digest\\|tesseract\" README.md CHANGELOG.md | head -20; git diff CHANGELOG.md | head -20": {
+   "count": 1,
+   "ms": 691,
+   "maxMs": 691,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 30 node -e \" const fs=require('fs'); const oldB='- \\`video_digest\\` (in the ce-workflow checkout only): give the agent a YouTube coding video and it saves the transcript plus the cod": {
+   "count": 1,
+   "ms": 367,
+   "maxMs": 367,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD:CHANGELOG.md > \"$TEMP/cl-head.md\" && timeout 30 node -e \" const fs=require('fs');const cur=fs.readFileSync('CHANGELOG.md','utf8');const head=fs.readFileSync(process.env.TEMP+'/": {
+   "count": 1,
+   "ms": 298,
+   "maxMs": 298,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add README.md docs/plans/2026-11-08-video-digest-v2-faster-capture-no-ocr-parallel-luna-per-sent-d7622210-plan3.md docs/plans/logs/d7622210.md && git commit -q -m \"plan3 d7622210 V2-07: ": {
+   "count": 1,
+   "ms": 3222,
+   "maxMs": 3222,
+   "failures": 0
+  },
+  "bash\u0000timeout 60 \"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\" --skip-download --print \"%(title)s | %(channel)s | %(duration)s\" \"https://www.youtube.com/watch?v=5C_HPTJg5ek\" 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 2512,
+   "maxMs": 2512,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for v in \"short https://www.youtube.com/shorts/k2zgcTDq4aQ\" \"long https://www.youtube.com/watch?v=lraHlXpuhKs\" \"other https://www.youtube.com/watch?v=5C_HPTJg5ek\"; do set -- $v; timeout 1800": {
+   "count": 1,
+   "ms": 291661,
+   "maxMs": 291661,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP\" && timeout 30 node -e \" for (const f of ['v2new-short.jsonl','v2new-other.jsonl']) { const L=require('fs').readFileSync(f,'utf8').split('\\n').filter(Boolean).map(l=>JSON.parse(l)); console.": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && d=\"docs/research/videos/2026-10-16-when-should-you-not-use-grill-me\" && cp -r \"$d\" \"$TEMP/v2new-short-digest\" && git checkout -- \"$d\" && rm -rf \"$d/frames\" && git status --short \"$d\" && time": {
+   "count": 1,
+   "ms": 87284,
+   "maxMs": 87284,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && rm -rf ytt && mkdir ytt && cd ytt && for i in 1 2 3 4; do timeout 120 \"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\" -q --no-warnings -f \"bv*[height<=720]/b\" -o \"v$i.%(ext)s\" \"https:/": {
+   "count": 1,
+   "ms": 13522,
+   "maxMs": 13522,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"else if (name === \\\"yt-dlp\\\") writeFileSync\\|const fake = \\|fake({ failing: \\\"ffmpeg\\\" })\" scripts/test-work-video-digest.mjs": {
+   "count": 1,
+   "ms": 49,
+   "maxMs": 49,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/video-digest.ts scripts/test-work-video-digest.mjs && git commit -q -m \"plan3 d7622210 V2-08: retry a transient video download failure once\" && d=\"docs/research/videos/202": {
+   "count": 1,
+   "ms": 90914,
+   "maxMs": 90914,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && rm -rf ytt && mkdir ytt && cd ytt && Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; timeout 120 \"$Y\" -q --no-warnings --skip-download --no-playlist --write-info-json -o \"v.%(ext)s\"": {
+   "count": 1,
+   "ms": 8644,
+   "maxMs": 8644,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && rm -rf ytt; timeout 30 node -e \" const L=require('fs').readFileSync('v2new-short3.jsonl','utf8').split('\\n').filter(Boolean).map(l=>JSON.parse(l)); for (const e of L) { if(e.type==='tool": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/video-digest.ts scripts/test-work-video-digest.mjs && git commit -q -m \"plan3 d7622210 V2-08: retry the download from the page URL\" && d=\"docs/research/videos/2026-10-16-w": {
+   "count": 1,
+   "ms": 62301,
+   "maxMs": 62301,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/research/videos\" && for d in 2025-05-16-6-typescript-tips-to-turn-you-into-a-wizard 2026-10-16-when-should-you-not-use-grill-me; do echo \"== $d v1\"; git show \"HEAD:docs/research/videos/$d/d": {
+   "count": 1,
+   "ms": 1877,
+   "maxMs": 1877,
+   "failures": 1
+  },
+  "bash\u0000cd \"./docs/research/videos\" && grep -n -i \"before\\|after\" 2025-05-16-6-typescript-tips-to-turn-you-into-a-wizard/digest.md | head -8; sed -n \"/flowchart/,/\\`\\`\\`$/p\" 2026-10-16-when-should-you-not-use": {
+   "count": 1,
+   "ms": 363,
+   "maxMs": 363,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && rm -rf fs && mkdir fs && cd fs && Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; timeout 300 \"$Y\" -q --no-warnings -f \"bv*[height<=720]/b\" -o \"v.%(ext)s\" \"https://www.youtube.com/w": {
+   "count": 1,
+   "ms": 4896,
+   "maxMs": 4896,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/research/videos/2021-10-12-rust-in-100-seconds\" && sed -n \"/Cargo project and main.rs edit/,/^\\[▶/p\" digest.md; du -sh frames; rm -rf \"$TEMP/fs\"": {
+   "count": 1,
+   "ms": 94,
+   "maxMs": 94,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short docs/research/videos | head; for f in docs/research/videos/*/digest.md; do echo \"$f $(grep -c \"## Takeaways for ce-workflow\" \"$f\")\"; done; git diff --stat docs/research/vi": {
+   "count": 1,
+   "ms": 186,
+   "maxMs": 186,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/plans/2026-11-08-video-digest-v2-faster-capture-no-ocr-parallel-luna-per-sent-d7622210-plan3.md docs/plans/logs/d7622210.md && git commit -q -m \"plan3 d7622210 V2-08: calibratio": {
+   "count": 1,
+   "ms": 233,
+   "maxMs": 233,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/research/videos docs/plans/2026-11-08-video-digest-v2-faster-capture-no-ocr-parallel-luna-per-sent-d7622210-plan3.md docs/plans/logs/d7622210.md && git commit -q -m \"plan3 d7622": {
+   "count": 1,
+   "ms": 314027,
+   "maxMs": 314027,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && timeout 300 \"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\" -q --no-warnings --flat-playlist --playlist-end 60 --print \"%(id)s | %(upload_date)s | %(duration)s | %(title)s\" \"https://www.yo": {
+   "count": 1,
+   "ms": 2427,
+   "maxMs": 2427,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP\" && timeout 900 \"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\" -q --no-warnings --skip-download --playlist-end 25 --break-match-filters \"upload_date>=20261008\" --print \"%(id)s | %(upload_": {
+   "count": 1,
+   "ms": 44331,
+   "maxMs": 44331,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && mkdir -p \"$TEMP/matt\" && printf \"%s\\n\" KJr1Q-k-yH0 Jy8vX_CIsBw Z1saoyb_98M Vo33extKAeA r8FYE2ZOj0E GAUWSmFmT3w fn3iRGgRuWU djSbndoByr8 9uSygtI-6lw Q8XzzKUbp0Y zgy8_ApYNDk y81cjELJMI0 JgEsphD": {
+   "count": 1,
+   "ms": 247574,
+   "maxMs": 247574,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/matt\" && for f in *.jsonl; do timeout 30 node -e \"const L=require('fs').readFileSync('$f','utf8').split('\\n').filter(Boolean).map(l=>JSON.parse(l));const r=L.find(e=>e.type==='tool_execution": {
+   "count": 1,
+   "ms": 1677,
+   "maxMs": 1677,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/matt\" && Y=\"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\"; for id in 9uSygtI-6lw y81cjELJMI0 r8FYE2ZOj0E fn3iRGgRuWU; do timeout 300 \"$Y\" -q --no-warnings -f \"bv*[height<=720]/b\" -o \"$id.": {
+   "count": 1,
+   "ms": 17798,
+   "maxMs": 17798,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"FLAT_SHARE\\|FLAT_\\|BLOCK\\|CHANGED_PX =\\|PIXEL_DIFF =\\|MOTION_HITS =\\|GROW =\\|scale=320\" extensions/video-digest.ts | head -20; grep -n \"function flatShare\" -A 16 extensions/video-di": {
+   "count": 1,
+   "ms": 263,
+   "maxMs": 263,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"320\\|180\\|THUMB\" extensions/video-digest.ts | head; cd \"$TEMP/matt\" && for id in r8FYE2ZOj0E fn3iRGgRuWU 9uSygtI-6lw; do timeout 120 ffmpeg -hide_banner -loglevel error -i \"$id.mp4\"": {
+   "count": 1,
+   "ms": 3761,
+   "maxMs": 3761,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/matt\" && timeout 120 node -e \" const fs=require('fs'); function flat(f,w,h,r=4){let fl=0,a=0;for(let by=0;by+8<=h;by+=8)for(let bx=0;bx+8<=w;bx+=8){let mi=255,ma=0;for(let y=by;y<by+8;y++)fo": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/matt\" && for id in r8FYE2ZOj0E fn3iRGgRuWU 9uSygtI-6lw; do timeout 120 ffmpeg -hide_banner -loglevel error -i \"$id.mp4\" -vf \"fps=1/4,scale=360:640,format=gray\" -f rawvideo -y \"$id.h.gray\"; d": {
+   "count": 1,
+   "ms": 1973,
+   "maxMs": 1973,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed \"s/if (flatShare(current, width, height) < FLAT_SHARE) continue;/if (!NOFLAT \\&\\& flatShare(current, width, height) < FLAT_SHARE) continue;/; s/^const FLAT_RANGE/const NOFLAT = process.e": {
+   "count": 1,
+   "ms": 396,
+   "maxMs": 396,
+   "failures": 1
+  },
+  "bash\u0000cd \"$TEMP/matt\" && NOFLAT=1 timeout 120 node -e \" import(require('url').pathToFileURL('vd-exp.ts').href).then(m=>{for(const id of ['r8FYE2ZOj0E','fn3iRGgRuWU','9uSygtI-6lw']){for(const [k,w,h] of [['p": {
+   "count": 1,
+   "ms": 676,
+   "maxMs": 676,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"info\\.\\(width\\|height\\|duration\\)\\|const info\\b\\|info = JSON\" extensions/video-digest.ts | head; grep -n \"screenFrames(\" scripts/test-work-video-digest.mjs | head": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"width\\|height\" scripts/test-work-video-digest.mjs | grep -i \"info\\|duration\" | head -5; timeout 120 node scripts/test-work-video-digest.mjs && timeout 120 npx tsc --noEmit --skipLib": {
+   "count": 1,
+   "ms": 1224,
+   "maxMs": 1224,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && printf \"%s\\n\" r8FYE2ZOj0E 9uSygtI-6lw | xargs -P 2 -I {} sh -c \"timeout 900 pi -p --mode json \\\"digest https://www.youtube.com/shorts/{}\\\" > \\\"$TEMP/matt/{}.v.jsonl\\\" 2>/dev/null; echo {} \\$": {
+   "count": 1,
+   "ms": 75767,
+   "maxMs": 75767,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/video-digest.ts scripts/test-work-video-digest.mjs && git commit -q -m \"video_digest: vertical shorts skip the camera check so split code-over-camera frames reach Luna\" &&": {
+   "count": 1,
+   "ms": 4048,
+   "maxMs": 4048,
+   "failures": 0
+  },
+  "bash\u0000timeout 900 \"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\" -q --no-warnings --skip-download --playlist-start 16 --playlist-end 24 --print \"%(id)s | %(upload_date)s | %(duration)s | %(title)s\" \"http": {
+   "count": 1,
+   "ms": 22760,
+   "maxMs": 22760,
+   "failures": 0
+  },
+  "bash\u0000timeout 1800 \"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\" -q --no-warnings --skip-download --playlist-start 16 --playlist-end 90 --break-match-filters \"upload_date>=20260608\" --print \"%(id)s | %(": {
+   "count": 1,
+   "ms": 45482,
+   "maxMs": 45482,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && { printf \"%s\\n\" KJr1Q-k-yH0 Jy8vX_CIsBw Z1saoyb_98M k2zgcTDq4aQ Vo33extKAeA GAUWSmFmT3w fn3iRGgRuWU djSbndoByr8 Q8XzzKUbp0Y zgy8_ApYNDk y81cjELJMI0 JgEsphDAXnY LGj1oUidC7Q; cut -d\" \" -f1 \"$T": {
+   "count": 1,
+   "ms": 668341,
+   "maxMs": 668341,
+   "failures": 1
+  },
+  "bash\u0000timeout 60 node \"$TEMP/matt/sum.cjs\"": {
+   "count": 1,
+   "ms": 1191,
+   "maxMs": 1191,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/research/videos\" && for d in 2026-11-05-is-vibe-coding-an-insult 2026-11-04-junior-engineers-don-t-wait-for-permission 2026-11-06-someone-wrote-a-paper-about-my-skill 2026-07-15-your-effort": {
+   "count": 1,
+   "ms": 1158,
+   "maxMs": 1158,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && du -sh docs/research/videos && git add docs/research/videos && git commit -q -m \"research: digests of Matt Pocock shorts, Jul 15 – Nov 6\" && git log --oneline -1 && git show --stat HEAD | ta": {
+   "count": 1,
+   "ms": 2076,
+   "maxMs": 2076,
+   "failures": 0
+  },
+  "bash\u0000timeout 900 \"$LOCALAPPDATA/Microsoft/WinGet/Links/yt-dlp.exe\" -q --no-warnings --flat-playlist --playlist-end 30 --print \"%(id)s | %(duration)s | %(title)s\" \"https://www.youtube.com/@mattpocockuk/vide": {
+   "count": 1,
+   "ms": 1957,
+   "maxMs": 1957,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && mkdir -p \"$TEMP/matt/long\" && printf \"%s\\n\" BsJGo1wFTvQ gaDdrDdczO4 F3lL98Pj90o n0VhIVtviC0 M6mYodf0dJM A8mokin_YOs UzMNBN6xLLA dtAJ2dOd3ko 6BB6exR8Zd8 E5-QK3CDVQM | xargs -P 3 -I {} sh -c \"": {
+   "count": 1,
+   "ms": 551516,
+   "maxMs": 551516,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/research/videos && git commit -q -m \"research: digests of 10 Matt Pocock workflow videos\" && git log --oneline -1 && du -sh docs/research/videos && cd docs/research/videos && fo": {
+   "count": 1,
+   "ms": 11905,
+   "maxMs": 11905,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && head -12 \"docs/research/videos/2026-07-15-a-dictionary-of-ai-coding/digest.md\"; grep -n \"video_digest:\\|Takeaways\\|keepTakeaways\" extensions/video-digest.ts | head; ls extensions | head -80;": {
+   "count": 1,
+   "ms": 822,
+   "maxMs": 822,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"project_commands\\|projectCommands\" extensions/hub-command.ts extensions/tool-loader.ts hub/src/hub.ts hub/src/cli.ts | head -30; wc -l extensions/hub-command.ts extensions/plan3-cat": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 195,240p hub/src/hub.ts; sed -n 285,330p hub/src/cli.ts": {
+   "count": 1,
+   "ms": 336,
+   "maxMs": 336,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"verb === \\\"\" hub/src/cli.ts | cut -c1-140; grep -rn \"PI_HUB_CLICK\" hub/src/*.ts | head -5; ls scripts | grep -i \"hub\\|button\\|command\" | head; git status --short | head -20": {
+   "count": 1,
+   "ms": 225,
+   "maxMs": 225,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 60,130p hub/src/commands.ts; sed -n 253,257p hub/src/cli.ts": {
+   "count": 1,
+   "ms": 276,
+   "maxMs": 276,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"WinGet\\|function run\\b\\|export function\\|export async function\\|export const\" extensions/video-digest.ts | head -30; grep -n \"video\" package.json | head": {
+   "count": 1,
+   "ms": 113,
+   "maxMs": 113,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls hub/bin/win hub/bin/posix && cat hub/bin/win/*; sed -n 1,8p extensions/video-digest.ts; sed -n 145,170p extensions/video-digest.ts; which pi pi-hub": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 0
+  },
+  "bash\u0000ls /c/Users/Flex/.pi/agent/bin/ | head; grep -rn \"\\\"pi\\\"\\|'pi'\\|pi\\.cmd\" ./hub/src/pool.ts ./hub/src/*.ts 2>/dev/null | head -5": {
+   "count": 1,
+   "ms": 330,
+   "maxMs": 330,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/^async function listTab(/export async function listTab(/\" scripts/video-feeds.mjs && cat >> scripts/test-work-video-digest.mjs <<'EOF' // Videos button (scripts/video-feeds.mjs): w": {
+   "count": 1,
+   "ms": 2505,
+   "maxMs": 2505,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/seed.mjs\" <<'EOF' import { writeFileSync } from \"node:fs\"; const m = await import(\"file:///./scripts/video-feeds.mjs\"); const feed = { name: \"Matt Pocock\", url: \"https://www.you": {
+   "count": 1,
+   "ms": 3055,
+   "maxMs": 3055,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && pi-hub commands add --folder \".\" --name \"Videos\" --kind run --text \"node scripts/video-feeds.mjs\" --help \"Watched YouTube feeds: what is new, digest it, add feeds\" && git diff CHANGELOG.md |": {
+   "count": 1,
+   "ms": 542,
+   "maxMs": 542,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && echo \"session=${PI_HUB_SESSION:-none}\" && PI_HUB_NODE=\"$(which node)\" timeout 60 \"$(which node)\" hub/src/cli.ts notice \"Videos button installed (test notice)\"; echo \"exit $?\"": {
+   "count": 1,
+   "ms": 491,
+   "maxMs": 491,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && LINE='- Hub **Videos** button (ce-workflow checkout): shows the YouTube channels you watch (Matt Pocock to start), how many new shorts and full videos each has, and how many digests still la": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 1
+  }
+ },
+ "steps": {
+  "V2-00": {
+   "ms": 672095,
+   "testMs": 0,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 11
+   },
+   "failures": 2
+  },
+  "V2-01": {
+   "ms": 62052,
+   "testMs": 736,
+   "replies": 9,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 9
+   },
+   "failures": 1
+  },
+  "V2-02": {
+   "ms": 2647940,
+   "testMs": 2507182,
+   "replies": 14,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 14
+   },
+   "failures": 2
+  },
+  "V2-03": {
+   "ms": 175955,
+   "testMs": 1370,
+   "replies": 13,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 13
+   },
+   "failures": 1
+  },
+  "V2-05": {
+   "ms": 54207,
+   "testMs": 1835,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   }
+  },
+  "V2-06": {
+   "ms": 111009,
+   "testMs": 3059,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   },
+   "failures": 1
+  },
+  "V2-07": {
+   "ms": 40811,
+   "testMs": 0,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   }
+  },
+  "V2-08": {
+   "ms": 712388,
+   "testMs": 2261,
+   "replies": 20,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 20
+   },
+   "failures": 2
+  },
+  "V2-09": {
+   "ms": 331552,
+   "testMs": 0,
+   "replies": 2,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 2
+   }
+  },
+  "(none)": {
+   "ms": 2125216,
+   "testMs": 2526,
+   "replies": 47,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 47
+   },
+   "failures": 4
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-08T15:04:45.166Z",
+   "ms": 3386073
+  },
+  {
+   "start": "2026-11-08T16:01:35.977Z",
+   "ms": 3889919
+  }
+ ],
+ "hints": []
+}

@@ -306,3 +306,15 @@ for (const [cwd, tag, expected] of [[repo, "repo", true], [os.tmpdir(), "other",
 	assert.equal(!!tools.get("tools_enable")?.description.includes("- video_digest:"), expected, cwd);
 }
 console.log("video-digest: ok");
+
+// Videos button (scripts/video-feeds.mjs): what counts as new, and channel URLs.
+{
+	const { newVideos, channelUrl, videoLabel } = await import("./video-feeds.mjs");
+	const index = new Map([["done1", { dir: "x", takeaways: true }]]);
+	const entries = [{ id: "done1" }, { id: "seen1" }, { id: "new1" }];
+	assert.deepEqual(newVideos(entries, index, ["seen1"]).map((e) => e.id), ["new1"]);
+	assert.equal(channelUrl("https://www.youtube.com/@mattpocockuk/videos"), "https://www.youtube.com/@mattpocockuk");
+	assert.equal(channelUrl(" https://youtube.com/channel/UC_x-1 "), "https://www.youtube.com/channel/UC_x-1");
+	assert.equal(channelUrl("https://www.youtube.com/watch?v=abc"), undefined);
+	assert.equal(videoLabel({ id: "a1", short: false, duration: 874, title: "T" }), "14:34 · T [a1]");
+}
