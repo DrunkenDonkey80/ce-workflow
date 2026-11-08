@@ -2,6 +2,17 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- When grilling a normal plan turns up more fog than one planning session can hold, the planner offers to turn the draft into a map, keeping the request, decisions and answers so far.
+- `/plan3 finish` also offers a changed definition of a term already in `GLOSSARY.md`, shown as old → new and unticked; ticking it replaces the entry in place.
+
+### Changed
+- Planning tunings from Matt Pocock's videos: Map only for foggy work (known work stays a Plan, in session-sized steps), questions talk can't settle become a prototype step, prototype tickets leave a trail, vague terms get a sharper proposal, ADR candidates name the alternative that lost, and a request without a clear user outcome is questioned first. `ask_user` asks independent planning questions together by default.
+- Compaction stores only observed facts in project knowledge. Decisions and preferences from one task stay in that session's summary, so they no longer steer unrelated work.
+- README: what to do when the agent ignores or invents something, when to compact versus hand over, and that night mode is not a sandbox.
+
 ## 0.4.0 — 2026-11-09
 
 ### Added
