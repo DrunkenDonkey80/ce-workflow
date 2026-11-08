@@ -40,8 +40,10 @@ check("only active utility agents are statically advertised",
 	JSON.stringify(listed("utility-agents")) === '["context-knowledge-discoverer.md","diff-reviewer.md","plan3-advisor.md"]');
 check("no legacy orchestration assets ship",
 	!pkg.pi?.prompts && !["agents", "prompts", "skills/work-orchestrator"].some((rel) => existsSync(path.join(root, rel))));
-check("only the standalone frontend design skill is statically advertised",
-	JSON.stringify(pkg.pi?.skills) === '["./skills/frontend-design"]' && pkg.files?.includes("skills/"));
+check("only the standalone skills are statically advertised",
+	JSON.stringify(pkg.pi?.skills) === '["./skills/frontend-design","./skills/two-axis-review","./skills/diagnosing-bugs"]' && pkg.files?.includes("skills/"));
+check("adapted Matt Pocock skills keep their MIT license and provenance",
+	["two-axis-review", "diagnosing-bugs"].every((name) => read(`skills/${name}/LICENSE.txt`).includes("Copyright (c) 2026 Matt Pocock") && read(`skills/${name}/UPSTREAM.md`).includes("4ae2317")));
 check("frontend design license and provenance are packaged",
 	read("skills/frontend-design/LICENSE.txt").includes("END OF TERMS AND CONDITIONS") &&
 	read("skills/frontend-design/UPSTREAM.md").includes("683bc88e56f3e09ba94f7055977f3d3aa499f202"));

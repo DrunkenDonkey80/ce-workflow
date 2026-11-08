@@ -47,7 +47,9 @@
       "extensions/ask-user/index.ts"
     ],
     "skills": [
-      "./skills/frontend-design"
+      "./skills/frontend-design",
+      "./skills/two-axis-review",
+      "./skills/diagnosing-bugs"
     ],
     "subagents": {
       "agents": [
