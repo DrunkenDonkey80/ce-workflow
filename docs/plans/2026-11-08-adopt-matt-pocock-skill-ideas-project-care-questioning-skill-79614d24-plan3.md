@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T13:30:17.584Z
+updated: 2026-11-08T13:41:31.345Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -163,8 +163,9 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ### Phase 3: Skill A/B runs and verdicts [think]
 
-- [ ] **SK-07** Run every shortlisted skill task: 2 arms by 3 repeats on Sol 6.1 (C-lab), B arm forced, plus one unforced B run per skill (Q-02).
+- [wip] **SK-07** Run every shortlisted skill task: 2 arms by 3 repeats on Sol 6.1 (C-lab), B arm forced, plus one unforced B run per skill (Q-02).
   - Check: results file has 7 runs per skill (3 off, 3 forced, 1 unforced, with whether the skill was read); failed runs are rerun or reported, never dropped.
+  - note: Batch running (sk07.sh); writing-for-agents phase 1 complete (7 runs), diagnosing-bugs 5/7. only-agents-md fails in all 7 because pi-lens probe logs land in the cwd (fixed for later runs in 73a1dbd); rescore that check from the diffs, excluding .pi-lens-probe-home/.
 - [ ] **SK-08** Judge blind with Astra and fill the scorecard: per skill, per-arm medians for every R3 metric and a verdict (adopt, reject, inconclusive).
   - Judge: read-only `reviewer` on gpt-6-astra:high gets both diffs and transcripts with arm labels shuffled, plus the rubric; the agent checks each judgment against the evidence.
   - Check: results.md has a scorecard and verdict per tested skill; no verdict rests on a single weighted score.
@@ -175,8 +176,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 ### Phase 4: Plan3 care and questioning design [think]
 
 - [x] **PC-01** docs/proposals/2026-11-08-plan3-care-and-questioning.md: final text for grilling rounds, project care (plan and execute), size action and Tiny lifecycle, map template, prompts and linear order, glossary and ADR finish checklist; frozen PC-09 rubric; prompt growth about 850 tokens per new plan.
-- [ ] **PC-02** Astra review: plan3-advisor reviews this plan with the PC-01 proposal as its named reference (review job, D-08); validate findings, record dispositions in Amendments.
-  - Check: Amendments lists every finding as accepted or rejected with reason; the proposal reflects the accepted ones.
+- [x] **PC-02** Astra review: 13 findings, 12 accepted (4 by removing scope), 1 rejected with reason; proposal updated (ownership via sizing id, no transitions, map order/completion, handoff section, ADR regex, rubric anchors and thresholds).
 
 ### Phase 5: Baseline [think]
 
@@ -231,7 +231,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ## Resume context
 
-SK-01..SK-05 done. SK-07 batch running (C:\SOFT\git\skills-lab\sk07.sh → sk07.log, runs/sk07/results.jsonl; timer watches for "SK07 ALL DONE"). SK-06 baseline also running early (sk06.sh → sk06.log, plan-runs/sk06-*; env line recorded: ce-workflow 9268ac3, pi 1.5.0) — no Plan3 code edits (PC-03+) until both finish. Next: write PC-01 proposal docs/proposals/2026-11-08-plan3-care-and-questioning.md (doc only), then PC-02 Astra review; after SK-07 finishes, SK-08 judging.
+PC-01 done (a2649d5). SK-07 wip: batch running (sk07.sh; timer c3374474); writing-for-agents phase 1 (7 runs) and diagnosing-bugs 5/7 done. SK-06 baseline running (sk06.sh; timer 57849d8a). SK-08 started: scripts/skills-lab-judge.mjs (ba6016d) builds blind bundles in skills-lab/judge/<run>/<task>/ (key.json = labels→arm; recomputes only-agents-md without pi-lens probe logs). Astra judging writing-for-agents phase 1 (reviewer 5858c784); Astra PC-02 review running (plan3-advisor afb2bc9e). Next: when each task's runs finish, bundle + judge it; record PC-02 dispositions in Amendments. Blocker: no Plan3 code edits (PC-03+) until SK-06 and SK-07 finish — lab clones load the live ce-workflow checkout.
 
 ## Amendments
 
@@ -247,3 +247,17 @@ Append material changes and their reasons; preserve the original request and set
   - F7 plan3-advisor contract: accepted. SK-02 and SK-08 use the builtin read-only `reviewer` on Astra; PC-02 has plan3-advisor review this plan with the proposal as its reference.
 - 2026-11-08: SK-06 baseline runs started before PC-01 and PC-02 (right after SK-05), in parallel with SK-07, to save wall time. The runs do not see the rubric, which PC-01 froze before any scoring; no Plan3 code changed before them (ce-workflow 9268ac3, recorded in sk06.log). PC-03 waits until SK-06 and SK-07 finish so neither batch sees changed prompts.
 - 2026-11-08: SK-07 workspaces moved to their own %TEMP%\skl-* folders after the smoke showed agents listing sibling run folders (commit 9268ac3).
+- 2026-11-08 PC-02 Astra review (plan3-advisor, gpt-6-astra:high, 13 findings), dispositions in the proposal:
+  1. Plan→Map rewrite erases work: accepted by removal: no later size transitions; map template only on the untouched `sizing` draft (§3b, §8).
+  2. Tiny ownership: accepted: in-memory `sizing` id set only by a fresh "Draft plan:" request; resumed, captured, converted and merged drafts refused (§3b, §3c).
+  3. Preselect: accepted: `currentValue: <recommended>`.
+  4. Linear order: accepted, smaller: map `next` is the first not-done ticket only when pending; `step wip` refuses later tickets; no auto-start of [human] (§4d).
+  5. Night state in selector: rejected: with (4) a [human]/blocked first ticket leaves nothing runnable, and the existing night loop stops on that (plan3-night.ts:180); no new night state needed.
+  6. Map completion: accepted: "no open ticket" wording; `status complete` refuses open tickets or remaining fog (§4d).
+  7. Handoff via plan3 create switches pointer/research: accepted by removal: the map writes a Handoff section with /plan3 requests and the user starts them (§4c).
+  8. Prefactor insertion before the current step: accepted by removal: a mid-work prefactor is done first inside the current step and noted in Amendments (§2b); no new add capability.
+  9. Project-language entry points: accepted: planningPrompt and convertPrompt only; write and resolve unchanged (§5a).
+  10. ADR candidate format: accepted: one D-line regex; non-matching marked lines reported as not exportable; body never truncated (§5a, §5b).
+  11. Rubric rewards candidate layout: accepted: cross-arm items by meaning (Q1-Q8), candidate-only conformance reported apart; F may be a normal plan with a recorded reason (§7).
+  12. Rubric not scorable: accepted: grade anchors, n/a and unscorable rules, aggregation, numeric material thresholds (15 % tokens/cost/runtime, 25 % turns/tool calls, outside the baseline range) (§7).
+  13. GLOSSARY-MAP scope: accepted: dropped (§5b, §8).

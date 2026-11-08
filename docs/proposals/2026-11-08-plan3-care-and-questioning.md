@@ -28,7 +28,7 @@ Brakes map to R5: churn (git log), named upcoming changes, deletion test, no sin
 
 Replace "Implement each step to its acceptance at the smallest sufficient depth;" with:
 
-> Implement each step to its acceptance at the smallest sufficient depth of the design the plan chose; a planned prefactor step is part of that design. When the code turns out to fight a step in a way the plan did not foresee (the patch would add a case to a list spelled out in several files, copy existing logic, or spread one idea over several modules), ask with ask_user before going on: the patch now or a prefactor step first, with the cost of each and your recommendation; record the answer in Decisions and add the prefactor with plan3 add when chosen.
+> Implement each step to its acceptance at the smallest sufficient depth of the design the plan chose; a planned prefactor step is part of that design. When the code turns out to fight a step in a way the plan did not foresee (the patch would add a case to a list spelled out in several files, copy existing logic, or spread one idea over several modules), ask with ask_user before going on: the patch now or a prefactor step first, with the cost of each and your recommendation; record the answer in Decisions; when the prefactor is chosen, do it first as part of the current step and note it in Amendments.
 
 The rest of the sentence ("hardening, edge cases or test sets beyond that acceptance become Backlog bullets ...") stays.
 
@@ -45,21 +45,21 @@ A plan whose frontmatter already has `size:` gets no size instruction (resume, c
 ### 3b. Tool contract
 
 - Parameters: `action: "size"`, `mode: "tiny" | "plan" | "map"` (the recommendation), `text` (one-line reason).
-- Allowed only while planning the current draft (`isPlanning`, pointer planning) and only once (`size:` meta absent); otherwise an error naming the reason.
-- Dialog (day mode with UI): `showListDialog(ctx, { title: "Plan size", purpose: <reason>, compact: true, cursorKey: "plan3-size", filter: false, items })` with the recommended item first and its label suffixed " (Recommended)":
+- Allowed only for the draft this `/plan3 <request>` just created: `startPlanning` with the "Draft plan:" lead stores its id in memory as `sizing`; the tool requires `plan.id === sizing` and clears it after the call. Resumed, continued, captured (write), converted and merged drafts never set `sizing`, so size refuses them ("size is only for a new /plan3 request"). One call per draft.
+- Dialog (day mode with UI): `showListDialog(ctx, { title: "Plan size", purpose: <reason>, compact: true, cursorKey: "plan3-size", filter: false, items })` with `currentValue: <recommended mode>` (the shared cursor would otherwise preselect the last pick) and the recommended label suffixed " (Recommended)":
   - `tiny` · "Tiny: just do it" · "Skip the plan: make the change now and show the diff"
   - `plan` · "Plan" · "Grill in rounds, then write a normal plan"
   - `map` · "Map" · "Multi-session decision map: destination, decision tickets, fog"
 - Night mode or no UI: the recommendation is taken without a dialog.
 - Cancel (Esc): the draft stays, `size:` stays unset, the result is `{ mode: "plan", cancelled: true, hint: "Size dialog cancelled: continue planning a normal plan." }`.
 - Plan: sets `size: plan`, appends a Decisions line `- **D-size** Size: plan. <reason> Source: <user pick | recommendation taken (night mode | no UI)>, <date>.`, returns `{ mode: "plan" }`.
-- Map: sets `size: map` and `kind: map`, rewrites the draft through the map template writer (§4a), appends the same Decisions line, returns `{ mode: "map", instructions: MAP_PROMPT }`.
+- Map: sets `size: map` and `kind: map`, rewrites the draft through the map template writer (§4a; safe because a `sizing` draft is still the untouched template), appends the same Decisions line, returns `{ mode: "map", instructions: MAP_PROMPT }`.
 - Tiny: see §3c.
-- Plan may become Map later: the planner calls size again with mode map when fog grows; the second call is allowed only from `size: plan` to map and asks again.
+- No later transitions: a plan that turns out foggy says so in Open questions and the user starts a map with a new `/plan3` request; a map that turns out clear recommends a normal plan (§4b step 5) the same way. This keeps settled work from being rewritten.
 
 ### 3c. Tiny lifecycle
 
-1. The tool checks that the draft has no steps and was created by this planning run (pointer id equals the plan id, status draft); otherwise it refuses with "Tiny needs the fresh draft; finish or delete the plan instead."
+1. Ownership is the `sizing` check above: only the draft this request just created can be deleted; it has no steps, decisions or source snapshot yet.
 2. It deletes only that draft file and its sidecar files (`logs/<id>.md`, `.stats.json`, `.needs.json`), clears the planning pointer, stores `pendingTiny = { request, cwd }` and returns `{ mode: "tiny", hint: "Planning ended. End your turn now; the change starts on its own." }` without rereading the deleted file (the generic tail of `execute` must skip `summarize` for this action).
 3. At `agent_settled` (same hook as `afterTagging`, line 1922): `research(ctx, false, true)`, switch to the coding model and effort (`runPhase` with mode `coding`, no plan), then send the Tiny prompt. A user abort clears `pendingTiny` and leaves research off.
 4. Tiny prompt:
@@ -123,25 +123,27 @@ All placeholders are ones `finishProblems` already rejects ("Pending investigati
 
 Added to `executePrompt` only for `kind: map` plans:
 
-> This plan is a decision map. Resolve one ticket at a time, in order: research by reading and summarizing sources (subagents allowed for independent research tickets), prototype by building a cheap throwaway artifact for the user to react to, grill by asking in rounds, task by doing the enabling work. Record each answer as one Decisions line (gist and ticket ID) and mark the ticket done with that gist. Then graduate what the answer made specifiable: new tickets from Not yet specified (plan3 add, in dependency order), patches that left the fog removed from it, tickets that now sit beyond the Destination moved to Out of scope. The map is done when Tickets and Not yet specified are both empty: then write the normal plan or plans the Destination needs with plan3 action create (one per independent part, each request self-contained, citing the map's decisions), and set the map complete.
+> This plan is a decision map. Resolve one ticket at a time, in order: research by reading and summarizing sources (subagents allowed for independent research tickets), prototype by building a cheap throwaway artifact for the user to react to, grill by asking in rounds, task by doing the enabling work. Record each answer as one Decisions line (gist and ticket ID) and mark the ticket done with that gist. Then graduate what the answer made specifiable: new tickets from Not yet specified (plan3 add, in dependency order), patches that left the fog removed from it, tickets that now sit beyond the Destination moved to Out of scope. The map is done when no ticket is open and Not yet specified is empty: then write a Handoff section listing the normal plans the Destination needs, one self-contained /plan3 request per independent part citing the map's decisions, set the map complete, and end with those requests as the next commands. Do not create the plans yourself.
 
-### 4d. Linear order
+### 4d. Linear order and completion
 
-`workState` (line 166) takes the first pending step past open [human] steps. For `kind: map` plans: `next` is the first open ticket of any mark (pending, wip or human); when that ticket is [human], `next` is it in day mode (the execute prompt already asks the user to do [human] steps) and nothing is runnable in night mode, so later tickets and the handoff wait. Requirements (`needs:`) are not used for this; order alone decides.
+- `workState` (line 166), for `kind: map` plans only: `next` is the first ticket that is not done when it is pending, and nothing otherwise. A first ticket that is [human], blocked or failed makes nothing runnable, so `next` never starts a later ticket and never auto-starts a [human] one. In day mode the execute prompt already asks the user to do a [human] step (the agent marks it wip with `step` on yes); in night mode the existing night loop stops with "every remaining step is blocked or needs you" (plan3-night.ts:180), so no night state is needed in the selector.
+- `step` with mark wip on a map refuses any ticket other than that first open one ("map tickets run in order: <id> first").
+- `status complete` on a map refuses while a ticket is open or Not yet specified has content other than "None" ("resolve the fog first"), next to the existing architecture check. A map with all tickets done but fog left stops night with "all steps done"; the morning resume then sees the refused completion and graduates the fog.
 
 ## 5. Glossary and ADRs (PC-06)
 
-### 5a. Planning prompt addition (all planning prompts)
+### 5a. Planning prompt addition (`planningPrompt` and `convertPrompt`; `writePrompt` and `resolvePrompt` stay unchanged: write captures the discussion first, resolve only settles listed questions)
 
-> **Project language**: when GLOSSARY.md (or GLOSSARY-MAP.md) or docs/adr/ exists, read it before asking and use its terms; when the request uses a word that conflicts with the glossary, say so and settle which is meant. When the discussion settles a term specific to this project (not a general programming concept), add it to the plan's Glossary section as "- **Term**: one or two sentences saying what it is. Avoid: other words". End a Decisions line with "(ADR candidate)" only when the decision is hard to reverse, surprising without context and the result of a real trade-off, all three. Leave GLOSSARY.md and docs/adr/ to /plan3 finish, which offers them to the user.
+> **Project language**: when GLOSSARY.md or docs/adr/ exists, read it before asking and use its terms; when the request uses a word that conflicts with the glossary, say so and settle which is meant. When the discussion settles a term specific to this project (not a general programming concept), add it to the plan's Glossary section as "- **Term**: one or two sentences saying what it is. Avoid: other words". An ADR candidate is a Decisions line in the form "- **D-NN Short title.** The decision and why. Source: ... (ADR candidate)"; write one (a resolved question gets its own D line) only when the decision is hard to reverse, surprising without context and the result of a real trade-off, all three. Leave GLOSSARY.md and docs/adr/ to /plan3 finish, which offers them to the user.
 
 ### 5b. Finish checklist
 
-- When: in `finish`, after the review offer and before the Plan ready dialog, only when the plan has Glossary terms missing from GLOSSARY.md or ADR candidates not yet exported, and only with UI.
+- When: in `finish`, after the review offer and before the Plan ready dialog, only when the plan has Glossary terms missing from GLOSSARY.md or ADR candidates not yet exported, and only with UI. A candidate is offered only when its line matches `^- \*\*(D-\d+) ([^*]+?)\.?\*\* (.+?) ?\(ADR candidate\)` with a nonempty title and body; other marked lines are listed in the finish result as "not exportable: rewrite as a D line".
 - Dialog: `showListDialog(ctx, { title: "Project docs", purpose: "Checked items are written when you confirm Plan ready.", cursorKey: "plan3-docs:<id>", filter: false, multi: { selected: <all> }, items })`; items `term:<Term>` "Glossary: <Term>" · "<definition>" and `adr:<D-ID>` "ADR: <short title>" · "docs/adr/<NNNN>-<slug>.md". Esc saves the ticks (`menu.ts:440`); the ticks stay provisional.
 - Write only after the Plan ready pick succeeds (the last cancellable dialog, line 1243). Cancel at Plan ready writes nothing.
-- GLOSSARY.md: created lazily as "# <repo folder name>\n\n## Language\n" when absent; each term appended under "## Language" as "**Term**:\n<definition>\n_Avoid_: <words>" unless a bold "**Term**:" (case-insensitive) already exists. GLOSSARY-MAP.md present: write nothing to the map; terms go to the root GLOSSARY.md only when it exists, else the item is shown disabled with "multi-context glossary: add by hand".
-- ADR: `docs/adr/` created lazily; number = highest existing `NNNN-` prefix + 1, four digits; slug from the title. Content: "# <short title>\n\n<decision text without the ID, bold markers and the (ADR candidate) marker>\n\nSource: Plan3 plan <id>, <D-ID>.\n". Short title: the bold text of the Decisions line minus its ID, else its first sentence, at most 80 characters.
+- GLOSSARY.md: created lazily as "# <repo folder name>\n\n## Language\n" when absent; each term appended under "## Language" as "**Term**:\n<definition>\n_Avoid_: <words>" unless a bold "**Term**:" (case-insensitive) already exists. Repo root only.
+- ADR: `docs/adr/` created lazily; number = highest existing `NNNN-` prefix + 1, four digits; slug from the title. Content: "# <title>\n\n<body>\n\nSource: Plan3 plan <id>, <D-ID>.\n" with title and body from the regex groups; the body is used whole, never truncated.
 - Idempotent: a term already in GLOSSARY.md is not offered; an ADR whose file contains "Source: Plan3 plan <id>, <D-ID>." is not offered.
 - Night mode or no UI: no dialog, nothing written.
 
@@ -163,25 +165,32 @@ A new plan's first planning turn grows by about 850 tokens, later planning turns
 
 ## 7. PC-09 rubric (frozen)
 
-Scored by the judge per run on the first-turn transcript and plan file, each item pass, partial or fail with a one-line quote as evidence. Script results (R3 metrics, check, outcome) are reported beside it, never folded into a score.
+Frozen before any scoring. The judge gets, per run, blind-labelled and arm-free: the first-turn transcript (reduced as in `scripts/skills-lab-judge.mjs`), the plan file, and for end-to-end runs the final diff and check results. Cross-arm items are worded by meaning, not by the candidate's layout: equivalent reasoning in the baseline's own words earns the same grade. Candidate-only format checks are reported apart and never compared across arms.
 
-| ID | Request | Item |
-|---|---|---|
-| G1 | all | Size fits the kind: P1, P2, P3 plan; T tiny; F map (baseline has no sizing: scored "n/a", compared on end result instead) |
-| G2 | all | Questions come in rounds: every question of a round has its prerequisites settled; the round asks all such open decisions at once |
-| G3 | all | Each question carries context, tradeoff and a recommendation; no question asks for a fact the agent could look up |
-| C1 | P1, P2, P3 | The plan names the scattered list or rule (shop lists in 4 modules; currencies in `ebay.py` and `fx.py`; `sale_price` in sync, pricing and report) |
-| C2 | P1, P2, P3 | A fit check line per touched module and a patch-versus-prefactor Decision with a reason |
-| C3 | P1, P2, P3 | A prefactor is proposed only with a churn or named-change reason; a big one is asked, not assumed |
-| C4 | P1, P2, P3 | No seam with a single adapter; no file split that keeps the same interface |
-| F1 | F | Destination stated; tickets are sharp questions with a type; fog separated from tickets and from out of scope |
-| T1 | T | End result: the description changed, suite green, no unrelated edits (both arms) |
-| E1 | P1 end to end | Hidden laptopbg test passes, suite green |
+Grades: **pass** = 1, **partial** = 0.5, **fail** = 0, **n/a** when the item does not apply (excluded from the mean), **unscorable** when the evidence it needs is missing (reported, never counted as pass or fail). Each grade carries a one-line quote or path.
 
-Verdict rules (AGENTS.md Optimization Regression Rule): keep when rubric items improve or hold and no R3 total (runtime, tokens, cost, turns, tool calls, summed over every session) regresses materially; T compares the Tiny path's totals with the baseline's plan-plus-execution totals. A material regression in any R3 total means tune and rerun or revert.
+Cross-arm quality items:
+
+| ID | Applies to | Pass | Partial | Fail |
+|---|---|---|---|---|
+| Q1 | P1, P2, P3 | Names the scattered rule with its places (P1 shop lists in normalize, pricing, report, sync; P2 currencies in `ebay.py` and `fx.py`; P3 `sale_price` in sync, pricing and report) | Names it with some places missing | Does not name it |
+| Q2 | P1, P2, P3 | Weighs a prefactor against the small patch and records the choice with a reason (churn, named next changes or cost) | Mentions one option only, or no reason | Neither |
+| Q3 | P1, P2, P3 | Proposes no seam with a single adapter and no file split that keeps the same interface | One such item, marked optional | One such item planned as required |
+| Q4 | runs that asked questions | Every question has context and a recommendation; none asks for a fact the agent could look up | One question misses one of these | Most miss them |
+| Q5 | runs with more than one question | No question in a batch depends on the answer to another in the same batch | One such pair | Several |
+| Q6 | F | Separates what is decided, what is still unknown and what is out of scope, and names the end goal | Two of the three plus the goal | Fewer |
+| Q7 | T end to end | Description changed, suite green, no unrelated edits | One unrelated edit | Wrong change or red suite |
+| Q8 | P1 end to end | Hidden laptopbg test passes and suite green | Suite green, hidden test fails | Suite red |
+
+Candidate-only conformance (reported, not compared): size picked (P1 to P3 plan, T tiny, F map or a normal plan with a recorded reason that the way is clear); fit check line per touched module; map tickets typed and in order.
+
+Aggregation: per request and arm, the mean grade over the 3 repeats per item, and the median of each R3 total (runtime, provider tokens, cost, turns, tool calls, summed over every session of the run, continuations included).
+
+Verdict rules (AGENTS.md Optimization Regression Rule): a **material regression** is a candidate median worse than the baseline median by more than 15 % in total tokens, cost or runtime, or by more than 25 % in turns or tool calls, and outside the baseline's 3-run range. Keep when no quality item's mean drops by 0.5 or more and no R3 total regresses materially; T compares the Tiny path's totals with the baseline's plan-plus-execution totals. A drop or a material regression means tune and rerun, or revert. Overlapping 3-run ranges on every item with no clear direction is **inconclusive**, reported as such.
 
 ## 8. Not changed
 
 - `executeClarification`, `writePrompt`, `resolvePrompt`, the advisor prompts.
 - Matt's "one ticket per session" rule: Plan3 compacts automatically, so a map keeps going through its tickets in one run; the order rule and checkpoints keep each ticket's context small.
-- GitHub issues as map storage (D-06), GLOSSARY-MAP.md multi-context writing (shown, not written).
+- GitHub issues as map storage (D-06); multi-context glossaries (GLOSSARY-MAP.md): no target project uses them.
+- Plan to Map or Map to Plan conversion of a draft that has content.
