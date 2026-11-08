@@ -151,7 +151,7 @@ For every run, record which checkout, SHA and implementation it used, so the rep
 
 ## 4. Scorecard template (R4)
 
-Fix the scorecard in the plan before Build starts (it is part of what Pick approves). Choose the performance metric and workload in Characterize, before CHR-03 records the baseline; Design may tighten the threshold but never picks the metric after the baseline. Score three dimensions separately. There is no weighted total.
+Fix the scorecard in the plan before Build starts (it is part of what Pick approves). Choose the performance metric and workload in Characterize, before CHR-03 records the baseline; Design may tighten the threshold but never picks the metric after the baseline. If the baseline spread is close to the median, the metric cannot show a difference: narrow the workload (e.g. warm cache, fewer process spawns) and re-baseline before Design. Score three dimensions separately. There is no weighted total.
 
 | Dimension | Metric | Workload | Baseline (old) | Candidate (new) | Threshold | Repetitions | Result |
 |---|---|---|---|---|---|---|---|
