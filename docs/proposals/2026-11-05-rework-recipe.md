@@ -244,6 +244,7 @@ needs: R-cutover-approved
 needs: R-retire-approved
 
 - [ ] **RET-01** Delete old code and the seam if no longer needed; remove the replay worktree; corpus green.
+- [ ] **RET-02** Only when the repo tracks built artifacts (installers, executables, firmware images): rebuild them from the final source with the project's own build command and commit them, so the shipped files match the reworked code. Skip with the note "no tracked artifacts" otherwise.
 ```
 
 The plan also records the pre-rework SHA in Resume context before MAP-01 starts.
