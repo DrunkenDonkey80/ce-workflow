@@ -163,7 +163,7 @@ try {
 	mkdirSync(tmpRoot);
 	const project = path.join(root, "project");
 	const arg = (args, flag) => args[args.indexOf(flag) + 1];
-	const fake = ({ missing, failing, captions = true, thumbs = typing, onCall } = {}) => {
+	const fake = ({ missing, failing, captions = true, thumbs = typing, onCall, flaky = 0 } = {}) => {
 		const calls = [];
 		const exec = async (command, args, options) => {
 			calls.push([command, ...args]);
@@ -175,6 +175,7 @@ try {
 				const info = { id: "k2zgcTDq4aQ", title: "When should you NOT use /grill-me?", channel: "Matt Pocock", duration: 97, upload_date: "20261016", language: "en-US", webpage_url: "https://www.youtube.com/watch?v=k2zgcTDq4aQ", automatic_captions: captions ? { "en-orig": [] } : {} };
 				writeFileSync(path.join(path.dirname(arg(args, "-o")), "v.info.json"), JSON.stringify(info));
 			} else if (name === "yt-dlp" && args.includes("--sub-langs")) writeFileSync(path.join(path.dirname(arg(args, "-o")), `v.${arg(args, "--sub-langs")}.json3`), JSON.stringify(json3));
+			else if (name === "yt-dlp" && flaky-- > 0) return { code: 1, stderr: "HTTP Error 403: Forbidden" };
 			else if (name === "yt-dlp") writeFileSync(path.join(path.dirname(arg(args, "-o")), "video.mp4"), "");
 			else if (name === "ffmpeg") {
 				for (let i = 0; i < thumbs.length / (320 * 180); i++) writeFileSync(path.join(path.dirname(args[args.indexOf("-q:v") + 2]), `f${String(i + 1).padStart(4, "0")}.jpg`), "jpg");
@@ -250,6 +251,11 @@ try {
 
 	// Failures and cancellation remove the temp dir.
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ failing: "ffmpeg" }).exec, model, tmpRoot }), /ffmpeg could not sample frames/);
+	tmpEmpty();
+	// A transient 403 on the download is retried once; two in a row fail with yt-dlp's error.
+	await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ flaky: 1 }).exec, model, tmpRoot });
+	tmpEmpty();
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ flaky: 2 }).exec, model, tmpRoot }), /could not download the video: HTTP Error 403/);
 	tmpEmpty();
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: async () => { throw new Error("Luna failed (error)."); }, tmpRoot }), /Luna failed/);
 	tmpEmpty();

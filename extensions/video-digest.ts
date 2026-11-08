@@ -401,7 +401,10 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 		meta.captions = lines.length || captionNote.startsWith("download") ? captionNote : "none";
 
 		progress("Downloading video…");
-		const video = await run("yt-dlp", ["--load-info-json", infoFile, "-f", "bv*[height<=720]/b", "-o", path.join(tmp, "video.%(ext)s")], 1_800_000);
+		// One retry: YouTube sometimes answers a download with a transient HTTP 403 (seen in V2-08).
+		const download = ["--load-info-json", infoFile, "-f", "bv*[height<=720]/b", "-o", path.join(tmp, "video.%(ext)s")];
+		let video = await run("yt-dlp", download, 1_800_000);
+		if (video.code !== 0) video = await run("yt-dlp", download, 1_800_000);
 		const videoFile = (await readdir(tmp)).find((name) => name.startsWith("video.") && !name.endsWith(".part"));
 		if (video.code !== 0 || !videoFile) throw new Error(`yt-dlp could not download the video: ${tail(video)}`);
 
