@@ -867,7 +867,9 @@ function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) 
 // pasted into a chat or a .md file, so the plain text gets Markdown pipe rows; the HTML copy (Excel, Word) stays as it was.
 document.addEventListener("copy", event => {
  const selection = getSelection(); if (!selection?.rangeCount || selection.isCollapsed || !event.clipboardData) return;
- const range = selection.getRangeAt(0), common = range.commonAncestorContainer, within = (common instanceof Element ? common : common.parentElement)?.closest("table.md-table");
+ const range = selection.getRangeAt(0), common = range.commonAncestorContainer, el = common instanceof Element ? common : common.parentElement, within = el?.closest("table.md-table");
+ // Text inside one cell copies as the browser gives it: there is no row to build.
+ if (within && el!.closest("td, th")) return;
  const box = document.createElement("div"); box.append(range.cloneContents());
  // Cells of one table come without it, and cells of one row without the row.
  if (within && !box.querySelector("table")) { const table = document.createElement("table"), row = box.querySelector("tr") ? table : table.appendChild(document.createElement("tr")); row.append(...box.childNodes); box.append(table); }

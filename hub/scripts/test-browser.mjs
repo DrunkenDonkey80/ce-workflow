@@ -392,6 +392,8 @@ try {
  assert.ok(plain.includes("| Setup | echo |\n|---|---|\n| RF | 5 ms |"), plain); assert.ok(plain.includes("Load:") && keptHtml, plain);
  await evaluate("(() => { const cells = document.querySelectorAll('[data-id=md_row] td'); const r = document.createRange(); r.setStartBefore(cells[0]); r.setEndAfter(cells[1]); getSelection().removeAllRanges(); getSelection().addRange(r); })()");
  assert.equal((await evaluate(copied))[0].trim(), "| RF | 5 ms |\n|---|---|", "cells inside one table");
+ await evaluate("(() => { const b = document.querySelector('[data-id=md_row] td b'); const r = document.createRange(); r.selectNodeContents(b.firstChild); getSelection().removeAllRanges(); getSelection().addRange(r); })()");
+ assert.equal((await evaluate(copied))[0], "", "text inside one cell: browser default copy, no empty pipe row");
  await evaluate("getSelection().removeAllRanges()");
  // A POSIX folder (/a/b, end of sentence) links as a folder; /wo commands and and/or stay text.
  {
