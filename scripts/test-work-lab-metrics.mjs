@@ -1,4 +1,4 @@
-// Self-check for scripts/lab-metrics.mjs: parent plus child session counted, subagent-artifacts copy skipped.
+// Self-check for scripts/lab-metrics.mjs: two prompts of one session plus a child session summed, subagent-artifacts copy skipped.
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -9,9 +9,10 @@ const dir = mkdtempSync(path.join(os.tmpdir(), "lab-metrics-"));
 const assistant = (tools, cost) => JSON.stringify({ type: "message", message: { role: "assistant", provider: "p", model: "m",
 	content: [{ type: "text", text: "x" }, ...Array.from({ length: tools }, () => ({ type: "toolCall" }))],
 	usage: { input: 10, output: 5, cacheRead: 100, cacheWrite: 0, totalTokens: 115, cost: { total: cost } } } });
+const user = (content) => JSON.stringify({ type: "message", message: { role: "user", content } });
 const lines = (...items) => `${items.join("\n")}\nnot json\n`;
 try {
-	writeFileSync(path.join(dir, "parent.jsonl"), lines(JSON.stringify({ type: "message", message: { role: "user", content: "hi" } }), assistant(2, 0.5), assistant(0, 0.25)));
+	writeFileSync(path.join(dir, "parent.jsonl"), lines(user("/plan3 x"), assistant(2, 0.5), user("/resume3"), assistant(0, 0.25)));
 	mkdirSync(path.join(dir, "parent", "run-id", "run-0"), { recursive: true });
 	writeFileSync(path.join(dir, "parent", "run-id", "run-0", "session.jsonl"), lines(assistant(1, 0.125)));
 	mkdirSync(path.join(dir, "subagent-artifacts"));

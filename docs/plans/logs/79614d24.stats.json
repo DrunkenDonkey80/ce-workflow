@@ -1,36 +1,36 @@
 {
  "version": 1,
- "activeMs": 860414,
- "runs": 1,
+ "activeMs": 2394432,
+ "runs": 2,
  "waitingMs": 0,
- "toolWallMs": 808474,
+ "toolWallMs": 1156116,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 135,
-   "thinkingMs": 744134,
-   "actingMs": 439336,
-   "input": 324,
-   "output": 112240,
-   "cacheRead": 18818974,
-   "cacheWrite": 449780,
-   "cost": 8.2587908,
+   "replies": 161,
+   "thinkingMs": 822126,
+   "actingMs": 498333,
+   "input": 384,
+   "output": 125891,
+   "cacheRead": 21347143,
+   "cacheWrite": 482994,
+   "cost": 9.2037546,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 104,
-   "ms": 623961,
-   "maxMs": 121752,
-   "failures": 7
+   "count": 123,
+   "ms": 949057,
+   "maxMs": 240604,
+   "failures": 9
   },
   "read": {
-   "count": 6,
-   "ms": 292,
+   "count": 7,
+   "ms": 299,
    "maxMs": 241,
    "failures": 0
   },
@@ -41,20 +41,20 @@
    "failures": 0
   },
   "plan3": {
-   "count": 12,
-   "ms": 13600,
+   "count": 14,
+   "ms": 13684,
    "maxMs": 10474,
    "failures": 0
   },
   "write": {
-   "count": 12,
-   "ms": 2049,
+   "count": 13,
+   "ms": 2056,
    "maxMs": 466,
    "failures": 0
   },
   "edit": {
-   "count": 11,
-   "ms": 29,
+   "count": 13,
+   "ms": 34,
    "maxMs": 10,
    "failures": 0
   },
@@ -63,20 +63,32 @@
    "ms": 0,
    "maxMs": 0,
    "failures": 2
+  },
+  "schedule": {
+   "count": 2,
+   "ms": 3344,
+   "maxMs": 2336,
+   "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 79,
-   "ms": 573025,
-   "maxMs": 121752,
-   "failures": 7
+   "count": 96,
+   "ms": 897805,
+   "maxMs": 240604,
+   "failures": 8
   },
   "test": {
-   "count": 25,
-   "ms": 50936,
+   "count": 26,
+   "ms": 51181,
    "maxMs": 7795,
    "failures": 0
+  },
+  "build": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 1
   }
  },
  "commands": {
@@ -703,6 +715,120 @@
    "ms": 105,
    "maxMs": 105,
    "failures": 0
+  },
+  "bash\u0000cd . && git add scripts/skills-lab.mjs scripts/lab-metrics.mjs scripts/test-work-lab-metrics.mjs docs/proposals/skills-lab docs/plans/2026-11-08-adopt-matt-pocock-skill-ideas-project-care-questioning-": {
+   "count": 1,
+   "ms": 1629,
+   "maxMs": 1629,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep -rn \"ultrafull\" --include=*.ts extensions | grep -i \"setting\\|mode\" | head -8": {
+   "count": 1,
+   "ms": 319,
+   "maxMs": 319,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -n 365,385p extensions/work-models.ts; grep -n \"contextMode\\|compactionMode\" extensions/work-models.ts | head -10": {
+   "count": 1,
+   "ms": 297,
+   "maxMs": 297,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep -on \"plan3\\.\\(planning\\|coding\\)[A-Za-z]*\\|planningEffort\\|codingEffort\" extensions/*.ts | sort -u -t: -k3 | head": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd . && python - <<'EOF' p='scripts/rework-lab.mjs'; s=open(p,encoding='utf8').read() def sub(a,b): global s; assert s.count(a)==1, a; s=s.replace(a,b) sub('// Usage: node scripts/rework-lab.mjs <run-": {
+   "count": 1,
+   "ms": 1503,
+   "maxMs": 1503,
+   "failures": 0
+  },
+  "bash\u0000cd . && node --check scripts/rework-lab.mjs && sed -n 150,215p scripts/rework-lab.mjs": {
+   "count": 1,
+   "ms": 336,
+   "maxMs": 336,
+   "failures": 0
+  },
+  "bash\u0000cd . && python - <<'EOF' p='scripts/test-work-lab-metrics.mjs'; s=open(p,encoding='utf8').read() a='lines(JSON.stringify({ type: \"message\", message: { role: \"user\", content: \"hi\" } }), assistant(2, 0.": {
+   "count": 1,
+   "ms": 245,
+   "maxMs": 245,
+   "failures": 0
+  },
+  "bash\u0000cd . && sed -n 56,72p docs/proposals/skills-lab/design.md; ls docs/proposals/skills-lab/ docs/proposals/skills-lab/tasks": {
+   "count": 1,
+   "ms": 320,
+   "maxMs": 320,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep -n \"^#\\|^>\" docs/proposals/skills-lab/tasks/planning-requests.md | head -30": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000cd . && grep -n 'sha}\\|, sha)' scripts/rework-lab.mjs": {
+   "count": 1,
+   "ms": 53,
+   "maxMs": 53,
+   "failures": 0
+  },
+  "bash\u0000cd . && python - <<'PYEOF' p='scripts/rework-lab.mjs'; s=open(p,encoding='utf8').read() def sub(a,b): global s; assert s.count(a)==1, a; s=s.replace(a,b) sub('// [--plan-only] [--check CMD]\\n','// [--": {
+   "count": 1,
+   "ms": 187,
+   "maxMs": 187,
+   "failures": 0
+  },
+  "bash\u0000cd . && mkdir -p C:/SOFT/git/skills-lab/requests && printf \"%s\\n\" \"The quick-sale price is always the lowest Bulgarian price minus 10% (€20-50). Make the cut configurable per source in config.toml: sh": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 1
+  },
+  "bash\u0000cd . && git -C C:/SOFT/git/DealFinder status --short > C:/SOFT/git/skills-lab/df-status-before.txt; (timeout 7200 node scripts/rework-lab.mjs sk05-smoke --root C:/SOFT/git/skills-lab/plan-runs --reque": {
+   "count": 1,
+   "ms": 30410,
+   "maxMs": 30410,
+   "failures": 0
+  },
+  "bash\u0000cd . && (timeout 7200 node scripts/rework-lab.mjs sk05-smoke --root C:/SOFT/git/skills-lab/plan-runs --request-file C:/SOFT/git/skills-lab/requests/P3.txt --plan-only --hours 2 > C:/SOFT/git/skills-la": {
+   "count": 1,
+   "ms": 45359,
+   "maxMs": 45359,
+   "failures": 0
+  },
+  "bash\u0000sleep 240; cat C:/SOFT/git/skills-lab/sk05-smoke.out | cut -c1-400": {
+   "count": 1,
+   "ms": 240604,
+   "maxMs": 240604,
+   "failures": 0
+  },
+  "bash\u0000cd C:/SOFT/git/skills-lab/plan-runs && tail -2 sk05-smoke.lab.jsonl | head -1 | cut -c400-1200; ls sk05-smoke.plan.md; grep -c \"resume3\" sk05-smoke.lab.jsonl sk05-smoke.rpc.jsonl; git -C C:/SOFT/git/D": {
+   "count": 1,
+   "ms": 605,
+   "maxMs": 605,
+   "failures": 0
+  },
+  "bash\u0000cd . && git diff -U0 scripts/rework-lab.mjs | grep -n \"^@@\"": {
+   "count": 1,
+   "ms": 1019,
+   "maxMs": 1019,
+   "failures": 0
+  },
+  "bash\u0000cd . && git diff -U0 scripts/rework-lab.mjs > /tmp/rl.patch 2>/dev/null && python - <<'EOF' import re s=open('/tmp/rl.patch',encoding='utf8',newline='').read() parts=re.split(r'(?m)^(?=@@ )',s) keep=[": {
+   "count": 1,
+   "ms": 210,
+   "maxMs": 210,
+   "failures": 1
+  },
+  "bash\u0000cd . && T=$(cygpath -m \"$TEMP\") && git diff -U0 scripts/rework-lab.mjs > \"$T/rl.patch\" 2>/dev/null && python - \"$T\" <<'EOF' import re,sys t=sys.argv[1] s=open(t+'/rl.patch',encoding='utf8',newline='')": {
+   "count": 1,
+   "ms": 1725,
+   "maxMs": 1725,
+   "failures": 0
   }
  },
  "steps": {
@@ -740,12 +866,34 @@
     "anthropic/claude-opus-5-5:high": 72
    },
    "failures": 6
+  },
+  "SK-05": {
+   "ms": 450224,
+   "testMs": 245,
+   "replies": 23,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 23
+   },
+   "failures": 1
+  },
+  "SK-07": {
+   "ms": 15308,
+   "testMs": 0,
+   "replies": 3,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 3
+   },
+   "failures": 1
   }
  },
  "spans": [
   {
    "start": "2026-11-08T12:36:56.405Z",
    "ms": 860414
+  },
+  {
+   "start": "2026-11-08T12:51:16.839Z",
+   "ms": 1534018
   }
  ],
  "hints": []

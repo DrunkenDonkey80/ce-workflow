@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T13:13:01.476Z
+updated: 2026-11-08T13:21:17.083Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -159,12 +159,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 ### Phase 2: Lab harness [code]
 
 - [x] **SK-04** scripts/skills-lab.mjs runs each arm in a fresh-history copy (or clone) with its own session dir, up to 5 in parallel, checks with hidden tests copied in only for the check, and records metrics, skillRead and outside-path audit per run; lab.json plus fixtures for all six tasks and the writing-for-agents replay.
-- [ ] **SK-05** rework-lab.mjs: add `--plan-only`, R3 metrics for every run, and a no-plan (Tiny) outcome instead of throwing.
-  - `--plan-only` stops after the first planning turn settles and copies the draft plan into the run dir.
-  - Metrics: one shared event parser with skills-lab (wall time, tokens, cost, turns, tool calls) summed over every prompt and continuation of the run, written to the `done` line. Plan3 stats cover execution only (`extensions/plan3.ts:1070`), so they are not the source.
-  - No plan after `/plan3` (Tiny, after PC-04): record transcript, diff stat and the check result, end as outcome `tiny` (today it throws, `scripts/rework-lab.mjs:151`).
-  - Pin the clone's effective setup in `.pi/settings.json`: planning and coding models, effort, compaction mode `ultrafull` (AGENTS.md compaction rule).
-  - Check: parser fixture test on a saved RPC log with two prompts gives the summed numbers; a smoke run (C-rework) stops with a draft plan copied, metrics written, and no `/resume3` sent.
+- [x] **SK-05** rework-lab.mjs: --plan-only (draft copied to <run>.plan.md), --check, --add (task inputs committed, tagged lab-base), outcome tiny/plan-only/complete/stuck, R3 metrics via shared lab-metrics.mjs on every final line, clone pins ultrafull compaction.
 
 ### Phase 3: Skill A/B runs and verdicts [think]
 

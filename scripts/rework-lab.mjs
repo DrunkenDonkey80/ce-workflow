@@ -3,12 +3,18 @@
 // A fresh clone at the pre-rework SHA, Plan3 driven over Pi RPC, the driver playing the human:
 // recommended answers in dialogs, gates turned on in order when the run stalls on them.
 // Usage: node scripts/rework-lab.mjs <run-name> [--source DIR] [--sha SHA] [--hours N] [--request-file FILE] [--resume]
+//          [--plan-only] [--check CMD] [--add SRC=DEST]...
+// --add copies task inputs (a fixture) into the clone as one commit on top of SHA; diffs and counts start after it.
 // --resume continues an existing run's clone and plan instead of cloning and planning again.
+// --plan-only stops after the first /plan3 turn and copies the draft plan to <root>/<run>.plan.md.
+// --check runs CMD (bash) in the clone at the end; its result goes on the final line.
+// No plan after /plan3 (the planner sized it Tiny and just did it) ends as outcome "tiny", not a failure.
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { sessionMetrics } from "./lab-metrics.mjs";
 
 const args = process.argv.slice(2);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };
@@ -41,9 +47,13 @@ function setup() {
 	git("remote", "remove", "origin"); // later commits (a pilot's answers) must not be reachable
 	git("reflog", "expire", "--expire=now", "--all");
 	git("gc", "-q", "--prune=now");
+	const adds = args.flatMap((arg, i) => arg === "--add" ? [args[i + 1].split("=")] : []);
+	for (const [src, dest] of adds) cpSync(src, path.join(dir, dest), { recursive: true });
+	if (adds.length) { git("add", "-A"); git("-c", "user.name=lab", "-c", "user.email=lab@local", "commit", "-q", "-m", "lab: task inputs"); }
+	git("tag", "lab-base");
 	if (existsSync(path.join(source, "data"))) cpSync(path.join(source, "data"), path.join(dir, "data"), { recursive: true });
 	mkdirSync(path.join(dir, ".pi"), { recursive: true });
-	writeFileSync(path.join(dir, ".pi", "settings.json"), `${JSON.stringify({ workOrchestrator: { plan3: { planningModel: thinker, codingModel: worker, codingEffort: "high" } } }, null, "\t")}\n`);
+	writeFileSync(path.join(dir, ".pi", "settings.json"), `${JSON.stringify({ workOrchestrator: { plan3: { planningModel: thinker, codingModel: worker, codingEffort: "high" }, context: { mode: "ultrafull" } } }, null, "\t")}\n`);
 	appendFileSync(path.join(dir, ".git", "info", "exclude"), "\n/.pi/\n/.ce-workflow/\n");
 	note("clone", { dir, sha: git("rev-parse", "--short", "HEAD"), commits: git("rev-list", "--all", "--count") });
 }
@@ -88,8 +98,9 @@ const launcher = path.join(os.homedir(), ".pi", "agent", "bin", "pi-launcher.js"
 let lastNotify = "", lastTitle = "", repeats = 0;
 let child, running = false, lastActivity = Date.now(), buffer = "";
 const rpcOut = path.join(root, `${runName}.rpc.jsonl`);
+const sessions = path.join(root, `${runName}-sessions`);
 function start() {
-	child = spawn(process.execPath, [launcher, "--mode", "rpc", "--session-dir", path.join(root, `${runName}-sessions`), "--model", thinker, "--thinking", "high"], { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))), stdio: ["pipe", "pipe", "pipe"] }); // no hub: dialogs must come here, not to the user's hub
+	child = spawn(process.execPath, [launcher, "--mode", "rpc", "--session-dir", sessions, "--model", thinker, "--thinking", "high"], { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))), stdio: ["pipe", "pipe", "pipe"] }); // no hub: dialogs must come here, not to the user's hub
 	child.stdout.on("data", (chunk) => {
 		appendFileSync(rpcOut, chunk);
 		buffer += chunk;
@@ -141,14 +152,39 @@ async function prompt(message, deadline) {
 	await idle(deadline);
 }
 
+// R3 metrics for the final line: every session of the run (all prompts, continuations, subagent children) summed,
+// wall time of this invocation, the check result and the diff against the pre-rework SHA.
+const started = Date.now();
+function result() {
+	const tail = (text) => String(text).trim().split("\n").slice(-3).join("\n");
+	const check = value("--check") && (() => {
+		try { return { pass: true, tail: tail(execFileSync("bash", ["-c", value("--check")], { cwd: dir, encoding: "utf8", stdio: "pipe" })) }; }
+		catch (error) { return { pass: false, tail: tail(`${error.stdout ?? ""}${error.stderr ?? ""}`) }; }
+	})();
+	return { wallMs: Date.now() - started, metrics: sessionMetrics(sessions), ...(check ? { check } : {}), diffStat: (git("add", "-N", "."), git("diff", "--shortstat", "lab-base")), sessions };
+}
+
 // ---------- main ----------
 const resume = args.includes("--resume");
 if (!resume) setup();
+else if (!git("tag", "-l", "lab-base")) git("tag", "lab-base", sha); // runs cloned before --add existed
 const deadline = Date.now() + hours * 3600_000;
 start();
 try {
 	if (!resume) await prompt(`/plan3 ${request}`, deadline);
-	if (!planFile()) throw new Error("no plan file after /plan3");
+	if (!planFile()) {
+		note("done", { outcome: "tiny", head: git("rev-parse", "--short", "HEAD"), ...result() });
+	} else if (args.includes("--plan-only")) {
+		cpSync(planFile(), path.join(root, `${runName}.plan.md`));
+		note("done", { outcome: "plan-only", status: status(), plan: planFile(), ...result() });
+	} else await execute();
+} catch (error) {
+	note("failed", { error: String(error?.message ?? error), status: status(), ...result() });
+} finally {
+	child.kill();
+}
+
+async function execute() {
 	// Planning ends only through /plan3 finish (review offer, then "Start work here").
 	for (let tries = 0; status() === "draft"; tries++) {
 		if (tries === 4) throw new Error(`plan still draft: ${lastNotify}`);
@@ -176,9 +212,5 @@ try {
 		}
 		await prompt("/resume3", deadline); // a run start applies the phase model
 	}
-	note("done", { status: status(), head: git("rev-parse", "--short", "HEAD"), commits: git("rev-list", "--count", `${sha}..HEAD`) });
-} catch (error) {
-	note("failed", { error: String(error?.message ?? error), status: status() });
-} finally {
-	child.kill();
+	note("done", { outcome: status() === "complete" ? "complete" : "stuck", status: status(), head: git("rev-parse", "--short", "HEAD"), commits: git("rev-list", "--count", "lab-base..HEAD"), ...result() });
 }
