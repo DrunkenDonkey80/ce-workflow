@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T16:23:59.828Z
+updated: 2026-11-08T16:26:29.375Z
 reviewed: 2026-11-08
 ---
 
@@ -123,7 +123,7 @@ Commands (referenced by steps):
 ### Phase 4: Calibrate [think]
 
 - [x] **V2-08** Calibrated on 3 videos: 16-min video 513 s → 133 s wall (tool 499 → 123 s, 23 Luna calls, 212 states, 12 visuals vs 8, total $0.129 → $0.148); short 73 → 52 s; Fireship 2:29 other channel 63 s, 31 states, 18 visuals, no camera/webcam noise in dropped frames. A transient YouTube HTTP 403 on the download now retries once from the page URL.
-- [ ] **V2-09** [human] User reviews a new digest with per-sentence timestamps and kept frames.
+- [x] **V2-09** User reviewed the v2 digests and approved them; the 3 digests and their frames are committed.
 
 ## Global validation
 
