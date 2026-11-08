@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T15:32:18.438Z
+updated: 2026-11-08T16:34:44.192Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -209,11 +209,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ### Phase 7: Measure and trial [think]
 
-- [ ] **PC-09** Rerun the SK-06 requests right after PC-08 with the new prompts (3 repeats, same endpoints) and compare with the baseline per R3 and the rubric.
-  - Tiny request: baseline is plan plus execution, candidate is the Tiny path; both compared on the end result (C-df, diff) and R3 totals.
-  - Rubric: right size picked, fit check present and sound, prefactor proposed only where churn or named changes justify it, big options asked not assumed, questions in rounds.
-  - Material overall regression: tune and rerun, or revert the change (AGENTS.md Optimization Regression Rule).
-  - Check: results.md has baseline versus candidate tables and a keep, tune or revert verdict.
+- [x] **PC-09** Candidate rerun (sk06c, 3 repeats) vs SK-06 plus a blind Astra judge: keep. No material R3 regression (worst P3 cost +8.6 %), Tiny cut T to $0.30/131 s from $1.19/425 s, Q2 up on P2/P3; two sizing bugs fixed (38e8baa, 8ac7ff0).
 - [human] **PC-10** Live trial: the user runs /plan3 on one real request in a real project and judges sizing, grilling rounds and the fit check.
   - Check: the user's verdict and any follow-ups recorded in Decisions or Backlog.
 - [x] **PC-11** skills/two-axis-review (SKILL.md, MIT LICENSE.txt, UPSTREAM.md), registered in pi.skills, verify-package checks, README line (09b7a78).

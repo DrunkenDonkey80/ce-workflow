@@ -102,3 +102,50 @@ Env: Pi 1.5.0, ce-workflow 9268ac3 (dirty, `git diff` sha1 063de4c77d74), DealFi
 | P1 end to end | 1 | 6 | 4,070 | 113 | 127 | 10,107,703 | 5.3611 | pass (suite + hidden laptopbg) |
 
 Runtime, turns, tool calls and tokens sum every session of the run (T and P1e2e have 2: plan plus execution). The PC-09 rubric (Q1-Q8) is scored blind later on baseline and candidate runs mixed together, so the judge cannot tell which arm a plan came from.
+
+## PC-09 Plan3 candidate (sizing, project care, question rounds, project language) versus SK-06
+
+Env: Pi 1.5.0, ce-workflow 52dca50 (PC-01 to PC-08 and PC-13), same DealFinder clones, runner, requests and repeats as SK-06 (`skills-lab/sk06c.sh`, log `sk06c.log`, runs `plan-runs/sk06c-*`). Totals sum every session of a run.
+
+| Request | Arm | Runtime s (median, range) | Turns | Tool calls | Tokens (median, range) | Cost $ (median, range) | Check |
+|---|---|---|---|---|---|---|---|
+| P1 laptop.bg plan | baseline | 402 (389-444) | 36 | 37 | 2,627,312 (2.16M-2.65M) | 1.3936 (1.19-1.42) | plan-only |
+| | candidate | 337 (292-405) | 31 | 34 | 2,718,000 (2.14M-2.99M) | 1.4637 (1.29-1.62) | plan-only |
+| P2 eBay.pl plan | baseline | 341 (284-351) | 21 | 23 | 1,405,120 (1.02M-2.44M) | 1.0358 (0.82-1.48) | plan-only |
+| | candidate | 306 (245-311) | 21 | 22 | 1,445,000 (0.93M-1.53M) | 1.0727 (0.80-1.20) | plan-only |
+| P3 quick-sale cut plan | baseline | 248 (224-292) | 16 | 17 | 847,335 (0.72M-0.97M) | 0.7249 (0.60-0.76) | plan-only |
+| | candidate | 229 (197-231) | 15 | 17 | 864,933 (0.76M-1.01M) | 0.7871 (0.66-0.80) | plan-only |
+| F deal alerts plan | baseline | 354 (327-388) | 19 | 23 | 1,449,357 (1.29M-2.04M) | 1.2022 (1.07-1.30) | plan-only |
+| | candidate | 285 (259-310) | 21 | 24 | 1,543,839 (1.42M-1.59M) | 1.1403 (1.04-1.19) | plan-only |
+| T CLI description, end to end | baseline (plan + execution) | 425 (394-451) | 27 | 30 | 1,090,475 (0.99M-1.10M) | 1.1868 (0.87-1.23) | 3/3 pass |
+| | candidate (Tiny) | 131 (115-312) | 10 | 8 | 368,605 (0.24M-1.22M) | 0.3045 (0.29-1.35) | 3/3 pass |
+| P1 end to end | baseline | 4,070 | 113 | 127 | 10,107,703 | 5.3611 | pass (suite + hidden laptopbg) |
+| | candidate | 3,255 | 84 | 99 | 7,104,428 | 4.6983 | pass (suite + hidden laptopbg) |
+
+No material regression: the worst candidate medians are P3 cost +8.6 %, F tokens +6.5 % and P1 cost +5.0 % (bar: 15 %). T-2 is the high end of the Tiny range: see bug 1 below.
+
+**Blind quality (§7 rubric):** gpt-6-astra:high `reviewer`, one judge per request, the six runs of both arms mixed under random labels; size calls, size dialogs, `D-size` lines, `size:` keys and timestamps removed. Bundles, judge outputs and the key: `skills-lab/judge/pc09/<req>/`. Mean grade per item, baseline → candidate (3 runs each):
+
+| Item | P1 | P2 | P3 | F |
+|---|---|---|---|---|
+| Q1 scattered rule named | 1 → 1 | 1 → 1 | 1 → 1 | n/a |
+| Q2 prefactor weighed against patch, with reason | 0.5 → 0.5 | 0.5 → **1** | 0.5 → **1** | n/a |
+| Q3 no single-adapter seam or same-interface split | 1 → 1 | 1 → 1 | 1 → 1 | n/a |
+| Q4 questions have context and a recommendation, no lookup-able facts | 1 → 1 | 1 → 1 | 1 → 1 | 1 → 1 |
+| Q5 no dependent questions in one batch | n/a | 1 → 1 | 1 → 0.83 | 1 → 1 |
+| Q6 decided / unknown / out of scope and the goal | n/a | n/a | n/a | 1 → 1 |
+| Judge's overall ranking (b = baseline, c = candidate) | c b c c b b | b c c b c b | c c b b c b | c c b b b c |
+| Q7 T end to end | 1 → 1 (one-line `cli.py` change, suite green) | | | |
+| Q8 P1 end to end | 1 → 1 | | | |
+
+The P1 Q2 partials in both arms are strict: candidate plans record a "small prefactor" with churn evidence (commit 28c4f09 touched both lists) but do not spell out the plain patch as the rejected option. The P3 Q5 drop is one candidate batch that asked starting values next to the config-shape question.
+
+**Candidate-only conformance:** size picked: P1-P3 Plan 9/9, T Tiny 3/3. F picked Plan 3/3, not Map, each with a reason ("channel and scheduling are open decisions; the code change itself is small"). That is sound for this request, since the way is clear once the channel is chosen. Fit-check lines per touched module appear in every candidate plan. No map tickets (no Map picked). The F runs asked more questions (11-17 dialogs versus 2-6); the judge found every batch independent and recommended.
+
+**Bugs found and fixed (regression tests red before the fix):**
+1. T-2 picked Tiny, but the agent had called `plan3 title` in parallel, which renamed the draft during the size dialog; Tiny's delete hit the old path, the size slot was spent and the run fell back to a full plan. `size` now re-resolves the draft by id after the dialog (38e8baa).
+2. Every candidate planner rewrote the whole plan with `write` right after sizing, dropping the `D-size` decision and the `size:` key; for a map that would also drop `kind: map`. Whole-plan writes now keep `size`, `kind` and the `D-size` line, like the model overrides (8ac7ff0).
+
+Neither fix changes the prompts, so the totals above stand.
+
+**Verdict: keep.** No quality item drops by 0.5 or more, Q2 (the point of project care) improves on P2 and P3, the judge ranks a candidate plan first on P1, P3 and F, and no R3 total regresses materially; the Tiny path cuts the small request to about a quarter of its cost and a third of its runtime.
