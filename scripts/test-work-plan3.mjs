@@ -19,6 +19,7 @@ assert.deepEqual(questionChoices("- **Q-02** Which plants?\n  - Context: two fil
 assert.deepEqual(questionChoices("- **Q-05** Which?\n  - Recommendation: A.\n  - Option: A \u2014 first\n  - Option: B \u2014 second").options.map(o => o.label), ["A", "B"]);
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
 import { catchUpPlanText, changelogExcerpt, recordCatchUp } from "../extensions/plan3-catch-up.ts";
+import { REWORK_RECIPE } from "../extensions/plan3-rework.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
@@ -85,7 +86,7 @@ try {
 	assert(manifest.pi.extensions.includes("extensions/plan3.ts"));
 	assert.deepEqual([...commands.keys()], ["night", "plan3", "plans3", "resume3", "pi-hub"]);
 	assert(tools.has("plan3") && tools.get("plan3").promptSnippet);
-	assert.deepEqual(commands.get("plan3").getArgumentCompletions("re").map((item) => item.value), ["resolve", "review", "review all"]);
+	assert.deepEqual(commands.get("plan3").getArgumentCompletions("re").map((item) => item.value), ["resolve", "review", "review all", "rework"]);
 
 	// Empty project: list and /plan3 without args only report.
 	await run("plans3");
@@ -1009,6 +1010,14 @@ try {
 			assert.equal(compactions, compactBeforeWrite, `${alias} never compacts`);
 		}
 	}
+	// /plan3 rework plans from the shipped recipe; the target narrows Map.
+	const beforeRework = await files();
+	const reworkTokens = tokens; tokens = 0; // small context: no compaction, so later compaction counts stay exact
+	await run("plan3", "rework payment webhooks");
+	tokens = reworkTokens;
+	const reworkPlan = await readFile(path.join(directory, (await files()).find(name => !beforeRework.includes(name))), "utf8");
+	assert.match(reworkPlan, /rework recipe at .*2026-11-05-rework-recipe\.md[\s\S]*Map starts from \\?"payment webhooks\\?"/);
+	assert.ok(existsSync(REWORK_RECIPE), "the recipe ships next to the extension");
 	// File conversion saves an unverified source snapshot, never edits/resumes the source or compacts.
 	assert.deepEqual(commands.get("plan3").getArgumentCompletions("co").map(item => item.value), ["convert"]);
 	const sourceDir = path.join(agentDir, "Imported plans");

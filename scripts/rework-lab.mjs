@@ -15,6 +15,7 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSyn
 import os from "node:os";
 import path from "node:path";
 import { sessionMetrics } from "./lab-metrics.mjs";
+import { reworkRequest } from "../extensions/plan3-rework.ts";
 
 const args = process.argv.slice(2);
 const value = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };
@@ -26,14 +27,13 @@ const hours = Number(value("--hours", "10"));
 const root = value("--root", "C:/SOFT/git/rework-lab");
 const thinker = value("--thinker", "anthropic/claude-opus-5-5");
 const worker = value("--worker", "openai-codex/gpt-6.1-sol");
-const recipe = path.resolve(import.meta.dirname, "..", "docs", "proposals", "2026-11-05-rework-recipe.md");
 const dir = path.join(root, runName);
 const log = path.join(root, `${runName}.lab.jsonl`);
 const note = (kind, data = {}) => { const line = { t: new Date().toISOString(), kind, ...data }; appendFileSync(log, `${JSON.stringify(line)}\n`); console.log(kind, JSON.stringify(data).slice(0, 300)); };
 const git = (...a) => execFileSync("git", a, { cwd: dir, encoding: "utf8" }).trim();
 
 const request = value("--request-file") ? readFileSync(value("--request-file"), "utf8").trim()
-	: `Rework: apply the rework recipe at ${recipe} to this project. Read the recipe in full first and follow its plan skeleton (section 7). Map picks the rework target. Pre-rework SHA: ${sha}. Goal: a deeper module (recipe §0): a smaller interface, rules moved from callers into the module, and fewer files touched by the next realistic changes, with no behavior regression. A split that keeps the same interface is not the goal. Local repair or stop is the right pick only when it meets that goal better. Planning writes the plan only: Map and every later phase run after /plan3 finish, on their phase models.`;
+	: reworkRequest("", sha);
 // Answer for every free-text dialog: this run has no human, so the agent's own recommendation stands.
 const HUMAN = "Unattended lab run in a throwaway clone: go with your recommended option. Any watch window is waived and counts as passed. Never waive or remove a gate: I turn gates on with Alt+A myself when their phase is next.";
 const GATE_DODGE = /amend|chat approval|instead of alt\+a|remove .*needs|waive .*gate/i;

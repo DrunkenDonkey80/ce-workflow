@@ -5,6 +5,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ## Unreleased
 
 ### Added
+- `/plan3 rework [target]` plans a safe rework of one messy part of a project into a deeper module. It maps the code, records the current behavior as tests, compares designs, and waits for you before building, switching over and deleting the old code.
 - `video_digest` (in the ce-workflow checkout only): give the agent a YouTube coding video and it saves the transcript plus the code, diagrams and tables shown on screen, rebuilt as text, to `docs/research/videos/`, then notes what ce-workflow could adopt.
 
 ## 0.3.1 — 2026-11-07

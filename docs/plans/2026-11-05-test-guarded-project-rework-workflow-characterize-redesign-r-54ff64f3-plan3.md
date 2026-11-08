@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-08T13:54:08.432Z
+updated: 2026-11-08T14:36:35.749Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -62,6 +62,8 @@ Acceptance examples:
 - **D-08 (Q-02) One Plan3 plan per target project, with a commit first.** Each pilot plan lives in its target repo (D-06). Before the pilot changes anything there, the pilot session makes a local pre-rework commit of the project's current state; that commit is the baseline sha for the replay worktree. It never stages credentials or junk files (such as the stray `nul` files seen in DealFinder and AI-Wedge), never pushes, and follows the target's AGENTS.md commit rules where they are stricter. Answer: "Plan per target project" with comment "But commit before making changes". Interpretation of the comment is the agent's reading, not separately confirmed. Source: user via /plan3 resolve, 2026-11-05.
 - **D-09 (Q-03) PhotoBook runs the full loop in this plan, commit first.** Map, Characterize, Design, Pick, Build, Replay, Switch and Retire on the chosen PhotoBook part, with the same pre-rework commit as D-08. Answer: "Full loop" with comment "Again commit first". Source: user via /plan3 resolve, 2026-11-05.
 - **D-10 (Q-01) AI-Wedge is read-only: analysis only.** RW-16 never writes to `C:\SOFT\git\ipc\AI-Wedge`: no commits (so the D-08 commit-first and its release-flow conflict do not arise), no new tests, no builds or Gradle runs (they write `build/` output beside unreleased release work). Its rework plan is created by `/plan3 rework` from a ce-workflow session and stored in ce-workflow `docs/plans/`, reading AI-Wedge by absolute path; it stops after Design and Pick, so its gated Build, Replay, Switch and Retire phases stay off. Characterize becomes a proposed corpus (which boundaries, such as `intent-contract`, cases and metrics) written in that plan, not code. Device qualification (RW-18) moves to Backlog. Answer: "Yea aiwedge should go read only just analyse". Where the plan is stored and the no-builds rule are the agent's reading of "read only". Source: user in chat, 2026-11-05.
+- **D-11 Lab runs replace the hand pilots; codify now.** The unattended lab runs (photobook-01, photobook-02 in `C:\SOFT\git\rework-lab`, reports in `docs/proposals/rework-lab/`) worked the full loop with the gates held, so RW-04…RW-09 are superseded. RW-10: one plan with requirement gates (D-05); photobook-02 showed R-design-approved, R-cutover-approved and R-retire-approved each held until granted. RW-11: no shared comparator; project-native runners plus `approved-delta` files were enough. The command is `/plan3 rework [target]` → `extensions/plan3-rework.ts` (`reworkRequest`, the lab's request text), and the recipe ships via package.json `files`. Making normal `/plan3` planning weigh "patch or deepen the module" belongs to plan 79614d24 (Skills session); it owns `extensions/plan3-care.ts` / `DEEPENING_TERMS`. The routing edit in `extensions/plan3.ts` waits until that session's SK-07 lab batch finishes (it loads the live checkout). Source: user, 2026-11-08 ("do 1 and 3 but leave 2"), intercom with 01a1bb0c.
+
 
 ## Open questions
 
