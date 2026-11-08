@@ -1135,7 +1135,7 @@ try {
 	const sdkRoot = sdkRoots.find(root => existsSync(path.join(root, "dist", "core", "extensions", "virtual-modules.js")));
 	assert(sdkRoot, "native popup selfcheck needs an installed Pi SDK");
 	// The shipped skill is discoverable by Pi; only its routing metadata enters the system prompt.
-	assert.deepEqual(manifest.pi.skills, ["./skills/frontend-design"], "legacy workflow skills stay unadvertised");
+	assert.deepEqual(manifest.pi.skills, ["./skills/frontend-design", "./skills/two-axis-review", "./skills/diagnosing-bugs"], "legacy workflow skills stay unadvertised");
 	const { loadSkillsFromDir, formatSkillsForPrompt } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "skills.js")).href);
 	const discovered = loadSkillsFromDir({ dir: fileURLToPath(new URL(`../${manifest.pi.skills[0]}`, import.meta.url)), source: "user" });
 	assert.deepEqual(discovered.diagnostics, []);
@@ -1144,6 +1144,11 @@ try {
 	assert.match(discovered.skills[0].description, /not routine behavior fixes, native UI or terminal dialogs/);
 	assert.match(formatSkillsForPrompt(discovered.skills), /frontend-design/);
 	assert.doesNotMatch(formatSkillsForPrompt(discovered.skills), /design lead at a design studio/);
+	for (const [dir, name] of [[manifest.pi.skills[1], "two-axis-review"], [manifest.pi.skills[2], "diagnosing-bugs"]]) {
+		const adapted = loadSkillsFromDir({ dir: fileURLToPath(new URL(`../${dir}`, import.meta.url)), source: "user" });
+		assert.deepEqual(adapted.diagnostics, []);
+		assert.deepEqual(adapted.skills.map((skill) => skill.name), [name]);
+	}
 	const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
 	const nativePlan3 = await createJiti(import.meta.url, { moduleCache: false, virtualModules: VIRTUAL_MODULES }).import("../extensions/plan3.ts", { default: true });
 	await hooks.get("session_shutdown")(); // Dispose the first runtime before testing the SDK loader's fresh runtime.
