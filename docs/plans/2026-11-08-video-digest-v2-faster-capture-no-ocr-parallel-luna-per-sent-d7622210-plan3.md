@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T16:10:43.740Z
+updated: 2026-11-08T16:23:59.828Z
 reviewed: 2026-11-08
 ---
 
@@ -122,10 +122,7 @@ Commands (referenced by steps):
 
 ### Phase 4: Calibrate [think]
 
-- [ ] **V2-08** Rerun both v1 videos and one video from another channel with C2; compare against the V2-00 baseline.
-  - Accept for both v1 videos: no visual of the v1 digest missing (`traceId` before and after included), Mermaid labels quoted, every frame link resolves; tool time at most half of V2-00 on the 16-minute video and not above V2-00 on the short; total tokens and cost (session plus Luna) not more than 1.5 times V2-00; turns and tool calls not above V2-00 plus one. Otherwise tune thresholds or revert per the repo's optimization regression rule.
-  - Accept for the other channel's video: the digest has its on-screen code or diagrams (checked against a few sampled frames) and the screen check did not drop them.
-  - Ask with numbers then if the other channel's video shows the screen check or the thresholds do not generalize.
+- [x] **V2-08** Calibrated on 3 videos: 16-min video 513 s → 133 s wall (tool 499 → 123 s, 23 Luna calls, 212 states, 12 visuals vs 8, total $0.129 → $0.148); short 73 → 52 s; Fireship 2:29 other channel 63 s, 31 states, 18 visuals, no camera/webcam noise in dropped frames. A transient YouTube HTTP 403 on the download now retries once from the page URL.
 - [ ] **V2-09** [human] User reviews a new digest with per-sentence timestamps and kept frames.
 
 ## Global validation
