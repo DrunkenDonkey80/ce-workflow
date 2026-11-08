@@ -6,7 +6,7 @@
 // --no-pi: set up and check only (fixture validation on the untouched base; the arm only names the run).
 // Task config: docs/proposals/skills-lab/tasks/<name>/lab.json (see design.md). Results: <root>/<run>/results.jsonl.
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { sessionMetrics } from "./lab-metrics.mjs";
@@ -57,10 +57,11 @@ function setup(dir) {
 	return base;
 }
 
-function runPi(dir, sessions, arm, prompt) {
+function runPi(dir, art, arm, prompt) {
+	const sessions = `${art}-sessions`;
 	const skillArgs = arm === "off" ? [] : [task.skill, ...(task.deps ?? [])].flatMap((rel) => ["--skill", skills(rel)]);
 	const message = `${arm === "forced" ? `/skill:${path.basename(task.skill)} ` : ""}${prompt}\n\n${UNATTENDED}`;
-	const events = path.join(dir, "..", `${path.basename(dir)}.events.jsonl`);
+	const events = `${art}.events.jsonl`;
 	return new Promise((resolve) => {
 		const child = spawn(process.execPath, [launcher, "-p", "--mode", "json", "--model", model, "--thinking", task.thinking ?? "high",
 			"--session-dir", sessions, ...skillArgs, message], { cwd: dir, env: piEnv, stdio: ["ignore", "pipe", "pipe"] });
@@ -79,12 +80,12 @@ function toolCalls(events) {
 	if (!existsSync(events)) return [];
 	return readFileSync(events, "utf8").split("\n").filter((line) => line.includes("\"tool_execution_start\"")).map((line) => line.replaceAll("\\\\", "/").toLowerCase());
 }
-function audit(events, id) {
+function audit(events, dir) {
 	const calls = toolCalls(events);
-	const own = [`runs/${runName}/${id}`, ...[task.skill, ...(task.deps ?? [])].filter(Boolean).map((rel) => `mattpocock-skills/skills/${rel}`)].map((s) => s.toLowerCase());
+	const own = [dir.replaceAll("\\", "/"), ...[task.skill, ...(task.deps ?? [])].filter(Boolean).map((rel) => `mattpocock-skills/skills/${rel}`)].map((s) => s.toLowerCase());
 	return {
 		skillRead: Boolean(task.skill) && calls.some((line) => line.includes(`${task.skill}/skill.md`)),
-		outside: calls.filter((line) => line.includes("skills-lab") && !own.some((p) => line.includes(p))).length,
+		outside: calls.filter((line) => /skills-lab|\/skl-/.test(line) && !own.some((p) => line.includes(p))).length,
 	};
 }
 
@@ -100,18 +101,20 @@ function check(dir) {
 
 async function one(arm, rep) {
 	const id = `${taskName}-${arm}-${rep}`;
-	const dir = path.join(root, runName, id);
-	if (existsSync(dir)) throw new Error(`${dir} exists; pick a new run name or --rep-start`);
-	const sessions = `${dir}-sessions`;
+	// Artifacts (events, sessions, diff) under root; the workspace in its own temp folder, so a run cannot list sibling runs.
+	const art = path.join(root, runName, id);
+	if (existsSync(`${art}.diff`)) throw new Error(`${art} exists; pick a new run name or --rep-start`);
+	const sessions = `${art}-sessions`;
+	const dir = path.join(mkdtempSync(path.join(os.tmpdir(), "skl-")), path.basename(task.copy ?? task.source));
 	const base = setup(dir);
 	const prompt = task.prompt.replaceAll("{base}", base);
 	const started = Date.now();
-	const pi = args.includes("--no-pi") ? { code: null, timedOut: false, events: "" } : await runPi(dir, sessions, arm, prompt);
+	const pi = args.includes("--no-pi") ? { code: null, timedOut: false, events: "" } : await runPi(dir, art, arm, prompt);
 	const wallMs = Date.now() - started;
 	git(dir, "add", "-A");
-	writeFileSync(`${dir}.diff`, git(dir, "diff", "--cached", base));
+	writeFileSync(`${art}.diff`, git(dir, "diff", "--cached", base));
 	const line = { t: new Date().toISOString(), run: runName, task: taskName, arm, rep, model, thinking: task.thinking ?? "high", pi: piVersion,
-		exit: pi.code, timedOut: pi.timedOut, wallMs, ...audit(pi.events, id), metrics: sessionMetrics(sessions),
+		exit: pi.code, timedOut: pi.timedOut, wallMs, ...audit(pi.events, dir), metrics: sessionMetrics(sessions),
 		checks: check(dir), diffStat: git(dir, "diff", "--cached", "--shortstat", base), dir };
 	appendFileSync(path.join(root, runName, "results.jsonl"), `${JSON.stringify(line)}\n`);
 	console.log(id, JSON.stringify({ exit: line.exit, wallMs, turns: line.metrics.turns, cost: line.metrics.cost, checks: line.checks.map((c) => `${c.name}:${c.pass}`) }));
