@@ -11,6 +11,7 @@ export const SITUATIONAL_TOOLS = {
 	generate_image: "generate or edit a PNG image from a prompt",
 	project_commands: "add/remove/list the user's project command buttons on the hub page",
 	design: "OpenDesign design sessions: start variants, track them, pick one and export it",
+	video_digest: "digest a YouTube coding video: transcript plus code, diagrams and tables rebuilt as Markdown",
 };
 
 export const TOOLS_ENABLE = "tools_enable";

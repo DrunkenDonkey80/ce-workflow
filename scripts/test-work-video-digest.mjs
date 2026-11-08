@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // video_digest (plan 544351ec): pure helpers, the pipeline with a fake runner and model, and the checkout-only registration.
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
 	isYouTubeUrl, pickCaptionTrack, captionLines, captionParagraphs, ocrTokens, similarity, selectCandidates, sampleInterval,
 	digestFolder, digestOwner, keepTakeaways, mergeArtifacts, renderDigest, digestVideo, NO_CAPTIONS, TAKEAWAYS,
@@ -166,11 +167,25 @@ try {
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ pageTokens: distinct }).exec, model: async () => { throw new Error("Luna failed (error)."); }, tmpRoot }), /Luna failed/);
 	tmpEmpty();
 	const controller = new AbortController();
-	const aborting = fake({ pageTokens: distinct, onCall: (command, args) => { if (args.includes("-f")) controller.abort(); } });
+	const aborting = fake({ pageTokens: distinct, onCall: (_command, args) => { if (args.includes("-f")) controller.abort(); } });
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: aborting.exec, model, signal: controller.signal, tmpRoot }), /cancelled/);
 	assert(!aborting.calls.some((call) => /ffmpeg/.test(call[0]) && call[1] !== "-version"), "nothing runs after the abort");
 	tmpEmpty();
 } finally {
 	rmSync(root, { recursive: true, force: true });
+}
+
+// D-01: registered deferred and listed by tools_enable only in the ce-workflow checkout (real session_start, fresh module each).
+const repo = path.resolve(import.meta.dirname, "..");
+for (const [cwd, tag, expected] of [[repo, "repo", true], [os.tmpdir(), "other", false]]) {
+	const mod = await import(`${pathToFileURL(path.join(repo, "extensions", "work-models.ts")).href}?${tag}`);
+	const tools = new Map(), hooks = new Map();
+	mod.default({
+		on: (name, handler) => hooks.set(name, handler), registerCommand() {}, registerShortcut() {}, registerTool: (tool) => tools.set(tool.name, tool),
+		events: { on() {}, emit() {} }, getAllTools: () => [...tools.values()], exec: async () => ({ code: 0 }), getActiveTools: () => [], setActiveTools() {}, appendEntry() {},
+	});
+	await hooks.get("session_start")({ reason: "startup" }, { cwd, hasUI: false, sessionManager: { getBranch: () => [], getEntries: () => [] }, ui: { notify() {}, setStatus() {} } });
+	assert.equal(tools.get("video_digest")?.exposure, expected ? "deferred" : undefined, cwd);
+	assert.equal(!!tools.get("tools_enable")?.description.includes("- video_digest:"), expected, cwd);
 }
 console.log("video-digest: ok");
