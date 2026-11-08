@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T14:36:34.322Z
+updated: 2026-11-08T14:59:35.962Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -54,6 +54,18 @@ Acceptance examples:
 - `/plan3 add a new deal source` in a DealFinder clone (where adding a source edits several modules) shows a size dialog, asks grilling rounds, and writes a plan whose approach records a patch-versus-prefactor fit check per touched module.
 - `/plan3 rename the CLI help text` shows the size dialog recommending Tiny; picking it removes the draft, leaves research mode, and the agent just makes the change.
 - `/plan3 finish` on a plan with glossary terms and an ADR candidate offers a checklist; ticked items land in `GLOSSARY.md` and `docs/adr/0001-<slug>.md`.
+### IDEA-384217f4: Two-axis code review skill (adapted from code-review)
+
+> Q-03 form: adapted copy in skills/ with credit and the MIT notice.
+### IDEA-da049cbe: Debugging skill (adapted from diagnosing-bugs)
+
+> Q-03 form: adapted copy in skills/ with credit and the MIT notice.
+### IDEA-eff9da13: Vertical slices and expand-migrate-contract in planning (from to-tickets)
+
+> Fold into Plan3 prompts (Q-03).
+
+
+
 
 ## Decisions
 
@@ -94,6 +106,16 @@ Acceptance examples:
   - Independent: yes
   - Answer: {"kind":"selection","selections":["Fold or adapt per winner"]}
   - Source: user via ask_user /plan3 resolve; not independently verified.
+- IDEA-384217f4: accepted — Two-axis code review skill (adapted from code-review). Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+- IDEA-da049cbe: accepted — Debugging skill (adapted from diagnosing-bugs). Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+- IDEA-eff9da13: accepted — Vertical slices and expand-migrate-contract in planning (from to-tickets). Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+- IDEA-8407f24d: rejected — Git guardrail as a Pi tool_call guard (from git-guardrails). Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Reject (Recommended)"]}
+- IDEA-87891b19: rejected — Evidence and reversibility for cutovers (from pr). Source: user via Plan3 idea review; not independently verified. Response: {"kind":"selection","selections":["Reject (Recommended)"]}
+
+
+
+
+
 
 
 
@@ -164,12 +186,8 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 ### Phase 3: Skill A/B runs and verdicts [think]
 
 - [x] **SK-07** SK-07 batch complete: 6 skill tasks (off/forced x3 + unforced x1; retro off/forced x3) and 10 writing-for-agents replays, all in runs/sk07/results.jsonl; no runner failures.
-- [ ] **SK-08** Judge blind with Astra and fill the scorecard: per skill, per-arm medians for every R3 metric and a verdict (adopt, reject, inconclusive).
-  - Judge: read-only `reviewer` on gpt-6-astra:high gets both diffs and transcripts with arm labels shuffled, plus the rubric; the agent checks each judgment against the evidence.
-  - Check: results.md has a scorecard and verdict per tested skill; no verdict rests on a single weighted score.
-- [ ] **SK-09** Bring adoption proposals to the user with plan3 action ideas: one per winning skill and per desk idea worth doing.
-  - Each proposal names its form per Q-03: folded into Plan3 prompts or code, or an adapted copy in `skills/` with credit and the MIT notice. Accepted ideas add steps (Backlog or a new phase) through the ideas flow.
-  - Check: every proposal is accepted or rejected in the plan's Ideas section.
+- [x] **SK-08** All 6 tested skills judged blind by Astra with per-arm R3 medians in results.md: code-review quality win at 2.9x cost (candidate); diagnosing-bugs better process at 1.6x cost (trade-off); tdd, prototype, retro, writing-for-agents reject.
+- [x] **SK-09** 5 proposals reviewed: accepted two-axis review skill, debugging skill (both adapted copies in skills/), vertical-slices planning sentence; rejected git guard and cutover evidence.
 
 ### Phase 4: Plan3 care and questioning design [think]
 
@@ -182,9 +200,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ### Phase 6: Build in Plan3 [think]
 
-- [ ] **PC-03** Project care and grilling rounds: update `clarification`, `planningPrompt` and `executePrompt` in extensions/plan3.ts per PC-01; update C-p3 assertions.
-  - Execution keeps "smallest sufficient depth" for the chosen design and gains the mid-work prefactor question rule (D-01).
-  - Check: C-p3 passes with assertions for the fit check, grilling rounds and the prefactor question rule.
+- [x] **PC-03** clarification now asks in frontier rounds (facts are the agent's job); PROJECT_CARE fit check in planningPrompt; executePrompt asks patch-vs-prefactor on unforeseen friction; C-p3 asserts updated (6eb96eb).
 - [ ] **PC-04** Sizing: add `plan3` action `size` with a compact showListDialog (Tiny, Plan, Map); record the pick in Decisions; Tiny removes the draft and leaves research.
   - Night mode and headless take the recommendation without a dialog. Map hands over to PC-05's template.
   - Tiny per the PC-01 lifecycle: early tool return, pointer cleared, research actually off at `agent_settled`, then the implementation prompt.
@@ -208,6 +224,9 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
   - Check: results.md has baseline versus candidate tables and a keep, tune or revert verdict.
 - [human] **PC-10** Live trial: the user runs /plan3 on one real request in a real project and judges sizing, grilling rounds and the fit check.
   - Check: the user's verdict and any follow-ups recorded in Decisions or Backlog.
+- [ ] **PC-11** Add skills/two-axis-review/SKILL.md adapted from mattpocock code-review (Standards and Spec passes via pi-subagents, side-by-side report), with credit and MIT notice; register in package.json pi.skills; README line.
+- [ ] **PC-12** Add skills/diagnosing-bugs/SKILL.md, a shortened adaptation (repro command first, one-factor experiment, ranked hypotheses, regression test red before the fix, cleanup), credit and MIT notice; register in package.json pi.skills; README line.
+- [ ] **PC-13** Add to planningPrompt: order steps as thin end-to-end slices that each leave the tree working, a planned prefactor first, and wide refactors as expand, migrate in batches, contract; assert it in C-p3.
 
 ## Global validation
 
@@ -258,3 +277,217 @@ Append material changes and their reasons; preserve the original request and set
   12. Rubric not scorable: accepted: grade anchors, n/a and unscorable rules, aggregation, numeric material thresholds (15 % tokens/cost/runtime, 25 % turns/tool calls, outside the baseline range) (§7).
   13. GLOSSARY-MAP scope: accepted: dropped (§5b, §8).
 - 2026-11-08 SK-06: baseline ran before PC-01/PC-02 (no Plan3 code changed in between, so the prompts measured are the current ones). Rubric scoring moved from SK-06 to PC-09: the baseline is scored blind together with the candidate runs, so the judge cannot tell the arms apart. T-2/T-3 result lines recomputed after the runner crashed on an agent-created `NUL` file (runner fixed: `git add -N -- . ":(exclude)NUL"`).
+- 2026-11-08: Added PC-11 after PC-10: Accepted IDEA-384217f4: Two-axis code review skill (adapted from code-review)
+- 2026-11-08: Added PC-12 after PC-11: Accepted IDEA-da049cbe: Debugging skill (adapted from diagnosing-bugs)
+- 2026-11-08: Added PC-13 after PC-12: Accepted IDEA-eff9da13: Vertical slices and expand-migrate-contract in planning (from to-tickets)
+
+
+
+
+
+## Ideas
+
+### IDEA-384217f4 Two-axis code review skill (adapted from code-review)
+
+Status: accepted
+Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+
+#### What this is
+
+> Lab winner. Review a diff in two separate passes, Standards (repo docs plus a fixed smell list) and Spec (missing, wrong, scope creep), and report them side by side, never merged.
+
+#### What you gain
+
+> Blind judge: skill runs found 8 of 9 planted defects vs 5.5-6 without, caught both standards smells (unused hook, bad name) and kept the axes apart; 0 false findings in both arms.
+
+#### Drawbacks and risks
+
+> Costs 2.9x a plain review (about $0.47 vs $0.16, 2.5x tokens) because each axis runs in a subagent. Both arms missed the unrelated-change seed, so scope creep still needs a human eye.
+
+#### Implementation and affected files
+
+> Adapted copy in skills/two-axis-review/SKILL.md with credit and the MIT notice, model-invoked by description ("review this diff"); no Plan3 hook, so it costs nothing unless used. Rewrite Claude-specific wording for pi-subagents.
+
+#### Cost
+
+> One skill file plus the package.json pi.skills entry and a README line; about an hour. No code.
+
+#### Recommendation
+
+> Accept: a clear quality win and on-demand only, so the cost lands only on reviews you ask for.
+
+#### Sources and agreement
+
+> docs/proposals/skills-lab/results.md (code-review); skills-lab/judge/sk07/code-review/judge.md; mattpocock/skills 4ae2317 engineering/code-review.
+
+#### Proposed requirement
+
+> Q-03 form: adapted copy in skills/ with credit and the MIT notice.
+
+#### Proposed steps
+
+> - Add skills/two-axis-review/SKILL.md adapted from mattpocock code-review (Standards and Spec passes via pi-subagents, side-by-side report), with credit and MIT notice; register in package.json pi.skills; README line.
+
+### IDEA-da049cbe Debugging skill (adapted from diagnosing-bugs)
+
+Status: accepted
+Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+
+#### What this is
+
+> Lab trade-off. Reproduce first with one command, change one factor at a time to prove the cause, and run the regression test red before the fix.
+
+#### What you gain
+
+> Forced runs ranked 1-3 of 7 with full rubric marks; off runs slipped (diagnosed before reproducing, edited beyond the fix, test repaired after the fix). The one run that only saw it listed read it on its own and scored 8/8 at off-arm cost.
+
+#### Drawbacks and risks
+
+> Forced use cost 1.6x (tokens +59 %, runtime +72 %) for the same end result: every arm fixed the bug.
+
+#### Implementation and affected files
+
+> Adapted, shortened copy in skills/diagnosing-bugs/SKILL.md (credit and MIT notice), model-invoked by its description only, never forced and never folded into executePrompt, so routine work pays nothing.
+
+#### Cost
+
+> One skill file plus the pi.skills entry; under an hour.
+
+#### Recommendation
+
+> Accept as an on-demand skill: the unforced run showed the model picks it up and uses it cheaply when the task is a bug.
+
+#### Sources and agreement
+
+> docs/proposals/skills-lab/results.md (diagnosing-bugs); skills-lab/judge/sk07/diagnosing-bugs/judge.md.
+
+#### Proposed requirement
+
+> Q-03 form: adapted copy in skills/ with credit and the MIT notice.
+
+#### Proposed steps
+
+> - Add skills/diagnosing-bugs/SKILL.md, a shortened adaptation (repro command first, one-factor experiment, ranked hypotheses, regression test red before the fix, cleanup), credit and MIT notice; register in package.json pi.skills; README line.
+
+### IDEA-eff9da13 Vertical slices and expand-migrate-contract in planning (from to-tickets)
+
+Status: accepted
+Response: {"kind":"selection","selections":["Accept (Recommended)"]}
+
+#### What this is
+
+> Desk idea, picked by both the desk review and Astra. Plan phases as thin end-to-end slices, prefactor first, and wide refactors as expand, migrate in batches, contract.
+
+#### What you gain
+
+> Fits project care (PC-03): steps become independently verifiable and a wide refactor never leaves the tree broken between steps.
+
+#### Drawbacks and risks
+
+> Adds about one sentence (~60 tokens) to every planning prompt; not A/B-tested on its own.
+
+#### Implementation and affected files
+
+> Fold one sentence into planningPrompt next to PROJECT_CARE; measured inside the PC-09 rerun together with the other prompt changes.
+
+#### Cost
+
+> One sentence and one test assertion; minutes.
+
+#### Recommendation
+
+> Accept: cheap and measured by PC-09 anyway.
+
+#### Sources and agreement
+
+> docs/proposals/2026-11-08-mattpocock-skills-review.md row 17 and Astra's top 3; mattpocock/skills engineering/to-tickets.
+
+#### Proposed requirement
+
+> Fold into Plan3 prompts (Q-03).
+
+#### Proposed steps
+
+> - Add to planningPrompt: order steps as thin end-to-end slices that each leave the tree working, a planned prefactor first, and wide refactors as expand, migrate in batches, contract; assert it in C-p3.
+
+### IDEA-8407f24d Git guardrail as a Pi tool_call guard (from git-guardrails)
+
+Status: rejected
+Response: {"kind":"selection","selections":["Reject (Recommended)"]}
+
+#### What this is
+
+> Desk idea (Astra: skip). Block destructive git commands in bash (push, reset --hard, clean -f, branch -D, checkout -- .) unless the user confirms in a dialog.
+
+#### What you gain
+
+> Turns the "never push" rule into code (Code-First rule); stops accidental data loss from a confused agent.
+
+#### Drawbacks and risks
+
+> Regex on shell text is no security boundary (Astra); can annoy when you asked for a push; a dialog in night mode has no one to answer, so night would just refuse.
+
+#### Implementation and affected files
+
+> Small extension: pi.on("tool_call") for bash, match the commands, askConfirm in day mode, block with a reason otherwise; tests for match and no-match.
+
+#### Cost
+
+> About 60 lines plus a test script; an hour or two.
+
+#### Recommendation
+
+> Reject for now: AGENTS.md rules already hold in practice and the guard adds a prompt to every wanted push; revisit if an accident happens.
+
+#### Sources and agreement
+
+> docs/proposals/2026-11-08-mattpocock-skills-review.md rows 29 and Astra row; extensions/plan3.ts:1906 tool_call pattern.
+
+#### Proposed requirement
+
+> Code-First Workflow Rule.
+
+#### Proposed steps
+
+> - Add extensions/git-guard.ts: tool_call guard for destructive git commands with askConfirm in day mode and a blocking reason otherwise; test script with match/no-match cases.
+
+### IDEA-87891b19 Evidence and reversibility for cutovers (from pr)
+
+Status: rejected
+Response: {"kind":"selection","selections":["Reject (Recommended)"]}
+
+#### What this is
+
+> Desk idea from Astra. For substantial changes and cutovers, record before/after evidence, affected consumers, and whether rollback needs state restored.
+
+#### What you gain
+
+> Makes risky switches reviewable and undoable.
+
+#### Drawbacks and risks
+
+> Overlaps the rework recipe's Replay/Switch/Retire (now /plan3 rework, 3124dfc) and the ADR hard-to-reverse test (PC-06); a third place for the same rule.
+
+#### Implementation and affected files
+
+> None new: rely on /plan3 rework for cutovers and ADR candidates for one-way doors.
+
+#### Cost
+
+> None.
+
+#### Recommendation
+
+> Reject: already covered by /plan3 rework and the ADR test.
+
+#### Sources and agreement
+
+> docs/proposals/2026-11-08-mattpocock-skills-review.md engineering/pr rows; extensions/plan3-rework.ts.
+
+#### Proposed requirement
+
+> None.
+
+#### Proposed steps
+
+> - Add to planningPrompt: for a cutover step, record before/after evidence, affected consumers and whether rollback needs state restoration.

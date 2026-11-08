@@ -1692,7 +1692,7 @@ try {
 	}
 	const planning = messages.find(entry => entry.message.startsWith("Plan3: planning only."))?.message;
 	assert.match(planning, /For new or substantially redesigned web UI, read the frontend-design skill/);
-	assert.match(planning, /\*\*Project care\*\*: plan the change[\s\S]*fit check[\s\S]*One adapter is a hypothetical seam[\s\S]*Keep the plan proportional: affected files, the chosen approach/);
+	assert.match(planning, /\*\*Project care\*\*: plan the change[\s\S]*fit check[\s\S]*One adapter is a hypothetical seam[\s\S]*thin end-to-end slices[\s\S]*expand \(add the new form beside the old\), migrate callers in batches, contract[\s\S]*Keep the plan proportional: affected files, the chosen approach/);
 	assert.match(planning, /record its reference, the chosen direction and tokens\/components to reuse in the plan, not the skill text/);
 	assert.match(planning, /Explicit briefs and project conventions win; native\/TUI work follows platform rules/);
 	for (const handoff of messages.filter(entry => entry.message.startsWith("Plan3:"))) {
