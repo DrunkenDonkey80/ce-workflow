@@ -61,12 +61,33 @@ Overlap was checked against: README "Plan3" (planning, research mode, Open quest
 
 Counts: adopt idea 9, A/B test 4, already covered 10, skip 16. Total 39.
 
-Desk shortlist for A/B (SK-03 designs one task each): diagnosing-bugs, tdd, code-review, retro.
+Desk shortlist for A/B: diagnosing-bugs, tdd, code-review, retro.
 
 ## Astra's verdicts (SK-02)
 
-Pending.
+Read-only `reviewer` on `openai-codex/gpt-6-astra:high`, without this doc. Full table with reasons, its own ranked A/B tasks and top-3 ideas: `docs/proposals/skills-lab/astra-verdicts.md`. Not blind: it read plan 79614d24, which contains the planning-time triage, so it calls already-planned work "already covered".
+
+Astra counts: adopt idea 3, A/B test 5, already covered 13, skip 18. It agrees with the desk on 27 of 39. The 12 differences:
+
+| Skill | Desk | Astra | Substance |
+|---|---|---|---|
+| engineering/domain-modeling | adopt idea | already covered | Same: planned in this plan (D-07, PC-06). Label only. |
+| engineering/grill-with-docs | adopt idea | already covered | Same: wrapper over grilling and domain-modeling. Label only. |
+| engineering/wayfinder | adopt idea | already covered | Same: planned (D-06, PC-05). Label only. |
+| productivity/grill-me | adopt idea | already covered | Same: planned (PC-03). Label only. |
+| productivity/grilling | adopt idea | already covered | Same: planned (PC-03). Label only. |
+| in-progress/chief-of-staff | already covered | skip | Same outcome: nothing to build. |
+| productivity/to-questionnaire | already covered | skip | Same outcome: nothing to build. |
+| engineering/pr | skip | adopt idea | Real. Astra: for substantial changes and cutovers, show recorded before/after evidence, affected consumers and whether rollback needs state restoration. Desk had only weighed the PR template. Taken as a desk idea for SK-09. |
+| engineering/retro | A/B test | adopt idea | Real but compatible: Astra adopts "session evidence, then the cheapest environment fix (repair an unwired check before writing prose)". Kept as A/B, since the backlog retro step waits on a measured result. |
+| engineering/prototype | adopt idea | A/B test | Real: Astra wants the logic-prototype branch measured (contradictions found before production edits). Added to the shortlist. |
+| productivity/writing-for-agents | adopt idea | A/B test | Real: Astra wants a prompt refactor measured by a coding replay, not by prompt length. Added to the shortlist. |
+| misc/git-guardrails-claude-code | adopt idea | skip | Real: Astra says regex hooks are no security boundary and the repo already has git rules. Stays a desk idea for SK-09, framed as a guard against accidents, not a security boundary. |
+
+Astra's top-3 ideas regardless of testing: evidence-linked environment fixes (retro), verifiable vertical slices with expand-migrate-contract (to-tickets, same as desk row 17), and evidence plus reversibility (pr).
 
 ## Final shortlist
 
-Pending (SK-02 merge).
+A/B (SK-03 designs one task each; union of both sides): **diagnosing-bugs, tdd, code-review, retro, writing-for-agents, prototype**. Astra proposed Plan3-code fixtures (stale-answer race, requirements scheduler); SK-03 picks each task's codebase and records why.
+
+Desk ideas for SK-09 (no A/B): to-tickets slicing, pr evidence plus reversibility, git guardrail as a Pi `tool_call` guard. Ideas already planned in this plan (PC-01, PC-03, PC-05, PC-06) are not repeated there.

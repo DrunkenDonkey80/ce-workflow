@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T12:39:50.705Z
+updated: 2026-11-08T12:45:36.529Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -153,10 +153,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 ### Phase 1: Skill review and experiment design [think]
 
 - [x] **SK-01** Desk review of all 39 skills in docs/proposals/2026-11-08-mattpocock-skills-review.md; desk A/B shortlist: diagnosing-bugs, tdd, code-review, retro.
-- [ ] **SK-02** Get Astra's independent verdicts: a read-only reviewer on gpt-6-astra:high reads the clone and ce-workflow, without the SK-01 doc; merge both side by side.
-  - `subagent({ agent: "reviewer", model: "openai-codex/gpt-6-astra:high", context: "fresh", async: true, task: <evaluate every skill in the clone for ce-workflow; read-only; one verdict and reason per skill> })`. Not plan3-advisor: its contract is reviewing one Plan3 plan (`utility-agents/plan3-advisor.md`).
-  - Disagreements are listed with both reasons; a skill either side marks "A/B test" joins the shortlist.
-  - Check: review doc has an Astra column for all 39 skills and a final shortlist.
+- [x] **SK-02** Astra (reviewer, gpt-6-astra:high) verdicts merged: agrees on 27/39; final A/B shortlist diagnosing-bugs, tdd, code-review, retro, writing-for-agents, prototype; SK-09 desk ideas to-tickets, pr evidence+reversibility, git guard.
 - [ ] **SK-03** Design the experiments in docs/proposals/skills-lab/design.md: one task per shortlisted skill, rubric, metrics, judge protocol, planning requests.
   - Per task: source and SHA, setup (planted bug patch and fresh history where needed), prompt, check command, rubric naming what the skill should change (for example a red regression test before the fix).
   - Arms per D-03 and Q-02; 3 repeats per arm (D-04); environment identical in both arms, recorded (Pi version, extensions, ponytail on).
@@ -258,7 +255,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ## Resume context
 
-Planning: reviewed by Astra (run fb4ad530); all 7 findings accepted and applied (see Amendments). Baseline SK-06 now runs in Phase 5, right before the build. No open questions. Next: the user reads the plan and runs /plan3 finish. No product code changed.
+Executing. SK-01, SK-02 done. Next SK-03: write docs/proposals/skills-lab/design.md + task files for 6 shortlisted skills (diagnosing-bugs, tdd, code-review, retro, writing-for-agents, prototype) and the 5 planning requests. Lab base: C:\SOFT\git\skills-lab\df-base (DealFinder 27221be export, 119 tests ~4 s). Mutation probe: sync.py/normalize.py mutations M2 (history days→hours in load_references), M8, M10 (touch dropped from same_machine exact), M11 (gone listings as references) survive the suite → candidate planted bugs.
 
 ## Amendments
 
