@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T13:41:31.345Z
+updated: 2026-11-08T14:35:55.001Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -180,9 +180,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ### Phase 5: Baseline [think]
 
-- [ ] **SK-06** Record the baseline right before Phase 6 lands: each SK-03 request, 3 repeats, current prompts (C-rework), at the SK-03 endpoints.
-  - Record Pi version, model ids, ce-workflow HEAD plus a hash of `git diff` (the checkout may be dirty), and the clone settings (Q-01). No Plan3 code changes between this step and PC-03.
-  - Check: baseline table in docs/proposals/skills-lab/results.md with R3 metrics and the frozen PC-01 rubric scores per request.
+- [x] **SK-06** Plan3 baseline recorded: 16 runs (P1-P3, F plan-only x3; T e2e x3; P1 e2e x1), R3 medians and ranges in results.md; rubric scored blind at PC-09.
 
 ### Phase 6: Build in Plan3 [think]
 
@@ -231,7 +229,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ## Resume context
 
-PC-01 done (a2649d5). SK-07 wip: batch running (sk07.sh; timer c3374474); writing-for-agents phase 1 (7 runs) and diagnosing-bugs 5/7 done. SK-06 baseline running (sk06.sh; timer 57849d8a). SK-08 started: scripts/skills-lab-judge.mjs (ba6016d) builds blind bundles in skills-lab/judge/<run>/<task>/ (key.json = labels→arm; recomputes only-agents-md without pi-lens probe logs). Astra judging writing-for-agents phase 1 (reviewer 5858c784); Astra PC-02 review running (plan3-advisor afb2bc9e). Next: when each task's runs finish, bundle + judge it; record PC-02 dispositions in Amendments. Blocker: no Plan3 code edits (PC-03+) until SK-06 and SK-07 finish — lab clones load the live ce-workflow checkout.
+PC-01, PC-02 done (a2ca9ec). SK-07 wip: batch running (timer c3374474). SK-06 baseline running (timer 57849d8a). SK-08 partial: writing-for-agents phase-1 judged blind (skills-lab/judge/sk07/writing-for-agents/judge-phase1.md): ranking C4DA(off) 968B(forced) E74F(forced) 0A70(off) 5FC1(off) 2FBD(forced) DC52(unforced); no clear arm signal; forced runs cheaper (median 348k vs 422k tokens). Verdict needs the replay phase (reps 1-3,11-13,21,31-33). Next: when SK-07 tasks complete, run scripts/skills-lab-judge.mjs sk07 <task> and an Astra reviewer judge (give it the DealFinder snapshot judge/df-27221be); then scorecard results.md. Blocker for PC-03+: no Plan3 code edits until SK-06 and SK-07 finish (lab loads live checkout).
 
 ## Amendments
 
@@ -261,3 +259,4 @@ Append material changes and their reasons; preserve the original request and set
   11. Rubric rewards candidate layout: accepted: cross-arm items by meaning (Q1-Q8), candidate-only conformance reported apart; F may be a normal plan with a recorded reason (§7).
   12. Rubric not scorable: accepted: grade anchors, n/a and unscorable rules, aggregation, numeric material thresholds (15 % tokens/cost/runtime, 25 % turns/tool calls, outside the baseline range) (§7).
   13. GLOSSARY-MAP scope: accepted: dropped (§5b, §8).
+- 2026-11-08 SK-06: baseline ran before PC-01/PC-02 (no Plan3 code changed in between, so the prompts measured are the current ones). Rubric scoring moved from SK-06 to PC-09: the baseline is scored blind together with the candidate runs, so the judge cannot tell the arms apart. T-2/T-3 result lines recomputed after the runner crashed on an agent-created `NUL` file (runner fixed: `git add -N -- . ":(exclude)NUL"`).
