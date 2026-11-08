@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: complete
 created: 2026-11-08
-updated: 2026-11-08T13:43:21.009Z
+updated: 2026-11-08T14:22:00.601Z
 reviewed: 2026-11-08
 started: 2026-11-08T12:59:02.498Z
 ---
@@ -122,8 +122,7 @@ Commands:
 - [x] **VD-06** Matt short via headless Pi: tools_enable → video_digest → digest at the D-09 path with the full 7-node flowchart (all notes), 2,032-char transcript, 0 images, 1 Luna call, takeaways appended; Mermaid syntax defect (labels starting with "/", literal \n) left for VD-08.
 - [x] **VD-07** Matt's 15:55 "6 TypeScript tips" (lraHlXpuhKs): 10 clean code artifacts, no talking-head ones, runtime under video length; D-11 last-of-run drops "before" states of live edits (e.g. traceId?: at 1:00 shown only as the 1:54 fixed version).
 - [x] **VD-08** Tuned per numbers: Mermaid labels quoted with <br> (short's flowchart now valid syntax); D-13 first+last of each run and Before/After blocks for live edits (user-approved cost); thresholds unchanged; reruns kept takeaways.
-- [human] **VD-09** User reviews the Matt short digest with the agent's takeaways and confirms the loop is useful.
-  - note: User judgment on the digest and takeaways.
+- [x] **VD-09** User confirmed the digest-plus-takeaways loop is useful; noted high CPU use (Backlog).
 
 ## Global validation
 
@@ -137,10 +136,11 @@ Commands:
 - Whisper fallback for videos without captions (deferred by D-07).
 - Local video files and other video sites.
 - Batch mode over a playlist or a channel's shorts.
+- CPU load (user, VD-09): Tesseract over up to 1,200 frames uses every core (OpenMP), and the VD-08 reruns ran two videos at once. Options: `OMP_THREAD_LIMIT=1` for the Tesseract child (needs an env-capable runner instead of `pi.exec`), OCR on downscaled frames, or skipping pixel-identical frames before OCR.
 
 ## Resume context
 
-Planning done; status draft, awaiting /plan3 finish. Review applied: all 7 advisor findings accepted (D-10 reruns keep takeaways, D-11 last-of-run frame selection, D-12 validated Luna replies with stable ids; fake-runner pipeline and session_start registration tests; two-video baseline). No open questions. Next: VD-01 (user installs yt-dlp), then VD-02. Spike artifacts are only in the research temp dir and are not needed to resume.
+Complete. All 9 steps done; global validation: C1 ok, C2 no diagnostics (LSP inconclusive, edit hooks clean), C3 short digest + takeaways, pi -p in C:\SOFT\git says tools_enable lacks video_digest (repo: yes), no temp left. Final verify:quiet failed once on "hub tests" (hub untouched here; other sessions have dirty hub files); a direct rerun of `node --test scripts/test-*.mjs` in hub/ exited 0. CPU load noted in Backlog.
 
 ## Amendments
 
