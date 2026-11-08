@@ -59,6 +59,10 @@ assert.deepEqual(screenFrames(film([
 	screen({ line: 200, corner: true }), screen({ line: 200, corner: true }), screen({ line: 200, corner: true }),
 	screen({ camera: true }), // 10 camera shot dropped
 ]), W, H, 1), [0, 4]);
+// Vertical videos skip the camera check: a camera shot after a screen is kept for Luna to judge.
+const still = screen({ camera: true });
+assert.deepEqual(screenFrames(film([screen(), still, still]), W, H, 1, false), [0, 1]);
+assert.deepEqual(screenFrames(film([screen(), still, still]), W, H, 1), [0]);
 // The motion window is in seconds: at 1 s a line edited twice within 4 s counts as motion; at 12 s apart both states are kept.
 const twice = film([screen(), screen(), screen({ line: 200 }), screen({ line: 200 }), screen({ line: 200 }), screen({ line: 200 }), screen({ line: 120 }), screen({ line: 120 })]);
 assert.deepEqual(screenFrames(twice, W, H, 1), [0]);

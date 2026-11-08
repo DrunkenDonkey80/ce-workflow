@@ -103,7 +103,7 @@ function flatShare(frame: Uint8Array, width: number, height: number) {
  * Camera frames are dropped; a frame is kept when enough pixels outside the moving regions (webcam, face)
  * differ from the last kept frame. Motion counts over plus or minus MOTION_SECONDS, at least one frame.
  */
-export function screenFrames(thumbs: Uint8Array, width: number, height: number, interval: number) {
+export function screenFrames(thumbs: Uint8Array, width: number, height: number, interval: number, cameraCheck = true) {
 	const size = width * height;
 	const count = Math.floor(thumbs.length / size);
 	const frame = (i: number) => thumbs.subarray(i * size, (i + 1) * size);
@@ -118,7 +118,7 @@ export function screenFrames(thumbs: Uint8Array, width: number, height: number, 
 	let last: Uint8Array | undefined;
 	for (let i = 0; i < count; i++) {
 		const current = frame(i);
-		if (flatShare(current, width, height) < FLAT_SHARE) continue;
+		if (cameraCheck && flatShare(current, width, height) < FLAT_SHARE) continue;
 		if (last) {
 			const hits = new Uint8Array(size);
 			for (let j = Math.max(1, i - radius); j <= Math.min(count - 1, i + radius); j++) for (let p = 0; p < size; p++) hits[p] += moved[j][p];
@@ -415,15 +415,18 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 		progress("Sampling frames…");
 		// D-04: one pass writes the JPEG frames Luna sees and the gray thumbnails the pixel filter reads.
 		const thumbFile = path.join(tmp, "thumbs.gray");
+		// Vertical shorts split code over camera, so the flat-block check rejects them; Luna (cheap) judges those frames instead.
+		const vertical = Number(info.height) > Number(info.width);
+		const [thumbW, thumbH] = vertical ? [THUMB_H, THUMB_W] : [THUMB_W, THUMB_H];
 		const ff = await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", path.join(tmp, videoFile),
-			"-filter_complex", `[0:v]fps=1/${interval},split=2[a][b];[a]scale=1280:1280:force_original_aspect_ratio=decrease[f];[b]scale=${THUMB_W}:${THUMB_H},format=gray[t]`,
+			"-filter_complex", `[0:v]fps=1/${interval},split=2[a][b];[a]scale=1280:1280:force_original_aspect_ratio=decrease[f];[b]scale=${thumbW}:${thumbH},format=gray[t]`,
 			"-map", "[f]", "-frames:v", String(MAX_FRAMES), "-q:v", "3", path.join(frameDir, "f%04d.jpg"),
 			"-map", "[t]", "-frames:v", String(MAX_FRAMES), "-f", "rawvideo", thumbFile], 1_800_000);
 		const frames = (await readdir(frameDir)).filter((name) => name.endsWith(".jpg")).sort().map((name) => path.join(frameDir, name));
 		if (ff.code !== 0 || !frames.length) throw new Error(`ffmpeg could not sample frames: ${tail(ff)}`);
 
 		progress(`Filtering ${frames.length} frames…`);
-		const candidates = screenFrames(await readFile(thumbFile), THUMB_W, THUMB_H, interval).filter((index) => index < frames.length);
+		const candidates = screenFrames(await readFile(thumbFile), thumbW, thumbH, interval, !vertical).filter((index) => index < frames.length);
 
 		let dropped = 0;
 		let calls = 0;
