@@ -50,7 +50,7 @@ function setup(dir) {
 	const inputs = [...(task.inputs ?? []), ...values("--add").map((pair) => { const [src, dest] = pair.split("="); return { src, dest }; })];
 	for (const { src, dest } of inputs) cpSync(src, path.join(dir, dest), { recursive: true });
 	if (!task.copy) git(dir, "init", "-q");
-	appendFileSync(path.join(dir, ".git", "info", "exclude"), "\n/.pi/\n/.ce-workflow/\n__pycache__/\n.pytest_cache/\n");
+	appendFileSync(path.join(dir, ".git", "info", "exclude"), "\n/.pi/\n/.ce-workflow/\n/.pi-lens-probe-home/\n__pycache__/\n.pytest_cache/\n"); // pi-lens writes probe logs into the cwd
 	if (task.setupPatch) git(dir, "apply", path.join(taskDir, task.setupPatch));
 	let base = task.copy ? commit(dir, "lab setup") : commit(dir, "DealFinder");
 	if (task.changePatch) { git(dir, "apply", path.join(taskDir, task.changePatch)); commit(dir, task.changeMessage); }

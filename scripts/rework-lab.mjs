@@ -54,7 +54,7 @@ function setup() {
 	if (existsSync(path.join(source, "data"))) cpSync(path.join(source, "data"), path.join(dir, "data"), { recursive: true });
 	mkdirSync(path.join(dir, ".pi"), { recursive: true });
 	writeFileSync(path.join(dir, ".pi", "settings.json"), `${JSON.stringify({ workOrchestrator: { plan3: { planningModel: thinker, codingModel: worker, codingEffort: "high" }, context: { mode: "ultrafull" } } }, null, "\t")}\n`);
-	appendFileSync(path.join(dir, ".git", "info", "exclude"), "\n/.pi/\n/.ce-workflow/\n");
+	appendFileSync(path.join(dir, ".git", "info", "exclude"), "\n/.pi/\n/.ce-workflow/\n/.pi-lens-probe-home/\n"); // pi-lens writes probe logs into the cwd
 	note("clone", { dir, sha: git("rev-parse", "--short", "HEAD"), commits: git("rev-list", "--all", "--count") });
 }
 
