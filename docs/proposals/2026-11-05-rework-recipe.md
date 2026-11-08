@@ -57,7 +57,7 @@ One loop per rework target (a module or a group of modules, never "the whole pro
       - the interface as callers see it before and after (entry points and rules), and how many call sites change;
       - tests at the new interface, and which tests become waste;
       - a strength: Strong, Worth exploring, or Speculative.
-   5. **Future-changes check.** Name 3 realistic upcoming changes from recent commits, plans, backlogs and docs. For each one, count the files and edit sites it touches today versus after each Strong candidate.
+   5. **Future-changes check.** Name 3 realistic upcoming changes from recent commits, plans, backlogs and docs. For each one, count the files and edit sites it touches today versus after each Strong candidate. Write each as one bounded scenario (the exact change, e.g. "add a Code39 symbology to the CLI and GUI") and keep the same three scenarios fixed through Design and Replay. Pass rule: at least one improves, and none gets worse.
    6. **Pick the rework target**: the candidate with the best leverage and locality on hot code. A bug the friction hides (such as lost updates) raises its priority; record it as unresolved for the human (§2).
 
    A proposed module map may go in the plan diagram (`plan3_diagram`).
@@ -151,7 +151,7 @@ For every run, record which checkout, SHA and implementation it used, so the rep
 
 ## 4. Scorecard template (R4)
 
-Fix the scorecard in the plan before Build starts (it is part of what Pick approves). Score three dimensions separately. There is no weighted total.
+Fix the scorecard in the plan before Build starts (it is part of what Pick approves). Choose the performance metric and workload in Characterize, before CHR-03 records the baseline; Design may tighten the threshold but never picks the metric after the baseline. Score three dimensions separately. There is no weighted total.
 
 | Dimension | Metric | Workload | Baseline (old) | Candidate (new) | Threshold | Repetitions | Result |
 |---|---|---|---|---|---|---|---|
@@ -186,7 +186,7 @@ Plan3 runs pending steps past an unanswered `[human]` step. It skips only steps 
 
 The human turns each one on with Alt+A. Agents never remove, edit or bypass a `needs:` line, and never propose chat approval in place of Alt+A: when the next phase waits on a gate, stop and name the gate. Until the human does, a gate is off by day and in night mode, so unattended runs cannot pass it. Once a gate is approved it stays on at night too: night mode does not take back an approval.
 
-Code-only and device projects (R7): device checks are separate `[blocked]` steps with the device as a prerequisite. Unit-level characterization runs without them.
+Code-only and device projects (R7): device checks are separate `[blocked]` steps with the device as a prerequisite. Unit-level characterization runs without them. When the target has several real callers (a CLI and a GUI), the device smoke goes through each of them.
 
 ## 7. Plan skeleton
 
