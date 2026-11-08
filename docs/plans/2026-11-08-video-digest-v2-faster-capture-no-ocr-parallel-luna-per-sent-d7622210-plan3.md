@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T15:17:47.934Z
+updated: 2026-11-08T16:02:53.735Z
 reviewed: 2026-11-08
 ---
 
@@ -107,11 +107,7 @@ Commands (referenced by steps):
 ### Phase 1: Capture and filter [code]
 
 - [x] **V2-01** 720p download (bv*[height<=720]/b) and one ffmpeg pass writing q3 JPEG frames plus 320x180 gray raw thumbnails; Luna gets image/jpeg.
-- [ ] **V2-02** Add `screenFrames()` with the D-05 thresholds and use it instead of OCR candidates.
-  - The motion window is plus or minus 5 seconds, so it spans max(1, round(5 / interval)) frames; the measurement used 5 frames at 1 fps. Long videos sampled every 12 s get a window of 1 frame, not 60 s.
-  - Unit test with synthetic thumbnails: a camera-like noisy frame dropped, an unchanged screen dropped, a one-line edit kept, a moving webcam corner ignored, and an interval of 12 s keeping two distinct screen states 12 s apart.
-  - Per D-08: remove `ocrTokens`, `similarity`, `selectCandidates`, the tesseract dependency entry and their tests.
-  - Check: C1, C3.
+- [x] **V2-02** screenFrames() (flat-block screen check, motion window in seconds with at least 1 frame, masked dedupe) replaces Tesseract; OCR helpers, the tesseract program entry and their tests removed.
 
 ### Phase 2: Parallel Luna and merge [code]
 

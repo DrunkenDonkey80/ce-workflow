@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-	isYouTubeUrl, pickCaptionTrack, captionLines, captionParagraphs, ocrTokens, similarity, selectCandidates, sampleInterval,
+	isYouTubeUrl, pickCaptionTrack, captionLines, captionParagraphs, screenFrames, sampleInterval,
 	digestFolder, digestOwner, keepTakeaways, mergeArtifacts, renderDigest, digestVideo, NO_CAPTIONS, TAKEAWAYS,
 } from "../extensions/video-digest.ts";
 
@@ -30,25 +30,31 @@ const lines = captionLines(json3);
 assert.deepEqual(lines, [{ t: 0, text: "A lot of people" }, { t: 12, text: "ask me" }, { t: 31, text: "when to grill" }]);
 assert.equal(captionParagraphs(lines), "[0:00] A lot of people ask me\n\n[0:31] when to grill");
 
-// OCR TSV → tokens per frame; low confidence dropped, numbers and symbols kept.
-const words = (n, prefix) => Array.from({ length: n }, (_, i) => `${prefix}${i}`);
-const tsv = (pages) => ["level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext",
-	...pages.flatMap((tokens, p) => [`1\t${p + 1}\t0\t0\t0\t0\t0\t0\t608\t1080\t-1\t`, ...tokens.map((t, i) => `5\t${p + 1}\t1\t1\t1\t${i + 1}\t0\t0\t9\t9\t${t === "blurry" ? 40 : 91}\t${t}`)])].join("\n");
-assert.deepEqual(ocrTokens(tsv([["const", "x", "=", "42;", "blurry"], []]), 3), [["const", "x", "=", "42;"], [], []]);
-
-// D-11/D-13 candidate selection.
-const code = words(20, "tok");
-const fixed = [...code.slice(0, 19), "43"]; // one changed token, a number
-const scrollA = words(20, "line"), scrollB = [...words(10, "line").map((_, i) => `line${i + 10}`), ...words(10, "more")];
-const pages = [
-	["so", "the", "idea", "is"], // 0 caption-only: dropped
-	code, code, code, // 1-3 exact repeats → keep 1 (before)
-	fixed, // 4 corrected line: same run, kept as the after state
-	[...fixed.slice(0, 18), "x", "43"], // 5 another edit in the run: replaces 4 as the last state
-	scrollA, scrollB, // 6, 7 overlapping scroll positions: both kept
-];
-assert(similarity(code, fixed) > 0.9 && similarity(scrollA, scrollB) < 0.5);
-assert.deepEqual(selectCandidates(pages), [1, 5, 6, 7]);
+// D-05 pixel filter on synthetic 64x32 gray thumbnails.
+let seed = 7;
+const noise = () => (seed = (seed * 1103515245 + 12345) % 2147483648) % 256;
+const W = 64, H = 32;
+const screen = ({ line = 0, corner = false, camera = false } = {}) => {
+	const f = new Uint8Array(W * H).fill(40);
+	for (let p = 0; p < f.length; p++) {
+		const x = p % W, y = Math.floor(p / W);
+		if (camera || (corner && x >= 48 && y < 16)) f[p] = noise(); // a camera shot, or a moving webcam corner
+		else if (line && y === 20 && x < 40) f[p] = line; // one edited line of 40 pixels
+	}
+	return f;
+};
+const film = (frames) => Buffer.concat(frames.map((f) => Buffer.from(f)));
+const s0 = screen({ corner: true });
+assert.deepEqual(screenFrames(film([
+	s0, s0, screen({ corner: true }), screen({ corner: true }), // 0 kept; an exact repeat and webcam-only changes dropped
+	screen({ line: 200, corner: true }), screen({ line: 200, corner: true }), screen({ line: 200, corner: true }), // 4 the edit kept
+	screen({ line: 200, corner: true }), screen({ line: 200, corner: true }), screen({ line: 200, corner: true }),
+	screen({ camera: true }), // 10 camera shot dropped
+]), W, H, 1), [0, 4]);
+// The motion window is in seconds: at 1 s a line edited twice within 4 s counts as motion; at 12 s apart both states are kept.
+const twice = film([screen(), screen(), screen({ line: 200 }), screen({ line: 200 }), screen({ line: 200 }), screen({ line: 200 }), screen({ line: 120 }), screen({ line: 120 })]);
+assert.deepEqual(screenFrames(twice, W, H, 1), [0]);
+assert.deepEqual(screenFrames(twice, W, H, 12), [0, 2, 6]);
 
 // D-08 sampling.
 assert.equal(sampleInterval(1199), 1);
@@ -100,12 +106,12 @@ try {
 	mkdirSync(tmpRoot);
 	const project = path.join(root, "project");
 	const arg = (args, flag) => args[args.indexOf(flag) + 1];
-	const fake = ({ missing, failing, captions = true, pageTokens, onCall } = {}) => {
+	const fake = ({ missing, failing, captions = true, thumbs = typing, onCall } = {}) => {
 		const calls = [];
 		const exec = async (command, args, options) => {
 			calls.push([command, ...args]);
 			onCall?.(command, args, options);
-			const name = /yt-dlp/.test(command) ? "yt-dlp" : /ffmpeg/.test(command) ? "ffmpeg" : "tesseract";
+			const name = /yt-dlp/.test(command) ? "yt-dlp" : "ffmpeg";
 			if (name === missing || name === failing && args[0] !== "--version" && args[0] !== "-version") return { code: 1, stderr: `${name} failed` };
 			if (args[0] === "--version" || args[0] === "-version") return { code: 0, stdout: "1.0" };
 			if (name === "yt-dlp" && args.includes("--write-info-json")) {
@@ -114,16 +120,20 @@ try {
 			} else if (name === "yt-dlp" && args.includes("--sub-langs")) writeFileSync(path.join(path.dirname(arg(args, "-o")), `v.${arg(args, "--sub-langs")}.json3`), JSON.stringify(json3));
 			else if (name === "yt-dlp") writeFileSync(path.join(path.dirname(arg(args, "-o")), "video.mp4"), "");
 			else if (name === "ffmpeg") {
-				pageTokens.forEach((_, i) => writeFileSync(path.join(path.dirname(args[args.indexOf("-q:v") + 2]), `f${String(i + 1).padStart(4, "0")}.jpg`), "jpg"));
-				writeFileSync(args.at(-1), Buffer.alloc(pageTokens.length * 320 * 180));
+				for (let i = 0; i < thumbs.length / (320 * 180); i++) writeFileSync(path.join(path.dirname(args[args.indexOf("-q:v") + 2]), `f${String(i + 1).padStart(4, "0")}.jpg`), "jpg");
+				writeFileSync(args.at(-1), thumbs);
 			}
-			else writeFileSync(`${args[1]}.tsv`, tsv(pageTokens));
 			return { code: 0, stdout: "" };
 		};
 		return { exec, calls };
 	};
 	const tmpEmpty = () => assert.deepEqual(readdirSync(tmpRoot), [], "the temp dir is removed");
-	const distinct = Array.from({ length: 12 }, (_, i) => words(10, `p${i}w`)); // 12 candidates → 2 batches
+	// 12 distinct screen states (a line typed per second) → 2 batches.
+	const typing = Buffer.concat(Array.from({ length: 12 }, (_, i) => {
+		const f = Buffer.alloc(320 * 180, 40);
+		for (let p = 0; p < f.length; p++) if (Math.floor(p / 320) < 10 + i * 8 && p % 320 < 100 && Math.floor(p / 320) % 8 === 2) f[p] = 200;
+		return f;
+	}));
 	const prompts = [];
 	const model = async (content) => {
 		prompts.push(content);
@@ -135,13 +145,14 @@ try {
 		return { text: JSON.stringify({ artifacts }), usage: { input: 100, output: 10, cost: { total: 0.01 } } };
 	};
 
-	// Missing Tesseract fails before any download.
-	const noOcr = fake({ missing: "tesseract", pageTokens: distinct });
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: noOcr.exec, model, tmpRoot }), /tesseract is not installed.*winget install/);
-	assert(!noOcr.calls.some((call) => call.includes("--write-info-json")), "nothing is downloaded");
+	// A missing program fails before any download; Tesseract is no longer needed (D-08).
+	const noFfmpeg = fake({ missing: "ffmpeg" });
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: noFfmpeg.exec, model, tmpRoot }), /ffmpeg is not installed.*winget install/);
+	assert(!noFfmpeg.calls.some((call) => call.includes("--write-info-json")), "nothing is downloaded");
+	assert(!noFfmpeg.calls.some((call) => /tesseract/.test(call[0])));
 
 	// Full run: two batches, an artifact spanning both is updated, the earlier unrelated one survives.
-	const ok = fake({ pageTokens: distinct });
+	const ok = fake();
 	const result = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", cwd: project, exec: ok.exec, model, tmpRoot });
 	tmpEmpty();
 	assert.equal(result.calls, 2);
@@ -164,7 +175,7 @@ try {
 	// Rerun keeps the agent's takeaways and rewrites the generated sections.
 	writeFileSync(digestFile, `${digest}\n${TAKEAWAYS}\n\n- Plan3 already sizes requests.\n`);
 	prompts.length = 0;
-	const rerun = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", cwd: project, exec: fake({ captions: false, pageTokens: distinct }).exec, model, tmpRoot });
+	const rerun = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", cwd: project, exec: fake({ captions: false }).exec, model, tmpRoot });
 	digest = readFileSync(digestFile, "utf8");
 	assert(rerun.keptTakeaways && digest.includes("- Plan3 already sizes requests.") && digest.split(TAKEAWAYS).length === 2);
 	// No captions: visuals still digested, with the note (D-07).
@@ -172,12 +183,12 @@ try {
 	tmpEmpty();
 
 	// Failures and cancellation remove the temp dir.
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ failing: "ffmpeg", pageTokens: distinct }).exec, model, tmpRoot }), /ffmpeg could not sample frames/);
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ failing: "ffmpeg" }).exec, model, tmpRoot }), /ffmpeg could not sample frames/);
 	tmpEmpty();
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ pageTokens: distinct }).exec, model: async () => { throw new Error("Luna failed (error)."); }, tmpRoot }), /Luna failed/);
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: async () => { throw new Error("Luna failed (error)."); }, tmpRoot }), /Luna failed/);
 	tmpEmpty();
 	const controller = new AbortController();
-	const aborting = fake({ pageTokens: distinct, onCall: (_command, args) => { if (args.includes("-f")) controller.abort(); } });
+	const aborting = fake({ onCall: (_command, args) => { if (args.includes("-f")) controller.abort(); } });
 	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: aborting.exec, model, signal: controller.signal, tmpRoot }), /cancelled/);
 	assert(!aborting.calls.some((call) => /ffmpeg/.test(call[0]) && call[1] !== "-version"), "nothing runs after the abort");
 	tmpEmpty();
