@@ -16,6 +16,18 @@ What the skill changed (judge): forced runs built a causal experiment before the
 
 **Verdict: trade-off, not a clear adopt.** Better process and tests on every forced run, same outcome, at about 1.6× cost, a material regression under the Optimization Regression Rule. The one unforced run read the skill on its own and landed in the middle at off-arm cost. Brought to the user at SK-09 as a choice (for example a lighter adapted version: reproduce first, one-factor experiment, regression test red before the fix).
 
+## prototype
+
+| Arm | Hidden test | Suite | #3 model run before production edit | Judge rank (1 best of 7) | Tokens | Cost $ | Runtime s | Turns | Tool calls |
+|---|---|---|---|---|---|---|---|---|---|
+| off | 3/3 | 3/3 | fail ×3 | 2, 4, 7 | 998,858 | 0.4370 | 506 | 18 | 17 |
+| forced | 3/3 | 3/3 | fail ×3 | 1, 3, 6 | 979,657 | 0.3708 | 472 | 19 | 18 |
+| unforced (did not read it) | 1/1 | 1/1 | fail | 5 | 907,073 | 0.3734 | 315 | 19 | 18 |
+
+No run, forced included, built and ran a throwaway model before editing production code; the one forced run that wrote a demo did it after the suite passed. Both arms spread across the ranking, and each arm has one run the judge would block for an expiry bug (off B95D: history expires even for deals present the whole time; forced 0A12: a short disappearance can be forgotten too early). The hidden test caught neither.
+
+**Verdict: no measurable effect; do not adopt.** The skill's core step never happened even when forced, quality and cost are within the spread of the off arm.
+
 ## writing-for-agents
 
 Phase 1 (write AGENTS.md) judged; the verdict waits for the replay phase (a fresh agent adds a shop source using each AGENTS.md).
