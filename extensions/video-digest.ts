@@ -11,6 +11,7 @@ export const NO_CAPTIONS = "No captions available for this video.";
 export const TAKEAWAYS = "## Takeaways for ce-workflow";
 const MAX_FRAMES = 1200; // D-08
 const BATCH = 10; // the vision bridge's per-call image limit
+const THUMB_W = 320, THUMB_H = 180; // D-04 filter thumbnails
 const MIN_TOKENS = 8; // D-11 thresholds, tuned in VD-08
 const SIMILAR = 0.5;
 const MIN_CONF = 70;
@@ -283,7 +284,7 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 		meta.captions = lines.length || captionNote.startsWith("download") ? captionNote : "none";
 
 		progress("Downloading video…");
-		const video = await run("yt-dlp", ["--load-info-json", infoFile, "-f", "bv*[height<=1080]/b", "-o", path.join(tmp, "video.%(ext)s")], 1_800_000);
+		const video = await run("yt-dlp", ["--load-info-json", infoFile, "-f", "bv*[height<=720]/b", "-o", path.join(tmp, "video.%(ext)s")], 1_800_000);
 		const videoFile = (await readdir(tmp)).find((name) => name.startsWith("video.") && !name.endsWith(".part"));
 		if (video.code !== 0 || !videoFile) throw new Error(`yt-dlp could not download the video: ${tail(video)}`);
 
@@ -292,8 +293,13 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 		const frameDir = path.join(tmp, "frames");
 		await mkdir(frameDir);
 		progress("Sampling frames…");
-		const ff = await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", path.join(tmp, videoFile), "-vf", `fps=1/${interval},scale=1280:1280:force_original_aspect_ratio=decrease`, "-frames:v", String(MAX_FRAMES), path.join(frameDir, "f%04d.png")], 1_800_000);
-		const frames = (await readdir(frameDir)).filter((name) => name.endsWith(".png")).sort().map((name) => path.join(frameDir, name));
+		// D-04: one pass writes the JPEG frames Luna sees and the gray thumbnails the pixel filter reads.
+		const thumbFile = path.join(tmp, "thumbs.gray");
+		const ff = await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", path.join(tmp, videoFile),
+			"-filter_complex", `[0:v]fps=1/${interval},split=2[a][b];[a]scale=1280:1280:force_original_aspect_ratio=decrease[f];[b]scale=${THUMB_W}:${THUMB_H},format=gray[t]`,
+			"-map", "[f]", "-frames:v", String(MAX_FRAMES), "-q:v", "3", path.join(frameDir, "f%04d.jpg"),
+			"-map", "[t]", "-frames:v", String(MAX_FRAMES), "-f", "rawvideo", thumbFile], 1_800_000);
+		const frames = (await readdir(frameDir)).filter((name) => name.endsWith(".jpg")).sort().map((name) => path.join(frameDir, name));
 		if (ff.code !== 0 || !frames.length) throw new Error(`ffmpeg could not sample frames: ${tail(ff)}`);
 
 		progress(`OCR on ${frames.length} frames…`);
@@ -316,7 +322,7 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 			const nearby = lines.filter((line) => line.t >= times[0] - 10 && line.t <= times[times.length - 1] + 10).map((line) => `[${clock(line.t)}] ${line.text}`).join("\n");
 			progress(`Luna batch ${calls + 1} of ${Math.ceil(candidates.length / BATCH)}…`);
 			const content: any[] = [{ type: "text", text: batchPrompt(meta, labels, nearby, artifacts) }];
-			for (const [i, index] of batch.entries()) content.push({ type: "text", text: `Frame ${labels[i]}:` }, { type: "image", data: (await readFile(frames[index])).toString("base64"), mimeType: "image/png" });
+			for (const [i, index] of batch.entries()) content.push({ type: "text", text: `Frame ${labels[i]}:` }, { type: "image", data: (await readFile(frames[index])).toString("base64"), mimeType: "image/jpeg" });
 			if (signal?.aborted) throw new Error("Video digest cancelled.");
 			const reply = await model(content, signal);
 			calls++;

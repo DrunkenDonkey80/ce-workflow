@@ -113,7 +113,10 @@ try {
 				writeFileSync(path.join(path.dirname(arg(args, "-o")), "v.info.json"), JSON.stringify(info));
 			} else if (name === "yt-dlp" && args.includes("--sub-langs")) writeFileSync(path.join(path.dirname(arg(args, "-o")), `v.${arg(args, "--sub-langs")}.json3`), JSON.stringify(json3));
 			else if (name === "yt-dlp") writeFileSync(path.join(path.dirname(arg(args, "-o")), "video.mp4"), "");
-			else if (name === "ffmpeg") pageTokens.forEach((_, i) => writeFileSync(path.join(path.dirname(args.at(-1)), `f${String(i + 1).padStart(4, "0")}.png`), "png"));
+			else if (name === "ffmpeg") {
+				pageTokens.forEach((_, i) => writeFileSync(path.join(path.dirname(args[args.indexOf("-q:v") + 2]), `f${String(i + 1).padStart(4, "0")}.jpg`), "jpg"));
+				writeFileSync(args.at(-1), Buffer.alloc(pageTokens.length * 320 * 180));
+			}
 			else writeFileSync(`${args[1]}.tsv`, tsv(pageTokens));
 			return { code: 0, stdout: "" };
 		};
@@ -145,6 +148,12 @@ try {
 	assert.equal(result.candidates, 12);
 	assert.match(prompts[1][0].text, /"id":"a1"/, "the second batch sees earlier artifacts with ids");
 	assert(!ok.calls.some((call) => call.includes("--write-subs") || call.includes("en")), "only the original-language track is requested");
+	// D-04: 720p download, one ffmpeg pass writing JPEG frames plus gray thumbnails.
+	assert(ok.calls.some((call) => call.includes("bv*[height<=720]/b")));
+	const ffCall = ok.calls.find((call) => /ffmpeg/.test(call[0]) && call[1] !== "-version");
+	assert.match(ffCall[ffCall.indexOf("-filter_complex") + 1], /fps=1\/1,split=2.*scale=320:180,format=gray/);
+	assert(ffCall.includes("-q:v") && /f%04d\.jpg$/.test(ffCall[ffCall.indexOf("-q:v") + 2]) && ffCall.at(-1).endsWith("thumbs.gray") && ffCall.includes("rawvideo"));
+	assert.equal(prompts[0].find((part) => part.type === "image").mimeType, "image/jpeg");
 	const digestFile = path.join(project, "docs", "research", "videos", "2026-10-16-when-should-you-not-use-grill-me", "digest.md");
 	assert.equal(result.file, digestFile);
 	let digest = readFileSync(digestFile, "utf8");

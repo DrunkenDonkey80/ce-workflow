@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-08
-updated: 2026-11-08T15:16:23.359Z
+updated: 2026-11-08T15:17:47.934Z
 reviewed: 2026-11-08
 ---
 
@@ -106,9 +106,7 @@ Commands (referenced by steps):
 
 ### Phase 1: Capture and filter [code]
 
-- [ ] **V2-01** Download 720p and run one ffmpeg pass writing JPEG frames plus 320x180 gray thumbnails (D-04).
-  - Drop the 1280 PNG scaling; keep the D-08 interval of plan 544351ec for long videos.
-  - Check: C1 with the injected runner asserting the new yt-dlp and ffmpeg arguments.
+- [x] **V2-01** 720p download (bv*[height<=720]/b) and one ffmpeg pass writing q3 JPEG frames plus 320x180 gray raw thumbnails; Luna gets image/jpeg.
 - [ ] **V2-02** Add `screenFrames()` with the D-05 thresholds and use it instead of OCR candidates.
   - The motion window is plus or minus 5 seconds, so it spans max(1, round(5 / interval)) frames; the measurement used 5 frames at 1 fps. Long videos sampled every 12 s get a window of 1 frame, not 60 s.
   - Unit test with synthetic thumbnails: a camera-like noisy frame dropped, an unchanged screen dropped, a one-line edit kept, a moving webcam corner ignored, and an interval of 12 s keeping two distinct screen states 12 s apart.
