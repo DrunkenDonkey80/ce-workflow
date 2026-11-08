@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T15:13:38.251Z
+updated: 2026-11-08T15:32:18.438Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -204,10 +204,8 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 - [x] **PC-04** plan3 size (fresh drafts only): compact dialog with recommendation preselected, night/headless take it, Plan/Map record D-size, Map writes the map template, Tiny deletes draft+sidecars and sends the Tiny prompt at agent_settled with research off (271109e).
 - [x] **PC-05** Map plans: template rejected by finishProblems until filled, single [think] phase (no tagging), MAP_PROMPT on continue, MAP_EXECUTE in execute, linear ticket order in workState, wip/complete refusals incl. fog (cdc3be9).
 - [x] **PC-06** PROJECT_LANGUAGE in planning and convert prompts; finish shows a Project docs checklist and writes picked terms/ADRs only after Plan ready via extensions/plan3-docs.ts (lazy, merged, numbered, idempotent) (505282c).
-- [ ] **PC-07** Document sizing, map plans, project care, grilling rounds and glossary/ADR in README's Plan3 section; add CHANGELOG Unreleased bullets.
-  - Check: manual read; README states limits (map order is linear, Tiny skips planning entirely).
-- [ ] **PC-08** Run C-types and C-verify once.
-  - Check: both pass.
+- [x] **PC-07** README Plan3 section: size first, map plans, how planning asks/plans (care, slices), project language; CHANGELOG Unreleased: 4 Added bullets (others' Hub line left unstaged).
+- [x] **PC-08** C-types and C-verify pass at 80b577a (clean worktree); the shared checkout's only failure is another session's uncommitted video-digest.ts edit.
 
 ### Phase 7: Measure and trial [think]
 
@@ -240,7 +238,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ## Resume context
 
-SK-01..09, PC-01..03, PC-13 done (HEAD 8f948a2). Next: PC-04 sizing per proposal §3 (docs/proposals/2026-11-08-plan3-care-and-questioning.md): in extensions/plan3.ts add `let sizing` (set in startPlanning only when lead starts "Draft plan:" and no sourceFile/fromChat; append SIZE prompt §3a to planningPrompt then), tool action `size` (enum at ~L1578, params mode/text, execute ~L1598; dialog via showListDialog compact with currentValue; night check `(readAvail(needsFile(logFile(plan.file))).mode ?? "day") === "day"`), Tiny: unlink draft + logs/<id>.md/.stats.json/.needs.json, clear pointer, pendingTiny handled at agent_settled (~L1926, like afterTagging L1094): research(ctx,false,true), runPhase(ctx,null,"coding"), send TINY prompt; generic tail of tool execute must skip summarize for tiny. Map branch of size depends on PC-05 template: implement PC-04 with map setting size/kind meta + returning MAP prompt, template writer in PC-05. Then PC-05, PC-06, PC-11, PC-12, PC-07, PC-08, PC-09 (rerun sk06 requests with new prompts; rubric blind mixed with baseline), PC-10 human.
+PC-01..08, PC-11..13, SK-* done. PC-09 running: C:\SOFT\git\skills-lab\sk06c.sh started 17:31 (nohup, timeout 8h) on ce-workflow 52dca50, log sk06c.log, runs plan-runs/sk06c-*; a 5-min script timer wakes on "SK06C ALL DONE". Next: R3 medians per request (sum all sessions) vs SK-06 baseline in docs/proposals/skills-lab/results.md; blind judge baseline+candidate mixed per proposal §7 (judge bundles like skills-lab/judge/sk07, Astra reviewer); candidate-only conformance (size picked: P plan, T tiny, F map or recorded reason); verdict keep/tune/revert per Optimization Regression Rule. Then PC-10 is [human]. Never push; stage only own files (CHANGELOG has another session's Hub line; video-digest.ts dirty from another session).
 
 ## Amendments
 
