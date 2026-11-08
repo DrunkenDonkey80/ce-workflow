@@ -1782,6 +1782,36 @@ try {
 		await writeFile(map.file, (await readFile(map.file, "utf8")).replace("## Not yet specified\n\nNone.", "## Not yet specified\n\nExporter batching."));
 		await assert.rejects(tool({ action: "status", plan: map.id, value: "complete" }), /resolve the fog first/);
 		await rm(map.file);
+
+		// PC-06 project docs: finish offers new terms and ADR candidates; writes only ticked ones after Plan ready; idempotent.
+		assert.match(messages.findLast((entry) => entry.message.startsWith("Plan3: planning only.")).message, /\*\*Project language\*\*: when GLOSSARY\.md or docs\/adr\/ exists[\s\S]*\(ADR candidate\)[\s\S]*all three\./);
+		const docsId = "d0c5d0c5", docsFile = path.join(directory, `2026-10-01-docs-fixture-${docsId}-plan3.md`);
+		await writeFile(docsFile, validPlan(docsId, "Docs fixture", "draft", "- [ ] **A-01** Build", "reviewed: astra\n")
+			.replace("## Decisions\n\nNone yet.", "## Glossary\n\n- **Widget**: A priced item shown in the report. Avoid: product, thing.\n\n## Decisions\n\n- **D-02 Use SQLite.** Store prices in SQLite because the sync needs transactions. Source: user, 2026-11-08. (ADR candidate)\n- **Q-03** Loose idea (ADR candidate)"));
+		entries.push({ type: "custom", customType: "plan3-current", data: { id: docsId, planning: true } });
+		ctx.hasUI = true;
+		const glossaryFile = path.join(cwd, "GLOSSARY.md"), adrDir = path.join(cwd, "docs", "adr");
+		let docLabels;
+		selectScript = [["Project docs", null, (labels) => { docLabels = labels; }], ["Plan ready", null]];
+		await run("plan3", "finish");
+		assert.deepEqual(docLabels.map((label) => label.replace(/^\W+/, "").split(" — ")[0]), ["Glossary: Widget", "ADR: Use SQLite"]);
+		assert(notices.some((notice) => /not exportable, rewrite as a D line:\n- - \*\*Q-03\*\* Loose idea/.test(notice.message)));
+		assert(!existsSync(glossaryFile) && !existsSync(adrDir), "Plan ready cancelled after ticking writes nothing");
+		selectScript = [["Project docs", "Glossary: Widget"], ["Project docs", "ADR: Use SQLite"], ["Project docs", null], ["Plan ready", "Not yet"]];
+		await run("plan3", "finish");
+		assert(!existsSync(glossaryFile) && !existsSync(adrDir), "nothing selected writes nothing");
+		selectScript = [["Project docs", null], ["Plan ready", "Not yet"]];
+		await run("plan3", "finish");
+		assert.equal(await readFile(glossaryFile, "utf8"), `# ${path.basename(cwd)}\n\n## Language\n\n**Widget**:\nA priced item shown in the report.\n_Avoid_: product, thing\n`);
+		assert.deepEqual(await readdir(adrDir), ["0001-use-sqlite.md"]);
+		assert.equal(await readFile(path.join(adrDir, "0001-use-sqlite.md"), "utf8"), `# Use SQLite\n\nStore prices in SQLite because the sync needs transactions. Source: user, 2026-11-08.\n\nSource: Plan3 plan ${docsId}, D-02.\n`);
+		selectScript = [["Plan ready", "Not yet"]];
+		await run("plan3", "finish");
+		assert.equal(selectScript.length, 0, "a second finish offers nothing already written");
+		assert.deepEqual(await readdir(adrDir), ["0001-use-sqlite.md"]);
+		assert.equal((await readFile(glossaryFile, "utf8")).match(/\*\*Widget\*\*/g).length, 1);
+		ctx.hasUI = false;
+		await rm(docsFile); await rm(glossaryFile); await rm(adrDir, { recursive: true });
 	}
 
 	// Runtime test/build guidance belongs only to execution, never planning/capture/resolve/advisors.

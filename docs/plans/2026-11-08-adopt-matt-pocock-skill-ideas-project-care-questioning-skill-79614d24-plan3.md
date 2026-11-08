@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-08
-updated: 2026-11-08T14:59:35.962Z
+updated: 2026-11-08T15:11:38.864Z
 reviewed: 2026-11-08
 tagsChecked: 94b415d9
 started: 2026-11-08T12:39:32.742Z
@@ -201,15 +201,9 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 ### Phase 6: Build in Plan3 [think]
 
 - [x] **PC-03** clarification now asks in frontier rounds (facts are the agent's job); PROJECT_CARE fit check in planningPrompt; executePrompt asks patch-vs-prefactor on unforeseen friction; C-p3 asserts updated (6eb96eb).
-- [ ] **PC-04** Sizing: add `plan3` action `size` with a compact showListDialog (Tiny, Plan, Map); record the pick in Decisions; Tiny removes the draft and leaves research.
-  - Night mode and headless take the recommendation without a dialog. Map hands over to PC-05's template.
-  - Tiny per the PC-01 lifecycle: early tool return, pointer cleared, research actually off at `agent_settled`, then the implementation prompt.
-  - Check: C-p3 covers each mode, the recommended preselect, the night-mode path, Tiny's successful tool return, research off after settle, the implementation prompt sent, cancel leaving the draft, and only the new draft deleted (other plans intact).
-- [ ] **PC-05** Map plans: template writer, map planning prompt and linear ticket order per PC-01; map plans pass `finishProblems` and need no tagging turn.
-  - Check: C-p3 creates a map plan, asserts its sections and typed [think] tickets, `finishProblems` empty after filling, `needsThinkTags` false, and that an open [human] ticket keeps the next ticket and the handoff unrunnable, in day and night mode.
-- [ ] **PC-06** Glossary and ADR: prompts read GLOSSARY.md and docs/adr when present; finish shows a checklist and writes selected terms and ADRs.
-  - Lazy creation, merge by term, next ADR number from existing files, ADR names the source plan and decision ID; written only after the Plan ready pick; idempotent (PC-01).
-  - Check: C-p3 runs finish on a fixture plan in a temp dir and asserts GLOSSARY.md and `docs/adr/0001-*.md` contents; no files when nothing is selected or when Plan ready is cancelled after ticking; a second finish adds no duplicate.
+- [x] **PC-04** plan3 size (fresh drafts only): compact dialog with recommendation preselected, night/headless take it, Plan/Map record D-size, Map writes the map template, Tiny deletes draft+sidecars and sends the Tiny prompt at agent_settled with research off (271109e).
+- [x] **PC-05** Map plans: template rejected by finishProblems until filled, single [think] phase (no tagging), MAP_PROMPT on continue, MAP_EXECUTE in execute, linear ticket order in workState, wip/complete refusals incl. fog (cdc3be9).
+- [x] **PC-06** PROJECT_LANGUAGE in planning and convert prompts; finish shows a Project docs checklist and writes picked terms/ADRs only after Plan ready via extensions/plan3-docs.ts (lazy, merged, numbered, idempotent) (20fe4d6).
 - [ ] **PC-07** Document sizing, map plans, project care, grilling rounds and glossary/ADR in README's Plan3 section; add CHANGELOG Unreleased bullets.
   - Check: manual read; README states limits (map order is linear, Tiny skips planning entirely).
 - [ ] **PC-08** Run C-types and C-verify once.
@@ -226,7 +220,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
   - Check: the user's verdict and any follow-ups recorded in Decisions or Backlog.
 - [ ] **PC-11** Add skills/two-axis-review/SKILL.md adapted from mattpocock code-review (Standards and Spec passes via pi-subagents, side-by-side report), with credit and MIT notice; register in package.json pi.skills; README line.
 - [ ] **PC-12** Add skills/diagnosing-bugs/SKILL.md, a shortened adaptation (repro command first, one-factor experiment, ranked hypotheses, regression test red before the fix, cleanup), credit and MIT notice; register in package.json pi.skills; README line.
-- [ ] **PC-13** Add to planningPrompt: order steps as thin end-to-end slices that each leave the tree working, a planned prefactor first, and wide refactors as expand, migrate in batches, contract; assert it in C-p3.
+- [x] **PC-13** planningPrompt orders steps as thin end-to-end slices, prefactor first, wide refactors as expand/migrate/contract; asserted in C-p3 (8f948a2).
 
 ## Global validation
 
@@ -246,7 +240,7 @@ Initial desk triage (agent proposal from reading every SKILL.md during planning;
 
 ## Resume context
 
-PC-01, PC-02 done (a2ca9ec). SK-07 wip: batch running (timer c3374474). SK-06 baseline running (timer 57849d8a). SK-08 partial: writing-for-agents phase-1 judged blind (skills-lab/judge/sk07/writing-for-agents/judge-phase1.md): ranking C4DA(off) 968B(forced) E74F(forced) 0A70(off) 5FC1(off) 2FBD(forced) DC52(unforced); no clear arm signal; forced runs cheaper (median 348k vs 422k tokens). Verdict needs the replay phase (reps 1-3,11-13,21,31-33). Next: when SK-07 tasks complete, run scripts/skills-lab-judge.mjs sk07 <task> and an Astra reviewer judge (give it the DealFinder snapshot judge/df-27221be); then scorecard results.md. Blocker for PC-03+: no Plan3 code edits until SK-06 and SK-07 finish (lab loads live checkout).
+SK-01..09, PC-01..03, PC-13 done (HEAD 8f948a2). Next: PC-04 sizing per proposal §3 (docs/proposals/2026-11-08-plan3-care-and-questioning.md): in extensions/plan3.ts add `let sizing` (set in startPlanning only when lead starts "Draft plan:" and no sourceFile/fromChat; append SIZE prompt §3a to planningPrompt then), tool action `size` (enum at ~L1578, params mode/text, execute ~L1598; dialog via showListDialog compact with currentValue; night check `(readAvail(needsFile(logFile(plan.file))).mode ?? "day") === "day"`), Tiny: unlink draft + logs/<id>.md/.stats.json/.needs.json, clear pointer, pendingTiny handled at agent_settled (~L1926, like afterTagging L1094): research(ctx,false,true), runPhase(ctx,null,"coding"), send TINY prompt; generic tail of tool execute must skip summarize for tiny. Map branch of size depends on PC-05 template: implement PC-04 with map setting size/kind meta + returning MAP prompt, template writer in PC-05. Then PC-05, PC-06, PC-11, PC-12, PC-07, PC-08, PC-09 (rerun sk06 requests with new prompts; rubric blind mixed with baseline), PC-10 human.
 
 ## Amendments
 
