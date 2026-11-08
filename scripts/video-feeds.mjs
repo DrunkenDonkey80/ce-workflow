@@ -1,14 +1,14 @@
 // Videos hub button (a run command): the YouTube channels we watch, what is new there, and digesting it.
 // Processed = a digest.md carrying the video id; analyzed for ideas = that digest has the Takeaways section.
-// Feeds and the ids passed over on purpose live in docs/research/videos/feeds.json.
+// Feeds and the ids passed over on purpose live in feeds.json beside the digests (DIGEST_DIR, outside the repo).
 import { execFile, spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { digestOwner, TAKEAWAYS } from "../extensions/video-digest.ts";
+import { DIGEST_DIR, digestOwner, TAKEAWAYS } from "../extensions/video-digest.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const VIDEOS = path.join(ROOT, "docs", "research", "videos");
+const VIDEOS = DIGEST_DIR;
 const FEEDS = path.join(VIDEOS, "feeds.json");
 const LATEST = 30; // newest entries checked per tab
 const PARALLEL = 3;

@@ -212,13 +212,13 @@ try {
 
 	// A missing program fails before any download; Tesseract is no longer needed (D-08).
 	const noFfmpeg = fake({ missing: "ffmpeg" });
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: noFfmpeg.exec, model, tmpRoot }), /ffmpeg is not installed.*winget install/);
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: noFfmpeg.exec, model, tmpRoot }), /ffmpeg is not installed.*winget install/);
 	assert(!noFfmpeg.calls.some((call) => call.includes("--write-info-json")), "nothing is downloaded");
 	assert(!noFfmpeg.calls.some((call) => /tesseract/.test(call[0])));
 
 	// Full run: two parallel batches, then the merge joins the artifact spanning both; the unrelated one survives.
 	const ok = fake();
-	const result = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", cwd: project, exec: ok.exec, model, tmpRoot });
+	const result = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", outDir: project, exec: ok.exec, model, tmpRoot });
 	tmpEmpty();
 	assert.equal(result.calls, 3);
 	assert.equal(result.usage.input, 300);
@@ -232,7 +232,7 @@ try {
 	assert.match(ffCall[ffCall.indexOf("-filter_complex") + 1], /fps=1\/1,split=2.*scale=320:180,format=gray/);
 	assert(ffCall.includes("-q:v") && /f%04d\.jpg$/.test(ffCall[ffCall.indexOf("-q:v") + 2]) && ffCall.at(-1).endsWith("thumbs.gray") && ffCall.includes("rawvideo"));
 	assert.equal(prompts[0].find((part) => part.type === "image").mimeType, "image/jpeg");
-	const digestFile = path.join(project, "docs", "research", "videos", "2026-10-16-when-should-you-not-use-grill-me", "digest.md");
+	const digestFile = path.join(project, "2026-10-16-when-should-you-not-use-grill-me", "digest.md");
 	assert.equal(result.file, digestFile);
 	let digest = readFileSync(digestFile, "utf8");
 	assert(digest.includes("A-->B-->C") && digest.includes("```ts\nx\n```") && !digest.includes("A-->B\n"));
@@ -246,7 +246,7 @@ try {
 	// Rerun keeps the agent's takeaways and rewrites the generated sections.
 	writeFileSync(digestFile, `${digest}\n${TAKEAWAYS}\n\n- Plan3 already sizes requests.\n`);
 	prompts.length = 0;
-	const rerun = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", cwd: project, exec: fake({ captions: false }).exec, model, tmpRoot });
+	const rerun = await digestVideo({ url: "https://www.youtube.com/shorts/k2zgcTDq4aQ", outDir: project, exec: fake({ captions: false }).exec, model, tmpRoot });
 	digest = readFileSync(digestFile, "utf8");
 	assert(rerun.keptTakeaways && digest.includes("- Plan3 already sizes requests.") && digest.split(TAKEAWAYS).length === 2);
 	// No captions: visuals still digested, with the note (D-07).
@@ -254,21 +254,21 @@ try {
 	tmpEmpty();
 
 	// Failures and cancellation remove the temp dir.
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ failing: "ffmpeg" }).exec, model, tmpRoot }), /ffmpeg could not sample frames/);
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: fake({ failing: "ffmpeg" }).exec, model, tmpRoot }), /ffmpeg could not sample frames/);
 	tmpEmpty();
 	// A transient 403 on the download is retried once from the page URL (fresh format URLs); two in a row fail with yt-dlp's error.
 	const flaky = fake({ flaky: 1 });
-	await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: flaky.exec, model, tmpRoot });
+	await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: flaky.exec, model, tmpRoot });
 	const downloads = flaky.calls.filter((call) => call.includes("bv*[height<=720]/b"));
 	assert(downloads.length === 2 && downloads[0].includes("--load-info-json") && !downloads[1].includes("--load-info-json") && downloads[1].at(-1) === "https://youtu.be/k2zgcTDq4aQ");
 	tmpEmpty();
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake({ flaky: 2 }).exec, model, tmpRoot }), /could not download the video: HTTP Error 403/);
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: fake({ flaky: 2 }).exec, model, tmpRoot }), /could not download the video: HTTP Error 403/);
 	tmpEmpty();
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: async () => { throw new Error("Luna failed (error)."); }, tmpRoot }), /Luna failed/);
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: fake().exec, model: async () => { throw new Error("Luna failed (error)."); }, tmpRoot }), /Luna failed/);
 	tmpEmpty();
 	// A failed or unusable merge keeps the batch artifacts, with a note.
 	for (const merge of [async () => { throw new Error("Luna failed (length)."); }, async () => ({ text: "sorry", usage })]) {
-		await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: fakeModel(merge), tmpRoot });
+		await digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: fake().exec, model: fakeModel(merge), tmpRoot });
 		digest = readFileSync(digestFile, "utf8");
 		assert(digest.includes("A-->B\n") && digest.includes("A-->B-->C") && /> The merge (call failed \(Luna failed \(length\)\.\)|reply was unusable); visuals from separate batches are listed unmerged\./.test(digest));
 		tmpEmpty();
@@ -279,13 +279,13 @@ try {
 		rmSync(digestFile, { force: true });
 		const cancelling = fakeModel(async () => { stopper.abort(); throw new Error("Video digest cancelled."); });
 		const cancelModel = during === "merge" ? cancelling : async (_content, callSignal) => { stopper.abort(); await sleep(5); assert(callSignal.aborted); throw new Error("Video digest cancelled."); };
-		await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: fake().exec, model: cancelModel, signal: stopper.signal, tmpRoot }), /cancelled/);
+		await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: fake().exec, model: cancelModel, signal: stopper.signal, tmpRoot }), /cancelled/);
 		assert(!existsSync(digestFile), `no digest after a cancel during the ${during}`);
 		tmpEmpty();
 	}
 	const controller = new AbortController();
 	const aborting = fake({ onCall: (_command, args) => { if (args.includes("-f")) controller.abort(); } });
-	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", cwd: project, exec: aborting.exec, model, signal: controller.signal, tmpRoot }), /cancelled/);
+	await assert.rejects(digestVideo({ url: "https://youtu.be/k2zgcTDq4aQ", outDir: project, exec: aborting.exec, model, signal: controller.signal, tmpRoot }), /cancelled/);
 	assert(!aborting.calls.some((call) => /ffmpeg/.test(call[0]) && call[1] !== "-version"), "nothing runs after the abort");
 	tmpEmpty();
 } finally {

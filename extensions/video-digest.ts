@@ -3,11 +3,13 @@ import { copyFile, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } fr
 import os from "node:os";
 import path from "node:path";
 
-// video_digest: one YouTube coding video → docs/research/videos/<upload-date>-<slug>/digest.md (plan 544351ec).
+// video_digest: one YouTube coding video → ~/Downloads/video-digests/<upload-date>-<slug>/digest.md (plan 544351ec).
 // Captions via yt-dlp, frames via ffmpeg, a pixel filter for distinct screen states (plan d7622210), then Luna rebuilds each on-screen artifact as text.
 
 export const LUNA = { provider: "openai-codex", id: "gpt-6-luna", reasoning: "medium" }; // D-05
 export const NO_CAPTIONS = "No captions available for this video.";
+// Outside every repo: frames make digests large (about 3 MB a full video).
+export const DIGEST_DIR = path.join(os.homedir(), "Downloads", "video-digests");
 export const TAKEAWAYS = "## Takeaways for ce-workflow";
 const MAX_FRAMES = 1200; // D-08
 const BATCH = 10; // the vision bridge's per-call image limit
@@ -362,7 +364,7 @@ const PROGRAMS = [
 ];
 
 /** The whole pipeline; exec and model are injected so tests run it with fakes. */
-export async function digestVideo({ url, cwd, exec, model, signal, progress = () => {}, tmpRoot = os.tmpdir() }: { url: string; cwd: string; exec: Exec; model: Model; signal?: AbortSignal; progress?: (text: string) => void; tmpRoot?: string }) {
+export async function digestVideo({ url, outDir = DIGEST_DIR, exec, model, signal, progress = () => {}, tmpRoot = os.tmpdir() }: { url: string; outDir?: string; exec: Exec; model: Model; signal?: AbortSignal; progress?: (text: string) => void; tmpRoot?: string }) {
 	if (!isYouTubeUrl(url)) throw new Error("Pass a YouTube video URL (watch, youtu.be or shorts).");
 	const bin: Record<string, string> = {};
 	for (const program of PROGRAMS) {
@@ -473,8 +475,7 @@ export async function digestVideo({ url, cwd, exec, model, signal, progress = ()
 		artifacts.sort((a, b) => a.start - b.start);
 		meta.mergeNote = mergeNote;
 
-		const base = path.join(cwd, "docs", "research", "videos");
-		const dir = digestFolder(base, info.upload_date, meta.title, meta.id, digestOwner);
+		const dir = digestFolder(outDir, info.upload_date, meta.title, meta.id, digestOwner);
 		await mkdir(dir, { recursive: true });
 		const digestFile = path.join(dir, "digest.md");
 		const previous = existsSync(digestFile) ? await readFile(digestFile, "utf8") : undefined;
@@ -509,7 +510,7 @@ export function lunaModel(registry: any): Model {
 export const videoDigestTool = (exec: Exec) => ({
 	name: "video_digest",
 	label: "Video digest",
-	description: "Digest a YouTube coding video: captions as a timestamped transcript plus every meaningful on-screen artifact (code, diagrams, tables, prompts) rebuilt as Markdown by Luna, written to docs/research/videos/<upload-date>-<slug>/digest.md. Takes minutes for long videos. Afterwards read the digest and add a '## Takeaways for ce-workflow' section.",
+	description: "Digest a YouTube coding video: captions as a timestamped transcript plus every meaningful on-screen artifact (code, diagrams, tables, prompts) rebuilt as Markdown by Luna, written to ~/Downloads/video-digests/<upload-date>-<slug>/digest.md (outside the repo). Takes minutes for long videos. Afterwards read the digest and add a '## Takeaways for ce-workflow' section.",
 	promptSnippet: "Digest a YouTube coding video into transcript plus rebuilt visuals",
 	parameters: {
 		type: "object",
@@ -518,8 +519,7 @@ export const videoDigestTool = (exec: Exec) => ({
 		properties: { url: { type: "string", description: "YouTube watch, youtu.be or shorts URL" } },
 	},
 	async execute(_id: string, args: { url: string }, signal?: AbortSignal, onUpdate?: (update: any) => void, ctx?: any) {
-		const cwd = ctx?.cwd ?? process.cwd();
-		const r = await digestVideo({ url: args.url, cwd, exec, model: lunaModel(ctx?.modelRegistry), signal, progress: (text) => onUpdate?.({ content: [{ type: "text", text }], details: {} }) });
+		const r = await digestVideo({ url: args.url, exec, model: lunaModel(ctx?.modelRegistry), signal, progress: (text) => onUpdate?.({ content: [{ type: "text", text }], details: {} }) });
 		const text = [
 			`Digest: ${r.file}`,
 			`${r.meta.title} (${clock(r.meta.duration)}), captions ${r.meta.captions}, transcript ${r.transcriptChars} characters.`,
