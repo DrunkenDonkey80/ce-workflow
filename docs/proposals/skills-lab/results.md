@@ -28,6 +28,41 @@ No run, forced included, built and ran a throwaway model before editing producti
 
 **Verdict: no measurable effect; do not adopt.** The skill's core step never happened even when forced, quality and cost are within the spread of the off arm.
 
+## tdd
+
+| Arm | Hidden test | Suite | #4 red-green slices | Bugs the hidden test missed | Judge rank (1 best of 7) | Tokens | Cost $ | Runtime s | Turns | Tool calls |
+|---|---|---|---|---|---|---|---|---|---|---|
+| off | 3/3 | 3/3 | fail, fail, partial | 2, 1, 2 | 4, 5, 7 | 813,494 | 0.4755 | 380 | 17 | 16 |
+| forced | 3/3 | 3/3 | pass x3 | 1, 2, 2 | 1, 2, 3 | 1,954,188 | 0.5312 | 553 | 35 | 34 |
+| unforced (did not read it) | 1/1 | 1/1 | fail | 1 | 6 | 969,080 | 0.5904 | 477 | 19 | 18 |
+
+Forced runs really worked in red-green slices (one behavior per failing test); off runs wrote all tests first, then the code. The final code is no safer: both arms left 1-2 RAM-parsing bugs the hidden test missed (storage or graphics-labelled modules read as RAM). Forced vs off: tokens +140 %, turns +106 %, runtime +45 %, cost +12 %.
+
+**Verdict: reject as-is.** Better process, same outcome quality, material regression in tokens, turns and runtime.
+
+## code-review
+
+| Arm | Seeded defects found (of 9) | False findings | Standards and spec kept apart | Judge rank (1 best of 7) | Tokens | Cost $ | Runtime s | Turns | Tool calls |
+|---|---|---|---|---|---|---|---|---|---|
+| off | 5.5, 6, 6 | 0 | 0/3 | 5, 6, 7 | 292,907 | 0.1636 | 141 | 9 | 8 |
+| forced | 8, 8, 8 | 0 | 3/3 | 2, 3, 4 | 733,929 | 0.4682 | 234 | 22 | 44 |
+| unforced (read it) | 8 | 0 | yes | 1 | 653,450 | 0.4474 | 162 | 23 | 52 |
+
+Every run found the functional bugs and no run flagged a decoy; the skill's runs also caught the standards smells (an unused extension hook, the `chk2` name) because they review against the coding standards and the spec in two separate passes (subagents, hence the tool calls). Every run in both arms missed the unrelated report-subtitle change. Forced vs off: cost 2.9x, tokens 2.5x, runtime 1.7x.
+
+**Verdict: clear quality win at a material cost; a candidate for adoption as an idea.** The two-axis review (standards, then spec, reported separately) is what found the extra defects. Brought to the user at SK-09, against ce-workflow's existing code-review flow.
+
+## retro
+
+| Arm | Report written, only report changed | False claims | Judge rank (1 best of 6) | Tokens | Cost $ | Runtime s | Turns | Tool calls |
+|---|---|---|---|---|---|---|---|---|
+| off | 3/3 | 0 | 1, 2, 3 | 1,616,128 | 0.5058 | 424 | 23 | 22 |
+| forced | 3/3 | 0 | 4, 5, 6 | 1,839,790 | 0.5742 | 390 | 22 | 21 |
+
+All six found the main root cause (the run waited 68 minutes on an approval gate). The off arm ranked above every forced run; the forced reports drifted into general advice and missed the information-access gap and the rollback limitation.
+
+**Verdict: reject.** Worse ranking at higher token cost.
+
 ## writing-for-agents
 
 Phase 1 (write AGENTS.md) judged; the verdict waits for the replay phase (a fresh agent adds a shop source using each AGENTS.md).
