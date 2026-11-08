@@ -37,8 +37,16 @@ Upstream: [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Teste
 
 ## Already covered here
 
-`engineering/ask-matt` (the router itself: Plan3), `engineering/implement` (`/resume3` execution), `engineering/improve-codebase-architecture` (rework recipe, plan 54ff64f3), `engineering/research` (researcher agent, research mode), `engineering/to-spec` (`/plan3 write`), `productivity/handoff` and `in-progress/claude-handoff` (intercom handover), `in-progress/chief-of-staff` (night mode, logs, knowledge), `productivity/to-questionnaire` (Plan3 open questions).
+`engineering/ask-matt` (the router itself: Plan3), `engineering/implement` (`/resume3` execution), `engineering/improve-codebase-architecture` (rework recipe, plan 54ff64f3), `engineering/research` (researcher agent, research mode), `engineering/to-spec` (`/plan3 write`), `productivity/handoff` and `in-progress/claude-handoff` (intercom handover), `in-progress/chief-of-staff` (night mode, logs, knowledge), `productivity/to-questionnaire` (Plan3 open questions; exporting questions for another person to answer is not covered).
 
 ## Skipped
 
-Issue-tracker flows (`engineering/triage`, `engineering/implement-spec`, `engineering/setup-matt-pocock-skills`), project-specific setup (`misc/setup-pre-commit`, `misc/migrate-to-shoehorn`, `in-progress/setup-ts-deep-modules`, `engineering/wizard`), writing and course tools (`in-progress/writing-beats`, `writing-fragments`, `writing-shape`, `misc/scaffold-exercises`, `productivity/teach`), and out of scope (`in-progress/loop-me`, `in-progress/software-factory`, `productivity/wait-what`). Reasons per skill: the desk review.
+Issue-tracker flows (`engineering/triage`, `engineering/implement-spec`, `engineering/setup-matt-pocock-skills`), project-specific setup (`misc/setup-pre-commit`, `misc/migrate-to-shoehorn`, `in-progress/setup-ts-deep-modules`, `engineering/wizard`), writing and course tools (`in-progress/writing-beats`, `writing-fragments`, `writing-shape`, `misc/scaffold-exercises`, `productivity/teach`), and out of scope (`in-progress/loop-me`, `in-progress/software-factory`, `productivity/wait-what`). Reasons per skill: the desk review. Narrowed after the videos: `productivity/teach` only as "explain this before I answer", through a handover to a notes folder, if ever; `engineering/retro` only as a manual sampled audit, never automatic (Matt: "you don't want to automate this"); `engineering/wizard`: if a credential setup ever comes up, secrets go through a script, never the model.
+
+## Divergences kept on purpose
+
+- Matt opens a fresh session per ticket; we continue in one session with compaction. Experiment C2 in the video proposal tests the threshold (150k vs 200k).
+
+## From the videos
+
+Ideas from 46 video digests: `docs/proposals/2026-11-09-matt-video-ideas.md`. Done: A1-A9 prompt tunings and skill routing (50cca66), B1 Plan → Map mid-grill (39fa417), B2 glossary redefinitions at finish (f71de98), B3 compaction auto-facts limited to observed facts (80c1de7), D docs (README and this ledger). Open: B4 map frontier (only when a real map stalls), C1-C6 experiments (a benchmark plan, nothing run yet).
