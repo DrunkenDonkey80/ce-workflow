@@ -33,7 +33,7 @@ const note = (kind, data = {}) => { const line = { t: new Date().toISOString(), 
 const git = (...a) => execFileSync("git", a, { cwd: dir, encoding: "utf8" }).trim();
 
 const request = value("--request-file") ? readFileSync(value("--request-file"), "utf8").trim()
-	: `Rework: apply the rework recipe at ${recipe} to this project. Read the recipe in full first and follow its plan skeleton (section 7). Map picks the rework target. Pre-rework SHA: ${sha}. Goal: a real structural improvement of the target (readability, changeability, security, performance) with no behavior regression; local repair or stop is the right pick only when it meets that goal better. Planning writes the plan only: Map and every later phase run after /plan3 finish, on their phase models.`;
+	: `Rework: apply the rework recipe at ${recipe} to this project. Read the recipe in full first and follow its plan skeleton (section 7). Map picks the rework target. Pre-rework SHA: ${sha}. Goal: a deeper module (recipe §0): a smaller interface, rules moved from callers into the module, and fewer files touched by the next realistic changes, with no behavior regression. A split that keeps the same interface is not the goal. Local repair or stop is the right pick only when it meets that goal better. Planning writes the plan only: Map and every later phase run after /plan3 finish, on their phase models.`;
 // Answer for every free-text dialog: this run has no human, so the agent's own recommendation stands.
 const HUMAN = "Unattended lab run in a throwaway clone: go with your recommended option. Any watch window is waived and counts as passed. Never waive or remove a gate: I turn gates on with Alt+A myself when their phase is next.";
 const GATE_DODGE = /amend|chat approval|instead of alt\+a|remove .*needs|waive .*gate/i;
@@ -155,13 +155,14 @@ async function prompt(message, deadline) {
 // R3 metrics for the final line: every session of the run (all prompts, continuations, subagent children) summed,
 // wall time of this invocation, the check result and the diff against the pre-rework SHA.
 const started = Date.now();
+// NUL excluded: an agent's `2>NUL` in bash leaves a file git refuses to add.
 function result() {
 	const tail = (text) => String(text).trim().split("\n").slice(-3).join("\n");
 	const check = value("--check") && (() => {
 		try { return { pass: true, tail: tail(execFileSync("bash", ["-c", value("--check")], { cwd: dir, encoding: "utf8", stdio: "pipe" })) }; }
 		catch (error) { return { pass: false, tail: tail(`${error.stdout ?? ""}${error.stderr ?? ""}`) }; }
 	})();
-	return { wallMs: Date.now() - started, metrics: sessionMetrics(sessions), ...(check ? { check } : {}), diffStat: (git("add", "-N", "."), git("diff", "--shortstat", "lab-base")), sessions };
+	return { wallMs: Date.now() - started, metrics: sessionMetrics(sessions), ...(check ? { check } : {}), diffStat: (git("add", "-N", "--", ".", ":(exclude)NUL"), git("diff", "--shortstat", "lab-base")), sessions };
 }
 
 // ---------- main ----------

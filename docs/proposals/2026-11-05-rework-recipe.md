@@ -4,22 +4,75 @@ Status: draft for the DealFinder pilot (plan 54ff64f3, RW-01). It changes after 
 
 This is a way to rework one part of a messy project safely. The current code gets tests first, and their results are recorded. Then a new design is chosen together with the human. The new code is built next to the old, the same tests are replayed against both, and the human approves the switch. Most of the effort goes into Map and Design: think hard before coding.
 
+The aim is not a smaller file or a safer split. The aim is a **deeper module** (§0): callers need to know less, change concentrates in one place, and the next realistic changes touch fewer files. A rework that only moves code between files has failed, even when every test passes.
+
 Out of scope: a workflow engine, one test protocol for every language, automatic deployment, snapshots of everything, and rewriting the whole project by default. Each project uses its own test runner (pytest, vitest, Gradle), with case IDs shared between the old and new runs.
+
+## 0. Design vocabulary and tests
+
+Adapted from Matt Pocock's `codebase-design` and `improve-codebase-architecture` skills (github.com/mattpocock/skills). Use these words exactly in Map, Design and the scorecard. Do not swap in "component", "service", "API" or "boundary".
+
+- **Module**: anything with an interface and an implementation (a function, class, package, or slice across tiers).
+- **Interface**: everything a caller must know to use the module correctly. That includes the type signature, plus invariants, ordering rules, error modes, required configuration, and unwritten rules such as "always re-read before writing".
+- **Deep module**: a lot of behavior behind a small interface. **Shallow module**: the interface is nearly as complex as the implementation (pass-throughs, one-line helpers, a facade that forwards every method).
+- **Seam**: the place where a module's interface lives, where behavior can change without editing callers. **Adapter**: a concrete thing that fills a seam.
+- **Leverage**: what callers gain (one implementation pays back across N call sites and M tests). **Locality**: what maintainers gain (change, bugs and verification concentrate in one place).
+
+Tests to apply:
+
+- **Deletion test**: imagine deleting the module. If the complexity vanishes, it was a pass-through. If the complexity reappears across N callers, it was earning its keep. A candidate is good when deepening it **concentrates** complexity; it is bad when it just **moves** complexity (a file split that keeps the same interface usually only moves it).
+- **The interface is the test surface**: callers and tests cross the same seam. Tests that must reach past the interface mean the module has the wrong shape.
+- **One adapter is a hypothetical seam; two adapters make a real one.** Do not add a port unless something actually varies across it (production plus test counts).
+- **Dependency category** of a candidate decides how it is tested:
+  - in-process: merge and test directly;
+  - local-substitutable: test with the local stand-in, such as a temp dir or an in-memory database;
+  - remote but owned: a port with production and in-memory adapters;
+  - true external: an injected port, with a mock adapter in tests.
+- **Replace, don't layer**: once tests exist at the deepened interface, delete the old unit tests of the shallow modules it absorbed. This is about tests of the old shallow internals; it never touches the corpus, which is frozen (§2).
+
+What to avoid:
+
+- **Callers may change.** Do not default to "keep the public interface, callers untouched, smallest switch". That default produces file splits that fail the deletion test. Changing 60 call sites mechanically is acceptable when the interface shrinks and a rule moves into the module. The corpus (§2) protects behavior, not the old interface.
+- **YAGNI still holds.** Deepen only where change keeps happening (churn) or where the next named changes land. A deep redesign of a module nobody touches is waste.
 
 ## 1. The loop
 
 One loop per rework target (a module or a group of modules, never "the whole project" by default).
 
-1. **Map** [think]. Map the code as it is, with every claim tied to files and lines:
-   - what each module is responsible for;
-   - which way the dependencies point;
-   - who owns which state;
-   - how things flow at runtime.
+1. **Map** [think]. Explore before picking.
+   1. **Scope by churn.** Find the hot spots: `git log --format= --name-only -n 150 | sort | uniq -c | sort -rn | head -30`, plus which files change together. Recent churn gets more weight. If churn is scattered, widen the net.
+   2. **Read the code.** Read the project's AGENTS.md, any GLOSSARY.md, and any ADRs (`docs/adr/`); do not re-argue an ADR unless the friction is real. Then walk the hot code in the open, without a checklist, and note friction:
+      - Where does one concept require bouncing between many small modules?
+      - Where are modules shallow?
+      - Where does every caller have to follow an unwritten rule (a lock, an ordering, a re-read)? Count the callers that break it.
+      - Where do tightly coupled modules leak across their seams?
+      - What is untested, or hard to test through its current interface?
+   3. **Map the hot area as it is**, with every claim tied to files and lines: responsibilities, dependency direction, state ownership, runtime flows, duplicate clusters.
+   4. **List 3–6 deepening candidates.** Each candidate gives:
+      - files;
+      - the problem in one sentence;
+      - the solution in one sentence;
+      - the deletion-test result;
+      - its dependency category;
+      - the interface as callers see it before and after (entry points and rules), and how many call sites change;
+      - tests at the new interface, and which tests become waste;
+      - a strength: Strong, Worth exploring, or Speculative.
+   5. **Future-changes check.** Name 3 realistic upcoming changes from recent commits, plans, backlogs and docs. For each one, count the files and edit sites it touches today versus after each Strong candidate.
+   6. **Pick the rework target**: the candidate with the best leverage and locality on hot code. A bug the friction hides (such as lost updates) raises its priority; record it as unresolved for the human (§2).
 
-   Also list clusters of duplicate code, the files that change most (`git log --format= --name-only | sort | uniq -c | sort -rn | head -30`), and 2–3 concrete changes that hurt today (for example "adding a source means editing 5 modules"). A proposed module map may go in the plan diagram (`plan3_diagram`).
-2. **Characterize** [code]. Write tests at the boundaries: CLI, HTTP, public API, intent contracts. Never test private classes. Record the results as a behavior corpus (section 2) and record baseline numbers for the scorecard (section 4). Commit the corpus, its fixtures and the baseline records. That commit's SHA is the **corpus SHA**.
-3. **Design** [think]. Write 2–3 options that really differ, always including "local repair, no rewrite". Each option gives:
+   A proposed module map may go in the plan diagram (`plan3_diagram`).
+2. **Characterize** [code]. Write tests at the boundaries: CLI, HTTP, public API, intent contracts. Never test private classes. **Pin behavior above the target's interface**, at a boundary that survives the redesign: usually HTTP routes, CLI commands or the callers' observable effects. Do not pin the interface Design may replace. Cases that go through the old module interface would block the very change the rework is for. When the target's own interface is the only practical boundary, keep those cases few and mark them `interface-bound`; Design may retire them with human approval, and they must be covered from above first. Record the results as a behavior corpus (section 2) and record baseline numbers for the scorecard (section 4). Commit the corpus, its fixtures and the baseline records. That commit's SHA is the **corpus SHA**.
+3. **Design** [think]. **Design It Twice.** First write the constraints that any new interface must meet, and the dependency category. Then get 3 interfaces that really differ, each from a fresh sub-agent working in parallel. Use the `subagent` tool; this recipe authorizes the delegation. Give each sub-agent the same technical brief (files, coupling, dependency category, §0 vocabulary, project domain terms), and one of these constraints:
+   - minimal interface: 1–3 entry points, maximum leverage per entry point;
+   - the most common caller is trivial;
+   - ports and adapters for the dependencies that cross the seam.
+
+   Each sub-agent returns: the interface (types, invariants, ordering, error modes), a caller usage example, what hides behind the seam, its adapters, and its trade-offs.
+
+   Compare the designs by depth, locality and seam placement, then take an opinionated pick or a hybrid. The options presented at Pick are this pick, the strongest alternative, and "local repair, no rewrite". Each option gives:
    - its module map and interface contracts;
+   - interface size before and after (entry points plus the rules callers must know) and the call sites that change;
+   - the future-changes counts from Map;
    - any library or platform changes: what they remove and what migration costs;
    - expected benefit, risk and reversibility;
    - whether stored state or file formats change (section 5).
@@ -102,7 +155,7 @@ Fix the scorecard in the plan before Build starts (it is part of what Pick appro
 
 | Dimension | Metric | Workload | Baseline (old) | Candidate (new) | Threshold | Repetitions | Result |
 |---|---|---|---|---|---|---|---|
-| Maintainability | e.g. files touched by change scenario 1; duplicate lines; module dependency count | the Map scenarios | | | | 1 | |
+| Maintainability | interface size (entry points plus rules callers must know); call sites that must follow an unwritten rule; files and edit sites per Map future change; deletion test (concentrates / moves). Line counts are not the measure | the Map candidates and future changes | | | | 1 | |
 | Performance | e.g. wall time of `<command>` on fixture X; peak memory | named fixture | | | | ≥5, report median and spread | |
 | Stability | corpus pass list; flaky count over N runs; error-path cases passing | full corpus | | | | ≥3 | |
 
@@ -111,6 +164,7 @@ Rules:
 - An improvement claim names the metric, workload, baseline, threshold and repetitions.
 - A material regression in one dimension is never offset by gains in another; report it, and it needs the human at Switch.
 - "Inconclusive" (spread larger than the difference) is a valid result.
+- Performance thresholds are relative: old and new runs interleaved in pairs on the same machine, not an absolute number from an earlier session. Machine load changes absolute timings (photobook-02: the unchanged old code itself missed its absolute threshold at Replay).
 
 ## 5. Cutover and rollback
 
@@ -149,18 +203,18 @@ Planning writes this plan only; Map and every later phase run after `/plan3 fini
 
 ### Phase 1: Map [think]
 
-- [ ] **MAP-01** As-is module map of <target> tied to files: responsibilities, dependency direction, state ownership, runtime flows.
-- [ ] **MAP-02** Duplicate clusters, churn hotspots, and 2–3 change scenarios that hurt today.
+- [ ] **MAP-01** Churn hot spots, open exploration, as-is map of the hot area tied to files.
+- [ ] **MAP-02** 3–6 deepening candidates (deletion test, interface before/after, dependency category, strength), future-changes check, rework target picked.
 
 ### Phase 2: Characterize [code]
 
-- [ ] **CHR-01** Boundary corpus cases with IDs, setup, actions, expectations and comparison rules; classify each behavior.
+- [ ] **CHR-01** Boundary corpus cases above the target's interface, with IDs, setup, actions, expectations and comparison rules; classify each behavior.
 - [ ] **CHR-02** Stability (two old runs, identical pass lists) and sensitivity (planted bug fails a case, reverted).
 - [ ] **CHR-03** Baseline scorecard numbers; commit the corpus, record the corpus SHA.
 
 ### Phase 3: Design [think]
 
-- [ ] **DES-01** 2–3 options including "local repair, no rewrite": module map, contracts, libraries, benefit, risk, reversibility, stored-state change.
+- [ ] **DES-01** Design It Twice: constraints, 3 parallel sub-agent interfaces, comparison and pick; options at Pick are the pick, the strongest alternative and "local repair, no rewrite", each with module map, interface size, call sites, future-change counts, risk, reversibility, stored-state change.
 - [ ] **DES-02** Thin experiment on the riskiest assumption; fix the scorecard thresholds.
 
 ### Phase 4: Pick [think]

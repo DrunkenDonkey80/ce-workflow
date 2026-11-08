@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-05
-updated: 2026-11-06T08:44:03.853Z
+updated: 2026-11-08T13:54:08.432Z
 reviewed: 2026-11-05
 started: 2026-11-05T10:39:25.505Z
 ---
@@ -217,7 +217,7 @@ needs: R-pb-pilot-done
 
 ## Resume context
 
-RW-18 wip. photobook-01 complete (docs/proposals/rework-lab/photobook-01.md): projectRepository split into store/normalizer/facade, no new test failures (same 8 pre-existing failures at 5cb626e), gates held, $10.99, 2h24 incl ~1h driver gate loop (fixed: [human] steps pass, marker-based gate stalls, --resume). Recipe §3 test-only seam note added. All lab work (recipe, driver, run-03/04/05/photobook-01 reports) uncommitted in ce-workflow. Next: user decides — commit lab work, codify /plan3 rework (RW-19+), or another lab run.
+RW-18 wip. photobook-02 complete with the merged recipe (Matt Pocock's §0 vocabulary, deletion test, churn-scoped Map, corpus above the interface, Design It Twice): report docs/proposals/rework-lab/photobook-02.md. Result is clearly better than photobook-01 (write interface narrowed, lost-update bug proven and fixed, field table, 1160/1160 tests, build green), $15.24. Recipe §4 now uses relative interleaved performance thresholds. All lab work uncommitted in ce-workflow. Next: user decides — commit lab work, carry the deepening ideas into normal /plan3 planning, or codify /plan3 rework.
 
 ## Amendments
 
