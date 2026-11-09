@@ -689,8 +689,6 @@ function orderPlans(ctx, plans) {
 
 // ---------- extension ----------
 export default function plan3(pi) {
-	// Pi running as OpenDesign's generation agent (OD sets these for its runs) must just build: no plan/research flow.
-	if (process.env.OD_PROJECT_DIR || "OD_STOCK_RUN_ID" in process.env) return;
 	const idle = (ctx) => {
 		if (ctx.isIdle()) return true;
 		ctx.ui.notify("Plan3 needs an idle agent; stop the current run first.", "warning");
@@ -770,7 +768,7 @@ export default function plan3(pi) {
 	function publishHub() {
 		if (!hubActive() || !hubCtx) return;
 		const live = activity.snapshot(undefined), info: { busy?: string } = {};
-		pi.events?.emit?.("wo:web-info", info); // busy: work outside this agent's turn the hub shows as working (an OpenDesign run)
+		pi.events?.emit?.("wo:web-info", info); // busy: work outside this agent's turn the hub shows as working
 		const state = { plan: hubPlan, modes: webModes(), compacting: live.compacting, subagents: live.subagents, ...info.busy && { busy: info.busy } };
 		const json = JSON.stringify(state);
 		if (json === hubSent) return;

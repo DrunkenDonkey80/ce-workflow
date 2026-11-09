@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { captureSite, PRESETS, presetSize, renderDesign, reportText } from "./design-render.ts";
-import { redactOpenDesignText } from "./opendesign-client.ts";
+import { redactSecrets } from "./redact.ts";
 import { atomic, confined, withPlanLock } from "./plan3-files.ts";
 
 type Changes = { added: string[]; changed: string[]; removed: string[] };
@@ -60,7 +60,7 @@ function text(value, label: string, max: number) {
 	if (typeof value !== "string" || !value.trim() || Buffer.byteLength(value) > max) throw new Error(`${label} must be non-empty text up to ${max} bytes.`);
 	return value.trim();
 }
-const clip = (value: string, max: number) => redactOpenDesignText(value.replace(/token=\w+/g, "token=…"), max);
+const clip = (value: string, max: number) => redactSecrets(value.replace(/token=\w+/g, "token=…"), max);
 export const designFolder = (handle: string) => `.pi/designs/${handle}`;
 
 /** workOrchestrator.designModel, "provider/id:effort": project setting first, then global. */

@@ -26,6 +26,11 @@ import {
 	resolveKnowledge,
 	searchKnowledge,
 } from "../extensions/work-knowledge.ts";
+import { redactSecrets } from "../extensions/redact.ts";
+
+// The knowledge discoverer's input redaction (moved from the OpenDesign client).
+assert.equal(redactSecrets("apiKey=sk-abcdefghijklmnop https://x.test/?token=private").includes("private"), false);
+assert.equal(redactSecrets("abcdef", 3), "def", "keeps the end when over max");
 
 const root = mkdtempSync(join(tmpdir(), "ce-knowledge-"));
 const cwd = join(root, "project");
@@ -49,8 +54,8 @@ try {
 			kind: "environment",
 			scope: "user",
 			authority: "human",
-			paths: ["extensions\\opendesign-client.ts"],
-			symbols: ["resolveOpenDesignCommand"],
+			paths: ["extensions\\design-render.ts"],
+			symbols: ["agentBrowser"],
 			source: {
 				sessionId: "session-od",
 				writeBucket: "goal:knowledge-test",
@@ -60,7 +65,7 @@ try {
 		{ ...options, allowedAuthorities: ["human"] },
 	);
 	assert.equal(first.deduplicated, false);
-	assert.equal(first.record.paths[0], "extensions/opendesign-client.ts");
+	assert.equal(first.record.paths[0], "extensions/design-render.ts");
 	assert.equal(knowledgeWriteCount(cwd, "goal:knowledge-test", options), 1);
 	assert.equal(knowledgeWriteCount(cwd, "goal:other", options), 0);
 	assert.ok(readFileSync(options.userPath, "utf8").endsWith("\n"));
@@ -72,8 +77,8 @@ try {
 			kind: "environment",
 			scope: "user",
 			authority: "observed",
-			paths: ["extensions/opendesign-client.ts"],
-			symbols: ["resolveOpenDesignCommand"],
+			paths: ["extensions/design-render.ts"],
+			symbols: ["agentBrowser"],
 		},
 		options,
 	);
@@ -90,8 +95,8 @@ try {
 			kind: "environment",
 			scope: "user",
 			authority: "observed",
-			paths: ["extensions/opendesign-client.ts"],
-			symbols: ["resolveOpenDesignCommand"],
+			paths: ["extensions/design-render.ts"],
+			symbols: ["agentBrowser"],
 		},
 		options,
 	);

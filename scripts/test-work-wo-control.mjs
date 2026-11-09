@@ -41,7 +41,7 @@ try {
 	let labels = [];
 	await commands.wo.handler("settings", { ...ctx, hasUI: true,
 		ui: { ...ctx.ui, select: (_title, choices) => { labels = choices; return undefined; } } });
-	assert(labels.some(label => label.includes("OpenDesign executable")), "settings renders retained design controls");
+	assert(labels.some(label => label.includes("Design session model")) && !labels.some(label => label.includes("OpenDesign")), "settings keeps the design model, without OpenDesign");
 	assert(labels.some(label => label.includes("Planning model")), "settings renders Plan3 controls");
 	assert(!labels.some(label => /Workflow|Advisor 1|Effort profile|Background verifiers/.test(label)), "settings has no orchestration controls");
 	const event = { toolName: "ask_user", input: {} };

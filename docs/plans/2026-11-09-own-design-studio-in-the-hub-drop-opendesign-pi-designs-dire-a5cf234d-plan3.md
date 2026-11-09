@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T13:13:49.031Z
+updated: 2026-11-09T13:19:05.633Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -208,9 +208,7 @@ Fit check per module:
 
 ### Phase 7: Remove OpenDesign and document [code]
 
-- [ ] **S17** Delete opendesign-client.ts, its test and fixtures; move the redact helper; remove the OD settings row, the plan3 and ask-user OD guards, and the tool-loader OD text (D11)
-  - Also: the redaction assertion from the deleted client test (`test-work-opendesign-client.mjs` line 661) moves to the helper's new test; `test-work-knowledge.mjs` OD sample claims point at existing paths if the test checks them; `test-sessions.mjs` busy label reworded.
-  - Check: `rg "opendesign-client|callOpenDesignTool|openDesignCommand|OD_PROJECT_DIR|OD_STOCK_RUN_ID|redactOpenDesignText"` over extensions, scripts and hub finds nothing. Upstream provenance, the library source (D14) and catch-up (D21) may still name nexu-io/open-design. C6, C7, C8, C9, C10.
+- [x] **S17** OpenDesign runtime removed: opendesign-client.ts, its test and fixtures deleted; redaction moved to extensions/redact.ts (redactSecrets) used by design.ts and work-models.ts; the /wo Settings "OpenDesign executable" row and its helpers gone; the OD-run guards in plan3.ts and ask-user removed; tool-loader text, wo-control label assert, knowledge sample paths and the test-sessions busy label reworded.
 - [ ] **S20** Add nexu-io/open-design to catch-up as a git source: list entry, baseline at the ported commit, docs/upstream/open-design.md ledger with the review paths (D21)
   - Ledger: what was ported (guide rules, viewport matrix, deck framework, brand-extract method, handoff checklist, comment bridge idea) and where it lives here.
   - Check: C7 (test-work-plan3.mjs has the catch-up cases, including mattpocock/skills) with a case that OD shows up as a git target with its ledger; C9.

@@ -59,8 +59,8 @@ try {
 	assert.equal(host.live.get(a.id).published.state.plan.id, "p1");
 	assert.deepEqual(host.busyReasons(a.id), ["subagents running"]);
 	await assert.rejects(host.park(a.id), /Cannot park while subagents running/);
-	await host.prompt(a.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: false, subagents: [], busy: "OpenDesign building 3 min" })}`);
-	assert.deepEqual(host.busyReasons(a.id), ["OpenDesign building 3 min"], "an extension's busy line (an OpenDesign run) counts as working");
+	await host.prompt(a.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: false, subagents: [], busy: "Rendering 3 min" })}`);
+	assert.deepEqual(host.busyReasons(a.id), ["Rendering 3 min"], "an extension's busy line counts as working");
 	await host.prompt(a.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: true, subagents: [] })}`);
 	assert.deepEqual(host.busyReasons(a.id), ["compacting"]);
 	await host.prompt(a.id, `/state ${JSON.stringify({ plan: null, modes: {}, compacting: false, subagents: [] })}`);

@@ -22,7 +22,7 @@ import { browserAccessMenu } from "./browser-fetch.ts";
 
 
 
-import { normalizeOpenDesignCommandSpec, redactOpenDesignText } from "./opendesign-client.ts";
+import { redactSecrets } from "./redact.ts";
 
 import {
 	collectRecentExtensionPage,
@@ -448,17 +448,6 @@ export function researchCompactionTrigger(ctx) {
 function nativeCompactionTrigger(ctx) {
 	const window = Number(ctx.model?.contextWindow ?? ctx.model?.context_window) || 200_000;
 	return Math.max(1, Math.floor(Math.min(200_000, window * 0.75 - 32_768)));
-}
-
-function workOrchBlock(settings) {
-	settings.workOrchestrator ??= {};
-	return settings.workOrchestrator;
-}
-
-function setOpenDesignCommandSetting(settings, value) {
-	const block = workOrchBlock(settings);
-	if (value) block.openDesignCommand = normalizeOpenDesignCommandSpec(value);
-	else delete block.openDesignCommand;
 }
 
 // ponytail: settings are prompt-live; the steps below are appended to the
@@ -1165,7 +1154,7 @@ function discovererCutText(messages) {
 
 export function buildKnowledgeDiscovererPacket(messages) {
 	const full = discovererCutText(messages);
-	const text = redactOpenDesignText(full, KNOWLEDGE_DISCOVERER_MAX_INPUT_CHARS);
+	const text = redactSecrets(full, KNOWLEDGE_DISCOVERER_MAX_INPUT_CHARS);
 	return {
 		text,
 		truncated: full.length > KNOWLEDGE_DISCOVERER_MAX_INPUT_CHARS,
@@ -1329,7 +1318,7 @@ async function compactSessionMemory(ctx, current, state, preparation, currentMes
 		model: configured.model === NONE_MODEL ? null : configured.model === INHERIT_MODEL ? currentModelId(ctx) : configured.model,
 		currentModel: currentModelId(ctx),
 		thinking: configured.thinking, registry: ctx.modelRegistry, signal: signal ?? ctx.signal,
-		redact: text => redactOpenDesignText(text, 400_000),
+		redact: text => redactSecrets(text, 400_000),
 	});
 	if (result.fallback) ctx.ui?.notify?.(`Compaction used preserved-memory fallback: ${result.fallback}`, "warning");
 	else if (result.attempts?.length > 1) ctx.ui?.notify?.(`Compaction used current model ${result.model}: ${result.attempts[0].error}`, "warning");
@@ -4196,7 +4185,6 @@ function hasProjectOverride(settings, item) {
 	if (item.kind === "visionModel") return owns(block, "visionModel");
 	if (item.kind === "visionAltModel") return owns(block, "visionAltModel");
 	if (item.kind === "imageModel") return owns(block, "imageModel");
-	if (item.kind === "openDesignCommand") return owns(block, "openDesignCommand");
 	if (item.kind === "designModel") return owns(block, "designModel");
 	if (item.kind === "reviewAfterPlan" || item.kind === "reviewBeforeCommit") return owns(block, item.kind);
 	return false;
@@ -4374,7 +4362,6 @@ async function workSettingsLoop(ctx, pi = undefined) {
 		const visionModel = visionModelSettings(ctx.cwd, settings);
 		const names = await modelDisplayNames(ctx);
 		const camera = cameraSettings(projectSettings);
-		const openDesignCommand = settings.workOrchestrator?.openDesignCommand;
 		const items: any[] = [
 {
 				kind: "planModels",
@@ -4440,13 +4427,6 @@ async function workSettingsLoop(ctx, pi = undefined) {
 				kind: "designModel", value: "designModel",
 				label: `Design session model: [${settings.workOrchestrator?.designModel ? (names.get(splitLevel(settings.workOrchestrator.designModel).model) ?? splitLevel(settings.workOrchestrator.designModel).model) + (splitLevel(settings.workOrchestrator.designModel).level ? ": " + splitLevel(settings.workOrchestrator.designModel).level : "") : "same as session"}] ${SUBMENU_ARROW}`,
 				description: "Model and effort of the hub sessions the design tool opens (design-1, design-2, ...); their agent builds and refines the design itself, so pick a strong model.",
-			},
-{
-				kind: "openDesignCommand",
-				value: "openDesignCommand",
-				label: `OpenDesign executable: ${openDesignCommand ? "Configured" : "Auto"} ${SUBMENU_ARROW}`,
-				description:
-					"Auto discovery or a validated command/args/env JSON spec; credentials are rejected",
 			},
 {
 				kind: "reset",
@@ -4681,51 +4661,6 @@ async function workSettingsLoop(ctx, pi = undefined) {
 			if (selected === INHERIT_MODEL) delete settings.workOrchestrator.designModel;
 			else settings.workOrchestrator.designModel = value;
 			writeScopedSettings(ctx.cwd, scope, settings);
-			continue;
-		}
-		if (pick.kind === "openDesignCommand") {
-			const mode = await choose(
-				ctx,
-				"OpenDesign executable",
-				[
-					{
-						value: "auto",
-						label: "Auto",
-						description: "Use OD_BIN or verified PATH discovery",
-					},
-					{
-						value: "configured",
-						label: "Configure command spec",
-						description:
-							"Paste command, args, and optional non-secret environment JSON",
-					},
-				],
-				openDesignCommand ? "configured" : "auto",
-			);
-			if (!mode) continue;
-			settings = readScopedSettings(ctx.cwd, scope);
-			if (mode === "auto") {
-				setOpenDesignCommandSetting(settings, null);
-			} else {
-				const input = await askText(ctx, pi, "OpenDesign command spec JSON", {
-					placeholder: '{"command":"od","args":["mcp"]}',
-				});
-				if (!input) continue;
-				try {
-					setOpenDesignCommandSetting(settings, JSON.parse(input));
-				} catch (error) {
-					ctx.ui.notify(
-						`Invalid OpenDesign command spec: ${error instanceof Error ? error.message : "invalid input"}`,
-						"error",
-					);
-					continue;
-				}
-			}
-			writeScopedSettings(ctx.cwd, scope, settings);
-			ctx.ui.notify(
-				`OpenDesign executable: ${mode === "auto" ? "Auto" : "configured"}`,
-				"info",
-			);
 			continue;
 		}
 
