@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { readdir } from "node:fs/promises";
-import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
+import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, newer, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -405,7 +405,7 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	resetSession();
 	const f = fake();
 	await mobileAct(f.exec, { action: "list" }, opts());
-	assert.deepEqual(f.calls.map(c => c[0]), [MOBILECLI], "runs the bundled binary, never npm install");
+	assert.deepEqual(f.calls.map(c => c[0]).filter(c => c !== "xcrun"), [MOBILECLI], "runs the bundled binary, never npm install (xcrun: devicectl looking for Wi-Fi devices)");
 
 	resetSession();
 	const sim = fake({ agent: false });
@@ -450,6 +450,45 @@ const opts = (extra = {}) => ({ sleep: async () => {}, ...extra });
 	assert.equal(tool.name, "mobile_act");
 	assert.ok(tool.parameters.properties.action.enum.includes("longpress"));
 }
+
+// Wi-Fi iPad (macOS: found through devicectl): commands go to its helper over the tunnel, not to mobilecli; the tree is filtered like mobilecli's.
+if (process.platform === "darwin") {
+	resetSession();
+	const rpcs = [], tree = { type: "XCUIElementTypeApplication", label: "Demo", rect: { x: 0, y: 0, width: 744, height: 1133 }, children: [
+		{ type: "XCUIElementTypeOther", rect: { x: 0, y: 0, width: 744, height: 1133 }, children: [{ type: "XCUIElementTypeButton", label: "Open Drawer", rawIdentifier: "drawer", rect: { x: 20.5, y: 300, width: 200, height: 44 } }] },
+		{ type: "XCUIElementTypeTextField", rect: { x: 20, y: 400, width: 300, height: 40 } },
+		{ type: "XCUIElementTypeButton", label: "Off screen", rect: { x: -400, y: 0, width: 10, height: 10 } },
+	] };
+	const ipad = { hardwareProperties: { udid: "IPAD-1", platform: "iOS", reality: "physical" }, deviceProperties: { name: "Viktor’s iPad", osVersionNumber: "26.4.1" }, connectionProperties: { transportType: "localNetwork", tunnelState: "connected", tunnelIPAddress: "fd00::1" } };
+	const exec = async (c, a) => {
+		if (c === "xcrun" && a[1] === "list") { await writeFile(a[a.indexOf("--json-output") + 1], JSON.stringify({ result: { devices: [ipad] } })); return { code: 0 }; }
+		if (c === "curl") {
+			assert.equal(a.at(-1), "http://[fd00::1]:12004/rpc");
+			const { method, params } = JSON.parse(a[a.indexOf("--data-binary") + 1]);
+			rpcs.push(`${method} ${JSON.stringify(params)}`);
+			const result = { "device.info": { scale: 2, screenSize: { width: 744, height: 1133 } }, "device.dump.ui": tree, "device.apps.foreground": { bundleId: "com.demo" } }[method] ?? {};
+			return { code: 0, stdout: JSON.stringify({ jsonrpc: "2.0", id: 1, result }) };
+		}
+		assert.deepEqual(a, ["devices", "--include-offline"], "mobilecli only lists");
+		return ok({ devices: [] });
+	};
+	assert.match(await mobileAct(exec, { action: "list" }, opts()), /^IPAD-1 ONLINE Viktor’s iPad \(ios real Wi-Fi 26\.4\.1\)$/);
+	const snap = await mobileAct(exec, { action: "snapshot" }, opts());
+	assert.match(snap, /app in front: com\.demo\n\n\[e1\] Button "Open Drawer" #drawer @\(20,300 200x44\)\n\[e2\] TextField "" @\(20,400 300x40\)$/);
+	await mobileAct(exec, { action: "tap", ref: "e1", settleMs: 0 }, opts());
+	await mobileAct(exec, { action: "type", ref: "e2", text: "AB", submit: true, settleMs: 0 }, opts());
+	await mobileAct(exec, { action: "button", button: "home", settleMs: 0 }, opts());
+	assert.deepEqual(rpcs.filter(r => !/^device\.(info|dump\.ui|apps\.foreground) /.test(r)), [
+		'device.io.tap {"x":120,"y":322}',
+		'device.io.tap {"x":170,"y":420}',
+		'device.io.keys {"keys":[{"key":"clear","modifiers":[]}]}',
+		'device.io.text {"text":"AB"}',
+		'device.io.keys {"keys":[{"key":"enter","modifiers":[]}]}',
+		'device.io.button {"button":"home"}',
+	]);
+	resetSession();
+}
+assert.ok(newer("1.0.22", "1.0.21") && newer("1.1.0", "1.0.99") && !newer("1.0.21", "1.0.21") && !newer("1.0.9", "1.0.10"));
 
 // Live: only with the bundled mobilecli and one online simulator with its agent; reads only, never taps.
 if (existsSync(MOBILECLI)) {

@@ -5,7 +5,7 @@ import { mkdir, open, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
-import { MOBILECLI } from "./mobile-act.ts";
+import { MOBILECLI, wifiScreenshot } from "./mobile-act.ts";
 import { resolveVm, VBOXMANAGE } from "./vm-act.ts";
 
 // One PowerShell/C# helper: window enumeration, PrintWindow capture (minimized windows included) and PNG crop/downscale.
@@ -445,6 +445,8 @@ export async function screenRead(exec: Exec, args: ScreenReadArgs, signal?: Abor
 	await mkdir(dir, { recursive: true });
 	const file = path.join(dir, `${Date.now()}-${randomUUID().slice(0, 8)}.png`);
 	const plan = screenReadPlan(args, file);
+	const wifiPng = args.target === "device" && platform === "darwin" ? await wifiScreenshot(exec, args.device?.device, signal) : undefined;
+	if (wifiPng) { const { png, ...shot } = processPng(wifiPng, plan.region, plan.maxEdge); await writeFile(file, png); return { file, window: undefined, ...shot }; }
 	if (platform === "darwin" && plan.op === "window") return macWindow(exec, plan as ReturnType<typeof screenReadPlan> & { op: "window" }, signal);
 	// vm too on Windows: only captureFile has the wake retry, and VBoxManage is an absolute .exe path that spawn runs directly
 	if (platform !== "win32" || (plan as FilePlan).wake) return { file, window: undefined, ...await captureFile(plan as FilePlan, signal).catch(e => {

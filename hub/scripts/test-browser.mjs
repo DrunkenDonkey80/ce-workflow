@@ -312,6 +312,9 @@ try {
  await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+ // Typing after the path keeps the same thumbnail element: rebuilding it on every key made the row blink and the page jump.
+ await browser("wait", "#composer-thumbs .composer-thumb img");
+ assert.equal(await evaluate("(() => { const box = document.getElementById('message-input'), img = document.querySelector('#composer-thumbs img'); box.value += ' typed'; box.dispatchEvent(new Event('input')); const same = document.querySelector('#composer-thumbs img') === img; box.value = box.value.slice(0, -6); box.dispatchEvent(new Event('input')); return same; })()"), true, "typing keeps the composer thumbnail");
  // Its thumbnail under the box opens the annotator; a marker's note goes into the box as text after the new image's path.
  await browser("click", "#composer-thumbs .composer-thumb"); await browser("wait", "dialog.annotate[open] canvas");
  await browser("click", ".annotate-tool[aria-label^=Numbered]"); await browser("click", "dialog.annotate canvas");

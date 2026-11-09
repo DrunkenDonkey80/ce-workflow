@@ -1,6 +1,6 @@
 {
   "name": "pi-work-orchestrator",
-  "version": "0.4.2",
+  "version": "0.5.1",
   "description": "Plan3 planning and execution, research mode, compaction and utility tools for Pi.",
   "type": "module",
   "license": "MIT",
@@ -59,7 +59,7 @@
   },
   "dependencies": {
     "jiti": "2.7.0",
-    "mobilecli": "1.0.21",
+    "mobilecli": "1.0.22",
     "wormhole-crypto": "0.3.1"
   },
   "peerDependencies": {
