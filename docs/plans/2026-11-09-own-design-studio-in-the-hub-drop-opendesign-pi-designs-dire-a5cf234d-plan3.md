@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T13:22:09.527Z
+updated: 2026-11-09T13:28:17.408Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -210,8 +210,7 @@ Fit check per module:
 
 - [x] **S17** OpenDesign runtime removed: opendesign-client.ts, its test and fixtures deleted; redaction moved to extensions/redact.ts (redactSecrets) used by design.ts and work-models.ts; the /wo Settings "OpenDesign executable" row and its helpers gone; the OD-run guards in plan3.ts and ask-user removed; tool-loader text, wo-control label assert, knowledge sample paths and the test-sessions busy label reworded.
 - [x] **S20** Catch-up watches nexu-io/open-design: added to PLAN3_CATCH_UP_PACKAGES; a git baseline entry at 07a86b1 with the ledger, the D21 review paths and six adopted decisions; writeGitCatchUpDiff takes the entry's paths (git diff -- paths); docs/upstream/open-design.md lists what was ported, where it lives and what was not taken; the review text says "upstream repo".
-- [ ] **S18** README design section, hub/README and CHANGELOG Unreleased rewritten for the studio; old OD plan marked superseded; changelog crops of the preview controls
-  - Crops with `node hub/scripts/changelog-shot.mjs` (the `--design` flag from v2) for the device picker, comment pins and the inspector.
+- [x] **S18** Docs: README "Design sessions" rewritten for the hub studio (no OD runtime) and Catch up packages names the OpenDesign source; hub/README notes the design preview and bridge; CHANGELOG Unreleased has Added/Removed bullets with crops 0.5.0-design-toolbar.png and 0.5.0-design-preview.png (phone frame, two pins, inspector); old plan 1fc5d5ce has a Superseded amendment and status blocked (no superseded status exists; complete is refused while steps are open).
 
 ### Phase 8: Live check [code]
 
