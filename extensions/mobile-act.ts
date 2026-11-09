@@ -6,6 +6,7 @@ import { appendFile, copyFile, mkdir, open, readdir, readFile, rm, writeFile } f
 import os from "node:os";
 import path from "node:path";
 import { askConfirm } from "./ask-user/menu.ts";
+import { wifi, wifiAgent, wifiCall, wifiConnect, wifiDevices } from "./mobile-wifi.ts";
 
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 type Confirm = (title: string, message: string) => Promise<boolean>;
@@ -47,10 +48,13 @@ const screens = new Map<string, Frame>();
 const agentOk = new Set<string>();
 const fronts = new Map<string, string>(); // device -> app in front at the last read
 const realIds = new Set<string>(); // real devices: no agent-start retries, their failures are diagnosed instead
-export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); fronts.clear(); realIds.clear(); breakers.clear(); crashSeen.clear(); exeNames.clear(); }
+export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); fronts.clear(); realIds.clear(); breakers.clear(); crashSeen.clear(); exeNames.clear(); wifi.clear(); }
 const pause = (o: Options, ms: number) => (o.sleep ?? (t => new Promise(res => setTimeout(res, t))))(ms);
 
 async function run(exec: Exec, args: string[], signal?: AbortSignal, timeout = 60_000, retries = 2): Promise<string> {
+	// Wi-Fi devices are out of mobilecli's reach: the same command goes to their helper directly, answered in mobilecli's shape.
+	const id = args[args.indexOf("--device") + 1], ip = args.includes("--device") ? wifi.get(id) : undefined;
+	if (ip) return JSON.stringify({ status: "ok", data: await wifiCall(exec, ip, args, signal, timeout).catch(e => { agentOk.delete(id); throw e; }) });
 	const r = await exec(MOBILECLI, args, { timeout, signal });
 	if (r.killed) throw new Error(`mobilecli ${args[0]} timed out.`);
 	const out = String(r.stdout ?? "");
@@ -94,6 +98,7 @@ export async function helperListed(exec: Exec, dev: Device, signal?: AbortSignal
 /** The DeviceKit helper agent must be on an iOS device before reading or touching it: automatic on simulators, asked on real iPhones. */
 async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 	if (dev.platform !== "ios" || agentOk.has(dev.id)) return;
+	if (wifi.has(dev.id)) { await wifiAgent(exec, dev, o); agentOk.add(dev.id); return; }
 	const installed = await run(exec, ["agent", "status", "--device", dev.id], o.signal).then(out => JSON.parse(out).status === "ok", () => false);
 	// A hung or failing status call is not a missing helper: asking to reinstall then repeats on every call and fails anyway.
 	if (!installed && dev.type === "real" && await helperListed(exec, dev, o.signal)) throw new Error(`The mobilecli helper is installed on ${dev.name} but does not answer (agent status failed). Not reinstalling.\n${await agentHint(exec, dev, o.signal)}`);
@@ -123,6 +128,7 @@ async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 
 export async function listDevices(exec: Exec, signal?: AbortSignal): Promise<Device[]> {
 	const list: Device[] = data(await run(exec, ["devices", "--include-offline"], signal)).devices ?? [];
+	for (const d of await wifiDevices(exec, signal)) if (list.some(l => l.id === d.id)) wifi.delete(d.id); else list.push(d); // USB wins: mobilecli has it
 	return list.sort((a, b) => Number(b.state === "online") - Number(a.state === "online"));
 }
 
@@ -577,10 +583,11 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 	const { signal } = o;
 	if (args.action === "list") {
 		const list = await listDevices(exec, signal);
-		return list.length ? list.map(d => `${d.id} ${d.state === "online" ? "ONLINE " : ""}${breakers.has(d.id) ? "BREAKER ON " : ""}${d.name} (${d.platform} ${d.type} ${d.version})`).join("\n") : "No devices: create a simulator in Xcode or an emulator in Android Studio, or plug in a phone.";
+		return (list.length ? list.map(d => `${d.id} ${d.state === "online" ? "ONLINE " : ""}${breakers.has(d.id) ? "BREAKER ON " : ""}${d.name} (${d.platform} ${d.type}${wifi.has(d.id) ? " Wi-Fi" : ""} ${d.version})`).join("\n") : "No devices: create a simulator in Xcode or an emulator in Android Studio, or plug in a phone.");
 	}
 	if (args.action === "boot") {
 		const dev = await resolveDevice(exec, args.device, false, signal);
+		if (wifi.has(dev.id)) { if (dev.state !== "online") await wifiConnect(exec, dev, signal); return `${dev.name} (${dev.id}) is connected over Wi-Fi.`; }
 		if (dev.state !== "online") await run(exec, ["device", "boot", "--device", dev.id], signal, 300_000);
 		return `${dev.name} (${dev.id}) is booted.`;
 	}
@@ -632,6 +639,33 @@ async function agentHint(exec: Exec, dev: Device, signal?: AbortSignal) {
 }
 const queues = new Map<string, Promise<unknown>>();
 
+/** screen_read target=device on a Wi-Fi device: a PNG from its helper; undefined for every other device (mobilecli takes those). */
+export async function wifiScreenshot(exec: Exec, device: string | undefined, signal?: AbortSignal) {
+	if (process.platform !== "darwin") return;
+	const dev = await resolveDevice(exec, device, true, signal).catch(() => undefined);
+	if (!dev || !wifi.has(dev.id)) return;
+	await ensureAgent(exec, dev, { signal });
+	const png = path.join(os.tmpdir(), `mobile-act-wifi-${process.pid}-${Date.now()}.png`);
+	try { await run(exec, ["screenshot", "--device", dev.id, "--output", png], signal); return await readFile(png); }
+	finally { await rm(png, { force: true }); }
+}
+
+const SHIPPED = (() => { try { return String(createRequire(import.meta.url)("mobilecli/package.json").version); } catch { return ""; } })();
+export const newer = (a: string, b: string) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] > y[i]; return false; };
+/** A line for list when npm has a newer mobilecli than ce-workflow ships; npm is asked at most once a day. */
+async function mobilecliNews(exec: Exec, o: Options) {
+	const file = path.join(o.dir ?? BASE, "mobilecli-latest.json");
+	let latest: string | undefined = await readFile(file, "utf8").then(t => { const j = JSON.parse(t); return Date.now() - j.at < 86_400_000 ? j.version : undefined; }, () => undefined);
+	if (!latest) {
+		const out = String((await exec("npm", ["view", "mobilecli", "version"], { timeout: 15_000, signal: o.signal }).catch(() => ({ stdout: "" }))).stdout ?? "").trim();
+		if (!/^\d+\.\d+\.\d+$/.test(out)) return "";
+		latest = out;
+		await mkdir(path.dirname(file), { recursive: true });
+		await writeFile(file, JSON.stringify({ version: latest, at: Date.now() }));
+	}
+	return SHIPPED && newer(latest, SHIPPED) ? `\nmobilecli ${latest} is out; ce-workflow ships ${SHIPPED}. Tell the user its pin in ce-workflow's package.json needs a bump, after checking the changes for anything mobile_act should use: https://github.com/mobile-next/mobilecli/blob/main/CHANGELOG.md` : "";
+}
+
 async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 	const { signal } = o, d = ["--device", dev.id], settle = args.settleMs ?? 500;
 	if (args.action === "resume") {
@@ -641,6 +675,7 @@ async function act(exec: Exec, dev: Device, args: MobileActArgs, o: Options) {
 	}
 	if (MUTATING.has(args.action) && breakers.has(dev.id)) throw new Error(`BREAKER ON for ${dev.name}, which stopped on: ${breakers.get(dev.id)!.split("\n")[0]}\nNo input until action resume: look at the saved screen first.`);
 	if (args.action === "launch" || args.action === "relaunch") {
+		if (wifi.has(dev.id)) await ensureAgent(exec, dev, o); // over Wi-Fi the helper launches apps too
 		if (!args.appId) throw new Error(`${args.action} needs appId (iOS bundle id or Android package).`);
 		const id = args.appId, verb = args.action === "relaunch" ? "Relaunched" : "Launched";
 		// Relaunch escapes screens the app cannot close itself (system sheets such as the Game Center dashboard).
@@ -717,7 +752,7 @@ export const mobileActTool = (exec: Exec) => ({
 		"Known multi-step flows (log in, walk onboarding, fill a form, play a game loop): run them in one codemode script with tools.mobile_act calls (query, wait, settleMs 0) and return only what you need to check, instead of one model turn per action.",
 	],
 	description: [
-		"Operate an iOS Simulator, a real iPhone or an Android emulator/phone through mobilecli (simulators boot headless, no window).",
+		"Operate an iOS Simulator, a real iPhone or an Android emulator/phone through mobilecli (simulators boot headless, no window). iPhones and iPads paired with Xcode over Wi-Fi work too (list marks them Wi-Fi; boot connects one that is offline).",
 		"Actions: list (devices, online first); boot {device}; launch {appId}; relaunch {appId} (terminate + launch: escapes system sheets such as Game Center); both fail when the app did not close or come to the front, and return its first screen (settleMs, default 1000); snapshot (accessibility elements as [ref] Type \"label\" = value #id @(x,y wxh));",
 		"find {query} (searches the last snapshot); ocr (on-screen text via Apple Vision as [tN] refs, for controls the accessibility tree misses; macOS); wait {query?, gone?, timeoutMs? (10000), (no query: until the screen stops changing for stableMs, default 1000, never fails on timeout; use instead of sleeping), stableMs? (the match must hold this long), failOn? [queries], failOnAlert?, expectApp?}: failOn text, an alert or another app in front fail it before success is checked;",
 		"tap, longpress, type and swipe take ref, or query (\"#id\" exact, else label/value/id text; read fresh, then OCR text if the tree has none) to find and act in one call; overlapped elements (fanned cards) are touched at their visible part.",
@@ -762,7 +797,8 @@ export const mobileActTool = (exec: Exec) => ({
 	},
 	async execute(_id: string, args: MobileActArgs, signal?: AbortSignal, _update?: unknown, ctx?: any) {
 		const confirm: Confirm | undefined = ctx?.hasUI ? (title, message) => askConfirm(ctx, title, message, { signal }) : undefined;
-		return { content: [{ type: "text", text: await mobileAct(exec, args, { signal, confirm }) }], details: {} };
+		const text = await mobileAct(exec, args, { signal, confirm });
+		return { content: [{ type: "text", text: args.action === "list" ? text + await mobilecliNews(exec, { signal }) : text }], details: {} };
 	},
 });
 

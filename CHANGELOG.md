@@ -2,6 +2,15 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.5.0 — 2026-11-09
+
+### Added
+- `mobile_act` and `screen_read target=device` work with iPhones and iPads that Xcode reaches over Wi-Fi, not only over USB. `list` marks them Wi-Fi, and `boot` connects one that is offline. On first use, mobile_act asks once, then builds the DeviceKit helper with your Xcode team (about 30 seconds) and starts it on the device. The helper keeps running for later sessions. The device needs Settings > Developer > Enable UI Automation turned on, and an iPad needs multitasking off.
+- `mobile_act list` says when a newer mobilecli is out than the one ce-workflow ships, with a link to its changelog. npm is checked at most once a day.
+
+### Changed
+- mobilecli 1.0.22: iOS `dump ui` is up to 3x faster on heavy screens, Flutter screens keep all their widgets, and the Android agent starts on x86_64 emulators.
+
 ## 0.4.2 — 2026-11-09
 
 ### Added
