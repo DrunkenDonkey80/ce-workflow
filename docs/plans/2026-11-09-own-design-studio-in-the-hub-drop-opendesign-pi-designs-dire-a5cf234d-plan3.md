@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T11:42:36.026Z
+updated: 2026-11-09T11:46:26.182Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -178,12 +178,7 @@ Fit check per module:
 
 ### Phase 2: Rendering for the agent [code]
 
-- [ ] **S06** extensions/design-render.ts: render a screen at a size (element or full page) and return a PNG plus a report of overflow, console errors and failed resources
-  - Render-state contract: `{folder (design or history version), screen, width, height (rotation already applied), hash (deck slide), styleEdits[] (live, unsaved inline edits)}`. Edits are applied by eval after load, never written to files.
-  - Sandbox parity: the folder is served on a short-lived 127.0.0.1 port with the same sandbox CSP as `sendExplored` (one shared constant), not `file://`.
-  - Isolation: every capture uses its own agent-browser session (`design-<handle>-<random>`), closed afterwards, so look, reference and Mark never share a page or viewport.
-  - agent-browser commands: `set viewport`, `open`, `eval` (report), `errors`, `console`, `screenshot [selector]`. Headless only.
-  - Check: a new self-check in C1 against a fixture page with a known overflow and a console error, two overlapping captures at different sizes each get their own size, and a styleEdit shows in the shot; skipped with a notice when agent-browser is missing.
+- [x] **S06** extensions/design-render.ts: renderDesign(render-state) serves the folder under the shared SANDBOX_CSP (also used by explore.ts), one agent-browser batch per isolated session, PNG + report (overflow, wide elements, errors, console, failed resources); reportText.
 - [ ] **S07** `design look` (one or more presets, screen, element) returns small images plus the report; `design reference <url>` writes references/<site>/ screenshots and STYLE.md (D6)
   - Reference fallback: when headless gets a bot wall or an empty body, the result tells the agent to use browser_fetch with images and save into the same folder.
   - Check: C1 with the fixture page for look; reference against a local fixture page served by the test.

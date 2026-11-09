@@ -6,6 +6,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { runDesign, snapshot, versions, writeRefusal } from "../extensions/design.ts";
+import { agentBrowser, renderDesign, reportText } from "../extensions/design-render.ts";
+import { decodePng } from "../extensions/screen-read.ts";
 
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "design-test-"));
 const storePath = path.join(cwd, ".pi/designs/sessions.json");
@@ -140,5 +142,30 @@ try {
 	for (let n = 0; n < 32; n++) { put(h, { "index.html": `<p>${n}</p>` }); await snapshot(cwd, h); }
 	assert.equal(versions(cwd, h).length, 30, "the newest 30 are kept");
 	assert.equal(fs.readFileSync(at(versions(cwd, h).at(-1)), "utf8"), "<p>31</p>");
+	// S06 renderer: overflow, page and console errors and a missing image are reported; two overlapping captures keep their
+	// own sizes (isolated sessions); a live style edit shows in the picture without touching the file.
+	if (!agentBrowser()) console.log("skipped the render checks: agent-browser is not installed");
+	else {
+		const fixture = path.join(cwd, "render");
+		fs.mkdirSync(fixture);
+		const page = `<!doctype html><style>body{margin:0;background:#fff}.wide{width:600px;height:40px}</style><h1 data-id="title">Hi</h1><div class="wide" data-id="band"></div><img src="gone.png"><script>console.error("boom"); missingFn();</script>`;
+		fs.writeFileSync(path.join(fixture, "index.html"), page);
+		const [phone, tablet] = await Promise.all([renderDesign({ folder: fixture, width: 360, height: 800, maxEdge: 4000 }), renderDesign({ folder: fixture, width: 820, height: 1180, maxEdge: 4000, styleEdits: [{ selector: "body", styles: { background: "rgb(255, 0, 0)" } }] })]);
+		assert.deepEqual([phone.width, phone.height, tablet.width, tablet.height], [360, 800, 820, 1180], "each capture kept its own viewport");
+		assert.equal(phone.report.overflow, true);
+		assert.match(phone.report.wide.join(), /@band 600px/);
+		assert.equal(tablet.report.overflow, false);
+		assert.match(phone.report.errors.join(), /missingFn/);
+		assert.match(phone.report.console.join(), /error: boom/);
+		assert.match(phone.report.failed.join(), /gone\.png/);
+		const pixel = (shot, x, y) => { const { width, rgba } = decodePng(shot.png); return [...rgba.subarray((y * width + x) * 4, (y * width + x) * 4 + 3)]; };
+		assert.deepEqual(pixel(tablet, 800, 1100), [255, 0, 0], "the live edit shows");
+		assert.deepEqual(pixel(phone, 300, 700), [255, 255, 255]);
+		assert.equal(fs.readFileSync(path.join(fixture, "index.html"), "utf8"), page, "edits never reach the file");
+		assert.match(reportText(tablet.report), /failed: /);
+		const element = await renderDesign({ folder: fixture, width: 360, height: 800, element: "@title" });
+		assert(element.height < 200, "an element shot is the element, not the page");
+		assert.match((await renderDesign({ folder: fixture, width: 360, height: 800, element: "@nope" })).report.missing, /no element @nope/);
+	}
 	console.log("design tool tests passed");
 } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
