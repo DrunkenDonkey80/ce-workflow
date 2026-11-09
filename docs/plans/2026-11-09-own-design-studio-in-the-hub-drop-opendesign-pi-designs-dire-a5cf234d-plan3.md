@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T11:49:09.915Z
+updated: 2026-11-09T11:54:28.972Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -183,9 +183,7 @@ Fit check per module:
 
 ### Phase 3: Design guide [think]
 
-- [ ] **S04** Write extensions/design-guide.md (D8, D2 data-id, D7 screens, D15 images, D16 deck framework) plus a provenance note; design.ts injects it in design sessions
-  - Judgment: which OD craft rules earn their tokens. Keep about 150 lines, and test them in S05's live trial.
-  - Check: C1 asserts the guide reaches a design session's system prompt and not other sessions'.
+- [x] **S04** extensions/design-guide.md (110 lines: files, start, content, data-id, visual craft, states, a11y, responsive, generate_image, Tweaks contract, hash-based deck framework, one look) + design-guide.UPSTREAM.md and OD LICENSE; design sessions get frontend-design body + guide in their prompt.
 - [ ] **S05** Live trial: one web and one app design built by a design session; tune the guide wording from what the agent got wrong
   - Verdict to record: does the agent keep `data-id`s, one file per screen, real content, and finish with one look? Note the misses fixed.
   - Needs: the hub running and a strong designModel. Run in a throwaway folder under Temp.

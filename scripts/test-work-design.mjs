@@ -6,7 +6,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { runDesign, snapshot, versions, writeRefusal } from "../extensions/design.ts";
+import designExtension, { runDesign, snapshot, versions, writeRefusal } from "../extensions/design.ts";
 import { agentBrowser, renderDesign, reportText } from "../extensions/design-render.ts";
 import { decodePng } from "../extensions/screen-read.ts";
 
@@ -61,6 +61,20 @@ try {
 	const shown = await runDesign(cwd, { action: "show" }, tools);
 	delete process.env.PI_HUB_SESSION;
 	assert.deepEqual([shown.handle, shown.folder, shown.files, shown.page], ["design-2", ".pi/designs/design-2", ["assets/a.css", "index.html"], "index.html"]);
+
+	// S04: the design guide (frontend-design body plus the craft rules) reaches a design session's prompt, not other sessions'.
+	const prompt = async hubId => {
+		const hooks = {};
+		designExtension({ on: (name, fn) => { hooks[name] = fn; } });
+		if (hubId) process.env.PI_HUB_SESSION = hubId;
+		try { hooks.session_start({}, { cwd }); } finally { delete process.env.PI_HUB_SESSION; }
+		return hooks.before_agent_start({ systemPrompt: "BASE" })?.systemPrompt;
+	};
+	const own = await prompt("00000000-0000-0000-0000-000000000001");
+	assert.match(own, /^BASE\n\nYou are design session design-2 [\s\S]*# Frontend Design[\s\S]*# Design session guide[\s\S]*data-id="kebab-case"[\s\S]*design:tweaks/);
+	assert.doesNotMatch(own, /^name: frontend-design/m, "no skill frontmatter");
+	assert.equal(await prompt(), undefined);
+	assert.equal(await prompt("some-other-session"), undefined);
 
 	// Select (R7): exports the folder to docs/designs/<name>/, stars it, asks where to implement.
 	const asked = [];

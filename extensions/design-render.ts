@@ -42,7 +42,7 @@ async function serve(folder: string) {
 		let real = "";
 		try { real = fs.realpathSync(file); } catch { /* missing */ }
 		if (!real || inside.startsWith("..") || path.isAbsolute(inside) || path.relative(root, real).startsWith("..") || !fs.statSync(real).isFile()) {
-			failed.push(`404 ${relative}`);
+			if (relative !== "favicon.ico") failed.push(`404 ${relative}`); // browsers ask for it unprompted
 			response.writeHead(404, { "content-type": "text/plain" });
 			return response.end("not found");
 		}

@@ -316,6 +316,13 @@ export function ownSession(cwd: string) {
 
 const DESIGN_ROLE = (item: Session) => `You are design session ${item.handle} (${item.name ?? item.handle}): you build this one design yourself (${item.kind}, direction: ${item.direction}). Write its files only into ${designFolder(item.handle)}/ (index.html first, one HTML file per screen, shared styles.css). The page shows the design live beside this chat (reloaded when files change), so never describe it at length and never post links or file paths to view it: the user is looking at it. After a change, reply in a line or two with what you changed. When the user picks this design ("select this", "use it"), call design {action:"select"}: it exports, stars it and asks the user where to implement it. To try a different approach without losing this one, call design {action:"clone", name} (ask the user for a name when they gave none).`;
 
+// D8: frontend-design (body only) plus the OD craft rules; read once, design sessions only.
+let guideText: string | undefined;
+export function designGuide() {
+	const read = (file: string) => fs.readFileSync(new URL(file, import.meta.url), "utf8");
+	return guideText ??= `${read("../skills/frontend-design/SKILL.md").replace(/^---[\s\S]*?\n---\n/, "").trim()}\n\n${read("./design-guide.md").trim()}`;
+}
+
 export default function designExtension(pi) {
 	let self: Session | undefined, modelSet = false;
 	pi.registerTool?.({
@@ -370,8 +377,9 @@ export default function designExtension(pi) {
 	pi.on?.("before_agent_start", event => {
 		if (!self) return;
 		const sections = event?.systemPromptOptions?.sections;
-		if (sections && typeof sections === "object") { sections.design = DESIGN_ROLE(self); return; }
-		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${DESIGN_ROLE(self)}` };
+		const text = `${DESIGN_ROLE(self)}\n\n${designGuide()}`;
+		if (sections && typeof sections === "object") { sections.design = text; return; }
+		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${text}` };
 	});
 	pi.events?.on?.("wo:web-info", info => { if (self) info.design = self.handle; });
 	pi.on?.("tool_call", (event, ctx) => {
