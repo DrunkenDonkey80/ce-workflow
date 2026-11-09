@@ -68,6 +68,11 @@ try {
 	for (const s of seen) { assert.equal(s.content, "secret-pw"); assert(!existsSync(s.file), "temp password file removed"); }
 	assert(!calls.flat().includes("secret-pw") && !out.includes("secret-pw"));
 	await assert.rejects(act({ action: "run", exe: "x", passwordEnv: "MISSING_PW_VAR" }), /MISSING_PW_VAR is not in .env/);
+	// script: PowerShell text, encoded
+	await act({ action: "run", script: "Get-Date | % { 'it''s' }" });
+	const sc = calls.find(c => c.some(x => x.startsWith("--exe=") && x.includes("powershell.exe")) && c.includes("-EncodedCommand") && Buffer.from(c[c.length - 1], "base64").toString("utf16le").includes("it''s"));
+	assert(sc, "script runs as powershell -EncodedCommand");
+	await assert.rejects(act({ action: "run", script: "x", exe: "y" }), /exe or script, not both/);
 	// D-15: VBoxManage exit 32 + guest code; 1-31 are VBoxManage's own errors
 	const runCode = (code) => vmAct({ action: "run", exe: "x" }, { cwd: dir, running: async () => ["S46"], run: async () => ({ code, stdout: "", stderr: "VBoxManage: error: boom" }) });
 	assert.match(await runCode(35), /^Exit code 3\./);
