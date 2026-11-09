@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Changed
+- Project command buttons the agent creates show on remote hub pages too (phone, other PCs). The agent hides one from them only when you ask.
+
 ### Fixed
 - Planning: when the agent sets the plan's title and its size in the same step, the size decision is no longer lost. Before, the rename made the size call fail, and the agent then planned without a recorded size.
 

@@ -292,7 +292,7 @@ export const projectCommandsTool = {
 			kind: nullable({ type: "string", enum: ["prompt", "run"] }),
 			text: nullable({ type: "string", description: "prompt: message to send; run: shell command line" }),
 			help: nullable({ type: "string", description: "One short line shown on hover" }),
-			local: nullable({ type: "boolean", description: "Show only on this PC's own hub page, not remote ones (for runs that open windows or act on this desktop)" }),
+			local: nullable({ type: "boolean", description: "Hide the button from remote hub pages (phone, other PCs). Buttons show everywhere by default; set true only when the user asks to hide it" }),
 			actions: nullable({ type: "array", description: "Extra actions; click binds one to middle, Ctrl+click or Shift+click", items: { type: "object", additionalProperties: false, required: ["name", "kind", "text"], properties: { name: { type: "string" }, kind: { type: "string", enum: ["prompt", "run"] }, text: { type: "string" }, click: { type: "string", enum: ["middle", "ctrl", "shift"] } } } }),
 			menu: nullable({ type: "boolean", description: "run only: the script lists its right-click actions when PI_HUB_CLICK=menu" }),
 		},
