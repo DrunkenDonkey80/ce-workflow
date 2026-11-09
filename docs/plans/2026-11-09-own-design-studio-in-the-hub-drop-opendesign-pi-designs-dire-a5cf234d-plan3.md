@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T13:28:17.408Z
+updated: 2026-11-09T13:32:15.160Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -239,7 +239,7 @@ Fit check per module:
 
 ## Resume context
 
-S01–S04, S06–S12 done (HEAD a663ad0a). Next: S13. S05 waits on a running hub plus a strong design model; S19 needs a person with a remote device. Unrelated dirty files stay unstaged: CHANGELOG.md, hub/web/index.html, the 427dd6a8/893d0619 plans, GLOSSARY.md, the stats json files, and the non-design hunks of hub/scripts/test-browser.mjs. For that test file, stage only your own hunks with git diff → filter → git apply --cached. Testing the sandboxed preview frame: eval cannot reach it, so read it from the agent-browser snapshot (Iframe "index.html" subtree) and click it with @ref. pi-lens flags the `?token=__TOKEN__` imports and the older `as unknown as` casts; these predate this plan and are not new findings.
+Steps S01–S04, S06–S18 and S20 are done and committed (the last code commit is 069c77fb, which also restored the S17 file deletions the first S17 commit missed). The full check set C1–C8 + C10 plus C4 browser passes on HEAD. Two steps remain, both needing the user: S05 (a live check with a strong design model in the real hub) and S19 (a remote-phone trial from start to select). No push yet. Before a push: version bump 0.4.2 → 0.5.0 (new module) and move CHANGELOG Unreleased under it. Left uncommitted on purpose: another session's work (CHANGELOG CPU-tooltip bullet, test-browser tooltip hunk, hub/web/index.html, GLOSSARY.md, the 427dd6a8/893d0619 plans, *.stats.json).
 
 ## Amendments
 
