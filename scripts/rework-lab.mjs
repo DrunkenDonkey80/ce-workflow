@@ -7,6 +7,7 @@
 // --add copies task inputs (a fixture) into the clone as one commit on top of SHA; diffs and counts start after it.
 // --resume continues an existing run's clone and plan instead of cloning and planning again.
 // --plan-only stops after the first /plan3 turn and copies the draft plan to <root>/<run>.plan.md.
+// --from-plan skips planning: --source is an earlier lab clone and --sha a commit where its plan is already decided (C1 coding arms).
 // --check runs CMD (bash) in the clone at the end; its result goes on the final line.
 // No plan after /plan3 (the planner sized it Tiny and just did it) ends as outcome "tiny", not a failure.
 import { execFileSync, spawn } from "node:child_process";
@@ -172,7 +173,7 @@ else if (!git("tag", "-l", "lab-base")) git("tag", "lab-base", sha); // runs clo
 const deadline = Date.now() + hours * 3600_000;
 start();
 try {
-	if (!resume) await prompt(`/plan3 ${request}`, deadline);
+	if (!resume && !args.includes("--from-plan")) await prompt(`/plan3 ${request}`, deadline);
 	if (!planFile()) {
 		note("done", { outcome: "tiny", head: git("rev-parse", "--short", "HEAD"), ...result() });
 	} else if (args.includes("--plan-only")) {
