@@ -441,7 +441,11 @@ if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.sec
 			}
 			task = `vm-act-run-${randomUUID()}`;
 			const enc = Buffer.from(runWrapper(task, a.exe!, a.args ?? []), "utf16le").toString("base64");
-			await guestPs(guestScript({ task, enc, user, logon: a.as ? "Interactive" : "S4U", level: a.as ? "Limited" : "Highest" }, TASK_START_PS));
+			await guestPs(guestScript({ task, enc, user, logon: a.as ? "Interactive" : "S4U", level: a.as ? "Limited" : "Highest" }, TASK_START_PS)).catch((e: Error) => {
+				// a highest-level task needs an unfiltered admin token; other admins get a UAC-filtered one over guestcontrol
+				if (a.via && /Access is denied/i.test(e.message)) throw new Error(`${e.message}\nvia: "task" needs an admin that UAC does not filter (the enabled built-in Administrator); ${user} is filtered here. Instead: run as: "console" with script "Start-Process <exe> -Verb RunAs", then uac consent if a prompt shows.`);
+				throw e;
+			});
 			started = `Started ${a.exe} as ${user} (${a.as ? "console session, not elevated" : "S4U task, elevated if an admin"}) in task ${task}.`;
 			if (a.wait === false) return withState(`${started} Get its exit code and output with run {task: "${task}"}.`);
 		}

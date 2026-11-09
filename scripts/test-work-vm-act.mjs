@@ -215,6 +215,8 @@ try {
 	assert.match(dec(calls[0]), /"user":"Administrator","logon":"S4U","level":"Highest"/);
 	assert.match(el, /^Started C:\\x\.exe as Administrator \(S4U task, elevated if an admin\)/);
 	await assert.rejects(sess({ action: "run", task: "evil'; rm" }, []), /task must be a task name/);
+	const denied = vmAct({ action: "run", via: "task", exe: "x" }, { cwd: dir, running: async () => ["S46"], sleep: async () => {}, run: async (args) => args[2] === "run" ? { code: 33, stdout: "", stderr: "Access is denied." } : { code: 0, stdout: "", stderr: "" } });
+	await assert.rejects(denied, /needs an admin that UAC does not filter[\s\S]*Start-Process <exe> -Verb RunAs/);
 	await assert.rejects(sess({ action: "run", via: "task", user: "relAdmin", exe: "x" }, []), /runs only as the guest admin account \(Administrator\)/);
 	await assert.rejects(sess({ action: "run", as: "console", exe: "x" }, [guestOut("", "LogonUI 4")]), /run as console needs a signed-in console user/);
 	await writeFile(path.join(dir, ".env"), "# test\nVM_TEST_PW=secret-pw\n");
