@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: blocked
 created: 2026-10-08
-updated: 2026-10-09T06:06:22.952Z
+updated: 2026-11-09T13:27:10.681Z
 started: 2026-10-08T10:55:36.537Z
 ---
 
@@ -339,6 +339,8 @@ Latest native calculator follow-up: user explicitly requested implementing reusa
 - 2026-10-08: Rejected cost/packet popup, extra mandatory broad suite enablement/runtime verification and legacy migration hint. Existing focused implementation/final checks remain development acceptance; extra post-feature verification is opt-in/off by default. Future legacy removal/direct /wo design entry is not authorized here.
 2026-10-08 targeted live-checkpoint recovery fix (latest user: “research mode is off, fix stuff”): accepted discovered normal-desktop empty bootstrap args without broadening arbitrary argument launches; pending create validates saved payload identity and only exact typed MCP missing-id lookup permits same-payload/same-id recovery. Permission/daemon/other-id failures never replay; lost-response lookup-first behavior retained. Current client and Plan3 regression suites, CE_WORKFLOW_ENABLED=0 npm run verify:quiet and git diff --check passed; active LSP on the five changed source/test/fixture paths reports 0 diagnostics (2 confirmed clean, 3 push-only inconclusive). Live generation/visual approval NOT reverified: /reload then calculator /plan3 design ca1c0001 → Check / recover remains the exact next public action. Full current checkpoint is C:/SOFT/git/ce-workflow/docs/plans/2026-10-08-calculator-design-checkpoint-ca1c0001-plan3.md → Resume context. S10/candidates and global live acceptance remain incomplete; no automatic implementation/approval/commit/push or replacement project.
 Latest explicit user instruction for calculator checkpoint ca1c0001 overrides the browser-opening workaround: launch/show the native OpenDesign app, send the whole settled idea automatically, let the user work there, stop. Removed Plan3 browser-opening rows/branch/import and corresponding README instructions; regression tests assert no browser/shell opening, including forged saved URL cases. Native app show confirmed windowVisible=true and one plain-idea start_run accepted runee866b01-0cf5-4ae0-8ece-0e44d9d1d892 in existing calculator project. Exact plain brief and acceptance receipt saved in calculator design directory. No imposed ce-workflow handoff schema, polling, exports, visual inspection, approval, reconciliation, product calculator implementation or further automation. Plan3 and workflow-disabled package checks passed; source/test LSP zero error diagnostics (one inconclusive). Parent S10/candidate/global live visual acceptance remains unverified; do not mark it complete from this narrower handoff. Preserve prior history and unrelated dirty files. Current agent stops here as requested.
+- 2026-11-09: **Superseded** by plan a5cf234d (own design studio in the hub). Its `/plan3 design` code was already gone, and plan a5cf234d S17 removed the remaining OpenDesign client, setting and run guards. Old exports in `docs/designs/` stay as history. Its open steps (S04 to S06 and on) will not run; status blocked marks it as superseded, since Plan3 has no superseded status.
+
 
 
 

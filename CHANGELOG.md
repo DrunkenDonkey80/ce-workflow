@@ -2,6 +2,20 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Added
+- Design studio in the hub: each design session's own agent now builds its design directly in `.pi/designs/<handle>/`, and its page previews it live. The preview has a device picker (phones, foldable, tablet, laptop, desktop, slide) with rotate, a screen picker, and back/forward through the versions saved after every turn that changed files, plus Restore.
+  ![The design preview toolbar: Comment, Edit, Mark, the device picker and rotate](docs/changelog/0.5.0-design-toolbar.png)
+- Comment on a design: click elements to drop numbered pins, and each one adds a line naming the element to your message. **Edit** changes an element's color, size and spacing live, and **Keep** sends the change to the agent. **Mark** opens a picture of the screen exactly as shown in the image annotator. Decks get previous/next and a slide counter.
+  ![A phone-sized design with two comment pins and the style inspector open](docs/changelog/0.5.0-design-preview.png)
+- `design systems`: the project's own DESIGN.md or tokens first, then OpenDesign's brand design systems, fetched on demand. `design look` renders a design at device sizes with a report, and `design reference <url>` captures a site's look to design from.
+- Selecting a design now also writes `HANDOFF.md` (screens, tokens, required states, viewports, checklist) and `BRIEF.md` next to the exported files.
+- Catch up packages also watches OpenDesign, but only for the craft rules, skills and preview code we ported (`docs/upstream/open-design.md`).
+
+### Removed
+- OpenDesign runtime: the design tool no longer starts OpenDesign runs, and the `/wo` Settings row "OpenDesign executable" is gone.
+
 ## 0.4.2 — 2026-11-09
 
 ### Added
