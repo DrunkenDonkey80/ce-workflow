@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T11:36:19.712Z
+updated: 2026-11-09T11:40:03.820Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -173,11 +173,7 @@ Fit check per module:
 ### Phase 1: Local design loop [code]
 
 - [x] **S01** Design preview controls moved to hub/web/design-view.ts (designControls, resetDesign); registered in hub.ts ASSETS.
-- [ ] **S02** design.ts builds locally: start makes folders, sessions and first prompts; clone copies the folder and forks; select exports from the folder; OD calls, watcher and mirror removed
-  - Store v2: `{handle, direction, name, title, brief, kind, inputs[], references[], system?: {name, commit}, from, hubSessionId, selected, created}`. brief, references and system feed BRIEF.md (D18, D20) after any restart.
-  - v1 migration: brief comes from the v1 `prompt` text before "Direction for this design" (`design.ts` line 139); other OD fields are dropped; mirrored folders become the design folders. Clone copies brief, references and system.
-  - Start's `inputs` become files the first prompt tells the agent to read. `kind` is web, app or deck. The building subtitle and the `busy` web-info go.
-  - Check: C1 rewritten (start, open, clone, select with delta, v1 store load keeps the brief, restart then select, clone then select), C9.
+- [x] **S02** design.ts rewritten for the local loop: store v2 (brief, kind, inputs, references, system), v1 migration, start/open/show/status/select/clone without OD; watcher, mirror, send, retry, add removed.
 - [ ] **S03** Design-session hooks: write guard on write and edit (D9), one shared snapshot function for versions (D5), `design restore`, designModel description updated
   - `snapshot(handle)`: copy the folder to the next history number unless it equals the newest version; returns the version. Called at agent_end, first in select (which then exports that immutable version) and first in restore (so pending edits are kept as their own version before the old one is copied back).
   - Check: C1 cases: write outside refused and inside allowed; an unchanged turn adds no version; edit then select in one turn exports the edited bytes under a version number; edit then restore keeps the edit as a version; no duplicate at agent_end; 30 kept. C6, C9.
