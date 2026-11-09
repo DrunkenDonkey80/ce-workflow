@@ -3,7 +3,7 @@
 // A fresh clone at the pre-rework SHA, Plan3 driven over Pi RPC, the driver playing the human:
 // recommended answers in dialogs, gates turned on in order when the run stalls on them.
 // Usage: node scripts/rework-lab.mjs <run-name> [--source DIR] [--sha SHA] [--hours N] [--request-file FILE] [--resume]
-//          [--plan-only] [--check CMD] [--add SRC=DEST]...
+//          [--plan-only] [--check CMD] [--add SRC=DEST]... [--coding-effort high|medium|...]
 // --add copies task inputs (a fixture) into the clone as one commit on top of SHA; diffs and counts start after it.
 // --resume continues an existing run's clone and plan instead of cloning and planning again.
 // --plan-only stops after the first /plan3 turn and copies the draft plan to <root>/<run>.plan.md.
@@ -53,7 +53,7 @@ function setup() {
 	git("tag", "lab-base");
 	if (existsSync(path.join(source, "data"))) cpSync(path.join(source, "data"), path.join(dir, "data"), { recursive: true });
 	mkdirSync(path.join(dir, ".pi"), { recursive: true });
-	writeFileSync(path.join(dir, ".pi", "settings.json"), `${JSON.stringify({ workOrchestrator: { plan3: { planningModel: thinker, codingModel: worker, codingEffort: "high" }, context: { mode: "ultrafull" } } }, null, "\t")}\n`);
+	writeFileSync(path.join(dir, ".pi", "settings.json"), `${JSON.stringify({ workOrchestrator: { plan3: { planningModel: thinker, codingModel: worker, codingEffort: value("--coding-effort", "high") }, context: { mode: "ultrafull" } } }, null, "\t")}\n`);
 	appendFileSync(path.join(dir, ".git", "info", "exclude"), "\n/.pi/\n/.ce-workflow/\n/.pi-lens-probe-home/\n"); // pi-lens writes probe logs into the cwd
 	note("clone", { dir, sha: git("rev-parse", "--short", "HEAD"), commits: git("rev-list", "--all", "--count") });
 }
