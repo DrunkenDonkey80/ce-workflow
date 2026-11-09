@@ -147,11 +147,49 @@ function syncTree(cwd: string, root: string, files: Map<string, Buffer>) {
 	for (const file of changes.removed) fs.rmSync(confined(cwd, `${root}/${file}`), { force: true }); // shortcut: empty folders stay; prune them if they clutter
 	return changes;
 }
+// D5: versions. .pi/designs/history/<handle>/<n>/ holds the folder as it was after a turn that changed it (the newest 30 kept).
+const KEEP = 30;
+const historyFolder = (handle: string) => `.pi/designs/history/${handle}`;
+/** The kept version numbers of a design, oldest first. */
+export function versions(cwd: string, handle: string) {
+	const dir = confined(cwd, historyFolder(handle));
+	return fs.existsSync(dir) ? fs.readdirSync(dir).filter(name => /^\d+$/.test(name)).map(Number).sort((a, b) => a - b) : [];
+}
+const same = (a: Map<string, Buffer>, b: Map<string, Buffer>) => a.size === b.size && [...a].every(([file, bytes]) => b.get(file)?.equals(bytes));
+/**
+ * The one snapshot boundary (agent_end, select and restore call it): copies the design folder to the next version unless it
+ * equals the newest one, and returns the version that now holds exactly the folder (0 while the folder is empty).
+ */
+export function snapshot(cwd: string, handle: string) {
+	return withPlanLock(confined(cwd, historyFolder(handle)), () => {
+		const files = readTree(confined(cwd, designFolder(handle))), kept = versions(cwd, handle), newest = kept.at(-1) ?? 0;
+		if (!files.size) return newest;
+		if (newest && same(files, readTree(confined(cwd, `${historyFolder(handle)}/${newest}`)))) return newest;
+		syncTree(cwd, `${historyFolder(handle)}/${newest + 1}`, files);
+		for (const old of kept.slice(0, Math.max(0, kept.length + 1 - KEEP))) fs.rmSync(confined(cwd, `${historyFolder(handle)}/${old}`), { recursive: true, force: true });
+		return newest + 1;
+	});
+}
+/** D19: version n back into the design folder as a new version; pending edits are kept first as their own version. */
+async function restore(cwd: string, handle: string, version) {
+	const item = session(load(cwd), handle), n = Number(version);
+	if (!versions(cwd, item.handle).includes(n)) throw new Error(`${item.handle} has no version ${version}; kept: ${versions(cwd, item.handle).join(", ") || "none"}.`);
+	await snapshot(cwd, item.handle);
+	syncTree(cwd, designFolder(item.handle), readTree(confined(cwd, `${historyFolder(item.handle)}/${n}`)));
+	return { handle: item.handle, restored: n, version: await snapshot(cwd, item.handle) };
+}
+/** D9: a design session writes only inside its own folder and the shared references; undefined when the path is allowed. */
+export function writeRefusal(cwd: string, handle: string, file: string) {
+	const target = path.resolve(cwd, file), inside = (dir: string) => { const rel = path.relative(path.resolve(cwd, dir), target); return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel); };
+	if (inside(designFolder(handle)) || inside(".pi/designs/references")) return undefined;
+	return `Design session ${handle} writes only inside ${designFolder(handle)}/ (and .pi/designs/references/); ${file} is outside it. The chosen design is built in a normal session after select.`;
+}
+
 /** One session's design folder: its files and first page. */
 function show(cwd: string, handle: string) {
 	const item = session(load(cwd), handle), root = designFolder(item.handle), files = [...readTree(confined(cwd, root)).keys()].sort();
 	const page = files.includes("index.html") ? "index.html" : files.find(file => file.endsWith(".html"));
-	return { handle: item.handle, name: item.name, kind: item.kind, folder: root, files, page };
+	return { handle: item.handle, name: item.name, kind: item.kind, folder: root, files, page, versions: versions(cwd, item.handle) };
 }
 function status(cwd: string, handle?: string) {
 	const items = handle ? [session(load(cwd), handle)] : load(cwd).sessions;
@@ -173,12 +211,12 @@ function exportFolder(cwd: string, item: Session) {
  * selection, kept in .pi/designs/selected/<handle>/ (the one before it in <handle>.before/ for git diff --no-index).
  */
 async function select(cwd: string, handle: string, tools: Tools) {
-	const item = session(load(cwd), handle);
-	const files = readTree(confined(cwd, designFolder(item.handle)));
-	if (!files.size) throw new Error(`${item.handle} has no design files yet.`);
+	const item = session(load(cwd), handle), version = await snapshot(cwd, item.handle);
+	if (!version) throw new Error(`${item.handle} has no design files yet.`);
+	const files = readTree(confined(cwd, `${historyFolder(item.handle)}/${version}`)); // the immutable version, not a folder the agent may still write
 	const dir = exportFolder(cwd, item), root = `docs/designs/${dir}`, copy = `.pi/designs/selected/${item.handle}`, before = `${copy}.before`;
 	const previous = readTree(confined(cwd, copy)), changes = previous.size ? delta(previous, files) : undefined;
-	const owned = Buffer.from(`${JSON.stringify({ handle: item.handle, name: item.name }, null, "\t")}\n`);
+	const owned = Buffer.from(`${JSON.stringify({ handle: item.handle, name: item.name, version }, null, "\t")}\n`);
 	syncTree(cwd, root, new Map([...files, ["DESIGN.json", owned]]));
 	fs.rmSync(confined(cwd, before), { recursive: true, force: true });
 	if (previous.size) fs.renameSync(confined(cwd, copy), confined(cwd, before));
@@ -209,7 +247,7 @@ async function select(cwd: string, handle: string, tools: Tools) {
 		const told = await tools.hub(["prompt", target, message]);
 		sent = told.ok ? `sent to ${where === "start" ? starting?.name ?? target : `Build ${name}`}` : `not sent: ${clip(told.text, 300)}`;
 	}
-	return { handle: saved.handle, name, folder: `${root}/`, files: [...files.keys()].sort(), changes, implement: where ?? "none", sent: sent!, message };
+	return { handle: saved.handle, name, version, folder: `${root}/`, files: [...files.keys()].sort(), changes, implement: where ?? "none", sent: sent!, message };
 }
 /** D12: another approach from this design: a new handle with a copy of its folder, and a hub session forked from this one (its chat so far). */
 async function clone(cwd: string, handle: string, args, tools: Tools) {
@@ -242,7 +280,8 @@ export async function runDesign(cwd: string, args, tools: Tools = { hub: hubCall
 	if (args.action === "select") return select(cwd, handle, tools);
 	if (args.action === "clone") return [await clone(cwd, handle, args, tools)];
 	if (args.action === "show") return show(cwd, handle);
-	throw new Error("action is start, status, open, show, select or clone.");
+	if (args.action === "restore") return restore(cwd, handle, args.version);
+	throw new Error("action is start, status, open, show, restore, select or clone.");
 }
 /** This Pi's own design session, when the hub started it for one (PI_HUB_SESSION is the hub's id for it). */
 export function ownSession(cwd: string) {
@@ -256,10 +295,11 @@ export default function designExtension(pi) {
 	let self: Session | undefined, modelSet = false;
 	pi.registerTool?.({
 		name: "design", label: "Design", exposure: "deferred",
-		description: "Design sessions: each design is a folder .pi/designs/<handle>/ built by its own hub Pi session. start: one design session per direction (the same brief: project description, the current interface with real copy, what the user wants changed; source files in inputs; kind web, app or deck), returns handles design-N; each opens its own hub Pi session named after its direction (names) with the brief's title below, whose agent builds the design while the user watches and refines it there; do not approve, repair or refine for them. status: every session, its files and hub session. open: open the hub session of a handle that has none. show (inside a design session, handle defaults to it): its files. select (when the user picks one, e.g. \"@design-2\", or \"select this\" inside its session): exports its files to docs/designs/<name>/, stars it and asks the user where to implement it (the session it was started from, or a new one), which gets a message naming the folder; selecting again updates the same folder and lists what changed. clone (to try another approach): a new handle with a copy of this design's files and a hub session forked from this one (name: the copy's name).",
+		description: "Design sessions: each design is a folder .pi/designs/<handle>/ built by its own hub Pi session. start: one design session per direction (the same brief: project description, the current interface with real copy, what the user wants changed; source files in inputs; kind web, app or deck), returns handles design-N; each opens its own hub Pi session named after its direction (names) with the brief's title below, whose agent builds the design while the user watches and refines it there; do not approve, repair or refine for them. status: every session, its files and hub session. open: open the hub session of a handle that has none. show (inside a design session, handle defaults to it): its files and kept versions. restore (when the user asks, e.g. \"Restore version 2\"): copies that version back; it becomes the newest version and nothing is lost. select (when the user picks one, e.g. \"@design-2\", or \"select this\" inside its session): exports its files to docs/designs/<name>/, stars it and asks the user where to implement it (the session it was started from, or a new one), which gets a message naming the folder; selecting again updates the same folder and lists what changed. clone (to try another approach): a new handle with a copy of this design's files and a hub session forked from this one (name: the copy's name).",
 		promptSnippet: "Design sessions: start variants built live in the hub, select one for implementation",
 		parameters: { type: "object", additionalProperties: false, required: ["action"], properties: {
-			action: { type: "string", enum: ["start", "status", "open", "show", "select", "clone"] },
+			action: { type: "string", enum: ["start", "status", "open", "show", "restore", "select", "clone"] },
+			version: { type: "number", description: "restore: the version to bring back (it becomes the newest version)" },
 			name: { type: "string", description: "clone: the copy's name for the session list (asked when missing)" },
 			brief: { type: "string", description: "start: the design brief" },
 			directions: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6, description: "start: one direction per session" },
@@ -299,4 +339,11 @@ export default function designExtension(pi) {
 		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${DESIGN_ROLE(self)}` };
 	});
 	pi.events?.on?.("wo:web-info", info => { if (self) info.design = self.handle; });
+	pi.on?.("tool_call", (event, ctx) => {
+		if (!self || !["write", "edit"].includes(event?.toolName)) return;
+		const reason = writeRefusal(ctx.cwd, self.handle, String(event.input?.path ?? ""));
+		return reason ? { block: true, reason } : undefined;
+	});
+	// D5: every turn that changed the design becomes a version.
+	pi.on?.("agent_end", async (_event, ctx) => { if (self) await snapshot(ctx.cwd, self.handle).catch(() => {}); }); // shortcut: a failed copy skips one version; report it if versions go missing
 }

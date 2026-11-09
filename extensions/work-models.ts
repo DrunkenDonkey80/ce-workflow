@@ -4439,7 +4439,7 @@ async function workSettingsLoop(ctx, pi = undefined) {
 {
 				kind: "designModel", value: "designModel",
 				label: `Design session model: [${settings.workOrchestrator?.designModel ? (names.get(splitLevel(settings.workOrchestrator.designModel).model) ?? splitLevel(settings.workOrchestrator.designModel).model) + (splitLevel(settings.workOrchestrator.designModel).level ? ": " + splitLevel(settings.workOrchestrator.designModel).level : "") : "same as session"}] ${SUBMENU_ARROW}`,
-				description: "Model and effort of the hub sessions the design tool opens (design-1, design-2, ...); they relay chat to OpenDesign, so a cheap fast model is enough.",
+				description: "Model and effort of the hub sessions the design tool opens (design-1, design-2, ...); their agent builds and refines the design itself, so pick a strong model.",
 			},
 {
 				kind: "openDesignCommand",

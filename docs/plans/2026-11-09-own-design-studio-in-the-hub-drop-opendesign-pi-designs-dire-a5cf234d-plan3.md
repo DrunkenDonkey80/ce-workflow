@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T11:40:03.820Z
+updated: 2026-11-09T11:42:36.026Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -174,9 +174,7 @@ Fit check per module:
 
 - [x] **S01** Design preview controls moved to hub/web/design-view.ts (designControls, resetDesign); registered in hub.ts ASSETS.
 - [x] **S02** design.ts rewritten for the local loop: store v2 (brief, kind, inputs, references, system), v1 migration, start/open/show/status/select/clone without OD; watcher, mirror, send, retry, add removed.
-- [ ] **S03** Design-session hooks: write guard on write and edit (D9), one shared snapshot function for versions (D5), `design restore`, designModel description updated
-  - `snapshot(handle)`: copy the folder to the next history number unless it equals the newest version; returns the version. Called at agent_end, first in select (which then exports that immutable version) and first in restore (so pending edits are kept as their own version before the old one is copied back).
-  - Check: C1 cases: write outside refused and inside allowed; an unchanged turn adds no version; edit then select in one turn exports the edited bytes under a version number; edit then restore keeps the edit as a version; no duplicate at agent_end; 30 kept. C6, C9.
+- [x] **S03** Write guard (writeRefusal on write/edit), shared snapshot() for agent_end/select/restore (30 kept), design restore, DESIGN.json version, designModel text now asks for a strong model.
 
 ### Phase 2: Rendering for the agent [code]
 

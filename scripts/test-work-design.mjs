@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { runDesign } from "../extensions/design.ts";
+import { runDesign, snapshot, versions, writeRefusal } from "../extensions/design.ts";
 
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "design-test-"));
 const storePath = path.join(cwd, ".pi/designs/sessions.json");
@@ -112,5 +112,33 @@ try {
 	// No name given: asked; nobody to ask: refused.
 	assert.equal((await runDesign(cwd, { action: "clone", handle: "design-2" }, { ...tools, text: async () => "Second try" }))[0].name, "Second try");
 	await assert.rejects(runDesign(cwd, { action: "clone", handle: "design-2" }, tools), /name must be/);
+	// D9 write guard: only its own folder and the shared references.
+	assert.equal(writeRefusal(cwd, "design-2", ".pi/designs/design-2/index.html"), undefined);
+	assert.equal(writeRefusal(cwd, "design-2", path.join(cwd, ".pi/designs/references/site/STYLE.md")), undefined);
+	assert.match(writeRefusal(cwd, "design-2", "src/app.ts"), /writes only inside \.pi\/designs\/design-2\//);
+	assert.match(writeRefusal(cwd, "design-2", ".pi/designs/design-22/x.html"), /outside/, "a sibling folder with the same prefix is outside");
+	assert.match(writeRefusal(cwd, "design-2", ".pi/designs/design-2/../design-3/x.html"), /outside/);
+
+	// D5 versions (one shared snapshot): an unchanged turn adds none; edit then select exports the edited bytes as a version;
+	// edit then restore keeps the edit first; restore of vN makes a new version equal to vN; the newest 30 stay.
+	const h = "design-3", at = n => path.join(cwd, ".pi/designs/history", h, String(n), "index.html");
+	const before = versions(cwd, h).at(-1);
+	assert.equal(await snapshot(cwd, h), before, "an unchanged folder adds no version");
+	put(h, { "index.html": "<h1>Edited</h1>" });
+	const picked = await runDesign(cwd, { action: "select", handle: h }, choose(undefined));
+	assert.equal(picked.version, before + 1);
+	assert.equal(fs.readFileSync(path.join(cwd, "docs/designs/bold-editorial-2/index.html"), "utf8"), "<h1>Edited</h1>");
+	assert.equal(JSON.parse(fs.readFileSync(path.join(cwd, "docs/designs/bold-editorial-2/DESIGN.json"), "utf8")).version, before + 1);
+	assert.equal(await snapshot(cwd, h), before + 1, "no duplicate at agent_end after select");
+	put(h, { "index.html": "<h1>Pending</h1>" });
+	const restored = await runDesign(cwd, { action: "restore", handle: h, version: before }, tools);
+	assert.deepEqual([restored.restored, restored.version], [before, before + 3]);
+	assert.equal(fs.readFileSync(at(before + 2), "utf8"), "<h1>Pending</h1>", "the pending edit was kept as its own version");
+	assert.equal(fs.readFileSync(at(before + 3), "utf8"), fs.readFileSync(at(before), "utf8"));
+	assert.equal(fs.readFileSync(path.join(cwd, ".pi/designs", h, "index.html"), "utf8"), fs.readFileSync(at(before), "utf8"));
+	await assert.rejects(runDesign(cwd, { action: "restore", handle: h, version: 999 }, tools), /no version 999/);
+	for (let n = 0; n < 32; n++) { put(h, { "index.html": `<p>${n}</p>` }); await snapshot(cwd, h); }
+	assert.equal(versions(cwd, h).length, 30, "the newest 30 are kept");
+	assert.equal(fs.readFileSync(at(versions(cwd, h).at(-1)), "utf8"), "<p>31</p>");
 	console.log("design tool tests passed");
 } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
