@@ -3,6 +3,7 @@
 // with their brief; select exports the folder to a named folder and hands it on (delta on reselect); clone copies and forks.
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { runDesign, snapshot, versions, writeRefusal } from "../extensions/design.ts";
@@ -166,6 +167,28 @@ try {
 		const element = await renderDesign({ folder: fixture, width: 360, height: 800, element: "@title" });
 		assert(element.height < 200, "an element shot is the element, not the page");
 		assert.match((await renderDesign({ folder: fixture, width: 360, height: 800, element: "@nope" })).report.missing, /no element @nope/);
+
+		// S07 look: presets (rotated too) give small pictures and the report per preset.
+		put("design-3", { "index.html": page });
+		const looked = await runDesign(cwd, { action: "look", handle: "design-3", presets: ["Phone small landscape", "Tablet"] }, tools);
+		assert.deepEqual(looked.shots.map(shot => shot.viewport), ["800×360", "820×1180"]);
+		assert.match(looked.shots[1].report, /failed: 404 gone\.png/);
+		assert(looked.shots.every(shot => decodePng(Buffer.from(shot.png, "base64")).width <= 768), "small pictures");
+		await assert.rejects(runDesign(cwd, { action: "look", handle: "design-3", presets: ["Watch"] }, tools), /Unknown preset Watch/);
+		// S07 reference: a local site's screenshots and measured style, noted on the design; an empty page is "blocked".
+		const site = http.createServer((request, response) => { response.writeHead(200, { "content-type": "text/html" }); response.end(request.url === "/empty" ? "<title>Just a moment...</title>" : `<title>Acme</title><style>body{font-family:Georgia;color:rgb(20, 30, 40)}button{border-radius:12px;padding:10px 18px}</style><h1>Acme tools</h1><p>${"Real words about the product. ".repeat(5)}</p><button>Buy</button>`); });
+		await new Promise(resolve => site.listen(0, "127.0.0.1", resolve));
+		try {
+			const base = `http://127.0.0.1:${site.address().port}`;
+			const captured = await runDesign(cwd, { action: "reference", handle: "design-3", url: `${base}/` }, tools);
+			assert.deepEqual([captured.folder, captured.files], [".pi/designs/references/127.0.0.1", ["desktop.png", "phone.png", "STYLE.md"]]);
+			const style = fs.readFileSync(path.join(cwd, captured.folder, "STYLE.md"), "utf8");
+			assert.match(style, /Georgia/);
+			assert.match(style, /rgb\(20, 30, 40\)/);
+			assert.match(style, /button: .*border-radius 12px/);
+			assert.deepEqual(stored().sessions.find(item => item.handle === "design-3").references, ["127.0.0.1"]);
+			assert.match((await runDesign(cwd, { action: "reference", url: `${base}/empty` }, tools)).blocked, /browser_fetch with images/);
+		} finally { site.close(); }
 	}
 	console.log("design tool tests passed");
 } finally { fs.rmSync(cwd, { recursive: true, force: true }); }

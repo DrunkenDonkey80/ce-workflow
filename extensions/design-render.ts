@@ -84,28 +84,43 @@ function run(exe: string, args: string[], timeout = 90_000) {
 	});
 }
 
-/** Renders state headless and returns the PNG (scaled to maxEdge, default 1024) plus the report. */
-export async function renderDesign(state: RenderState): Promise<Rendered> {
+/**
+ * One isolated headless visit: viewport, open, the page script (its JSON string result is parsed), errors, console and a
+ * screenshot (of [data-design-look] when element, else the viewport or full page). The session is always closed.
+ */
+async function visit(url: string, width: number, height: number, script: string, shot: { element?: boolean; full?: boolean; tolerate?: (page) => boolean } = {}) {
 	const exe = agentBrowser();
 	if (!exe) throw new Error("agent-browser is not installed (npm i -g agent-browser); design rendering needs it.");
-	const width = Math.round(state.width), height = Math.round(state.height);
 	if (!(width >= 200 && width <= 4000 && height >= 200 && height <= 4000)) throw new Error("width and height must be 200 to 4000 pixels.");
-	const screen = state.screen ?? "index.html";
-	if (!/^[\w.-]+\.html?$/.test(screen)) throw new Error(`screen must be an HTML file directly in the design folder: ${screen}`);
-	if (!fs.existsSync(path.join(state.folder, screen))) throw new Error(`${screen} does not exist in the design.`);
-	const server = await serve(state.folder), session = `design-${crypto.randomBytes(6).toString("hex")}`;
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "design-render-")), shot = path.join(dir, "shot.png").split(path.sep).join("/");
-	const hash = state.hash ? `#${encodeURIComponent(state.hash.replace(/^#/, ""))}` : "";
+	const session = `design-${crypto.randomBytes(6).toString("hex")}`, dir = fs.mkdtempSync(path.join(os.tmpdir(), "design-render-")), file = path.join(dir, "shot.png").split(path.sep).join("/");
 	try {
 		const out = await run(exe, ["--session", session, "--json", "batch", "--bail",
-			`set viewport ${width} ${height}`, `open ${server.origin}/${encodeURIComponent(screen)}${hash}`,
-			`eval -b ${Buffer.from(PAGE_SCRIPT(state)).toString("base64")}`, "errors", "console",
-			`screenshot ${state.element ? "[data-design-look] " : ""}${shot}${state.full && !state.element ? " --full" : ""}`]);
+			`set viewport ${width} ${height}`, `open ${url}`, `eval -b ${Buffer.from(script).toString("base64")}`, "errors", "console",
+			`screenshot ${shot.element ? "[data-design-look] " : ""}${file}${shot.full && !shot.element ? " --full" : ""}`]);
 		let steps: Step[];
 		try { steps = JSON.parse(out); } catch { throw new Error(`agent-browser returned no result: ${out.slice(0, 300)}`); }
 		const failedStep = steps.find(step => !step.success);
-		const page = JSON.parse(steps[2]?.result?.result ?? "{}");
-		if (failedStep && !(page.missing && failedStep.command[0] === "screenshot")) throw new Error(`agent-browser ${failedStep.command.slice(0, 2).join(" ")}: ${failedStep.error}`);
+		let page;
+		try { page = JSON.parse(steps[2]?.result?.result ?? "{}"); } catch { page = {}; }
+		if (failedStep && !(failedStep.command[0] === "screenshot" && shot.tolerate?.(page))) throw new Error(`agent-browser ${failedStep.command.slice(0, 2).join(" ")}: ${failedStep.error}`);
+		const png = fs.existsSync(file) ? fs.readFileSync(file) : undefined;
+		return { steps, page, png };
+	} finally {
+		await run(exe, ["--session", session, "close"], 20_000).catch(() => {});
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+}
+
+/** Renders state headless and returns the PNG (scaled to maxEdge, default 1024) plus the report. */
+export async function renderDesign(state: RenderState): Promise<Rendered> {
+	const width = Math.round(state.width), height = Math.round(state.height);
+	const screen = state.screen ?? "index.html";
+	if (!/^[\w.-]+\.html?$/.test(screen)) throw new Error(`screen must be an HTML file directly in the design folder: ${screen}`);
+	if (!fs.existsSync(path.join(state.folder, screen))) throw new Error(`${screen} does not exist in the design.`);
+	const server = await serve(state.folder);
+	const hash = state.hash ? `#${encodeURIComponent(state.hash.replace(/^#/, ""))}` : "";
+	try {
+		const { steps, page, png } = await visit(`${server.origin}/${encodeURIComponent(screen)}${hash}`, width, height, PAGE_SCRIPT(state), { element: !!state.element, full: state.full, tolerate: page => !!page.missing });
 		const report: RenderReport = {
 			viewport: `${width}×${height}`, scrollWidth: page.scrollWidth, overflow: page.scrollWidth > page.vw + 1, wide: page.wide ?? [],
 			errors: (steps[3]?.result?.errors ?? []).map(item => String(item.text).split("\n")[0]).slice(0, 20),
@@ -113,14 +128,56 @@ export async function renderDesign(state: RenderState): Promise<Rendered> {
 			failed: [...new Set([...server.failed, ...page.broken ?? []])].slice(0, 20),
 			...page.missing && { missing: `no element ${page.missing} (give a data-id or a CSS selector)` },
 		};
-		if (page.missing) return { png: Buffer.alloc(0), width: 0, height: 0, report }; // no element, no picture: the report says why
-		const image = processPng(fs.readFileSync(shot), undefined, state.maxEdge ?? 1024);
+		if (page.missing || !png) return { png: Buffer.alloc(0), width: 0, height: 0, report }; // no element, no picture: the report says why
+		const image = processPng(png, undefined, state.maxEdge ?? 1024);
 		return { png: image.png, width: image.width, height: image.height, report };
-	} finally {
-		await run(exe, ["--session", session, "close"], 20_000).catch(() => {});
-		await server.close();
-		fs.rmSync(dir, { recursive: true, force: true });
-	}
+	} finally { await server.close(); }
+}
+
+// D4 device presets, shared by design look and the hub preview. Desktop is the panel width in the preview, 1440 here.
+export const PRESETS: Record<string, [number, number]> = { "Phone small": [360, 800], Phone: [390, 844], "Phone large": [430, 932], Foldable: [600, 960], Tablet: [820, 1180], Laptop: [1366, 768], Desktop: [1440, 900], Slide: [1920, 1080] };
+/** "Tablet", "tablet landscape", "390x844" -> [width, height]. */
+export function presetSize(name: string): [number, number] {
+	const text = String(name ?? "").trim(), size = text.match(/^(\d{3,4})\s*[x×]\s*(\d{3,4})$/);
+	if (size) return [Number(size[1]), Number(size[2])];
+	const landscape = /\s+landscape$/i.test(text), base = text.replace(/\s+(landscape|portrait)$/i, "").toLowerCase();
+	const found = Object.entries(PRESETS).find(([key]) => key.toLowerCase() === base);
+	if (!found) throw new Error(`Unknown preset ${name}; use ${Object.keys(PRESETS).join(", ")} (optionally "landscape") or WIDTHxHEIGHT.`);
+	return landscape ? [found[1][1], found[1][0]] : found[1];
+}
+
+// D6: what a site really uses, measured from computed styles of its main elements (method: OD skills/brand-extract).
+const STYLE_SCRIPT = `(async () => {
+	await (document.fonts ? document.fonts.ready : Promise.resolve());
+	const pick = { body: "body", h1: "h1", h2: "h2", h3: "h3", link: "a", button: "button, .btn, [class*=button], a[class*=btn]", nav: "nav, header", card: "[class*=card], article", input: "input, textarea", footer: "footer" };
+	const props = ["color", "background-color", "font-family", "font-size", "font-weight", "line-height", "letter-spacing", "padding", "margin", "gap", "border-radius", "box-shadow", "border"];
+	const elements = {};
+	for (const [key, sel] of Object.entries(pick)) { const el = document.querySelector(sel); if (!el) continue; const cs = getComputedStyle(el); elements[key] = Object.fromEntries(props.map(p => [p, cs.getPropertyValue(p)]).filter(([, v]) => v && v !== "none" && v !== "normal" && v !== "0px" && v !== "rgba(0, 0, 0, 0)")); }
+	const count = (values) => Object.entries(values.reduce((m, v) => (m[v] = (m[v] || 0) + 1, m), {})).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([v, n]) => v + " (" + n + ")");
+	const all = [...document.body.querySelectorAll("*")].slice(0, 3000).map(el => getComputedStyle(el));
+	return JSON.stringify({ title: document.title, text: (document.body.innerText || "").length,
+		colors: count(all.map(s => s.color)), backgrounds: count(all.map(s => s.backgroundColor).filter(v => v !== "rgba(0, 0, 0, 0)")),
+		fonts: count(all.map(s => s.fontFamily)), sizes: count(all.map(s => s.fontSize)), radii: count(all.map(s => s.borderRadius).filter(v => v !== "0px")),
+		shadows: count(all.map(s => s.boxShadow).filter(v => v !== "none")), spacing: count(all.flatMap(s => [s.paddingTop, s.paddingLeft, s.gap]).filter(v => v && v !== "0px" && v !== "normal")), elements });
+})()`;
+const BLOCKED = /just a moment|attention required|access denied|verify you are human|captcha|cloudflare/i;
+
+/** D6: Desktop and Phone screenshots plus STYLE.md of a site into folder; blocked tells the caller to use browser_fetch instead. */
+export async function captureSite(url: string, folder: string) {
+	if (!/^https?:\/\//i.test(url) || /\s/.test(url)) throw new Error("reference needs an http(s) URL.");
+	const [desktop, phone] = await Promise.all([visit(url, ...PRESETS.Desktop, STYLE_SCRIPT), visit(url, ...PRESETS.Phone, STYLE_SCRIPT)]);
+	const page = desktop.page;
+	if (!page.text || page.text < 50 || BLOCKED.test(page.title ?? "")) return { blocked: `The page came back empty or behind a bot check (${page.title || "no title"}). Use browser_fetch with images: true on ${url}, and save the screenshots and your measured notes into ${folder}.` };
+	fs.mkdirSync(folder, { recursive: true });
+	fs.writeFileSync(path.join(folder, "desktop.png"), desktop.png!);
+	fs.writeFileSync(path.join(folder, "phone.png"), phone.png!);
+	const list = (label: string, items: string[]) => items?.length ? `- ${label}: ${items.join(", ")}` : "";
+	const style = [`# ${page.title || url}`, "", `Measured from ${url} on ${new Date().toISOString().slice(0, 10)} (computed styles, counts in brackets). Borrow style and structure; never logos, brand marks or copy.`, "",
+		"## Tokens", "", list("Text colors", page.colors), list("Backgrounds", page.backgrounds), list("Font families", page.fonts), list("Font sizes", page.sizes), list("Spacing", page.spacing), list("Radii", page.radii), list("Shadows", page.shadows), "",
+		"## Elements", "", ...Object.entries(page.elements ?? {}).map(([key, values]) => `- ${key}: ${Object.entries(values as Record<string, string>).map(([k, v]) => `${k} ${v}`).join("; ")}`), "",
+		"Screenshots: desktop.png (1440×900), phone.png (390×844).", ""].filter(line => line !== undefined).join("\n").replace(/\n{3,}/g, "\n\n");
+	fs.writeFileSync(path.join(folder, "STYLE.md"), style);
+	return { files: ["desktop.png", "phone.png", "STYLE.md"], title: page.title };
 }
 
 /** One line per finding, or "no overflow, no errors". */

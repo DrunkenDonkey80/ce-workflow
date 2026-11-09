@@ -6,6 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { captureSite, presetSize, renderDesign, reportText } from "./design-render.ts";
 import { redactOpenDesignText } from "./opendesign-client.ts";
 import { atomic, confined, withPlanLock } from "./plan3-files.ts";
 
@@ -185,6 +186,28 @@ export function writeRefusal(cwd: string, handle: string, file: string) {
 	return `Design session ${handle} writes only inside ${designFolder(handle)}/ (and .pi/designs/references/); ${file} is outside it. The chosen design is built in a normal session after select.`;
 }
 
+/** D3: the design (or a kept version) rendered headless at each preset, with what went wrong; images are small. */
+async function look(cwd: string, handle: string, args) {
+	const item = session(load(cwd), handle);
+	const folder = args.version ? confined(cwd, `${historyFolder(item.handle)}/${Number(args.version)}`) : confined(cwd, designFolder(item.handle));
+	const presets: string[] = Array.isArray(args.presets) && args.presets.length ? args.presets.map(String).slice(0, 6) : ["Phone", "Desktop"];
+	const shots = await Promise.all(presets.map(async preset => {
+		const [width, height] = presetSize(preset);
+		const shot = await renderDesign({ folder, screen: args.screen, width, height, element: args.element, full: !!args.full, hash: args.hash, maxEdge: 768 });
+		return { preset, viewport: `${width}×${height}`, report: reportText(shot.report), png: shot.png.length ? shot.png.toString("base64") : undefined };
+	}));
+	return { handle: item.handle, screen: args.screen ?? "index.html", element: args.element, shots };
+}
+/** D6: a site's screenshots and measured style into .pi/designs/references/<site>/, noted on the design that asked. */
+async function reference(cwd: string, handle: string | undefined, url) {
+	let parsed: URL;
+	try { parsed = new URL(text(url, "url", 2000)); } catch (cause) { throw new Error(`reference needs an http(s) URL: ${url}`, { cause }); }
+	const site = parsed.hostname.replace(/^www\./, "").replace(/[^a-z0-9.-]/gi, "-");
+	const folder = `.pi/designs/references/${site}`, result = await captureSite(url, confined(cwd, folder));
+	if (!("blocked" in result) && handle) await change(cwd, store => { const item = session(store, handle); if (!item.references.includes(site)) item.references.push(site); });
+	return { folder, ...result };
+}
+
 /** One session's design folder: its files and first page. */
 function show(cwd: string, handle: string) {
 	const item = session(load(cwd), handle), root = designFolder(item.handle), files = [...readTree(confined(cwd, root)).keys()].sort();
@@ -281,7 +304,9 @@ export async function runDesign(cwd: string, args, tools: Tools = { hub: hubCall
 	if (args.action === "clone") return [await clone(cwd, handle, args, tools)];
 	if (args.action === "show") return show(cwd, handle);
 	if (args.action === "restore") return restore(cwd, handle, args.version);
-	throw new Error("action is start, status, open, show, restore, select or clone.");
+	if (args.action === "look") return look(cwd, handle, args);
+	if (args.action === "reference") return reference(cwd, handle, args.url);
+	throw new Error("action is start, status, open, show, look, reference, restore, select or clone.");
 }
 /** This Pi's own design session, when the hub started it for one (PI_HUB_SESSION is the hub's id for it). */
 export function ownSession(cwd: string) {
@@ -295,11 +320,17 @@ export default function designExtension(pi) {
 	let self: Session | undefined, modelSet = false;
 	pi.registerTool?.({
 		name: "design", label: "Design", exposure: "deferred",
-		description: "Design sessions: each design is a folder .pi/designs/<handle>/ built by its own hub Pi session. start: one design session per direction (the same brief: project description, the current interface with real copy, what the user wants changed; source files in inputs; kind web, app or deck), returns handles design-N; each opens its own hub Pi session named after its direction (names) with the brief's title below, whose agent builds the design while the user watches and refines it there; do not approve, repair or refine for them. status: every session, its files and hub session. open: open the hub session of a handle that has none. show (inside a design session, handle defaults to it): its files and kept versions. restore (when the user asks, e.g. \"Restore version 2\"): copies that version back; it becomes the newest version and nothing is lost. select (when the user picks one, e.g. \"@design-2\", or \"select this\" inside its session): exports its files to docs/designs/<name>/, stars it and asks the user where to implement it (the session it was started from, or a new one), which gets a message naming the folder; selecting again updates the same folder and lists what changed. clone (to try another approach): a new handle with a copy of this design's files and a hub session forked from this one (name: the copy's name).",
+		description: "Design sessions: each design is a folder .pi/designs/<handle>/ built by its own hub Pi session. start: one design session per direction (the same brief: project description, the current interface with real copy, what the user wants changed; source files in inputs; kind web, app or deck), returns handles design-N; each opens its own hub Pi session named after its direction (names) with the brief's title below, whose agent builds the design while the user watches and refines it there; do not approve, repair or refine for them. status: every session, its files and hub session. open: open the hub session of a handle that has none. show (inside a design session, handle defaults to it): its files and kept versions. look: renders the design headless at device presets (optionally one element or screen) and returns small pictures plus a report of overflow, errors and failed resources; use it once to check your work, not in loops. reference: captures a site (Desktop and Phone screenshots plus STYLE.md of its measured colors, fonts, sizes, spacing, radii and shadows) into .pi/designs/references/<site>/ to design from; borrow style and structure, never logos or copy. restore (when the user asks, e.g. \"Restore version 2\"): copies that version back; it becomes the newest version and nothing is lost. select (when the user picks one, e.g. \"@design-2\", or \"select this\" inside its session): exports its files to docs/designs/<name>/, stars it and asks the user where to implement it (the session it was started from, or a new one), which gets a message naming the folder; selecting again updates the same folder and lists what changed. clone (to try another approach): a new handle with a copy of this design's files and a hub session forked from this one (name: the copy's name).",
 		promptSnippet: "Design sessions: start variants built live in the hub, select one for implementation",
 		parameters: { type: "object", additionalProperties: false, required: ["action"], properties: {
-			action: { type: "string", enum: ["start", "status", "open", "show", "restore", "select", "clone"] },
-			version: { type: "number", description: "restore: the version to bring back (it becomes the newest version)" },
+			action: { type: "string", enum: ["start", "status", "open", "show", "look", "reference", "restore", "select", "clone"] },
+			version: { type: "number", description: "restore: the version to bring back (it becomes the newest version); look: render a kept version" },
+			presets: { type: "array", items: { type: "string" }, maxItems: 6, description: "look: device presets (Phone small, Phone, Phone large, Foldable, Tablet, Laptop, Desktop, Slide; add ' landscape' to rotate) or WIDTHxHEIGHT; default Phone and Desktop" },
+			screen: { type: "string", description: "look: the screen file, default index.html" },
+			element: { type: "string", description: "look: one element only, by data-id (@hero-cta) or CSS selector" },
+			full: { type: "boolean", description: "look: the full page instead of the first screenful" },
+			hash: { type: "string", description: "look: location.hash to open (a deck slide)" },
+			url: { type: "string", description: "reference: the site to capture" },
 			name: { type: "string", description: "clone: the copy's name for the session list (asked when missing)" },
 			brief: { type: "string", description: "start: the design brief" },
 			directions: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6, description: "start: one direction per session" },
@@ -316,6 +347,10 @@ export default function designExtension(pi) {
 			};
 			const askName = async (title: string) => (await import("./ask-user/menu.ts")).askText(ctx, pi, title);
 			const result = await runDesign(ctx.cwd, args, { hub: hubCall, ask, text: askName });
+			if (args.action === "look") {
+				const looked = result as Awaited<ReturnType<typeof look>>, shots = looked.shots.map(shot => ({ ...shot, png: undefined }));
+				return { content: [{ type: "text", text: JSON.stringify({ ...looked, shots }) }, ...looked.shots.filter(shot => shot.png).map(shot => ({ type: "image", data: shot.png, mimeType: "image/png" }))], details: { ...looked, shots } };
+			}
 			return { content: [{ type: "text", text: JSON.stringify(result) }], details: result };
 		},
 	});

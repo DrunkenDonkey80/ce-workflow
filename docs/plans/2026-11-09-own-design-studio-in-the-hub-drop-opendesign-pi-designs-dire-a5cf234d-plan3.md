@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T11:46:26.182Z
+updated: 2026-11-09T11:49:09.915Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -179,9 +179,7 @@ Fit check per module:
 ### Phase 2: Rendering for the agent [code]
 
 - [x] **S06** extensions/design-render.ts: renderDesign(render-state) serves the folder under the shared SANDBOX_CSP (also used by explore.ts), one agent-browser batch per isolated session, PNG + report (overflow, wide elements, errors, console, failed resources); reportText.
-- [ ] **S07** `design look` (one or more presets, screen, element) returns small images plus the report; `design reference <url>` writes references/<site>/ screenshots and STYLE.md (D6)
-  - Reference fallback: when headless gets a bot wall or an empty body, the result tells the agent to use browser_fetch with images and save into the same folder.
-  - Check: C1 with the fixture page for look; reference against a local fixture page served by the test.
+- [x] **S07** design look (presets incl. landscape/WxH, screen, element, full, hash, version; small images + report in tool content) and design reference (captureSite: desktop/phone shots + measured STYLE.md, bot-wall → browser_fetch hint, site noted in references); PRESETS shared in design-render.ts.
 
 ### Phase 3: Design guide [think]
 
