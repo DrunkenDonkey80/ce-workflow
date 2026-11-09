@@ -21,7 +21,7 @@ const unpacked = new Map<string, string>(), folders = new Map<string, string>();
 // A viewed page's live folder: each file served must pass the same check as a chat link for that project and device.
 // One key per open viewer (D3): the real files it served are watched, and a change tells that viewer (notify) to reload.
 // own: a design session's mirror (designPage), confined to its folder instead of the chat-link check (which refuses .pi).
-type View = { project: string; remote: boolean; own?: boolean; owner?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout> };
+type View = { project: string; remote: boolean; own?: boolean; owner?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout>; extra?: FSWatcher[] };
 const live = new Map<string, View>();
 // Folders, not files, are watched: an atomic save (temp file + rename) or delete-and-recreate replaces the file's inode.
 const watched = new Map<string, { watcher: FSWatcher; keys: Set<string> }>();
@@ -74,17 +74,47 @@ export async function viewPage(real: string, project: string, remote: boolean, w
  * D7: a design session's page, <project>/.pi/designs/<handle>/index.html, only when both really are there (no symlinked
  * folder or page); viewPage(own) then serves only that folder. Any other .pi file stays refused.
  */
-export async function designPage(project: string, handle: string) {
-	if (!/^design-\d+$/.test(handle)) return undefined;
+export async function designPage(project: string, handle: string, screen = "index.html") {
+	if (!/^design-\d+$/.test(handle) || !SCREEN.test(screen)) return undefined;
 	const base = await realpath(project).catch(() => undefined), dir = base && await realpath(join(base, ".pi", "designs", handle)).catch(() => undefined);
-	const page = dir && await realpath(join(dir, "index.html")).catch(() => undefined);
+	const page = dir && await realpath(join(dir, screen)).catch(() => undefined);
 	return base && dir && page && relative(base, dir) === join(".pi", "designs", handle) && dirname(page) === dir ? page : undefined;
+}
+// A design screen: an HTML file directly in the design folder (D7).
+const SCREEN = /^[\w.-]+\.html?$/i;
+/** D7, D5: a design's screens (index.html first) and kept version numbers, for the preview's pickers. */
+export async function designLists(project: string, handle: string) {
+	const names = async (dir: string) => (await readdir(dir, { withFileTypes: true }).catch(() => []));
+	const screens = (await names(join(project, ".pi", "designs", handle))).filter(entry => entry.isFile() && SCREEN.test(entry.name)).map(entry => entry.name)
+		.sort((a, b) => Number(b === "index.html") - Number(a === "index.html") || a.localeCompare(b));
+	const versions = (await names(join(project, ".pi", "designs", "history", handle))).filter(entry => entry.isDirectory() && /^\d+$/.test(entry.name)).map(entry => Number(entry.name)).sort((a, b) => a - b);
+	return { screens, versions };
+}
+/**
+ * S08: while a design view is open, its folder and history are watched; a burst of events that changed the screen or
+ * version lists calls changed once with the new lists (a plain save changes neither, and file-changed covers it).
+ */
+export async function watchDesign(key: string, project: string, handle: string, changed: (lists: Awaited<ReturnType<typeof designLists>>) => void) {
+	const view = live.get(key);
+	if (!view) return;
+	const history = join(project, ".pi", "designs", "history", handle);
+	await mkdir(history, { recursive: true }).catch(() => undefined); // watchable before the first version exists
+	let last = JSON.stringify(await designLists(project, handle)), timer: ReturnType<typeof setTimeout> | undefined;
+	const check = () => { clearTimeout(timer); timer = setTimeout(async () => {
+		if (!live.has(key)) return;
+		const lists = await designLists(project, handle), now = JSON.stringify(lists);
+		if (now !== last) { last = now; changed(lists); }
+	}, 150); };
+	view.extra = [join(project, ".pi", "designs", handle), history].flatMap(dir => {
+		try { const watcher = watch(dir, check); watcher.on("error", () => watcher.close()); return [watcher]; } catch { return []; } // gone or out of handles: no live lists
+	});
 }
 /** The viewer closed: its key stops serving and its watches close. */
 export function unview(key: string, owner?: string) {
 	const view = live.get(key);
 	if (!view || owner !== undefined && view.owner !== owner) return false;
 	clearTimeout(view.timer); live.delete(key); folders.delete(key);
+	for (const watcher of view.extra ?? []) watcher.close();
 	for (const [dir, entry] of watched) if (entry.keys.delete(key) && !entry.keys.size) { entry.watcher.close(); watched.delete(dir); }
 	return true;
 }

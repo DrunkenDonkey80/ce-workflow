@@ -12,7 +12,7 @@ import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { ARCHIVE, designPage, explore, unview, viewPage } from "./explore.ts";
+import { ARCHIVE, designLists, designPage, explore, unview, viewPage, watchDesign } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
@@ -413,12 +413,16 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			}
 			// D7: a design session's own mirrored page; it names no path, so no other folder or session can be asked for.
 			case "designpreview": {
-				only(data, ["target"], "Invalid fields.");
+				only(data, ["target", "screen"], "Invalid fields.");
+				if (data.screen !== undefined && typeof data.screen !== "string") throw fail(400, "Invalid screen.");
 				const handle = ((published(id)?.modes ?? registry.get(id)?.modes) as { design?: string } | undefined)?.design;
 				if (!handle) throw fail(404, "Not a design session.");
-				const real = await designPage(folder(id), handle);
-				if (!real) throw fail(404, "No design yet: its first run has not ended.");
-				return { ...await viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) }, true), design: true };
+				const real = await designPage(folder(id), handle, data.screen as string | undefined);
+				if (!real) throw fail(404, data.screen ? "No such screen in this design." : "No design yet: its first run has not ended.");
+				const view = await viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) }, true);
+				// S08: added or removed screens and new versions reach the open preview's pickers.
+				await watchDesign(view.key, folder(id), handle, lists => views.get(id)?.publish("design-changed", { key: view.key, ...lists }));
+				return { ...view, design: true, handle, ...await designLists(folder(id), handle) };
 			}
 			case "unview": only(data, ["target", "key"], "Invalid fields."); return { ok: unview(String(data.key), id) }; // the page closed or replaced its viewer
 			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.

@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, rename, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { explore, sendExplored, unview, viewers, viewPage } from "../src/explore.ts";
+import { designLists, designPage, explore, sendExplored, unview, viewers, viewPage, watchDesign } from "../src/explore.ts";
 
 const work = await mkdtemp(join(tmpdir(), "pi-hub-explore-test-"));
 try {
@@ -76,5 +76,30 @@ try {
 	assert.equal((await fetchLike(`/x/${a.key}/a.css`)).status, 404, "and its key no longer serves");
 	viewers("s1", 0, 10); await sleep(50);
 	assert.equal((await fetchLike(`/x/${b.key}/b.css`)).status, 404, "no page left for the session: its viewers close");
+
+	// S08: design screens are HTML files directly in the folder; adding or removing one, or a new version, sends one design-changed.
+	const project = join(work, "proj"), design = join(project, ".pi", "designs", "design-1");
+	await mkdir(join(design, "sub"), { recursive: true });
+	for (const [name, text] of [["index.html", "<h1>i</h1>"], ["b.html", "b"], ["sub/c.html", "c"], ["styles.css", ""]]) await writeFile(join(design, name), text);
+	assert.equal(await designPage(project, "design-1", "sub/c.html"), undefined, "screens are directly in the folder");
+	assert.equal(await designPage(project, "design-1", "../design-1/b.html"), undefined);
+	assert.equal(await designPage(project, "design-1", "styles.css"), undefined, "only HTML");
+	assert.match(await designPage(project, "design-1", "b.html"), /b\.html$/);
+	assert.deepEqual(await designLists(project, "design-1"), { screens: ["index.html", "b.html"], versions: [] });
+	const lists = [], d = await viewPage(join(design, "index.html"), project, false, { owner: "s3", notify: () => {} }, true);
+	await watchDesign(d.key, project, "design-1", value => lists.push(value));
+	const changes = async () => { await sleep(600); return lists.splice(0); };
+	await writeFile(join(design, "index.html"), "<h1>edited</h1>");
+	assert.deepEqual(await changes(), [], "a plain save is not a list change");
+	await writeFile(join(design, "a.html"), "a");
+	assert.deepEqual(await changes(), [{ screens: ["index.html", "a.html", "b.html"], versions: [] }], "a new screen");
+	await rm(join(design, "b.html"));
+	assert.deepEqual(await changes(), [{ screens: ["index.html", "a.html"], versions: [] }], "a removed screen");
+	await mkdir(join(project, ".pi", "designs", "history", "design-1", "1"));
+	await writeFile(join(project, ".pi", "designs", "history", "design-1", "1", "index.html"), "v1");
+	assert.deepEqual(await changes(), [{ screens: ["index.html", "a.html"], versions: [1] }], "a new version");
+	unview(d.key, "s3");
+	await writeFile(join(design, "z.html"), "z");
+	assert.deepEqual(await changes(), [], "a closed design view stops watching");
 	console.log("explore ok");
 } finally { await rm(work, { recursive: true, force: true }); }

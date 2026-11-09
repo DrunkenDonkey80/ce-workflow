@@ -131,6 +131,14 @@ try {
 	assert.equal((await preview("design-2")).status, 404, "another handle with no design yet");
 	assert.equal((await preview("../..")).status, 404, "a handle is design-N only");
 	assert.equal((await post(id, "designpreview", { path: "x" })).status, 400, "names no path");
+	// S08: a screen is an HTML file directly in its own design folder; the lists feed the pickers.
+	assert.deepEqual([designView.handle, designView.screens, designView.versions], ["design-1", ["index.html"], []]);
+	fs.writeFileSync(path.join(mine, "pay.html"), "<p>pay</p>"); hub.registry.update(id, { modes: { design: "design-1" } });
+	const screenRes = await post(id, "designpreview", { screen: "pay.html" }), screenView = screenRes.body; assert.equal(screenRes.status, 200, JSON.stringify(screenRes.body));
+	assert.deepEqual([screenView.open, screenView.screens], ["pay.html", ["index.html", "pay.html"]]);
+	for (const screen of ["css/a.css", "../design-1/pay.html", "out/page.html", "nope.html"]) assert.equal((await post(id, "designpreview", { screen })).status, 404, screen);
+	assert.equal((await post(id, "designpreview", { screen: 1 })).status, 400);
+	await post(id, "unview", { key: screenView.key });
 	assert.equal((await post(id, "explore", { path: ".pi/designs/design-1/index.html" })).status, 404, "other .pi files stay refused for chat links");
 	await post(id, "unview", { key: designView.key }); hub.registry.update(id, { modes: undefined });
 	fs.rmSync(path.join(folder, ".pi"), { recursive: true, force: true }); fs.rmSync(path.join(folder, "secret.txt"));

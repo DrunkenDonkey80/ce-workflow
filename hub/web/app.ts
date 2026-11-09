@@ -2706,6 +2706,7 @@ setInterval(renderProgress, 30_000);
 function listen(name, update) { handlers.push([name, update]); }
 listen("files", () => filesView.changed(!$("files").hidden));
 listen("file-changed", value => filesView.reload(value.key));
+listen("design-changed", value => filesView.designChanged(value));
 listen("status", value => {
  state.status = value;
  // Woken by typing: a compaction the message would wait for starts now, while you finish typing (ce-workflow /wo compact early).

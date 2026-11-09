@@ -1196,9 +1196,25 @@ try {
  const designDir = join(folder, ".pi", "designs", "design-1"); fs.mkdirSync(designDir, { recursive: true }); fs.writeFileSync(join(designDir, "index.html"), "<h1>Calm</h1>");
  await rpc().send({ type: "prompt", message: "/state " + JSON.stringify({ plan: null, modes: { design: "design-1" }, compacting: false, subagents: [] }) });
  await browser("wait", "--fn", "document.getElementById('files').classList.contains('tree-hidden') && !!document.querySelector('#files .files-frame')");
- assert.deepEqual(await evaluate("[...document.querySelectorAll('#files .files-width')].map(b => b.textContent + ':' + b.getAttribute('aria-pressed'))"), ["Phone:false", "Desktop:true"]);
- await evaluate("[...document.querySelectorAll('#files .files-width')].find(b => b.textContent === 'Phone').click()");
- assert(Math.abs(await evaluate("document.querySelector('#files .files-frame').getBoundingClientRect().width") - 390) <= 2, "Phone shows the page 390 px wide");
+ // S08: one device picker (Desktop first, the panel's width), rotate, the frame scaled to fit; the choice is kept per design.
+ assert.deepEqual(await evaluate("[document.querySelector('#files .design-device').value, document.querySelector('#files .design-rotate').disabled, !!document.querySelector('#files .design-screen')]"), ["Desktop", true, false]);
+ const pick = preset => evaluate(`(() => { const s = document.querySelector('#files .design-device'); s.value = ${JSON.stringify(preset)}; s.dispatchEvent(new Event('change')); })()`);
+ const frameBox = "(() => { const f = document.querySelector('#files .files-frame'), r = f.getBoundingClientRect(); return [f.offsetWidth, f.offsetHeight, Math.round(r.width / r.height * 1000)]; })()";
+ await pick("Phone");
+ assert.deepEqual(await evaluate(frameBox), [390, 844, Math.round(390 / 844 * 1000)], "Phone renders 390×844, scaled whole");
+ await evaluate("document.querySelector('#files .design-rotate').click()");
+ assert.deepEqual(await evaluate(frameBox), [844, 390, Math.round(844 / 390 * 1000)], "rotated");
+ assert(await evaluate("(() => { const f = document.querySelector('#files .files-frame').getBoundingClientRect(), b = document.querySelector('#files .files-body').getBoundingClientRect(); return f.right <= b.right + 1 && f.left >= b.left - 1; })()"), "fits the panel");
+ assert.equal(await evaluate("localStorage.getItem('design-device:design-1')"), JSON.stringify({ preset: "Phone", rotated: true }));
+ // A new screen shows the screen picker while the preview stays open; picking it shows that page.
+ fs.writeFileSync(join(designDir, "pay.html"), "<h1>Pay</h1>");
+ await browser("wait", "--fn", "!!document.querySelector('#files .design-screen')");
+ assert.deepEqual(await evaluate("[...document.querySelector('#files .design-screen').options].map(o => o.value)"), ["index.html", "pay.html"]);
+ await evaluate("(() => { const s = document.querySelector('#files .design-screen'); s.value = 'pay.html'; s.dispatchEvent(new Event('change')); })()");
+ await browser("wait", "--fn", "document.querySelector('#files .files-frame').title === 'pay.html'");
+ assert.equal(await evaluate("document.querySelector('#files .design-device').value"), "Phone", "the device stays");
+ await pick("Desktop");
+ assert.equal(await evaluate("document.querySelector('#files .files-frame').style.transform"), "", "Desktop is unscaled");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

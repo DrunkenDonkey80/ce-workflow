@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T11:54:28.972Z
+updated: 2026-11-09T12:02:48.637Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -190,10 +190,7 @@ Fit check per module:
 
 ### Phase 4: Preview controls [code]
 
-- [ ] **S08** Device picker with every preset plus rotate, frame scaled to fit, choice remembered per design (D4); screen picker from the design's HTML files (D7)
-  - The hub `designpreview` accepts `screen`. `designPage` allows any `.html` directly in the design folder.
-  - Live metadata: for own design keys the hub also watches the design folder and `.pi/designs/history/<handle>/` for added or removed screens and new versions, and publishes `design-changed {key}`. design-view refetches the screen and version lists. Generic viewers are unchanged.
-  - Check: C2 (screen path confinement; adding and removing a screen and adding a history folder each send one design-changed), C3, C4 (the picker updates while the preview stays open).
+- [x] **S08** design-view.ts designFrame: device picker (8 presets, Desktop = panel), rotate, frame scaled to fit, choice kept per design in localStorage; screen picker; designpreview takes screen and returns handle/screens/versions; explore.ts designLists + watchDesign publish design-changed only when the lists change.
 - [ ] **S09** Versions in the preview: "vN ◂ ▸" shows history folders read-only through designpreview {version}; Restore sends a chat message (D19)
   - Check: C2 (a history path confined to its own handle), C3, C4.
 

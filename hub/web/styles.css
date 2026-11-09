@@ -89,8 +89,11 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-body.rich { font: inherit; white-space: normal; flex: 1; display: flex; flex-direction: column; } .files-body.rich > :is(div, p) { white-space: pre-wrap; }
 .files-image { max-width: 100%; max-height: 70dvh; object-fit: contain; align-self: flex-start; cursor: zoom-in; border: 1px solid var(--line); }
 .files-frame { flex: 1; min-height: 60dvh; width: 100%; border: 1px solid var(--line); background: #fff; }
-.files[data-width=phone] .files-frame { flex: 1 0 auto; width: 390px; max-width: 100%; align-self: center; }
-.files-width[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.design-stage { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.design-stage.device { flex: none; position: relative; overflow: hidden; align-self: center; }
+.design-stage.device .files-frame { position: absolute; left: 0; top: 0; flex: none; min-height: 0; transform-origin: 0 0; }
+.design-rotate[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
+.files-actions select { font: inherit; font-size: 12px; max-width: 14em; }
 @media (max-width: 899px) { .files { grid-template-columns: none; grid-template-rows: minmax(120px, 40%) minmax(0, 1fr); } .files-tree { border-right: 0; border-bottom: 1px solid var(--line); } }
 .canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); }
 /* The diagram stays a light sketch, inverted like Excalidraw's dark mode. */
