@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.5.3 — 2026-11-09
+
+### Fixed
+- `mobile_act`: a Wi-Fi iPhone or iPad whose helper was left running (when its start timed out, or it started while the link was down) no longer refuses every new start with "Address already in use". mobile_act now ends the leftover helper on the device before starting a new one.
+
 ## 0.5.2 — 2026-11-09
 
 ### Fixed

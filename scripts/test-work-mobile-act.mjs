@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { readdir } from "node:fs/promises";
+import { endStaleHelpers } from "../extensions/mobile-wifi.ts";
 import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, newer, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
@@ -501,6 +502,19 @@ if (process.platform === "darwin") {
 	net = phone("wired", "connected"); usb = [PHONE];
 	assert.match(await mobileAct(exec2, { action: "list" }, opts()), /^0000-REAL ONLINE Lorenz’s iPhone \(ios real 27\.0\)$/, "wired: no stale Wi-Fi label");
 	resetSession();
+
+	// A runner left on the device (xcodebuild killed after the wait) holds port 12004: the next start ends it first.
+	const ended = [];
+	const exec3 = async (c, a) => {
+		const out = a[a.indexOf("--json-output") + 1];
+		if (a.slice(1, 4).join(" ") === "device info processes") await writeFile(out, JSON.stringify({ result: { runningProcesses: [
+			{ processIdentifier: 7569, executable: "file:///private/var/containers/Bundle/Application/X/devicekit-iosUITests-Runner.app/devicekit-iosUITests-Runner" },
+			{ processIdentifier: 12, executable: "file:///usr/libexec/backboardd" }] } }));
+		else { ended.push(a.slice(1, a.indexOf("--json-output")).join(" ")); await writeFile(out, JSON.stringify({ result: {} })); }
+		return { code: 0 };
+	};
+	assert.deepEqual(await endStaleHelpers(exec3, "0000-REAL"), ["7569"]);
+	assert.deepEqual(ended, ["device process terminate --device 0000-REAL --pid 7569"], "ends only the helper runner");
 }
 assert.ok(newer("1.0.22", "1.0.21") && newer("1.1.0", "1.0.99") && !newer("1.0.21", "1.0.21") && !newer("1.0.9", "1.0.10"));
 
