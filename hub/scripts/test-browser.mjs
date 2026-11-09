@@ -1264,6 +1264,26 @@ try {
  for (let i = 0; i < 50 && messages.length === sentBeforeComments; i++) await new Promise(done => setTimeout(done, 100));
  assert.equal(messages.at(-1).text, '(2) index.html @title <h1> "Calm": warmer\n');
  await untilPins("", "Send clears the pins");
+ // S12: Edit mode inspects the clicked element; a change applies live (a second inspect reads it back) and Keep adds a Set
+ // line. The page's Tweaks panel (chrome, so its clicks pass through) offers Keep tweaks.
+ fs.writeFileSync(join(designDir, "index.html"), `<h1 data-id="title">Calm</h1><div data-design-chrome><button onclick="window.dispatchEvent(new CustomEvent('design:tweaks', { detail: { accent: '#c2410c', scale: 1.125 } }))">Tweak</button></div>`);
+ const refOf = async name => { for (let i = 0; i < 40; i++) { const tree = await designTree(), ref = tree.some(row => row.includes("Tweak")) && tree.find(row => row.startsWith(name))?.match(/ref=(e\d+)/)?.[1]; if (ref) return "@" + ref; await new Promise(done => setTimeout(done, 150)); } assert.fail("no " + name); };
+ await evaluate("document.getElementById('message-input').value = ''; document.querySelector('#files .design-edit').click()");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#files .design-comment, #files .design-edit')].map(b => b.getAttribute('aria-pressed'))"), ["false", "true"], "one mode at a time");
+ await browser("click", await refOf("- heading \"Calm\""));
+ await browser("wait", "--fn", "!!document.querySelector('#files .design-inspector')");
+ assert.equal(await evaluate("document.querySelector('#files .design-inspector [name=font-size]').value"), "32px");
+ await evaluate("(() => { const input = document.querySelector('#files .design-inspector [name=font-size]'); input.value = '40px'; input.dispatchEvent(new Event('input')); })()");
+ await browser("click", await refOf("- heading \"Calm\""));
+ await browser("wait", "--fn", "document.querySelector('#files .design-inspector [name=font-size]')?.value === '40px'");
+ await evaluate("(() => { const input = document.querySelector('#files .design-inspector [name=color]'); input.value = '#c2410c'; input.dispatchEvent(new Event('input')); document.querySelector('#files .design-inspector').requestSubmit(); })()");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), "Set index.html @title: color #c2410c\n", "the live 40px was already the element's value when inspected again");
+ assert.equal(await evaluate("!!document.querySelector('#files .design-inspector') || !document.querySelector('#files .design-keep-tweaks').hidden"), false);
+ await browser("click", await refOf("- button \"Tweak\""));
+ await browser("wait", "--fn", "!document.querySelector('#files .design-keep-tweaks').hidden");
+ await evaluate("document.querySelector('#files .design-keep-tweaks').click()");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), "Set index.html @title: color #c2410c\nKeep tweaks: accent #c2410c, scale 1.125\n");
+ assert.equal(await evaluate("!!document.querySelector('#files .design-inspector')"), false, "a click on chrome does not inspect");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

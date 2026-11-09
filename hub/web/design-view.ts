@@ -15,13 +15,18 @@ function device(view: DesignView): Device {
  return { preset: "Desktop", rotated: false };
 }
 
-// S10: the bridge in the page (hub/src/design-bridge.ts). Only the frame shown now, with its current load id, is heard;
-// a valid pick goes out as a bubbling "design-pick" event from that frame. Comment mode and the pins outlive reloads.
+// S10/S12: the bridge in the page (hub/src/design-bridge.ts). Only the frame shown now, with its current load id, is
+// heard. Each valid message goes out as a bubbling event from that frame: design-pick in Comment mode, design-inspect in
+// Edit mode, design-tweaks from the page's Tweaks panel. The mode and the pins outlive reloads.
 export type DesignPick = { screen: string; id: string; selector: string; tag: string; text: string; rect: { x: number; y: number; width: number; height: number } };
 export type DesignPin = { n: number; screen: string; id: string; selector: string };
-let current: { frame: HTMLIFrameElement; load: string; screen: string } | undefined, commenting = false, pins: DesignPin[] = [];
+let current: { frame: HTMLIFrameElement; load: string; screen: string } | undefined, mode = "", pins: DesignPin[] = [];
 const tell = (data: Record<string, unknown>) => { if (current?.frame.isConnected) current.frame.contentWindow?.postMessage({ load: current.load, ...data }, "*"); };
 export function setDesignPins(list: DesignPin[]) { pins = list; tell({ pins }); }
+/** How a chat line names an element (D2): its screen and data-id, or a short selector when it has none. */
+export const elementName = (pick: DesignPick) => `${pick.screen} ${pick.id ? "@" + pick.id : pick.selector}`;
+const line = (text: string) => document.dispatchEvent(new CustomEvent("design-line", { detail: text })); // app.ts adds it to the chat box
+const STYLES = ["color", "background-color", "font-size", "font-weight", "padding", "margin", "gap", "border-radius"];
 const bounded = (value: unknown, max: number, pattern?: RegExp) => typeof value === "string" && value.length <= max && (!pattern || pattern.test(value));
 function readPick(data: any, screen: string): DesignPick | undefined {
  const rect = data?.rect;
@@ -29,11 +34,44 @@ function readPick(data: any, screen: string): DesignPick | undefined {
  if (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) return undefined;
  return { screen, id: data.id, selector: data.selector, tag: data.tag, text: data.text, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
 }
+const readStyles = (styles: any) => styles && typeof styles === "object" && STYLES.every(name => bounded(styles[name], 100)) ? Object.fromEntries(STYLES.map(name => [name, styles[name] as string])) : undefined;
+function readTweaks(values: any) {
+ const entries = values && typeof values === "object" && !Array.isArray(values) ? Object.entries(values) : [];
+ const valid = entries.length > 0 && entries.length <= 20 && entries.every(([key, value]) => /^[\w-]{1,40}$/.test(key) && (bounded(value, 80) || typeof value === "boolean" || Number.isFinite(value)));
+ return valid ? Object.fromEntries(entries) : undefined;
+}
 addEventListener("message", event => {
- if (!current?.frame.isConnected || event.source !== current.frame.contentWindow || event.data?.load !== current.load || event.data.type !== "design:pick") return;
- const pick = readPick(event.data, current.screen);
- if (pick) current.frame.dispatchEvent(new CustomEvent("design-pick", { bubbles: true, detail: pick }));
+ if (!current?.frame.isConnected || event.source !== current.frame.contentWindow || event.data?.load !== current.load) return;
+ const data = event.data, frame = current.frame, emit = (name: string, detail: unknown) => frame.dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
+ if (data.type === "design:tweaks") { const values = readTweaks(data.values); if (values) emit("design-tweaks", values); return; }
+ const pick = readPick(data, current.screen); if (!pick) return;
+ if (data.type === "design:pick" && mode === "comment") emit("design-pick", pick);
+ const styles = data.type === "design:inspect" && mode === "edit" && readStyles(data.styles);
+ if (styles) emit("design-inspect", { ...pick, styles });
 });
+// D12: the inspector changes the element live; Keep adds a Set line with what changed, Cancel undoes the inline styles.
+function inspect(body: HTMLElement, pick: DesignPick & { styles: Record<string, string> }) {
+ body.querySelector(".design-inspector")?.remove();
+ const form = Object.assign(document.createElement("form"), { className: "design-inspector" });
+ form.setAttribute("aria-label", "Element styles");
+ const title = Object.assign(document.createElement("div"), { className: "design-inspector-title", textContent: `<${pick.tag}>${pick.text ? ` "${pick.text.slice(0, 40)}"` : ""}` });
+ const inputs = STYLES.map(name => {
+  const input = Object.assign(document.createElement("input"), { name, value: pick.styles[name], spellcheck: false });
+  input.addEventListener("input", () => tell({ style: { [name]: input.value } }));
+  const row = document.createElement("label"); row.append(name, input); return row;
+ });
+ const keep = Object.assign(document.createElement("button"), { type: "submit", textContent: "Keep", title: "Add a Set line to your message for the agent to write" });
+ const cancel = Object.assign(document.createElement("button"), { type: "button", textContent: "Cancel" });
+ const changed = () => STYLES.map(name => [name, (form.elements.namedItem(name) as HTMLInputElement).value.replace(/\s+/g, " ").trim()]).filter(([name, value]) => value !== pick.styles[name]);
+ cancel.addEventListener("click", () => { tell({ style: Object.fromEntries(changed().map(([name]) => [name, ""])) }); form.remove(); });
+ form.addEventListener("submit", event => {
+  event.preventDefault(); const edits = changed();
+  if (edits.length) line(`Set ${elementName(pick)}: ${edits.map(([name, value]) => `${name} ${value}`).join("; ")}`);
+  form.remove();
+ });
+ const buttons = Object.assign(document.createElement("div"), { className: "design-inspector-buttons" }); buttons.append(keep, cancel);
+ form.append(title, ...inputs, buttons); body.append(form);
+}
 
 /** The design's page in a device frame, with the device, rotate and screen controls added before Download and Open. */
 export function designFrame(view: DesignView, path: string, src: string, body: HTMLElement, actions: HTMLElement, act: DesignActions) {
@@ -47,14 +85,24 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
  picker.value = state.preset;
  const rotate = Object.assign(document.createElement("button"), { type: "button", className: "design-rotate", textContent: "⟳", title: "Rotate (landscape)" });
  rotate.setAttribute("aria-label", "Rotate");
- const comment = Object.assign(document.createElement("button"), { type: "button", className: "design-comment", textContent: "Comment", title: "Click an element in the page to comment on it" });
- comment.setAttribute("aria-pressed", String(commenting));
- comment.addEventListener("click", () => { commenting = !commenting; comment.setAttribute("aria-pressed", String(commenting)); tell({ mode: commenting ? "comment" : "" }); });
+ // Comment and Edit are one mode at a time; pressing the active one turns it off.
+ const modes = ([["comment", "Comment", "Click an element in the page to comment on it"], ["edit", "Edit", "Click an element to change its styles live"]] as const).map(([value, text, title]) => {
+  const button = Object.assign(document.createElement("button"), { type: "button", className: "design-" + value, textContent: text, title });
+  button.addEventListener("click", () => { mode = mode === value ? "" : value; sync(); tell({ mode }); if (mode !== "edit") body.querySelector(".design-inspector")?.remove(); });
+  return button;
+ });
+ const sync = () => { for (const button of modes) button.setAttribute("aria-pressed", String(button.className === "design-" + mode)); };
+ sync();
+ const keepTweaks = Object.assign(document.createElement("button"), { type: "button", className: "design-keep-tweaks", textContent: "Keep tweaks", title: "Add the page's Tweaks values to your message", hidden: true });
+ let tweaks: Record<string, unknown> = {};
+ frame.addEventListener("design-tweaks", event => { tweaks = (event as CustomEvent).detail; keepTweaks.hidden = false; });
+ keepTweaks.addEventListener("click", () => { line("Keep tweaks: " + Object.entries(tweaks).map(([key, value]) => `${key} ${value}`).join(", ")); keepTweaks.hidden = true; });
+ frame.addEventListener("design-inspect", event => inspect(body, (event as CustomEvent).detail));
  frame.addEventListener("load", () => {
   current = { frame, load: crypto.randomUUID(), screen: path };
-  frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode: commenting ? "comment" : "", pins }, "*");
+  frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode, pins }, "*");
  });
- const controls: HTMLElement[] = [comment, picker, rotate];
+ const controls: HTMLElement[] = [...modes, keepTweaks, picker, rotate];
  if ((view.screens?.length ?? 0) > 1) {
   const screens = Object.assign(document.createElement("select"), { className: "design-screen", title: "Screen" });
   screens.setAttribute("aria-label", "Screen");

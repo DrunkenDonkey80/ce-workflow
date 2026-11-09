@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T12:41:07.516Z
+updated: 2026-11-09T12:51:36.123Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -197,9 +197,7 @@ Fit check per module:
 
 - [x] **S10** hub/src/design-bridge.ts injected before </body> into HTML of own design keys only; Comment toggle in the preview; parent hello with a per-load id, pins/mode re-sent each load; picks accepted only from the current frame's contentWindow with its load id and a bounded schema, re-emitted as a bubbling design-pick event.
 - [x] **S11** A pick opens the existing note popup; Add puts the D2 line "(n) screen @id|selector <tag> "text": note" in the chat box and a numbered pin in the page; renderMentions syncs pins to the lines left, so a deleted line drops its pin and Send clears them.
-- [ ] **S12** Edit mode inspector (D12): computed values of the clicked element, live inline changes through the bridge, Keep adds a Set line; Tweaks messages get a Keep tweaks line
-  - Tweaks contract in the guide: the page posts `{type: "design:tweaks", values}`, and the panel is marked `data-design-chrome`.
-  - Check: C4.
+- [x] **S12** Edit mode (one mode at a time with Comment): a click sends computed color/background/font-size/weight/padding/margin/gap/radius; the inspector applies inputs live through the bridge, Keep adds "Set <screen> @id: prop value; …", Cancel undoes; the page's Tweaks panel dispatches a window "design:tweaks" CustomEvent (guide amended: the bridge adds the load id), and Keep tweaks adds "Keep tweaks: k v, …".
 - [ ] **S13** Mark (D13): hub designshot renders what the preview shows, opens it in the annotator, and the saved image path plus legend go into the chat box
   - It passes the S06 render-state: the shown version, screen, rotated size, deck slide hash and unsaved inline edits.
   - Check: C3 (designshot confined to the session's own design; Mark on a non-first slide, an older version and a live CSS edit each render that state), C5, C4.

@@ -59,7 +59,7 @@ Use real visuals. Call `generate_image` for photos and illustrations and save th
 
 ## Tweaks panel (prototypes)
 
-When variations are worth trying live, add a small floating Tweaks panel with a few knobs (accent, type scale, density, dark mode). Mark its root `data-design-chrome` so it is not taken as product UI, apply values through CSS custom properties, and on every change call `parent.postMessage({ type: "design:tweaks", values: { accent: "#c2410c", scale: 1.125 } }, "*")` so the user can keep them.
+When variations are worth trying live, add a small floating Tweaks panel with a few knobs (accent, type scale, density, dark mode). Mark its root `data-design-chrome` so it is not taken as product UI, apply values through CSS custom properties, and on every change call `window.dispatchEvent(new CustomEvent("design:tweaks", { detail: { accent: "#c2410c", scale: 1.125 } }))` so the user can keep them (the hub's preview passes them on).
 
 ## Decks (kind deck)
 

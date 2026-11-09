@@ -89,6 +89,12 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-body.rich { font: inherit; white-space: normal; flex: 1; display: flex; flex-direction: column; } .files-body.rich > :is(div, p) { white-space: pre-wrap; }
 .files-image { max-width: 100%; max-height: 70dvh; object-fit: contain; align-self: flex-start; cursor: zoom-in; border: 1px solid var(--line); }
 .files-frame { flex: 1; min-height: 60dvh; width: 100%; border: 1px solid var(--line); background: #fff; }
+.files-body:has(> .design-stage) { position: relative; }
+.design-inspector { position: absolute; z-index: 5; right: 12px; top: 12px; display: grid; gap: 4px; width: 240px; padding: 8px; background: var(--panel, #fff); border: 1px solid var(--line, #ccc); border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, .18); font: 12px/1.4 system-ui, sans-serif; white-space: normal; }
+.design-inspector label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 6px; }
+.design-inspector input { min-width: 0; font: 12px ui-monospace, Consolas, monospace; }
+.design-inspector-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.design-inspector-buttons { display: flex; gap: 6px; justify-content: flex-end; }
 .design-stage { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .design-stage.device { flex: none; position: relative; overflow: hidden; align-self: center; }
 .design-stage.device .files-frame { position: absolute; left: 0; top: 0; flex: none; min-height: 0; transform-origin: 0 0; }

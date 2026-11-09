@@ -8,7 +8,7 @@ import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 const { ICONS, iconSvg, BUTTON_ICONS } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _states?: string[]) => "", BUTTON_ICONS: {} as Record<string, [string, string]> }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
-import { setDesignPins } from "./design-view.js?token=__TOKEN__";
+import { elementName, setDesignPins } from "./design-view.js?token=__TOKEN__";
 let designPick = null, designPins = []; // S11 (declared first: renderMentions runs during start-up)
 // @ts-ignore Browser URL includes the workspace token.
 import { createPromptView } from "./prompts.js?token=__TOKEN__";
@@ -422,6 +422,11 @@ document.addEventListener("design-pick", event => {
  openNote(`Comment on <${pick.tag}>${pick.text ? ` "${pick.text.slice(0, 60)}"` : ""}`, "Adds a numbered line to your message and a pin on the element. Add more, then send them together.", "Add to message");
  designPick = pick;
 });
+// S12: Set and Keep tweaks lines from the preview go into the chat box the same way.
+document.addEventListener("design-line", event => {
+ const input = $("message-input"), line = (event as CustomEvent).detail;
+ input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n"; renderMentions();
+});
 function syncDesignPins() {
  const rows = $("message-input").value.split("\n"), kept = designPins.filter(pin => rows.includes(pin.line));
  if (kept.length !== designPins.length) { designPins = kept; setDesignPins(kept); }
@@ -549,7 +554,7 @@ $("comment-form").addEventListener("submit", async event => {
  if (designPick) {
   const note = $("comment-text").value.replace(/\s+/g, " ").trim(); if (!note) return;
   const { screen, id, selector, tag, text } = designPick, n = (designPins.at(-1)?.n ?? 0) + 1;
-  const line = `(${n}) ${screen} ${id ? "@" + id : selector} <${tag}>${text ? ` "${text}"` : ""}: ${note}`;
+  const line = `(${n}) ${elementName(designPick)} <${tag}>${text ? ` "${text}"` : ""}: ${note}`;
   designPins = [...designPins, { n, screen, id, selector, line }]; setDesignPins(designPins);
   const input = $("message-input"); input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n";
   $("comment-prompt").close(); $("comment-text").value = ""; designPick = null; input.focus(); input.setSelectionRange(input.value.length, input.value.length); renderMentions();

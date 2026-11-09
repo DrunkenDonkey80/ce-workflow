@@ -3,10 +3,13 @@
 // says hello with a load id after each load; every message back carries that id, so the parent drops messages from
 // another frame or an earlier load. In Comment mode a click picks an element instead of acting on it; pins are drawn
 // from the list the parent sends, so they survive live reloads. Its own elements are marked data-design-chrome.
+// S12: in Edit mode a click inspects (computed styles go back), and style messages change that element inline until
+// the next load. A page's Tweaks panel dispatches a "design:tweaks" CustomEvent, which goes up with the load id.
 export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	if (window.parent === window || window.__designBridge) return;
 	window.__designBridge = true;
-	let load = "", mode = "", pins = [], hovered = null, layer = null;
+	let load = "", mode = "", pins = [], hovered = null, layer = null, editing = null;
+	const STYLES = ["color", "background-color", "font-size", "font-weight", "padding", "margin", "gap", "border-radius"];
 	const screen = decodeURIComponent(location.pathname.split("/").pop() || "index.html");
 	const send = (type, data) => { if (load) parent.postMessage({ type, load, ...data }, "*"); };
 	const chrome = el => !!(el && el.closest && el.closest("[data-design-chrome]"));
@@ -52,16 +55,21 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		const message = event.data || {};
 		if (message.type === "design:hello" && typeof message.load === "string") { load = message.load; send("design:ready", { screen }); }
 		if (message.load !== load) return;
-		if (typeof message.mode === "string") { mode = message.mode; if (mode !== "comment") outline(null); document.documentElement.style.cursor = mode === "comment" ? "crosshair" : ""; }
+		if (typeof message.mode === "string") { mode = message.mode; if (!mode) outline(null); document.documentElement.style.cursor = mode ? "crosshair" : ""; }
+		if (message.style && editing) for (const name of STYLES) if (typeof message.style[name] === "string") editing.style.setProperty(name, message.style[name].slice(0, 100));
 		if (Array.isArray(message.pins)) { pins = message.pins; drawPins(); }
 	});
-	addEventListener("mouseover", event => { if (mode === "comment" && !chrome(event.target)) outline(target(event.target)); }, true);
+	addEventListener("mouseover", event => { if (mode && !chrome(event.target)) outline(target(event.target)); }, true);
 	addEventListener("click", event => {
-		if (mode !== "comment" || chrome(event.target)) return;
+		if (!mode || chrome(event.target)) return;
 		event.preventDefault(); event.stopPropagation();
 		const el = target(event.target), box = el.getBoundingClientRect(), id = el.dataset.id && /^[\\w-]{1,80}$/.test(el.dataset.id) ? el.dataset.id : "";
-		send("design:pick", { screen, id, selector: id ? "" : selector(el), tag: el.tagName.toLowerCase(), text: clip(el.innerText || el.getAttribute("aria-label") || el.getAttribute("alt") || el.getAttribute("placeholder") || el.value, 160), rect: { x: box.left, y: box.top, width: box.width, height: box.height } });
+		const pick = { screen, id, selector: id ? "" : selector(el), tag: el.tagName.toLowerCase(), text: clip(el.innerText || el.getAttribute("aria-label") || el.getAttribute("alt") || el.getAttribute("placeholder") || el.value, 160), rect: { x: box.left, y: box.top, width: box.width, height: box.height } };
+		if (mode === "comment") return send("design:pick", pick);
+		outline(null); editing = el; const computed = getComputedStyle(el);
+		send("design:inspect", { ...pick, styles: Object.fromEntries(STYLES.map(name => [name, computed.getPropertyValue(name).slice(0, 100)])) });
 	}, true);
+	addEventListener("design:tweaks", event => { if (event.detail && typeof event.detail === "object") send("design:tweaks", { values: event.detail }); });
 	addEventListener("resize", drawPins);
 	addEventListener("load", drawPins);
 })();</script>`;
