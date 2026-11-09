@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, tileOrder, vmAct, vmActTool, winArg } from "../extensions/vm-act.ts";
+import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, tileOrder, vmAct, vmActTool, vmLogin, winArg } from "../extensions/vm-act.ts";
 
 // Keys: modifiers pressed first, released in reverse; extended keys keep their e0 prefix.
 assert.deepEqual(scancodes("alt+y"), ["38", "15", "95", "b8"]);
@@ -86,7 +86,7 @@ try {
 	assert.deepEqual(g.slice(0, 4).concat(g.slice(5, 13)), ["guestcontrol", "S46", "run", "--username=Administrator", "--exe=C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "--wait-stdout", "--wait-stderr", "--timeout=60000", "--", "-NoProfile", "-NonInteractive", "-EncodedCommand"]);
 	assert.match(Buffer.from(g[13], "base64").toString("utf16le"), /query session[\s\S]*Get-Process LogonUI,consent[\s\S]*PromptOnSecureDesktop/);
 	assert(seen.length === 1 && !existsSync(seen[0].file) && !st.includes("secret-pw"));
-	await assert.rejects(vmAct({ action: "status" }, { cwd: os.tmpdir(), run: fake({ showvminfo: 'VMState="running"\n' }), running: async () => ["S46"] }), /built-in Administrator: put its password in .env as VM_ADMIN_PASSWORD/);
+	await assert.rejects(vmAct({ action: "status" }, { cwd: os.tmpdir(), run: fake({ showvminfo: 'VMState="running"\n' }), running: async () => ["S46"] }), /as Administrator on S46: put its password in .env as VM_ADMIN_PASSWORD/);
 
 	// account: .env first, password to the guest only as a copied file, host cleanup when the script fails or is cancelled
 	const decode = (c) => Buffer.from(c[c.length - 1], "base64").toString("utf16le");
@@ -222,6 +222,31 @@ try {
 	assert.deepEqual(calls, []);
 	// Not running: no poweroff, no note.
 	assert.equal(await act({ action: "snapshot", op: "restore", name: "clean", vm: "Other" }, { running: [] }), 'Restored "clean" and started Other headless.');
+
+	// Several copy sources in one call.
+	calls.length = 0;
+	assert.match(await act({ action: "copyto", sources: ["C:/h/a.zip", "C:/h/b.zip"], dest: "C:/T" }), /^Copied C:\/h\/a\.zip, C:\/h\/b\.zip to C:\/T/);
+	assert.deepEqual(calls.pop().slice(-3), ["--target-directory=C:/T/", "C:/h/a.zip", "C:/h/b.zip"]);
+	await assert.rejects(act({ action: "copyto", dest: "C:/T" }), /copyto needs source or sources/);
+
+	// Per-VM guest login (vms) beats the configured VM's; another VM is not given S46's login.
+	await writeFile(path.join(dir, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { vm: { vm: "S46", user: "relAdmin", passwordEnv: "VM_TEST_PW" }, vms: { Box: { user: "vboxuser", passwordEnv: "VM_TEST_PW" } } } }));
+	assert.deepEqual(vmLogin(dir, "S46"), { user: "relAdmin", passwordEnv: "VM_TEST_PW" });
+	assert.deepEqual(vmLogin(dir, "Box"), { user: "vboxuser", passwordEnv: "VM_TEST_PW" });
+	assert.deepEqual(vmLogin(dir, "Other"), { user: "Administrator", passwordEnv: "VM_ADMIN_PASSWORD" });
+	await writeFile(path.join(dir, ".pi", "settings.json"), JSON.stringify({ workOrchestrator: { vm: { vm: "S46", user: "Administrator", passwordEnv: "VM_TEST_PW" } } }));
+
+	// Booting guest: status says so; power start waits for guest commands; disabled login gets a hint.
+	const booting = (a, guestErrs) => { let i = 0; calls.length = 0; return vmAct(a, { cwd: dir, running: async () => ["S46"], sleep: async () => {}, run: async (args) => {
+		calls.push(args);
+		if (args[0] === "showvminfo") return { code: 0, stdout: 'VMState="running"\n', stderr: "" };
+		if (args[2] === "run") { const e = guestErrs[Math.min(i++, guestErrs.length - 1)]; return e ? { code: 1, stdout: "", stderr: e } : { code: 0, stdout: `#session\r\n${QS}#proc\r\nexplorer 2\r\n#uac\r\n0 3 0\r\n`, stderr: "" }; }
+		return { code: 0, stdout: "", stderr: "" };
+	} }); };
+	assert.match(await booting({ action: "status" }, ["VBoxManage.exe: error: Guest Additions are not installed or not ready (yet)"]), /^VM S46: running, still booting/);
+	assert.match(await booting({ action: "power" }, ["The guest execution service is not ready (yet)", ""]), /^VM S46: running\.\nConsole \(session 2\): S22New, desktop/);
+	assert(!calls.some(c => c[0] === "startvm"), "already running: no startvm");
+	await assert.rejects(booting({ action: "status" }, ["The specified user account on the guest is restricted and can't be used to logon"]), /Administrator cannot log on to S46 .*workOrchestrator\.vms\.S46/);
 
 	await act({ action: "snapshot", op: "take", name: "base" });
 	assert.deepEqual(calls.pop(), ["snapshot", "S46", "take", "base"], "paused save, not --live");
