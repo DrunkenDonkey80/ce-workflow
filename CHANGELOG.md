@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.5.2 — 2026-11-09
+
+### Fixed
+- `mobile_act`: an iPhone first seen over Wi-Fi with its link down, then plugged in by USB, no longer stays marked Wi-Fi for the rest of the session. Before, every call tried to start the helper over a link with no address, and failed with "The helper did not start". A Wi-Fi device whose link is down now gets reconnected before the helper starts.
+
 ## 0.5.1 — 2026-11-09
 
 ### Fixed

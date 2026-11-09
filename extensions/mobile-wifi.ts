@@ -25,8 +25,10 @@ async function devicectl(exec: Exec, args: string[], signal?: AbortSignal, timeo
 /** Paired iPhones and iPads that Xcode reaches over the network; online when their tunnel is up. Empty off macOS or without Xcode. */
 export async function wifiDevices(exec: Exec, signal?: AbortSignal): Promise<Device[]> {
 	if (process.platform !== "darwin") return [];
-	const list = (await devicectl(exec, ["list", "devices"], signal).catch(() => undefined))?.devices ?? [];
-	return list.filter((d: any) => d.hardwareProperties?.reality === "physical" && d.hardwareProperties?.platform === "iOS" && d.connectionProperties?.transportType === "localNetwork").map((d: any) => {
+	const result = await devicectl(exec, ["list", "devices"], signal).catch(() => undefined);
+	if (!result) return [];
+	wifi.clear(); // a phone that is now wired (or gone) must not keep its old Wi-Fi entry and route through a dead tunnel
+	return (result.devices ?? []).filter((d: any) => d.hardwareProperties?.reality === "physical" && d.hardwareProperties?.platform === "iOS" && d.connectionProperties?.transportType === "localNetwork").map((d: any) => {
 		const id = d.hardwareProperties.udid, ip = d.connectionProperties.tunnelState === "connected" ? d.connectionProperties.tunnelIPAddress ?? "" : "";
 		wifi.set(id, ip);
 		return { id, name: d.deviceProperties?.name ?? id, platform: "ios", type: "real", state: ip ? "online" : "offline", version: d.deviceProperties?.osVersionNumber ?? "" };
@@ -104,7 +106,9 @@ export async function teamFor(exec: Exec, udid: string, signal?: AbortSignal, di
 
 /** Makes sure the DeviceKit helper answers on the device: builds it once per device with the user's team, then starts it as a UI test. */
 export async function wifiAgent(exec: Exec, dev: Device, o: Options) {
-	const ip = wifi.get(dev.id)!, { signal } = o;
+	const { signal } = o;
+	if (!wifi.get(dev.id)) await wifiConnect(exec, dev, signal); // no tunnel address: the helper would listen on 127.0.0.1 only
+	const ip = wifi.get(dev.id)!;
 	if (await rpc(exec, ip, "device.info", {}, signal, 5000).then(() => true, () => false)) return;
 	const dir = path.join(CACHE, "devicekit", dev.id), products = path.join(dir, "Build", "Products"); // per device: its signing profile must list it
 	const find = async () => (await readdir(products).catch(() => [] as string[])).find(f => f.endsWith(".xctestrun"));

@@ -487,6 +487,20 @@ if (process.platform === "darwin") {
 		'device.io.button {"button":"home"}',
 	]);
 	resetSession();
+
+	// A phone seen on Wi-Fi with its tunnel down, then plugged in: USB takes over instead of a stale Wi-Fi entry with no address.
+	const phone = (transportType, tunnelState) => ({ hardwareProperties: { udid: PHONE.id, platform: "iOS", reality: "physical" }, deviceProperties: { name: PHONE.name, osVersionNumber: "27.0" }, connectionProperties: { transportType, tunnelState, tunnelIPAddress: "fd00::2" } });
+	let net = phone("localNetwork", "disconnected"), usb = [];
+	const exec2 = async (c, a) => {
+		if (c === "xcrun" && a[1] === "list") { await writeFile(a[a.indexOf("--json-output") + 1], JSON.stringify({ result: { devices: [net] } })); return { code: 0 }; }
+		if (c === "xcrun" && a[1] === "device") { await writeFile(a[a.indexOf("--json-output") + 1], JSON.stringify({ result: {} })); return { code: 0 }; }
+		assert.notEqual(c, "curl", "never calls a helper at an empty address");
+		return ok({ devices: usb });
+	};
+	assert.match(await mobileAct(exec2, { action: "list" }, opts()), /^0000-REAL Lorenz’s iPhone \(ios real Wi-Fi 27\.0\)$/);
+	net = phone("wired", "connected"); usb = [PHONE];
+	assert.match(await mobileAct(exec2, { action: "list" }, opts()), /^0000-REAL ONLINE Lorenz’s iPhone \(ios real 27\.0\)$/, "wired: no stale Wi-Fi label");
+	resetSession();
 }
 assert.ok(newer("1.0.22", "1.0.21") && newer("1.1.0", "1.0.99") && !newer("1.0.21", "1.0.21") && !newer("1.0.9", "1.0.10"));
 
