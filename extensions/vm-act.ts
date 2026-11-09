@@ -476,6 +476,8 @@ if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.sec
 			// no --no-replace: on 7.2.20 it leaves every copied file empty
 			// an existing directory without a trailing separator is refused as "already exists and is a directory" (7.2.20)
 			const dest = /[\\/]$/.test(a.dest!) ? a.dest! : a.dest + (a.dest!.includes("/") && !a.dest!.includes("\\") ? "/" : "\\");
+			// copyto into a missing folder fails with "Path to guest file not found"
+			if (a.action === "copyto") await call(["guestcontrol", vm, "mkdir", ...auth, "--parents", a.dest!], 60_000);
 			await call(["guestcontrol", vm, a.action, ...auth, `--target-directory=${dest}`, ...sources], 600_000);
 			return `Copied ${sources.join(", ")} to ${a.dest} (${a.action === "copyto" ? "guest" : "host"}).`;
 		});

@@ -64,7 +64,8 @@ try {
 	assert.deepEqual(runArgs.filter(a => !a.startsWith("--passwordfile=")), ["guestcontrol", "S46", "run", "--username=Administrator", "--exe=C:\\Windows\\System32\\whoami.exe", "--wait-stdout", "--wait-stderr", "--timeout=120000", "--", "/groups"]);
 	await act({ action: "copyto", source: "C:\\host\\a.msi", dest: "C:\\Temp\\fresh" });
 	assert.deepEqual(calls.pop().filter(a => !a.startsWith("--passwordfile=")), ["guestcontrol", "S46", "copyto", "--username=Administrator", "--target-directory=C:\\Temp\\fresh\\", "C:\\host\\a.msi"]);
-	assert.equal(seen.length, 3, "run, its state, copyto");
+	assert.equal(seen.length, 4, "run, its state, mkdir, copyto");
+	assert.deepEqual(calls.at(-1).slice(2, 4).concat(calls.at(-1).slice(-2)), ["mkdir", "--username=Administrator", "--parents", "C:\\Temp\\fresh"], "copyto makes the folder first");
 	for (const s of seen) { assert.equal(s.content, "secret-pw"); assert(!existsSync(s.file), "temp password file removed"); }
 	assert(!calls.flat().includes("secret-pw") && !out.includes("secret-pw"));
 	await assert.rejects(act({ action: "run", exe: "x", passwordEnv: "MISSING_PW_VAR" }), /MISSING_PW_VAR is not in .env/);
