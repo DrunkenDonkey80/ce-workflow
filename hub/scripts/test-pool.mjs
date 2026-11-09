@@ -20,7 +20,7 @@ else if (args[0] === "import") { const text = fs.readFileSync(0, "utf8"); text.s
 else if (args[0] === "login") { if (args[1] === "gone") { console.log(JSON.stringify({ error: "No account gone" })); process.exit(1); }
  console.log(JSON.stringify({ url: "https://claude.ai/oauth/authorize?x=1", label: args[1], email: "flex@datecs.bg" }));
  let input = ""; process.stdin.on("data", c => { input += c; if (input.includes("\\n")) { const code = input.trim(); fs.appendFileSync(${JSON.stringify(log)}, "code " + code + "\\n");
-  console.log(JSON.stringify(code === "bad#s" ? { error: "Signed in as other@x, not flex@datecs.bg" } : { ok: true, label: args[1], email: "flex@datecs.bg" })); process.exit(code === "bad#s" ? 1 : 0); } });
+  console.log(JSON.stringify(code === "bad#s" ? { error: "Signed in as other@x, not flex@datecs.bg" } : code === "old#s" ? { error: 'Token exchange request failed. details=Error: HTTP request failed. status=400; body={"error": "invalid_grant", "error_description": "Invalid code in request."}; stack=Error at x' } : { ok: true, label: args[1], email: "flex@datecs.bg" })); process.exit(code === "bad#s" || code === "old#s" ? 1 : 0); } });
  process.stdin.on("end", () => process.exit(1)); }
 else if (args[0] === "daemon") { if (fs.existsSync(${JSON.stringify(path.join(root, "alive"))})) { console.error("cpool daemon already running (pid 1)"); process.exit(1); } setInterval(() => {}, 1000); }`);
 fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "claudeex", bin: { cpool: "bin/cpool.mjs" } }));
@@ -69,6 +69,8 @@ assert(calls().includes("code abc#s"));
 await assert.rejects(pool.action({ act: "login-code", text: "abc#s" }), error => error.status === 409, "no sign-in running");
 await pool.action({ act: "login", label: "datecs:datecs" });
 await assert.rejects(pool.action({ act: "login-code", text: "bad#s" }), error => error.status === 502 && /not flex@datecs.bg/.test(error.message));
+await pool.action({ act: "login", label: "datecs:datecs" });
+await assert.rejects(pool.action({ act: "login-code", text: "old#s" }), error => error.message === "Anthropic refused the code: Invalid code in request.");
 await assert.rejects(pool.action({ act: "login", label: "gone" }), error => error.status === 502 && /No account gone/.test(error.message));
 for (const bad of [{ act: "login" }, { act: "login", label: "--help" }]) await assert.rejects(pool.action(bad), error => error.status === 400);
 await pool.action({ act: "login", label: "a" });

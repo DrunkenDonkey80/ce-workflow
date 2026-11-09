@@ -59,7 +59,8 @@ export function createPool({ cpool = findCpool(), retryMs = 300_000, log = (line
 		if (line === undefined) throw fail(502, state.closed ? "cpool login ended without an answer." : "cpool login did not answer in time.");
 		let result: any;
 		try { result = JSON.parse(line); } catch { throw fail(502, line.startsWith("cpool ") ? "This pi-provider-claude-ex has no cpool login yet; update it (pi update) and restart the hub." : "cpool login printed no JSON."); }
-		if (result?.error) throw fail(502, String(result.error));
+		// Anthropic's refusal is buried in an HTTP dump with a stack trace; show just its words.
+		if (result?.error) { const said = /"error_description":\s*"([^"]+)"/.exec(String(result.error))?.[1]; throw fail(502, said ? `Anthropic refused the code: ${said}` : String(result.error)); }
 		return result;
 	}
 	function startLogin(label: string) {

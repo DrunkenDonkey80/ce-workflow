@@ -1,23 +1,23 @@
 {
  "version": 1,
- "activeMs": 7833457,
- "runs": 4,
+ "activeMs": 8119532,
+ "runs": 5,
  "waitingMs": 219288,
- "toolWallMs": 6132206,
+ "toolWallMs": 6138187,
  "compactions": {
-  "count": 1,
-  "ms": 29955
+  "count": 2,
+  "ms": 59036
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 167,
-   "thinkingMs": 848863,
-   "actingMs": 512289,
-   "input": 430,
-   "output": 134712,
-   "cacheRead": 19766402,
-   "cacheWrite": 593502,
-   "cost": 9.616750399999997,
+   "replies": 171,
+   "thinkingMs": 862873,
+   "actingMs": 518276,
+   "input": 438,
+   "output": 136489,
+   "cacheRead": 20313616,
+   "cacheWrite": 596660,
+   "cost": 9.777555199999997,
    "errors": 1
   }
  },
@@ -29,8 +29,8 @@
    "failures": 0
   },
   "bash": {
-   "count": 124,
-   "ms": 5931576,
+   "count": 127,
+   "ms": 5936441,
    "maxMs": 2504663,
    "failures": 14
   },
@@ -85,8 +85,8 @@
  },
  "categories": {
   "shell": {
-   "count": 103,
-   "ms": 3366376,
+   "count": 106,
+   "ms": 3371241,
    "maxMs": 668341,
    "failures": 8
   },
@@ -775,6 +775,24 @@
    "ms": 230,
    "maxMs": 230,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');let c=fs.readFileSync('CHANGELOG.md','utf8'); if(!c.includes('## Unreleased\\n'))throw 'no unreleased';c=c.replace('## Unreleased\\n','## 0.4.0 — 2026-11-09\\n'": {
+   "count": 1,
+   "ms": 817,
+   "maxMs": 817,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1850,1854p package-lock.json && git diff HEAD~1 HEAD -- package-lock.json | grep \"^[-+]\"": {
+   "count": 1,
+   "ms": 712,
+   "maxMs": 712,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"1853s/\\\"version\\\": \\\"0.4.0\\\"/\\\"version\\\": \\\"0.3.1\\\"/\" package-lock.json && git diff HEAD~1 -- package-lock.json | grep \"^[-+]\" && git add package-lock.json && git commit -q --amend -": {
+   "count": 1,
+   "ms": 3336,
+   "maxMs": 3336,
+   "failures": 0
   }
  },
  "steps": {
@@ -857,11 +875,11 @@
    }
   },
   "(none)": {
-   "ms": 2495015,
+   "ms": 2519877,
    "testMs": 48757,
-   "replies": 79,
+   "replies": 83,
    "models": {
-    "anthropic/claude-opus-5-5:high": 79
+    "anthropic/claude-opus-5-5:high": 83
    },
    "failures": 6
   }
@@ -882,6 +900,10 @@
   {
    "start": "2026-11-08T22:06:16.157Z",
    "ms": 294691
+  },
+  {
+   "start": "2026-11-08T22:11:46.835Z",
+   "ms": 256994
   }
  ],
  "hints": []

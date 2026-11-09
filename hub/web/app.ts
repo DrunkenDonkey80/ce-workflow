@@ -115,6 +115,7 @@ function renderShell() {
  const git = status?.git, busy = !state.connected || messageSending || !!state.activity.working || promptView.busy;
  $("git-commit").hidden = !git?.changed; $("git-push").hidden = !git?.changed && !git?.ahead; $("git-pull").hidden = !git?.behind;
  $("git-pull-text").textContent = git?.behind ? `Pull latest (${git.behind})` : "Pull latest";
+ $("git-commit-text").textContent = gitLabel("Commit", git); $("git-push-text").textContent = gitLabel("Commit and push", git, true);
  for (const id of ["git-pull", "git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
  for (const button of document.querySelectorAll<HTMLButtonElement>(".session-git-action")) button.disabled = busy; // the sidebar copies (the drawer on phones)
  renderCommands(status?.commands ?? [], busy);
@@ -1450,10 +1451,16 @@ type GitFiles = { changed: number; added?: number; modified?: number; deleted?: 
 type Group = { folder: string; label: string; archived?: boolean; git?: GitFiles | null; sessions: HubSession[] };
 // The folder's uncommitted files under its name: added +n, modified ~n, deleted ×n, not yet in git +n (lighter green).
 // The open session's folder also gets the header's Pull / Commit / Commit and push as icons on the right; they click the header buttons.
+// "Commit (5 files)", "Commit and push (5 files, 2 commits)": what the button would commit and push.
+function gitLabel(label: string, git?: GitFiles | null, push = false) {
+ const n = (count: number, word: string) => count ? [`${count} ${word}${count === 1 ? "" : "s"}`] : [];
+ const parts = [...n(git?.changed ?? 0, "file"), ...push ? n(git?.ahead ?? 0, "commit") : []];
+ return parts.length ? `${label} (${parts.join(", ")})` : label;
+}
 function gitLine(git?: GitFiles | null, own = false) {
  const parts = ([["added", "+", "added"], ["untracked", "+", "not in git yet"], ["modified", "+", "modified"], ["deleted", "×", "deleted"]] as const)
   .filter(([kind]) => git?.[kind]).map(([kind, sign, words]) => html("span", { className: "git-" + kind, textContent: sign + git![kind], title: `${git![kind]} ${words}` }));
- const actions = !own || !git ? [] : ([["git-pull", !!git.behind, "Pull latest"], ["git-commit", !!git.changed, "Commit"], ["git-push", !!(git.changed || git.ahead), "Commit and push"]] as const).filter(([, shown]) => shown).map(([id, , label]) => {
+ const actions = !own || !git ? [] : ([["git-pull", !!git.behind, "Pull latest"], ["git-commit", !!git.changed, gitLabel("Commit", git)], ["git-push", !!(git.changed || git.ahead), gitLabel("Commit and push", git, true)]] as const).filter(([, shown]) => shown).map(([id, , label]) => {
   const button = html("button", { type: "button", className: "session-git-action", title: label, disabled: ($(id) as HTMLButtonElement).disabled }); button.dataset.git = id;
   button.setAttribute("aria-label", label); button.append($(id).querySelector(".git-icon")!.cloneNode(true));
   // Phones hide the header, so the push test menu lives in the drawer and opens under this icon.
