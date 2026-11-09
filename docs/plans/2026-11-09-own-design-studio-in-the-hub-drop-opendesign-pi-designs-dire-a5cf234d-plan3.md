@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T13:03:59.101Z
+updated: 2026-11-09T13:08:27.878Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -199,8 +199,7 @@ Fit check per module:
 - [x] **S11** A pick opens the existing note popup; Add puts the D2 line "(n) screen @id|selector <tag> "text": note" in the chat box and a numbered pin in the page; renderMentions syncs pins to the lines left, so a deleted line drops its pin and Send clears them.
 - [x] **S12** Edit mode (one mode at a time with Comment): a click sends computed color/background/font-size/weight/padding/margin/gap/radius; the inspector applies inputs live through the bridge, Keep adds "Set <screen> @id: prop value; …", Cancel undoes; the page's Tweaks panel dispatches a window "design:tweaks" CustomEvent (guide amended: the bridge adds the load id), and Keep tweaks adds "Keep tweaks: k v, …".
 - [x] **S13** Mark: the preview sends {screen, version, device size (rotated; Desktop = frame size), slide hash from the bridge, unsaved inspector edits}; hub designshot (own design only, bounded fields) renders it with renderDesign into a pasted-image file; the page puts it in the chat box and opens the annotator; Save leaves the image plus legend, Cancel removes it.
-- [ ] **S14** Deck kind in the preview (D16): the Slide preset, previous and next through the bridge, the slide counter, and `slide N` in comment lines
-  - Check: C4 with a fixture deck.
+- [x] **S14** Deck preview: the bridge reports the slide count and hash and moves slides on {go}; the preview shows ‹ N / M › for decks, switches to the Slide preset when no device was saved, and comment lines read "index.html slide N @id"; pins on hidden slides are skipped.
 
 ### Phase 6: Library and handoff [code]
 

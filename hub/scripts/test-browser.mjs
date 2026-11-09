@@ -1297,6 +1297,22 @@ try {
  await browser("wait", "--fn", "document.activeElement?.className === 'annotate-note'"); await browser("fill", ".annotate-note", "too big"); await browser("press", "Enter");
  await browser("click", ".annotate-save");
  await browser("wait", "--fn", "/^\\S*pi-clipboard-[0-9a-f-]+\\.png\\n\\(1\\) too big/.test(document.getElementById('message-input').value)");
+ // S14: a deck (the guide's framework) opens on Slide when no device was chosen, with previous, next and the counter;
+ // a comment names its slide.
+ await evaluate("localStorage.removeItem('design-device:design-1'); document.getElementById('message-input').value = ''");
+ const guide = fs.readFileSync(join(import.meta.dirname, "..", "..", "extensions", "design-guide.md"), "utf8"), deckHtml = guide.match(/```html\n([\s\S]*?)```/)[1];
+ fs.writeFileSync(join(designDir, "index.html"), deckHtml.replace("<!-- slide content --></section>", "<h1>One</h1></section>").replace("<!-- slide content --></section>", "<h1 data-id=\"s2-title\">Two</h1></section>"));
+ await browser("wait", "--fn", "document.querySelector('#files .design-slide')?.textContent === '1 / 2' && !document.querySelector('#files .design-deck').hidden");
+ assert.equal(await evaluate("document.querySelector('#files .design-device').value"), "Slide");
+ await evaluate("document.querySelector('#files .design-deck [aria-label=\"Next slide\"]').click()");
+ await browser("wait", "--fn", "document.querySelector('#files .design-slide').textContent === '2 / 2'");
+ await evaluate("document.querySelector('#files .design-comment').click()");
+ await browser("click", await (async () => { for (let i = 0; i < 40; i++) { const ref = (await designTree()).find(row => row.startsWith("- heading \"Two\""))?.match(/ref=(e\d+)/)?.[1]; if (ref) return "@" + ref; await new Promise(done => setTimeout(done, 150)); } assert.fail("slide 2 heading"); })());
+ await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
+ await browser("fill", "#comment-text", "shorter"); await evaluate("document.getElementById('comment-form').requestSubmit()");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), '(1) index.html slide 2 @s2-title <h1> "Two": shorter\n');
+ await evaluate("document.querySelector('#files .design-deck [aria-label=\"Previous slide\"]').click()");
+ await browser("wait", "--fn", "document.querySelector('#files .design-slide').textContent === '1 / 2'");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

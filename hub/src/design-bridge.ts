@@ -9,6 +9,9 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	if (window.parent === window || window.__designBridge) return;
 	window.__designBridge = true;
 	let load = "", mode = "", pins = [], hovered = null, layer = null, editing = null;
+	// S14, D16: a deck (the guide's framework) reports its slide count; the slide shown lives in location.hash.
+	const slides = () => document.querySelectorAll(".deck-stage .slide").length, slide = () => slides() ? Math.min(slides(), Math.max(1, parseInt(location.hash.slice(1), 10) || 1)) : 0;
+	const position = () => send("design:hash", { hash: location.hash, slides: slides() });
 	const STYLES = ["color", "background-color", "font-size", "font-weight", "padding", "margin", "gap", "border-radius"];
 	const screen = decodeURIComponent(location.pathname.split("/").pop() || "index.html");
 	const send = (type, data) => { if (load) parent.postMessage({ type, load, ...data }, "*"); };
@@ -43,6 +46,7 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		for (const pin of mine) {
 			const el = find(pin); if (!el) continue;
 			const box = el.getBoundingClientRect(), dot = document.createElement("span");
+			if (!box.width && !box.height) continue; // on another slide or hidden
 			dot.textContent = String(pin.n);
 			dot.style.cssText = "position:absolute;min-width:22px;height:22px;padding:0 5px;box-sizing:border-box;border-radius:11px;background:#e8590c;color:#fff;font:600 12px/22px system-ui,sans-serif;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.4)";
 			dot.style.left = Math.max(0, box.left + scrollX - 8) + "px"; dot.style.top = Math.max(0, box.top + scrollY - 8) + "px";
@@ -53,9 +57,10 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	addEventListener("message", event => {
 		if (event.source !== parent) return;
 		const message = event.data || {};
-		if (message.type === "design:hello" && typeof message.load === "string") { load = message.load; send("design:hash", { hash: location.hash }); }
+		if (message.type === "design:hello" && typeof message.load === "string") { load = message.load; position(); }
 		if (message.load !== load) return;
 		if (typeof message.mode === "string") { mode = message.mode; if (!mode) outline(null); document.documentElement.style.cursor = mode ? "crosshair" : ""; }
+		if (Number.isSafeInteger(message.go) && slides()) location.hash = String(Math.min(slides(), Math.max(1, message.go)));
 		if (message.style && editing) for (const name of STYLES) if (typeof message.style[name] === "string") editing.style.setProperty(name, message.style[name].slice(0, 100));
 		if (Array.isArray(message.pins)) { pins = message.pins; drawPins(); }
 	});
@@ -64,14 +69,14 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		if (!mode || chrome(event.target)) return;
 		event.preventDefault(); event.stopPropagation();
 		const el = target(event.target), box = el.getBoundingClientRect(), id = el.dataset.id && /^[\\w-]{1,80}$/.test(el.dataset.id) ? el.dataset.id : "";
-		const pick = { screen, id, selector: id ? "" : selector(el), tag: el.tagName.toLowerCase(), text: clip(el.innerText || el.getAttribute("aria-label") || el.getAttribute("alt") || el.getAttribute("placeholder") || el.value, 160), rect: { x: box.left, y: box.top, width: box.width, height: box.height } };
+		const pick = { screen, id, selector: id ? "" : selector(el), tag: el.tagName.toLowerCase(), text: clip(el.innerText || el.getAttribute("aria-label") || el.getAttribute("alt") || el.getAttribute("placeholder") || el.value, 160), rect: { x: box.left, y: box.top, width: box.width, height: box.height }, slide: slide() };
 		if (mode === "comment") return send("design:pick", pick);
 		outline(null); editing = el; const computed = getComputedStyle(el);
 		send("design:inspect", { ...pick, styles: Object.fromEntries(STYLES.map(name => [name, computed.getPropertyValue(name).slice(0, 100)])) });
 	}, true);
 	addEventListener("design:tweaks", event => { if (event.detail && typeof event.detail === "object") send("design:tweaks", { values: event.detail }); });
 	addEventListener("resize", drawPins);
-	addEventListener("hashchange", () => { send("design:hash", { hash: location.hash }); drawPins(); }); // Mark renders the slide shown
+	addEventListener("hashchange", () => { position(); drawPins(); }); // Mark renders the slide shown; the counter follows
 	addEventListener("load", drawPins);
 })();</script>`;
 

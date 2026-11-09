@@ -12,6 +12,7 @@ export type DesignActions = { screen: (screen: string) => void; open: (version: 
 const DEVICES: [string, number, number][] = [["Desktop", 0, 0], ["Phone small", 360, 800], ["Phone", 390, 844], ["Phone large", 430, 932], ["Foldable", 600, 960], ["Tablet", 820, 1180], ["Laptop", 1366, 768], ["Slide", 1920, 1080]];
 type Device = { preset: string; rotated: boolean };
 const storeKey = (view: DesignView) => "design-device:" + (view.handle ?? view.name);
+const saved = (view: DesignView) => { try { return !!localStorage.getItem(storeKey(view)); } catch { return false; } };
 function device(view: DesignView): Device {
  try { const saved = JSON.parse(localStorage.getItem(storeKey(view)) ?? "{}"); if (DEVICES.some(([name]) => name === saved.preset)) return { preset: saved.preset, rotated: !!saved.rotated }; } catch { /* unreadable: default */ }
  return { preset: "Desktop", rotated: false };
@@ -20,14 +21,16 @@ function device(view: DesignView): Device {
 // S10/S12: the bridge in the page (hub/src/design-bridge.ts). Only the frame shown now, with its current load id, is
 // heard. Each valid message goes out as a bubbling event from that frame: design-pick in Comment mode, design-inspect in
 // Edit mode, design-tweaks from the page's Tweaks panel. The mode and the pins outlive reloads.
-export type DesignPick = { screen: string; id: string; selector: string; tag: string; text: string; rect: { x: number; y: number; width: number; height: number } };
+// slide: the deck slide it is on (S14); 0 outside decks.
+export type DesignPick = { screen: string; id: string; selector: string; tag: string; text: string; rect: { x: number; y: number; width: number; height: number }; slide: number };
 export type DesignPin = { n: number; screen: string; id: string; selector: string };
 // hash and edits: the slide shown and the unsaved inline styles of this load, so Mark renders exactly that.
-let current: { frame: HTMLIFrameElement; load: string; screen: string; hash: string; edits: Map<string, Record<string, string>> } | undefined, mode = "", pins: DesignPin[] = [];
+let current: { frame: HTMLIFrameElement; load: string; screen: string; hash: string; slides: number; edits: Map<string, Record<string, string>> } | undefined, mode = "", pins: DesignPin[] = [];
 const tell = (data: Record<string, unknown>) => { if (current?.frame.isConnected) current.frame.contentWindow?.postMessage({ load: current.load, ...data }, "*"); };
 export function setDesignPins(list: DesignPin[]) { pins = list; tell({ pins }); }
 /** How a chat line names an element (D2): its screen and data-id, or a short selector when it has none. */
-export const elementName = (pick: DesignPick) => `${pick.screen} ${pick.id ? "@" + pick.id : pick.selector}`;
+export const elementName = (pick: DesignPick) => `${pick.screen}${pick.slide ? ` slide ${pick.slide}` : ""} ${pick.id ? "@" + pick.id : pick.selector}`;
+const slideCount = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 0 && (value as number) <= 999;
 const line = (text: string) => document.dispatchEvent(new CustomEvent("design-line", { detail: text })); // app.ts adds it to the chat box
 const STYLES = ["color", "background-color", "font-size", "font-weight", "padding", "margin", "gap", "border-radius"];
 const bounded = (value: unknown, max: number, pattern?: RegExp) => typeof value === "string" && value.length <= max && (!pattern || pattern.test(value));
@@ -35,7 +38,7 @@ function readPick(data: any, screen: string): DesignPick | undefined {
  const rect = data?.rect;
  if (data?.screen !== screen || !bounded(data.id, 80, /^[\w-]*$/) || !bounded(data.selector, 300) || !(data.id || data.selector) || !bounded(data.tag, 32, /^[a-z][a-z0-9-]*$/) || !bounded(data.text, 160)) return undefined;
  if (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) return undefined;
- return { screen, id: data.id, selector: data.selector, tag: data.tag, text: data.text, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+ return { screen, id: data.id, selector: data.selector, tag: data.tag, text: data.text, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, slide: slideCount(data.slide) ? data.slide : 0 };
 }
 const readStyles = (styles: any) => styles && typeof styles === "object" && STYLES.every(name => bounded(styles[name], 100)) ? Object.fromEntries(STYLES.map(name => [name, styles[name] as string])) : undefined;
 function readTweaks(values: any) {
@@ -46,7 +49,11 @@ function readTweaks(values: any) {
 addEventListener("message", event => {
  if (!current?.frame.isConnected || event.source !== current.frame.contentWindow || event.data?.load !== current.load) return;
  const data = event.data, frame = current.frame, emit = (name: string, detail: unknown) => frame.dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
- if (data.type === "design:hash") { if (bounded(data.hash, 41, /^(#[\w-]{0,40})?$/)) current.hash = data.hash; return; }
+ if (data.type === "design:hash") {
+  if (!bounded(data.hash, 41, /^(#[\w-]{0,40})?$/) || !slideCount(data.slides)) return;
+  Object.assign(current, { hash: data.hash, slides: data.slides });
+  return emit("design-slide", { slide: Math.min(data.slides, Math.max(1, parseInt(data.hash.slice(1), 10) || 1)), slides: data.slides });
+ }
  if (data.type === "design:tweaks") { const values = readTweaks(data.values); if (values) emit("design-tweaks", values); return; }
  const pick = readPick(data, current.screen); if (!pick) return;
  if (data.type === "design:pick" && mode === "comment") emit("design-pick", pick);
@@ -108,7 +115,7 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
  keepTweaks.addEventListener("click", () => { line("Keep tweaks: " + Object.entries(tweaks).map(([key, value]) => `${key} ${value}`).join(", ")); keepTweaks.hidden = true; });
  frame.addEventListener("design-inspect", event => inspect(body, (event as CustomEvent).detail));
  frame.addEventListener("load", () => {
-  current = { frame, load: crypto.randomUUID(), screen: path, hash: "", edits: new Map() };
+  current = { frame, load: crypto.randomUUID(), screen: path, hash: "", slides: 0, edits: new Map() };
   frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode, pins }, "*");
  });
  const mark = Object.assign(document.createElement("button"), { type: "button", className: "design-mark", textContent: "Mark", title: "Draw on a picture of this screen at this size" });
@@ -118,7 +125,21 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
   const live = current?.frame === frame ? current : undefined;
   act.mark({ screen: path, ...view.version ? { version: view.version } : {}, width: clamp(width), height: clamp(height), ...live?.hash ? { hash: live.hash } : {}, styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) });
  });
- const controls: HTMLElement[] = [...modes, keepTweaks, mark, picker, rotate];
+ // S14, D16: a deck gets previous, next and the counter, and opens on the Slide preset unless a device was chosen.
+ const deck = Object.assign(document.createElement("span"), { className: "design-deck", hidden: true });
+ const counter = Object.assign(document.createElement("span"), { className: "design-slide" });
+ let slide = 1;
+ const go = (text: string, label: string, by: number) => {
+  const button = Object.assign(document.createElement("button"), { type: "button", textContent: text, title: label });
+  button.setAttribute("aria-label", label); button.addEventListener("click", () => tell({ go: slide + by })); return button;
+ };
+ deck.append(go("‹", "Previous slide", -1), counter, go("›", "Next slide", 1));
+ frame.addEventListener("design-slide", event => {
+  const { slide: at, slides } = (event as CustomEvent).detail; slide = at;
+  deck.hidden = !slides; counter.textContent = `${at} / ${slides}`;
+  if (slides && !saved(view) && state.preset !== "Slide") { state.preset = picker.value = "Slide"; fit(); }
+ });
+ const controls: HTMLElement[] = [...modes, keepTweaks, mark, deck, picker, rotate];
  if ((view.screens?.length ?? 0) > 1) {
   const screens = Object.assign(document.createElement("select"), { className: "design-screen", title: "Screen" });
   screens.setAttribute("aria-label", "Screen");
