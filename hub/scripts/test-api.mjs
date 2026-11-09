@@ -385,6 +385,11 @@ try {
 	assert.equal((await post(id, "session", { action: "new", folder: "relative" })).status, 404, "only absolute paths");
 	assert.equal((await post(id, "session", { action: "new", folder: "~/pi-hub-test-missing-" + process.pid })).body.error, "Folder does not exist.", "~ is the home folder (Local uses ~/pi-local)");
 	assert.equal((await post(id, "session", { action: "rename", id: created.id, name: "Docs" })).status, 200);
+	// Folder and session menus: Copy git URL gives origin without a token stored in it.
+	assert.equal((await post(id, "session", { action: "git-url", folder })).status, 404, "no git origin");
+	execFileSync("git", ["init", "-q"], { cwd: folder }); execFileSync("git", ["remote", "add", "origin", "https://me:tok3n@github.com/me/proj.git"], { cwd: folder });
+	assert.deepEqual((await post(id, "session", { action: "git-url", folder })).body, { url: "https://github.com/me/proj.git" });
+	fs.rmSync(path.join(folder, ".git"), { recursive: true, force: true });
 	// Plan d21eefbf S08: the session menu's hub links; pairing needs remote access (the tailnet) first.
 	assert.deepEqual((await post(id, "links", { action: "list", session: created.id })).body, { comm: 1, hubs: [], pairing: null, links: [] });
 	assert.equal((await post(id, "links", { action: "list", session: "nope" })).status, 404);

@@ -283,9 +283,14 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				for (const list of [data.folders, data.sessions]) if (list !== undefined && (!Array.isArray(list) || list.length > 500 || !list.every(item => typeof item === "string"))) throw fail(400, "Order must be a list of strings.");
 				try { registry.arrange({ order: data.folders as string[] | undefined, sessions: data.sessions as string[] | undefined }); } catch (error) { throw fail(404, (error as Error).message); }
 				return { ok: true };
-			case "archive": case "unarchive": case "open-folder": {
+			case "archive": case "unarchive": case "open-folder": case "git-url": {
 				const group = registry.groups().find(item => typeof data.folder === "string" && item.folder.toLowerCase() === path.resolve(data.folder).toLowerCase());
 				if (!group) throw fail(404, "Unknown folder.");
+				if (data.action === "git-url") {
+					const url = await promisify(execFile)("git", ["remote", "get-url", "origin"], { cwd: group.folder, timeout: 5000, windowsHide: true, env: gitReadEnv() }).then(result => result.stdout.trim(), () => "");
+					if (!url) throw fail(404, "This folder has no git origin.");
+					return { url: url.replace(/\/\/[^@/:]+:[^@/]+@/, "//") }; // never hand out a token stored in the URL
+				}
 				if (data.action !== "open-folder") { registry.arrange({ [data.action]: group.folder }); return { ok: true }; }
 				// Windows paths cannot contain quotes, so verbatim quoting is safe; explorer.exe never goes through cmd's & parsing.
 				const [command, args, verbatim] = process.platform === "win32" ? ["explorer.exe", [`"${group.folder}"`], true] : [process.platform === "darwin" ? "open" : "xdg-open", [group.folder], false];

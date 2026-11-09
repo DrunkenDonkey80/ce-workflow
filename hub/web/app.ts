@@ -1730,11 +1730,11 @@ function renderSessions(groups: Group[], recents: Recent[]) {
   fold.setAttribute("aria-label", `${fold.title} in ${group.label}`); fold.addEventListener("click", () => toggleFold(group.folder, hidden));
   const add = html("button", { type: "button", className: "session-add", textContent: "+", title: `New session in ${group.label} (Alt+N)` });
   add.setAttribute("aria-label", `New session in ${group.label}`); add.addEventListener("click", () => void newSession(group.folder));
-  const label = html("span", { className: "session-group-label", textContent: `${group.label} (${group.sessions.length})`, title: `${group.folder}\nRight-click: open folder, archive` });
+  const label = html("span", { className: "session-group-label", textContent: `${group.label} (${group.sessions.length})`, title: `${group.folder}\nRight-click: open folder, copy its path or git URL, archive` });
   label.addEventListener("click", event => { event.stopPropagation(); if (Date.now() - draggedAt > 300) toggleFold(group.folder, hidden); });
   head.addEventListener("contextmenu", event => {
    event.preventDefault(); event.stopPropagation();
-   showMenu(label, [["Open folder", () => void sessionAction({ action: "open-folder", folder: group.folder })], group.archived ? ["Unarchive", () => void sessionAction({ action: "unarchive", folder: group.folder })] : ["Archive", () => void sessionAction({ action: "archive", folder: group.folder })]]);
+   showMenu(label, [["Open folder", () => void sessionAction({ action: "open-folder", folder: group.folder })], ["Copy folder path", () => void copyPath(group.folder)], ["Copy git URL", () => void copyGitUrl(group.folder)], group.archived ? ["Unarchive", () => void sessionAction({ action: "unarchive", folder: group.folder })] : ["Archive", () => void sessionAction({ action: "archive", folder: group.folder })]]);
   });
   head.append(fold, label, add);
   // One framed box per folder: red while one waits for an answer, orange while one works, light blue for the open session's folder.
@@ -1850,9 +1850,10 @@ function openSessionMenu(anchor: HTMLElement, session: HubSession, path: string)
  const parked = session.parked ?? session.tone === "parked", item = menuItem;
  // H7-01: a session open in a terminal window comes back by itself when that window closes.
  if (session.tone === "terminal") showNotice(`"${session.name}" is open in a terminal on the PC; it returns here when that Pi exits.`);
- sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path))] : [
+ sessionMenu.replaceChildren(...session.tone === "terminal" ? [item("Copy folder path", () => void copyPath(path)), item("Copy git URL", () => void copyGitUrl(path))] : [
   item("Rename…", () => { const name = prompt("New name:", session.name); if (name?.trim()) void sessionAction({ action: "rename", id: session.id, name }); }),
   item("Copy folder path", () => void copyPath(path)),
+  item("Copy git URL", () => void copyGitUrl(path)),
   item("Copy intercom id", () => void copyPath(sessionRef(path, session))),
   item("Hub links…", () => void openHubLinks(anchor, session)),
   ...(session.timers ?? []).map(t => item(`Cancel ⏰ ${t.kind}: ${t.label.slice(0, 40)}`, () => void sessionAction({ action: "cancel-timer", id: session.id, timer: t.id }))),
@@ -1902,6 +1903,9 @@ document.addEventListener("pointerdown", event => { if (!sessionMenu.contains(ev
 const sessionRef = (folder: string, session: HubSession) => (folder.split(/[\\/]/).filter(Boolean).pop() ?? folder) + "/" + session.name + (session.pi ? " (intercom " + session.pi + ")" : "");
 async function copyPath(path: string) {
  try { await navigator.clipboard.writeText(path); showNotice(`Copied ${path}`); } catch { prompt("Path:", path); }
+}
+async function copyGitUrl(folder: string) {
+ try { void copyPath((await post("session", { action: "git-url", folder })).url); } catch (error) { showNotice(error.message); }
 }
 sessionMenu.addEventListener("keydown", event => { if (event.key === "Escape") { event.stopPropagation(); sessionMenu.hidden = true; } });
 async function sessionAction(data: Record<string, unknown>) {

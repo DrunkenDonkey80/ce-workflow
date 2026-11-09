@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Added
+- Hub sidebar: right-click a session or a folder header to copy the project's git URL (origin). The folder header menu can copy the folder path too, like the session menu.
+
 ### Changed
 - `video_digest` and the Videos button's script moved to their own Pi package, yt-ingest. Install it in a project to get the tool there; ce-workflow's `tools_enable` still turns it on.
 - Project command buttons the agent creates show on remote hub pages too (phone, other PCs). The agent hides one from them only when you ask.
