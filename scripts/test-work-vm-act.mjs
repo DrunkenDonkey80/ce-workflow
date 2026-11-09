@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, scancodes, tileOrder, vmAct, vmActTool, vmLogin, winArg } from "../extensions/vm-act.ts";
+import vmActExtension, { CLICK_SCRIPT, envName, parseSessions, parseStatus, plainClixml, scancodes, tileOrder, vmAct, vmActTool, vmLogin, winArg } from "../extensions/vm-act.ts";
 
 // Keys: modifiers pressed first, released in reverse; extended keys keep their e0 prefix.
 assert.deepEqual(scancodes("alt+y"), ["38", "15", "95", "b8"]);
@@ -279,4 +279,6 @@ try {
 	if (agentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = agentDir;
 	await rm(dir, { recursive: true, force: true });
 }
+assert.equal(plainClixml('#< CLIXML\r\n<Objs Version="1.1.0.1" xmlns="x"><S S="Error">releases : not recognized_x000D__x000A_</S><S S="Error">At line:2 &amp; more_x000D__x000A_</S></Objs>'), "releases : not recognized\r\nAt line:2 & more");
+assert.equal(plainClixml("plain"), "plain");
 console.log("ok - vm_act");

@@ -153,6 +153,11 @@ Remove-LocalUser -SID $u.SID; if($pr) { $pr | Remove-CimInstance; 'PROFILE' }`,
 Set-LocalUser -Name $p.user -Password (ConvertTo-SecureString $secret -AsPlainText -Force)`,
 };
 /** One Windows command-line argument (CommandLineToArgvW rules). */
+/** PowerShell writes errors to a redirected stderr as CLIXML; this turns it back into the text a console shows. */
+export const plainClixml = (s: string) => !s.includes("#< CLIXML") ? s : s.replace(/#< CLIXML\r?\n?<Objs[\s\S]*?<\/Objs>/g, xml =>
+	[...xml.matchAll(/<S S="(?:Error|Warning)">([\s\S]*?)<\/S>/g)].map(m => m[1]).join("")
+		.replace(/_x([0-9A-F]{4})_/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+		.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&").trimEnd());
 export const winArg = (s: string) => s && !/[\s"]/.test(s) ? s : `"${s.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
 // Task action (D-05): runs exe, writes stdout, stderr and the exit code into C:\Windows\Temp\<task>\; kept a .ps1-free one-liner so the task needs no file.
 // Cmdlets only: a standard user's PowerShell can be in ConstrainedLanguage mode (WDAC/AppLocker guests), where .NET method calls fail (S46, U1).
@@ -419,7 +424,7 @@ if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.sec
 		if (r.code !== 0) throw new Error(`click failed: ${(r.stderr || r.stdout).trim().slice(-1500)}`);
 		return `${a.double ? "Double-clicked" : "Clicked"} ${a.button ?? "left"} at ${a.x},${a.y} in ${vm}.`;
 	}
-	const out = (s: string) => s.length > 6000 ? `…${s.slice(-6000)}` : s;
+	const out = (t: string) => { const s = plainClixml(t); return s.length > 6000 ? `…${s.slice(-6000)}` : s; };
 	// script: PowerShell text, sent encoded so no quoting survives two command lines
 	if (a.action === "run" && a.script !== undefined) {
 		if (a.exe) throw new Error("run takes exe or script, not both.");
