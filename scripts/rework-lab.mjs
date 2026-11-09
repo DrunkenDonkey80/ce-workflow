@@ -51,7 +51,7 @@ function setup() {
 	const adds = args.flatMap((arg, i) => arg === "--add" ? [args[i + 1].split("=")] : []);
 	for (const [src, dest] of adds) cpSync(src, path.join(dir, dest), { recursive: true });
 	if (adds.length) { git("add", "-A"); git("-c", "user.name=lab", "-c", "user.email=lab@local", "commit", "-q", "-m", "lab: task inputs"); }
-	git("tag", "lab-base");
+	git("tag", "-f", "lab-base"); // -f: a --from-plan source is a lab clone that has its own lab-base
 	if (existsSync(path.join(source, "data"))) cpSync(path.join(source, "data"), path.join(dir, "data"), { recursive: true });
 	mkdirSync(path.join(dir, ".pi"), { recursive: true });
 	writeFileSync(path.join(dir, ".pi", "settings.json"), `${JSON.stringify({ workOrchestrator: { plan3: { planningModel: thinker, codingModel: worker, codingEffort: value("--coding-effort", "high") }, context: { mode: "ultrafull" } } }, null, "\t")}\n`);
