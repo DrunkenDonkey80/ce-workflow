@@ -15,7 +15,6 @@ import { registerSelfUpdate } from "./work-self-update.ts";
 import { registerLensFormatCheck } from "./work-lens-format.ts";
 import { createImageTools, imageModelCanDraw } from "./work-images.ts";
 import { toolsEnableTool } from "./tool-loader.ts";
-import { videoDigestTool } from "./video-digest.ts";
 import { registerRemoteAskAnswers } from "./work-ask-remote.ts";
 import { createCameraController, cameraSettings } from "./work-camera.ts";
 import { cameraTools } from "./work-camera-tools.ts";
@@ -3763,7 +3762,6 @@ if(event.toolName === "ask_user" && event.input && event.input.allowComment == n
 
 	pi.on("session_start", (_event, ctx) => {
 syncCameraTools(pi, ctx.cwd);
-if (!videoDigestRegistered && maintenanceCheckout(ctx.cwd)) { pi.registerTool({ ...videoDigestTool(pi.exec.bind(pi)), exposure: "deferred" }); videoDigestRegistered = true; } // D-01: this checkout only
 // Every extension has registered its tools by now, so the loader lists only those on this machine.
 if (!loaderRegistered) { const loader = toolsEnableTool(pi); if (loader) { registerConstrainedTool(pi, loader); loaderRegistered = true; } }
 visionBridge.clear();
@@ -4172,7 +4170,6 @@ function workSettingsStatus(ctx) {
 
 const SETTINGS_RESET = "__reset__";
 let loaderRegistered = false;
-let videoDigestRegistered = false;
 let cameraController;
 const CAMERA_TOOLS = ["camera_capture", "camera_recover", "camera_watch", "camera_stop"];
 // The camera tools cost ~4k chars on every request: declare them only while this project's camera is ON with a device.
