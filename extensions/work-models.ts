@@ -2675,7 +2675,7 @@ async function buildWorkCatchUpState(cwd, names, progress = (_text) => {}) {
 		const changed = Boolean(baselineVersion && targetVersion !== baselineVersion);
 		progress(changed ? `Catch-up: ${name} ${baselineVersion} → ${targetVersion}, downloading the diff…` : `Catch-up: ${name} ${baselineVersion} unchanged.`);
 		const diffPath = isGit
-			? await writeGitCatchUpDiff(dir, item.url, name, baselineVersion, targetVersion)
+			? await writeGitCatchUpDiff(dir, item.url, name, baselineVersion, targetVersion, Array.isArray(item.paths) ? item.paths : [])
 			: await writeWorkCatchUpDiff(cwd, dir, name, baselineVersion, targetVersion);
 		return {
 			name,

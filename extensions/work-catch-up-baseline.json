@@ -328,6 +328,74 @@
           "version": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d"
         }
       ]
+    },
+    {
+      "name": "nexu-io/open-design",
+      "kind": "git",
+      "url": "https://github.com/nexu-io/open-design",
+      "ledger": "docs/upstream/open-design.md",
+      "paths": [
+        "craft/",
+        "skills/",
+        "design-templates/",
+        "apps/daemon/src/prompts/",
+        "apps/web/src/runtime/comment-bridge.ts",
+        "apps/web/src/comments.ts",
+        "apps/web/src/runtime/exports.ts"
+      ],
+      "version": "07a86b1041531bfa0bec1006d9c0993985fee560",
+      "reviewedAt": "2026-11-09T12:00:00.000Z",
+      "reviewedVersion": "07a86b1041531bfa0bec1006d9c0993985fee560",
+      "decisions": [
+        {
+          "title": "craft rules: compact design guide",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "extensions/design-guide.md (anti-slop, color, type, states, accessibility, motion); see docs/upstream/open-design.md",
+          "verification": "plan a5cf234d S03; node scripts/test-work-design.mjs",
+          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
+        },
+        {
+          "title": "viewport matrix: device presets",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "PRESETS in extensions/design-render.ts and DEVICES in hub/web/design-view.ts; see docs/upstream/open-design.md",
+          "verification": "plan a5cf234d S07/S08; test-work-design and hub test-browser",
+          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
+        },
+        {
+          "title": "deck framework",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Deck section of extensions/design-guide.md and the hub preview deck controls; see docs/upstream/open-design.md",
+          "verification": "plan a5cf234d S14; hub test-browser deck fixture",
+          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
+        },
+        {
+          "title": "brand-extract: measured site style",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "captureSite STYLE_SCRIPT in extensions/design-render.ts; see docs/upstream/open-design.md",
+          "verification": "plan a5cf234d S07; test-work-design reference case",
+          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
+        },
+        {
+          "title": "handoff checklist",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "handoff() in extensions/design.ts writes HANDOFF.md at select; see docs/upstream/open-design.md",
+          "verification": "plan a5cf234d S16; test-work-design",
+          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
+        },
+        {
+          "title": "comment bridge idea: element picks and pins",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "hub/src/design-bridge.ts plus hub/web/design-view.ts; see docs/upstream/open-design.md",
+          "verification": "plan a5cf234d S10/S11; hub test-browser",
+          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
+        }
+      ]
     }
   ]
 }

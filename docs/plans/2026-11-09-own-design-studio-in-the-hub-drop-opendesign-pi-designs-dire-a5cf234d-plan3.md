@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T13:19:05.633Z
+updated: 2026-11-09T13:22:09.527Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -209,9 +209,7 @@ Fit check per module:
 ### Phase 7: Remove OpenDesign and document [code]
 
 - [x] **S17** OpenDesign runtime removed: opendesign-client.ts, its test and fixtures deleted; redaction moved to extensions/redact.ts (redactSecrets) used by design.ts and work-models.ts; the /wo Settings "OpenDesign executable" row and its helpers gone; the OD-run guards in plan3.ts and ask-user removed; tool-loader text, wo-control label assert, knowledge sample paths and the test-sessions busy label reworded.
-- [ ] **S20** Add nexu-io/open-design to catch-up as a git source: list entry, baseline at the ported commit, docs/upstream/open-design.md ledger with the review paths (D21)
-  - Ledger: what was ported (guide rules, viewport matrix, deck framework, brand-extract method, handoff checklist, comment bridge idea) and where it lives here.
-  - Check: C7 (test-work-plan3.mjs has the catch-up cases, including mattpocock/skills) with a case that OD shows up as a git target with its ledger; C9.
+- [x] **S20** Catch-up watches nexu-io/open-design: added to PLAN3_CATCH_UP_PACKAGES; a git baseline entry at 07a86b1 with the ledger, the D21 review paths and six adopted decisions; writeGitCatchUpDiff takes the entry's paths (git diff -- paths); docs/upstream/open-design.md lists what was ported, where it lives and what was not taken; the review text says "upstream repo".
 - [ ] **S18** README design section, hub/README and CHANGELOG Unreleased rewritten for the studio; old OD plan marked superseded; changelog crops of the preview controls
   - Crops with `node hub/scripts/changelog-shot.mjs` (the `--design` flag from v2) for the device picker, comment pins and the inspector.
 

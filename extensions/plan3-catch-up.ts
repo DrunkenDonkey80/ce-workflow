@@ -6,7 +6,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 
 // Baseline entries with kind "git" (upstream skill repos) are tracked by commit instead of npm version.
-export const PLAN3_CATCH_UP_PACKAGES = ["@earendil-works/pi-coding-agent", "pi-subagents", "pi-ask-user", "pi-intercom", "pi-lens", "mattpocock/skills"];
+export const PLAN3_CATCH_UP_PACKAGES = ["@earendil-works/pi-coding-agent", "pi-subagents", "pi-ask-user", "pi-intercom", "pi-lens", "mattpocock/skills", "nexu-io/open-design"];
 const BASELINE = path.join(import.meta.dirname, "work-catch-up-baseline.json");
 const DECISIONS = "Catch-up decisions";
 
@@ -52,7 +52,8 @@ export async function gitLatestCommit(url) {
 }
 
 // `--name-status` first (a new skill shows as `A <dir>/SKILL.md`), then the full diff; skill repos are small Markdown.
-export async function writeGitCatchUpDiff(dir, url, name, from, to) {
+// paths: the baseline entry's review scope (a busy repo such as nexu-io/open-design); none means the whole repo.
+export async function writeGitCatchUpDiff(dir, url, name, from, to, paths: string[] = []) {
 	if (!from || !to || from === to) return undefined;
 	const safe = name.replace(/[^\w.-]+/g, "-");
 	const file = path.join(dir, `${safe}-${from.slice(0, 7)}-to-${to.slice(0, 7)}.diff`);
@@ -60,7 +61,8 @@ export async function writeGitCatchUpDiff(dir, url, name, from, to) {
 	try {
 		await git(["clone", "--quiet", "--filter=blob:none", "--no-checkout", url, repo], { timeout: 180_000 });
 		const inRepo = (args) => git(["-C", repo, ...args], { maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
-		writeFileSync(file, `${await inRepo(["diff", "--name-status", from, to])}\n${await inRepo(["diff", from, to])}`);
+		const scope = paths.length ? ["--", ...paths] : [];
+		writeFileSync(file, `${await inRepo(["diff", "--name-status", from, to, ...scope])}\n${await inRepo(["diff", from, to, ...scope])}`);
 	} catch (error) {
 		writeFileSync(file, `${[error?.stdout, error?.stderr].filter(Boolean).join("\n").trim() || String(error)}\n`);
 	}
@@ -81,7 +83,7 @@ export function catchUpPlanText(state, focus = "", today = new Date().toISOStrin
 		: "";
 	const skillSources = targets.filter((pkg) => pkg.kind === "git");
 	const skillsReview = skillSources.length
-		? `\n   For an upstream skills repo (${skillSources.map((pkg) => `${pkg.name}: ledger ${pkg.ledger ? `\`${pkg.ledger}\`` : "none"}`).join("; ")}), read its ledger first: what we adopted, where it lives here and the commit we tested. The diff starts with \`git diff --name-status\`.
+		? `\n   For an upstream repo (${skillSources.map((pkg) => `${pkg.name}: ledger ${pkg.ledger ? `\`${pkg.ledger}\`` : "none"}`).join("; ")}), read its ledger first: what we adopted, where it lives here and the commit we tested. The diff starts with \`git diff --name-status\`.
    - Adopted skills: diff each one's upstream path. For every real change (a new rule, technique or fix, not rewording), say what it would change in our copy or prompt.
    - New skills (\`A <dir>/SKILL.md\`): desk-review each like \`docs/proposals/2026-11-08-mattpocock-skills-review.md\` (summary, overlap here, verdict adopt idea / A/B test / already covered / skip, reason).
    - Rejected or skipped skills: only when a change removes the recorded reason.

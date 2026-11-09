@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
 import { existsSync, renameSync } from "node:fs";
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, unlink, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
@@ -18,7 +18,7 @@ assert.deepEqual(inlineOptions("- **Q-07** Fix it with v3 or let Luna override?"
 assert.deepEqual(questionChoices("- **Q-02** Which plants?\n  - Context: two files.\n  - Recommendation: S-06 inspects them.").options, [{ label: "Accept recommendation", description: "S-06 inspects them." }]);
 assert.deepEqual(questionChoices("- **Q-05** Which?\n  - Recommendation: A.\n  - Option: A \u2014 first\n  - Option: B \u2014 second").options.map(o => o.label), ["A", "B"]);
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
-import { catchUpPlanText, changelogExcerpt, gitLatestCommit, recordCatchUp, writeGitCatchUpDiff } from "../extensions/plan3-catch-up.ts";
+import { catchUpPlanText, changelogExcerpt, gitLatestCommit, PLAN3_CATCH_UP_PACKAGES, recordCatchUp, writeGitCatchUpDiff } from "../extensions/plan3-catch-up.ts";
 import { REWORK_RECIPE } from "../extensions/plan3-rework.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
@@ -984,6 +984,13 @@ try {
 	assert(skillsText.includes(`catch-up: {"mattpocock/skills":"${toSha}"}`) && skillsText.includes(`${fromSha.slice(0, 7)}→${toSha.slice(0, 7)}`), "full commit recorded, short one shown");
 	assert(/docs\/upstream\/mattpocock-skills\.md/.test(skillsText) && /plan3 ideas/.test(skillsText) && /New skills/.test(skillsText), "skills review reads the ledger and offers ideas");
 	assert(!catchUpText.includes("plan3 ideas"), "skills review only appears for a git target");
+	// D21: OpenDesign is a git target with its ledger, and its diff keeps to the baseline's review paths.
+	const odEntry = JSON.parse(await readFile(new URL("../extensions/work-catch-up-baseline.json", import.meta.url), "utf8")).packages.find(item => item.name === "nexu-io/open-design");
+	assert.deepEqual([odEntry.kind, odEntry.ledger, odEntry.paths.includes("craft/"), PLAN3_CATCH_UP_PACKAGES.includes("nexu-io/open-design")], ["git", "docs/upstream/open-design.md", true, true]);
+	await access(new URL(`../${odEntry.ledger}`, import.meta.url));
+	const odDiff = await writeGitCatchUpDiff(cwd, upstream, "nexu-io/open-design", fromSha, toSha, ["craft/"]);
+	assert.doesNotMatch(await readFile(odDiff, "utf8"), /skills\/fresh/, "only the review paths are diffed");
+	assert.match(catchUpPlanText({ packages: [{ name: "nexu-io/open-design", kind: "git", ledger: odEntry.ledger, baselineVersion: fromSha, targetVersion: toSha, needsReview: true, diffPath: odDiff }] }), /nexu-io\/open-design: ledger `docs\/upstream\/open-design\.md`/);
 	const catchUpFile = path.join(directory, "2026-10-06-catch-up-pi-packages-cafe0001-plan3.md");
 	await writeFile(catchUpFile, catchUpText);
 	idle = true;
