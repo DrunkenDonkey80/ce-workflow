@@ -176,7 +176,7 @@ else { $pr=${start} -Wait -PassThru; $c=$pr.ExitCode; 'vm_act: the program requi
 // Results of wait: false runs nobody fetched leave tasks behind; those finished over a day ago go first.
 export const TASK_START_PS = `Get-ScheduledTask -TaskName 'vm-act-run-*' -ErrorAction SilentlyContinue | Where-Object { $_.State -ne 'Running' -and (Get-ScheduledTaskInfo $_).LastRunTime -lt (Get-Date).AddDays(-1) } | ForEach-Object { Unregister-ScheduledTask $_.TaskName -Confirm:$false; Remove-Item "C:\\Windows\\Temp\\$($_.TaskName)*" -Recurse -Force -ErrorAction SilentlyContinue }
 $d="C:\\Windows\\Temp\\$($p.task)"; New-Item -ItemType Directory $d -Force | Out-Null; icacls $d /grant "$($p.user):(OI)(CI)M" | Out-Null
-if ($p.script) { "$ProgressPreference='SilentlyContinue'\`n$($p.script)" | Set-Content -LiteralPath "$d\\s.ps1" -Encoding UTF8 }
+if ($p.script) { "\`$ProgressPreference='SilentlyContinue'\`n$($p.script)" | Set-Content -LiteralPath "$d\\s.ps1" -Encoding UTF8 }
 Register-ScheduledTask -TaskName $p.task -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $($p.enc)") -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType $p.logon -RunLevel $p.level) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)) | Out-Null
 Start-ScheduledTask $p.task`;
 export const TASK_POLL_PS = `$t=Get-ScheduledTask -TaskName $p.task -ErrorAction SilentlyContinue; $d="C:\\Windows\\Temp\\$($p.task)"; $b="$d\\r"

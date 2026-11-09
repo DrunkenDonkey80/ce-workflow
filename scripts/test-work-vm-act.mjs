@@ -218,7 +218,7 @@ try {
 	await sess({ action: "run", as: "console", script: long, wait: false }, [uacOut("explorer 3"), ""]);
 	const ls = dec(calls[1]), lp = JSON.parse(ls.match(/\$p='(.*?)'\|ConvertFrom-Json/)[1].replace(/''/g, "'"));
 	assert.equal(lp.script, long);
-	assert.match(ls, /Set-Content -LiteralPath "\$d\\s\.ps1"/);
+	assert.match(ls, /"`\$ProgressPreference='SilentlyContinue'`n\$\(\$p\.script\)" \| Set-Content -LiteralPath "\$d\\s\.ps1"/, "the header variable is escaped in the admin script");
 	assert.match(Buffer.from(lp.enc, "base64").toString("utf16le"), /Get-Content -Raw -LiteralPath ''C:\\Windows\\Temp\\vm-act-run-[0-9a-f-]+\\s\.ps1'' \| Invoke-Expression/);
 	assert(calls[1].at(-1).length < 32000, "fits one command line");
 	const el = await sess({ action: "run", via: "task", exe: "C:\\x.exe", timeoutSec: 3 }, ["", "RUNNING\r\n"]);
