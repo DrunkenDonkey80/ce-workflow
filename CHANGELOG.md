@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.4.2 — 2026-11-09
 
 ### Added
 - Hub sidebar: right-click a session or a folder header to copy the project's git URL (origin). The folder header menu can copy the folder path too, like the session menu.
