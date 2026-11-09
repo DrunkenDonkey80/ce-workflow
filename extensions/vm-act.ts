@@ -176,6 +176,7 @@ else { $pr=${start} -Wait -PassThru; $c=$pr.ExitCode; 'vm_act: the program requi
 // Results of wait: false runs nobody fetched leave tasks behind; those finished over a day ago go first.
 export const TASK_START_PS = `Get-ScheduledTask -TaskName 'vm-act-run-*' -ErrorAction SilentlyContinue | Where-Object { $_.State -ne 'Running' -and (Get-ScheduledTaskInfo $_).LastRunTime -lt (Get-Date).AddDays(-1) } | ForEach-Object { Unregister-ScheduledTask $_.TaskName -Confirm:$false; Remove-Item "C:\\Windows\\Temp\\$($_.TaskName)*" -Recurse -Force -ErrorAction SilentlyContinue }
 $d="C:\\Windows\\Temp\\$($p.task)"; New-Item -ItemType Directory $d -Force | Out-Null; icacls $d /grant "$($p.user):(OI)(CI)M" | Out-Null
+if ($p.script) { "$ProgressPreference='SilentlyContinue'\`n$($p.script)" | Set-Content -LiteralPath "$d\\s.ps1" -Encoding UTF8 }
 Register-ScheduledTask -TaskName $p.task -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $($p.enc)") -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType $p.logon -RunLevel $p.level) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)) | Out-Null
 Start-ScheduledTask $p.task`;
 export const TASK_POLL_PS = `$t=Get-ScheduledTask -TaskName $p.task -ErrorAction SilentlyContinue; $d="C:\\Windows\\Temp\\$($p.task)"; $b="$d\\r"
@@ -426,6 +427,7 @@ if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.sec
 	}
 	const out = (t: string) => { const s = plainClixml(t); return s.length > 6000 ? `…${s.slice(-6000)}` : s; };
 	// script: PowerShell text, sent encoded so no quoting survives two command lines
+	const script = a.script;
 	if (a.action === "run" && a.script !== undefined) {
 		if (a.exe) throw new Error("run takes exe or script, not both.");
 		a = { ...a, exe: POWERSHELL, args: ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(`$ProgressPreference='SilentlyContinue'\n${a.script}`, "utf16le").toString("base64")] };
@@ -445,8 +447,10 @@ if($null -ne $p.secure) { Set-ItemProperty $k PromptOnSecureDesktop ([int]$p.sec
 				user = s.console.user;
 			}
 			task = `vm-act-run-${randomUUID()}`;
+			// a script goes to the task folder as a file: encoding it inside the task's encoded command overflows the 32K command line (S46 live, ~900 chars)
+			if (script !== undefined) a = { ...a, exe: POWERSHELL, args: ["-NoProfile", "-NonInteractive", "-Command", `Get-Content -Raw -LiteralPath 'C:\\Windows\\Temp\\${task}\\s.ps1' | Invoke-Expression`] };
 			const enc = Buffer.from(runWrapper(task, a.exe!, a.args ?? []), "utf16le").toString("base64");
-			await guestPs(guestScript({ task, enc, user, logon: a.as ? "Interactive" : "S4U", level: a.as ? "Limited" : "Highest" }, TASK_START_PS)).catch((e: Error) => {
+			await guestPs(guestScript({ task, enc, user, script, logon: a.as ? "Interactive" : "S4U", level: a.as ? "Limited" : "Highest" }, TASK_START_PS)).catch((e: Error) => {
 				// a highest-level task needs an unfiltered admin token; other admins get a UAC-filtered one over guestcontrol
 				if (a.via && /Access is denied/i.test(e.message)) throw new Error(`${e.message}\nvia: "task" needs an admin that UAC does not filter (the enabled built-in Administrator); ${user} is filtered here. Instead: run as: "console" with script "Start-Process <exe> -Verb RunAs", then uac consent if a prompt shows.`);
 				throw e;
