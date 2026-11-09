@@ -74,11 +74,13 @@ export async function viewPage(real: string, project: string, remote: boolean, w
  * D7: a design session's page, <project>/.pi/designs/<handle>/index.html, only when both really are there (no symlinked
  * folder or page); viewPage(own) then serves only that folder. Any other .pi file stays refused.
  */
-export async function designPage(project: string, handle: string, screen = "index.html") {
-	if (!/^design-\d+$/.test(handle) || !SCREEN.test(screen)) return undefined;
-	const base = await realpath(project).catch(() => undefined), dir = base && await realpath(join(base, ".pi", "designs", handle)).catch(() => undefined);
+export async function designPage(project: string, handle: string, screen = "index.html", version?: number) {
+	if (!/^design-\d+$/.test(handle) || !SCREEN.test(screen) || version !== undefined && !(Number.isSafeInteger(version) && version > 0)) return undefined;
+	// S09: a kept version is history/<handle>/<n>/, read-only by convention (only design restore copies it back).
+	const place = version ? join(".pi", "designs", "history", handle, String(version)) : join(".pi", "designs", handle);
+	const base = await realpath(project).catch(() => undefined), dir = base && await realpath(join(base, place)).catch(() => undefined);
 	const page = dir && await realpath(join(dir, screen)).catch(() => undefined);
-	return base && dir && page && relative(base, dir) === join(".pi", "designs", handle) && dirname(page) === dir ? page : undefined;
+	return base && dir && page && relative(base, dir) === place && dirname(page) === dir ? page : undefined;
 }
 // A design screen: an HTML file directly in the design folder (D7).
 const SCREEN = /^[\w.-]+\.html?$/i;

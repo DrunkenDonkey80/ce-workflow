@@ -139,6 +139,14 @@ try {
 	for (const screen of ["css/a.css", "../design-1/pay.html", "out/page.html", "nope.html"]) assert.equal((await post(id, "designpreview", { screen })).status, 404, screen);
 	assert.equal((await post(id, "designpreview", { screen: 1 })).status, 400);
 	await post(id, "unview", { key: screenView.key });
+	// S09: a kept version is shown read-only from its own history folder, with that version's screens.
+	fs.mkdirSync(path.join(designs, "history", "design-1", "2"), { recursive: true }); fs.writeFileSync(path.join(designs, "history", "design-1", "2", "index.html"), "<p>v2</p>");
+	const old = (await post(id, "designpreview", { version: 2 })).body;
+	assert.deepEqual([old.version, old.screens, old.versions, old.open], [2, ["index.html"], [2], "index.html"]);
+	assert.equal(await (await fetch(`${origin}/x/${old.key}/index.html`)).text(), "<p>v2</p>");
+	for (const version of [3, 0, "2", 1.5]) assert.equal((await post(id, "designpreview", { version })).status, typeof version === "number" && version === 3 ? 404 : 400, String(version));
+	assert.equal((await post(id, "designpreview", { version: 2, screen: "pay.html" })).status, 404, "that version had no pay screen");
+	await post(id, "unview", { key: old.key });
 	assert.equal((await post(id, "explore", { path: ".pi/designs/design-1/index.html" })).status, 404, "other .pi files stay refused for chat links");
 	await post(id, "unview", { key: designView.key }); hub.registry.update(id, { modes: undefined });
 	fs.rmSync(path.join(folder, ".pi"), { recursive: true, force: true }); fs.rmSync(path.join(folder, "secret.txt"));

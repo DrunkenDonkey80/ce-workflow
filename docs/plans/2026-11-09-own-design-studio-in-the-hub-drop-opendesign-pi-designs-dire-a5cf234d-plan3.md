@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T12:02:48.637Z
+updated: 2026-11-09T12:16:52.194Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -191,8 +191,7 @@ Fit check per module:
 ### Phase 4: Preview controls [code]
 
 - [x] **S08** design-view.ts designFrame: device picker (8 presets, Desktop = panel), rotate, frame scaled to fit, choice kept per design in localStorage; screen picker; designpreview takes screen and returns handle/screens/versions; explore.ts designLists + watchDesign publish design-changed only when the lists change.
-- [ ] **S09** Versions in the preview: "vN ◂ ▸" shows history folders read-only through designpreview {version}; Restore sends a chat message (D19)
-  - Check: C2 (a history path confined to its own handle), C3, C4.
+- [x] **S09** Versions in the preview: ◂ Live/vN of M ▸ steps through history folders via designpreview {version} (own handle's history only, that version's screens); Restore posts "Restore version N" as a chat message; version lists update live.
 
 ### Phase 5: Bridge, comments and hand edits [code]
 

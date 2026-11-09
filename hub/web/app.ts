@@ -549,7 +549,12 @@ window.addEventListener("keydown", event => { if (event.key === "Escape") { $("h
 $("zoom-in").addEventListener("click", () => diagramView.zoom(1.2));
 $("zoom-out").addEventListener("click", () => diagramView.zoom(1 / 1.2));
 $("zoom-fit").addEventListener("click", () => diagramView.fit());
-const filesView = createFilesView($("files"), { get, image: src => openViewer(src), markdown: (target, text) => renderMarkdown(target, text, new Set()), closed: () => closeExplore() });
+const filesView = createFilesView($("files"), { get, image: src => openViewer(src), markdown: (target, text) => renderMarkdown(target, text, new Set()), closed: () => closeExplore(),
+ // S09: look back at a kept version (or live again); Restore asks the agent (D19), which stays the only writer.
+ design: {
+  open: async (version, screen) => { try { showExplored(await post("designpreview", version ? { version, screen } : { screen })); } catch { try { showExplored(await post("designpreview", version ? { version } : {})); } catch (error) { showNotice(error.message); } } },
+  restore: async version => { try { await post("message", { text: `Restore version ${version}` }); showNotice(`Asked to restore version ${version}.`, true); } catch (error) { showNotice(error.message); } },
+ } });
 // /plan3 architecture links open on the Project tab.
 setTab(target === "product" ? "project" : remembered("plan3-tab", [...LEFT_TABS, "diagram"], "plan"));
 { const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view); }

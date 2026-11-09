@@ -413,16 +413,20 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			}
 			// D7: a design session's own mirrored page; it names no path, so no other folder or session can be asked for.
 			case "designpreview": {
-				only(data, ["target", "screen"], "Invalid fields.");
+				only(data, ["target", "screen", "version"], "Invalid fields.");
 				if (data.screen !== undefined && typeof data.screen !== "string") throw fail(400, "Invalid screen.");
+				if (data.version !== undefined && !(Number.isSafeInteger(data.version) && (data.version as number) > 0)) throw fail(400, "Invalid version.");
 				const handle = ((published(id)?.modes ?? registry.get(id)?.modes) as { design?: string } | undefined)?.design;
 				if (!handle) throw fail(404, "Not a design session.");
-				const real = await designPage(folder(id), handle, data.screen as string | undefined);
-				if (!real) throw fail(404, data.screen ? "No such screen in this design." : "No design yet: its first run has not ended.");
+				const real = await designPage(folder(id), handle, data.screen as string | undefined, data.version as number | undefined);
+				if (!real) throw fail(404, data.version ? "No such version or screen." : data.screen ? "No such screen in this design." : "No design yet: its first run has not ended.");
 				const view = await viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) }, true);
 				// S08: added or removed screens and new versions reach the open preview's pickers.
 				await watchDesign(view.key, folder(id), handle, lists => views.get(id)?.publish("design-changed", { key: view.key, ...lists }));
-				return { ...view, design: true, handle, ...await designLists(folder(id), handle) };
+				const lists = await designLists(folder(id), handle);
+				// A kept version's own screens, so its picker matches what it had.
+				const screens = data.version ? view.files.map(file => file.path).filter(file => /^[\w.-]+\.html?$/i.test(file)).sort((a, b) => Number(b === "index.html") - Number(a === "index.html") || a.localeCompare(b)) : lists.screens;
+				return { ...view, design: true, handle, ...lists, screens, ...data.version ? { version: data.version } : {} };
 			}
 			case "unview": only(data, ["target", "key"], "Invalid fields."); return { ok: unview(String(data.key), id) }; // the page closed or replaced its viewer
 			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.

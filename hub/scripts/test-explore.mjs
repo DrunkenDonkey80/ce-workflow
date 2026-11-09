@@ -98,6 +98,10 @@ try {
 	await mkdir(join(project, ".pi", "designs", "history", "design-1", "1"));
 	await writeFile(join(project, ".pi", "designs", "history", "design-1", "1", "index.html"), "v1");
 	assert.deepEqual(await changes(), [{ screens: ["index.html", "a.html"], versions: [1] }], "a new version");
+	// S09: a kept version is its own handle's history folder only.
+	assert.match(await designPage(project, "design-1", "index.html", 1), /history.design-1.1.index.html$/);
+	await mkdir(join(project, ".pi", "designs", "history", "design-2", "5"), { recursive: true }); await writeFile(join(project, ".pi", "designs", "history", "design-2", "5", "index.html"), "x");
+	for (const version of [5, 0, -1, 1.5, 2]) assert.equal(await designPage(project, "design-1", "index.html", version), undefined, String(version));
 	unview(d.key, "s3");
 	await writeFile(join(design, "z.html"), "z");
 	assert.deepEqual(await changes(), [], "a closed design view stops watching");

@@ -71,7 +71,7 @@ function stub(endpoint, body) {
   product = { ...result.diagram, revision: product.revision + 1 }; persist(); publish("diagram", { target: { kind: "product" }, diagram: product });
   return { diagram: product, line: planned.line, removed: result.removed };
  }
- assert.equal(body.target, "12345678");
+ if (!(endpoint === "/api/message" && body.target === "product")) assert.equal(body.target, "12345678"); // a chat message may be sent from the Project tab
  if (endpoint === "/api/command") { commands.push(body.command); return { ok: true }; }
  if (endpoint === "/api/message" && body.text.startsWith("/")) { commands.push(body.text); return { accepted: true }; }
  if (endpoint === "/api/message") {
@@ -1215,6 +1215,18 @@ try {
  assert.equal(await evaluate("document.querySelector('#files .design-device').value"), "Phone", "the device stays");
  await pick("Desktop");
  assert.equal(await evaluate("document.querySelector('#files .files-frame').style.transform"), "", "Desktop is unscaled");
+ // S09: a new version shows ◂ Live ▸; ◂ shows it read-only with Restore, which asks the agent in the chat.
+ const historyDir = join(folder, ".pi", "designs", "history", "design-1", "1"); fs.mkdirSync(historyDir, { recursive: true }); fs.writeFileSync(join(historyDir, "index.html"), "<h1>Old</h1>");
+ await browser("wait", "--fn", "document.querySelector('#files .design-version')?.textContent === 'Live'");
+ await evaluate("document.querySelector('#files .design-step[aria-label=\"Older version\"]').click()");
+ await browser("wait", "--fn", "document.querySelector('#files .design-version')?.textContent === 'v1 of 1'");
+ assert.deepEqual(await evaluate("[document.querySelector('#files .files-frame').title, document.querySelector('#files .design-step[aria-label=\"Older version\"]').disabled, !!document.querySelector('#files .design-screen')]"), ["index.html", true, false], "v1 had only index.html");
+ const sentBeforeRestore = messages.length;
+ await evaluate("document.querySelector('#files .design-restore').click()");
+ for (let i = 0; i < 50 && messages.length === sentBeforeRestore; i++) await new Promise(done => setTimeout(done, 100));
+ assert.equal(messages.at(-1).text, "Restore version 1");
+ await evaluate("document.querySelector('#files .design-step[aria-label=\"Newer version\"]').click()");
+ await browser("wait", "--fn", "document.querySelector('#files .design-version')?.textContent === 'Live' && !document.querySelector('#files .design-restore')");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

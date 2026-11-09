@@ -1,7 +1,10 @@
 // Design session preview (D17): files.ts stays the generic viewer and hands a design's page to designFrame.
 // D4: one device picker (OD's viewport matrix plus Slide), rotate, the frame scaled down to fit, the choice kept per design.
 // D7: a screen picker when the design has more than one HTML file.
-export type DesignView = { key: string; name: string; handle?: string; screens?: string[]; versions?: number[] };
+// version: a kept version shown read-only (S09); none is the live design.
+export type DesignView = { key: string; name: string; handle?: string; screens?: string[]; versions?: number[]; version?: number };
+// screen: show another screen of this view; open: reopen the preview at a version (none = live); restore: ask the agent.
+export type DesignActions = { screen: (screen: string) => void; open: (version: number | undefined, screen: string) => void; restore: (version: number) => void };
 
 // Desktop is the panel's own width (no frame); the rest mirror extensions/design-render.ts (the page cannot import it).
 const DEVICES: [string, number, number][] = [["Desktop", 0, 0], ["Phone small", 360, 800], ["Phone", 390, 844], ["Phone large", 430, 932], ["Foldable", 600, 960], ["Tablet", 820, 1180], ["Laptop", 1366, 768], ["Slide", 1920, 1080]];
@@ -13,7 +16,7 @@ function device(view: DesignView): Device {
 }
 
 /** The design's page in a device frame, with the device, rotate and screen controls added before Download and Open. */
-export function designFrame(view: DesignView, path: string, src: string, body: HTMLElement, actions: HTMLElement, showScreen: (screen: string) => void) {
+export function designFrame(view: DesignView, path: string, src: string, body: HTMLElement, actions: HTMLElement, act: DesignActions) {
  const state = device(view);
  const frame = Object.assign(document.createElement("iframe"), { src, className: "files-frame", title: path });
  const stage = Object.assign(document.createElement("div"), { className: "design-stage" });
@@ -30,8 +33,24 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
   screens.setAttribute("aria-label", "Screen");
   for (const screen of view.screens!) screens.append(new Option(screen.replace(/\.html?$/i, ""), screen));
   screens.value = path;
-  screens.addEventListener("change", () => showScreen(screens.value));
+  screens.addEventListener("change", () => act.screen(screens.value));
   controls.unshift(screens);
+ }
+ // S09, D19: ◂ steps back from live to the newest version and on; ▸ forward to live. Restore goes through the agent.
+ const kept = view.versions ?? [];
+ if (kept.length) {
+  const at = view.version ? kept.indexOf(view.version) : kept.length;
+  const step = (text: string, label: string, target: number | undefined, enabled: boolean) => {
+   const button = Object.assign(document.createElement("button"), { type: "button", className: "design-step", textContent: text, title: label, disabled: !enabled });
+   button.setAttribute("aria-label", label); button.addEventListener("click", () => act.open(target, path)); return button;
+  };
+  const label = Object.assign(document.createElement("span"), { className: "design-version", textContent: view.version ? `v${view.version} of ${kept.at(-1)}` : "Live" });
+  controls.push(step("◂", "Older version", kept[at - 1], at > 0), label, step("▸", "Newer version", kept[at + 1], at < kept.length));
+  if (view.version) {
+   const restore = Object.assign(document.createElement("button"), { type: "button", className: "design-restore", textContent: "Restore", title: `Ask the agent to restore version ${view.version}` });
+   restore.addEventListener("click", () => act.restore(view.version!));
+   controls.push(restore);
+  }
  }
  actions.prepend(...controls);
  const viewer = body.parentElement!;
