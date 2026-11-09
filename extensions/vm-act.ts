@@ -154,22 +154,30 @@ Set-LocalUser -Name $p.user -Password (ConvertTo-SecureString $secret -AsPlainTe
 };
 /** One Windows command-line argument (CommandLineToArgvW rules). */
 export const winArg = (s: string) => s && !/[\s"]/.test(s) ? s : `"${s.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
-// Task action (D-05): runs exe, writes stdout, stderr and the exit code next to C:\Windows\Temp\<task>; kept a .ps1-free one-liner so the task needs no file
-const runWrapper = (task: string, exe: string, args: string[]) => `$b='C:\\Windows\\Temp\\${task}'; try { $si=New-Object Diagnostics.ProcessStartInfo; $si.FileName='${exe.replace(/\//g, "\\").replace(/'/g, "''")}'; $si.Arguments='${args.map(winArg).join(" ").replace(/'/g, "''")}'; $si.UseShellExecute=$false; $si.RedirectStandardOutput=$true; $si.RedirectStandardError=$true
-try { $pr=[Diagnostics.Process]::Start($si); $o=$pr.StandardOutput.ReadToEndAsync(); $e=$pr.StandardError.ReadToEndAsync(); $pr.WaitForExit()
-[IO.File]::WriteAllText("$b.out", $o.Result); [IO.File]::WriteAllText("$b.err", $e.Result) }
-# 740: a requireAdministrator exe cannot start without the shell; ShellExecute raises the UAC prompt
-catch { if($_.Exception.GetBaseException().NativeErrorCode -ne 740) { throw }; $si.UseShellExecute=$true; $si.RedirectStandardOutput=$false; $si.RedirectStandardError=$false; $pr=[Diagnostics.Process]::Start($si); $pr.WaitForExit()
-[IO.File]::WriteAllText("$b.err", "vm_act: the program requires elevation, so it was started through UAC; no output captured.") }
-$c=$pr.ExitCode } catch { [IO.File]::WriteAllText("$b.err", "vm_act could not start the program: $($_.Exception.Message)"); $c=-1 }
-[IO.File]::WriteAllText("$b.code", "$c")`;
-export const TASK_START_PS = `Register-ScheduledTask -TaskName $p.task -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $($p.enc)") -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType $p.logon -RunLevel $p.level) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)) | Out-Null
+// Task action (D-05): runs exe, writes stdout, stderr and the exit code into C:\Windows\Temp\<task>\; kept a .ps1-free one-liner so the task needs no file.
+// Cmdlets only: a standard user's PowerShell can be in ConstrainedLanguage mode (WDAC/AppLocker guests), where .NET method calls fail (S46, U1).
+// shortcut: Start-Process -Wait also waits for the program's child processes, use run without as/via for a launcher that leaves one behind
+const runWrapper = (task: string, exe: string, args: string[]) => {
+	const q = (v: string) => `'${v.replace(/'/g, "''")}'`, list = args.length ? ` -ArgumentList ${q(args.map(winArg).join(" "))}` : "";
+	const start = `Start-Process -FilePath ${q(exe.replace(/\//g, "\\"))}${list}`;
+	return `$b='C:\\Windows\\Temp\\${task}\\r'; $c=-1
+try { $pr=${start} -RedirectStandardOutput "$b.out" -RedirectStandardError "$b.err" -NoNewWindow -Wait -PassThru; $c=$pr.ExitCode }
+catch { if("$_" -notmatch 'elevation') { "vm_act could not start the program: $_" | Set-Content "$b.err" }
+# 740: a requireAdministrator exe cannot start with redirected output; without it Windows raises the UAC prompt
+else { $pr=${start} -Wait -PassThru; $c=$pr.ExitCode; 'vm_act: the program requires elevation, so it was started through UAC; no output captured.' | Set-Content "$b.err" } }
+"$c" | Set-Content "$b.code"`;
+};
+// A standard user may not create files in C:\Windows\Temp itself (BUILTIN\Users has no generic write there), so each run gets its own folder that user can modify.
+// Results of wait: false runs nobody fetched leave tasks behind; those finished over a day ago go first.
+export const TASK_START_PS = `Get-ScheduledTask -TaskName 'vm-act-run-*' -ErrorAction SilentlyContinue | Where-Object { $_.State -ne 'Running' -and (Get-ScheduledTaskInfo $_).LastRunTime -lt (Get-Date).AddDays(-1) } | ForEach-Object { Unregister-ScheduledTask $_.TaskName -Confirm:$false; Remove-Item "C:\\Windows\\Temp\\$($_.TaskName)*" -Recurse -Force -ErrorAction SilentlyContinue }
+$d="C:\\Windows\\Temp\\$($p.task)"; New-Item -ItemType Directory $d -Force | Out-Null; icacls $d /grant "$($p.user):(OI)(CI)M" | Out-Null
+Register-ScheduledTask -TaskName $p.task -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $($p.enc)") -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType $p.logon -RunLevel $p.level) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)) | Out-Null
 Start-ScheduledTask $p.task`;
-export const TASK_POLL_PS = `$t=Get-ScheduledTask -TaskName $p.task -ErrorAction SilentlyContinue; $b="C:\\Windows\\Temp\\$($p.task)"
+export const TASK_POLL_PS = `$t=Get-ScheduledTask -TaskName $p.task -ErrorAction SilentlyContinue; $d="C:\\Windows\\Temp\\$($p.task)"; $b="$d\\r"
 if(!$t) { throw "No task $($p.task) on the guest (a result is deleted once it has been returned)." }
 if(!(Test-Path "$b.code")) { if($t.State -eq 'Running' -or $t.State -eq 'Queued') { 'RUNNING'; exit 0 }; Start-Sleep 2; if(!(Test-Path "$b.code")) { [IO.File]::WriteAllText("$b.code", "task:$((Get-ScheduledTaskInfo $p.task).LastTaskResult)") } }
 $m="#$($p.task)"; "$m-code"; Get-Content "$b.code" -Raw; "$m-out"; Get-Content "$b.out" -Raw -ErrorAction SilentlyContinue; "$m-err"; Get-Content "$b.err" -Raw -ErrorAction SilentlyContinue
-Unregister-ScheduledTask $p.task -Confirm:$false; Remove-Item "$b.*" -Force -ErrorAction SilentlyContinue`;
+Unregister-ScheduledTask $p.task -Confirm:$false; Remove-Item $d -Recurse -Force -ErrorAction SilentlyContinue`;
 /** VBoxManage errors while the guest's VBoxService is not up yet. */
 export const BOOTING = /Guest Additions are not installed or not ready|guest execution service is not ready/i;
 export const envName = (user: string) => `VM_${user.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_PASSWORD`;

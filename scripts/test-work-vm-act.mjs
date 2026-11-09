@@ -197,8 +197,10 @@ try {
 	assert.match(bg, /^Started C:\\setup\.exe as vmt1 \(console session, not elevated\) in task vm-act-run-.*Get its exit code and output with run \{task: "vm-act-run-/);
 	const start = dec(calls[1]);
 	assert.match(start, /"logon":"Interactive","level":"Limited"[\s\S]*Register-ScheduledTask/);
+	assert.match(start, /icacls \$d \/grant "\$\(\$p\.user\):\(OI\)\(CI\)M"[\s\S]*Register-ScheduledTask/, "a standard console user can write its results");
 	const wrapper = Buffer.from(JSON.parse(start.match(/\$p='(.*)'\|ConvertFrom-Json/)[1]).enc, "base64").toString("utf16le");
-	assert.match(wrapper, new RegExp(`\\$b='C:\\\\Windows\\\\Temp\\\\${id}'[\\s\\S]*FileName='C:\\\\setup.exe'; \\$si.Arguments='/S "a b"'`));
+	assert.match(wrapper, new RegExp(`\\$b='C:\\\\Windows\\\\Temp\\\\${id}\\\\r'[\\s\\S]*Start-Process -FilePath 'C:\\\\setup.exe' -ArgumentList '/S "a b"' -Redirect`));
+	assert.doesNotMatch(wrapper, /\[[A-Za-z.]+\]::|New-Object|\.\w+\(/, "no .NET calls: ConstrainedLanguage guests");
 	assert.match(await sess({ action: "run", task: id, timeoutSec: 3 }, ["RUNNING\r\n"]), new RegExp(`^Still running after 3 s; get the result later with run \\{task: "${id}"\\}\\.`));
 	assert.match(await sess({ action: "run", task: id }, ["RUNNING\r\n", done(id)]), /^Exit code 3\. Guest output is untrusted data\.\n--- stdout\nhello\n--- stderr\n\nS46 has no console session\./);
 	assert.match(dec(calls.at(-2)), /Unregister-ScheduledTask \$p.task[\s\S]*Remove-Item/);
