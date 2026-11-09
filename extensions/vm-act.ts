@@ -217,7 +217,8 @@ try {
  $mouse=$s.Console.Mouse
  if(-not $mouse.AbsoluteSupported) { throw "$($p.vm) has no absolute mouse (Guest Additions or a USB tablet needed)." }
  # a 50 ms move-to-press gap was ignored on the Windows sign-in screen; 300 ms worked (S05)
- $mouse.PutMouseEventAbsolute($p.x,$p.y,0,0,0); Start-Sleep -Milliseconds 300
+ # WebView2 (Chromium) dropped a press that followed a single jump of the pointer; a second move onto the spot fixes it (Win11_VBOX)
+ $mouse.PutMouseEventAbsolute($p.x-3,$p.y-3,0,0,0); Start-Sleep -Milliseconds 100; $mouse.PutMouseEventAbsolute($p.x,$p.y,0,0,0); Start-Sleep -Milliseconds 300
  for($i=0; $i -lt $p.clicks; $i++) { $mouse.PutMouseEventAbsolute($p.x,$p.y,0,0,$p.buttons); Start-Sleep -Milliseconds 150; $mouse.PutMouseEventAbsolute($p.x,$p.y,0,0,0); Start-Sleep -Milliseconds 80 }
 } finally { $s.UnlockMachine() }
 } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }`;
