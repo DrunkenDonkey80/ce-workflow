@@ -580,6 +580,15 @@ const filesView = createFilesView($("files"), { get, image: src => openViewer(sr
  // S09: look back at a kept version (or live again); Restore asks the agent (D19), which stays the only writer.
  design: {
   open: async (version, screen) => { try { showExplored(await post("designpreview", version ? { version, screen } : { screen })); } catch { try { showExplored(await post("designpreview", version ? { version } : {})); } catch (error) { showNotice(error.message); } } },
+  // S13, D13: the hub renders the shown state; it goes into the chat box and opens in the annotator; Cancel takes it out again.
+  mark: async state => {
+   showNotice("Rendering the screen for marking…");
+   try {
+    const { path } = await post("designshot", state), input = $("message-input");
+    input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + path + "\n" : path + "\n"; input.dispatchEvent(new Event("input"));
+    if (!await annotateImage(path)) { input.value = input.value.split("\n").filter(row => row !== path).join("\n"); input.dispatchEvent(new Event("input")); showNotice(""); }
+   } catch (error) { showNotice(error.message); }
+  },
   restore: async version => { try { await post("message", { text: `Restore version ${version}` }); showNotice(`Asked to restore version ${version}.`, true); } catch (error) { showNotice(error.message); } },
  } });
 // /plan3 architecture links open on the Project tab.
@@ -1093,8 +1102,8 @@ function renderComposerThumbs() {
 }
 async function annotateImage(path: string) {
  const previous = annotated.get(path), source = previous?.source ?? path;
- let result; try { result = await annotate(imageSource(source), previous?.state); } catch (error) { return showNotice(error.message); }
- if (!result) return;
+ let result; try { result = await annotate(imageSource(source), previous?.state); } catch (error) { showNotice(error.message); return false; }
+ if (!result) return false;
  showNotice("Saving the annotated image…");
  try {
   const name = "annotated-" + (source.split(/[\\/]/).pop() ?? "image").replace(/\.[^.]+$/, "") + ".png";
@@ -1102,12 +1111,12 @@ async function annotateImage(path: string) {
   const saved = await response.json(); if (!response.ok) throw new Error(saved.error ?? "Upload failed.");
   const input = $("message-input"), notes = legend(result.state.shapes), quoted = /\s/.test(saved.path) ? `"${saved.path}"` : saved.path;
   let text = input.value; if (previous?.notes) text = text.replace("\n" + previous.notes, "");
-  const at = text.indexOf(path); if (at < 0) return showNotice("The image is no longer in the message.");
+  const at = text.indexOf(path); if (at < 0) { showNotice("The image is no longer in the message."); return false; }
   const before = text.slice(0, at).replace(/"$/, ""), after = text.slice(at + path.length).replace(/^"/, "");
   input.value = before + quoted + (notes ? "\n" + notes : "") + (notes && after && !after.startsWith("\n") ? "\n" : "") + after;
   annotated.delete(path); annotated.set(saved.path, { source, state: result.state, notes });
-  input.dispatchEvent(new Event("input")); showNotice("Annotated image saved.", true);
- } catch (error) { showNotice(error.message); }
+  input.dispatchEvent(new Event("input")); showNotice("Annotated image saved.", true); return true;
+ } catch (error) { showNotice(error.message); return false; }
 }
 $("message-input").addEventListener("input", renderComposerThumbs);
 // Talk: the browser's own speech recognition (Chrome and Safari send the audio to Google/Apple). Tap to start, tap again to stop;

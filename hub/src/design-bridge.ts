@@ -53,7 +53,7 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	addEventListener("message", event => {
 		if (event.source !== parent) return;
 		const message = event.data || {};
-		if (message.type === "design:hello" && typeof message.load === "string") { load = message.load; send("design:ready", { screen }); }
+		if (message.type === "design:hello" && typeof message.load === "string") { load = message.load; send("design:hash", { hash: location.hash }); }
 		if (message.load !== load) return;
 		if (typeof message.mode === "string") { mode = message.mode; if (!mode) outline(null); document.documentElement.style.cursor = mode ? "crosshair" : ""; }
 		if (message.style && editing) for (const name of STYLES) if (typeof message.style[name] === "string") editing.style.setProperty(name, message.style[name].slice(0, 100));
@@ -71,6 +71,7 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	}, true);
 	addEventListener("design:tweaks", event => { if (event.detail && typeof event.detail === "object") send("design:tweaks", { values: event.detail }); });
 	addEventListener("resize", drawPins);
+	addEventListener("hashchange", () => { send("design:hash", { hash: location.hash }); drawPins(); }); // Mark renders the slide shown
 	addEventListener("load", drawPins);
 })();</script>`;
 

@@ -14,6 +14,7 @@ import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
 import { ARCHIVE, designLists, designPage, explore, unview, viewPage, watchDesign } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
+import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
@@ -43,6 +44,12 @@ type Plan = Awaited<ReturnType<typeof listPlans>>[number];
 export function createPageApi({ host, registry, views, scheduler, usage, pool, models, commands, links, progress, settings = () => ({}) }: { links?: ReturnType<typeof createLinks>; progress?: (id: string) => { done: number; total: number; ago: number } | null; host: SessionHost; registry: Registry; views: Map<string, SessionView>; scheduler?: Scheduler; usage?: Usage; pool?: Pool; models?: ParkedModels; commands?: Commands; settings?: () => Record<string, unknown> }) {
 	const folder = (id: string) => registry.get(id)!.folder;
 	const published = (id: string) => host.live.get(id)?.published.state as { plan?: { id: string }; modes?: unknown } | undefined;
+	/** The design handle of a design session (its own design only, D7); anything else is refused. */
+	const designHandle = (id: string) => {
+		const handle = ((published(id)?.modes ?? registry.get(id)?.modes) as { design?: string } | undefined)?.design;
+		if (!handle) throw fail(404, "Not a design session.");
+		return handle;
+	};
 
 	/** The session's plan: the one Pi published, else the newest open plan (what Pi would pick, ce-workflow R6). */
 	function current(id: string, plans: Plan[]) {
@@ -416,8 +423,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				only(data, ["target", "screen", "version"], "Invalid fields.");
 				if (data.screen !== undefined && typeof data.screen !== "string") throw fail(400, "Invalid screen.");
 				if (data.version !== undefined && !(Number.isSafeInteger(data.version) && (data.version as number) > 0)) throw fail(400, "Invalid version.");
-				const handle = ((published(id)?.modes ?? registry.get(id)?.modes) as { design?: string } | undefined)?.design;
-				if (!handle) throw fail(404, "Not a design session.");
+				const handle = designHandle(id);
 				const real = await designPage(folder(id), handle, data.screen as string | undefined, data.version as number | undefined);
 				if (!real) throw fail(404, data.version ? "No such version or screen." : data.screen ? "No such screen in this design." : "No design yet: its first run has not ended.");
 				const view = await viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) }, true);
@@ -427,6 +433,24 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				// A kept version's own screens, so its picker matches what it had.
 				const screens = data.version ? view.files.map(file => file.path).filter(file => /^[\w.-]+\.html?$/i.test(file)).sort((a, b) => Number(b === "index.html") - Number(a === "index.html") || a.localeCompare(b)) : lists.screens;
 				return { ...view, design: true, handle, ...lists, screens, ...data.version ? { version: data.version } : {} };
+			}
+			// S13, D13: Mark renders what the preview shows (version, screen, device size, slide, unsaved inline edits) to a
+			// pasted-image temp file, which the page then opens in the annotator. Like designpreview, it names no path.
+			case "designshot": {
+				only(data, ["target", "screen", "version", "width", "height", "hash", "styleEdits"], "Invalid fields.");
+				const size = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 200 && (value as number) <= 4000;
+				if (typeof data.screen !== "string") throw fail(400, "Invalid screen.");
+				if (data.version !== undefined && !(Number.isSafeInteger(data.version) && (data.version as number) > 0)) throw fail(400, "Invalid version.");
+				if (!size(data.width) || !size(data.height)) throw fail(400, "Width and height must be 200 to 4000 pixels.");
+				if (data.hash !== undefined && !(typeof data.hash === "string" && /^#?[\w-]{0,40}$/.test(data.hash))) throw fail(400, "Invalid hash.");
+				const edits = data.styleEdits ?? [];
+				const validEdit = (edit: any) => typeof edit?.selector === "string" && edit.selector.length <= 300 && edit.styles && typeof edit.styles === "object" && Object.entries(edit.styles).every(([name, value]) => /^[a-z-]{1,40}$/.test(name) && typeof value === "string" && value.length <= 100);
+				if (!Array.isArray(edits) || edits.length > 50 || !edits.every(validEdit)) throw fail(400, "Invalid style edits.");
+				const real = await designPage(folder(id), designHandle(id), data.screen, data.version as number | undefined);
+				if (!real) throw fail(404, "No such version or screen.");
+				const shot = await renderDesign({ folder: path.dirname(real), screen: path.basename(real), width: data.width as number, height: data.height as number, hash: data.hash as string | undefined, styleEdits: edits });
+				if (!shot.png.length) throw fail(502, "The render gave no picture.\n" + reportText(shot.report));
+				return { path: await savePastedImage(shot.png) };
 			}
 			case "unview": only(data, ["target", "key"], "Invalid fields."); return { ok: unview(String(data.key), id) }; // the page closed or replaced its viewer
 			// Wormhole: only files Download would serve this device, so a phone can't send out anything it couldn't fetch.

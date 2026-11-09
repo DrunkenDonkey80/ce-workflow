@@ -4,7 +4,9 @@
 // version: a kept version shown read-only (S09); none is the live design.
 export type DesignView = { key: string; name: string; handle?: string; screens?: string[]; versions?: number[]; version?: number };
 // screen: show another screen of this view; open: reopen the preview at a version (none = live); restore: ask the agent.
-export type DesignActions = { screen: (screen: string) => void; open: (version: number | undefined, screen: string) => void; restore: (version: number) => void };
+// mark: render what the preview shows and open it in the annotator (S13, D13).
+export type MarkState = { screen: string; version?: number; width: number; height: number; hash?: string; styleEdits: { selector: string; styles: Record<string, string> }[] };
+export type DesignActions = { screen: (screen: string) => void; open: (version: number | undefined, screen: string) => void; restore: (version: number) => void; mark: (state: MarkState) => void };
 
 // Desktop is the panel's own width (no frame); the rest mirror extensions/design-render.ts (the page cannot import it).
 const DEVICES: [string, number, number][] = [["Desktop", 0, 0], ["Phone small", 360, 800], ["Phone", 390, 844], ["Phone large", 430, 932], ["Foldable", 600, 960], ["Tablet", 820, 1180], ["Laptop", 1366, 768], ["Slide", 1920, 1080]];
@@ -20,7 +22,8 @@ function device(view: DesignView): Device {
 // Edit mode, design-tweaks from the page's Tweaks panel. The mode and the pins outlive reloads.
 export type DesignPick = { screen: string; id: string; selector: string; tag: string; text: string; rect: { x: number; y: number; width: number; height: number } };
 export type DesignPin = { n: number; screen: string; id: string; selector: string };
-let current: { frame: HTMLIFrameElement; load: string; screen: string } | undefined, mode = "", pins: DesignPin[] = [];
+// hash and edits: the slide shown and the unsaved inline styles of this load, so Mark renders exactly that.
+let current: { frame: HTMLIFrameElement; load: string; screen: string; hash: string; edits: Map<string, Record<string, string>> } | undefined, mode = "", pins: DesignPin[] = [];
 const tell = (data: Record<string, unknown>) => { if (current?.frame.isConnected) current.frame.contentWindow?.postMessage({ load: current.load, ...data }, "*"); };
 export function setDesignPins(list: DesignPin[]) { pins = list; tell({ pins }); }
 /** How a chat line names an element (D2): its screen and data-id, or a short selector when it has none. */
@@ -43,6 +46,7 @@ function readTweaks(values: any) {
 addEventListener("message", event => {
  if (!current?.frame.isConnected || event.source !== current.frame.contentWindow || event.data?.load !== current.load) return;
  const data = event.data, frame = current.frame, emit = (name: string, detail: unknown) => frame.dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
+ if (data.type === "design:hash") { if (bounded(data.hash, 41, /^(#[\w-]{0,40})?$/)) current.hash = data.hash; return; }
  if (data.type === "design:tweaks") { const values = readTweaks(data.values); if (values) emit("design-tweaks", values); return; }
  const pick = readPick(data, current.screen); if (!pick) return;
  if (data.type === "design:pick" && mode === "comment") emit("design-pick", pick);
@@ -55,15 +59,20 @@ function inspect(body: HTMLElement, pick: DesignPick & { styles: Record<string, 
  const form = Object.assign(document.createElement("form"), { className: "design-inspector" });
  form.setAttribute("aria-label", "Element styles");
  const title = Object.assign(document.createElement("div"), { className: "design-inspector-title", textContent: `<${pick.tag}>${pick.text ? ` "${pick.text.slice(0, 40)}"` : ""}` });
+ const target = pick.id ? `[data-id="${pick.id}"]` : pick.selector;
  const inputs = STYLES.map(name => {
   const input = Object.assign(document.createElement("input"), { name, value: pick.styles[name], spellcheck: false });
-  input.addEventListener("input", () => tell({ style: { [name]: input.value } }));
+  input.addEventListener("input", () => { tell({ style: { [name]: input.value } }); current?.edits.set(target, { ...current.edits.get(target), [name]: input.value }); });
   const row = document.createElement("label"); row.append(name, input); return row;
  });
  const keep = Object.assign(document.createElement("button"), { type: "submit", textContent: "Keep", title: "Add a Set line to your message for the agent to write" });
  const cancel = Object.assign(document.createElement("button"), { type: "button", textContent: "Cancel" });
  const changed = () => STYLES.map(name => [name, (form.elements.namedItem(name) as HTMLInputElement).value.replace(/\s+/g, " ").trim()]).filter(([name, value]) => value !== pick.styles[name]);
- cancel.addEventListener("click", () => { tell({ style: Object.fromEntries(changed().map(([name]) => [name, ""])) }); form.remove(); });
+ cancel.addEventListener("click", () => {
+  const undone = changed().map(([name]) => name), kept = { ...current?.edits.get(target) };
+  for (const name of undone) delete kept[name];
+  tell({ style: Object.fromEntries(undone.map(name => [name, ""])) }); current?.edits.set(target, kept); form.remove();
+ });
  form.addEventListener("submit", event => {
   event.preventDefault(); const edits = changed();
   if (edits.length) line(`Set ${elementName(pick)}: ${edits.map(([name, value]) => `${name} ${value}`).join("; ")}`);
@@ -99,10 +108,17 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
  keepTweaks.addEventListener("click", () => { line("Keep tweaks: " + Object.entries(tweaks).map(([key, value]) => `${key} ${value}`).join(", ")); keepTweaks.hidden = true; });
  frame.addEventListener("design-inspect", event => inspect(body, (event as CustomEvent).detail));
  frame.addEventListener("load", () => {
-  current = { frame, load: crypto.randomUUID(), screen: path };
+  current = { frame, load: crypto.randomUUID(), screen: path, hash: "", edits: new Map() };
   frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode, pins }, "*");
  });
- const controls: HTMLElement[] = [...modes, keepTweaks, picker, rotate];
+ const mark = Object.assign(document.createElement("button"), { type: "button", className: "design-mark", textContent: "Mark", title: "Draw on a picture of this screen at this size" });
+ mark.addEventListener("click", () => {
+  const [, presetWidth, presetHeight] = DEVICES.find(([name]) => name === state.preset)!, clamp = (value: number) => Math.min(4000, Math.max(200, Math.round(value)));
+  const [width, height] = !presetWidth ? [frame.clientWidth, frame.clientHeight] : state.rotated ? [presetHeight, presetWidth] : [presetWidth, presetHeight];
+  const live = current?.frame === frame ? current : undefined;
+  act.mark({ screen: path, ...view.version ? { version: view.version } : {}, width: clamp(width), height: clamp(height), ...live?.hash ? { hash: live.hash } : {}, styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) });
+ });
+ const controls: HTMLElement[] = [...modes, keepTweaks, mark, picker, rotate];
  if ((view.screens?.length ?? 0) > 1) {
   const screens = Object.assign(document.createElement("select"), { className: "design-screen", title: "Screen" });
   screens.setAttribute("aria-label", "Screen");

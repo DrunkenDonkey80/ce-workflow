@@ -1284,6 +1284,19 @@ try {
  await evaluate("document.querySelector('#files .design-keep-tweaks').click()");
  assert.equal(await evaluate("document.getElementById('message-input').value"), "Set index.html @title: color #c2410c\nKeep tweaks: accent #c2410c, scale 1.125\n");
  assert.equal(await evaluate("!!document.querySelector('#files .design-inspector')"), false, "a click on chrome does not inspect");
+ // S13: Mark renders the shown screen (a real headless render) into the annotator; Cancel takes the picture out again, Save
+ // leaves the annotated image and its legend in the box.
+ await evaluate("document.getElementById('message-input').value = ''; document.querySelector('#files .design-mark').click()");
+ await browser("wait", "--timeout", "60000", "dialog.annotate[open] canvas");
+ assert.match(await evaluate("document.getElementById('message-input').value"), /^\S*pi-clipboard-[0-9a-f-]+\.png\n$/, "the render is in the box while marking");
+ await evaluate("[...document.querySelectorAll('dialog.annotate button')].find(b => b.textContent === 'Cancel').click()");
+ await browser("wait", "--fn", "!document.querySelector('dialog.annotate[open]') && document.getElementById('message-input').value === ''");
+ await evaluate("document.querySelector('#files .design-mark').click()");
+ await browser("wait", "--timeout", "60000", "dialog.annotate[open] canvas");
+ await browser("click", ".annotate-tool[aria-label^=Numbered]"); await browser("click", "dialog.annotate canvas");
+ await browser("wait", "--fn", "document.activeElement?.className === 'annotate-note'"); await browser("fill", ".annotate-note", "too big"); await browser("press", "Enter");
+ await browser("click", ".annotate-save");
+ await browser("wait", "--fn", "/^\\S*pi-clipboard-[0-9a-f-]+\\.png\\n\\(1\\) too big/.test(document.getElementById('message-input').value)");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

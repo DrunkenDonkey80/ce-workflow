@@ -143,10 +143,18 @@ try {
 	fs.mkdirSync(path.join(designs, "history", "design-1", "2"), { recursive: true }); fs.writeFileSync(path.join(designs, "history", "design-1", "2", "index.html"), "<p>v2</p>");
 	const old = (await post(id, "designpreview", { version: 2 })).body;
 	assert.deepEqual([old.version, old.screens, old.versions, old.open], [2, ["index.html"], [2], "index.html"]);
-	assert.equal(await (await fetch(`${origin}/x/${old.key}/index.html`)).text(), "<p>v2</p>");
+	assert.match(await (await fetch(`${origin}/x/${old.key}/index.html`)).text(), /^<p>v2<\/p><script data-design-chrome>/, "the kept page, with the bridge (S10)");
 	for (const version of [3, 0, "2", 1.5]) assert.equal((await post(id, "designpreview", { version })).status, typeof version === "number" && version === 3 ? 404 : 400, String(version));
 	assert.equal((await post(id, "designpreview", { version: 2, screen: "pay.html" })).status, 404, "that version had no pay screen");
 	await post(id, "unview", { key: old.key });
+	// S13: Mark renders the shown state of the session's own design only: slide hash, kept version and unsaved inline edits.
+	const shot = async (body) => { const res = await post(id, "designshot", { screen: "index.html", width: 400, height: 300, ...body }); return res.status === 200 ? fs.readFileSync(res.body.path) : res.status; };
+	for (const [body, status] of [[{ width: 100 }, 400], [{ hash: "#a b" }, 400], [{ styleEdits: [{ selector: "p", styles: { "x;y": "1" } }] }, 400], [{ screen: 1 }, 400], [{ path: "x" }, 400], [{ screen: "../design-1/pay.html" }, 404], [{ screen: "out/page.html" }, 404], [{ version: 9 }, 404]]) assert.equal(await shot(body), status, JSON.stringify(body));
+	fs.writeFileSync(path.join(mine, "deck.html"), "<body><p>slide</p><script>document.body.style.background = location.hash === '#2' ? '#000' : '#fff'</script></body>");
+	const [first, second, edited, version2, current] = [await shot({ screen: "deck.html" }), await shot({ screen: "deck.html", hash: "#2" }), await shot({ screen: "deck.html", styleEdits: [{ selector: "p", styles: { "font-size": "80px" } }] }), await shot({ version: 2 }), await shot({})];
+	assert(Buffer.isBuffer(first) && Buffer.isBuffer(current), `renders give PNG files: ${first} ${current}`);
+	assert(!first.equals(second) && !first.equals(edited) && !version2.equals(current), "the slide, the inline edit and the version each change the picture");
+	hub.registry.update(id, { modes: undefined }); assert.equal(await shot({}), 404, "not a design session"); hub.registry.update(id, { modes: { design: "design-1" } });
 	assert.equal((await post(id, "explore", { path: ".pi/designs/design-1/index.html" })).status, 404, "other .pi files stay refused for chat links");
 	await post(id, "unview", { key: designView.key }); hub.registry.update(id, { modes: undefined });
 	fs.rmSync(path.join(folder, ".pi"), { recursive: true, force: true }); fs.rmSync(path.join(folder, "secret.txt"));

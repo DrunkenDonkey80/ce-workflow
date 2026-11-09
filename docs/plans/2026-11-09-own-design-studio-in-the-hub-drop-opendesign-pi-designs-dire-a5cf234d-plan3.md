@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T12:51:36.123Z
+updated: 2026-11-09T13:03:59.101Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -198,9 +198,7 @@ Fit check per module:
 - [x] **S10** hub/src/design-bridge.ts injected before </body> into HTML of own design keys only; Comment toggle in the preview; parent hello with a per-load id, pins/mode re-sent each load; picks accepted only from the current frame's contentWindow with its load id and a bounded schema, re-emitted as a bubbling design-pick event.
 - [x] **S11** A pick opens the existing note popup; Add puts the D2 line "(n) screen @id|selector <tag> "text": note" in the chat box and a numbered pin in the page; renderMentions syncs pins to the lines left, so a deleted line drops its pin and Send clears them.
 - [x] **S12** Edit mode (one mode at a time with Comment): a click sends computed color/background/font-size/weight/padding/margin/gap/radius; the inspector applies inputs live through the bridge, Keep adds "Set <screen> @id: prop value; …", Cancel undoes; the page's Tweaks panel dispatches a window "design:tweaks" CustomEvent (guide amended: the bridge adds the load id), and Keep tweaks adds "Keep tweaks: k v, …".
-- [ ] **S13** Mark (D13): hub designshot renders what the preview shows, opens it in the annotator, and the saved image path plus legend go into the chat box
-  - It passes the S06 render-state: the shown version, screen, rotated size, deck slide hash and unsaved inline edits.
-  - Check: C3 (designshot confined to the session's own design; Mark on a non-first slide, an older version and a live CSS edit each render that state), C5, C4.
+- [x] **S13** Mark: the preview sends {screen, version, device size (rotated; Desktop = frame size), slide hash from the bridge, unsaved inspector edits}; hub designshot (own design only, bounded fields) renders it with renderDesign into a pasted-image file; the page puts it in the chat box and opens the annotator; Save leaves the image plus legend, Cancel removes it.
 - [ ] **S14** Deck kind in the preview (D16): the Slide preset, previous and next through the bridge, the slide counter, and `slide N` in comment lines
   - Check: C4 with a fixture deck.
 
@@ -250,7 +248,7 @@ Fit check per module:
 
 ## Resume context
 
-Planning draft. D1-D21 settled; review A1 (9 findings) all accepted and applied: S01 registers design-view.js in hub.ts ASSETS, rendering moved before the guide trial (Phase 2 S06-S07, Phase 3 S04-S05), store v2 keeps brief/references/system commit, shared snapshot for select and restore, render-state contract and isolated capture sessions, bridge message trust checks, design-changed refresh, R15 scoped to runtime integration with fixture updates (C10). No open questions. No product code changed. After /plan3 finish the next action is S01: record C4's baseline first.
+S01–S04, S06–S12 done (HEAD a663ad0a). Next: S13. S05 waits on a running hub plus a strong design model; S19 needs a person with a remote device. Unrelated dirty files stay unstaged: CHANGELOG.md, hub/web/index.html, the 427dd6a8/893d0619 plans, GLOSSARY.md, the stats json files, and the non-design hunks of hub/scripts/test-browser.mjs. For that test file, stage only your own hunks with git diff → filter → git apply --cached. Testing the sandboxed preview frame: eval cannot reach it, so read it from the agent-browser snapshot (Iframe "index.html" subtree) and click it with @ref. pi-lens flags the `?token=__TOKEN__` imports and the older `as unknown as` casts; these predate this plan and are not new findings.
 
 ## Amendments
 
