@@ -4,6 +4,7 @@ type ProjectFile = { path: string; change?: string; size?: number };
 // open: a viewed HTML page (its live folder, explore.ts viewPage), shown at once.
 // design: a design session's preview (S07): no file tree, and Desktop / Phone (390 px) widths for the page.
 type Archive = { key: string; name: string; files: ProjectFile[]; truncated: boolean; open?: string; design?: boolean };
+import { designControls, resetDesign } from "./design-view.js?token=__TOKEN__";
 const IMAGE = /.(?:png|jpe?g|gif|webp|bmp|svg|ico)$/i, FRAME = /.(?:html?|pdf)$/i, MEDIA = /.(?:mp4|webm|mp3|wav)$/i, MARKDOWN = /.(?:md|markdown)$/i, TEXT_BYTES = 1_048_576;
 const size = (bytes = 0) => bytes < 1024 ? bytes + " B" : bytes < 1_048_576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1_048_576).toFixed(1) + " MB";
 type Folder = { folders: Map<string, Folder>; files: ProjectFile[]; changed: boolean; size: number };
@@ -105,12 +106,7 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
   heading.replaceChildren(`${file.path} · ${size(file.size)}`, actions);
   body.className = "files-body rich";
   if (IMAGE.test(file.path)) { const img = Object.assign(document.createElement("img"), { src, alt: file.path, className: "files-image" }); img.addEventListener("click", () => image(url)); return body.replaceChildren(img); }
-  if (from.design && FRAME.test(file.path)) for (const [text, width] of [["Desktop", ""], ["Phone", "phone"]]) {
-   const button = Object.assign(document.createElement("button"), { type: "button", textContent: text, className: "files-width" });
-   button.setAttribute("aria-pressed", String((root.dataset.width ?? "") === width));
-   button.addEventListener("click", () => { if (width) root.dataset.width = width; else delete root.dataset.width; for (const other of actions.querySelectorAll(".files-width")) other.setAttribute("aria-pressed", String(other === button)); });
-   actions.prepend(button);
-  }
+  if (from.design && FRAME.test(file.path)) designControls(root, actions);
   if (FRAME.test(file.path)) return body.replaceChildren(Object.assign(document.createElement("iframe"), { src, className: "files-frame", title: file.path }));
   if (MEDIA.test(file.path)) return body.replaceChildren(Object.assign(document.createElement(/.mp[34]$|.wav$/i.test(file.path) && !/.mp4$/i.test(file.path) ? "audio" : "video"), { src, controls: true, className: "files-image" }));
   if ((file.size ?? 0) > TEXT_BYTES) return body.replaceChildren(`Too large to show here (${size(file.size)}); use Download.`);
@@ -127,11 +123,11 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
   /** Shows an explored archive's files instead of the project's until Close. */
   explore(value: Archive) {
    archive = value; selected = ""; heading.textContent = "Select a file"; body.replaceChildren();
-   root.classList.toggle("tree-hidden", !!value.design); toggle.textContent = value.design ? "Show files" : "Hide files"; delete root.dataset.width;
+   root.classList.toggle("tree-hidden", !!value.design); toggle.textContent = value.design ? "Show files" : "Hide files"; resetDesign(root);
    void refresh().then(() => { const page = archive === value && value.files.find(file => file.path === value.open); if (page) void show(page); });
   },
   /** Back to the project's files (the page restores its layout through closed). */
-  close() { if (archive?.design) { root.classList.remove("tree-hidden"); toggle.textContent = "Hide files"; delete root.dataset.width; } archive = null; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); },
+  close() { if (archive?.design) { root.classList.remove("tree-hidden"); toggle.textContent = "Hide files"; resetDesign(root); } archive = null; selected = ""; heading.textContent = "Select a file"; body.replaceChildren(); void refresh(); },
   get exploring() { return !!archive; },
   /** The viewer's key, so the page can close it on the hub. */
   get key() { return archive?.key; },
