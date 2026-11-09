@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Fixed
+- Planning: when the agent sets the plan's title and its size in the same step, the size decision is no longer lost. Before, the rename made the size call fail, and the agent then planned without a recorded size.
+
 ## 0.4.1 — 2026-11-09
 
 ### Added

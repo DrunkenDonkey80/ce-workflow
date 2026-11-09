@@ -1765,6 +1765,16 @@ try {
 		assert.match(plannedText, /^size: plan$/m);
 		assert.match(plannedText, /- \*\*D-size\*\* Size: plan\. Looks small\. Source: user pick, \d{4}-\d\d-\d\d\./);
 
+		// size and title in one parallel batch (lab runs sk09a/sk09c P3): the rename must not lose the size decision.
+		await sizeDraft("Pangolin quota sweep marmalade");
+		selectScript = [["Plan size", "Plan"]];
+		const [racedSize, retitled] = await Promise.all([tool({ action: "size", mode: "plan", text: "Known way." }), new Promise((done) => setTimeout(done, 3)).then(() => tool({ action: "title", text: "Pangolin quota sweep" }))]);
+		assert.equal(racedSize.mode, "plan");
+		const racedText = await readFile(retitled.path, "utf8");
+		assert.match(racedText, /^size: plan$/m);
+		assert.match(racedText, /^# Pangolin quota sweep$/m);
+		assert.match(racedText, /- \*\*D-size\*\* Size: plan\. Known way\./);
+
 		// Night mode takes the recommendation without a dialog; map rewrites the draft and returns the map instructions.
 		entries.push({ type: "custom", customType: "plan3-night", data: { plan: planned.id, rules: "" } });
 		await hooks.get("session_start")({ reason: "resume" }, ctx);
@@ -1787,6 +1797,11 @@ try {
 		const headless = await sizeDraft("Ocelot schema linter tangerine");
 		assert.equal((await tool({ action: "size", mode: "plan", text: "Normal." })).mode, "plan");
 		assert.match(await readFile(headless.file, "utf8"), /Source: recommendation taken \(no UI\), /);
+		// Without a dialog to wait on, size and title race for the same file.
+		await sizeDraft("Tapir index rebuild saffron");
+		const [headlessSize, headlessTitle] = await Promise.all([tool({ action: "size", mode: "plan", text: "Known way." }), tool({ action: "title", text: "Tapir index rebuild" })]);
+		assert.equal(headlessSize.mode, "plan");
+		assert.match(await readFile(headlessTitle.path, "utf8"), /^size: plan$[\s\S]*^# Tapir index rebuild$[\s\S]*- \*\*D-size\*\* Size: plan\. Known way\./m);
 		// The planner then rewrites the whole plan with write (every lab run did): size, kind and D-size survive.
 		const rewrite = { toolName: "write", input: { path: headless.file, content: "---\nplan3: true\nstatus: draft\n---\n\n# Linter\n\n## Decisions\n\n- **D-01** Own decision.\n\n## Steps\n" } };
 		hooks.get("tool_call")(rewrite, ctx);

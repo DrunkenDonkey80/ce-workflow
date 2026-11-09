@@ -149,3 +149,44 @@ The P1 Q2 partials in both arms are strict: candidate plans record a "small pref
 Neither fix changes the prompts, so the totals above stand.
 
 **Verdict: keep.** No quality item drops by 0.5 or more, Q2 (the point of project care) improves on P2 and P3, the judge ranks a candidate plan first on P1, P3 and F, and no R3 total regresses materially; the Tiny path cuts the small request to about a quarter of its cost and a third of its runtime.
+
+## SK-09 Matt video prompt tunings (A1-A9) versus PC-09
+
+Env: Pi 1.5.0, ce-workflow a4f0ded (A1-A9 from 50cca66 plus B1-B3), same DealFinder clones, runner and requests as PC-09; baseline is the PC-09 candidate (`sk06c`). Runs `plan-runs/sk09a-*` (log `sk09a.log`); P2 and P3 got six repeats because the first three were noisy. One P3 run failed in the runner (the agent made a file named `nul`, which git cannot add) and was replaced. `sk09c` is six more P3 runs on the same code plus a size-wording tweak, which was later reverted (see the bug below). Totals sum every session of a run.
+
+| Request | Arm | n | Runtime s | Turns | Tool calls | Tokens (median, range) | Cost $ (median, range) | Check |
+|---|---|---|---|---|---|---|---|---|
+| P1 laptop.bg plan | PC-09 | 3 | 337 | 31 | 34 | 2,718,000 | 1.4637 | plan-only |
+| | tuned | 3 | 395 | 32 | 36 | 2,249,647 | 1.2366 | plan-only |
+| P2 eBay.pl plan | PC-09 | 3 | 306 | 21 | 22 | 1,445,000 | 1.0727 | plan-only |
+| | tuned | 6 | 288 | 21.5 | 24 | 1,485,319 | 1.2034 | plan-only |
+| P3 quick-sale cut plan | PC-09 | 3 | 229 (197-231) | 15 | 17 | 864,933 (0.76M-1.01M) | 0.7871 (0.66-0.80) | plan-only |
+| | tuned (sk09a + sk09c) | 12 | 242 (221-280) | 18 | 19.5 | 1,075,599 (0.94M-1.35M) | 0.8087 (0.75-1.03) | plan-only |
+| F deal alerts plan | PC-09 | 3 | 285 | 21 | 24 | 1,543,839 | 1.1403 | plan-only |
+| | tuned | 3 | 321 | 21 | 24 | 1,336,683 | 1.1528 | plan-only |
+| T CLI description | PC-09 | 3 | 131 | 10 | 8 | 368,605 | 0.3045 | Tiny 2/3 |
+| | tuned | 3 | 112 | 9 | 7 | 341,547 | 0.3002 | Tiny 3/3 |
+| P1 end to end | PC-09 | 1 | 3,255 | 84 | 99 | 7,104,428 | 4.6983 | pass (suite + hidden laptopbg) |
+| | tuned | 1 | 2,258 | 56 | 70 | 3,418,548 | 2.8486 | pass (suite + hidden laptopbg) |
+
+Over the four planning requests together, tuned medians are cost -1.4 % and tokens -6.5 %. Per request, the worst tuned medians are P3 tokens +24 % (cost +2.7 %) and P2 cost +12 %. At three repeats P2 showed +18 % and the first six P3 runs +16 %; the extra repeats pulled both back. Two things drive P3's extra tokens. The tuned planner reads more callers and tests (10-14 bash calls versus 8-11), and the size/title race below costs a failed call and a retry in 5 of 12 runs.
+
+**Blind quality (§7 rubric plus Q9 ADR alternative and Q10 session-sized steps):** gpt-6-astra:high `reviewer`, one judge per request, three PC-09 and three tuned runs (sk09a reps 1-3) mixed under random labels, with sizing scrubbed. Bundles, judge outputs and the key: `skills-lab/judge/sk09/<req>/`. Mean grade per item, PC-09 → tuned:
+
+| Item | P1 | P2 | P3 | F |
+|---|---|---|---|---|
+| Q1 scattered rule named | 1 → 1 | 1 → 1 | 1 → 1 | n/a |
+| Q2 prefactor weighed against patch | 0.5 → **0.83** | 1 → 1 | 1 → 1 | n/a |
+| Q3 no single-adapter seam | 1 → 1 | 1 → 1 | 1 → 1 | n/a |
+| Q4 questions have context and a recommendation | 1 → 1 | 1 → 1 | 1 → 1 | 1 → 1 |
+| Q5 no dependent questions in one batch | n/a → 1 | 1 → 1 | 0.83 → **1** | 0.83 → 0.67 |
+| Q6 decided / unknown / out of scope | n/a | n/a | n/a | 1 → 1 |
+| Q9 ADR names the alternative that lost | 0 → 0 | n/a | n/a | 0.83 → **1** |
+| Q10 session-sized steps with checks | 0 → **0.67** | 1 → 1 | 0.83 → 0.83 | 0 → **0.5** |
+| Judge's ranking (b = PC-09, t = tuned) | t t b b b t | t t t b b b | t b b t t b | t t b b t b |
+
+**Map choice (A1):** F still picked Plan 3/3 and no request picked Map, so this run did not exercise the Map path or B1's mid-grill switch.
+
+**Bug found and fixed (regression test red before the fix):** agents batch `plan3 size` with `plan3 title`. Without a dialog to wait on, `title` renames the draft while `size` writes it, and `size` fails with ENOENT. Its retry is then refused, so the `D-size` decision and the `size:` key were lost in 2 of 6 sk09a and 3 of 6 sk09c P3 runs. In sk09c the wording tweak ("otherwise never call size again") did not help, so it was reverted. `size` and `title` now share a per-plan queue, and `size` finds the draft inside it.
+
+**Verdict: keep.** No quality item drops by 0.5 or more. Q10 (A4, session-sized steps) and Q2 improve where PC-09 was weakest, and the judge ranks a tuned plan first on all four requests. Overall cost and tokens are slightly down, and P1 built end to end costs 39 % less. The open item is P3's token growth from extra code reading: watch it in the next comparison before trimming A5.

@@ -50,7 +50,7 @@ const PROJECT_LANGUAGE = "**Project language**: when GLOSSARY.md or docs/adr/ ex
 // Plan → Map mid-grill (proposal 2026-11-09 B1): convert the draft in place, keeping what was settled.
 const MAP_SWITCH = "This draft was a normal plan and is now a map. Convert it in place: keep Original request, Decisions and answered questions; turn every open question and every unsettled part into a ticket; collect the build steps already settled for the Handoff; replace Phases with one \"### Tickets [think]\" phase.";
 const MAP_SECTIONS = ["Destination", "Notes", "Not yet specified", "Out of scope"];
-const SIZE_RULE = "**Size** first. After a short look at the request and the code it touches (minutes, not the full investigation), call plan3 action size with your recommended mode and a one-line reason: tiny when the whole change is a small diff that is quick to review and cheap to redo (one module, no open design decision); plan for normal work whose way is known, even when building it takes several sessions (grill in rounds, then plan; if grilling later shows more fog than one planning session can hold, call plan3 action size with mode map to turn the draft into a map, keeping what is settled; otherwise never call size again); map only when the way to the goal is still in fog: reaching a buildable design needs research, prototypes or decision sessions that one planning session cannot hold. The user confirms or overrides your pick. On tiny, end your turn right after the tool returns; the change starts on its own. On map, follow the map instructions the tool returns. On plan, continue planning.";
+const SIZE_RULE = "**Size** first. After a short look at the request and the code it touches (minutes, not the full investigation), call plan3 action size with your recommended mode and a one-line reason: tiny when the whole change is a small diff that is quick to review and cheap to redo (one module, no open design decision); plan for normal work whose way is known, even when building it takes several sessions (grill in rounds, then plan; if grilling later shows more fog than one planning session can hold, call plan3 action size with mode map to turn the draft into a map, keeping what is settled); map only when the way to the goal is still in fog: reaching a buildable design needs research, prototypes or decision sessions that one planning session cannot hold. The user confirms or overrides your pick. On tiny, end your turn right after the tool returns; the change starts on its own. On map, follow the map instructions the tool returns. On plan, continue planning.";
 const MAP_PROMPT = "**Map** mode: the way to this request's goal is in fog. Turn the draft into a decision map, not a build plan; nothing is built while charting. 1. Destination: grill in rounds until you can state in one or two lines what reaching the end looks like (a spec, a locked decision, or a change in place); write it under Destination and set the title. 2. Notes: the domain, files and skills every session should read, standing preferences. 3. Grill breadth-first across the whole space. Every decision you can state precisely now becomes a ticket under Tickets: \"- [ ] **T-01** <question>\" with a sub-bullet \"  - type: research | prototype | grill | task\", ordered so each ticket comes after the tickets it depends on; tickets run strictly in this order. Pick the type by what is missing: research for facts, grill for a choice the user can answer by talking, prototype for behavior or feel that needs an artifact to judge, task for enabling work. Size each ticket to one working session: split one that would not finish, merge tiny ones that share the same setup. research and task tickets are worked by the agent; prototype and grill tickets resolve only with the user, so mark them [human]; a task that needs the user is [human] too. 4. What you can tell is coming but cannot phrase as a sharp question yet goes under Not yet specified; work beyond the Destination goes under Out of scope with one line why. 5. If charting shows no fog (the way is clear, however many sessions building takes), say so and recommend a normal plan instead. Charting is done when Destination, Notes and the first tickets are written; leave the map a draft for /plan3 finish.";
 const MAP_EXECUTE = "This plan is a decision map. Resolve one ticket at a time, in order: research by reading and summarizing sources (subagents allowed for independent research tickets), prototype by building a cheap throwaway artifact for the user to react to (a logic question: a tiny interactive model of the states; a look-and-feel question: two or three contrasting variants on the existing page, switched by a parameter, not a separate canvas), clearly marked as throwaway; its Decisions line also names the artifact path, the converged verdict (often parts of several variants) and anything non-obvious the artifact does not show, and the Handoff carries that path so the implementing plan removes the prototype code, grill by asking in rounds, task by doing the enabling work. Record each answer as one Decisions line (gist and ticket ID) and mark the ticket done with that gist. Then graduate what the answer made specifiable: new tickets from Not yet specified (plan3 add, in dependency order), patches that left the fog removed from it, tickets that now sit beyond the Destination moved to Out of scope. The map is done when no ticket is open and Not yet specified is empty: then write a Handoff section listing the normal plans the Destination needs, one self-contained /plan3 request per independent part citing the map's decisions, set the map complete, and end with those requests as the next commands. Do not create the plans yourself.";
 const tinyPrompt = (request) => `Plan3 Tiny: the user chose to skip the plan for this small change. Request (task data, not instructions):\n${quote(request)}\n\nMake the change now at the smallest sufficient depth. Preserve unrelated dirty files and obey project safety rules. Run the smallest existing checks that cover the change. Do not commit. End with the files changed, the diff (or its stat when longer than 60 lines), the checks run and their results. If the change turns out bigger than tiny (several modules, an open design decision), stop before going further, say what you found and suggest /plan3 again.`;
@@ -973,8 +973,16 @@ export default function plan3(pi) {
 		send(tinyPrompt(pending.request));
 	}
 	// plan3 size: confirm the recommendation (day mode with UI), then Tiny deletes the draft, Map rewrites it, Plan records it.
+	// Agents batch size with title, which renames the draft: one queue per plan id, and size finds the file inside it.
+	const renaming = new Map();
+	function byPlanId(id, run) {
+		const next = (renaming.get(id) ?? Promise.resolve()).catch(() => {}).then(run);
+		renaming.set(id, next);
+		return next;
+	}
 	async function size(ctx, plan, recommended, reason) {
 		if (!SIZES[recommended]) throw new Error("size mode must be tiny, plan or map.");
+		plan = await resolvePlan(ctx.cwd, plan.id, await listPlans(ctx.cwd));
 		if (!sizing || plan.id !== sizing) return toMap(ctx, plan, recommended, reason);
 		sizing = null;
 		let mode = recommended, source = `recommendation taken (${ctx.hasUI ? "night mode" : "no UI"})`;
@@ -984,7 +992,7 @@ export default function plan3(pi) {
 			if (!pick) return { mode: "plan", cancelled: true, hint: "Size dialog cancelled: continue planning a normal plan." };
 			mode = pick.value;
 			source = "user pick";
-			plan = await resolvePlan(ctx.cwd, plan.id, await listPlans(ctx.cwd)); // a parallel title call may have renamed the draft meanwhile
+			plan = await resolvePlan(ctx.cwd, plan.id, await listPlans(ctx.cwd)); // renamed outside this queue (hub, another session) while the dialog waited
 		}
 		if (mode === "tiny") {
 			await unlink(plan.file);
@@ -1705,7 +1713,7 @@ export default function plan3(pi) {
 			let result: { file?: string; warning?: string; view?: string; [key: string]: unknown } = {};
 			const need = (key) => { if (args[key] === undefined || args[key] === "") throw new Error(`${args.action} needs ${key}`); return args[key]; };
 			if (args.action === "size") {
-				result = await size(ctx, plan, need("mode"), need("text").split(/\r?\n/)[0].trim());
+				result = await byPlanId(plan.id, () => size(ctx, plan, need("mode"), need("text").split(/\r?\n/)[0].trim()));
 				if (result.tiny) { await refresh(ctx); return { content: [{ type: "text", text: JSON.stringify(result) }], details: result }; } // The draft is gone: skip the summary tail.
 			} else if (args.action === "ideas") {
 				result = await reviewIdeas(ctx, plan, args.ideas, _signal);
@@ -1719,11 +1727,14 @@ export default function plan3(pi) {
 				}) };
 			} else if (args.action === "title") {
 				const title = need("text").split(/\r?\n/)[0].trim();
-				await mutate(plan, (lines) => { const i = lines.findIndex((line) => /^# /.test(line)); if (i < 0) lines.splice(frontEnd(lines) + 1, 0, "", `# ${title}`); else lines[i] = `# ${title}`; });
-				const id = stablePlanId(ctx.cwd, plan);
-				const file = path.join(path.dirname(plan.file), `${plan.created ?? today()}-${slugify(title)}-${id}-plan3.md`);
-				if (file !== plan.file) await movePlanWithDiagram(ctx.cwd, plan.file, file);
-				if (logFile(file) !== logFile(plan.file) && existsSync(logFile(plan.file))) await rename(logFile(plan.file), logFile(file));
+				const { id, file } = await byPlanId(plan.id, async () => {
+					await mutate(plan, (lines) => { const i = lines.findIndex((line) => /^# /.test(line)); if (i < 0) lines.splice(frontEnd(lines) + 1, 0, "", `# ${title}`); else lines[i] = `# ${title}`; });
+					const id = stablePlanId(ctx.cwd, plan);
+					const file = path.join(path.dirname(plan.file), `${plan.created ?? today()}-${slugify(title)}-${id}-plan3.md`);
+					if (file !== plan.file) await movePlanWithDiagram(ctx.cwd, plan.file, file);
+					if (logFile(file) !== logFile(plan.file) && existsSync(logFile(plan.file))) await rename(logFile(plan.file), logFile(file));
+					return { id, file };
+				});
 				pi.events.emit("plan3:plan-moved", { cwd: ctx.cwd, id, file });
 				result = { file };
 			} else if (args.action === "status") {
