@@ -1240,6 +1240,30 @@ try {
  const picks = await evaluate("window.picks");
  assert(picks.every(pick => pick.text === "Get started" && pick.id === "cta" && pick.tag === "button" && pick.selector === "" && pick.screen === "index.html" && pick.rect.width > 0), JSON.stringify(picks));
  assert.equal(await evaluate("document.querySelector('#files .design-comment').getAttribute('aria-pressed')"), "true");
+ // S11: the pick opens the note popup; each comment adds a numbered line and a pin; deleting a line drops its pin; Send clears them.
+ await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
+ await evaluate("document.getElementById('message-input').value = ''; document.getElementById('message-input').dispatchEvent(new Event('input'))");
+ await browser("fill", "#comment-text", "make it\nbigger"); await evaluate("document.getElementById('comment-form').requestSubmit()");
+ // The sandboxed frame is out of eval's reach; its accessibility tree shows the page and the pins, and its refs take real clicks.
+ const designTree = async () => { const rows = (await browser("snapshot")).snapshot.split("\n"), at = rows.findIndex(row => /Iframe "index\.html"/.test(row)); if (at < 0) return []; const depth = rows[at].search(/\S/), inner = []; for (const row of rows.slice(at + 1)) { if (row.search(/\S/) <= depth) break; inner.push(row.trim()); } return inner; };
+ const pinsShown = async () => (await designTree()).filter(row => /^- StaticText "\d+"$/.test(row)).map(row => row.match(/\d+/)[0]).join(",");
+ const untilPins = async (want, label) => { let seen; for (let i = 0; i < 40; i++) { if ((seen = await pinsShown()) === want) return; await new Promise(done => setTimeout(done, 150)); } assert.fail(label + ": " + seen); };
+ await untilPins("1", "the pick's pin");
+ fs.writeFileSync(join(designDir, "index.html"), `<h1 data-id="title">Calm</h1><p>Fresh</p><button data-id="cta">Get started</button>`);
+ let heading; for (let i = 0; i < 40 && !heading; i++) { const tree = await designTree(); heading = tree.some(row => row.includes("Fresh")) && tree.find(row => row.startsWith("- heading \"Calm\""))?.match(/ref=(e\d+)/)?.[1]; if (!heading) await new Promise(done => setTimeout(done, 150)); } // the reloaded page
+ await untilPins("1", "the reloaded page keeps pin 1");
+ await browser("click", "@" + heading);
+ await browser("wait", "--fn", "document.getElementById('comment-prompt').open");
+ await browser("fill", "#comment-text", "warmer"); await evaluate("document.getElementById('comment-form').requestSubmit()");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), '(1) index.html @cta <button> "Get started": make it bigger\n(2) index.html @title <h1> "Calm": warmer\n');
+ await untilPins("1,2", "two pins");
+ await evaluate("(() => { const input = document.getElementById('message-input'); input.value = input.value.split(String.fromCharCode(10)).slice(1).join(String.fromCharCode(10)); input.dispatchEvent(new Event('input')); })()");
+ await untilPins("2", "a deleted line drops its pin");
+ const sentBeforeComments = messages.length;
+ await evaluate("document.getElementById('composer').requestSubmit()");
+ for (let i = 0; i < 50 && messages.length === sentBeforeComments; i++) await new Promise(done => setTimeout(done, 100));
+ assert.equal(messages.at(-1).text, '(2) index.html @title <h1> "Calm": warmer\n');
+ await untilPins("", "Send clears the pins");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

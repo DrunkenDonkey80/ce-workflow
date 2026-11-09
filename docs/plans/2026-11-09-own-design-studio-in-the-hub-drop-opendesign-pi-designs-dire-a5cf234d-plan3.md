@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T12:24:15.049Z
+updated: 2026-11-09T12:41:07.516Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -196,9 +196,7 @@ Fit check per module:
 ### Phase 5: Bridge, comments and hand edits [code]
 
 - [x] **S10** hub/src/design-bridge.ts injected before </body> into HTML of own design keys only; Comment toggle in the preview; parent hello with a per-load id, pins/mode re-sent each load; picks accepted only from the current frame's contentWindow with its load id and a bounded schema, re-emitted as a bubbling design-pick event.
-- [ ] **S11** Comment flow: a note popover, numbered pins, D2 lines added to the chat box; deleting a line drops its pin; sending clears the pins
-  - Reuses the `addEditLine` and `dropEditLines` pattern in app.ts.
-  - Check: C4 page test with a fixture design: two comments give two lines and two pins; a removed line removes its pin.
+- [x] **S11** A pick opens the existing note popup; Add puts the D2 line "(n) screen @id|selector <tag> "text": note" in the chat box and a numbered pin in the page; renderMentions syncs pins to the lines left, so a deleted line drops its pin and Send clears them.
 - [ ] **S12** Edit mode inspector (D12): computed values of the clicked element, live inline changes through the bridge, Keep adds a Set line; Tweaks messages get a Keep tweaks line
   - Tweaks contract in the guide: the page posts `{type: "design:tweaks", values}`, and the panel is marked `data-design-chrome`.
   - Check: C4.

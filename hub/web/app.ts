@@ -8,6 +8,8 @@ import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 const { ICONS, iconSvg, BUTTON_ICONS } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _states?: string[]) => "", BUTTON_ICONS: {} as Record<string, [string, string]> }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
+import { setDesignPins } from "./design-view.js?token=__TOKEN__";
+let designPick = null, designPins = []; // S11 (declared first: renderMentions runs during start-up)
 // @ts-ignore Browser URL includes the workspace token.
 import { createPromptView } from "./prompts.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
@@ -412,7 +414,18 @@ function drawNotes(stage, boxes, view, rc, data, detailY) {
 }
 // Right-click: the note popup adds "@id: note" as a line of the message, so several notes and a closing request go to the agent together.
 let draftFor = "";
-function openNote(title, purpose, save) { $("comment-delete").hidden = true; $("comment-title").textContent = title; $("comment-purpose").textContent = purpose; $("comment-save").textContent = save; $("comment-error").hidden = true; $("comment-prompt").showModal(); $("comment-text").focus(); }
+function openNote(title, purpose, save) { designPick = null; $("comment-delete").hidden = true; $("comment-title").textContent = title; $("comment-purpose").textContent = purpose; $("comment-save").textContent = save; $("comment-error").hidden = true; $("comment-prompt").showModal(); $("comment-text").focus(); }
+// S11, D2: a design comment is a numbered pin in the page plus its line in the chat box. The line is the comment: deleting
+// it drops the pin, and sending clears them. It names the screen, the element's data-id (or a short selector), tag and text.
+document.addEventListener("design-pick", event => {
+ const pick = (event as CustomEvent).detail; draftFor = ""; labelFor = null; $("comment-label").textContent = "Comment";
+ openNote(`Comment on <${pick.tag}>${pick.text ? ` "${pick.text.slice(0, 60)}"` : ""}`, "Adds a numbered line to your message and a pin on the element. Add more, then send them together.", "Add to message");
+ designPick = pick;
+});
+function syncDesignPins() {
+ const rows = $("message-input").value.split("\n"), kept = designPins.filter(pin => rows.includes(pin.line));
+ if (kept.length !== designPins.length) { designPins = kept; setDesignPins(kept); }
+}
 function startNote(id) { draftFor = id; labelFor = null; $("comment-label").textContent = "Note"; openNote("Note on @" + id, "Adds a line to your message. Add more notes, then send them together.", "Add to message"); }
 function insertMention(id) { const input = $("message-input"); input.value += (input.value && !/\s$/.test(input.value) ? " " : "") + "@" + id + " "; input.focus(); renderMentions(); }
 // E-03 editing bar: Box and Group draw on the canvas (U-02); Select moves, resizes, connects and edits labels.
@@ -531,6 +544,15 @@ $("comment-form").addEventListener("submit", async event => {
   $("comment-save").disabled = true;
   try { if (await applyEdit({ ...labelFor, label })) { $("comment-prompt").close(); $("comment-text").value = ""; labelFor = null; } }
   finally { $("comment-save").disabled = false; }
+  return;
+ }
+ if (designPick) {
+  const note = $("comment-text").value.replace(/\s+/g, " ").trim(); if (!note) return;
+  const { screen, id, selector, tag, text } = designPick, n = (designPins.at(-1)?.n ?? 0) + 1;
+  const line = `(${n}) ${screen} ${id ? "@" + id : selector} <${tag}>${text ? ` "${text}"` : ""}: ${note}`;
+  designPins = [...designPins, { n, screen, id, selector, line }]; setDesignPins(designPins);
+  const input = $("message-input"); input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + line + "\n" : line + "\n";
+  $("comment-prompt").close(); $("comment-text").value = ""; designPick = null; input.focus(); input.setSelectionRange(input.value.length, input.value.length); renderMentions();
   return;
  }
  if (draftFor) {
@@ -1049,6 +1071,7 @@ function attachTo(text: HTMLTextAreaElement) {
 const imageSource = (path: string) => "api/image?path=" + encodeURIComponent(path) + (token ? "&token=" + token : "");
 const mentioned = () => [...new Set([...$("message-input").value.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
 function renderMentions() {
+ syncDesignPins(); // every change to the chat box passes here, so a deleted or sent comment line drops its pin
  const data = state.diagram, all = [...(data?.nodes ?? []), ...(data?.edges ?? []), ...(data?.notes ?? [])]; $("mentions").replaceChildren();
  for (const id of mentioned()) { const entity = all.find(item => item.id === id), chip = document.createElement("span"); chip.className = "mention-chip"; chip.textContent = "@" + id + (entity ? "" : " (not found)"); chip.title = "No matching element; sent as text."; if (entity && "label" in entity) chip.title = entity.label ?? chip.title; if (entity && "text" in entity) chip.title = entity.text; $("mentions").append(chip); }
 }
