@@ -83,8 +83,18 @@ try {
 	hubCalls.length = 0;
 	const selected = await runDesign(cwd, { action: "select", handle: "@design-2" }, choose("start"));
 	assert.deepEqual([selected.folder, selected.files, selected.changes], ["docs/designs/calm/", ["assets/a.css", "index.html"], undefined]);
-	assert.deepEqual(fs.readdirSync(exported).sort(), ["DESIGN.json", "assets", "index.html"]);
-	assert.equal(JSON.parse(fs.readFileSync(path.join(exported, "DESIGN.json"), "utf8")).handle, "design-2");
+	assert.deepEqual(fs.readdirSync(exported).sort(), ["BRIEF.md", "DESIGN.json", "HANDOFF.md", "assets", "index.html"]);
+	const owner = JSON.parse(fs.readFileSync(path.join(exported, "DESIGN.json"), "utf8"));
+	assert.deepEqual([owner.handle, owner.version], ["design-2", selected.version], "DESIGN.json records the exported version");
+	// S16 (D15, D18): the handoff contract and the brief, from code.
+	const handoffText = fs.readFileSync(path.join(exported, "HANDOFF.md"), "utf8"), briefText = fs.readFileSync(path.join(exported, "BRIEF.md"), "utf8");
+	assert.match(handoffText, /^# Calm implementation handoff\n\nVersion \d+ of design-2 \(app\)/);
+	assert.match(handoffText, /## Screens\n\n- `index\.html`\n\n/);
+	assert.match(handoffText, /- Phone small: 360×800\n[\s\S]*- Desktop: 1440×900\n/);
+	assert.doesNotMatch(handoffText, /Slide/, "no deck preset for an app");
+	assert.match(handoffText, /`data-design-chrome` \(the Tweaks panel and other design helpers\) are not product UI/);
+	assert.match(handoffText, /No `DESIGN\.md`: extract the tokens/);
+	assert.match(briefText, /- Direction: calm\n- Kind: app\n- Design system: none\n- References: none\n- Project files read: page\.html\n\n## Brief\n\nHome page\nThe whole landing page, real copy\./);
 	assert.deepEqual(asked.at(-1), ["Implement Calm where?", ["start", "new"]], "the starting session is offered while the hub has it");
 	assert.deepEqual(hubCalls.map(call => call.slice(0, 2)), [["subtitle", "00000000-0000-0000-0000-000000000001"], ["session", "parent-session"], ["wake", "parent-session"], ["prompt", "parent-session"]]);
 	assert.equal(hubCalls[0][2], "★ Home page", "the star shows on its row");
@@ -237,5 +247,14 @@ try {
 	const withSystem = await runDesign(cwd, { action: "start", brief: "b", directions: ["y"], names: ["Y"], title: "t", system: "airbnb" }, net);
 	assert.deepEqual(withSystem.sessions[0].system, { name: "airbnb", commit: sha });
 	assert.match(hubCalls.find(call => call[0] === "prompt")[2], /Follow the design system in \.pi\/designs\/systems\/airbnb\/ \(DESIGN\.md first/);
+	// S16: the handoff lists every screen (index first), points at DESIGN.md and where the chrome is; the brief names the system and commit.
+	const ownHandle = withSystem.sessions[0].handle;
+	put(ownHandle, { "index.html": "<div data-design-chrome></div>", "pay.html": "<p>pay</p>", "DESIGN.md": "# tokens" });
+	const sysExport = (await runDesign(cwd, { action: "select", handle: ownHandle }, choose(undefined))).folder;
+	const sysHandoff = fs.readFileSync(path.join(cwd, sysExport, "HANDOFF.md"), "utf8");
+	assert.match(sysHandoff, /## Screens\n\n- `index\.html`\n- `pay\.html`\n/);
+	assert.match(sysHandoff, /`DESIGN\.md` lists the color tokens/);
+	assert.match(sysHandoff, /Found in: index\.html\./);
+	assert.match(fs.readFileSync(path.join(cwd, sysExport, "BRIEF.md"), "utf8"), new RegExp(`- Design system: airbnb \\(github\\.com/nexu-io/open-design design-systems/airbnb at ${sha}\\)`));
 	console.log("design tool tests passed");
 } finally { fs.rmSync(cwd, { recursive: true, force: true }); }

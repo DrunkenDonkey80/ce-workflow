@@ -6,7 +6,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { captureSite, presetSize, renderDesign, reportText } from "./design-render.ts";
+import { captureSite, PRESETS, presetSize, renderDesign, reportText } from "./design-render.ts";
 import { redactOpenDesignText } from "./opendesign-client.ts";
 import { atomic, confined, withPlanLock } from "./plan3-files.ts";
 
@@ -288,6 +288,31 @@ function exportFolder(cwd: string, item: Session) {
 	const stem = slug(item.name ?? "") || item.handle;
 	for (let n = 1; ; n++) if (!fs.existsSync(path.join(base, n === 1 ? stem : `${stem}-${n}`))) return n === 1 ? stem : `${stem}-${n}`;
 }
+// D18, D20: what the design was asked for and built from; no chat transcript.
+const briefFile = (item: Session) => [
+	`# ${item.name ?? item.handle}: brief`, "", `- Direction: ${item.direction}`, `- Kind: ${item.kind}`,
+	`- Design system: ${item.system ? `${item.system.name} (github.com/${OD} design-systems/${item.system.name} at ${item.system.commit})` : "none"}`,
+	`- References: ${item.references.length ? item.references.map(site => `.pi/designs/references/${site}/`).join(", ") : "none"}`,
+	...item.inputs.length ? [`- Project files read: ${item.inputs.join(", ")}`] : [], "", "## Brief", "", item.brief?.trim() || "(none recorded)", "",
+].join("\n");
+// D15: the implementer's contract, adapted from OD's buildDesignHandoffContent (apps/web/src/runtime/exports.ts, Apache-2.0).
+function handoff(item: Session, version: number, files: Map<string, Buffer>) {
+	const screens = [...files.keys()].filter(file => /^[^/]+\.html?$/i.test(file)).sort((a, b) => Number(b === "index.html") - Number(a === "index.html") || a.localeCompare(b));
+	const chrome = [...files].filter(([file, bytes]) => /\.(html?|js|css)$/i.test(file) && bytes.includes("data-design-chrome")).map(([file]) => file);
+	const presets = Object.entries(PRESETS).filter(([name]) => (item.kind === "deck") === (name === "Slide"));
+	return [
+		`# ${item.name ?? item.handle} implementation handoff`, "",
+		`Version ${version} of ${item.handle} (${item.kind}). These files are the visual contract: build production UI that matches them, not a loose reinterpretation. BRIEF.md says what was asked for.`, "",
+		"## Screens", "", ...screens.length ? screens.map(file => `- \`${file}\``) : ["- None"], "",
+		"## Tokens", "", files.has("DESIGN.md") ? "`DESIGN.md` lists the color tokens, type scale, spacing, radii and components with their states. Extract them as tokens before writing components." : "No `DESIGN.md`: extract the tokens (background, surface, text, border, accent, radius, shadow, spacing, type scale, motion) from the stylesheets before writing components.", "",
+		"## Required states", "", "- Data views: loading, empty, error (input kept) and populated; long text and missing optional fields.", "- Controls: hover, focus (visible), pressed, disabled, and validation where present.", "",
+		"## Viewports", "", ...presets.map(([name, [width, height]]) => `- ${name}: ${width}×${height}`), item.kind === "deck" ? "" : "\nOne adaptive layout across these, not separate fixed screens; keep the media queries and fluid sizes in the files.", "",
+		"## Not product UI", "", `Elements marked \`data-design-chrome\` (the Tweaks panel and other design helpers) are not product UI: leave them out.${chrome.length ? ` Found in: ${chrome.join(", ")}.` : ""}`, "",
+		"## Checklist", "",
+		"- [ ] Map each screen to a route or view; keep their boundaries.", "- [ ] Tokens first, then components, then screens.", "- [ ] Keep the real copy, labels and data; no generic filler.",
+		"- [ ] Keep heading order, real buttons, links and inputs, and visible focus.", "- [ ] Cover the required states above.", "- [ ] Check every viewport above against the design.", "",
+	].join("\n");
+}
 /**
  * R7: the design folder into docs/designs/<name>/ (never a folder another handle or the user owns), starred, and handed to
  * the starting session (offered only while the hub has it) or a new one. D10: a reselect lists what changed since the last
@@ -300,7 +325,7 @@ async function select(cwd: string, handle: string, tools: Tools) {
 	const dir = exportFolder(cwd, item), root = `docs/designs/${dir}`, copy = `.pi/designs/selected/${item.handle}`, before = `${copy}.before`;
 	const previous = readTree(confined(cwd, copy)), changes = previous.size ? delta(previous, files) : undefined;
 	const owned = Buffer.from(`${JSON.stringify({ handle: item.handle, name: item.name, version }, null, "\t")}\n`);
-	syncTree(cwd, root, new Map([...files, ["DESIGN.json", owned]]));
+	syncTree(cwd, root, new Map([...files, ["DESIGN.json", owned], ["BRIEF.md", Buffer.from(briefFile(item))], ["HANDOFF.md", Buffer.from(handoff(item, version, files))]]));
 	fs.rmSync(confined(cwd, before), { recursive: true, force: true });
 	if (previous.size) fs.renameSync(confined(cwd, copy), confined(cwd, before));
 	syncTree(cwd, copy, files);
@@ -309,7 +334,7 @@ async function select(cwd: string, handle: string, tools: Tools) {
 	const name = saved.name ?? saved.handle, list = (label: string, items: string[]) => items.length ? `${label}: ${items.join(", ")}` : "";
 	const message = changes
 		? `Design ${name} (${saved.handle}) was selected again: ${root}/ now holds the new version. Since the last selection: ${[list("added", changes.added), list("changed", changes.changed), list("removed", changes.removed)].filter(Boolean).join("; ") || "no file changed"}. See the lines with git diff --no-index ${before} ${root}, then update the implementation to match.`
-		: `Design ${name} (${saved.handle}) was selected for implementation: ${root}/ (index.html first, ${files.size} file${files.size === 1 ? "" : "s"}). Compare it with the current code, then write the implementation plan with /plan3.`;
+		: `Design ${name} (${saved.handle}) was selected for implementation: ${root}/ (index.html first, ${files.size} file${files.size === 1 ? "" : "s"}; read HANDOFF.md and BRIEF.md first). Compare it with the current code, then write the implementation plan with /plan3.`;
 	// D2: the starting session only while the hub still has it.
 	const found = saved.from ? await tools.hub(["session", saved.from]) : undefined;
 	let starting: { name?: string } | undefined;

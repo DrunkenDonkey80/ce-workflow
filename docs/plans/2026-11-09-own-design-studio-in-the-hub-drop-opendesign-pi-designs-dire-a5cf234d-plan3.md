@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T13:11:46.209Z
+updated: 2026-11-09T13:13:49.031Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -204,8 +204,7 @@ Fit check per module:
 ### Phase 6: Library and handoff [code]
 
 - [x] **S15** design systems: the project's own DESIGN.md/tokens files first, then OD's package names from a cached index of main (index.json with the commit; refresh re-reads it, a failed refresh keeps the cache); a name fetches DESIGN.md, tokens.css and SOURCE.json (commit, Apache-2.0, manifest source) once into .pi/designs/systems/<name>/ and notes {name, commit} on the design; start takes system and its first message tells the agent to follow it.
-- [ ] **S16** Select writes HANDOFF.md (D15) and BRIEF.md (D18), records the exported version, and keeps the v2 ask-where and delta flow
-  - Check: C1 (HANDOFF.md lists the screens, version, presets and chrome note; reselect delta unchanged).
+- [x] **S16** Select writes BRIEF.md (direction, kind, system with commit, references, inputs, brief) and HANDOFF.md (version, screens index-first, DESIGN.md tokens or an extract note, required states, the viewport matrix from PRESETS with Slide only for decks, data-design-chrome as not product UI with where it occurs, a checklist) beside the export; DESIGN.json keeps the version; the ask-where and reselect delta flow is unchanged, and the message says to read HANDOFF.md and BRIEF.md first.
 
 ### Phase 7: Remove OpenDesign and document [code]
 
