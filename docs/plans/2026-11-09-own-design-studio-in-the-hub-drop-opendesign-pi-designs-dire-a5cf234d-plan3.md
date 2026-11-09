@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T12:16:52.194Z
+updated: 2026-11-09T12:24:15.049Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -195,10 +195,7 @@ Fit check per module:
 
 ### Phase 5: Bridge, comments and hand edits [code]
 
-- [ ] **S10** hub/src/design-bridge.ts injected into HTML served for own design keys; Comment mode picks an element and posts {screen, id or selector, tag, text, rect}
-  - Pins are drawn by the bridge inside the page from a pin list the parent sends after every load, so they survive live reloads.
-  - Trust: the page accepts bridge messages only when `event.source` is the current frame's `contentWindow` and they carry the frame's load id. Each message type has a bounded schema (text 160 chars, selector 300, numbers finite). Anything else is dropped. Messages only fill the chat box; sending always stays a user action.
-  - Check: C2 (injected only for own design keys, not other explored pages), C4 (messages from another frame, a stale load and malformed payloads are ignored).
+- [x] **S10** hub/src/design-bridge.ts injected before </body> into HTML of own design keys only; Comment toggle in the preview; parent hello with a per-load id, pins/mode re-sent each load; picks accepted only from the current frame's contentWindow with its load id and a bounded schema, re-emitted as a bubbling design-pick event.
 - [ ] **S11** Comment flow: a note popover, numbered pins, D2 lines added to the chat box; deleting a line drops its pin; sending clears the pins
   - Reuses the `addEditLine` and `dropEditLines` pattern in app.ts.
   - Check: C4 page test with a fixture design: two comments give two lines and two pins; a removed line removes its pin.

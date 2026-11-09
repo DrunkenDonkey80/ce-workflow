@@ -98,6 +98,14 @@ try {
 	await mkdir(join(project, ".pi", "designs", "history", "design-1", "1"));
 	await writeFile(join(project, ".pi", "designs", "history", "design-1", "1", "index.html"), "v1");
 	assert.deepEqual(await changes(), [{ screens: ["index.html", "a.html"], versions: [1] }], "a new version");
+	// S10: a design session's own pages carry the comment bridge (with a matching length); other explored pages do not.
+	const bridged = await fetchLike(`/x/${d.key}/index.html`);
+	assert.match(bridged.body, /^<h1>edited<\/h1><script data-design-chrome>[\s\S]*design:pick[\s\S]*<\/script>$/);
+	assert.equal(bridged.head["content-length"], Buffer.byteLength(bridged.body));
+	assert.doesNotMatch((await fetchLike(`/x/${first.key}/index.html`)).body, /data-design-chrome/, "an explored archive page is served as it is");
+	await writeFile(join(design, "page.html"), "<body><p>x</p></body></html>");
+	assert.match((await fetchLike(`/x/${d.key}/page.html`)).body, /<p>x<\/p><script data-design-chrome>[\s\S]*<\/script><\/body><\/html>$/, "before the closing body tag");
+	await rm(join(design, "page.html")); await changes();
 	// S09: a kept version is its own handle's history folder only.
 	assert.match(await designPage(project, "design-1", "index.html", 1), /history.design-1.1.index.html$/);
 	await mkdir(join(project, ".pi", "designs", "history", "design-2", "5"), { recursive: true }); await writeFile(join(project, ".pi", "designs", "history", "design-2", "5", "index.html"), "x");

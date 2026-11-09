@@ -15,6 +15,26 @@ function device(view: DesignView): Device {
  return { preset: "Desktop", rotated: false };
 }
 
+// S10: the bridge in the page (hub/src/design-bridge.ts). Only the frame shown now, with its current load id, is heard;
+// a valid pick goes out as a bubbling "design-pick" event from that frame. Comment mode and the pins outlive reloads.
+export type DesignPick = { screen: string; id: string; selector: string; tag: string; text: string; rect: { x: number; y: number; width: number; height: number } };
+export type DesignPin = { n: number; screen: string; id: string; selector: string };
+let current: { frame: HTMLIFrameElement; load: string; screen: string } | undefined, commenting = false, pins: DesignPin[] = [];
+const tell = (data: Record<string, unknown>) => { if (current?.frame.isConnected) current.frame.contentWindow?.postMessage({ load: current.load, ...data }, "*"); };
+export function setDesignPins(list: DesignPin[]) { pins = list; tell({ pins }); }
+const bounded = (value: unknown, max: number, pattern?: RegExp) => typeof value === "string" && value.length <= max && (!pattern || pattern.test(value));
+function readPick(data: any, screen: string): DesignPick | undefined {
+ const rect = data?.rect;
+ if (data?.screen !== screen || !bounded(data.id, 80, /^[\w-]*$/) || !bounded(data.selector, 300) || !(data.id || data.selector) || !bounded(data.tag, 32, /^[a-z][a-z0-9-]*$/) || !bounded(data.text, 160)) return undefined;
+ if (!rect || ![rect.x, rect.y, rect.width, rect.height].every(Number.isFinite)) return undefined;
+ return { screen, id: data.id, selector: data.selector, tag: data.tag, text: data.text, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
+}
+addEventListener("message", event => {
+ if (!current?.frame.isConnected || event.source !== current.frame.contentWindow || event.data?.load !== current.load || event.data.type !== "design:pick") return;
+ const pick = readPick(event.data, current.screen);
+ if (pick) current.frame.dispatchEvent(new CustomEvent("design-pick", { bubbles: true, detail: pick }));
+});
+
 /** The design's page in a device frame, with the device, rotate and screen controls added before Download and Open. */
 export function designFrame(view: DesignView, path: string, src: string, body: HTMLElement, actions: HTMLElement, act: DesignActions) {
  const state = device(view);
@@ -27,7 +47,14 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
  picker.value = state.preset;
  const rotate = Object.assign(document.createElement("button"), { type: "button", className: "design-rotate", textContent: "⟳", title: "Rotate (landscape)" });
  rotate.setAttribute("aria-label", "Rotate");
- const controls: HTMLElement[] = [picker, rotate];
+ const comment = Object.assign(document.createElement("button"), { type: "button", className: "design-comment", textContent: "Comment", title: "Click an element in the page to comment on it" });
+ comment.setAttribute("aria-pressed", String(commenting));
+ comment.addEventListener("click", () => { commenting = !commenting; comment.setAttribute("aria-pressed", String(commenting)); tell({ mode: commenting ? "comment" : "" }); });
+ frame.addEventListener("load", () => {
+  current = { frame, load: crypto.randomUUID(), screen: path };
+  frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode: commenting ? "comment" : "", pins }, "*");
+ });
+ const controls: HTMLElement[] = [comment, picker, rotate];
  if ((view.screens?.length ?? 0) > 1) {
   const screens = Object.assign(document.createElement("select"), { className: "design-screen", title: "Screen" });
   screens.setAttribute("aria-label", "Screen");

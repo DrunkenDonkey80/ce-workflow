@@ -1227,6 +1227,19 @@ try {
  assert.equal(messages.at(-1).text, "Restore version 1");
  await evaluate("document.querySelector('#files .design-step[aria-label=\"Newer version\"]').click()");
  await browser("wait", "--fn", "document.querySelector('#files .design-version')?.textContent === 'Live' && !document.querySelector('#files .design-restore')");
+ // S10: in Comment mode a click in the page comes back as one pick; another window, a stale load and malformed payloads do not.
+ fs.writeFileSync(join(designDir, "index.html"), `<h1>Calm</h1><button data-id="cta">Get started</button><script>addEventListener("message", e => { const d = e.data || {}; if (d.mode !== "comment") return;
+  const ok = { type: "design:pick", screen: "index.html", id: "cta", selector: "", tag: "button", text: "Fake", rect: { x: 0, y: 0, width: 1, height: 1 } };
+  for (const bad of [{ load: "stale" }, { load: d.load, text: "x".repeat(161) }, { load: d.load, rect: { x: NaN } }, { load: d.load, screen: "pay.html" }, { load: d.load, tag: "<b>" }]) parent.postMessage({ ...ok, ...bad }, "*");
+  setTimeout(() => document.querySelector("[data-id=cta]").click(), 50); });</script>`);
+ await new Promise(done => setTimeout(done, 1500)); // the live preview reloads the page
+ await evaluate("window.picks = []; document.addEventListener('design-pick', e => window.picks.push(e.detail)); window.postMessage({ type: 'design:pick', load: 'x', screen: 'index.html', id: 'cta', selector: '', tag: 'p', text: 'Top', rect: { x: 0, y: 0, width: 1, height: 1 } }, '*')");
+ await evaluate("document.querySelector('#files .design-comment').click()");
+ await browser("wait", "--fn", "window.picks.length > 0");
+ await new Promise(done => setTimeout(done, 300));
+ const picks = await evaluate("window.picks");
+ assert(picks.every(pick => pick.text === "Get started" && pick.id === "cta" && pick.tag === "button" && pick.selector === "" && pick.screen === "index.html" && pick.rect.width > 0), JSON.stringify(picks));
+ assert.equal(await evaluate("document.querySelector('#files .design-comment').getAttribute('aria-pressed')"), "true");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});
