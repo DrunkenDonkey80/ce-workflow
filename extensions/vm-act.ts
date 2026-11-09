@@ -174,7 +174,7 @@ else { $pr=${start} -Wait -PassThru; $c=$pr.ExitCode; 'vm_act: the program requi
 };
 // A standard user may not create files in C:\Windows\Temp itself (BUILTIN\Users has no generic write there), so each run gets its own folder that user can modify.
 // Results of wait: false runs nobody fetched leave tasks behind; those finished over a day ago go first.
-export const TASK_START_PS = `Get-ScheduledTask -TaskName 'vm-act-run-*' -ErrorAction SilentlyContinue | Where-Object { $_.State -ne 'Running' -and (Get-ScheduledTaskInfo $_).LastRunTime -lt (Get-Date).AddDays(-1) } | ForEach-Object { Unregister-ScheduledTask $_.TaskName -Confirm:$false; Remove-Item "C:\\Windows\\Temp\\$($_.TaskName)*" -Recurse -Force -ErrorAction SilentlyContinue }
+export const TASK_START_PS = `Get-ScheduledTask -TaskName 'vm-act-run-*' -ErrorAction SilentlyContinue | Where-Object { $_.State -ne 'Running' -and (Get-ScheduledTaskInfo $_).LastRunTime -lt (Get-Date).AddDays(-1) } | ForEach-Object { Unregister-ScheduledTask $_.TaskName -Confirm:$false; try { Remove-Item "C:\\Windows\\Temp\\$($_.TaskName)\\*" -Force; Remove-Item "C:\\Windows\\Temp\\$($_.TaskName)" -Force } catch {} }
 $d="C:\\Windows\\Temp\\$($p.task)"; New-Item -ItemType Directory $d -Force | Out-Null; icacls $d /grant "$($p.user):(OI)(CI)M" | Out-Null
 if ($p.script) { "\`$ProgressPreference='SilentlyContinue'\`n$($p.script)" | Set-Content -LiteralPath "$d\\s.ps1" -Encoding UTF8 }
 Register-ScheduledTask -TaskName $p.task -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $($p.enc)") -Principal (New-ScheduledTaskPrincipal -UserId $p.user -LogonType $p.logon -RunLevel $p.level) -Settings (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)) | Out-Null
@@ -183,7 +183,9 @@ export const TASK_POLL_PS = `$t=Get-ScheduledTask -TaskName $p.task -ErrorAction
 if(!$t) { throw "No task $($p.task) on the guest (a result is deleted once it has been returned)." }
 if(!(Test-Path "$b.code")) { if($t.State -eq 'Running' -or $t.State -eq 'Queued') { 'RUNNING'; exit 0 }; Start-Sleep 2; if(!(Test-Path "$b.code")) { [IO.File]::WriteAllText("$b.code", "task:$((Get-ScheduledTaskInfo $p.task).LastTaskResult)") } }
 $m="#$($p.task)"; "$m-code"; Get-Content "$b.code" -Raw; "$m-out"; Get-Content "$b.out" -Raw -ErrorAction SilentlyContinue; "$m-err"; Get-Content "$b.err" -Raw -ErrorAction SilentlyContinue
-Unregister-ScheduledTask $p.task -Confirm:$false; Remove-Item $d -Recurse -Force -ErrorAction SilentlyContinue`;
+Unregister-ScheduledTask $p.task -Confirm:$false
+# Win11_VBOX: a recursive Remove-Item threw a terminating Access is denied on this folder (only the user's ACE) despite SilentlyContinue; files first, then the folder works; a failed cleanup must not lose the result
+try { Remove-Item "$d\\*" -Force; Remove-Item $d -Force } catch {}`;
 /** VBoxManage errors while the guest's VBoxService is not up yet. */
 export const BOOTING = /Guest Additions are not installed or not ready|guest execution service is not ready/i;
 export const envName = (user: string) => `VM_${user.toUpperCase().replace(/[^A-Z0-9]/g, "_")}_PASSWORD`;
