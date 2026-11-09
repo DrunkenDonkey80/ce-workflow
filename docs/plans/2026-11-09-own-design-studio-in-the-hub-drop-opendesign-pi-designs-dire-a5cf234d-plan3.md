@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-09
-updated: 2026-11-09T13:08:27.878Z
+updated: 2026-11-09T13:11:46.209Z
 size: plan
 reviewed: 2026-11-09
 ---
@@ -203,9 +203,7 @@ Fit check per module:
 
 ### Phase 6: Library and handoff [code]
 
-- [ ] **S15** `design systems` lists OD packages from a cached GitHub index; picking one fetches DESIGN.md, tokens.css and the manifest source into .pi/designs/systems/<name>/ (D14, D20)
-  - Start accepts `system`. The project's own `DESIGN.md` or tokens file is listed first.
-  - Check: C1 with a fake fetch (index, one package, offline cache hit).
+- [x] **S15** design systems: the project's own DESIGN.md/tokens files first, then OD's package names from a cached index of main (index.json with the commit; refresh re-reads it, a failed refresh keeps the cache); a name fetches DESIGN.md, tokens.css and SOURCE.json (commit, Apache-2.0, manifest source) once into .pi/designs/systems/<name>/ and notes {name, commit} on the design; start takes system and its first message tells the agent to follow it.
 - [ ] **S16** Select writes HANDOFF.md (D15) and BRIEF.md (D18), records the exported version, and keeps the v2 ask-where and delta flow
   - Check: C1 (HANDOFF.md lists the screens, version, presets and chrome note; reselect delta unchanged).
 

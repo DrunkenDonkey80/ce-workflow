@@ -76,14 +76,16 @@ const hubCall = (args: string[]) => new Promise<{ ok: boolean; text: string }>(r
 	resolve({ ok: !error, text: `${stdout}\n${stderr}`.trim() || String(error?.message ?? "") })));
 // ask: one choice from items (the tool draws it with ask-user's list dialog); undefined when dismissed.
 // text: one line from the user (askText); undefined when dismissed.
-type Tools = { hub: typeof hubCall; ask?: (title: string, purpose: string, items: { value: string; label: string }[]) => Promise<string | undefined>; text?: (title: string) => Promise<string | undefined> };
+// fetch: the network for the design-system library (tests pass a fake).
+type Tools = { hub: typeof hubCall; fetch?: typeof fetch; ask?: (title: string, purpose: string, items: { value: string; label: string }[]) => Promise<string | undefined>; text?: (title: string) => Promise<string | undefined> };
 
 /** The first message of a new design session: what to build, from what, and where. */
 function buildPrompt(item: Session) {
-	return `${item.brief ?? ""}\n\nDirection for this design (${item.handle}, ${item.kind}): ${item.direction}\n${item.inputs.length ? `\nRead these project files first (read only; keep their real copy and content): ${item.inputs.join(", ")}\n` : ""}\nBuild the design now: write its files into ${designFolder(item.handle)}/ (index.html first). The user watches it appear beside this chat.`;
+	return `${item.brief ?? ""}\n\nDirection for this design (${item.handle}, ${item.kind}): ${item.direction}\n${item.inputs.length ? `\nRead these project files first (read only; keep their real copy and content): ${item.inputs.join(", ")}\n` : ""}${item.system ? `\nFollow the design system in ${SYSTEMS}/${item.system.name}/ (DESIGN.md first, then tokens.css).\n` : ""}\nBuild the design now: write its files into ${designFolder(item.handle)}/ (index.html first). The user watches it appear beside this chat.`;
 }
 
-async function start(cwd: string, args, hub: Tools["hub"]) {
+async function start(cwd: string, args, tools: Tools) {
+	const hub = tools.hub;
 	const brief = text(args.brief, "brief", 60_000);
 	const directions = Array.isArray(args.directions) ? args.directions.map((item, index) => text(item, `direction ${index + 1}`, 4_000)) : [];
 	if (directions.length < 1 || directions.length > 6) throw new Error("Give 1-6 directions: one design session each.");
@@ -92,12 +94,13 @@ async function start(cwd: string, args, hub: Tools["hub"]) {
 	if (names.length !== directions.length || names.some(name => !name)) throw new Error("Give names: one short name per direction for the session list, e.g. Calm, Bold editorial (never design-N).");
 	const title = short(text(args.title, "title (a few words naming what is designed, e.g. Home page)", 400), 60);
 	const kind: Kind = KINDS.includes(args.kind) ? args.kind : "web";
+	const system = args.system === undefined ? undefined : await fetchSystem(cwd, args.system, tools);
 	const inputs: string[] = [], skipped: string[] = [];
 	for (const file of Array.isArray(args.inputs) ? args.inputs.map(String).slice(0, 30) : []) {
 		try { if (!fs.statSync(confined(cwd, file)).isFile()) throw new Error("not a file"); inputs.push(file); } catch (error) { skipped.push(`${file} (${error.message})`); }
 	}
 	const items = await change(cwd, store => directions.map((direction, index) => {
-		const item: Session = { handle: `design-${store.next++}`, direction, name: names[index], title, brief, kind, inputs, references: [], from: process.env.PI_HUB_SESSION, created: Date.now() };
+		const item: Session = { handle: `design-${store.next++}`, direction, name: names[index], title, brief, kind, inputs, references: [], ...system ? { system: { name: system.name, commit: system.commit } } : {}, from: process.env.PI_HUB_SESSION, created: Date.now() };
 		store.sessions.push(item);
 		fs.mkdirSync(confined(cwd, designFolder(item.handle)), { recursive: true });
 		return item;
@@ -208,6 +211,63 @@ async function reference(cwd: string, handle: string | undefined, url) {
 	return { folder, ...result };
 }
 
+// D14, D20: OD's design systems, fetched on demand from its main branch into .pi/designs/systems/ with the commit they came from.
+const SYSTEMS = ".pi/designs/systems", OD = "nexu-io/open-design", OWN = ["DESIGN.md", "tokens.css", "design-tokens.json"];
+type SystemIndex = { commit: string; fetched: number; names: string[] };
+async function get(tools: Tools, url: string, accept?: string) {
+	const response = await (tools.fetch ?? fetch)(url, { headers: { "user-agent": "ce-workflow", ...accept ? { accept } : {} }, signal: AbortSignal.timeout(20_000) });
+	if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+	const body = await response.text();
+	if (body.length > 1_000_000) throw new Error(`${url}: over 1 MB`);
+	return body;
+}
+const readIndex = (cwd: string): SystemIndex | undefined => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${SYSTEMS}/index.json`), "utf8")); } catch { return undefined; } };
+/** The cached index of OD's packages; refresh (or no cache) reads main's tree again, and a failed refresh keeps the cache. */
+async function systemIndex(cwd: string, tools: Tools, refresh = false) {
+	const cached = readIndex(cwd);
+	if (cached && !refresh) return cached;
+	try {
+		const commit = (await get(tools, `https://api.github.com/repos/${OD}/commits/main`, "application/vnd.github.sha")).trim();
+		if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error(`unexpected commit ${clip(commit, 60)}`);
+		const entries = JSON.parse(await get(tools, `https://api.github.com/repos/${OD}/contents/design-systems?ref=${commit}`));
+		const names = entries.filter(entry => entry?.type === "dir" && /^[a-z0-9][a-z0-9-]{0,60}$/.test(entry.name)).map(entry => entry.name).sort();
+		const index: SystemIndex = { commit, fetched: Date.now(), names };
+		atomic(confined(cwd, `${SYSTEMS}/index.json`), `${JSON.stringify(index, null, "\t")}\n`);
+		return index;
+	} catch (error) {
+		if (cached) return { ...cached, offline: `refresh failed: ${clip(error.message, 200)}` };
+		throw new Error(`No design-system index (offline?): ${error.message}`, { cause: error });
+	}
+}
+/** systems: the project's own system files first, then OD's packages; with name, that package is fetched (once) and noted on the design. */
+async function systems(cwd: string, args, handle: string | undefined, tools: Tools) {
+	if (args.name === undefined) {
+		const own = OWN.filter(file => fs.existsSync(confined(cwd, file)));
+		const index = await systemIndex(cwd, tools, !!args.refresh), fetched = index.names.filter(name => fs.existsSync(confined(cwd, `${SYSTEMS}/${name}/DESIGN.md`)));
+		return { own, ownNote: own.length ? "the project's own system: pass these files in start inputs" : undefined, source: `github.com/${OD} design-systems at ${index.commit.slice(0, 7)}`, systems: index.names, fetched, offline: (index as { offline?: string }).offline };
+	}
+	const system = await fetchSystem(cwd, args.name, tools);
+	if (handle) await change(cwd, store => Object.assign(session(store, handle), { system: { name: system.name, commit: system.commit } }));
+	return system;
+}
+async function fetchSystem(cwd: string, name, tools: Tools) {
+	if (typeof name !== "string" || !/^[a-z0-9][a-z0-9-]{0,60}$/.test(name)) throw new Error(`A design system is one name from design {action:"systems"}, e.g. airbnb; got ${clip(String(name), 80)}.`);
+	const folder = `${SYSTEMS}/${name}`, saved = (() => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${folder}/SOURCE.json`), "utf8")); } catch { return undefined; } })();
+	const files = (dir: string) => fs.readdirSync(confined(cwd, dir)).sort();
+	if (saved?.commit) return { name, commit: saved.commit, folder, files: files(folder), cached: true };
+	const index = await systemIndex(cwd, tools);
+	if (!index.names.includes(name)) throw new Error(`No design system ${name}; see design {action:"systems"} (refresh: true for the newest list).`);
+	const raw = (file: string) => get(tools, `https://raw.githubusercontent.com/${OD}/${index.commit}/design-systems/${name}/${file}`);
+	const design = await raw("DESIGN.md"), tokens = await raw("tokens.css").catch(() => undefined); // legacy packages have DESIGN.md only
+	let manifest: Record<string, unknown> = {};
+	try { manifest = JSON.parse(await raw("manifest.json")); } catch { /* legacy package: no manifest */ }
+	atomic(confined(cwd, `${folder}/DESIGN.md`), design);
+	if (tokens !== undefined) atomic(confined(cwd, `${folder}/tokens.css`), tokens);
+	const source = { repo: `github.com/${OD}`, path: `design-systems/${name}`, commit: index.commit, license: "Apache-2.0", name: manifest.name, category: manifest.category, description: manifest.description, source: manifest.source };
+	atomic(confined(cwd, `${folder}/SOURCE.json`), `${JSON.stringify(source, null, "\t")}\n`);
+	return { name, commit: index.commit, folder, files: files(folder), cached: false };
+}
+
 /** One session's design folder: its files and first page. */
 function show(cwd: string, handle: string) {
 	const item = session(load(cwd), handle), root = designFolder(item.handle), files = [...readTree(confined(cwd, root)).keys()].sort();
@@ -297,7 +357,8 @@ async function clone(cwd: string, handle: string, args, tools: Tools) {
 
 export async function runDesign(cwd: string, args, tools: Tools = { hub: hubCall }) {
 	const handle = args.handle ?? ownSession(cwd)?.handle;
-	if (args.action === "start") return start(cwd, args, tools.hub);
+	if (args.action === "start") return start(cwd, args, tools);
+	if (args.action === "systems") return systems(cwd, args, handle, tools);
 	if (args.action === "status") return status(cwd, args.handle);
 	if (args.action === "open") { const item = session(load(cwd), handle); return [await openSession(cwd, item, tools.hub, reopenPrompt(cwd, item))]; }
 	if (args.action === "select") return select(cwd, handle, tools);
@@ -306,7 +367,7 @@ export async function runDesign(cwd: string, args, tools: Tools = { hub: hubCall
 	if (args.action === "restore") return restore(cwd, handle, args.version);
 	if (args.action === "look") return look(cwd, handle, args);
 	if (args.action === "reference") return reference(cwd, handle, args.url);
-	throw new Error("action is start, status, open, show, look, reference, restore, select or clone.");
+	throw new Error("action is start, status, open, show, look, reference, systems, restore, select or clone.");
 }
 /** This Pi's own design session, when the hub started it for one (PI_HUB_SESSION is the hub's id for it). */
 export function ownSession(cwd: string) {
@@ -327,10 +388,10 @@ export default function designExtension(pi) {
 	let self: Session | undefined, modelSet = false;
 	pi.registerTool?.({
 		name: "design", label: "Design", exposure: "deferred",
-		description: "Design sessions: each design is a folder .pi/designs/<handle>/ built by its own hub Pi session. start: one design session per direction (the same brief: project description, the current interface with real copy, what the user wants changed; source files in inputs; kind web, app or deck), returns handles design-N; each opens its own hub Pi session named after its direction (names) with the brief's title below, whose agent builds the design while the user watches and refines it there; do not approve, repair or refine for them. status: every session, its files and hub session. open: open the hub session of a handle that has none. show (inside a design session, handle defaults to it): its files and kept versions. look: renders the design headless at device presets (optionally one element or screen) and returns small pictures plus a report of overflow, errors and failed resources; use it once to check your work, not in loops. reference: captures a site (Desktop and Phone screenshots plus STYLE.md of its measured colors, fonts, sizes, spacing, radii and shadows) into .pi/designs/references/<site>/ to design from; borrow style and structure, never logos or copy. restore (when the user asks, e.g. \"Restore version 2\"): copies that version back; it becomes the newest version and nothing is lost. select (when the user picks one, e.g. \"@design-2\", or \"select this\" inside its session): exports its files to docs/designs/<name>/, stars it and asks the user where to implement it (the session it was started from, or a new one), which gets a message naming the folder; selecting again updates the same folder and lists what changed. clone (to try another approach): a new handle with a copy of this design's files and a hub session forked from this one (name: the copy's name).",
+		description: "Design sessions: each design is a folder .pi/designs/<handle>/ built by its own hub Pi session. start: one design session per direction (the same brief: project description, the current interface with real copy, what the user wants changed; source files in inputs; kind web, app or deck), returns handles design-N; each opens its own hub Pi session named after its direction (names) with the brief's title below, whose agent builds the design while the user watches and refines it there; do not approve, repair or refine for them. status: every session, its files and hub session. open: open the hub session of a handle that has none. show (inside a design session, handle defaults to it): its files and kept versions. look: renders the design headless at device presets (optionally one element or screen) and returns small pictures plus a report of overflow, errors and failed resources; use it once to check your work, not in loops. reference: captures a site (Desktop and Phone screenshots plus STYLE.md of its measured colors, fonts, sizes, spacing, radii and shadows) into .pi/designs/references/<site>/ to design from; borrow style and structure, never logos or copy. systems: lists the project's own design-system files first, then OpenDesign's brand design systems (cached; refresh: true for the newest); with name, fetches that one (DESIGN.md, tokens.css) into .pi/designs/systems/<name>/ and notes it on the design; start takes system too. restore (when the user asks, e.g. \"Restore version 2\"): copies that version back; it becomes the newest version and nothing is lost. select (when the user picks one, e.g. \"@design-2\", or \"select this\" inside its session): exports its files to docs/designs/<name>/, stars it and asks the user where to implement it (the session it was started from, or a new one), which gets a message naming the folder; selecting again updates the same folder and lists what changed. clone (to try another approach): a new handle with a copy of this design's files and a hub session forked from this one (name: the copy's name).",
 		promptSnippet: "Design sessions: start variants built live in the hub, select one for implementation",
 		parameters: { type: "object", additionalProperties: false, required: ["action"], properties: {
-			action: { type: "string", enum: ["start", "status", "open", "show", "look", "reference", "restore", "select", "clone"] },
+			action: { type: "string", enum: ["start", "status", "open", "show", "look", "reference", "systems", "restore", "select", "clone"] },
 			version: { type: "number", description: "restore: the version to bring back (it becomes the newest version); look: render a kept version" },
 			presets: { type: "array", items: { type: "string" }, maxItems: 6, description: "look: device presets (Phone small, Phone, Phone large, Foldable, Tablet, Laptop, Desktop, Slide; add ' landscape' to rotate) or WIDTHxHEIGHT; default Phone and Desktop" },
 			screen: { type: "string", description: "look: the screen file, default index.html" },
@@ -338,7 +399,9 @@ export default function designExtension(pi) {
 			full: { type: "boolean", description: "look: the full page instead of the first screenful" },
 			hash: { type: "string", description: "look: location.hash to open (a deck slide)" },
 			url: { type: "string", description: "reference: the site to capture" },
-			name: { type: "string", description: "clone: the copy's name for the session list (asked when missing)" },
+			name: { type: "string", description: "clone: the copy's name for the session list (asked when missing); systems: the design system to fetch" },
+			system: { type: "string", description: "start: a design system name from systems (fetched now and followed by every direction)" },
+			refresh: { type: "boolean", description: "systems: read OpenDesign's newest list instead of the cache" },
 			brief: { type: "string", description: "start: the design brief" },
 			directions: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6, description: "start: one direction per session" },
 			names: { type: "array", items: { type: "string" }, maxItems: 6, description: "start (required): a short name per direction for the session list, e.g. Calm, Bold editorial (never design-N), no default: the direction's first words" },

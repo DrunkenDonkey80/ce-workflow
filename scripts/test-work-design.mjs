@@ -204,5 +204,38 @@ try {
 			assert.match((await runDesign(cwd, { action: "reference", url: `${base}/empty` }, tools)).blocked, /browser_fetch with images/);
 		} finally { site.close(); }
 	}
+
+	// S15 design systems: the project's own files first, OD's index cached with its commit, a package fetched once (offline after).
+	const sha = "a".repeat(40), urls = [];
+	let online = true;
+	const net = { ...tools, async fetch(url) {
+		urls.push(url);
+		const reply = (status, body) => ({ ok: status === 200, status, text: async () => body });
+		if (!online) throw new Error("offline");
+		if (url.endsWith("/commits/main")) return reply(200, sha);
+		if (url.includes(`/contents/design-systems?ref=${sha}`)) return reply(200, JSON.stringify([{ name: "airbnb", type: "dir" }, { name: "_schema", type: "dir" }, { name: "README.md", type: "file" }, { name: "stripe", type: "dir" }]));
+		const file = url.match(new RegExp(`raw\\.githubusercontent\\.com/nexu-io/open-design/${sha}/design-systems/airbnb/(.+)$`))?.[1];
+		if (file === "DESIGN.md") return reply(200, "# Airbnb");
+		if (file === "tokens.css") return reply(200, ":root{--accent:#ff385c}");
+		if (file === "manifest.json") return reply(200, JSON.stringify({ name: "Airbnb", category: "Travel", source: { type: "bundled" } }));
+		return reply(404, "");
+	} };
+	fs.writeFileSync(path.join(cwd, "DESIGN.md"), "# Ours");
+	const listed = await runDesign(cwd, { action: "systems" }, net);
+	assert.deepEqual([listed.own, listed.systems, listed.source], [["DESIGN.md"], ["airbnb", "stripe"], "github.com/nexu-io/open-design design-systems at aaaaaaa"]);
+	const fetchedSystem = await runDesign(cwd, { action: "systems", name: "airbnb", handle: "design-2" }, net);
+	assert.deepEqual([fetchedSystem.files, fetchedSystem.commit, fetchedSystem.cached], [["DESIGN.md", "SOURCE.json", "tokens.css"], sha, false]);
+	assert.deepEqual(JSON.parse(fs.readFileSync(path.join(cwd, ".pi/designs/systems/airbnb/SOURCE.json"), "utf8")).license, "Apache-2.0");
+	assert.deepEqual(stored().sessions.find(item => item.handle === "design-2").system, { name: "airbnb", commit: sha });
+	online = false; urls.length = 0;
+	assert.equal((await runDesign(cwd, { action: "systems", name: "airbnb" }, net)).cached, true, "offline: the cache answers");
+	assert.deepEqual([(await runDesign(cwd, { action: "systems" }, net)).fetched, urls], [["airbnb"], []], "the cached index needs no network");
+	assert.match((await runDesign(cwd, { action: "systems", refresh: true }, net)).offline, /refresh failed: offline/);
+	await assert.rejects(runDesign(cwd, { action: "systems", name: "../x" }, net), /one name from design/);
+	await assert.rejects(runDesign(cwd, { action: "systems", name: "nope" }, net), /No design system nope/);
+	online = true; hubCalls.length = 0;
+	const withSystem = await runDesign(cwd, { action: "start", brief: "b", directions: ["y"], names: ["Y"], title: "t", system: "airbnb" }, net);
+	assert.deepEqual(withSystem.sessions[0].system, { name: "airbnb", commit: sha });
+	assert.match(hubCalls.find(call => call[0] === "prompt")[2], /Follow the design system in \.pi\/designs\/systems\/airbnb\/ \(DESIGN\.md first/);
 	console.log("design tool tests passed");
 } finally { fs.rmSync(cwd, { recursive: true, force: true }); }
