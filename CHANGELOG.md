@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.5.1 — 2026-11-09
+
+### Fixed
+- Hub: with an image path in the chat box (a pasted screenshot) or a prompt's answer box, typing no longer makes the thumbnails under it blink and the page jump. They only redraw when the images in the text change.
+
 ## 0.5.0 — 2026-11-09
 
 ### Added

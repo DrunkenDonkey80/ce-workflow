@@ -1038,7 +1038,11 @@ function attachTo(text: HTMLTextAreaElement) {
  const picker = Object.assign(document.createElement("input"), { type: "file", multiple: true, hidden: true }), button = Object.assign(document.createElement("label"), { className: "attach button", title: "Attach files (or drop or paste them here)", textContent: "File" }), thumbs = Object.assign(document.createElement("div"), { className: "prompt-thumbs" });
  button.append(picker); picker.addEventListener("change", () => { const files = [...picker.files ?? []]; picker.value = ""; void attachAll(files, text); });
  takeFiles(text, text);
- text.addEventListener("input", () => { thumbs.replaceChildren(); appendThumbs(thumbs, new Set([...text.value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => IMAGE_FILE.test(path)))); });
+ text.addEventListener("input", () => {
+  const images = new Set([...text.value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => IMAGE_FILE.test(path))), key = [...images].join("\n");
+  // Rebuilding on every key press reloads the images: the row blinks out and the page jumps.
+  if (thumbs.dataset.paths === key) return; thumbs.dataset.paths = key; thumbs.replaceChildren(); appendThumbs(thumbs, images);
+ });
  text.after(button, thumbs);
 }
 const imageSource = (path: string) => "api/image?path=" + encodeURIComponent(path) + (token ? "&token=" + token : "");
@@ -1052,8 +1056,10 @@ $("message-input").addEventListener("input", renderMentions);
 // the box and puts the marker notes after it as text. A re-edit starts again from the original with the shapes still editable.
 const annotated = new Map<string, { source: string; state: unknown; notes: string }>();
 function renderComposerThumbs() {
- const value = $("message-input").value, paths = [...new Set([...value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => IMAGE_FILE.test(path)))].slice(0, 8);
- $("composer-thumbs").replaceChildren(...paths.map(path => {
+ const value = $("message-input").value, paths = [...new Set([...value.matchAll(LINKED_PATH)].map(match => match[0]).filter(path => IMAGE_FILE.test(path)))].slice(0, 8), box = $("composer-thumbs");
+ // Same paths: keep the row. Rebuilding on every key press reloads the images, so it blinks out and the page jumps.
+ if (box.dataset.paths === paths.join("\n")) return; box.dataset.paths = paths.join("\n");
+ box.replaceChildren(...paths.map(path => {
   const button = html("button", { type: "button", className: "composer-thumb", title: "Annotate " + path }), img = html("img", { src: imageSource(path), alt: "" });
   img.addEventListener("error", () => button.remove()); button.append(img); button.addEventListener("click", () => void annotateImage(path)); return button;
  }));
