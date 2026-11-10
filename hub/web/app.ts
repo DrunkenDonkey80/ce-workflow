@@ -906,7 +906,8 @@ function renderMarkdown(target: HTMLElement, text: string, images: Set<string>) 
  flush();
 }
 // Copying a rendered table (chat or the file viewer): the browser's plain text is tab-separated cells, which fall apart when
-// pasted into a chat or a .md file, so the plain text gets Markdown pipe rows; the HTML copy (Excel, Word) stays as it was.
+// pasted into a chat or a .md file, so the plain text gets Markdown pipe rows padded into columns; the HTML copy (Excel, Word,
+// mail) gets inline borders and a shaded header, since the page's stylesheet does not travel with it.
 document.addEventListener("copy", event => {
  const selection = getSelection(); if (!selection?.rangeCount || selection.isCollapsed || !event.clipboardData) return;
  const range = selection.getRangeAt(0), common = range.commonAncestorContainer, el = common instanceof Element ? common : common.parentElement, within = el?.closest("table.md-table");
@@ -916,12 +917,18 @@ document.addEventListener("copy", event => {
  // Cells of one table come without it, and cells of one row without the row.
  if (within && !box.querySelector("table")) { const table = document.createElement("table"), row = box.querySelector("tr") ? table : table.appendChild(document.createElement("tr")); row.append(...box.childNodes); box.append(table); }
  if (!within && !box.querySelector("table.md-table")) return;
+ for (const table of box.querySelectorAll("table")) {
+  table.setAttribute("style", "border-collapse:collapse;font-family:Segoe UI,Arial,sans-serif;font-size:10pt");
+  for (const cell of table.querySelectorAll("th, td")) cell.setAttribute("style", "border:1px solid #c8c8d0;padding:3px 8px;text-align:left" + (cell.tagName === "TH" ? ";background:#e8e8ee;font-weight:bold" : ""));
+ }
  const html = box.innerHTML;
  for (const table of box.querySelectorAll("table")) {
   const rows = [...table.querySelectorAll("tr")].map(row => [...row.cells].map(cell => cell.textContent!.trim().replace(/\s+/g, " ").replace(/\|/g, "\\|")));
   if (!rows.length) { table.remove(); continue; }
-  const lines = rows.map(cells => "| " + cells.join(" | ") + " |");
-  lines.splice(1, 0, "|" + rows[0].map(() => "---").join("|") + "|");
+  // shortcut: pads by character count, so emoji and CJK cells drift; measure display width if those show up in tables.
+  const widths = rows[0].map((_, c) => Math.max(3, ...rows.map(cells => (cells[c] ?? "").length)));
+  const lines = rows.map(cells => "| " + widths.map((w, c) => (cells[c] ?? "").padEnd(w)).join(" | ") + " |");
+  lines.splice(1, 0, "|" + widths.map(w => "-".repeat(w + 2)).join("|") + "|");
   table.replaceWith(Object.assign(document.createElement("pre"), { textContent: lines.join("\n") }));
  }
  // innerText needs layout for its line breaks: measure off screen.

@@ -1,32 +1,32 @@
 {
  "version": 1,
- "activeMs": 9817405,
- "runs": 20,
+ "activeMs": 11366451,
+ "runs": 23,
  "waitingMs": 2324233,
- "toolWallMs": 5886486,
+ "toolWallMs": 6102438,
  "compactions": {
-  "count": 4,
-  "ms": 179188
+  "count": 5,
+  "ms": 215350
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 377,
-   "thinkingMs": 1394926,
-   "actingMs": 507827,
-   "input": 950,
-   "output": 157373,
-   "cacheRead": 42484887,
-   "cacheWrite": 1963829,
-   "cost": 21.46738240000001,
+   "replies": 419,
+   "thinkingMs": 1575624,
+   "actingMs": 583924,
+   "input": 1052,
+   "output": 175600,
+   "cacheRead": 47978935,
+   "cacheWrite": 2195010,
+   "cost": 24.08704500000001,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 308,
-   "ms": 5495466,
+   "count": 340,
+   "ms": 5683321,
    "maxMs": 509389,
-   "failures": 12
+   "failures": 14
   },
   "plan3": {
    "count": 8,
@@ -35,8 +35,8 @@
    "failures": 0
   },
   "edit": {
-   "count": 21,
-   "ms": 878,
+   "count": 24,
+   "ms": 1210,
    "maxMs": 601,
    "failures": 3
   },
@@ -47,14 +47,14 @@
    "failures": 0
   },
   "compaction_note": {
-   "count": 1,
+   "count": 2,
    "ms": 0,
    "maxMs": 0,
    "failures": 0
   },
   "read": {
-   "count": 19,
-   "ms": 333,
+   "count": 22,
+   "ms": 379,
    "maxMs": 76,
    "failures": 0
   },
@@ -65,24 +65,24 @@
    "failures": 0
   },
   "write": {
-   "count": 1,
-   "ms": 1,
+   "count": 2,
+   "ms": 2,
    "maxMs": 1,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 241,
-   "ms": 2122747,
+   "count": 271,
+   "ms": 2174452,
    "maxMs": 509389,
-   "failures": 7
+   "failures": 8
   },
   "test": {
-   "count": 67,
-   "ms": 3372719,
+   "count": 69,
+   "ms": 3508869,
    "maxMs": 331907,
-   "failures": 5
+   "failures": 6
   }
  },
  "commands": {
@@ -104,12 +104,6 @@
    "maxMs": 1150,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git diff -U1 package.json": {
-   "count": 1,
-   "ms": 248,
-   "maxMs": 248,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff -U1 package.json | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const [head,...h]=s.split(/^(?=@@)/m);process.stdout.write(head+h[1].replace('+72,3','+71,3'))})\"": {
    "count": 1,
    "ms": 1770,
@@ -126,12 +120,6 @@
    "count": 1,
    "ms": 999,
    "maxMs": 999,
-   "failures": 0
-  },
-  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.0/node_modules/@earendil-works/pi-coding-agent/dist/utils\" && rg -n \"jpegQuality|interface ImageResizeOptions\" image-resize*.d.ts; cat image-convert.js": {
-   "count": 1,
-   "ms": 311,
-   "maxMs": 311,
    "failures": 0
   },
   "bash\u0000cd \".\" && git diff scripts/test-work-compaction-notifications.mjs | rg \"^[-+]\" | cut -c1-200 | tail -15": {
@@ -326,12 +314,6 @@
    "maxMs": 896,
    "failures": 0
   },
-  "bash\u0000cd \".\" && f=\"docs/plans/2026-11-06-catch-up-pi-1-5-0-pi-subagents-0-86-0-pi-lens-4-4-9-6a5cdf60-plan3.md\"; sed -i \"s/package-lock.json both 1.5.0 (commit 2c? see log)/package-lock.json both 1.5.0 (com": {
-   "count": 1,
-   "ms": 311,
-   "maxMs": 311,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git add extensions/work-catch-up-baseline.json \"docs/plans/2026-11-06-catch-up-pi-1-5-0-pi-subagents-0-86-0-pi-lens-4-4-9-6a5cdf60-plan3.md\" docs/plans/logs/6a5cdf60* && git commit -q -m \"CU": {
    "count": 1,
    "ms": 442,
@@ -362,12 +344,6 @@
    "maxMs": 868,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && node scripts/test-browser-dbg.mjs 2>&1 | rg -v \"^\\s+at \" | tail -12 | cut -c1-300": {
-   "count": 1,
-   "ms": 290,
-   "maxMs": 290,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && cat > \"$TEMP/fix.cjs\" << \"EOF\" const fs = require(\"fs\"); const f = \"scripts/test-browser-dbg.mjs\"; const lines = fs.readFileSync(f, \"utf8\").split(\"\\n\"); const i = lines.findIndex(l => l.": {
    "count": 1,
    "ms": 473,
@@ -392,18 +368,6 @@
    "maxMs": 266584,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"unseen|\\bseen\\b\" src/*.ts | rg -v \"^src/api.ts:(19[1-9]|20[0-9])\" | cut -c1-200 | head -20": {
-   "count": 1,
-   "ms": 281,
-   "maxMs": 281,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n 110,132p scripts/fake-pi.mjs | cut -c1-200": {
-   "count": 1,
-   "ms": 248,
-   "maxMs": 248,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && for i in 1 2 3 4; do node scripts/test-browser.mjs > \"$TEMP/tbf$i.log\" 2>&1; echo run$i exit=$?; rg -n \"AssertionError|Command failed\" \"$TEMP/tbf$i.log\" | head -1 | cut -c1-200; done": {
    "count": 1,
    "ms": 331907,
@@ -422,12 +386,6 @@
    "maxMs": 710,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && sed -n 755,766p scripts/test-browser.mjs | cut -c1-330": {
-   "count": 1,
-   "ms": 282,
-   "maxMs": 282,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"compact early|compact-now|compact-early\" web/*.ts web/*.html src/*.ts 2>/dev/null | cut -c1-260 | head; git diff -U0 web/ | rg -n \"compact\" | cut -c1-200 | head": {
    "count": 1,
    "ms": 693,
@@ -440,22 +398,10 @@
    "maxMs": 362,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && rg -n \"commands\\.push|const commands|commands\\.length = 0\" scripts/test-browser.mjs | cut -c1-220 | head; sed -n 2655,2668p web/app.ts | cut -c1-220": {
-   "count": 1,
-   "ms": 297,
-   "maxMs": 297,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"parked: true|parked\\\":true|waking|compact early|S-12\" scripts/test-browser.mjs | cut -c1-240 | head": {
    "count": 1,
    "ms": 1366,
    "maxMs": 1366,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n 68,80p scripts/test-browser.mjs | cut -c1-200; rg -n \"parked\" scripts/test-browser.mjs | awk -F: \"\\$1>600 && \\$1<770\" | cut -c1-220": {
-   "count": 1,
-   "ms": 290,
-   "maxMs": 290,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && cat > \"$TEMP/mk2.cjs\" << \"EOF\" const fs = require(\"fs\"); let s = fs.readFileSync(\"scripts/test-browser.mjs\", \"utf8\"); const a = `await browser(\"click\", \"#compact-now\"); assert.equal(comm": {
@@ -482,12 +428,6 @@
    "maxMs": 320985,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n \"/^## Amendments/,\\$p\" \"docs/plans/2026-11-06-catch-up-pi-1-5-0-pi-subagents-0-86-0-pi-lens-4-4-9-6a5cdf60-plan3.md\" | tail -3 | cut -c1-120": {
-   "count": 1,
-   "ms": 250,
-   "maxMs": 250,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git add -A \"docs/plans/done/2026-11-06-catch-up-pi-1-5-0-pi-subagents-0-86-0-pi-lens-4-4-9-6a5cdf60-plan3.md\" \"docs/plans/2026-11-06-catch-up-pi-1-5-0-pi-subagents-0-86-0-pi-lens-4-4-9-6a5cd": {
    "count": 1,
    "ms": 462,
@@ -498,12 +438,6 @@
    "count": 1,
    "ms": 1016,
    "maxMs": 1016,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && sed -n 140p extensions/design.ts | cut -c1-1200; rg -n \"DESIGN_GUIDE =\" -A 25 extensions/design.ts | cut -c1-400": {
-   "count": 1,
-   "ms": 306,
-   "maxMs": 306,
    "failures": 0
   },
   "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | tail -3 | cut -c1-200; echo exit=$?": {
@@ -546,12 +480,6 @@
    "count": 1,
    "ms": 527,
    "maxMs": 527,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"folded\\(\" web/*.ts | cut -c1-200": {
-   "count": 1,
-   "ms": 300,
-   "maxMs": 300,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && git stash list | head -1; git show HEAD:hub/web/app.ts > \"$TEMP/app-head.ts\"; rg -n \"pending.commands|\\.commands\\b\" \"$TEMP/app-head.ts\" | head -2 | cut -c1-120": {
@@ -638,12 +566,6 @@
    "maxMs": 2570,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git status --short | cut -c1-120; echo ---; git diff --stat | tail -1; git remote -v | head -1; git branch --show-current": {
-   "count": 1,
-   "ms": 263,
-   "maxMs": 263,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git diff --cached package.json | rg \"^[-+] \"; ls docs/proposals/rework-lab | head; du -sh docs/proposals/rework-lab; head -5 scripts/rework-lab.mjs | cut -c1-150; rg -n \"plan3-files|plan3-de": {
    "count": 1,
    "ms": 815,
@@ -666,12 +588,6 @@
    "count": 1,
    "ms": 1074,
    "maxMs": 1074,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && node -e \" const fs=require('fs'); for (const f of ['package.json','package-lock.json']) { let s=fs.readFileSync(f,'utf8'); let n=0; s=s.replace(/\\\"version\\\": \\\"0\\.2\\.38\\\"/g,m=>(n++<(f==='pac": {
-   "count": 1,
-   "ms": 272,
-   "maxMs": 272,
    "failures": 0
   },
   "bash\u0000cd \".\" && mkdir -p \"$TEMP/tt\" && printf \"%s\\n\" ask-user compaction-notifications compaction design mobile-act native-smoke opendesign-client plan3-diagram plan3-types plan3 plan3-web plan3-stats plan3": {
@@ -776,12 +692,6 @@
    "maxMs": 1426,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && node -e \"const fs=require('fs'),f='scripts/test-pool.mjs';let s=fs.readFileSync(f,'utf8');s=s.replace('text: \\\" abc#s \\n\\\"','text: \\\" abc#s \\\"');fs.writeFileSync(f,s)\" && node scripts/te": {
-   "count": 1,
-   "ms": 274,
-   "maxMs": 274,
-   "failures": 1
-  },
   "bash\u0000cd \"./hub\" && node -e \"const fs=require('fs'),f='scripts/test-pool.mjs';let s=fs.readFileSync(f,'utf8');const bs=String.fromCharCode(92);s=s.replace('input.includes(\\\"\\n\\\")','input.includes(\\\"'+bs+bs+": {
    "count": 1,
    "ms": 1893,
@@ -795,16 +705,10 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 107,
-   "ms": 14481,
-   "maxMs": 247,
-   "failures": 7
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"effort: string; context\\?: number\" web/app.ts | cut -c1-80; rg -n \"function renderCommands\" web/app.ts | cut -c1-200; rg -n \"\\bel\\((?!\\\")\" -P web/app.ts | cut -c1-120 | head": {
-   "count": 1,
-   "ms": 268,
-   "maxMs": 268,
-   "failures": 0
+   "count": 139,
+   "ms": 22174,
+   "maxMs": 311,
+   "failures": 9
   },
   "bash\u0000cd \"./hub\" && rg -n \"parked\\?: boolean \\}\" web/app.ts | cut -c1-120; rg -n \"type ProjectCommand\" web/app.ts | cut -c1-120; rg -n \"[^.\\w]el\\([a-z]\" web/app.ts | cut -c1-120 | head": {
    "count": 1,
@@ -852,12 +756,6 @@
    "count": 1,
    "ms": 9041,
    "maxMs": 9041,
-   "failures": 0
-  },
-  "bash\u0000cd \"C:/Users/Flex/.pi/agent/git/github.com/DrunkenDonkey80/pi-provider-claude-ex\" && git log --oneline -1; rg -c \"case \\\"login\\\"\" bin/cpool.ts; cd \"C:/SOFT/git/pi-provider-claude-ex\" && git log --onel": {
-   "count": 1,
-   "ms": 298,
-   "maxMs": 298,
    "failures": 0
   },
   "bash\u0000cd \"C:/SOFT/git/pi-provider-claude-ex\" && node bin/cpool.ts login datecs:home --json < /dev/null 2>/dev/null | sed -E \"s/(code_challenge|state)=[^&\\\"]*/\\1=…/g\" | cut -c1-400": {
@@ -991,18 +889,6 @@
    "ms": 569,
    "maxMs": 569,
    "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && awk 'NR>=100 && NR<=136 {print NR\": \"substr($0,1,140)}' web/index.html": {
-   "count": 1,
-   "ms": 281,
-   "maxMs": 281,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"#canvas .hover|\\.canvas .hover|load-tip\" web/styles.css web/app.ts scripts/*.mjs | cut -c1-160; rg -n \"</main>\" web/index.html": {
-   "count": 1,
-   "ms": 282,
-   "maxMs": 282,
-   "failures": 1
   },
   "bash\u0000cd \"./hub\" && sed -n 720,728p scripts/test-browser.mjs | cut -c1-260; rg -n \"</main|<body|</body>\" web/index.html | cut -c1-80": {
    "count": 1,
@@ -1244,18 +1130,6 @@
    "maxMs": 1403,
    "failures": 0
   },
-  "bash\u0000sed -n 25,40p \"C:/Users/Flex/.pi/agent/bin/pi-launcher.js\"": {
-   "count": 1,
-   "ms": 279,
-   "maxMs": 279,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && node --check scripts/rework-lab.mjs && node --check scripts/skills-lab.mjs && echo syntax-ok; git log --oneline -3 -- extensions/hub-channel.ts extensions/ask-user/menu.ts scripts/test-work-": {
-   "count": 1,
-   "ms": 269,
-   "maxMs": 269,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"setStatus|const ctx|ui: \\{\" scripts/test-work-wo-control.mjs | head -8 | cut -c1-200; sed -n 10,35p extensions/hub-channel.ts | cut -c1-160": {
    "count": 1,
    "ms": 480,
@@ -1284,6 +1158,132 @@
    "count": 1,
    "ms": 2566,
    "maxMs": 2566,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -A && git status --short | cat && git commit -q -m \"0.6.0: design studio, plans verify their own work, CPU tooltip with collapsed left panel, hidden lab Pi windows, wo-control test i": {
+   "count": 1,
+   "ms": 3797,
+   "maxMs": 3797,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"process\\.title\" --glob \"*.{ts,mjs,js}\" . -g \"!node_modules\" | head; rg -n \"process\\.title\\s*=\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.1/node_modules/@earendil-works/pi-coding-a": {
+   "count": 1,
+   "ms": 2693,
+   "maxMs": 2693,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"--version\\\"|'--version'|--version\" hub/src extensions --glob \"*.ts\" | cut -c1-220 | head; rg -n \"defaultCommand\\(\\)|piCommand|launcher\" hub/src/*.ts extensions/*.ts | rg -v \"^hub/sr": {
+   "count": 1,
+   "ms": 408,
+   "maxMs": 408,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n 55,75p src/scheduler.ts | cut -c1-250; tail -30 \"$USERPROFILE/.pi/agent/pi-control-hub/hub.log\" 2>/dev/null | rg -i \"timer\" | tail -5 | cut -c1-200; ls \"$USERPROFILE/.pi/agent/\" |": {
+   "count": 1,
+   "ms": 839,
+   "maxMs": 839,
+   "failures": 0
+  },
+  "bash\u0000L=\"$USERPROFILE/.pi/agent/pi-control-hub/hub.log\"; ls -la \"$L\"; rg -n \"^2026-11-10T0[34]:\" \"$L\" | cut -c1-220 | tail -40": {
+   "count": 1,
+   "ms": 911,
+   "maxMs": 911,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && for f in src/auto-update.ts src/linked-files.ts src/remote.ts src/images.ts src/files.ts src/explore.ts src/cli.ts app/dev-restart.mjs; do rg -n \"spawn\\(|execFile\\(|execFileSync\\(|spawnS": {
+   "count": 1,
+   "ms": 2079,
+   "maxMs": 2079,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/app/src-tauri\" && rg -n \"Command::new|CREATE_NO_WINDOW|creation_flags\" --glob \"*.rs\" . | cut -c1-200 | head -20": {
+   "count": 1,
+   "ms": 328,
+   "maxMs": 328,
+   "failures": 0
+  },
+  "bash\u0000rm -f /tmp/pi-window.log; timeout 7300 powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-window-watch.ps1\" -out \"C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-window.l": {
+   "count": 1,
+   "ms": 2316,
+   "maxMs": 2316,
+   "failures": 0
+  },
+  "bash\u0000cmd.exe //c \"start \\\"watchtest\\\" /min cmd /c ping -n 3 127.0.0.1 >nul\"; sleep 4; cat /tmp/pi-window.log | cut -c1-200 | head -12": {
+   "count": 1,
+   "ms": 30638,
+   "maxMs": 30638,
+   "failures": 1
+  },
+  "bash\u0000cat /tmp/pi-window.log | cut -c1-200 | head -14; powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='powershell.exe'\\\" | ? { \\$_.CommandLine -match 'pi-window-watch' } | ": {
+   "count": 1,
+   "ms": 1102,
+   "maxMs": 1102,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && node -p \"require('./package.json').version\"; rg -n \"detached|windowsHide\" src --glob \"*.ts\" | cut -c1-200 | head -20": {
+   "count": 1,
+   "ms": 400,
+   "maxMs": 400,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && ls src | head; rg -l -uu \"detached\" . 2>/dev/null | rg -v node_modules | head; rg -uu -o -N \".{0,120}detached.{0,120}\" --glob \"*.{js,ts,mj": {
+   "count": 1,
+   "ms": 372,
+   "maxMs": 372,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && rg -uu -o -N \"spawn\\([^;]{0,250}\" --glob \"*.{js,mjs,cjs}\" bundle src *.mjs *.cjs 2>/dev/null | cut -c1-330 | head -20": {
+   "count": 1,
+   "ms": 1169,
+   "maxMs": 1169,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && rg -n -A6 \"spawn\\(spawnCommand, spawnArgs\" src/runs/background/async-execution.js | cut -c1-200; rg -n \"spawn\\(|windowsHide|detached\" src/": {
+   "count": 1,
+   "ms": 401,
+   "maxMs": 401,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && rg -rn \"function backgroundProcessOptions\" -A8 src | cut -c1-200; rg -n \"spawn\\(\" src/runs/background/*.js src/runs/shared/subagent-runner": {
+   "count": 1,
+   "ms": 504,
+   "maxMs": 504,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && cat src/runs/shared/background-process-options.js; grep -rn \"spawn(\" src/runs/shared/*.js src/runs/foreground/*.js | grep -v windowsHide |": {
+   "count": 1,
+   "ms": 360,
+   "maxMs": 360,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"text/plain|copy\\\"|\\| --- |---\\|\" scripts/test-browser.mjs | cut -c1-260 | head": {
+   "count": 1,
+   "ms": 398,
+   "maxMs": 398,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs'),f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); const ed=(a,b)=>{if(s.split(a).length!==2)throw a;s=s.replace(a,b)}; ed(\\\"d.getData('text/h": {
+   "count": 1,
+   "ms": 367,
+   "maxMs": 367,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && timeout 280 node scripts/test-browser.mjs 2>&1 | tail -3 | cut -c1-300": {
+   "count": 1,
+   "ms": 135783,
+   "maxMs": 135783,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git fetch -q origin; git status -sb | cat; git diff --stat | cat": {
+   "count": 1,
+   "ms": 739,
+   "maxMs": 739,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline origin/master..HEAD | cat; git show --stat HEAD | cat | head -20": {
+   "count": 1,
+   "ms": 458,
+   "maxMs": 458,
    "failures": 0
   }
  },
@@ -1331,13 +1331,13 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 3465020,
-   "testMs": 1284805,
-   "replies": 247,
+   "ms": 3910049,
+   "testMs": 1420955,
+   "replies": 289,
    "models": {
-    "anthropic/claude-opus-5-5:high": 247
+    "anthropic/claude-opus-5-5:high": 289
    },
-   "failures": 13
+   "failures": 15
   }
  },
  "spans": [
@@ -1420,6 +1420,18 @@
   {
    "start": "2026-11-10T05:31:27.408Z",
    "ms": 89815
+  },
+  {
+   "start": "2026-11-10T05:34:16.657Z",
+   "ms": 1046185
+  },
+  {
+   "start": "2026-11-10T05:54:28.282Z",
+   "ms": 251499
+  },
+  {
+   "start": "2026-11-10T06:06:45.783Z",
+   "ms": 215200
   }
  ],
  "hints": [

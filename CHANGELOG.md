@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.6.1 — 2026-11-10
+
+### Changed
+- Copying a table from the hub chat or file viewer: the plain text lines its columns up, and Word, Outlook or Excel get the table with borders and a shaded header row.
+
 ## 0.6.0 — 2026-11-10
 
 ### Added
