@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-10
-updated: 2026-11-10T22:28:04.989Z
+updated: 2026-11-10T23:08:39.698Z
 reviewed: 2026-11-10
 started: 2026-11-10T20:34:40.770Z
 ---
@@ -152,9 +152,7 @@ Run only checks relevant to touched code after each change. Commands execute fro
 
 - [x] **P3-03** Design-only form handlers now run while native navigation remains blocked; generic viewers retain their original sandbox.
 - [x] **P3-04** Pins paint above native modal/popover layers, follow layout/scroll and hide stale controls; modal inline edits and real-pointer isolation pass screenshot regressions.
-- [wip] **P3-05** Fix render readiness and distinguish touch capability from viewport size.
-  - Add bounded readiness/settling to the existing renderer and preview evidence; do not wait forever for looping animations. Report timeout/errors rather than silently capturing transitional or blank pixels.
-  - Headless rendering accepts honest mouse/touch contexts; device controls clearly distinguish size-only live iframe behavior from emulated rendering. Never claim changing iframe width emulates touch. Cover phone, tablet, landscape and reduced motion with C1–C4, C9.
+- [x] **P3-05** Headless captures use a shared five-second readiness watchdog, observed mouse/touch/motion reports and size-only live-preview labels.
 - [ ] **P3-06** Fix Mark state loss through a bounded, explicitly acknowledged page-state replay contract.
   - Implement the P3-02 contract in the bridge, RenderState, designshot validation, look and Mark flow. Reuse existing annotator. Preserve screen, version, slide/hash, unsaved CSS and supported modal/form state; do not execute functions from serialized state.
   - Bind request/reply to current frame/load/version, bound payload and capture time, avoid logging transient user values, and reject stale or malformed replies. Unsupported state or failed replay is visible before annotation rather than a false exact capture.
@@ -235,10 +233,12 @@ Run only checks relevant to touched code after each change. Commands execute fro
 ## Backlog
 
 Excluded from this implementation scope unless a concrete later requirement earns them: experimental native/mobile rendering targets; static HTML reverse-export with embedded source; a wholesale internal interaction harness import; generic gesture engines; complex swizzled components and additional chart/template stacks. The live interactive preview, existing HTML decks and the imperative hub remain.
+- Existing C4 annotator note-focus assertion intermittently times out (2026-11-10): failed once before design checks, passed an unchanged traced run. Tiny-image hit target, focus timing and outside focus were candidate hypotheses, not proven causes; do not describe it as fixed.
+
 
 ## Resume context
 
-P3-01..04 done, P3-05 wip; HEAD70d3bd64 contains user-approved first-wheel throttle fix and stale-CDP-drag settle only (partial-staged unrelated app/test work preserved). P4 pin source/tests and plan/log awaiting own-only local commit now. C4 screenshot red0orange→green; latest full sequential C4 passed all new modal/popover/Phone/scroll/close/reopen/hidden/real-pointer/no-duplicate/inline-edit cases. C2 pass. Active LSP3paths0findings butallinconclusive, not clean. Read-only oracle635d6e82 accepted after two unrelated pre-design C4 failures; no implementation delegated, no more advisory round for these failures. No skips/retry changes. Next finish own-only P4 commit, then inspect extensions/design-render.ts callers/tests and P3-02 readiness/input contracts for P5. Prechange product baseline572.068s/2,762,429tokens/$2.6376342/36turns42tools; remaining live benchmark budget37.3623658 for final2arms, no automatic paid retry. Full effective baseline prompt/independent sandbox acceptance not captured, recorded limitations. Preserve unrelated dirty cachemiss/chat/view/app/styles/index/changelog/otherplans; test-browser cache-miss hunk must remain unstaged. No push. P3-16 real Safari/touch still blocked. Continue all runnable work in parent.
+HEAD fef8912c/master; P3-05 now functionally verified and done (5/18), implementation still uncommitted pending owned-hunk staging. C1/C2/C3 pass; C4 first existing annotate-note focus timeout, unchanged traced --keep-browser run passed full suite incl labels+Mark; retained browser hub-ui-49044 explicitly closed. No annotator changes; intermittent failure recorded in Backlog. Initial full active LSP batch only hints/warnings; final 4-path error probe 1 confirmed/3 inconclusive, NOT a clean check. P5 owns renderer, design.ts, guide, input-contract probe, C1, design-view.ts, files.ts token-import ignore, and ONLY new picker assertions + app.ts token-import ignore in mixed files. Preserve cache-miss/session/benchmark unrelated work; stage owned hunks and plan55b392b8/log only, local commit, no push. Next P3-06: read P3-02 replay contract and current bridge/designshot/look/Mark call sites; add red regression before implementing bounded state replay. $37.3623658 benchmark budget remains for two final arms; no paid retries. P3-16 real Safari/touch blocked. Renderer oracle advice already validated (hidden tab selected); no second advisory round for resolved readiness issue.
 
 ## Amendments
 

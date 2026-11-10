@@ -18,7 +18,8 @@ try{
  const {sessionId}=await send("Target.attachToTarget",{targetId:target.targetId,flatten:true});
  const rows=[];
  for(const touch of [false,true]){
-  await send("Emulation.setDeviceMetricsOverride",{width:820,height:1180,deviceScaleFactor:1,mobile:touch},sessionId);
+  // P3-05: preserve iframe-sized CSS layout; input capability must not depend on mobile layout emulation.
+  await send("Emulation.setDeviceMetricsOverride",{width:820,height:1180,deviceScaleFactor:1,mobile:false},sessionId);
   await send("Emulation.setTouchEmulationEnabled",{enabled:touch,maxTouchPoints:touch?1:undefined},sessionId);
   await send("Emulation.setEmulatedMedia",{features:[{name:"prefers-reduced-motion",value:"reduce"}]},sessionId);
   const {result}=await send("Runtime.evaluate",{expression:'({width:innerWidth,height:innerHeight,touch:navigator.maxTouchPoints,coarse:matchMedia("(pointer:coarse)").matches,reducedMotion:matchMedia("(prefers-reduced-motion:reduce)").matches})',returnByValue:true},sessionId);

@@ -53,6 +53,10 @@ Semantic HTML first (`button`, `a`, `nav`, `main`, `label`), one `h1` per screen
 
 Every screen works from 360 px phones to 1440 px desktops without horizontal scrolling. App designs are designed phone first; web pages check both ends.
 
+The live device picker changes size only; input remains the viewer's browser capability. Headless `design look` defaults to mouse at every size; set `input: "touch"` and/or `reducedMotion: true` explicitly when checking those behaviors. Its report records the observed capability, not a real-device or Safari certification.
+
+For async startup, assign a promise to `window.designReady` and resolve it after the page commits. Rendering waits for it, fonts, images, finite animations and stable layout within one five-second readiness budget; rejected or timed-out readiness returns an error instead of a settled picture. Explicitly infinite decorations do not block capture.
+
 ## Images
 
 Use real visuals. Call `generate_image` for photos and illustrations and save them under `assets/` (reference them by relative path). Never hotlink placeholder services (unsplash, placehold.co, picsum). A neutral labelled placeholder box beats a wrong picture.

@@ -95,9 +95,9 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
  const frame = Object.assign(document.createElement("iframe"), { src, className: "files-frame", title: path });
  const stage = Object.assign(document.createElement("div"), { className: "design-stage" });
  stage.append(frame); body.replaceChildren(stage);
- const picker = Object.assign(document.createElement("select"), { className: "design-device", title: "Device" });
- picker.setAttribute("aria-label", "Device");
- for (const [name, width, height] of DEVICES) picker.append(new Option(width ? `${name} ${width}×${height}` : name, name));
+ const picker = Object.assign(document.createElement("select"), { className: "design-device", title: "Preview size only — input stays with your browser" });
+ picker.setAttribute("aria-label", "Preview size");
+ for (const [name, width, height] of DEVICES) picker.append(new Option(`${width ? `${name} ${width}×${height}` : name} (size only)`, name));
  picker.value = state.preset;
  const rotate = Object.assign(document.createElement("button"), { type: "button", className: "design-rotate", textContent: "⟳", title: "Rotate (landscape)" });
  rotate.setAttribute("aria-label", "Rotate");

@@ -7,7 +7,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import designExtension, { runDesign, snapshot, versions, writeRefusal } from "../extensions/design.ts";
-import { agentBrowser, renderDesign, reportText } from "../extensions/design-render.ts";
+import { agentBrowser, renderDesign, reportText, selectRenderTarget } from "../extensions/design-render.ts";
 import { decodePng } from "../extensions/screen-read.ts";
 
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "design-test-"));
@@ -15,6 +15,14 @@ const storePath = path.join(cwd, ".pi/designs/sessions.json");
 const stored = () => { const raw = fs.readFileSync(storePath, "utf8"); try { return JSON.parse(raw); } catch (cause) { throw new Error("sessions.json is not JSON: " + raw.slice(0, 200), { cause }); } };
 const put = (handle, files) => { for (const [file, body] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(cwd, ".pi/designs", handle, file)), { recursive: true }); fs.writeFileSync(path.join(cwd, ".pi/designs", handle, file), body); } };
 try {
+	const owned = { type: "page", url: "about:blank", attached: true, targetId: "owned" }, hiddenTab = { type: "page", url: "chrome://newtab/", attached: false, targetId: "hidden" };
+	for (const targets of [[hiddenTab, owned], [owned, hiddenTab]]) assert.equal(selectRenderTarget(targets).targetId, "owned", "native capture target is independent of CDP target order");
+	assert.throws(() => selectRenderTarget([hiddenTab]), /ambiguous|missing/i);
+	assert.throws(() => selectRenderTarget([owned, { ...owned, targetId: "other" }]), /ambiguous/i);
+	let definition;
+	designExtension({ registerTool: tool => { definition = tool; } });
+	assert.deepEqual(definition.parameters.properties.input?.enum, ["mouse", "touch"], "look exposes input independently of size");
+	assert.equal(definition.parameters.properties.reducedMotion?.type, "boolean");
 	fs.writeFileSync(path.join(cwd, "page.html"), "<h1>Home</h1>");
 	// Hub fakes: always pass these, the default tools create real hub sessions.
 	const hubCalls = [];
@@ -176,18 +184,47 @@ try {
 		fs.writeFileSync(path.join(fixture, "form.html"), '<form id="local"><input required value="valid"><button>Save</button></form><script>local.addEventListener("submit",event=>{event.preventDefault();const saved=document.createElement("p");saved.dataset.id="saved";saved.textContent="Saved locally";document.body.append(saved);});local.requestSubmit();</script>');
 		const localForm = await renderDesign({ folder: fixture, screen: "form.html", width: 360, height: 800, element: "@saved" });
 		assert.equal(localForm.report.missing, undefined, "renderer allows prevented local form handlers");
-		assert.ok(localForm.png.length, "saved content was rendered");
+		assert.ok(localForm.png.length, `saved content was rendered: ${reportText(localForm.report)}`);
 		const page = `<!doctype html><style>body{margin:0;background:#fff}.wide{width:600px;height:40px}</style><h1 data-id="title">Hi</h1><div class="wide" data-id="band"></div><img src="gone.png"><script>console.error("boom"); missingFn();</script>`;
 		fs.writeFileSync(path.join(fixture, "index.html"), page);
 		const [phone, tablet] = await Promise.all([renderDesign({ folder: fixture, width: 360, height: 800, maxEdge: 4000 }), renderDesign({ folder: fixture, width: 820, height: 1180, maxEdge: 4000, styleEdits: [{ selector: "body", styles: { background: "rgb(255, 0, 0)" } }] })]);
 		assert.deepEqual([phone.width, phone.height, tablet.width, tablet.height], [360, 800, 820, 1180], "each capture kept its own viewport");
 		assert.equal(phone.report.overflow, true);
+		assert.equal(phone.report.input.requested, "mouse");
+		assert.equal(phone.report.input.touchPoints, 0, "Phone dimensions alone do not enable touch");
 		assert.match(phone.report.wide.join(), /@band 600px/);
 		assert.equal(tablet.report.overflow, false);
 		assert.match(phone.report.errors.join(), /missingFn/);
 		assert.match(phone.report.console.join(), /error: boom/);
 		assert.match(phone.report.failed.join(), /gone\.png/);
 		const pixel = (shot, x, y) => { const { width, rgba } = decodePng(shot.png); return [...rgba.subarray((y * width + x) * 4, (y * width + x) * 4 + 3)]; };
+		// P3-05: wait for authored readiness and finite paint animations; ignore an explicitly infinite decoration.
+		fs.writeFileSync(path.join(fixture, "ready.html"), `<!doctype html><style>body{margin:0;background:white}.decoration{animation:pulse 1s infinite}@keyframes pulse{to{opacity:.5}}</style><div class="decoration">Ready</div><script>window.designReady=new Promise(resolve=>setTimeout(()=>{document.body.style.background='rgb(255, 0, 0)';document.body.animate([{opacity:0},{opacity:1}],{duration:250});resolve();},800));</script>`);
+		const inputs = await Promise.all([renderDesign({ folder: fixture, screen: "ready.html", width: 820, height: 1180, input: "mouse", reducedMotion: false, maxEdge: 4000 }), renderDesign({ folder: fixture, screen: "ready.html", width: 820, height: 1180, input: "touch", reducedMotion: true, maxEdge: 4000 })]);
+		for (const [i, shot] of inputs.entries()) {
+			assert.equal(shot.report.readiness?.settled, true, `authored readiness and finite animation settled: ${reportText(shot.report)}`);
+			assert.deepEqual([shot.width, shot.height], [820, 1180], `input ${i} keeps the capture viewport`);
+			assert.equal(shot.report.readiness.ignoredAnimations, 1, "infinite decoration cannot block a capture");
+			assert.equal(shot.report.observedViewport, "820×1180");
+			assert.deepEqual(shot.report.input, { requested: i ? "touch" : "mouse", requestedReducedMotion: !!i, touchPoints: i, coarse: !!i, reducedMotion: !!i }, "same dimensions, independently configured and observed input");
+			assert.deepEqual(pixel(shot, 800, 1100), [255, 0, 0], "capture is past the opening paint transition");
+		}
+		fs.writeFileSync(path.join(fixture, "unready.html"), `<p>Not ready</p><script>window.designReady=new Promise(()=>{});</script>`);
+		const unready = await renderDesign({ folder: fixture, screen: "unready.html", width: 360, height: 800 });
+		assert.equal(unready.png.length, 0, "a timed-out page must not return a falsely settled picture");
+		assert.equal(unready.report.readiness.settled, false);
+		assert.match(reportText(unready.report), /ready|settle|timed out/i);
+		fs.writeFileSync(path.join(fixture, "rejected.html"), `<p>Rejected</p><script>window.designReady=Promise.reject(new Error('Authored readiness failed'));window.designReady.catch(()=>{});</script>`);
+		const rejected = await renderDesign({ folder: fixture, screen: "rejected.html", width: 360, height: 800 });
+		assert.equal(rejected.png.length, 0);
+		assert.match(reportText(rejected.report), /Authored readiness failed/);
+		fs.writeFileSync(path.join(fixture, "hung.html"), `<p>Hung</p><script>for(;;){}</script>`);
+		const hung = await renderDesign({ folder: fixture, screen: "hung.html", width: 360, height: 800 });
+		assert.equal(hung.png.length, 0, "hung page JavaScript cannot produce a settled PNG");
+		assert.match(hung.report.readiness.error, /timed out/);
+		assert(hung.report.readiness.elapsedMs < 7000, "host watchdog fires even when page JavaScript never yields");
+		await assert.rejects(renderDesign({ folder: fixture, width: 360, height: 800, input: "invalid" }), /input/i);
+		await assert.rejects(renderDesign({ folder: fixture, width: 360, height: 800, reducedMotion: "true" }), /reducedMotion/i);
 		assert.deepEqual(pixel(tablet, 800, 1100), [255, 0, 0], "the live edit shows");
 		assert.deepEqual(pixel(phone, 300, 700), [255, 255, 255]);
 		assert.equal(fs.readFileSync(path.join(fixture, "index.html"), "utf8"), page, "edits never reach the file");
@@ -198,13 +235,18 @@ try {
 
 		// S07 look: presets (rotated too) give small pictures and the report per preset.
 		put("design-3", { "index.html": page });
-		const looked = await runDesign(cwd, { action: "look", handle: "design-3", presets: ["Phone small landscape", "Tablet"] }, tools);
+		const looked = await runDesign(cwd, { action: "look", handle: "design-3", presets: ["Phone small landscape", "Tablet"], input: "touch", reducedMotion: true }, tools);
 		assert.deepEqual(looked.shots.map(shot => shot.viewport), ["800×360", "820×1180"]);
 		assert.match(looked.shots[1].report, /failed: 404 gone\.png/);
+		assert(looked.shots.every(shot => /touch requested, touch points 1, coarse true/.test(shot.report) && /reduced motion true requested, true observed/.test(shot.report)), "look forwards input and motion to every preset");
 		assert(looked.shots.every(shot => decodePng(Buffer.from(shot.png, "base64")).width <= 768), "small pictures");
 		await assert.rejects(runDesign(cwd, { action: "look", handle: "design-3", presets: ["Watch"] }, tools), /Unknown preset Watch/);
 		// S07 reference: a local site's screenshots and measured style, noted on the design; an empty page is "blocked".
-		const site = http.createServer((request, response) => { response.writeHead(200, { "content-type": "text/html" }); response.end(request.url === "/empty" ? "<title>Just a moment...</title>" : `<title>Acme</title><style>body{font-family:Georgia;color:rgb(20, 30, 40)}button{border-radius:12px;padding:10px 18px}</style><h1>Acme tools</h1><p>${"Real words about the product. ".repeat(5)}</p><button>Buy</button>`); });
+		const site = http.createServer((request, response) => {
+			if (request.url === "/delayed.svg") return setTimeout(() => { response.writeHead(200, { "content-type": "image/svg+xml" }); response.end(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="red"/></svg>`); }, 2000);
+			const reply = () => { response.writeHead(200, { "content-type": "text/html" }); response.end(request.url === "/empty" ? "<title>Just a moment...</title>" : request.url === "/staged" ? `<title>Staged</title><p>${"Real staged content. ".repeat(20)}</p><img id="delayed" src="/delayed.svg"><script>window.designReady=new Promise(resolve=>delayed.addEventListener("load",()=>setTimeout(resolve,2000)));</script>` : request.url === "/images" ? `<title>Delayed image</title><p>${"Real image content. ".repeat(20)}</p><img loading="lazy" src="/delayed.svg" style="position:fixed;left:0;top:0;width:100px;height:100px">` : `<title>Acme</title><style>body{font-family:Georgia;color:rgb(20, 30, 40)}button{border-radius:12px;padding:10px 18px}</style><h1>Acme tools</h1><p>${"Real words about the product. ".repeat(5)}</p><button>Buy</button>`); };
+			if (request.url === "/staged") setTimeout(reply, 2000); else reply();
+		});
 		await new Promise(resolve => site.listen(0, "127.0.0.1", resolve));
 		try {
 			const base = `http://127.0.0.1:${site.address().port}`;
@@ -216,6 +258,13 @@ try {
 			assert.match(style, /button: .*border-radius 12px/);
 			assert.deepEqual(stored().sessions.find(item => item.handle === "design-3").references, ["127.0.0.1"]);
 			assert.match((await runDesign(cwd, { action: "reference", url: `${base}/empty` }, tools)).blocked, /browser_fetch with images/);
+			const imaged = await runDesign(cwd, { action: "reference", url: `${base}/images` }, tools);
+			assert(imaged.files, "a delayed lazy image settles successfully");
+			for (const file of ["desktop.png", "phone.png"]) assert.deepEqual(pixel({ png: fs.readFileSync(path.join(cwd, imaged.folder, file)) }, 20, 20), [255, 0, 0], `${file} contains the decoded delayed image`);
+			const started = Date.now();
+			const staged = await runDesign(cwd, { action: "reference", url: `${base}/staged` }, tools);
+			assert.match(staged.blocked, /timed out/i, "navigation + image + authored readiness share one five-second budget, not three separate budgets");
+			assert(Date.now() - started < 15000, "the shared watchdog and cleanup are bounded");
 		} finally { site.close(); }
 	}
 

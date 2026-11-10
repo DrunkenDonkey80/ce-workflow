@@ -4,6 +4,7 @@ type ProjectFile = { path: string; change?: string; size?: number };
 // open: a viewed HTML page (its live folder, explore.ts viewPage), shown at once.
 // design: a design session's preview (S07): no file tree, its page in design-view's device frame.
 type Archive = { key: string; name: string; files: ProjectFile[]; truncated: boolean; open?: string; design?: boolean; handle?: string; screens?: string[]; versions?: number[]; version?: number };
+// @ts-ignore Browser URL includes the workspace token.
 import { designFrame, type DesignActions } from "./design-view.js?token=__TOKEN__";
 const IMAGE = /.(?:png|jpe?g|gif|webp|bmp|svg|ico)$/i, FRAME = /.(?:html?|pdf)$/i, MEDIA = /.(?:mp4|webm|mp3|wav)$/i, MARKDOWN = /.(?:md|markdown)$/i, TEXT_BYTES = 1_048_576;
 const size = (bytes = 0) => bytes < 1024 ? bytes + " B" : bytes < 1_048_576 ? (bytes / 1024).toFixed(1) + " KB" : (bytes / 1_048_576).toFixed(1) + " MB";

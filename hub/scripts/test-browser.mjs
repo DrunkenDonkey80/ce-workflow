@@ -1206,6 +1206,9 @@ try {
  await browser("wait", "--fn", "document.getElementById('files').classList.contains('tree-hidden') && !!document.querySelector('#files .files-frame')");
  // S08: one device picker (Desktop first, the panel's width), rotate, the frame scaled to fit; the choice is kept per design.
  assert.deepEqual(await evaluate("[document.querySelector('#files .design-device').value, document.querySelector('#files .design-rotate').disabled, !!document.querySelector('#files .design-screen')]"), ["Desktop", true, false]);
+ assert.match(await evaluate("document.querySelector('#files .design-device').title"), /size only.*input stays with your browser/i);
+ assert.equal(await evaluate("document.querySelector('#files .design-device').getAttribute('aria-label')"), "Preview size");
+ assert(await evaluate("[...document.querySelector('#files .design-device').options].every(option => option.textContent.includes('(size only)'))"), "every size preset avoids claiming input emulation");
  const pick = preset => evaluate(`(() => { const s = document.querySelector('#files .design-device'); s.value = ${JSON.stringify(preset)}; s.dispatchEvent(new Event('change')); })()`);
  const frameBox = "(() => { const f = document.querySelector('#files .files-frame'), r = f.getBoundingClientRect(); return [f.offsetWidth, f.offsetHeight, Math.round(r.width / r.height * 1000)]; })()";
  await pick("Phone");

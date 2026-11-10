@@ -8,6 +8,7 @@ import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 const { ICONS, iconSvg, BUTTON_ICONS } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _states?: string[]) => "", BUTTON_ICONS: {} as Record<string, [string, string]> }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
+// @ts-ignore Browser URL includes the workspace token.
 import { elementName, setDesignPins } from "./design-view.js?token=__TOKEN__";
 let designPick = null, designPins = []; // S11 (declared first: renderMentions runs during start-up)
 // @ts-ignore Browser URL includes the workspace token.
