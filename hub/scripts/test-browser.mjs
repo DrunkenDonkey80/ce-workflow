@@ -130,8 +130,9 @@ try {
  await browser("set", "viewport", "1280", "800");
  await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
  // Ctrl+wheel: the page 10% bigger, still exactly filling the window; and back.
- const wheel = up => `document.getElementById("chat").dispatchEvent(new WheelEvent("wheel", { deltaY: ${up ? -100 : 100}, ctrlKey: true, bubbles: true, cancelable: true }))`;
- assert.deepEqual(await evaluate(`(() => { ${wheel(true)}; const r = document.body.getBoundingClientRect(); return [document.body.style.zoom, Math.round(r.bottom) === innerHeight, localStorage.getItem("hub-zoom")]; })()`), ["1.1", true, "1.1"]);
+ const wheel = (up, first = false) => `(() => { const event = new WheelEvent("wheel", { deltaY: ${up ? -100 : 100}, ctrlKey: true, bubbles: true, cancelable: true }); ${first ? `Object.defineProperty(event, "timeStamp", { value: 0 });` : ""} document.getElementById("chat").dispatchEvent(event); })()`;
+ // A first event at page time zero must not be throttled by an imaginary previous wheel.
+ assert.deepEqual(await evaluate(`(() => { ${wheel(true, true)}; const r = document.body.getBoundingClientRect(); return [document.body.style.zoom, Math.round(r.bottom) === innerHeight, localStorage.getItem("hub-zoom")]; })()`), ["1.1", true, "1.1"]);
  await new Promise(resolve => setTimeout(resolve, 150));
  assert.equal(await evaluate(`(() => { ${wheel(false)}; localStorage.removeItem("hub-zoom"); return document.body.style.zoom; })()`), "1");
  // The excerpt and stream-gap refetches ask the hub for the whole row; here every row's full text is fixed.
@@ -470,7 +471,7 @@ try {
  // Fit first so the box is on screen, then grab a visible part: the zoom controls may cover part of it.
  await browser("click", "#zoom-fit");
  const stalePoint = await evaluate("(() => { const r = document.querySelector(\"[data-node=web_client]\").getBoundingClientRect(); for (let y = r.y + 8; y < r.bottom; y += 8) for (let x = r.x + 8; x < r.right; x += 16) if (document.elementFromPoint(x, y)?.closest(\"[data-node=web_client]\")) return { x: Math.round(x), y: Math.round(y) }; })()");
- assert(stalePoint, "part of the box is visible"); await dragUntil(stalePoint, "document.getElementById(\"diagram\").dataset.revision === \"3\"");
+ assert(stalePoint, "part of the box is visible"); await new Promise(done => setTimeout(done, 1000)); await dragUntil(stalePoint, "document.getElementById(\"diagram\").dataset.revision === \"3\"");
  assert.equal(edits.length, 1); assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition);
  assert(await evaluate("document.getElementById(\"notice\").textContent.includes(\"Positions were not saved\")"));
  await browser("press", "Escape");

@@ -286,7 +286,7 @@ document.addEventListener("touchend", event => {
 // Add #debug to the address to see the numbers on screen.
 const debugViewport = location.hash.includes("debug") ? document.body.appendChild(Object.assign(document.createElement("output"), { style: "position:fixed;z-index:99;right:4px;top:30%;font:11px monospace;background:#ff0c;color:#000;padding:2px 4px;white-space:pre;pointer-events:none" })) : undefined;
 // Ctrl+wheel: the whole page 10% bigger or smaller (50\u2013200%), remembered per hub; a pinch on a touchpad arrives the same way, one step per 120 ms.
-let pageZoom = Number(localStorage.getItem("hub-zoom")) || 1, zoomedAt = 0;
+let pageZoom = Number(localStorage.getItem("hub-zoom")) || 1, zoomedAt = -Infinity;
 document.body.style.zoom = String(pageZoom);
 document.addEventListener("wheel", event => {
  if (!event.ctrlKey || event.defaultPrevented) return; // the diagram and image viewer zoom themselves
