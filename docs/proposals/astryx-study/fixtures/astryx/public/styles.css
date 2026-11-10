@@ -1,0 +1,381 @@
+/* Relay custom rules. Astryx component CSS (assets/astryx.css) sits in cascade layers, so these unlayered rules win. */
+
+/* ---------- Tokens: purpose-named, mapped onto Astryx neutral-theme tokens ---------- */
+[data-astryx-theme] {
+  --relay-body: light-dark(#edf0ee, #121715);
+  --relay-surface: light-dark(#fafbfa, #1a201e);
+  --relay-ink: light-dark(#18211e, #e6ece9);
+  --relay-ink-muted: light-dark(#4a5652, #a3afaa);
+  --relay-line: light-dark(#cdd5d1, #313a37);
+  --relay-line-strong: light-dark(#788581, #6f7b77);
+  --accent: light-dark(#0e5a6b, #7cc6d6);
+  --on-accent: light-dark(#f4f9f9, #0e1a1d);
+  --accent-wash: light-dark(#dcebee, #1d3a41);
+  --status-active: var(--color-text-success);
+  --status-review: var(--color-text-warning);
+  --status-planned: var(--relay-ink-muted);
+  --status-paused: var(--color-text-info);
+
+  --font-display: "Bahnschrift", "DIN Alternate", "Segoe UI Variable Display", system-ui, sans-serif;
+  --font-text: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* Type scale 1.25 on a 16px base: 13, 16, 20, 25, 31, 39 */
+  --step--1: 0.8125rem;
+  --step-0: 1rem;
+  --step-1: 1.25rem;
+  --step-2: 1.5625rem;
+  --step-3: 1.9375rem;
+  --step-4: 2.4375rem;
+
+  --radius-panel: 12px;
+  --radius-control: 8px;
+  --target: 44px;
+
+  --color-background-body: var(--relay-body);
+  --color-background-surface: var(--relay-surface);
+  --color-background-card: var(--relay-surface);
+  --color-background-popover: var(--relay-surface);
+  --color-text-primary: var(--relay-ink);
+  --color-text-secondary: var(--relay-ink-muted);
+  --color-icon-primary: var(--relay-ink);
+  --color-border: var(--relay-line);
+  --color-border-emphasized: var(--relay-line-strong);
+  --color-accent: var(--accent);
+  --color-text-accent: var(--accent);
+  --color-icon-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-muted: var(--accent-wash);
+  --font-family-body: var(--font-text);
+  --font-family-heading: var(--font-display);
+  --font-size-base: var(--step-0);
+}
+
+html { background: var(--relay-body); }
+body { margin: 0; }
+
+.page {
+  min-height: 100dvh;
+  background: var(--relay-body);
+  color: var(--relay-ink);
+  font-family: var(--font-text);
+  font-size: var(--step-0);
+  line-height: 1.5;
+}
+
+.page :where(h1, h2, h3) { font-family: var(--font-display); color: var(--relay-ink); text-wrap: balance; margin: 0; }
+.page :where(p) { text-wrap: pretty; margin: 0; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.page a:focus-visible,
+.relay-focus:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute; left: 8px; top: -100px; z-index: 10;
+  padding: 10px 16px;
+  background: var(--relay-surface); color: var(--relay-ink);
+  border: 1px solid var(--relay-line-strong);
+}
+.skip-link:focus { top: 8px; }
+
+/* ---------- Header ---------- */
+.app-header {
+  background: var(--relay-surface);
+  border-bottom: 1px solid var(--relay-line);
+}
+.app-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "brand user" "nav nav";
+  align-items: center;
+  column-gap: 16px;
+}
+.brand {
+  grid-area: brand;
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 56px;
+  color: var(--relay-ink);
+  text-decoration: none;
+}
+.brand-mark { color: var(--relay-ink); flex: none; }
+.brand-text { display: grid; line-height: 1.2; }
+.brand-name { font-family: var(--font-display); font-size: var(--step-1); font-weight: 600; overflow-wrap: anywhere; }
+.brand-team { font-size: var(--step--1); color: var(--relay-ink-muted); }
+.signed-in { grid-area: user; display: inline-flex; align-items: center; }
+
+.app-nav { grid-area: nav; display: flex; gap: 4px; margin: 0 -8px; }
+.app-nav a {
+  display: inline-flex; align-items: center;
+  min-height: var(--target);
+  padding: 0 12px;
+  color: var(--relay-ink-muted);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 3px solid transparent;
+}
+.app-nav a:hover { color: var(--relay-ink); }
+.app-nav a[aria-current="page"] { color: var(--relay-ink); border-bottom-color: var(--accent); }
+
+@media (min-width: 640px) {
+  .app-header-inner { grid-template-columns: auto 1fr auto; grid-template-areas: "brand nav user"; padding: 0 24px; }
+  .app-nav { margin: 0; justify-content: flex-end; }
+  .app-nav a { min-height: 64px; }
+}
+
+/* ---------- Page frame ---------- */
+.page-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: grid;
+  gap: 24px;
+}
+@media (min-width: 640px) { .page-main { padding: 32px 24px 64px; gap: 32px; } }
+
+.page-title { display: grid; gap: 4px; }
+.page-title h1 { font-size: var(--step-3); font-weight: 600; line-height: 1.1; letter-spacing: -0.01em; }
+.page-title p { color: var(--relay-ink-muted); max-width: 60ch; }
+@media (min-width: 1024px) { .page-title h1 { font-size: var(--step-4); } }
+
+/* ---------- Overview band ---------- */
+.overview {
+  background: var(--relay-surface);
+  border: 1px solid var(--relay-line);
+  border-radius: var(--radius-panel);
+  padding: 20px 16px 16px;
+  display: grid;
+  gap: 24px;
+}
+.overview-note { color: var(--relay-ink-muted); }
+.overview-grid { display: grid; gap: 20px; }
+.overview-label { font-size: var(--step--1); color: var(--relay-ink-muted); font-weight: 600; }
+.overview-meta { color: var(--relay-ink-muted); overflow-wrap: anywhere; }
+.next-due, .review-queue { display: grid; gap: 4px; align-content: start; justify-items: start; }
+.next-due-date {
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.next-due-name { font-size: var(--step-1); font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.review-count { font-family: var(--font-display); font-size: var(--step-2); font-weight: 600; line-height: 1.1; }
+.review-queue .astryx-button { margin-top: 8px; }
+
+.status-counts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 16px;
+  border-top: 1px solid var(--relay-line);
+  padding-top: 16px;
+}
+.status-count { display: grid; gap: 2px; }
+.status-count dt { font-size: var(--step--1); color: var(--relay-ink-muted); display: inline-flex; align-items: center; gap: 6px; }
+.status-count dd { margin: 0; font-family: var(--font-display); font-size: var(--step-2); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+:is(.status-count, .relay-rail li)[data-status="Active"] .status-shape { color: var(--status-active); }
+:is(.status-count, .relay-rail li)[data-status="Review"] .status-shape { color: var(--status-review); }
+:is(.status-count, .relay-rail li)[data-status="Planned"] .status-shape { color: var(--status-planned); }
+:is(.status-count, .relay-rail li)[data-status="Paused"] .status-shape { color: var(--status-paused); }
+
+@media (min-width: 760px) {
+  .overview { padding: 24px; }
+  .overview-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 32px; }
+  .status-counts { grid-template-columns: 1fr 1fr; gap: 16px; border-top: 0; padding-top: 0; border-left: 1px solid var(--relay-line); padding-left: 24px; align-content: start; }
+}
+
+/* Relay rail: the deliberate signature. Due dates as hand-off stops on one track. */
+.relay-rail {
+  list-style: none;
+  margin: 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--relay-line);
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  position: relative;
+}
+.relay-rail::before {
+  content: "";
+  position: absolute;
+  top: calc(16px + 11px);
+  left: calc(100% / 12);
+  right: calc(100% / 12);
+  height: 2px;
+  background: var(--relay-line-strong);
+}
+.relay-rail li { display: grid; justify-items: center; gap: 4px; text-align: center; min-width: 0; position: relative; }
+.rail-stop {
+  display: grid; place-items: center;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--relay-surface);
+  border: 2px solid var(--relay-line-strong);
+}
+.rail-stop .status-shape { width: 10px; height: 10px; }
+.rail-date { font-family: var(--font-display); font-size: var(--step-0); font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rail-name { font-size: var(--step--1); color: var(--relay-ink-muted); line-height: 1.2; max-width: 100%; overflow-wrap: anywhere; }
+.relay-rail li.is-next .rail-stop { border-color: var(--accent); background: var(--accent); }
+.relay-rail li.is-next .rail-stop .status-shape { color: var(--on-accent); }
+.relay-rail li.is-next .rail-date { color: var(--accent); }
+@media (max-width: 400px) { .rail-date { font-size: var(--step--1); } }
+@media (min-width: 760px) { .relay-rail { padding-top: 20px; } .relay-rail::before { top: calc(20px + 11px); } }
+
+/* ---------- Projects ---------- */
+.projects { display: grid; gap: 16px; scroll-margin-top: 16px; }
+.projects-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.projects-head h2 { font-size: var(--step-2); font-weight: 600; line-height: 1.2; }
+.result-count { color: var(--relay-ink-muted); font-size: var(--step--1); }
+.saved-note { color: var(--relay-ink); font-weight: 600; }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; }
+.toolbar-search { flex: 1 1 260px; max-width: 420px; }
+.toolbar-filter { flex: 1 1 100%; }
+.toolbar-reset { flex: none; }
+.toolbar-filter { display: grid; gap: 6px; }
+.field-label { font-size: var(--step--1); font-weight: 600; color: var(--relay-ink); }
+@media (min-width: 760px) {
+  .toolbar-filter { flex: 0 1 460px; }
+}
+
+.list-head { display: none; }
+.project-list {
+  background: var(--relay-surface);
+  border: 1px solid var(--relay-line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+.project-rows { list-style: none; margin: 0; padding: 0; }
+.project-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name action" "meta meta";
+  gap: 8px 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--relay-line);
+}
+.project-row:first-child { border-top: 0; }
+.project-name { grid-area: name; font-family: var(--font-text); font-size: var(--step-0); font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; align-self: center; }
+.project-meta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; color: var(--relay-ink-muted); font-size: var(--step--1); }
+.project-meta p { overflow-wrap: anywhere; }
+.project-action { grid-area: action; }
+.row-label { color: var(--relay-ink-muted); }
+.project-owner, .project-due { color: var(--relay-ink); }
+.project-owner .row-label, .project-due .row-label { color: var(--relay-ink-muted); }
+.status-badge { display: inline-flex; }
+.status-badge .status-shape { width: 10px; height: 10px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .project-row.is-just-saved { animation: row-saved 1600ms ease-out; }
+}
+@keyframes row-saved { from { background: var(--accent-wash); } to { background: transparent; } }
+
+@media (min-width: 760px) {
+  .list-head, .project-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 140px 110px 120px 72px;
+    grid-template-areas: none;
+    column-gap: 16px;
+    align-items: center;
+  }
+  .list-head {
+    padding: 0 17px 0;
+    font-size: var(--step--1);
+    color: var(--relay-ink-muted);
+    font-weight: 600;
+    margin-bottom: -8px;
+  }
+  .project-row { padding: 12px 16px; }
+  .project-name, .project-action { grid-area: auto; }
+  .project-meta { display: contents; font-size: var(--step-0); }
+  .project-owner { grid-column: 2; }
+  .project-status { grid-column: 3; }
+  .project-due { grid-column: 4; font-variant-numeric: tabular-nums; }
+  .project-action { grid-column: 5; justify-self: end; }
+  .project-row .row-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media (min-width: 1024px) {
+  .list-head, .project-row { grid-template-columns: minmax(0, 1fr) 170px 130px 140px 80px; column-gap: 24px; }
+  .list-head { padding: 0 25px; }
+  .project-row { padding: 12px 24px; }
+}
+
+.list-state { padding: 24px 16px; }
+.list-loading { display: grid; gap: 16px; }
+.loading-line { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
+.skeleton-row { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--relay-line); }
+
+/* ---------- Edit dialog ---------- */
+/* The dialog itself scrolls; its footer sticks to the bottom so Save and Cancel stay reachable on short screens. */
+dialog[data-id="edit-project-dialog"] :has(> .dialog-actions) {
+  position: sticky;
+  bottom: calc(-1 * var(--relay-dialog-pad, 16px));
+  z-index: 1;
+  background: var(--relay-surface);
+  border-top: 1px solid var(--relay-line);
+  padding-block: 12px var(--relay-dialog-pad, 16px);
+  margin-bottom: calc(-1 * var(--relay-dialog-pad, 16px));
+}
+
+/* ---------- Prototype chrome ---------- */
+.state-switcher {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+  padding: 12px 16px;
+  border: 1px dashed var(--relay-line-strong);
+  border-radius: var(--radius-control);
+  color: var(--relay-ink-muted);
+}
+.state-switcher-label { font-size: var(--step--1); font-weight: 600; }
+
+/* ---------- Settings ---------- */
+.settings-main { max-width: 760px; }
+.settings-form {
+  display: grid;
+  background: var(--relay-surface);
+  border: 1px solid var(--relay-line);
+  border-radius: var(--radius-panel);
+}
+.settings-group { display: grid; gap: 16px; padding: 24px 16px; border-bottom: 1px solid var(--relay-line); }
+.settings-group h2 { font-size: var(--step-1); font-weight: 600; line-height: 1.2; }
+.settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 20px 16px; }
+.saved-ack { display: inline-flex; align-items: flex-start; gap: 8px; color: var(--relay-ink); font-weight: 600; max-width: 52ch; }
+.saved-ack:empty { display: none; }
+.saved-ack svg { flex: none; margin-top: 4px; color: var(--status-active); }
+@media (min-width: 640px) { .settings-group, .settings-actions { padding-inline: 24px; } }
+
+/* ---------- Touch targets on phone layouts (portrait by width, landscape by height) ---------- */
+@media (max-width: 759px), (max-height: 500px) {
+  .page .astryx-button,
+  .page .astryx-segmented-control-item,
+  dialog .astryx-button { min-height: var(--target); }
+  .page :is(.astryx-button[aria-label^="Edit"], .astryx-segmented-control-item) { min-width: var(--target); }
+  .page .astryx-segmented-control-item { padding-inline: 6px; }
+  :is(.page, dialog) :is([data-pressable-container], .astryx-selector, .astryx-date-input) {
+    min-height: var(--target);
+    padding-block: 0;
+  }
+  /* The native control fills its painted box so the tap target itself measures 44px. */
+  :is(.page, dialog) :is([data-pressable-container] input, .astryx-selector > button[role="combobox"], .astryx-date-input > input) {
+    min-height: var(--target);
+  }
+  /* Invisible switch input grows its hit area, as Astryx does for coarse pointers. */
+  .page input[role="switch"] { min-width: var(--target); min-height: var(--target); }
+  :is(.page, dialog) .astryx-date-input > button[aria-label] {
+    min-width: var(--target);
+    min-height: var(--target);
+    margin-inline: -14px -6px;
+  }
+}
+
+.noscript { padding: 24px; font-family: system-ui, sans-serif; }

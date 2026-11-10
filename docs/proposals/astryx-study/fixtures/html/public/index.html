@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Projects: Relay</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-id="skip-link">Skip to projects overview</a>
+
+  <header class="site-header" data-id="site-header">
+    <div class="site-header-inner">
+      <div class="brand" data-id="brand">
+        <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
+          <rect x="2" y="10" width="24" height="8" rx="4" fill="#f2c200" stroke="#17202b" stroke-width="2"/>
+          <circle cx="7" cy="14" r="4.5" fill="#fff" stroke="#17202b" stroke-width="2"/>
+          <circle cx="21" cy="14" r="4.5" fill="#17202b" stroke="#17202b" stroke-width="2"/>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-name" data-id="workspace-label">Relay</span>
+          <span class="brand-team" data-id="team-label">Field operations</span>
+        </span>
+      </div>
+      <nav class="primary-nav" aria-label="Primary" data-id="primary-nav">
+        <ul>
+          <li><a class="nav-link" href="index.html" aria-current="page" data-id="nav-projects">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Projects</a></li>
+          <li><a class="nav-link" href="settings.html" data-id="nav-settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Settings</a></li>
+        </ul>
+      </nav>
+      <div class="account" data-id="account" title="Signed in as Maya Chen">
+        <span aria-hidden="true">MC</span><span class="sr-only">Signed in as Maya Chen</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page" data-id="main">
+    <section class="intro" data-id="dashboard-intro" aria-labelledby="page-title">
+      <h1 id="page-title" data-id="page-title">Field operations</h1>
+      <p data-id="dashboard-summary" id="dashboard-summary"></p>
+    </section>
+
+    <section class="overview" data-id="overview" aria-labelledby="overview-title">
+      <div class="overview-line" data-id="handoff-line">
+        <div class="overview-line-head">
+          <h2 class="section-title" id="overview-title" data-id="overview-title">Handoff line</h2>
+          <p data-id="handoff-line-hint">Projects in due-date order</p>
+        </div>
+        <ol class="track" id="track" data-id="track-stops"></ol>
+        <dl class="status-legend" id="status-counts" data-id="status-counts"></dl>
+      </div>
+      <div class="overview-details">
+        <div class="overview-block" data-id="due-next">
+          <h3 data-id="due-next-title">Due next</h3>
+          <div id="due-next-body"></div>
+        </div>
+        <div class="overview-block" data-id="waiting-review">
+          <h3 data-id="waiting-review-title">Waiting for review</h3>
+          <div id="waiting-review-body"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="projects" data-id="projects" aria-labelledby="projects-title">
+      <div class="projects-head">
+        <h2 class="section-title" id="projects-title" data-id="projects-title">Projects</h2>
+      </div>
+
+      <div class="controls" data-id="project-controls">
+        <div class="field">
+          <label class="field-label" for="search" data-id="project-search-label">Search by project or owner</label>
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>
+            <input class="input" id="search" type="search" autocomplete="off" data-id="project-search">
+          </div>
+        </div>
+        <fieldset class="segmented" data-id="status-filter">
+          <legend>Status</legend>
+          <div class="segments">
+            <label class="segment"><input type="radio" name="status-filter" value="All" checked data-id="status-filter-all"><span>All</span></label>
+            <label class="segment"><input type="radio" name="status-filter" value="Active" data-id="status-filter-active"><span>Active</span></label>
+            <label class="segment"><input type="radio" name="status-filter" value="Review" data-id="status-filter-review"><span>Review</span></label>
+            <label class="segment"><input type="radio" name="status-filter" value="Planned" data-id="status-filter-planned"><span>Planned</span></label>
+            <label class="segment"><input type="radio" name="status-filter" value="Paused" data-id="status-filter-paused"><span>Paused</span></label>
+          </div>
+        </fieldset>
+        <button class="button" type="button" id="reset-filters" data-id="reset-filters">Reset filters</button>
+      </div>
+
+      <fieldset class="segmented design-chrome" data-design-chrome data-id="state-switcher">
+        <legend>Prototype only: project list state</legend>
+        <div class="segments">
+          <label class="segment"><input type="radio" name="list-state" value="populated" checked data-id="state-populated"><span>Populated</span></label>
+          <label class="segment"><input type="radio" name="list-state" value="loading" data-id="state-loading"><span>Loading</span></label>
+          <label class="segment"><input type="radio" name="list-state" value="empty" data-id="state-empty"><span>Empty</span></label>
+          <label class="segment"><input type="radio" name="list-state" value="error" data-id="state-error"><span>Error</span></label>
+        </div>
+      </fieldset>
+
+      <div class="list-status" id="list-status" tabindex="-1" role="status" data-id="list-status"></div>
+
+      <div class="project-panel" data-id="project-list" id="project-list" aria-labelledby="projects-title"></div>
+    </section>
+  </main>
+
+  <dialog class="dialog" id="edit-dialog" aria-labelledby="edit-title" aria-describedby="edit-desc" data-id="edit-project-dialog">
+    <form class="dialog-form" id="edit-form" method="dialog" novalidate data-id="edit-project-form">
+      <div class="dialog-head">
+        <h2 id="edit-title" data-id="edit-project-title">Edit project</h2>
+        <p id="edit-desc" data-id="edit-project-description">Changes show in this view right away and reset when the page reloads.</p>
+      </div>
+      <div class="dialog-grid">
+        <div class="field field-wide">
+          <label class="field-label" for="project-name">Project name</label>
+          <input class="input" id="project-name" name="name" type="text" required autocomplete="off" aria-describedby="project-name-error" data-id="project-name">
+          <p class="field-error" id="project-name-error" hidden data-id="project-name-error">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>
+            <span>Enter a project name. It can't be blank.</span>
+          </p>
+        </div>
+        <div class="field">
+          <label class="field-label" for="project-owner">Owner</label>
+          <select class="input" id="project-owner" name="owner" data-id="project-owner"></select>
+        </div>
+        <div class="field">
+          <label class="field-label" for="project-status">Status</label>
+          <select class="input" id="project-status" name="status" data-id="project-status"></select>
+        </div>
+        <div class="field field-wide">
+          <label class="field-label" for="project-due">Due date</label>
+          <input class="input" id="project-due" name="due" type="date" data-id="project-due">
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="button" type="button" id="cancel-project" data-id="cancel-project">Cancel</button>
+        <button class="button button-primary" type="submit" id="save-project" data-id="save-project">Save project</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

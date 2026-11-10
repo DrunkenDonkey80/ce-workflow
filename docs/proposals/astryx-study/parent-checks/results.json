@@ -1,0 +1,1868 @@
+{
+  "allowForms": false,
+  "startedAt": "2026-11-10T21:00:58.432Z",
+  "cases": [
+    {
+      "arm": "html",
+      "file": "index.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "html",
+      "file": "settings.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "html",
+      "file": "index.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": false
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set.",
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "blocked": [
+        "Paused filter on saved edit: saving failed"
+      ],
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "html",
+      "file": "settings.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "settings validation",
+          "ok": true
+        },
+        {
+          "name": "notifications toggles",
+          "ok": true
+        },
+        {
+          "name": "appearance toggles",
+          "ok": true
+        },
+        {
+          "name": "settings acknowledgement",
+          "ok": false
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "html",
+      "file": "index.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "html",
+      "file": "settings.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "html",
+      "file": "index.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": false
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set.",
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": false,
+        "storage": "SecurityError"
+      },
+      "blocked": [
+        "Paused filter on saved edit: saving failed"
+      ],
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "html",
+      "file": "settings.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": false,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "html",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "html",
+      "file": "settings.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "html",
+      "file": "index.html",
+      "width": 360,
+      "height": 360,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 287,
+              "bottom": 331,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 287,
+              "bottom": 331,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 287,
+          "bottom": 331,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 287,
+          "bottom": 331,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "html",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 317,
+              "bottom": 361,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 317,
+              "bottom": 361,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 317,
+          "bottom": 361,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 317,
+          "bottom": 361,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "astryx",
+      "file": "index.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "astryx",
+      "file": "settings.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "astryx",
+      "file": "index.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": false
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": false
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set.",
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "blocked": [
+        "Paused filter on saved edit: saving failed"
+      ],
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "astryx",
+      "file": "settings.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "settings validation",
+          "ok": false
+        },
+        {
+          "name": "notifications toggles",
+          "ok": true
+        },
+        {
+          "name": "appearance toggles",
+          "ok": true
+        },
+        {
+          "name": "settings acknowledgement",
+          "ok": false
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set.",
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "astryx",
+      "file": "index.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "show-review-queue",
+            "text": "Show review queue",
+            "w": 165.109375,
+            "h": 32
+          },
+          {
+            "id": "project-search",
+            "text": "",
+            "w": 254,
+            "h": 24
+          },
+          {
+            "id": "status-filter-all",
+            "text": "All",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "status-filter-active",
+            "text": "Active",
+            "w": 88.8125,
+            "h": 24
+          },
+          {
+            "id": "status-filter-review",
+            "text": "Review",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "status-filter-planned",
+            "text": "Planned",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "status-filter-paused",
+            "text": "Paused",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "reset-filters",
+            "text": "Reset filters",
+            "w": 108.546875,
+            "h": 32
+          },
+          {
+            "id": "edit-atlas",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-beacon",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-cedar",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-delta",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-ember",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-fjord",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "state-populated",
+            "text": "Populated",
+            "w": 80.53125,
+            "h": 20
+          },
+          {
+            "id": "state-loading",
+            "text": "Loading",
+            "w": 66.578125,
+            "h": 20
+          },
+          {
+            "id": "state-empty",
+            "text": "Empty",
+            "w": 56.265625,
+            "h": 20
+          },
+          {
+            "id": "state-error",
+            "text": "Error",
+            "w": 47.15625,
+            "h": 20
+          }
+        ],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": [
+        {
+          "id": "show-review-queue",
+          "text": "Show review queue",
+          "w": 165.109375,
+          "h": 32
+        },
+        {
+          "id": "project-search",
+          "text": "",
+          "w": 254,
+          "h": 24
+        },
+        {
+          "id": "status-filter-all",
+          "text": "All",
+          "w": 88.796875,
+          "h": 24
+        },
+        {
+          "id": "status-filter-active",
+          "text": "Active",
+          "w": 88.8125,
+          "h": 24
+        },
+        {
+          "id": "status-filter-review",
+          "text": "Review",
+          "w": 88.796875,
+          "h": 24
+        },
+        {
+          "id": "status-filter-planned",
+          "text": "Planned",
+          "w": 88.796875,
+          "h": 24
+        },
+        {
+          "id": "status-filter-paused",
+          "text": "Paused",
+          "w": 88.796875,
+          "h": 24
+        },
+        {
+          "id": "reset-filters",
+          "text": "Reset filters",
+          "w": 108.546875,
+          "h": 32
+        },
+        {
+          "id": "edit-atlas",
+          "text": "Edit",
+          "w": 51.890625,
+          "h": 32
+        },
+        {
+          "id": "edit-beacon",
+          "text": "Edit",
+          "w": 51.890625,
+          "h": 32
+        },
+        {
+          "id": "edit-cedar",
+          "text": "Edit",
+          "w": 51.890625,
+          "h": 32
+        },
+        {
+          "id": "edit-delta",
+          "text": "Edit",
+          "w": 51.890625,
+          "h": 32
+        },
+        {
+          "id": "edit-ember",
+          "text": "Edit",
+          "w": 51.890625,
+          "h": 32
+        },
+        {
+          "id": "edit-fjord",
+          "text": "Edit",
+          "w": 51.890625,
+          "h": 32
+        },
+        {
+          "id": "state-populated",
+          "text": "Populated",
+          "w": 80.53125,
+          "h": 20
+        },
+        {
+          "id": "state-loading",
+          "text": "Loading",
+          "w": 66.578125,
+          "h": 20
+        },
+        {
+          "id": "state-empty",
+          "text": "Empty",
+          "w": 56.265625,
+          "h": 20
+        },
+        {
+          "id": "state-error",
+          "text": "Error",
+          "w": 47.15625,
+          "h": 20
+        }
+      ]
+    },
+    {
+      "arm": "astryx",
+      "file": "settings.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "workspace-name",
+            "text": "",
+            "w": 644,
+            "h": 24
+          },
+          {
+            "id": "save-settings",
+            "text": "Save settings",
+            "w": 119.09375,
+            "h": 32
+          }
+        ],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": [
+        {
+          "id": "workspace-name",
+          "text": "",
+          "w": 644,
+          "h": 24
+        },
+        {
+          "id": "save-settings",
+          "text": "Save settings",
+          "w": 119.09375,
+          "h": 32
+        }
+      ]
+    },
+    {
+      "arm": "astryx",
+      "file": "index.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": false
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": false
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set.",
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "show-review-queue",
+            "text": "Show review queue",
+            "w": 165.109375,
+            "h": 32
+          },
+          {
+            "id": "project-search",
+            "text": "",
+            "w": 378,
+            "h": 22.84375
+          },
+          {
+            "id": "status-filter-all",
+            "text": "All",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "status-filter-active",
+            "text": "Active",
+            "w": 88.8125,
+            "h": 24
+          },
+          {
+            "id": "status-filter-review",
+            "text": "Review",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "status-filter-planned",
+            "text": "Planned",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "status-filter-paused",
+            "text": "Paused",
+            "w": 88.796875,
+            "h": 24
+          },
+          {
+            "id": "reset-filters",
+            "text": "Reset filters",
+            "w": 108.546875,
+            "h": 32
+          },
+          {
+            "id": "edit-atlas",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-beacon",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-cedar",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-delta",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-ember",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "edit-fjord",
+            "text": "Edit",
+            "w": 51.890625,
+            "h": 32
+          },
+          {
+            "id": "state-populated",
+            "text": "Populated",
+            "w": 71.3125,
+            "h": 20
+          },
+          {
+            "id": "state-loading",
+            "text": "Loading",
+            "w": 59.359375,
+            "h": 20
+          },
+          {
+            "id": "state-empty",
+            "text": "Empty",
+            "w": 50.515625,
+            "h": 20
+          },
+          {
+            "id": "state-error",
+            "text": "Error",
+            "w": 42.703125,
+            "h": 20
+          }
+        ],
+        "coarse": false,
+        "storage": "SecurityError"
+      },
+      "blocked": [
+        "Paused filter on saved edit: saving failed"
+      ],
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "astryx",
+      "file": "settings.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "workspace-name",
+            "text": "",
+            "w": 644,
+            "h": 22.84375
+          },
+          {
+            "text": "",
+            "w": 40,
+            "h": 24
+          },
+          {
+            "text": "",
+            "w": 40,
+            "h": 24
+          },
+          {
+            "id": "save-settings",
+            "text": "Save settings",
+            "w": 119.09375,
+            "h": 32
+          }
+        ],
+        "coarse": false,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "astryx",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "astryx",
+      "file": "settings.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "astryx",
+      "file": "index.html",
+      "width": 360,
+      "height": 360,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 298,
+              "bottom": 342,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 298,
+              "bottom": 342,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 298,
+          "bottom": 342,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 298,
+          "bottom": 342,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "astryx",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 326.5,
+              "bottom": 370.5,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 326.5,
+              "bottom": 370.5,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [
+        "Blocked form submission to '' because the form's frame is sandboxed and the 'allow-forms' permission is not set."
+      ],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 326.5,
+          "bottom": 370.5,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 326.5,
+          "bottom": 370.5,
+          "reachable": true
+        }
+      ]
+    }
+  ],
+  "endedAt": "2026-11-10T21:01:23.423Z"
+}

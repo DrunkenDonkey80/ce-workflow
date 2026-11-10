@@ -1,0 +1,337 @@
+{
+  "html": {
+    "metrics": {
+      "sessions": 1,
+      "turns": 58,
+      "toolCalls": 93,
+      "input": 132,
+      "output": 85351,
+      "cacheRead": 4847031,
+      "cacheWrite": 275601,
+      "totalTokens": 5208115,
+      "cost": 4.055,
+      "models": {
+        "anthropic/claude-opus-5-5": 58
+      }
+    },
+    "inclusiveMetrics": {
+      "sessions": 1,
+      "turns": 58,
+      "toolCalls": 93,
+      "input": 132,
+      "output": 85351,
+      "cacheRead": 4847031,
+      "cacheWrite": 275601,
+      "totalTokens": 5208115,
+      "cost": 4.055,
+      "models": {
+        "anthropic/claude-opus-5-5": 58
+      }
+    },
+    "auxiliary": [],
+    "costEvidence": {
+      "providerReported": 0,
+      "explicitlyEstimated": 58,
+      "unspecified": 0
+    },
+    "missingUsage": 0,
+    "missingCost": 0,
+    "entryTypes": {
+      "session": 1,
+      "model_change": 1,
+      "thinking_level_change": 1,
+      "session_info": 2,
+      "message": 154
+    },
+    "compactionRows": [],
+    "thinking": [
+      "high"
+    ],
+    "stages": [
+      {
+        "runId": "641e98ff-6a90-4a64-93ae-ebb8c92e1a2f",
+        "startedAt": "2026-11-10T18:52:42.889Z",
+        "endedAt": "2026-11-10T19:05:40.027Z",
+        "elapsedSeconds": 777.138,
+        "model": "anthropic/claude-opus-5-5",
+        "thinking": "high",
+        "reportedTokens": {
+          "input": 90,
+          "output": 69516,
+          "total": 69606,
+          "window": 104382,
+          "windowPeak": 104382
+        },
+        "reportedCost": {
+          "inputTokens": 90,
+          "outputTokens": 69516,
+          "costUsd": 2.6521673999999997
+        }
+      },
+      {
+        "runId": "85d2cdab-f6b9-494f-a150-a03372c8b801",
+        "startedAt": "2026-11-10T19:14:12.416Z",
+        "endedAt": "2026-11-10T19:17:56.641Z",
+        "elapsedSeconds": 224.225,
+        "model": "anthropic/claude-opus-5-5",
+        "thinking": "high",
+        "reportedTokens": {
+          "input": 42,
+          "output": 15835,
+          "total": 15877,
+          "window": 132083,
+          "windowPeak": 132083
+        },
+        "reportedCost": {
+          "inputTokens": 42,
+          "outputTokens": 15835,
+          "costUsd": 1.4027918000000001
+        }
+      }
+    ],
+    "activeSeconds": 1001.363,
+    "elapsedSeconds": 1513.752,
+    "assets": [
+      {
+        "path": "app.js",
+        "bytes": 13545,
+        "gzip": 4461
+      },
+      {
+        "path": "DESIGN.md",
+        "bytes": 4197,
+        "gzip": 2186
+      },
+      {
+        "path": "HANDOFF.md",
+        "bytes": 3050,
+        "gzip": 1431
+      },
+      {
+        "path": "index.html",
+        "bytes": 8322,
+        "gzip": 2106
+      },
+      {
+        "path": "settings.html",
+        "bytes": 5826,
+        "gzip": 1617
+      },
+      {
+        "path": "settings.js",
+        "bytes": 2096,
+        "gzip": 823
+      },
+      {
+        "path": "styles.css",
+        "bytes": 22734,
+        "gzip": 5031
+      }
+    ],
+    "runtimeAssetBytes": 52523,
+    "runtimeAssetGzipBytes": 14038,
+    "sourceFiles": [
+      {
+        "path": "html\\public\\app.js",
+        "lines": 284
+      },
+      {
+        "path": "html\\public\\index.html",
+        "lines": 146
+      },
+      {
+        "path": "html\\public\\settings.html",
+        "lines": 101
+      },
+      {
+        "path": "html\\public\\settings.js",
+        "lines": 50
+      },
+      {
+        "path": "html\\public\\styles.css",
+        "lines": 675
+      }
+    ],
+    "scopeAuditCandidateCount": 29
+  },
+  "astryx": {
+    "metrics": {
+      "sessions": 1,
+      "turns": 103,
+      "toolCalls": 130,
+      "input": 264,
+      "output": 107020,
+      "cacheRead": 9526289,
+      "cacheWrite": 3182997,
+      "totalTokens": 12816570,
+      "cost": 19.9617,
+      "models": {
+        "anthropic/claude-opus-5-5": 103
+      }
+    },
+    "inclusiveMetrics": {
+      "sessions": 1,
+      "turns": 103,
+      "toolCalls": 130,
+      "input": 35660,
+      "output": 107998,
+      "cacheRead": 9526289,
+      "cacheWrite": 3182997,
+      "totalTokens": 12852944,
+      "cost": 19.9657,
+      "models": {
+        "anthropic/claude-opus-5-5": 103
+      }
+    },
+    "auxiliary": [
+      {
+        "kind": "compaction",
+        "model": "openai-codex/gpt-6-luna",
+        "usage": {
+          "input": 35396,
+          "output": 978,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 139,
+          "totalTokens": 36374,
+          "cost": {
+            "input": 0.0035396000000000004,
+            "output": 0.000489,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.0040286,
+            "totalFromProvider": false
+          }
+        }
+      }
+    ],
+    "costEvidence": {
+      "providerReported": 0,
+      "explicitlyEstimated": 102,
+      "unspecified": 1
+    },
+    "missingUsage": 0,
+    "missingCost": 0,
+    "entryTypes": {
+      "session": 1,
+      "model_change": 1,
+      "thinking_level_change": 1,
+      "session_info": 2,
+      "message": 236,
+      "compaction": 1,
+      "context_edit": 1
+    },
+    "compactionRows": [
+      {
+        "type": "compaction",
+        "timestamp": "2026-11-10T19:18:35.557Z"
+      }
+    ],
+    "thinking": [
+      "high"
+    ],
+    "stages": [
+      {
+        "runId": "d32c4d2d-7b9d-4edc-8311-98e70cc17cb1",
+        "startedAt": "2026-11-10T18:52:43.561Z",
+        "endedAt": "2026-11-10T19:14:09.966Z",
+        "elapsedSeconds": 1286.405,
+        "model": "anthropic/claude-opus-5-5",
+        "thinking": "high",
+        "reportedTokens": {
+          "input": 202,
+          "output": 86016,
+          "total": 86218,
+          "window": 5948,
+          "windowPeak": 169833
+        },
+        "reportedCost": {
+          "inputTokens": 202,
+          "outputTokens": 86016,
+          "costUsd": 5.513070000000001
+        }
+      },
+      {
+        "runId": "b889e867-2b9c-4776-af2b-f914ae3b1acc",
+        "startedAt": "2026-11-10T19:14:12.436Z",
+        "endedAt": "2026-11-10T19:18:59.732Z",
+        "elapsedSeconds": 287.296,
+        "model": "anthropic/claude-opus-5-5",
+        "thinking": "high",
+        "reportedTokens": {
+          "input": 62,
+          "output": 21004,
+          "total": 21066,
+          "window": 5946,
+          "windowPeak": 5948
+        },
+        "reportedCost": {
+          "inputTokens": 62,
+          "outputTokens": 21004,
+          "costUsd": 14.448628799999998
+        }
+      }
+    ],
+    "activeSeconds": 1573.701,
+    "elapsedSeconds": 1576.171,
+    "assets": [
+      {
+        "path": "assets/app.js",
+        "bytes": 1122991,
+        "gzip": 362661
+      },
+      {
+        "path": "assets/astryx.css",
+        "bytes": 297027,
+        "gzip": 48128
+      },
+      {
+        "path": "DESIGN.md",
+        "bytes": 5509,
+        "gzip": 2628
+      },
+      {
+        "path": "HANDOFF.md",
+        "bytes": 6413,
+        "gzip": 3019
+      },
+      {
+        "path": "index.html",
+        "bytes": 467,
+        "gzip": 277
+      },
+      {
+        "path": "LICENSES.txt",
+        "bytes": 13824,
+        "gzip": 2547
+      },
+      {
+        "path": "settings.html",
+        "bytes": 467,
+        "gzip": 277
+      },
+      {
+        "path": "styles.css",
+        "bytes": 15537,
+        "gzip": 3955
+      }
+    ],
+    "runtimeAssetBytes": 1436489,
+    "runtimeAssetGzipBytes": 415298,
+    "sourceFiles": [
+      {
+        "path": "astryx\\public\\index.html",
+        "lines": 16
+      },
+      {
+        "path": "astryx\\public\\settings.html",
+        "lines": 16
+      },
+      {
+        "path": "astryx\\public\\styles.css",
+        "lines": 382
+      }
+    ],
+    "scopeAuditCandidateCount": 36
+  }
+}

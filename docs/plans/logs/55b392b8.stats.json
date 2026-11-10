@@ -1,0 +1,313 @@
+{
+ "version": 1,
+ "activeMs": 0,
+ "runs": 0,
+ "waitingMs": 1004502,
+ "toolWallMs": 328123,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 8,
+   "thinkingMs": 38551,
+   "actingMs": 19066,
+   "input": 24,
+   "output": 3453,
+   "cacheRead": 600806,
+   "cacheWrite": 104814,
+   "cost": 0.7133872,
+   "errors": 0
+  },
+  "openai-codex/gpt-6.1-sol:high": {
+   "replies": 36,
+   "thinkingMs": 578631,
+   "actingMs": 97776,
+   "input": 407084,
+   "output": 22632,
+   "cacheRead": 4063488,
+   "cacheWrite": 0,
+   "cost": 1.4468368000000003,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "plan3": {
+   "count": 5,
+   "ms": 317,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "bash": {
+   "count": 26,
+   "ms": 206976,
+   "maxMs": 136023,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 2,
+   "ms": 10066,
+   "maxMs": 9539,
+   "failures": 0
+  },
+  "read": {
+   "count": 48,
+   "ms": 676,
+   "maxMs": 282,
+   "failures": 2
+  },
+  "codemode": {
+   "count": 21,
+   "ms": 241561,
+   "maxMs": 137297,
+   "failures": 4
+  },
+  "module_report": {
+   "count": 3,
+   "ms": 62,
+   "maxMs": 48,
+   "failures": 0
+  },
+  "read_symbol": {
+   "count": 5,
+   "ms": 61,
+   "maxMs": 15,
+   "failures": 0
+  },
+  "jev_triage": {
+   "count": 1,
+   "ms": 5,
+   "maxMs": 5,
+   "failures": 0
+  },
+  "edit": {
+   "count": 11,
+   "ms": 46,
+   "maxMs": 19,
+   "failures": 1
+  },
+  "jev_evidence": {
+   "count": 1,
+   "ms": 2962,
+   "maxMs": 2962,
+   "failures": 0
+  },
+  "write": {
+   "count": 2,
+   "ms": 2,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "pi_lens_activate_tools": {
+   "count": 1,
+   "ms": 2,
+   "maxMs": 2,
+   "failures": 0
+  },
+  "lsp_navigation": {
+   "count": 4,
+   "ms": 1246,
+   "maxMs": 383,
+   "failures": 0
+  },
+  "read_enclosing": {
+   "count": 2,
+   "ms": 35,
+   "maxMs": 24,
+   "failures": 1
+  },
+  "resolve-library-id": {
+   "count": 1,
+   "ms": 1312,
+   "maxMs": 1312,
+   "failures": 0
+  },
+  "schedule": {
+   "count": 1,
+   "ms": 455,
+   "maxMs": 455,
+   "failures": 0
+  },
+  "query-docs": {
+   "count": 1,
+   "ms": 1552,
+   "maxMs": 1552,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 22,
+   "ms": 24522,
+   "maxMs": 4838,
+   "failures": 0
+  },
+  "test": {
+   "count": 4,
+   "ms": 182454,
+   "maxMs": 136023,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short && git log --oneline -3 && ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\" && ls docs/proposals 2>/dev/null | head": {
+   "count": 1,
+   "ms": 280,
+   "maxMs": 280,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\" && ls -la . reports parent-checks html astryx | head -80 && cat manifest.json | head -60": {
+   "count": 1,
+   "ms": 390,
+   "maxMs": 390,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\" && D=\"./docs/proposals/astryx-study\" && mkdir -p \"$D/probes\" \"$D/screenshots\" && cp brief.md refinement.md rubric.md manifest.json m": {
+   "count": 1,
+   "ms": 501,
+   "maxMs": 501,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/proposals/astryx-study/probes\" && head -12 workflow.js && sed -n 1,20p setup.mjs && sed -n 1,12p metrics.mjs && grep -n \"root\\|repo\\b\" acceptance.mjs form-security.mjs look.mjs | head -20": {
+   "count": 1,
+   "ms": 1211,
+   "maxMs": 1211,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/proposals/astryx-study/probes\" && sed -i -e \"s#file:///./#../../../../#g\" -e \"s#executablePath:\\\"C:/Users/Flex/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe\\\"#executable": {
+   "count": 1,
+   "ms": 782,
+   "maxMs": 782,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && (npm pack --dry-run --json 2>/dev/null | node -e \"let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const f=JSON.parse(s)[0].files.map(x=>x.path);console.log(f.length, f.filter(p=>p.in": {
+   "count": 1,
+   "ms": 3028,
+   "maxMs": 3028,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && npm pack --dry-run --json > \"$TEMP/pack.json\" 2>\"$TEMP/pack.err\"; echo $?; head -c 300 \"$TEMP/pack.json\"; tail -5 \"$TEMP/pack.err\"": {
+   "count": 1,
+   "ms": 1354,
+   "maxMs": 1354,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"hub/scripts/test-browser.mjs\" > \"$TEMP/astryx-browser-baseline.log\" 2>&1; result=$?; tail -15 \"$TEMP/astryx-browser-baseline.log\"; exit $result": {
+   "count": 1,
+   "ms": 136023,
+   "maxMs": 136023,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"design|sessionMetrics|createAgentSession|compaction\" \"scripts/lab-metrics.mjs\" \"scripts\" --glob \"*bench*\" --glob \"*design*\" --glob \"*lab*\" | head -70; node -e \"const fs=require(\\\"node:fs\\\");let": {
+   "count": 1,
+   "ms": 789,
+   "maxMs": 789,
+   "failures": 0
+  },
+  "bash\u0000ls \"hub\"; ls \"hub/scripts\"; rg -n \"PI_HUB|new|prompt|wait|idle\" \"hub/scripts/cli.mjs\" | head -50": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"HUB_CLI\" \"extensions/design.ts\"; ls \"hub/bin\"; ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison/html/public\"; ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq": {
+   "count": 1,
+   "ms": 215,
+   "maxMs": 215,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"process.env|PI_HUB|sessions.*prompt|create.*Hub|listen|port|command\" \"hub/src/hub.ts\" \"hub/src/rpc-client.ts\" \"hub/src/api.ts\" | head -70; ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygW": {
+   "count": 1,
+   "ms": 2458,
+   "maxMs": 2458,
+   "failures": 0
+  },
+  "bash\u0000STUDY_ROOT=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\" STUDY_DEPS=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules\" CHROME_PATH=\"C:/Users/Flex/AppData/Local": {
+   "count": 3,
+   "ms": 46431,
+   "maxMs": 25496,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"hub/src/cli.ts\" status --json; rg -n \"sessionFile|case \\\"prompt\\\"|verb === \\\"session\\\"|state\\(\" \"hub/src/cli.ts\" \"hub/src/sessions.ts\" | head -45; git diff --stat": {
+   "count": 1,
+   "ms": 714,
+   "maxMs": 714,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require(\\\"node:fs\\\");const p=JSON.parse(fs.readFileSync(process.env.USERPROFILE+\\\"/.pi/agent/settings.json\\\"));console.log(JSON.stringify({packages:p.packages,extensions:p.extensions": {
+   "count": 1,
+   "ms": 87,
+   "maxMs": 87,
+   "failures": 0
+  },
+  "bash\u0000ROOT=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\"; DEST=\"./docs/proposals/astryx-study\"; mkdir -p \"$DEST/fixtures/html\" \"$DEST/fixtures/astryx/public\" \"$DEST/parent-checks\" \"$DEST/": {
+   "count": 1,
+   "ms": 1374,
+   "maxMs": 1374,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"case \\\"abort\\\"|get\\(id|/s/.*api|busyReasons\" \"hub/src/api.ts\" \"hub/src/hub.ts\" \"hub/src/sessions.ts\" | head -35": {
+   "count": 1,
+   "ms": 1288,
+   "maxMs": 1288,
+   "failures": 0
+  },
+  "bash\u0000node \"docs/proposals/astryx-study/probes/product-benchmark.mjs\" --self-check": {
+   "count": 1,
+   "ms": 527,
+   "maxMs": 527,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"./.pi/astryx-product-benchmark\"; node \"./docs/proposals/astryx-study/probes/product-benchmark.mjs\" --root \"./.pi/astryx-product-benchmark\" --label \"prechange-html\" --run > \"./.pi/astryx-prod": {
+   "count": 1,
+   "ms": 1174,
+   "maxMs": 1174,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"designshot|\\.mark|styleEdits|MarkState\" \"hub/web/app.ts\" \"hub/web/files.ts\"; rg -n \"theme|compile|palette|contrast\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/cli/api\"": {
+   "count": 1,
+   "ms": 359,
+   "maxMs": 359,
+   "failures": 0
+  },
+  "bash\u0000rm \"./docs/proposals/astryx-study/probes/setup.mjs\" \"./docs/proposals/astryx-study/probes/workflow.js\"; ROOT=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\"; DEST=\"./docs/proposals/as": {
+   "count": 1,
+   "ms": 1712,
+   "maxMs": 1712,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"SANDBOX_CSP|renderDesign\\(|withBridge\\(|MarkState|designshot\" \"extensions\" \"hub\" \"scripts\" --glob \"*.ts\" --glob \"*.mjs\" --glob \"!test-browser.mjs\" | head -85; git diff --name-only; git branch -": {
+   "count": 1,
+   "ms": 1156,
+   "maxMs": 1156,
+   "failures": 0
+  },
+  "bash\u0000rg --files \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules/@astryxdesign/cli\" | grep -E \"(generateTonalPalette|themePalette|compileTheme|themeBuild|themeValidate)\" | head -25": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 0
+  },
+  "bash\u0000for f in \"docs/proposals/astryx-study/probes/\"*.mjs; do node --check \"$f\" || exit; done; node \"docs/proposals/astryx-study/probes/product-benchmark.mjs\" --self-check; npm pack --dry-run --json > \".pi/": {
+   "count": 1,
+   "ms": 4838,
+   "maxMs": 4838,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "P3-01": {
+   "ms": 992053,
+   "testMs": 0,
+   "replies": 44,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8,
+    "openai-codex/gpt-6.1-sol:high": 36
+   },
+   "failures": 4
+  }
+ },
+ "spans": [],
+ "hints": []
+}

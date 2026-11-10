@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Settings: Relay</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script src="settings.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main" data-id="skip-link">Skip to settings</a>
+
+  <header class="site-header" data-id="site-header">
+    <div class="site-header-inner">
+      <div class="brand" data-id="brand">
+        <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
+          <rect x="2" y="10" width="24" height="8" rx="4" fill="#f2c200" stroke="#17202b" stroke-width="2"/>
+          <circle cx="7" cy="14" r="4.5" fill="#fff" stroke="#17202b" stroke-width="2"/>
+          <circle cx="21" cy="14" r="4.5" fill="#17202b" stroke="#17202b" stroke-width="2"/>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-name" id="workspace-label" data-id="workspace-label">Relay</span>
+          <span class="brand-team" data-id="team-label">Field operations</span>
+        </span>
+      </div>
+      <nav class="primary-nav" aria-label="Primary" data-id="primary-nav">
+        <ul>
+          <li><a class="nav-link" href="index.html" data-id="nav-projects">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Projects</a></li>
+          <li><a class="nav-link" href="settings.html" aria-current="page" data-id="nav-settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>Settings</a></li>
+        </ul>
+      </nav>
+      <div class="account" data-id="account" title="Signed in as Maya Chen">
+        <span aria-hidden="true">MC</span><span class="sr-only">Signed in as Maya Chen</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page" data-id="main">
+    <a class="back-link" href="index.html" data-id="back-to-projects">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back to projects</a>
+
+    <section class="intro" data-id="settings-intro" aria-labelledby="page-title">
+      <h1 id="page-title" data-id="page-title">Settings</h1>
+      <p data-id="settings-summary">Changes apply to this visit only. This prototype has no server, so settings reset when you reload or leave the page.</p>
+    </section>
+
+    <form class="settings-form" id="settings-form" novalidate data-id="settings-form">
+      <section class="settings-group" data-id="workspace-group" aria-labelledby="workspace-title">
+        <h2 id="workspace-title" data-id="workspace-title">Workspace</h2>
+        <div class="field">
+          <label class="field-label" for="workspace-name">Workspace name</label>
+          <input class="input" id="workspace-name" name="workspace" type="text" value="Relay" required autocomplete="off" aria-describedby="workspace-name-error" data-id="workspace-name">
+          <p class="field-error" id="workspace-name-error" hidden data-id="workspace-name-error">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>
+            <span>Enter a workspace name. It can't be blank.</span>
+          </p>
+        </div>
+      </section>
+
+      <section class="settings-group" data-id="notifications-group" aria-labelledby="notifications-title">
+        <h2 id="notifications-title" data-id="notifications-title">Notifications</h2>
+        <div class="switch-row">
+          <div class="switch-text">
+            <span class="field-label" id="notifications-label">Project updates</span>
+            <span class="field-hint" id="notifications-hint">Notify me when a project's owner, status or due date changes.</span>
+          </div>
+          <label class="switch" data-id="notifications-switch">
+            <input type="checkbox" role="switch" id="notifications" checked aria-labelledby="notifications-label" aria-describedby="notifications-hint" data-id="notifications">
+            <span class="switch-state" id="notifications-state" aria-hidden="true">On</span>
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-group" data-id="appearance-group" aria-labelledby="appearance-title">
+        <h2 id="appearance-title" data-id="appearance-title">Appearance</h2>
+        <div class="switch-row">
+          <div class="switch-text">
+            <span class="field-label" id="appearance-label">Dark appearance</span>
+            <span class="field-hint" id="appearance-hint">Switches this page between light and dark right away.</span>
+          </div>
+          <label class="switch" data-id="appearance-switch">
+            <input type="checkbox" role="switch" id="appearance" aria-labelledby="appearance-label" aria-describedby="appearance-hint" data-id="appearance">
+            <span class="switch-state" id="appearance-state" aria-hidden="true">Light</span>
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+      </section>
+
+      <div class="settings-actions">
+        <button class="button button-primary" type="submit" data-id="save-settings">Save settings</button>
+        <p class="settings-saved" id="settings-saved" role="status" data-id="settings-saved"></p>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

@@ -1,0 +1,25 @@
+[
+  {
+    "mode": "original",
+    "localHandlerCalls": 0,
+    "posts": 0,
+    "opaqueStorage": true,
+    "violations": []
+  },
+  {
+    "mode": "local",
+    "localHandlerCalls": 1,
+    "posts": 0,
+    "opaqueStorage": true,
+    "violations": [
+      "form-action"
+    ]
+  },
+  {
+    "mode": "unrestricted-control",
+    "localHandlerCalls": 1,
+    "posts": 1,
+    "opaqueStorage": true,
+    "violations": []
+  }
+]
