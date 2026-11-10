@@ -1914,6 +1914,10 @@ try {
 	assert.match(planning, /\*\*Locked writes in plans\*\*[\s\S]*runs the same write twice at once[\s\S]*version that input/, "planning carries the locked-writes test guidance");
 	const system = hooks.get("before_agent_start")({ systemPrompt: "BASE" })?.systemPrompt;
 	assert.match(system, /^BASE\n\n\*\*Locked writes\*\*: [\s\S]*read taken before the lock is only a hint/, "every turn's system prompt carries the locked-writes rule, so compaction cannot drop it");
+	const sections = {};
+	hooks.get("before_agent_start")({ systemPrompt: "BASE", systemPromptOptions: { sections } });
+	assert.deepEqual(Object.keys(sections).filter(name => !/^[a-z][a-z0-9_-]*$/.test(name)), [], "section names pass Pi's SYSTEM_PROMPT_SECTION_NAME");
+	assert.match(Object.values(sections).join(""), /\*\*Locked writes\*\*/);
 	assert.match(planning, /talking cannot settle[\s\S]*plan a throwaway prototype step naming the question/, "ungrillable questions become a prototype step");
 	assert.match(planning, /record its reference, the chosen direction and tokens\/components to reuse in the plan, not the skill text/);
 	assert.match(planning, /Explicit briefs and project conventions win; native\/TUI work follows platform rules/);

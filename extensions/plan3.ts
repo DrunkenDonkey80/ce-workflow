@@ -2029,7 +2029,7 @@ export default function plan3(pi) {
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
 	pi.on?.("before_agent_start", event => {
 		const sections = event?.systemPromptOptions?.sections;
-		if (sections && typeof sections === "object") { sections.lockedWrites = LOCKED_WRITES; return; }
+		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; return; }
 		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${LOCKED_WRITES}` };
 	});
 	// Plans are born from the template (plan3 create), never invented: block writing a NEW plan3 file by hand.
