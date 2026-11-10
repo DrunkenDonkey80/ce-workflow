@@ -128,7 +128,8 @@ async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 
 export async function listDevices(exec: Exec, signal?: AbortSignal): Promise<Device[]> {
 	const list: Device[] = data(await run(exec, ["devices", "--include-offline"], signal)).devices ?? [];
-	for (const d of await wifiDevices(exec, signal)) if (list.some(l => l.id === d.id)) wifi.delete(d.id); else list.push(d); // USB wins: mobilecli has it
+	// devicectl knows the transport (it reports a wired device as wired, not here); mobilecli 1.0.22 lists Wi-Fi devices too.
+	for (const d of await wifiDevices(exec, signal)) { const i = list.findIndex(l => l.id === d.id); if (i < 0) list.push(d); else list[i] = d; }
 	return list.sort((a, b) => Number(b.state === "online") - Number(a.state === "online"));
 }
 

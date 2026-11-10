@@ -471,7 +471,8 @@ if (process.platform === "darwin") {
 			return { code: 0, stdout: JSON.stringify({ jsonrpc: "2.0", id: 1, result }) };
 		}
 		assert.deepEqual(a, ["devices", "--include-offline"], "mobilecli only lists");
-		return ok({ devices: [] });
+		// mobilecli 1.0.22 lists the Wi-Fi iPad too; it must still go through the tunnel, not the USB agent install.
+		return ok({ devices: [{ id: "IPAD-1", name: "Viktor’s iPad", platform: "ios", type: "real", version: "26.4.1", state: "online" }] });
 	};
 	assert.match(await mobileAct(exec, { action: "list" }, opts()), /^IPAD-1 ONLINE Viktor’s iPad \(ios real Wi-Fi 26\.4\.1\)$/);
 	const snap = await mobileAct(exec, { action: "snapshot" }, opts());

@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.6.2 — 2026-11-10
+
+### Fixed
+- mobile_act: an iPad or iPhone on Wi-Fi was taken for a wired one once mobilecli 1.0.22 started listing Wi-Fi devices too, and every action failed asking for a wildcard provisioning profile. devicectl's transport type decides now.
+
 ## 0.6.1 — 2026-11-10
 
 ### Changed
