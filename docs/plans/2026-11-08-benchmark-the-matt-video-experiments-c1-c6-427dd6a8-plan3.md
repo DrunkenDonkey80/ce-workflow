@@ -2,7 +2,7 @@
 plan3: true
 status: draft
 created: 2026-11-08
-updated: 2026-11-10T06:07:52.028Z
+updated: 2026-11-10T06:28:03.119Z
 started: 2026-11-09T11:22:42.019Z
 ---
 
@@ -55,6 +55,7 @@ None open. Q-01 → D-04, Q-02 → D-05, Q-03 → D-06.
 
   - note: Baseline = the C1 high arm itself (current settings, current ce-workflow 24bb80d): photobook-02 ran on an older recipe/ce-workflow, so it can't be the baseline. Runner: C:/SOFT/git/rework-lab/c1-run.sh (3 reps, high+medium side by side per rep, --check = npm run build + vitest). Metrics: wallMs/metrics/check in each c1-*.lab.jsonl done line (lab-metrics sessionMetrics).
 - [x] **C-01** C1 done (D-08/D-09): coding-only 2x2x3 from one Opus-high plan; verdict keep Sol on high effort; medium rejected for coding.
+- [ ] **C-10** C1c: rerun Opus high (and medium) x3 coding-only from 1d0fb5c with the new Locked writes rule; count arm-specific races blind vs D-09.
 - [ ] **C-02** C1 design: coding effort one level lower on `[code]` phases only, planning unchanged.
   - Arms: current effort vs one lower; metrics from `lab-metrics.mjs`; quality from hidden tests and the blind judge.
   - Keep only if quality holds and cost or runtime drops materially.
@@ -87,3 +88,4 @@ C1 coding-only: all 12 runs done. Coding time/cost per arm via C:/SOFT/git/rewor
 ## Amendments
 
 Append material changes and their reasons; preserve the original request and settled decisions.
+- 2026-11-10: Added C-10 after C-01: D-09 found reads taken before the lock were Opus's main coding defect; the Locked writes prompt rule (plan3.ts) needs a measured before/after on the same frozen plan.

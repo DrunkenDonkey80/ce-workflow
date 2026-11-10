@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- Plan3 planning, step execution and Tiny changes now follow a "locked writes" rule: code that saves shared state under a lock makes every decision from what it reads inside the lock. New plans that add such a write get a test that sends the same write twice at once, versioned input for background jobs whose input can be withdrawn, and a check for reads taken before the lock. The coding benchmark showed this was the most common bug in Opus-written code.
+
 ## 0.6.1 — 2026-11-10
 
 ### Changed
