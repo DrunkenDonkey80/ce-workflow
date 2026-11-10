@@ -5,6 +5,8 @@
 // from the list the parent sends, so they survive live reloads. Its own elements are marked data-design-chrome.
 // S12: in Edit mode a click inspects (computed styles go back), and style messages change that element inline until
 // the next load. A page's Tweaks panel dispatches a "design:tweaks" CustomEvent, which goes up with the load id.
+import { designStateJson } from "../../extensions/design-state.ts";
+
 export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	if (window.parent === window || window.__designBridge) return;
 	window.__designBridge = true;
@@ -15,6 +17,20 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	const STYLES = ["color", "background-color", "font-size", "font-weight", "padding", "margin", "gap", "border-radius"];
 	const screen = decodeURIComponent(location.pathname.split("/").pop() || "index.html");
 	const send = (type, data) => { if (load) parent.postMessage({ type, load, ...data }, "*"); };
+	const stateJson = ${designStateJson.toString()};
+	async function captureState(message) {
+		const at = load, reply = { request: message.request, screen, version: message.version };
+		try {
+			await window.designReady;
+			const api = window.designPreview;
+			if (typeof api?.capture !== "function" || typeof api?.restore !== "function") return send("design:state", { ...reply, error: "unsupported" });
+			const state = JSON.parse(stateJson(await api.capture()));
+			if (load !== at) return;
+			const coarse = matchMedia("(pointer: coarse)").matches, touch = navigator.maxTouchPoints > 0;
+			if (coarse !== touch) return send("design:state", { ...reply, error: "input" });
+			send("design:state", { ...reply, state, hash: location.hash, input: touch ? "touch" : "mouse", reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches });
+		} catch { if (load === at) send("design:state", { ...reply, error: "capture" }); }
+	}
 	const chrome = el => { if (el?.nodeType === 3) el = el.parentElement; return !!(el && el.closest && el.closest("[data-design-chrome]")); };
 	const css = document.createElement("style"); css.setAttribute("data-design-chrome", "");
 	css.textContent = "[data-design-pins]::backdrop{pointer-events:none;background:transparent}"; document.head.append(css);
@@ -69,6 +85,7 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		const message = event.data || {};
 		if (message.type === "design:hello" && typeof message.load === "string") { load = message.load; position(); }
 		if (message.load !== load) return;
+		if (message.type === "design:capture" && typeof message.request === "string" && message.request.length <= 80 && message.screen === screen && Number.isSafeInteger(message.version) && message.version >= 0) void captureState(message);
 		if (typeof message.mode === "string") { mode = message.mode; if (!mode) outline(null); document.documentElement.style.cursor = mode ? "crosshair" : ""; }
 		if (Number.isSafeInteger(message.go) && slides()) location.hash = String(Math.min(slides(), Math.max(1, message.go)));
 		if (message.style && editing) { const el = find(editing); if (el) for (const name of STYLES) if (typeof message.style[name] === "string") el.style.setProperty(name, message.style[name].slice(0, 100)); }

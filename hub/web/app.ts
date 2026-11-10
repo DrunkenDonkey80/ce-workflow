@@ -582,10 +582,13 @@ const filesView = createFilesView($("files"), { get, image: src => openViewer(sr
  design: {
   open: async (version, screen) => { try { showExplored(await post("designpreview", version ? { version, screen } : { screen })); } catch { try { showExplored(await post("designpreview", version ? { version } : {})); } catch (error) { showNotice(error.message); } } },
   // S13, D13: the hub renders the shown state; it goes into the chat box and opens in the annotator; Cancel takes it out again.
-  mark: async state => {
+  mark: async (state, isCurrent) => {
    showNotice("Rendering the screen for marking…");
    try {
-    const { path } = await post("designshot", state), input = $("message-input");
+    const captured = await state;
+    if (!isCurrent()) throw new Error("Preview changed during capture.");
+    const { path } = await post("designshot", captured), input = $("message-input");
+    if (!isCurrent()) throw new Error("Preview changed during rendering.");
     input.value = input.value.trimEnd() ? input.value.trimEnd() + "\n" + path + "\n" : path + "\n"; input.dispatchEvent(new Event("input"));
     if (!await annotateImage(path)) { input.value = input.value.split("\n").filter(row => row !== path).join("\n"); input.dispatchEvent(new Event("input")); showNotice(""); }
    } catch (error) { showNotice(error.message); }

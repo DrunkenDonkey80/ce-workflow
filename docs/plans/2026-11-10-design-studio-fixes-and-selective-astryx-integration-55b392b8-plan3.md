@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-10
-updated: 2026-11-10T23:08:39.698Z
+updated: 2026-11-10T23:45:55.196Z
 reviewed: 2026-11-10
 started: 2026-11-10T20:34:40.770Z
 ---
@@ -153,13 +153,11 @@ Run only checks relevant to touched code after each change. Commands execute fro
 - [x] **P3-03** Design-only form handlers now run while native navigation remains blocked; generic viewers retain their original sandbox.
 - [x] **P3-04** Pins paint above native modal/popover layers, follow layout/scroll and hide stale controls; modal inline edits and real-pointer isolation pass screenshot regressions.
 - [x] **P3-05** Headless captures use a shared five-second readiness watchdog, observed mouse/touch/motion reports and size-only live-preview labels.
-- [ ] **P3-06** Fix Mark state loss through a bounded, explicitly acknowledged page-state replay contract.
-  - Implement the P3-02 contract in the bridge, RenderState, designshot validation, look and Mark flow. Reuse existing annotator. Preserve screen, version, slide/hash, unsaved CSS and supported modal/form state; do not execute functions from serialized state.
-  - Bind request/reply to current frame/load/version, bound payload and capture time, avoid logging transient user values, and reject stale or malformed replies. Unsupported state or failed replay is visible before annotation rather than a false exact capture.
-  - Verify HTML and React open-dialog drafts, custom selectors, scroll where supported, unsaved inspector edits, stale loads, unsupported pages and replay errors. Checks C1–C5, C9.
-- [ ] **P3-07** Add actual-sandbox interaction checks and a touch-safe app starter contract.
+- [x] **P3-06** Mark replays bounded, acknowledged HTML/React drafts and live styles; stale/unsupported/failed captures cannot annotate a fresh or wrong preview.
+- [wip] **P3-07** Add actual-sandbox interaction checks and a touch-safe app starter contract.
   - Fold the proven parent acceptance patterns into existing tests: Save, validation, focus trap/return, Escape, state retry, comments, modal pins, no external assets and settled images. Do not rely on file:// selfchecks for sandbox claims.
   - Extend design-guide.md's phone-only target rule to coarse-pointer tablets and test fixtures accordingly; the component starter is created later in P3-10. Preserve desktop density and test native form/date behavior where automation can observe it. Checks C1–C4, C9.
+  - note: P3-06 verified; preserve its opt-in capture contract and refresh-current-API regression. Begin actual sandbox mouse/touch/keyboard/focus/reduced-motion/short-dialog checks; use the reviewed study runtime already installed, do not download or run paid arms here.
 
 ### Phase 3: Provision pinned tooling and borrow theme/discovery features [code]
 
@@ -238,7 +236,7 @@ Excluded from this implementation scope unless a concrete later requirement earn
 
 ## Resume context
 
-HEAD fef8912c/master; P3-05 now functionally verified and done (5/18), implementation still uncommitted pending owned-hunk staging. C1/C2/C3 pass; C4 first existing annotate-note focus timeout, unchanged traced --keep-browser run passed full suite incl labels+Mark; retained browser hub-ui-49044 explicitly closed. No annotator changes; intermittent failure recorded in Backlog. Initial full active LSP batch only hints/warnings; final 4-path error probe 1 confirmed/3 inconclusive, NOT a clean check. P5 owns renderer, design.ts, guide, input-contract probe, C1, design-view.ts, files.ts token-import ignore, and ONLY new picker assertions + app.ts token-import ignore in mixed files. Preserve cache-miss/session/benchmark unrelated work; stage owned hunks and plan55b392b8/log only, local commit, no push. Next P3-06: read P3-02 replay contract and current bridge/designshot/look/Mark call sites; add red regression before implementing bounded state replay. $37.3623658 benchmark budget remains for two final arms; no paid retries. P3-16 real Safari/touch blocked. Renderer oracle advice already validated (hidden tab selected); no second advisory round for resolved readiness issue.
+P3-01–06 done (6/18), P3-07 WIP. P6 code/tests/guide verified, awaiting own-only local commit now (HEAD 90c813d0). Final C1 59.3s PASS, C2/C3/C5/C7 PASS, final full C4 159.8s PASS (hub-ui-10576 closed), git diff --check PASS; C9 no new primary errors but push-only clean unconfirmed. Actual React product probe first red: cached pre-commit api.capture closure gave mismatched acknowledgement; minimal fix re-reads window.designPreview.capture after restore, proved green on real HTML+React product modal screenshots, C1 dependency-free replacement regression retained. Bridge similarly resolves designReady before reading the API; C4 handshake proves deferred readiness. Reviewed dependencies found at C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules (React/DOM19.3.1 esbuild0.28.2 Playwright1.65.0 Astryx0.7.12); Chrome C:/Users/Flex/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe. Existing state-contract.mjs expanded to real renderer, no payload logging, no downloads. Stage full P6-only files and only Mark/S13 hunks in mixed hub/web/app.ts and hub/scripts/test-browser.mjs; leave unrelated cache-miss edits unstaged. Include this plan/log; consider only owned stats. Next after local commit: read P3-07 and existing interaction probes before edit. No push, no paid invocations; $37.3623658 benchmark budget untouched; P3-16 Safari/touch hardware remains blocked.
 
 ## Amendments
 

@@ -9,12 +9,20 @@ import path from "node:path";
 import designExtension, { runDesign, snapshot, versions, writeRefusal } from "../extensions/design.ts";
 import { agentBrowser, renderDesign, reportText, selectRenderTarget } from "../extensions/design-render.ts";
 import { decodePng } from "../extensions/screen-read.ts";
+import { designStateJson } from "../extensions/design-state.ts";
 
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "design-test-"));
 const storePath = path.join(cwd, ".pi/designs/sessions.json");
 const stored = () => { const raw = fs.readFileSync(storePath, "utf8"); try { return JSON.parse(raw); } catch (cause) { throw new Error("sessions.json is not JSON: " + raw.slice(0, 200), { cause }); } };
 const put = (handle, files) => { for (const [file, body] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(cwd, ".pi/designs", handle, file)), { recursive: true }); fs.writeFileSync(path.join(cwd, ".pi/designs", handle, file), body); } };
 try {
+	assert.equal(designStateJson({ z: 1, a: [null, true, "ok"] }), '{"a":[null,true,"ok"],"z":1}', "canonical state comparison ignores object key order");
+	const cycle = {}; cycle.self = cycle;
+	let getterReads = 0;
+	const getter = Object.defineProperty({}, "value", { enumerable: true, get() { getterReads++; return "secret"; } });
+	for (const invalid of [undefined, Infinity, NaN, 1n, () => {}, new Date(), cycle, getter, { constructor: {} }, Object.fromEntries([["__proto__", {}]]), Object.create({ custom: true }), [undefined], Array(2), Array(257).fill(0), "é".repeat(8192), Array.from({ length: 9 }).reduce(value => [value], null)]) assert.throws(() => designStateJson(invalid), /state/i);
+	assert.equal(getterReads, 0, "validation never invokes a state getter");
+	assert.equal(JSON.parse(designStateJson(Array(256).fill(0))).length, 256);
 	const owned = { type: "page", url: "about:blank", attached: true, targetId: "owned" }, hiddenTab = { type: "page", url: "chrome://newtab/", attached: false, targetId: "hidden" };
 	for (const targets of [[hiddenTab, owned], [owned, hiddenTab]]) assert.equal(selectRenderTarget(targets).targetId, "owned", "native capture target is independent of CDP target order");
 	assert.throws(() => selectRenderTarget([hiddenTab]), /ambiguous|missing/i);
@@ -23,6 +31,7 @@ try {
 	designExtension({ registerTool: tool => { definition = tool; } });
 	assert.deepEqual(definition.parameters.properties.input?.enum, ["mouse", "touch"], "look exposes input independently of size");
 	assert.equal(definition.parameters.properties.reducedMotion?.type, "boolean");
+	assert.equal(definition.parameters.properties.state?.type, "string", "look exposes only declared named states");
 	fs.writeFileSync(path.join(cwd, "page.html"), "<h1>Home</h1>");
 	// Hub fakes: always pass these, the default tools create real hub sessions.
 	const hubCalls = [];
@@ -185,6 +194,38 @@ try {
 		const localForm = await renderDesign({ folder: fixture, screen: "form.html", width: 360, height: 800, element: "@saved" });
 		assert.equal(localForm.report.missing, undefined, "renderer allows prevented local form handlers");
 		assert.ok(localForm.png.length, `saved content was rendered: ${reportText(localForm.report)}`);
+		// P3-06: replay an explicit draft, acknowledge its committed state, then capture the open modal.
+		fs.writeFileSync(path.join(fixture, "state.html"), `<style>dialog{width:260px;height:180px;border:0;padding:0}#scroller{height:30px;overflow:auto}</style><dialog id="panel" aria-label="Draft editor"><input id="draft" value="Saved"><div id="scroller"><div style="height:500px">Details</div></div></dialog><script>window.designPreview={states:{edit:{open:true,draft:"Unsaved Delta",scroll:120}},capture:()=>({open:panel.open,draft:draft.value,scroll:scroller.scrollTop}),restore:async value=>{draft.value=value.draft;if(value.open&&!panel.open)panel.showModal();if(!value.open&&panel.open)panel.close();scroller.scrollTop=value.scroll;panel.style.background=value.draft==="Unsaved Delta"?"red":"blue";await new Promise(requestAnimationFrame);}};</script>`);
+		const draftState = { open: true, draft: "Unsaved Delta", scroll: 120 };
+		const replayed = await renderDesign({ folder: fixture, screen: "state.html", width: 360, height: 800, pageState: draftState, maxEdge: 4000 });
+		assert.equal(replayed.report.state?.restored, true, `page-state replay must be acknowledged: ${reportText(replayed.report)}`);
+		const replayPixels = decodePng(replayed.png), sample = (470 * replayPixels.width + 180) * 4;
+		assert.deepEqual([...replayPixels.rgba.subarray(sample, sample + 3)], [255, 0, 0], "the open modal contains the replayed draft, not the fresh default");
+		const named = await renderDesign({ folder: fixture, screen: "state.html", width: 360, height: 800, state: "edit", element: '[aria-label="Draft editor"]' });
+		assert.equal(named.report.state?.restored, true, "named states use the same acknowledged replay path");
+		assert(named.png.length && named.height < 300, "custom-selector capture finds the restored modal");
+		const missingState = await renderDesign({ folder: fixture, screen: "state.html", width: 360, height: 800, state: "missing" });
+		assert.equal(missingState.png.length, 0, "an undeclared named state is not a fresh-page picture");
+		fs.writeFileSync(path.join(fixture, "no-state.html"), "<h1>Legacy preview</h1>");
+		const unsupported = await renderDesign({ folder: fixture, screen: "no-state.html", width: 360, height: 800, pageState: null });
+		assert.equal(unsupported.png.length, 0, "explicit static null still needs page-owned capture/restore support");
+		assert.match(reportText(unsupported.report), /state.*support|designPreview/i);
+		fs.writeFileSync(path.join(fixture, "wrong-state.html"), '<p>Wrong acknowledgement</p><script>window.designPreview={capture:()=>null,restore:()=>{}};</script>');
+		const mismatch = await renderDesign({ folder: fixture, screen: "wrong-state.html", width: 360, height: 800, pageState: draftState });
+		assert.equal(mismatch.png.length, 0, "a mismatched acknowledgement cannot produce a PNG");
+		assert.match(reportText(mismatch.report), /state.*match|acknowledg/i);
+		fs.writeFileSync(path.join(fixture, "replace-api.html"), '<script>window.designPreview={capture:()=>null,restore:value=>{window.designPreview={capture:()=>value,restore:()=>{}}}};</script>');
+		const replaced = await renderDesign({ folder: fixture, screen: "replace-api.html", width: 360, height: 800, pageState: draftState });
+		assert.equal(replaced.report.state?.restored, true, "a component may replace the capture closure when its restored state commits");
+		for (const [name, restore] of [["throw", 'throw new Error("PRIVATE_DRAFT")'], ["hang", "return new Promise(()=>{})"]]) {
+			fs.writeFileSync(path.join(fixture, name + "-restore.html"), `<script>window.designPreview={capture:()=>null,restore:()=>{${restore}}};</script>`);
+			const failed = await renderDesign({ folder: fixture, screen: name + "-restore.html", width: 360, height: 800, pageState: null });
+			assert.equal(failed.png.length, 0, "failed or hung restore cannot produce a success PNG");
+			assert.match(reportText(failed.report), /replay failed|timed out|deadline/i);
+			assert(!reportText(failed.report).includes("PRIVATE_DRAFT"), "restore exceptions never disclose captured values");
+		}
+		await assert.rejects(renderDesign({ folder: fixture, screen: "state.html", width: 360, height: 800, pageState: { draft: "x".repeat(16384) } }), /state|16 KiB/i);
+		await assert.rejects(renderDesign({ folder: fixture, screen: "state.html", width: 360, height: 800, pageState: { constructor: {} } }), /state|key/i);
 		const page = `<!doctype html><style>body{margin:0;background:#fff}.wide{width:600px;height:40px}</style><h1 data-id="title">Hi</h1><div class="wide" data-id="band"></div><img src="gone.png"><script>console.error("boom"); missingFn();</script>`;
 		fs.writeFileSync(path.join(fixture, "index.html"), page);
 		const [phone, tablet] = await Promise.all([renderDesign({ folder: fixture, width: 360, height: 800, maxEdge: 4000 }), renderDesign({ folder: fixture, width: 820, height: 1180, maxEdge: 4000, styleEdits: [{ selector: "body", styles: { background: "rgb(255, 0, 0)" } }] })]);
@@ -234,7 +275,11 @@ try {
 		assert.match((await renderDesign({ folder: fixture, width: 360, height: 800, element: "@nope" })).report.missing, /no element @nope/);
 
 		// S07 look: presets (rotated too) give small pictures and the report per preset.
-		put("design-3", { "index.html": page });
+		put("design-3", { "index.html": page, "state.html": fs.readFileSync(path.join(fixture, "state.html"), "utf8") });
+		const namedLook = await runDesign(cwd, { action: "look", handle: "design-3", screen: "state.html", presets: ["Phone"], state: "edit", element: '[aria-label="Draft editor"]' }, tools);
+		assert.equal(namedLook.shots.length, 1);
+		assert.match(namedLook.shots[0].report, /state restored and acknowledged/i, "look forwards the declared name and reports acknowledgement");
+		assert(!namedLook.shots[0].report.includes("Unsaved"), "state values stay out of reports");
 		const looked = await runDesign(cwd, { action: "look", handle: "design-3", presets: ["Phone small landscape", "Tablet"], input: "touch", reducedMotion: true }, tools);
 		assert.deepEqual(looked.shots.map(shot => shot.viewport), ["800×360", "820×1180"]);
 		assert.match(looked.shots[1].report, /failed: 404 gone\.png/);

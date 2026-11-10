@@ -196,7 +196,7 @@ async function look(cwd: string, handle: string, args) {
 	const presets: string[] = Array.isArray(args.presets) && args.presets.length ? args.presets.map(String).slice(0, 6) : ["Phone", "Desktop"];
 	const shots = await Promise.all(presets.map(async preset => {
 		const [width, height] = presetSize(preset);
-		const shot = await renderDesign({ folder, screen: args.screen, width, height, element: args.element, full: !!args.full, hash: args.hash, input: args.input, reducedMotion: args.reducedMotion, maxEdge: 768 });
+		const shot = await renderDesign({ folder, screen: args.screen, width, height, element: args.element, full: !!args.full, hash: args.hash, input: args.input, reducedMotion: args.reducedMotion, state: args.state, maxEdge: 768 });
 		return { preset, viewport: `${width}×${height}`, report: reportText(shot.report), png: shot.png.length ? shot.png.toString("base64") : undefined };
 	}));
 	return { handle: item.handle, screen: args.screen ?? "index.html", element: args.element, shots };
@@ -421,6 +421,7 @@ export default function designExtension(pi) {
 			presets: { type: "array", items: { type: "string" }, maxItems: 6, description: "look: size presets, not input capability (Phone small, Phone, Phone large, Foldable, Tablet, Laptop, Desktop, Slide; add ' landscape' to rotate) or WIDTHxHEIGHT; default Phone and Desktop" },
 			input: { type: "string", enum: ["mouse", "touch"], description: "look: emulated input, independent of size; default mouse (including Phone); touch enables touch points and a coarse pointer, not a real-device/Safari test" },
 			reducedMotion: { type: "boolean", description: "look: emulate prefers-reduced-motion; default false" },
+			state: { type: "string", maxLength: 80, description: "look: a named state declared in window.designPreview.states; restored and acknowledged before capture" },
 			screen: { type: "string", description: "look: the screen file, default index.html" },
 			element: { type: "string", description: "look: one element only, by data-id (@hero-cta) or CSS selector" },
 			full: { type: "boolean", description: "look: the full page instead of the first screenful" },

@@ -15,6 +15,7 @@ import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linke
 import { ARCHIVE, designLists, designPage, explore, unview, viewPage, watchDesign } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { renderDesign, reportText } from "../../extensions/design-render.ts";
+import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
@@ -437,7 +438,10 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			// S13, D13: Mark renders what the preview shows (version, screen, device size, slide, unsaved inline edits) to a
 			// pasted-image temp file, which the page then opens in the annotator. Like designpreview, it names no path.
 			case "designshot": {
-				only(data, ["target", "screen", "version", "width", "height", "hash", "styleEdits"], "Invalid fields.");
+				only(data, ["target", "screen", "version", "width", "height", "hash", "styleEdits", "pageState", "input", "reducedMotion"], "Invalid fields.");
+				if (!Object.hasOwn(data, "pageState")) throw fail(400, "Mark needs a captured page state (window.designPreview).");
+				try { designStateJson(data.pageState); } catch { throw fail(400, "Invalid design state (finite JSON, 16 KiB, 8 levels, 256 entries)."); }
+				if (!(data.input === "mouse" || data.input === "touch") || typeof data.reducedMotion !== "boolean") throw fail(400, "Invalid captured input capability.");
 				const size = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 200 && (value as number) <= 4000;
 				if (typeof data.screen !== "string") throw fail(400, "Invalid screen.");
 				if (data.version !== undefined && !(Number.isSafeInteger(data.version) && (data.version as number) > 0)) throw fail(400, "Invalid version.");
@@ -448,7 +452,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				if (!Array.isArray(edits) || edits.length > 50 || !edits.every(validEdit)) throw fail(400, "Invalid style edits.");
 				const real = await designPage(folder(id), designHandle(id), data.screen, data.version as number | undefined);
 				if (!real) throw fail(404, "No such version or screen.");
-				const shot = await renderDesign({ folder: path.dirname(real), screen: path.basename(real), width: data.width as number, height: data.height as number, hash: data.hash as string | undefined, styleEdits: edits });
+				const shot = await renderDesign({ folder: path.dirname(real), screen: path.basename(real), width: data.width as number, height: data.height as number, hash: data.hash as string | undefined, styleEdits: edits, pageState: data.pageState as DesignJson, input: data.input, reducedMotion: data.reducedMotion });
 				if (!shot.png.length) throw fail(502, "The render gave no picture.\n" + reportText(shot.report));
 				return { path: await savePastedImage(shot.png) };
 			}

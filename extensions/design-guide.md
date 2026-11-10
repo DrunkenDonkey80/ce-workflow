@@ -55,7 +55,15 @@ Every screen works from 360 px phones to 1440 px desktops without horizontal scr
 
 The live device picker changes size only; input remains the viewer's browser capability. Headless `design look` defaults to mouse at every size; set `input: "touch"` and/or `reducedMotion: true` explicitly when checking those behaviors. Its report records the observed capability, not a real-device or Safari certification.
 
-For async startup, assign a promise to `window.designReady` and resolve it after the page commits. Rendering waits for it, fonts, images, finite animations and stable layout within one five-second readiness budget; rejected or timed-out readiness returns an error instead of a settled picture. Explicitly infinite decorations do not block capture.
+For async startup, assign a promise to `window.designReady` and resolve it after the page commits. Rendering waits for it, fonts, images, finite animations and stable layout within one five-second readiness budget; rejected or timed-out readiness returns an error instead of a settled picture. Explicitly infinite animations are not awaited; ongoing layout movement can still time out.
+
+## Mark and declared states
+
+Mark needs `window.designPreview = { capture, restore, states? }`. `capture()` returns only the supported draft (open dialogs, unsaved fields and any supported scroll position); `restore(value)` applies it and resolves only after the DOM commits, including when it is already current. This works with HTML and component state; do not serialize framework internals. An explicitly static page may use `window.designPreview = { capture: () => null, restore: () => {} }`.
+
+Keep the state finite JSON: at most 16 KiB UTF-8, 8 levels and 256 total keys/array entries; no credentials, unrelated private data, functions, getters or prototype keys. Mark captures for at most three seconds, restores in isolation, and requires the same canonical capture back before taking a picture. Unsupported state, changed viewers, malformed replies, replay failures and timeouts show an error before annotation; no fresh-page fallback. Live inline CSS and the current hash/version travel separately. Mixed touch/fine-pointer hardware cannot currently be reproduced and reports that limitation.
+
+For repeatable checks, declare named values in `designPreview.states` and pass their name as `state` to `design look`; only declared names can be restored. Its report confirms acknowledgement without exposing the draft values.
 
 ## Images
 

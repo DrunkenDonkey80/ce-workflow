@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 import { processPng } from "./screen-read.ts";
+import { designStateJson, type DesignJson } from "./design-state.ts";
 
 /** The preview's sandbox: an opaque origin (no allow-same-origin), so page scripts run but cannot read the server. */
 export const SANDBOX_CSP = (origin: string) => `sandbox allow-scripts allow-popups allow-pointer-lock allow-downloads; default-src ${origin} https: data: blob: 'unsafe-inline' 'unsafe-eval'`;
@@ -19,8 +20,8 @@ export const DESIGN_CSP = (origin: string) => `${SANDBOX_CSP(origin).replace("sa
 
 // The render-state (S06): what to show. folder is absolute (a design folder or a history version); width and height already
 // carry the rotation; hash is the deck slide (location.hash); styleEdits are the preview's live, unsaved inline edits.
-export type RenderState = { folder: string; screen?: string; width: number; height: number; hash?: string; input?: "mouse" | "touch"; reducedMotion?: boolean; styleEdits?: { selector: string; styles: Record<string, string> }[]; element?: string; full?: boolean; maxEdge?: number };
-export type RenderReport = { viewport: string; observedViewport: string; input: { requested: "mouse" | "touch"; requestedReducedMotion: boolean; touchPoints: number | null; coarse: boolean | null; reducedMotion: boolean | null }; readiness: { settled: boolean; ignoredAnimations: number; elapsedMs: number; error?: string }; scrollWidth: number; overflow: boolean; wide: string[]; errors: string[]; console: string[]; failed: string[]; missing?: string };
+export type RenderState = { folder: string; screen?: string; width: number; height: number; hash?: string; input?: "mouse" | "touch"; reducedMotion?: boolean; pageState?: DesignJson; state?: string; styleEdits?: { selector: string; styles: Record<string, string> }[]; element?: string; full?: boolean; maxEdge?: number };
+export type RenderReport = { state?: { restored: true }; viewport: string; observedViewport: string; input: { requested: "mouse" | "touch"; requestedReducedMotion: boolean; touchPoints: number | null; coarse: boolean | null; reducedMotion: boolean | null }; readiness: { settled: boolean; ignoredAnimations: number; elapsedMs: number; error?: string }; scrollWidth: number; overflow: boolean; wide: string[]; errors: string[]; console: string[]; failed: string[]; missing?: string };
 export type Rendered = { png: Buffer; width: number; height: number; report: RenderReport };
 
 const MIME: Record<string, string> = { ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".ico": "image/x-icon", ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".otf": "font/otf", ".mp4": "video/mp4", ".webm": "video/webm" };
@@ -85,6 +86,16 @@ const SETTLE_SCRIPT = `(async () => {
 // Runs in the page: applies the live edits, marks the target element, and measures overflow and broken images.
 const PAGE_SCRIPT = (state: RenderState) => `(async () => {
 	await window.designReady;
+	const stateJson = ${designStateJson.toString()}, named = ${JSON.stringify(state.state)}, replay = ${state.pageState !== undefined || state.state !== undefined};
+	if (replay) {
+		const api = window.designPreview;
+		if (typeof api?.capture !== "function" || typeof api?.restore !== "function") throw new Error("This page does not support state replay (window.designPreview).");
+		if (named !== undefined && (!api.states || !Object.prototype.hasOwnProperty.call(api.states, named))) throw new Error("The named design state is not declared.");
+		const expected = stateJson(named === undefined ? ${state.pageState === undefined ? "undefined" : designStateJson(state.pageState)} : api.states[named]);
+		let actual;
+		try { await api.restore(JSON.parse(expected)); actual = await window.designPreview.capture(); } catch { throw new Error("Design state replay failed."); }
+		if (stateJson(actual) !== expected) throw new Error("Design state acknowledgement does not match.");
+	}
 	const edits = ${JSON.stringify(state.styleEdits ?? [])}, target = ${JSON.stringify(state.element ?? "")};
 	for (const edit of edits) for (const el of document.querySelectorAll(edit.selector)) for (const [k, v] of Object.entries(edit.styles)) el.style.setProperty(k, String(v));
 	let missing = "";
@@ -97,7 +108,7 @@ const PAGE_SCRIPT = (state: RenderState) => `(async () => {
 	const vw = document.documentElement.clientWidth, name = el => el.dataset.id ? "@" + el.dataset.id : el.tagName.toLowerCase() + (el.id ? "#" + el.id : "") + (el.classList[0] ? "." + el.classList[0] : "");
 	const wide = [...document.body.querySelectorAll("*")].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > vw + 1 && getComputedStyle(el).position !== "fixed"; }).slice(0, 10).map(el => name(el) + " " + Math.round(el.getBoundingClientRect().right) + "px");
 	const broken = [...document.images].filter(img => img.complete && !img.naturalWidth).map(img => "image " + img.getAttribute("src"));
-	return JSON.stringify({ ...settled, scrollWidth: document.documentElement.scrollWidth, vw, wide, broken, missing });
+	return JSON.stringify({ ...settled, state: replay ? { restored: true } : undefined, scrollWidth: document.documentElement.scrollWidth, vw, wide, broken, missing });
 })()`;
 
 type Step = { command: string[]; success: boolean; error: string | null; result: any };
@@ -206,6 +217,9 @@ async function visit(url: string, width: number, height: number, script: string,
 
 /** Renders state headless and returns the PNG (scaled to maxEdge, default 1024) plus the report. */
 export async function renderDesign(state: RenderState): Promise<Rendered> {
+	if (state.pageState !== undefined) designStateJson(state.pageState);
+	if (state.state !== undefined && (typeof state.state !== "string" || !/^[\w-]{1,80}$/.test(state.state))) throw new Error("Invalid named design state.");
+	if (state.pageState !== undefined && state.state !== undefined) throw new Error("Choose a captured or named design state, not both.");
 	const width = Math.round(state.width), height = Math.round(state.height);
 	const screen = state.screen ?? "index.html";
 	if (!/^[\w.-]+\.html?$/.test(screen)) throw new Error(`screen must be an HTML file directly in the design folder: ${screen}`);
@@ -215,7 +229,7 @@ export async function renderDesign(state: RenderState): Promise<Rendered> {
 	try {
 		const { steps, page, png } = await visit(`${server.origin}/${encodeURIComponent(screen)}${hash}`, width, height, PAGE_SCRIPT(state), { element: !!state.element, full: state.full, input: state.input, reducedMotion: state.reducedMotion, tolerate: page => !!page.missing });
 		const report: RenderReport = {
-			viewport: `${width}×${height}`, observedViewport: page.observedViewport ?? "unavailable", readiness: page.readiness,
+			state: page.state, viewport: `${width}×${height}`, observedViewport: page.observedViewport ?? "unavailable", readiness: page.readiness,
 			input: { requested: state.input ?? "mouse", requestedReducedMotion: !!state.reducedMotion, touchPoints: page.input?.touchPoints ?? null, coarse: page.input?.coarse ?? null, reducedMotion: page.input?.reducedMotion ?? null }, scrollWidth: page.scrollWidth, overflow: page.scrollWidth > page.vw + 1, wide: page.wide ?? [],
 			errors: (steps.find(step => step.command[0] === "errors")?.result?.errors ?? []).map(item => String(item.text).split("\n")[0]).slice(0, 20),
 			console: (steps.find(step => step.command[0] === "console")?.result?.messages ?? []).filter(item => ["error", "warning"].includes(item.type)).map(item => `${item.type}: ${item.text}`).slice(0, 20),
@@ -280,6 +294,7 @@ export function reportText(report: RenderReport) {
 	const lines = [
 		`${report.viewport} requested, ${report.observedViewport} observed; ${report.input.requested} requested, touch points ${report.input.touchPoints ?? "unknown"}, coarse ${report.input.coarse ?? "unknown"}; reduced motion ${report.input.requestedReducedMotion} requested, ${report.input.reducedMotion ?? "unknown"} observed.`,
 		report.readiness.settled ? `Settled in ${report.readiness.elapsedMs}ms; ignored ${report.readiness.ignoredAnimations} infinite animation(s).` : `Not settled: ${report.readiness.error}`,
+		report.state?.restored ? "Declared page state restored and acknowledged." : "",
 		report.missing,
 		report.overflow ? `horizontal overflow: page is ${report.scrollWidth}px wide in ${report.viewport}` : "",
 		report.wide.length ? `wider than the viewport: ${report.wide.join(", ")}` : "",

@@ -2,11 +2,14 @@
 // D4: one device picker (OD's viewport matrix plus Slide), rotate, the frame scaled down to fit, the choice kept per design.
 // D7: a screen picker when the design has more than one HTML file.
 // version: a kept version shown read-only (S09); none is the live design.
+// @ts-ignore Browser URL includes the workspace token.
+import { designStateJson, type DesignJson } from "./design-state.js?token=__TOKEN__";
+
 export type DesignView = { key: string; name: string; handle?: string; screens?: string[]; versions?: number[]; version?: number };
 // screen: show another screen of this view; open: reopen the preview at a version (none = live); restore: ask the agent.
 // mark: render what the preview shows and open it in the annotator (S13, D13).
-export type MarkState = { screen: string; version?: number; width: number; height: number; hash?: string; styleEdits: { selector: string; styles: Record<string, string> }[] };
-export type DesignActions = { screen: (screen: string) => void; open: (version: number | undefined, screen: string) => void; restore: (version: number) => void; mark: (state: MarkState) => void };
+export type MarkState = { pageState: DesignJson; input: "mouse" | "touch"; reducedMotion: boolean; screen: string; version?: number; width: number; height: number; hash?: string; styleEdits: { selector: string; styles: Record<string, string> }[] };
+export type DesignActions = { screen: (screen: string) => void; open: (version: number | undefined, screen: string) => void; restore: (version: number) => void; mark: (state: Promise<MarkState>, isCurrent: () => boolean) => Promise<void> };
 
 // Desktop is the panel's own width (no frame); the rest mirror extensions/design-render.ts (the page cannot import it).
 const DEVICES: [string, number, number][] = [["Desktop", 0, 0], ["Phone small", 360, 800], ["Phone", 390, 844], ["Phone large", 430, 932], ["Foldable", 600, 960], ["Tablet", 820, 1180], ["Laptop", 1366, 768], ["Slide", 1920, 1080]];
@@ -25,7 +28,20 @@ function device(view: DesignView): Device {
 export type DesignPick = { screen: string; id: string; selector: string; tag: string; text: string; rect: { x: number; y: number; width: number; height: number }; slide: number };
 export type DesignPin = { n: number; screen: string; id: string; selector: string };
 // hash and edits: the slide shown and the unsaved inline styles of this load, so Mark renders exactly that.
-let current: { frame: HTMLIFrameElement; load: string; screen: string; hash: string; slides: number; edits: Map<string, Record<string, string>> } | undefined, mode = "", pins: DesignPin[] = [];
+type PageCapture = Pick<MarkState, "pageState" | "input" | "reducedMotion" | "hash">;
+let current: { frame: HTMLIFrameElement; load: string; screen: string; version: number; hash: string; slides: number; edits: Map<string, Record<string, string>>; pending?: { request: string; resolve: (value: PageCapture) => void; reject: (error: Error) => void } } | undefined, mode = "", pins: DesignPin[] = [];
+function captureState(live: NonNullable<typeof current>) {
+ live.pending?.reject(new Error("Preview capture replaced."));
+ return new Promise<PageCapture>((resolve, reject) => {
+  const request = crypto.randomUUID();
+  const observer = new MutationObserver(() => { if (!live.frame.isConnected || current !== live) live.pending?.reject(new Error("Preview changed during capture.")); });
+  const timer = setTimeout(() => live.pending?.reject(new Error("Preview state capture timed out after 3 seconds.")), 3000);
+  const cleanup = () => { clearTimeout(timer); observer.disconnect(); live.pending = undefined; };
+  live.pending = { request, resolve: value => { cleanup(); resolve(value); }, reject: error => { cleanup(); reject(error); } };
+  observer.observe(document.body, { subtree: true, childList: true });
+  tell({ type: "design:capture", request, screen: live.screen, version: live.version });
+ });
+}
 const tell = (data: Record<string, unknown>) => { if (current?.frame.isConnected) current.frame.contentWindow?.postMessage({ load: current.load, ...data }, "*"); };
 export function setDesignPins(list: DesignPin[]) { pins = list; tell({ pins }); }
 /** How a chat line names an element (D2): its screen and data-id, or a short selector when it has none. */
@@ -49,6 +65,18 @@ function readTweaks(values: any) {
 addEventListener("message", event => {
  if (!current?.frame.isConnected || event.source !== current.frame.contentWindow || event.data?.load !== current.load) return;
  const data = event.data, frame = current.frame, emit = (name: string, detail: unknown) => frame.dispatchEvent(new CustomEvent(name, { bubbles: true, detail }));
+ if (data.type === "design:state") {
+  const pending = current.pending;
+  if (!pending || data.request !== pending.request || data.screen !== current.screen || data.version !== current.version) return;
+  try {
+   if (data.error === "unsupported") throw new Error("This page does not support Mark state capture (window.designPreview).");
+   if (data.error === "input") throw new Error("This browser has mixed pointer capabilities that Mark cannot reproduce.");
+   if (data.error) throw new Error("Preview state capture failed.");
+   if (!(data.input === "mouse" || data.input === "touch") || typeof data.reducedMotion !== "boolean" || !bounded(data.hash, 41, /^(#[\w-]{0,40})?$/)) throw new Error("Invalid preview state capture.");
+   pending.resolve({ pageState: JSON.parse(designStateJson(data.state)), input: data.input, reducedMotion: data.reducedMotion, hash: data.hash });
+  } catch (error) { pending.reject(error); }
+  return;
+ }
  if (data.type === "design:hash") {
   if (!bounded(data.hash, 41, /^(#[\w-]{0,40})?$/) || !slideCount(data.slides)) return;
   Object.assign(current, { hash: data.hash, slides: data.slides });
@@ -91,6 +119,7 @@ function inspect(body: HTMLElement, pick: DesignPick & { styles: Record<string, 
 
 /** The design's page in a device frame, with the device, rotate and screen controls added before Download and Open. */
 export function designFrame(view: DesignView, path: string, src: string, body: HTMLElement, actions: HTMLElement, act: DesignActions) {
+ current?.pending?.reject(new Error("Preview changed during capture.")); current = undefined;
  const state = device(view);
  const frame = Object.assign(document.createElement("iframe"), { src, className: "files-frame", title: path });
  const stage = Object.assign(document.createElement("div"), { className: "design-stage" });
@@ -115,15 +144,20 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
  keepTweaks.addEventListener("click", () => { line("Keep tweaks: " + Object.entries(tweaks).map(([key, value]) => `${key} ${value}`).join(", ")); keepTweaks.hidden = true; });
  frame.addEventListener("design-inspect", event => inspect(body, (event as CustomEvent).detail));
  frame.addEventListener("load", () => {
-  current = { frame, load: crypto.randomUUID(), screen: path, hash: "", slides: 0, edits: new Map() };
+  if (!frame.isConnected) return;
+  current?.pending?.reject(new Error("Preview reloaded during capture."));
+  current = { frame, load: crypto.randomUUID(), screen: path, version: view.version ?? 0, hash: "", slides: 0, edits: new Map() };
   frame.contentWindow?.postMessage({ type: "design:hello", load: current.load, mode, pins }, "*");
  });
  const mark = Object.assign(document.createElement("button"), { type: "button", className: "design-mark", textContent: "Mark", title: "Draw on a picture of this screen at this size" });
- mark.addEventListener("click", () => {
+ mark.addEventListener("click", async () => {
   const [, presetWidth, presetHeight] = DEVICES.find(([name]) => name === state.preset)!, clamp = (value: number) => Math.min(4000, Math.max(200, Math.round(value)));
   const [width, height] = !presetWidth ? [frame.clientWidth, frame.clientHeight] : state.rotated ? [presetHeight, presetWidth] : [presetWidth, presetHeight];
   const live = current?.frame === frame ? current : undefined;
-  act.mark({ screen: path, ...view.version ? { version: view.version } : {}, width: clamp(width), height: clamp(height), ...live?.hash ? { hash: live.hash } : {}, styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) });
+  const base = { screen: path, ...view.version ? { version: view.version } : {}, width: clamp(width), height: clamp(height), styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) };
+  const captured = live ? captureState(live).then(value => ({ ...base, ...value })) : Promise.reject(new Error("The preview has not loaded yet."));
+  mark.disabled = true;
+  try { await act.mark(captured, () => !!live && current === live && frame.isConnected); } finally { mark.disabled = false; }
  });
  // S14, D16: a deck gets previous, next and the counter, and opens on the Slide preset unless a device was chosen.
  const deck = Object.assign(document.createElement("span"), { className: "design-deck", hidden: true });

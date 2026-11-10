@@ -119,7 +119,8 @@ try {
 	// S07 design preview: only the session's own .pi/designs/<handle>/ (handle from its published modes); no path is taken.
 	assert.equal((await post(id, "designpreview", {})).status, 404, "not a design session");
 	const designs = path.join(folder, ".pi", "designs"), mine = path.join(designs, "design-1");
-	fs.mkdirSync(path.join(mine, "css"), { recursive: true }); fs.writeFileSync(path.join(mine, "index.html"), "<link href=css/a.css>"); fs.writeFileSync(path.join(mine, "css", "a.css"), "p{}");
+	const staticState = '<script>window.designPreview={capture:()=>null,restore:()=>{}};</script>';
+	fs.mkdirSync(path.join(mine, "css"), { recursive: true }); fs.writeFileSync(path.join(mine, "index.html"), "<link href=css/a.css>" + staticState); fs.writeFileSync(path.join(mine, "css", "a.css"), "p{}");
 	fs.writeFileSync(path.join(designs, "sessions.json"), "{}"); fs.writeFileSync(path.join(folder, "secret.txt"), "s");
 	fs.symlinkSync(folder, path.join(mine, "out"), "junction");
 	const preview = async handle => { hub.registry.update(id, { modes: { design: handle } }); return post(id, "designpreview", {}); };
@@ -140,20 +141,26 @@ try {
 	assert.equal((await post(id, "designpreview", { screen: 1 })).status, 400);
 	await post(id, "unview", { key: screenView.key });
 	// S09: a kept version is shown read-only from its own history folder, with that version's screens.
-	fs.mkdirSync(path.join(designs, "history", "design-1", "2"), { recursive: true }); fs.writeFileSync(path.join(designs, "history", "design-1", "2", "index.html"), "<p>v2</p>");
+	fs.mkdirSync(path.join(designs, "history", "design-1", "2"), { recursive: true }); fs.writeFileSync(path.join(designs, "history", "design-1", "2", "index.html"), "<p>v2</p>" + staticState);
 	const old = (await post(id, "designpreview", { version: 2 })).body;
 	assert.deepEqual([old.version, old.screens, old.versions, old.open], [2, ["index.html"], [2], "index.html"]);
-	assert.match(await (await fetch(`${origin}/x/${old.key}/index.html`)).text(), /^<p>v2<\/p><script data-design-chrome>/, "the kept page, with the bridge (S10)");
+	assert((await (await fetch(`${origin}/x/${old.key}/index.html`)).text()).startsWith("<p>v2</p>" + staticState + "<script data-design-chrome>"), "the kept page, with the bridge (S10)");
 	for (const version of [3, 0, "2", 1.5]) assert.equal((await post(id, "designpreview", { version })).status, typeof version === "number" && version === 3 ? 404 : 400, String(version));
 	assert.equal((await post(id, "designpreview", { version: 2, screen: "pay.html" })).status, 404, "that version had no pay screen");
 	await post(id, "unview", { key: old.key });
 	// S13: Mark renders the shown state of the session's own design only: slide hash, kept version and unsaved inline edits.
-	const shot = async (body) => { const res = await post(id, "designshot", { screen: "index.html", width: 400, height: 300, ...body }); return res.status === 200 ? fs.readFileSync(res.body.path) : res.status; };
+	const shot = async (body) => { const res = await post(id, "designshot", { screen: "index.html", width: 400, height: 300, pageState: null, input: "mouse", reducedMotion: false, ...body }); return res.status === 200 ? fs.readFileSync(res.body.path) : res.status; };
 	for (const [body, status] of [[{ width: 100 }, 400], [{ hash: "#a b" }, 400], [{ styleEdits: [{ selector: "p", styles: { "x;y": "1" } }] }, 400], [{ screen: 1 }, 400], [{ path: "x" }, 400], [{ screen: "../design-1/pay.html" }, 404], [{ screen: "out/page.html" }, 404], [{ version: 9 }, 404]]) assert.equal(await shot(body), status, JSON.stringify(body));
-	fs.writeFileSync(path.join(mine, "deck.html"), "<body><p>slide</p><script>document.body.style.background = location.hash === '#2' ? '#000' : '#fff'</script></body>");
+	fs.writeFileSync(path.join(mine, "deck.html"), "<body><p>slide</p><script>document.body.style.background = location.hash === '#2' ? '#000' : '#fff'</script>" + staticState + "</body>");
 	const [first, second, edited, version2, current] = [await shot({ screen: "deck.html" }), await shot({ screen: "deck.html", hash: "#2" }), await shot({ screen: "deck.html", styleEdits: [{ selector: "p", styles: { "font-size": "80px" } }] }), await shot({ version: 2 }), await shot({})];
 	assert(Buffer.isBuffer(first) && Buffer.isBuffer(current), `renders give PNG files: ${first} ${current}`);
 	assert(!first.equals(second) && !first.equals(edited) && !version2.equals(current), "the slide, the inline edit and the version each change the picture");
+	assert.equal((await post(id, "designshot", { screen: "index.html", width: 400, height: 300 })).status, 400, "missing capture cannot silently render defaults");
+	for (const body of [{ pageState: { constructor: {} } }, { pageState: "é".repeat(8192) }, { pageState: Array(257).fill(0) }, { pageState: Array.from({ length: 9 }).reduce(value => [value], null) }, { input: "pen" }, { reducedMotion: "false" }]) assert.equal(await shot(body), 400, "invalid state/capability rejected before rendering");
+	fs.writeFileSync(path.join(mine, "legacy.html"), "<p>No state support</p>");
+	assert.equal(await shot({ screen: "legacy.html" }), 502, "unsupported capture is not a success PNG");
+	fs.writeFileSync(path.join(mine, "state.html"), '<script>let current=null;window.designPreview={capture:()=>current,restore:value=>{current=value;document.body.style.background=value.color;}};</script><p>Restored</p>');
+	assert(Buffer.isBuffer(await shot({ screen: "state.html", pageState: { color: "red" }, input: "touch", reducedMotion: true })), "validated state and capability reach the renderer");
 	hub.registry.update(id, { modes: undefined }); assert.equal(await shot({}), 404, "not a design session"); hub.registry.update(id, { modes: { design: "design-1" } });
 	assert.equal((await post(id, "explore", { path: ".pi/designs/design-1/index.html" })).status, 404, "other .pi files stay refused for chat links");
 	await post(id, "unview", { key: designView.key }); hub.registry.update(id, { modes: undefined });

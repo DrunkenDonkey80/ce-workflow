@@ -1331,11 +1331,30 @@ try {
  await evaluate("document.querySelector('#files .design-keep-tweaks').click()");
  assert.equal(await evaluate("document.getElementById('message-input').value"), "Set index.html @title: color #c2410c\nKeep tweaks: accent #c2410c, scale 1.125\n");
  assert.equal(await evaluate("!!document.querySelector('#files .design-inspector')"), false, "a click on chrome does not inspect");
- // S13: Mark renders the shown screen (a real headless render) into the annotator; Cancel takes the picture out again, Save
- // leaves the annotated image and its legend in the box.
+ // P3-06: legacy previews stay viewable, but cannot silently Mark their fresh default state.
  await evaluate("document.getElementById('message-input').value = ''; document.querySelector('#files .design-mark').click()");
+ await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('does not support Mark state capture')");
+ assert.equal(await evaluate("!!document.querySelector('dialog.annotate[open]') || !!document.getElementById('message-input').value"), false);
+ const replayPage = `<style>dialog{width:240px;height:180px;background:white}#swatch{width:70px;height:40px;background:blue}</style><h1>Replay fixture</h1><button onclick="panel.showModal()">Open editor</button><dialog id="panel" aria-label="Draft editor"><label>Project name<input id="draft" value="Saved" oninput="panel.style.background='red'"></label><button id="swatch" data-id="swatch">Color block</button></dialog><script>
+ window.captureMode='normal';window.designPreview={capture:()=>window.captureMode==='normal'?{open:panel.open,draft:draft.value}:new Promise(()=>{}),restore:async value=>{draft.value=value.draft;panel.style.background=value.draft==='Unsaved Delta'?'red':'white';if(value.open&&!panel.open)panel.showModal();if(!value.open&&panel.open)panel.close();await new Promise(requestAnimationFrame);}};
+ const captureApi=window.designPreview;let readyNow;addEventListener('message',event=>{if(event.source!==parent)return;const m=event.data;if(m.type==='test:defer'){window.designPreview=undefined;window.designReady=new Promise(resolve=>readyNow=()=>{window.designPreview=captureApi;resolve();});parent.postMessage({type:'test:deferred'},'*');}if(m.type==='design:capture'&&readyNow)parent.postMessage({type:'test:capturing'},'*');if(m.type==='test:release'){readyNow();readyNow=null;}if(m.type==='test:mode'){window.captureMode=m.mode;parent.postMessage({type:'test:mode-ready',mode:m.mode},'*');}if(m.type==='design:capture'&&(window.captureMode==='stale'||window.captureMode==='bad')){const reply={type:'design:state',load:m.load,request:m.request,screen:m.screen,version:m.version,state:null,input:'mouse',reducedMotion:false,hash:''};if(window.captureMode==='bad')parent.postMessage({...reply,state:{constructor:{}}},'*');else for(const bad of [{load:'old'},{request:'old'},{screen:'other.html'},{version:99}])parent.postMessage({...reply,...bad},'*');}});</script>`;
+ fs.writeFileSync(join(designDir, "index.html"), replayPage);
+ const replayRef = async name => { for (let i = 0; i < 40; i++) { const ref = (await designTree()).find(row => row.startsWith(name))?.match(/ref=(e\d+)/)?.[1]; if (ref) return "@" + ref; await new Promise(done => setTimeout(done, 150)); } assert.fail("missing replay control: " + name); };
+ await replayRef('- heading "Replay fixture"');
+ await evaluate("for(const b of document.querySelectorAll('#files .design-comment, #files .design-edit'))if(b.getAttribute('aria-pressed')==='true')b.click()");
+ await browser("click", await replayRef('- button "Open editor"'));
+ await browser("fill", await replayRef('- textbox "Project name"'), "Unsaved Delta");
+ await evaluate("document.querySelector('#files .design-edit').click()");
+ await browser("click", await replayRef('- button "Color block"'));
+ await browser("wait", "--fn", "!!document.querySelector('#files .design-inspector')");
+ await evaluate("(() => {const form=document.querySelector('#files .design-inspector'),input=form.querySelector('[name=background-color]');input.value='rgb(0, 255, 0)';input.dispatchEvent(new Event('input'));form.requestSubmit();document.querySelector('#files .design-edit').click();document.getElementById('message-input').value='';})()");
+ // S13: wait for async page readiness before looking up its API, then replay the modal/draft and unsaved CSS.
+ await evaluate("new Promise(resolve=>{const frame=document.querySelector('#files .files-frame');const ready=event=>{if(event.source!==frame.contentWindow)return;if(event.data?.type==='test:deferred')document.querySelector('#files .design-mark').click();if(event.data?.type==='test:capturing'){frame.contentWindow.postMessage({type:'test:release'},'*');removeEventListener('message',ready);resolve();}};addEventListener('message',ready);frame.contentWindow.postMessage({type:'test:defer'},'*');})");
  await browser("wait", "--timeout", "60000", "dialog.annotate[open] canvas");
  assert.match(await evaluate("document.getElementById('message-input').value"), /^\S*pi-clipboard-[0-9a-f-]+\.png\n$/, "the render is in the box while marking");
+ const markedPath = (await evaluate("document.getElementById('message-input').value")).trim(), marked = decodePng(fs.readFileSync(markedPath));
+ let redPixels=0,greenPixels=0;for(let i=0;i<marked.rgba.length;i+=4){if(marked.rgba[i]===255&&marked.rgba[i+1]===0&&marked.rgba[i+2]===0)redPixels++;if(marked.rgba[i]===0&&marked.rgba[i+1]===255&&marked.rgba[i+2]===0)greenPixels++;}
+ assert(redPixels>1000&&greenPixels>500,"Mark pixels include the restored unsaved draft and live green CSS edit");
  await evaluate("[...document.querySelectorAll('dialog.annotate button')].find(b => b.textContent === 'Cancel').click()");
  await browser("wait", "--fn", "!document.querySelector('dialog.annotate[open]') && document.getElementById('message-input').value === ''");
  await evaluate("document.querySelector('#files .design-mark').click()");
@@ -1344,6 +1363,26 @@ try {
  await browser("wait", "--fn", "document.activeElement?.className === 'annotate-note'"); await browser("fill", ".annotate-note", "too big"); await browser("press", "Enter");
  await browser("click", ".annotate-save");
  await browser("wait", "--fn", "/^\\S*pi-clipboard-[0-9a-f-]+\\.png\\n\\(1\\) too big/.test(document.getElementById('message-input').value)");
+ // Replies from the correct child but another request/load/screen/version cannot satisfy a capture.
+ const captureMode = async mode => { await evaluate(`new Promise(resolve=>{const frame=document.querySelector('#files .files-frame');const done=event=>{if(event.source===frame.contentWindow&&event.data?.type==='test:mode-ready'&&event.data.mode===${JSON.stringify(mode)}){removeEventListener('message',done);resolve();}};addEventListener('message',done);frame.contentWindow.postMessage({type:'test:mode',mode:${JSON.stringify(mode)}},'*');})`); };
+ await evaluate("document.getElementById('message-input').value=''");
+ await captureMode("stale");await evaluate("document.querySelector('#files .design-mark').click()");
+ await browser("wait","--fn","document.getElementById('notice').textContent.includes('capture timed out')");
+ assert.equal(await evaluate("!!document.querySelector('dialog.annotate[open]') || !!document.getElementById('message-input').value"),false,"stale acknowledgements never become an image");
+ await captureMode("bad");await evaluate("document.querySelector('#files .design-mark').click()");
+ await browser("wait","--fn","document.getElementById('notice').textContent.includes('state key')");
+ await captureMode("hang");await evaluate("document.querySelector('#files .design-mark').click()");
+ fs.writeFileSync(join(designDir,"index.html"),replayPage);
+ await browser("wait","--fn","document.getElementById('notice').textContent.includes('Preview changed during capture')");
+ await replayRef('- heading "Replay fixture"');
+ // A result arriving after its viewer changed must not open the annotator either.
+ await evaluate("window.shotStarted=false;window.realShotFetch=fetch;window.shotGate=new Promise(resolve=>window.releaseShot=resolve);window.fetch=async(...args)=>{const response=await realShotFetch(...args);if(String(args[0]).includes('api/designshot')){window.shotStarted=true;await shotGate;}return response;};document.querySelector('#files .design-mark').click()");
+ await browser("wait","--fn","window.shotStarted");
+ fs.writeFileSync(join(designDir,"index.html"),replayPage.replace("Replay fixture","New replay fixture"));
+ await replayRef('- heading "New replay fixture"');
+ await evaluate("window.fetch=realShotFetch;releaseShot()");
+ await browser("wait","--fn","document.getElementById('notice').textContent.includes('Preview changed during rendering')");
+ assert.equal(await evaluate("!!document.querySelector('dialog.annotate[open]') || !!document.getElementById('message-input').value"),false,"late renders never annotate the wrong viewer");
  // S14: a deck (the guide's framework) opens on Slide when no device was chosen, with previous, next and the counter;
  // a comment names its slide.
  await evaluate("localStorage.removeItem('design-device:design-1'); document.getElementById('message-input').value = ''");
