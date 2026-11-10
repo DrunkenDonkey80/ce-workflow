@@ -7,6 +7,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Changed
 - Every session now follows a "locked writes" rule: code that saves shared state under a lock makes every decision from what it reads inside the lock. The rule sits in the system prompt, so it reaches sessions outside Plan3 too and survives compaction. New plans that add such a write get a test that sends the same write twice at once, versioned input for background jobs whose input can be withdrawn, and a check for reads taken before the lock. The coding benchmark showed this was the most common bug in Opus-written code.
 
+### Added
+- Locked-writes check: when the agent writes or edits source code with a locked save whose callback ignores the current state it is handed (`transact(id, () => patch)`), the result tells it straight away to move the checks inside the callback. The benchmark found agents wrapping old code this way, which looks safe but keeps the stale read.
+
 ## 0.6.1 — 2026-11-10
 
 ### Changed

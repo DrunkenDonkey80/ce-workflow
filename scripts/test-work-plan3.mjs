@@ -1918,6 +1918,8 @@ try {
 	hooks.get("before_agent_start")({ systemPrompt: "BASE", systemPromptOptions: { sections } });
 	assert.deepEqual(Object.keys(sections).filter(name => !/^[a-z][a-z0-9_-]*$/.test(name)), [], "section names pass Pi's SYSTEM_PROMPT_SECTION_NAME");
 	assert.match(Object.values(sections).join(""), /\*\*Locked writes\*\*/);
+	const flagged = hooks.get("tool_result")({ toolName: "write", input: { path: "server/a.ts", content: "repo.transact(id, () => patch);" }, isError: false, content: [{ type: "text", text: "Wrote" }] });
+	assert.deepEqual([flagged.content[0].text, /Locked writes check/.test(flagged.content[1].text)], ["Wrote", true], "a write that wraps a stale patch gets the locked-writes note");
 	assert.match(planning, /talking cannot settle[\s\S]*plan a throwaway prototype step naming the question/, "ungrillable questions become a prototype step");
 	assert.match(planning, /record its reference, the chosen direction and tokens\/components to reuse in the plan, not the skill text/);
 	assert.match(planning, /Explicit briefs and project conventions win; native\/TUI work follows platform rules/);

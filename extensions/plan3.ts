@@ -19,6 +19,7 @@ import { hubActive, publish as hubPublish } from "./hub-channel.ts";
 import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
+import { lockedWritesNote } from "./locked-writes.ts";
 
 const POINTER = "plan3-current";
 const RUN = "plan3-run";
@@ -2031,6 +2032,11 @@ export default function plan3(pi) {
 		const sections = event?.systemPromptOptions?.sections;
 		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; return; }
 		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${LOCKED_WRITES}` };
+	});
+	// The rule above is a reminder; this flags the benchmark's commonest violation as soon as it is written (D-12).
+	pi.on?.("tool_result", event => {
+		const note = lockedWritesNote(event.toolName, event.input, event.isError);
+		if (note) return { content: [...(event.content ?? []), { type: "text", text: note }] };
 	});
 	// Plans are born from the template (plan3 create), never invented: block writing a NEW plan3 file by hand.
 	// shortcut: covers the write tool only, not shell redirection; extend if agents start bypassing it.
