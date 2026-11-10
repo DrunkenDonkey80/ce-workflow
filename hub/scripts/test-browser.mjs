@@ -11,6 +11,7 @@ import { promisify } from "node:util";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyDiagramOperations, toolbarEdit } from "../../extensions/plan3-diagram.ts";
+import { decodePng } from "../../extensions/screen-read.ts";
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `hub-ui-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
@@ -1271,6 +1272,42 @@ try {
  for (let i = 0; i < 50 && messages.length === sentBeforeComments; i++) await new Promise(done => setTimeout(done, 100));
  assert.equal(messages.at(-1).text, '(2) index.html @title <h1> "Calm": warmer\n');
  await untilPins("", "Send clears the pins");
+ // P3-04: a modal pick must paint a real pin above the modal, not merely leave a hidden body overlay in the DOM.
+ fs.writeFileSync(join(designDir, "index.html"), `<style>dialog{width:260px;height:200px;overflow:auto;background:white}button{height:44px;margin:12px}#pop{background:white}</style>
+ <dialog id="modal" aria-label="Layered controls"><div style="height:40px"></div><button data-id="modal-cta" onclick="window.clicked++">Modal action</button><div style="height:360px"></div><div id="pop" popover="manual"><button data-id="popover-cta" onclick="window.clicked++">Popover action</button></div></dialog>
+ <script>window.clicked=0;modal.showModal();addEventListener('message',event=>{if(event.source!==parent||event.data?.type!=='test:pins')return;const {action,request}=event.data;
+ if(action==='pick')document.querySelector('[data-id=modal-cta]').click();if(action==='scroll')modal.scrollTop+=24;if(action==='close')modal.close();if(action==='open')modal.showModal();
+ if(action==='hide')document.querySelector('[data-id=modal-cta]').hidden=true;if(action==='show')document.querySelector('[data-id=modal-cta]').hidden=false;
+ if(action==='popover')pop.showPopover();if(action==='pick-popover')document.querySelector('[data-id=popover-cta]').click();if(action==='close-popover')pop.hidePopover();
+ requestAnimationFrame(()=>requestAnimationFrame(()=>parent.postMessage({type:'test:pins-result',request,detail:{clicked:window.clicked,fontSize:getComputedStyle(document.querySelector('[data-id=modal-cta]')).fontSize,layers:document.querySelectorAll('div[data-design-chrome]').length,pins:[...document.querySelectorAll('[data-design-chrome] > span')].map(dot=>({n:dot.textContent,...dot.getBoundingClientRect().toJSON()}))}},'*')));});</script>`);
+ const probePins = action => evaluate(`new Promise((resolve,reject)=>{const frame=document.querySelector('#files .files-frame'),request=crypto.randomUUID();const reply=event=>{if(event.source!==frame.contentWindow||event.data?.type!=='test:pins-result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',reply);resolve(event.data.detail);};const timer=setTimeout(()=>{removeEventListener('message',reply);reject(new Error('Pin fixture did not reply'));},3000);addEventListener('message',reply);frame.contentWindow.postMessage({type:'test:pins',action:${JSON.stringify(action)},request},'*');})`);
+ let modalReady=false;for(let i=0;i<40&&!modalReady;i++){modalReady=(await designTree()).some(row=>row.includes('Layered controls'));if(!modalReady)await new Promise(done=>setTimeout(done,150));}assert(modalReady);
+ const beforeModalPicks=await evaluate("window.picks.length");
+ const clickModal=async()=>{const ref=(await designTree()).find(row=>row.startsWith('- button "Modal action"'))?.match(/ref=(e\d+)/)?.[1];assert(ref,"modal button has an accessible click target");await browser("click","@"+ref);};
+ await probePins("pick");await browser("wait","--fn","document.getElementById('comment-prompt').open");
+ assert.equal(await evaluate("window.picks.length"),beforeModalPicks+1,"one pick, no duplicate listeners");
+ await browser("fill","#comment-text","modal pin");await evaluate("document.getElementById('comment-form').requestSubmit()");
+ const modalPin=await probePins("inspect");assert.deepEqual(modalPin.pins.map(pin=>pin.n),["1"]);assert.equal(modalPin.clicked,0,"comment mode prevents the real action");
+ const paintedPin=async n=>{
+  const state=await probePins("inspect"),dot=state.pins.find(pin=>pin.n===n);assert(dot,"pin "+n+" exists");assert.equal(state.layers,1,"one pin layer only");
+  const rect=await evaluate("(() => {const f=document.querySelector('#files .files-frame'),r=f.getBoundingClientRect();return{x:r.x,y:r.y,scale:r.width/f.offsetWidth};})()"),file=join(root,"modal-pin.png");
+  await browser("screenshot",file);const {width,height,rgba}=decodePng(fs.readFileSync(file));let orange=0;
+  for(let y=Math.max(0,Math.floor(rect.y+dot.y*rect.scale));y<Math.min(height,rect.y+(dot.y+dot.height)*rect.scale);y++)for(let x=Math.max(0,Math.floor(rect.x+dot.x*rect.scale));x<Math.min(width,rect.x+(dot.x+dot.width)*rect.scale);x++){const at=(y*width+x)*4;if(rgba[at]===232&&rgba[at+1]===89&&rgba[at+2]===12)orange++;}
+  assert(orange>40,"screenshot must show pin "+n+" above the modal/popover: "+orange+" orange pixels");return dot;
+ };
+ await paintedPin("1");await clickModal();await browser("wait","--fn","document.getElementById('comment-prompt').open");
+ assert.equal(await evaluate("window.picks.length"),beforeModalPicks+2,"pin overlay/backdrop does not block real pointer picks");assert.equal((await probePins("inspect")).clicked,0);await browser("press","Escape");
+ const scrolledPin=await probePins("scroll");assert.equal(Math.round(modalPin.pins[0].y-scrolledPin.pins[0].y),24,"pins follow nested scrolling");
+ await probePins("popover");await probePins("pick-popover");await browser("wait","--fn","document.getElementById('comment-prompt').open");
+ await browser("fill","#comment-text","popover pin");await evaluate("document.getElementById('comment-form').requestSubmit()");await paintedPin("2");
+ assert(!(await probePins("close-popover")).pins.some(pin=>pin.n==="2"),"closing popover hides its obsolete pin");
+ assert.equal((await probePins("close")).pins.length,0,"closing modal hides its pins");assert.deepEqual((await probePins("open")).pins.map(pin=>pin.n),["1"],"reopen keeps one pin");
+ assert.equal((await probePins("hide")).pins.length,0,"hidden control has no pin");await probePins("show");await paintedPin("1");
+ await pick("Phone");await paintedPin("1");await pick("Desktop");
+ await evaluate("document.querySelector('#files .design-edit').click()");await clickModal();await browser("wait","--fn","!!document.querySelector('#files .design-inspector')");
+ await evaluate("(() => {const input=document.querySelector('#files .design-inspector [name=font-size]');input.value='24px';input.dispatchEvent(new Event('input'));})()");
+ assert.equal((await probePins("inspect")).fontSize,"24px","inline edit reaches the modal control");
+ await evaluate("document.querySelector('#files .design-inspector button[type=button]').click();document.querySelector('#files .design-edit').click();const input=document.getElementById('message-input');input.value='';input.dispatchEvent(new Event('input'))");
  // S12: Edit mode inspects the clicked element; a change applies live (a second inspect reads it back) and Keep adds a Set
  // line. The page's Tweaks panel (chrome, so its clicks pass through) offers Keep tweaks.
  fs.writeFileSync(join(designDir, "index.html"), `<h1 data-id="title">Calm</h1><div data-design-chrome><button onclick="window.dispatchEvent(new CustomEvent('design:tweaks', { detail: { accent: '#c2410c', scale: 1.125 } }))">Tweak</button></div>`);

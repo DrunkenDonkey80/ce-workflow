@@ -15,7 +15,9 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 	const STYLES = ["color", "background-color", "font-size", "font-weight", "padding", "margin", "gap", "border-radius"];
 	const screen = decodeURIComponent(location.pathname.split("/").pop() || "index.html");
 	const send = (type, data) => { if (load) parent.postMessage({ type, load, ...data }, "*"); };
-	const chrome = el => !!(el && el.closest && el.closest("[data-design-chrome]"));
+	const chrome = el => { if (el?.nodeType === 3) el = el.parentElement; return !!(el && el.closest && el.closest("[data-design-chrome]")); };
+	const css = document.createElement("style"); css.setAttribute("data-design-chrome", "");
+	css.textContent = "[data-design-pins]::backdrop{pointer-events:none;background:transparent}"; document.head.append(css);
 	const clip = (text, max) => String(text || "").replace(/\\s+/g, " ").trim().slice(0, max);
 	// A short selector for an element without a data-id: up to its nearest data-id or id ancestor.
 	const selector = el => {
@@ -41,19 +43,27 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		const mine = pins.filter(pin => pin.screen === screen);
 		if (!mine.length) return;
 		layer = document.createElement("div");
-		layer.setAttribute("data-design-chrome", "");
-		layer.style.cssText = "position:absolute;left:0;top:0;width:0;height:0;z-index:2147483647;pointer-events:none";
+		layer.setAttribute("data-design-chrome", ""); layer.setAttribute("data-design-pins", ""); layer.setAttribute("popover", "manual");
+		layer.style.cssText = "position:fixed;inset:auto;left:0;top:0;width:0;height:0;min-width:0;min-height:0;margin:0;border:0;padding:0;overflow:visible;background:transparent;z-index:2147483647;pointer-events:none";
 		for (const pin of mine) {
 			const el = find(pin); if (!el) continue;
 			const box = el.getBoundingClientRect(), dot = document.createElement("span");
-			if (!box.width && !box.height) continue; // on another slide or hidden
+			if (!box.width || !box.height || el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue;
+			const at = document.elementFromPoint(Math.max(0, Math.min(innerWidth - 1, box.left + box.width / 2)), Math.max(0, Math.min(innerHeight - 1, box.top + box.height / 2)));
+			if (!at || !(at === el || el.contains(at))) continue; // clipped, covered by another layer, or inert behind a modal
 			dot.textContent = String(pin.n);
 			dot.style.cssText = "position:absolute;min-width:22px;height:22px;padding:0 5px;box-sizing:border-box;border-radius:11px;background:#e8590c;color:#fff;font:600 12px/22px system-ui,sans-serif;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.4)";
-			dot.style.left = Math.max(0, box.left + scrollX - 8) + "px"; dot.style.top = Math.max(0, box.top + scrollY - 8) + "px";
+			dot.style.left = Math.max(0, box.left - 8) + "px"; dot.style.top = Math.max(0, box.top - 8) + "px";
 			layer.append(dot);
 		}
+		if (!layer.childElementCount) { layer = null; return; }
 		document.body.append(layer);
+		// shortcut: layered pins need the Popover API; add a legacy host fallback if pre-2024 browsers become supported.
+		layer.showPopover?.();
 	}
+	let redraw = false;
+	const queuePins = event => { if (!pins.length || chrome(event?.target) || redraw) return; redraw = true; requestAnimationFrame(() => { redraw = false; drawPins(); }); };
+	new MutationObserver(records => { if (pins.length && records.some(record => record.type === "childList" ? [...record.addedNodes, ...record.removedNodes].some(node => !chrome(node)) : !chrome(record.target))) queuePins(); }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["open", "hidden", "style", "class"] });
 	addEventListener("message", event => {
 		if (event.source !== parent) return;
 		const message = event.data || {};
@@ -61,7 +71,7 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		if (message.load !== load) return;
 		if (typeof message.mode === "string") { mode = message.mode; if (!mode) outline(null); document.documentElement.style.cursor = mode ? "crosshair" : ""; }
 		if (Number.isSafeInteger(message.go) && slides()) location.hash = String(Math.min(slides(), Math.max(1, message.go)));
-		if (message.style && editing) for (const name of STYLES) if (typeof message.style[name] === "string") editing.style.setProperty(name, message.style[name].slice(0, 100));
+		if (message.style && editing) { const el = find(editing); if (el) for (const name of STYLES) if (typeof message.style[name] === "string") el.style.setProperty(name, message.style[name].slice(0, 100)); }
 		if (Array.isArray(message.pins)) { pins = message.pins; drawPins(); }
 	});
 	addEventListener("mouseover", event => { if (mode && !chrome(event.target)) outline(target(event.target)); }, true);
@@ -71,11 +81,11 @@ export const DESIGN_BRIDGE = `<script data-design-chrome>(() => {
 		const el = target(event.target), box = el.getBoundingClientRect(), id = el.dataset.id && /^[\\w-]{1,80}$/.test(el.dataset.id) ? el.dataset.id : "";
 		const pick = { screen, id, selector: id ? "" : selector(el), tag: el.tagName.toLowerCase(), text: clip(el.innerText || el.getAttribute("aria-label") || el.getAttribute("alt") || el.getAttribute("placeholder") || el.value, 160), rect: { x: box.left, y: box.top, width: box.width, height: box.height }, slide: slide() };
 		if (mode === "comment") return send("design:pick", pick);
-		outline(null); editing = el; const computed = getComputedStyle(el);
+		outline(null); editing = pick; const computed = getComputedStyle(el);
 		send("design:inspect", { ...pick, styles: Object.fromEntries(STYLES.map(name => [name, computed.getPropertyValue(name).slice(0, 100)])) });
 	}, true);
 	addEventListener("design:tweaks", event => { if (event.detail && typeof event.detail === "object") send("design:tweaks", { values: event.detail }); });
-	addEventListener("resize", drawPins);
+	for (const event of ["resize", "scroll", "toggle", "close", "transitionend", "animationend"]) addEventListener(event, queuePins, true);
 	addEventListener("hashchange", () => { position(); drawPins(); }); // Mark renders the slide shown; the counter follows
 	addEventListener("load", drawPins);
 })();</script>`;

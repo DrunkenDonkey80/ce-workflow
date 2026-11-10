@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-10
-updated: 2026-11-10T21:37:00.639Z
+updated: 2026-11-10T22:28:04.989Z
 reviewed: 2026-11-10
 started: 2026-11-10T20:34:40.770Z
 ---
@@ -151,10 +151,8 @@ Run only checks relevant to touched code after each change. Commands execute fro
 ### Phase 2: Fix the shared studio correctness gaps [code]
 
 - [x] **P3-03** Design-only form handlers now run while native navigation remains blocked; generic viewers retain their original sandbox.
-- [wip] **P3-04** Fix numbered comment pins and inline inspection on dialogs and popovers.
-  - Use the correct top-layer surface, keep stable IDs and existing chat-line format, and retain pointer-event isolation. Handle nested layers, close/reopen, scroll/resize, hidden controls and version/stale-load changes.
-  - Add a browser test where the pick succeeds AND a screenshot shows the pin in the open modal. Verify no duplicate pins/listeners or interactions while in comment mode. Checks C2, C4, C9.
-- [ ] **P3-05** Fix render readiness and distinguish touch capability from viewport size.
+- [x] **P3-04** Pins paint above native modal/popover layers, follow layout/scroll and hide stale controls; modal inline edits and real-pointer isolation pass screenshot regressions.
+- [wip] **P3-05** Fix render readiness and distinguish touch capability from viewport size.
   - Add bounded readiness/settling to the existing renderer and preview evidence; do not wait forever for looping animations. Report timeout/errors rather than silently capturing transitional or blank pixels.
   - Headless rendering accepts honest mouse/touch contexts; device controls clearly distinguish size-only live iframe behavior from emulated rendering. Never claim changing iframe width emulates touch. Cover phone, tablet, landscape and reduced motion with C1–C4, C9.
 - [ ] **P3-06** Fix Mark state loss through a bounded, explicitly acknowledged page-state replay contract.
@@ -240,7 +238,7 @@ Excluded from this implementation scope unless a concrete later requirement earn
 
 ## Resume context
 
-P3-01..03 done, P3-04 wip. Prechange real product baseline completed572.068s/2,762,429tokens/$2.6376342/36turns/42tools; budget37.3623658 remains for final2arms. Baseline archive product-prechange-html.json notes full effective system prompt unavailable in canonical JSONL; raw sessions/guides remain local only. P3-02 contracts/probes committed ad0d2a49. P3-03 uncommitted product diff: DESIGN_CSP exported in extensions/design-render.ts (generic untouched), dedicated serve uses it, hub/src/explore.ts selects it only access.own. Red→green regressions in scripts/test-work-design.mjs and hub/scripts/test-explore.mjs. C1–3 pass; C4 initial parallel run failed earlier drawer push-menu geometry, isolated with diagnostic-only message passed; message removed and original assertions preserved. Cause not established; repeat C4 at next step. Production form-targets15groups and acceptance100/100 both HTML/Astryx pass. Active LSP silent-on-clean unconfirmed; old private shell-free spawn Semgrep false positive reviewed. Oracle advisory attempted per global2fail rule for target-probe assumption, but failed modelverification expectedOpus5.5 observedgpt6-astra; no retry/model switch, narrow advice independently validated. No implementation delegated. Next: commit verified P3-03 only owned files; then modal/popover pin top-layer/scroll tests and fix in design-bridge.ts. Preserve unrelated dirty cache-miss/chat/view/app/test-browser/changelog/otherplans. No push. P3-16 physical touch/Safari still blocked. Continue all runnable work in parent.
+P3-01..04 done, P3-05 wip; HEAD70d3bd64 contains user-approved first-wheel throttle fix and stale-CDP-drag settle only (partial-staged unrelated app/test work preserved). P4 pin source/tests and plan/log awaiting own-only local commit now. C4 screenshot red0orange→green; latest full sequential C4 passed all new modal/popover/Phone/scroll/close/reopen/hidden/real-pointer/no-duplicate/inline-edit cases. C2 pass. Active LSP3paths0findings butallinconclusive, not clean. Read-only oracle635d6e82 accepted after two unrelated pre-design C4 failures; no implementation delegated, no more advisory round for these failures. No skips/retry changes. Next finish own-only P4 commit, then inspect extensions/design-render.ts callers/tests and P3-02 readiness/input contracts for P5. Prechange product baseline572.068s/2,762,429tokens/$2.6376342/36turns42tools; remaining live benchmark budget37.3623658 for final2arms, no automatic paid retry. Full effective baseline prompt/independent sandbox acceptance not captured, recorded limitations. Preserve unrelated dirty cachemiss/chat/view/app/styles/index/changelog/otherplans; test-browser cache-miss hunk must remain unstaged. No push. P3-16 real Safari/touch still blocked. Continue all runnable work in parent.
 
 ## Amendments
 
@@ -276,3 +274,4 @@ Measured dashboard artifacts remain 52,523 B raw / 14,038 B gzip (HTML) versus 1
 
 Sources: Context7 /meta/astryx, https://github.com/meta/astryx/wiki/Why-StyleX and https://github.com/meta/astryx/wiki/Distribution; audited source packages/cli/api/swizzle/swizzle.doc.mjs at fd5cf0df987791117e96ccc0bec603c64be8b136; installed 0.7.12 manifests and comparison/astryx/build.mjs under C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/. The pilot establishes neither a general library cost multiplier nor that copying equivalent component behavior would be cheaper. No product tests rerun for this discussion.
 - Reconciled the applied Q-01 selection into D14 and P3-02/P3-18/P3-10/P3-14/P3-17: first-use host download, consent/progress, no mandatory runtime in the base package, cold-offline failure and warm-cache reuse checks, and remote-browser provisioning coverage. No new steps or scope changes required; Open questions is empty. P3-16's external device prerequisite remains unresolved.
+P3-04 validation prerequisite, approved via ask_user 2026-11-10: user chose Fix both prerequisites (recommended). Read-only oracle635d6e82 identified first-wheel throttle initialized at0 and an existing stale-drag CDP synchronisation gap. Parent verified the throttle source. Scope adds only zoomedAt=-Infinity in shared app.ts, a deterministic first-event timestamp0 regression in C4 and the same1000ms settle already used by the neighboring CDP drag; no assertions weakened, skip flags or extra retries. Validate original failures via one sequential C4; drag root cause remains unproven until retest. Preserve unrelated app/test hunks with partial staging.

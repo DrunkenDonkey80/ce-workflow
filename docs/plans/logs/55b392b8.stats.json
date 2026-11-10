@@ -2,8 +2,8 @@
  "version": 1,
  "activeMs": 0,
  "runs": 0,
- "waitingMs": 1004502,
- "toolWallMs": 686941,
+ "waitingMs": 2487323,
+ "toolWallMs": 1144537,
  "compactions": {
   "count": 0,
   "ms": 0
@@ -21,52 +21,52 @@
    "errors": 0
   },
   "openai-codex/gpt-6.1-sol:high": {
-   "replies": 107,
-   "thinkingMs": 1772866,
-   "actingMs": 254606,
-   "input": 743023,
-   "output": 65558,
-   "cacheRead": 13139840,
+   "replies": 147,
+   "thinkingMs": 2754226,
+   "actingMs": 311297,
+   "input": 869302,
+   "output": 96796,
+   "cacheRead": 17881856,
    "cacheWrite": 0,
-   "cost": 3.455609999999998,
+   "cost": 4.494749599999999,
    "errors": 0
   }
  },
  "tools": {
   "plan3": {
-   "count": 17,
-   "ms": 1576,
-   "maxMs": 176,
+   "count": 24,
+   "ms": 2321,
+   "maxMs": 193,
    "failures": 0
   },
   "bash": {
-   "count": 65,
-   "ms": 496657,
+   "count": 84,
+   "ms": 900397,
    "maxMs": 136023,
-   "failures": 8
+   "failures": 13
   },
   "lens_diagnostics": {
-   "count": 8,
-   "ms": 43047,
-   "maxMs": 10786,
+   "count": 10,
+   "ms": 59187,
+   "maxMs": 11355,
    "failures": 0
   },
   "read": {
-   "count": 76,
-   "ms": 2054,
+   "count": 90,
+   "ms": 2210,
    "maxMs": 458,
    "failures": 2
   },
   "codemode": {
-   "count": 43,
-   "ms": 363300,
+   "count": 51,
+   "ms": 393442,
    "maxMs": 137297,
    "failures": 6
   },
   "module_report": {
-   "count": 4,
-   "ms": 87,
-   "maxMs": 48,
+   "count": 5,
+   "ms": 171,
+   "maxMs": 84,
    "failures": 0
   },
   "read_symbol": {
@@ -82,8 +82,8 @@
    "failures": 0
   },
   "edit": {
-   "count": 29,
-   "ms": 111,
+   "count": 34,
+   "ms": 137,
    "maxMs": 22,
    "failures": 1
   },
@@ -106,9 +106,9 @@
    "failures": 0
   },
   "lsp_navigation": {
-   "count": 5,
-   "ms": 1481,
-   "maxMs": 383,
+   "count": 7,
+   "ms": 7921,
+   "maxMs": 4270,
    "failures": 0
   },
   "read_enclosing": {
@@ -148,30 +148,30 @@
    "failures": 0
   },
   "subagents_enable": {
-   "count": 1,
-   "ms": 1,
+   "count": 2,
+   "ms": 2,
    "maxMs": 1,
    "failures": 0
   },
   "subagent": {
-   "count": 1,
-   "ms": 2455,
+   "count": 4,
+   "ms": 4602,
    "maxMs": 2455,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 42,
-   "ms": 39585,
+   "count": 52,
+   "ms": 41873,
    "maxMs": 4838,
-   "failures": 3
+   "failures": 4
   },
   "test": {
-   "count": 23,
-   "ms": 457072,
+   "count": 32,
+   "ms": 858524,
    "maxMs": 136023,
-   "failures": 5
+   "failures": 9
   }
  },
  "commands": {
@@ -446,16 +446,16 @@
    "failures": 1
   },
   "bash\u0000node --no-warnings \"hub/scripts/test-explore.mjs\"": {
-   "count": 2,
-   "ms": 15857,
+   "count": 4,
+   "ms": 32798,
    "maxMs": 9287,
    "failures": 1
   },
   "bash\u0000node --no-warnings \"hub/scripts/test-browser.mjs\"": {
-   "count": 2,
-   "ms": 127913,
-   "maxMs": 113153,
-   "failures": 1
+   "count": 8,
+   "ms": 512147,
+   "maxMs": 131395,
+   "failures": 5
   },
   "bash\u0000node --no-warnings \"hub/scripts/test-api.mjs\"": {
    "count": 1,
@@ -473,6 +473,72 @@
    "count": 1,
    "ms": 208,
    "maxMs": 208,
+   "failures": 0
+  },
+  "bash\u0000git diff --check -- \"extensions/design-render.ts\" \"hub/src/explore.ts\" \"scripts/test-work-design.mjs\" \"hub/scripts/test-explore.mjs\" \"docs/proposals/astryx-study\" && git add -- \"extensions/design-rend": {
+   "count": 1,
+   "ms": 524,
+   "maxMs": 524,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"design.*pin|pin.*design|design-comment|dialog|popover\" \"hub/scripts/test-browser.mjs\" | tail -45": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000git status --short && git diff --stat": {
+   "count": 1,
+   "ms": 140,
+   "maxMs": 140,
+   "failures": 0
+  },
+  "bash\u0000df -h \".\"": {
+   "count": 1,
+   "ms": 84,
+   "maxMs": 84,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"STUDY_ROOT|STUDY_DEPS|CHROME_PATH|production|parent-production\" \"docs/proposals/astryx-study/README.md\" \"docs/proposals/astryx-study/contracts.md\"": {
+   "count": 1,
+   "ms": 90,
+   "maxMs": 90,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq\" && ls \".pi/astryx-product-benchmark\"": {
+   "count": 1,
+   "ms": 77,
+   "maxMs": 77,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\" && ls \"C:/Users/Flex/AppData/Local/ms-playwright\"": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000rg --files -g \"AGENTS.md\" \"hub\"": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 1
+  },
+  "bash\u0000git diff -- \"hub/src/design-bridge.ts\" \"hub/web/app.ts\" \"hub/scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 921,
+   "maxMs": 921,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const {execFileSync:e}=require(\\\"node:child_process\\\"),a=require(\\\"node:assert/strict\\\"); a.equal(e(\\\"git\\\",[\\\"diff\\\",\\\"--cached\\\",\\\"--name-only\\\"],{encoding:\\\"utf8\\\"}).trim(),\\\"\\\",\\\"Index mu": {
+   "count": 1,
+   "ms": 277,
+   "maxMs": 277,
+   "failures": 0
+  },
+  "bash\u0000git commit -m \"fix(hub): accept first zoom input and settle stale-drag test\"": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
    "failures": 0
   }
  },
@@ -504,6 +570,23 @@
     "openai-codex/gpt-6.1-sol:high": 23
    },
    "failures": 1
+  },
+  "P3-04": {
+   "ms": 1426238,
+   "testMs": 384234,
+   "replies": 38,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 38
+   },
+   "failures": 4
+  },
+  "P3-05": {
+   "ms": 29504,
+   "testMs": 0,
+   "replies": 2,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 2
+   }
   }
  },
  "spans": [],
