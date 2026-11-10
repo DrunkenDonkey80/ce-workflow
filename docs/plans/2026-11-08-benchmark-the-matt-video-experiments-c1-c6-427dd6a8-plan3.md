@@ -2,7 +2,7 @@
 plan3: true
 status: draft
 created: 2026-11-08
-updated: 2026-11-09T15:33:23.051Z
+updated: 2026-11-10T06:07:52.028Z
 started: 2026-11-09T11:22:42.019Z
 ---
 
@@ -31,6 +31,8 @@ started: 2026-11-09T11:22:42.019Z
 - **D-06** Q-03: no budget cap, as in the skills lab. Source: user, 2026-11-09 ("3 yep").
 - **D-07** C1 arms: `codingEffort` high (what we all use today; rework-lab's default) vs medium; planning unchanged. Needs a `--coding-effort` option in `scripts/rework-lab.mjs`, which writes `codingEffort: "high"` into the clone's settings today. Source: user, 2026-11-09 ("we all use high for coding so test med").
 - **D-08** C1 is coding-only: plan and design once on Opus high, then reuse that decided plan for every coding arm. Source: user, 2026-11-09 ("plan once on high opus and stop! reuse that plan for several coding sessions… opus high vs med, sol high vs med"). Frozen point: `c1-high-1` at `1d0fb5c` (PICK recorded, before Build). Arms: coding model Sol or Opus × effort high or medium, 3 reps, all four side by side per rep (`C:/SOFT/git/rework-lab/c1b-run.sh`, `rework-lab.mjs --from-plan`). Remaining [think] phases (Replay, Switch) stay on Opus high in every arm. The first full-run pair (`c1-high-1` $14.72 green, `c1-medium-1` $54.44, 1 failing test, a different and 3× larger pick) is kept only as evidence that full runs vary too much; rounds 2-3 were stopped.
+- **D-09** C1 result (12 coding-only runs, 3 rounds, blind Opus + Astra judges, keys in C:/SOFT/git/rework-lab/judge/c1b-r{1,2,3}.key.json): keep coding effort **high** and Sol as coder. Astra average rank: sol-high 1.3, sol-medium 2.3, opus-high 3.0, opus-medium 3.3. Arm-specific race bugs flagged by Astra across 3 rounds: sol-high 4, sol-medium 5, opus-high 12, opus-medium 12. Objective check: payment-webhook dedupe inside the lock in 6/6 Sol builds, 1/6 Opus builds. Default suite green: sol-high 3/3, sol-medium 1/3, opus 2/3 each. Sol medium saves only ~3 min and ~$0.90 per build. Caveats: the Opus judge ran out of context on rounds 2-3 (partial reads); Astra shares Sol's model family.
+
 
 
 
@@ -52,7 +54,7 @@ None open. Q-01 → D-04, Q-02 → D-05, Q-03 → D-06.
 ### Phase 1: Benchmark designs [think]
 
   - note: Baseline = the C1 high arm itself (current settings, current ce-workflow 24bb80d): photobook-02 ran on an older recipe/ce-workflow, so it can't be the baseline. Runner: C:/SOFT/git/rework-lab/c1-run.sh (3 reps, high+medium side by side per rep, --check = npm run build + vitest). Metrics: wallMs/metrics/check in each c1-*.lab.jsonl done line (lab-metrics sessionMetrics).
-- [wip] **C-01** Settle Q-01 and Q-02, then record the baseline workload and its metrics command for each experiment.
+- [x] **C-01** C1 done (D-08/D-09): coding-only 2x2x3 from one Opus-high plan; verdict keep Sol on high effort; medium rejected for coding.
 - [ ] **C-02** C1 design: coding effort one level lower on `[code]` phases only, planning unchanged.
   - Arms: current effort vs one lower; metrics from `lab-metrics.mjs`; quality from hidden tests and the blind judge.
   - Keep only if quality holds and cost or runtime drops materially.
@@ -80,7 +82,7 @@ None open. Q-01 → D-04, Q-02 → D-05, Q-03 → D-06.
 
 ## Resume context
 
-C1 coding-only (D-08): round 1 judged blind (C:/SOFT/git/rework-lab/judge/c1b-r1, key c1b-r1.key.json: A=sol-high B=opus-medium C=sol-medium D=opus-high; verdict.task-1.md Opus, verdict.task-2.md Astra). Scores Opus/Astra: sol-high 7/8, opus-medium 8/6, opus-high 6.5/7, sol-medium 6/5. Verified by me (check-then-act reads outside transact): sol-high 0; opus-high 1 (draftReviewSessions); opus-medium 1+ (humanAlbumApproval; webhook dedupe unverified); sol-medium 2+ (albumBuild failure cleanup, retention extension). Shared consent-resurrection issue in all four = frozen design flaw, not arm. Rounds 2-3 running (timer 95ce21a7); judge each round the same way (fresh random labels), then decide per model.
+C1 coding-only: all 12 runs done. Coding time/cost per arm via C:/SOFT/git/rework-lab/c1b-report.mjs (time split by plan3-run mode markers): opus-high 38 min/$9.9, opus-medium 29/$7.0, sol-high 58/$4.5, sol-medium 55/$3.6; default-suite pass 2/2/3/1 of 3 (all fails = PB-010 delta-default wrap-up miss). Rounds 2-3 blind judging running (workflow cf65b394; judge/c1b-r2, c1b-r3, keys judge/c1b-r{2,3}.key.json; Opus + Astra each, race-hunt instruction added). Next: unmask, verify flagged races per arm, combine with round 1 (judge/c1b-r1), decide high vs medium per coding model.
 
 ## Amendments
 
