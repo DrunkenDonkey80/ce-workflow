@@ -101,7 +101,7 @@ let child, running = false, lastActivity = Date.now(), buffer = "";
 const rpcOut = path.join(root, `${runName}.rpc.jsonl`);
 const sessions = path.join(root, `${runName}-sessions`);
 function start() {
-	child = spawn(process.execPath, [launcher, "--mode", "rpc", "--session-dir", sessions, "--model", thinker, "--thinking", "high"], { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))), stdio: ["pipe", "pipe", "pipe"] }); // no hub: dialogs must come here, not to the user's hub
+	child = spawn(process.execPath, [launcher, "--mode", "rpc", "--session-dir", sessions, "--model", thinker, "--thinking", "high"], { cwd: dir, env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PI_HUB"))), stdio: ["pipe", "pipe", "pipe"], windowsHide: true }); // no hub: dialogs must come here, not to the user's hub
 	child.stdout.on("data", (chunk) => {
 		appendFileSync(rpcOut, chunk);
 		buffer += chunk;

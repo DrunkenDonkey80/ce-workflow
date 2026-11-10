@@ -130,7 +130,6 @@
    <p id="empty-diagram" class="empty-diagram"></p>
    <div class="search-box"><input id="search" type="search" placeholder="Search (Ctrl+F)" aria-label="Search the diagram; Enter jumps to the next match"><output id="search-count" aria-live="polite"></output></div>
    <div id="hover-card" class="hover-card" role="tooltip" tabindex="0" hidden></div>
-   <div id="load-tip" class="hover-card" data-notes="false" role="tooltip" hidden></div>
   </section>
   </section>
   <div id="splitter" class="splitter" role="separator" tabindex="0" aria-label="Resize chat pane" aria-orientation="vertical" aria-controls="chat" aria-valuemin="280" aria-valuemax="640" aria-valuenow="380"></div>
@@ -180,6 +179,8 @@
  <dialog id="devices" aria-labelledby="devices-title"><h2 id="devices-title">Paired devices</h2><p id="devices-remote" class="dialog-purpose"></p><ul id="device-list" class="device-list"></ul><div class="dialog-actions"><button id="devices-close" type="button">Close</button></div></dialog>
  <dialog id="usage-window" class="usage-window" aria-labelledby="usage-title"><button id="usage-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="usage-title">Usage</h2><div id="usage-body"></div></dialog>
  <dialog id="changelog" class="usage-window" aria-labelledby="changelog-title"><button id="changelog-close" type="button" class="dialog-close" aria-label="Close">×</button><h2 id="changelog-title">Changelog</h2><div id="changelog-body" class="changelog-body"></div></dialog>
+ <!-- Outside the left panel: collapsing it (or the Files tab) would hide the graphs' tooltip too. -->
+ <div id="load-tip" class="hover-card" data-notes="false" role="tooltip" hidden></div>
  <dialog id="viewer" aria-label="Image, tap to close"><img alt=""></dialog>
 </body>
 </html>

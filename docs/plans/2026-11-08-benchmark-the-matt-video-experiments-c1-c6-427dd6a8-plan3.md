@@ -2,7 +2,8 @@
 plan3: true
 status: draft
 created: 2026-11-08
-updated: 2026-11-08T23:07:34.925Z
+updated: 2026-11-09T15:33:23.051Z
+started: 2026-11-09T11:22:42.019Z
 ---
 
 # Benchmark the Matt video experiments C1-C6
@@ -25,28 +26,17 @@ updated: 2026-11-08T23:07:34.925Z
 - **D-01** Planning only for now; runs wait for the user's go. Source: user pick "C: plan the benchmarks … without running them yet", 2026-11-09.
 - **D-02** Reuse the existing harnesses instead of new ones: `scripts/skills-lab.mjs` (isolated copies, arms, `results.jsonl`), `scripts/rework-lab.mjs` (unattended Plan3 over RPC on a throwaway clone), `scripts/lab-metrics.mjs` (tokens, cost, turns, tool calls incl. subagent children), `scripts/skills-lab-judge.mjs` (blind judge bundles). Source: agent proposal; these already produced the PC-09 and SK-08 results.
 - **D-03** Every arm compares like with like: same task, same base commit, same model (`openai-codex/gpt-6.1-sol` as in the skills lab unless the experiment varies it), three reps per arm as in SK-08. Source: agent proposal, following `docs/proposals/skills-lab/results.md`.
+- **D-04** Q-01: C1 and C2 both use a rework-lab run on the photobook fixture as the workload; its numbers are recorded as the baseline before any arm runs. Source: user, 2026-11-09 ("1 yea agreed").
+- **D-05** Q-02: C3 uses scripted reactions written before the runs (one per variant round), plus one live run with the user at the end. Source: user, 2026-11-09 ("2. yep").
+- **D-06** Q-03: no budget cap, as in the skills lab. Source: user, 2026-11-09 ("3 yep").
+- **D-07** C1 arms: `codingEffort` high (what we all use today; rework-lab's default) vs medium; planning unchanged. Needs a `--coding-effort` option in `scripts/rework-lab.mjs`, which writes `codingEffort: "high"` into the clone's settings today. Source: user, 2026-11-09 ("we all use high for coding so test med").
+- **D-08** C1 is coding-only: plan and design once on Opus high, then reuse that decided plan for every coding arm. Source: user, 2026-11-09 ("plan once on high opus and stop! reuse that plan for several coding sessions… opus high vs med, sol high vs med"). Frozen point: `c1-high-1` at `1d0fb5c` (PICK recorded, before Build). Arms: coding model Sol or Opus × effort high or medium, 3 reps, all four side by side per rep (`C:/SOFT/git/rework-lab/c1b-run.sh`, `rework-lab.mjs --from-plan`). Remaining [think] phases (Replay, Switch) stay on Opus high in every arm. The first full-run pair (`c1-high-1` $14.72 green, `c1-medium-1` $54.44, 1 failing test, a different and 3× larger pick) is kept only as evidence that full runs vary too much; rounds 2-3 were stopped.
+
+
 
 ## Open questions
 
-### Blocking
-
-- **Q-01** Which workload is the "accepted /resume3 benchmark" baseline for C1 and C2?
-  - Context: the proposal names an accepted `/resume3` benchmark, but no single artifact is marked accepted. Candidates: the rework-lab runs (`docs/proposals/rework-lab/run-03..05.md`, multi-hour, Plan3 end to end) and the PC-09 planning requests (`docs/proposals/skills-lab/tasks/planning-requests.md`, planning only). C1 needs execution; C2 needs a session long enough to cross 150k.
-  - Recommendation: a rework-lab run on the photobook fixture for both, since it executes and crosses 200k; record its numbers as the baseline in this plan before any arm runs.
-  - Option: Rework-lab run — real execution, long sessions; slow and costly per rep.
-  - Option: Skills-lab tasks — cheap, three reps easy; too short to reach 150k, so C2 would not trigger.
-  - Option: Both — skills-lab for C1, rework-lab for C2.
-  - Independent: yes
-- **Q-02** C3 needs a human in the loop: who reacts to the prototypes?
-  - Context: the SK-08 prototype arm ran unattended, so Matt's core loop (react, combine variants, iterate) never happened. A scripted reaction keeps runs comparable; a real human is closer to Matt's claim but varies per run.
-  - Recommendation: scripted reactions written before the runs (one per variant round), driven by the rework-lab dialog driver; one live human run at the end as a sanity check.
-  - Option: Scripted reactions — repeatable; may not match how a person reacts.
-  - Option: You react live — realistic; needs your time for every rep.
-  - Independent: yes
-
-### Deferred
-
-- **Q-03** Budget cap per experiment. The skills lab ran without a cap ("unlimited, lets get it right", plan 79614d24); assume the same unless you say otherwise.
+None open. Q-01 → D-04, Q-02 → D-05, Q-03 → D-06.
 
 ## Relevant files and approach
 
@@ -61,7 +51,8 @@ updated: 2026-11-08T23:07:34.925Z
 
 ### Phase 1: Benchmark designs [think]
 
-- [ ] **C-01** Settle Q-01 and Q-02, then record the baseline workload and its metrics command for each experiment.
+  - note: Baseline = the C1 high arm itself (current settings, current ce-workflow 24bb80d): photobook-02 ran on an older recipe/ce-workflow, so it can't be the baseline. Runner: C:/SOFT/git/rework-lab/c1-run.sh (3 reps, high+medium side by side per rep, --check = npm run build + vitest). Metrics: wallMs/metrics/check in each c1-*.lab.jsonl done line (lab-metrics sessionMetrics).
+- [wip] **C-01** Settle Q-01 and Q-02, then record the baseline workload and its metrics command for each experiment.
 - [ ] **C-02** C1 design: coding effort one level lower on `[code]` phases only, planning unchanged.
   - Arms: current effort vs one lower; metrics from `lab-metrics.mjs`; quality from hidden tests and the blind judge.
   - Keep only if quality holds and cost or runtime drops materially.
@@ -79,7 +70,7 @@ updated: 2026-11-08T23:07:34.925Z
 
 ### Phase 2: Runs [think]
 
-- [human] **C-08** User go for the runs, with Q-03's budget.
+- [x] **C-08** User said "go" (2026-11-09) after D-04..D-07; no budget cap.
 - [ ] **C-09** Run and report each experiment in its design's order; one results section per experiment with keep or revert.
 
 ## Global validation
@@ -89,7 +80,7 @@ updated: 2026-11-08T23:07:34.925Z
 
 ## Resume context
 
-Planning draft written at night without the user. Next: /plan3 resolve for Q-01 and Q-02, then fill the designs C-02 to C-07. Nothing has run.
+C1 coding-only (D-08): round 1 judged blind (C:/SOFT/git/rework-lab/judge/c1b-r1, key c1b-r1.key.json: A=sol-high B=opus-medium C=sol-medium D=opus-high; verdict.task-1.md Opus, verdict.task-2.md Astra). Scores Opus/Astra: sol-high 7/8, opus-medium 8/6, opus-high 6.5/7, sol-medium 6/5. Verified by me (check-then-act reads outside transact): sol-high 0; opus-high 1 (draftReviewSessions); opus-medium 1+ (humanAlbumApproval; webhook dedupe unverified); sol-medium 2+ (albumBuild failure cleanup, retention extension). Shared consent-resurrection issue in all four = frozen design flaw, not arm. Rounds 2-3 running (timer 95ce21a7); judge each round the same way (fresh random labels), then decide per model.
 
 ## Amendments
 

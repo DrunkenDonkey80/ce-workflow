@@ -64,7 +64,7 @@ function runPi(dir, art, arm, prompt) {
 	const events = `${art}.events.jsonl`;
 	return new Promise((resolve) => {
 		const child = spawn(process.execPath, [launcher, "-p", "--mode", "json", "--model", model, "--thinking", task.thinking ?? "high",
-			"--session-dir", sessions, ...skillArgs, message], { cwd: dir, env: piEnv, stdio: ["ignore", "pipe", "pipe"] });
+			"--session-dir", sessions, ...skillArgs, message], { cwd: dir, env: piEnv, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 		let timedOut = false;
 		const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);
 		child.stdout.on("data", (chunk) => appendFileSync(events, chunk));

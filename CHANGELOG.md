@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.6.0 — 2026-11-10
 
 ### Added
 - Design studio in the hub: each design session's own agent now builds its design directly in `.pi/designs/<handle>/`, and its page previews it live. The preview has a device picker (phones, foldable, tablet, laptop, desktop, slide) with rotate, a screen picker, and back/forward through the versions saved after every turn that changed files, plus Restore.
@@ -13,8 +13,15 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Selecting a design now also writes `HANDOFF.md` (screens, tokens, required states, viewports, checklist) and `BRIEF.md` next to the exported files.
 - Catch up packages also watches OpenDesign, but only for the craft rules, skills and preview code we ported (`docs/upstream/open-design.md`).
 
+### Changed
+- Plans verify their own work: checks run as tests or through the agent's tools (agent-browser, `screen_read`, `mobile_act`, `app_act`, `browser_act`, `vm_act`), and the plan completes when they pass. A step asking you to try it yourself appears only for what no tool can see, like a printout. Your own testing comes after the plan is done.
+
 ### Removed
 - OpenDesign runtime: the design tool no longer starts OpenDesign runs, and the `/wo` Settings row "OpenDesign executable" is gone.
+
+### Fixed
+- Hub CPU and memory graphs show their top-5 programs on hover again. With the left panel collapsed or the Files tab open, the tooltip used to be hidden along with that panel.
+- Rework and skills lab runs start their Pi processes with a hidden window.
 
 ## 0.5.3 — 2026-11-09
 

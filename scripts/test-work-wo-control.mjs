@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import workModelsExtension from "../extensions/work-models.ts";
 
+delete process.env.PI_HUB; // run from a hub session, dialogs would go to the hub channel the fake ui lacks
 const cwd = mkdtempSync(path.join(tmpdir(), "ce-utilities-control-"));
 const commands = {}, shortcuts = {}, tools = {}, hooks = {};
 const sent = [], notices = [], forwarded = [];

@@ -1,0 +1,1451 @@
+{
+ "version": 1,
+ "activeMs": 7350108,
+ "runs": 1,
+ "waitingMs": 0,
+ "toolWallMs": 3836001,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 363,
+   "thinkingMs": 1474173,
+   "actingMs": 1142265,
+   "input": 948,
+   "output": 260904,
+   "cacheRead": 49645881,
+   "cacheWrite": 1159892,
+   "cost": 20.9505082,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 298,
+   "ms": 3415541,
+   "maxMs": 156289,
+   "failures": 6
+  },
+  "read": {
+   "count": 26,
+   "ms": 266,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "write": {
+   "count": 10,
+   "ms": 327,
+   "maxMs": 203,
+   "failures": 1
+  },
+  "lens_diagnostics": {
+   "count": 10,
+   "ms": 58423,
+   "maxMs": 16589,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 35,
+   "ms": 4563,
+   "maxMs": 1203,
+   "failures": 2
+  },
+  "edit": {
+   "count": 60,
+   "ms": 2910,
+   "maxMs": 521,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 3,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 1
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 236,
+   "ms": 858281,
+   "maxMs": 154567,
+   "failures": 6
+  },
+  "test": {
+   "count": 62,
+   "ms": 2557260,
+   "maxMs": 156289,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -20 && git log --oneline -3 && wc -l hub/web/files.ts extensions/design.ts && rg -n \"design\" hub/web/files.ts | head -60": {
+   "count": 1,
+   "ms": 2448,
+   "maxMs": 2448,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat hub/scripts/test-browser.mjs hub/web/index.html CHANGELOG.md; (time node --no-warnings hub/scripts/test-browser.mjs) 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 154567,
+   "maxMs": 154567,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"design|files-width\" hub/scripts/test-browser.mjs | head -20; rg -n \"files\\.js|createFilesView\" hub/web/*.ts hub/web/index.html | head": {
+   "count": 1,
+   "ms": 819,
+   "maxMs": 819,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p='hub/web/files.ts';let s=fs.readFileSync(p,'utf8'); const a=s.indexOf(' if (from.design && FRAME.test(file.path)) for');const b=s.indexOf(' if (FRAME": {
+   "count": 1,
+   "ms": 3249,
+   "maxMs": 3249,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-explore.mjs 2>&1 | tail -3; rg -ln \"ASSETS|icons.js\" hub/scripts | head": {
+   "count": 1,
+   "ms": 5468,
+   "maxMs": 5468,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs 2>&1 | tail -3": {
+   "count": 1,
+   "ms": 136229,
+   "maxMs": 136229,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/web/design-view.ts hub/web/files.ts hub/src/hub.ts docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/plans/logs/a5cf234d.m": {
+   "count": 1,
+   "ms": 922,
+   "maxMs": 922,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"sessions\\.json|designs/|\\.design\\b|designpreview|designPage\" hub/src | head -30; rg -n \"design\" extensions/*.ts --glob \"!extensions/design.ts\" -l | head -20": {
+   "count": 1,
+   "ms": 395,
+   "maxMs": 395,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"runDesign|openDesign\\(|building\\b.*design\" --glob \"!extensions/design.ts\" extensions scripts hub | head": {
+   "count": 1,
+   "ms": 352,
+   "maxMs": 352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | tail -20": {
+   "count": 1,
+   "ms": 468,
+   "maxMs": 468,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p='scripts/test-work-design.mjs';let s=fs.readFileSync(p,'utf8'); s=s.replace('const stored = () => JSON.parse(fs.readFileSync(storePath, \\\"utf8\\\"));',": {
+   "count": 1,
+   "ms": 774,
+   "maxMs": 774,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"design \\{action|\\\"send\\\"|retry.*design|design.*(send|retry|add)\\b\" extensions/tool-loader.ts extensions/work-models.ts extensions/plan3.ts README.md | head -15": {
+   "count": 1,
+   "ms": 627,
+   "maxMs": 627,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/design.ts scripts/test-work-design.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/plans/logs/a5cf234d.md && ": {
+   "count": 3,
+   "ms": 3678,
+   "maxMs": 1630,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"pi.on\\?*\\(\\\"tool_call\\\"\" extensions | head -5; rg -n \"designModel\" extensions/work-models.ts | head; rg -n \"agent_end\" extensions/*.ts | head -3": {
+   "count": 1,
+   "ms": 2089,
+   "maxMs": 2089,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | tail -12; node scripts/test-work-wo-control.mjs 2>&1 | tail -2; node scripts/test-work-settings.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 4176,
+   "maxMs": 4176,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-wo-control.mjs 2>&1 | grep -v \"^\\s*at \" | tail -15": {
+   "count": 1,
+   "ms": 1208,
+   "maxMs": 1208,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git worktree add -q \"$TEMP/wt-c6\" 24bb80d && cd \"$TEMP/wt-c6\" && ln -s \"./node_modules\" node_modules 2>/dev/null; node scripts/test-work-wo-control.mjs 2>&1 | grep -v \"^\\s*at \" | tail -4; no": {
+   "count": 1,
+   "ms": 15961,
+   "maxMs": 15961,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git worktree remove --force \"$TEMP/wt-c6\" && git worktree prune && git status --short | head": {
+   "count": 1,
+   "ms": 2359,
+   "maxMs": 2359,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/design.ts extensions/work-models.ts scripts/test-work-design.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/": {
+   "count": 1,
+   "ms": 271,
+   "maxMs": 271,
+   "failures": 0
+  },
+  "bash\u0000agent-browser --version; agent-browser --help 2>&1 | head -80": {
+   "count": 1,
+   "ms": 1210,
+   "maxMs": 1210,
+   "failures": 0
+  },
+  "bash\u0000agent-browser --help 2>&1 | sed -n 80,200p": {
+   "count": 1,
+   "ms": 739,
+   "maxMs": 739,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/ab-try\" && (timeout 120 node serve.mjs &) ; sleep 1; time agent-browser --session try-1 --json batch \"set viewport 360 800\" \"open http://127.0.0.1:47123/page.html\" \"eval JSON.stringify({w:do": {
+   "count": 1,
+   "ms": 5178,
+   "maxMs": 5178,
+   "failures": 0
+  },
+  "bash\u0000D=\"$(cygpath -w \"$TEMP\")\\\\ab-try\"; mkdir -p \"$D\" && cd \"$D\" && cat > page.html <<'EOF' <!doctype html><html><head><style>body{margin:0}.wide{width:900px;height:50px;background:red}</style></head><body": {
+   "count": 1,
+   "ms": 2972,
+   "maxMs": 2972,
+   "failures": 0
+  },
+  "bash\u0000agent-browser eval --help 2>&1 | head -30; agent-browser screenshot --help 2>&1 | head -30": {
+   "count": 1,
+   "ms": 1352,
+   "maxMs": 1352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p='hub/src/explore.ts';let s=fs.readFileSync(p,'utf8'); const a='\\\"content-security-policy\\\": \\`sandbox allow-scripts allow-popups allow-pointer-lock a": {
+   "count": 1,
+   "ms": 243,
+   "maxMs": 243,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time node scripts/test-work-design.mjs 2>&1 | grep -v \"^\\s*at \" | tail -15": {
+   "count": 1,
+   "ms": 2540,
+   "maxMs": 2540,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | grep -m3 \"test-work-design.mjs:\"": {
+   "count": 1,
+   "ms": 2407,
+   "maxMs": 2407,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s/.wide{width:900px;height:40px}/.wide{width:600px;height:40px}/; s/@band 900px/@band 600px/\" scripts/test-work-design.mjs && time node scripts/test-work-design.mjs 2>&1 | grep -v \"^": {
+   "count": 1,
+   "ms": 4952,
+   "maxMs": 4952,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-explore.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 4344,
+   "maxMs": 4344,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/design-render.ts hub/src/explore.ts scripts/test-work-design.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/": {
+   "count": 1,
+   "ms": 581,
+   "maxMs": 581,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time node scripts/test-work-design.mjs 2>&1 | grep -v \"^\\s*at node:\" | tail -15": {
+   "count": 1,
+   "ms": 12425,
+   "maxMs": 12425,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/design.ts extensions/design-render.ts scripts/test-work-design.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md doc": {
+   "count": 1,
+   "ms": 11370,
+   "maxMs": 11370,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^- \\*\\*D(2|7|8|15|16)\\b\" docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"before_agent_start|systemPrompt|frontend-design\" ": {
+   "count": 1,
+   "ms": 418,
+   "maxMs": 418,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,40p extensions/design.ts | rg -n \"DESIGN_ROLE|readFileSync\" ; rg -n \"DESIGN_ROLE\" -A12 extensions/design.ts | head -40; sed -n 360,380p extensions/design.ts; wc -l skills/frontend-d": {
+   "count": 1,
+   "ms": 1547,
+   "maxMs": 1547,
+   "failures": 1
+  },
+  "bash\u0000ls /c/SOFT/git | grep -i -E \"open-?design|od\" ; ls ~/.pi/agent/git/github.com 2>/dev/null | head -30; cd \".\" && rg -n \"craft/|official-system\" docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-o": {
+   "count": 1,
+   "ms": 482,
+   "maxMs": 482,
+   "failures": 0
+  },
+  "bash\u0000ls -d /tmp/*open* /c/Users/Flex/AppData/Local/Temp/*open-design* 2>/dev/null; find /c/SOFT /c/Users/Flex/AppData/Local/Temp -maxdepth 3 -type d -name \"open-design\" 2>/dev/null | head": {
+   "count": 1,
+   "ms": 11965,
+   "maxMs": 11965,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp && rm -rf od-src && git clone -q --filter=blob:none --no-checkout https://github.com/nexu-io/open-design.git od-src && cd od-src && git sparse-checkout set --no-cone \"/craft/\" \"/apps/daemon/sr": {
+   "count": 1,
+   "ms": 5961,
+   "maxMs": 5961,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp/od-src && git checkout -q HEAD -- craft apps/daemon/src/prompts/official-system.ts apps/daemon/src/prompts/discovery.ts 2>&1|tail -2; wc -l craft/*.md apps/daemon/src/prompts/*.ts; git ls-tree": {
+   "count": 1,
+   "ms": 2342,
+   "maxMs": 2342,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp/od-src && mkdir -p x && for f in craft/README.md craft/anti-ai-slop.md craft/state-coverage.md craft/typography.md craft/color.md craft/accessibility-baseline.md craft/laws-of-ux.md craft/anim": {
+   "count": 1,
+   "ms": 8564,
+   "maxMs": 8564,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp/od-src/x && cat anti-ai-slop.md color.md; sed -n 1,203p official-system.ts | grep -v \"^\\s*$\" | head -150": {
+   "count": 1,
+   "ms": 385,
+   "maxMs": 385,
+   "failures": 0
+  },
+  "bash\u0000cd /tmp/od-src && git grep -l \"Slide deck — fixed framework\" HEAD -- apps packages | head; cd x && sed -n 1,134p state-coverage.md | head -80": {
+   "count": 1,
+   "ms": 6684,
+   "maxMs": 6684,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^- \\[ \\] \\*\\*S(1[0-9]|0[89]|20)\\*\\*\" docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"^- \\*\\*D(4|9|10|12|13|14|17|18|19|20)": {
+   "count": 1,
+   "ms": 353,
+   "maxMs": 353,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const p=require('./package.json');console.log(JSON.stringify(p.files))\"; ls extensions/*.md 2>/dev/null; head -12 skills/frontend-design/SKILL.md; cd /tmp/od-src/x && sed -n 1,60p t": {
+   "count": 1,
+   "ms": 243,
+   "maxMs": 243,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && head -5 skills/frontend-design/LICENSE.txt; wc -l skills/frontend-design/LICENSE.txt; cd /tmp/od-src && git show HEAD:LICENSE | wc -l; git show HEAD:LICENSE | tail -15; git show HEAD:NOTICE ": {
+   "count": 1,
+   "ms": 571,
+   "maxMs": 571,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"pi.on\\?\\.\\(\\\"\" extensions/design.ts; rg -n \"^import\" scripts/test-work-design.mjs": {
+   "count": 1,
+   "ms": 352,
+   "maxMs": 352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | grep -v \"^\\s*at node:\" | tail -8": {
+   "count": 1,
+   "ms": 10713,
+   "maxMs": 10713,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && mkdir -p /tmp/deckchk && node -e \" const fs=require('fs');const g=fs.readFileSync('extensions/design-guide.md','utf8');const html=g.match(/\\`\\`\\`html\\n([\\s\\S]*?)\\`\\`\\`/)[1].replace('<!-- sli": {
+   "count": 1,
+   "ms": 1428,
+   "maxMs": 1428,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/deckchk.mts\" <<'EOF' import fs from \"node:fs\"; import os from \"node:os\"; import path from \"node:path\"; import { renderDesign } from \"./extensions/design-render.ts\"; const dir = ": {
+   "count": 1,
+   "ms": 428,
+   "maxMs": 428,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i \"s#\\\"./extensions/design-render.ts\\\"#\\\"file:///./extensions/design-render.ts\\\"#\" \"$TEMP/deckchk.mts\" && node \"$TEMP/deckchk.mts\" 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 4943,
+   "maxMs": 4943,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/design.ts extensions/design-render.ts extensions/design-guide.md extensions/design-guide.UPSTREAM.md extensions/design-guide.LICENSE.txt scripts/test-work-design.mjs docs/": {
+   "count": 1,
+   "ms": 528,
+   "maxMs": 528,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | tail -2; rm -f \"$TEMP/deckchk.mts\" \"$TEMP/deck2.png\"": {
+   "count": 1,
+   "ms": 15145,
+   "maxMs": 15145,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l hub/web/design-view.ts && rg -n \"design\" hub/src/*.ts | grep -v \"^hub/src/design-bridge\" | cut -c1-220 | head -40": {
+   "count": 1,
+   "ms": 402,
+   "maxMs": 402,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"design|data-width|files-width|file-changed|designpreview\" hub/web/files.ts hub/web/app.ts hub/web/style.css hub/web/index.html | cut -c1-260 | head -50": {
+   "count": 1,
+   "ms": 611,
+   "maxMs": 611,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,150p hub/web/files.ts | tr -d '\\000' ; rg -n \"files-width|data-width|files-frame|tree-hidden\" hub/web/styles.css": {
+   "count": 1,
+   "ms": 357,
+   "maxMs": 357,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^- \\*\\*C[0-9]+\" docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md | cut -c1-300; rg -n \"designpreview|design\" hub/scripts/test-explo": {
+   "count": 1,
+   "ms": 391,
+   "maxMs": 391,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"C1|C2|C3|C4|C5\" docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md | grep -v \"Check:\" | cut -c1-260 | head; rg -n \"designPage|designp": {
+   "count": 1,
+   "ms": 2159,
+   "maxMs": 2159,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 110,150p hub/scripts/test-api.mjs; rg -n \"viewPage|unview|file-changed\" hub/scripts/test-explore.mjs | head": {
+   "count": 1,
+   "ms": 374,
+   "maxMs": 374,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 70,96p hub/web/styles.css": {
+   "count": 1,
+   "ms": 313,
+   "maxMs": 313,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#^listen(\"file-changed\", value => filesView.reload(value.key));#listen(\"file-changed\", value => filesView.reload(value.key));\\nlisten(\"design-changed\", value => filesView.designChan": {
+   "count": 1,
+   "ms": 756,
+   "maxMs": 756,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\"file-changed\\\"\" hub --glob \"!*.mjs\" ; rg -n \"function listen|const listen\" -A4 hub/web/app.ts | head": {
+   "count": 1,
+   "ms": 404,
+   "maxMs": 404,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p='hub/web/styles.css';let s=fs.readFileSync(p,'utf8'); const a='.files[data-width=phone] .files-frame { flex: 1 0 auto; width: 390px; max-width: 100%;": {
+   "count": 1,
+   "ms": 1153,
+   "maxMs": 1153,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-explore.mjs 2>&1 | grep -v \"^\\s*at \" | tail -12": {
+   "count": 2,
+   "ms": 17738,
+   "maxMs": 9506,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-api.mjs 2>&1 | grep -v \"^\\s*at \" | tail -12": {
+   "count": 1,
+   "ms": 880,
+   "maxMs": 880,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#\\tconst screenView = (await post(id, \"designpreview\", { screen: \"pay.html\" })).body;#\\tconst screenRes = await post(id, \"designpreview\", { screen: \"pay.html\" }), screenView = scree": {
+   "count": 1,
+   "ms": 1415,
+   "maxMs": 1415,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-api.mjs 2>&1 | grep -B2 -A8 \"AssertionError\" | head -20; rg -n \"async function post|const post\" hub/scripts/test-api.mjs | head -3": {
+   "count": 1,
+   "ms": 3162,
+   "maxMs": 3162,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#\\tfs.writeFileSync(path.join(mine, \"pay.html\"), \"<p>pay</p>\");#\\tfs.writeFileSync(path.join(mine, \"pay.html\"), \"<p>pay</p>\"); hub.registry.update(id, { modes: { design: \"design-1\" ": {
+   "count": 1,
+   "ms": 10234,
+   "maxMs": 10234,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time node --no-warnings hub/scripts/test-browser.mjs 2>&1 | grep -v \"^\\s*at \" | tail -12": {
+   "count": 1,
+   "ms": 128467,
+   "maxMs": 128467,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff -U3 hub/scripts/test-browser.mjs > \"$TEMP/tb.patch\" && node -e \" const fs=require('fs');const t=fs.readFileSync(process.argv[1],'utf8');const i=t.indexOf('\\n@@');const head=t.slice(": {
+   "count": 5,
+   "ms": 13551,
+   "maxMs": 10449,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/src/explore.ts hub/src/api.ts hub/web/design-view.ts hub/web/files.ts hub/web/app.ts hub/web/styles.css hub/scripts/test-explore.mjs hub/scripts/test-api.mjs docs/plans/2026-11-0": {
+   "count": 1,
+   "ms": 721,
+   "maxMs": 721,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 990,1010p hub/web/app.ts; rg -n \"function showExplored|createFilesView\\(|async function sendMessage|function sendPrompt|function submit|addEditLine\" hub/web/app.ts | head": {
+   "count": 1,
+   "ms": 384,
+   "maxMs": 384,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p='hub/web/app.ts';let s=fs.readFileSync(p,'utf8'); const a='closed: () => closeExplore() });';if(s.split(a).length!==2)throw 1; s=s.replace(a,'closed:": {
+   "count": 1,
+   "ms": 374,
+   "maxMs": 374,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"stripTypeScriptTypes|transform\\(|amaro|esbuild\" hub/src/hub.ts | head -5": {
+   "count": 1,
+   "ms": 390,
+   "maxMs": 390,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs'); let p='hub/scripts/test-explore.mjs',s=fs.readFileSync(p,'utf8'); const a='\\tunview(d.key, \"s3\");\\n'; s=s.replace(a,`\\t// S09: a kept version is its ow": {
+   "count": 1,
+   "ms": 11632,
+   "maxMs": 11632,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-explore.mjs 2>&1 | grep -B3 -A10 \"AssertionError\" | head -20": {
+   "count": 1,
+   "ms": 6938,
+   "maxMs": 6938,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p='hub/scripts/test-explore.mjs';let s=fs.readFileSync(p,'utf8'); s=s.replace(/assert\\.match\\(await designPage\\(project, \\\"design-1\\\", \\\"index\\.html\\\",": {
+   "count": 1,
+   "ms": 7403,
+   "maxMs": 7403,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"prompts\\.|received|messages\\.at\\(-1\\)|lastPrompt\" hub/scripts/test-browser.mjs | head -10": {
+   "count": 1,
+   "ms": 814,
+   "maxMs": 814,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"const messages|messages = \\[\" hub/scripts/test-browser.mjs | head -3; rg -n \"await pick\\(\\\"Desktop\\\"\\);\" -A2 hub/scripts/test-browser.mjs": {
+   "count": 1,
+   "ms": 346,
+   "maxMs": 346,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"const waitFor|function waitFor\" hub/scripts/test-browser.mjs | head -2": {
+   "count": 1,
+   "ms": 680,
+   "maxMs": 680,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#^ await waitFor(() => messages.length > sentBeforeRestore);# for (let i = 0; i < 50 \\&\\& messages.length === sentBeforeRestore; i++) await new Promise(done => setTimeout(done, 100)": {
+   "count": 1,
+   "ms": 92059,
+   "maxMs": 92059,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs 2>&1 | grep -B2 -A4 \"actual:\" | head -12": {
+   "count": 1,
+   "ms": 107810,
+   "maxMs": 107810,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#^ assert.equal(messages.at(-1).text, \"Restore version 1\");# assert.equal(messages.at(-1).text, \"Restore version 1\", await evaluate(\"JSON.stringify([document.getElementById(\\x27noti": {
+   "count": 1,
+   "ms": 69601,
+   "maxMs": 69601,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for i in 1 2; do node --no-warnings hub/scripts/test-browser.mjs 2>&1 | grep -E \"^ok - hub page|AssertionError\" -A2 | head -4; done": {
+   "count": 1,
+   "ms": 154852,
+   "maxMs": 154852,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 74,84p hub/scripts/test-browser.mjs | cut -c1-300; rg -n \"holdMessage =|rejectMessage =\" hub/scripts/test-browser.mjs | head": {
+   "count": 1,
+   "ms": 399,
+   "maxMs": 399,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i '74s#^ assert.equal(body.target, \"12345678\");# if (!(endpoint === \"/api/message\" \\&\\& body.target === \"product\")) assert.equal(body.target, \"12345678\"); // a chat message may be sent ": {
+   "count": 1,
+   "ms": 137066,
+   "maxMs": 137066,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#^ assert.equal(messages.at(-1).text, \"Restore version 1\", await evaluate(.*# assert.equal(messages.at(-1).text, \"Restore version 1\");#' hub/scripts/test-browser.mjs && rg -n \"Resto": {
+   "count": 1,
+   "ms": 336,
+   "maxMs": 336,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/src/explore.ts hub/src/api.ts hub/web/design-view.ts hub/web/files.ts hub/web/app.ts hub/scripts/test-explore.mjs hub/scripts/test-api.mjs docs/plans/2026-11-09-own-design-studio": {
+   "count": 1,
+   "ms": 1593,
+   "maxMs": 1593,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1270,1290p hub/web/app.ts | cut -c1-400; rg -n \"^function renderMentions\" -A6 hub/web/app.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 367,
+   "maxMs": 367,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"own\\b|own:|own\\?\" hub/src/explore.ts | head -20; rg -n \"designpreview\" -A14 hub/src/api.ts | rg -n \"view|explore\" | head": {
+   "count": 1,
+   "ms": 806,
+   "maxMs": 806,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i '8s#import { mkdir, readdir, realpath, rm, stat }#import { mkdir, readdir, readFile, realpath, rm, stat }#; 13a import { withBridge } from \"./design-bridge.ts\";' hub/src/explore.ts &&": {
+   "count": 1,
+   "ms": 355,
+   "maxMs": 355,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"designs\" hub/scripts/test-browser.mjs | cut -c1-260 | head; rg -n \"frame|reload|show\\(\" hub/web/files.ts | rg -a -v \"^\\s*//\" | cut -c1-200 | head -30": {
+   "count": 1,
+   "ms": 403,
+   "maxMs": 403,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1195,1236p hub/scripts/test-browser.mjs | cut -c1-330; rg -a -n \"iframe|files-frame|contentWindow|\\.src =\" hub/web/files.ts | cut -c1-220": {
+   "count": 1,
+   "ms": 337,
+   "maxMs": 337,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#^const tell = (data: object) =>#const tell = (data: Record<string, unknown>) =>#' hub/web/design-view.ts && rg -n \"^const tell\" hub/web/design-view.ts && rg -n \"\\?token=__TOKEN__\" ": {
+   "count": 1,
+   "ms": 386,
+   "maxMs": 386,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"sendExplored|viewPage\\(|fetch\\(|serve\\(\" hub/scripts/test-explore.mjs | cut -c1-240 | head -20": {
+   "count": 1,
+   "ms": 326,
+   "maxMs": 326,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs');const p='hub/scripts/test-explore.mjs';let s=fs.readFileSync(p,'utf8'); const a='\\t// S09: a kept version is its own handle\\'s history folder only.\\n'; ": {
+   "count": 1,
+   "ms": 425,
+   "maxMs": 425,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"S10: a design session\" -A8 hub/scripts/test-explore.mjs": {
+   "count": 1,
+   "ms": 461,
+   "maxMs": 461,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD~2:hub/web/files.ts | sed -n 7p": {
+   "count": 1,
+   "ms": 1417,
+   "maxMs": 1417,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs 2>&1 | grep -E \"^ok - hub page|AssertionError|Error\" -A3 | head -8": {
+   "count": 1,
+   "ms": 135562,
+   "maxMs": 135562,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/src/design-bridge.ts hub/src/explore.ts hub/web/design-view.ts hub/scripts/test-explore.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5c": {
+   "count": 1,
+   "ms": 423,
+   "maxMs": 423,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"D2\\b|\\*\\*D2\\*\\*\" docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md | cut -c1-900 | head -5": {
+   "count": 1,
+   "ms": 331,
+   "maxMs": 331,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 61p docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md | cut -c880-2000; rg -n \"comment-prompt\" hub/web/app.ts hub/web/index.html | c": {
+   "count": 1,
+   "ms": 1266,
+   "maxMs": 1266,
+   "failures": 0
+  },
+  "bash\u0000agent-browser --help 2>&1 | grep -i -E \"frame\" | head": {
+   "count": 1,
+   "ms": 251,
+   "maxMs": 251,
+   "failures": 0
+  },
+  "bash\u0000agent-browser --help 2>&1 | grep -n -i -E \"^\\s+(frame|switch|eval|get|snapshot)\" | head; agent-browser frame --help 2>&1 | head -15": {
+   "count": 1,
+   "ms": 1234,
+   "maxMs": 1234,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs 2>&1 | grep -E \"^ok - hub page|AssertionError|Error\" -A6 | head -12": {
+   "count": 1,
+   "ms": 29646,
+   "maxMs": 29646,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"ce-workflow - 1\" hub/scripts/test-browser.mjs | cut -c1-200; node --no-warnings hub/scripts/test-browser.mjs 2>&1 | grep -E \"test-browser.mjs:[0-9]+\" -o | head -3": {
+   "count": 1,
+   "ms": 26877,
+   "maxMs": 26877,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs --keep-browser 2>&1 | grep -o \"session hub-ui-[0-9]*\" | head -1 > \"$TEMP/s.txt\"; S=$(sed \"s/session //\" \"$TEMP/s.txt\"); agent-browser --sessio": {
+   "count": 1,
+   "ms": 29109,
+   "maxMs": 29109,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs --keep-browser > \"$TEMP/tb.log\" 2>&1; grep -o -m1 \"hub-ui-[0-9]*\" \"$TEMP/tb.log\"; tail -c 600 \"$TEMP/tb.log\"": {
+   "count": 1,
+   "ms": 26596,
+   "maxMs": 26596,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && S=hub-ui-18212; agent-browser --session \"$S\" errors 2>&1 | head; agent-browser --session \"$S\" eval \"document.getElementById('title').textContent\" 2>&1 | head -3; agent-browser --session \"$S\"": {
+   "count": 1,
+   "ms": 1788,
+   "maxMs": 1788,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs');const p='hub/web/app.ts';let s=fs.readFileSync(p,'utf8'); const a='let designPick = null, designPins = [];\\n'; if(s.split(a).length!==2)throw 1; s=s.rep": {
+   "count": 1,
+   "ms": 26521,
+   "maxMs": 26521,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const {stripTypeScriptTypes}=require('node:module');const fs=require('fs'); try{const js=stripTypeScriptTypes(fs.readFileSync('hub/web/app.ts','utf8'));fs.writeFileSync(process.env": {
+   "count": 1,
+   "ms": 495,
+   "maxMs": 495,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash list | head -2 >/dev/null; git diff hub/web/app.ts | grep \"^+\" | cut -c1-220": {
+   "count": 1,
+   "ms": 410,
+   "maxMs": 410,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; grep -E \"^ok - hub page|AssertionError|Error:\" -A8 \"$TEMP/tb.log\" | head -16": {
+   "count": 1,
+   "ms": 73809,
+   "maxMs": 73809,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -E \"stdout:\" \"$TEMP/tb.log\" | head -3; grep -n \"assert.fail\\|inFrame\" \"$TEMP/tb.log\" | head": {
+   "count": 1,
+   "ms": 313,
+   "maxMs": 313,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs');const p='hub/scripts/test-browser.mjs';let s=fs.readFileSync(p,'utf8'); const def=' const inFrame = async (fn, label) =>'; const add=\" const toFrame = a": {
+   "count": 1,
+   "ms": 407,
+   "maxMs": 407,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; grep -E \"^ok - hub page|AssertionError|Error:|stdout:\" -A4 \"$TEMP/tb.log\" | head -16": {
+   "count": 1,
+   "ms": 80748,
+   "maxMs": 80748,
+   "failures": 0
+  },
+  "bash\u0000agent-browser frame --help 2>&1 | sed -n 15,40p": {
+   "count": 1,
+   "ms": 297,
+   "maxMs": 297,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs --keep-browser > \"$TEMP/tb.log\" 2>&1; S=$(grep -o -m1 \"hub-ui-[0-9]*\" \"$TEMP/tb.log\"); echo $S; agent-browser --session \"$S\" frame \"iframe\" 2>": {
+   "count": 1,
+   "ms": 85686,
+   "maxMs": 85686,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && S=hub-ui-39688; agent-browser --session \"$S\" frame \"@e126\" 2>&1 | head -2; agent-browser --session \"$S\" eval \"document.title + '|' + location.href\" 2>&1 | head -2; agent-browser --session \"$": {
+   "count": 1,
+   "ms": 4985,
+   "maxMs": 4985,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && S=hub-ui-39688; agent-browser --session \"$S\" eval \"document.getElementById('comment-prompt').open + '|' + document.getElementById('comment-title').textContent\" 2>&1 | head -2; agent-browser ": {
+   "count": 1,
+   "ms": 4052,
+   "maxMs": 4052,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"const browser =|function browser|const evaluate\" -A3 hub/scripts/test-browser.mjs | cut -c1-250 | head -10; agent-browser --help 2>&1 | grep -i -A2 \"^ snapshot\"": {
+   "count": 1,
+   "ms": 881,
+   "maxMs": 881,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"S11: the pick opens\" hub/scripts/test-browser.mjs && sed -n 1245,1270p hub/scripts/test-browser.mjs | cut -c1-120": {
+   "count": 1,
+   "ms": 490,
+   "maxMs": 490,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs');const p='hub/scripts/test-browser.mjs';let s=fs.readFileSync(p,'utf8');let lines=s.split('\\n'); const start=lines.findIndex(l=>l.startsWith(' const toFr": {
+   "count": 1,
+   "ms": 1200,
+   "maxMs": 1200,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs');const p='hub/scripts/test-browser.mjs';let s=fs.readFileSync(p,'utf8'); const a='<h1 data-id=\"title\">Calm</h1><button data-id=\"cta\">Get started</button>": {
+   "count": 1,
+   "ms": 84217,
+   "maxMs": 84217,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; grep -E \"^ok - hub page|AssertionError|Error:|stdout:\" -A4 \"$TEMP/tb.log\" | head -14": {
+   "count": 2,
+   "ms": 212815,
+   "maxMs": 133434,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff hub/web/app.ts | grep \"^+\" | grep -c -E \"as unknown as|innerHTML\"; git diff -U3 hub/scripts/test-browser.mjs > \"$TEMP/tb.patch\" && node -e \" const fs=require('fs');const t=fs.readFi": {
+   "count": 1,
+   "ms": 354,
+   "maxMs": 354,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/web/app.ts docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/plans/logs/a5cf234d.md && git commit -qm \"S11: design comment": {
+   "count": 1,
+   "ms": 1043,
+   "maxMs": 1043,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"D12|D11|Tweaks|tweaks\" \"$P\" | cut -c1-1200; rg -n -i \"tweak\" extensions/design-": {
+   "count": 1,
+   "ms": 371,
+   "maxMs": 371,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls hub/web/*.css; sed -n 85,96p hub/web/files.css 2>/dev/null || true; rg -n \"files-body \\{|\\.files-body\" hub/web/*.css | head -3": {
+   "count": 1,
+   "ms": 1245,
+   "maxMs": 1245,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/dv.mjs\" <<'EOF' import fs from \"node:fs\"; const p = \"hub/web/design-view.ts\"; let s = fs.readFileSync(p, \"utf8\"); const lines = s.split(\"\\n\"); const a = lines.findIndex(l => l.s": {
+   "count": 1,
+   "ms": 1189,
+   "maxMs": 1189,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; grep -E \"^ok - hub page|AssertionError|Error:|stdout:\" -A6 \"$TEMP/tb.log\" | head -16": {
+   "count": 1,
+   "ms": 103294,
+   "maxMs": 103294,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs --keep-browser > \"$TEMP/tb.log\" 2>&1; S=$(grep -o -m1 \"hub-ui-[0-9]*\" \"$TEMP/tb.log\"); agent-browser --session \"$S\" snapshot 2>&1 | grep -n -A": {
+   "count": 1,
+   "ms": 103239,
+   "maxMs": 103239,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && agent-browser --session hub-ui-532 close >/dev/null 2>&1; sed -i \"s#onclick=\\\"dispatchEvent(new CustomEvent('design:tweaks'#onclick=\\\"window.dispatchEvent(new CustomEvent('design:tweaks'#\" h": {
+   "count": 1,
+   "ms": 140368,
+   "maxMs": 140368,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git show HEAD~5:hub/web/app.ts | grep -n \"token=__TOKEN__\" | head -4; git diff hub/web/app.ts | grep \"^+\" | grep -c \"as unknown as\"": {
+   "count": 1,
+   "ms": 386,
+   "maxMs": 386,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git add hub/src/design-bridge.ts hub/web/design-view.ts hub/web/app.ts hub/web/styles.css extensions/design-guide.md docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-des": {
+   "count": 1,
+   "ms": 884,
+   "maxMs": 884,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"^- \\*\\*C[0-9]|D13\" \"$P\" | cut -c1-700; rg -n \"^export\" extensions/design-render": {
+   "count": 1,
+   "ms": 440,
+   "maxMs": 440,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"C5|C3\\b|C4\\b\" \"$P\" | head -8 | cut -c1-400; rg -n \"annotateImage|openAnnotator|": {
+   "count": 1,
+   "ms": 733,
+   "maxMs": 733,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 410,432p hub/src/api.ts; rg -n \"\\\"paste\\\"|/api/paste|pi-clipboard\" hub/src/*.ts | head": {
+   "count": 1,
+   "ms": 322,
+   "maxMs": 322,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^import\" hub/src/api.ts | cut -c1-200": {
+   "count": 1,
+   "ms": 1052,
+   "maxMs": 1052,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 44,50p hub/src/api.ts | cut -c1-200; rg -n '\\\\\\\\w-\\]\\{0,40\\}|w-\\]\\{0,40' hub/src/api.ts": {
+   "count": 1,
+   "ms": 338,
+   "maxMs": 338,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const {stripTypeScriptTypes}=require('node:module');stripTypeScriptTypes(require('fs').readFileSync('hub/src/api.ts','utf8'));console.log('ok')\" 2>&1 | grep -v Warning | grep -v tra": {
+   "count": 1,
+   "ms": 477,
+   "maxMs": 477,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"design:ready|addEventListener\\(\\\"resize\\\"\" hub/src/design-bridge.ts": {
+   "count": 1,
+   "ms": 321,
+   "maxMs": 321,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for f in hub/web/app.ts hub/web/design-view.ts hub/src/api.ts hub/src/design-bridge.ts; do node -e \"const {stripTypeScriptTypes}=require('node:module');stripTypeScriptTypes(require('fs').rea": {
+   "count": 1,
+   "ms": 871,
+   "maxMs": 871,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && time node --no-warnings hub/scripts/test-api.mjs 2>&1 | grep -v \"^\\s*at \" | tail -8": {
+   "count": 2,
+   "ms": 11629,
+   "maxMs": 10837,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 86,
+   "ms": 11450,
+   "maxMs": 240,
+   "failures": 3
+  },
+  "bash\u0000cd \".\" && sed -i \"s/const \\[first, second, edited, version2, live\\] = /const [first, second, edited, version2, current] = /; s/Buffer.isBuffer(live), \\\"renders give PNG files: \\\" + first + \\\" \\\" + liv": {
+   "count": 1,
+   "ms": 633,
+   "maxMs": 633,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#\\tassert.equal(await (await fetch(`${origin}/x/${old.key}/index.html`)).text(), \"<p>v2</p>\");#\\tassert.match(await (await fetch(`${origin}/x/${old.key}/index.html`)).text(), /^<p>v": {
+   "count": 1,
+   "ms": 793,
+   "maxMs": 793,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff hub/scripts/test-api.mjs | grep -c newer; node --no-warnings hub/scripts/test-annotate.mjs 2>&1 | tail -2; rg -n \"annotate|\\.annotate-|annotator\" hub/scripts/test-browser.mjs | cut ": {
+   "count": 1,
+   "ms": 730,
+   "maxMs": 730,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"className: \\\"annotate-[a-z]+\\\"|annotate-cancel|annotate-close\" hub/web/annotate.ts | cut -c1-180 | head": {
+   "count": 1,
+   "ms": 612,
+   "maxMs": 612,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; grep -E \"^ok - hub page|AssertionError|Error:|stdout:\" -A6 \"$TEMP/tb.log\" | head -14": {
+   "count": 3,
+   "ms": 391579,
+   "maxMs": 141347,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs --keep-browser > \"$TEMP/tb.log\" 2>&1; S=$(grep -o -m1 \"hub-ui-[0-9]*\" \"$TEMP/tb.log\"); agent-browser --session \"$S\" eval \"JSON.stringify([docu": {
+   "count": 1,
+   "ms": 107674,
+   "maxMs": 107674,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/src/api.ts hub/src/design-bridge.ts hub/web/design-view.ts hub/web/app.ts hub/scripts/test-api.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-d": {
+   "count": 1,
+   "ms": 323,
+   "maxMs": 323,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"D16\" \"$P\" | cut -c1-900 | head -3; sed -n 64,110p extensions/design-guide.md; r": {
+   "count": 1,
+   "ms": 1249,
+   "maxMs": 1249,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/src/design-bridge.ts hub/web/design-view.ts docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/plans/logs/a5cf234d.md && gi": {
+   "count": 1,
+   "ms": 253,
+   "maxMs": 253,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"D14|D20|C1 \" \"$P\" | cut -c1-1200; rg -n \"system|fetch\\(|C1\" extensions/design.t": {
+   "count": 1,
+   "ms": 693,
+   "maxMs": 693,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,30p extensions/design.ts; rg -n \"action ===|case \\\"|async execute|function reference|BRIEF\" extensions/design.ts | cut -c1-200; rg -n \"fetch|reference|import \" scripts/test-work-des": {
+   "count": 1,
+   "ms": 1271,
+   "maxMs": 1271,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git\" && ls -d */ | grep -i -E \"open|design\"; P=ce-workflow/docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"design-systems|syste": {
+   "count": 1,
+   "ms": 410,
+   "maxMs": 410,
+   "failures": 0
+  },
+  "bash\u0000ls \"$TEMP\" | grep -i -E \"open|od-\" | head; find /c/SOFT /c/Users/Flex/AppData/Local/Temp -maxdepth 3 -type d -name \"design-systems\" 2>/dev/null | head": {
+   "count": 1,
+   "ms": 7372,
+   "maxMs": 7372,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/pi-research-G9n9tQ/od/design-systems\" && ls | head -5; ls | wc -l; ls \"$(ls | head -1)\"; for d in $(ls | head -40); do ls \"$d\"; done | sort | uniq -c; cat \"$(ls -d */ | head -1)manifest.json": {
+   "count": 1,
+   "ms": 3641,
+   "maxMs": 3641,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/pi-research-G9n9tQ/od/design-systems\" && head -40 README.md; grep -c \"\" README.md; ls _schema": {
+   "count": 1,
+   "ms": 631,
+   "maxMs": 631,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings scripts/test-work-design.mjs 2>&1 | grep -v \"^\\s*at \" | tail -12": {
+   "count": 3,
+   "ms": 21270,
+   "maxMs": 10743,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's/const picked = await runDesign(cwd, { action: \"systems\"/const fetchedSystem = await runDesign(cwd, { action: \"systems\"/; s/assert.deepEqual(\\[picked.files, picked.commit, picked.ca": {
+   "count": 1,
+   "ms": 10855,
+   "maxMs": 10855,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && D=$(mktemp -d) && node --no-warnings -e \" const { runDesign } = await import('./extensions/design.ts'); const l = await runDesign(process.argv[1], { action: 'systems' }); console.log(l.sourc": {
+   "count": 1,
+   "ms": 1835,
+   "maxMs": 1835,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"^- \\*\\*D15|^- \\*\\*D18|^- \\*\\*R11|HANDOFF|BRIEF\" \"$P\" | cut -c1-1500; rg -n \"sel": {
+   "count": 1,
+   "ms": 1490,
+   "maxMs": 1490,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/pi-research-G9n9tQ/od\" && grep -n \"buildDesignHandoffContent\" -A70 apps/web/src/runtime/exports.ts | head -110; cd \".\" && rg -n \"^export|PRESETS|const DEVICES\" extensions/design-render.ts | ": {
+   "count": 1,
+   "ms": 385,
+   "maxMs": 385,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"DESIGN.md|tokens|data-design-chrome|state|generate_image|assets/\" extensions/design-guide.md | cut -c1-250; sed -n 138,139p extensions/design-render.ts | cut -c1-300": {
+   "count": 1,
+   "ms": 947,
+   "maxMs": 947,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"^- C(6|7|8|9|10) \" \"$P\"; rg -n \"^- \\*\\*D11\" \"$P\" | cut -c1-1500; rg -l -i \"open": {
+   "count": 1,
+   "ms": 542,
+   "maxMs": 542,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"^- \\[ \\] \\*\\*S(18|19|20)\" -A3 \"$P\" | cut -c1-400; rg -n \"opendesign\" package.js": {
+   "count": 1,
+   "ms": 644,
+   "maxMs": 644,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > extensions/redact.ts <<'EOF' // Secrets out of text that leaves the process (hub errors, knowledge input): URL token/key params, sk-/Bearer *** key=value pairs. export function redactS": {
+   "count": 1,
+   "ms": 598,
+   "maxMs": 598,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"OD_PROJECT_DIR|OD_STOCK|OpenDesign\" scripts/test-work-plan3.mjs scripts/test-work-ask-user.mjs scripts/test-work-tool-loader.mjs scripts/test-work-settings.mjs scripts/test-work-wo-co": {
+   "count": 1,
+   "ms": 409,
+   "maxMs": 409,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git rm -rq extensions/opendesign-client.ts scripts/test-work-opendesign-client.mjs scripts/fixtures/opendesign && rg -n \"opendesign-client|callOpenDesignTool|openDesignCommand|OD_PROJECT_DIR": {
+   "count": 1,
+   "ms": 577,
+   "maxMs": 577,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i 's#extensions\\\\\\\\\\\\\\\\opendesign-client\\.ts#extensions\\\\\\\\\\\\\\\\design-render.ts#; s#extensions/opendesign-client\\.ts#extensions/design-render.ts#g; s#\"resolveOpenDesignCommand\"#\"agentBr": {
+   "count": 1,
+   "ms": 526,
+   "maxMs": 526,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in scripts/test-work-wo-control.mjs scripts/test-work-settings.mjs scripts/test-work-plan3.mjs scripts/test-work-ask-user.mjs scripts/test-work-tool-loader.mjs scripts/test-work-knowle": {
+   "count": 1,
+   "ms": 32491,
+   "maxMs": 32491,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings scripts/test-work-wo-control.mjs 2>&1 | grep -v \"^\\s*at \" | head -12; node --no-warnings scripts/test-work-settings.mjs 2>&1 | grep -v \"^\\s*at \" | head -12": {
+   "count": 1,
+   "ms": 3095,
+   "maxMs": 3095,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git stash -q && (node --no-warnings scripts/test-work-wo-control.mjs 2>&1 | grep -v \"^\\s*at \" | tail -3; node --no-warnings scripts/test-work-settings.mjs 2>&1 | grep -v \"^\\s*at \" | tail -3)": {
+   "count": 1,
+   "ms": 2929,
+   "maxMs": 2929,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git log --oneline -3 -- extensions/hub-channel.ts; node --no-warnings scripts/test-work-wo-control.mjs 2>&1 | grep \"^\\s*at \" | head -6; rg -n \"setStatus\" scripts/test-work-wo-control.mjs scr": {
+   "count": 1,
+   "ms": 1949,
+   "maxMs": 1949,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in scripts/test-work-wo-control.mjs scripts/test-work-settings.mjs; do out=$(env -u PI_HUB -u PI_HUB_SESSION node --no-warnings \"$t\" 2>&1); echo \"$t exit=$? :: $(echo \"$out\" | grep -v ": {
+   "count": 1,
+   "ms": 3785,
+   "maxMs": 3785,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"opendesign-client|callOpenDesignTool|openDesignCommand|OD_PROJECT_DIR|OD_STOCK_RUN_ID|redactOpenDesignText\" extensions scripts hub package.json; echo \"rg exit=$?\"": {
+   "count": 1,
+   "ms": 334,
+   "maxMs": 334,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/redact.ts extensions/ask-user/index.ts extensions/design.ts extensions/plan3.ts extensions/tool-loader.ts extensions/work-models.ts hub/scripts/test-sessions.mjs scripts/t": {
+   "count": 1,
+   "ms": 1888,
+   "maxMs": 1888,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"mattpocock|kind === \\\"git\\\"|ledger|reviewPaths|paths\" extensions/plan3-catch-up.ts | cut -c1-260; node -e \"const b=require('./extensions/work-catch-up-baseline.json');const k=Object.k": {
+   "count": 1,
+   "ms": 393,
+   "maxMs": 393,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"writeGitCatchUpDiff|async function|kind === \\\"git\\\"|pkg.kind|\\.kind\" extensions/plan3-catch-up.ts extensions/work-catch-up*.ts | cut -c1-200 | head -30": {
+   "count": 1,
+   "ms": 320,
+   "maxMs": 320,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"upstream skills repo|For an upstream\" scripts/test-work-plan3.mjs extensions | cut -c1-160; rg -n \"\\\"version\\\"|\\\"name\\\"|capturedAt\" extensions/work-catch-up-baseline.json | head -20; ": {
+   "count": 1,
+   "ms": 1611,
+   "maxMs": 1611,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -i '9s/import { copyFile, mkdir/import { access, copyFile, mkdir/' scripts/test-work-plan3.mjs && sed -i 's/^import { catchUpPlanText, changelogExcerpt, gitLatestCommit, recordCatchUp, w": {
+   "count": 1,
+   "ms": 9036,
+   "maxMs": 9036,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"work-catch-up-baseline|catchUpReviewBlocker|buildWorkCatchUpState\" scripts hub/scripts": {
+   "count": 1,
+   "ms": 352,
+   "maxMs": 352,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add extensions/plan3-catch-up.ts extensions/work-models.ts extensions/work-catch-up-baseline.json docs/upstream/open-design.md scripts/test-work-plan3.mjs docs/plans/2026-11-09-own-desig": {
+   "count": 1,
+   "ms": 1561,
+   "maxMs": 1561,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff CHANGELOG.md | head -40; sed -n 1,25p CHANGELOG.md | cut -c1-250; rg -n -i \"design\" hub/README.md | cut -c1-200 | head; rg -n \"\\-\\-design\" hub/scripts/changelog-shot.mjs | head -5": {
+   "count": 1,
+   "ms": 452,
+   "maxMs": 452,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,80p hub/scripts/changelog-shot.mjs | cut -c1-260; ls docs/changelog | tail -5": {
+   "count": 1,
+   "ms": 345,
+   "maxMs": 345,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"designFrame\\(\" hub/web/*.ts | cut -c1-200; rg -n \"0.3.0-design\" CHANGELOG.md | cut -c1-300": {
+   "count": 1,
+   "ms": 1278,
+   "maxMs": 1278,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/changelog-shot.mjs \"#files .files-actions\" \"docs/changelog/0.5.0-design-toolbar.png\" \"for (let i = 0; i < 80 && !document.querySelector('#files .design-mark');": {
+   "count": 1,
+   "ms": 63177,
+   "maxMs": 63177,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"function find\\|const find\" hub/src/design-bridge.ts | cut -c1-250": {
+   "count": 1,
+   "ms": 361,
+   "maxMs": 361,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && SETUP=\"for (let i = 0; i < 80 && !document.querySelector('#files .design-mark'); i++) await new Promise(r => setTimeout(r, 100)); const s = document.querySelector('#files .design-device'); s": {
+   "count": 1,
+   "ms": 64312,
+   "maxMs": 64312,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/readme-design.md\" <<'EOF' ## Design sessions Ask the agent for design variants and it uses the `design` tool. `start` opens one hub session per direction from the same brief (pr": {
+   "count": 1,
+   "ms": 493,
+   "maxMs": 493,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^## |^### \" hub/README.md | head -40; rg -n -i \"files panel|Files tab|preview\" hub/README.md | cut -c1-200 | head": {
+   "count": 1,
+   "ms": 364,
+   "maxMs": 364,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && P=docs/plans/2026-10-08-optional-opendesign-phase-for-plan3-1fc5d5ce-plan3.md; sed -n 1,12p \"$P\"; rg -n \"superseded\" extensions/plan3*.ts | head -5": {
+   "count": 1,
+   "ms": 355,
+   "maxMs": 355,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && cat > \"$TEMP/cl-mine.md\" <<'EOF' ### Added - Design studio in the hub: each design session's own agent now builds its design directly in `.pi/designs/<handle>/`, and its page previews it liv": {
+   "count": 1,
+   "ms": 1187,
+   "maxMs": 1187,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add README.md hub/README.md docs/changelog/0.5.0-design-toolbar.png docs/changelog/0.5.0-design-preview.png docs/plans/2026-10-08-optional-opendesign-phase-for-plan3-1fc5d5ce-plan3.md do": {
+   "count": 1,
+   "ms": 1191,
+   "maxMs": 1191,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git rm -q --cached extensions/opendesign-client.ts scripts/fixtures/opendesign/fake-od.mjs scripts/fixtures/opendesign/handoff-invalid.json scripts/fixtures/opendesign/handoff-valid.json scr": {
+   "count": 1,
+   "ms": 698,
+   "maxMs": 698,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && git add docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/plans/logs/a5cf234d.md && git commit -qm \"S18: mark done\" && P=docs/plans/20": {
+   "count": 1,
+   "ms": 693,
+   "maxMs": 693,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for t in scripts/test-work-design.mjs hub/scripts/test-explore.mjs hub/scripts/test-api.mjs hub/scripts/test-annotate.mjs scripts/test-work-wo-control.mjs scripts/test-work-settings.mjs scri": {
+   "count": 1,
+   "ms": 54636,
+   "maxMs": 54636,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs > \"$TEMP/tb.log\" 2>&1; echo \"exit=$?\"; grep -E \"^ok - hub page|AssertionError|Error:\" \"$TEMP/tb.log\" | head -3 | cut -c1-200": {
+   "count": 1,
+   "ms": 156289,
+   "maxMs": 156289,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat hub/scripts/test-browser.mjs && git diff -U0 hub/scripts/test-browser.mjs | grep \"^@@\\|^+\" | grep -i -c \"design\\|deck\\|S1[0-9]\"; git diff -U0 hub/scripts/test-browser.mjs | g": {
+   "count": 1,
+   "ms": 655,
+   "maxMs": 655,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md && git commit -qm \"Plan a5cf234d: checkpoint\" && git log --oneline -6": {
+   "count": 1,
+   "ms": 481,
+   "maxMs": 481,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "S01": {
+   "ms": 356926,
+   "testMs": 144946,
+   "replies": 9,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 9
+   }
+  },
+  "S02": {
+   "ms": 185378,
+   "testMs": 1242,
+   "replies": 13,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 13
+   }
+  },
+  "S03": {
+   "ms": 130184,
+   "testMs": 5707,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
+   }
+  },
+  "S06": {
+   "ms": 192504,
+   "testMs": 9291,
+   "replies": 23,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 23
+   },
+   "failures": 2
+  },
+  "S07": {
+   "ms": 141078,
+   "testMs": 12425,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   }
+  },
+  "S04": {
+   "ms": 245119,
+   "testMs": 25858,
+   "replies": 26,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 26
+   },
+   "failures": 1
+  },
+  "S08": {
+   "ms": 399662,
+   "testMs": 142015,
+   "replies": 34,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 34
+   },
+   "failures": 1
+  },
+  "S09": {
+   "ms": 754633,
+   "testMs": 288635,
+   "replies": 26,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 26
+   }
+  },
+  "S10": {
+   "ms": 352755,
+   "testMs": 144219,
+   "replies": 24,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 24
+   }
+  },
+  "S11": {
+   "ms": 909130,
+   "testMs": 650754,
+   "replies": 35,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 35
+   }
+  },
+  "S12": {
+   "ms": 558578,
+   "testMs": 346901,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   },
+   "failures": 2
+  },
+  "S13": {
+   "ms": 613185,
+   "testMs": 371013,
+   "replies": 36,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 36
+   }
+  },
+  "S14": {
+   "ms": 213583,
+   "testMs": 140038,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   }
+  },
+  "S15": {
+   "ms": 151824,
+   "testMs": 529,
+   "replies": 17,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 17
+   }
+  },
+  "S16": {
+   "ms": 95913,
+   "testMs": 22231,
+   "replies": 7,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 7
+   }
+  },
+  "S17": {
+   "ms": 185852,
+   "testMs": 40188,
+   "replies": 21,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 21
+   }
+  },
+  "S20": {
+   "ms": 106701,
+   "testMs": 343,
+   "replies": 15,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 15
+   },
+   "failures": 1
+  },
+  "S18": {
+   "ms": 259194,
+   "testMs": 0,
+   "replies": 23,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 23
+   },
+   "failures": 3
+  },
+  "(none)": {
+   "ms": 246269,
+   "testMs": 210925,
+   "replies": 5,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 5
+   }
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-09T11:30:08.064Z",
+   "ms": 7350108
+  }
+ ],
+ "hints": []
+}

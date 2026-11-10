@@ -725,8 +725,11 @@ try {
  await browser("wait", "--fn", "document.querySelector('#load-cpu polyline').getAttribute('points')");
  assert.match(await evaluate("['load-cpu', 'load-memory'].map(id => document.getElementById(id).getAttribute('aria-label')).join(' · ')"), /^CPU \d+% · Memory \d+%$/, "PC load boxes left of the gear");
  assert.deepEqual(await evaluate("['load-cpu', 'load-memory', 'settings-button'].map(id => { const r = document.getElementById(id).getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })"), [[34, 34], [34, 34], [34, 34]], "same-size squares");
+ await evaluate("document.getElementById('left-panel').style.display = 'none'"); // a collapsed left panel must not hide the tooltip
  await browser("hover", "#load-cpu");
  assert.match(await evaluate("$('load-tip').hidden ? '' : $('load-tip').textContent".replaceAll("$(", "document.getElementById(")), /^CPU \d+% \(graph/, "hovering a graph shows its own tooltip, updated in place (a title would blink every 5 s)");
+ assert(await evaluate("document.getElementById('load-tip').getBoundingClientRect().height > 0"), "the tooltip is visible with the left panel collapsed");
+ await evaluate("document.getElementById('left-panel').style.display = ''");
  await browser("hover", "#message-input");
  assert.equal(await evaluate("document.getElementById('load-tip').hidden"), true, "leaving hides it");
  // A form taller than the window scrolls inside its frame, with the title and buttons kept in view.
