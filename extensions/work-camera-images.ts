@@ -7,7 +7,8 @@ const TTL = 24 * 60 * 60 * 1000;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 type Frame = { version: 1; id: string; project: string; createdAt: number; expiresAt: number; bytes: number; format: "png" | "jpg"; capture?: Record<string, unknown> };
 // Only matching, validated camera manifests authorize deletion; corrupt entries fail closed.
-export function createCameraImages({ directory = join(tmpdir(), "ce-workflow-camera-images"), now = Date.now, maxFiles = 64, maxBytes = 64 * 1024 * 1024 } = {}) {
+// realpath: macOS tmpdir() sits under the /var -> /private/var symlink, which the redirect check below would refuse.
+export function createCameraImages({ directory = join(realpathSync(tmpdir()), "ce-workflow-camera-images"), now = Date.now, maxFiles = 64, maxBytes = 64 * 1024 * 1024 } = {}) {
 	if (!Number.isSafeInteger(maxFiles) || maxFiles <= 0 || maxFiles > 64 || !Number.isSafeInteger(maxBytes) || maxBytes <= 0 || maxBytes > 64 * 1024 * 1024) throw new Error("Invalid camera storage budget.");
 	const root = resolve(directory);
 	let timer: ReturnType<typeof setInterval> | undefined;

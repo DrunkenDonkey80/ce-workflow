@@ -7,7 +7,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { readdir } from "node:fs/promises";
 import { endStaleHelpers } from "../extensions/mobile-wifi.ts";
-import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, newer, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
+import { alertText, assignRefs, gridDiff, gridOf, findProfile, flatten, line, matches, short, mobileAct, mobileActTool, MOBILECLI, cameraShot, newer, resetSession, resolveDevice, swipePoints, visiblePoint, keyboard } from "../extensions/mobile-act.ts";
 
 const run = promisify(execFile);
 const SIM = { id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online", version: "26.0" };
@@ -516,6 +516,69 @@ if (process.platform === "darwin") {
 	};
 	assert.deepEqual(await endStaleHelpers(exec3, "0000-REAL"), ["7569"]);
 	assert.deepEqual(ended, ["device process terminate --device 0000-REAL --pid 7569"], "ends only the helper runner");
+
+	// Phone as camera: the Camera app is brought to the front once, lockAt long-presses in points, and a helper that stopped
+	// answering mid-session is started again instead of failing the capture.
+	resetSession();
+	const shot = Buffer.alloc(33); shot.writeUInt32BE(2358, 16); // only the IHDR width is read
+	let app = "com.apple.springboard", downOnce = true;
+	const calls = [];
+	const exec4 = async (c, a) => {
+		if (c === "xcrun" && a[1] === "list") { await writeFile(a[a.indexOf("--json-output") + 1], JSON.stringify({ result: { devices: [ipad] } })); return { code: 0 }; }
+		if (c !== "curl") return ok({ devices: [] });
+		const { method, params } = JSON.parse(a[a.indexOf("--data-binary") + 1]);
+		if (method === "device.screenshot" && calls.includes("device.io.longpress") && downOnce) { downOnce = false; return { code: 7, stderr: "Failed to connect" }; }
+		calls.push(method);
+		if (method === "device.apps.launch") { assert.equal(params.bundleId, "com.apple.camera"); app = "com.apple.camera"; }
+		if (method === "device.io.longpress") assert.deepEqual(params, { x: 100, y: 200, duration: 1.5 }, "lockAt is in screenshot pixels, the helper takes points");
+		const result = { "device.info": { screenSize: { width: 786, height: 1704 } }, "device.apps.foreground": { bundleId: app }, "device.screenshot": { data: `data:image/png;base64,${shot.toString("base64")}` } }[method] ?? {};
+		return { code: 0, stdout: JSON.stringify({ jsonrpc: "2.0", id: 1, result }) };
+	};
+	const frame = await cameraShot(exec4, "IPAD-1", opts({ lockAt: { x: 300, y: 600 } }));
+	assert.equal(frame.png.readUInt32BE(16), 2358);
+	assert.equal(calls.filter(m => m === "device.apps.launch").length, 1, "Camera launched once");
+	assert.ok(!downOnce, "the dead helper was met once and the capture still came back");
+	calls.length = 0;
+	await cameraShot(exec4, "IPAD-1", opts());
+	assert.ok(!calls.includes("device.apps.launch") && !calls.includes("device.io.longpress"), "Camera already in front: just a screenshot");
+
+	// A wired iPhone whose mobilecli agent cannot run (no wildcard profile): ce-workflow's helper over its CoreDevice tunnel instead.
+	resetSession();
+	const usbPhone = { hardwareProperties: { udid: PHONE.id, platform: "iOS", reality: "physical" }, deviceProperties: { name: PHONE.name, osVersionNumber: "27.0" }, connectionProperties: { transportType: "wired", tunnelState: "connected", tunnelIPAddress: "fd00::3" } };
+	const helperCalls = [];
+	const exec5 = async (c, a) => {
+		if (c === "xcrun" && a[1] === "list") { await writeFile(a[a.indexOf("--json-output") + 1], JSON.stringify({ result: { devices: [usbPhone] } })); return { code: 0 }; }
+		if (c === "xcrun" && a[1] === "device") { if (a.includes("--json-output")) await writeFile(a[a.indexOf("--json-output") + 1], JSON.stringify({ result: {} })); return { code: 0, stdout: "" }; }
+		if (c === "security") return { code: 0, stdout: "" };
+		if (c === "curl") {
+			assert.equal(a.at(-1), "http://[fd00::3]:12004/rpc");
+			const { method } = JSON.parse(a[a.indexOf("--data-binary") + 1]);
+			helperCalls.push(method);
+			const result = { "device.info": { screenSize: { width: 402, height: 874 } }, "device.dump.ui": { type: "XCUIElementTypeApplication", rect: { x: 0, y: 0, width: 402, height: 874 }, children: [] }, "device.apps.foreground": { bundleId: "com.apple.springboard" } }[method] ?? {};
+			return { code: 0, stdout: JSON.stringify({ jsonrpc: "2.0", id: 1, result }) };
+		}
+		if (a[0] === "agent") return { code: 1, stdout: JSON.stringify({ status: "error", error: "Agent is not installed on the device" }) };
+		return ok({ devices: [PHONE] });
+	};
+	assert.match(await mobileAct(exec5, { action: "list" }, opts()), /^0000-REAL ONLINE Lorenz’s iPhone \(ios real 27\.0\)$/, "wired, helper not built: mobilecli's");
+	await mobileAct(exec5, { action: "snapshot" }, opts({ confirm: async () => assert.fail("no install question"), profileDirs: [] }));
+	assert.ok(helperCalls.includes("device.dump.ui"), "read through the tunnel helper");
+	assert.match(await mobileAct(exec5, { action: "list" }, opts()), /^0000-REAL ONLINE Lorenz’s iPhone \(ios real USB helper 27\.0\)$/, "it stays on the helper");
+	await assert.rejects(cameraShot(exec4, "NOPE", opts()), /No device/);
+	resetSession();
+}
+
+// Another mobilecli on PATH with a different version shares the daemon: list says so once.
+{
+	const dir = await mkdtemp(path.join(os.tmpdir(), "mobilecli-path-")), fake = path.join(dir, "mobilecli"), oldPath = process.env.PATH;
+	await writeFile(fake, "#!/bin/sh\n");
+	process.env.PATH = `${dir}${path.delimiter}${oldPath}`;
+	try {
+		resetSession(true);
+		const exec = async (c, a) => c === fake ? { code: 0, stdout: "mobilecli version 0.0.1\n" } : ok({ devices: [PHONE] });
+		assert.match(await mobileAct(exec, { action: "list" }, opts()), /^Another mobilecli 0\.0\.1 is on PATH .*npm i -g mobilecli@/);
+		assert.doesNotMatch(await mobileAct(exec, { action: "list" }, opts()), /Another mobilecli/, "said once");
+	} finally { process.env.PATH = oldPath; resetSession(); await rm(dir, { recursive: true, force: true }); }
 }
 assert.ok(newer("1.0.22", "1.0.21") && newer("1.1.0", "1.0.99") && !newer("1.0.21", "1.0.21") && !newer("1.0.9", "1.0.10"));
 

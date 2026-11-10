@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import { cameraRequestKey, cameraProject } from "./work-camera-state.ts";
 import { discoverCameras } from "./work-camera.ts";
 import { resolveCameraFFmpeg, runCameraProcess } from "./work-camera-process.ts";
+import { PHONE_CAMERA, phoneShot } from "./work-camera-phone.ts";
+import { processPng } from "./screen-read.ts";
 import type { createCameraController } from "./work-camera.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 type Crop = { x: number; y: number; width: number; height: number };
-type Request = { count?: number; intervalMs?: number; fullSize?: boolean; crop?: Crop; width?: number; height?: number; deadlineMs?: number };
+type Request = { count?: number; intervalMs?: number; fullSize?: boolean; crop?: Crop; width?: number; height?: number; deadlineMs?: number; lockAt?: { x: number; y: number } };
 export function cameraCaptureRequest(input: Request) {
 	const count = input.count ?? 1, intervalMs = input.intervalMs ?? 1000;
 	const deadlineMs = input.deadlineMs ?? Math.min(600000, count * 20000 + (count - 1) * intervalMs);
@@ -16,6 +18,7 @@ export function cameraCaptureRequest(input: Request) {
 	if (input.crop && (!Object.values(input.crop).every(Number.isSafeInteger) || input.crop.x < 0 || input.crop.y < 0 || input.crop.width <= 0 || input.crop.height <= 0)) throw new Error("Invalid crop geometry.");
 	if ((input.width === undefined) !== (input.height === undefined) || input.width !== undefined && (!Number.isSafeInteger(input.width) || !Number.isSafeInteger(input.height) || input.width < 1 || input.height! < 1 || input.width * input.height! > 16000000)) throw new Error("Output size requires bounded integer width and height.");
 	if (input.fullSize && input.width !== undefined) throw new Error("Full-size capture cannot also request a downscaled output.");
+	if (input.lockAt && (!Number.isSafeInteger(input.lockAt.x) || !Number.isSafeInteger(input.lockAt.y) || input.lockAt.x < 0 || input.lockAt.y < 0)) throw new Error("Invalid lockAt point.");
 	return { ...input, count, intervalMs, deadlineMs, fullSize: input.fullSize ?? false };
 }
 export function cameraModes(text: string) {
@@ -54,14 +57,16 @@ const delay = (milliseconds: number, signal: AbortSignal) => new Promise<void>((
 	const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, milliseconds);
 	signal.addEventListener("abort", abort, { once: true });
 });
-export function createCameraCapture(controller: ReturnType<typeof createCameraController>, { resolveFFmpeg = resolveCameraFFmpeg, devices = discoverCameras, run = runCameraProcess } = {}) {
+export function createCameraCapture(controller: ReturnType<typeof createCameraController>, { resolveFFmpeg = resolveCameraFFmpeg, devices = discoverCameras, run = runCameraProcess, shot = phoneShot } = {}) {
 	return {
 		async capture(ctx: ExtensionContext, input: Request, signal?: AbortSignal) {
 			if (ctx.mode !== "tui" || ctx.hasUI !== true || typeof ctx.ui?.setWidget !== "function" || typeof ctx.ui?.theme?.fg !== "function") throw new Error("Camera capture requires eligible local TUI warning UI.");
 			const request = cameraCaptureRequest(input);
 			const selected = controller.settings(ctx);
 			if (!selected.enabled || !selected.device) throw new Error("Project camera is OFF or not selected.");
-			const executable = await resolveFFmpeg();
+			const phone = PHONE_CAMERA.exec(selected.device.id)?.[1];
+			if (request.lockAt && !phone) throw new Error("lockAt needs a phone camera: it long-presses the Camera app's viewfinder.");
+			const executable = phone ? "" : await resolveFFmpeg();
 			if (!(await devices()).some(device => device.id === selected.device!.id)) throw new Error("Selected camera identity changed or is unavailable; no fallback.");
 			controller.images.prepare(ctx.cwd);
 			controller.images.start(ctx.cwd, error => { try { ctx.ui.notify(String(error), "error"); } catch { console.error("Camera image cleanup failed."); } });
@@ -69,21 +74,37 @@ export function createCameraCapture(controller: ReturnType<typeof createCameraCo
 			const frames: ReturnType<typeof controller.images.save>[] = [];
 			let outcome = "captured", failure = "";
 			try {
-				const options = await run(owner, executable, ["-hide_banner", "-nostdin", "-f", "dshow", "-list_options", "true", "-i", `video=${selected.device.id}`], { durationMs: 10000, maxBytes: 256 * 1024, keepLease: true, allowNonzero: true });
-				const mode = cameraModes(options.stderr)[0];
-				if (!mode || mode.width * mode.height > 16000000) throw new Error("Native camera mode unavailable or exceeds the pixel limit; no silent downgrade.");
-				const plan = cameraStillArgs(selected.device.id, mode, request);
+				let grab: (sequence: number) => Promise<ReturnType<typeof controller.images.save>>;
+				if (phone) {
+					owner.attachStop(async () => {}); // nothing to close: the Camera app stays open, and frames are read only during a capture
+					await owner.begin();
+					// shortcut: an explicit width/height only bounds the longest edge here (the crop keeps its aspect), fine for viewing.
+					const maxEdge = request.fullSize ? 16000 : request.width ? Math.max(request.width, request.height!) : 1024;
+					grab = async sequence => {
+						const { png, receivedAt } = await shot(phone, { signal: owner.signal, lockAt: sequence ? undefined : request.lockAt });
+						const out = processPng(png, request.crop && [request.crop.x, request.crop.y, request.crop.width, request.crop.height], maxEdge);
+						return controller.images.save(ctx.cwd, out.png, "png", { device: selected.device!.id, timestamp: receivedAt, timestampBasis: "screenshot of the phone's Camera app viewfinder received locally, not sensor exposure time", sequence, sourceWidth: out.sourceWidth, sourceHeight: out.sourceHeight, crop: request.crop ?? { x: 0, y: 0, width: out.sourceWidth, height: out.sourceHeight }, width: out.width, height: out.height });
+					};
+				} else {
+					const options = await run(owner, executable, ["-hide_banner", "-nostdin", "-f", "dshow", "-list_options", "true", "-i", `video=${selected.device.id}`], { durationMs: 10000, maxBytes: 256 * 1024, keepLease: true, allowNonzero: true });
+					const mode = cameraModes(options.stderr)[0];
+					if (!mode || mode.width * mode.height > 16000000) throw new Error("Native camera mode unavailable or exceeds the pixel limit; no silent downgrade.");
+					const plan = cameraStillArgs(selected.device.id, mode, request);
+					grab = async sequence => {
+						const observation = await run(owner, executable, plan.args, { durationMs: 15000, maxBytes: 4 * 1024 * 1024, keepLease: true });
+						const geometry = cameraPNGSize(observation.stdout);
+						if (geometry.width !== plan.width || geometry.height !== plan.height) throw new Error("Camera output geometry differs from the request.");
+						return controller.images.save(ctx.cwd, observation.stdout, "png", { device: selected.device!.id, timestamp: observation.receivedAt, timestampBasis: "encoded frame first received locally, not sensor exposure time", sequence, sourceWidth: mode.width, sourceHeight: mode.height, crop: plan.crop, ...geometry });
+					};
+				}
 				for (let sequence = 0; sequence < request.count; sequence++) {
 					if (sequence) await delay(request.intervalMs, owner.signal);
 					await owner.guard();
-					const observation = await run(owner, executable, plan.args, { durationMs: 15000, maxBytes: 4 * 1024 * 1024, keepLease: true });
-					const geometry = cameraPNGSize(observation.stdout);
-					if (geometry.width !== plan.width || geometry.height !== plan.height) throw new Error("Camera output geometry differs from the request.");
-					frames.push(controller.images.save(ctx.cwd, observation.stdout, "png", { device: selected.device.id, timestamp: observation.receivedAt, timestampBasis: "encoded frame first received locally, not sensor exposure time", sequence, sourceWidth: mode.width, sourceHeight: mode.height, crop: plan.crop, ...geometry }));
+					frames.push(await grab(sequence));
 				}
 			} catch (error) { if (!frames.length) throw error; outcome = "partial"; failure = String(error); }
 			finally { await owner.finish(); }
-			return { outcome, failure, frames, project: cameraProject(ctx.cwd), intervalMeaning: "minimum wait after process closure; reopening and warm-up add latency; no catch-up bursts", provisional: "one-second warm-up and numerical bounds await calibration" };
+			return { outcome, failure, frames, project: cameraProject(ctx.cwd), intervalMeaning: phone ? "wait between phone screenshots; each screenshot adds its own transfer time" : "minimum wait after process closure; reopening and warm-up add latency; no catch-up bursts", provisional: "one-second warm-up and numerical bounds await calibration" };
 		},
 		recover(ctx: ExtensionContext, id: string) { return controller.images.read(ctx.cwd, id); },
 	};

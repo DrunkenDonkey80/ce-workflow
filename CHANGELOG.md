@@ -2,6 +2,17 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## 0.6.3 — 2026-11-10
+
+### Added
+- Project camera on a Mac: an iPhone or iPad on a stand (USB or Wi-Fi) is the camera. camera_capture opens its Camera app and reads the viewfinder; `lockAt` locks focus and exposure on a point first; camera_watch polls it for changes. Pick it under /wo → Settings → Camera.
+
+### Fixed
+- mobile_act: a real iPhone or iPad whose mobilecli agent cannot run (no wildcard profile, or "waiting for WebDriverAgent") now uses ce-workflow's own helper over its CoreDevice tunnel, wired or Wi-Fi, and keeps that route once built.
+- mobile_act: a Wi-Fi helper that stopped answering is started again instead of failing every call; the UI-automation error names the "Enter iPhone Passcode for XCTest" prompt.
+- mobile_act list warns when another mobilecli on PATH has a different version (they share one daemon and keep restarting it).
+- Camera images could not be saved on macOS (the temp folder sits under the /var symlink).
+
 ## 0.6.2 — 2026-11-10
 
 ### Fixed

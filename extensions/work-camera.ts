@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { showListDialog } from "./ask-user/menu.ts";
 import { cameraProject, cameraRequestKey, createCameraState } from "./work-camera-state.ts";
 import { createCameraImages } from "./work-camera-images.ts";
+import { PHONE_CAMERA, phoneCameras } from "./work-camera-phone.ts";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 type CameraDevice = { id: string; label: string };
@@ -15,7 +16,7 @@ export function cameraSettings(settings: ProjectSettings): { enabled: boolean; d
 	const camera = settings?.workOrchestrator?.camera;
 	const device = camera?.device;
 	if (typeof device?.id !== "string" || typeof device.label !== "string" ||
-		!/^@device_[a-z]+_/i.test(device.id) || device.id.length > 2048 || /[\x00-\x1f\x7f":]/.test(device.id) ||
+		!(/^@device_[a-z]+_/i.test(device.id) || PHONE_CAMERA.test(device.id)) || device.id.length > 2048 || /[\x00-\x1f\x7f":]/.test(device.id) ||
 		!device.label.length || device.label.length > 256 || /[\x00-\x1f\x7f]/.test(device.label)) return { enabled: false };
 	return { enabled: camera?.enabled === true, device: { id: device.id, label: device.label } };
 }
@@ -37,8 +38,13 @@ export function parseDshowDevices(stderr: string): CameraDevice[] {
 	return devices;
 }
 
-export function discoverCameras(): Promise<CameraDevice[]> {
-	if (process.platform !== "win32") return Promise.reject(new Error("Camera capture currently requires Windows and an existing FFmpeg with DirectShow."));
+export async function discoverCameras(): Promise<CameraDevice[]> {
+	if (process.platform === "darwin") {
+		const phones = await phoneCameras();
+		if (!phones.length) throw new Error("No iPhone or iPad is online. On a Mac the camera is a phone's Camera app: connect one by USB, or pair it in Xcode for Wi-Fi, and unlock it.");
+		return phones;
+	}
+	if (process.platform !== "win32") throw new Error("Camera capture needs Windows with FFmpeg (DirectShow) or a Mac with an iPhone or iPad.");
 	return new Promise<CameraDevice[]>((resolve, reject) => {
 		execFile("ffmpeg", ["-hide_banner", "-nostdin", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
 			{ timeout: 15000, maxBuffer: 256 * 1024, windowsHide: true }, (error, _stdout, stderr) => {
@@ -231,7 +237,7 @@ export function createCameraController(pi: Pick<ExtensionAPI, "on">, { readProje
 					try { devices = await listDevices(); }
 					catch (error) { ctx.ui.notify(error instanceof Error ? error.message : "Camera enumeration failed.", "error"); continue; }
 					const selected = await showListDialog(ctx, {
-						title: "Select project camera", purpose: "Choose the exact DirectShow identity; selection does not open it.",
+						title: "Select project camera", purpose: "Choose the exact camera identity; selection does not open it.",
 						cursorKey: "work-camera-device", forceCustom: true, currentValue: device?.id, terminalOnly: true,
 						items: devices.map(item => ({ value: item.id, label: item.label, description: item.id })),
 					});

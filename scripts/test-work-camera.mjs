@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti";
@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const { runCameraProcess } = await createJiti(import.meta.url).import("../extensions/work-camera-process.ts");
 const { cameraSettings, parseDshowDevices, cameraGrantExpiry, createCameraController } = await createJiti(import.meta.url).import("../extensions/work-camera.ts");
 const { cameraRequestKey } = await createJiti(import.meta.url).import("../extensions/work-camera-state.ts");
-const sandbox = mkdtempSync(join(tmpdir(), "work-camera-ui-"));
+const sandbox = mkdtempSync(join(realpathSync(tmpdir()), "work-camera-ui-")); // macOS: /var is a symlink
 const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
 const projectDir = join(sandbox, "project");
 const otherDir = join(sandbox, "other");
@@ -574,6 +574,40 @@ assert.equal(wakeMessages[5].details.outcome, "partial:revoked", "user revocatio
 assert.equal(wakeMessages[5].content.filter(part => part.type === "image").length, 0, "no pixels are delivered after revocation");
 assert.match(wakeMessages[5].details.failure, /revoked/);
 watchImages.stop();
+// Phone cameras (macOS: an iPhone or iPad's Camera app through mobile_act): no FFmpeg, crop and lockAt on the screenshot.
+{
+	const { cameraRGBPNG } = await createJiti(import.meta.url).import("../extensions/work-camera-retain.ts");
+	const { phoneCameras } = await createJiti(import.meta.url).import("../extensions/work-camera-phone.ts");
+	const phoneCam = { id: "ios-00008140-0012399C0C99801C", label: "Lorenz’s iPhone (Camera app)" };
+	assert.deepEqual(cameraSettings({ workOrchestrator: { camera: { enabled: true, device: phoneCam } } }).device, phoneCam);
+	assert.equal(cameraSettings({ workOrchestrator: { camera: { enabled: true, device: { ...phoneCam, id: "ios-../x" } } } }).enabled, false);
+	if (process.platform === "darwin") assert.deepEqual(await phoneCameras(async () => [
+		{ id: "00008140-0012399C0C99801C", name: "Lorenz’s iPhone", platform: "ios", type: "real", state: "online" },
+		{ id: "SIM-1", name: "iPhone 17", platform: "ios", type: "simulator", state: "online" },
+		{ id: "00008130-AAAA", name: "Gone", platform: "ios", type: "real", state: "offline" }]), [phoneCam], "online real devices only");
+	const raw = Buffer.alloc(40 * 20 * 3); for (let i = 0; i < raw.length; i += 3) raw[i] = (i / 3) % 40 < 20 ? 255 : 0;
+	const viewfinder = cameraRGBPNG(raw, 40, 20), phoneImages = createCameraImages({ directory: join(sandbox, "phone-images") });
+	const shots = [];
+	const phoneController = { images: phoneImages, settings() { return { enabled: true, device: phoneCam }; }, async lease() { return supervisorOwner(); } };
+	const phoneCapture = createCameraCapture(phoneController, {
+		async resolveFFmpeg() { assert.fail("a phone needs no FFmpeg"); }, async devices() { return [phoneCam]; }, async run() { assert.fail("no subprocess"); },
+		async shot(udid, o) { shots.push([udid, o.lockAt]); return { png: viewfinder, receivedAt: 777 + shots.length }; },
+	});
+	const got = await phoneCapture.capture(ctx, { count: 2, intervalMs: 0, crop: { x: 10, y: 0, width: 20, height: 10 }, lockAt: { x: 5, y: 6 } });
+	assert.equal(got.outcome, "captured", got.failure);
+	assert.deepEqual(shots, [["00008140-0012399C0C99801C", { x: 5, y: 6 }], ["00008140-0012399C0C99801C", undefined]], "focus locked before the first frame only");
+	assert.deepEqual([got.frames[0].capture.width, got.frames[0].capture.height, got.frames[0].capture.sourceWidth, got.frames[1].capture.timestamp], [20, 10, 40, 779]);
+	assert.deepEqual(cameraPNGSize(phoneCapture.recover(ctx, got.frames[0].id).data), { width: 20, height: 10 });
+	await assert.rejects(fakeCapture.capture(ctx, { lockAt: { x: 1, y: 1 } }), /lockAt needs a phone/);
+	const { runCameraAcquisition: acquirePhone } = await createJiti(import.meta.url).import("../extensions/work-camera-detect.ts");
+	const watchOwner = supervisorOwner(), samples = [];
+	await assert.rejects(acquirePhone(ctx, { ...phoneController, async lease() { return watchOwner; } }, { deadlineMs: 10000, summary: "phone watch", crop: { x: 0, y: 0, width: 40, height: 20 } }, {
+		owner() {}, sample(sample, geometry) { samples.push([sample.type, geometry.width, geometry.height]); if (samples.length === 3) watchOwner.cancel(); },
+	}, undefined, { async resolveFFmpeg() { assert.fail("no FFmpeg"); }, async devices() { return [phoneCam]; }, async shot() { return { png: viewfinder, receivedAt: Date.now() }; } }), /cancelled/);
+	assert.deepEqual(samples.map(s => s.slice(1)), [[40, 20], [40, 20], [40, 20]], "phone frames polled at the crop's own size");
+	assert.ok(watchOwner.released, "the watch released its owner");
+	phoneImages.stop();
+}
 console.log("ok - camera metadata, project opt-in, persistent local consent, stale-dialog fences and owned cancellation/release (no hardware)");
 } finally {
 	if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR; else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
