@@ -1,30 +1,30 @@
 {
  "version": 1,
- "activeMs": 11366451,
- "runs": 23,
+ "activeMs": 11386818,
+ "runs": 24,
  "waitingMs": 2324233,
- "toolWallMs": 6102438,
+ "toolWallMs": 6106582,
  "compactions": {
   "count": 5,
   "ms": 215350
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 419,
-   "thinkingMs": 1575624,
-   "actingMs": 583924,
-   "input": 1052,
-   "output": 175600,
-   "cacheRead": 47978935,
-   "cacheWrite": 2195010,
-   "cost": 24.08704500000001,
+   "replies": 421,
+   "thinkingMs": 1580263,
+   "actingMs": 586006,
+   "input": 1056,
+   "output": 176297,
+   "cacheRead": 48147903,
+   "cacheWrite": 2196013,
+   "cost": 24.13980960000001,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 340,
-   "ms": 5683321,
+   "count": 341,
+   "ms": 5686936,
    "maxMs": 509389,
    "failures": 14
   },
@@ -73,8 +73,8 @@
  },
  "categories": {
   "shell": {
-   "count": 271,
-   "ms": 2174452,
+   "count": 272,
+   "ms": 2178067,
    "maxMs": 509389,
    "failures": 8
   },
@@ -705,9 +705,9 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 139,
-   "ms": 22174,
-   "maxMs": 311,
+   "count": 140,
+   "ms": 22491,
+   "maxMs": 317,
    "failures": 9
   },
   "bash\u0000cd \"./hub\" && rg -n \"parked\\?: boolean \\}\" web/app.ts | cut -c1-120; rg -n \"type ProjectCommand\" web/app.ts | cut -c1-120; rg -n \"[^.\\w]el\\([a-z]\" web/app.ts | cut -c1-120 | head": {
@@ -978,12 +978,6 @@
    "count": 1,
    "ms": 1367,
    "maxMs": 1367,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && git diff \"stash@{0}^1\" \"stash@{0}\" -- . \":(exclude)docs/plans/logs/6a5cdf60.stats.json\" > \"$TEMP/aut.patch\" && git apply --3way \"$TEMP/aut.patch\" 2>&1 | tail -8; git status --short | cat; rg": {
-   "count": 1,
-   "ms": 317,
-   "maxMs": 317,
    "failures": 0
   },
   "bash\u0000cd \".\" && sed -n 1,40p CHANGELOG.md | cut -c1-120": {
@@ -1285,6 +1279,12 @@
    "ms": 458,
    "maxMs": 458,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \" const fs=require('fs'); for(const f of ['package.json','package-lock.json']){let t=fs.readFileSync(f,'utf8');const n=f==='package.json'?1:2;let c=0;t=t.replace(/\\\"version\\\": \\\"0\\.6": {
+   "count": 1,
+   "ms": 3615,
+   "maxMs": 3615,
+   "failures": 0
   }
  },
  "steps": {
@@ -1331,11 +1331,11 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 3910049,
+   "ms": 3920385,
    "testMs": 1420955,
-   "replies": 289,
+   "replies": 291,
    "models": {
-    "anthropic/claude-opus-5-5:high": 289
+    "anthropic/claude-opus-5-5:high": 291
    },
    "failures": 15
   }
@@ -1432,6 +1432,10 @@
   {
    "start": "2026-11-10T06:06:45.783Z",
    "ms": 215200
+  },
+  {
+   "start": "2026-11-10T06:17:23.204Z",
+   "ms": 20367
   }
  ],
  "hints": [

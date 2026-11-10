@@ -2,7 +2,7 @@
 plan3: true
 status: draft
 created: 2026-11-08
-updated: 2026-11-10T11:01:21.685Z
+updated: 2026-11-10T13:03:31.265Z
 started: 2026-11-09T11:22:42.019Z
 ---
 
@@ -34,6 +34,8 @@ started: 2026-11-09T11:22:42.019Z
 - **D-09** C1 result (12 coding-only runs, 3 rounds, blind Opus + Astra judges, keys in C:/SOFT/git/rework-lab/judge/c1b-r{1,2,3}.key.json): keep coding effort **high** and Sol as coder. Astra average rank: sol-high 1.3, sol-medium 2.3, opus-high 3.0, opus-medium 3.3. Arm-specific race bugs flagged by Astra across 3 rounds: sol-high 4, sol-medium 5, opus-high 12, opus-medium 12. Objective check: payment-webhook dedupe inside the lock in 6/6 Sol builds, 2/6 Opus builds (corrected by C-10 recount). Default suite green: sol-high 3/3, sol-medium 1/3, opus 2/3 each. Sol medium saves only ~3 min and ~$0.90 per build. Caveats: the Opus judge ran out of context on rounds 2-3 (partial reads); Astra shares Sol's model family.
 - **D-10** C-10 result (6 new Opus coding-only builds with the Locked writes rule vs the 6 C1b Opus builds, same frozen plan 1d0fb5c; blind, old and new mixed per round; keys C:/SOFT/git/rework-lab/judge/c1c-r{1,2,3}.key.json, verdicts judge/c1c-verdict.task-*.md). Race counts old -> new, summed over 3 reps: **medium** Opus judge 40 -> 27, Astra 55 -> 42 (better in all 6 pairs); **high** Opus judge 34 -> 34, Astra 54 -> 54 (net zero, 2 better, 1 tie, 1-2 worse per judge). Payment dedupe inside the lock: 4/6 new vs 2/6 old. Coding cost per build rose (high $9.9 -> $11.9, medium $7.0 -> $9.6), within noise for n=3. 7-14 races per build are shared by every build and come from the frozen plan. Decision: **keep the rule** (clear gain at medium, no measured harm at high), but it does not fix Opus at high effort; the planning half of the rule (shared design races) is still unmeasured.
 - **D-11** C-11 result (3 Opus-high coding-only builds, Locked writes rule in the system prompt, ce-workflow a58154f9; each round blind-judged next to the c1b (no rule) and c1c (prompt-only rule) Opus-high build of the same rep; keys judge/c1d-r{1,2,3}.key.json, verdicts judge/c1d-verdict.task-{1..6}.md, Astra = tasks 1-3, Opus = 4-6). Race totals over 3 reps, no rule / prompt-only / system prompt: **Astra 49 / 48 / 44**, **Opus judge 27 / 27 / 24**. Per rep, both judges rank the system-prompt build best in reps 2 and 3 and worst in rep 1 (that build still dedupes payments before the lock). Payment dedupe inside the lock: 2/3. Coding time 39 min mean (c1c 40); coding cost $8.0 / $22.5 / $9.0 (the $22.5 outlier is unexplained). Read: a small gain at high (about 10%), well inside n=3 noise; no harm. Decision: **keep the system-prompt version** — it survives compaction, reaches non-Plan3 sessions and is at least as good — but the rule alone does not fix Opus at high effort; most remaining races (11-13 per build) are shared and come from the frozen plan.
+- **D-12 Planning guidance (C1e) made races worse; do not count it as a fix.** Blind pairs c1d-opus-high-N (frozen reviewed plan) vs c1e-opus-high-N (own plan with Locked writes plan guidance, same Opus-high coder and system-prompt rule): all 6 verdicts favored c1d. Races c1d/c1e: Astra 21/36, 20/29, 15/28 (56/93); Opus 11/29, 10/18, 8/26 (29/73). Scores favored c1d 6-4, 6-4, 6-4 (Astra) and 7-4, 7-5, 7-4 (Opus). Cause seen in the code: the new plans chose a callback-only write API and then wrapped many old call sites mechanically (`() => precomputedPatch`, or callbacks that ignore their argument), so the API looks safe while the stale pre-lock reads stay; c1e-1 also deferred about 12 sites. Zero-argument updaters in server code: c1d 7/5/6, c1e 21/8/14. c1e coding was shorter (23/25/62 min) and the full runs cost $26-29. Caveats: each c1e run planned on its own (plan variance), n=3. The system-prompt rule (D-11) stays; the plan guidance needs a call-site audit requirement or a check that rejects updaters which ignore their argument before it is retested. Source: judge/c1e-verdict.task-1..6.md, keys judge/c1e-r{1,2,3}.key.json.
+
 
 
 
@@ -61,6 +63,7 @@ None open. Q-01 → D-04, Q-02 → D-05, Q-03 → D-06.
 - [x] **C-01** C1 done (D-08/D-09): coding-only 2x2x3 from one Opus-high plan; verdict keep Sol on high effort; medium rejected for coding.
 - [x] **C-10** C1c done (D-10): Locked writes rule cuts Opus races at medium (Opus judge 40->27, Astra 55->42), no net change at high (34->34, 54->54); rule kept.
 - [x] **C-11** C1d done (D-11): system-prompt rule gives Opus high a small, noisy gain (races Astra 49/48/44, Opus judge 27/27/24 for none/prompt/system); kept.
+- [x] **C-12** C1e done: own-plan runs with plan guidance lost all 6 blind verdicts to the frozen-plan builds (races Astra 56→93, Opus 29→73); mechanical zero-arg updater wrapping is the visible cause (D-12).
 - [ ] **C-02** C1 design: coding effort one level lower on `[code]` phases only, planning unchanged.
   - Arms: current effort vs one lower; metrics from `lab-metrics.mjs`; quality from hidden tests and the blind judge.
   - Keep only if quality holds and cost or runtime drops materially.
@@ -88,10 +91,11 @@ None open. Q-01 → D-04, Q-02 → D-05, Q-03 → D-06.
 
 ## Resume context
 
-C-11 builds done (ce-workflow a58154f9, rule in system prompt): c1d-opus-high-1/2/3 coding 45/43/30 min, $8.0/$22.5/$9.0 coding cost, 1-2 compactions each; tests red only on PB-010 default (pass with REWORK_EXPECT=delta). Payment dedupe inside lock 2/3 (c1d-1 still before). Blind judging running: workflow 936d0c4e, 6 reviewers (Astra + Opus per round) on judge/c1d-r{1,2,3} = c1b vs c1c vs c1d Opus-high rep N, keys judge/c1d-r{1,2,3}.key.json, output judge/c1d-verdict*.md. Next: unmask, sum races per arm per judge, record D-11.
+C-12 builds done (full runs from 5cb626e, ce-workflow ac684219): c1e-opus-high-1/2/3 wall 83/87/92 min, total $26.4/$26.8/$28.7, coding 23/25/62 min ($4.7/$5.4/$20.9). All 3 planned the same target as c1d (ProjectRepository writes) but chose a callback-only sync updateWorkspace (old object/save forms removed); c1e-2 added a read-before-lock check, c1e-1 deferred ~12 pre-lock sites to backlog (D-14). Tests: c1e-1/3 all pass; c1e-2 4 approved-delta corpus fails on plain run, 20/20 with REWORK_SIDE=new. Blind judging running: workflow 29d22101, 6 reviewers (Astra tasks 1-3, Opus 4-6) on judge/c1e-r{1,2,3} = c1d vs c1e rep N, diffs from 5cb626e, keys judge/c1e-r{1,2,3}.key.json, output judge/c1e-verdict*.md. Next: unmask, sum races per arm per judge, record D-12.
 
 ## Amendments
 
 Append material changes and their reasons; preserve the original request and settled decisions.
 - 2026-11-10: Added C-10 after C-01: D-09 found reads taken before the lock were Opus's main coding defect; the Locked writes prompt rule (plan3.ts) needs a measured before/after on the same frozen plan.
 - 2026-11-10: Added C-11 after C-10: D-10: the prompt-only rule did not help Opus high, and compaction cut the rule out of the Plan3 handoff; the user asked to test the system-prompt version.
+- 2026-11-10: Added C-12 after C-11: D-11: 11-13 races per build are shared and come from the frozen plan; the user asked to test planning next.
