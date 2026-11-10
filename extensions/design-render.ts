@@ -2,7 +2,7 @@
 // (overflow, too-wide elements, page errors, console errors, failed resources). Callers: design look and reference
 // (design.ts) and the hub's Mark (designshot). Every capture uses its own agent-browser session, closed afterwards, so
 // overlapping captures never share a page or viewport; the folder is served on a short-lived 127.0.0.1 port under the
-// same sandbox CSP as the hub's preview (SANDBOX_CSP), so scripts behave as they do in the preview.
+// same design sandbox CSP as the hub's preview (DESIGN_CSP), so scripts behave as they do in the preview.
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -14,6 +14,8 @@ import { processPng } from "./screen-read.ts";
 
 /** The preview's sandbox: an opaque origin (no allow-same-origin), so page scripts run but cannot read the server. */
 export const SANDBOX_CSP = (origin: string) => `sandbox allow-scripts allow-popups allow-pointer-lock allow-downloads; default-src ${origin} https: data: blob: 'unsafe-inline' 'unsafe-eval'`;
+/** Local submit handlers need permission; native form navigation stays forbidden, including popup targets. */
+export const DESIGN_CSP = (origin: string) => `${SANDBOX_CSP(origin).replace("sandbox ", "sandbox allow-forms ")}; form-action 'none'`;
 
 // The render-state (S06): what to show. folder is absolute (a design folder or a history version); width and height already
 // carry the rotation; hash is the deck slide (location.hash); styleEdits are the preview's live, unsaved inline edits.
@@ -46,7 +48,7 @@ async function serve(folder: string) {
 			response.writeHead(404, { "content-type": "text/plain" });
 			return response.end("not found");
 		}
-		response.writeHead(200, { "content-type": MIME[path.extname(real).toLowerCase()] ?? "application/octet-stream", "cache-control": "no-store", "content-security-policy": SANDBOX_CSP(origin), "access-control-allow-origin": "*" });
+		response.writeHead(200, { "content-type": MIME[path.extname(real).toLowerCase()] ?? "application/octet-stream", "cache-control": "no-store", "content-security-policy": DESIGN_CSP(origin), "access-control-allow-origin": "*" });
 		fs.createReadStream(real).on("error", () => response.destroy()).pipe(response);
 	});
 	await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));

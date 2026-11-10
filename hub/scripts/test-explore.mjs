@@ -102,6 +102,10 @@ try {
 	const bridged = await fetchLike(`/x/${d.key}/index.html`);
 	assert.match(bridged.body, /^<h1>edited<\/h1><script data-design-chrome>[\s\S]*design:pick[\s\S]*<\/script>$/);
 	assert.equal(bridged.head["content-length"], Buffer.byteLength(bridged.body));
+	assert.match(bridged.head["content-security-policy"], /sandbox [^;]*\ballow-forms\b/, "own designs permit local submit handlers");
+	assert.match(bridged.head["content-security-policy"], /; form-action 'none'/, "native form navigation is forbidden");
+	assert.doesNotMatch(bridged.head["content-security-policy"], /allow-same-origin|allow-top-navigation|allow-popups-to-escape-sandbox/);
+	assert.doesNotMatch((await fetchLike(`/x/${view.key}/index.html`)).head["content-security-policy"], /allow-forms|form-action/, "generic live HTML keeps its original policy");
 	assert.doesNotMatch((await fetchLike(`/x/${first.key}/index.html`)).body, /data-design-chrome/, "an explored archive page is served as it is");
 	await writeFile(join(design, "page.html"), "<body><p>x</p></body></html>");
 	assert.match((await fetchLike(`/x/${d.key}/page.html`)).body, /<p>x<\/p><script data-design-chrome>[\s\S]*<\/script><\/body><\/html>$/, "before the closing body tag");

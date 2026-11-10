@@ -1,0 +1,20 @@
+{
+  "testedTree": "ad0d2a49 plus the P3-03 working-tree patch and concurrent changes",
+  "policy": "DESIGN_CSP for authorized own designs and dedicated renderer; generic SANDBOX_CSP unchanged",
+  "redRegressions": ["test-explore: own design missing allow-forms", "test-work-design: prevented submit did not create @saved"],
+  "productFormTargets": {"command": "node docs/proposals/astryx-study/probes/form-targets.mjs --production", "groupsPassed": 15, "nativeCollectorRequests": 0, "positiveControlPOSTs": 1},
+  "sandboxFixtures": [
+    {"arm": "html", "cases": 12, "checks": 100, "passed": 100, "pageErrors": 0, "failedResources": 0},
+    {"arm": "astryx", "cases": 12, "checks": 100, "passed": 100, "pageErrors": 0, "failedResources": 0}
+  ],
+  "fixtureCommand": "node docs/proposals/astryx-study/probes/acceptance.mjs --production",
+  "environment": "Existing STUDY_ROOT/STUDY_DEPS and explicit installed Chromium1243 CHROME_PATH; Windows/Node26.13.0; no downloads",
+  "repoTests": {
+    "node scripts/test-work-design.mjs": "PASS",
+    "node --no-warnings hub/scripts/test-explore.mjs": "PASS",
+    "node --no-warnings hub/scripts/test-api.mjs": "PASS (fixture reports unavailable SDK for one usage path)",
+    "node --no-warnings hub/scripts/test-browser.mjs": "PASS isolated with a temporary diagnostic-only assertion message; initial parallel run failed at the earlier phone push-menu viewport assertion. Diagnostic message removed; no production drawer change or weakened assertion. Cause not established; next browser run must retain this check."
+  },
+  "diagnostics": "No confirmed LSP-clean files from the push-only server. Existing private shell-free spawn helper was flagged by Semgrep and reviewed as a false positive: only the trusted platform agentBrowser binary controls exe.",
+  "notProven": ["Modal pin visibility (still outside modal top layer)", "Mark state reproduction", "Safari or physical touch", "Full WCAG compliance"]
+}

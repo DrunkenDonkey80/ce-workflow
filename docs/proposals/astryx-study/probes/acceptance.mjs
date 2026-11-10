@@ -6,10 +6,10 @@ import {pathToFileURL} from "node:url";
 assert.ok(process.env.STUDY_ROOT && process.env.STUDY_DEPS, "Set STUDY_ROOT (fixture/output root) and STUDY_DEPS (installed node_modules)");
 const {chromium}=await import(pathToFileURL(path.join(process.env.STUDY_DEPS,"playwright/index.mjs")).href);
 import {withBridge} from "../../../../hub/src/design-bridge.ts";
-import {SANDBOX_CSP} from "../../../../extensions/design-render.ts";
-const localForms=process.argv.includes("--control-local-forms"),allowForms=localForms||process.argv.includes("--control-allow-forms");
-const root=path.resolve(process.env.STUDY_ROOT), out=path.join(root,localForms?"parent-control-local-forms":allowForms?"parent-control-forms":"parent-checks");fs.mkdirSync(out,{recursive:true});
-const result={allowForms,startedAt:new Date().toISOString(),cases:[]};
+import {DESIGN_CSP,SANDBOX_CSP} from "../../../../extensions/design-render.ts";
+const production=process.argv.includes("--production"),localForms=process.argv.includes("--control-local-forms"),allowForms=production||localForms||process.argv.includes("--control-allow-forms");
+const root=path.resolve(process.env.STUDY_ROOT), out=path.join(root,production?"parent-production-forms":localForms?"parent-control-local-forms":allowForms?"parent-control-forms":"parent-checks");fs.mkdirSync(out,{recursive:true});
+const result={production,allowForms,startedAt:new Date().toISOString(),cases:[]};
 const server=http.createServer((req,res)=>{
  const origin=`http://127.0.0.1:${server.address().port}`;
  const pathname=new URL(req.url,origin).pathname;
@@ -18,7 +18,7 @@ const server=http.createServer((req,res)=>{
  const file=path.resolve(root,"."+decodeURIComponent(pathname));
  if(!["html","astryx"].some(a=>file.startsWith(path.join(root,a,"public")+path.sep))||!fs.existsSync(file)||!fs.statSync(file).isFile()){res.writeHead(404);return res.end();}
  res.setHeader("content-type",({".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"application/javascript; charset=utf-8"})[path.extname(file)]??"application/octet-stream");
- res.setHeader("access-control-allow-origin","*");res.setHeader("content-security-policy",(allowForms?SANDBOX_CSP(origin).replace("sandbox ","sandbox allow-forms "):SANDBOX_CSP(origin))+(localForms?"; form-action 'none'":""));
+ res.setHeader("access-control-allow-origin","*");res.setHeader("content-security-policy",production?DESIGN_CSP(origin):(allowForms?SANDBOX_CSP(origin).replace("sandbox ","sandbox allow-forms "):SANDBOX_CSP(origin))+(localForms?"; form-action 'none'":""));
  res.end(file.endsWith(".html")?withBridge(fs.readFileSync(file,"utf8")):fs.readFileSync(file));
 });
 await new Promise(r=>server.listen(0,"127.0.0.1",r));

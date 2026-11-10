@@ -173,6 +173,10 @@ try {
 	else {
 		const fixture = path.join(cwd, "render");
 		fs.mkdirSync(fixture);
+		fs.writeFileSync(path.join(fixture, "form.html"), '<form id="local"><input required value="valid"><button>Save</button></form><script>local.addEventListener("submit",event=>{event.preventDefault();const saved=document.createElement("p");saved.dataset.id="saved";saved.textContent="Saved locally";document.body.append(saved);});local.requestSubmit();</script>');
+		const localForm = await renderDesign({ folder: fixture, screen: "form.html", width: 360, height: 800, element: "@saved" });
+		assert.equal(localForm.report.missing, undefined, "renderer allows prevented local form handlers");
+		assert.ok(localForm.png.length, "saved content was rendered");
 		const page = `<!doctype html><style>body{margin:0;background:#fff}.wide{width:600px;height:40px}</style><h1 data-id="title">Hi</h1><div class="wide" data-id="band"></div><img src="gone.png"><script>console.error("boom"); missingFn();</script>`;
 		fs.writeFileSync(path.join(fixture, "index.html"), page);
 		const [phone, tablet] = await Promise.all([renderDesign({ folder: fixture, width: 360, height: 800, maxEdge: 4000 }), renderDesign({ folder: fixture, width: 820, height: 1180, maxEdge: 4000, styleEdits: [{ selector: "body", styles: { background: "rgb(255, 0, 0)" } }] })]);

@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, isAbsolute } from "node:path";
 import { linkedFile } from "./linked-files.ts";
 import { sevenZip } from "./wormhole.ts";
-import { SANDBOX_CSP } from "../../extensions/design-render.ts";
+import { DESIGN_CSP, SANDBOX_CSP } from "../../extensions/design-render.ts";
 import { withBridge } from "./design-bridge.ts";
 
 export const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
@@ -178,7 +178,7 @@ export async function sendExplored(pathname: string, download: boolean, origin: 
 		"content-type": download ? "application/octet-stream" : type, "content-length": bridged?.length ?? info.size, "cache-control": "private, no-store", "x-content-type-options": "nosniff",
 		// Opaque origin (no allow-same-origin): page scripts run but cannot read the hub. https: lets pages load libraries from a CDN;
 		// their module scripts and fetches are cross-origin to this opaque page, hence allow-origin * (the key is the capability).
-		"content-security-policy": SANDBOX_CSP(origin),
+		"content-security-policy": (access?.own ? DESIGN_CSP : SANDBOX_CSP)(origin),
 		"access-control-allow-origin": "*",
 		"content-disposition": `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(basename(real!))}`,
 	});

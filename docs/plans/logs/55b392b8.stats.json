@@ -3,7 +3,7 @@
  "activeMs": 0,
  "runs": 0,
  "waitingMs": 1004502,
- "toolWallMs": 471013,
+ "toolWallMs": 686941,
  "compactions": {
   "count": 0,
   "ms": 0
@@ -21,47 +21,47 @@
    "errors": 0
   },
   "openai-codex/gpt-6.1-sol:high": {
-   "replies": 84,
-   "thinkingMs": 1429360,
-   "actingMs": 231332,
-   "input": 713558,
-   "output": 54091,
-   "cacheRead": 9799808,
+   "replies": 107,
+   "thinkingMs": 1772866,
+   "actingMs": 254606,
+   "input": 743023,
+   "output": 65558,
+   "cacheRead": 13139840,
    "cacheWrite": 0,
-   "cost": 2.948006799999999,
+   "cost": 3.455609999999998,
    "errors": 0
   }
  },
  "tools": {
   "plan3": {
-   "count": 13,
-   "ms": 1192,
+   "count": 17,
+   "ms": 1576,
    "maxMs": 176,
    "failures": 0
   },
   "bash": {
-   "count": 53,
-   "ms": 278833,
+   "count": 65,
+   "ms": 496657,
    "maxMs": 136023,
-   "failures": 5
+   "failures": 8
   },
   "lens_diagnostics": {
-   "count": 6,
-   "ms": 24451,
-   "maxMs": 9539,
+   "count": 8,
+   "ms": 43047,
+   "maxMs": 10786,
    "failures": 0
   },
   "read": {
-   "count": 70,
-   "ms": 2003,
+   "count": 76,
+   "ms": 2054,
    "maxMs": 458,
    "failures": 2
   },
   "codemode": {
-   "count": 36,
-   "ms": 308714,
+   "count": 43,
+   "ms": 363300,
    "maxMs": 137297,
-   "failures": 5
+   "failures": 6
   },
   "module_report": {
    "count": 4,
@@ -82,9 +82,9 @@
    "failures": 0
   },
   "edit": {
-   "count": 19,
-   "ms": 61,
-   "maxMs": 19,
+   "count": 29,
+   "ms": 111,
+   "maxMs": 22,
    "failures": 1
   },
   "jev_evidence": {
@@ -94,8 +94,8 @@
    "failures": 0
   },
   "write": {
-   "count": 9,
-   "ms": 11,
+   "count": 10,
+   "ms": 12,
    "maxMs": 2,
    "failures": 0
   },
@@ -106,8 +106,8 @@
    "failures": 0
   },
   "lsp_navigation": {
-   "count": 4,
-   "ms": 1246,
+   "count": 5,
+   "ms": 1481,
    "maxMs": 383,
    "failures": 0
   },
@@ -142,9 +142,9 @@
    "failures": 0
   },
   "lens_diagnostic_mark": {
-   "count": 2,
-   "ms": 18,
-   "maxMs": 10,
+   "count": 4,
+   "ms": 45,
+   "maxMs": 22,
    "failures": 0
   },
   "subagents_enable": {
@@ -162,16 +162,16 @@
  },
  "categories": {
   "shell": {
-   "count": 40,
-   "ms": 38793,
+   "count": 42,
+   "ms": 39585,
    "maxMs": 4838,
    "failures": 3
   },
   "test": {
-   "count": 13,
-   "ms": 240040,
+   "count": 23,
+   "ms": 457072,
    "maxMs": 136023,
-   "failures": 2
+   "failures": 5
   }
  },
  "commands": {
@@ -248,8 +248,8 @@
    "failures": 0
   },
   "bash\u0000STUDY_ROOT=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\" STUDY_DEPS=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules\" CHROME_PATH=\"C:/Users/Flex/AppData/Local": {
-   "count": 3,
-   "ms": 46431,
+   "count": 4,
+   "ms": 71824,
    "maxMs": 25496,
    "failures": 0
   },
@@ -422,8 +422,8 @@
    "failures": 0
   },
   "bash\u0000STUDY_DEPS=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules\" CHROME_PATH=\"C:/Users/Flex/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe\" node \"docs/proposals/a": {
-   "count": 9,
-   "ms": 57586,
+   "count": 10,
+   "ms": 66345,
    "maxMs": 11892,
    "failures": 2
   },
@@ -431,6 +431,48 @@
    "count": 1,
    "ms": 122,
    "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000git diff --check -- \"docs/proposals/astryx-study\" \"docs/plans/2026-11-10-design-studio-fixes-and-selective-astryx-integration-55b392b8-plan3.md\" && git add -- \"docs/proposals/astryx-study\" \"docs/plans": {
+   "count": 1,
+   "ms": 277,
+   "maxMs": 277,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-design.mjs\"": {
+   "count": 2,
+   "ms": 20005,
+   "maxMs": 17798,
+   "failures": 1
+  },
+  "bash\u0000node --no-warnings \"hub/scripts/test-explore.mjs\"": {
+   "count": 2,
+   "ms": 15857,
+   "maxMs": 9287,
+   "failures": 1
+  },
+  "bash\u0000node --no-warnings \"hub/scripts/test-browser.mjs\"": {
+   "count": 2,
+   "ms": 127913,
+   "maxMs": 113153,
+   "failures": 1
+  },
+  "bash\u0000node --no-warnings \"hub/scripts/test-api.mjs\"": {
+   "count": 1,
+   "ms": 18897,
+   "maxMs": 18897,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"hub/web/app.ts\" \"hub/web/index.html\" \"hub/web/styles.css\" \"hub/scripts/test-browser.mjs\"; git diff -- \"hub/scripts/test-browser.mjs\" | head -105; git diff -- \"hub/web/app.ts\" | hea": {
+   "count": 1,
+   "ms": 515,
+   "maxMs": 515,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require(\\\"node:fs\\\");const r=JSON.parse(fs.readFileSync(\\\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison/parent-production-forms/results.json\\\"));for(const arm of [\\\"": {
+   "count": 1,
+   "ms": 208,
+   "maxMs": 208,
    "failures": 0
   }
  },
@@ -453,6 +495,15 @@
     "openai-codex/gpt-6.1-sol:high": 27
    },
    "failures": 3
+  },
+  "P3-03": {
+   "ms": 545866,
+   "testMs": 113361,
+   "replies": 23,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 23
+   },
+   "failures": 1
   }
  },
  "spans": [],

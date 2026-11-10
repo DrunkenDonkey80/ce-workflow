@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-10
-updated: 2026-11-10T21:26:41.383Z
+updated: 2026-11-10T21:37:00.639Z
 reviewed: 2026-11-10
 started: 2026-11-10T20:34:40.770Z
 ---
@@ -150,10 +150,8 @@ Run only checks relevant to touched code after each change. Commands execute fro
 
 ### Phase 2: Fix the shared studio correctness gaps [code]
 
-- [wip] **P3-03** Fix local form validation and saving in the real design sandbox without enabling form navigation.
-  - Introduce the validated design response policy without changing the generic SANDBOX_CSP. Select it at sendExplored's own-design boundary and the dedicated renderer serve(); do not add a redundant iframe restriction that blocks the new permission. Add red regressions for HTML/component forms and separate own-design versus generic HTML/archive responses. Preserve the existing generic-CSP assertion in test-explore.mjs and add design-only assertions.
-  - Verify prevented submit, Enter, validation, unhandled POST/GET, self/parent/blank targets, popups, form.submit(), requestSubmit(), and per-button formaction/formtarget/formmethod overrides. Test method="dialog" closing separately from network submission; its current behavior is an unverified hypothesis, not a claimed result. Instrument requests and navigation; confirm parent/storage isolation. Checks C1–C4 and C9.
-- [ ] **P3-04** Fix numbered comment pins and inline inspection on dialogs and popovers.
+- [x] **P3-03** Design-only form handlers now run while native navigation remains blocked; generic viewers retain their original sandbox.
+- [wip] **P3-04** Fix numbered comment pins and inline inspection on dialogs and popovers.
   - Use the correct top-layer surface, keep stable IDs and existing chat-line format, and retain pointer-event isolation. Handle nested layers, close/reopen, scroll/resize, hidden controls and version/stale-load changes.
   - Add a browser test where the pick succeeds AND a screenshot shows the pin in the open modal. Verify no duplicate pins/listeners or interactions while in comment mode. Checks C2, C4, C9.
 - [ ] **P3-05** Fix render readiness and distinguish touch capability from viewport size.
@@ -242,7 +240,7 @@ Excluded from this implementation scope unless a concrete later requirement earn
 
 ## Resume context
 
-Execution active, P3-01 wip. Preserved minimal pilot evidence and portable probes under docs/proposals/astryx-study; archived source excludes vendor bundles/dependency trees/transcripts. HEAD at start 28a5d72a082f1810b2c3f04194ae0f2cc234782f on master; unrelated dirty chat/view/app/browser-test/changelog and other plans remain untouched. C4 node --no-warnings hub/scripts/test-browser.mjs PASS (136s). Reran acceptance: red HTML95/98, Astryx92/98, zero harness exceptions; local-form control100/100 each; security handler0→1, blocked POST0 vs positive control1, opaque storage throughout. npm pack --dry-run --json excludes study; probe node --check + product accounting self-check pass. Active LSP on five .mjs scripts: 0 diagnostics, all5 inconclusive, not confirmed clean. User approved combined $40 live benchmark estimate budget (D15). Real product prechange-html generation/refinement is running via docs/proposals/astryx-study/probes/product-benchmark.mjs --root C:/SOFT/git/ce-workflow/.pi/astryx-product-benchmark --label prechange-html --run; result/log/budget are there, and a native script timer will report completion. Do not rerun automatically or change shared product guide/tools before this baseline is captured. Next action: validate baseline completion/usage/context and preserve minimal sanitized result, finish P3-01, commit, then P3-02 contracts/prototypes. No product edits yet; P3-16 external Safari/real-touch environment still missing. This checkpoint is for context continuity, not a stop.
+P3-01..03 done, P3-04 wip. Prechange real product baseline completed572.068s/2,762,429tokens/$2.6376342/36turns/42tools; budget37.3623658 remains for final2arms. Baseline archive product-prechange-html.json notes full effective system prompt unavailable in canonical JSONL; raw sessions/guides remain local only. P3-02 contracts/probes committed ad0d2a49. P3-03 uncommitted product diff: DESIGN_CSP exported in extensions/design-render.ts (generic untouched), dedicated serve uses it, hub/src/explore.ts selects it only access.own. Red→green regressions in scripts/test-work-design.mjs and hub/scripts/test-explore.mjs. C1–3 pass; C4 initial parallel run failed earlier drawer push-menu geometry, isolated with diagnostic-only message passed; message removed and original assertions preserved. Cause not established; repeat C4 at next step. Production form-targets15groups and acceptance100/100 both HTML/Astryx pass. Active LSP silent-on-clean unconfirmed; old private shell-free spawn Semgrep false positive reviewed. Oracle advisory attempted per global2fail rule for target-probe assumption, but failed modelverification expectedOpus5.5 observedgpt6-astra; no retry/model switch, narrow advice independently validated. No implementation delegated. Next: commit verified P3-03 only owned files; then modal/popover pin top-layer/scroll tests and fix in design-bridge.ts. Preserve unrelated dirty cache-miss/chat/view/app/test-browser/changelog/otherplans. No push. P3-16 physical touch/Safari still blocked. Continue all runnable work in parent.
 
 ## Amendments
 
