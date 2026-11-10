@@ -1911,7 +1911,9 @@ try {
 	const planning = messages.find(entry => entry.message.startsWith("Plan3: planning only."))?.message;
 	assert.match(planning, /For new or substantially redesigned web UI, read the frontend-design skill/);
 	assert.match(planning, /\*\*Project care\*\*: plan the change[\s\S]*fit check[\s\S]*One adapter is a hypothetical seam[\s\S]*thin end-to-end slices[\s\S]*expand \(add the new form beside the old\), migrate callers in batches, contract[\s\S]*Keep the plan proportional: affected files, the chosen approach/);
-	assert.match(planning, /\*\*Locked writes\*\*: [\s\S]*read taken before the lock is only a hint[\s\S]*runs the same write twice at once[\s\S]*version that input/, "planning carries the locked-writes rule and its tests");
+	assert.match(planning, /\*\*Locked writes in plans\*\*[\s\S]*runs the same write twice at once[\s\S]*version that input/, "planning carries the locked-writes test guidance");
+	const system = hooks.get("before_agent_start")({ systemPrompt: "BASE" })?.systemPrompt;
+	assert.match(system, /^BASE\n\n\*\*Locked writes\*\*: [\s\S]*read taken before the lock is only a hint/, "every turn's system prompt carries the locked-writes rule, so compaction cannot drop it");
 	assert.match(planning, /talking cannot settle[\s\S]*plan a throwaway prototype step naming the question/, "ungrillable questions become a prototype step");
 	assert.match(planning, /record its reference, the chosen direction and tokens\/components to reuse in the plan, not the skill text/);
 	assert.match(planning, /Explicit briefs and project conventions win; native\/TUI work follows platform rules/);
@@ -1925,7 +1927,7 @@ try {
 	assert.match(execution, /follow settled design decisions and existing tokens\/components without restarting brainstorming or expanding scope/);
 	assert.match(execution, /Check usability and accessibility with available project tools; native\/TUI work follows platform rules/);
 	assert.match(execution, /run the smallest existing checks that cover the change/);
-	assert.match(execution, /\*\*Locked writes\*\*: [\s\S]*every decision and computed value from the state read inside it/, "coding carries the locked-writes rule");
+	assert.doesNotMatch(execution, /\*\*Locked writes\*\*/, "the rule comes from the system prompt, not a compactable handoff");
 	assert.doesNotMatch(execution, /version that input/, "plan-only test guidance stays out of coding");
 	assert.match(execution, /Prefer running independent work in parallel: test suites or modules and build jobs \(not individual assertions\)/);
 	assert.match(execution, /agent or LLM runs that test different cases \(up to 5 at once/);
