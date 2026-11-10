@@ -25,8 +25,10 @@ async function devicectl(exec: Exec, args: string[], signal?: AbortSignal, timeo
 /** Paired iPhones and iPads that Xcode reaches over the network; online when their tunnel is up. Empty off macOS or without Xcode. */
 export async function wifiDevices(exec: Exec, signal?: AbortSignal): Promise<Device[]> {
 	if (process.platform !== "darwin") return [];
-	const list = (await devicectl(exec, ["list", "devices"], signal).catch(() => undefined))?.devices ?? [];
-	return list.filter((d: any) => d.hardwareProperties?.reality === "physical" && d.hardwareProperties?.platform === "iOS" && d.connectionProperties?.transportType === "localNetwork").map((d: any) => {
+	const result = await devicectl(exec, ["list", "devices"], signal).catch(() => undefined);
+	if (!result) return [];
+	wifi.clear(); // a phone that is now wired (or gone) must not keep its old Wi-Fi entry and route through a dead tunnel
+	return (result.devices ?? []).filter((d: any) => d.hardwareProperties?.reality === "physical" && d.hardwareProperties?.platform === "iOS" && d.connectionProperties?.transportType === "localNetwork").map((d: any) => {
 		const id = d.hardwareProperties.udid, ip = d.connectionProperties.tunnelState === "connected" ? d.connectionProperties.tunnelIPAddress ?? "" : "";
 		wifi.set(id, ip);
 		return { id, name: d.deviceProperties?.name ?? id, platform: "ios", type: "real", state: ip ? "online" : "offline", version: d.deviceProperties?.osVersionNumber ?? "" };
@@ -102,9 +104,20 @@ export async function teamFor(exec: Exec, udid: string, signal?: AbortSignal, di
 	return best?.team;
 }
 
+/** Ends helper runners that do not answer but hold the port (a killed xcodebuild leaves its runner on the device, or it bound while
+ * the tunnel was down), so the next one can bind. Returns the ended pids. */
+export async function endStaleHelpers(exec: Exec, id: string, signal?: AbortSignal) {
+	const procs = await devicectl(exec, ["device", "info", "processes", "--device", id], signal).catch(() => undefined);
+	const pids = (procs?.runningProcesses ?? []).filter((p: any) => /devicekit-iosUITests-Runner/.test(p.executable ?? "")).map((p: any) => String(p.processIdentifier));
+	for (const pid of pids) await devicectl(exec, ["device", "process", "terminate", "--device", id, "--pid", pid], signal).catch(() => undefined);
+	return pids;
+}
+
 /** Makes sure the DeviceKit helper answers on the device: builds it once per device with the user's team, then starts it as a UI test. */
 export async function wifiAgent(exec: Exec, dev: Device, o: Options) {
-	const ip = wifi.get(dev.id)!, { signal } = o;
+	const { signal } = o;
+	if (!wifi.get(dev.id)) await wifiConnect(exec, dev, signal); // no tunnel address: the helper would listen on 127.0.0.1 only
+	const ip = wifi.get(dev.id)!;
 	if (await rpc(exec, ip, "device.info", {}, signal, 5000).then(() => true, () => false)) return;
 	const dir = path.join(CACHE, "devicekit", dev.id), products = path.join(dir, "Build", "Products"); // per device: its signing profile must list it
 	const find = async () => (await readdir(products).catch(() => [] as string[])).find(f => f.endsWith(".xctestrun"));
@@ -124,6 +137,7 @@ export async function wifiAgent(exec: Exec, dev: Device, o: Options) {
 		const b = await exec("xcrun", ["xcodebuild", "build-for-testing", "-project", path.join(src, "devicekit-ios.xcodeproj"), "-scheme", "devicekit-ios", "-destination", `id=${dev.id}`, "-derivedDataPath", dir, "-allowProvisioningUpdates", `DEVELOPMENT_TEAM=${team}`, "CODE_SIGN_STYLE=Automatic"], { timeout: 900_000, signal });
 		if (b.code || b.killed || !await find()) throw new Error(`Building the helper failed:\n${String(b.stdout ?? "").split("\n").filter(l => /error:/.test(l)).slice(0, 8).join("\n") || String(b.stderr ?? "").trim().slice(-800)}`);
 	}
+	await endStaleHelpers(exec, dev.id, signal);
 	// Detached: the helper keeps running for later calls and sessions. It listens on the tunnel address only, not the whole network.
 	const log = path.join(dir, "helper.log"), out = openSync(log, "w");
 	const child = spawn("xcrun", ["xcodebuild", "test-without-building", "-xctestrun", path.join(products, (await find())!), "-destination", `id=${dev.id}`], { detached: true, stdio: ["ignore", out, out], env: { ...process.env, TEST_RUNNER_DEVICEKIT_LISTEN_HOST: `127.0.0.1,${ip}` } });
