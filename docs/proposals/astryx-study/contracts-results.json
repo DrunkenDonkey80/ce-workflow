@@ -1,0 +1,243 @@
+{
+  "environment": "Windows, Node 26.13.0, installed Chromium 1243; explicit pre-existing STUDY_DEPS/CHROME_PATH, no downloads",
+  "cases": [
+    {
+      "name": "formsOriginal",
+      "command": "node docs/proposals/astryx-study/probes/form-targets.mjs",
+      "elapsedSeconds": 11.6,
+      "result": {
+        "candidate": false,
+        "results": [
+          {
+            "case": "local validation/save/Enter/dialog/isolation",
+            "candidate": false
+          },
+          {
+            "case": "GET _self",
+            "blocked": true
+          },
+          {
+            "case": "GET _parent",
+            "blocked": true
+          },
+          {
+            "case": "GET _top",
+            "blocked": true
+          },
+          {
+            "case": "GET _blank",
+            "blocked": true
+          },
+          {
+            "case": "GET probe-popup",
+            "blocked": true
+          },
+          {
+            "case": "POST _self",
+            "blocked": true
+          },
+          {
+            "case": "POST _parent",
+            "blocked": true
+          },
+          {
+            "case": "POST _top",
+            "blocked": true
+          },
+          {
+            "case": "POST _blank",
+            "blocked": true
+          },
+          {
+            "case": "POST probe-popup",
+            "blocked": true
+          },
+          {
+            "case": "submit",
+            "blocked": true
+          },
+          {
+            "case": "requestSubmit",
+            "blocked": true
+          },
+          {
+            "case": "override",
+            "blocked": true
+          },
+          {
+            "case": "unrestricted positive control",
+            "receivedPOST": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "formsCandidate",
+      "command": "node docs/proposals/astryx-study/probes/form-targets.mjs --candidate",
+      "elapsedSeconds": 11.9,
+      "result": {
+        "candidate": true,
+        "results": [
+          {
+            "case": "local validation/save/Enter/dialog/isolation",
+            "candidate": true
+          },
+          {
+            "case": "GET _self",
+            "blocked": true
+          },
+          {
+            "case": "GET _parent",
+            "blocked": true
+          },
+          {
+            "case": "GET _top",
+            "blocked": true
+          },
+          {
+            "case": "GET _blank",
+            "blocked": true
+          },
+          {
+            "case": "GET probe-popup",
+            "blocked": true
+          },
+          {
+            "case": "POST _self",
+            "blocked": true
+          },
+          {
+            "case": "POST _parent",
+            "blocked": true
+          },
+          {
+            "case": "POST _top",
+            "blocked": true
+          },
+          {
+            "case": "POST _blank",
+            "blocked": true
+          },
+          {
+            "case": "POST probe-popup",
+            "blocked": true
+          },
+          {
+            "case": "submit",
+            "blocked": true
+          },
+          {
+            "case": "requestSubmit",
+            "blocked": true
+          },
+          {
+            "case": "override",
+            "blocked": true
+          },
+          {
+            "case": "unrestricted positive control",
+            "receivedPOST": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "state",
+      "command": "node docs/proposals/astryx-study/probes/state-contract.mjs",
+      "elapsedSeconds": 5.1,
+      "result": {
+        "maxBytes": 16384,
+        "maxDepth": 8,
+        "results": [
+          {
+            "kind": "html",
+            "replayedDialog": true,
+            "replayedUnsavedValue": true,
+            "acknowledgedState": {
+              "open": true,
+              "draft": "Unsaved Delta"
+            }
+          },
+          {
+            "kind": "react",
+            "replayedDialog": true,
+            "replayedUnsavedValue": true,
+            "acknowledgedState": {
+              "open": true,
+              "draft": "Unsaved Delta"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "theme",
+      "command": "node docs/proposals/astryx-study/probes/theme-contract.mjs",
+      "elapsedSeconds": 2.2,
+      "result": {
+        "recipe": "astryx-oklch-v1",
+        "stops": [
+          0,
+          5,
+          10,
+          15,
+          20,
+          25,
+          30,
+          35,
+          40,
+          45,
+          50,
+          55,
+          60,
+          65,
+          70,
+          75,
+          80,
+          85,
+          90,
+          95,
+          100
+        ],
+        "families": [
+          "accent",
+          "neutral"
+        ],
+        "modes": [
+          "light",
+          "dark"
+        ],
+        "sample": {
+          "accentLight50": "#c9440f",
+          "accentDark50": "#be502b"
+        },
+        "exactAnchor": "#c2410c",
+        "checks": "deterministic, both modes, hex-only output, invalid color/stops, exact anchor"
+      }
+    },
+    {
+      "name": "input",
+      "command": "node docs/proposals/astryx-study/probes/input-contract.mjs",
+      "elapsedSeconds": 2.6,
+      "result": {
+        "checks": "Same dimensions, different actual pointer/touch capabilities; reduced motion confirmed",
+        "rows": [
+          {
+            "width": 820,
+            "height": 1180,
+            "touch": 0,
+            "coarse": false,
+            "reducedMotion": true
+          },
+          {
+            "width": 820,
+            "height": 1180,
+            "touch": 1,
+            "coarse": true,
+            "reducedMotion": true
+          }
+        ]
+      }
+    }
+  ]
+}

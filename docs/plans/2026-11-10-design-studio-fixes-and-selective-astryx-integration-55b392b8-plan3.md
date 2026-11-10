@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-10
-updated: 2026-11-10T21:06:25.854Z
+updated: 2026-11-10T21:26:41.383Z
 reviewed: 2026-11-10
 started: 2026-11-10T20:34:40.770Z
 ---
@@ -145,17 +145,12 @@ Run only checks relevant to touched code after each change. Commands execute fro
 ## Phases
 
 ### Phase 1: Preserve evidence and settle technical contracts [think]
-- [wip] **P3-01** Preserve the frozen benchmark and audit current integration callers without touching unrelated changes.
-  - Preserve the minimal non-secret brief, refinement, rubric, pins, parameterized probes, selected screenshots and deduplicated totals under docs/proposals/astryx-study/ (not included by the current package files allowlist). No raw transcripts, dependency trees or complete screenshot dump. Parameterize machine-specific roots, cwd and browser paths; verify npm pack --dry-run --json excludes study artifacts. Retain original hashes alongside portable-driver changes.
-  - Record current HEAD/dirty paths and C4 baseline; establish C10 against a real pre-change HTML design session before modifying shared guides/tools. Capture the actual model, prompt/tool context, all sessions/compaction, runtime and usage. Keep the worker-only pilot and its setup caveats distinct. Accept when brief/refinement hashes match, security probes reproduce the failures, the product baseline is captured, and C10 names the actual durable commands.
-- [ ] **P3-02** Settle the bounded state, runtime and theme contracts from small discriminating prototypes.
-  - Define ready/settled behavior, input capability reporting, opt-in serializable Mark state, maximum sizes, replay acknowledgement, unsupported-state UX and stale-load handling. Preserve R4; if named states alone cannot reproduce unsaved drafts, include the bounded draft contract instead of weakening the requirement.
-  - Choose the smallest public theme API/compiler or pure-helper reuse that emits standalone CSS without React in the output. Verify exact version APIs from installed docs.
-  - Define design-root ownership, deterministic publication, failed-draft semantics and minimal manifest around D7's extension-owned triggers; include agent_end, look, select, clone and restore in serialization. Implement the approved first-use host-download choice (D14) in the contract: settle cache location, transitive lock/integrity, disabled install scripts and cold-network timing before P3-18. Package only the reviewed provisioning manifest/lock, notices and integration code—not the runtime dependency tree; verify package files without adding Astryx to mandatory root dependencies. Test form target/popup negative controls before adopting D4. Record findings; ask only if evidence reveals another genuine user tradeoff.
+- [x] **P3-01** Preserved portable pilot evidence and captured a real pre-change product HTML initial/refinement baseline with explicit context/acceptance limits.
+- [x] **P3-02** Settled bounded draft replay/readiness/input, public theme API, host cache and source/build lifecycle contracts; candidate form targets and HTML/React drafts independently passed.
 
 ### Phase 2: Fix the shared studio correctness gaps [code]
 
-- [ ] **P3-03** Fix local form validation and saving in the real design sandbox without enabling form navigation.
+- [wip] **P3-03** Fix local form validation and saving in the real design sandbox without enabling form navigation.
   - Introduce the validated design response policy without changing the generic SANDBOX_CSP. Select it at sendExplored's own-design boundary and the dedicated renderer serve(); do not add a redundant iframe restriction that blocks the new permission. Add red regressions for HTML/component forms and separate own-design versus generic HTML/archive responses. Preserve the existing generic-CSP assertion in test-explore.mjs and add design-only assertions.
   - Verify prevented submit, Enter, validation, unhandled POST/GET, self/parent/blank targets, popups, form.submit(), requestSubmit(), and per-button formaction/formtarget/formmethod overrides. Test method="dialog" closing separately from network submission; its current behavior is an unverified hypothesis, not a claimed result. Instrument requests and navigation; confirm parent/storage isolation. Checks C1–C4 and C9.
 - [ ] **P3-04** Fix numbered comment pins and inline inspection on dialogs and popovers.

@@ -1,0 +1,132 @@
+{
+  "label": "prechange-html",
+  "arm": "html",
+  "repoHead": "28a5d72a082f1810b2c3f04194ae0f2cc234782f",
+  "dirty": " M CHANGELOG.md\n M docs/plans/2026-11-08-benchmark-the-matt-video-experiments-c1-c6-427dd6a8-plan3.md\n M docs/plans/logs/427dd6a8.md\n M docs/plans/logs/6a5cdf60.stats.json\n M docs/plans/logs/a5cf234d.stats.json\n M hub/scripts/test-browser.mjs\n M hub/scripts/test-chat-files.mjs\n M hub/scripts/test-view.mjs\n M hub/src/chat.ts\n M hub/src/view.ts\n M hub/web/app.ts\n M hub/web/index.html\n M hub/web/styles.css\n?? docs/plans/2026-11-10-astryx-versus-html-remote-design-studio-comparison-and-integ-cfaad2ca-plan3.md\n?? docs/plans/2026-11-10-design-studio-fixes-and-selective-astryx-integration-55b392b8-plan3.md\n?? docs/plans/logs/55b392b8.md\n?? docs/plans/logs/55b392b8.stats.json\n?? docs/plans/logs/cfaad2ca.md\n?? docs/proposals/astryx-study/\n?? hub/src/cache-miss.ts\n",
+  "model": "anthropic/claude-opus-5-5:high",
+  "compaction": "ultrafull",
+  "translation": "\n\nProduct benchmark mapping (applies identically to both product arms): the historical fixture brief above names public/ and supplied craft/check files. In this real design session, deliver directly in your own .pi/designs/<handle>/ instead; craft guides are supplied by the production session. Use the existing design look action and read its returned images instead of ../look.mjs; write CHECKS.md inside your design folder. Source/build handling follows the selected production foundation. The content, behavior, fixed data, stable IDs and requested refinement are unchanged. No delegation, external research, commits, package installation or files outside your own design folder. Do not wait for user input. Stop on tool/setup failure.",
+  "startedAt": "2026-11-10T21:00:39.677Z",
+  "sessions": {
+    "count": 1,
+    "canonicalFilesRetainedLocally": true
+  },
+  "stages": [
+    {
+      "name": "initial",
+      "elapsedMs": 431566,
+      "metrics": {
+        "sessions": 1,
+        "turns": 25,
+        "toolCalls": 30,
+        "input": 52,
+        "output": 42749,
+        "cacheRead": 1566952,
+        "cacheWrite": 127045,
+        "totalTokens": 1736798,
+        "cost": 1.8038033999999998,
+        "missingUsage": 0,
+        "missingCost": 0,
+        "models": {
+          "anthropic/claude-opus-5-5": 25
+        },
+        "compactions": 0,
+        "errors": []
+      }
+    },
+    {
+      "name": "refinement",
+      "elapsedMs": 127432,
+      "metrics": {
+        "sessions": 1,
+        "turns": 36,
+        "toolCalls": 42,
+        "input": 76,
+        "output": 55494,
+        "cacheRead": 2501426,
+        "cacheWrite": 205433,
+        "totalTokens": 2762429,
+        "cost": 2.6376342000000004,
+        "missingUsage": 0,
+        "missingCost": 0,
+        "models": {
+          "anthropic/claude-opus-5-5": 36
+        },
+        "compactions": 0,
+        "errors": []
+      }
+    }
+  ],
+  "state": "complete",
+  "handle": "design-1",
+  "metrics": {
+    "sessions": 1,
+    "turns": 36,
+    "toolCalls": 42,
+    "input": 76,
+    "output": 55494,
+    "cacheRead": 2501426,
+    "cacheWrite": 205433,
+    "totalTokens": 2762429,
+    "cost": 2.6376342000000004,
+    "missingUsage": 0,
+    "missingCost": 0,
+    "models": {
+      "anthropic/claude-opus-5-5": 36
+    },
+    "compactions": 0,
+    "errors": []
+  },
+  "toolsUsed": [
+    "bash",
+    "tools_enable",
+    "read",
+    "design",
+    "write",
+    "edit",
+    "codemode"
+  ],
+  "versions": {
+    "handle": "design-1",
+    "name": "Relay html",
+    "kind": "app",
+    "folder": ".pi/designs/design-1",
+    "files": [
+      "CHECKS.md",
+      "DESIGN.md",
+      "HANDOFF.md",
+      "app.js",
+      "checks/dialog-error-390.png",
+      "checks/dialog-landscape-844x390.png",
+      "checks/dialog-phone-360x480.png",
+      "checks/selfcheck-output.txt",
+      "checks/selfcheck.cjs",
+      "checks/settings-dark-390.png",
+      "checks/shots-refine.cjs",
+      "checks/shots.cjs",
+      "checks/state-error-390.png",
+      "checks/state-loading-390.png",
+      "data.js",
+      "index.html",
+      "settings.html",
+      "settings.js",
+      "styles.css"
+    ],
+    "page": "index.html",
+    "versions": [
+      1,
+      2
+    ]
+  },
+  "endedAt": "2026-11-10T21:10:11.745Z",
+  "elapsedMs": 572068,
+  "contextEvidence": {
+    "productionStart": true,
+    "guideAndExtensionCopiesRetainedLocally": true,
+    "actualToolCallsRetainedInCanonicalSession": true,
+    "fullEffectiveSystemPromptRetained": false,
+    "limitation": "Canonical session JSONL does not persist the complete built system prompt. The agent's CHECKS.md says guide files/TREATMENT.md were unavailable; these were production-supplied guides, not fixture files. Do not treat source copies as a provider-payload capture."
+  },
+  "acceptance": "Generated initial and refinement, two production snapshots. Independent actual-sandbox acceptance remains P3-14; the agent self-check used file://, not the preview sandbox.",
+  "stageMetricSemantics": "Stage metrics are cumulative. Do not sum them; final metrics already aggregate all continuations and compaction."
+}
