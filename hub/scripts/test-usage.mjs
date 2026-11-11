@@ -69,6 +69,12 @@ try {
 	fs.writeFileSync(path.join(root, "claude-pool-usage.json"), JSON.stringify({ a: { at: Date.now(), five_hour: { pct: 10, resets_at: week.resets_at }, seven_day: week } }));
 	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => async () => undefined });
 	await usage.start(); assert.deepEqual(usage.usage().summary.map(s => [s.id, s.left]), [["claude", 70]]); usage.stop();
+	// A "−−" (last resort) account stays out of the pool gauge.
+	fs.writeFileSync(path.join(root, "claude-pool.json"), JSON.stringify({ active: "a", accounts: [{ label: "a" }, { label: "b" }, { label: "c", priority: -2 }] }));
+	const reading = (pct) => ({ at: Date.now(), five_hour: { pct: 10, resets_at: week.resets_at }, seven_day: { pct, resets_at: week.resets_at } });
+	fs.writeFileSync(path.join(root, "claude-pool-usage.json"), JSON.stringify({ a: reading(30), b: reading(50), c: reading(0) }));
+	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => async () => undefined });
+	await usage.start(); assert.equal(usage.usage().summary[0].left, 60, "the −− account's 100% is not averaged in"); usage.stop();
 	fs.rmSync(path.join(root, "claude-pool-usage.json"));
 
 	// Issue #5: GLM/Kimi ids carry an index and Copilot has only a month, yet each shows; the headline window is named.
