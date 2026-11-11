@@ -2,6 +2,11 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
+## Unreleased
+
+### Changed
+- In the hub and `/wo`, cold-cache compaction now uses one configurable share of the active mode's auto-compact trigger (70% by default); set it with `/wo context cold <percent>` and inspect it with `/wo context status`.
+
 ## 0.7.0 — 2026-11-11
 
 ### Fixed

@@ -213,6 +213,7 @@ const DEFAULT_CONTEXT = {
 	enabled: true,
 	autoCompact: true,
 	compactAtTokens: 150_000,
+	coldCompactPercent: 70,
 	keepRecentTokens: 30_000, // real cost (replayCost): Pi's 20k by visible text kept ~38k on Claude
 	maxSummaryChars: 32_000,
 };
@@ -377,7 +378,9 @@ function contextSettings(settings) {
 	const configured = settings.workOrchestrator?.context ?? {};
 	const mode = COMPACTION_MODES.some(item => item.value === configured.mode)
 		? configured.mode : configured.enabled === false ? "native" : "ultracompact";
-	return { ...DEFAULT_CONTEXT, ...configured, mode, enabled: usesUltraSummary(mode) };
+	const percent = Number(configured.coldCompactPercent ?? DEFAULT_CONTEXT.coldCompactPercent);
+	const coldCompactPercent = Number.isFinite(percent) ? Math.max(1, Math.min(100, Math.round(percent))) : DEFAULT_CONTEXT.coldCompactPercent;
+	return { ...DEFAULT_CONTEXT, ...configured, coldCompactPercent, mode, enabled: usesUltraSummary(mode) };
 }
 
 export function compactionModeSettings(cwd, settings = readEffectiveSettings(cwd)) {
@@ -437,6 +440,14 @@ function compactionThresholdFor(ctx, settings) {
 
 function compactTriggerTokens(ctx, settings) {
 	return compactionThresholdFor(ctx, settings).trigger;
+}
+
+function coldCompactThreshold(ctx, settings) {
+	const current = contextSettings(settings);
+	const window = Number(ctx.model?.contextWindow ?? ctx.model?.context_window) || 200_000;
+	const trigger = current.mode === "native" ? Math.max(1, window - (settings.compaction?.reserveTokens ?? 16_384))
+		: current.mode === "native-200k" ? nativeCompactionTrigger(ctx) : compactTriggerTokens(ctx, settings);
+	return Math.ceil(trigger * current.coldCompactPercent / 100);
 }
 
 // Research mode keeps its context longer but still auto-compacts near the window (D04).
@@ -2182,6 +2193,7 @@ function contextStatus(ctx, settings) {
 		`Auto compact: ${current.autoCompact === true ? "enabled" : "disabled"}`,
 		`Usage: ${usage?.tokens ? `${usage.tokens.toLocaleString()} tokens` : "unknown"}`,
 		`Trigger: ${threshold.trigger.toLocaleString()} tokens`,
+		`Cold-cache compact: ${current.coldCompactPercent}% (${coldCompactThreshold(ctx, settings).toLocaleString()} tokens)`,
 		`Keep recent: ${keep} tokens`,
 		threshold.headroom
 			? `Reserved headroom: ${threshold.headroom.toLocaleString()} tokens (ceiling ${threshold.ceiling.toLocaleString()})`
@@ -2261,11 +2273,10 @@ function runNativeMicrocompact(ctx, customInstructions = undefined, force = fals
 // Cold-cache compaction: the next request re-bills the whole prompt anyway, so a large context is cheapest
 // to compact right before it. Returns idle minutes when it applies, else undefined.
 const cacheTtlMs = ctx => (ctx.model?.promptCache?.[process.env.PI_CACHE_RETENTION === "long" ? "long" : "short"] ?? 300) * 1000;
-export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), share = 0.6) {
+export function coldCacheCompactMinutes(ctx, entries, now = Date.now()) {
 	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
-	const budget = currentCompactionMode(ctx) === "native-200k" ? nativeCompactionTrigger(ctx) : compactTriggerTokens(ctx, readEffectiveSettings(ctx.cwd));
-	if (tokens < share * budget) return undefined;
+	if (tokens < coldCompactThreshold(ctx, readEffectiveSettings(ctx.cwd))) return undefined;
 	let last = 0;
 	for (let index = entries.length - 1; index >= 0 && !last; index--) {
 		const entry = entries[index];
@@ -2757,7 +2768,7 @@ async function handleWorkMenuCommand(ctx, pi) {
 	const items = [
 		{ value: "work-settings", label: "Settings", description: "Configure Plan3 models, compaction, images and camera. Global and project scopes are available." },
 		...(maintenanceCheckout(ctx.cwd) ? [
-			{ value: "work-context", label: "Context guard", description: "Inspect or tune proactive context compaction.", argumentTitle: "Context action", placeholder: "Blank shows status; compact / on / off / set <tokens>" },
+			{ value: "work-context", label: "Context guard", description: "Inspect or tune proactive context compaction.", argumentTitle: "Context action", placeholder: "Blank shows status; compact / on / off / set <tokens> / cold <percent>" },
 			{ value: "work-catch-up", label: "Catch up packages", description: "Review the Pi/plugin packages and upstream skill repos ce-workflow still uses in a Plan3 plan." },
 		] : []),
 		...(extensionScoutEnabled() ? [
@@ -2814,7 +2825,7 @@ async function sendFollowUp(ctx, message, pi) {
 	);
 }
 
-async function handleWorkContextCommand(args, ctx) {
+export async function handleWorkContextCommand(args, ctx) {
 	let settings;
 	try {
 		settings = readEffectiveSettings(ctx.cwd);
@@ -2850,7 +2861,18 @@ async function handleWorkContextCommand(args, ctx) {
 		writeSettings(ctx.cwd, settings);
 		return ctx.ui.notify(contextStatus(ctx, settings), "info");
 	}
-	ctx.ui.notify("Use: status, compact, ultracompact, ultrafull, native, native-200k, on, off, or set <tokens>", "warning");
+	if (command === "cold") {
+		const percent = Number(value);
+		if (!Number.isInteger(percent) || percent < 1 || percent > 100)
+			return ctx.ui.notify("Use: cold <percent> (integer 1 to 100)", "warning");
+		settings = readSettings(ctx.cwd);
+		settings.workOrchestrator ??= {};
+		settings.workOrchestrator.context ??= {};
+		settings.workOrchestrator.context.coldCompactPercent = percent;
+		writeSettings(ctx.cwd, settings);
+		return ctx.ui.notify(contextStatus(ctx, readEffectiveSettings(ctx.cwd)), "info");
+	}
+	ctx.ui.notify("Use: status, compact, ultracompact, ultrafull, native, native-200k, on, off, set <tokens>, or cold <percent>", "warning");
 }
 
 async function screenExtensionMetadataWithLuna(items, ctx, signal) {
@@ -3979,7 +4001,7 @@ if (blockedInternalBackgroundCompletionTurn) {
 
 		const mode = currentCompactionMode(ctx);
 		// Tools outlived the prompt cache: the next request re-bills everything anyway, so a large context compacts first.
-		const coldMinutes = event.toolResults?.length ? coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? [], Date.now(), 0.65) : undefined;
+		const coldMinutes = event.toolResults?.length ? coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? []) : undefined;
 		if (coldMinutes !== undefined) ctx.ui.notify(`Prompt cache expired during ${coldMinutes}m of tool work; compacting before the next request.`, "info");
 		const forced = boundaryCompactionRequested || coldMinutes !== undefined;
 		if (!forced) {

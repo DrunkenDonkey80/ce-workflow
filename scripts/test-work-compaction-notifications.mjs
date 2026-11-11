@@ -21,6 +21,7 @@ import workModelsExtension, {
 	systemSafeContext,
 	researchCompactionTrigger,
 	coldCacheCompactMinutes,
+	handleWorkContextCommand,
 	resetContextFilter,
 	stripProcessedPayloads,
 	summarizeNativeContext,
@@ -72,6 +73,33 @@ import { searchKnowledge } from "../extensions/work-knowledge.ts";
 	assert.equal(cold(20_000, 20 * 60_000), undefined, "a small context is not worth compacting");
 	assert.equal(cold(190_000, 20 * 60_000, { model: { contextWindow: 1_000_000, promptCache: { short: 3600 } } }), undefined, "the model's cache lifetime counts");
 	assert.equal(coldCacheCompactMinutes({ compact() {}, getContextUsage: () => ({ tokens: 190_000 }), cwd: mkdtempSync(path.join(tmpdir(), "ce-cold-")) }, [{ type: "usage", kind: "cache_warm", timestamp: new Date(now - 60_000).toISOString() }], now), undefined, "a cache warm-up refreshes the cache");
+	const thresholdDir = mkdtempSync(path.join(tmpdir(), "ce-cold-threshold-"));
+	mkdirSync(path.join(thresholdDir, ".pi"));
+	try {
+		for (const [mode, trigger, compaction] of [
+			["ultracompact", 150_000], ["ultrafull", 150_000],
+			["native-200k", 200_000], ["native", 983_616],
+			["native", 900_000, { reserveTokens: 100_000 }],
+		]) {
+			const configure = percent => writeFileSync(path.join(thresholdDir, ".pi", "settings.json"), JSON.stringify({
+				compaction, workOrchestrator: { context: { mode, compactAtTokens: 150_000, coldCompactPercent: percent } },
+			}));
+			configure(undefined);
+			const check = tokens => cold(tokens, 20 * 60_000, { cwd: thresholdDir });
+			assert.equal(check(Math.floor(trigger * 0.65)), undefined, `${mode}: 65% no longer compacts by default`);
+			assert.equal(check(Math.ceil(trigger * 0.7) - 1), undefined, `${mode}: below the cold threshold`);
+			assert.equal(check(Math.ceil(trigger * 0.7)), 20, `${mode}: 70% of its own trigger compacts`);
+			configure(50);
+			assert.equal(check(trigger / 2), 20, `${mode}: project 50% setting applies`);
+		}
+		for (const [value, percent] of [[0, 1], [101, 100], [50.4, 50], ["invalid", 70]]) {
+			writeFileSync(path.join(thresholdDir, ".pi", "settings.json"), JSON.stringify({
+				workOrchestrator: { context: { mode: "ultrafull", compactAtTokens: 150_000, coldCompactPercent: value } },
+			}));
+			assert.equal(cold(1500 * percent - 1, 20 * 60_000, { cwd: thresholdDir }), undefined);
+			assert.equal(cold(1500 * percent, 20 * 60_000, { cwd: thresholdDir }), 20, "configured percent is clamped to a valid integer");
+		}
+	} finally { rmSync(thresholdDir, { recursive: true, force: true }); }
 }
 
 // Replay the delayed wakeups seen after compaction in LPGSlim and ce-workflow
@@ -1588,7 +1616,7 @@ try {
 	resetContextFilter();
 	const modeSettingsFile = path.join(cwd, ".pi", "settings.json");
 	const selectCompactMode = mode => writeFileSync(modeSettingsFile, JSON.stringify({
-		workOrchestrator: { context: { mode, compactionModel: "__none_model__" } },
+		workOrchestrator: { context: { mode, compactionModel: "__none_model__", coldCompactPercent: 70 } },
 	}));
 	// Keep the stored transcript below 150k so usage overrides isolate the trigger.
 	const boundaryMessages = [
@@ -1624,16 +1652,30 @@ try {
 		manualOptions.onComplete({});
 		assert.equal(await hooks.turn_end(boundary, { ...nativeCtx, getContextUsage: () => ({ tokens: 199_999 }) }), undefined, "no forced compaction below 200k");
 	}
+	// The command persists only the project percent, reports the effective threshold, and rejects invalid input.
+	{
+		const notices = [];
+		const commandCtx = { ...nativeCtx, ui: { ...ctx.ui, notify: message => notices.push(message) } };
+		await handleWorkContextCommand("cold 50", commandCtx);
+		assert.equal(JSON.parse(readFileSync(modeSettingsFile, "utf8")).workOrchestrator.context.coldCompactPercent, 50);
+		assert(notices.at(-1).includes(`Cold-cache compact: 50% (${(100_000).toLocaleString()} tokens)`));
+		for (const value of ["0", "101", "1.5", "invalid", ""]) {
+			await handleWorkContextCommand(`cold ${value}`, commandCtx);
+			assert.match(notices.at(-1), /integer 1 to 100/);
+			assert.equal(JSON.parse(readFileSync(modeSettingsFile, "utf8")).workOrchestrator.context.coldCompactPercent, 50);
+		}
+		selectCompactMode("native-200k");
+	}
 	// Tool work that outlives the prompt cache compacts a large context before the next request.
 	const toolTurn = { ...boundary, toolResults: [{ role: "toolResult" }] };
 	const lastAsk = ago => ({ ...nativeCtx, getContextUsage: () => ({ tokens: 150_000 }),
 		sessionManager: { ...nativeCtx.sessionManager, getBranch: () => [{ type: "message", message: { role: "assistant", timestamp: Date.now() - ago } }] } });
 	assert.equal(await hooks.turn_end(toolTurn, lastAsk(60_000)), undefined, "a warm cache keeps the context");
 	assert.equal(await hooks.turn_end(boundary, lastAsk(10 * 60_000)), undefined, "a final answer without tools does not compact");
-	assert.equal(await hooks.turn_end(toolTurn, { ...lastAsk(10 * 60_000), getContextUsage: () => ({ tokens: 120_000 }) }), undefined, "below 65% the miss is cheaper than losing context");
-	const coldTurn = await hooks.turn_end(toolTurn, lastAsk(10 * 60_000));
+	assert.equal(await hooks.turn_end(toolTurn, { ...lastAsk(10 * 60_000), getContextUsage: () => ({ tokens: 130_000 }) }), undefined, "65% no longer compacts after tool work");
+	const coldTurn = await hooks.turn_end(toolTurn, { ...lastAsk(10 * 60_000), getContextUsage: () => ({ tokens: 140_000 }) });
 	assert.match(boundaryWarnings.find(message => /Prompt cache expired/.test(message)) ?? "", /10m of tool work/);
-	assert(coldTurn?.entries?.[0]?.type === "compaction" || boundaryWarnings.at(-1)?.includes("native summary generator is unavailable"), "a cold cache at 65% compacts first");
+	assert(coldTurn?.entries?.[0]?.type === "compaction" || boundaryWarnings.at(-1)?.includes("native summary generator is unavailable"), "a cold cache at 70% compacts first");
 	{ // Hub typing wake (/wo compact early): a cold cache compacts now; a message sent meanwhile waits for it, then goes out.
 		let finish; const sent = [];
 		pi.sendUserMessage = message => sent.push(message);

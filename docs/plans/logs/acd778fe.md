@@ -29,3 +29,12 @@ Planning and review done; status draft, awaiting /plan3 finish. Review accepted 
   - open-design.md: note that 6147958 was reviewed with no changes in the review paths.
   - Check: `node scripts/test-work-plan3.mjs` passes; `rg -n "api-report" extensions docs/upstream` finds nothing.
   - check: node scripts/test-work-plan3.mjs -> Plan3 command self-checks passed; rg -n "api-report" extensions docs/upstream -> no matches, expected exit 1.
+
+## 2026-11-11T21:02:32.926Z CU-03 done: Unified cold compaction at configurable 70% of each mode's auto-compact trigger, with command/status and regressions.
+
+- [x] **CU-03** Replace the 60% and 65% cold-cache shares with `coldCompactPercent` (default 70) of the auto-compact trigger; add `/wo context cold <percent>`.
+  - coldCacheCompactMinutes reads the setting itself; drop its share parameter and the 0.65 argument in turn_end. Clamp to an integer 1 to 100; status prints the percent and the token count.
+  - Its denominator is the active mode's trigger (D-05); today Native wrongly uses ce-workflow's trigger. One helper serves both coldCacheCompactMinutes and status.
+  - README: one sentence next to `/wo context set`. CHANGELOG: one Unreleased bullet.
+  - Check: test-work-compaction-notifications.mjs asserts 65% no longer compacts by default, 70% does, a project setting of 50 compacts at 50%, each of the four modes uses its own trigger (Native: window minus reserveTokens), and turn_end uses the same value; update the "cold cache at 65%" case.
+  - check: node scripts/test-work-compaction-notifications.mjs -> passed; test_sensitivity default 70→60 -> caught at 'ultracompact: 65% no longer compacts by default', baseline/restored green. lens_diagnostics source=lsp paths work-models.ts/test -> no findings, both inconclusive (silent server). git diff --check -> passed.
