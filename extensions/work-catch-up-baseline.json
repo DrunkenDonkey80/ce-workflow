@@ -337,7 +337,6 @@
       "paths": [
         "LICENSE",
         "packages/cli/package.json",
-        "packages/cli/api-report.md",
         "packages/cli/api/index.mjs",
         "packages/cli/api/theme/palette/",
         "packages/cli/api/theme/generateTonalPalette.doc.mjs",

@@ -10,6 +10,8 @@ Upstream: [nexu-io/open-design](https://github.com/nexu-io/open-design) (Apache-
 
 Review new craft rules, skills and prompt ideas against the table below and offer each finding as an idea. New design systems need no catch-up: `design systems` fetches them from main on demand (`refresh: true` for the newest list).
 
+Reviewed through `614795896e09a2c1682b24cc1406529baf531bd7` (2026-11-11): no changes since the ported commit in the scoped review paths above; nothing new adopted.
+
 ## Ported
 
 | Upstream | What we took | Where it lives here |

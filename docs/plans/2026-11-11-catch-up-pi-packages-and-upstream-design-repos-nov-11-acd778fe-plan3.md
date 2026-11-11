@@ -4,7 +4,7 @@ status: active
 created: 2026-11-11
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.2","pi-subagents":"0.88.0","pi-lens":"4.4.12","meta/astryx":"b8335ba861a8207a7b22bba1f0748d400d022a65","nexu-io/open-design":"614795896e09a2c1682b24cc1406529baf531bd7"}
-updated: 2026-11-11T20:56:09.054Z
+updated: 2026-11-11T20:57:23.382Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:55:15.681Z
 ---
@@ -131,7 +131,8 @@ Fill during planning. Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-p
       "title": "Watched packages/cli/api-report.md was deleted upstream",
       "pov": "Adopt",
       "status": "adopted",
-      "rationale": "b8335ba deletes packages/cli/api-report.md and the api:report scripts. The baseline still watches that path and the ledger cites it as part of the palette contract; packages/cli/api/index.mjs stays watched for exports. Drop the path and advance the ledger review commit. Step CU-02."
+      "rationale": "b8335ba deletes packages/cli/api-report.md and the api:report scripts. The baseline still watches that path and the ledger cites it as part of the palette contract; packages/cli/api/index.mjs stays watched for exports. Drop the path and advance the ledger review commit. Step CU-02.",
+      "verification": "CU-02: node scripts/test-work-plan3.mjs passed; rg -n api-report extensions docs/upstream returned no matches (exit 1); both ledgers record full reviewed SHAs, runtime stays 0.7.12."
     },
     {
       "title": "Runtime 0.7.12 to 0.7.14: Core 0.7.13 fixes and CLI lookup changes",
@@ -212,11 +213,7 @@ None.
 ### Phase 1: Apply adopted changes [code]
 
 - [x] **CU-01** Pinned Pi devDependency and lockfile to 1.5.2; installed version verified.
-- [ ] **CU-02** Drop packages/cli/api-report.md from the meta/astryx baseline paths; advance the Astryx and OpenDesign ledgers to b8335ba and 6147958.
-  - astryx.md: add review baseline b8335ba (manifests 0.7.14) and keep fd5cf0df987791117e96ccc0bec603c64be8b136 as the previous review, runtime pins unchanged at 0.7.12; remove the api-report.md cell; list the rejected 0.7.13 Core and CLI lookup changes in one line.
-  - test-work-plan3.mjs requires the ledger to contain the baseline's current full SHA (still fd5cf0d until CU-91) and the strings 0.7.12 and 0.7.13, so the old SHA stays as history; do not weaken that assertion.
-  - open-design.md: note that 6147958 was reviewed with no changes in the review paths.
-  - Check: `node scripts/test-work-plan3.mjs` passes; `rg -n "api-report" extensions docs/upstream` finds nothing.
+- [x] **CU-02** Removed deleted Astryx watch path; advanced both source-review ledgers without runtime changes.
 - [ ] **CU-03** Replace the 60% and 65% cold-cache shares with `coldCompactPercent` (default 70) of the auto-compact trigger; add `/wo context cold <percent>`.
   - coldCacheCompactMinutes reads the setting itself; drop its share parameter and the 0.65 argument in turn_end. Clamp to an integer 1 to 100; status prints the percent and the token count.
   - Its denominator is the active mode's trigger (D-05); today Native wrongly uses ce-workflow's trigger. One helper serves both coldCacheCompactMinutes and status.

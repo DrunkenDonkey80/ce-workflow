@@ -20,3 +20,12 @@ Planning and review done; status draft, awaiting /plan3 finish. Review accepted 
   - Check: the npm install command, then `node -p "require('./node_modules/@earendil-works/pi-coding-agent/package.json').version"` prints 1.5.2 (the package exports no ./package.json subpath).
   - Keep unrelated lockfile changes only when they are Pi 1.5.2 dependencies; note any other in the step log.
   - check: npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.5.2 && node -p "require('./node_modules/@earendil-works/pi-coding-agent/package.json').version" -> exit 0, 1.5.2. git diff package.json package-lock.json: only Pi dependencies and grok-mermaid → lovely-mermaid. npm warned about locked mobilecli cleanup and blocked dependency scripts; zero vulnerabilities.
+
+## 2026-11-11T20:57:23.383Z CU-02 done: Removed deleted Astryx watch path; advanced both source-review ledgers without runtime changes.
+
+- [x] **CU-02** Drop packages/cli/api-report.md from the meta/astryx baseline paths; advance the Astryx and OpenDesign ledgers to b8335ba and 6147958.
+  - astryx.md: add review baseline b8335ba (manifests 0.7.14) and keep fd5cf0df987791117e96ccc0bec603c64be8b136 as the previous review, runtime pins unchanged at 0.7.12; remove the api-report.md cell; list the rejected 0.7.13 Core and CLI lookup changes in one line.
+  - test-work-plan3.mjs requires the ledger to contain the baseline's current full SHA (still fd5cf0d until CU-91) and the strings 0.7.12 and 0.7.13, so the old SHA stays as history; do not weaken that assertion.
+  - open-design.md: note that 6147958 was reviewed with no changes in the review paths.
+  - Check: `node scripts/test-work-plan3.mjs` passes; `rg -n "api-report" extensions docs/upstream` finds nothing.
+  - check: node scripts/test-work-plan3.mjs -> Plan3 command self-checks passed; rg -n "api-report" extensions docs/upstream -> no matches, expected exit 1.
