@@ -677,6 +677,15 @@ try {
  await browser("click", "#prompt-form button[type=submit]");
  await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual(answers.at(-1).selections, ["Blue"]); assert.equal(answers.at(-1).comment, "Matches the boxes", "with an option chosen the text is the comment");
+ // A long list gets a filter; a short description sits on the title's line, a long one under it.
+ ask({ question: "Which builds?", options: [...Array(9).keys()].map(n => ({ title: "build " + n, description: n === 8 ? "line one\nline two" : "next version 1." + n })), allowMultiple: true, allowFreeform: false });
+ await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-description')].map(d => d.classList.contains('inline'))"), [...Array(8).fill(true), false], "short descriptions inline");
+ await browser("fill", "#prompt-form .prompt-filter", "1.3"); await browser("press", "Enter");
+ assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-option')].filter(r => r.offsetParent).map(r => r.querySelector('input').value)"), ["build 3"], "filter matches descriptions");
+ assert.equal(await evaluate("document.getElementById('prompt').open"), true, "Enter in the filter does not send");
+ await browser("click", "#prompt-form input[value='build 3']"); await browser("click", "#prompt-form button[type=submit]");
+ await browser("wait", "--fn", "!document.getElementById(\"prompt\").open"); assert.deepEqual(answers.at(-1).selections, ["build 3"]);
  ask({ question: "Pick a colour", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  await browser("click", "#prompt-form input[value=Pink]"); await browser("click", "#prompt-form input[value=Pink]");
