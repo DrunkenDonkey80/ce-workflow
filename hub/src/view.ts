@@ -15,7 +15,7 @@ const MAX_CLIENTS = 8;
 /** A row id is `<role>_<message timestamp>[_n]` (createChatMirror in chat.ts); 0 when it carries no timestamp. */
 const stamp = (id: string) => { const value = Number(/^[a-z]+_(\d+)(?:_\d+)?$/.exec(id)?.[1]); return value > 1e11 ? value : 0; };
 
-/** Message entries of the session's current branch, oldest first. Read-only; the hub never writes a session file. */
+/** Current-branch messages plus cache reset/warming markers, oldest first. Never writes a session file. */
 export async function branchMessages(file: string): Promise<{ type: "message"; message: any }[]> {
 	// shortcut: reads the whole file per request (540 MB ≈ 2 s); index line offsets if paging ever feels slow.
 	// Line by line: one string of a big file passes V8's 512 MB limit. Tool results keep only what the chat shows, since
@@ -34,7 +34,11 @@ export async function branchMessages(file: string): Promise<{ type: "message"; m
 		branch = [];
 		for (let entry = entries.findLast(item => byId.has(item?.id)); entry; entry = byId.get(entry.parentId)) branch.unshift(entry);
 	}
-	return branch.filter(entry => entry?.type === "message" && entry.message);
+	return branch.flatMap(entry => {
+		if (entry?.type === "message" && entry.message) return [entry];
+		const role = entry?.type === "compaction" ? "compactionSummary" : entry?.type === "branch_summary" ? "branchSummary" : entry?.type === "usage" && entry.kind === "cache_warm" ? "cacheWarm" : null;
+		return role ? [{ type: "message" as const, message: { role, timestamp: Date.parse(entry.timestamp), usage: entry.usage, provider: entry.provider, model: entry.model } }] : [];
+	});
 }
 
 /** Rows built by a throwaway mirror, so file rows look exactly like live ones. */
@@ -144,7 +148,7 @@ export class SessionView {
 		const at = stamp(before);
 		if (!at) throw Object.assign(new Error("Unknown chat row."), { status: 404 });
 		const older = (await this.fileEntries()).filter(entry => entry.message.timestamp < at);
-		const page = rowsOf(older.slice(-100)).page(undefined, PAGE) as Page;
+		const page = rowsOf(older).page(undefined, PAGE) as Page;
 		return { rows: page.rows, more: page.more || older.length > 100 };
 	}
 
@@ -154,7 +158,7 @@ export class SessionView {
 		const at = stamp(id);
 		if (!at) throw Object.assign(new Error("Unknown chat row."), { status: 404 });
 		const entries = (await this.fileEntries()).filter(entry => entry.message.timestamp <= at);
-		try { return rowsOf(entries.slice(-100)).row(id); } catch { throw Object.assign(new Error("Unknown chat row."), { status: 404 }); }
+		try { return rowsOf(entries).row(id); } catch { throw Object.assign(new Error("Unknown chat row."), { status: 404 }); }
 	}
 
 	close() { for (const client of this.clients) client.end(); this.clients.clear(); }

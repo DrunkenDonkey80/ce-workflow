@@ -4,7 +4,7 @@ Craft rules adapted from OpenDesign (Apache-2.0); see design-guide.UPSTREAM.md. 
 
 ## Files
 
-- Build in your design folder only: `index.html` first, one HTML file per screen (`settings.html`, `checkout.html`), a shared `styles.css`, and images under `assets/`. Never write anywhere else, also not through bash.
+- Build in your design folder only: `index.html` first, one HTML file per screen (`settings.html`, `checkout.html`), a shared `styles.css`, and images under `assets/`. For a component foundation, follow its source/build instructions instead of editing generated HTML/assets. Never write anywhere else, also not through bash.
 - Keep `DESIGN.md` in the folder current: color tokens, type scale, spacing, radii, the main components and their states. The implementer builds from it.
 - Keep each file under about 1000 lines; split scripts or styles into their own files when it grows.
 - The page runs in a sandboxed frame with an opaque origin: `localStorage`, `sessionStorage` and cookies throw. Do not use them, or wrap them in try. Fonts, images and scripts from https URLs load.
@@ -41,7 +41,7 @@ Give every element the user is likely to point at a stable `data-id="kebab-case"
 
 - Every interactive element has hover, `:focus-visible`, active and disabled styles.
 - Every list, table, form or panel that shows data covers loading, empty (headline, one sentence, one action), error (what happened, why, what to do, input kept) and populated, and survives long text and missing optional fields. Show them in the screen (a state switcher marked `data-design-chrome`) or as their own screens.
-- Forms: visible labels, validation on blur, errors next to the field.
+- Forms: visible labels, blur feedback, native validation and errors next to the field. Handle submit locally with `preventDefault()`; form navigation, popups and downloads remain blocked. Keep input on failure.
 - Touch targets at least 44 by 44 px on phone layouts and coarse-pointer tablets (use `@media (pointer: coarse)`); no hover-only actions there. Keep fine-pointer desktop controls compact.
 - Motion: 150 to 300 ms, ease-out, transform and opacity only, and honor `prefers-reduced-motion`.
 
@@ -68,6 +68,12 @@ For repeatable checks, declare named values in `designPreview.states` and pass t
 ## Images
 
 Use real visuals. Call `generate_image` for photos and illustrations and save them under `assets/` (reference them by relative path). Never hotlink placeholder services (unsplash, placehold.co, picsum). A neutral labelled placeholder box beats a wrong picture.
+
+## Generated tokens (optional, independent of React)
+
+For a coherent custom theme, call `design {action:"theme", accent:"#c2410c", neutral:"#767676", baseSize:16, typeScale:1.2, radius:8}` using the brief's colors. It asks before first-use host tooling installation, then works from the pinned offline cache. Its output is plain CSS/JSON, not a React requirement. Write the returned CSS as `tokens.css`, link it, write `theme.tokens.json`, and merge `designNotes` into `DESIGN.md` without discarding existing decisions. Use the semantic color, type and radius variables in the screens. Contrast results cover named token pairs only; keep failures visible and check actual states separately.
+
+The optional `previewControls` use the existing Tweaks/Keep flow. They expose `window.designTheme.capture()` and async `restore(value)`; compose those into your declared `designPreview` capture/restore alongside supported app drafts (do not replace or lose those drafts). Live accent edits are temporary overrides, not freshly generated ramps or contrast evidence. When Keep arrives, call theme again with its seed/typeScale/radius, retain its chosen dark mode on the root, and update all token files and notes before handoff.
 
 ## Tweaks panel (prototypes)
 

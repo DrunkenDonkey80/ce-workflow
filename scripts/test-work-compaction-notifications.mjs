@@ -1590,12 +1590,13 @@ try {
 	const selectCompactMode = mode => writeFileSync(modeSettingsFile, JSON.stringify({
 		workOrchestrator: { context: { mode, compactionModel: "__none_model__" } },
 	}));
+	// Keep the stored transcript below 150k so usage overrides isolate the trigger.
 	const boundaryMessages = [
 		{ role: "compactionSummary", summary: "Previous checkpoint" },
 		{ role: "user", content: "Original request" },
 		{ role: "assistant", content: [{ type: "thinking", thinking: "Full retained reasoning" },
 			{ type: "toolCall", id: "old", name: "read", arguments: { path: "source.md" } }] },
-		{ role: "toolResult", toolCallId: "old", toolName: "read", content: [{ type: "text", text: "Full evidence. ".repeat(30_000) }] },
+		{ role: "toolResult", toolCallId: "old", toolName: "read", content: [{ type: "text", text: "Full evidence. ".repeat(21_000) }] },
 		{ role: "assistant", content: [{ type: "text", text: "Old result" }] },
 		{ role: "user", content: "Current request" },
 		{ role: "assistant", content: [{ type: "toolCall", id: "recent", name: "read", arguments: { path: "recent.md" } }] },
@@ -1750,10 +1751,9 @@ try {
 	assert.match(nudged.messages.at(-1).content, /call compaction_note/);
 	const noted = [...boundaryMessages, { role: "assistant", content: [{ type: "toolCall", name: "compaction_note", arguments: { note: "handoff" } }] }];
 	assert.equal(await hooks.context({ messages: noted }, fullCtx), undefined, "no nudge once a note exists");
-	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 150_000 }) }), undefined, "Ultrafull no longer triggers at 150k by default");
-	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 199_999 }) }), undefined);
-	const fullAuto = await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 200_000 }) });
-	assert.equal(fullAuto.entries[0].type, "compaction", "Ultrafull publishes a real Pi checkpoint at its threshold");
+	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 149_999 }) }), undefined, "Ultrafull waits below the 150k default");
+	const fullAuto = await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 150_000 }) });
+	assert.equal(fullAuto?.entries?.[0]?.type, "compaction", "Ultrafull publishes a real Pi checkpoint at its threshold");
 	assert.equal(fullAuto.entries[0].details.compactionMode, "ultrafull");
 	assert.equal(fullAuto.entries[0].details.compactionModel, "test/summary");
 	assert.deepEqual(fullAuto.entries[0].details.files.read, ["source.md"]);
@@ -1762,9 +1762,10 @@ try {
 	assert.equal(fullCalls, 1);
 	assert.equal(fullAuto.entries[0].usage.output, 5);
 	const fullSettings = JSON.parse(readFileSync(modeSettingsFile, "utf8"));
-	fullSettings.workOrchestrator.context.compactAtTokens = 210_000;
+	fullSettings.workOrchestrator.context.compactAtTokens = 200_000;
 	writeFileSync(modeSettingsFile, JSON.stringify(fullSettings));
-	assert.equal(await hooks.turn_end(boundary, fullCtx), undefined, "an explicit threshold still overrides the 200k default");
+	assert.equal(await hooks.turn_end(boundary, { ...fullCtx, getContextUsage: () => ({ tokens: 199_999 }) }), undefined, "an explicit 200k threshold still overrides the 150k default");
+	assert.equal((await hooks.turn_end(boundary, fullCtx))?.entries?.[0]?.type, "compaction", "the explicit 200k threshold still triggers at 200k");
 	delete fullSettings.workOrchestrator.context.compactAtTokens;
 	writeFileSync(modeSettingsFile, JSON.stringify(fullSettings));
 	const smallerFull = await hooks.turn_end(boundary, { ...fullCtx,
@@ -1785,8 +1786,8 @@ try {
 	manualOptions.onComplete({});
 	let fullExitCompactions = 0;
 	await commands.research.handler("off", { ...fullCtx, isIdle: () => true,
-		getContextUsage: () => ({ tokens: 199_999 }), compact: () => { fullExitCompactions++; } });
-	assert.equal(fullExitCompactions, 0, "exiting research does not trigger Ultrafull below 200k");
+		getContextUsage: () => ({ tokens: 149_999 }), compact: () => { fullExitCompactions++; } });
+	assert.equal(fullExitCompactions, 0, "exiting research does not trigger Ultrafull below 150k");
 	rmSync(path.dirname(fullNotebook), { recursive: true, force: true });
 	assert.equal(JSON.stringify(boundaryMessages), originalBoundary, "checkpoint generation never edits the raw transcript");
 	resetContextFilter();

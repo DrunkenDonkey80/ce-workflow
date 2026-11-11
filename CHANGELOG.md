@@ -2,12 +2,31 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.7.0 — 2026-11-11
+
+### Fixed
+- Claude accounts marked last resort (`−−`) no longer inflate the hub's pooled weekly usage gauge.
+- The test-suite and changelog-screenshot launchers now request hidden child-process windows on Windows. Quiet verification retains failing test output, and browser reload checks cannot accept the old page's ready state.
+- Design preview controls wrap cleanly on phones instead of stacking letters or running off-screen, with 44px touch targets. Checked on a real Pixel 10a and at narrow, landscape and 2× UI sizes.
+- Plan3 checkpoints and native Edit/Write now share a cross-process plan lock. Conflicting edits fail clearly instead of silently disappearing; accepted edits finish before Plan3 reads the plan. Locks are released after failures, cancellation and reload. Completed updates also recover their result path when another call renames the plan.
+- Design forms can validate and save locally without allowing form navigation. Comments and inline edits work inside native dialogs and popovers; Mark replays supported unsaved drafts and live styles, and reports unsupported or failed replay instead of showing a fresh page.
+  ![Design controls, including size-only device presets](docs/changelog/astryx-comment-control.png)
+  ![Commenting on an unsaved field inside a component dialog](docs/changelog/astryx-comment-dialog.png)
+- Pi command errors and notifications now appear in the hub instead of being silently dropped, and “Message sent” no longer overwrites a notice received during sending. `/plan3 optimize` explains that it takes a plan, not source code, and suggests how to request code optimization.
 
 ### Changed
+- Design captures report their actual mouse/touch and motion capability and wait for declared readiness. A phone-sized preview does not pretend to be touch hardware. Catch up now watches the adopted Astryx APIs and browser/license contracts separately from the pinned runtime.
+- Ultrafull compact now checkpoints at 150k tokens by default in the hub and `/wo`; explicit project/global thresholds still win. A three-pair benchmark favored this as a provisional trial: fewer tokens and lower estimated cost, with no aggregate quality regression. Native 200k is unchanged.
 - Every session now follows a "locked writes" rule: code that saves shared state under a lock makes every decision from what it reads inside the lock. The rule sits in the system prompt, so it reaches sessions outside Plan3 too and survives compaction. New plans that add such a write get a test that sends the same write twice at once, versioned input for background jobs whose input can be withdrawn, and a check for reads taken before the lock. The coding benchmark showed this was the most common bug in Opus-written code.
 
 ### Added
+- Optional, experimental Astryx app designs in the existing studio: pinned components build on the host, remote clients need only a browser, failed builds keep the last good preview, and versions/clone/selection retain editable source and notices. First use asks before a shared host download; ordinary HTML and decks stay independent. The full product comparison was slower and heavier than HTML, without a demonstrated visual gain; this is not a speed optimization. Pixel touch interactions are checked; real Safari and the complete production paired remote lifecycle remain open.
+  ![First-use host download consent; remote clients install nothing](docs/changelog/astryx-runtime-consent.png)
+- Design theme generation produces standalone CSS/JSON and sampled contrast results without requiring React. Installed-version lookup returns only requested component, template, theme, documentation and hook details.
+- Every coding session now asks for a test that demonstrably catches the bug. Existing red/green bug-fix evidence counts; otherwise `test_sensitivity` runs one deliberate regression in a temporary source copy and records the baseline, failing assertion and restored result. It leaves working files alone, reports survivors and inconclusive runs, and needs no project-specific setup. This is guidance with a helper, not a hard completion gate or a guarantee against all bugs.
+- Hub Display settings can show red cache-miss warnings in Full, Thinking and Compact chat, including re-billed tokens and a cost estimate when available. The choice is remembered on each device.
+  ![Open Hub settings from the gear button](docs/changelog/0.7.0-settings-control.png)
+  ![Cache miss warnings in the Display settings](docs/changelog/0.7.0-cache-miss-settings.png)
 - Locked-writes check: when the agent writes or edits source code with a locked save whose callback ignores the current state it is handed (`transact(id, () => patch)`), the result tells it straight away to move the checks inside the callback. The benchmark found agents wrapping old code this way, which looks safe but keeps the stale read.
 
 ## 0.6.3 — 2026-11-10
@@ -288,6 +307,7 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Auto-park compacts first when the prompt cache has already run out, then parks. The first message after waking no longer waits for a compaction.
 
 ### Removed
+
 - The unused "ChatGPT Web" advisor choice in the `/wo` model pickers (it needed the separate pi-chatgpt-web package).
 
 ## 0.2.22 — 2026-11-02

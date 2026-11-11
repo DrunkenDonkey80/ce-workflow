@@ -1,0 +1,392 @@
+{
+  "frozenBriefHashesMatch": true,
+  "frozenFinalGuides": {
+    "design.ts": "8cb3e69f6067e58b39b5b1ba54e98ae23a218456f7e35ffff87c80630a8ee44a",
+    "design-guide.md": "9e51d0385914c925c946d78f2e7ba7d7dbd5df95a087c645d1948d166bd7eae0",
+    "design-guide.UPSTREAM.md": "baa428999126ad55a8d1db678d2d172f495ddc7e5dd13085a7f2fe971e5194a0",
+    "frontend-design.md": "ebecbe58900d5a9b12e14fe6a9ea667e29ff891781e37639d8e49da8a1be705b"
+  },
+  "runs": [
+    {
+      "label": "prechange-html",
+      "canonicalMetricsMatch": true,
+      "canonicalSessionCount": 1,
+      "toolErrors": 1,
+      "tools": {
+        "bash": 12,
+        "tools_enable": 1,
+        "read": 2,
+        "design": 6,
+        "write": 10,
+        "edit": 7,
+        "codemode": 4
+      },
+      "directDesignActions": {
+        "show": 1,
+        "look": 5
+      },
+      "designResultDetailKeys": [
+        "handle",
+        "name",
+        "kind",
+        "folder",
+        "files",
+        "versions",
+        "screen",
+        "shots",
+        "element"
+      ],
+      "activeElapsedMs": 558998,
+      "endToEndElapsedMs": 572068,
+      "initialRuntime": {
+        "bytes": 42991,
+        "gzipBytes": 12985,
+        "files": [
+          {
+            "name": "app.js",
+            "bytes": 14175,
+            "gzipBytes": 4504
+          },
+          {
+            "name": "data.js",
+            "bytes": 937,
+            "gzipBytes": 444
+          },
+          {
+            "name": "index.html",
+            "bytes": 5780,
+            "gzipBytes": 1731
+          },
+          {
+            "name": "settings.html",
+            "bytes": 3762,
+            "gzipBytes": 1328
+          },
+          {
+            "name": "settings.js",
+            "bytes": 1173,
+            "gzipBytes": 532
+          },
+          {
+            "name": "styles.css",
+            "bytes": 17164,
+            "gzipBytes": 4446
+          }
+        ]
+      },
+      "refinedRuntime": {
+        "bytes": 43901,
+        "gzipBytes": 13297,
+        "files": [
+          {
+            "name": "app.js",
+            "bytes": 14440,
+            "gzipBytes": 4559
+          },
+          {
+            "name": "data.js",
+            "bytes": 947,
+            "gzipBytes": 449
+          },
+          {
+            "name": "index.html",
+            "bytes": 5899,
+            "gzipBytes": 1771
+          },
+          {
+            "name": "settings.html",
+            "bytes": 3762,
+            "gzipBytes": 1328
+          },
+          {
+            "name": "settings.js",
+            "bytes": 1173,
+            "gzipBytes": 532
+          },
+          {
+            "name": "styles.css",
+            "bytes": 17680,
+            "gzipBytes": 4658
+          }
+        ]
+      },
+      "buildMs": null,
+      "coldInstallMs": null,
+      "downloadBytes": null
+    },
+    {
+      "label": "final-html",
+      "canonicalMetricsMatch": true,
+      "canonicalSessionCount": 1,
+      "toolErrors": 2,
+      "tools": {
+        "bash": 10,
+        "tools_enable": 1,
+        "read": 2,
+        "write": 9,
+        "edit": 18,
+        "design": 11
+      },
+      "directDesignActions": {
+        "look": 11
+      },
+      "designResultDetailKeys": [
+        "handle",
+        "screen",
+        "shots",
+        "element"
+      ],
+      "activeElapsedMs": 687072,
+      "endToEndElapsedMs": 690417,
+      "initialRuntime": {
+        "bytes": 50060,
+        "gzipBytes": 14476,
+        "files": [
+          {
+            "name": "app.js",
+            "bytes": 16746,
+            "gzipBytes": 5392
+          },
+          {
+            "name": "index.html",
+            "bytes": 6419,
+            "gzipBytes": 1856
+          },
+          {
+            "name": "settings.html",
+            "bytes": 3630,
+            "gzipBytes": 1213
+          },
+          {
+            "name": "settings.js",
+            "bytes": 2461,
+            "gzipBytes": 1018
+          },
+          {
+            "name": "styles.css",
+            "bytes": 20804,
+            "gzipBytes": 4997
+          }
+        ]
+      },
+      "refinedRuntime": {
+        "bytes": 52106,
+        "gzipBytes": 15035,
+        "files": [
+          {
+            "name": "app.js",
+            "bytes": 17393,
+            "gzipBytes": 5606
+          },
+          {
+            "name": "index.html",
+            "bytes": 6710,
+            "gzipBytes": 1913
+          },
+          {
+            "name": "settings.html",
+            "bytes": 3630,
+            "gzipBytes": 1213
+          },
+          {
+            "name": "settings.js",
+            "bytes": 2461,
+            "gzipBytes": 1018
+          },
+          {
+            "name": "styles.css",
+            "bytes": 21912,
+            "gzipBytes": 5285
+          }
+        ]
+      },
+      "buildMs": null,
+      "coldInstallMs": null,
+      "downloadBytes": null
+    },
+    {
+      "label": "final-astryx",
+      "canonicalMetricsMatch": true,
+      "canonicalSessionCount": 1,
+      "toolErrors": 10,
+      "tools": {
+        "bash": 48,
+        "codemode": 3,
+        "tools_enable": 1,
+        "design": 18,
+        "read": 4,
+        "write": 10,
+        "edit": 11,
+        "compaction_note": 2
+      },
+      "directDesignActions": {
+        "lookup": 1,
+        "look": 17
+      },
+      "designResultDetailKeys": [
+        "handle",
+        "screen",
+        "shots",
+        "element"
+      ],
+      "activeElapsedMs": 1980614,
+      "endToEndElapsedMs": 2039499,
+      "initialRuntime": {
+        "bytes": 2132432,
+        "gzipBytes": 583961,
+        "files": [
+          {
+            "name": "assets/app-43b0e487905bf2268e6b59ff0c1ced5c5621b3ae628e0c82d941032d681454c9.css",
+            "bytes": 10279,
+            "gzipBytes": 2891
+          },
+          {
+            "name": "assets/app-e13083f9a5438e36971e40618be371fdac59b4787626fb3d1f3bcaa1fd8ba8a5.js",
+            "bytes": 1824017,
+            "gzipBytes": 534647
+          },
+          {
+            "name": "assets/astryx-93af8dfc93783b3a3dc5e76e1b2f51f686c40b1494c581a56418619b78a28c99.css",
+            "bytes": 297027,
+            "gzipBytes": 45671
+          },
+          {
+            "name": "index.html",
+            "bytes": 553,
+            "gzipBytes": 377
+          },
+          {
+            "name": "settings.html",
+            "bytes": 556,
+            "gzipBytes": 375
+          }
+        ]
+      },
+      "refinedRuntime": {
+        "bytes": 2133482,
+        "gzipBytes": 584216,
+        "files": [
+          {
+            "name": "assets/app-cffaa298250a5e7bfb07acbfedc397076cfe90b865d970a1e88e1f5218823f72.js",
+            "bytes": 1824542,
+            "gzipBytes": 534763
+          },
+          {
+            "name": "assets/app-e5cb5f270bf18c9d90c394c98bb3e586ad1bffc3a5556420a18b5ff42c527089.css",
+            "bytes": 10804,
+            "gzipBytes": 3030
+          },
+          {
+            "name": "assets/astryx-93af8dfc93783b3a3dc5e76e1b2f51f686c40b1494c581a56418619b78a28c99.css",
+            "bytes": 297027,
+            "gzipBytes": 45671
+          },
+          {
+            "name": "index.html",
+            "bytes": 553,
+            "gzipBytes": 377
+          },
+          {
+            "name": "settings.html",
+            "bytes": 556,
+            "gzipBytes": 375
+          }
+        ]
+      },
+      "buildMs": null,
+      "coldInstallMs": null,
+      "downloadBytes": null
+    }
+  ],
+  "budget": {
+    "limit": 40,
+    "spent": 10.302076400000002,
+    "remaining": 29.697923599999996
+  },
+  "acceptance": {
+    "scope": "Refined outputs only; current production bridge/CSP, loopback Chromium, emulated touch; not a physically remote client, Safari, hardware or a WCAG audit.",
+    "parentElapsedMs": 27226,
+    "arms": {
+      "prechange-html": {
+        "cases": 12,
+        "passed": 100,
+        "total": 100,
+        "harnessExceptions": 0,
+        "failures": [],
+        "pageErrors": 0,
+        "externalRequests": 0,
+        "failedResources": 0
+      },
+      "final-html": {
+        "cases": 12,
+        "passed": 98,
+        "total": 100,
+        "harnessExceptions": 0,
+        "failures": [
+          {
+            "file": "settings.html",
+            "width": 360,
+            "height": 800,
+            "name": "phone targets 44px",
+            "ok": false,
+            "detail": [
+              {
+                "id": "notifications",
+                "text": "",
+                "w": 52,
+                "h": 30
+              },
+              {
+                "id": "appearance",
+                "text": "",
+                "w": 52,
+                "h": 30
+              }
+            ]
+          },
+          {
+            "file": "settings.html",
+            "width": 390,
+            "height": 844,
+            "name": "phone targets 44px",
+            "ok": false,
+            "detail": [
+              {
+                "id": "notifications",
+                "text": "",
+                "w": 52,
+                "h": 30
+              },
+              {
+                "id": "appearance",
+                "text": "",
+                "w": 52,
+                "h": 30
+              }
+            ]
+          }
+        ],
+        "pageErrors": 0,
+        "externalRequests": 0,
+        "failedResources": 0
+      },
+      "final-astryx": {
+        "cases": 12,
+        "passed": 100,
+        "total": 100,
+        "harnessExceptions": 0,
+        "failures": [],
+        "pageErrors": 0,
+        "externalRequests": 0,
+        "failedResources": 0
+      }
+    }
+  },
+  "instrumentationLimits": {
+    "c10BuildDuration": "Not separately instrumented; included in active/end-to-end time. Do not treat null as zero.",
+    "c10Install": "Warm approved host cache, no new provisioning run. Cold install/download timings are not measured by this C10 driver; C11 independently recorded zero downloads.",
+    "runtimeBytes": "Sum of local runtime HTML/CSS/JS/assets for both screens, excluding source/docs/checks. gzip is per-file level9; not a wire capture, renderDesign envelope, or simulated remote transfer.",
+    "toolErrors": "Count of canonical toolResult.isError, distinct from zero provider errors; failed attempts are retained in totals.",
+    "context": "Complete effective system prompts and all imported module snapshots were not retained. Frozen four guide/module copies match across final arms. Dirty-tree/model variance prevents causal attribution."
+  }
+}

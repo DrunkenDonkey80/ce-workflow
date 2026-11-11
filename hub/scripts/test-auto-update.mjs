@@ -34,5 +34,11 @@ try {
 	clock += 6 * 3_600_000 + 1; await again.tick();
 	assert.equal(maintained.length, 3, "and is tried again after them");
 	assert.equal(createAutoUpdate({ state: () => ({ pi: null, packages: [], checkedAt: 1, checking: false }), refresh: async () => {}, busy: () => [], loaded: "1", disk: () => "1", attemptsFile, maintain: async () => {} }).waiting(), null, "nothing new: no waiting");
+	// UI-only fixtures must not turn their displayed package names into real installs or maintenance.
+	for (const value of [{ pi: null, packages: ["ce-workflow"], checkedAt: 1, checking: false }, { pi: null, packages: [], checkedAt: 1, checking: false, installed: [{ source: "npm:fixture", name: "fixture", version: "1", update: false }] }]) {
+		const fixture = createAutoUpdate({ state: () => value, refresh: async () => assert.fail("fixture refresh"), busy: () => [], loaded: "1", disk: () => "1", attemptsFile: path.join(dir, "fixture.json"), download: async () => assert.fail("fixture install"), maintain: async () => assert.fail("fixture maintenance") });
+		await fixture.tick(); await fixture.tick();
+		assert.equal(fixture.waiting(), null, "non-actionable fixture has no pending maintenance");
+	}
 	console.log("auto-update ok");
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }

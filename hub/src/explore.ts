@@ -12,6 +12,7 @@ import { linkedFile } from "./linked-files.ts";
 import { sevenZip } from "./wormhole.ts";
 import { DESIGN_CSP, SANDBOX_CSP } from "../../extensions/design-render.ts";
 import { withBridge } from "./design-bridge.ts";
+import { appPreviewFolder, buildInfo } from "../../extensions/design-build.ts";
 
 export const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
 const TAR_FAMILY = /\.(?:tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i, MAX_ARCHIVE = 2e9, MAX_FILES = 5000;
@@ -80,8 +81,10 @@ export async function designPage(project: string, handle: string, screen = "inde
 	// S09: a kept version is history/<handle>/<n>/, read-only by convention (only design restore copies it back).
 	const place = version ? join(".pi", "designs", "history", handle, String(version)) : join(".pi", "designs", handle);
 	const base = await realpath(project).catch(() => undefined), dir = base && await realpath(join(base, place)).catch(() => undefined);
-	const page = dir && await realpath(join(dir, screen)).catch(() => undefined);
-	return base && dir && page && relative(base, dir) === place && dirname(page) === dir ? page : undefined;
+	if (!base || !dir || relative(base, dir) !== place) return undefined;
+	let preview: string; try { preview = appPreviewFolder(dir, !!version); } catch { return undefined; }
+	const page = await realpath(join(preview, screen)).catch(() => undefined);
+	return page && dirname(page) === preview ? page : undefined;
 }
 // A design screen: an HTML file directly in the design folder (D7).
 const SCREEN = /^[\w.-]+\.html?$/i;
@@ -91,7 +94,8 @@ export async function designLists(project: string, handle: string) {
 	const screens = (await names(join(project, ".pi", "designs", handle))).filter(entry => entry.isFile() && SCREEN.test(entry.name)).map(entry => entry.name)
 		.sort((a, b) => Number(b === "index.html") - Number(a === "index.html") || a.localeCompare(b));
 	const versions = (await names(join(project, ".pi", "designs", "history", handle))).filter(entry => entry.isDirectory() && /^\d+$/.test(entry.name)).map(entry => Number(entry.name)).sort((a, b) => a - b);
-	return { screens, versions };
+	const build = buildInfo(join(project, ".pi", "designs", handle));
+	return { screens: build ? build.screens.sort((a, b) => Number(b === "index.html") - Number(a === "index.html") || a.localeCompare(b)) : screens, versions, ...build ? { build } : {} };
 }
 /**
  * S08: while a design view is open, its folder and history are watched; a burst of events that changed the screen or

@@ -218,7 +218,7 @@ const DEFAULT_CONTEXT = {
 };
 const COMPACTION_MODES = [
 	{ value: "ultracompact", label: "Ultracompact", description: "Early summaries and rolling evidence stripping (existing behavior)." },
-	{ value: "ultrafull", label: "Ultrafull compact", description: "Real checkpoints at 200k by default, with a recent tail and the configured summarizer; no rolling stripping." },
+	{ value: "ultrafull", label: "Ultrafull compact", description: "Real checkpoints at 150k by default, with a recent tail and the configured summarizer; no rolling stripping." },
 	{ value: "native", label: "Native", description: "Pi's built-in compaction only; no Ultracompact filtering." },
 	{ value: "native-200k", label: "Native 200k", description: "Native summaries by 200k (earlier for proxy headroom), after tools finish; research suspends this trigger." },
 ];
@@ -377,8 +377,7 @@ function contextSettings(settings) {
 	const configured = settings.workOrchestrator?.context ?? {};
 	const mode = COMPACTION_MODES.some(item => item.value === configured.mode)
 		? configured.mode : configured.enabled === false ? "native" : "ultracompact";
-	return { ...DEFAULT_CONTEXT, compactAtTokens: mode === "ultrafull" ? 200_000 : DEFAULT_CONTEXT.compactAtTokens,
-		...configured, mode, enabled: usesUltraSummary(mode) };
+	return { ...DEFAULT_CONTEXT, ...configured, mode, enabled: usesUltraSummary(mode) };
 }
 
 export function compactionModeSettings(cwd, settings = readEffectiveSettings(cwd)) {

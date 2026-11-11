@@ -1,79 +1,79 @@
 {
  "version": 1,
- "activeMs": 42085412,
- "runs": 3,
- "waitingMs": 28983048,
- "toolWallMs": 3765442,
+ "activeMs": 63687353,
+ "runs": 9,
+ "waitingMs": 29132609,
+ "toolWallMs": 9035639,
  "compactions": {
   "count": 0,
   "ms": 0
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 8,
-   "thinkingMs": 38551,
-   "actingMs": 19066,
-   "input": 24,
-   "output": 3453,
-   "cacheRead": 600806,
-   "cacheWrite": 104814,
-   "cost": 0.7133872,
+   "replies": 12,
+   "thinkingMs": 54994,
+   "actingMs": 28093,
+   "input": 36,
+   "output": 5469,
+   "cacheRead": 810328,
+   "cacheWrite": 387527,
+   "cost": 2.2092245999999998,
    "errors": 0
   },
   "openai-codex/gpt-6.1-sol:high": {
-   "replies": 323,
-   "thinkingMs": 8187204,
-   "actingMs": 861458,
-   "input": 1850932,
-   "output": 300626,
-   "cacheRead": 40212608,
+   "replies": 659,
+   "thinkingMs": 22036995,
+   "actingMs": 1896143,
+   "input": 3317967,
+   "output": 700343,
+   "cacheRead": 82224256,
    "cacheWrite": 0,
-   "cost": 10.729384799999998,
-   "errors": 0
+   "cost": 21.86178960000002,
+   "errors": 1
   }
  },
  "tools": {
   "plan3": {
-   "count": 59,
-   "ms": 11687,
+   "count": 121,
+   "ms": 20985,
    "maxMs": 2575,
    "failures": 2
   },
   "bash": {
-   "count": 225,
-   "ms": 3017175,
-   "maxMs": 187027,
-   "failures": 46
+   "count": 375,
+   "ms": 7992925,
+   "maxMs": 357968,
+   "failures": 73
   },
   "lens_diagnostics": {
-   "count": 20,
-   "ms": 168248,
+   "count": 34,
+   "ms": 290843,
    "maxMs": 26587,
    "failures": 0
   },
   "read": {
-   "count": 234,
-   "ms": 4187,
-   "maxMs": 779,
-   "failures": 5
+   "count": 503,
+   "ms": 9618,
+   "maxMs": 986,
+   "failures": 11
   },
   "codemode": {
-   "count": 146,
-   "ms": 2465289,
-   "maxMs": 226609,
-   "failures": 14
+   "count": 297,
+   "ms": 6186891,
+   "maxMs": 360233,
+   "failures": 25
   },
   "module_report": {
-   "count": 17,
-   "ms": 403,
+   "count": 32,
+   "ms": 626,
    "maxMs": 84,
    "failures": 0
   },
   "read_symbol": {
-   "count": 12,
-   "ms": 275,
+   "count": 53,
+   "ms": 935,
    "maxMs": 92,
-   "failures": 0
+   "failures": 1
   },
   "jev_triage": {
    "count": 1,
@@ -82,20 +82,20 @@
    "failures": 0
   },
   "edit": {
-   "count": 94,
-   "ms": 2825,
+   "count": 196,
+   "ms": 3348,
    "maxMs": 2311,
-   "failures": 1
+   "failures": 5
   },
   "jev_evidence": {
-   "count": 11,
-   "ms": 64011,
+   "count": 18,
+   "ms": 99655,
    "maxMs": 12270,
    "failures": 1
   },
   "write": {
-   "count": 20,
-   "ms": 48,
+   "count": 35,
+   "ms": 70,
    "maxMs": 13,
    "failures": 0
   },
@@ -106,10 +106,10 @@
    "failures": 0
   },
   "lsp_navigation": {
-   "count": 8,
-   "ms": 8170,
+   "count": 96,
+   "ms": 13241,
    "maxMs": 4270,
-   "failures": 0
+   "failures": 9
   },
   "read_enclosing": {
    "count": 4,
@@ -118,57 +118,57 @@
    "failures": 1
   },
   "resolve-library-id": {
-   "count": 4,
-   "ms": 5104,
-   "maxMs": 1350,
+   "count": 11,
+   "ms": 14265,
+   "maxMs": 1688,
    "failures": 0
   },
   "schedule": {
-   "count": 3,
-   "ms": 911,
+   "count": 5,
+   "ms": 1344,
    "maxMs": 455,
-   "failures": 1
+   "failures": 2
   },
   "query-docs": {
-   "count": 6,
-   "ms": 6310,
-   "maxMs": 1552,
+   "count": 16,
+   "ms": 17606,
+   "maxMs": 1666,
    "failures": 0
   },
   "compaction_note": {
-   "count": 3,
+   "count": 6,
    "ms": 0,
    "maxMs": 0,
    "failures": 0
   },
   "lens_diagnostic_mark": {
-   "count": 14,
-   "ms": 6493,
+   "count": 15,
+   "ms": 6513,
    "maxMs": 875,
    "failures": 0
   },
   "subagents_enable": {
-   "count": 5,
-   "ms": 5,
+   "count": 7,
+   "ms": 7,
    "maxMs": 1,
    "failures": 0
   },
   "subagent": {
-   "count": 11,
-   "ms": 5568,
+   "count": 17,
+   "ms": 6497,
    "maxMs": 2455,
    "failures": 1
   },
   "symbol_search": {
-   "count": 2,
-   "ms": 803,
-   "maxMs": 422,
+   "count": 5,
+   "ms": 1892,
+   "maxMs": 613,
    "failures": 0
   },
   "project_report": {
-   "count": 1,
-   "ms": 16,
-   "maxMs": 16,
+   "count": 2,
+   "ms": 33,
+   "maxMs": 17,
    "failures": 0
   },
   "fetch_content": {
@@ -180,16 +180,16 @@
  },
  "categories": {
   "shell": {
-   "count": 141,
-   "ms": 241682,
-   "maxMs": 26055,
-   "failures": 20
+   "count": 236,
+   "ms": 729999,
+   "maxMs": 122524,
+   "failures": 30
   },
   "test": {
-   "count": 84,
-   "ms": 2775493,
-   "maxMs": 187027,
-   "failures": 26
+   "count": 139,
+   "ms": 7262926,
+   "maxMs": 357968,
+   "failures": 43
   }
  },
  "commands": {
@@ -275,12 +275,6 @@
    "count": 1,
    "ms": 714,
    "maxMs": 714,
-   "failures": 0
-  },
-  "bash\u0000node -e \"const fs=require(\\\"node:fs\\\");const p=JSON.parse(fs.readFileSync(process.env.USERPROFILE+\\\"/.pi/agent/settings.json\\\"));console.log(JSON.stringify({packages:p.packages,extensions:p.extensions": {
-   "count": 1,
-   "ms": 87,
-   "maxMs": 87,
    "failures": 0
   },
   "bash\u0000ROOT=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\"; DEST=\"./docs/proposals/astryx-study\"; mkdir -p \"$DEST/fixtures/html\" \"$DEST/fixtures/astryx/public\" \"$DEST/parent-checks\" \"$DEST/": {
@@ -380,8 +374,8 @@
    "failures": 0
   },
   "bash\u0000git status --short": {
-   "count": 1,
-   "ms": 104,
+   "count": 2,
+   "ms": 195,
    "maxMs": 104,
    "failures": 0
   },
@@ -433,12 +427,6 @@
    "maxMs": 189,
    "failures": 1
   },
-  "bash\u0000ls \"C:/Users/Flex/AppData/Local/ms-playwright/chromium-1243\"; ls \"C:/Users/Flex/AppData/Local/ms-playwright/chromium_headless_shell-1243\"": {
-   "count": 1,
-   "ms": 100,
-   "maxMs": 100,
-   "failures": 0
-  },
   "bash\u0000STUDY_DEPS=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules\" CHROME_PATH=\"C:/Users/Flex/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe\" node \"docs/proposals/a": {
    "count": 10,
    "ms": 66345,
@@ -458,10 +446,10 @@
    "failures": 0
   },
   "bash\u0000node \"scripts/test-work-design.mjs\"": {
-   "count": 4,
-   "ms": 143030,
-   "maxMs": 61555,
-   "failures": 1
+   "count": 9,
+   "ms": 408469,
+   "maxMs": 71387,
+   "failures": 2
   },
   "bash\u0000node --no-warnings \"hub/scripts/test-explore.mjs\"": {
    "count": 7,
@@ -470,10 +458,10 @@
    "failures": 1
   },
   "bash\u0000node --no-warnings \"hub/scripts/test-browser.mjs\"": {
-   "count": 9,
-   "ms": 630194,
-   "maxMs": 131395,
-   "failures": 6
+   "count": 12,
+   "ms": 1062275,
+   "maxMs": 174034,
+   "failures": 7
   },
   "bash\u0000node --no-warnings \"hub/scripts/test-api.mjs\"": {
    "count": 4,
@@ -511,36 +499,6 @@
    "maxMs": 150,
    "failures": 0
   },
-  "bash\u0000df -h \".\"": {
-   "count": 1,
-   "ms": 84,
-   "maxMs": 84,
-   "failures": 0
-  },
-  "bash\u0000rg -n \"STUDY_ROOT|STUDY_DEPS|CHROME_PATH|production|parent-production\" \"docs/proposals/astryx-study/README.md\" \"docs/proposals/astryx-study/contracts.md\"": {
-   "count": 1,
-   "ms": 90,
-   "maxMs": 90,
-   "failures": 0
-  },
-  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq\" && ls \".pi/astryx-product-benchmark\"": {
-   "count": 1,
-   "ms": 77,
-   "maxMs": 77,
-   "failures": 0
-  },
-  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison\" && ls \"C:/Users/Flex/AppData/Local/ms-playwright\"": {
-   "count": 1,
-   "ms": 88,
-   "maxMs": 88,
-   "failures": 0
-  },
-  "bash\u0000rg --files -g \"AGENTS.md\" \"hub\"": {
-   "count": 1,
-   "ms": 86,
-   "maxMs": 86,
-   "failures": 1
-  },
   "bash\u0000git diff -- \"hub/src/design-bridge.ts\" \"hub/web/app.ts\" \"hub/scripts/test-browser.mjs\"": {
    "count": 1,
    "ms": 921,
@@ -571,22 +529,10 @@
    "maxMs": 179,
    "failures": 0
   },
-  "bash\u0000rm -rf \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-workflow--/2026-11-09T10-49-03-483Z_01a1bfed-02f9-7250-b266-97f578ec10cd/forks/635d6e82-f187-471c-813b-87f4c529427f\"": {
-   "count": 1,
-   "ms": 63,
-   "maxMs": 63,
-   "failures": 0
-  },
   "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" open --help": {
    "count": 1,
    "ms": 530,
    "maxMs": 530,
-   "failures": 0
-  },
-  "bash\u0000ls \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser\"": {
-   "count": 1,
-   "ms": 51,
-   "maxMs": 51,
    "failures": 0
   },
   "bash\u0000ls \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/cli\" && rg -n \"wait-until|wait_until\" \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/README.md\"": {
@@ -661,18 +607,6 @@
    "maxMs": 486,
    "failures": 0
   },
-  "bash\u0000rg -n \"annotate-note|design-mark|coordinate|canvas|style.font\" \"hub/scripts/test-browser.mjs\" \"hub/web/annotate.ts\" \"hub/web/app.ts\" \"hub/src/api.ts\"": {
-   "count": 1,
-   "ms": 84,
-   "maxMs": 84,
-   "failures": 0
-  },
-  "bash\u0000git diff -- \"hub/web/styles.css\" \"hub/web/app.ts\" \"hub/scripts/test-browser.mjs\"": {
-   "count": 1,
-   "ms": 85,
-   "maxMs": 85,
-   "failures": 0
-  },
   "bash\u0000rg -n \"annotate|focus\" \"docs/adr\" \"docs/adrs\" -g \"*.md\"": {
    "count": 1,
    "ms": 633,
@@ -697,40 +631,16 @@
    "maxMs": 651,
    "failures": 0
   },
-  "bash\u0000git diff -- \"extensions/design.ts\" \"extensions/design-guide.md\" \"hub/web/design-view.ts\" \"hub/web/files.ts\" \"scripts/test-work-design.mjs\"": {
-   "count": 1,
-   "ms": 84,
-   "maxMs": 84,
-   "failures": 0
-  },
-  "bash\u0000git diff -- \"extensions/design.ts\" \"extensions/design-guide.md\" \"docs/proposals/astryx-study/probes/input-contract.mjs\"": {
-   "count": 1,
-   "ms": 73,
-   "maxMs": 73,
-   "failures": 0
-  },
   "bash\u0000git diff --check && git diff --numstat -- \"extensions/design-render.ts\" \"extensions/design.ts\" \"extensions/design-guide.md\" \"scripts/test-work-design.mjs\" \"hub/web/design-view.ts\" \"hub/web/files.ts\" \"": {
    "count": 1,
    "ms": 1831,
    "maxMs": 1831,
    "failures": 0
   },
-  "bash\u0000git diff -- \"hub/scripts/test-browser.mjs\"": {
-   "count": 1,
-   "ms": 78,
-   "maxMs": 78,
-   "failures": 0
-  },
   "bash\u0000printf \"%s\" \"ZGlmZiAtLWdpdCBhL2h1Yi9zY3JpcHRzL3Rlc3QtYnJvd3Nlci5tanMgYi9odWIvc2NyaXB0cy90ZXN0LWJyb3dzZXIubWpzCmluZGV4IDc5OGVjOWZjLi5jMjI3YWZhMyAxMDA2NDQKLS0tIGEvaHViL3NjcmlwdHMvdGVzdC1icm93c2VyLm1qcwo": {
    "count": 1,
    "ms": 124,
    "maxMs": 124,
-   "failures": 0
-  },
-  "bash\u0000git diff -- \"hub/web/app.ts\"": {
-   "count": 1,
-   "ms": 98,
-   "maxMs": 98,
    "failures": 0
   },
   "bash\u0000printf \"%s\" \"ZGlmZiAtLWdpdCBhL2h1Yi93ZWIvYXBwLnRzIGIvaHViL3dlYi9hcHAudHMKaW5kZXggNjA2NGFiY2QuLjVhNDA5NjJlIDEwMDY0NAotLS0gYS9odWIvd2ViL2FwcC50cworKysgYi9odWIvd2ViL2FwcC50cwpAQCAtOCw2ICs4LDcgQEAgaW1wb3J": {
@@ -749,12 +659,6 @@
    "count": 1,
    "ms": 667,
    "maxMs": 667,
-   "failures": 0
-  },
-  "bash\u0000rg -n \"designshot|styleEdits|renderDesign|MarkState|designFrame|withBridge\" \"hub/scripts/test-api.mjs\" \"hub/scripts/test-explore.mjs\" \"scripts/test-work-design.mjs\" \"extensions\" \"hub\" -g \"*.ts\" -g \"*.": {
-   "count": 1,
-   "ms": 95,
-   "maxMs": 95,
    "failures": 0
   },
   "bash\u0000rg -n \"design-view|annotate.js|forms.js|assets|WEB|\\.ts\" \"hub/src/hub.ts\" \"hub/src/assets.ts\"": {
@@ -781,18 +685,6 @@
    "maxMs": 187027,
    "failures": 1
   },
-  "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" --session \"hub-ui-53088\" --json eval -b \"KHtub3RpY2U6ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ25vdGljZScpLnRleHRD": {
-   "count": 1,
-   "ms": 64,
-   "maxMs": 64,
-   "failures": 0
-  },
-  "bash\u0000compgen -G \"C:/Users/Flex/AppData/Local/Temp/*astryx*\"": {
-   "count": 1,
-   "ms": 93,
-   "maxMs": 93,
-   "failures": 0
-  },
   "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" --session \"hub-ui-53088\" --json close; compgen -G \"C:/Users/Flex/AppData/Local/Temp/*study*\"; compgen -G ": {
    "count": 1,
    "ms": 384,
@@ -817,18 +709,6 @@
    "maxMs": 610,
    "failures": 0
   },
-  "bash\u0000rg -n --max-columns 300 --max-columns-preview \"STUDY_DEPS|state-contract|node_modules|P3-02\" \"docs/plans/logs/55b392b8.md\"": {
-   "count": 1,
-   "ms": 87,
-   "maxMs": 87,
-   "failures": 0
-  },
-  "bash\u0000git status --short && compgen -G \"C:/SOFT/git/*astryx*\" && compgen -G \"C:/Users/Flex/AppData/Local/Temp/*studio*\"": {
-   "count": 1,
-   "ms": 89,
-   "maxMs": 89,
-   "failures": 1
-  },
   "bash\u0000node -e \"for(const name of ['react','react-dom/client','esbuild','playwright']){try{console.log(name,import.meta.resolve(name))}catch{console.log(name,'missing')}}\"; compgen -G \"C:/Temp/*astryx*\"; com": {
    "count": 1,
    "ms": 408,
@@ -840,12 +720,6 @@
    "ms": 334,
    "maxMs": 334,
    "failures": 1
-  },
-  "bash\u0000rg -n --max-columns 300 --max-columns-preview \"Temp|node_modules|clone|scratch\" \"docs/proposals/astryx-study/astryx-assessment.md\" \"docs/proposals/astryx-study/comparison-report.md\" \"docs/proposals/as": {
-   "count": 1,
-   "ms": 101,
-   "maxMs": 101,
-   "failures": 0
   },
   "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq\"; ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial\"; compgen -G \"C:/Users/Flex/AppData/Local/ms-playwright/chromium-1243/*\"; compge": {
    "count": 1,
@@ -919,12 +793,6 @@
    "maxMs": 454,
    "failures": 0
   },
-  "bash\u0000df -h \"C:/Users/Flex/.pi/agent\"": {
-   "count": 1,
-   "ms": 91,
-   "maxMs": 91,
-   "failures": 0
-  },
   "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" --session \"hub-ui-24092\" --json close": {
    "count": 1,
    "ms": 315,
@@ -985,12 +853,6 @@
    "maxMs": 437,
    "failures": 0
   },
-  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq\" && find \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules/@stylexjs\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq": {
-   "count": 1,
-   "ms": 100,
-   "maxMs": 100,
-   "failures": 0
-  },
   "bash\u0000node --input-type=module -e \"import fs from \\\"node:fs\\\";import os from \\\"node:os\\\";import path from \\\"node:path\\\";import{execFileSync}from\\\"node:child_process\\\";const dir=fs.mkdtempSync(path.join(os.t": {
    "count": 1,
    "ms": 3032,
@@ -1003,12 +865,6 @@
    "maxMs": 144,
    "failures": 0
   },
-  "bash\u0000node -e \"process.stdout.write(require(\\\"node:fs\\\").readFileSync(\\\"C:/Users/Flex/AppData/Local/Temp/ce-astryx-lock-ZpvTDR/package.json\\\",\\\"utf8\\\"))\"": {
-   "count": 1,
-   "ms": 93,
-   "maxMs": 93,
-   "failures": 0
-  },
   "bash\u0000node -e \"process.stdout.write(require(\\\"node:fs\\\").readFileSync(\\\"C:/Users/Flex/AppData/Local/Temp/ce-astryx-lock-ZpvTDR/package-lock.json\\\",\\\"utf8\\\"))\"": {
    "count": 1,
    "ms": 108,
@@ -1019,12 +875,6 @@
    "count": 1,
    "ms": 229,
    "maxMs": 229,
-   "failures": 0
-  },
-  "bash\u0000node -e \"const fs=require(\\\"node:fs\\\");for(const f of [\\\"manifest.json\\\",\\\"runtime-lock.json\\\",\\\"notices.json\\\",\\\"upstream-notices.json\\\"]){const t=fs.readFileSync(\\\"extensions/astryx-runtime/\\\"+f,\\\"u": {
-   "count": 1,
-   "ms": 97,
-   "maxMs": 97,
    "failures": 0
   },
   "bash\u0000node --no-warnings --input-type=module -e \"import {ensureDesignRuntime} from \\\"./extensions/design-runtime.ts\\\";const cold=await ensureDesignRuntime({confirm:async()=>true,progress:console.log});conso": {
@@ -1045,15 +895,9 @@
    "maxMs": 371,
    "failures": 0
   },
-  "bash\u0000rm \"./extensions/astryx-runtime/upstream-notices.json\"": {
-   "count": 1,
-   "ms": 86,
-   "maxMs": 86,
-   "failures": 0
-  },
   "bash\u0000node \"scripts/test-work-tool-loader.mjs\"": {
-   "count": 1,
-   "ms": 147,
+   "count": 2,
+   "ms": 281,
    "maxMs": 147,
    "failures": 0
   },
@@ -1099,12 +943,6 @@
    "maxMs": 394,
    "failures": 0
   },
-  "bash\u0000node -e \"console.log(JSON.stringify(Object.fromEntries(Object.entries(process.env).filter(([k])=>/^PI_.*SESSION/.test(k)&&!/TOKEN|KEY|AUTH|SECRET/.test(k)))));\"": {
-   "count": 1,
-   "ms": 97,
-   "maxMs": 97,
-   "failures": 0
-  },
   "bash\u0000ls -lh \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-workflow--/2026-11-09T10-49-03-483Z_01a1bfed-02f9-7250-b266-97f578ec10cd.jsonl\" && df -h \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-wo": {
    "count": 1,
    "ms": 224,
@@ -1115,12 +953,6 @@
    "count": 1,
    "ms": 736,
    "maxMs": 736,
-   "failures": 0
-  },
-  "bash\u0000ls \"./docs/proposals/astryx-study\"": {
-   "count": 1,
-   "ms": 58,
-   "maxMs": 58,
    "failures": 0
   },
   "bash\u0000npm pack --dry-run --json --ignore-scripts | node -e \"const fs=require(\\\"node:fs\\\"),assert=require(\\\"node:assert/strict\\\"),raw=fs.readFileSync(0,\\\"utf8\\\"),v=JSON.parse(raw),p=Array.isArray(v)?v[0]:Obj": {
@@ -1135,10 +967,430 @@
    "maxMs": 429,
    "failures": 0
   },
-  "bash\u0000rm -rf \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-workflow--/2026-11-09T10-49-03-483Z_01a1bfed-02f9-7250-b266-97f578ec10cd/forks/118a9b55-5c07-4884-99b7-b638a5b7f219\"": {
+  "bash\u0000git add -- \"extensions/design-runtime.ts\" \"extensions/astryx-runtime/manifest.json\" \"extensions/astryx-runtime/runtime-lock.json\" \"extensions/astryx-runtime/notices.json\" \"scripts/test-work-design.mjs": {
    "count": 1,
-   "ms": 65,
-   "maxMs": 65,
+   "ms": 1504,
+   "maxMs": 1504,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/cli/api/theme\" && rg -n \"askConfirm|theme": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import {pathToFileURL} from \\\"node:url\\\";const {generateTonalPalette}=await import(pathToFileURL(\\\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b6": {
+   "count": 1,
+   "ms": 917,
+   "maxMs": 917,
+   "failures": 0
+  },
+  "bash\u0000git status --short && git log -3 --oneline && git branch --show-current && rg -n \"tweaks|designFrame|designHtml|design-keep-tweaks|design-example\" \"hub/scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 557,
+   "maxMs": 557,
+   "failures": 0
+  },
+  "bash\u0000git status --short && git log -3 --oneline && git branch --show-current && rg -n \"tweaks|designFrame|designHtml|design-keep-tweaks\" \"hub/scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 1263,
+   "maxMs": 1263,
+   "failures": 0
+  },
+  "bash\u0000git diff -- \"hub/src/scheduler.ts\" && git show \"HEAD:hub/src/scheduler.ts\" | rg -n \"spawn|child.stdout|child.stderr|stdio\"": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"pi-coding-agent|instructions|extension\" \"scripts/test-work-design.mjs\"": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"extensions/design-theme.ts\" \"extensions/design.ts\" \"extensions/design-guide.md\" \"scripts/test-work-design.mjs\" \"hub/scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 344,
+   "maxMs": 344,
+   "failures": 0
+  },
+  "bash\u0000rg --files \"hub/scripts\" -g \"*sched*\" && rg -n \"runScript\\(\" \"hub\" --glob \"*.ts\" --glob \"*.mjs\"": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"hub/scripts/test-scheduler.mjs\"": {
+   "count": 1,
+   "ms": 11238,
+   "maxMs": 11238,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import {runTheme} from \\\"./extensions/design-theme.ts\\\";const start=performance.now();const result=await runTheme({accent:\\\"#c2410c\\\"},{confirm:async()=>{throw Error(\\\"Une": {
+   "count": 2,
+   "ms": 17731,
+   "maxMs": 9401,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import {createHash} from \\\"node:crypto\\\";import {themeInput,themeTokens} from \\\"./extensions/design-theme.ts\\\";const ramp=Object.fromEntries(Array.from({length:21},(_,i)=>": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000git diff -- \"extensions/design.ts\" \"extensions/design-guide.md\" \"scripts/test-work-design.mjs\" \"hub/src/scheduler.ts\" && git diff --numstat -- \"hub/scripts/test-browser.mjs\" \"CHANGELOG.md\"": {
+   "count": 1,
+   "ms": 118,
+   "maxMs": 118,
+   "failures": 0
+  },
+  "bash\u0000git status --short && git diff --check": {
+   "count": 1,
+   "ms": 965,
+   "maxMs": 965,
+   "failures": 0
+  },
+  "bash\u0000ls \"docs/proposals/astryx-study\" && ls \"docs/proposals/astryx-study/probes\"": {
+   "count": 1,
+   "ms": 1175,
+   "maxMs": 1175,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"loadProject|loadConfig|findUp|fetch|write|async function component|export async function|linkSearchResponse\" \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2": {
+   "count": 1,
+   "ms": 472,
+   "maxMs": 472,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import {pathToFileURL} from \\\"node:url\\\";const cwd=\\\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/": {
+   "count": 1,
+   "ms": 2686,
+   "maxMs": 2686,
+   "failures": 0
+  },
+  "bash\u0000git status --short && rg -n \"lookup|theme|astryx|ThemeOptions|generateTheme|design_theme|paramsSchema|Type.Object|action:\" \"./extensions/work-design-tools.ts\" \"./scripts/test-work-design.mjs\" \"./exten": {
+   "count": 1,
+   "ms": 999,
+   "maxMs": 999,
+   "failures": 1
+  },
+  "bash\u0000node \"./scripts/test-work-design.mjs\"": {
+   "count": 14,
+   "ms": 1529796,
+   "maxMs": 264874,
+   "failures": 8
+  },
+  "bash\u0000node \"./scripts/test-work-tool-loader.mjs\"": {
+   "count": 7,
+   "ms": 3972,
+   "maxMs": 1154,
+   "failures": 0
+  },
+  "bash\u0000ls \"./docs/proposals/astryx-study/probes\" && git diff --stat -- \"extensions/design.ts\" \"extensions/design-theme.ts\" \"scripts/test-work-design.mjs\" && rg -n \"lookup|search|bounded\" \"./docs/proposals/as": {
+   "count": 1,
+   "ms": 412,
+   "maxMs": 412,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import {runLookup} from \\\"./extensions/design-lookup.ts\\\";import {ensureDesignRuntime} from \\\"./extensions/design-runtime.ts\\\";const options={confirm:async()=>{throw Error": {
+   "count": 1,
+   "ms": 60772,
+   "maxMs": 60772,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"systems|system.commit|system:|airbnb|SYSTEMS|SOURCE.json\" \"./scripts/test-work-design.mjs\" \"./extensions/design.ts\" \"./extensions/design-render.ts\" \"./hub/src/design-preview.ts\"": {
+   "count": 1,
+   "ms": 341,
+   "maxMs": 341,
+   "failures": 1
+  },
+  "bash\u0000node --input-type=module -e \"import {runLookup} from \\\"./extensions/design-lookup.ts\\\";import {runTheme} from \\\"./extensions/design-theme.ts\\\";const options={confirm:async()=>{throw Error(\\\"No additio": {
+   "count": 1,
+   "ms": 25775,
+   "maxMs": 25775,
+   "failures": 0
+  },
+  "bash\u0000git diff --check && git diff --stat -- \"extensions/design.ts\" \"scripts/test-work-design.mjs\" && git status --short -- \"extensions/design-library.ts\" \"extensions/design-lookup.ts\" \"extensions/design-th": {
+   "count": 1,
+   "ms": 185,
+   "maxMs": 185,
+   "failures": 0
+  },
+  "bash\u0000ls \"./hub/src\" && rg -n \"font-face|url\\(|--font\" \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxde": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 1
+  },
+  "bash\u0000rg --files -g \"*.woff2\" -g \"*.woff\" -g \"*.ttf\" -g \"*.otf\" \".\"": {
+   "count": 1,
+   "ms": 978,
+   "maxMs": 978,
+   "failures": 1
+  },
+  "bash\u0000git status --short && rg -n \"design-lists|designLists|versions.*screen|design-screen|design-versions\" \"./hub/web/app.ts\" \"./hub/src/api.ts\" \"./hub/src/explore.ts\"": {
+   "count": 1,
+   "ms": 404,
+   "maxMs": 404,
+   "failures": 0
+  },
+  "bash\u0000ls \"./docs/proposals/astryx-study\" && rg -n \"file-changed|design-lists|design-screen|design-version|design.view|designView|data-design\" \"./hub/web/app.ts\"": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"report\\.(errors|failed|resources|state|ready|input)|designshot|files-head|design-tools\" \"./scripts/test-work-design.mjs\" \"./hub/web/styles.css\" \"./hub/web/app.ts\"": {
+   "count": 1,
+   "ms": 361,
+   "maxMs": 361,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"./hub/scripts/test-sessions.mjs\"": {
+   "count": 3,
+   "ms": 23866,
+   "maxMs": 9183,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 59,
+   "ms": 4814,
+   "maxMs": 101,
+   "failures": 5
+  },
+  "bash\u0000node --no-warnings \"./hub/scripts/test-explore.mjs\"": {
+   "count": 1,
+   "ms": 9471,
+   "maxMs": 9471,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"./hub/scripts/test-api.mjs\"": {
+   "count": 1,
+   "ms": 18173,
+   "maxMs": 18173,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"openDesign|designpreview|previewDesign|designAuto|designPreviewFor\" \"./hub/web/app.ts\"": {
+   "count": 1,
+   "ms": 608,
+   "maxMs": 608,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"./hub/scripts/test-browser.mjs\"": {
+   "count": 4,
+   "ms": 552728,
+   "maxMs": 166570,
+   "failures": 2
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-Process node | Select-Object Id,CPU,StartTime,WorkingSet\"": {
+   "count": 1,
+   "ms": 807,
+   "maxMs": 807,
+   "failures": 0
+  },
+  "bash\u0000git rev-parse --short HEAD && git branch --show-current": {
+   "count": 1,
+   "ms": 1680,
+   "maxMs": 1680,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object Name -EQ node.exe | Where-Object CommandLine -Match test-work-design.mjs | Select-Object ProcessId,ParentProcessId,Creation": {
+   "count": 2,
+   "ms": 846,
+   "maxMs": 452,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-explore.mjs\"": {
+   "count": 2,
+   "ms": 18180,
+   "maxMs": 9188,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-api.mjs\"": {
+   "count": 2,
+   "ms": 39395,
+   "maxMs": 19763,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat && git status --short": {
+   "count": 1,
+   "ms": 1411,
+   "maxMs": 1411,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/SOFT/git\" -maxdepth 3 -type d -name \"astryx*\"": {
+   "count": 1,
+   "ms": 812,
+   "maxMs": 812,
+   "failures": 0
+  },
+  "bash\u0000sha256sum \"./extensions/astryx-runtime/runtime-lock.json\"": {
+   "count": 2,
+   "ms": 401,
+   "maxMs": 349,
+   "failures": 0
+  },
+  "bash\u0000git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" rev-parse HEAD && git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" ls-tree -r --name-only HEAD \"packages/cli/src\"": {
+   "count": 1,
+   "ms": 413,
+   "maxMs": 413,
+   "failures": 0
+  },
+  "bash\u0000git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" ls-tree -r --name-only HEAD \"packages/cli\" \"packages/core\" \"packages/theme-neutral\"": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" ls-tree -r --name-only HEAD \"packages/core\" | rg \"/(Button|Theme|Dialog|Selector|Popover|TextField)/|/(Button|Theme|Dialog|Selector|": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 1
+  },
+  "bash\u0000git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" ls-tree -r --name-only HEAD \"packages/cli/api/theme\" \"packages/cli/foundation\" \"packages/theme-neutral\" | rg \"palette|tonal|index|th": {
+   "count": 1,
+   "ms": 417,
+   "maxMs": 417,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/core\" && git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" ls-tree -r --name-only HEAD \"packages/core\" | rg -i": {
+   "count": 1,
+   "ms": 1264,
+   "maxMs": 1264,
+   "failures": 0
+  },
+  "bash\u0000git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" ls-tree --name-only \"HEAD:packages\" && git -C \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" ls-tree --name-only \"HEAD": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000node \"./scripts/test-work-plan3.mjs\"": {
+   "count": 1,
+   "ms": 9449,
+   "maxMs": 9449,
+   "failures": 0
+  },
+  "bash\u0000ls \"./docs/proposals/astryx-study/probes\" && ls \"./docs/proposals/astryx-study/parent-checks\" && ls \"./.pi/astryx-product-benchmark\"": {
+   "count": 1,
+   "ms": 389,
+   "maxMs": 389,
+   "failures": 0
+  },
+  "bash\u0000ls \"./docs/proposals/astryx-study/probes\" && find \"./docs/proposals/astryx-study/fixtures\" -maxdepth 3 -type f && ls \"./.pi/astryx-product-benchmark\"": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "bash\u0000STUDY_DEPS=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules\" node --no-warnings \"./hub/scripts/test-browser.mjs\" --design-remote": {
+   "count": 6,
+   "ms": 1572340,
+   "maxMs": 357968,
+   "failures": 5
+  },
+  "bash\u0000git status --short && rg -n \"autoUpdate|auto-update|updateDelay|idle|updates:\" \"./hub/scripts/test-browser.mjs\" \"./hub/src/update-check.ts\" \"./hub/src/hub.ts\"": {
+   "count": 1,
+   "ms": 692,
+   "maxMs": 692,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/astryx-c11-01a1bfed-20261111-build-probe.mjs\"": {
+   "count": 2,
+   "ms": 122628,
+   "maxMs": 122524,
+   "failures": 1
+  },
+  "bash\u0000rm \"C:/Users/Flex/AppData/Local/Temp/astryx-c11-01a1bfed-20261111-build-probe.mjs\"": {
+   "count": 1,
+   "ms": 481,
+   "maxMs": 481,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/astryx-c11-01a1bfed-route-probe.mjs\"": {
+   "count": 3,
+   "ms": 63103,
+   "maxMs": 29278,
+   "failures": 0
+  },
+  "bash\u0000ls \"./docs/proposals/astryx-study\"": {
+   "count": 2,
+   "ms": 642,
+   "maxMs": 574,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"./hub/scripts/test-auto-update.mjs\"": {
+   "count": 2,
+   "ms": 325,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/astryx-c11-01a1bfed-sw-probe.mjs\"": {
+   "count": 1,
+   "ms": 4175,
+   "maxMs": 4175,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/changelog-shot.mjs\" \"#prompt\" \"./docs/changelog/astryx-runtime-consent.png\" \"--ask={\\\"question\\\":\\\"Install the optional Astryx runtime?\\\",\\\"context\\\":\\\"Download the reviewed pinned": {
+   "count": 1,
+   "ms": 62382,
+   "maxMs": 62382,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/changelog-shot.mjs\" \"#prompt\" \"./docs/changelog/astryx-runtime-consent.png\" \"--ask={\\\"kind\\\":\\\"list\\\",\\\"title\\\":\\\"Install the optional Astryx runtime?\\\",\\\"purpose\\\":\\\"Download the ": {
+   "count": 1,
+   "ms": 63202,
+   "maxMs": 63202,
+   "failures": 0
+  },
+  "bash\u0000wc -l \"./docs/proposals/astryx-study/remote-browser-results.json\"": {
+   "count": 1,
+   "ms": 1017,
+   "maxMs": 1017,
+   "failures": 0
+  },
+  "bash\u0000git diff --check": {
+   "count": 2,
+   "ms": 244,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"./docs/proposals/astryx-study/probes/product-benchmark.mjs\" --self-check": {
+   "count": 1,
+   "ms": 295,
+   "maxMs": 295,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq\"": {
+   "count": 1,
+   "ms": 796,
+   "maxMs": 796,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/Users/Flex/AppData/Local/Temp\" -maxdepth 3 -name \"budget.json\"": {
+   "count": 1,
+   "ms": 30174,
+   "maxMs": 30174,
+   "failures": 1
+  },
+  "bash\u0000node --no-warnings --input-type=module -e \"import assert from \\\"node:assert/strict\\\";import fs from \\\"node:fs\\\";import {readConfig,markerPath} from \\\"./hub/src/hub.ts\\\";import {ensureDesignRuntime} fr": {
+   "count": 1,
+   "ms": 8006,
+   "maxMs": 8006,
+   "failures": 0
+  },
+  "bash\u0000node --input-type=module -e \"import assert from \\\"node:assert/strict\\\";import fs from \\\"node:fs\\\";import {spawn} from \\\"node:child_process\\\";const root=\\\"./.pi/astryx-product-benchmark\\\";assert(!fs.ex": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require('fs');const r='./.pi/astryx-product-benchmark/';let j={};try{j=JSON.parse(fs.readFileSync(r+'final-html/result.json','utf8'))}catch{};console.log(JSON.stringify({state:j.stat": {
+   "count": 1,
+   "ms": 374,
+   "maxMs": 374,
    "failures": 0
   }
  },
@@ -1215,6 +1467,76 @@
     "openai-codex/gpt-6.1-sol:high": 36
    },
    "failures": 4
+  },
+  "P3-08": {
+   "ms": 2918958,
+   "testMs": 163,
+   "replies": 33,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 33
+   },
+   "failures": 2
+  },
+  "P3-09": {
+   "ms": 1849807,
+   "testMs": 174,
+   "replies": 39,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 39
+   },
+   "failures": 1
+  },
+  "P3-10": {
+   "ms": 4531674,
+   "testMs": 737253,
+   "replies": 86,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 86
+   },
+   "failures": 9
+  },
+  "P3-11": {
+   "ms": 5367,
+   "testMs": 0,
+   "replies": 1,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 1
+   }
+  },
+  "P3-12": {
+   "ms": 2005004,
+   "testMs": 254900,
+   "replies": 38,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 38
+   },
+   "failures": 4
+  },
+  "P3-13": {
+   "ms": 685739,
+   "testMs": 0,
+   "replies": 21,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 21
+   },
+   "failures": 1
+  },
+  "P3-14": {
+   "ms": 7844313,
+   "testMs": 0,
+   "replies": 118,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 118
+   },
+   "failures": 7
+  },
+  "P3-15": {
+   "ms": 25844,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
   }
  },
  "spans": [
@@ -1229,6 +1551,30 @@
   {
    "start": "2026-11-10T23:56:11.933Z",
    "ms": 29707013
+  },
+  {
+   "start": "2026-11-11T08:11:18.973Z",
+   "ms": 6144565
+  },
+  {
+   "start": "2026-11-11T09:53:43.562Z",
+   "ms": 10667277
+  },
+  {
+   "start": "2026-11-11T12:51:30.863Z",
+   "ms": 2651551
+  },
+  {
+   "start": "2026-11-11T13:35:42.438Z",
+   "ms": 1039450
+  },
+  {
+   "start": "2026-11-11T13:54:30.414Z",
+   "ms": 1091910
+  },
+  {
+   "start": "2026-11-11T14:12:42.349Z",
+   "ms": 7188
   }
  ],
  "hints": []

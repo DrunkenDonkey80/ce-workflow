@@ -1,12 +1,12 @@
 {
  "version": 1,
- "activeMs": 11386818,
- "runs": 24,
+ "activeMs": 14353663,
+ "runs": 29,
  "waitingMs": 2324233,
- "toolWallMs": 6106582,
+ "toolWallMs": 7391081,
  "compactions": {
-  "count": 5,
-  "ms": 215350
+  "count": 7,
+  "ms": 280914
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
@@ -19,31 +19,42 @@
    "cacheWrite": 2196013,
    "cost": 24.13980960000001,
    "errors": 0
+  },
+  "openai-codex/gpt-6-astra:high": {
+   "replies": 92,
+   "thinkingMs": 1143315,
+   "actingMs": 277141,
+   "input": 484046,
+   "output": 38926,
+   "cacheRead": 8509696,
+   "cacheWrite": 0,
+   "cost": 15.296455999999997,
+   "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 341,
-   "ms": 5686936,
+   "count": 400,
+   "ms": 6852903,
    "maxMs": 509389,
-   "failures": 14
+   "failures": 27
   },
   "plan3": {
-   "count": 8,
-   "ms": 551,
-   "maxMs": 127,
+   "count": 18,
+   "ms": 7416,
+   "maxMs": 3247,
    "failures": 0
   },
   "edit": {
-   "count": 24,
-   "ms": 1210,
-   "maxMs": 601,
+   "count": 59,
+   "ms": 2689,
+   "maxMs": 789,
    "failures": 3
   },
   "lens_diagnostics": {
-   "count": 10,
-   "ms": 30403,
-   "maxMs": 13546,
+   "count": 15,
+   "ms": 132957,
+   "maxMs": 41895,
    "failures": 0
   },
   "compaction_note": {
@@ -53,10 +64,10 @@
    "failures": 0
   },
   "read": {
-   "count": 22,
-   "ms": 379,
-   "maxMs": 76,
-   "failures": 0
+   "count": 120,
+   "ms": 3225,
+   "maxMs": 662,
+   "failures": 1
   },
   "intercom": {
    "count": 3,
@@ -65,24 +76,48 @@
    "failures": 0
   },
   "write": {
-   "count": 2,
-   "ms": 2,
+   "count": 4,
+   "ms": 8,
+   "maxMs": 4,
+   "failures": 0
+  },
+  "project_report": {
+   "count": 1,
+   "ms": 183,
+   "maxMs": 183,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 48,
+   "ms": 698319,
+   "maxMs": 155114,
+   "failures": 1
+  },
+  "read_enclosing": {
+   "count": 1,
+   "ms": 115,
+   "maxMs": 115,
+   "failures": 1
+  },
+  "research_exit": {
+   "count": 1,
+   "ms": 1,
    "maxMs": 1,
    "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 272,
-   "ms": 2178067,
+   "count": 307,
+   "ms": 2195072,
    "maxMs": 509389,
-   "failures": 8
+   "failures": 12
   },
   "test": {
-   "count": 69,
-   "ms": 3508869,
+   "count": 93,
+   "ms": 4657831,
    "maxMs": 331907,
-   "failures": 6
+   "failures": 15
   }
  },
  "commands": {
@@ -122,12 +157,6 @@
    "maxMs": 999,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git diff scripts/test-work-compaction-notifications.mjs | rg \"^[-+]\" | cut -c1-200 | tail -15": {
-   "count": 1,
-   "ms": 350,
-   "maxMs": 350,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && node scripts/test-work-compaction-notifications.mjs 2>&1 | tail -3; git diff -U0 scripts/test-work-compaction-notifications.mjs | rg \"^@@\"": {
    "count": 1,
    "ms": 3496,
@@ -144,12 +173,6 @@
    "count": 1,
    "ms": 4727,
    "maxMs": 4727,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const rep=(f,a,b)=>{let s=fs.readFileSync(f,'utf8');if(s.split(a).length!==2)throw new Error('miss '+a);fs.writeFileSync(f,s.replace(a,b))}; rep('extensions/": {
-   "count": 1,
-   "ms": 342,
-   "maxMs": 342,
    "failures": 0
   },
   "bash\u0000cd \".\" && node scripts/test-work-plan3.mjs 2>&1 | tail -2": {
@@ -200,12 +223,6 @@
    "maxMs": 319423,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"^not ok|# fail|# pass|✖\" \"$TEMP/cu90.log\" | head -20; sed -n 50,62p scripts/test-work-native-smoke.mjs | cut -c1-220": {
-   "count": 1,
-   "ms": 327,
-   "maxMs": 327,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && node --test scripts/test-*.mjs > \"$TEMP/hub.log\" 2>&1; echo exit=$?; rg -n \"^not ok|^# (pass|fail)\" \"$TEMP/hub.log\" | head": {
    "count": 1,
    "ms": 132967,
@@ -234,12 +251,6 @@
    "count": 1,
    "ms": 436,
    "maxMs": 436,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n 1,20p scripts/test-app-trail.mjs | cut -c1-220": {
-   "count": 1,
-   "ms": 345,
-   "maxMs": 345,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && node scripts/test-app-trail.mjs; echo exit=$?; cd .. && git stash list | head -2 >/dev/null; node -e \" const fs=require('fs'),f='scripts/test-work-native-smoke.mjs';let s=fs.readFileSync": {
@@ -278,12 +289,6 @@
    "maxMs": 8512,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git worktree remove --force \"$TEMP/cu90-head\" 2>&1 | tail -1; ls -l --time-style=+%H:%M:%S hub/src/*.ts hub/app/ui/*.html hub/web/*.js hub/scripts/test-browser.mjs 2>/dev/null | awk \"{print ": {
-   "count": 1,
-   "ms": 397,
-   "maxMs": 397,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git status --short | awk \"{print \\$2}\" | while read f; do [ -f \"$f\" ] && echo \"$(date -r \"$f\" +%m-%d_%H:%M:%S) $f\"; done | sort | tail -12": {
    "count": 1,
    "ms": 3256,
@@ -294,18 +299,6 @@
    "count": 1,
    "ms": 201618,
    "maxMs": 201618,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"complete|status|verify|refuse|throw new Error\" scripts/work-catch-up-record.mjs | head -20 | cut -c1-200": {
-   "count": 1,
-   "ms": 329,
-   "maxMs": 329,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"verification\" scripts/work-catch-up-record.mjs | head -8 | cut -c1-220": {
-   "count": 1,
-   "ms": 345,
-   "maxMs": 345,
    "failures": 0
   },
   "bash\u0000cd \".\" && ls scripts | rg -i \"catch\"; rg -ln \"work-catch-up-baseline\" scripts extensions | head": {
@@ -392,12 +385,6 @@
    "maxMs": 693,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && sed -n 345,365p src/sessions.ts | cut -c1-220; git diff src/sessions.ts | rg \"^[-+]\" | cut -c1-200 | head -30; git log -2 --format=\"%h %ad %s\" --date=iso -- src/sessions.ts web/app.ts | ": {
-   "count": 1,
-   "ms": 362,
-   "maxMs": 362,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"parked: true|parked\\\":true|waking|compact early|S-12\" scripts/test-browser.mjs | cut -c1-240 | head": {
    "count": 1,
    "ms": 1366,
@@ -452,12 +439,6 @@
    "maxMs": 1138,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && sed -n 1680,1719p web/app.ts | cut -c1-330; rg -n \"function toggleFold|folded|foldState\" web/app.ts | head | cut -c1-220": {
-   "count": 1,
-   "ms": 388,
-   "maxMs": 388,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && sed -n 1640,1660p web/app.ts | cut -c1-330; rg -n \"design\" src/api.ts src/registry.ts src/sessions.ts | cut -c1-240 | head -20": {
    "count": 1,
    "ms": 909,
@@ -470,12 +451,6 @@
    "maxMs": 1127,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"function webModes|webModes =\" -A 12 extensions/*.ts | cut -c1-260 | rg -i -n \"design|webModes\"; rg -n \"ownSession|function load\\b|designs.json|\\.pi/designs\" extensions/design.ts | hea": {
-   "count": 1,
-   "ms": 340,
-   "maxMs": 340,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && sed -n 18,30p extensions/design.ts | cut -c1-200; rg -n \"^import\" hub/src/api.ts | cut -c1-200; rg -n \"picked|sessions.json\" hub/src/api.ts | head": {
    "count": 1,
    "ms": 527,
@@ -486,12 +461,6 @@
    "count": 1,
    "ms": 937,
    "maxMs": 937,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"design\" scripts/test-*.mjs | rg -v \"test-browser\" | cut -c1-200 | head; rg -n \"toggleFold|session-fold|hidden session\" scripts/test-browser.mjs | head -5 | cut -c1-260": {
-   "count": 1,
-   "ms": 367,
-   "maxMs": 367,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && cat > \"$TEMP/fx3.cjs\" << \"EOF\" const fs = require(\"fs\"), f = \"scripts/test-browser.mjs\"; let s = fs.readFileSync(f, \"utf8\"); const a = ` assert.equal(await evaluate(\"document.querySelect": {
@@ -596,12 +565,6 @@
    "maxMs": 11276,
    "failures": 0
   },
-  "bash\u0000cd \".\" && for t in settings wo-control; do echo \"== $t\"; rg -n \"Error|assert|not ok|fail\" \"$TEMP/tt/$t.log\" | head -8 | cut -c1-260; done": {
-   "count": 1,
-   "ms": 343,
-   "maxMs": 343,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && sed -n 1,14p \"$TEMP/tt/settings.log\" | cut -c1-200": {
    "count": 1,
    "ms": 598,
@@ -642,12 +605,6 @@
    "count": 1,
    "ms": 602,
    "maxMs": 602,
-   "failures": 0
-  },
-  "bash\u0000cd \"C:/SOFT/git/pi-provider-claude-ex\" && git log --oneline -5; ls; rg -n \"registerCommand|oauth|login|authorize|redirect_uri|localhost|callback\" --glob \"*.ts\" --glob \"!node_modules\" -i . | rg -v \"tes": {
-   "count": 1,
-   "ms": 373,
-   "maxMs": 373,
    "failures": 0
   },
   "bash\u0000cd \".\" && d=node_modules/@earendil-works/pi-ai/dist; ls $d/utils/oauth 2>/dev/null | head -20; rg -n \"export (async )?function|redirect|localhost|onPrompt|onManualCodeInput|onAuth\" $d/utils/oauth/anth": {
@@ -705,10 +662,10 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 140,
-   "ms": 22491,
-   "maxMs": 317,
-   "failures": 9
+   "count": 185,
+   "ms": 34943,
+   "maxMs": 397,
+   "failures": 14
   },
   "bash\u0000cd \"./hub\" && rg -n \"parked\\?: boolean \\}\" web/app.ts | cut -c1-120; rg -n \"type ProjectCommand\" web/app.ts | cut -c1-120; rg -n \"[^.\\w]el\\([a-z]\" web/app.ts | cut -c1-120 | head": {
    "count": 1,
@@ -732,12 +689,6 @@
    "count": 1,
    "ms": 5066,
    "maxMs": 5066,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && rg -n \"done switch|pool\\b.*action|pool:\" scripts/test-browser.mjs | cut -c1-260 | head; sed -n 795,800p scripts/test-browser.mjs | cut -c1-300": {
-   "count": 1,
-   "ms": 362,
-   "maxMs": 362,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && cat > \"$TEMP/fxb.cjs\" << \"EOF\" const fs = require(\"fs\"), f = \"scripts/test-browser.mjs\"; let s = fs.readFileSync(f, \"utf8\"); const rep = (a, b) => { if (s.split(a).length !== 2) throw ne": {
@@ -780,18 +731,6 @@
    "count": 1,
    "ms": 432,
    "maxMs": 432,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub/app\" && ls; rg -n -i \"NewWindowRequested|external|ShellExecute|Process.Start|new_window|open_url|opener\" --glob \"!node_modules\" --glob \"!target\" --glob \"!bin\" --glob \"!obj\" . | cut -c1-220 |": {
-   "count": 1,
-   "ms": 320,
-   "maxMs": 320,
-   "failures": 0
-  },
-  "bash\u0000curl -s --max-time 15 \"https://status.claude.com/api/v2/summary.json\" | node -e \"let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log(j.status.description);for(con": {
-   "count": 1,
-   "ms": 345,
-   "maxMs": 345,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && rg -n \"type GitFiles|GitFiles =|ahead|behind\" src/*.ts web/app.ts | cut -c1-220 | head -40": {
@@ -888,18 +827,6 @@
    "count": 1,
    "ms": 569,
    "maxMs": 569,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n 720,728p scripts/test-browser.mjs | cut -c1-260; rg -n \"</main|<body|</body>\" web/index.html | cut -c1-80": {
-   "count": 1,
-   "ms": 372,
-   "maxMs": 372,
-   "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && sed -n 180,184p web/index.html | cut -c1-120; rg -n \"collapse-left\" scripts/test-browser.mjs | head -3 | cut -c1-200": {
-   "count": 1,
-   "ms": 346,
-   "maxMs": 346,
    "failures": 0
   },
   "bash\u0000cd \"./hub\" && git stash push -q -- web/index.html && node scripts/test-browser.mjs > \"$TEMP/tbh0.log\" 2>&1; echo old=$?; rg -o \"the tooltip is visible[^\\\"]*\" \"$TEMP/tbh0.log\" | head -1; git stash pop ": {
@@ -1010,12 +937,6 @@
    "maxMs": 672,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n 66,80p extensions/plan3.ts | cut -c1-1500; rg -n -i \"qualification|verify|verif\" extensions/plan3.ts | cut -c1-250 | head -40": {
-   "count": 1,
-   "ms": 355,
-   "maxMs": 355,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n -o -i \".{0,200}(the user seeing|user sees|user check|human\\]|visual check|acceptance).{0,200}\" extensions/plan3.ts extensions/plan3-*.ts | rg -v \"plan3-stats\" | cut -c1-500 | head -30": {
    "count": 1,
    "ms": 933,
@@ -1046,12 +967,6 @@
    "maxMs": 164053,
    "failures": 0
   },
-  "bash\u0000cd \"./hub\" && sed -n 25,50p src/rpc-client.ts | cut -c1-200; rg -n \"defaultCommand\" -A8 src/rpc-client.ts | head -20 | cut -c1-200": {
-   "count": 1,
-   "ms": 367,
-   "maxMs": 367,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"terminal\" scripts/*.mjs src/sessions.ts | cut -c1-220 | head -20": {
    "count": 1,
    "ms": 570,
@@ -1062,12 +977,6 @@
    "count": 1,
    "ms": 38898,
    "maxMs": 38898,
-   "failures": 0
-  },
-  "bash\u0000ls -la \"$TEMP/winwatch.ps1\" 2>&1 | head -2; echo \"$TEMP\"; cygpath -w \"$TEMP\"": {
-   "count": 1,
-   "ms": 336,
-   "maxMs": 336,
    "failures": 0
   },
   "bash\u0000cd \".\" && rm -f /tmp/win.log; timeout 280 powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\Flex\\AppData\\Local\\Temp\\winwatch.ps1\" -out \"C:\\Users\\Flex\\AppData\\Local\\Temp\\win.log\" -secon": {
@@ -1190,12 +1099,6 @@
    "maxMs": 2079,
    "failures": 0
   },
-  "bash\u0000cd \"./hub/app/src-tauri\" && rg -n \"Command::new|CREATE_NO_WINDOW|creation_flags\" --glob \"*.rs\" . | cut -c1-200 | head -20": {
-   "count": 1,
-   "ms": 328,
-   "maxMs": 328,
-   "failures": 0
-  },
   "bash\u0000rm -f /tmp/pi-window.log; timeout 7300 powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-window-watch.ps1\" -out \"C:\\Users\\Flex\\AppData\\Local\\Temp\\pi-window.l": {
    "count": 1,
    "ms": 2316,
@@ -1220,12 +1123,6 @@
    "maxMs": 400,
    "failures": 0
   },
-  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && ls src | head; rg -l -uu \"detached\" . 2>/dev/null | rg -v node_modules | head; rg -uu -o -N \".{0,120}detached.{0,120}\" --glob \"*.{js,ts,mj": {
-   "count": 1,
-   "ms": 372,
-   "maxMs": 372,
-   "failures": 0
-  },
   "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && rg -uu -o -N \"spawn\\([^;]{0,250}\" --glob \"*.{js,mjs,cjs}\" bundle src *.mjs *.cjs 2>/dev/null | cut -c1-330 | head -20": {
    "count": 1,
    "ms": 1169,
@@ -1244,23 +1141,11 @@
    "maxMs": 504,
    "failures": 0
   },
-  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-subagents\" && cat src/runs/shared/background-process-options.js; grep -rn \"spawn(\" src/runs/shared/*.js src/runs/foreground/*.js | grep -v windowsHide |": {
-   "count": 1,
-   "ms": 360,
-   "maxMs": 360,
-   "failures": 0
-  },
   "bash\u0000cd \"./hub\" && rg -n \"text/plain|copy\\\"|\\| --- |---\\|\" scripts/test-browser.mjs | cut -c1-260 | head": {
    "count": 1,
    "ms": 398,
    "maxMs": 398,
    "failures": 0
-  },
-  "bash\u0000cd \"./hub\" && node -e \" const fs=require('fs'),f='scripts/test-browser.mjs';let s=fs.readFileSync(f,'utf8'); const ed=(a,b)=>{if(s.split(a).length!==2)throw a;s=s.replace(a,b)}; ed(\\\"d.getData('text/h": {
-   "count": 1,
-   "ms": 367,
-   "maxMs": 367,
-   "failures": 1
   },
   "bash\u0000cd \"./hub\" && timeout 280 node scripts/test-browser.mjs 2>&1 | tail -3 | cut -c1-300": {
    "count": 1,
@@ -1284,6 +1169,156 @@
    "count": 1,
    "ms": 3615,
    "maxMs": 3615,
+   "failures": 0
+  },
+  "bash\u0000git status -sb; rg -n -i \"cache.?miss\" \"extensions\" \"hub\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\" \"C:/Users/Flex/.pi/agent/install/releases/1": {
+   "count": 1,
+   "ms": 2861,
+   "maxMs": 2861,
+   "failures": 0
+  },
+  "bash\u0000rg -n -i \"cache_miss|cacheMiss|cache_notice|cache.*notice\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" -g \"*.d.ts\"; rg -n \"notification|notice|se": {
+   "count": 1,
+   "ms": 674,
+   "maxMs": 674,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"cache|usage\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs/json.md\"; rg -n \"cache|collectCache\" \"C:/Users/Flex/.pi/agent/install/releases/1.5": {
+   "count": 1,
+   "ms": 540,
+   "maxMs": 540,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"createChatMirror|\\.hydrate\\(\" \"hub/src\" \"hub/scripts\"; rg -n \"maybeShowCacheMissNotice|function detectCacheMiss|function collectCacheMisses\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node": {
+   "count": 1,
+   "ms": 581,
+   "maxMs": 581,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"cache_warm|cacheWarming\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js\" | head -20; rg -n \"chat-compact|chat-thinking|h": {
+   "count": 1,
+   "ms": 742,
+   "maxMs": 742,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-chat-files.mjs\"": {
+   "count": 2,
+   "ms": 7633,
+   "maxMs": 4130,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-view.mjs\"": {
+   "count": 2,
+   "ms": 122938,
+   "maxMs": 61713,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-browser.mjs\"": {
+   "count": 4,
+   "ms": 366723,
+   "maxMs": 152810,
+   "failures": 3
+  },
+  "bash\u0000git diff --check; git diff -- \"hub/src/chat.ts\" \"hub/src/view.ts\" \"hub/web/app.ts\" \"hub/web/styles.css\" \"hub/web/index.html\"": {
+   "count": 1,
+   "ms": 989,
+   "maxMs": 989,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function resolvePlan\" \"extensions/plan3.ts\"; rg -n \"plan3.*optimize|/plan3.*request|/plan3.*Plan\" \"README.md\"": {
+   "count": 1,
+   "ms": 673,
+   "maxMs": 673,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"extension_ui_request|method === \\\"notify\\\"|notificationType\" \"hub/src\" \"extensions/hub-channel.ts\"; rg -n \"error|notice\" \"hub/src/view.ts\" \"hub/scripts/test-view.mjs\"": {
+   "count": 1,
+   "ms": 877,
+   "maxMs": 877,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"on\\(\\\"ui\\\"|on\\(\\\"notice\\\"|showNotice|function showError\" \"hub/src/api.ts\" \"hub/web/app.ts\"; rg -n \"notice\" \"hub/scripts/test-browser.mjs\"; rg -n \"report\\(\" \"extensions/plan3.ts\"": {
+   "count": 1,
+   "ms": 438,
+   "maxMs": 438,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\"": {
+   "count": 2,
+   "ms": 37415,
+   "maxMs": 22415,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\"": {
+   "count": 7,
+   "ms": 73626,
+   "maxMs": 14637,
+   "failures": 3
+  },
+  "bash\u0000rg -n \"snapshot\" \"hub/scripts/test-browser.mjs\"; git diff --check; git diff --stat -- \"extensions/plan3.ts\" \"hub/src/api.ts\" \"hub/web/app.ts\" \"scripts/test-work-plan3.mjs\" \"hub/scripts/test-api.mjs\" \"": {
+   "count": 1,
+   "ms": 482,
+   "maxMs": 482,
+   "failures": 0
+  },
+  "bash\u0000BROWSER_TRACE=1 node \"hub/scripts/test-browser.mjs\" > \"C:/Users/Flex/AppData/Local/Temp/plan3-notice-browser.log\" 2>&1": {
+   "count": 1,
+   "ms": 177001,
+   "maxMs": 177001,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"withFileMutationQueue|createEditTool|createWriteTool\" \"extensions\" \"scripts\"; rg -n \"withFileMutationQueue\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-codin": {
+   "count": 1,
+   "ms": 756,
+   "maxMs": 756,
+   "failures": 0
+  },
+  "bash\u0000ls \"node_modules/@earendil-works/pi-coding-agent/dist/core/tools/file-mutation-queue.js\"; rg -n \"withPlanLock|atomic|lock\" \"scripts/test-work-plan3-diagram.mjs\" \"scripts/test-work-plan3.mjs\"; rg -n \"p": {
+   "count": 1,
+   "ms": 506,
+   "maxMs": 506,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"takeSessionLock|session-lock\" \"scripts\" \"hub/scripts\" --glob \"*test*\" -l; rg -n \"withPlanLock|writeFile\\(plan.file\" \"extensions/plan3.ts\"; rg -n \"function keepOverrides|const plansDir|const don": {
+   "count": 1,
+   "ms": 1557,
+   "maxMs": 1557,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"resolveToCwd|expandPath|canonicalizePath\" \"node_modules/@earendil-works/pi-coding-agent/dist/index.js\" \"node_modules/@earendil-works/pi-coding-agent/dist/core/tools/index.js\"; rg -n \"normalize.": {
+   "count": 1,
+   "ms": 686,
+   "maxMs": 686,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-session-lock.mjs\"": {
+   "count": 2,
+   "ms": 2144,
+   "maxMs": 1262,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-diagram.mjs\"": {
+   "count": 1,
+   "ms": 3950,
+   "maxMs": 3950,
+   "failures": 0
+  },
+  "bash\u0000git diff --check; git diff --stat; git status --short": {
+   "count": 1,
+   "ms": 1076,
+   "maxMs": 1076,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-design.mjs\"": {
+   "count": 2,
+   "ms": 357313,
+   "maxMs": 236732,
+   "failures": 1
+  },
+  "bash\u0000git diff -- \"extensions/plan3.ts\" \"scripts/test-work-session-lock.mjs\"; git diff --check": {
+   "count": 1,
+   "ms": 172,
+   "maxMs": 172,
    "failures": 0
   }
  },
@@ -1331,13 +1366,14 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 3920385,
-   "testMs": 1420955,
-   "replies": 291,
+   "ms": 6545410,
+   "testMs": 1926014,
+   "replies": 383,
    "models": {
-    "anthropic/claude-opus-5-5:high": 291
+    "anthropic/claude-opus-5-5:high": 291,
+    "openai-codex/gpt-6-astra:high": 92
    },
-   "failures": 15
+   "failures": 23
   }
  },
  "spans": [
@@ -1436,6 +1472,26 @@
   {
    "start": "2026-11-10T06:17:23.204Z",
    "ms": 20367
+  },
+  {
+   "start": "2026-11-10T18:57:19.579Z",
+   "ms": 825395
+  },
+  {
+   "start": "2026-11-11T12:45:48.369Z",
+   "ms": 41870
+  },
+  {
+   "start": "2026-11-11T12:47:09.718Z",
+   "ms": 628105
+  },
+  {
+   "start": "2026-11-11T15:36:28.376Z",
+   "ms": 48196
+  },
+  {
+   "start": "2026-11-11T15:38:31.994Z",
+   "ms": 1357715
   }
  ],
  "hints": [

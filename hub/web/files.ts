@@ -3,7 +3,7 @@ type ProjectFile = { path: string; change?: string; size?: number };
 // An explored archive (hub/src/explore.ts): its files are served raw under /x/<key>/.
 // open: a viewed HTML page (its live folder, explore.ts viewPage), shown at once.
 // design: a design session's preview (S07): no file tree, its page in design-view's device frame.
-type Archive = { key: string; name: string; files: ProjectFile[]; truncated: boolean; open?: string; design?: boolean; handle?: string; screens?: string[]; versions?: number[]; version?: number };
+type Archive = { key: string; name: string; files: ProjectFile[]; truncated: boolean; open?: string; design?: boolean; handle?: string; screens?: string[]; versions?: number[]; version?: number; build?: { state: string; error?: string; generation?: string } };
 // @ts-ignore Browser URL includes the workspace token.
 import { designFrame, type DesignActions } from "./design-view.js?token=__TOKEN__";
 const IMAGE = /.(?:png|jpe?g|gif|webp|bmp|svg|ico)$/i, FRAME = /.(?:html?|pdf)$/i, MEDIA = /.(?:mp4|webm|mp3|wav)$/i, MARKDOWN = /.(?:md|markdown)$/i, TEXT_BYTES = 1_048_576;
@@ -25,6 +25,12 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
  let selected = "", linked = "", loaded = false, version = 0, archive: Archive | null = null;
  const open = new Set<string>();
 
+ function showBuild() {
+  heading.querySelector(".design-build-status")?.remove();
+  if (!archive?.build) return;
+  const build = archive.build, label = build.state === "building" ? "Building · last-good preview" : build.state === "failed" ? `Build failed · last-good preview. ${build.error ?? "Fix the source and call design look."}` : "Component preview ready";
+  const status = Object.assign(document.createElement("span"), { className: "design-build-status", textContent: label }); status.setAttribute("role", "status"); heading.append(status);
+ }
  function folder(files: ProjectFile[]) {
   const top: Folder = { folders: new Map(), files: [], changed: false, size: 0 };
   for (const file of files) {
@@ -104,7 +110,7 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
   const link = (text: string, href: string, extra: Record<string, string>) => Object.assign(document.createElement("a"), { textContent: text, href, ...extra });
   const actions = Object.assign(document.createElement("span"), { className: "files-actions" });
   actions.append(link("Download", url + "?download=1", { download: file.path.split("/").pop()! }), link("Open", url, { target: "_blank", rel: "noopener" }));
-  heading.replaceChildren(`${file.path} · ${size(file.size)}`, actions);
+  heading.replaceChildren(`${file.path} · ${size(file.size)}`, actions); showBuild();
   body.className = "files-body rich";
   if (IMAGE.test(file.path)) { const img = Object.assign(document.createElement("img"), { src, alt: file.path, className: "files-image" }); img.addEventListener("click", () => image(url)); return body.replaceChildren(img); }
   if (from.design && FRAME.test(file.path)) return designFrame(from, file.path, src, body, actions, { ...design, screen: screen => void show(from.files.find(item => item.path === screen) ?? { path: screen }) });
@@ -139,11 +145,18 @@ export function createFilesView(root: HTMLElement, { get, image, markdown, close
    void showExplored(archive!, file, true).then(() => { [viewer.scrollTop, body.scrollTop] = at; });
   },
   /** S08: the open design's screens or versions changed: redraw its pickers (a removed screen falls back to the first). */
-  designChanged(value: { key: string; screens: string[]; versions: number[] }) {
+  designChanged(value: { key: string; screens: string[]; versions: number[]; build?: Archive["build"] }) {
    if (archive?.key !== value.key) return;
    archive.versions = value.versions;
    // A kept version's screens never change; only its version list does.
    if (archive.version) return void show(archive.files.find(file => file.path === selected) ?? { path: selected }, true);
+   const previous = archive.build?.generation; archive.build = value.build;
+   if (value.build) {
+    archive.screens = value.screens; showBuild();
+    // No reload on building/failure: unsaved state stays in the fully published last-good iframe.
+    if (value.build.generation && value.build.generation !== previous) design.open(undefined, value.screens.includes(selected) ? selected : value.screens[0] ?? "index.html");
+    return;
+   }
    archive.screens = value.screens;
    for (const screen of value.screens) if (!archive.files.some(file => file.path === screen)) archive.files.push({ path: screen });
    const screen = value.screens.includes(selected) ? selected : value.screens[0];

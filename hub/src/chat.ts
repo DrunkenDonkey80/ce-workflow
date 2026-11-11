@@ -1,5 +1,7 @@
 // Chat rows and check-in snapshots for the page, built from the session's RPC events
 // (moved from ce-workflow plan3-web.ts in plan 0db155f7 H9-01).
+import { createCacheMissTracker } from "./cache-miss.ts";
+
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 
 // Thinking and tool calls travel as collapsed blocks (like Pi's terminal); a tool result joins its call's block.
@@ -8,7 +10,7 @@ type ChatBlock = { type: "thinking"; text: string } | { type: "tool"; id: string
 type AskQuestion = { question: string; context?: string; options: string[] };
 const askOf = (args): AskQuestion[] => (Array.isArray(args?.questions) ? args.questions : [args]).filter(item => typeof item?.question === "string")
 	.map(item => ({ question: clip(item.question, 2000), ...(typeof item.context === "string" && item.context.trim() ? { context: clip(item.context, 6000) } : {}), options: (Array.isArray(item.options) ? item.options : []).map(option => String(option?.title ?? "")).filter(Boolean).slice(0, 12) }));
-type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; excerpt?: boolean; brief?: boolean; error?: string; blocks?: ChatBlock[] };
+type ChatRow = { id: string; role: string; text: string; streaming: boolean; truncated?: boolean; excerpt?: boolean; brief?: boolean; error?: string; cacheMiss?: string; blocks?: ChatBlock[] };
 // Thinking/tool blocks as titles only (brief); the page fetches the full row when one opens.
 const briefBlocks = (blocks: ChatBlock[]) => blocks.map(block => block.type === "thinking" ? { ...block, text: "" } : block.ask ? block : { ...block, args: "", ...(block.result === undefined ? {} : { result: "" }), ...(block.diff === undefined ? {} : { diff: "" }) });
 // Cuts never split a surrogate pair.
@@ -41,6 +43,7 @@ function toolTitle(name: string, args: Record<string, unknown>) {
 export function createChatMirror(pi, publish: (event: string, data: unknown) => void) {
 	const rows: ChatRow[] = [], active = new Map<string, string>(), sent = new Map<string, { length: number; blocks: string }>();
 	let next = 0;
+	const cache = createCacheMissTracker();
 	// Live stream (D20/D21): `{ id, offset, text }` appends; blocks travel brief and only when they change.
 	// shortcut: assumes streamed text only grows (a shorter text resends from offset 0); hash the prefix if rewrites appear.
 	const stream = coalescer(id => {
@@ -48,11 +51,11 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 		if (!row) return void sent.delete(id);
 		const last = sent.get(id), offset = last && row.text.length >= last.length ? last.length : 0;
 		const blocks = row.blocks?.length ? briefBlocks(row.blocks) : [], json = JSON.stringify(blocks);
-		publish("delta", { id, role: row.role, offset, text: row.text.slice(offset), streaming: row.streaming, ...(row.truncated ? { truncated: true } : {}), ...(row.error ? { error: row.error } : {}), ...(json !== last?.blocks ? { blocks } : {}) });
+		publish("delta", { id, role: row.role, offset, text: row.text.slice(offset), streaming: row.streaming, ...(row.truncated ? { truncated: true } : {}), ...(row.error ? { error: row.error } : {}), ...(row.cacheMiss ? { cacheMiss: row.cacheMiss } : {}), ...(json !== last?.blocks ? { blocks } : {}) });
 		sent.set(id, { length: row.text.length, blocks: json });
 		for (const key of sent.keys()) if (!rows.some(item => item.id === key)) sent.delete(key);
 	});
-	const put = (message, streaming: boolean, emit = true, start = false) => {
+	const put = (message, streaming: boolean, emit = true, start = false, cacheMiss?: string) => {
 		// `!cmd` from the chat box (Pi's bash command): your row, with the output as a code block.
 		// shortcut: an output line starting with ``` ends the code block early; fine for command output.
 		if (message?.role === "bashExecution") {
@@ -85,7 +88,7 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 		const index = rows.findIndex(item => item.id === id), results = new Map((rows[index]?.blocks ?? []).flatMap(block => block.type === "tool" && block.result !== undefined ? [[block.id, block]] : []));
 		const blocks: ChatBlock[] = (Array.isArray(message.content) ? message.content : []).flatMap(part => part?.type === "thinking" && part.thinking?.trim() ? [{ type: "thinking" as const, text: clip(part.thinking, 4000) }]
 			: part?.type === "toolCall" ? [{ type: "tool" as const, id: String(part.id), name: String(part.name), title: toolTitle(String(part.name), part.arguments), args: clip(JSON.stringify(part.arguments ?? {}, null, 1), 2000), ...(part.name === "write" && typeof part.arguments?.content === "string" ? { diff: clip(part.arguments.content.split("\n").map(line => "+" + line).join("\n"), 8000) } : {}), ...(part.name === "ask_user" ? { ask: askOf(part.arguments) } : {}), ...(results.has(part.id) ? { result: results.get(part.id).result, ...(results.get(part.id).error ? { error: true } : {}), ...(results.get(part.id).diff === undefined ? {} : { diff: results.get(part.id).diff }) } : {}) }] : []);
-		const row: ChatRow = { id, role, text: content.slice(0, 64_000), streaming, ...(content.length > 64_000 ? { truncated: true } : {}), ...(typeof message.errorMessage === "string" ? { error: message.errorMessage.slice(0, 4000) } : {}), ...(blocks.length ? { blocks } : {}) };
+		const row: ChatRow = { id, role, ...(cacheMiss ? { cacheMiss } : {}), text: content.slice(0, 64_000), streaming, ...(content.length > 64_000 ? { truncated: true } : {}), ...(typeof message.errorMessage === "string" ? { error: message.errorMessage.slice(0, 4000) } : {}), ...(blocks.length ? { blocks } : {}) };
 		if (index < 0) rows.push(row); else rows[index] = row;
 		while (rows.length > 100 || Buffer.byteLength(JSON.stringify(rows)) > 512_000) rows.shift();
 		if (emit) stream.push(id, !streaming);
@@ -94,7 +97,8 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 	pi.on("input", event => { publish("input", { text: typeof event.text === "string" ? event.text.slice(0, 64_000) : "", source: event.source, streamingBehavior: event.streamingBehavior }); });
 	pi.on("message_start", event => put(event.message, true, true, true));
 	pi.on("message_update", event => put(event.message, true));
-	pi.on("message_end", event => put(event.message, false));
+	pi.on("message_end", event => put(event.message, false, true, false, cache.observe(event.message)));
+	pi.on("session_compact", () => cache.reset());
 	return {
 		snapshot: () => structuredClone(rows),
 		/** The `count` rows before `before` (default: newest) as excerpts, and whether older rows exist. */
@@ -108,14 +112,20 @@ export function createChatMirror(pi, publish: (event: string, data: unknown) => 
 			if (!row) throw fail(404, "Unknown chat row.");
 			return structuredClone(row);
 		},
-		reset: () => { rows.length = 0; active.clear(); sent.clear(); stream.clear(); next = 0; },
+		reset: () => { rows.length = 0; active.clear(); sent.clear(); stream.clear(); next = 0; cache.reset(); },
 		hydrate(ctx) {
 			const live = structuredClone(rows);
 			rows.length = 0;
-			for (const entry of (ctx.sessionManager?.getBranch?.() ?? []).filter(entry => entry.type === "message").slice(-100)) put(entry.message, false, false, true);
+			cache.reset();
+			const entries = ctx.sessionManager?.getBranch?.() ?? [], misses = new Map();
+			for (const entry of entries) {
+				if (entry.type === "compaction" || entry.type === "branch_summary") cache.reset();
+				else if (entry.type === "message") { const miss = cache.observe(entry.message); if (miss) misses.set(entry.message, miss); }
+			}
+			for (const entry of entries.filter(entry => entry.type === "message").slice(-100)) put(entry.message, false, false, true, misses.get(entry.message));
 			for (const row of live) {
 				const index = rows.findIndex(item => item.id === row.id);
-				if (index < 0) rows.push(row); else rows[index] = row;
+				if (index < 0) rows.push(row); else rows[index] = { ...row, cacheMiss: row.cacheMiss ?? rows[index].cacheMiss };
 			}
 			while (rows.length > 100 || Buffer.byteLength(JSON.stringify(rows)) > 512_000) rows.shift();
 			active.clear();

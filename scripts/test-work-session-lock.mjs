@@ -8,11 +8,12 @@ import { releaseSessionLock, takeSessionLock } from "../extensions/session-lock.
 // D9: same lock file format and takeover rules as pi-control-hub.
 const dir = mkdtempSync(path.join(os.tmpdir(), "session-lock-"));
 const file = path.join(dir, "s.jsonl"), lock = `${file}.lock`;
-const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore" });
+const holder = spawn(process.execPath, ["-e", "setTimeout(() => {}, 60000)"], { stdio: "ignore", windowsHide: true });
 try {
 	const { info } = takeSessionLock(file);
 	assert.equal(JSON.parse(readFileSync(lock, "utf8")).pid, process.pid);
 	assert.deepEqual(takeSessionLock(file).info, info, "our own lock (after /reload) is kept");
+	assert.deepEqual(takeSessionLock(file, "plan3", false), { holder: info }, "mutations in the same process cannot adopt an active lock");
 	releaseSessionLock(file, info);
 	assert(!existsSync(lock));
 

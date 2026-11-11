@@ -1,0 +1,2523 @@
+{
+  "product": true,
+  "production": true,
+  "allowForms": true,
+  "startedAt": "2026-11-11T15:02:07.941Z",
+  "cases": [
+    {
+      "arm": "prechange-html",
+      "file": "index.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "prechange-html",
+      "file": "settings.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "prechange-html",
+      "file": "index.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": true
+        },
+        {
+          "name": "Paused filters edited row",
+          "ok": true
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "prechange-html",
+      "file": "settings.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "settings validation",
+          "ok": true
+        },
+        {
+          "name": "notifications toggles",
+          "ok": true
+        },
+        {
+          "name": "appearance toggles",
+          "ok": true
+        },
+        {
+          "name": "settings acknowledgement",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "prechange-html",
+      "file": "index.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "prechange-html",
+      "file": "settings.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "prechange-html",
+      "file": "index.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": true
+        },
+        {
+          "name": "Paused filters edited row",
+          "ok": true
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": false,
+        "storage": "SecurityError"
+      },
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "prechange-html",
+      "file": "settings.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": false,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "prechange-html",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "filter-all",
+            "text": "All 6",
+            "w": 42.640625,
+            "h": 44
+          }
+        ],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": [
+        {
+          "id": "filter-all",
+          "text": "All 6",
+          "w": 42.640625,
+          "h": 44
+        }
+      ]
+    },
+    {
+      "arm": "prechange-html",
+      "file": "settings.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "prechange-html",
+      "file": "index.html",
+      "width": 360,
+      "height": 360,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 287,
+              "bottom": 331,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 287,
+              "bottom": 331,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 287,
+          "bottom": 331,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 287,
+          "bottom": 331,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "prechange-html",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 317,
+              "bottom": 361,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 317,
+              "bottom": 361,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 317,
+          "bottom": 361,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 317,
+          "bottom": 361,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "final-html",
+      "file": "index.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-html",
+      "file": "settings.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": false,
+          "detail": [
+            {
+              "id": "notifications",
+              "text": "",
+              "w": 52,
+              "h": 30
+            },
+            {
+              "id": "appearance",
+              "text": "",
+              "w": 52,
+              "h": 30
+            }
+          ]
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "notifications",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "appearance",
+            "text": "",
+            "w": 52,
+            "h": 30
+          }
+        ],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-html",
+      "file": "index.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": true
+        },
+        {
+          "name": "Paused filters edited row",
+          "ok": true
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "final-html",
+      "file": "settings.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": false,
+          "detail": [
+            {
+              "id": "notifications",
+              "text": "",
+              "w": 52,
+              "h": 30
+            },
+            {
+              "id": "appearance",
+              "text": "",
+              "w": 52,
+              "h": 30
+            }
+          ]
+        },
+        {
+          "name": "settings validation",
+          "ok": true
+        },
+        {
+          "name": "notifications toggles",
+          "ok": true
+        },
+        {
+          "name": "appearance toggles",
+          "ok": true
+        },
+        {
+          "name": "settings acknowledgement",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "notifications",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "appearance",
+            "text": "",
+            "w": 52,
+            "h": 30
+          }
+        ],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-html",
+      "file": "index.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "final-html",
+      "file": "settings.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "notifications",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "appearance",
+            "text": "",
+            "w": 52,
+            "h": 30
+          }
+        ],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": [
+        {
+          "id": "notifications",
+          "text": "",
+          "w": 52,
+          "h": 30
+        },
+        {
+          "id": "appearance",
+          "text": "",
+          "w": 52,
+          "h": 30
+        }
+      ]
+    },
+    {
+      "arm": "final-html",
+      "file": "index.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": true
+        },
+        {
+          "name": "Paused filters edited row",
+          "ok": true
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "show-review",
+            "text": "Show review queue",
+            "w": 175.109375,
+            "h": 36
+          },
+          {
+            "id": "reset-filters",
+            "text": "Reset filters",
+            "w": 102.546875,
+            "h": 36
+          },
+          {
+            "id": "edit-atlas",
+            "text": "Edit",
+            "w": 61.890625,
+            "h": 36
+          },
+          {
+            "id": "edit-beacon",
+            "text": "Edit",
+            "w": 61.890625,
+            "h": 36
+          },
+          {
+            "id": "edit-cedar",
+            "text": "Edit",
+            "w": 61.890625,
+            "h": 36
+          },
+          {
+            "id": "edit-delta",
+            "text": "Edit",
+            "w": 61.890625,
+            "h": 36
+          },
+          {
+            "id": "edit-ember",
+            "text": "Edit",
+            "w": 61.890625,
+            "h": 36
+          },
+          {
+            "id": "edit-fjord",
+            "text": "Edit",
+            "w": 61.890625,
+            "h": 36
+          }
+        ],
+        "coarse": false,
+        "storage": "SecurityError"
+      },
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "final-html",
+      "file": "settings.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "notifications",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "appearance",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "save-settings",
+            "text": "Save settings",
+            "w": 129.09375,
+            "h": 36
+          }
+        ],
+        "coarse": false,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-html",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "final-html",
+      "file": "settings.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "notifications",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "appearance",
+            "text": "",
+            "w": 52,
+            "h": 30
+          }
+        ],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": [
+        {
+          "id": "notifications",
+          "text": "",
+          "w": 52,
+          "h": 30
+        },
+        {
+          "id": "appearance",
+          "text": "",
+          "w": 52,
+          "h": 30
+        }
+      ]
+    },
+    {
+      "arm": "final-html",
+      "file": "index.html",
+      "width": 360,
+      "height": 360,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 287,
+              "bottom": 331,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 287,
+              "bottom": 331,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 287,
+          "bottom": 331,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 287,
+          "bottom": 331,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "final-html",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 317,
+              "bottom": 361,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 317,
+              "bottom": 361,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 317,
+          "bottom": 361,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 317,
+          "bottom": 361,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "final-astryx",
+      "file": "index.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-astryx",
+      "file": "settings.html",
+      "width": 360,
+      "height": 800,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-astryx",
+      "file": "index.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": true
+        },
+        {
+          "name": "Paused filters edited row",
+          "ok": true
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "final-astryx",
+      "file": "settings.html",
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "phone targets 44px",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "settings validation",
+          "ok": true
+        },
+        {
+          "name": "notifications toggles",
+          "ok": true
+        },
+        {
+          "name": "appearance toggles",
+          "ok": true
+        },
+        {
+          "name": "settings acknowledgement",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-astryx",
+      "file": "index.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "final-astryx",
+      "file": "settings.html",
+      "width": 820,
+      "height": 1180,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "final-astryx",
+      "file": "index.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "six sample rows",
+          "ok": true
+        },
+        {
+          "name": "owner search",
+          "ok": true
+        },
+        {
+          "name": "combined search/status",
+          "ok": true
+        },
+        {
+          "name": "reset filters",
+          "ok": true
+        },
+        {
+          "name": "no results",
+          "ok": true
+        },
+        {
+          "name": "cancel discards",
+          "ok": true
+        },
+        {
+          "name": "cancel restores focus",
+          "ok": true
+        },
+        {
+          "name": "Escape discards",
+          "ok": true
+        },
+        {
+          "name": "Escape restores focus",
+          "ok": true
+        },
+        {
+          "name": "blank name blocked",
+          "ok": true
+        },
+        {
+          "name": "focus trapped",
+          "ok": true,
+          "detail": 0
+        },
+        {
+          "name": "save updates name/status",
+          "ok": true
+        },
+        {
+          "name": "Paused filters edited row",
+          "ok": true
+        },
+        {
+          "name": "state loading",
+          "ok": true
+        },
+        {
+          "name": "state empty",
+          "ok": true
+        },
+        {
+          "name": "state error",
+          "ok": true
+        },
+        {
+          "name": "Retry restores rows",
+          "ok": true
+        },
+        {
+          "name": "bridge comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "bridge inline edit",
+          "ok": true
+        },
+        {
+          "name": "modal comment stable ID",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "next-due-update",
+            "text": "Update project",
+            "w": 119.03125,
+            "h": 32
+          },
+          {
+            "id": "state-populated",
+            "text": "Populated",
+            "w": 71.3125,
+            "h": 20
+          },
+          {
+            "id": "state-loading",
+            "text": "Loading",
+            "w": 59.359375,
+            "h": 20
+          },
+          {
+            "id": "state-empty",
+            "text": "Empty",
+            "w": 50.515625,
+            "h": 20
+          },
+          {
+            "id": "state-error",
+            "text": "Error",
+            "w": 42.703125,
+            "h": 20
+          },
+          {
+            "id": "project-search",
+            "text": "",
+            "w": 238.015625,
+            "h": 20
+          },
+          {
+            "id": "filter-all",
+            "text": "All",
+            "w": 40.71875,
+            "h": 24
+          },
+          {
+            "id": "filter-active",
+            "text": "Active",
+            "w": 63.25,
+            "h": 24
+          },
+          {
+            "id": "filter-review",
+            "text": "Review",
+            "w": 68.53125,
+            "h": 24
+          },
+          {
+            "id": "filter-planned",
+            "text": "Planned",
+            "w": 75.359375,
+            "h": 24
+          },
+          {
+            "id": "filter-paused",
+            "text": "Paused",
+            "w": 69.09375,
+            "h": 24
+          },
+          {
+            "id": "reset-filters",
+            "text": "Reset filters",
+            "w": 97.984375,
+            "h": 32
+          },
+          {
+            "id": "edit-atlas",
+            "text": "Edit",
+            "w": 48.40625,
+            "h": 32
+          },
+          {
+            "id": "edit-beacon",
+            "text": "Edit",
+            "w": 48.40625,
+            "h": 32
+          },
+          {
+            "id": "edit-cedar",
+            "text": "Edit",
+            "w": 48.40625,
+            "h": 32
+          },
+          {
+            "id": "edit-delta",
+            "text": "Edit",
+            "w": 48.40625,
+            "h": 32
+          },
+          {
+            "id": "edit-ember",
+            "text": "Edit",
+            "w": 48.40625,
+            "h": 32
+          },
+          {
+            "id": "edit-fjord",
+            "text": "Edit",
+            "w": 48.40625,
+            "h": 32
+          }
+        ],
+        "coarse": false,
+        "storage": "SecurityError"
+      },
+      "pinLayer": {
+        "exists": true,
+        "inDialog": false,
+        "modalOpen": true
+      }
+    },
+    {
+      "arm": "final-astryx",
+      "file": "settings.html",
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [
+          {
+            "id": "workspace-name",
+            "text": "",
+            "w": 596,
+            "h": 20
+          },
+          {
+            "text": "",
+            "w": 40,
+            "h": 24
+          },
+          {
+            "text": "",
+            "w": 40,
+            "h": 24
+          },
+          {
+            "id": "save-settings",
+            "text": "Save settings",
+            "w": 107.21875,
+            "h": 32
+          }
+        ],
+        "coarse": false,
+        "storage": "SecurityError"
+      }
+    },
+    {
+      "arm": "final-astryx",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "final-astryx",
+      "file": "settings.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "no overflow",
+          "ok": true
+        },
+        {
+          "name": "unique stable IDs",
+          "ok": true,
+          "detail": []
+        },
+        {
+          "name": "one h1 and language",
+          "ok": true
+        },
+        {
+          "name": "opaque storage",
+          "ok": true
+        },
+        {
+          "name": "no errors/offline",
+          "ok": true
+        }
+      ],
+      "console": [],
+      "layout": {
+        "overflow": false,
+        "duplicates": [],
+        "h1": 1,
+        "lang": "en",
+        "small": [],
+        "coarse": true,
+        "storage": "SecurityError"
+      },
+      "largeTouchTargetGaps": []
+    },
+    {
+      "arm": "final-astryx",
+      "file": "index.html",
+      "width": 360,
+      "height": 360,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 255,
+              "bottom": 299,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 255,
+              "bottom": 299,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 255,
+          "bottom": 299,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 255,
+          "bottom": 299,
+          "reachable": true
+        }
+      ]
+    },
+    {
+      "arm": "final-astryx",
+      "file": "index.html",
+      "width": 844,
+      "height": 390,
+      "touch": true,
+      "errors": [],
+      "externalRequests": [],
+      "failedResources": [],
+      "checks": [
+        {
+          "name": "short touch dialog actions reachable",
+          "ok": true,
+          "detail": [
+            {
+              "id": "cancel-project",
+              "top": 281.25,
+              "bottom": 325.25,
+              "reachable": true
+            },
+            {
+              "id": "save-project",
+              "top": 281.25,
+              "bottom": 325.25,
+              "reachable": true
+            }
+          ]
+        }
+      ],
+      "console": [],
+      "actions": [
+        {
+          "id": "cancel-project",
+          "top": 281.25,
+          "bottom": 325.25,
+          "reachable": true
+        },
+        {
+          "id": "save-project",
+          "top": 281.25,
+          "bottom": 325.25,
+          "reachable": true
+        }
+      ]
+    }
+  ],
+  "endedAt": "2026-11-11T15:02:35.167Z"
+}

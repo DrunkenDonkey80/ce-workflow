@@ -1,0 +1,175 @@
+{
+  "label": "final-html",
+  "arm": "html",
+  "repoHead": "5283a1f881277ad1b9ccb080ca1acd253365e0c4",
+  "model": "anthropic/claude-opus-5-5:high",
+  "compaction": "ultrafull",
+  "translation": "\n\nProduct benchmark mapping (applies identically to both product arms): the historical fixture brief above names public/ and supplied craft/check files. In this real design session, deliver directly in your own .pi/designs/<handle>/ instead; craft guides are supplied by the production session. Use the existing design look action and read its returned images instead of ../look.mjs; write CHECKS.md inside your design folder. Source/build handling follows the selected production foundation. The content, behavior, fixed data, stable IDs and requested refinement are unchanged. No delegation, external research, commits, package installation or files outside your own design folder. Do not wait for user input. Stop on tool/setup failure.",
+  "startedAt": "2026-11-11T14:10:54.875Z",
+  "stages": [
+    {
+      "name": "initial",
+      "elapsedMs": 524628,
+      "metrics": {
+        "sessions": 1,
+        "turns": 26,
+        "toolCalls": 39,
+        "input": 54,
+        "output": 53243,
+        "cacheRead": 1877016,
+        "cacheWrite": 147760,
+        "totalTokens": 2078073,
+        "cost": 2.1792792000000007,
+        "missingUsage": 0,
+        "missingCost": 0,
+        "models": {
+          "anthropic/claude-opus-5-5": 26
+        },
+        "compactions": 0,
+        "errors": []
+      }
+    },
+    {
+      "name": "refinement",
+      "elapsedMs": 162444,
+      "metrics": {
+        "sessions": 1,
+        "turns": 35,
+        "toolCalls": 51,
+        "input": 74,
+        "output": 68867,
+        "cacheRead": 2750727,
+        "cacheWrite": 242362,
+        "totalTokens": 3062030,
+        "cost": 3.139591400000001,
+        "missingUsage": 0,
+        "missingCost": 0,
+        "models": {
+          "anthropic/claude-opus-5-5": 35
+        },
+        "compactions": 0,
+        "errors": []
+      }
+    }
+  ],
+  "state": "complete",
+  "handle": "design-1",
+  "metrics": {
+    "sessions": 1,
+    "turns": 35,
+    "toolCalls": 51,
+    "input": 74,
+    "output": 68867,
+    "cacheRead": 2750727,
+    "cacheWrite": 242362,
+    "totalTokens": 3062030,
+    "cost": 3.139591400000001,
+    "missingUsage": 0,
+    "missingCost": 0,
+    "models": {
+      "anthropic/claude-opus-5-5": 35
+    },
+    "compactions": 0,
+    "errors": []
+  },
+  "toolsUsed": [
+    "bash",
+    "tools_enable",
+    "read",
+    "write",
+    "edit",
+    "design"
+  ],
+  "versions": {
+    "handle": "design-1",
+    "name": "Relay html",
+    "kind": "app",
+    "folder": ".pi/designs/design-1",
+    "files": [
+      "CHECKS.md",
+      "DESIGN.md",
+      "HANDOFF.md",
+      "app.js",
+      "checks/interaction-check.mjs",
+      "index.html",
+      "settings.html",
+      "settings.js",
+      "styles.css"
+    ],
+    "page": "index.html",
+    "versions": [
+      1,
+      2
+    ]
+  },
+  "endedAt": "2026-11-11T14:22:25.292Z",
+  "elapsedMs": 690417,
+  "dirtyWorktree": true,
+  "sessions": {
+    "count": 1,
+    "canonicalFilesRetainedLocally": true
+  },
+  "contextEvidence": {
+    "productionStart": true,
+    "guideAndExtensionCopiesRetainedLocally": true,
+    "actualToolCallsRetainedInCanonicalSession": true,
+    "fullEffectiveSystemPromptRetained": false,
+    "frozenGuideByteComparisonBeforeAstryx": true,
+    "limitation": "Complete effective system prompts and all imported module snapshots were not retained. Frozen four guide/module copies match across final arms. Dirty-tree/model variance prevents causal attribution."
+  },
+  "acceptance": {
+    "cases": 12,
+    "passed": 98,
+    "total": 100,
+    "harnessExceptions": 0,
+    "failures": [
+      {
+        "file": "settings.html",
+        "width": 360,
+        "height": 800,
+        "name": "phone targets 44px",
+        "ok": false,
+        "detail": [
+          {
+            "id": "notifications",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "appearance",
+            "text": "",
+            "w": 52,
+            "h": 30
+          }
+        ]
+      },
+      {
+        "file": "settings.html",
+        "width": 390,
+        "height": 844,
+        "name": "phone targets 44px",
+        "ok": false,
+        "detail": [
+          {
+            "id": "notifications",
+            "text": "",
+            "w": 52,
+            "h": 30
+          },
+          {
+            "id": "appearance",
+            "text": "",
+            "w": 52,
+            "h": 30
+          }
+        ]
+      }
+    ],
+    "pageErrors": 0,
+    "externalRequests": 0,
+    "failedResources": 0,
+    "report": "product-acceptance.json"
+  },
+  "stageMetricSemantics": "Stage metrics are cumulative; do not sum them. Active elapsed is the sum of stage elapsedMs; end-to-end includes setup and lifecycle overhead."
+}

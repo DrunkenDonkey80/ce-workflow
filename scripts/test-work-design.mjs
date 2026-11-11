@@ -2,6 +2,7 @@
 // design tool (D1): start makes one folder and hub session per direction with a build prompt; v1 (OpenDesign) stores load
 // with their brief; select exports the folder to a named folder and hands it on (delta on reselect); clone copies and forks.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -11,6 +12,10 @@ import { agentBrowser, renderDesign, reportText, selectRenderTarget } from "../e
 import { decodePng } from "../extensions/screen-read.ts";
 import { designStateJson } from "../extensions/design-state.ts";
 import { ensureDesignRuntime, astryxRuntime } from "../extensions/design-runtime.ts";
+import { themeInput, contrastRatio, themeTokens, runTheme } from "../extensions/design-theme.ts";
+import { lookupInput, lookupResponse, runLookup } from "../extensions/design-lookup.ts";
+import { appStarter, appSources, assertAppRecipe, buildApp } from "../extensions/design-app.ts";
+import { appPreviewFolder, appReceipt, BUILD_FILE, buildStatus, ensureAppBuilt, PREVIEW, readAppFiles } from "../extensions/design-build.ts";
 
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "design-test-"));
 const storePath = path.join(cwd, ".pi/designs/sessions.json");
@@ -76,6 +81,79 @@ try {
 	fs.symlinkSync(outsideCache, path.join(linkedAgent, "cache/design-runtimes"), process.platform === "win32" ? "junction" : "dir");
 	await assert.rejects(ensureDesignRuntime({ ...runtimeOptions, agentDir: linkedAgent }, fakeRuntimeRun), /symlink/);
 	assert.equal(fs.readdirSync(outsideCache).length, 0, "cache path cannot traverse a symlink");
+	// Standalone tokens and evidence are deterministic; only the bounded child loads Astryx.
+	const themeArgs = { accent: "#808080" }, themeParams = themeInput(themeArgs);
+	const tonal = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [i * 5, "#" + Math.round(i * 255 / 20).toString(16).padStart(2, "0").repeat(3)]));
+	const palette = { schemaVersion: 1, recipe: "astryx-oklch-v1", stops: Array.from({ length: 21 }, (_, i) => i * 5), palette: { accent: { light: tonal, dark: tonal }, neutral: { light: tonal, dark: tonal } } };
+	const provenance = { version: "0.7.12", lockDigest: astryxRuntime.lockDigest };
+	const generatedTheme = themeTokens(themeParams, palette, provenance);
+	assert.deepEqual(generatedTheme, themeTokens(themeParams, palette, provenance));
+	assert.equal(createHash("sha256").update(generatedTheme.css).digest("hex"), "ce1fd9daac75f448efc513139ba6d30b21594cadde69da48a652c8b95113341b", "standalone CSS golden");
+	assert.equal(generatedTheme.tokens.modes.light.accent, "#808080");assert.equal(generatedTheme.tokens.modes.dark.accent, "#b3b3b3");
+	assert(generatedTheme.css.includes("--type-heading: calc(") && generatedTheme.css.includes("--radius-lg: calc("));
+	assert(!/https?:\/\//.test(generatedTheme.css), "tokens need no remote or React runtime");
+	assert(generatedTheme.tokens.contrast.some(pair => !pair.pass), "contrast failures are reported");
+	assert.equal(contrastRatio("#000", "#fff"), 21);assert.equal(contrastRatio("#fff", "#fff"), 1);
+	assert(contrastRatio("#777", "#fff") < 4.5 && contrastRatio("#767676", "#fff") > 4.5);
+	assert(Math.abs(contrastRatio("#00000080", "#ffffff") - 4.0041) < 0.001, "composite alpha before luminance");
+	assert.equal(contrastRatio("#00000000", "#ffffff00", "#000"), 1);
+	assert.throws(() => contrastRatio("red", "#fff"), /hex/);assert.throws(() => contrastRatio("#fff", "#000", "#ffffff00"), /opaque/);
+	for (const args of [{}, { accent: "red" }, { accent: "#fff;}" }, { ...themeArgs, neutral: "#gggggg" }, { ...themeArgs, typeScale: NaN }, { ...themeArgs, radius: -1 }, { ...themeArgs, baseSize: 0 }, { ...themeArgs, neutral: null }, { ...themeArgs, radius: null }, { ...themeArgs, typeScale: Infinity }]) assert.throws(() => themeInput(args), /accent|neutral|typeScale|radius|baseSize/);
+	assert.equal(themeInput({ ...themeArgs, radius: 0, typeScale: 1, baseSize: 24 }).radius, 0);
+	assert.throws(() => themeTokens(themeParams, { ...palette, palette: {} }, provenance), /palette/i);
+	assert.throws(() => themeTokens(themeParams, { ...palette, recipe: "other-version" }, provenance), /palette/i);
+	const fakeThemeCache = path.join(cwd, "theme-runtime"), fakeApi = path.join(fakeThemeCache, "node_modules/@astryxdesign/cli/api");fs.mkdirSync(fakeApi, { recursive: true });
+	fs.writeFileSync(path.join(fakeApi, "index.mjs"), `export function generateTonalPalette(request) { if (process.cwd() !== ${JSON.stringify(fakeThemeCache)}) throw Error("project config boundary");if(request.families[0].anchors[0].policy !== "exact") throw Error("missing exact anchor");return ${JSON.stringify(palette)}; }`);
+	const themeTools = { runtime: async () => ({ directory: fakeThemeCache, lockDigest: astryxRuntime.lockDigest, versions: astryxRuntime.versions }) };
+	assert.deepEqual(await runTheme(themeArgs, themeTools), generatedTheme, "real jiti bootstrap uses the cache public API");
+	assert.deepEqual(await runDesign(cwd, { action: "theme", ...themeArgs }, { hub: async () => assert.fail("theme is not a hub session"), ...themeTools }), generatedTheme);
+	await assert.rejects(runTheme({ accent: "bad" }, { runtime: async () => assert.fail("invalid request must not provision") }), /accent/);
+	// Installed-version lookup: validate before provisioning, read-only API branches, bounded output and provenance.
+	for (const args of [{}, { query: "x".repeat(257) }, { query: "é".repeat(129) }, { query: "button", limit: 0 }, { query: "button", limit: 11 }, { query: "button", limit: 1.5 }, { query: "button", catalog: "install" }, { catalog: "component", name: "../../outside" }, { catalog: "component", name: "Button@latest" }, { query: "button", name: "Button" }, { catalog: "template", name: "dashboard", section: "copy" }, { catalog: "component", name: "Button", libraryVersion: "latest" }]) {
+		assert.throws(() => lookupInput(args), /lookup|query|limit|catalog|name|section|version/i);
+		await assert.rejects(runLookup(args, { runtime: async () => assert.fail("invalid lookup must not provision") }), /lookup|query|limit|catalog|name|section|version/i);
+	}
+	assert.equal(lookupInput({ query: "  button  " }).query, "button");
+	assert.equal(lookupInput({ catalog: "doc", name: "tokens/colors", section: "overview" }).section, "overview");
+	assert.throws(() => lookupResponse({}, { query: "button", limit: 5 }), /response/i);
+	assert.throws(() => lookupResponse({ type: "template.show", data: {} }, { catalog: "component", name: "Button" }), /response/i);
+	assert.throws(() => lookupResponse({ type: "component.detail", data: "x".repeat(50_000) }, { catalog: "component", name: "Button" }), /size|large|48/i);
+	assert.throws(() => lookupResponse({ type: "search", data: { results: Array(6).fill({}) } }, { query: "button", limit: 5 }), /count|limit/i);
+	const lookupCache = path.join(cwd, "lookup-runtime"), lookupApi = path.join(lookupCache, "node_modules/@astryxdesign/cli/api");fs.mkdirSync(lookupApi, { recursive: true });
+	fs.copyFileSync(new URL("../extensions/astryx-runtime/manifest.json", import.meta.url), path.join(lookupCache, "package.json"));
+	for (const name of ["cli", "core"]) { const file = path.join(lookupCache, `node_modules/@astryxdesign/${name}/package.json`);fs.mkdirSync(path.dirname(file), { recursive: true });fs.writeFileSync(file, JSON.stringify({ name: `@astryxdesign/${name}`, version: "0.7.12" })); }
+	fs.writeFileSync(path.join(lookupApi, "index.mjs"), `
+	const check = o => { if (process.cwd() !== ${JSON.stringify(lookupCache)} || o.cwd !== process.cwd()) throw Error("project config boundary"); };
+	export async function search(query,o) { check(o);if(query==="hang") await new Promise(resolve=>setTimeout(resolve,30_000));return {type:"search",data:{query,matchCount:1,results:[{domain:"component",name:"Button",package:"@astryxdesign/core"}]}}; }
+	export async function component(name,o) { check(o);if(o.package!=="@astryxdesign/core"||o.detail!=="compact") throw Error("unscoped component");if(name==="Unknown") throw Error("Unknown component");return {type:"component.detail",package:o.package,data:{name,usage:"<Button>Save</Button>"}}; }
+	export async function template(name,o) { check(o);if(!o.show||o.targetPath||o.cdn||o.overwrite) throw Error("write branch");return {type:"template.show",package:o.package,data:{template:name,source:"<main />"}}; }
+	export async function themeListAvailable(o) { check(o);return {type:"theme.list",data:[{slug:"neutral",package:"@astryxdesign/theme-neutral"}]}; }
+	export async function docs(name,section,o) { check(o);return {type:"docs.detail.section",package:"@astryxdesign/cli",data:{name,section}}; }
+	`);
+	const lookupTools = { runtime: async () => ({ directory: lookupCache, ...astryxRuntime }) };
+	const lookupFiles = fs.readdirSync(cwd, { recursive: true }).sort();
+	const foundButton = await runLookup({ query: "button" }, lookupTools);
+	assert.equal(foundButton.response.data.results[0].name, "Button");assert.equal(foundButton.source.versions["@astryxdesign/core"], "0.7.12");assert.equal(foundButton.source.lockDigest, astryxRuntime.lockDigest);
+	foundButton.response.data.results[0].name = "mutated";
+	assert.equal((await runLookup({ query: "button" }, lookupTools)).response.data.results[0].name, "Button", "cached responses cannot be mutated by callers");
+	for (const [catalog, name] of [["component", "Button"], ["template", "dashboard"], ["theme", "neutral"], ["doc", "tokens"]]) assert((await runDesign(cwd, { action: "lookup", catalog, name }, { hub: async () => assert.fail("lookup is not a hub session"), ...lookupTools })).response.type);
+	await assert.rejects(runLookup({ catalog: "component", name: "Unknown" }, lookupTools), /Unknown component/);
+	await assert.rejects(runLookup({ catalog: "theme", name: "Unknown" }, lookupTools), /Unknown theme/);
+	await assert.rejects(runLookup({ query: "button" }, { runtime: async () => ({ directory: lookupCache, lockDigest: "wrong", versions: astryxRuntime.versions }) }), /version|lock|pin/i);
+	const cancelledLookup = new AbortController();cancelledLookup.abort();
+	await assert.rejects(runLookup({ query: "button" }, { signal: cancelledLookup.signal, runtime: async () => assert.fail("aborted lookup must not provision") }), /abort/i);
+	const runningLookup = new AbortController(), abortLookup = setTimeout(() => runningLookup.abort(), 300);
+	try { await assert.rejects(runLookup({ query: "hang" }, { ...lookupTools, signal: runningLookup.signal }), /abort/i); } finally { clearTimeout(abortLookup); }
+	fs.writeFileSync(path.join(lookupCache, "astryx.config.mjs"), `throw Error("must not execute config");`);
+	await assert.rejects(runLookup({ query: "not-cached" }, lookupTools), /configuration/);
+	fs.unlinkSync(path.join(lookupCache, "astryx.config.mjs"));
+	const lookupManifest = path.join(lookupCache, "package.json"), goodLookupManifest = fs.readFileSync(lookupManifest);
+	fs.writeFileSync(lookupManifest, "{");
+	await assert.rejects(runLookup({ query: "bad-json" }, lookupTools), /metadata|Invalid package config/);fs.writeFileSync(lookupManifest, goodLookupManifest);
+	const lookupCore = path.join(lookupCache, "node_modules/@astryxdesign/core/package.json"), goodLookupCore = fs.readFileSync(lookupCore);
+	fs.writeFileSync(lookupCore, JSON.stringify({ name: "@astryxdesign/core", version: "0.7.13" }));
+	await assert.rejects(runLookup({ query: "wrong-installed-version" }, lookupTools), /version mismatch/);fs.writeFileSync(lookupCore, goodLookupCore);
+	assert.deepEqual(fs.readdirSync(cwd, { recursive: true }).sort(), lookupFiles, "lookups and failures create no project or cache files");
 	const guideText = fs.readFileSync(new URL("../extensions/design-guide.md", import.meta.url), "utf8");
 	assert(/Touch targets[^.]*coarse-pointer tablets/.test(guideText), "the starter contract covers coarse-pointer tablets, not phone widths alone");
 	assert.equal(designStateJson({ z: 1, a: [null, true, "ok"] }), '{"a":[null,true,"ok"],"z":1}', "canonical state comparison ignores object key order");
@@ -94,25 +172,41 @@ try {
 	assert.deepEqual(definition.parameters.properties.input?.enum, ["mouse", "touch"], "look exposes input independently of size");
 	assert.equal(definition.parameters.properties.reducedMotion?.type, "boolean");
 	assert.equal(definition.parameters.properties.state?.type, "string", "look exposes only declared named states");
+	assert(definition.parameters.properties.action.enum.includes("lookup"));assert.equal(definition.parameters.properties.limit.maximum, 10);assert.equal(definition.parameters.properties.query.maxLength, 256);
 	fs.writeFileSync(path.join(cwd, "page.html"), "<h1>Home</h1>");
 	// Hub fakes: always pass these, the default tools create real hub sessions.
 	const hubCalls = [];
 	let hubUp = true, hubN = 0;
 	const tools = {
-		async hub(args) { hubCalls.push(args); if (!hubUp) return { ok: false, text: "hub not running token=abc" }; if (args[0] === "session") return { ok: true, text: JSON.stringify({ id: args[1], name: "Parent" }) }; return ["new", "fork"].includes(args[0]) ? { ok: true, text: `New session ${args[2]}: http://127.0.0.1:1/s/00000000-0000-0000-0000-00000000000${++hubN}/?token=x` } : { ok: true, text: "Sent." }; },
+		async hub(args) { hubCalls.push(args); if (!hubUp) return { ok: false, text: "hub not running token=abc" }; if (args[0] === "session") return { ok: true, text: JSON.stringify({ id: args[1], name: "Parent" }) }; return ["new", "fork"].includes(args[0]) ? { ok: true, text: `New session ${args[2]}: http://127.0.0.1:1/s/00000000-0000-0000-0000-${String(++hubN).padStart(12, "0")}/?token=x` } : { ok: true, text: "Sent." }; },
 	};
 
 	// v1 store (OpenDesign): loads with the brief from its run prompt and OD's fields dropped; the next write is version 2.
 	fs.mkdirSync(path.dirname(storePath), { recursive: true });
-	fs.writeFileSync(storePath, JSON.stringify({ version: 1, next: 2, sessions: [{ handle: "design-1", projectId: "p", runId: "r", status: "succeeded", direction: "old", name: "Old", title: "Old page", prompt: "Old brief\nwith detail\n\nDirection for this design (design-1): old\nBuild it", created: 1 }] }));
+	fs.writeFileSync(storePath, JSON.stringify({ version: 1, next: 2, sessions: [{ handle: "design-1", projectId: "p", runId: "r", status: "succeeded", retained: { note: "legacy data" }, direction: "old", name: "Old", title: "Old page", prompt: "Old brief\nwith detail\n\nDirection for this design (design-1): old\nBuild it", created: 1 }] }));
 	const [old] = await runDesign(cwd, { action: "status" }, tools);
 	assert.deepEqual([old.handle, old.name, old.kind, old.projectId, old.runId], ["design-1", "Old", "web", undefined, undefined]);
+	assert.deepEqual(old.retained,{note:"legacy data"},"migration preserves unrelated legacy fields");
+	const invalidStore=path.join(cwd,"invalid-metadata"), invalidStorePath=path.join(invalidStore,".pi/designs/sessions.json");fs.mkdirSync(path.dirname(invalidStorePath),{recursive:true});
+	const validMetadata={handle:"design-1",direction:"x",kind:"web",inputs:[],references:[],created:1};
+	for(const invalid of[{...validMetadata,foundation:"other"},{...validMetadata,foundation:"astryx"},{...validMetadata,system:{name:"astryx",version:"latest",lockDigest:"bad"}},{...validMetadata,handle:"../escape"},{...validMetadata,handle:["design-1"]},{...validMetadata,inputs:[1]},{...validMetadata,system:{name:"astryx",version:["0.7.12"],lockDigest:["a".repeat(64)]}}]){
+	 const original=JSON.stringify({version:2,next:2,sessions:[invalid]});fs.writeFileSync(invalidStorePath,original);
+	 await assert.rejects(runDesign(invalidStore,{action:"open",handle:invalid.handle},tools),/session.*metadata|session.*list/i);
+	 assert.equal(fs.readFileSync(invalidStorePath,"utf8"),original,"invalid metadata is never rewritten or silently upgraded");
+	}
 
+	for(const invalid of[{version:2,next:1,sessions:[validMetadata]},{version:2,next:3,sessions:[validMetadata,validMetadata]}]){
+	 fs.writeFileSync(invalidStorePath,JSON.stringify(invalid));await assert.rejects(runDesign(invalidStore,{action:"status"},tools),/session.*metadata|session.*list/i);
+	}
+	fs.writeFileSync(invalidStorePath,JSON.stringify({version:1,custom:"retained",sessions:[{...validMetadata,handle:"design-7"}]}));
+	const migratedGap=await runDesign(invalidStore,{action:"start",brief:"New",directions:["x"],names:["New"],title:"New design"},{hub:async()=>({ok:false,text:"offline"})});
+	assert.equal(migratedGap.sessions[0].handle,"design-8","a missing legacy counter cannot overwrite an existing design");assert.equal(JSON.parse(fs.readFileSync(invalidStorePath)).custom,"retained");
 	// Start: one folder and hub session per direction, named by direction, the title below, the brief and inputs in its first message.
 	process.env.PI_HUB_SESSION = "parent-session";
 	const started = await runDesign(cwd, { action: "start", brief: "Home page\nThe whole landing page, real copy.", directions: ["calm", "bold"], names: ["Calm", "Bold editorial"], title: "Home page", kind: "app", inputs: ["page.html", "../escape.txt", "missing.css"] }, tools);
 	delete process.env.PI_HUB_SESSION;
 	assert.equal(stored().version, 2);
+	assert.deepEqual(stored().sessions[0].retained,{note:"legacy data"},"the next write preserves unrelated migrated fields");
 	assert.equal(stored().sessions[0].brief, "Old brief\nwith detail", "the v1 brief survives the rewrite");
 	assert.deepEqual(started.sessions.map(item => [item.handle, item.name, item.title, item.from, item.kind, item.hubSessionId]), [["design-2", "Calm", "Home page", "parent-session", "app", "00000000-0000-0000-0000-000000000001"], ["design-3", "Bold editorial", "Home page", "parent-session", "app", "00000000-0000-0000-0000-000000000002"]]);
 	assert.equal(started.skipped.length, 2, "an escaping and a missing input are reported");
@@ -264,6 +358,11 @@ try {
 			targetHeights.push(target.height);
 		}
 		assert.deepEqual(targetHeights, [28, 44], "same-size coarse tablet enlarges targets; fine-pointer desktop keeps its density");
+		// Use production before-navigation input and observed capability, not screenshot size.
+		fs.writeFileSync(path.join(fixture, "theme.html"), `<style>${generatedTheme.css}</style>${generatedTheme.previewControls}<script>window.designReady=(async()=>{document.querySelector("[data-theme-tweaks]").open=true;await new Promise(requestAnimationFrame);const targets=[...document.querySelectorAll("[data-theme-tweaks] summary,[data-theme-tweaks] input")];if(!matchMedia("(pointer:coarse)").matches||targets.length!==5||targets.some(node=>{const r=node.getBoundingClientRect();return r.width<44||r.height<44;}))throw Error("Generated theme targets require observed coarse input and 44x44 bounds");})();</script>`);
+		const touchTheme = await renderDesign({ folder: fixture, screen: "theme.html", width: 360, height: 800, input: "touch", element: "[data-theme-knob=radius]" });
+		assert.equal(touchTheme.report.input.coarse, true);assert(touchTheme.png.length && touchTheme.report.readiness.settled, reportText(touchTheme.report));
+		assert.equal(touchTheme.report.errors.length, 0);assert(touchTheme.height >= 44, "generated Tweaks follow the coarse-pointer target policy");
 		// P3-06: replay an explicit draft, acknowledge its committed state, then capture the open modal.
 		fs.writeFileSync(path.join(fixture, "state.html"), `<style>dialog{width:260px;height:180px;border:0;padding:0}#scroller{height:30px;overflow:auto}</style><dialog id="panel" aria-label="Draft editor"><input id="draft" value="Saved"><div id="scroller"><div style="height:500px">Details</div></div></dialog><script>window.designPreview={states:{edit:{open:true,draft:"Unsaved Delta",scroll:120}},capture:()=>({open:panel.open,draft:draft.value,scroll:scroller.scrollTop}),restore:async value=>{draft.value=value.draft;if(value.open&&!panel.open)panel.showModal();if(!value.open&&panel.open)panel.close();scroller.scrollTop=value.scroll;panel.style.background=value.draft==="Unsaved Delta"?"red":"blue";await new Promise(requestAnimationFrame);}};</script>`);
 		const draftState = { open: true, draft: "Unsaved Delta", scroll: 120 };
@@ -401,6 +500,7 @@ try {
 	fs.writeFileSync(path.join(cwd, "DESIGN.md"), "# Ours");
 	const listed = await runDesign(cwd, { action: "systems" }, net);
 	assert.deepEqual([listed.own, listed.systems, listed.source], [["DESIGN.md"], ["airbnb", "stripe"], "github.com/nexu-io/open-design design-systems at aaaaaaa"]);
+	assert.equal(listed.libraries[0].name, "astryx");assert.equal(listed.libraries[0].version, "0.7.12");assert(!("guide" in listed.libraries[0]), "lists never inject another system's guidance");
 	const fetchedSystem = await runDesign(cwd, { action: "systems", name: "airbnb", handle: "design-2" }, net);
 	assert.deepEqual([fetchedSystem.files, fetchedSystem.commit, fetchedSystem.cached], [["DESIGN.md", "SOURCE.json", "tokens.css"], sha, false]);
 	assert.deepEqual(JSON.parse(fs.readFileSync(path.join(cwd, ".pi/designs/systems/airbnb/SOURCE.json"), "utf8")).license, "Apache-2.0");
@@ -424,5 +524,133 @@ try {
 	assert.match(sysHandoff, /`DESIGN\.md` lists the color tokens/);
 	assert.match(sysHandoff, /Found in: index\.html\./);
 	assert.match(fs.readFileSync(path.join(cwd, sysExport, "BRIEF.md"), "utf8"), new RegExp(`- Design system: airbnb \\(github\\.com/nexu-io/open-design design-systems/airbnb at ${sha}\\)`));
+	put(ownHandle, { "tokens.css": generatedTheme.css, "theme.tokens.json": JSON.stringify(generatedTheme.tokens), "DESIGN.md": generatedTheme.designNotes });
+	await runDesign(cwd, { action: "select", handle: ownHandle }, choose(undefined));
+	assert.match(fs.readFileSync(path.join(cwd, sysExport, "HANDOFF.md"), "utf8"), /Keep `theme.tokens.json` alongside `tokens.css`/);
+	assert.deepEqual(JSON.parse(fs.readFileSync(path.join(cwd, sysExport, "theme.tokens.json"), "utf8")), generatedTheme.tokens);
+	// Selecting Astryx references stays local, injects only its compact guide, and preserves exact non-Git provenance.
+	const noLibraryInstall = { ...tools, fetch: async () => assert.fail("reference selection must not fetch"), runtime: async () => assert.fail("reference selection must not install") };
+	const brandless = path.join(cwd, "brandless");fs.mkdirSync(brandless);
+	const offlineLibraries = await runDesign(brandless, { action: "systems" }, { ...noLibraryInstall, fetch: async () => { throw new Error("offline"); } });
+	assert.equal(offlineLibraries.libraries[0].name, "astryx");assert.equal(offlineLibraries.systems.length, 0);assert.match(offlineLibraries.offline, /offline/);
+	const astryxReference = await runDesign(cwd, { action: "systems", name: "astryx" }, noLibraryInstall);
+	assert.equal(astryxReference.version, "0.7.12");assert.equal(astryxReference.lockDigest, astryxRuntime.lockDigest);assert.equal(astryxReference.commit, undefined);
+	assert.deepEqual(astryxReference.files, ["DESIGN.md", "SOURCE.json"]);
+	assert.equal((await runDesign(cwd, { action: "systems", name: "astryx" }, noLibraryInstall)).cached, true);
+	const referenceGuide = fs.readFileSync(path.join(cwd, astryxReference.folder, "DESIGN.md"), "utf8");
+	assert(referenceGuide.length < 1500 && referenceGuide.includes('action:"lookup"'));assert(!referenceGuide.includes("Airbnb"));
+	await runDesign(cwd, { action: "systems", name: "astryx", handle: ownHandle }, noLibraryInstall);
+	assert.deepEqual(stored().sessions.find(item => item.handle === ownHandle).system, { name: "astryx", version: "0.7.12", lockDigest: astryxRuntime.lockDigest });
+	await runDesign(cwd, { action: "select", handle: ownHandle }, choose(undefined));
+	const astryxBrief = fs.readFileSync(path.join(cwd, sysExport, "BRIEF.md"), "utf8");
+	assert(astryxBrief.includes(`astryx (@astryxdesign/core 0.7.12; lock ${astryxRuntime.lockDigest})`));assert(!astryxBrief.includes("design-systems/astryx"));
+	hubCalls.length = 0;
+	const withAstryx = await runDesign(cwd, { action: "start", brief: "b", directions: ["z"], names: ["Z"], title: "t", system: "astryx" }, noLibraryInstall);
+	assert.equal(withAstryx.sessions[0].system.lockDigest, astryxRuntime.lockDigest);
+	assert.match(hubCalls.find(call => call[0] === "prompt")[2], /systems\/astryx\/ \(DESIGN\.md first/);
+	assert(!hubCalls.find(call => call[0] === "prompt")[2].includes("Airbnb"));
+	// Optional component foundation: fixed recipe, local output, immutable last-good publication and source-only writes.
+	const componentCache = path.join(cwd, "component-cache"), compiler = path.join(componentCache, "node_modules/esbuild/lib/main.js");
+	fs.mkdirSync(path.dirname(compiler), { recursive: true });
+	fs.writeFileSync(compiler, `exports.build = async o => {
+	  const p = require("node:path");let load,resolve;
+	  o.plugins[0].setup({onLoad(_o,fn){load=fn},onResolve(_o,fn){resolve=fn}});
+	  const source=load(await resolve({path:"src/main.jsx",kind:"entry-point"})).contents.toString();
+	  if(source.includes("FAIL_BUILD"))throw Error("Deliberate build failure");
+	  if(source.includes("SLOW_BUILD"))await new Promise(r=>setTimeout(r,500));
+	  const app=load({path:"src/App.jsx"}).contents.toString();
+	  return {metafile:{outputs:{}},outputFiles:[{path:p.join(o.outdir,"app.js"),contents:Buffer.from("window.compiledSource="+JSON.stringify(source+app))},{path:p.join(o.outdir,"astryx.css"),contents:Buffer.from("/* pinned component test double */")}]} }`);
+	let componentRuns = 0;
+	const componentTools = { ...tools, runtime: async () => { componentRuns++;return { directory: componentCache, ...astryxRuntime }; }, confirm: async () => assert.fail("component tests never download") };
+	const starter = appStarter('Local <& " design');assertAppRecipe(starter);
+	assert(starter.has("src/screens/index.html") && starter.has("src/App.jsx") && starter.has("package-lock.json") && starter.has("THIRD_PARTY_NOTICES.md"));
+	assert(!starter.has("index.html"), "root HTML is generated, not the authored screen shell");
+	assert(starter.get("src/screens/index.html").toString().includes("&lt;&amp; &quot;"));
+	assert(!/https?:\/\//.test(starter.get("src/vendor.css").toString()), "no Google Fonts/CDN import");
+	const badSource = new Map(starter);badSource.set("src/../../secret.js",Buffer.from("secret"));assert.throws(()=>appSources(badSource),/path/);
+	const badPin = new Map(starter);badPin.set("package.json",Buffer.from("{}"));await assert.rejects(buildApp(badPin,componentTools),/pin|reviewed/);assert.equal(componentRuns,0);
+	const componentProject = path.join(cwd,"component-project");fs.mkdirSync(componentProject);
+	const componentStart = await runDesign(componentProject,{action:"start",kind:"app",system:"astryx",brief:"Build a project tool",directions:["compact"],names:["Component"],title:"Local app"},componentTools);
+	const component = componentStart.sessions[0], componentDir = path.join(componentProject,".pi/designs",component.handle);
+	assert.equal(component.foundation,"astryx");assert.equal(componentRuns,1,"start compiles once; verified unchanged output skips provisioning");
+	assert(fs.existsSync(path.join(componentDir,"index.html")));assert.equal(buildStatus(componentDir).state,"ready");
+	const outputBefore = fs.readFileSync(path.join(componentDir,BUILD_FILE)), goodPreview = appPreviewFolder(componentDir);
+	assert.notEqual(goodPreview,componentDir);assert(![...readAppFiles(componentDir).keys()].some(name=>name.startsWith(PREVIEW+"/")));
+	assert.match(writeRefusal(componentProject,component.handle,path.join(componentDir,"index.html")),/source|extension-owned/);
+	assert.equal(writeRefusal(componentProject,component.handle,path.join(componentDir,"src/App.jsx")),undefined);
+	await ensureAppBuilt(componentDir,componentTools);assert.equal(componentRuns,1);assert(fs.readFileSync(path.join(componentDir,BUILD_FILE)).equals(outputBefore));
+	assert.throws(()=>appReceipt(new Map([[BUILD_FILE,Buffer.from(JSON.stringify({...JSON.parse(outputBefore),sourceDigest:["a".repeat(64)]}))]])),/Invalid component build receipt/);
+	const componentVersion = await snapshot(componentProject,component.handle,componentTools);assert.equal(componentVersion,1);assert.equal(await snapshot(componentProject,component.handle,componentTools),1);
+	const componentMain = path.join(componentDir,"src/main.jsx"), goodMain = fs.readFileSync(componentMain);
+	fs.appendFileSync(componentMain,"\n// FAIL_BUILD");
+	await assert.rejects(runDesign(componentProject,{action:"select",handle:component.handle},componentTools),/Deliberate build failure/);
+	assert.equal(buildStatus(componentDir).state,"failed");assert.equal(appPreviewFolder(componentDir),goodPreview);
+	assert(fs.readFileSync(path.join(componentDir,BUILD_FILE)).equals(outputBefore),"failed build never replaces last-good receipt");
+	await assert.rejects(snapshot(componentProject,component.handle,componentTools),/Deliberate build failure/);
+	assert(fs.existsSync(path.join(componentProject,".pi/designs/history",component.handle,"2/.design-draft.json")),"failed source is explicitly versioned as a draft");
+	await runDesign(componentProject,{action:"restore",handle:component.handle,version:1},componentTools);
+	assert(fs.readFileSync(componentMain).equals(goodMain));assert.equal(buildStatus(componentDir).state,"ready");
+	assert.equal(versions(componentProject,component.handle).at(-1),3,"restore preserves failed edits then publishes a coherent version");
+	// Output/cache corruption, cancellation and concurrent lifecycle operations cannot publish a mismatched version.
+	const generatedJs=Object.keys(JSON.parse(outputBefore).generated).find(name=>name.endsWith(".js"));
+	fs.writeFileSync(path.join(componentDir,generatedJs),"tampered output");await ensureAppBuilt(componentDir,componentTools);
+	assert.equal(await snapshot(componentProject,component.handle,componentTools),3,"repairing identical output consumes no version slot");
+	fs.writeFileSync(path.join(goodPreview,"index.html"),"corrupt preview cache");await ensureAppBuilt(componentDir,componentTools);
+	assert.notEqual(fs.readFileSync(path.join(appPreviewFolder(componentDir),"index.html"),"utf8"),"corrupt preview cache");
+	fs.rmSync(path.join(componentDir,PREVIEW),{recursive:true});assert.equal(appPreviewFolder(componentDir),goodPreview,"a missing generated cache is reconstructed offline from verified retained output");
+	fs.appendFileSync(componentMain,"\n// SLOW_BUILD");const buildAbort=new AbortController();
+	const cancelledBuild=ensureAppBuilt(componentDir,{...componentTools,signal:buildAbort.signal});const abortTimer=setTimeout(()=>buildAbort.abort(),30);
+	try{await assert.rejects(cancelledBuild,/abort|cancel/i);}finally{clearTimeout(abortTimer);}
+	assert(fs.readFileSync(path.join(componentDir,BUILD_FILE)).equals(outputBefore));
+	const changedDuring=ensureAppBuilt(componentDir,componentTools), editTimer=setTimeout(()=>fs.appendFileSync(componentMain,"\n// changed during build"),40);
+	try{await assert.rejects(changedDuring,/Source changed during/);}finally{clearTimeout(editTimer);}
+	assert(fs.readFileSync(path.join(componentDir,BUILD_FILE)).equals(outputBefore));
+	fs.writeFileSync(componentMain,Buffer.concat([goodMain,Buffer.from("\n// refinement")]));
+	const concurrent=await Promise.all([snapshot(componentProject,component.handle,componentTools),runDesign(componentProject,{action:"select",handle:component.handle},componentTools),runDesign(componentProject,{action:"clone",handle:component.handle,name:"Copy"},componentTools),runDesign(componentProject,{action:"restore",handle:component.handle,version:1},componentTools),runDesign(componentProject,{action:"look",handle:component.handle,presets:["Phone"]},componentTools)]);
+	assert.equal(concurrent[0],4);assert.equal(concurrent[1].version,4);assert.equal(concurrent[2][0].foundation,"astryx");assert.equal(concurrent[3].version,5);assert(concurrent[4].shots[0].png);
+	assert.equal(await snapshot(componentProject,component.handle,componentTools),5,"serialized look/restore/clone/select never create a duplicate snapshot");
+	assert(!fs.readdirSync(path.join(componentDir,PREVIEW)).some(name=>name.startsWith(".stage-")||name.startsWith(".corrupt-")),"publication/corruption scratch paths are cleaned");
+	console.log("component lifecycle regressions passed");
+	// Real pinned compiler/browser coverage when the already-approved host cache exists; never provision from a test.
+	const importFailure=(error,expected)=>{assert.doesNotMatch(error.message,/timed out|ETIMEDOUT|killed|SIGTERM/i);assert.notEqual(error.cause?.killed,true);assert.match(error.message,/\[plugin:\s*confined-design-source\]/);assert.match(error.message,expected);return true;};
+	assert.throws(()=>importFailure(new Error("Command failed: node.exe bootstrap node:fs",{cause:{killed:true}}),/Could not resolve/),"a killed worker never passes as an import rejection");
+	assert.throws(()=>importFailure(new Error("[plugin: confined-design-source] Could not resolve; timed out"),/Could not resolve/),"timeout text never passes as an import rejection");
+	const realCache = path.join(process.env.PI_CODING_AGENT_DIR ?? path.join(os.homedir(),".pi/agent"),"cache/design-runtimes/astryx",astryxRuntime.lockDigest,`${process.platform}-${process.arch}`);
+	if (fs.existsSync(path.join(realCache,"receipt.json"))) {
+		const realRuntime = await ensureDesignRuntime({confirm:async()=>assert.fail("live checks must reuse the verified cache without downloads")});
+		const realTools = {...tools,runtime:async()=>realRuntime};
+		const largeSource=new Map(starter);largeSource.set("src/App.jsx",Buffer.concat([starter.get("src/App.jsx"),Buffer.from("\n/*"+"x".repeat(70_000)+"*/")]));
+		const a=await buildApp(largeSource,realTools), b=await buildApp(largeSource,realTools);
+		const outputDigests=files=>[...files].map(([name,bytes])=>[name,createHash("sha256").update(bytes).digest("hex")]);
+		assert.deepEqual(outputDigests(a),outputDigests(b),"two real fixed-recipe builds must be byte-identical");
+		assert(a.has("index.html") && [...a.keys()].some(name=>/^assets\/app-.*\.js$/.test(name)),"source larger than Windows argv limits compiles through bounded stdin");
+		console.log("real compiler determinism/large-source checks passed");
+		for (const [spec,expected] of [["../../outside.js",/Missing confined app source/],["node:fs",/never URLs, absolute paths or Node builtins/],["https://example.invalid/module.js",/never URLs, absolute paths or Node builtins/],["not-a-reviewed-design-package",/Could not resolve/]]) {
+			const hostile = new Map(starter);hostile.set("src/main.jsx",Buffer.from(`import ${JSON.stringify(spec)};`));
+			await assert.rejects(buildApp(hostile,realTools),error=>importFailure(error,expected));
+		}
+		const realProject=path.join(cwd,"real-component");fs.mkdirSync(realProject);
+		const {sessions:[real]}=await runDesign(realProject,{action:"start",kind:"app",system:"astryx",brief:"Prototype",directions:["local"],names:["Local"],title:"Real pinned components"},realTools);
+		const realDir=path.join(realProject,".pi/designs",real.handle), preview=appPreviewFolder(realDir);
+		const shot=await renderDesign({folder:preview,width:820,height:1180,input:"touch",state:"started",element:"@starter-action"});
+		assert(shot.png.length && shot.report.readiness.settled,reportText(shot.report));assert.equal(shot.report.state?.restored,true,reportText(shot.report));
+		assert.equal(shot.report.errors.length,0,reportText(shot.report));assert.equal(shot.report.failed.length,0,reportText(shot.report));assert.equal(shot.report.input.coarse,true);assert(shot.height>=44,"real component tablet target is touch-safe");
+		const selectedReal=await runDesign(realProject,{action:"select",handle:real.handle},realTools), selectedDir=path.join(realProject,selectedReal.folder), selectedFiles=readAppFiles(selectedDir), selectedReceipt=appReceipt(selectedFiles);
+		assert.equal(JSON.parse(selectedFiles.get("DESIGN.json")).foundation,"astryx");assert(selectedFiles.has("src/main.jsx")&&selectedFiles.has("src/App.jsx")&&selectedFiles.has("package-lock.json")&&selectedFiles.has("THIRD_PARTY_NOTICES.md"));
+		assert.match(selectedFiles.get("HANDOFF.md").toString(),/Verification matrix[\s\S]*Prototype behavior only/);assert.match(selectedFiles.get("BRIEF.md").toString(),/Component foundation: Astryx/);
+		assert(!fs.existsSync(path.join(selectedDir,PREVIEW)) && !fs.existsSync(path.join(selectedDir,"node_modules")),"selection contains no installed dependencies or scratch cache");
+		assert.equal((await ensureAppBuilt(selectedDir,{runtime:async()=>assert.fail("a coherent exported receipt needs no rebuild")})).rebuilt,false);
+		const isolated=path.join(cwd,"selected-offline");for(const[name,bytes]of selectedFiles){fs.mkdirSync(path.dirname(path.join(isolated,name)),{recursive:true});fs.writeFileSync(path.join(isolated,name),bytes);}
+		for(const name of Object.keys(selectedReceipt.generated))fs.rmSync(path.join(isolated,name));fs.rmSync(path.join(isolated,BUILD_FILE));
+		assert.equal((await ensureAppBuilt(isolated,realTools)).rebuilt,true);assert.deepEqual(appReceipt(readAppFiles(isolated)).generated,selectedReceipt.generated,"offline export rebuild reproduces every generated byte/hash");
+		const roundtripShot=await renderDesign({folder:appPreviewFolder(isolated),width:820,height:1180,input:"touch",state:"started",element:"@starter-action"});
+		assert.equal(createHash("sha256").update(roundtripShot.png).digest("hex"),createHash("sha256").update(shot.png).digest("hex"),"the same restored component state renders identically after an isolated offline rebuild");
+		const handoffBefore=fs.readFileSync(path.join(selectedDir,"HANDOFF.md")), recipePath=path.join(realDir,"APP.json");fs.writeFileSync(recipePath,"{}");
+		await assert.rejects(runDesign(realProject,{action:"select",handle:real.handle},realTools),/recipe|pin/i);assert(fs.readFileSync(path.join(selectedDir,"HANDOFF.md")).equals(handoffBefore));assert.equal(fs.readFileSync(recipePath,"utf8"),"{}","failed selection never silently upgrades or discards broken source metadata");
+		await runDesign(realProject,{action:"restore",handle:real.handle,version:selectedReal.version},realTools);assertAppRecipe(readAppFiles(realDir));
+		console.log("selected editable-source offline roundtrip passed");
+		const beforeRuntime=realRuntime.downloadBytes;assert.equal(beforeRuntime,0);
+		console.log("real pinned component checks passed",JSON.stringify({downloadBytes:0,outputBytes:[...a.values()].reduce((n,v)=>n+v.length,0),touchTargetHeight:shot.height,stateRestored:shot.report.state.restored,settled:shot.report.readiness.settled}));
+	} else console.log("real pinned component checks skipped: no preinstalled host cache (unit coverage still ran; no download attempted)");
 	console.log("design tool tests passed");
 } finally { fs.rmSync(cwd, { recursive: true, force: true }); }

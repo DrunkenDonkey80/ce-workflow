@@ -5,10 +5,10 @@
 // @ts-ignore Browser URL includes the workspace token.
 import { designStateJson, type DesignJson } from "./design-state.js?token=__TOKEN__";
 
-export type DesignView = { key: string; name: string; handle?: string; screens?: string[]; versions?: number[]; version?: number };
+export type DesignView = { key: string; name: string; handle?: string; screens?: string[]; versions?: number[]; version?: number; build?: { state: string; error?: string; generation?: string } };
 // screen: show another screen of this view; open: reopen the preview at a version (none = live); restore: ask the agent.
 // mark: render what the preview shows and open it in the annotator (S13, D13).
-export type MarkState = { pageState: DesignJson; input: "mouse" | "touch"; reducedMotion: boolean; screen: string; version?: number; width: number; height: number; hash?: string; styleEdits: { selector: string; styles: Record<string, string> }[] };
+export type MarkState = { pageState: DesignJson; input: "mouse" | "touch"; reducedMotion: boolean; screen: string; version?: number; buildGeneration?: string; width: number; height: number; hash?: string; styleEdits: { selector: string; styles: Record<string, string> }[] };
 export type DesignActions = { screen: (screen: string) => void; open: (version: number | undefined, screen: string) => void; restore: (version: number) => void; mark: (state: Promise<MarkState>, isCurrent: () => boolean) => Promise<void> };
 
 // Desktop is the panel's own width (no frame); the rest mirror extensions/design-render.ts (the page cannot import it).
@@ -154,7 +154,7 @@ export function designFrame(view: DesignView, path: string, src: string, body: H
   const [, presetWidth, presetHeight] = DEVICES.find(([name]) => name === state.preset)!, clamp = (value: number) => Math.min(4000, Math.max(200, Math.round(value)));
   const [width, height] = !presetWidth ? [frame.clientWidth, frame.clientHeight] : state.rotated ? [presetHeight, presetWidth] : [presetWidth, presetHeight];
   const live = current?.frame === frame ? current : undefined;
-  const base = { screen: path, ...view.version ? { version: view.version } : {}, width: clamp(width), height: clamp(height), styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) };
+  const base = { screen: path, ...view.version ? { version: view.version } : {}, ...view.build?.generation ? { buildGeneration: view.build.generation } : {}, width: clamp(width), height: clamp(height), styleEdits: [...live?.edits ?? []].filter(([, styles]) => Object.keys(styles).length).map(([selector, styles]) => ({ selector, styles })) };
   const captured = live ? captureState(live).then(value => ({ ...base, ...value })) : Promise.reject(new Error("The preview has not loaded yet."));
   mark.disabled = true;
   try { await act.mark(captured, () => !!live && current === live && frame.isConnected); } finally { mark.disabled = false; }

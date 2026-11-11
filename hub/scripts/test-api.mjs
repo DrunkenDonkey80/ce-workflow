@@ -7,6 +7,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { saveDiagram } from "../../extensions/plan3-diagram.ts";
+import { appStarter } from "../../extensions/design-app.ts";
+import { appPublication, ensureAppBuilt } from "../../extensions/design-build.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-api-"));
 process.env.PI_CODING_AGENT_DIR = root;
@@ -25,7 +27,8 @@ const plan = (id, title, updated, status = "active") => {
 	fs.writeFileSync(file, `---\nplan3: true\nstatus: ${status}\ncreated: 2026-10-18\nupdated: ${updated}\n---\n\n# ${title}\n\n## Steps\n\n- [x] **A-01** one\n- [ ] **A-02** two\n`);
 	return { kind: "plan", plan: { id, file, title } };
 };
-const older = plan("aaaaaaaa", "Older", "2026-10-18T10:00:00Z"), newer = plan("bbbbbbbb", "Newer", "2026-10-18T12:00:00Z");
+const older = plan("aaaaaaaa", "Older", "2026-10-18T10:00:00Z");
+plan("bbbbbbbb", "Newer", "2026-10-18T12:00:00Z");
 plan("cccccccc", "Finished", "2026-10-18T13:00:00Z", "complete");
 await saveDiagram(folder, older, { version: 1, kind: "plan", plan: "aaaaaaaa", title: "Older", revision: 0, nodes: [{ id: "api", label: "API", kind: "service" }], edges: [], notes: [] }, 0);
 fs.writeFileSync(path.join(folder, "notes.txt"), "hello\n");
@@ -150,7 +153,7 @@ try {
 	await post(id, "unview", { key: old.key });
 	// S13: Mark renders the shown state of the session's own design only: slide hash, kept version and unsaved inline edits.
 	const shot = async (body) => { const res = await post(id, "designshot", { screen: "index.html", width: 400, height: 300, pageState: null, input: "mouse", reducedMotion: false, ...body }); return res.status === 200 ? fs.readFileSync(res.body.path) : res.status; };
-	for (const [body, status] of [[{ width: 100 }, 400], [{ hash: "#a b" }, 400], [{ styleEdits: [{ selector: "p", styles: { "x;y": "1" } }] }, 400], [{ screen: 1 }, 400], [{ path: "x" }, 400], [{ screen: "../design-1/pay.html" }, 404], [{ screen: "out/page.html" }, 404], [{ version: 9 }, 404]]) assert.equal(await shot(body), status, JSON.stringify(body));
+	for (const [body, status] of [[{ buildGeneration: "../bad" }, 400], [{ buildGeneration: "0".repeat(64) }, 409], [{ width: 100 }, 400], [{ hash: "#a b" }, 400], [{ styleEdits: [{ selector: "p", styles: { "x;y": "1" } }] }, 400], [{ screen: 1 }, 400], [{ path: "x" }, 400], [{ screen: "../design-1/pay.html" }, 404], [{ screen: "out/page.html" }, 404], [{ version: 9 }, 404]]) assert.equal(await shot(body), status, JSON.stringify(body));
 	fs.writeFileSync(path.join(mine, "deck.html"), "<body><p>slide</p><script>document.body.style.background = location.hash === '#2' ? '#000' : '#fff'</script>" + staticState + "</body>");
 	const [first, second, edited, version2, current] = [await shot({ screen: "deck.html" }), await shot({ screen: "deck.html", hash: "#2" }), await shot({ screen: "deck.html", styleEdits: [{ selector: "p", styles: { "font-size": "80px" } }] }), await shot({ version: 2 }), await shot({})];
 	assert(Buffer.isBuffer(first) && Buffer.isBuffer(current), `renders give PNG files: ${first} ${current}`);
@@ -163,6 +166,16 @@ try {
 	assert(Buffer.isBuffer(await shot({ screen: "state.html", pageState: { color: "red" }, input: "touch", reducedMotion: true })), "validated state and capability reach the renderer");
 	hub.registry.update(id, { modes: undefined }); assert.equal(await shot({}), 404, "not a design session"); hub.registry.update(id, { modes: { design: "design-1" } });
 	assert.equal((await post(id, "explore", { path: ".pi/designs/design-1/index.html" })).status, 404, "other .pi files stay refused for chat links");
+	// Component Mark binds the capture to the exact generation, never a newer source build with a similar state schema.
+	const componentDir=path.join(designs,"design-3"), componentSource=appStarter("Component"), componentOutput=new Map([["index.html",Buffer.from("<p>Component</p>"+staticState)]]);
+	const publishComponent=async()=>{for(const [name,bytes]of appPublication(componentSource,componentOutput)){const dest=path.join(componentDir,name);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,bytes);}await ensureAppBuilt(componentDir,{runtime:async()=>assert.fail("retained component output must be usable without installing")});};
+	await publishComponent();const componentView=(await preview("design-3")).body;
+	assert.match(componentView.build.generation,/^[a-f0-9]{64}$/);
+	assert.equal(await shot({}),409,"a component capture must identify its generation");
+	assert(Buffer.isBuffer(await shot({buildGeneration:componentView.build.generation})),"matching component generation renders");
+	componentSource.set("src/App.jsx",Buffer.from("// refined source"));await publishComponent();
+	assert.equal(await shot({buildGeneration:componentView.build.generation}),409,"an older live capture cannot silently render the new generation");
+	await post(id,"unview",{key:componentView.key});
 	await post(id, "unview", { key: designView.key }); hub.registry.update(id, { modes: undefined });
 	fs.rmSync(path.join(folder, ".pi"), { recursive: true, force: true }); fs.rmSync(path.join(folder, "secret.txt"));
 
@@ -270,6 +283,17 @@ try {
 	assert.deepEqual(steered, [[id, '[Session lead in game answered "Go?" with: Yes. That was the other session, not the user.]', { streamingBehavior: "steer" }]]);
 	assert.deepEqual((await hubRoute(`/api/sessions/${id}/dialogs`)).answered.find(entry => entry.askId === peer.askId), { askId: peer.askId, by: "lead in game", answer: "Yes" });
 	assert.deepEqual((await hubRoute(`/api/sessions/${id}/dialogs`)).answered.find(entry => entry.askId === channel.askId), { askId: channel.askId, answer: "A (comment: ok)" }, "the user's own answers are recorded too, without by");
+
+	// Standard Pi notifications (including slash-command errors) reach the page, not just custom hub notices.
+	const notifiedFrames = [], beforeNotify = view.publish;
+	view.publish = (event, value) => { if (event === "notice") notifiedFrames.push(value.text); beforeNotify(event, value); };
+	hub.host.live.get(id).rpc.emit("ui", { type: "extension_ui_request", method: "notify", message: "Plan3: Choose a Plan3 plan.", notifyType: "error" });
+	assert.equal(notifiedFrames.at(-1), "Plan3: Choose a Plan3 plan.", "Pi command errors must reach the hub notice area");
+	hub.host.live.get(id).rpc.emit("ui", { type: "extension_ui_request", method: "notify", message: "x".repeat(3000) });
+	assert.equal(notifiedFrames.at(-1).length, 2000, "notifications are bounded like hub notices");
+	hub.host.live.get(id).rpc.emit("ui", { type: "extension_ui_request", method: "notify", message: {} });
+	assert.equal(notifiedFrames.length, 2, "malformed notifications are ignored");
+	view.publish = beforeNotify;
 
 	// A run button's script asks through pi-hub ask (shim on PATH, PI_HUB_SESSION set) and gets the answer: no model turn.
 	const noticed = [], withDialogs = view.publish;

@@ -90,6 +90,47 @@ assert.equal(mirror.page(mirror.snapshot()[10].id).more, false);
  assert(packet.dialogs[0].brief && packet.dialogs[0].title === "Pick one" && !("context" in packet.dialogs[0]), "a large question travels brief");
  assert.deepEqual(packet.activity.tools.map(tool => tool.id), ["t"]); assert.equal(packet.activity.thinkingLength, 64_000);
 }
+// Cache warnings use completed usage only, survive snapshots/paging, and reset with context changes.
+{
+ const { createCacheMissTracker } = await import("../src/cache-miss.ts");
+ const message = (timestamp, input = 0, cacheRead = 30000, cacheWrite = 0, model = "m") => ({ role: "assistant", provider: "p", model, timestamp, content: [], usage: { input, cacheRead, cacheWrite, cost: { input: input * 0.000003, cacheRead: cacheRead * 0.0000003, cacheWrite: cacheWrite * 0.00000375 } } });
+ const first = message(1), miss = message(360001, 30000, 0);
+ const tracker = createCacheMissTracker();
+ assert.equal(tracker.observe(first), undefined, "first request is not a miss");
+ assert.equal(tracker.observe(miss), "Cache miss after 6m idle: 30,000 tokens re-billed (~$0.08)");
+ assert.equal(tracker.observe(message(360002)), undefined, "full hit");
+ assert.equal(tracker.observe(message(360003, 1024, 28976)), undefined, "breakpoint noise");
+ assert.equal(tracker.observe(message(360004, 15000, 15000)), undefined, "small cheap miss");
+ assert.match(tracker.observe(message(360005, 30000, 0, 0, "other")), /after model switch: 30,000 tokens re-billed$/);
+ tracker.reset(); assert.equal(tracker.observe(miss), undefined);
+ assert.equal(tracker.observe(message(360006, 30000, 0)), undefined, "no cache reporting means no warning");
+ tracker.observe(first);
+ assert.equal(tracker.observe({ ...miss, role: "cacheWarm" }), undefined, "warming is not a chat warning");
+ assert.match(tracker.observe(message(360002, 30000, 0)), /^Cache miss: /, "warming refreshes idle time");
+ tracker.observe({ role: "compactionSummary" }); assert.equal(tracker.observe(miss), undefined);
+ tracker.observe({ role: "branchSummary" }); assert.equal(tracker.observe(miss), undefined);
+ tracker.reset(); tracker.observe(first);
+ const costly = message(2, 10000, 20000); costly.usage.cost.input = 0.3;
+ assert.match(tracker.observe(costly), /10,000 tokens re-billed \(~\$0.30\)/, "cost threshold catches smaller expensive misses");
+ assert.equal(tracker.observe({ role: "assistant", usage: { input: NaN } }), undefined);
+ assert.equal(tracker.observe({ role: "assistant", content: [] }), undefined);
+ const hooks = new Map(), events = [], live = createChatMirror({ on: (name, fn) => hooks.set(name, fn) }, (event, value) => events.push({ event, value }));
+ hooks.get("message_end")({ message: first });
+ hooks.get("message_start")({ message: miss });
+ hooks.get("message_update")({ message: miss });
+ assert(!live.snapshot().at(-1).cacheMiss, "no warning before usage is final");
+ hooks.get("message_end")({ message: miss });
+ assert.match(events.at(-1).value.cacheMiss, /30,000/);
+ assert.equal(live.page().rows.at(-1).cacheMiss, live.row("assistant_360001").cacheMiss);
+ const entries = [first, miss].map(message => ({ type: "message", message }));
+ live.reset(); live.hydrate({ sessionManager: { getBranch: () => entries } });
+ assert.match(live.snapshot().at(-1).cacheMiss, /30,000/);
+ hooks.get("session_compact")({}); hooks.get("message_end")({ message: message(360003, 30000, 0) });
+ assert(!live.snapshot().at(-1).cacheMiss, "live compaction resets the baseline");
+ live.reset(); live.hydrate({ sessionManager: { getBranch: () => [entries[0], { type: "compaction" }, entries[1]] } });
+ assert(!live.snapshot().at(-1).cacheMiss, "history compaction resets the baseline");
+ live.reset();
+}
 // P4-02: Files API (D11, D21): hidden paths, change marks, diffs that never show secrets.
 {
  const { listFiles, readProjectFile, readProjectDiff, FileRefused } = await import("../src/files.ts");

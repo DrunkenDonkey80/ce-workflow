@@ -78,6 +78,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-head { display: flex; align-items: baseline; gap: 8px; } .files-toggle { flex: none; font-size: 12px; padding: 2px 8px; }
 .files.tree-hidden { grid-template: minmax(0, 1fr) / minmax(0, 1fr); } .files.tree-hidden .files-tree { display: none; }
 .files-viewer h2 { font-size: 13px; padding-bottom: 6px; overflow-wrap: anywhere; }
+.design-build-status { display: block; font-size: 12px; font-weight: 400; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
 .files-body { margin: 0; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
 .files-body.diff .add { background: var(--new); }
 .files-body.diff .del { background: var(--pink); }
@@ -86,6 +87,11 @@ h2 { font-size: 15px; font-weight: 600; }
 .files-empty { color: var(--muted); font-size: 13px; padding: 4px; }
 .files-archive { display: flex; align-items: center; gap: 6px; padding: 2px 4px 6px; font-weight: 600; overflow-wrap: anywhere; } .files-archive button { margin-left: auto; font-weight: 400; }
 .files-actions { display: inline-flex; gap: 10px; margin-left: 10px; font-weight: 400; }
+.files-head:has(.design-device) { flex-wrap: wrap; }
+.files-head:has(.design-device) h2 { min-width: 0; max-width: 100%; }
+.files-actions:has(.design-device) { display: flex; flex-wrap: wrap; align-items: center; margin: 6px 0 0; }
+.files-actions:has(.design-device) > * { flex: none; white-space: nowrap; }
+@media (max-width: 899px), (pointer: coarse) { .files-actions:has(.design-device) > :is(button, select, a) { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; } }
 .files-body.rich { font: inherit; white-space: normal; flex: 1; display: flex; flex-direction: column; } .files-body.rich > :is(div, p) { white-space: pre-wrap; }
 .files-image { max-width: 100%; max-height: 70dvh; object-fit: contain; align-self: flex-start; cursor: zoom-in; border: 1px solid var(--line); }
 .files-frame { flex: 1; min-height: 60dvh; width: 100%; border: 1px solid var(--line); background: #fff; }
@@ -99,7 +105,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .design-stage.device { flex: none; position: relative; overflow: hidden; align-self: center; }
 .design-stage.device .files-frame { position: absolute; left: 0; top: 0; flex: none; min-height: 0; transform-origin: 0 0; }
 .design-rotate[aria-pressed=true] { border-color: var(--accent); color: var(--accent); }
-.files-actions select { font: inherit; font-size: 12px; max-width: 14em; }
+.files-actions select { font: inherit; font-size: 12px; max-width: min(14em, 100%); }
 @media (max-width: 899px) { .files { grid-template-columns: none; grid-template-rows: minmax(120px, 40%) minmax(0, 1fr); } .files-tree { border-right: 0; border-bottom: 1px solid var(--line); } }
 .canvas { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; background: var(--canvas); }
 /* The diagram stays a light sketch, inverted like Excalidraw's dark mode. */
@@ -508,6 +514,11 @@ dialog.annotate { width: min(1400px, 96vw); max-height: 96dvh; padding: 12px 14p
 /* ask_user exchanges stay in every view; in Compact only the exchange of a non-final row shows. */
 .chat-compact .message.assistant.has-ask, .chat-compact .message-blocks.has-ask, .chat-thinking .message-blocks.has-ask { display: block; }
 .chat-compact .message.has-ask:not(.final) > div:nth-child(3) { display: none; }
+.cache-miss { display: none; color: var(--error); font-size: 13px; font-weight: 600; margin: 6px 0; }
+.show-cache-misses .has-cache-miss > .cache-miss { display: block; }
+.show-cache-misses .message.assistant.has-cache-miss { display: block; }
+.show-cache-misses.chat-compact .message.has-cache-miss:not(.final) > div:nth-child(3),
+.show-cache-misses.chat-compact .message.has-cache-miss:not(.final) > .row-full { display: none; }
 .ask-exchange { margin: 6px 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 14px; }
 .ask-q { padding: 8px 12px; background: var(--final-bg); border-left: 3px solid var(--accent); }
 .ask-question { font-weight: 600; }

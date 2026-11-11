@@ -34,14 +34,14 @@ function readLock(file: string): LockInfo | undefined {
 }
 
 /** Take the lock, or return the live holder. A lock whose holder is gone (dead or reused pid) is taken over. */
-export function takeSessionLock(sessionFile: string, owner = "pi terminal"): { info?: LockInfo; holder?: LockInfo } {
+export function takeSessionLock(sessionFile: string, owner = "pi terminal", reuseOwn = true): { info?: LockInfo; holder?: LockInfo } {
 	const file = lockPath(sessionFile);
 	const info = { pid: process.pid, owner, startedAt: Date.now() };
 	for (let attempt = 0; attempt < 3; attempt++) {
 		try { writeFileSync(file, JSON.stringify(info), { flag: "wx" }); return { info }; }
 		catch (error: any) { if (error?.code !== "EEXIST") throw error; }
 		const holder = readLock(file);
-		if (holder?.pid === process.pid) return { info: holder }; // ours from before a /reload
+		if (holder?.pid === process.pid) return reuseOwn ? { info: holder } : { holder }; // Sessions adopt after /reload; file mutations must not re-enter.
 		if (holder && holderAlive(holder)) return { holder };
 		const aside = `${file}.${crypto.randomBytes(4).toString("hex")}.stale`;
 		try { renameSync(file, aside); } catch { continue; }

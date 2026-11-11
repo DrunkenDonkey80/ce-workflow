@@ -62,7 +62,7 @@ const windowsBash = () => bash ??= process.platform !== "win32" ? Promise.resolv
 export async function runScript(command: string, cwd: string, timeoutMs = SCRIPT_TIMEOUT_MS, env?: Record<string, string>): Promise<ScriptResult> {
 	const shell = await windowsBash();
 	return new Promise(resolve => {
-		const options = { cwd, env: { ...process.env, ...env }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] } as const;
+		const options = { cwd, env: { ...process.env, ...env }, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] as ["ignore", "pipe", "pipe"] };
 		const child = shell ? spawn(shell.shell, [...shell.args, command], options) : spawn(command, { ...options, shell: true });
 		let output = "", timedOut = false;
 		const take = (chunk: Buffer) => { if (output.length < OUTPUT_CAP * 2) output += chunk.toString("utf8"); };

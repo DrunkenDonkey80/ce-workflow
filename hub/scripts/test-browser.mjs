@@ -12,12 +12,16 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyDiagramOperations, toolbarEdit } from "../../extensions/plan3-diagram.ts";
 import { decodePng } from "../../extensions/screen-read.ts";
+import { themeInput, themeTokens } from "../../extensions/design-theme.ts";
+import { appStarter } from "../../extensions/design-app.ts";
+import { appPublication, BUILD_STATUS, ensureAppBuilt } from "../../extensions/design-build.ts";
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `hub-ui-${process.pid}`, execute = promisify(execFile);
+const hostAgentDir=process.env.PI_CODING_AGENT_DIR??join(os.homedir(),".pi","agent");
 async function browser(...args) {
  if (process.env.BROWSER_TRACE) console.error(Math.round(performance.now() / 1000) + "s", args.join(" ").slice(0, 100));
  // execFile's timeout can't end a call whose pipe the agent-browser daemon still holds (Windows), so a failed wait hung the run.
- const run = execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 }); let timer;
+ const run = execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true }); let timer;
  const { stdout } = await Promise.race([run, new Promise((_, reject) => { timer = setTimeout(() => { run.child.kill(); reject(new Error("agent-browser timed out: " + args.join(" ").slice(0, 200))); }, 35_000); })]).finally(() => clearTimeout(timer));
  let result; try { result = JSON.parse(stdout); } catch { throw new Error("agent-browser returned non-JSON: " + stdout.slice(0, 500)); }
  assert(result.success, JSON.stringify(result)); return result.data;
@@ -39,6 +43,13 @@ async function withPageCdp(origin, run) {
  } finally { socket.close(); for (const request of pending.values()) { clearTimeout(request.timer); request.reject(new Error("CDP connection closed")); } }
 }
 async function evaluate(script) { return (await browser("eval", "-b", Buffer.from(script).toString("base64"))).result; }
+async function reload(ready) {
+ const fresh = `!window.__beforeReload && (${ready})`;
+ await evaluate("window.__beforeReload = true");
+ assert.equal(await evaluate(fresh), false, "reload readiness must reject the old document");
+ await browser("reload");
+ await browser("wait", "--fn", fresh);
+}
 const fixture = new URL("./fixtures/diagrams/upload-service.diagram.json", import.meta.url);
 let sample; try { sample = JSON.parse(await readFile(fixture, "utf8")); } catch (error) { throw new Error("Unreadable fixture " + fixture.pathname + ": " + error.message); }
 let diagram = { ...sample, kind: "plan", plan: "12345678" }; const edits = [], comments = [], toolbarEdits = [];
@@ -106,8 +117,8 @@ process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
 const { createUpdateCheck } = await import("../src/update-check.ts");
-// ce-workflow has an update: the Update button shows (its menu is checked; no item is picked, that would run pi update).
-const updates = createUpdateCheck({ find: async () => ({ pi: null, packages: ["ce-workflow"], installed: [{ source: "git:github.com/x/ce-workflow", name: "ce-workflow", version: "0.1.0", update: true }] }), latest: async () => null });
+// Legacy update summary exercises the badge/menu without an actionable install source; auto-update has its own test.
+const updates = createUpdateCheck({ find: async () => ({ pi: null, packages: ["ce-workflow"] }), latest: async () => null });
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], updates, usage: { usage: () => ({ summary: stub("/api/usage", {}).summary, accounts: [] }), start: async () => {}, stop() {}, refresh: async () => {}, flush: async () => {} }, pool: { available: true, daemon: () => undefined, view: async () => stub("/api/pool", {}), action: async data => stub("/api/pool", data), start() {}, stop() {} },
  app: { status: () => ({ supported: true, installed: true, version: "0.1.0", staged: null, latest: "0.2.0", running: false, login: true }), install() {}, autoStage: async () => ({}), stage: () => ({ supported: true, installed: true, version: "0.1.0", staged: "0.2.0", latest: "0.2.0", running: false, login: true }), uninstall() {}, setLogin() {} } });
 const origin = `http://127.0.0.1:${hub.config.port}`;
@@ -127,9 +138,8 @@ try {
  await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
  assert.equal(await evaluate("document.getElementById(\"send\").disabled"), false, "missing icons do not disable chat");
  await browser("network", "unroute", "**/icons.js?*");
- await browser("reload");
+ await reload("document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
  await browser("set", "viewport", "1280", "800");
- await browser("wait", "--fn", "document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
  // Ctrl+wheel: the page 10% bigger, still exactly filling the window; and back.
  const wheel = (up, first = false) => `(() => { const event = new WheelEvent("wheel", { deltaY: ${up ? -100 : 100}, ctrlKey: true, bubbles: true, cancelable: true }); ${first ? `Object.defineProperty(event, "timeStamp", { value: 0 });` : ""} document.getElementById("chat").dispatchEvent(event); })()`;
  // A first event at page time zero must not be throttled by an imaginary previous wheel.
@@ -504,7 +514,7 @@ try {
  assert(await evaluate("document.querySelectorAll(\"foreignObject .note-text\").length >= 6"));
  assert.equal(await evaluate("document.querySelector(\"foreignObject img\")"), null, "note markup stays inert text");
  await browser("fill", "#message-input", "half-written draft");
- await browser("reload"); await browser("wait", "--fn", "document.getElementById(\"diagram\").dataset.revision === \"6\"");
+ await reload("document.getElementById(\"diagram\").dataset.revision === \"6\"");
  assert.equal(await evaluate("document.getElementById('message-input').value"), "half-written draft", "unsent draft survives leaving the page");
  await browser("fill", "#message-input", "");
  assert.deepEqual(diagram.nodes.find(node => node.id === "web_client"), savedPosition, "saved drag survives the full snapshot after reload");
@@ -579,6 +589,27 @@ try {
  assert.equal(await evaluate("localStorage.getItem(\"plan3-chat\")"), "compact");
  await browser("click", "#chat-compact");
  assert.equal(await evaluate("document.getElementById(\"chat-compact\").textContent"), "Full", "the third click returns to Full");
+ // Cache misses survive every chat filter, including a tool-only/non-final reply. Off by default, remembered per device.
+ const warning = "Cache miss: 30,000 tokens re-billed (~$0.08)";
+ publish("delta", { id: "assistant_cache", role: "assistant", offset: 0, text: "Hidden intermediate reply", streaming: false, cacheMiss: warning });
+ publish("message", { id: "assistant_after_cache", role: "assistant", text: "Final reply", streaming: false });
+ await browser("wait", "--fn", "document.querySelector('[data-id=assistant_cache] .cache-miss')?.textContent.includes('Cache miss')");
+ const warningShown = () => evaluate("(() => { const p = document.querySelector('[data-id=assistant_cache] .cache-miss'); return !!p.getClientRects().length && p.checkVisibility(); })()");
+ assert.equal(await warningShown(), false);
+ await browser("click", "#settings-button"); await browser("click", "#hub-cache-misses"); await browser("click", "#settings-button");
+ assert.equal(await evaluate("localStorage.getItem('hub-cache-misses')"), "on");
+ for (const mode of ["Full", "Thinking", "Compact"]) {
+  assert.equal(await warningShown(), true, mode + " shows cache warning");
+  assert(await evaluate("(() => { const p = document.querySelector('[data-id=assistant_cache] .cache-miss'), sample = document.createElement('span'); sample.style.color = 'var(--error)'; document.body.append(sample); const ok = getComputedStyle(p).color === getComputedStyle(sample).color; sample.remove(); return ok; })()"), "warning is red");
+  if (mode === "Compact") assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-id=assistant_cache]').children[2]).display"), "none", "warning does not reveal intermediate reply");
+  await browser("click", "#chat-compact");
+ }
+ publish("message", { id: "assistant_cache", role: "assistant", text: "", streaming: false, cacheMiss: warning });
+ await browser("wait", "--fn", "document.querySelector('[data-id=assistant_cache]').classList.contains('message-blocks')");
+ for (let i = 0; i < 3; i++) { assert(await warningShown(), "tool-only cache warning stays visible"); await browser("click", "#chat-compact"); }
+ await browser("click", "#settings-button"); await browser("click", "#hub-cache-misses"); await browser("click", "#settings-button");
+ assert.equal(await warningShown(), false, "turning off hides existing warnings immediately");
+ assert.equal(await evaluate("localStorage.getItem('hub-cache-misses')"), "off");
  const rowText = id => evaluate(`document.querySelector("#messages [data-id=${id}]").children[2].textContent`);
  publish("delta", { id: "assistant_3", role: "assistant", offset: 0, text: "Hel", streaming: true });
  publish("delta", { id: "assistant_3", role: "assistant", offset: 3, text: "lo", streaming: true });
@@ -666,7 +697,12 @@ try {
  await browser("fill", "#message-input", "Sent while leaving"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"send\").disabled");
  assert.equal(await evaluate("localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])"), null, "a send in flight drops the stored draft");
+ const commandError = "Plan3: /plan3 optimize needs an existing Plan3 plan, not source code.";
+ rpc().emit("ui", { type: "extension_ui_request", method: "notify", message: commandError, notifyType: "error" });
+ await browser("wait", "--fn", `document.getElementById("notice").textContent === ${JSON.stringify(commandError)}`);
  holdMessage = null; release(); await browser("wait", "--fn", "document.getElementById(\"message-input\").value === \"\"");
+ assert.equal(await evaluate("document.getElementById('notice').textContent"), commandError, "send success must not overwrite a command error received while sending");
+ assert.equal(await evaluate("document.getElementById('notice').checkVisibility()"), true);
  rejectMessage = true; await browser("fill", "#message-input", "Keep this draft"); await browser("press", "Control+Enter");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"draft is kept\")");
  assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this draft");
@@ -999,13 +1035,15 @@ try {
  publish("plan", null); await browser("wait", "--fn", "document.getElementById('plan-button').textContent.startsWith('New plan')");
  publish("plan", { id: "12345678", title: sample.title, done: 2, total: 5, focus: "S03", bias: 0 });
  await browser("wait", "--fn", `document.getElementById('plan-button').textContent.includes(${JSON.stringify(sample.title)})`);
- activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", startedAt: Date.now() - 65_000, args: JSON.stringify({ path: "src/app.ts", limit: 9 }), progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
+ const liveToolNow=Date.now();await evaluate(`window.liveToolClock=Date.now;Date.now=()=>${liveToolNow}`);
+ activity = { working: true, compacting: true, thinking: "Considering <script>safe text</script>", tools: [{ id: "tool_1", name: "read", state: "running", startedAt: liveToolNow - 65_000, args: JSON.stringify({ path: "src/app.ts", limit: 9 }), progress: "Loading lines" }, { id: "tool_2", parent: "tool_1", name: "child", state: "done", result: "Text-only result", durationMs: 250 }], queueExact: false, queue: [{ id: "queue_1", text: "Follow up", delivery: "followUp" }] }; publish("activity", activity);
  await browser("wait", "--fn", "document.getElementById(\"connection\").textContent === \"Compacting\"");
  assert.equal(await evaluate("document.getElementById(\"stop\").hidden"), false);
  assert.deepEqual(await evaluate("[...document.querySelectorAll('.queued-msg')].map(r => r.textContent)"), ["Follow upedit✕"], "a queued message shows grey with edit and cancel");
  assert.equal(await evaluate("document.querySelectorAll(\".nested-tool\").length"), 1); assert.equal(await evaluate("document.querySelector(\"#activity script\")"), null);
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1]\").open"), false, "tool rows start collapsed");
  assert.equal(await evaluate("document.querySelector(\"details[data-id=tool_1] summary\").textContent"), "(1:05) read src/app.ts · running", "the running time leads the live tool line");
+ await evaluate("Date.now=window.liveToolClock;delete window.liveToolClock");
  // While working, Thinking and Compact keep the live thinking and only the latest tool call; Compact drops thinking once settled.
  const activityShown = () => evaluate("['#activity [data-id=tool_1]', '#activity [data-id=tool_2]', '#activity .thinking-row'].map(sel => !!document.querySelector(sel) && getComputedStyle(document.querySelector(sel)).display !== 'none')");
  await browser("click", "#chat-compact"); assert.deepEqual(await activityShown(), [false, true, true], "Thinking view while working");
@@ -1194,8 +1232,7 @@ try {
  view.emit("message_end", { message: { role: "user", timestamp: t0, content: [{ type: "text", text: "Earlier question" }] } });
  for (let n = 1; n <= 25; n++) view.emit("message_end", { message: { role: "assistant", timestamp: t0 + n, content: [{ type: "toolCall", id: "tl" + n, name: "bash", arguments: {} }] } });
  view.emit("message_end", { message: { role: "assistant", timestamp: t0 + 30, content: [{ type: "text", text: "Long turn done" }] } });
- await browser("reload");
- await browser("wait", "--fn", "document.documentElement.classList.contains(\"chat-compact\")");
+ await reload("document.documentElement.classList.contains(\"chat-compact\")");
  // The reload drew the sidebar from the last list at once (sessionStorage), before the hub answered, without errors.
  assert.deepEqual((await browser("errors")).errors ?? [], []); assert.equal(await evaluate("document.getElementById(\"switcher\").hidden"), false);
  await browser("wait", "--fn", "[...document.querySelectorAll(\"#messages li\")].some(item => item.textContent.includes(\"Earlier question\") && item.offsetParent)");
@@ -1204,7 +1241,7 @@ try {
  ask({ question: "Pick a colour", options: [{ title: "Blue" }, { title: "Pink" }], allowMultiple: false, allowFreeform: true, allowComment: true });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  await browser("click", "#prompt-form input[value=Pink]"); await browser("fill", "#prompt-form textarea", "Kept across pages");
- await browser("reload"); await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
+ await reload("document.getElementById(\"prompt\").open");
  assert.deepEqual(await evaluate("[document.querySelector('#prompt-form input[value=Pink]').checked, document.querySelector('#prompt-form textarea').value]"), [true, "Kept across pages"], "the ask draft survives a reload");
  await browser("click", "#prompt-form button[type=submit]"); await browser("wait", "--fn", "!document.getElementById(\"prompt\").open");
  assert.deepEqual([answers.at(-1).selections, answers.at(-1).comment], [["Pink"], "Kept across pages"]);
@@ -1213,6 +1250,16 @@ try {
  const designDir = join(folder, ".pi", "designs", "design-1"); fs.mkdirSync(designDir, { recursive: true }); fs.writeFileSync(join(designDir, "index.html"), "<h1>Calm</h1>");
  await rpc().send({ type: "prompt", message: "/state " + JSON.stringify({ plan: null, modes: { design: "design-1" }, compacting: false, subagents: [] }) });
  await browser("wait", "--fn", "document.getElementById('files').classList.contains('tree-hidden') && !!document.querySelector('#files .files-frame')");
+ // Keep phone toolbar labels whole and every control inside its viewer, including enlarged UI and landscape.
+ for(const [width,height,zoom]of[[320,800,1],[390,844,1],[844,390,1],[390,844,2]]){
+  await browser("set","viewport",String(width),String(height));
+  await evaluate(`document.querySelector('.workspace').dataset.mobile='panel';document.body.style.zoom=${JSON.stringify(String(zoom))}`);
+  const toolbar=await evaluate("(() => {const actions=document.querySelector('#files .files-actions'),viewer=document.querySelector('#files .files-viewer').getBoundingClientRect();return [...actions.querySelectorAll(':scope > button, :scope > select, :scope > a')].filter(el=>el.getClientRects().length).map(el=>{const r=el.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(el);return {label:el.textContent,lines:el.tagName==='BUTTON'?range.getClientRects().length:1,width:r.width/Number(document.body.style.zoom),height:r.height/Number(document.body.style.zoom),fits:r.left>=viewer.left&&r.right<=viewer.right+1};});})()");
+  assert(toolbar.length>=7,"exercise the complete design toolbar");
+  assert(toolbar.every(control=>control.lines===1),"Design toolbar labels must stay on one line: "+JSON.stringify(toolbar));
+  assert(toolbar.every(control=>control.fits&&control.width>=44&&control.height>=44),"Design toolbar controls must fit and keep 44px touch targets: "+JSON.stringify(toolbar));
+ }
+ await evaluate("document.body.style.zoom='1'");await browser("set","viewport","1280","800");
  // S08: one device picker (Desktop first, the panel's width), rotate, the frame scaled to fit; the choice is kept per design.
  assert.deepEqual(await evaluate("[document.querySelector('#files .design-device').value, document.querySelector('#files .design-rotate').disabled, !!document.querySelector('#files .design-screen')]"), ["Desktop", true, false]);
  assert.match(await evaluate("document.querySelector('#files .design-device').title"), /size only.*input stays with your browser/i);
@@ -1340,6 +1387,25 @@ try {
  await evaluate("document.querySelector('#files .design-keep-tweaks').click()");
  assert.equal(await evaluate("document.getElementById('message-input').value"), "Set index.html @title: color #c2410c\nKeep tweaks: accent #c2410c, scale 1.125\n");
  assert.equal(await evaluate("!!document.querySelector('#files .design-inspector')"), false, "a click on chrome does not inspect");
+ // P3-08: generated standalone tokens reuse live Tweaks/Keep; preview changes never write source.
+ const ramp = Object.fromEntries(Array.from({length:21},(_,i)=>[i*5,"#"+Math.round(i*255/20).toString(16).padStart(2,"0").repeat(3)]));
+ const generated = themeTokens(themeInput({accent:"#808080"}),{schemaVersion:1,recipe:"astryx-oklch-v1",stops:Array.from({length:21},(_,i)=>i*5),palette:{accent:{light:ramp,dark:ramp},neutral:{light:ramp,dark:ramp}}},{version:"0.7.12",lockDigest:"0".repeat(64)});
+ const themePage = `<style>${generated.css}</style><h1 data-id="title" style="font-size:var(--type-heading);border-radius:var(--radius-lg)">Token theme</h1>${generated.previewControls}<script>
+ addEventListener('message',async event=>{if(event.source!==parent||event.data?.type!=='test:theme')return;const m=event.data;try{if(m.action==='restore')await designTheme.restore(m.values);if(m.action==='change'){for(const [key,value]of Object.entries(m.values)){const knob=document.querySelector('[data-theme-knob="'+key+'"]');if(key==='dark')knob.checked=value;else knob.value=value;}document.querySelector('[data-theme-tweaks]').dispatchEvent(new Event('input',{bubbles:true}));}const root=getComputedStyle(document.documentElement),title=getComputedStyle(document.querySelector('h1'));parent.postMessage({type:'test:theme-result',request:m.request,values:designTheme.capture(),accent:root.getPropertyValue('--accent').trim(),bg:root.getPropertyValue('--bg').trim(),font:title.fontSize,radius:title.borderRadius},'*');}catch(error){parent.postMessage({type:'test:theme-result',request:m.request,error:error.message},'*');}});</script>`;
+ fs.writeFileSync(join(designDir,"index.html"),themePage);
+ await evaluate("document.getElementById('message-input').value=''");
+ let themeReady=false;for(let i=0;i<40&&!themeReady;i++){themeReady=(await designTree()).some(row=>row.includes('Token theme'));if(!themeReady)await new Promise(done=>setTimeout(done,150));}assert(themeReady);
+ const probeTheme=(action,values)=>evaluate(`new Promise((resolve,reject)=>{const frame=document.querySelector('#files .files-frame'),request=crypto.randomUUID();const reply=event=>{if(event.source!==frame.contentWindow||event.data?.type!=='test:theme-result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',reply);resolve(event.data);};const timer=setTimeout(()=>{removeEventListener('message',reply);reject(Error('Theme fixture did not reply'));},3000);addEventListener('message',reply);frame.contentWindow.postMessage({type:'test:theme',request,action:${JSON.stringify(action)},values:${JSON.stringify(values)}},'*');})`);
+ const initialTheme={accent:"#808080",typeScale:1.2,radius:8,dark:false};
+ assert.equal((await probeTheme("restore",initialTheme)).accent,"#808080");
+ assert.equal((await probeTheme("restore",{...initialTheme,dark:true})).accent,"#b3b3b3","dark mode uses its generated ramp, not a seed override");
+ const changedTheme={accent:"#c2410c",typeScale:1.25,radius:4,dark:true},liveTheme=await probeTheme("change",changedTheme);
+ assert.deepEqual(liveTheme.values,changedTheme);assert.equal(liveTheme.font,"31.25px");assert.equal(liveTheme.radius,"6px");assert.equal(liveTheme.bg,"#0d0d0d");assert.equal(liveTheme.accent,"#c2410c");
+ await browser("wait","--fn","!document.querySelector('#files .design-keep-tweaks').hidden");await evaluate("document.querySelector('#files .design-keep-tweaks').click()");
+ assert.equal(await evaluate("document.getElementById('message-input').value"),"Keep tweaks: accent #c2410c, typeScale 1.25, radius 4, dark true\n");
+ assert.equal(fs.readFileSync(join(designDir,"index.html"),"utf8"),themePage,"the agent remains the only source writer");
+ assert.equal((await probeTheme("restore",{...initialTheme,dark:true})).accent,"#b3b3b3","restoring removes a temporary accent override");
+ assert.match((await probeTheme("restore",{...initialTheme,radius:-1})).error,/Invalid theme tweak state/);
  // P3-06: legacy previews stay viewable, but cannot silently Mark their fresh default state.
  await evaluate("document.getElementById('message-input').value = ''; document.querySelector('#files .design-mark').click()");
  await browser("wait", "--fn", "document.getElementById('notice').textContent.includes('does not support Mark state capture')");
@@ -1348,7 +1414,7 @@ try {
  window.captureMode='normal';window.designPreview={capture:()=>window.captureMode==='normal'?{open:panel.open,draft:draft.value}:new Promise(()=>{}),restore:async value=>{draft.value=value.draft;panel.style.background=value.draft==='Unsaved Delta'?'red':'white';if(value.open&&!panel.open)panel.showModal();if(!value.open&&panel.open)panel.close();await new Promise(requestAnimationFrame);}};
  const captureApi=window.designPreview;let readyNow;addEventListener('message',event=>{if(event.source!==parent)return;const m=event.data;if(m.type==='test:defer'){window.designPreview=undefined;window.designReady=new Promise(resolve=>readyNow=()=>{window.designPreview=captureApi;resolve();});parent.postMessage({type:'test:deferred'},'*');}if(m.type==='design:capture'&&readyNow)parent.postMessage({type:'test:capturing'},'*');if(m.type==='test:release'){readyNow();readyNow=null;}if(m.type==='test:mode'){window.captureMode=m.mode;parent.postMessage({type:'test:mode-ready',mode:m.mode},'*');}if(m.type==='design:capture'&&(window.captureMode==='stale'||window.captureMode==='bad')){const reply={type:'design:state',load:m.load,request:m.request,screen:m.screen,version:m.version,state:null,input:'mouse',reducedMotion:false,hash:''};if(window.captureMode==='bad')parent.postMessage({...reply,state:{constructor:{}}},'*');else for(const bad of [{load:'old'},{request:'old'},{screen:'other.html'},{version:99}])parent.postMessage({...reply,...bad},'*');}});</script>`;
  fs.writeFileSync(join(designDir, "index.html"), replayPage);
- const replayRef = async name => { for (let i = 0; i < 40; i++) { const ref = (await designTree()).find(row => row.startsWith(name))?.match(/ref=(e\d+)/)?.[1]; if (ref) return "@" + ref; await new Promise(done => setTimeout(done, 150)); } assert.fail("missing replay control: " + name); };
+ const replayRef = async name => { let rows = []; for (let i = 0; i < 40; i++) { rows = await designTree(); const ref = rows.find(row => row.startsWith(name))?.match(/ref=(e\d+)/)?.[1]; if (ref) return "@" + ref; await new Promise(done => setTimeout(done, 150)); } assert.fail("missing replay control: " + name + "\n" + rows.slice(0, 25).join("\n")); };
  await replayRef('- heading "Replay fixture"');
  await evaluate("for(const b of document.querySelectorAll('#files .design-comment, #files .design-edit'))if(b.getAttribute('aria-pressed')==='true')b.click()");
  await browser("click", await replayRef('- button "Open editor"'));
@@ -1423,6 +1489,27 @@ try {
  await browser("click", await replayRef('- button "Retry save"'));formState=await formStats();assert(!formState.open&&formState.saved==="Saved Project Delta"&&formState.active==="open","Retry saves locally and returns focus");
  await browser("click", await replayRef('- button "Edit project"'));await browser("fill", await replayRef('- textbox "Project name"'),"Discard me");await browser("click", await replayRef('- button "Cancel project"'));
  formState=await formStats();assert(!formState.open&&formState.saved==="Saved Project Delta"&&formState.active==="open","Cancel discards the edit and returns focus");
+ // Component publication uses the same remote controls: status changes do not reset an unsaved last-good iframe.
+ for(const entry of fs.readdirSync(designDir))fs.rmSync(join(designDir,entry),{recursive:true,force:true});
+ const componentSource=appStarter("Component preview"), componentHtml=title=>`<h1>${title}</h1><label>Prototype draft<input data-id="component-draft" value="initial"></label><script>window.designPreview={capture:()=>({draft:document.querySelector('input').value}),restore:value=>{document.querySelector('input').value=value.draft}};</script>`;
+ const componentOutput=new Map([["index.html",Buffer.from(componentHtml("Published component"))]]);
+ const publishComponent=async()=>{for(const[name,bytes]of appPublication(componentSource,componentOutput)){fs.mkdirSync(join(designDir,name,".."),{recursive:true});fs.writeFileSync(join(designDir,name),bytes);}await ensureAppBuilt(designDir,{runtime:async()=>assert.fail("published browser fixture needs no dependency download")});};
+ await publishComponent();await replayRef('- heading "Published component"');
+ await browser("wait","--fn","document.querySelector('.design-build-status')?.textContent==='Component preview ready'");
+ await browser("fill",await replayRef('- textbox "Prototype draft"'),"Unsaved component draft");
+ const componentFrame=await evaluate("document.querySelector('#files .files-frame').src");
+ for(const state of["building","failed"]){
+  fs.writeFileSync(join(designDir,BUILD_STATUS),JSON.stringify({state,error:state==="failed"?"Deliberate syntax failure":undefined}));
+  await browser("wait","--fn",`document.querySelector('.design-build-status')?.textContent.includes(${JSON.stringify(state==="building"?"Building":"Deliberate syntax failure")})`);
+  assert.equal(await evaluate("document.querySelector('#files .files-frame').src"),componentFrame,"status-only changes never reload the last-good frame");
+  assert((await designTree()).some(row=>row.includes("Unsaved component draft")),"an unsaved draft survives build progress/failure");
+ }
+ await evaluate("window.componentCapture=null;window.componentFetch=fetch;window.fetch=(...args)=>{if(String(args[0]).includes('api/designshot')){window.componentCapture=JSON.parse(args[1].body);return Promise.resolve(new Response(JSON.stringify({error:'Generation transport check'}),{status:409}));}return componentFetch(...args);};document.querySelector('#files .design-mark').click()");
+ await browser("wait","--fn","!!window.componentCapture");assert.match(await evaluate("window.componentCapture.buildGeneration"),/^[a-f0-9]{64}$/,"Mark carries the displayed component generation");
+ await evaluate("window.fetch=componentFetch");
+ componentSource.set("src/App.jsx",Buffer.from("// refined source"));componentOutput.set("index.html",Buffer.from(componentHtml("Refined component")));await publishComponent();
+ await replayRef('- heading "Refined component"');assert.notEqual(await evaluate("document.querySelector('#files .files-frame').src"),componentFrame,"a complete new generation reopens through the existing preview action");
+ if(process.argv.includes("--design-remote")){const {remoteStudio}=await import("../../docs/proposals/astryx-study/probes/remote-studio.mjs");await remoteStudio({browser,origin,designDir,hostAgentDir,ownerKey:hub.config.localKey});}
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

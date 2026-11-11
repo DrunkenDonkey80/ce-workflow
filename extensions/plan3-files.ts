@@ -7,23 +7,35 @@ import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 type Plan = { id: string; file: string };
 const queues = new Map<string, Promise<unknown>>();
 export async function withPlanLock<T>(file: string, change: () => T | Promise<T>): Promise<T> {
-	const key = path.resolve(file).toLowerCase();
-	const next = (queues.get(key) ?? Promise.resolve()).catch(() => {}).then(() => acrossProcesses(key, change));
+	const key = planLockKey(file);
+	const next = (queues.get(key) ?? Promise.resolve()).catch(() => {}).then(() => acrossProcesses(file, change));
 	queues.set(key, next);
 	try { return await next; } finally { if (queues.get(key) === next) queues.delete(key); }
 }
-// pi-control-hub and Pi sessions save the same plans and diagrams: the in-memory queue covers one process, a lock file in temp covers the rest.
-async function acrossProcesses<T>(key: string, change: () => T | Promise<T>): Promise<T> {
+function planLockKey(file: string) {
+	let resolved = path.resolve(file);
+	try { resolved = fs.realpathSync(resolved); }
+	catch (error) { if (error.code !== "ENOENT") throw error; }
+	return resolved.toLowerCase();
+}
+// Nonblocking for tool preflight: waiting here can deadlock siblings that have not executed yet.
+export function tryPlanLock(file: string): (() => void) | undefined {
+	const key = planLockKey(file);
 	const dir = path.join(os.tmpdir(), "plan3-locks");
 	fs.mkdirSync(dir, { recursive: true });
 	const base = path.join(dir, crypto.createHash("sha256").update(key).digest("hex").slice(0, 32));
+	const { info } = takeSessionLock(base, "plan3", false);
+	if (info) return () => releaseSessionLock(base, info);
+}
+// Pi sessions and the hub share the same lock; native Edit/Write reserve it during preflight.
+async function acrossProcesses<T>(file: string, change: () => T | Promise<T>): Promise<T> {
 	const deadline = Date.now() + 10_000;
-	let lock;
-	while (!(lock = takeSessionLock(base, "plan3").info)) {
-		if (Date.now() > deadline) throw new Error("The plan or diagram is being saved by another process; try again.");
+	let release;
+	while (!(release = tryPlanLock(file))) {
+		if (Date.now() > deadline) throw new Error("The plan or diagram is being saved by another operation; try again.");
 		await new Promise(resolve => setTimeout(resolve, 20));
 	}
-	try { return await change(); } finally { releaseSessionLock(base, lock); }
+	try { return await change(); } finally { release(); }
 }
 /** A project-relative path that cannot escape the project or pass through a symlink. */
 export function confined(cwd: string, relative: string) {

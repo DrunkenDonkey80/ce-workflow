@@ -19,7 +19,7 @@ if (!selector || !out || !/\.png$/i.test(out)) { console.error('Usage: changelog
 const binary = process.platform === "win32" ? join(process.env.APPDATA, "npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe") : "agent-browser";
 const session = `hub-shot-${process.pid}`, execute = promisify(execFile);
 async function browser(...args) {
-	const { stdout } = await execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000 });
+	const { stdout } = await execute(binary, ["--session", session, "--json", ...args], { timeout: 30_000, maxBuffer: 2_000_000, windowsHide: true });
 	let result; try { result = JSON.parse(stdout); } catch { throw new Error("agent-browser returned non-JSON: " + stdout.slice(0, 300)); }
 	if (!result.success) throw new Error(args[0] + ": " + JSON.stringify(result.error ?? result)); return result.data;
 }
@@ -28,7 +28,7 @@ const root = fs.mkdtempSync(join(os.tmpdir(), "hub-shot-")), folder = join(root,
 process.env.PI_CODING_AGENT_DIR = root;
 fs.mkdirSync(join(folder, "docs/plans"), { recursive: true });
 fs.writeFileSync(join(folder, "docs/plans/2026-10-25-sample-plan-12345678-plan3.md"), "---\nplan3: true\nstatus: active\ncreated: 2026-10-25\n---\n\n# Sample plan\n\n## Steps\n\n- [x] **S01** first\n- [ ] **S02** second\n");
-execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "init", "-q"], { cwd: folder });
+execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "init", "-q"], { cwd: folder, windowsHide: true });
 
 // What ce-workflow would answer through /pi-hub: just enough for a full header.
 const models = { model: { provider: "fake", id: "fake-1", name: "Claude Opus" }, effort: "high", efforts: ["low", "medium", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Claude Opus" }], others: [] };
@@ -38,9 +38,9 @@ await new Promise(done => relay.listen(0, "127.0.0.1", done));
 process.env.FAKE_PI_HUB_URL = `http://127.0.0.1:${relay.address().port}/`;
 
 const { startHub } = await import("../src/hub.ts");
-// Sample extensions for the gear's list; no network, nothing installed or removed.
+// Sample installed extensions, without pending sources: the automatic updater must never run real installs here.
 const { createUpdateCheck } = await import("../src/update-check.ts");
-const updates = createUpdateCheck({ find: async () => ({ pi: null, packages: ["pi-lens"], installed: [["npm:pi-lens", "4.4.4", true], ["npm:pi-subagents", "0.81.0"], ["npm:pi-web-access", "0.44.0"], ["git:github.com/DrunkenDonkey80/ce-workflow", "0.1.73"]].map(([source, version, update]) => ({ source, name: source.split(/[:/]/).at(-1), version, update: !!update })) }), remove: async () => true });
+const updates = createUpdateCheck({ find: async () => ({ pi: null, packages: [], installed: [["npm:pi-lens", "4.4.4"], ["npm:pi-subagents", "0.81.0"], ["npm:pi-web-access", "0.44.0"], ["git:github.com/DrunkenDonkey80/ce-workflow", "0.1.73"]].map(([source, version]) => ({ source, name: source.split(/[:/]/).at(-1), version, update: false })) }), latest: async () => null, remove: async () => true });
 const hub = await startHub({ command: [process.execPath, fileURLToPath(new URL("./fake-pi.mjs", import.meta.url))], usage: false, pool: false, models: undefined, updates });
 try {
 	const { id } = await hub.host.create(folder, "1"), rpc = hub.host.live.get(id).rpc;

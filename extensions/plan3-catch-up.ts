@@ -5,8 +5,8 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 
-// Baseline entries with kind "git" (upstream skill repos) are tracked by commit instead of npm version.
-export const PLAN3_CATCH_UP_PACKAGES = ["@earendil-works/pi-coding-agent", "pi-subagents", "pi-ask-user", "pi-intercom", "pi-lens", "mattpocock/skills", "nexu-io/open-design"];
+// Baseline entries with kind "git" (scoped upstream source/skill repos) track commits, not npm runtime pins.
+export const PLAN3_CATCH_UP_PACKAGES = ["@earendil-works/pi-coding-agent", "pi-subagents", "pi-ask-user", "pi-intercom", "pi-lens", "mattpocock/skills", "nexu-io/open-design", "meta/astryx"];
 const BASELINE = path.join(import.meta.dirname, "work-catch-up-baseline.json");
 const DECISIONS = "Catch-up decisions";
 
@@ -87,7 +87,8 @@ export function catchUpPlanText(state, focus = "", today = new Date().toISOStrin
    - Adopted skills: diff each one's upstream path. For every real change (a new rule, technique or fix, not rewording), say what it would change in our copy or prompt.
    - New skills (\`A <dir>/SKILL.md\`): desk-review each like \`docs/proposals/2026-11-08-mattpocock-skills-review.md\` (summary, overlap here, verdict adopt idea / A/B test / already covered / skip, reason).
    - Rejected or skipped skills: only when a change removes the recorded reason.
-   Offer every finding through plan3 ideas so the user accepts or rejects each one: test first (skills-lab A/B per \`docs/proposals/skills-lab/design.md\`, graded Trial), adopt directly, or reject. Accepted ones become Phase 1 steps. Update the ledger (tested commit, adopted and rejected lists) as a Phase 1 step.`
+   - Adopted library/API contracts: follow the ledger's scoped paths, browser-floor and license changes. Keep the git review commit separate from installed npm pins; never upgrade a runtime just by advancing this review. Use the relevant API/build/browser regressions, not skill text grading.
+   Offer every finding through plan3 ideas so the user accepts or rejects each one: test first (skills-lab A/B per \`docs/proposals/skills-lab/design.md\` for skill/prompt changes, contract-specific regressions for libraries; graded Trial), adopt directly, or reject. Accepted ones become Phase 1 steps. Update the ledger (tested commit, adopted and rejected lists) as a Phase 1 step.`
 		: "";
 	return `---
 plan3: true
@@ -101,7 +102,7 @@ catch-up: ${JSON.stringify(Object.fromEntries(targets.map((pkg) => [pkg.name, pk
 
 ## Original request
 
-> Catch ce-workflow up with the new releases of the Pi packages and upstream skill repos it still uses: review every release after the last reviewed version up to the target, decide what helps or breaks this repository, apply what is adopted, then record the reviewed versions.${focus ? `\n> User focus: ${focus}` : ""}
+> Catch ce-workflow up with the new releases of the Pi packages and scoped upstream source/skill repos it still uses: review every release after the last reviewed version up to the target, decide what helps or breaks this repository, apply what is adopted, then record the reviewed versions.${focus ? `\n> User focus: ${focus}` : ""}
 
 ## Review targets
 

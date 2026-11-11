@@ -16,6 +16,7 @@ import { ARCHIVE, designLists, designPage, explore, unview, viewPage, watchDesig
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
+import { buildInfo } from "../../extensions/design-build.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
@@ -433,12 +434,13 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				const lists = await designLists(folder(id), handle);
 				// A kept version's own screens, so its picker matches what it had.
 				const screens = data.version ? view.files.map(file => file.path).filter(file => /^[\w.-]+\.html?$/i.test(file)).sort((a, b) => Number(b === "index.html") - Number(a === "index.html") || a.localeCompare(b)) : lists.screens;
-				return { ...view, design: true, handle, ...lists, screens, ...data.version ? { version: data.version } : {} };
+				return { ...view, design: true, handle, ...lists, screens, ...data.version ? { version: data.version, build: buildInfo(path.dirname(real)) } : {} };
 			}
 			// S13, D13: Mark renders what the preview shows (version, screen, device size, slide, unsaved inline edits) to a
 			// pasted-image temp file, which the page then opens in the annotator. Like designpreview, it names no path.
 			case "designshot": {
-				only(data, ["target", "screen", "version", "width", "height", "hash", "styleEdits", "pageState", "input", "reducedMotion"], "Invalid fields.");
+				only(data, ["target", "screen", "version", "width", "height", "hash", "styleEdits", "pageState", "input", "reducedMotion", "buildGeneration"], "Invalid fields.");
+				if (data.buildGeneration !== undefined && !(typeof data.buildGeneration === "string" && /^[a-f0-9]{64}$/.test(data.buildGeneration))) throw fail(400, "Invalid component generation.");
 				if (!Object.hasOwn(data, "pageState")) throw fail(400, "Mark needs a captured page state (window.designPreview).");
 				try { designStateJson(data.pageState); } catch { throw fail(400, "Invalid design state (finite JSON, 16 KiB, 8 levels, 256 entries)."); }
 				if (!(data.input === "mouse" || data.input === "touch") || typeof data.reducedMotion !== "boolean") throw fail(400, "Invalid captured input capability.");
@@ -452,6 +454,8 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				if (!Array.isArray(edits) || edits.length > 50 || !edits.every(validEdit)) throw fail(400, "Invalid style edits.");
 				const real = await designPage(folder(id), designHandle(id), data.screen, data.version as number | undefined);
 				if (!real) throw fail(404, "No such version or screen.");
+				const build = buildInfo(path.dirname(real));
+				if ((build || data.buildGeneration !== undefined) && build?.generation !== data.buildGeneration) throw fail(409, "Component preview changed; reload it before Mark.");
 				const shot = await renderDesign({ folder: path.dirname(real), screen: path.basename(real), width: data.width as number, height: data.height as number, hash: data.hash as string | undefined, styleEdits: edits, pageState: data.pageState as DesignJson, input: data.input, reducedMotion: data.reducedMotion });
 				if (!shot.png.length) throw fail(502, "The render gave no picture.\n" + reportText(shot.report));
 				return { path: await savePastedImage(shot.png) };
@@ -584,6 +588,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 	host.on("ui", (id: string, request: RpcRecord) => {
 		const view = views.get(id), form = view && toForm(request);
 		if (form) view.publish("dialog", form);
+		if (view && request.method === "notify" && typeof request.message === "string") view.publish("notice", { text: request.message.slice(0, 2000) });
 		if (!view || request.method !== "setStatus") return;
 		if (request.statusKey === "pi-hub:notice") { const text = parse(request.statusText)?.text; if (typeof text === "string") view.publish("notice", { text: text.slice(0, 2000) }); }
 		if (request.statusKey === "pi-hub:state") {

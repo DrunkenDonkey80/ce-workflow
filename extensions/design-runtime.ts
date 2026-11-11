@@ -24,6 +24,7 @@ for (const [file, pkg] of Object.entries(lock.packages) as [string, any][]) {
 	if (notice?.version !== pkg.version || !notice.sources?.length || notice.sources.some(source => typeof source.text !== "string" || source.text.length < 100)) throw new Error(`Missing full notice for ${file}.`);
 }
 const noticeText = "# Astryx runtime third-party notices\n\n" + Object.values(notices.packages).map((pkg: any) => `## ${pkg.name}@${pkg.version}\n\n${pkg.sources.map(source => `Source: ${source.source ?? source.url}\n\n${source.text}`).join("\n\n")}\n`).join("\n");
+export const astryxRuntimeFiles = Object.freeze({ "package.json": manifestText, "package-lock.json": lockText, "THIRD_PARTY_NOTICES.md": noticeText });
 export const astryxRuntime = Object.freeze({ lockDigest: hash(lockText), versions: Object.freeze({ ...manifest.dependencies }) });
 type Options = { agentDir?: string; signal?: AbortSignal; confirm?: (title: string, purpose: string) => Promise<boolean>; progress?: (message: string) => void };
 type Run = (exe: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout: number; signal?: AbortSignal }) => Promise<{ stdout: string }>;

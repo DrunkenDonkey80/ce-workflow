@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
-import { createRequire } from "node:module";
+import { execFileSync, spawn } from "node:child_process";
+import { createRequire, syncBuiltinESMExports } from "node:module";
+import fsPromises from "node:fs/promises";
+import { createEditToolDefinition, createWriteToolDefinition } from "@earendil-works/pi-coding-agent";
+import { tryPlanLock, withPlanLock } from "../extensions/plan3-files.ts";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
-import { existsSync, renameSync } from "node:fs";
-import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, unlink, writeFile } from "node:fs/promises";
+import { existsSync, readFileSync, renameSync } from "node:fs";
+import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import plan3, { listPlans, similarity, optimizeLint, phaseSettings, inlineOptions, questionChoices, finishProblems, needsThinkTags } from "../extensions/plan3.ts";
@@ -63,7 +66,10 @@ const api = {
 	registerCommand: (name, command) => commands.set(name, command),
 	registerShortcut: (key, shortcut) => shortcuts.set(key, shortcut),
 	registerTool: (tool) => tools.set(tool.name, tool),
-	on: (name, handler) => hooks.set(name, handler),
+	on: (name, handler) => {
+		const previous = name === "tool_execution_end" && hooks.get(name);
+		hooks.set(name, previous ? (event, ctx) => { previous(event, ctx); return handler(event, ctx); } : handler);
+	},
 	events: { emit: (name, data) => { if (["plan3:plans-changed", "plan3:plan-moved"].includes(name)) planEvents.push({ name, ...data }); else events.push({ name, enabled: data.enabled, ...("active" in data ? { active: data.active } : {}), ...(data.force ? { force: true } : {}) }); listeners.get(name)?.(data); }, on: (name, handler) => { listeners.set(name, handler); return () => { if (listeners.get(name) === handler) listeners.delete(name); }; } },
 	appendEntry: (customType, data) => entries.push({ type: "custom", customType, data }),
 	sendUserMessage: (message, options) => messages.push({ message, options }),
@@ -86,6 +92,14 @@ try {
 	assert(manifest.pi.extensions.includes("extensions/plan3.ts"));
 	assert.deepEqual([...commands.keys()], ["night", "plan3", "plans3", "resume3", "pi-hub"]);
 	assert(tools.has("plan3") && tools.get("plan3").promptSnippet);
+	assert(tools.has("test_sensitivity") && tools.get("test_sensitivity").promptSnippet, "sensitivity tool is available without starting a plan");
+	const sensitivitySections = {};
+	const sensitivityLegacy = hooks.get("before_agent_start")({ systemPrompt: "BASE" }).systemPrompt;
+	assert.match(sensitivityLegacy, /\*\*Test sensitivity \(every project\)\*\*/);
+	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
+	assert.match(sensitivitySections["test-sensitivity"], /failing-before-fix[\s\S]*test_sensitivity[\s\S]*unrelated failures/);
+	hooks.get("before_agent_start")({ systemPromptOptions: { sections: sensitivitySections } });
+	assert.equal(Object.keys(sensitivitySections).filter(name => name === "test-sensitivity").length, 1, "reinjection is stable after compaction");
 	assert.deepEqual(commands.get("plan3").getArgumentCompletions("re").map((item) => item.value), ["resolve", "review", "review all", "rework"]);
 
 	// Empty project: list and /plan3 without args only report.
@@ -98,6 +112,13 @@ try {
 	await run("resume3");
 	assert.equal(messages.length, 0, "usage, listing and busy agent start nothing");
 	idle = true;
+
+	// Optimize is a reserved plan command: a source path must explain the mistake and start no work.
+	await run("plan3", String.raw`optimize C:\SOFT\WIN\PinpadAPP\AccenturePinpadApp\rff\tools\equinox_com_bench.c`);
+	assert.equal(notices.at(-1).severity, "error");
+	assert.match(notices.at(-1).message, /\/plan3 optimize.*existing Plan3 plan.*not source code[\s\S]*\/plan3 Improve the performance of/);
+	assert.equal(messages.length, 0, "invalid optimize sends no model request");
+	assert.equal(compactions, 0, "invalid optimize does not compact");
 
 	// New plan: draft file, research on, planning pointer, official prompt.
 	const request = "Add CSV import\nwith quoted fields";
@@ -194,6 +215,130 @@ try {
 	assert.deepEqual([state.done, state.total, state.next], [0, 3, "CSV-01"]);
 	await assert.rejects(tool({ action: "step", id: "NOPE", mark: "done" }), /Steps: CSV-01, CSV-02, IO-01/);
 	await assert.rejects(tool({ action: "section", name: "Nope", text: "x" }), /Sections: Original request/);
+	// Force checkpoint to pause after reading the plan, then run a real native Edit in that window.
+	{
+		const raceFile = path.join(directory, "2026-11-11-race-aabbccdd-plan3.md");
+		await writeFile(raceFile, validPlan("aabbccdd", "Race", "active", "- [ ] **R1** Work"));
+		const paused = Promise.withResolvers(), resume = Promise.withResolvers();
+		const originalAppend = fsPromises.appendFile;
+		fsPromises.appendFile = async (...args) => {
+			if (String(args[0]).endsWith("aabbccdd.md")) { paused.resolve(); await resume.promise; }
+			return originalAppend(...args);
+		};
+		syncBuiltinESMExports();
+		const checkpoint = tool({ action: "checkpoint", plan: "aabbccdd", text: "Checkpoint survives." });
+		const event = { toolName: "edit", toolCallId: "checkpoint-race-edit", input: { path: raceFile, edits: [{ oldText: "None yet.", newText: "D-14: Keep this edit." }] } };
+		const edit = createEditToolDefinition(cwd);
+		let blocked;
+		try {
+			await paused.promise;
+			blocked = await hooks.get("tool_call")(event, ctx);
+			if (!blocked?.block) await edit.execute(event.toolCallId, event.input, undefined, undefined, ctx);
+			await hooks.get("tool_execution_end")?.({ ...event, isError: !!blocked?.block }, ctx);
+		} finally {
+			resume.resolve();
+			await checkpoint;
+			fsPromises.appendFile = originalAppend; syncBuiltinESMExports();
+		}
+		if (blocked?.block) {
+			assert.match(blocked.reason, /being saved|busy|concurrent/i);
+			assert.equal(await hooks.get("tool_call")(event, ctx), undefined);
+			try { await edit.execute(event.toolCallId, event.input, undefined, undefined, ctx); }
+			finally { await hooks.get("tool_execution_end")?.(event, ctx); }
+		}
+		const saved = await readFile(raceFile, "utf8");
+		assert(saved.includes("D-14: Keep this edit."), "checkpoint must not erase a successful native edit");
+		assert(saved.includes("Checkpoint survives."), "native edit must preserve the checkpoint");
+		await rm(raceFile);
+	}
+
+	// Native write wins preflight: Plan3 waits, reads its final contents and preserves both changes.
+	{
+		const file = path.join(directory, "2026-11-11-native-eeff0011-plan3.md");
+		const initial = validPlan("eeff0011", "Native", "active", "- [ ] **N1** Work");
+		await writeFile(file, initial);
+		const event = { toolName: "write", toolCallId: "native-first", input: { path: file, content: initial.replace("None yet.", "D-14: Written first.") } };
+		assert.equal(await hooks.get("tool_call")({ toolName: "plan3", toolCallId: "checkpoint-first-preflight", input: { action: "checkpoint", plan: "eeff0011" } }, ctx), undefined);
+		assert.equal(await hooks.get("tool_call")(event, ctx), undefined);
+		const sibling = { toolName: "edit", toolCallId: "conflicting-sibling", input: { path: file, edits: [{ oldText: "Native", newText: "Sibling" }] } };
+		assert.equal(hooks.get("tool_call")(sibling, ctx).block, true, "sibling preflight rejects immediately, never waits for an unstarted tool");
+		await hooks.get("tool_execution_end")({ ...sibling, isError: true }, ctx);
+		assert.equal(tryPlanLock(file), undefined, "ending the blocked sibling must not release the accepted write");
+		const entered = Promise.withResolvers(), release = Promise.withResolvers();
+		const native = createWriteToolDefinition(cwd, { operations: {
+			mkdir: dir => mkdir(dir, { recursive: true }),
+			writeFile: async (target, content) => { entered.resolve(); await release.promise; await writeFile(target, content); },
+		} });
+		const writing = native.execute(event.toolCallId, event.input, undefined, undefined, ctx)
+			.finally(() => hooks.get("tool_execution_end")(event, ctx));
+		await entered.promise;
+		const checkpoint = tool({ action: "checkpoint", plan: "eeff0011", text: "After the native write." });
+		assert.equal(tryPlanLock(file), undefined, "lock spans the in-flight filesystem write");
+		release.resolve();
+		await Promise.all([writing, checkpoint]);
+		const result = await readFile(file, "utf8");
+		assert(result.includes("D-14: Written first.") && result.includes("After the native write."), "checkpoint reads the accepted native write, not a stale snapshot");
+
+		// Existing plans in done and junction aliases take the identical lock.
+		const alias = path.join(cwd, "plan-alias");
+		await symlink(directory, alias, process.platform === "win32" ? "junction" : "dir");
+		const aliases = ["@" + file, pathToFileURL(file).href, path.join(alias, path.basename(file)), path.relative(cwd, file)];
+		if (process.platform === "win32") aliases.push("/" + file[0].toLowerCase() + file.slice(2).replaceAll("\\", "/"));
+		for (const target of aliases) {
+			const locked = tryPlanLock(file);
+			assert(locked);
+			try { assert.equal(hooks.get("tool_call")({ ...sibling, input: { ...sibling.input, path: target } }, ctx).block, true, "aliases must not bypass the lock"); }
+			finally { locked(); }
+		}
+		await rm(alias);
+
+		// Errors, later-extension blocks and cancellation before execution all finalize and unlock.
+		for (const outcome of ["error", "blocked", "aborted"]) {
+			const call = { ...sibling, toolCallId: "cleanup-" + outcome, input: { path: file, edits: [{ oldText: "not in this plan", newText: "x" }] } };
+			assert.equal(hooks.get("tool_call")(call, ctx), undefined);
+			try {
+				if (outcome !== "blocked") await assert.rejects(createEditToolDefinition(cwd).execute(call.toolCallId, call.input, outcome === "aborted" ? AbortSignal.abort() : undefined, undefined, ctx));
+			} finally { await hooks.get("tool_execution_end")({ ...call, isError: true }, ctx); }
+			const unlocked = tryPlanLock(file); assert(unlocked, outcome + " releases the lock"); unlocked();
+		}
+		// Aborting during I/O must not release early; the native operation still has a write pending.
+		const abort = new AbortController(), writingPaused = Promise.withResolvers(), finishWrite = Promise.withResolvers();
+		const abortedCall = { ...event, toolCallId: "abort-in-io", input: { path: file, content: result } };
+		assert.equal(hooks.get("tool_call")(abortedCall, ctx), undefined);
+		const aborted = createWriteToolDefinition(cwd, { operations: {
+			mkdir: dir => mkdir(dir, { recursive: true }),
+			writeFile: async (target, content) => { writingPaused.resolve(); await finishWrite.promise; await writeFile(target, content); },
+		} }).execute(abortedCall.toolCallId, abortedCall.input, abort.signal, undefined, ctx)
+			.finally(() => hooks.get("tool_execution_end")({ ...abortedCall, isError: true }, ctx));
+		const failed = assert.rejects(aborted, /aborted/);
+		await writingPaused.promise; abort.abort();
+		assert.equal(tryPlanLock(file), undefined, "abort alone does not unlock pending I/O");
+		finishWrite.resolve(); await failed;
+		await assert.rejects(withPlanLock(file, () => { throw new Error("mutation failed"); }), /mutation failed/);
+		const unlocked = tryPlanLock(file); assert(unlocked, "failed Plan3 mutations unlock too"); unlocked();
+
+		// Separate processes use the same exclusion, not just an in-memory guard.
+		const childSource = `import { tryPlanLock } from ${JSON.stringify(new URL("../extensions/plan3-files.ts", import.meta.url).href)};
+			const release = tryPlanLock(process.argv[1]); process.send({ held: !!release });
+			process.once("message", () => { release?.(); process.disconnect(); });`;
+		const child = () => {
+			const proc = spawn(process.execPath, ["--input-type=module", "-e", childSource, file], { stdio: ["ignore", "ignore", "pipe", "ipc"], windowsHide: true });
+			const ready = new Promise((resolve, reject) => { proc.once("message", resolve); proc.once("error", reject); proc.once("exit", code => reject(new Error("lock child exited before ready: " + code))); });
+			const exited = new Promise(resolve => proc.once("exit", resolve));
+			return { proc, ready, exited };
+		};
+		assert.equal(hooks.get("tool_call")({ ...event, toolCallId: "parent-owner" }, ctx), undefined);
+		let worker = child();
+		try { assert.equal((await worker.ready).held, false, "another process cannot enter a native tool's reservation"); }
+		finally { worker.proc.send("release"); await worker.exited; await hooks.get("tool_execution_end")({ toolCallId: "parent-owner" }, ctx); }
+		worker = child();
+		try {
+			assert.equal((await worker.ready).held, true);
+			assert.equal(hooks.get("tool_call")(sibling, ctx).block, true, "native Edit rejects another process's reservation");
+		} finally { worker.proc.send("release"); await worker.exited; }
+		await rm(file);
+	}
+
 	// New plans come from the template, never a hand-written file.
 	const handWritten = { toolName: "write", input: { path: "docs/plans/2026-10-09-invented.md", content: "---\nplan3: true\nstatus: draft\n---\n\n# Invented\n" } };
 	assert.match(hooks.get("tool_call")(handWritten, ctx)?.reason ?? "", /plan3 with action create/);
@@ -202,7 +347,8 @@ try {
 	const created = await tool({ action: "create", text: "Library objects to 3D" });
 	assert.match(created.file, /library-objects-to-3d-[0-9a-f]{8}-plan3\.md$/);
 	assert.match(await readFile(created.file, "utf8"), /## Decisions[\s\S]*## Open questions[\s\S]*## Phases/, "standard template");
-	assert.equal(hooks.get("tool_call")({ toolName: "write", input: { path: created.file, content: handWritten.input.content } }, ctx), undefined, "filling the created file is allowed");
+	assert.equal(hooks.get("tool_call")({ toolName: "write", toolCallId: "fill-created", input: { path: created.file, content: handWritten.input.content } }, ctx), undefined, "filling the created file is allowed");
+	await hooks.get("tool_execution_end")({ toolCallId: "fill-created" }, ctx);
 	await unlink(created.file);
 	if (currentBefore) entries.push(currentBefore); // keep the earlier current plan for the checks below
 	state = await tool({ action: "next" });
@@ -484,9 +630,10 @@ try {
 		await writeFile(execFile, (await readFile(execFile, "utf8")).replace("status: active", "status: active\ncodingModel: anthropic/claude-opus-5-5\ncodingEffort: low"));
 		await run("resume3", "7c7c7c7c");
 		assert.deepEqual([ref(), thinking], ["anthropic/claude-opus-5-5", "low"], "the plan's override wins");
-		const rewrite = { toolName: "write", input: { path: execFile, content: validPlan("7c7c7c7c", "Exec", "active", "- [ ] **E-01** Code") } };
+		const rewrite = { toolName: "write", toolCallId: "rewrite-exec", input: { path: execFile, content: validPlan("7c7c7c7c", "Exec", "active", "- [ ] **E-01** Code") } };
 		assert.equal(hooks.get("tool_call")(rewrite, ctx), undefined);
 		assert.match(rewrite.input.content, /codingModel: anthropic\/claude-opus-5-5\ncodingEffort: low/, "a rewrite keeps the overrides");
+		await hooks.get("tool_execution_end")(rewrite, ctx);
 		// Phase tags: untagged unfinished phases get a tagging turn in think mode; turn_end follows the current step's phase.
 		await settings({ planningModel: "anthropic/claude-opus-5-5", codingModel: "openai-codex/gpt-6-sol", codingEffort: "medium" });
 		const thinkFile = path.join(directory, "2026-10-02-think-7e7e7e7e-plan3.md");
@@ -975,6 +1122,7 @@ try {
 	const fromSha = gitIn("rev-parse", "HEAD");
 	await mkdir(path.join(upstream, "skills", "fresh"));
 	await writeFile(path.join(upstream, "skills", "fresh", "SKILL.md"), "fresh\n");
+	const paletteReviewPath="packages/cli/api/theme/palette/generate/generate.mjs";await mkdir(path.dirname(path.join(upstream,paletteReviewPath)),{recursive:true});await writeFile(path.join(upstream,paletteReviewPath),"// palette review fixture\n");
 	gitIn("add", "-A"); gitIn("commit", "-qm", "two");
 	const toSha = await gitLatestCommit(upstream);
 	assert.equal(toSha, gitIn("rev-parse", "HEAD"), "ls-remote HEAD is the target commit");
@@ -991,6 +1139,12 @@ try {
 	const odDiff = await writeGitCatchUpDiff(cwd, upstream, "nexu-io/open-design", fromSha, toSha, ["craft/"]);
 	assert.doesNotMatch(await readFile(odDiff, "utf8"), /skills\/fresh/, "only the review paths are diffed");
 	assert.match(catchUpPlanText({ packages: [{ name: "nexu-io/open-design", kind: "git", ledger: odEntry.ledger, baselineVersion: fromSha, targetVersion: toSha, needsReview: true, diffPath: odDiff }] }), /nexu-io\/open-design: ledger `docs\/upstream\/open-design\.md`/);
+	const astryxEntry=JSON.parse(await readFile(new URL("../extensions/work-catch-up-baseline.json",import.meta.url),"utf8")).packages.find(item=>item.name==="meta/astryx");
+	assert.deepEqual([astryxEntry.kind,astryxEntry.ledger,PLAN3_CATCH_UP_PACKAGES.includes("meta/astryx")],["git","docs/upstream/astryx.md",true]);assert.match(astryxEntry.version,/^[a-f0-9]{40}$/);assert.equal(astryxEntry.reviewedVersion,astryxEntry.version);
+	assert(astryxEntry.paths.includes("packages/cli/api/theme/palette/")&&astryxEntry.paths.includes("packages/core/src/Button/")&&astryxEntry.paths.includes("packages/cli/assets/docs/browser-support.doc.mjs")&&astryxEntry.paths.includes("LICENSE"));assert(!astryxEntry.paths.includes("packages/")&&!astryxEntry.paths.includes("packages/core/"),"watch adopted surfaces, not the entire source tree");
+	const astryxLedger=await readFile(new URL(`../${astryxEntry.ledger}`,import.meta.url),"utf8");assert(astryxLedger.includes(astryxEntry.version)&&astryxLedger.includes("0.7.12")&&astryxLedger.includes("0.7.13")&&astryxLedger.includes("runtime-lock.json"),"source HEAD and runtime pin remain distinct");
+	const astryxDiff=await writeGitCatchUpDiff(cwd,upstream,"meta/astryx",fromSha,toSha,astryxEntry.paths),astryxDiffText=await readFile(astryxDiff,"utf8");assert(astryxDiffText.includes(paletteReviewPath));assert.doesNotMatch(astryxDiffText,/skills\/fresh/);
+	assert.match(catchUpPlanText({packages:[{name:"meta/astryx",kind:"git",ledger:astryxEntry.ledger,baselineVersion:fromSha,targetVersion:toSha,needsReview:true,diffPath:astryxDiff}]}),/meta\/astryx: ledger `docs\/upstream\/astryx\.md`/);
 	const catchUpFile = path.join(directory, "2026-10-06-catch-up-pi-packages-cafe0001-plan3.md");
 	await writeFile(catchUpFile, catchUpText);
 	idle = true;
@@ -1187,7 +1341,15 @@ try {
 	}
 	const { VIRTUAL_MODULES } = await import(pathToFileURL(path.join(sdkRoot, "dist", "core", "extensions", "virtual-modules.js")).href);
 	const nativePlan3 = await createJiti(import.meta.url, { moduleCache: false, virtualModules: VIRTUAL_MODULES }).import("../extensions/plan3.ts", { default: true });
+	const shutdownFile = path.join(directory, "done", "2026-11-11-cleanup-aaccbbdd-plan3.md");
+	await mkdir(path.dirname(shutdownFile), { recursive: true });
+	await writeFile(shutdownFile, validPlan("aaccbbdd", "Shutdown", "complete", "- [x] **C1** Done"));
+	assert.equal(hooks.get("tool_call")({ toolName: "edit", toolCallId: "shutdown-reservation", input: { path: shutdownFile } }, ctx), undefined);
+	assert.equal(tryPlanLock(shutdownFile), undefined, "archived plans are protected too");
 	await hooks.get("session_shutdown")(); // Dispose the first runtime before testing the SDK loader's fresh runtime.
+	const afterShutdown = tryPlanLock(shutdownFile); assert(afterShutdown, "shutdown releases abandoned reservations"); afterShutdown();
+	await rm(shutdownFile);
+	hooks.clear();
 	process.env.PI_HUB = "1"; nativePlan3(api); delete process.env.PI_HUB; // registers this runtime's /pi-hub
 	// One hub page call (H3-09) answered by id; calls may nest, as Finish waits on compaction while others run.
 	const hubPage = async (endpoint, data, context = ctx) => {
@@ -1805,18 +1967,38 @@ try {
 		assert.equal((await tool({ action: "size", mode: "plan", text: "Normal." })).mode, "plan");
 		assert.match(await readFile(headless.file, "utf8"), /Source: recommendation taken \(no UI\), /);
 		// Without a dialog to wait on, size and title race for the same file.
-		await sizeDraft("Tapir index rebuild saffron");
-		const [headlessSize, headlessTitle] = await Promise.all([tool({ action: "size", mode: "plan", text: "Known way." }), tool({ action: "title", text: "Tapir index rebuild" })]);
+		const tapir = await sizeDraft("Tapir index rebuild saffron");
+		// Rename after size's mutation but before its result read: the completed change must still report success.
+		const resultRead = Promise.withResolvers(), finishRead = Promise.withResolvers();
+		const originalRead = fsPromises.readFile;
+		let heldResult = false;
+		fsPromises.readFile = async (...args) => {
+			if (!heldResult && args[0] === tapir.file && /^size: plan$/m.test(readFileSync(tapir.file, "utf8"))) {
+				heldResult = true; resultRead.resolve(); await finishRead.promise;
+			}
+			return originalRead(...args);
+		};
+		syncBuiltinESMExports();
+		const sizeResult = tool({ action: "size", mode: "plan", text: "Known way." });
+		let headlessSize, headlessTitle;
+		try {
+			await resultRead.promise;
+			headlessTitle = await tool({ action: "title", text: "Tapir index rebuild" });
+			finishRead.resolve();
+			headlessSize = await sizeResult;
+		} finally { finishRead.resolve(); fsPromises.readFile = originalRead; syncBuiltinESMExports(); }
 		assert.equal(headlessSize.mode, "plan");
 		assert.match(await readFile(headlessTitle.path, "utf8"), /^size: plan$[\s\S]*^# Tapir index rebuild$[\s\S]*- \*\*D-size\*\* Size: plan\. Known way\./m);
 		// The planner then rewrites the whole plan with write (every lab run did): size, kind and D-size survive.
-		const rewrite = { toolName: "write", input: { path: headless.file, content: "---\nplan3: true\nstatus: draft\n---\n\n# Linter\n\n## Decisions\n\n- **D-01** Own decision.\n\n## Steps\n" } };
+		const rewrite = { toolName: "write", toolCallId: "rewrite-headless", input: { path: headless.file, content: "---\nplan3: true\nstatus: draft\n---\n\n# Linter\n\n## Decisions\n\n- **D-01** Own decision.\n\n## Steps\n" } };
 		hooks.get("tool_call")(rewrite, ctx);
 		assert.match(rewrite.input.content, /^size: plan$/m);
 		assert.match(rewrite.input.content, /## Decisions\n\n- \*\*D-01\*\* Own decision\.\n- \*\*D-size\*\* Size: plan\. Normal\./);
-		const mapRewrite = { toolName: "write", input: { path: mapped.file, content: "---\nplan3: true\nstatus: draft\n---\n\n# Map\n\n## Decisions\n" } };
+		await hooks.get("tool_execution_end")(rewrite, ctx);
+		const mapRewrite = { toolName: "write", toolCallId: "rewrite-map", input: { path: mapped.file, content: "---\nplan3: true\nstatus: draft\n---\n\n# Map\n\n## Decisions\n" } };
 		hooks.get("tool_call")(mapRewrite, ctx);
 		assert.match(mapRewrite.input.content, /^kind: map$/m, "a rewrite keeps the map a map");
+		await hooks.get("tool_execution_end")(mapRewrite, ctx);
 		assert.equal(selectScript.length, 0);
 		// B1: a planning draft turns into a map mid-grill in place; what was settled stays.
 		await writeFile(planned.file, (await readFile(planned.file, "utf8")).replace("## Decisions", "## Decisions\n\n- **D-01** Keep the ledger format."));

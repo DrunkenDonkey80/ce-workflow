@@ -330,6 +330,64 @@
       ]
     },
     {
+      "name": "meta/astryx",
+      "kind": "git",
+      "url": "https://github.com/meta/astryx",
+      "ledger": "docs/upstream/astryx.md",
+      "paths": [
+        "LICENSE",
+        "packages/cli/package.json",
+        "packages/cli/api-report.md",
+        "packages/cli/api/index.mjs",
+        "packages/cli/api/theme/palette/",
+        "packages/cli/api/theme/generateTonalPalette.doc.mjs",
+        "packages/cli/api/theme/list/",
+        "packages/cli/api/search/",
+        "packages/cli/api/component/",
+        "packages/cli/api/template/",
+        "packages/cli/api/docs/",
+        "packages/cli/api/hook/",
+        "packages/cli/assets/docs/browser-support.doc.mjs",
+        "packages/core/package.json",
+        "packages/core/CHANGELOG.md",
+        "packages/core/src/Button/",
+        "packages/core/src/theme/",
+        "packages/core/src/Dialog/",
+        "packages/core/src/Popover/",
+        "packages/core/src/Selector/",
+        "packages/themes/neutral/"
+      ],
+      "version": "fd5cf0df987791117e96ccc0bec603c64be8b136",
+      "reviewedAt": "2026-11-11T00:00:00.000Z",
+      "reviewedVersion": "fd5cf0df987791117e96ccc0bec603c64be8b136",
+      "decisions": [
+        {
+          "title": "Public palette and read-only discovery APIs",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Published 0.7.12 APIs drive standalone themes and bounded lookups; local mapping and host worker are ours. The source review SHA is not the npm runtime pin. See docs/upstream/astryx.md.",
+          "verification": "P3-08/P3-09: design-tool and tool-loader tests, real cached API probes, theme/lookup results under docs/proposals/astryx-study.",
+          "version": "fd5cf0df987791117e96ccc0bec603c64be8b136"
+        },
+        {
+          "title": "Optional prebuilt component authoring and editable handoff",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Consume reviewed prebuilt core/theme APIs, not upstream project loaders or arbitrary templates. Preserve JSX, fixed recipe, full notices and matching local outputs. See docs/upstream/astryx.md.",
+          "verification": "P3-10/P3-11/P3-12: C1-C4/C8 pass; real cached component, deterministic build, touch/state and isolated offline export roundtrip evidence in app-results.md.",
+          "version": "fd5cf0df987791117e96ccc0bec603c64be8b136"
+        },
+        {
+          "title": "Browser-floor and licensing compatibility watch",
+          "pov": "Adopt",
+          "status": "adopted",
+          "rationale": "Track used layered-surface contracts, browser-support warnings, package changes and MIT notices. This is not a Safari/hardware certification or automatic dependency upgrade.",
+          "verification": "Pinned runtime full-notice/integrity checks and browser compatibility probes; outstanding real Safari/hardware gates remain explicit in plan55b392b8.",
+          "version": "fd5cf0df987791117e96ccc0bec603c64be8b136"
+        }
+      ]
+    },
+    {
       "name": "nexu-io/open-design",
       "kind": "git",
       "url": "https://github.com/nexu-io/open-design",

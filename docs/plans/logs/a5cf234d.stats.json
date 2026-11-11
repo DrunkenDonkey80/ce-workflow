@@ -1,9 +1,9 @@
 {
  "version": 1,
- "activeMs": 7350108,
- "runs": 1,
- "waitingMs": 0,
- "toolWallMs": 3836001,
+ "activeMs": 9055018,
+ "runs": 3,
+ "waitingMs": 84227,
+ "toolWallMs": 4068359,
  "compactions": {
   "count": 0,
   "ms": 0
@@ -19,24 +19,35 @@
    "cacheWrite": 1159892,
    "cost": 20.9505082,
    "errors": 0
+  },
+  "openai-codex/gpt-6-astra:high": {
+   "replies": 85,
+   "thinkingMs": 871553,
+   "actingMs": 448452,
+   "input": 648089,
+   "output": 37384,
+   "cacheRead": 11454976,
+   "cacheWrite": 0,
+   "cost": 19.805066,
+   "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 298,
-   "ms": 3415541,
+   "count": 338,
+   "ms": 3551117,
    "maxMs": 156289,
-   "failures": 6
+   "failures": 12
   },
   "read": {
-   "count": 26,
-   "ms": 266,
-   "maxMs": 66,
-   "failures": 0
+   "count": 106,
+   "ms": 6780,
+   "maxMs": 2737,
+   "failures": 3
   },
   "write": {
-   "count": 10,
-   "ms": 327,
+   "count": 23,
+   "ms": 343,
    "maxMs": 203,
    "failures": 1
   },
@@ -47,34 +58,106 @@
    "failures": 0
   },
   "plan3": {
-   "count": 35,
-   "ms": 4563,
+   "count": 42,
+   "ms": 5067,
    "maxMs": 1203,
    "failures": 2
   },
   "edit": {
-   "count": 60,
-   "ms": 2910,
+   "count": 69,
+   "ms": 2926,
    "maxMs": 521,
-   "failures": 0
+   "failures": 2
   },
   "compaction_note": {
    "count": 3,
    "ms": 0,
    "maxMs": 0,
    "failures": 1
+  },
+  "project_report": {
+   "count": 1,
+   "ms": 107,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "web_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 32,
+   "ms": 184683,
+   "maxMs": 31671,
+   "failures": 1
+  },
+  "module_report": {
+   "count": 3,
+   "ms": 357,
+   "maxMs": 242,
+   "failures": 0
+  },
+  "resolve-library-id": {
+   "count": 1,
+   "ms": 929,
+   "maxMs": 929,
+   "failures": 0
+  },
+  "research_note": {
+   "count": 5,
+   "ms": 3,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "query-docs": {
+   "count": 2,
+   "ms": 2002,
+   "maxMs": 1120,
+   "failures": 0
+  },
+  "jev_triage": {
+   "count": 1,
+   "ms": 4,
+   "maxMs": 4,
+   "failures": 0
+  },
+  "jev_evidence": {
+   "count": 1,
+   "ms": 18694,
+   "maxMs": 18694,
+   "failures": 0
+  },
+  "subagents_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "subagent": {
+   "count": 7,
+   "ms": 1095,
+   "maxMs": 724,
+   "failures": 0
+  },
+  "subagent_launch": {
+   "count": 2,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
   }
  },
  "categories": {
   "shell": {
-   "count": 236,
-   "ms": 858281,
+   "count": 275,
+   "ms": 976655,
    "maxMs": 154567,
-   "failures": 6
+   "failures": 12
   },
   "test": {
-   "count": 62,
-   "ms": 2557260,
+   "count": 63,
+   "ms": 2574462,
    "maxMs": 156289,
    "failures": 0
   }
@@ -126,12 +209,6 @@
    "count": 1,
    "ms": 395,
    "maxMs": 395,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"runDesign|openDesign\\(|building\\b.*design\" --glob \"!extensions/design.ts\" extensions scripts hub | head": {
-   "count": 1,
-   "ms": 352,
-   "maxMs": 352,
    "failures": 0
   },
   "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | tail -20": {
@@ -188,12 +265,6 @@
    "maxMs": 2359,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git add extensions/design.ts extensions/work-models.ts scripts/test-work-design.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/": {
-   "count": 1,
-   "ms": 271,
-   "maxMs": 271,
-   "failures": 0
-  },
   "bash\u0000agent-browser --version; agent-browser --help 2>&1 | head -80": {
    "count": 1,
    "ms": 1210,
@@ -222,12 +293,6 @@
    "count": 1,
    "ms": 1352,
    "maxMs": 1352,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && node -e \" const fs=require('fs');const p='hub/src/explore.ts';let s=fs.readFileSync(p,'utf8'); const a='\\\"content-security-policy\\\": \\`sandbox allow-scripts allow-popups allow-pointer-lock a": {
-   "count": 1,
-   "ms": 243,
-   "maxMs": 243,
    "failures": 0
   },
   "bash\u0000cd \".\" && time node scripts/test-work-design.mjs 2>&1 | grep -v \"^\\s*at \" | tail -15": {
@@ -332,22 +397,10 @@
    "maxMs": 353,
    "failures": 0
   },
-  "bash\u0000cd \".\" && node -e \"const p=require('./package.json');console.log(JSON.stringify(p.files))\"; ls extensions/*.md 2>/dev/null; head -12 skills/frontend-design/SKILL.md; cd /tmp/od-src/x && sed -n 1,60p t": {
-   "count": 1,
-   "ms": 243,
-   "maxMs": 243,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && head -5 skills/frontend-design/LICENSE.txt; wc -l skills/frontend-design/LICENSE.txt; cd /tmp/od-src && git show HEAD:LICENSE | wc -l; git show HEAD:LICENSE | tail -15; git show HEAD:NOTICE ": {
    "count": 1,
    "ms": 571,
    "maxMs": 571,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"pi.on\\?\\.\\(\\\"\" extensions/design.ts; rg -n \"^import\" scripts/test-work-design.mjs": {
-   "count": 1,
-   "ms": 352,
-   "maxMs": 352,
    "failures": 0
   },
   "bash\u0000cd \".\" && node scripts/test-work-design.mjs 2>&1 | grep -v \"^\\s*at node:\" | tail -8": {
@@ -420,12 +473,6 @@
    "count": 1,
    "ms": 374,
    "maxMs": 374,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && sed -n 70,96p hub/web/styles.css": {
-   "count": 1,
-   "ms": 313,
-   "maxMs": 313,
    "failures": 0
   },
   "bash\u0000cd \".\" && sed -i 's#^listen(\"file-changed\", value => filesView.reload(value.key));#listen(\"file-changed\", value => filesView.reload(value.key));\\nlisten(\"design-changed\", value => filesView.designChan": {
@@ -536,12 +583,6 @@
    "maxMs": 814,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"const messages|messages = \\[\" hub/scripts/test-browser.mjs | head -3; rg -n \"await pick\\(\\\"Desktop\\\"\\);\" -A2 hub/scripts/test-browser.mjs": {
-   "count": 1,
-   "ms": 346,
-   "maxMs": 346,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"const waitFor|function waitFor\" hub/scripts/test-browser.mjs | head -2": {
    "count": 1,
    "ms": 680,
@@ -584,12 +625,6 @@
    "maxMs": 137066,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -i 's#^ assert.equal(messages.at(-1).text, \"Restore version 1\", await evaluate(.*# assert.equal(messages.at(-1).text, \"Restore version 1\");#' hub/scripts/test-browser.mjs && rg -n \"Resto": {
-   "count": 1,
-   "ms": 336,
-   "maxMs": 336,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git add hub/src/explore.ts hub/src/api.ts hub/web/design-view.ts hub/web/files.ts hub/web/app.ts hub/scripts/test-explore.mjs hub/scripts/test-api.mjs docs/plans/2026-11-09-own-design-studio": {
    "count": 1,
    "ms": 1593,
@@ -620,22 +655,10 @@
    "maxMs": 403,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n 1195,1236p hub/scripts/test-browser.mjs | cut -c1-330; rg -a -n \"iframe|files-frame|contentWindow|\\.src =\" hub/web/files.ts | cut -c1-220": {
-   "count": 1,
-   "ms": 337,
-   "maxMs": 337,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && sed -i 's#^const tell = (data: object) =>#const tell = (data: Record<string, unknown>) =>#' hub/web/design-view.ts && rg -n \"^const tell\" hub/web/design-view.ts && rg -n \"\\?token=__TOKEN__\" ": {
    "count": 1,
    "ms": 386,
    "maxMs": 386,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"sendExplored|viewPage\\(|fetch\\(|serve\\(\" hub/scripts/test-explore.mjs | cut -c1-240 | head -20": {
-   "count": 1,
-   "ms": 326,
-   "maxMs": 326,
    "failures": 0
   },
   "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs');const p='hub/scripts/test-explore.mjs';let s=fs.readFileSync(p,'utf8'); const a='\\t// S09: a kept version is its own handle\\'s history folder only.\\n'; ": {
@@ -668,22 +691,10 @@
    "maxMs": 423,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"D2\\b|\\*\\*D2\\*\\*\" docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md | cut -c1-900 | head -5": {
-   "count": 1,
-   "ms": 331,
-   "maxMs": 331,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && sed -n 61p docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md | cut -c880-2000; rg -n \"comment-prompt\" hub/web/app.ts hub/web/index.html | c": {
    "count": 1,
    "ms": 1266,
    "maxMs": 1266,
-   "failures": 0
-  },
-  "bash\u0000agent-browser --help 2>&1 | grep -i -E \"frame\" | head": {
-   "count": 1,
-   "ms": 251,
-   "maxMs": 251,
    "failures": 0
   },
   "bash\u0000agent-browser --help 2>&1 | grep -n -i -E \"^\\s+(frame|switch|eval|get|snapshot)\" | head; agent-browser frame --help 2>&1 | head -15": {
@@ -746,12 +757,6 @@
    "maxMs": 73809,
    "failures": 0
   },
-  "bash\u0000cd \".\" && grep -E \"stdout:\" \"$TEMP/tb.log\" | head -3; grep -n \"assert.fail\\|inFrame\" \"$TEMP/tb.log\" | head": {
-   "count": 1,
-   "ms": 313,
-   "maxMs": 313,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && node - <<'EOF' const fs=require('fs');const p='hub/scripts/test-browser.mjs';let s=fs.readFileSync(p,'utf8'); const def=' const inFrame = async (fn, label) =>'; const add=\" const toFrame = a": {
    "count": 1,
    "ms": 407,
@@ -762,12 +767,6 @@
    "count": 1,
    "ms": 80748,
    "maxMs": 80748,
-   "failures": 0
-  },
-  "bash\u0000agent-browser frame --help 2>&1 | sed -n 15,40p": {
-   "count": 1,
-   "ms": 297,
-   "maxMs": 297,
    "failures": 0
   },
   "bash\u0000cd \".\" && node --no-warnings hub/scripts/test-browser.mjs --keep-browser > \"$TEMP/tb.log\" 2>&1; S=$(grep -o -m1 \"hub-ui-[0-9]*\" \"$TEMP/tb.log\"); echo $S; agent-browser --session \"$S\" frame \"iframe\" 2>": {
@@ -890,34 +889,16 @@
    "maxMs": 733,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n 410,432p hub/src/api.ts; rg -n \"\\\"paste\\\"|/api/paste|pi-clipboard\" hub/src/*.ts | head": {
-   "count": 1,
-   "ms": 322,
-   "maxMs": 322,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && rg -n \"^import\" hub/src/api.ts | cut -c1-200": {
    "count": 1,
    "ms": 1052,
    "maxMs": 1052,
    "failures": 0
   },
-  "bash\u0000cd \".\" && sed -n 44,50p hub/src/api.ts | cut -c1-200; rg -n '\\\\\\\\w-\\]\\{0,40\\}|w-\\]\\{0,40' hub/src/api.ts": {
-   "count": 1,
-   "ms": 338,
-   "maxMs": 338,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && node -e \"const {stripTypeScriptTypes}=require('node:module');stripTypeScriptTypes(require('fs').readFileSync('hub/src/api.ts','utf8'));console.log('ok')\" 2>&1 | grep -v Warning | grep -v tra": {
    "count": 1,
    "ms": 477,
    "maxMs": 477,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"design:ready|addEventListener\\(\\\"resize\\\"\" hub/src/design-bridge.ts": {
-   "count": 1,
-   "ms": 321,
-   "maxMs": 321,
    "failures": 0
   },
   "bash\u0000cd \".\" && for f in hub/web/app.ts hub/web/design-view.ts hub/src/api.ts hub/src/design-bridge.ts; do node -e \"const {stripTypeScriptTypes}=require('node:module');stripTypeScriptTypes(require('fs').rea": {
@@ -933,10 +914,10 @@
    "failures": 0
   },
   "\u0000(other)": {
-   "count": 86,
-   "ms": 11450,
-   "maxMs": 240,
-   "failures": 3
+   "count": 122,
+   "ms": 21082,
+   "maxMs": 352,
+   "failures": 6
   },
   "bash\u0000cd \".\" && sed -i \"s/const \\[first, second, edited, version2, live\\] = /const [first, second, edited, version2, current] = /; s/Buffer.isBuffer(live), \\\"renders give PNG files: \\\" + first + \\\" \\\" + liv": {
    "count": 1,
@@ -974,22 +955,10 @@
    "maxMs": 107674,
    "failures": 0
   },
-  "bash\u0000cd \".\" && git add hub/src/api.ts hub/src/design-bridge.ts hub/web/design-view.ts hub/web/app.ts hub/scripts/test-api.mjs docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-d": {
-   "count": 1,
-   "ms": 323,
-   "maxMs": 323,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"D16\" \"$P\" | cut -c1-900 | head -3; sed -n 64,110p extensions/design-guide.md; r": {
    "count": 1,
    "ms": 1249,
    "maxMs": 1249,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && git add hub/src/design-bridge.ts hub/web/design-view.ts docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md docs/plans/logs/a5cf234d.md && gi": {
-   "count": 1,
-   "ms": 253,
-   "maxMs": 253,
    "failures": 0
   },
   "bash\u0000cd \".\" && P=docs/plans/2026-11-09-own-design-studio-in-the-hub-drop-opendesign-pi-designs-dire-a5cf234d-plan3.md; rg -n \"D14|D20|C1 \" \"$P\" | cut -c1-1200; rg -n \"system|fetch\\(|C1\" extensions/design.t": {
@@ -1130,12 +1099,6 @@
    "maxMs": 3785,
    "failures": 0
   },
-  "bash\u0000cd \".\" && rg -n \"opendesign-client|callOpenDesignTool|openDesignCommand|OD_PROJECT_DIR|OD_STOCK_RUN_ID|redactOpenDesignText\" extensions scripts hub package.json; echo \"rg exit=$?\"": {
-   "count": 1,
-   "ms": 334,
-   "maxMs": 334,
-   "failures": 0
-  },
   "bash\u0000cd \".\" && git add extensions/redact.ts extensions/ask-user/index.ts extensions/design.ts extensions/plan3.ts extensions/tool-loader.ts extensions/work-models.ts hub/scripts/test-sessions.mjs scripts/t": {
    "count": 1,
    "ms": 1888,
@@ -1146,12 +1109,6 @@
    "count": 1,
    "ms": 393,
    "maxMs": 393,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && rg -n \"writeGitCatchUpDiff|async function|kind === \\\"git\\\"|pkg.kind|\\.kind\" extensions/plan3-catch-up.ts extensions/work-catch-up*.ts | cut -c1-200 | head -30": {
-   "count": 1,
-   "ms": 320,
-   "maxMs": 320,
    "failures": 0
   },
   "bash\u0000cd \".\" && rg -n \"upstream skills repo|For an upstream\" scripts/test-work-plan3.mjs extensions | cut -c1-160; rg -n \"\\\"version\\\"|\\\"name\\\"|capturedAt\" extensions/work-catch-up-baseline.json | head -20; ": {
@@ -1182,12 +1139,6 @@
    "count": 1,
    "ms": 452,
    "maxMs": 452,
-   "failures": 0
-  },
-  "bash\u0000cd \".\" && sed -n 1,80p hub/scripts/changelog-shot.mjs | cut -c1-260; ls docs/changelog | tail -5": {
-   "count": 1,
-   "ms": 345,
-   "maxMs": 345,
    "failures": 0
   },
   "bash\u0000cd \".\" && rg -n \"designFrame\\(\" hub/web/*.ts | cut -c1-200; rg -n \"0.3.0-design\" CHANGELOG.md | cut -c1-300": {
@@ -1278,6 +1229,138 @@
    "count": 1,
    "ms": 481,
    "maxMs": 481,
+   "failures": 0
+  },
+  "bash\u0000git -C \".\" status --short": {
+   "count": 1,
+   "ms": 1890,
+   "maxMs": 1890,
+   "failures": 0
+  },
+  "bash\u0000git clone --depth 1 \"https://github.com/meta/astryx.git\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\"": {
+   "count": 1,
+   "ms": 31067,
+   "maxMs": 31067,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages\" && ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/cli\" && ls \"C:/Users/Flex/AppData/Local/Temp/pi-rese": {
+   "count": 1,
+   "ms": 516,
+   "maxMs": 516,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"^##|^###\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/cli/README.md\" && rg -n \"^##|^###\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/themes/REA": {
+   "count": 1,
+   "ms": 420,
+   "maxMs": 420,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"rest|data-|domProps\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/core/src/Button/Button.tsx\" && rg -n \"sandbox|Content-Security-Policy|script-src|style-src\" \"./hub/web/": {
+   "count": 1,
+   "ms": 518,
+   "maxMs": 518,
+   "failures": 0
+  },
+  "bash\u0000npm view \"@astryxdesign/core\" version dist.unpackedSize dist-tags --json && npm view \"@astryxdesign/cli\" version dist.unpackedSize --json && npm view \"@astryxdesign/theme-neutral\" version dist.unpacke": {
+   "count": 1,
+   "ms": 11370,
+   "maxMs": 11370,
+   "failures": 0
+  },
+  "bash\u0000npm install --prefix \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial\" --ignore-scripts --no-audit --no-fund \"@astryxdesign/core@0.7.12\" \"@astryxdesign/cli@0.7.12\" \"@astryxdesign/theme-neutr": {
+   "count": 1,
+   "ms": 17202,
+   "maxMs": 17202,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial\" && node \"node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs\" template --cdn && node \"node_modules/@astryxdesign/cli/clients/cli/bi": {
+   "count": 1,
+   "ms": 3459,
+   "maxMs": 3459,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"peer|trusted|global|AGENTS|CLAUDE|write|install\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/cli/scripts/postinstall.mjs\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-": {
+   "count": 1,
+   "ms": 607,
+   "maxMs": 607,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial\" && node \"node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs\" component Dialog --dense && node \"node_modules/@astryxdesign/cli/clie": {
+   "count": 1,
+   "ms": 850,
+   "maxMs": 850,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/core/src/theme\" && ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/cli/assets/templates\" && ls \"C:/Users": {
+   "count": 1,
+   "ms": 402,
+   "maxMs": 402,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/cdn-probe.mjs\"": {
+   "count": 2,
+   "ms": 4775,
+   "maxMs": 2693,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/cdn-probe.mjs\" && ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/cli/assets/templates/pages/dashb": {
+   "count": 1,
+   "ms": 2654,
+   "maxMs": 2654,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/local-probe.mjs\"": {
+   "count": 3,
+   "ms": 30942,
+   "maxMs": 12499,
+   "failures": 0
+  },
+  "bash\u0000rg --files \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\" -g \"*browser-support*\" -g \"*createDrag*\" -g \"*createReorder*\" -g \"*createPinch*\" && git -C \".\" status --short": {
+   "count": 1,
+   "ms": 469,
+   "maxMs": 469,
+   "failures": 0
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/local-probe.mjs\" && node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/render-probe.mjs\"": {
+   "count": 1,
+   "ms": 16604,
+   "maxMs": 16604,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"presentation|Popover|adaptive\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/packages/core/src/Selector/Selector.doc.mjs\" -m 12": {
+   "count": 1,
+   "ms": 375,
+   "maxMs": 375,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial\" && node \"node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs\" experimental render \"static-page.tsx\" --out \"portable.html\" --json &&": {
+   "count": 2,
+   "ms": 3356,
+   "maxMs": 2190,
+   "failures": 1
+  },
+  "bash\u0000node --no-warnings \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/render-probe.mjs\"": {
+   "count": 1,
+   "ms": 3905,
+   "maxMs": 3905,
+   "failures": 0
+  },
+  "bash\u0000git -C \".\" status --short && ls \"./benchmarks\" && ls \"./scripts\" -1": {
+   "count": 1,
+   "ms": 509,
+   "maxMs": 509,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require('fs');for(const p of ['./.pi/settings.json','C:/Users/Flex/.pi/agent/settings.json']){if(fs.existsSync(p)){const s=JSON.parse(fs.readFileSync(p,'utf8'));console.log(JSON.stri": {
+   "count": 1,
+   "ms": 680,
+   "maxMs": 680,
+   "failures": 0
+  },
+  "bash\u0000node \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison/setup.mjs\" && node --check \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/comparison/look.mjs\"": {
+   "count": 1,
+   "ms": 241,
+   "maxMs": 241,
    "failures": 0
   }
  },
@@ -1433,18 +1516,28 @@
    "failures": 3
   },
   "(none)": {
-   "ms": 246269,
+   "ms": 1752918,
    "testMs": 210925,
-   "replies": 5,
+   "replies": 90,
    "models": {
-    "anthropic/claude-opus-5-5:high": 5
-   }
+    "anthropic/claude-opus-5-5:high": 5,
+    "openai-codex/gpt-6-astra:high": 85
+   },
+   "failures": 3
   }
  },
  "spans": [
   {
    "start": "2026-11-09T11:30:08.064Z",
    "ms": 7350108
+  },
+  {
+   "start": "2026-11-10T18:21:02.953Z",
+   "ms": 1096647
+  },
+  {
+   "start": "2026-11-10T18:43:03.374Z",
+   "ms": 608263
   }
  ],
  "hints": []

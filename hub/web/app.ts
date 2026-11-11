@@ -45,9 +45,9 @@ const COMPACT_AT = 200_000;
 function setBar(item: HTMLElement, percent: number, tone: string) {
  item.style.setProperty("--fill", Math.max(0, Math.min(100, percent)) + "%"); item.dataset.tone = tone;
 }
-let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+let noticeTimer: ReturnType<typeof setTimeout> | undefined, noticeVersion = 0;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
-function showNotice(text, brief = false) { clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
+function showNotice(text, brief = false) { noticeVersion++; clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
 let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
 let navRequest: { n: number; dir: number; ctrl: boolean } | null = null; // a back/forward press for the app (see piHubGo)
 // D5: inside the desktop app (user agent marker) the title is a machine line the app reads for its tab, taskbar and tray.
@@ -235,6 +235,13 @@ function setChatView(view: string) {
 const chatView = () => CHAT_VIEWS.find(name => document.documentElement.classList.contains("chat-" + name)) ?? "expanded";
 for (const id of ["chat-compact", "chat-compact-m"]) $(id).addEventListener("click", () => { setChatView(CHAT_VIEWS[(CHAT_VIEWS.indexOf(chatView()) + 1) % CHAT_VIEWS.length]); pinChat(); fillChat(); });
 setChatView(remembered("plan3-chat", CHAT_VIEWS, "expanded"));
+const cacheMissToggle = $("hub-cache-misses") as HTMLInputElement;
+cacheMissToggle.checked = remembered("hub-cache-misses", ["on", "off"], "off") === "on";
+document.documentElement.classList.toggle("show-cache-misses", cacheMissToggle.checked);
+cacheMissToggle.addEventListener("change", () => {
+ remember("hub-cache-misses", cacheMissToggle.checked ? "on" : "off");
+ document.documentElement.classList.toggle("show-cache-misses", cacheMissToggle.checked); pinChat(); fillChat();
+});
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
 const mobileViews = ["chat", "files", "project", "plan"];
 function setMobile(view) {
@@ -828,7 +835,7 @@ function renderChat() {
   let shown = 0, bytes = 0, keep = rows.length;
   for (; keep > 0; keep--) {
    const row = rows[keep - 1];
-   if (!compact || row.role === "user" || finals.has(row.id) || row.blocks?.some(block => block.ask)) { shown++; bytes += encoder.encode(row.text).length; }
+   if (!compact || row.role === "user" || finals.has(row.id) || row.blocks?.some(block => block.ask) || (cacheMissToggle.checked && row.cacheMiss)) { shown++; bytes += encoder.encode(row.text).length; }
    if (shown > 100 || bytes > 512000 || rows.length - keep >= 3000) break;
   }
   for (const row of rows.splice(0, keep)) chat.delete(row.id);
@@ -838,7 +845,7 @@ function renderChat() {
  let previous: HTMLLIElement | null = null;
  for (const row of chat.values()) {
   let item = [...list.querySelectorAll<HTMLLIElement>(":scope > li")].find(item => item.dataset.id === row.id);
-  if (!item) { item = document.createElement("li"); item.dataset.id = row.id; const full = document.createElement("button"); full.type = "button"; full.className = "row-full"; full.textContent = "Show full message"; full.dataset.full = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("div"), document.createElement("small"), full); }
+  if (!item) { item = document.createElement("li"); item.dataset.id = row.id; const full = document.createElement("button"); full.type = "button"; full.className = "row-full"; full.textContent = "Show full message"; full.dataset.full = row.id; item.append(document.createElement("strong"), document.createElement("div"), document.createElement("div"), document.createElement("small"), full, Object.assign(document.createElement("p"), { className: "cache-miss", role: "status" })); }
   // Keep server order, also for rows inserted above by loadEarlier.
   if (!item.isConnected || item.previousElementSibling !== previous) { if (previous) previous.after(item); else list.prepend(item); }
   previous = item;
@@ -847,11 +854,12 @@ function renderChat() {
   const json = JSON.stringify(row); if (item.dataset.json === json) continue; item.dataset.json = json;
   const text = row.text.trim(), note = row.error ?? (row.truncated ? "Excerpt; full history stays in Pi." : row.streaming && !row.blocks?.length ? "Streaming…" : "");
   // A turn with only thinking/tool calls is a compact block list without the "Agent" header; an empty one is hidden.
-  item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : "") + (row.blocks?.some(block => block.ask) ? " has-ask" : "") + (row.role === "user" && text.startsWith("⏰ Scheduled") ? " scheduled" : ""); item.hidden = !text && !row.blocks?.length && !note;
+  item.className = "message " + row.role + (text ? "" : " message-blocks") + (finals.has(row.id) ? " final" : "") + (row.blocks?.some(block => block.ask) ? " has-ask" : "") + (row.role === "user" && text.startsWith("⏰ Scheduled") ? " scheduled" : ""); item.classList.toggle("has-cache-miss", !!row.cacheMiss); item.hidden = !text && !row.blocks?.length && !note && !row.cacheMiss;
   // Rows are told apart by colour (user block vs plain agent text); the label stays for screen readers.
   item.children[0].textContent = text ? (row.role === "user" ? "You:" : "Agent:") : ""; item.children[0].className = "sr-only";
   renderBlocks(item.children[1] as HTMLElement, row); renderLinks(item.children[2] as HTMLElement, row.text);
   item.children[3].textContent = note; (item.children[4] as HTMLElement).hidden = !row.excerpt;
+  item.children[5].textContent = row.cacheMiss ?? "";
  }
  // ✕ on the last prompt takes it and everything after it out of the context (a prompt sent by mistake).
  const lastPrompt = [...chat.values()].findLast(row => row.role === "user"), drop = $("drop-last") ?? Object.assign(document.createElement("button"), { id: "drop-last", type: "button", className: "drop-last", textContent: "\u2715", title: "Remove this message and everything after it from the context" });
@@ -1329,6 +1337,7 @@ $("composer").addEventListener("submit", async event => {
   if (!state.connected) return;
  }
  const text = $("message-input").value; if (!text.trim()) return;
+ const noticeBefore = noticeVersion; // A command error arriving during send outranks the transport success.
  // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
  for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
@@ -1338,7 +1347,7 @@ $("composer").addEventListener("submit", async event => {
  const replacing = $("message-input").classList.contains("editing-last") ? prompts().at(-1)?.text : undefined;
  historyAt = -1; $("message-input").classList.remove("editing-last", "from-history"); $("message-input").title = ""; renderHistoryNav();
  try {
-  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
+  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); if (noticeVersion === noticeBefore) showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
  catch (error) { expectWork(false); showNotice(error.message + ". Your message draft is kept."); }
  finally { messageSending = false; saveDraft(); renderShell(); }
 });
@@ -1414,8 +1423,9 @@ for (const button of document.querySelectorAll<HTMLElement>("#plan-menu [data-co
  if (command === "delete" && !await confirmBox(`Delete the plan "${state.plan?.title ?? "shown here"}" and its diagram permanently?`)) return;
  if (command === "force finish" && !await confirmBox(`Force finish "${state.plan?.title ?? "this plan"}"? It is archived as complete; its unfinished steps are listed in the plan.`)) return;
  if (commandSending) return; commandSending = true; renderShell();
+ const noticeBefore = noticeVersion;
  try {
-  await post("command", { command }); showNotice("");
+  await post("command", { command }); if (noticeVersion === noticeBefore) showNotice("");
   // The deleted plan can't be shown any more; fall back to the session's current plan or the project diagram.
   if (command === "delete" || command === "force finish") { const url = new URL(location.href); url.searchParams.delete("target"); location.assign(url); }
  }
@@ -2827,7 +2837,7 @@ listen("delta", delta => {
  const row = chat.get(delta.id), text = applyText(row && !row.excerpt ? row.text : undefined, delta.offset, delta.text);
  if (text === "gap") { void loadRow(delta.id); return; }
  if (text === "stale") return;
- chat.set(delta.id, { ...row, id: delta.id, role: delta.role, text, streaming: delta.streaming, excerpt: false, truncated: delta.truncated ?? row?.truncated, error: delta.error ?? row?.error, ...(delta.blocks ? { blocks: delta.blocks, brief: delta.blocks.length > 0 } : {}) });
+ chat.set(delta.id, { ...row, id: delta.id, role: delta.role, text, streaming: delta.streaming, excerpt: false, truncated: delta.truncated ?? row?.truncated, error: delta.error ?? row?.error, cacheMiss: delta.cacheMiss ?? row?.cacheMiss, ...(delta.blocks ? { blocks: delta.blocks, brief: delta.blocks.length > 0 } : {}) });
  renderChat();
  // An open block would lose its body to the brief update; reload it.
  if (delta.blocks?.length && $("messages").querySelector(`li[data-id="${CSS.escape(delta.id)}"] details[open]`)) void loadRow(delta.id);

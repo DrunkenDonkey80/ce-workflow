@@ -1,14 +1,15 @@
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { appendFile, mkdir, readdir, readFile, realpath, rename, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { askConfirm, progressBar, showAskDialog, showListDialog } from "./ask-user/menu.ts";
 import { decideIdea, ideaBlock, ideaOptions, ideaPopupContext, ideaResponse, ideaSchema, storedIdeas } from "./plan3-ideas.ts";
 import { loadPlan3Ask } from "./plan3-ask.ts";
-import { withPlanLock, movePlanWithDiagram, stablePlanId } from "./plan3-files.ts";
+import { withPlanLock, tryPlanLock, movePlanWithDiagram, stablePlanId } from "./plan3-files.ts";
 import { applyDiagram, toolbarEdit, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
 import { createActivityMirror, forwardDiagramChat, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
 import { createNight } from "./plan3-night.ts";
@@ -20,6 +21,7 @@ import { releaseSessionLock, takeSessionLock } from "./session-lock.ts";
 import { childWorkItems, listWorkItems, loadStore } from "./work-store.ts";
 import { docCandidates, slug as docSlug, writeDocs } from "./plan3-docs.ts";
 import { lockedWritesNote } from "./locked-writes.ts";
+import { registerTestSensitivity, TEST_SENSITIVITY } from "./test-sensitivity.ts";
 
 const POINTER = "plan3-current";
 const RUN = "plan3-run";
@@ -696,6 +698,7 @@ function orderPlans(ctx, plans) {
 
 // ---------- extension ----------
 export default function plan3(pi) {
+	registerTestSensitivity(pi);
 	const idle = (ctx) => {
 		if (ctx.isIdle()) return true;
 		ctx.ui.notify("Plan3 needs an idle agent; stop the current run first.", "warning");
@@ -1645,8 +1648,10 @@ export default function plan3(pi) {
 	// The plan file and its diagram; the sidecar log stays as history.
 	async function deletePlan(cwd, plan) {
 		let diagram; try { diagram = diagramPath(cwd, { kind: "plan", plan }); } catch { /* not a diagram owner */ }
-		await unlink(plan.file);
-		if (diagram) await unlink(diagram).catch(() => undefined);
+		await withPlanLock(plan.file, async () => {
+			await unlink(plan.file);
+			if (diagram) await unlink(diagram).catch(() => undefined);
+		});
 	}
 	// Rows show the plan's override or what it inherits; "inherit" removes the front-matter key.
 	async function editOverrides(ctx, plan) {
@@ -1665,9 +1670,7 @@ export default function plan3(pi) {
 				? await showListDialog(ctx, { title: `${label.codingEffort}: ${plan.title}`, purpose: "Effort while executing this plan; planning switches back.", currentValue: overrides.codingEffort ?? "inherit", items: [{ value: "inherit", label: inherit }, ...EFFORTS.map((level) => ({ value: level, label: level }))] }).then((selected) => selected && (selected.value === "inherit" ? null : selected.value))
 				: await pickModel(ctx, `${label[pick.value]}: ${plan.title}`, overrides[pick.value], inherit);
 			if (value === undefined) continue;
-			const { eol, lines } = split(await readFile(plan.file, "utf8"));
-			setMeta(lines, pick.value, value ?? undefined);
-			await writeFile(plan.file, lines.join(eol));
+			await mutate(plan, lines => { setMeta(lines, pick.value, value ?? undefined); });
 		}
 	}
 
@@ -1829,8 +1832,14 @@ export default function plan3(pi) {
 				if (!Array.isArray(args.steps) || !args.steps.length) throw new Error("add needs steps");
 				result = { added: await mutate(plan, (lines) => addSteps(lines, args.after, args.steps, need("reason"))) };
 			} else if (args.action !== "get") throw new Error("Unknown action.");
-			const file = result.file ?? plan.file;
-			const freshText = await readFile(file, "utf8");
+			let file = result.file ?? plan.file, freshText;
+			try { freshText = await readFile(file, "utf8"); }
+			catch (error) {
+				if (error.code !== "ENOENT") throw error;
+				// A sibling title/status call can move the plan after this mutation completes.
+				file = (await resolvePlan(ctx.cwd, plan.id, await listPlans(ctx.cwd))).file;
+				freshText = await readFile(file, "utf8");
+			}
 			const fresh = summarize(file, freshText, path.dirname(file) === doneDir(ctx.cwd) ? "done" : "plans");
 			const packetBytes = fresh.status === "complete" ? 0 : Buffer.byteLength(resumePacket(freshText, availOf(file)));
 			if (packetBytes > PLAN_WARN_BYTES) result.warning = `Resume packet is ${Math.round(packetBytes / 1024)} KB; /plans3 \u2192 Optimize compacts the plan.`;
@@ -1915,7 +1924,13 @@ export default function plan3(pi) {
 				if (/^(finish|done)$/i.test(request)) return await finish(ctx, selectedPlan);
 				if (/^needs$/i.test(request)) return await editNeeds(ctx, currentPlan(ctx, await listPlans(ctx.cwd)));
 				const optimizeArg = request.match(/^optimize(?:\s+([\s\S]+))?$/i);
-				if (optimizeArg) { const plans = await listPlans(ctx.cwd); return await optimize(ctx, optimizeArg[1] ? await resolvePlan(ctx.cwd, optimizeArg[1], plans) : currentPlan(ctx, plans)); }
+				if (optimizeArg) {
+					const plans = await listPlans(ctx.cwd);
+					let plan;
+					try { plan = optimizeArg[1] ? await resolvePlan(ctx.cwd, optimizeArg[1], plans) : currentPlan(ctx, plans); }
+					catch (error) { throw new Error(`/plan3 optimize compacts an existing Plan3 plan, not source code. For source-code work, use /plan3 Improve the performance of <file>. ${error.message}`); }
+					return await optimize(ctx, plan);
+				}
 				const resolveArg = request.match(/^resolve(?:\s+(\S+))?$/i);
 				if (resolveArg) { const plans = await listPlans(ctx.cwd); return await resolveQuestions(ctx, selectedPlan ?? (resolveArg[1] ? await resolvePlan(ctx.cwd, resolveArg[1], plans) : currentPlan(ctx, plans))); }
 				const review = request.match(/^review(?:\s+(all))?$/i);
@@ -2022,6 +2037,8 @@ export default function plan3(pi) {
 		return refresh(ctx);
 	});
 	pi.on?.("session_shutdown", async () => {
+		for (const release of planWrites.values()) release();
+		planWrites.clear();
 		forcingArchitecture = undefined; // Never archive from a reconciliation owned by the previous conversation.
 		activity.reset();
 		night.shutdown(); disposeDiagram(); activity.dispose();
@@ -2030,22 +2047,39 @@ export default function plan3(pi) {
 	pi.on?.("session_tree", (_event, ctx) => refresh(ctx));
 	pi.on?.("before_agent_start", event => {
 		const sections = event?.systemPromptOptions?.sections;
-		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; return; }
-		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${LOCKED_WRITES}` };
+		if (sections && typeof sections === "object") { sections["locked-writes"] = LOCKED_WRITES; sections["test-sensitivity"] = TEST_SENSITIVITY; return; }
+		return { systemPrompt: `${event.systemPrompt ?? ""}\n\n${LOCKED_WRITES}\n\n${TEST_SENSITIVITY}` };
 	});
 	// The rule above is a reminder; this flags the benchmark's commonest violation as soon as it is written (D-12).
 	pi.on?.("tool_result", event => {
 		const note = lockedWritesNote(event.toolName, event.input, event.isError);
 		if (note) return { content: [...(event.content ?? []), { type: "text", text: note }] };
 	});
-	// Plans are born from the template (plan3 create), never invented: block writing a NEW plan3 file by hand.
-	// shortcut: covers the write tool only, not shell redirection; extend if agents start bypassing it.
+	const planWrites = new Map<string, () => void>();
+	// shortcut: shell writes and external editors do not take this lock; use Edit/Write for plan prose.
 	pi.on?.("tool_call", (event, ctx) => {
-		if (event.toolName !== "write" || !/^---\r?\nplan3: true\r?\n/.test(String(event.input?.content ?? ""))) return;
-		const file = path.resolve(ctx.cwd, String(event.input?.path ?? ""));
-		if (path.dirname(file).toLowerCase() !== plansDir(ctx.cwd).toLowerCase()) return;
-		if (existsSync(file)) return keepOverrides(file, event.input);
-		return { block: true, reason: "New Plan3 plans come from the template: call plan3 with action create and text = the request, then fill the returned file in place (keep its headings)." };
+		if (!["edit", "write"].includes(event.toolName) || typeof event.input?.path !== "string") return;
+		// Match native file-tool path forms before choosing the lock (not an SDK-private import).
+		let target = event.input.path.replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, " ").replace(/^@/, "");
+		if (process.platform === "win32" && !target.includes("\\")) target = target.replace(/^\/(?:mnt\/|cygdrive\/)?([a-z])(?:\/|$)/i, "$1:/");
+		target = target.replace(process.platform === "win32" ? /^~(?=$|[\\/])/ : /^~(?=$|\/)/, os.homedir());
+		let file = path.resolve(ctx.cwd, target.startsWith("file://") ? fileURLToPath(target) : target);
+		try { file = realpathSync(file); } catch (error) { if (error.code !== "ENOENT") throw error; }
+		if (!/[\\/]docs[\\/]plans[\\/](?:done[\\/])?[^\\/]+\.md$/i.test(file)) return;
+		const isPlanWrite = event.toolName === "write" && /^---\r?\nplan3: true\r?\n/.test(String(event.input?.content ?? ""));
+		if (!existsSync(file)) {
+			if (isPlanWrite) return { block: true, reason: "New Plan3 plans come from the template: call plan3 with action create and text = the request, then fill the returned file in place (keep its headings)." };
+			return;
+		}
+		const release = tryPlanLock(file);
+		if (!release) return { block: true, reason: "This plan is being saved by another operation. Nothing was written. Retry Edit/Write after that operation finishes; do not batch writes to the same plan." };
+		planWrites.set(event.toolCallId, release);
+		if (isPlanWrite) keepOverrides(file, event.input);
+	});
+	// Includes calls blocked by a later extension, errors and cancellation; never release on abort before I/O settles.
+	pi.on?.("tool_execution_end", event => {
+		planWrites.get(event.toolCallId)?.();
+		planWrites.delete(event.toolCallId);
 	});
 	pi.on?.("turn_end", async (_event, ctx) => { await refresh(ctx); await followMode(ctx); }); // Steps may be written with write/edit.
 	// Remove only Plan3's trailing model-owned command footer; code owns the phase handoff.

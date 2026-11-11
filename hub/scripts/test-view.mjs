@@ -18,6 +18,21 @@ fs.mkdirSync(folder);
  const [{ message }] = await branchMessages(file);
  assert.deepEqual([message.content[0].text.length, message.content[1], message.details], [4001, { type: "image" }, undefined]); }
 
+// Parked history retains cache warm/reset markers, but never renders them as conversation rows.
+{
+ const { SessionView, branchMessages } = await import("../src/view.ts"), file = path.join(root, "cache.jsonl"), t = 1_760_000_000_000;
+ const usage = (input, cacheRead) => ({ input, cacheRead, cacheWrite: 0, cost: { input: input * 0.000003, cacheRead: cacheRead * 0.0000003, cacheWrite: 0 } });
+ const reply = (n, input, cacheRead) => ({ type: "message", message: { role: "assistant", provider: "p", model: "m", timestamp: t + n * 1000, content: [{ type: "text", text: "reply " + n }], usage: usage(input, cacheRead) } });
+ const entries = [reply(0, 0, 30000), { type: "usage", kind: "cache_warm", timestamp: new Date(t + 359000).toISOString(), provider: "p", model: "m", usage: usage(0, 30000) }, reply(360, 30000, 0), { type: "compaction", timestamp: new Date(t + 361000).toISOString() }, reply(362, 30000, 0), { type: "branch_summary", timestamp: new Date(t + 363000).toISOString() }, reply(364, 30000, 0)];
+ fs.writeFileSync(file, entries.map(entry => JSON.stringify(entry)).join("\n") + "\n");
+ assert.equal((await branchMessages(file)).length, 7);
+ const view = new SessionView({ file: () => file, idle: () => true }); await view.hydrate();
+ assert.equal(view.snapshot().chat.length, 4, "reset/warm markers do not become visible rows");
+ assert.equal(view.snapshot().chat[1].cacheMiss, "Cache miss: 30,000 tokens re-billed (~$0.08)", "warming updated the idle clock");
+ assert(!view.snapshot().chat[2].cacheMiss && !view.snapshot().chat[3].cacheMiss, "compaction and branch summary reset the baseline");
+ view.close();
+}
+
 // A tree session: 50 messages on the current branch plus one abandoned branch entry that must not show.
 const writeSession = (name, count) => {
 	const file = path.join(folder, `${name}.jsonl`), lines = [{ type: "session", id: "root" }];

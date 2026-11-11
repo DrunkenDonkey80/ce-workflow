@@ -88,6 +88,7 @@ check(
 
 const runtimeTracked = execFileSync("git", ["ls-files"], {
 	cwd: root,
+	windowsHide: true,
 	encoding: "utf8",
 })
 	.split(/\r?\n/)
@@ -123,6 +124,7 @@ for (const script of tests) {
 		execFileSync(process.execPath, [path.join("scripts", script)], {
 			cwd: root,
 			stdio: quiet ? "pipe" : "inherit",
+			windowsHide: true,
 			env: testEnvironment,
 		});
 		check(`${script} passes`, true);
@@ -130,17 +132,17 @@ for (const script of tests) {
 		check(
 			`${script} passes`,
 			false,
-			error instanceof Error ? error.message : String(error),
+			error instanceof Error ? error.message + String(error.stdout ?? "") : String(error),
 		);
 	}
 }
 
 // The hub (hub/) imports ce-workflow's modules, so its suite runs with the package's.
 try {
-	execFileSync(process.execPath, ["--test", "scripts/test-*.mjs"], { cwd: path.join(root, "hub"), stdio: quiet ? "pipe" : "inherit", env: parentEnvironment });
+	execFileSync(process.execPath, ["--test", "scripts/test-*.mjs"], { cwd: path.join(root, "hub"), stdio: quiet ? "pipe" : "inherit", env: parentEnvironment, windowsHide: true });
 	check("hub tests pass", true);
 } catch (error) {
-	check("hub tests pass", false, error instanceof Error ? error.message : String(error));
+	check("hub tests pass", false, error instanceof Error ? error.message + String(error.stdout ?? "") : String(error));
 }
 
 if (failures.length) {

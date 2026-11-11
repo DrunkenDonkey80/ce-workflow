@@ -1,0 +1,152 @@
+{
+  "label": "final-astryx",
+  "arm": "astryx",
+  "repoHead": "5283a1f881277ad1b9ccb080ca1acd253365e0c4",
+  "model": "anthropic/claude-opus-5-5:high",
+  "compaction": "ultrafull",
+  "translation": "\n\nProduct benchmark mapping (applies identically to both product arms): the historical fixture brief above names public/ and supplied craft/check files. In this real design session, deliver directly in your own .pi/designs/<handle>/ instead; craft guides are supplied by the production session. Use the existing design look action and read its returned images instead of ../look.mjs; write CHECKS.md inside your design folder. Source/build handling follows the selected production foundation. The content, behavior, fixed data, stable IDs and requested refinement are unchanged. No delegation, external research, commits, package installation or files outside your own design folder. Do not wait for user input. Stop on tool/setup failure.",
+  "startedAt": "2026-11-11T14:23:19.288Z",
+  "stages": [
+    {
+      "name": "initial",
+      "elapsedMs": 1478102,
+      "metrics": {
+        "sessions": 1,
+        "turns": 61,
+        "toolCalls": 73,
+        "input": 27140,
+        "output": 60168,
+        "cacheRead": 6258611,
+        "cacheWrite": 199840,
+        "totalTokens": 6545759,
+        "cost": 3.429844400000001,
+        "missingUsage": 0,
+        "missingCost": 0,
+        "models": {
+          "anthropic/claude-opus-5-5": 61
+        },
+        "compactions": 1,
+        "errors": []
+      }
+    },
+    {
+      "name": "refinement",
+      "elapsedMs": 502512,
+      "metrics": {
+        "sessions": 1,
+        "turns": 85,
+        "toolCalls": 97,
+        "input": 27190,
+        "output": 76142,
+        "cacheRead": 8261543,
+        "cacheWrite": 274788,
+        "totalTokens": 8639663,
+        "cost": 4.524850800000001,
+        "missingUsage": 0,
+        "missingCost": 0,
+        "models": {
+          "anthropic/claude-opus-5-5": 85
+        },
+        "compactions": 1,
+        "errors": []
+      }
+    }
+  ],
+  "state": "complete",
+  "handle": "design-1",
+  "metrics": {
+    "sessions": 1,
+    "turns": 85,
+    "toolCalls": 97,
+    "input": 27190,
+    "output": 76142,
+    "cacheRead": 8261543,
+    "cacheWrite": 274788,
+    "totalTokens": 8639663,
+    "cost": 4.524850800000001,
+    "missingUsage": 0,
+    "missingCost": 0,
+    "models": {
+      "anthropic/claude-opus-5-5": 85
+    },
+    "compactions": 1,
+    "errors": []
+  },
+  "toolsUsed": [
+    "bash",
+    "codemode",
+    "tools_enable",
+    "design",
+    "read",
+    "write",
+    "edit",
+    "compaction_note"
+  ],
+  "versions": {
+    "handle": "design-1",
+    "name": "Relay astryx",
+    "kind": "app",
+    "folder": ".pi/designs/design-1",
+    "files": [
+      ".design-build.json",
+      "APP.json",
+      "CHECKS.md",
+      "DESIGN.md",
+      "HANDOFF.md",
+      "THIRD_PARTY_NOTICES.md",
+      "assets/app-cffaa298250a5e7bfb07acbfedc397076cfe90b865d970a1e88e1f5218823f72.js",
+      "assets/app-e5cb5f270bf18c9d90c394c98bb3e586ad1bffc3a5556420a18b5ff42c527089.css",
+      "assets/astryx-93af8dfc93783b3a3dc5e76e1b2f51f686c40b1494c581a56418619b78a28c99.css",
+      "checks/cdp.mjs",
+      "checks/dialog-844x390.png",
+      "checks/dialog-shot.mjs",
+      "checks/interaction-check.mjs",
+      "checks/interaction-results.json",
+      "index.html",
+      "package-lock.json",
+      "package.json",
+      "settings.html",
+      "src/App.jsx",
+      "src/main.jsx",
+      "src/screens/index.html",
+      "src/screens/settings.html",
+      "src/styles.css",
+      "src/vendor.css"
+    ],
+    "page": "index.html",
+    "versions": [
+      1,
+      2
+    ],
+    "build": {
+      "state": "ready"
+    }
+  },
+  "endedAt": "2026-11-11T14:57:18.787Z",
+  "elapsedMs": 2039499,
+  "dirtyWorktree": true,
+  "sessions": {
+    "count": 1,
+    "canonicalFilesRetainedLocally": true
+  },
+  "contextEvidence": {
+    "productionStart": true,
+    "guideAndExtensionCopiesRetainedLocally": true,
+    "actualToolCallsRetainedInCanonicalSession": true,
+    "fullEffectiveSystemPromptRetained": false,
+    "frozenGuideByteComparisonBeforeAstryx": true,
+    "limitation": "Complete effective system prompts and all imported module snapshots were not retained. Frozen four guide/module copies match across final arms. Dirty-tree/model variance prevents causal attribution."
+  },
+  "acceptance": {
+    "cases": 12,
+    "passed": 100,
+    "total": 100,
+    "harnessExceptions": 0,
+    "failures": [],
+    "pageErrors": 0,
+    "externalRequests": 0,
+    "failedResources": 0,
+    "report": "product-acceptance.json"
+  },
+  "stageMetricSemantics": "Stage metrics are cumulative; do not sum them. Active elapsed is the sum of stage elapsedMs; end-to-end includes setup and lifecycle overhead."
+}

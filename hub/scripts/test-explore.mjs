@@ -5,6 +5,8 @@ import { mkdtemp, mkdir, rename, rm, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { designLists, designPage, explore, sendExplored, unview, viewers, viewPage, watchDesign } from "../src/explore.ts";
+import { appStarter } from "../../extensions/design-app.ts";
+import { appPublication, BUILD_STATUS, ensureAppBuilt } from "../../extensions/design-build.ts";
 
 const work = await mkdtemp(join(tmpdir(), "pi-hub-explore-test-"));
 try {
@@ -117,5 +119,26 @@ try {
 	unview(d.key, "s3");
 	await writeFile(join(design, "z.html"), "z");
 	assert.deepEqual(await changes(), [], "a closed design view stops watching");
+	// Component views remain on a complete immutable generation throughout failed/partial source publication.
+	const component = join(project,".pi/designs/design-3");await mkdir(component,{recursive:true});
+	const source=appStarter("Component"), output=new Map([["index.html",Buffer.from("<h1>Good component</h1>")]]);
+	const put=async files=>{for(const [name,bytes]of files){await mkdir(join(component,name,".."),{recursive:true});await writeFile(join(component,name),bytes);}};
+	await put(appPublication(source,output));
+	await ensureAppBuilt(component,{runtime:async()=>assert.fail("verified output works offline without a dependency cache")});
+	const good=await designPage(project,"design-3");assert.match(good,/\.design-preview.[a-f0-9]{64}.index.html$/);
+	const componentView=await viewPage(good,project,true,{owner:"component",notify},true), componentChanges=[];
+	await watchDesign(componentView.key,project,"design-3",value=>componentChanges.push(value));
+	await writeFile(join(component,"index.html"),"HALF WRITTEN");
+	await writeFile(join(component,BUILD_STATUS),JSON.stringify({state:"failed",error:"Syntax error in the draft"}));
+	assert.equal(await designPage(project,"design-3"),good,"uncommitted root HTML never becomes the live preview");
+	assert.match((await fetchLike(`/x/${componentView.key}/index.html`)).body,/Good component/);
+	await sleep(500);assert(componentChanges.some(value=>value.build?.state==="failed"),"failure reaches existing preview status controls");
+	const oldGeneration=(await designLists(project,"design-3")).build.generation;
+	source.set("src/App.jsx",Buffer.from("// refined"));output.set("index.html",Buffer.from("<h1>Refined component</h1>"));
+	await put(appPublication(source,output));await ensureAppBuilt(component,{runtime:async()=>assert.fail("matching retained output needs no compiler")});
+	const latest=await designPage(project,"design-3");assert.notEqual(latest,good);
+	await sleep(500);assert(componentChanges.some(value=>value.build?.generation && value.build.generation!==oldGeneration),"the complete new generation reaches the existing preview");
+	assert.match((await fetchLike(`/x/${componentView.key}/index.html`)).body,/Good component/,"old viewer stays internally coherent until it reopens the new generation");
+	unview(componentView.key,"component");
 	console.log("explore ok");
 } finally { await rm(work, { recursive: true, force: true }); }
