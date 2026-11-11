@@ -104,7 +104,7 @@ async function handle(cmd) {
 				if (cmd.message.startsWith("/subtitle ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:subtitle", statusText: cmd.message.slice(10) });
 				if (cmd.message.startsWith("/state ")) out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:state", statusText: cmd.message.slice(7) });
 				// Mirrors ce-workflow work-models.ts startEarlyCompact on a cold cache: compaction starts and ends after the command answers.
-				if (cmd.message === "/wo compact early") { out({ type: "compaction_start" }); setTimeout(() => out({ type: "compaction_end", result: { estimatedTokensAfter: 1000 } }), 300); }
+				if (cmd.message === "/wo compact early" || cmd.message === "/wo compact early park") { out({ type: "compaction_start" }); setTimeout(() => out({ type: "compaction_end", result: { estimatedTokensAfter: 1000 } }), 300); }
 				if (flags.has("slow-command")) await new Promise(r => setTimeout(r, 300));
 				return reply({ disposition: "handled" });
 			}

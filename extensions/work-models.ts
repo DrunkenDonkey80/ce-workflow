@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { askConfirm, askText, showListDialog } from "./ask-user/menu.ts";
 import { publish } from "./hub-channel.ts";
-import { handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
+import { handleDesignLibraryCommand, handleHubCommand, intercomParkedSessions, projectCommandsTool, scheduleTool, sessionDialogTool, longSleepWait, LONG_WAIT_REASON, undeclaredBackground, BACKGROUND_REASON } from "./hub-command.ts";
 import { handleEnvCommand } from "./work-env.ts";
 import { registerSelfUpdate } from "./work-self-update.ts";
 import { registerLensFormatCheck } from "./work-lens-format.ts";
@@ -282,7 +282,7 @@ const extensionScoutRuns = new Map();
 export function extensionScoutEnabled(env = process.env) {
 	return env.CE_WORK_EXTENSION_SCOUT === "1";
 }
-const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",review:"Review changes since the last commit or review with the other-provider model",reload:"Reload Pi after the current run (works from the browser)",env:"Set an environment variable or secret; the agent only sees its name",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
+const woSubcommands = () => ({compact:"Compact the current context",plan:"Plan3: start a plan or run a subcommand",plans:"Plan3: browse plans",resume:"Plan3: continue the current or named plan",settings:"Open Settings",hub:"Pi control hub: status, install, open, restart",design:"Browse design examples and collect references",review:"Review changes since the last commit or review with the other-provider model",reload:"Reload Pi after the current run (works from the browser)",env:"Set an environment variable or secret; the agent only sees its name",fact:"Store, search, correct or forget durable knowledge",...(maintenanceCheckout()?{"catch-up":"Catch up packages",context:"Context guard settings"}:{}),...(extensionScoutEnabled()?{scout:"Scout Pi extensions"}:{})});
 
 function settingsPath(cwd) {
 	return join(cwd, CONFIG_DIR_NAME, "settings.json");
@@ -2273,20 +2273,20 @@ function runNativeMicrocompact(ctx, customInstructions = undefined, force = fals
 // Cold-cache compaction: the next request re-bills the whole prompt anyway, so a large context is cheapest
 // to compact right before it. Returns idle minutes when it applies, else undefined.
 const cacheTtlMs = ctx => (ctx.model?.promptCache?.[process.env.PI_CACHE_RETENTION === "long" ? "long" : "short"] ?? 300) * 1000;
-function lastPromptCacheTime(entries) {
+function lastPromptCacheTime(entries, ignoreWarms = false) {
 	let last = 0;
 	for (let index = entries.length - 1; index >= 0 && !last; index--) {
 		const entry = entries[index];
 		if (entry.type === "message" && entry.message?.role === "assistant") last = Number(entry.message.timestamp) || Date.parse(entry.timestamp);
-		else if (entry.type === "usage" && entry.kind === "cache_warm") last = Date.parse(entry.timestamp);
+		else if (!ignoreWarms && entry.type === "usage" && entry.kind === "cache_warm") last = Date.parse(entry.timestamp);
 	}
 	return last;
 }
-export function coldCacheCompactMinutes(ctx, entries, now = Date.now()) {
+export function coldCacheCompactMinutes(ctx, entries, now = Date.now(), ignoreWarms = false) {
 	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
 	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
 	if (tokens < coldCompactThreshold(ctx, readEffectiveSettings(ctx.cwd))) return undefined;
-	const last = lastPromptCacheTime(entries);
+	const last = lastPromptCacheTime(entries, ignoreWarms);
 	const ttl = cacheTtlMs(ctx);
 	return last && now - last > ttl ? Math.round((now - last) / 60_000) : undefined;
 }
@@ -2300,9 +2300,9 @@ function compactColdCache(event, ctx, pi) {
 // The hub page resumes a parked session when you start typing (/wo compact early): a cold cache would be compacted when the
 // message is sent, so start now and let the message wait for it (startColdCompact).
 let earlyCompact = null;
-function startEarlyCompact(ctx, why = "while you type") {
+function startEarlyCompact(ctx, why = "while you type", ignoreWarms = false) {
 	if (earlyCompact || ctx.isIdle?.() === false || typeof ctx.compact !== "function") return false;
-	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
+	const minutes = coldCacheCompactMinutes(ctx, ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? [], Date.now(), ignoreWarms);
 	if (minutes === undefined) return false;
 	ctx.ui?.notify?.(`Prompt cache expired ${minutes}m ago; compacting ${Math.round((ctx.getContextUsage?.()?.tokens ?? 0) / 1000)}k tokens ${why}.`, "info");
 	earlyCompact = new Promise<void>((resolve) => ctx.compact({
@@ -4156,9 +4156,10 @@ if (blockedInternalBackgroundCompletionTurn) {
   if(action==="reload") { await ctx.waitForIdle(); return ctx.reload(); }
   const utility=WO_UTILITY_ACTIONS[action];
   if(utility && (maintenanceCheckout(ctx.cwd)||!["work-context","work-catch-up"].includes(utility))) return executeUtilityAction(utility,rest,ctx,pi);
-  if(action==="compact") return rest==="early" ? void startEarlyCompact(ctx) : requestMicrocompact(ctx);
+  if(action==="compact") return rest==="early park" ? void startEarlyCompact(ctx, "before parking", true) : rest==="early" ? void startEarlyCompact(ctx) : requestMicrocompact(ctx);
   if(action==="fact") return handleKnowledgeCommand(rest,ctx);
   if(action==="hub") return handleHubCommand(rest,ctx);
+  if(action==="design") return handleDesignLibraryCommand(rest,ctx,pi);
   if(action==="review") return pi.events?.emit?.("wo:review",{ctx});
   if(action==="env") return handleEnvCommand(ctx,pi);
   if(action==="context-fill") {

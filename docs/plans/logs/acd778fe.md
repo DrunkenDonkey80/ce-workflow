@@ -46,3 +46,10 @@ Planning and review done; status draft, awaiting /plan3 finish. Review accepted 
   - Pi fires the decision before the warm request and writes cache_warm after it returns (cache-warmer.js), so a slow warm can land after the timer was armed. When the timer finds a newer cache_warm, it re-arms for that entry's remaining TTL plus 15 s instead of ending; any new turn or input still cancels it.
   - Check: test-work-compaction-notifications.mjs drives agent_end, a warm decision and a cache_warm entry at 0.9 TTL, then the timer: compaction starts only after TTL+15 s from the warm. A second case writes the final cache_warm 20 s after its decision with no later decision and still compacts.
   - check: node scripts/test-work-compaction-notifications.mjs -> red before fix ('idle warms must re-arm compaction'), green after fix; deterministic normal/20s-delayed final warms, stop/busy/print guards and input/turn cancellation. lens_diagnostics source=lsp -> no findings, two inconclusive; git diff --check -> passed.
+
+## 2026-11-11T21:07:57.421Z CU-05 done: Hub park checks the last real request, ignoring idle warms while preserving recent-request and long-retention protection.
+
+- [x] **CU-05** Compact before parking when only idle warms keep the cache warm: hub sends `/wo compact early park`, which counts a trailing cache_warm as cold.
+  - A real request inside the TTL (long retention) still parks without compaction. fake-pi.mjs mirrors the new command; CHANGELOG bullet in plain words.
+  - Check: test-work-compaction-notifications.mjs (warm-only park compacts, a recent real request does not) and `node --test scripts/test-sessions.mjs` in hub/.
+  - check: node scripts/test-work-compaction-notifications.mjs -> red before fix at 'parking never compacts a recent real request', green after; cd hub && node --test scripts/test-sessions.mjs -> 1 passed. git diff --check -> passed. LSP no new findings: four silent-server inconclusive paths; six existing unchecked JSON.parse advisories in fake-pi.mjs are outside its changed line.

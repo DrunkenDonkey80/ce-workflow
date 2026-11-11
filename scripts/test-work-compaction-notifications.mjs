@@ -1691,6 +1691,32 @@ try {
 		assert.equal(finish, undefined, "a warm cache does not compact early");
 		delete pi.sendUserMessage;
 	}
+	{ // Parking ends warming: ignore idle warms, but still respect a recent real request and long retention.
+		let finish;
+		const now = Date.now();
+		const entries = [
+			{ type: "message", message: { role: "assistant", timestamp: now - 10 * 60_000 } },
+			{ type: "usage", kind: "cache_warm", timestamp: new Date(now - 60_000).toISOString() },
+		];
+		const parkCtx = { ...lastAsk(0), isIdle: () => true,
+			model: { contextWindow: 1_000_000, promptCache: { short: 300, long: 3600 } },
+			sessionManager: { ...nativeCtx.sessionManager, getBranch: () => entries },
+			compact: options => { finish = options.onComplete; },
+		};
+		assert.equal(coldCacheCompactMinutes(parkCtx, entries, now), undefined, "ordinary checks keep idle warms fresh");
+		await commands.wo.handler("compact early", parkCtx);
+		assert.equal(finish, undefined, "typing wake does not ignore idle warms");
+		await commands.wo.handler("compact early park", parkCtx);
+		assert.equal(typeof finish, "function", "parking compacts a cache kept alive only by idle warms");
+		finish(); await new Promise(resolve => setImmediate(resolve));
+		finish = undefined;
+		entries[0].message.timestamp = now - 60_000;
+		await commands.wo.handler("compact early park", parkCtx);
+		assert.equal(finish, undefined, "parking never compacts a recent real request");
+		entries[0].message.timestamp = now - 10 * 60_000;
+		await commands.wo.handler("compact early park", { ...parkCtx, model: { ...parkCtx.model, promptCache: { short: 3600, long: 3600 } } });
+		assert.equal(finish, undefined, "long retention still protects the real request before parking");
+	}
 	{ // Idle warming re-arms compaction without overriding Pi's decision, including a slow final warm.
 		const realTimeout = globalThis.setTimeout, realClearTimeout = globalThis.clearTimeout, realNow = Date.now;
 		const timers = []; let now = realNow(), compacted = 0;

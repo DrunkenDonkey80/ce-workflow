@@ -4,6 +4,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Fixed
+- Idle cold-cache compaction now waits until Pi's last idle cache warm expires, including slow final warms. The hub compacts before parking when only idle warms kept the cache fresh, but still respects a recent real request and long cache retention.
+
 ### Changed
 - In the hub and `/wo`, cold-cache compaction now uses one configurable share of the active mode's auto-compact trigger (70% by default); set it with `/wo context cold <percent>` and inspect it with `/wo context status`.
 

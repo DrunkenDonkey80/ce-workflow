@@ -349,12 +349,12 @@ export class SessionHost extends EventEmitter {
 	}
 
 	/**
-	 * A parked session whose prompt cache has expired would compact when the next message is sent, so you wait for it.
-	 * ce-workflow's /wo compact early does it now, only when that holds; park once Pi is quiet for 2 s (at most 15 min).
+	 * Parking ends idle cache warming, so consider only the last real request when checking for a cold cache.
+	 * ce-workflow's /wo compact early park does it now, only when that holds; park once Pi is quiet for 2 s (at most 15 min).
 	 */
 	private async compactBeforePark(live: Live) {
 		if (!await this.hasHub(live)) return;
-		await this.prompt(live.id, "/wo compact early");
+		await this.prompt(live.id, "/wo compact early park");
 		for (const end = Date.now() + 15 * 60_000; Date.now() < end && this.live.has(live.id);) {
 			await new Promise(resolve => setTimeout(resolve, 500));
 			if (!this.busyReasons(live.id).length && Date.now() - live.lastActivity >= 2000) return;

@@ -128,12 +128,16 @@ try {
 	idle.lastActivity = clock; idle.rpc.emit("ui", { type: "extension_ui_request", id: "s1", method: "setStatus", statusKey: "x", statusText: "y" });
 	assert.equal(idle.lastActivity, clock, "status repaints are not activity");
 	assert.deepEqual(await host.autoPark(Date.now() + 30 * 60_000), []);
-	// It compacts a cold cache first (/wo compact early), so the next message does not wait for it; parks once that ends.
+	// Parking checks the last real request (/wo compact early park), so idle warms do not postpone compaction.
+	const parkPrompts = [], prompt = host.prompt.bind(host);
+	host.prompt = async (id, text, ...rest) => { parkPrompts.push(text); return prompt(id, text, ...rest); };
 	const seen = [], track = (sid, e) => { if (sid === a.id) seen.push(e.type); };
 	host.on("event", track);
 	const parking = host.autoPark(Date.now() + 61 * 60_000);
 	assert.deepEqual(await host.autoPark(Date.now() + 61 * 60_000), [], "a session compacting before its park is not parked twice");
 	assert.deepEqual(await parking, [a.id]);
+	assert.deepEqual(parkPrompts, ["/wo compact early park"], "auto-park must ignore idle warms, not force an ordinary microcompact");
+	host.prompt = prompt;
 	host.off("event", track);
 	assert.deepEqual(seen.filter(type => type.startsWith("compaction")), ["compaction_start", "compaction_end"]);
 	host.idleParkMinutes = 0;
