@@ -4,13 +4,14 @@
   "verification": {
     "command": "npm run verify:quiet",
     "fullRuns": 1,
-    "result": "All checks covered by the full run plus targeted reruns of its two failed tests; no production or package-surface changes followed the full run.",
+    "result": "BLOCKED: the full run exited 1. Catch-up compaction/session regressions passed; the full-suite gate is not certified while concurrent approved Design work changes command and browser expectations. The isolated app-install rerun passed; the isolated browser rerun still failed.",
     "initialFailures": [
-      "test-work-goal.mjs: completed review had not yet advanced baseline versions; advancing only after per-decision verification resolves this temporary manifest mismatch.",
-      "test-work-wo-control.mjs: mock replaced rather than chained context handlers; chain them as Pi does and explicitly select ultracompact instead of inheriting global user mode."
+      "test-work-wo-control.mjs: forbidden-design assertion conflicts with the intentional restoration of /wo design; Design session acknowledged and owns its test migration.",
+      "hub/scripts/test-app-install.mjs: fetch ECONNRESET in the full hub suite; isolated rerun passed.",
+      "hub/scripts/test-browser.mjs: phone push-menu assertion in the full hub suite; isolated rerun then failed mobile-chat versus newly added mobile-library. Design session requested no overlapping browser suites."
     ],
-    "review": "Independent initial sensitive review and one targeted re-review: PASS after Windows local-peer and backslash-path fixes.",
-    "limitations": "No live opt-in patched TUI/intercom test; installed ask-user package was not mutated. LSP oversized and inconclusive outcomes are not reported clean."
+    "review": "Current-agent checks only, no delegated or background verifier. Plan acd778fe: six of seven steps done; CU-90 remains blocked. node scripts/test-work-plan3.mjs passed after recording the exact review targets.",
+    "limitations": "No live provider idle-warming or cost benchmark; deterministic timing and park regressions passed. Source LSP probes were inconclusive, with existing fake-pi JSON.parse advisories; these are not reported clean. Unrelated live-session changes were preserved."
   },
   "packages": [
     {
