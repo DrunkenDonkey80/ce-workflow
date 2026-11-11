@@ -10,12 +10,72 @@ import designExtension, { runDesign, snapshot, versions, writeRefusal } from "..
 import { agentBrowser, renderDesign, reportText, selectRenderTarget } from "../extensions/design-render.ts";
 import { decodePng } from "../extensions/screen-read.ts";
 import { designStateJson } from "../extensions/design-state.ts";
+import { ensureDesignRuntime, astryxRuntime } from "../extensions/design-runtime.ts";
 
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "design-test-"));
 const storePath = path.join(cwd, ".pi/designs/sessions.json");
 const stored = () => { const raw = fs.readFileSync(storePath, "utf8"); try { return JSON.parse(raw); } catch (cause) { throw new Error("sessions.json is not JSON: " + raw.slice(0, 200), { cause }); } };
 const put = (handle, files) => { for (const [file, body] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(cwd, ".pi/designs", handle, file)), { recursive: true }); fs.writeFileSync(path.join(cwd, ".pi/designs", handle, file), body); } };
 try {
+	// Optional host runtime: cold consent, cancellation, atomic failure, warm offline integrity and serialization.
+	const runtimeLock = JSON.parse(fs.readFileSync(new URL("../extensions/astryx-runtime/runtime-lock.json", import.meta.url), "utf8"));
+	const runtimeNotices = JSON.parse(fs.readFileSync(new URL("../extensions/astryx-runtime/notices.json", import.meta.url), "utf8"));
+	assert.equal(Object.keys(runtimeNotices.packages).length, Object.keys(runtimeLock.packages).length - 1);
+	assert(Object.values(runtimeLock.packages).slice(1).every(p => p.resolved.startsWith("https://registry.npmjs.org/") && /^sha512-/.test(p.integrity) && !p.link));
+	let runtimeRuns = 0, runtimeConsents = 0, fakePayloadBytes = 0;
+	const runtimeOptions = { agentDir: path.join(cwd, "runtime-agent"), confirm: async () => { runtimeConsents++; return true; } };
+	const fakeRuntimeRun = async (_exe, args, options) => {
+		runtimeRuns++;
+		if (!args.includes("ci")) { assert.deepEqual(args, ["--version"]);return { stdout: "0.28.2\n" }; }
+		for (const flag of ["--ignore-scripts=true", "--bin-links=false", "--audit=false", "--fund=false", "--registry=https://registry.npmjs.org/", "--fetch-retries=0"]) assert(args.includes(flag), flag);
+		assert(!Object.keys(options.env).some(key => /^(npm_config_|node_options$|node_path$)/i.test(key)), "ambient npm settings/code hooks are not inherited");
+		fakePayloadBytes = 0;
+		for (const [file, pkg] of Object.entries(runtimeLock.packages)) {
+			if (!file || (pkg.os && !pkg.os.includes(process.platform)) || (pkg.cpu && !pkg.cpu.includes(process.arch))) continue;
+			const dir = path.join(options.cwd, file);fs.mkdirSync(dir, { recursive: true });
+			fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: file.split("node_modules/").at(-1), version: pkg.version }));
+			const hex = Buffer.from(pkg.integrity.slice(7), "base64").toString("hex"), archive = path.join(options.cwd, ".npm-cache/_cacache/content-v2/sha512", hex.slice(0, 2), hex.slice(2, 4), hex.slice(4));
+			if (!fs.existsSync(archive)) { fs.mkdirSync(path.dirname(archive), { recursive: true });fs.writeFileSync(archive, "payload");fakePayloadBytes += 7; }
+			if (file === `node_modules/@esbuild/${process.platform}-${process.arch}`) {
+				const binary = path.join(dir, process.platform === "win32" ? "esbuild.exe" : "bin/esbuild");fs.mkdirSync(path.dirname(binary), { recursive: true });fs.writeFileSync(binary, "test-native-builder");
+			}
+		}
+		return { stdout: "" };
+	};
+	await assert.rejects(ensureDesignRuntime({ ...runtimeOptions, confirm: async () => false }, fakeRuntimeRun), /approval|declined|cancel/i);
+	assert.equal(runtimeRuns, 0, "refusal executes nothing");
+	const cancelledInstall = new AbortController();
+	await assert.rejects(ensureDesignRuntime({ ...runtimeOptions, signal: cancelledInstall.signal, confirm: async () => { cancelledInstall.abort(); return true; } }, fakeRuntimeRun), /abort|cancel/i);
+	assert.equal(runtimeRuns, 0, "cancellation before installation executes nothing");
+	await assert.rejects(ensureDesignRuntime(runtimeOptions, async () => { throw new Error("offline"); }), /unavailable|offline|install/i);
+	const runtimeRoot = path.join(runtimeOptions.agentDir, "cache/design-runtimes/astryx", astryxRuntime.lockDigest);
+	assert(!fs.existsSync(runtimeRoot) || fs.readdirSync(runtimeRoot).length === 0, "failed staging is never activated or left behind");
+	const duringInstall = new AbortController();
+	await assert.rejects(ensureDesignRuntime({ ...runtimeOptions, signal: duringInstall.signal }, async (...args) => { const result = await fakeRuntimeRun(...args);duringInstall.abort();return result; }), /abort|cancel/i);
+	assert.equal(fs.readdirSync(runtimeRoot).length, 0, "mid-install cancellation removes all staging without activating");
+	await assert.rejects(ensureDesignRuntime(runtimeOptions, async (...args) => args[1].includes("ci") ? fakeRuntimeRun(...args) : { stdout: "wrong-version" }), /native builder verification/);
+	assert.equal(fs.readdirSync(runtimeRoot).length, 0, "an unusable native builder cannot activate");
+	const beforeColdRuns = runtimeRuns;
+	const coldRuntime = await ensureDesignRuntime(runtimeOptions, fakeRuntimeRun);
+	assert.equal(coldRuntime.cold, true);assert.equal(coldRuntime.downloadBytes, fakePayloadBytes);assert(coldRuntime.footprintBytes > 0);
+	assert.equal(runtimeRuns - beforeColdRuns, 2, "only fixed npm ci and native builder verification execute");
+	const warmRuntime = await ensureDesignRuntime({ ...runtimeOptions, confirm: async () => { assert.fail("warm use must not prompt"); } }, async () => { assert.fail("warm offline use must not spawn or fetch"); });
+	assert.equal(warmRuntime.cold, false);assert.equal(warmRuntime.directory, coldRuntime.directory);
+	const cachedReact = path.join(coldRuntime.directory, "node_modules/react/package.json"), originalReact = fs.readFileSync(cachedReact);
+	fs.writeFileSync(cachedReact, JSON.stringify({ name: "react", version: "19.3.1", tampered: true }));
+	await assert.rejects(ensureDesignRuntime({ ...runtimeOptions, confirm: async () => false }, fakeRuntimeRun), /approval|declined|cancel|corrupt/i);
+	assert(fs.readFileSync(cachedReact, "utf8").includes("tampered"), "refusal preserves the existing cache");
+	await assert.rejects(ensureDesignRuntime(runtimeOptions, async () => { throw new Error("offline"); }), /unavailable|offline|install/i);
+	assert(fs.readFileSync(cachedReact, "utf8").includes("tampered"), "a failed reinstall cannot replace the existing cache");
+	const replacedRuntime = await ensureDesignRuntime(runtimeOptions, fakeRuntimeRun);assert.equal(replacedRuntime.cold, true);assert(fs.readFileSync(cachedReact).equals(originalReact));
+	const concurrentOptions = { ...runtimeOptions, agentDir: path.join(cwd, "concurrent-runtime") }, beforeRuns = runtimeRuns, beforeConsents = runtimeConsents;
+	const concurrentRuntime = await Promise.all([ensureDesignRuntime(concurrentOptions, fakeRuntimeRun), ensureDesignRuntime(concurrentOptions, fakeRuntimeRun)]);
+	assert.deepEqual(concurrentRuntime.map(r => r.cold), [true, false]);assert.equal(runtimeRuns - beforeRuns, 2);assert.equal(runtimeConsents - beforeConsents, 1);
+	const linkedAgent = path.join(cwd, "linked-runtime"), outsideCache = path.join(cwd, "outside-runtime");
+	fs.mkdirSync(path.join(linkedAgent, "cache"), { recursive: true });fs.mkdirSync(outsideCache);
+	fs.symlinkSync(outsideCache, path.join(linkedAgent, "cache/design-runtimes"), process.platform === "win32" ? "junction" : "dir");
+	await assert.rejects(ensureDesignRuntime({ ...runtimeOptions, agentDir: linkedAgent }, fakeRuntimeRun), /symlink/);
+	assert.equal(fs.readdirSync(outsideCache).length, 0, "cache path cannot traverse a symlink");
 	const guideText = fs.readFileSync(new URL("../extensions/design-guide.md", import.meta.url), "utf8");
 	assert(/Touch targets[^.]*coarse-pointer tablets/.test(guideText), "the starter contract covers coarse-pointer tablets, not phone widths alone");
 	assert.equal(designStateJson({ z: 1, a: [null, true, "ok"] }), '{"a":[null,true,"ok"],"z":1}', "canonical state comparison ignores object key order");
