@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-11-06T10:34:49.123Z",
+  "capturedAt": "2026-11-11T21:17:10.051Z",
   "verification": {
     "command": "npm run verify:quiet",
     "fullRuns": 1,
@@ -15,75 +15,67 @@
   "packages": [
     {
       "name": "@earendil-works/pi-coding-agent",
-      "version": "1.5.0",
-      "reviewedAt": "2026-11-06T10:34:49.123Z",
-      "reviewedVersion": "1.5.0",
+      "version": "1.5.2",
+      "reviewedAt": "2026-11-11T21:17:10.051Z",
+      "reviewedVersion": "1.5.2",
       "decisions": [
         {
-          "title": "Pin the devDependency to the reviewed release 1.5.0",
+          "title": "Pin the devDependency to the reviewed release 1.5.2",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "package.json still pins @earendil-works/pi-coding-agent 1.4.0 for type checks and tests, while the host now runs 1.5.0 (summary.json installedVersion). The 1.4.0 catch-up adopted the same pin rule. Step CU-01.",
-          "verification": "CU-01: npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.5.0 -> package.json devDependency and package-lock.json both 1.5.0 (commit d09de12)",
-          "version": "1.5.0"
+          "rationale": "package.json pins @earendil-works/pi-coding-agent 1.5.0 for type checks and tests (local node_modules reads 1.5.0), while the host runs the 1.5.2 release (~/.pi/agent/install/releases/1.5.2). Earlier catch-ups adopted the same pin rule (d09de120, 29288787). Step CU-01.",
+          "verification": "CU-01: npm install --save-dev --save-exact @earendil-works/pi-coding-agent@1.5.2 passed; installed package version prints 1.5.2; lockfile changes only Pi packages and its Mermaid dependency replacement.",
+          "version": "1.5.2"
         },
         {
-          "title": "Image resizing now picks the smaller of PNG and JPEG: keep generate_image output PNG",
+          "title": "cacheWarming now defaults to idle: re-arm ce-workflow's cold-cache compaction around warms",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "1.5.0 'Fixed resized photos being sent as multi-megabyte PNGs': resizeImage now tries the smaller encoding first (dist/utils/image-resize-core.js `const preferred`); 1.4.0 always took PNG first when no byte budget applied. extensions/work-images.ts fitImage scales every sized generate_image result (Codex draws about 1448x1086 for 800x600) with maxBytes MAX_SAFE_INTEGER, and execute() names the file by the returned mimeType, so a requested out.png can now be saved as out.jpg, and pngSize() then skips the size check. shrinkImage (process_image input) benefits from smaller JPEGs and stays as is. Step CU-02.",
-          "verification": "CU-02: node scripts/test-work-compaction-notifications.mjs -> ok; a JPEG resize with a stub converter returns image/png at 800x600, jpegQuality 100 is passed, and a failed conversion keeps the original",
-          "version": "1.5.0"
+          "rationale": "Idle warming re-sends the prompt with a one-token output cap for up to 30 minutes between runs when Pi expects it to save money (pi-ai dist/cache-warming.js evaluateCacheWarming: 0.15 x missCost - warmCost >= $0.05). coldCacheCompactMinutes (work-models.ts) counts cache_warm usage entries as fresh, so after a warm the idle-compaction timer and the hub's compact-before-park (sessions.ts compactBeforePark) skip compaction and the next message waits for it. Rare today (about 345k prompt tokens on Opus 5.5, 270k on GPT-6.1 Sol, 86k on Fable 5.2), but the user chose to keep warming and re-arm compaction (Q-01), and to make the cold-cache threshold one setting at 70% of the auto-compact point. Steps CU-03 to CU-05.",
+          "verification": "CU-03: node scripts/test-work-compaction-notifications.mjs passed (four mode thresholds, project override, clamping, command/status and turn_end). test_sensitivity caught default 70→60 at the 65% assertion, baseline/restored green. CU-04: same test passed, including immediate/20s-delayed final warms and input/turn cancellation; red before fix at idle-warm handler assertion. CU-05: node scripts/test-work-compaction-notifications.mjs and (in hub) node --test scripts/test-sessions.mjs passed; park ignores only idle warms, protects recent real requests/long TTL, and hub sends the exact park command. Red before fix at recent-real-request guard.",
+          "version": "1.5.2"
         },
         {
-          "title": "Tool argument validation moved to pi-schema (breaking change)",
+          "title": "Anthropic message threads",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Pi now validates tool arguments as plain JSON Schema and coerces loosely typed values for every tool, and drops a null in an optional property whose schema rejects null (pi-schema dist/coerce.js). rg finds no Type.Refine, BigInt, Undefined, Codec or Format.Set in extensions, scripts or hub/src, and no test asserts TypeBox error wording. extensions/ask-user imports @sinclair/typebox, which the 1.5.0 loader still maps (core/extensions/loader.js). Required nullable fields use type unions that accept null; jev_triage state has an empty schema, so coercion passes it through.",
-          "version": "1.5.0"
+          "rationale": "Requests on api.anthropic.com send only new messages and continue a server-side thread; any changed prefix (compaction, tool list) sends the full request, and thread_not_found and similar rejections retry once as a new thread (pi-ai dist/api/anthropic-messages.js sendThreadRequest). Recent sessions show 6 thread_not_found fallbacks, each recovered. Claude pool account switches land in the same fallback. hub/src/cache-miss.ts reads usage fields only; usage reported under threads was not separately verified.",
+          "version": "1.5.2"
         },
         {
-          "title": "Extension update changelogs shown by Pi after a package update",
+          "title": "Missing session cwd: Continue, Fork or Cancel",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Pi reads CHANGELOG.md from an extension package and shows entries newer than the last seen version on the next fresh TUI launch (docs/packages.md 'Show a changelog'). Its parser (dist/utils/changelog.js) matches our `## x.y.z — date` headings and skips `## Unreleased`; every push bumps package.json version, so ce-workflow notes appear once per update. Hub sessions run in RPC mode, where the interactive notice does not show, and the hub keeps its own changelog. Default kept.",
-          "version": "1.5.0"
+          "rationale": "The prompt is interactive only (interactive-mode.js promptForMissingSessionCwd; main.js shows it only through the startup selector). ce-workflow calls no ctx.switchSession, and hub sessions run in RPC mode, whose path is unchanged.",
+          "version": "1.5.2"
         },
         {
-          "title": "ctx.ui.custom() `blocked` option for inline dialogs",
+          "title": "ctx.ui.custom() overlays now honor blocked",
           "pov": "Reject",
           "status": "no-action",
-          "rationale": "The option only makes Pi report OSC 7501 program status `blocked` (Rex, iTerm2; docs/terminal-setup.md 'Program status'). The vendored ask-user defaults to overlays, which ignore it; inline list menus in extensions/ask-user/menu.ts could pass it, but this setup is Windows plus the hub, which tracks open questions itself.",
-          "version": "1.5.0"
+          "rationale": "The 1.5.0 review rejected this because overlays ignored the option; 1.5.1 removes that reason. The option only reports OSC 7501 program status blocked (docs/terminal-setup.md Program status) for Rex or iTerm2. This setup is Windows Terminal plus the hub, which tracks open questions itself.",
+          "version": "1.5.2"
         },
         {
-          "title": "pi.exec, setActiveTools order, tool_search ranking, Windows path case and session-write fixes",
+          "title": "grep, find, read and edit tool fixes; GrepOperations.readFile deprecated",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "Host fixes that help without code changes: pi.exec output cap and SIGKILL after timeout (plan3.ts and browser-fetch.ts call pi.exec for short commands), no redundant system prompt update when the exposure manager re-sets the same tools in another order, better tool_search and searchTools ranking for tools_enable and codemode, case-insensitive Windows path comparison in Pi, and no lost history after a failed session write.",
-          "version": "1.5.0"
+          "rationale": "rg finds no GrepOperations, ReadOperations, createGrepTool or createReadTool in extensions or hub/src, so the breaking grep change and the streaming read change reach nothing here; the Windows find and line-ending fixes help without code.",
+          "version": "1.5.2"
         },
         {
-          "title": "selfUpdateCommand, keyHint/keyText injection, MarkdownTransformContext ids, responseModel",
+          "title": "pi auth login/logout from the shell",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "rg finds no use of keyHint, keyText, markdown transforms or responseModel in extensions or hub/src. The hub's Update all runs pi update --all on the pi.dev installer, which needs no custom update command.",
-          "version": "1.5.0"
+          "rationale": "The hub's Re-login runs cpool login (hub/src/pool.ts), not Pi's /login.",
+          "version": "1.5.2"
         },
         {
-          "title": "Usage.cost.totalFromProvider: keep summed compaction usage correct",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "1.5.0 adds the boolean Usage.cost.totalFromProvider, true when the total is the provider's billed amount; combined usage counts as provider-reported only when every part is. Two loops add every cost field as a number: extensions/work-models.ts (chunked native summary, around line 1694) and extensions/work-compaction-memory.ts (hybrid memory attempts, around line 251). A true flag becomes 1, and mixed parts stay truthy. Sum only numeric fields and AND the flag. Step CU-04 (found by the plan review).",
-          "verification": "CU-04: node scripts/test-work-compaction.mjs -> ok (all-true, mixed and absent addCost cases); node scripts/test-work-compaction-notifications.mjs -> ok (chunked usage keeps the flag true)",
-          "version": "1.5.0"
-        },
-        {
-          "title": "Model catalog v2: image-only models are no longer chat models",
+          "title": "Markdown transformer surfaces, Mermaid, classifiers, new models and default models, compat flags, RPC shutdown and reload fixes, pi update summaries",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "generateImages() in extensions/work-images.ts finds image models with registry.findOfType('image', ...) and only draws with chat models of api openai-codex-responses, so removing image-only models from the chat list changes nothing here.",
-          "version": "1.5.0"
+          "rationale": "rg finds no registerMarkdownTransformer in ce-workflow; jev tools pick their own classifier; plan3.ts calls ctx.shutdown only in terminal sessions; the hub never reloads over RPC (it parks and resumes); hub/src/cli.ts runs pi update with inherited stdio and parses nothing. reviewExtensionFinalist still names claude-opus-5 on purpose; the new anthropic default does not change it.",
+          "version": "1.5.2"
         }
       ]
     },
@@ -108,45 +100,30 @@
     },
     {
       "name": "pi-subagents",
-      "version": "0.86.0",
-      "reviewedAt": "2026-11-06T10:34:49.123Z",
-      "reviewedVersion": "0.86.0",
+      "version": "0.88.0",
+      "reviewedAt": "2026-11-11T21:17:10.051Z",
+      "reviewedVersion": "0.88.0",
       "decisions": [
         {
-          "title": "Session switches with background work now ask stay, take or leave: report a cancelled Plan3 handoff",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "0.85.0 adds a session_before_switch guard (src/extension/session-switch.js): with queued or running runs, undelivered results or open supervisor questions it asks via ctx.ui.select, and in RPC mode a 60 s timeout cancels the switch. The hub's new_session path already reports `Pi kept the current session.` (hub/src/sessions.ts). Plan3 startFresh (extensions/plan3.ts) ignores ctx.newSession's `{ cancelled }` result, so a refused or timed-out switch leaves the user with no message after the handoff. Step CU-03.",
-          "verification": "CU-03: node scripts/test-work-plan3.mjs -> Plan3 command self-checks passed; a cancelled newSession shows \"Pi kept this session; the plan is ready · /resume3 <id>\"",
-          "version": "0.86.0"
-        },
-        {
-          "title": "Workflow children go through a nested subagent_launch tool call",
+          "title": "provider/id models run only on that provider (0.87.0)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.85.0 runs a deferred, model-hidden subagent_launch tool before each workflow child so tool_call handlers can block it (src/extension/subagent-launch-tool.js). Every ce-workflow tool_call handler filters on its own tool names (bash, read, intercom, ask_user, subagent), so none blocks it. Changing event.input does not reach the child, because pi-subagents launches from its own args object, so advisor-model.ts cannot pin the oracle model there and keeps its prompt guideline for workflow scripts.",
-          "version": "0.86.0"
+          "rationale": "spawnSubagentRpc (work-models.ts) retries the knowledge discoverer on the inherited model when a configured model fails to launch; advisor models come from /wo Plan models, which lists signed-in providers.",
+          "version": "0.88.0"
         },
         {
-          "title": "Subagent tools restored after compaction once pi-subagents was reloaded",
+          "title": "Truncated final replies now fail (0.88.0)",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.86.0 fix (#3198). Idle sessions in the hub reload onto updated extensions by themselves, so this upstream fix removes a case where subagent and subagents_enable disappeared after a later compaction; nothing to change here.",
-          "version": "0.86.0"
+          "rationale": "The only ce-workflow child that parses output, context-knowledge-discoverer, returns structured_output against KNOWLEDGE_DISCOVERER_SCHEMA, which upstream still counts as success.",
+          "version": "0.88.0"
         },
         {
-          "title": "structured_output checked strictly against outputSchema",
+          "title": "Fork copy cleanup, supervisor waits outside timeoutMs, progress in widget and status, list cap and search, stop drain, defaultInheritGlobalContext, Windows and Electron fixes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "0.85.0 validates the model's raw structured_output before Pi coercion. The context-knowledge-discoverer schema (KNOWLEDGE_DISCOVERER_SCHEMA in work-models.ts) uses plain strings, enums and string arrays; a wrong type now fails validation and the child calls again, which is correct.",
-          "version": "0.86.0"
-        },
-        {
-          "title": "Resume hardening, waitTool.name, requireLauncher, workflow script sandbox, Herdr and Rex placement fixes",
-          "pov": "Not-our-problem",
-          "status": "no-action",
-          "rationale": "ce-workflow registers no bg_wait, sets no launcher or placement, and starts its subagents through spawnSubagentRpc or the subagent tool. Runs started before 0.85.0 cannot be resumed, which only affects runs that were already interrupted.",
-          "version": "0.86.0"
+          "rationale": "ce-workflow manages no fork copies, sets no run timeoutMs, does not call list, and ships its utility agents with explicit inheritProjectContext. defaultInheritGlobalContext is a user setting in ~/.pi/agent/settings.json, not package code. The installed copy already reads 0.88.0.",
+          "version": "0.88.0"
         }
       ]
     },
@@ -220,16 +197,16 @@
     },
     {
       "name": "pi-lens",
-      "version": "4.4.9",
-      "reviewedAt": "2026-11-06T10:34:49.123Z",
-      "reviewedVersion": "4.4.9",
+      "version": "4.4.12",
+      "reviewedAt": "2026-11-11T21:17:10.051Z",
+      "reviewedVersion": "4.4.12",
       "decisions": [
         {
-          "title": "4.4.9 tool output and guard changes",
+          "title": "4.4.10 to 4.4.12 tool, guard, runner and config changes",
           "pov": "Not-our-problem",
           "status": "no-action",
-          "rationale": "4.4.9 changes lsp_navigation's default output to text, rejects unknown severity and read_symbol kind values, routes partial edit applies through Pi's edit tool, and repeats unresolved blockers at the next prompt. ce-workflow calls none of these tools from code: work-compaction.ts and work-models.ts only list the names read_symbol, read_enclosing, module_report and lens_diagnostics, and these names are unchanged. The only ce-workflow write guard (extensions/plan3.ts, around line 1900) handles the write tool for new Plan3 files; the upstream change concerns partial edit batches, and no ce-workflow handler guards edit, so it has nothing to reach.",
-          "version": "4.4.9"
+          "rationale": "ce-workflow calls no pi-lens tool from code and only lists the unchanged names read_symbol, read_enclosing, module_report and lens_diagnostics. The MCP-only path argument change, the complexity-vs-main edit line, glob and lang filters and the .pi-lens.json upward layering need nothing here; work-lens-format.ts writes only the global ~/.pi-lens/config.json format.enabled key, which layering does not touch.",
+          "version": "4.4.12"
         }
       ]
     },
@@ -356,33 +333,24 @@
         "packages/core/src/Selector/",
         "packages/themes/neutral/"
       ],
-      "version": "fd5cf0df987791117e96ccc0bec603c64be8b136",
-      "reviewedAt": "2026-11-11T00:00:00.000Z",
-      "reviewedVersion": "fd5cf0df987791117e96ccc0bec603c64be8b136",
+      "version": "b8335ba861a8207a7b22bba1f0748d400d022a65",
+      "reviewedAt": "2026-11-11T21:17:10.051Z",
+      "reviewedVersion": "b8335ba861a8207a7b22bba1f0748d400d022a65",
       "decisions": [
         {
-          "title": "Public palette and read-only discovery APIs",
+          "title": "Watched packages/cli/api-report.md was deleted upstream",
           "pov": "Adopt",
           "status": "adopted",
-          "rationale": "Published 0.7.12 APIs drive standalone themes and bounded lookups; local mapping and host worker are ours. The source review SHA is not the npm runtime pin. See docs/upstream/astryx.md.",
-          "verification": "P3-08/P3-09: design-tool and tool-loader tests, real cached API probes, theme/lookup results under docs/proposals/astryx-study.",
-          "version": "fd5cf0df987791117e96ccc0bec603c64be8b136"
+          "rationale": "b8335ba deletes packages/cli/api-report.md and the api:report scripts. The baseline still watches that path and the ledger cites it as part of the palette contract; packages/cli/api/index.mjs stays watched for exports. Drop the path and advance the ledger review commit. Step CU-02.",
+          "verification": "CU-02: node scripts/test-work-plan3.mjs passed; rg -n api-report extensions docs/upstream returned no matches (exit 1); both ledgers record full reviewed SHAs, runtime stays 0.7.12.",
+          "version": "b8335ba861a8207a7b22bba1f0748d400d022a65"
         },
         {
-          "title": "Optional prebuilt component authoring and editable handoff",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Consume reviewed prebuilt core/theme APIs, not upstream project loaders or arbitrary templates. Preserve JSX, fixed recipe, full notices and matching local outputs. See docs/upstream/astryx.md.",
-          "verification": "P3-10/P3-11/P3-12: C1-C4/C8 pass; real cached component, deterministic build, touch/state and isolated offline export roundtrip evidence in app-results.md.",
-          "version": "fd5cf0df987791117e96ccc0bec603c64be8b136"
-        },
-        {
-          "title": "Browser-floor and licensing compatibility watch",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Track used layered-surface contracts, browser-support warnings, package changes and MIT notices. This is not a Safari/hardware certification or automatic dependency upgrade.",
-          "verification": "Pinned runtime full-notice/integrity checks and browser compatibility probes; outstanding real Safari/hardware gates remain explicit in plan55b392b8.",
-          "version": "fd5cf0df987791117e96ccc0bec603c64be8b136"
+          "title": "Runtime 0.7.12 to 0.7.14: Core 0.7.13 fixes and CLI lookup changes",
+          "pov": "Reject",
+          "status": "no-action",
+          "rationale": "Manifests move to 0.7.14. Core 0.7.13 drops data: URLs in Markdown, shares the layer runtime with swizzled copies, keeps light-dismiss Popovers open during an outside touch pan, and renders disabled submit Buttons as type=button while hydrating. Search ignores keywords that name another entry, component reads add an example-block pointer to errors, and theme.list adds meta.skippedThemes. In the watched Selector and theme paths, the Selector list now writes its entrance side itself after the overlay margin moves it (hooks.ts, usePopoverInternal writesEntranceSide), and the theme and icon registries are shared by every Core copy on one React (themeRegistry.ts sharedForReact); our foundation builds one Core copy per design, so neither changes a contract we rely on. None fixes a failure in our pinned 0.7.12 runtime. Per the ledger, a runtime bump is a separate pin, integrity and browser review.",
+          "version": "b8335ba861a8207a7b22bba1f0748d400d022a65"
         }
       ]
     },
@@ -400,57 +368,16 @@
         "apps/web/src/comments.ts",
         "apps/web/src/runtime/exports.ts"
       ],
-      "version": "07a86b1041531bfa0bec1006d9c0993985fee560",
-      "reviewedAt": "2026-11-09T12:00:00.000Z",
-      "reviewedVersion": "07a86b1041531bfa0bec1006d9c0993985fee560",
+      "version": "614795896e09a2c1682b24cc1406529baf531bd7",
+      "reviewedAt": "2026-11-11T21:17:10.051Z",
+      "reviewedVersion": "614795896e09a2c1682b24cc1406529baf531bd7",
       "decisions": [
         {
-          "title": "craft rules: compact design guide",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "extensions/design-guide.md (anti-slop, color, type, states, accessibility, motion); see docs/upstream/open-design.md",
-          "verification": "plan a5cf234d S03; node scripts/test-work-design.mjs",
-          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
-        },
-        {
-          "title": "viewport matrix: device presets",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "PRESETS in extensions/design-render.ts and DEVICES in hub/web/design-view.ts; see docs/upstream/open-design.md",
-          "verification": "plan a5cf234d S07/S08; test-work-design and hub test-browser",
-          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
-        },
-        {
-          "title": "deck framework",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "Deck section of extensions/design-guide.md and the hub preview deck controls; see docs/upstream/open-design.md",
-          "verification": "plan a5cf234d S14; hub test-browser deck fixture",
-          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
-        },
-        {
-          "title": "brand-extract: measured site style",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "captureSite STYLE_SCRIPT in extensions/design-render.ts; see docs/upstream/open-design.md",
-          "verification": "plan a5cf234d S07; test-work-design reference case",
-          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
-        },
-        {
-          "title": "handoff checklist",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "handoff() in extensions/design.ts writes HANDOFF.md at select; see docs/upstream/open-design.md",
-          "verification": "plan a5cf234d S16; test-work-design",
-          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
-        },
-        {
-          "title": "comment bridge idea: element picks and pins",
-          "pov": "Adopt",
-          "status": "adopted",
-          "rationale": "hub/src/design-bridge.ts plus hub/web/design-view.ts; see docs/upstream/open-design.md",
-          "verification": "plan a5cf234d S10/S11; hub test-browser",
-          "version": "07a86b1041531bfa0bec1006d9c0993985fee560"
+          "title": "No changes in the review paths",
+          "pov": "Not-our-problem",
+          "status": "no-action",
+          "rationale": "The scoped git diff 07a86b1..6147958 over the ledger's review paths is empty: no craft rule, skill, template, prompt, comment bridge or export changed. The ledger's review commit advances in CU-02.",
+          "version": "614795896e09a2c1682b24cc1406529baf531bd7"
         }
       ]
     }

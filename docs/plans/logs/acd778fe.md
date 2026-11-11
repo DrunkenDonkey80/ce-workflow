@@ -57,3 +57,16 @@ Planning and review done; status draft, awaiting /plan3 finish. Review accepted 
 ## 2026-11-11T21:08:17.559Z Superseded resume context
 
 Planning and two reviews done; status draft, awaiting /plan3 finish. Second review accepted both findings: Native mode's cold threshold uses Pi's own trigger (D-05, CU-03), and the Astryx Selector and theme-registry changes are recorded in the runtime rejection. Next: CU-01. No blockers.
+
+## 2026-11-11T21:18:38.202Z CU-91 done: Recorded all five exact review targets and verified the updated Astryx baseline with Plan3 self-checks.
+
+- [x] **CU-91** Record the reviewed versions: `node scripts/work-catch-up-record.mjs acd778fe`.
+  - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json`.
+  - It refuses missing, unexplained or unverified decisions.
+  - Before it runs, fill the verification field of every adopted decision from its step's check.
+  - Check after recording: `node scripts/test-work-plan3.mjs` passes, so the Astryx ledger contains the newly recorded b8335ba.
+  - check: node scripts/work-catch-up-record.mjs acd778fe -> recorded Pi 1.5.2, pi-subagents 0.88.0, pi-lens 4.4.12, meta/astryx b8335ba861a8207a7b22bba1f0748d400d022a65 and open-design 614795896e09a2c1682b24cc1406529baf531bd7; node scripts/test-work-plan3.mjs -> passed; git diff --check -> passed.
+
+## 2026-11-11T21:18:49.430Z Superseded resume context
+
+CU-01 through CU-05 implemented and locally committed with targeted checks; CU-90 current. Next run npm run verify:quiet once, diagnose any failures and rerun affected checks; then CU-91 recorder and final targeted Plan3 checks before completion. No blockers. LSP probes have silent-server inconclusive coverage and pre-existing fake-pi JSON.parse advisories, not a clean certificate. No live provider warming/budget test or benchmark performed (D-07); deterministic normal/slow-warm and park tests passed. Preserve pre-existing unrelated dirty/untracked files; README's unrelated video-review paragraph remains unstaged.

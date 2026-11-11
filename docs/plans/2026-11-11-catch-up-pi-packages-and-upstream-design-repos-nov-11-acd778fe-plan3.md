@@ -1,10 +1,10 @@
 ---
 plan3: true
-status: active
+status: blocked
 created: 2026-11-11
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.2","pi-subagents":"0.88.0","pi-lens":"4.4.12","meta/astryx":"b8335ba861a8207a7b22bba1f0748d400d022a65","nexu-io/open-design":"614795896e09a2c1682b24cc1406529baf531bd7"}
-updated: 2026-11-11T21:08:17.472Z
+updated: 2026-11-11T21:18:49.429Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:55:15.681Z
 ---
@@ -221,12 +221,11 @@ None.
 
 ### Phase 2: Verify and record [code]
 
-- [wip] **CU-90** Run `npm run verify:quiet` after the adopted changes and record the result.
-- [ ] **CU-91** Record the reviewed versions: `node scripts/work-catch-up-record.mjs acd778fe`.
-  - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json`.
-  - It refuses missing, unexplained or unverified decisions.
-  - Before it runs, fill the verification field of every adopted decision from its step's check.
-  - Check after recording: `node scripts/test-work-plan3.mjs` passes, so the Astryx ledger contains the newly recorded b8335ba.
+- [blocked] **CU-90** Run `npm run verify:quiet` after the adopted changes and record the result.
+  - note: Full command ran once and exited 1: test-work-wo-control.mjs rejects design; hub tests 33/35 passed with app-install ECONNRESET and phone push-menu failure. Isolated app-install passed; browser now fails expected mobile-chat vs new mobile-library while Design session is changing UI. Own compaction and sessions checks passed; no unrelated changes touched.
+  - check: npm run verify:quiet -> exit 1 (test-work-wo-control design assertion; hub 33 pass/2 fail). cd hub && node --test scripts/test-app-install.mjs -> pass. cd hub && node --test scripts/test-browser.mjs -> fail mobile-library vs mobile-chat at line 215. Design session notified.
+  - note: Cannot certify full-suite acceptance while the concurrent approved Design work changes command/browser expectations. Design acknowledged /wo design is intentional and will migrate its tests; asked no overlapping browser runs. Preserve failure evidence; do not rerun browser/full suite during that work.
+- [x] **CU-91** Recorded all five exact review targets and verified the updated Astryx baseline with Plan3 self-checks.
 
 ## Acceptance
 
@@ -240,7 +239,7 @@ None.
 
 ## Resume context
 
-CU-01 through CU-05 implemented and locally committed with targeted checks; CU-90 current. Next run npm run verify:quiet once, diagnose any failures and rerun affected checks; then CU-91 recorder and final targeted Plan3 checks before completion. No blockers. LSP probes have silent-server inconclusive coverage and pre-existing fake-pi JSON.parse advisories, not a clean certificate. No live provider warming/budget test or benchmark performed (D-07); deterministic normal/slow-warm and park tests passed. Preserve pre-existing unrelated dirty/untracked files; README's unrelated video-review paragraph remains unstaged.
+CU-01–CU-05 and CU-91 done; CU-90 blocked, not green. npm run verify:quiet ran once and failed test-work-wo-control's forbidden-design assertion plus hub tests (33/35 passed; app-install ECONNRESET, phone push-menu assertion). Isolated app-install passed; isolated browser then failed mobile-chat vs new mobile-library. Concurrent Design session confirmed it is intentionally restoring /wo design and changing the library UI/tests, and requested no overlapping browser suites. No more full/browser runs until that work stabilizes; then re-run affected checks and seek approval for a second full suite if needed to certify acceptance. Catch-up recorder wrote exact five targets; node scripts/test-work-plan3.mjs passed. Own compaction/sessions regressions passed, threshold mutation caught. No live provider warming/benchmark or clean LSP certificate; silent-server coverage remains inconclusive with existing fake-pi JSON.parse advisories. Preserve unrelated dirty/untracked changes and commit only this baseline/plan/log; never push.
 
 ## Amendments
 
