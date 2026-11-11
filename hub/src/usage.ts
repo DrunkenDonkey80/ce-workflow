@@ -265,7 +265,10 @@ function upcomingNightMs(from, to) {
 // within 3 days (yellow).
 function poolWindows(store, accounts, entries, used, t) {
 	const text = (id, value, color = undefined) => ({ id, label: id, usedPercent: 0, text: value, color });
-	const week = entries.map((e) => used(e.seven_day)).filter((w) => w.pct !== undefined);
+	// "−−" (last resort, priority -2) accounts are not meant to be used, so they do not count toward the gauge.
+	const lastResort = new Set(accounts.filter((a) => a.priority === -2).map((a) => a.label));
+	const counted = entries.filter((e) => !lastResort.has(e.label));
+	const week = (counted.length ? counted : entries).map((e) => used(e.seven_day)).filter((w) => w.pct !== undefined);
 	if (!week.length) throw new QuotaError("unavailable");
 	const usedAvg = week.reduce((sum, w) => sum + w.pct, 0) / week.length;
 	const dead = accounts.filter((a) => a.dead).length;
