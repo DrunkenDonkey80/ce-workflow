@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-10
-updated: 2026-11-10T23:45:55.196Z
+updated: 2026-11-11T00:10:40.310Z
 reviewed: 2026-11-10
 started: 2026-11-10T20:34:40.770Z
 ---
@@ -154,17 +154,15 @@ Run only checks relevant to touched code after each change. Commands execute fro
 - [x] **P3-04** Pins paint above native modal/popover layers, follow layout/scroll and hide stale controls; modal inline edits and real-pointer isolation pass screenshot regressions.
 - [x] **P3-05** Headless captures use a shared five-second readiness watchdog, observed mouse/touch/motion reports and size-only live-preview labels.
 - [x] **P3-06** Mark replays bounded, acknowledged HTML/React drafts and live styles; stale/unsupported/failed captures cannot annotate a fresh or wrong preview.
-- [wip] **P3-07** Add actual-sandbox interaction checks and a touch-safe app starter contract.
-  - Fold the proven parent acceptance patterns into existing tests: Save, validation, focus trap/return, Escape, state retry, comments, modal pins, no external assets and settled images. Do not rely on file:// selfchecks for sandbox claims.
-  - Extend design-guide.md's phone-only target rule to coarse-pointer tablets and test fixtures accordingly; the component starter is created later in P3-10. Preserve desktop density and test native form/date behavior where automation can observe it. Checks C1–C4, C9.
-  - note: P3-06 verified; preserve its opt-in capture contract and refresh-current-API regression. Begin actual sandbox mouse/touch/keyboard/focus/reduced-motion/short-dialog checks; use the reviewed study runtime already installed, do not download or run paid arms here.
+- [x] **P3-07** Added shared real-sandbox mouse/touch/keyboard/form/date/retry checks and coarse-tablet guidance, preserving desktop density and existing Mark/pin behavior.
 
 ### Phase 3: Provision pinned tooling and borrow theme/discovery features [code]
 
-- [ ] **P3-18** Provision the pinned runtime and docs cache before theme generation, discovery and starter creation.
+- [wip] **P3-18** Provision the pinned runtime and docs cache before theme generation, discovery and starter creation.
   - Delivery is approved by Q-01/D14; depends on the P3-02 manifest/trust contract, not a further delivery decision. On first Astryx-backed use with a missing cache, obtain consent through existing ask_user, then download the pinned dependencies on the host with visible progress. Ordinary HTML/deck use must not trigger provisioning. Proposed cache: <Pi agent directory>/cache/design-runtimes/astryx/<lock-digest>, outside projects and .pi/designs. Resolve the full transitive dependency graph with integrity hashes, not caret ranges at first use.
   - Install only that reviewed manifest/lock with lifecycle scripts disabled; verify required native build binary is usable without silently enabling install scripts. Stage, integrity-check and atomically publish the cache under a provisioning lock; report cancellation, corruption, offline miss and errors through existing UI.
   - Record cold download bytes/time and package footprint. Test cold-cache consent, refusal/cancellation without partial activation, offline cache miss, and warm offline reuse without registry calls or another install prompt. A cold offline miss leaves existing HTML features available. No arbitrary user/model-supplied package names or root-project manifest changes. Verify delivery assets and notices in the npm pack dry-run, plus C1, C7, C9.
+  - note: P7 complete, continuing immediately. Read approved manifest/trust and cache contract from P3-02 evidence before implementation. No new downloads without first-use consent; ordinary HTML/decks stay independent.
 
 - [ ] **P3-08** Add standalone theme generation, contrast evidence and existing Tweaks integration.
   - After P3-18, emit named accent/neutral ramps, semantic type/radius scales and light/dark CSS from the supported mechanism. Borrow helpers from the version-matching published package/revision where possible; if using audited 0.7.13 main with 0.7.12 runtime, record exact helper SHA and compatibility tests in the ledger. Preserve full attribution and upstream tests; test alpha compositing and contrast thresholds.
@@ -236,7 +234,7 @@ Excluded from this implementation scope unless a concrete later requirement earn
 
 ## Resume context
 
-P3-01–06 done (6/18), P3-07 WIP. P6 code/tests/guide verified, awaiting own-only local commit now (HEAD 90c813d0). Final C1 59.3s PASS, C2/C3/C5/C7 PASS, final full C4 159.8s PASS (hub-ui-10576 closed), git diff --check PASS; C9 no new primary errors but push-only clean unconfirmed. Actual React product probe first red: cached pre-commit api.capture closure gave mismatched acknowledgement; minimal fix re-reads window.designPreview.capture after restore, proved green on real HTML+React product modal screenshots, C1 dependency-free replacement regression retained. Bridge similarly resolves designReady before reading the API; C4 handshake proves deferred readiness. Reviewed dependencies found at C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/trial/node_modules (React/DOM19.3.1 esbuild0.28.2 Playwright1.65.0 Astryx0.7.12); Chrome C:/Users/Flex/AppData/Local/ms-playwright/chromium-1243/chrome-win64/chrome.exe. Existing state-contract.mjs expanded to real renderer, no payload logging, no downloads. Stage full P6-only files and only Mark/S13 hunks in mixed hub/web/app.ts and hub/scripts/test-browser.mjs; leave unrelated cache-miss edits unstaged. Include this plan/log; consider only owned stats. Next after local commit: read P3-07 and existing interaction probes before edit. No push, no paid invocations; $37.3623658 benchmark budget untouched; P3-16 Safari/touch hardware remains blocked.
+P3-01–07 done (7/18); P3-18 WIP. P7 final C1/C2/C3/C4 and sandbox probe twice PASS; C9 1 clean/4 unconfirmed. P7 changes uncommitted; own hub/scripts/test-browser.mjs hunk is only P3-07 tail (cache-warning hunk belongs to other session); other owned files: design-guide.md, test-work-design.mjs, input-contract.mjs, new design-interactions.html and interaction-contract-results.md, plan/log. No browser retained; oracle done, advice validated, generated fork deleted. Next read P3-02 sidecar manifest/lock/cache evidence + extension tool/settings context, implement P18 pinned trusted atomic cache provisioning with consent/cancel/offline/warm tests. Existing reviewed deps at Temp/pi-research-62ygWq/trial/node_modules, no install/download authorization inferred. $37.3623658 budget remains; no paid work here. Safari/hardware blocked P16 only; do not stop runnable work.
 
 ## Amendments
 

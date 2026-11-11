@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Interaction fixture</title>
+<style>
+body{margin:0;font:16px system-ui}button,input{box-sizing:border-box;min-width:28px;min-height:28px}h1{font-size:20px}
+dialog{width:min(420px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:0}form{display:grid;grid-template-rows:auto minmax(0,1fr) auto;max-height:inherit;margin:0}h2{margin:0;padding:12px;font-size:18px}.fields{overflow:auto;padding:12px}label{display:grid;margin-bottom:8px}footer{display:flex;gap:8px;padding:12px;background:white}.details{height:300px}.status{transition:opacity .2s}
+@media(pointer:coarse){button,input{min-width:44px;min-height:44px}}
+@media(prefers-reduced-motion:reduce){.status{transition:none}}
+</style>
+<h1>Interaction fixture</h1><button id="open" data-id="open">Edit project</button><output id="saved">Saved</output>
+<dialog id="panel" aria-labelledby="title"><form id="form"><h2 id="title">Project editor</h2><div class="fields">
+<label>Project name<input id="projectName" data-id="project-name" required value="Saved" autofocus></label>
+<label>Due date<input id="due" data-id="due-date" type="date" min="2020-01-01" max="2030-12-31" required value="2026-11-10"></label>
+<p id="status" class="status" role="status"></p><div class="details">Scrollable project details</div></div>
+<footer><button id="save" data-id="save">Save project</button><button id="retry" data-id="retry" type="button" hidden>Retry save</button><button id="cancel" data-id="cancel" type="button">Cancel project</button></footer></form></dialog>
+<script>
+const byId=id=>document.getElementById(id),panel=byId('panel'),form=byId('form'),name=byId('projectName'),due=byId('due'),status=byId('status'),save=byId('save'),retry=byId('retry');let stored='Saved',failed=false,pointer='',trusted=false;
+byId('open').onclick=()=>{name.value=stored;name.setCustomValidity('');name.removeAttribute('aria-invalid');status.textContent='';failed=false;save.hidden=false;retry.hidden=true;panel.showModal();};
+name.oninput=()=>{name.setCustomValidity(name.value.trim()?'':'Enter a project name.');name.setAttribute('aria-invalid',String(!name.validity.valid));};
+form.addEventListener('invalid',()=>{status.textContent='Check the project fields.';},true);
+form.onsubmit=event=>{event.preventDefault();if(!failed){failed=true;status.textContent='Save failed: offline. Your draft is kept.';save.hidden=true;retry.hidden=false;retry.focus();return;}stored=name.value;byId('saved').textContent='Saved '+stored;panel.close();};
+retry.onclick=()=>form.requestSubmit();byId('cancel').onclick=()=>panel.close();panel.addEventListener('close',()=>byId('open').focus());
+panel.addEventListener('keydown',event=>{if(event.key!=='Tab')return;const items=[...panel.querySelectorAll('input,button')].filter(el=>!el.disabled&&!el.hidden),index=items.indexOf(document.activeElement);event.preventDefault();items[(index+(event.shiftKey?-1:1)+items.length)%items.length].focus();});
+addEventListener('pointerdown',event=>{pointer=event.pointerType;trusted=event.isTrusted;});
+addEventListener('message',async event=>{if(event.source!==parent||event.data?.type!=='fixture:stats')return;const message=event.data;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));if(typeof message.date==='string')due.value=message.date;const rect=id=>{const r=byId(id).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};};parent.postMessage({type:'fixture:result',request:message.request,width:innerWidth,height:innerHeight,coarse:matchMedia('(pointer:coarse)').matches,touch:navigator.maxTouchPoints,reducedMotion:matchMedia('(prefers-reduced-motion:reduce)').matches,transition:getComputedStyle(status).transitionDuration,pointer,trusted,open:panel.open,focused:document.hasFocus(),inside:panel.contains(document.activeElement),active:document.activeElement.id,name:name.value,nameValid:name.validity.valid,date:due.value,dateValid:due.validity.valid,dateISO:due.valueAsDate?.toISOString().slice(0,10)??null,status:status.textContent,saved:byId('saved').textContent,retry:!retry.hidden,scrollable:panel.querySelector('.fields').scrollHeight>panel.querySelector('.fields').clientHeight,rects:Object.fromEntries(['open','save','retry','cancel'].map(id=>[id,rect(id)]))},'*');});
+</script>
+</html>

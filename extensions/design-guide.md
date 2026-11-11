@@ -42,7 +42,7 @@ Give every element the user is likely to point at a stable `data-id="kebab-case"
 - Every interactive element has hover, `:focus-visible`, active and disabled styles.
 - Every list, table, form or panel that shows data covers loading, empty (headline, one sentence, one action), error (what happened, why, what to do, input kept) and populated, and survives long text and missing optional fields. Show them in the screen (a state switcher marked `data-design-chrome`) or as their own screens.
 - Forms: visible labels, validation on blur, errors next to the field.
-- Touch targets at least 44 by 44 px on phone layouts; no hover-only actions there.
+- Touch targets at least 44 by 44 px on phone layouts and coarse-pointer tablets (use `@media (pointer: coarse)`); no hover-only actions there. Keep fine-pointer desktop controls compact.
 - Motion: 150 to 300 ms, ease-out, transform and opacity only, and honor `prefers-reduced-motion`.
 
 ## Accessibility

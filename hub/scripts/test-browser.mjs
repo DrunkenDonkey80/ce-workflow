@@ -1399,6 +1399,21 @@ try {
  assert.equal(await evaluate("document.getElementById('message-input').value"), '(1) index.html slide 2 @s2-title <h1> "Two": shorter\n');
  await evaluate("document.querySelector('#files .design-deck [aria-label=\"Previous slide\"]').click()");
  await browser("wait", "--fn", "document.querySelector('#files .design-slide').textContent === '1 / 2'");
+ // P3-07: native form validation, keyboard focus and retry in the real hub-served opaque frame.
+ fs.writeFileSync(join(designDir, "index.html"), fs.readFileSync(new URL("./fixtures/design-interactions.html", import.meta.url), "utf8"));
+ await replayRef('- heading "Interaction fixture"');
+ await evaluate("for(const b of document.querySelectorAll('#files .design-comment, #files .design-edit'))if(b.getAttribute('aria-pressed')==='true')b.click();const device=document.querySelector('#files .design-device');device.value='Tablet';device.dispatchEvent(new Event('change'))");
+ const formStats = () => evaluate("new Promise((resolve,reject)=>{const frame=document.querySelector('#files .files-frame'),request=crypto.randomUUID(),timer=setTimeout(()=>{removeEventListener('message',done);reject(new Error('Fixture reply timeout'));},2500);const done=event=>{if(event.source!==frame.contentWindow||event.data?.type!=='fixture:result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',done);resolve(event.data);};addEventListener('message',done);frame.contentWindow.postMessage({type:'fixture:stats',request},'*');})");
+ await browser("click", await replayRef('- button "Edit project"'));
+ for (let n=0;n<6;n++) { await browser("press",n%2?"Tab":"Shift+Tab");const state=await formStats();assert(state.focused&&state.inside,"keyboard focus stays inside the sandbox modal"); }
+ await browser("press","Escape");let formState=await formStats();assert(!formState.open&&formState.active==="open","Escape closes the modal and restores opener focus");
+ await browser("click", await replayRef('- button "Edit project"'));await browser("fill", await replayRef('- textbox "Project name"'),"");
+ await browser("click", await replayRef('- button "Save project"'));formState=await formStats();assert(formState.open&&!formState.nameValid&&formState.status.includes("Check"),"native validation blocks submission inside the actual sandbox");
+ await browser("fill", await replayRef('- textbox "Project name"'),"Project Delta");await browser("click", await replayRef('- button "Save project"'));
+ formState=await formStats();assert(formState.open&&formState.retry&&formState.name==="Project Delta","failed Save keeps the draft");
+ await browser("click", await replayRef('- button "Retry save"'));formState=await formStats();assert(!formState.open&&formState.saved==="Saved Project Delta"&&formState.active==="open","Retry saves locally and returns focus");
+ await browser("click", await replayRef('- button "Edit project"'));await browser("fill", await replayRef('- textbox "Project name"'),"Discard me");await browser("click", await replayRef('- button "Cancel project"'));
+ formState=await formStats();assert(!formState.open&&formState.saved==="Saved Project Delta"&&formState.active==="open","Cancel discards the edit and returns focus");
  console.log(`ok - hub page against the real hub and fake Pi: browser shell, session bar, semantic zoom, deterministic strokes, pan, revision-checked drag, node/edge/canvas notes and responsive resize; session=${session}`);
 } finally {
  await hub.stop(); relay.close(); relay.closeAllConnections(); await rm(root, { recursive: true, force: true, maxRetries: 5 }).catch(() => {});

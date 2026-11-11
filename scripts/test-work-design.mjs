@@ -16,6 +16,8 @@ const storePath = path.join(cwd, ".pi/designs/sessions.json");
 const stored = () => { const raw = fs.readFileSync(storePath, "utf8"); try { return JSON.parse(raw); } catch (cause) { throw new Error("sessions.json is not JSON: " + raw.slice(0, 200), { cause }); } };
 const put = (handle, files) => { for (const [file, body] of Object.entries(files)) { fs.mkdirSync(path.dirname(path.join(cwd, ".pi/designs", handle, file)), { recursive: true }); fs.writeFileSync(path.join(cwd, ".pi/designs", handle, file), body); } };
 try {
+	const guideText = fs.readFileSync(new URL("../extensions/design-guide.md", import.meta.url), "utf8");
+	assert(/Touch targets[^.]*coarse-pointer tablets/.test(guideText), "the starter contract covers coarse-pointer tablets, not phone widths alone");
 	assert.equal(designStateJson({ z: 1, a: [null, true, "ok"] }), '{"a":[null,true,"ok"],"z":1}', "canonical state comparison ignores object key order");
 	const cycle = {}; cycle.self = cycle;
 	let getterReads = 0;
@@ -194,6 +196,14 @@ try {
 		const localForm = await renderDesign({ folder: fixture, screen: "form.html", width: 360, height: 800, element: "@saved" });
 		assert.equal(localForm.report.missing, undefined, "renderer allows prevented local form handlers");
 		assert.ok(localForm.png.length, `saved content was rendered: ${reportText(localForm.report)}`);
+		fs.copyFileSync(new URL("../hub/scripts/fixtures/design-interactions.html", import.meta.url), path.join(fixture, "interaction.html"));
+		const targetHeights = [];
+		for (const input of ["mouse", "touch"]) {
+			const target = await renderDesign({ folder: fixture, screen: "interaction.html", width: 820, height: 1180, input, element: "@open", maxEdge: 4000 });
+			assert(!target.report.failed.length && !target.report.errors.length, "the standalone fixture needs no external assets");
+			targetHeights.push(target.height);
+		}
+		assert.deepEqual(targetHeights, [28, 44], "same-size coarse tablet enlarges targets; fine-pointer desktop keeps its density");
 		// P3-06: replay an explicit draft, acknowledge its committed state, then capture the open modal.
 		fs.writeFileSync(path.join(fixture, "state.html"), `<style>dialog{width:260px;height:180px;border:0;padding:0}#scroller{height:30px;overflow:auto}</style><dialog id="panel" aria-label="Draft editor"><input id="draft" value="Saved"><div id="scroller"><div style="height:500px">Details</div></div></dialog><script>window.designPreview={states:{edit:{open:true,draft:"Unsaved Delta",scroll:120}},capture:()=>({open:panel.open,draft:draft.value,scroll:scroller.scrollTop}),restore:async value=>{draft.value=value.draft;if(value.open&&!panel.open)panel.showModal();if(!value.open&&panel.open)panel.close();scroller.scrollTop=value.scroll;panel.style.background=value.draft==="Unsaved Delta"?"red":"blue";await new Promise(requestAnimationFrame);}};</script>`);
 		const draftState = { open: true, draft: "Unsaved Delta", scroll: 120 };
