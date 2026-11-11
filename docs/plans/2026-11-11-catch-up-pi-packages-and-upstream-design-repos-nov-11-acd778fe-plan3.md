@@ -4,7 +4,7 @@ status: active
 created: 2026-11-11
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.2","pi-subagents":"0.88.0","pi-lens":"4.4.12","meta/astryx":"b8335ba861a8207a7b22bba1f0748d400d022a65","nexu-io/open-design":"614795896e09a2c1682b24cc1406529baf531bd7"}
-updated: 2026-11-11T21:02:32.925Z
+updated: 2026-11-11T21:05:17.827Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:55:15.681Z
 ---
@@ -60,7 +60,7 @@ Fill during planning. Each entry: {"title", "pov": "Adopt|Trial|Reject|Not-our-p
       "pov": "Adopt",
       "status": "adopted",
       "rationale": "Idle warming re-sends the prompt with a one-token output cap for up to 30 minutes between runs when Pi expects it to save money (pi-ai dist/cache-warming.js evaluateCacheWarming: 0.15 x missCost - warmCost >= $0.05). coldCacheCompactMinutes (work-models.ts) counts cache_warm usage entries as fresh, so after a warm the idle-compaction timer and the hub's compact-before-park (sessions.ts compactBeforePark) skip compaction and the next message waits for it. Rare today (about 345k prompt tokens on Opus 5.5, 270k on GPT-6.1 Sol, 86k on Fable 5.2), but the user chose to keep warming and re-arm compaction (Q-01), and to make the cold-cache threshold one setting at 70% of the auto-compact point. Steps CU-03 to CU-05.",
-      "verification": "CU-03: node scripts/test-work-compaction-notifications.mjs passed (four mode thresholds, project override, clamping, command/status and turn_end). test_sensitivity caught default 70→60 at the 65% assertion, baseline/restored green. CU-04/CU-05 pending."
+      "verification": "CU-03: node scripts/test-work-compaction-notifications.mjs passed (four mode thresholds, project override, clamping, command/status and turn_end). test_sensitivity caught default 70→60 at the 65% assertion, baseline/restored green. CU-04: same test passed, including immediate/20s-delayed final warms and input/turn cancellation; red before fix at idle-warm handler assertion. CU-05 pending."
     },
     {
       "title": "Anthropic message threads",
@@ -216,10 +216,7 @@ None.
 - [x] **CU-01** Pinned Pi devDependency and lockfile to 1.5.2; installed version verified.
 - [x] **CU-02** Removed deleted Astryx watch path; advanced both source-review ledgers without runtime changes.
 - [x] **CU-03** Unified cold compaction at configurable 70% of each mode's auto-compact trigger, with command/status and regressions.
-- [ ] **CU-04** Re-arm idle compaction on each idle `cache_warming_decision` whose action is warm, so it runs one TTL after the last warm.
-  - Only when `ctx.isIdle()` is not false; never change Pi's decision. A stop decision keeps the timer already armed.
-  - Pi fires the decision before the warm request and writes cache_warm after it returns (cache-warmer.js), so a slow warm can land after the timer was armed. When the timer finds a newer cache_warm, it re-arms for that entry's remaining TTL plus 15 s instead of ending; any new turn or input still cancels it.
-  - Check: test-work-compaction-notifications.mjs drives agent_end, a warm decision and a cache_warm entry at 0.9 TTL, then the timer: compaction starts only after TTL+15 s from the warm. A second case writes the final cache_warm 20 s after its decision with no later decision and still compacts.
+- [x] **CU-04** Re-armed idle compaction on warm decisions and delayed usage entries without overriding Pi warming.
 - [ ] **CU-05** Compact before parking when only idle warms keep the cache warm: hub sends `/wo compact early park`, which counts a trailing cache_warm as cold.
   - A real request inside the TTL (long retention) still parks without compaction. fake-pi.mjs mirrors the new command; CHANGELOG bullet in plain words.
   - Check: test-work-compaction-notifications.mjs (warm-only park compacts, a recent real request does not) and `node --test scripts/test-sessions.mjs` in hub/.

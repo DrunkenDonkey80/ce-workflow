@@ -38,3 +38,11 @@ Planning and review done; status draft, awaiting /plan3 finish. Review accepted 
   - README: one sentence next to `/wo context set`. CHANGELOG: one Unreleased bullet.
   - Check: test-work-compaction-notifications.mjs asserts 65% no longer compacts by default, 70% does, a project setting of 50 compacts at 50%, each of the four modes uses its own trigger (Native: window minus reserveTokens), and turn_end uses the same value; update the "cold cache at 65%" case.
   - check: node scripts/test-work-compaction-notifications.mjs -> passed; test_sensitivity default 70→60 -> caught at 'ultracompact: 65% no longer compacts by default', baseline/restored green. lens_diagnostics source=lsp paths work-models.ts/test -> no findings, both inconclusive (silent server). git diff --check -> passed.
+
+## 2026-11-11T21:05:17.827Z CU-04 done: Re-armed idle compaction on warm decisions and delayed usage entries without overriding Pi warming.
+
+- [x] **CU-04** Re-arm idle compaction on each idle `cache_warming_decision` whose action is warm, so it runs one TTL after the last warm.
+  - Only when `ctx.isIdle()` is not false; never change Pi's decision. A stop decision keeps the timer already armed.
+  - Pi fires the decision before the warm request and writes cache_warm after it returns (cache-warmer.js), so a slow warm can land after the timer was armed. When the timer finds a newer cache_warm, it re-arms for that entry's remaining TTL plus 15 s instead of ending; any new turn or input still cancels it.
+  - Check: test-work-compaction-notifications.mjs drives agent_end, a warm decision and a cache_warm entry at 0.9 TTL, then the timer: compaction starts only after TTL+15 s from the warm. A second case writes the final cache_warm 20 s after its decision with no later decision and still compacts.
+  - check: node scripts/test-work-compaction-notifications.mjs -> red before fix ('idle warms must re-arm compaction'), green after fix; deterministic normal/20s-delayed final warms, stop/busy/print guards and input/turn cancellation. lens_diagnostics source=lsp -> no findings, two inconclusive; git diff --check -> passed.

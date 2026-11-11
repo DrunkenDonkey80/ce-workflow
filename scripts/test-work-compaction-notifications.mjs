@@ -1691,18 +1691,61 @@ try {
 		assert.equal(finish, undefined, "a warm cache does not compact early");
 		delete pi.sendUserMessage;
 	}
-	{ // Idle: a session left alone compacts once its prompt cache runs out (the next message would anyway); a new turn cancels it.
-		const realTimeout = globalThis.setTimeout, timers = []; let compacted = 0;
-		globalThis.setTimeout = (run, ms) => { timers.push({ run, ms }); return { unref() {} }; };
+	{ // Idle warming re-arms compaction without overriding Pi's decision, including a slow final warm.
+		const realTimeout = globalThis.setTimeout, realClearTimeout = globalThis.clearTimeout, realNow = Date.now;
+		const timers = []; let now = realNow(), compacted = 0;
+		Date.now = () => now;
+		globalThis.setTimeout = (run, ms) => {
+			const timer = { run, ms, at: now + ms, cancelled: false, unref() {} };
+			timers.push(timer); return timer;
+		};
+		globalThis.clearTimeout = timer => { if (timer) timer.cancelled = true; };
 		try {
-			const idleCtx = { ...lastAsk(10 * 60_000), hasUI: true, isIdle: () => true, model: { promptCache: { short: 300 } }, compact: () => { compacted++; } };
-			hooks.agent_end({}, idleCtx);
-			assert.equal(timers.at(-1)?.ms, 315_000, "armed for just after the cache runs out");
-			timers.at(-1).run(); assert.equal(compacted, 1, "a cold, large idle session compacts");
-			hooks.agent_end({}, { ...idleCtx, hasUI: false }); assert.equal(timers.length, 1, "print-mode runs never arm it");
-			hooks.agent_end({}, { ...lastAsk(60_000), hasUI: true, isIdle: () => true, compact: () => { compacted++; } }); timers.at(-1).run();
-			assert.equal(compacted, 1, "a still-warm cache does not compact");
-		} finally { globalThis.setTimeout = realTimeout; }
+			assert.equal(typeof hooks.cache_warming_decision, "function", "idle warms must re-arm compaction");
+			for (const warmDelay of [0, 20_000]) {
+				const entries = [{ type: "message", message: { role: "assistant", timestamp: now } }];
+				const idleCtx = { ...lastAsk(0), hasUI: true, isIdle: () => true,
+					model: { contextWindow: 1_000_000, promptCache: { short: 300 } },
+					sessionManager: { ...nativeCtx.sessionManager, getBranch: () => entries },
+					compact: options => { compacted++; options.onComplete(); },
+				};
+				hooks.agent_end({}, idleCtx);
+				const beforeWarm = timers.at(-1);
+				assert.equal(beforeWarm.ms, 315_000, "armed for just after the cache runs out");
+				now += 270_000;
+				assert.equal(hooks.cache_warming_decision({ action: "warm" }, idleCtx), undefined, "never override warming");
+				assert(beforeWarm.cancelled, "warm decision cancels the original timer");
+				const afterWarm = timers.at(-1);
+				now += warmDelay;
+				entries.push({ type: "usage", kind: "cache_warm", timestamp: new Date(now).toISOString() });
+				assert.equal(hooks.cache_warming_decision({ action: "stop" }, idleCtx), undefined);
+				assert.equal(timers.at(-1), afterWarm, "stop keeps the last compaction timer");
+				const beforeBusy = timers.length;
+				hooks.cache_warming_decision({ action: "warm" }, { ...idleCtx, isIdle: () => false });
+				assert.equal(timers.length, beforeBusy, "streaming warms do not arm idle compaction");
+				const before = compacted;
+				now = afterWarm.at; afterWarm.run();
+				if (warmDelay) {
+					assert.equal(compacted, before, "slow final warm must not lose the idle compaction timer");
+					const remaining = timers.at(-1);
+					assert.equal(remaining.ms, warmDelay, "wait for the final warm's remaining TTL plus grace");
+					now = remaining.at; remaining.run();
+				}
+				assert.equal(compacted, before + 1, "compact one TTL plus grace after the final warm");
+				await new Promise(resolve => setImmediate(resolve));
+				hooks.agent_end({}, idleCtx);
+				const beforeInput = timers.at(-1);
+				await hooks.input({ source: "extension", text: "/noop" }, idleCtx);
+				assert(beforeInput.cancelled, "new input cancels idle compaction");
+				hooks.agent_end({}, idleCtx);
+				const beforeTurn = timers.at(-1);
+				hooks.agent_start({}, idleCtx);
+				assert(beforeTurn.cancelled, "a new agent run cancels idle compaction");
+				const beforePrint = timers.length;
+				hooks.agent_end({}, { ...idleCtx, hasUI: false });
+				assert.equal(timers.length, beforePrint, "print-mode runs never arm it");
+			}
+		} finally { globalThis.setTimeout = realTimeout; globalThis.clearTimeout = realClearTimeout; Date.now = realNow; }
 	}
 	const nativeDraft = await buildBoundaryCompaction(boundary, nativeCtx, "native-200k", async (...args) => {
 		assert(args[0].some(message => message.content?.some?.(part => part.thinking === "Full retained reasoning")), "native summary gets unstripped reasoning");

@@ -2273,16 +2273,20 @@ function runNativeMicrocompact(ctx, customInstructions = undefined, force = fals
 // Cold-cache compaction: the next request re-bills the whole prompt anyway, so a large context is cheapest
 // to compact right before it. Returns idle minutes when it applies, else undefined.
 const cacheTtlMs = ctx => (ctx.model?.promptCache?.[process.env.PI_CACHE_RETENTION === "long" ? "long" : "short"] ?? 300) * 1000;
-export function coldCacheCompactMinutes(ctx, entries, now = Date.now()) {
-	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
-	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
-	if (tokens < coldCompactThreshold(ctx, readEffectiveSettings(ctx.cwd))) return undefined;
+function lastPromptCacheTime(entries) {
 	let last = 0;
 	for (let index = entries.length - 1; index >= 0 && !last; index--) {
 		const entry = entries[index];
 		if (entry.type === "message" && entry.message?.role === "assistant") last = Number(entry.message.timestamp) || Date.parse(entry.timestamp);
 		else if (entry.type === "usage" && entry.kind === "cache_warm") last = Date.parse(entry.timestamp);
 	}
+	return last;
+}
+export function coldCacheCompactMinutes(ctx, entries, now = Date.now()) {
+	if (researchContext || typeof ctx.compact !== "function" || contextCompactState.inFlight) return undefined;
+	const tokens = ctx.getContextUsage?.()?.tokens ?? 0;
+	if (tokens < coldCompactThreshold(ctx, readEffectiveSettings(ctx.cwd))) return undefined;
+	const last = lastPromptCacheTime(entries);
 	const ttl = cacheTtlMs(ctx);
 	return last && now - last > ttl ? Math.round((now - last) / 60_000) : undefined;
 }
@@ -2311,10 +2315,18 @@ function startEarlyCompact(ctx, why = "while you type") {
 // An idle session compacts once its prompt cache runs out, not only when parked or on the next message: that message would
 // compact anyway (same condition), so do it while nobody waits. Any new turn or input cancels the timer.
 let idleCompactTimer;
-function armIdleCompact(ctx) {
+function armIdleCompact(ctx, delay = cacheTtlMs(ctx) + 15_000) {
 	clearTimeout(idleCompactTimer);
 	if (!ctx?.hasUI || typeof ctx.compact !== "function") return; // print-mode runs (subagents) exit instead
-	idleCompactTimer = setTimeout(() => { try { startEarlyCompact(ctx, "while idle"); } catch { /* the session was replaced */ } }, cacheTtlMs(ctx) + 15_000);
+	idleCompactTimer = setTimeout(() => {
+		try {
+			// The warm's usage entry lands after its decision, possibly after the timer was armed.
+			const last = lastPromptCacheTime(ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? []);
+			const remaining = last + cacheTtlMs(ctx) + 15_000 - Date.now();
+			if (remaining > 0) armIdleCompact(ctx, remaining);
+			else startEarlyCompact(ctx, "while idle");
+		} catch { /* the session was replaced */ }
+	}, delay);
 	idleCompactTimer.unref?.();
 }
 
@@ -3877,6 +3889,9 @@ if (blockedInternalBackgroundCompletionTurn) {
 		(event, ctx) => compactionNoteNudge(event, ctx),
 	]);
 	pi.on("agent_end", (_event, ctx) => { activePromptBackedAgent = false; armIdleCompact(ctx); });
+	pi.on("cache_warming_decision", (event, ctx) => {
+		if (event.action === "warm" && ctx.isIdle?.() !== false) armIdleCompact(ctx);
+	});
 
 	pi.on("session_before_compact", async (event, ctx) => {
 		pi.events?.emit?.("work:compaction-start", {}); // Plan3 stats time compaction; this handler does the summarizing.
