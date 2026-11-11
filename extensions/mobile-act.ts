@@ -6,7 +6,7 @@ import { appendFile, copyFile, mkdir, open, readdir, readFile, rm, writeFile } f
 import os from "node:os";
 import path from "node:path";
 import { askConfirm } from "./ask-user/menu.ts";
-import { wifi, wifiAgent, wifiCall, wifiConnect, wifiDevices } from "./mobile-wifi.ts";
+import { tunnel, wifi, wifiAgent, wifiCall, wifiConnect, wifiDevices, wired } from "./mobile-wifi.ts";
 
 type Exec = (command: string, args: string[], options: { timeout: number; signal?: AbortSignal }) => Promise<{ code?: number; killed?: boolean; stdout?: string; stderr?: string }>;
 type Confirm = (title: string, message: string) => Promise<boolean>;
@@ -48,7 +48,8 @@ const screens = new Map<string, Frame>();
 const agentOk = new Set<string>();
 const fronts = new Map<string, string>(); // device -> app in front at the last read
 const realIds = new Set<string>(); // real devices: no agent-start retries, their failures are diagnosed instead
-export function resetSession() { snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); fronts.clear(); realIds.clear(); breakers.clear(); crashSeen.clear(); exeNames.clear(); wifi.clear(); }
+/** Tests: a clean session; the PATH check for another mobilecli stays off unless asked for. */
+export function resetSession(checkPath = false) { pathChecked = !checkPath; tunnel.clear(); wired.clear(); snapshots.clear(); ocrTexts.clear(); devices.clear(); screens.clear(); agentOk.clear(); fronts.clear(); realIds.clear(); breakers.clear(); crashSeen.clear(); exeNames.clear(); wifi.clear(); }
 const pause = (o: Options, ms: number) => (o.sleep ?? (t => new Promise(res => setTimeout(res, t))))(ms);
 
 async function run(exec: Exec, args: string[], signal?: AbortSignal, timeout = 60_000, retries = 2): Promise<string> {
@@ -100,6 +101,13 @@ async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 	if (dev.platform !== "ios" || agentOk.has(dev.id)) return;
 	if (wifi.has(dev.id)) { await wifiAgent(exec, dev, o); agentOk.add(dev.id); return; }
 	const installed = await run(exec, ["agent", "status", "--device", dev.id], o.signal).then(out => JSON.parse(out).status === "ok", () => false);
+	// mobilecli's agent cannot serve this device (it does not start, or there is no wildcard profile to install it with): ce-workflow's
+	// own helper over the CoreDevice tunnel, which wired devices have too. It needs only the profile Xcode made for the device.
+	if (!installed && dev.type === "real" && process.platform === "darwin" && (await helperListed(exec, dev, o.signal) || !await findProfile(exec, dev.id, o.signal, o.profileDirs))) {
+		tunnel.add(dev.id);
+		if (await wifiConnect(exec, dev, o.signal).then(() => true, () => false)) { await wifiAgent(exec, dev, o); agentOk.add(dev.id); return; }
+		tunnel.delete(dev.id); // Xcode does not reach it either: mobilecli's own install below is the only way
+	}
 	// A hung or failing status call is not a missing helper: asking to reinstall then repeats on every call and fails anyway.
 	if (!installed && dev.type === "real" && await helperListed(exec, dev, o.signal)) throw new Error(`The mobilecli helper is installed on ${dev.name} but does not answer (agent status failed). Not reinstalling.\n${await agentHint(exec, dev, o.signal)}`);
 	if (!installed) {
@@ -128,7 +136,9 @@ async function ensureAgent(exec: Exec, dev: Device, o: Options) {
 
 export async function listDevices(exec: Exec, signal?: AbortSignal): Promise<Device[]> {
 	const list: Device[] = data(await run(exec, ["devices", "--include-offline"], signal)).devices ?? [];
-	for (const d of await wifiDevices(exec, signal)) if (list.some(l => l.id === d.id)) wifi.delete(d.id); else list.push(d); // USB wins: mobilecli has it
+	// devicectl knows the transport (it reports a wired device as wired, not here); mobilecli 1.0.22 lists Wi-Fi devices too.
+	// A device mobilecli has online stays online: the helper route opens its tunnel on the first call.
+	for (const d of await wifiDevices(exec, signal)) { const i = list.findIndex(l => l.id === d.id); if (i < 0) list.push(d); else list[i] = { ...d, state: d.state === "online" ? d.state : list[i].state }; }
 	return list.sort((a, b) => Number(b.state === "online") - Number(a.state === "online"));
 }
 
@@ -583,7 +593,7 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 	const { signal } = o;
 	if (args.action === "list") {
 		const list = await listDevices(exec, signal);
-		return (list.length ? list.map(d => `${d.id} ${d.state === "online" ? "ONLINE " : ""}${breakers.has(d.id) ? "BREAKER ON " : ""}${d.name} (${d.platform} ${d.type}${wifi.has(d.id) ? " Wi-Fi" : ""} ${d.version})`).join("\n") : "No devices: create a simulator in Xcode or an emulator in Android Studio, or plug in a phone.");
+		return (await otherMobilecli(exec, signal)) + (list.length ? list.map(d => `${d.id} ${d.state === "online" ? "ONLINE " : ""}${breakers.has(d.id) ? "BREAKER ON " : ""}${d.name} (${d.platform} ${d.type}${wifi.has(d.id) ? wired.has(d.id) ? " USB helper" : " Wi-Fi" : ""} ${d.version})`).join("\n") : "No devices: create a simulator in Xcode or an emulator in Android Studio, or plug in a phone.");
 	}
 	if (args.action === "boot") {
 		const dev = await resolveDevice(exec, args.device, false, signal);
@@ -605,6 +615,7 @@ export async function mobileAct(exec: Exec, args: MobileActArgs, o: Options = {}
 		return await queued();
 	} catch (e) {
 		devices.delete(cacheKey);
+		if (helperGone(dev, e)) return `(Started the mobile_act helper on ${dev.name} again: it had stopped answering.)\n${await queued()}`;
 		// A timeout is the same dead link: after the phone's tunnel changes, the daemon keeps dialling the old address.
 		const dead = /WebDriverAgent|^mobilecli \w+ timed out/;
 		if (dev.platform !== "ios" || dev.type !== "real" || !dead.test((e as Error).message)) throw e;
@@ -638,6 +649,60 @@ async function agentHint(exec: Exec, dev: Device, signal?: AbortSignal) {
 	return `The helper app (${AGENT_ID}) probably crashes as it starts: look for devicekit-iosUITests-Runner-*.ips crash reports (idevicecrashreport -e -k -f devicekit <dir>). One that aborts in XCTRunnerDaemonSession means the phone's test service is stuck. The screen can still be captured without the helper: xcrun devicectl device capture screenshot --device ${dev.id} --destination shot.png`;
 }
 const queues = new Map<string, Promise<unknown>>();
+/** A Wi-Fi helper that stopped answering (the device slept, or its runner was ended): the next ensureAgent starts it again. */
+function helperGone(dev: Device, e: unknown) {
+	if (!wifi.has(dev.id) || !/mobile_act helper does not answer/.test((e as Error)?.message ?? "")) return false;
+	agentOk.delete(dev.id);
+	return true;
+}
+
+const CAMERA_APP = "com.apple.camera";
+/** camera_capture from an iPhone or iPad: its Camera app in front (launched when not, then left open), and a screenshot of the
+ * viewfinder. lockAt (screenshot pixels) long-presses there first, which locks the Camera app's focus and exposure (AE/AF LOCK). */
+export async function cameraShot(exec: Exec, udid: string, o: Options & { lockAt?: { x: number; y: number } } = {}) {
+	const dev = await resolveDevice(exec, udid, true, o.signal);
+	if (dev.platform !== "ios" || dev.type !== "real") throw new Error(`${dev.name} is not an iPhone or iPad.`);
+	realIds.add(dev.id);
+	const d = ["--device", dev.id], png = path.join(os.tmpdir(), `camera-phone-${process.pid}-${Date.now()}.png`);
+	const shoot = async () => {
+		await run(exec, ["screenshot", ...d, "--output", png, "--format", "png"], o.signal);
+		return { png: await readFile(png), receivedAt: Date.now() };
+	};
+	const once = async () => {
+		await ensureAgent(exec, dev, o);
+		if (await front(exec, dev, o.signal) !== CAMERA_APP) {
+			await run(exec, ["apps", "launch", CAMERA_APP, ...d], o.signal);
+			if (await frontUntil(exec, dev, a => a === CAMERA_APP, 5000, o) !== CAMERA_APP) throw new Error(`The Camera app did not come to the front on ${dev.name}: unlock it, then retry.`);
+			await pause(o, 1500); // focus and exposure settle after the viewfinder opens
+		}
+		if (o.lockAt) {
+			const pixels = (await shoot()).png.readUInt32BE(16), s = await screen(exec, dev, o.signal), k = s.width / pixels;
+			await run(exec, ["io", "longpress", `${Math.round(o.lockAt.x * k)},${Math.round(o.lockAt.y * k)}`, "--duration", "1500", ...d], o.signal);
+			await pause(o, 1000);
+		}
+		return shoot();
+	};
+	const mine = (queues.get(dev.id) ?? Promise.resolve()).then(() => once().catch(e => helperGone(dev, e) ? once() : Promise.reject(e))).finally(() => rm(png, { force: true }));
+	queues.set(dev.id, mine.catch(() => undefined));
+	return mine;
+}
+
+/** A line for list when another mobilecli on PATH has a different version: both share one daemon (~/.mobilecli), and each call of
+ * either restarts it for the other ("version mismatch"), dropping its links to devices. */
+let pathChecked = false;
+async function otherMobilecli(exec: Exec, signal?: AbortSignal) {
+	if (pathChecked || !SHIPPED) return "";
+	pathChecked = true;
+	for (const dir of (process.env.PATH ?? "").split(path.delimiter)) for (const name of ["mobilecli", "mobilecli.exe"]) {
+		const file = path.join(dir, name);
+		if (!dir || file === MOBILECLI || !existsSync(file)) continue;
+		const out = String((await exec(file, ["--version"], { timeout: 15_000, signal }).catch(() => ({ stdout: "" }))).stdout ?? "");
+		const version = out.match(/(\d+\.\d+\.\d+)/)?.[1];
+		if (version && version !== SHIPPED) return `Another mobilecli ${version} is on PATH (${file}); mobile_act uses ${SHIPPED}. Calling it restarts the shared daemon and breaks mobile_act's device links: update it (npm i -g mobilecli@${SHIPPED}) or do not call it.\n`;
+		return "";
+	}
+	return "";
+}
 
 /** screen_read target=device on a Wi-Fi device: a PNG from its helper; undefined for every other device (mobilecli takes those). */
 export async function wifiScreenshot(exec: Exec, device: string | undefined, signal?: AbortSignal) {

@@ -10,6 +10,22 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 ### Added
 - Locked-writes check: when the agent writes or edits source code with a locked save whose callback ignores the current state it is handed (`transact(id, () => patch)`), the result tells it straight away to move the checks inside the callback. The benchmark found agents wrapping old code this way, which looks safe but keeps the stale read.
 
+## 0.6.3 — 2026-11-10
+
+### Added
+- Project camera on a Mac: an iPhone or iPad on a stand (USB or Wi-Fi) is the camera. camera_capture opens its Camera app and reads the viewfinder; `lockAt` locks focus and exposure on a point first; camera_watch polls it for changes. Pick it under /wo → Settings → Camera.
+
+### Fixed
+- mobile_act: a real iPhone or iPad whose mobilecli agent cannot run (no wildcard profile, or "waiting for WebDriverAgent") now uses ce-workflow's own helper over its CoreDevice tunnel, wired or Wi-Fi, and keeps that route once built.
+- mobile_act: a Wi-Fi helper that stopped answering is started again instead of failing every call; the UI-automation error names the "Enter iPhone Passcode for XCTest" prompt.
+- mobile_act list warns when another mobilecli on PATH has a different version (they share one daemon and keep restarting it).
+- Camera images could not be saved on macOS (the temp folder sits under the /var symlink).
+
+## 0.6.2 — 2026-11-10
+
+### Fixed
+- mobile_act: an iPad or iPhone on Wi-Fi was taken for a wired one once mobilecli 1.0.22 started listing Wi-Fi devices too, and every action failed asking for a wildcard provisioning profile. devicectl's transport type decides now.
+
 ## 0.6.1 — 2026-11-10
 
 ### Changed

@@ -98,7 +98,13 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
    const section = node("fieldset", { className: "prompt-question" }); const legend = node("legend", ask.questions ? {} : { id: "prompt-title" }); links(legend, question.question); section.append(legend);
    // Image paths in the context or options become links with thumbnails; click opens full size.
    if (question.context) { const context = node("div", { className: "prompt-context" }); links(context, question.context); section.append(context); }
-   const inputs = [];
+   const inputs = [], rows = [];
+   // A long list gets a filter box over its titles and descriptions, like the picker lists.
+   if (question.options.length > 8) {
+    const filter = node("input", { type: "search", placeholder: "Filter options", className: "prompt-filter" }); filter.setAttribute("aria-label", "Filter options");
+    filter.addEventListener("keydown", event => { if (event.key === "Enter") event.preventDefault(); });
+    filter.addEventListener("input", () => { for (const row of rows) row.hidden = !row.dataset.search.includes(filter.value.toLowerCase()); }); section.append(filter);
+   }
    for (const option of question.options) {
     const input = node("input", { type: question.allowMultiple ? "checkbox" : "radio", name: "question_" + index, value: option.title, checked: !!option.selected }); input.dataset.on = option.selected ? "1" : ""; inputs.push(input);
     if (question.allowMultiple) input.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); input.checked = !input.checked; } });
@@ -106,8 +112,9 @@ export function createPromptView(dialog: HTMLDialogElement, form: HTMLFormElemen
     else input.addEventListener("click", () => { if (input.dataset.on) input.checked = false; for (const other of inputs) other.dataset.on = other.checked ? "1" : ""; });
     // Paths and URLs in an option link like in chat (a file link's click is handled, so it doesn't tick the option).
     const title = node("span"); links(title, option.title);
-    const row = node("label", { className: "prompt-option" }); row.append(input, title);
-    if (option.description) { const description = node("small", { className: "prompt-description" }); links(description, option.description); row.append(description); } section.append(row);
+    const row = node("label", { className: "prompt-option" }); row.append(input, title); row.dataset.search = (option.title + " " + (option.description ?? "")).toLowerCase(); rows.push(row);
+    // A short one-line description ("next version 1.74") sits on the title's line; longer ones go below it.
+    if (option.description) { const description = node("small", { className: "prompt-description" + (option.description.length <= 40 && !option.description.includes("\n") ? " inline" : "") }); links(description, option.description); row.append(description); } section.append(row);
    }
    // One box like the terminal: with an option chosen it is the comment, with none it is your own answer.
    const freeform = question.allowFreeform || !question.options.length, commented = ask.allowComment && question.options.length > 0;

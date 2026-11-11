@@ -4,6 +4,7 @@ import { cameraCaptureRequest, cameraModes, cameraStillArgs } from "./work-camer
 import { cameraRequestKey } from "./work-camera-state.ts";
 import { discoverCameras } from "./work-camera.ts";
 import { resolveCameraFFmpeg, runCameraProcess } from "./work-camera-process.ts";
+import { PHONE_CAMERA, phoneRaw, phoneShot } from "./work-camera-phone.ts";
 import type { createCameraController } from "./work-camera.ts";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -73,14 +74,15 @@ export function cameraRawFrames(width: number, height: number, onFrame: (frame: 
 		finish() { if (filled) throw new Error("Camera stream ended with a partial frame."); },
 	};
 }
-export async function runCameraAcquisition(ctx: ExtensionContext, controller: ReturnType<typeof createCameraController>, input: Partial<DetectionOptions> & { crop?: { x: number; y: number; width: number; height: number }; deadlineMs: number; summary: string }, callbacks: { owner: (owner: Awaited<ReturnType<typeof controller.lease>>) => void; sample: (sample: ReturnType<ReturnType<typeof createCameraDetector>["frame"]>, geometry: Record<string, unknown>) => void }, signal?: AbortSignal, { resolveFFmpeg = resolveCameraFFmpeg, devices = discoverCameras, run = runCameraProcess } = {}) {
+export async function runCameraAcquisition(ctx: ExtensionContext, controller: ReturnType<typeof createCameraController>, input: Partial<DetectionOptions> & { crop?: { x: number; y: number; width: number; height: number }; deadlineMs: number; summary: string }, callbacks: { owner: (owner: Awaited<ReturnType<typeof controller.lease>>) => void; sample: (sample: ReturnType<ReturnType<typeof createCameraDetector>["frame"]>, geometry: Record<string, unknown>) => void }, signal?: AbortSignal, { resolveFFmpeg = resolveCameraFFmpeg, devices = discoverCameras, run = runCameraProcess, shot = phoneShot } = {}) {
 	if (ctx.mode !== "tui" || ctx.hasUI !== true) throw new Error("Continuous camera acquisition requires local TUI.");
 	if (!Number.isSafeInteger(input.deadlineMs) || input.deadlineMs < 2000 || input.deadlineMs > 172800000) throw new Error("Invalid continuous camera deadline.");
 	const width = input.width ?? 320, height = input.height ?? 180;
-	const detector = createCameraDetector({ ...input, width, height });
+	let detector = createCameraDetector({ ...input, width, height });
 	const selected = controller.settings(ctx).device;
 	if (!controller.settings(ctx).enabled || !selected) throw new Error("Project camera is OFF or not selected.");
-	const executable = await resolveFFmpeg();
+	const phone = PHONE_CAMERA.exec(selected.id)?.[1];
+	const executable = phone ? "" : await resolveFFmpeg();
 	if (!(await devices()).some(device => device.id === selected.id)) throw new Error("Selected camera identity changed; no fallback.");
 	controller.images.prepare(ctx.cwd);
 	controller.images.start(ctx.cwd, error => { try { ctx.ui.notify(String(error), "error"); } catch { console.error("Camera cleanup failed."); } });
@@ -88,6 +90,30 @@ export async function runCameraAcquisition(ctx: ExtensionContext, controller: Re
 	let guard: ReturnType<typeof setInterval> | undefined;
 	try {
 		callbacks.owner(owner);
+		if (phone) {
+			// Polled phone screenshots, as fast as they come; the crop keeps its aspect within width (default 320, raw frames stay <= 640x480).
+			let stopping = false, loop: Promise<void> | undefined;
+			owner.attachStop(async () => { stopping = true; await loop?.catch(() => {}); });
+			await owner.begin();
+			const maxEdge = Math.min(input.width ?? 320, 480), first = await shot(phone, { signal: owner.signal });
+			const sized = phoneRaw(first.png, input.crop, maxEdge);
+			detector = createCameraDetector({ staleMs: 6000, ...input, width: sized.width, height: sized.height }); // a Wi-Fi screenshot can take over a second
+			const geometry = { sourceWidth: sized.sourceWidth, sourceHeight: sized.sourceHeight, width: sized.width, height: sized.height, crop: input.crop ?? { x: 0, y: 0, width: sized.sourceWidth, height: sized.sourceHeight }, device: selected.id, fps: "as fast as phone screenshots arrive", timestampBasis: "phone Camera app screenshot received locally; not sensor exposure time" };
+			const startingAt = performance.now();
+			let staleError: unknown;
+			guard = setInterval(() => { try { if (!detector.stats().sequence && performance.now() - startingAt > 15000) throw new Error("Camera stalled before baseline readiness."); detector.assertFresh(performance.now()); } catch (error) { staleError ??= error; void owner.finish().catch(() => {}); } }, 100);
+			loop = (async () => {
+				let next: { png: Buffer; receivedAt: number } | undefined = first;
+				while (!stopping) {
+					await owner.guard();
+					const frame = next ?? await shot(phone, { signal: owner.signal });
+					next = undefined;
+					callbacks.sample(detector.frame(phoneRaw(frame.png, input.crop, maxEdge).raw, frame.receivedAt, performance.now()), geometry);
+				}
+			})();
+			try { await loop; } catch (error) { throw staleError ?? error; }
+			return;
+		}
 		const options = await run(owner, executable, ["-hide_banner", "-nostdin", "-f", "dshow", "-list_options", "true", "-i", `video=${selected.id}`], { durationMs: 10000, maxBytes: 256 * 1024, allowNonzero: true, keepLease: true });
 		const mode = cameraModes(options.stderr)[0];
 		if (!mode || mode.width * mode.height > 16000000 || mode.fps < (input.fps ?? 10)) throw new Error("Native camera mode unavailable or cannot supply the requested sampling rate; no simulated frames.");

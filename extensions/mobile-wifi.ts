@@ -1,7 +1,7 @@
 // Wi-Fi iPhones and iPads for mobile_act. mobilecli finds real iOS devices only through usbmuxd (USB), so the ones Xcode reaches
 // over the network come from devicectl, and mobile_act drives their DeviceKit helper itself, over the CoreDevice tunnel.
 import { spawn } from "node:child_process";
-import { existsSync, openSync } from "node:fs";
+import { existsSync, openSync, readdirSync } from "node:fs";
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,8 +11,13 @@ type Exec = (command: string, args: string[], options: { timeout: number; signal
 export const DEVICEKIT_TAG = "0.0.36"; // the helper version mobilecli 1.0.22 installs (agentVersionIOS); keep them in step
 const PORT = 12004;
 const CACHE = path.join(os.homedir(), ".cache", "ce-workflow");
-/** Wi-Fi-only iOS devices: id -> tunnel address ("" while the tunnel is down). */
+/** iOS devices driven through ce-workflow's helper over the CoreDevice tunnel: id -> tunnel address ("" while the tunnel is down). */
 export const wifi = new Map<string, string>();
+/** Wired devices that use the tunnel helper because mobilecli's own agent cannot serve them (no wildcard profile, or it does not start). */
+export const tunnel = new Set<string>();
+export const wired = new Set<string>(); // of the wifi entries, the ones on USB (list shows them as "helper", not "Wi-Fi")
+/** Once ce-workflow built its helper for a device, that device keeps the tunnel route in later sessions too. */
+const helperBuilt = (id: string) => { try { return readdirSync(path.join(CACHE, "devicekit", id, "Build", "Products")).some(f => f.endsWith(".xctestrun")); } catch { return false; } };
 
 async function devicectl(exec: Exec, args: string[], signal?: AbortSignal, timeout = 60_000) {
 	const out = path.join(os.tmpdir(), `mobile-wifi-${process.pid}-${Math.random().toString(36).slice(2)}.json`);
@@ -27,10 +32,12 @@ export async function wifiDevices(exec: Exec, signal?: AbortSignal): Promise<Dev
 	if (process.platform !== "darwin") return [];
 	const result = await devicectl(exec, ["list", "devices"], signal).catch(() => undefined);
 	if (!result) return [];
-	wifi.clear(); // a phone that is now wired (or gone) must not keep its old Wi-Fi entry and route through a dead tunnel
-	return (result.devices ?? []).filter((d: any) => d.hardwareProperties?.reality === "physical" && d.hardwareProperties?.platform === "iOS" && d.connectionProperties?.transportType === "localNetwork").map((d: any) => {
+	wifi.clear(); wired.clear(); // a phone that is now wired (or gone) must not keep its old Wi-Fi entry and route through a dead tunnel
+	const viaTunnel = (d: any) => d.connectionProperties?.transportType === "localNetwork" || tunnel.has(d.hardwareProperties.udid) || helperBuilt(d.hardwareProperties.udid);
+	return (result.devices ?? []).filter((d: any) => d.hardwareProperties?.reality === "physical" && d.hardwareProperties?.platform === "iOS" && viaTunnel(d)).map((d: any) => {
 		const id = d.hardwareProperties.udid, ip = d.connectionProperties.tunnelState === "connected" ? d.connectionProperties.tunnelIPAddress ?? "" : "";
 		wifi.set(id, ip);
+		if (d.connectionProperties?.transportType !== "localNetwork") wired.add(id);
 		return { id, name: d.deviceProperties?.name ?? id, platform: "ios", type: "real", state: ip ? "online" : "offline", version: d.deviceProperties?.osVersionNumber ?? "" };
 	});
 }
@@ -150,6 +157,6 @@ export async function wifiAgent(exec: Exec, dev: Device, o: Options) {
 	}
 	if (!ended) child.kill();
 	const text = await readFile(log, "utf8").catch(() => "");
-	if (/enabling automation mode/i.test(text)) throw new Error(`${dev.name} refused UI automation: turn on Settings > Developer > Enable UI Automation on the device (it may ask for the passcode), then retry.`);
+	if (/enabling automation mode/i.test(text)) throw new Error(`${dev.name} did not allow UI automation. Usually it shows "Enter iPhone Passcode for XCTest" (iOS asks once after each restart): ask the user to type the passcode on the device and close any alert over it. Otherwise Settings > Developer > Enable UI Automation is off. Then retry.`);
 	throw new Error(`The helper did not start on ${dev.name}${/iPad/i.test(dev.name) ? " (an iPad needs multitasking off: Settings > Multitasking & Gestures, Full Screen Apps)" : ""}. Log: ${log}\n${text.split("\n").filter(l => /error|fail/i.test(l)).slice(-6).join("\n")}`);
 }
