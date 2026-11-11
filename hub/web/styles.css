@@ -546,7 +546,7 @@ dialog.annotate { width: min(1400px, 96vw); max-height: 96dvh; padding: 12px 14p
 .prompt-option { display: flex; align-items: start; flex-wrap: wrap; gap: 8px; margin: 8px 0; cursor: pointer; }
 .prompt-option input { margin-top: 4px; flex: none; }
 .prompt-option > span { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
-.prompt-description { display: block; flex-basis: 100%; margin-left: 24px; color: var(--muted); font-size: 13px; }
+.prompt-description { display: block; flex-basis: 100%; margin-left: 24px; color: var(--muted); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt-heading { font-weight: 600; margin-top: 12px; }
 .prompt-question { border: 0; padding: 0; margin: 16px 0 24px; }
 .prompt-question legend { font-weight: 600; margin-bottom: 8px; }
