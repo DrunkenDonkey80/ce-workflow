@@ -4,7 +4,7 @@ status: active
 created: 2026-11-11
 source: catch-up
 catch-up: {"@earendil-works/pi-coding-agent":"1.5.2","pi-subagents":"0.88.0","pi-lens":"4.4.12","meta/astryx":"b8335ba861a8207a7b22bba1f0748d400d022a65","nexu-io/open-design":"614795896e09a2c1682b24cc1406529baf531bd7"}
-updated: 2026-11-11T21:07:57.411Z
+updated: 2026-11-11T21:08:17.472Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:55:15.681Z
 ---
@@ -221,7 +221,7 @@ None.
 
 ### Phase 2: Verify and record [code]
 
-- [ ] **CU-90** Run `npm run verify:quiet` after the adopted changes and record the result.
+- [wip] **CU-90** Run `npm run verify:quiet` after the adopted changes and record the result.
 - [ ] **CU-91** Record the reviewed versions: `node scripts/work-catch-up-record.mjs acd778fe`.
   - It writes exactly the target versions above (not newer releases) into `extensions/work-catch-up-baseline.json`.
   - It refuses missing, unexplained or unverified decisions.
@@ -240,7 +240,7 @@ None.
 
 ## Resume context
 
-Planning and two reviews done; status draft, awaiting /plan3 finish. Second review accepted both findings: Native mode's cold threshold uses Pi's own trigger (D-05, CU-03), and the Astryx Selector and theme-registry changes are recorded in the runtime rejection. Next: CU-01. No blockers.
+CU-01 through CU-05 implemented and locally committed with targeted checks; CU-90 current. Next run npm run verify:quiet once, diagnose any failures and rerun affected checks; then CU-91 recorder and final targeted Plan3 checks before completion. No blockers. LSP probes have silent-server inconclusive coverage and pre-existing fake-pi JSON.parse advisories, not a clean certificate. No live provider warming/budget test or benchmark performed (D-07); deterministic normal/slow-warm and park tests passed. Preserve pre-existing unrelated dirty/untracked files; README's unrelated video-review paragraph remains unstaged.
 
 ## Amendments
 

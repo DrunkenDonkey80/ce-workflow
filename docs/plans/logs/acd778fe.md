@@ -53,3 +53,7 @@ Planning and review done; status draft, awaiting /plan3 finish. Review accepted 
   - A real request inside the TTL (long retention) still parks without compaction. fake-pi.mjs mirrors the new command; CHANGELOG bullet in plain words.
   - Check: test-work-compaction-notifications.mjs (warm-only park compacts, a recent real request does not) and `node --test scripts/test-sessions.mjs` in hub/.
   - check: node scripts/test-work-compaction-notifications.mjs -> red before fix at 'parking never compacts a recent real request', green after; cd hub && node --test scripts/test-sessions.mjs -> 1 passed. git diff --check -> passed. LSP no new findings: four silent-server inconclusive paths; six existing unchecked JSON.parse advisories in fake-pi.mjs are outside its changed line.
+
+## 2026-11-11T21:08:17.559Z Superseded resume context
+
+Planning and two reviews done; status draft, awaiting /plan3 finish. Second review accepted both findings: Native mode's cold threshold uses Pi's own trigger (D-05, CU-03), and the Astryx Selector and theme-registry changes are recorded in the runtime rejection. Next: CU-01. No blockers.
