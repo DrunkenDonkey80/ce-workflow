@@ -73,7 +73,7 @@
     }
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@earendil-works/pi-coding-agent": "1.5.2",
     "@sinclair/typebox": "0.34.41",
     "@types/node": "22.19.19",
     "typescript": "5.9.3"
