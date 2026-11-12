@@ -2,6 +2,8 @@
 // Pi session named by its direction whose own agent builds the design there while the hub's design page previews it live.
 // select exports it to docs/designs/<name>/ and hands it to the starting session or a new one; clone forks another approach.
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { referenceBundleAssets, referenceBundleContext } from "./design-bundles.ts";
 import type { ThemeOptions } from "./design-theme.ts";
 import fs from "node:fs";
 import os from "node:os";
@@ -17,8 +19,9 @@ type Changes = { added: string[]; changed: string[]; removed: string[] };
 type Kind = "web" | "app" | "deck";
 // name: the hub row's name (the direction, short); title: its second line; brief: what start was asked for (BRIEF.md at select);
 // inputs: project files the first prompt names; references: captured sites it uses; from: the hub session that started it.
-export type Session = { handle: string; direction: string; name?: string; title?: string; brief?: string; kind: Kind; foundation?: "astryx"; inputs: string[]; references: string[]; system?: { name: string; commit?: string; version?: string; lockDigest?: string }; from?: string; hubSessionId?: string; hubError?: string; selected?: boolean; created: number };
-type Store = { version: 2; next: number; sessions: Session[] };
+export type Session = { handle: string; direction: string; name?: string; title?: string; brief?: string; kind: Kind; foundation?: "astryx"; inputs: string[]; references: string[]; system?: { name: string; commit?: string; version?: string; lockDigest?: string }; from?: string; hubSessionId?: string; hubError?: string; hubStage?: "creating" | "created" | "sending" | "sent" | "uncertain"; bundle?: string; selected?: boolean; created: number };
+type Store = { version: 2; next: number; sessions: Session[]; launches?: Record<string, { request: string; handles: string[] }> };
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const FILE = ".pi/designs/sessions.json";
 const KINDS = ["web", "app", "deck"];
 
@@ -42,10 +45,13 @@ function load(cwd: string): Store {
 	let last = 0;
 	for (const item of sessions) {
 		if (!item || typeof item.handle !== "string" || !/^design-\d+$/.test(item.handle) || seen.has(item.handle) || !Number.isSafeInteger(Number(item.handle.slice(7))) || !KINDS.includes(item.kind) || typeof item.direction !== "string" || ![item.inputs, item.references].every(list => Array.isArray(list) && list.every(value => typeof value === "string")) || !Number.isFinite(item.created)
+			|| item.bundle !== undefined && (typeof item.bundle !== "string" || !UUID.test(item.bundle) || typeof item.from !== "string" || !UUID.test(item.from))
+			|| item.hubStage !== undefined && (!["creating", "created", "sending", "sent", "uncertain"].includes(item.hubStage) || ["created", "sending", "sent"].includes(item.hubStage) && !item.hubSessionId)
 			|| item.foundation !== undefined && (item.foundation !== "astryx" || item.kind !== "app")
 			|| item.system !== undefined && (!item.system || typeof item.system.name !== "string" || !item.system.name || item.system.version !== undefined && (typeof item.system.version !== "string" || !/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(item.system.version)) || item.system.lockDigest !== undefined && (typeof item.system.lockDigest !== "string" || !/^[a-f0-9]{64}$/.test(item.system.lockDigest) || !item.system.version))) throw new Error(`${FILE} has invalid design session metadata; repair it before continuing.`);
 		seen.add(item.handle); last = Math.max(last, Number(item.handle.slice(7)));
 	}
+	if (store.launches !== undefined && (!store.launches || typeof store.launches !== "object" || Array.isArray(store.launches) || Object.entries(store.launches).some(([id, launch]: [string, any]) => !UUID.test(id) || !launch || !/^[a-f0-9]{64}$/.test(launch.request) || !Array.isArray(launch.handles) || !launch.handles.length || launch.handles.length > 6 || new Set(launch.handles).size !== launch.handles.length || launch.handles.some(handle => !sessions.some(item => item.handle === handle && item.bundle === id))))) throw new Error(`${FILE} has invalid launch reservations; repair it before continuing.`);
 	const next = store.version === 1 ? Math.max(last + 1, Number(store.next) || 1) : store.next;
 	if (!Number.isSafeInteger(next) || next <= last) throw new Error(`${FILE} has an invalid design session list counter; repair it before continuing.`);
 	return { ...store, version: 2, next, sessions };
@@ -85,16 +91,22 @@ function designModelSetting(cwd: string) {
 
 // The hub's own CLI, like hub-command.ts's hubCli (not imported: its menu imports need Pi's packages).
 const HUB_CLI = fileURLToPath(new URL("../hub/src/cli.ts", import.meta.url));
-const hubCall = (args: string[]) => new Promise<{ ok: boolean; text: string }>(resolve => execFile(process.execPath, ["--no-warnings", HUB_CLI, ...args], { timeout: 120_000, windowsHide: true }, (error, stdout, stderr) =>
-	resolve({ ok: !error, text: `${stdout}\n${stderr}`.trim() || String(error?.message ?? "") })));
+const hubCall = (args: string[]) => new Promise<{ ok: boolean; text: string; uncertain?: boolean }>(resolve => execFile(process.execPath, ["--no-warnings", HUB_CLI, ...args], { timeout: 120_000, windowsHide: true }, (error, stdout, stderr) =>
+	resolve({ ok: !error, uncertain: !!error?.killed || !!error?.signal, text: `${stdout}\n${stderr}`.trim() || String(error?.message ?? "") })));
 // ask: one choice from items (the tool draws it with ask-user's list dialog); undefined when dismissed.
 // text: one line from the user (askText); undefined when dismissed.
 // fetch: the network for the design-system library (tests pass a fake).
 type Tools = { hub: typeof hubCall; fetch?: typeof fetch; ask?: (title: string, purpose: string, items: { value: string; label: string }[]) => Promise<string | undefined>; text?: (title: string) => Promise<string | undefined> } & ThemeOptions;
 
 /** The first message of a new design session: what to build, from what, and where. */
-function buildPrompt(item: Session) {
-	return `${item.brief ?? ""}\n\nDirection for this design (${item.handle}, ${item.kind}): ${item.direction}\n${item.inputs.length ? `\nRead these project files first (read only; keep their real copy and content): ${item.inputs.join(", ")}\n` : ""}${item.system ? `\nFollow the design system in ${SYSTEMS}/${item.system.name}/ (DESIGN.md first, then tokens.css when present).\n` : ""}\nBuild the design now: ${item.foundation ? `edit ${designFolder(item.handle)}/src/ (App.jsx, styles.css and screens/index.html); keep {{appScript}}, {{appStyle}} and {{vendorStyle}} in every screen shell. Call design look to compile through the studio. Never run shell builds, install dependencies or edit generated root HTML/assets/pins.` : `write its files into ${designFolder(item.handle)}/ (index.html first).`} The user watches it appear beside this chat.`;
+function frozenReferences(cwd: string, item: Pick<Session, "bundle" | "from">) {
+	if (item.bundle === undefined) return undefined;
+	const { bundle } = referenceBundleAssets(cwd, item.bundle);
+	if (!bundle.authorized || bundle.owner !== item.from) throw new Error("This reference bundle is not authorized for the starting conversation.");
+	return bundle;
+}
+function buildPrompt(cwd: string, item: Session) {
+	return `${item.brief ?? ""}\n\nDirection for this design (${item.handle}, ${item.kind}): ${item.direction}\n${item.inputs.length ? `\nRead these project files first (read only; keep their real copy and content): ${item.inputs.join(", ")}\n` : ""}${item.system ? `\nFollow the design system in ${SYSTEMS}/${item.system.name}/ (DESIGN.md first, then tokens.css when present).\n` : ""}\nBuild the design now: ${item.foundation ? `edit ${designFolder(item.handle)}/src/ (App.jsx, styles.css and screens/index.html); keep {{appScript}}, {{appStyle}} and {{vendorStyle}} in every screen shell. Call design look to compile through the studio. Never run shell builds, install dependencies or edit generated root HTML/assets/pins.` : `write its files into ${designFolder(item.handle)}/ (index.html first).`} The user watches it appear beside this chat.${item.bundle ? "\n\n" + referenceBundleContext(frozenReferences(cwd, item)!) : ""}`;
 }
 
 async function start(cwd: string, args, tools: Tools) {
@@ -106,47 +118,83 @@ async function start(cwd: string, args, tools: Tools) {
 	const names = Array.isArray(args.names) ? args.names.map(name => short(String(name ?? ""), 40)) : [];
 	if (names.length !== directions.length || names.some(name => !name)) throw new Error("Give names: one short name per direction for the session list, e.g. Calm, Bold editorial (never design-N).");
 	const title = short(text(args.title, "title (a few words naming what is designed, e.g. Home page)", 400), 60);
-	const kind: Kind = KINDS.includes(args.kind) ? args.kind : "web";
+	const kind: Kind = KINDS.includes(args.kind) ? args.kind : "web", owner = process.env.PI_HUB_SESSION;
+	const requestedInputs = Array.isArray(args.inputs) ? args.inputs.map(String).slice(0, 30) : [];
+	const request = createHash("sha256").update(JSON.stringify({ brief, directions, names, title, kind, inputs: requestedInputs, system: args.system ?? null })).digest("hex");
+	const reuse = (store: Store) => {
+		if (args.bundle === undefined) return undefined;
+		frozenReferences(cwd, { bundle: args.bundle, from: owner });
+		const launch = store.launches?.[args.bundle];
+		if (!launch) return undefined;
+		if (launch.request !== request) throw new Error("This bundle already reserved different start arguments. Request a fresh submission for another batch.");
+		return launch.handles.map(handle => session(store, handle));
+	};
+	if (args.bundle !== undefined) {
+		const existing = await change(cwd, reuse);
+		if (existing) return { sessions: existing, duplicate: true };
+	}
 	const system = args.system === undefined ? undefined : await fetchSystem(cwd, args.system, tools);
 	const component = kind === "app" && system?.name === "astryx";
 	const starter = component ? appStarter(title) : undefined;
 	const initial = starter ? appPublication(starter, await buildApp(starter, tools)) : undefined;
 	const inputs: string[] = [], skipped: string[] = [];
-	for (const file of Array.isArray(args.inputs) ? args.inputs.map(String).slice(0, 30) : []) {
+	for (const file of requestedInputs) {
 		try { if (!fs.statSync(confined(cwd, file)).isFile()) throw new Error("not a file"); inputs.push(file); } catch (error) { skipped.push(`${file} (${error.message})`); }
 	}
-	const items = await change(cwd, store => directions.map((direction, index) => {
-		const item: Session = { handle: `design-${store.next++}`, direction, name: names[index], title, brief, kind, ...component ? { foundation: "astryx" as const } : {}, inputs, references: [], ...system ? { system: systemRef(system) } : {}, from: process.env.PI_HUB_SESSION, created: Date.now() };
+	const reserved = await change(cwd, store => {
+		const existing = reuse(store);
+		if (existing) return { items: existing, duplicate: true };
+		const items = directions.map((direction, index) => {
+		const item: Session = { handle: `design-${store.next++}`, direction, name: names[index], title, brief, kind, ...component ? { foundation: "astryx" as const } : {}, inputs, references: [], ...system ? { system: systemRef(system) } : {}, from: owner, ...args.bundle !== undefined ? { bundle: args.bundle } : {}, created: Date.now() };
 		store.sessions.push(item);
 		fs.mkdirSync(confined(cwd, designFolder(item.handle)), { recursive: true });
 		if (initial) syncTree(cwd, designFolder(item.handle), initial);
 		return item;
-	}));
+		});
+		if (args.bundle !== undefined) (store.launches ??= {})[args.bundle] = { request, handles: items.map(item => item.handle) };
+		return { items, duplicate: false };
+	});
+	if (reserved.duplicate) return { sessions: reserved.items, duplicate: true };
 	const opened = [];
-	for (const item of items) {
+	for (const item of reserved.items) {
 		if (item.foundation) await withPlanLock(confined(cwd, designFolder(item.handle)), () => ensureAppBuilt(confined(cwd, designFolder(item.handle)), tools));
-		opened.push(await openSession(cwd, item, hub, buildPrompt(item)));
+		opened.push(await openSession(cwd, item, hub, buildPrompt(cwd, item)));
 	}
 	return { sessions: opened, skipped: skipped.length ? skipped : undefined };
 }
 
 /** A hub Pi session for one handle, in the same folder; first is its first message (it starts the agent's work). */
 async function openSession(cwd: string, item: Session, hub: Tools["hub"], first: string) {
-	if (item.hubSessionId) return item;
-	const made = await hub(["new", cwd, item.name ?? item.handle]);
-	const id = made.ok ? made.text.match(/\/s\/([0-9a-f-]{36})\//)?.[1] : undefined;
-	if (!id) return change(cwd, store => Object.assign(session(store, item.handle), { hubError: `no hub session (is pi-control-hub running?): ${clip(made.text, 300)}` }));
-	const saved = await change(cwd, store => Object.assign(session(store, item.handle), { hubSessionId: id, hubError: undefined }));
-	if (subtitleOf(saved)) await hub(["subtitle", id, subtitleOf(saved)]); // cosmetic: a failure leaves the row without its title
-	const told = await hub(["prompt", id, first]);
-	if (!told.ok) return change(cwd, store => Object.assign(session(store, item.handle), { hubError: `hub session made, first message failed: ${clip(told.text, 300)}` }));
-	return saved;
+	return withPlanLock(confined(cwd, `${designFolder(item.handle)}/.hub-session`), async () => {
+		item = session(load(cwd), item.handle);
+		const save = (fields: Partial<Session>) => change(cwd, store => Object.assign(session(store, item.handle), fields));
+		if (["creating", "sending", "uncertain"].includes(item.hubStage ?? "")) return save({ hubStage: "uncertain", hubError: "Previous hub delivery is uncertain. Reconcile this handle and its hub conversation before retrying; no prompt was resent." });
+		if (item.hubSessionId && item.hubStage !== "created") return item;
+		if (!item.hubSessionId) {
+			await save({ hubStage: "creating" });
+			let made;
+			try { made = await hub(["new", cwd, item.name ?? item.handle]); }
+			catch (error) { return save({ hubStage: "uncertain", hubError: `Hub creation is uncertain: ${clip(String(error.message ?? error), 300)}` }); }
+			const id = made.ok ? made.text.match(/\/s\/([0-9a-f-]{36})\//)?.[1] : undefined;
+			if (!id) return save({ hubStage: made.uncertain ? "uncertain" : undefined, hubError: `no hub session (is pi-control-hub running?): ${clip(made.text, 300)}` });
+			item = await save({ hubSessionId: id, hubStage: "created", hubError: undefined });
+		}
+		const id = item.hubSessionId!;
+		// Cosmetic only: a failed subtitle does not prevent the first prompt.
+		if (subtitleOf(item)) await hub(["subtitle", id, subtitleOf(item)]).catch(() => {});
+		await save({ hubStage: "sending" });
+		let told;
+		try { told = await hub(["prompt", id, first]); }
+		catch (error) { return save({ hubStage: "uncertain", hubError: `First prompt delivery is uncertain: ${clip(String(error.message ?? error), 300)}` }); }
+		if (!told.ok) return save({ hubStage: "uncertain", hubError: `hub session made, first message failed (delivery uncertain): ${clip(told.text, 300)}` });
+		return save({ hubStage: "sent", hubError: undefined });
+	});
 }
 /** open: a hub session for a handle that has none; it continues the design when files are there, else builds it. */
 function reopenPrompt(cwd: string, item: Session) {
-	return readTree(confined(cwd, designFolder(item.handle))).size
-		? `You are design session ${item.handle} (${item.name ?? item.handle}), direction: ${item.direction}. Its files are in ${designFolder(item.handle)}/ and show beside this chat. Wait for the user's next request; reply in one line.`
-		: buildPrompt(item);
+	return item.hubStage !== "created" && readTree(confined(cwd, designFolder(item.handle))).size
+		? `You are design session ${item.handle} (${item.name ?? item.handle}), direction: ${item.direction}. Its files are in ${designFolder(item.handle)}/ and show beside this chat. Wait for the user's next request; reply in one line.${item.bundle ? "\n\n" + referenceBundleContext(frozenReferences(cwd, item)!) : ""}`
+		: buildPrompt(cwd, item);
 }
 
 /** A folder's files as relative "/" paths with their bytes (symlinks are skipped). */
@@ -349,6 +397,7 @@ const briefFile = (item: Session) => [
 	`- Design system: ${item.system ? item.system.lockDigest ? `${item.system.name} (@astryxdesign/core ${item.system.version}; lock ${item.system.lockDigest})` : `${item.system.name} (github.com/${OD} design-systems/${item.system.name} at ${item.system.commit})` : "none"}`,
 	...(item.foundation ? [`- Component foundation: Astryx; fixed recipe ${appRecipe.recipe}; pins and runtime versions: APP.json and package-lock.json. Editable entry: src/main.jsx; screen shells: src/screens/.`] : []),
 	`- References: ${item.references.length ? item.references.map(site => `.pi/designs/references/${site}/`).join(", ") : "none"}`,
+	...(item.bundle ? ["- Selected reference evidence: REFERENCE-SOURCES.json (provenance only; source assets were not redistributed)."] : []),
 	...item.inputs.length ? [`- Project files read: ${item.inputs.join(", ")}`] : [], "", "## Brief", "", item.brief?.trim() || "(none recorded)", "",
 ].join("\n");
 // D15: the implementer's contract, adapted from OD's buildDesignHandoffContent (apps/web/src/runtime/exports.ts, Apache-2.0).
@@ -359,6 +408,7 @@ function handoff(item: Session, version: number, files: Map<string, Buffer>) {
 	return [
 		`# ${item.name ?? item.handle} implementation handoff`, "",
 		`Version ${version} of ${item.handle} (${item.kind}). These files are the visual contract: build production UI that matches them, not a loose reinterpretation. BRIEF.md says what was asked for.`, "",
+		...(item.bundle ? ["## Reference provenance", "", "REFERENCE-SOURCES.json records the frozen selection, aspects, notes and source licenses. It is provenance only: reference source assets were not redistributed and local studio paths are not export dependencies. Check source permissions before reusing assets.", ""] : []),
 		"## Screens", "", ...screens.length ? screens.map(file => `- \`${file}\``) : ["- None"], "",
 		...(item.foundation ? ["## Editable component source and rebuild", "", `Experimental Astryx authoring foundation, not a production-readiness certification. Fixed recipe: \`${appRecipe.recipe}\`. \`APP.json\` records the reviewed runtime versions and lock digest; \`package.json\`/\`package-lock.json\` and \`THIRD_PARTY_NOTICES.md\` retain the exact pins and full license texts.`, "", "Start with `src/main.jsx`, `src/App.jsx`, `src/styles.css` and `src/screens/*.html`; root HTML and `assets/` are generated, not the only source supplied. Rebuild the registered studio design with `design look` (or its automatic end-of-turn build), using the consented host cache. The installed studio owns the fixed builder; exported package files are pins, not permission to run arbitrary project install/build scripts. No node_modules or private caches are exported.", "", "`window.designReady` gates readiness. `window.designPreview.capture/restore` handles the bounded JSON prototype state. Supported named states are exactly the keys declared in `window.designPreview.states` in the editable source; `design look state:<name>` accepts those names only. This export does not assert that every named state has been inspected.", "", "## Verification matrix", "", "| Check | Evidence/status |", "| --- | --- |", "| Recipe, pins, coherent source and generated output | Checked at selection; hashes in `.design-build.json` |", "| Every screen and declared state | Recheck rendered output; no per-state visual certification is stored |", "| Phone/tablet/desktop, rotation, mouse/touch, keyboard | Check the viewport/state combinations below; do not infer hardware compatibility |", "| Loading/empty/error, persistence and backend integration | Prototype behavior only; verify in the production implementation |", ""] : []),
 		"## Tokens", "", files.has("DESIGN.md") ? "`DESIGN.md` lists the color tokens, type scale, spacing, radii and components with their states. Extract them as tokens before writing components." : "No `DESIGN.md`: extract the tokens (background, surface, text, border, accent, radius, shadow, spacing, type scale, motion) from the stylesheets before writing components.", "",
@@ -384,8 +434,12 @@ async function select(cwd: string, handle: string, tools: Tools) {
 	const files = readTree(confined(cwd, `${historyFolder(item.handle)}/${version}`)); // the immutable version, not a folder the agent may still write
 	const dir = exportFolder(cwd, item), root = `docs/designs/${dir}`, copy = `.pi/designs/selected/${item.handle}`, before = `${copy}.before`;
 	const previous = readTree(confined(cwd, copy)), changes = previous.size ? delta(previous, files) : undefined;
-	const owned = Buffer.from(`${JSON.stringify({ handle: item.handle, name: item.name, version, ...item.foundation ? { foundation: item.foundation, app: APP_FILE, build: BUILD_FILE, entry: "src/main.jsx" } : {} }, null, "\t")}\n`);
+	const owned = Buffer.from(`${JSON.stringify({ handle: item.handle, name: item.name, version, ...item.bundle ? { bundle: item.bundle, referenceEvidence: "REFERENCE-SOURCES.json" } : {}, ...item.foundation ? { foundation: item.foundation, app: APP_FILE, build: BUILD_FILE, entry: "src/main.jsx" } : {} }, null, "\t")}\n`);
 	let exported = new Map([...files, ["DESIGN.json", owned], ["BRIEF.md", Buffer.from(briefFile(item))], ["HANDOFF.md", Buffer.from(handoff(item, version, files))]]);
+	if (item.bundle) {
+		const bundle = frozenReferences(cwd, item)!;
+		exported.set("REFERENCE-SOURCES.json", Buffer.from(JSON.stringify({ bundle: bundle.id, mode: "provenance-only", notice: "Source assets were not redistributed. Check licenses and source permissions before reuse.", refs: bundle.refs.map(ref => ({ ref: ref.ref, source: ref.source, aspect: ref.aspect, note: ref.note, region: ref.region, sourceFiles: ref.files })) }, null, "\t")));
+	}
 	if (item.foundation) {
 		const record = appReceipt(files)!;
 		// Export-only handoff files belong to the exported receipt, not the studio's authored snapshot.
@@ -431,21 +485,18 @@ async function clone(cwd: string, handle: string, args, tools: Tools) {
 	const given = typeof args.name === "string" && args.name.trim() ? args.name : await tools.text?.(`Name the copy of ${source.name ?? source.handle}`);
 	const name = short(text(given, "name", 200), 40);
 	const item = await change(cwd, store => {
-		const added: Session = { ...structuredClone(source), handle: `design-${store.next++}`, name, selected: undefined, hubSessionId: undefined, hubError: undefined, created: Date.now() };
+		const added: Session = { ...structuredClone(source), handle: `design-${store.next++}`, name, selected: undefined, hubSessionId: undefined, hubError: undefined, hubStage: source.hubSessionId ? "creating" : undefined, created: Date.now() };
 		store.sessions.push(added);
 		return added;
 	});
 	const copied = [...syncTree(cwd, designFolder(item.handle), readTree(confined(cwd, designFolder(source.handle)))).added];
-	const first = `You are now design session ${item.handle} (${name}), a copy of ${source.handle} (${source.name ?? source.handle}): ${designFolder(item.handle)}/ holds a copy of its files, and the chat above was ${source.handle}'s. From now on write only into ${designFolder(item.handle)}/. Reply in one line.`;
+	const first = `You are now design session ${item.handle} (${name}), a copy of ${source.handle} (${source.name ?? source.handle}): ${designFolder(item.handle)}/ holds a copy of its files, and the chat above was ${source.handle}'s. From now on write only into ${designFolder(item.handle)}/. Reply in one line.${item.bundle ? "\n\n" + referenceBundleContext(frozenReferences(cwd, item)!) : ""}`;
 	if (!source.hubSessionId) return { ...await openSession(cwd, item, tools.hub, first), copied };
 	const made = await tools.hub(["fork", source.hubSessionId, name]);
 	const id = made.ok ? made.text.match(/\/s\/([0-9a-f-]{36})\//)?.[1] : undefined;
-	if (!id) return { ...await change(cwd, store => Object.assign(session(store, item.handle), { hubError: `no forked hub session: ${clip(made.text, 300)}` })), copied };
-	const saved = await change(cwd, store => Object.assign(session(store, item.handle), { hubSessionId: id }));
-	if (subtitleOf(saved)) await tools.hub(["subtitle", id, subtitleOf(saved)]);
-	const told = await tools.hub(["prompt", id, first]);
-	if (!told.ok) return { ...await change(cwd, store => Object.assign(session(store, item.handle), { hubError: `forked, first message failed: ${clip(told.text, 300)}` })), copied };
-	return { ...saved, copied };
+	if (!id) return { ...await change(cwd, store => Object.assign(session(store, item.handle), { hubStage: made.uncertain ? "uncertain" : undefined, hubError: `no forked hub session: ${clip(made.text, 300)}` })), copied };
+	const saved = await change(cwd, store => Object.assign(session(store, item.handle), { hubSessionId: id, hubStage: "created" as const }));
+	return { ...await openSession(cwd, saved, tools.hub, first), copied };
 }
 
 export async function runDesign(cwd: string, args, tools: Tools = { hub: hubCall }) {
@@ -515,6 +566,7 @@ export default function designExtension(pi) {
 			system: { type: "string", description: "start: a system from systems; kind app + system astryx creates the optional pinned, locally bundled component starter (first host download asks consent). Other kinds only receive reference guidance; HTML/decks stay independent." },
 			refresh: { type: "boolean", description: "systems: read OpenDesign's newest list instead of the cache" },
 			brief: { type: "string", description: "start: the design brief" },
+			bundle: { type: "string", description: "start: the authorized reference bundle ID from this conversation's explicit Send. Same ID and arguments reuse its original handles; a new batch needs a fresh submission." },
 			directions: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6, description: "start: one direction per session" },
 			names: { type: "array", items: { type: "string" }, maxItems: 6, description: "start (required): a short name per direction for the session list, e.g. Calm, Bold editorial (never design-N), no default: the direction's first words" },
 			title: { type: "string", description: "start (required): a few words naming what is designed, shown under each name, e.g. Home page" },

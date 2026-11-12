@@ -235,6 +235,22 @@ try {
  assert.equal(await evaluate("document.getElementById('left-panel').getClientRects().length > 0"), true, "deep-linked library is not collapsed by initial snapshots");
  assert.deepEqual({ messages: messages.length, commands: commands.length, sessions: hub.registry.list().length }, beforeLibrary, "browsing neither starts sessions nor forwards a provider prompt");
  assert.equal(await evaluate("location.pathname"), "/s/" + id + "/", "the invoking conversation stays current");
+ { // Explicit reference Send: an uncertain failure retries the same frozen submission only.
+  await browser("fill", "#library input[type=search]", "neutral");
+  await evaluate("document.querySelector(\"#library [data-entry='astryx:theme:neutral'] h3\").dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true, cancelable: true }))");
+  await browser("wait", "--fn", "document.querySelector('#reference-draft [data-reference]') && !document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-add]\").disabled");
+  const sentBefore = messages.length; rejectMessage = true;
+  await browser("fill", "#message-input", "Design two variants like this"); await evaluate("document.getElementById('composer').requestSubmit()");
+  await browser("wait", "#draft-retry:not([hidden])");
+  const saved = await evaluate("JSON.parse(localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])).pending.request.references.submission");
+  assert.equal(messages.length, sentBefore, "a refused delivery reaches no agent");
+  await reload("document.getElementById('draft-retry').checkVisibility() && !document.getElementById('connection').textContent.includes('Disconnected')");
+  await browser("click", "#draft-retry"); await browser("wait", "--fn", "document.getElementById('draft-recovery').hidden && !document.getElementById('send').disabled");
+  assert.equal(messages.length, sentBefore + 1); assert.equal(messages.at(-1).bundle, saved, "retry reuses the frozen submission ID");
+  assert.equal(messages.at(-1).references, undefined, "the agent receives a bundle ID, not browser selections");
+  assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 0, "sent references leave the draft");
+  await browser("wait", "--fn", "document.getElementById('connection').dataset.state === 'idle'"); // the fake run starts no turn; let the optimistic Working state lapse
+ }
  // Later reload checks exercise remembered tabs, not the explicit library deep link.
  await evaluate("(() => { const url = new URL(location.href); url.searchParams.delete('view'); history.replaceState(null, '', url); })()");
  await browser("fill", "#message-input", ""); await browser("click", "#tab-plan");
@@ -804,7 +820,7 @@ try {
  await browser("fill", "#message-input", "@web_client @ghost person@cdn.example.com <img src=x onerror=alert(1)>");
  assert.equal(await evaluate("document.querySelectorAll(\".mention-chip\").length"), 2, "emails are not mentions");
  await browser("click", "#send"); await browser("wait", "--fn", "document.getElementById(\"message-input\").value === \"\"");
- assert(messages[0].text.includes("@web_client")); assert.equal(await evaluate("document.querySelector(\"#messages img\")"), null);
+ assert(messages.at(-1).text.includes("@web_client")); assert.equal(await evaluate("document.querySelector(\"#messages img\")"), null);
  // Keep an in-flight submission separately from newer edits until acknowledgment.
  let release; holdMessage = new Promise(resolve => release = resolve);
  await browser("fill", "#message-input", "Sent while leaving"); await browser("click", "#send");

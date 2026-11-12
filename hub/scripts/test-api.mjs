@@ -11,7 +11,7 @@ import { addDesignReference, designReferences, editDesignReference, referenceAss
 import { saveDiagram } from "../../extensions/plan3-diagram.ts";
 import { authorizeReferenceBundle, deliverReferenceBundle, freezeReferenceBundle, referenceBundle, referenceBundleAssets } from "../../extensions/design-bundles.ts";
 import { appStarter } from "../../extensions/design-app.ts";
-import { writeRefusal } from "../../extensions/design.ts";
+import { runDesign, writeRefusal } from "../../extensions/design.ts";
 import { appPublication, ensureAppBuilt } from "../../extensions/design-build.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-api-"));
@@ -665,6 +665,46 @@ try {
 	assert.match(headers.get("content-security-policy"), /default-src 'none'/);
 	assert.match(headers.get("content-security-policy"), /frame-src 'self'/, "View page and explored HTML show in a frame");
 	assert.equal(headers.get("referrer-policy"), "no-referrer");
+	{ // Bundle-aware launch uses the existing executor, with no model, renderer or network.
+		const project = path.join(root, "reference-launch"), owner = randomUUID(), previousOwner = process.env.PI_HUB_SESSION;
+		const source = { id: "astryx:theme:neutral", revision: "b".repeat(64), name: "Owned launch fixture", provenance: "Local fixture", license: "Test license" };
+		const ref = await addDesignReference(project, owner, { ...source, aspect: "colors", note: "Only these colors" }, async () => ({ source, files: new Map([["colors.css", Buffer.from(":root { --accent: purple; }")]]) }));
+		const submission = randomUUID(), data = { text: "Make two variants", target: "product" };
+		await freezeReferenceBundle(project, owner, submission, [{ ref: ref.ref, revision: ref.revision }], data);
+		const args = { action: "start", brief: data.text, title: "Fixture app", kind: "app", directions: ["Calm", "Bold"], names: ["Calm", "Bold"], bundle: submission };
+		const calls = []; let createFails = true, promptFails = false;
+		const tools = { hub: async parts => { calls.push(parts); if (parts[0] === "new" && parts[2] === "Bold" && createFails) return { ok: false, text: "Host unavailable" }; if (["new", "fork"].includes(parts[0])) return { ok: true, text: `http://localhost/s/${randomUUID()}/` }; if (parts[0] === "prompt" && promptFails) return { ok: false, text: "Connection lost after dispatch" }; return { ok: true, text: "Sent." }; } };
+		process.env.PI_HUB_SESSION = owner;
+		try {
+			await assert.rejects(runDesign(project, args, tools), /not authorized/); assert.equal(calls.length, 0, "browsing/freezing cannot start generation");
+			await authorizeReferenceBundle(project, owner, submission, data);
+			process.env.PI_HUB_SESSION = randomUUID(); await assert.rejects(runDesign(project, args, tools), /not authorized/); process.env.PI_HUB_SESSION = owner;
+			await assert.rejects(runDesign(project, { ...args, bundle: "" }, tools), /Invalid reference bundle/);
+			const results = await Promise.all([runDesign(project, args, tools), runDesign(project, args, tools)]), handles = results[0].sessions.map(item => item.handle);
+			assert.deepEqual(results[1].sessions.map(item => item.handle), handles); assert.equal(calls.filter(parts => parts[0] === "new").length, 2, "concurrent starts reserve each direction once");
+			const status = await runDesign(project, { action: "status" }, tools), calm = status.find(item => item.name === "Calm"), bold = status.find(item => item.name === "Bold");
+			assert(calm.hubSessionId); assert.equal(bold.hubSessionId, undefined); assert.equal(calm.foundation, undefined, "an Astryx reference cannot silently choose the component runtime");
+			const first = calls.find(parts => parts[0] === "prompt")[2]; assert.match(first, /untrusted design evidence[\s\S]*Only these colors[\s\S]*colors.css/);
+			const beforeReplay = calls.length; await runDesign(project, args, tools); assert.equal(calls.length, beforeReplay, "replay returns handles without retrying partial launches");
+			await assert.rejects(runDesign(project, { ...args, directions: ["Changed", "Bold"] }, tools), /different start arguments/);
+			createFails = false; promptFails = true;
+			const [failed] = await runDesign(project, { action: "open", handle: bold.handle }, tools); assert(failed.hubSessionId); assert.equal(failed.hubStage, "uncertain");
+			const afterFailure = calls.length; await runDesign(project, { action: "open", handle: bold.handle }, tools); await runDesign(project, { action: "open", handle: calm.handle }, tools);
+			assert.equal(calls.length, afterFailure, "a created session with ambiguous first-prompt delivery is never blindly resent");
+			promptFails = false;
+			// Simulate a reconciled/crash-before-dispatch stage, including an existing scaffold.
+			const storeFile = path.join(project, ".pi/designs/sessions.json"), store = JSON.parse(fs.readFileSync(storeFile)); store.sessions.find(item => item.handle === bold.handle).hubStage = "created"; fs.writeFileSync(storeFile, JSON.stringify(store));
+			for (const handle of handles) fs.writeFileSync(path.join(project, ".pi/designs", handle, "index.html"), "<h1>Owned fixture</h1>");
+			await runDesign(project, { action: "open", handle: bold.handle }, tools); assert.equal(calls.at(-1)[1], failed.hubSessionId); assert.match(calls.at(-1)[2], /Build the design now:[\s\S]*untrusted design evidence/);
+			const [clone] = await runDesign(project, { action: "clone", handle: calm.handle, name: "Calm copy" }, tools); assert.equal(clone.bundle, submission); assert(!handles.includes(clone.handle));
+			assert.deepEqual((await runDesign(project, args, tools)).sessions.map(item => item.handle), handles, "clones retain provenance but never join the original launch reservation");
+			const selected = await runDesign(project, { action: "select", handle: calm.handle }, tools), exported = path.join(project, selected.folder), evidence = JSON.parse(fs.readFileSync(path.join(exported, "REFERENCE-SOURCES.json")));
+			assert.equal(evidence.mode, "provenance-only"); assert.equal(evidence.refs[0].source.license, "Test license"); assert.equal(evidence.refs[0].aspect, "colors");
+			assert(!JSON.stringify(evidence).includes(".pi/designs/references/bundles/"), "exports do not leave broken studio asset dependencies"); assert.match(fs.readFileSync(path.join(exported, "HANDOFF.md"), "utf8"), /not redistributed/);
+			const fresh = randomUUID(); await freezeReferenceBundle(project, owner, fresh, [{ ref: ref.ref, revision: ref.revision }], data); await authorizeReferenceBundle(project, owner, fresh, data);
+			const another = await runDesign(project, { ...args, bundle: fresh }, tools); assert(another.sessions.every(item => !handles.includes(item.handle)), "an explicit fresh submission creates another batch");
+		} finally { if (previousOwner === undefined) delete process.env.PI_HUB_SESSION; else process.env.PI_HUB_SESSION = previousOwner; }
+	}
 	console.log("api ok");
 } finally {
 	await hub.stop();

@@ -36,7 +36,8 @@ type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
 const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
-let pendingSubmission: { text: string; refs: string[]; at: number } | undefined, draftEdits = 0;
+type ReferenceMessage = { text: string; target?: string; diagrams?: { target: string; ids: string[] }[]; references: { submission: string; refs: { ref: string; revision: number }[] } };
+let pendingSubmission: { text: string; refs: string[]; at: number; request?: ReferenceMessage } | undefined, draftEdits = 0;
 let selectedReferenceIds: string[] = [];
 const referenceRows = new Map<string, DesignReference>();
 const chat = new Map();
@@ -129,6 +130,7 @@ function renderShell() {
  for (const button of document.querySelectorAll<HTMLButtonElement>(".session-git-action")) button.disabled = busy; // the sidebar copies (the drawer on phones)
  renderCommands(status?.commands ?? [], busy);
  $("send").disabled = !state.connected || messageSending || !!pendingSubmission; $("send").textContent = state.activity.working ? "Queue" : "Send";
+ ($("draft-retry") as HTMLButtonElement).disabled = !state.connected || messageSending;
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
  $("waiting").textContent = waiting; $("waiting").hidden = !waiting;
@@ -1414,33 +1416,44 @@ $("composer").addEventListener("submit", async event => {
  }
  if (messageSending || !state.connected) return;
  if (pendingSubmission) { showNotice("Resolve the saved submission before sending another message."); return; }
- if (selectedReferenceIds.length) { showNotice("Your references are saved. Reference-led launch is not available in this build yet."); return; }
  if (chatUploads.size) {
   messageSending = true; showNotice("Waiting for the pasted file\u2026");
   try { while (chatUploads.size) await Promise.allSettled([...chatUploads]); } finally { messageSending = false; }
   if (!state.connected) return;
  }
  const text = $("message-input").value; if (!text.trim()) return;
+ const refs = selectedReferenceIds.map(id => referenceRows.get(id));
+ if (refs.some(ref => !ref || ref.status !== "ready")) { showNotice("Wait for ready reference metadata, or remove unavailable selections before sending."); return; }
+ if (refs.length && (/^[/!]/.test(text.trimStart()) || $("message-input").classList.contains("editing-last"))) { showNotice("Send reference selections with a new design brief, not a command or replacement message."); return; }
  const noticeBefore = noticeVersion; // A command error arriving during send outranks the transport success.
  // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
  for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
- const submittedEdits = draftEdits;
- pendingSubmission = { text, refs: [...selectedReferenceIds], at: Date.now() };
- messageSending = true; saveDraft(); expectWork(); renderShell();
+ const message = { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}), ...(refs.length ? { references: { submission: crypto.randomUUID(), refs: refs.map(ref => ({ ref: ref!.ref, revision: ref!.revision })) } } : {}) };
+ pendingSubmission = { text, refs: [...selectedReferenceIds], at: Date.now(), ...message.references ? { request: message as ReferenceMessage } : {} };
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
  const replacing = $("message-input").classList.contains("editing-last") ? prompts().at(-1)?.text : undefined;
  historyAt = -1; $("message-input").classList.remove("editing-last", "from-history"); $("message-input").title = ""; renderHistoryNav();
- try {
-  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); pendingSubmission = undefined; if (draftEdits === submittedEdits && $("message-input").value === text) $("message-input").value = ""; renderMentions(); if (noticeVersion === noticeBefore) showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
- catch (error) {
-  // An explicit refusal before acceptance is retryable; a missing response is not evidence of non-delivery.
-  if (Number.isInteger(error.status) && error.status >= 400 && error.status < 500 && error.status !== 408 && draftEdits === submittedEdits) pendingSubmission = undefined;
-  expectWork(false); showNotice(error.message + ". Your message draft is kept.");
- }
- finally { messageSending = false; saveDraft(); renderRecovery(); renderShell(); }
+ await sendSubmission(pendingSubmission, message, noticeBefore, replacing, sent);
 });
+async function sendSubmission(saved: NonNullable<typeof pendingSubmission>, message: Record<string, unknown>, noticeBefore = noticeVersion, replacing?: string, sent: { line: string }[] = []) {
+ const submittedEdits = draftEdits;
+ messageSending = true; saveDraft(); expectWork(); renderReferenceDraft(); renderRecovery(); renderShell();
+ try {
+  if (replacing !== undefined) await post("drop", { text: replacing });
+  const result = await post("message", message);
+  editLines = editLines.filter(item => !sent.includes(item)); pendingSubmission = undefined;
+  selectedReferenceIds = selectedReferenceIds.filter(id => !saved.refs.includes(id));
+  if (draftEdits === submittedEdits && $("message-input").value === saved.text) $("message-input").value = "";
+  renderMentions();
+  if (noticeVersion === noticeBefore) showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true);
+ } catch (error) {
+  // Reference retries keep the exact envelope even on refusal; never turn uncertainty into a fresh launch ID.
+  if (!saved.request && Number.isInteger(error.status) && error.status >= 400 && error.status < 500 && error.status !== 408 && draftEdits === submittedEdits) pendingSubmission = undefined;
+  expectWork(false); showNotice(error.message + ". Your message draft is kept.");
+ } finally { messageSending = false; saveDraft(); renderRecovery(); renderReferenceDraft(); renderShell(); }
+}
 // Sending shows Working at once instead of when the agent starts seconds later. The server's next activity event
 // replaces this guess; if none comes (a command that starts no turn), it drops back after 15 s.
 let expectTimer = 0;
@@ -1662,6 +1675,14 @@ function saveDraft() {
   else localStorage.removeItem(draftKey);
  } catch { /* private mode */ }
 }
+function savedReferenceRequest(value, text: string, ids: string[]): ReferenceMessage | undefined {
+ if (!value || value.text !== text || value.target !== undefined && (typeof value.target !== "string" || !/^(?:product|[a-f0-9]{8})$/.test(value.target))) return;
+ const selection = value.references;
+ if (!selection || typeof selection.submission !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(selection.submission) || !Array.isArray(selection.refs) || !ids.length || selection.refs.length !== ids.length || selection.refs.some((ref, index) => ref?.ref !== ids[index] || !Number.isSafeInteger(ref.revision) || ref.revision < 1)) return;
+ const diagrams = value.diagrams;
+ if (diagrams !== undefined && (!Array.isArray(diagrams) || diagrams.length > 64 || diagrams.some(part => !part || typeof part.target !== "string" || part.target.length > 128 || !Array.isArray(part.ids) || part.ids.length > 64 || part.ids.some(id => typeof id !== "string" || id.length > 128)))) return;
+ return { text, target: value.target, ...(diagrams ? { diagrams: diagrams.map(part => ({ target: part.target, ids: part.ids })) } : {}), references: { submission: selection.submission, refs: selection.refs.map(ref => ({ ref: ref.ref, revision: ref.revision })) } };
+}
 try {
  const raw = localStorage.getItem(draftKey) ?? "";
  let value; try { value = JSON.parse(raw); } catch { /* legacy plain-text draft */ }
@@ -1669,20 +1690,26 @@ try {
  const ids = (rows: unknown): string[] => Array.isArray(rows) ? [...new Set(rows.filter((id): id is string => typeof id === "string" && /^ref[1-9]\d{0,4}$/.test(id)))].slice(0, 16) : [];
  if (!$("message-input").value) $("message-input").value = structured ? value.text : raw;
  if (structured) selectedReferenceIds = ids(value.refs);
- if (structured && typeof value.pending?.text === "string" && value.pending.text.length <= 20000 && Number.isFinite(value.pending.at)) pendingSubmission = { text: value.pending.text, refs: ids(value.pending.refs), at: value.pending.at };
+ if (structured && typeof value.pending?.text === "string" && value.pending.text.length <= 20000 && Number.isFinite(value.pending.at)) {
+  const refs = ids(value.pending.refs);
+  pendingSubmission = { text: value.pending.text, refs, at: value.pending.at, request: savedReferenceRequest(value.pending.request, value.pending.text, refs) };
+ }
 } catch { /* private mode */ }
 function renderRecovery() {
  $("draft-recovery").hidden = !pendingSubmission || messageSending;
+ $("draft-retry").hidden = !pendingSubmission?.request;
  $("draft-recovery-text").textContent = pendingSubmission ? [pendingSubmission.text, pendingSubmission.refs.map(id => "@" + id).join(" ")].filter(Boolean).join("\n") : "";
 }
-$("draft-restore").addEventListener("click", () => {
- if (!pendingSubmission) return;
+$("draft-retry").addEventListener("click", () => { const saved = pendingSubmission; if (saved?.request && state.connected && !messageSending) void sendSubmission(saved, saved.request); });
+const confirmNewSubmission = () => confirmBox("This does not cancel the earlier submission. Check Chat and existing design handles first. Sending the edited draft again creates a NEW submission and may create more variants. Continue?");
+$("draft-restore").addEventListener("click", async () => {
+ if (!pendingSubmission || pendingSubmission.refs.length && !await confirmNewSubmission()) return;
  const box = $("message-input"), text = !box.value || box.value === pendingSubmission.text ? pendingSubmission.text : pendingSubmission.text + "\n\n" + box.value;
  const refs = [...new Set([...pendingSubmission.refs, ...selectedReferenceIds])];
  if (text.length > box.maxLength || refs.length > 16) { showNotice("Both drafts are kept. Copy the saved text separately; merging would exceed the message limit."); return; }
  box.value = text; selectedReferenceIds = refs; pendingSubmission = undefined; box.dispatchEvent(new Event("input")); box.focus(); renderRecovery(); renderReferenceDraft(); renderShell();
 });
-$("draft-dismiss").addEventListener("click", () => { pendingSubmission = undefined; saveDraft(); renderRecovery(); renderReferenceDraft(); renderShell(); });
+$("draft-dismiss").addEventListener("click", async () => { if (pendingSubmission?.refs.length && !await confirmNewSubmission()) return; pendingSubmission = undefined; saveDraft(); renderRecovery(); renderReferenceDraft(); renderShell(); });
 renderRecovery(); renderReferenceDraft(); void loadReferenceRows();
 $("message-input").addEventListener("input", () => { draftEdits++; saveDraft(); });
 // S-12: typing into a parked session starts it once, so Pi is (nearly) ready when the message is sent.
