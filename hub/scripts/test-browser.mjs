@@ -306,7 +306,7 @@ try {
  }
  { // P3-12: the agent's web picks show as this conversation's cards; one becomes a normal @ref and Send delivers its saved image.
   const { publishFound } = await import("../../extensions/design-references.ts"), downloads = join(root, "downloads");
-  fs.mkdirSync(join(downloads, "set"), { recursive: true }); fs.copyFileSync(new URL("../../extensions/astryx-runtime/previews/neutral.webp", import.meta.url), join(downloads, "set", "01.webp"));
+  fs.mkdirSync(join(downloads, "set"), { recursive: true }); fs.copyFileSync(new URL(`../../extensions/astryx-runtime/previews/components/${JSON.parse(fs.readFileSync(new URL("../../extensions/astryx-runtime/previews/components/components.json", import.meta.url), "utf8")).themes.neutral}.webp`, import.meta.url), join(downloads, "set", "01.webp"));
   assert.equal((await publishFound(folder, id, [{ title: "Kiosk POS", page: "https://pos.example/kiosk", image: join(downloads, "set", "01.webp"), why: "Large tiles for fast orders" }], downloads)).added, 1);
   await evaluate("[...document.querySelectorAll('#library .library-heading button')].find(button => button.textContent === 'Refresh sources').click()");
   await browser("fill", "#library input[type=search]", ""); await browser("click", "#library [data-tab=image]");
@@ -337,7 +337,7 @@ try {
   assert.match(await evaluate("document.querySelector('.library-detail a').href"), /^https:\/\/pos\.test\/a/);
   await clickShown(".library-detail button"); await browser("wait", "#library [data-result='1']");
   // V-06: Add saves the result as a pick (the session's publishFound) and attaches it; a new search keeps the pick.
-  onPick = async ({ set, n }) => { assert.deepEqual([set, n], ["s1", 1]); fs.copyFileSync(new URL("../../extensions/astryx-runtime/previews/stone.webp", import.meta.url), join(downloads, "set", "02.webp")); const { ids } = await publishFound(folder, id, [{ title: "Kiosk grid", page: "https://pos.test/a", image: join(downloads, "set", "02.webp") }], downloads); return { id: ids[0] }; }; // stone, not neutral: the same bytes would merge into the first pick
+  onPick = async ({ set, n }) => { assert.deepEqual([set, n], ["s1", 1]); fs.copyFileSync(new URL(`../../extensions/astryx-runtime/previews/components/${JSON.parse(fs.readFileSync(new URL("../../extensions/astryx-runtime/previews/components/components.json", import.meta.url), "utf8")).themes.stone}.webp`, import.meta.url), join(downloads, "set", "02.webp")); const { ids } = await publishFound(folder, id, [{ title: "Kiosk grid", page: "https://pos.test/a", image: join(downloads, "set", "02.webp") }], downloads); return { id: ids[0] }; }; // stone, not neutral: the same bytes would merge into the first pick
   const draftBefore = await evaluate("document.querySelectorAll('#reference-draft [data-reference]').length");
   await clickShown("#library [data-result='1'] [data-pick]");
   await browser("wait", "--fn", `document.querySelectorAll('#reference-draft [data-reference]').length === ${draftBefore + 1}`);

@@ -70,9 +70,13 @@ for (const name of names) {
 	else rows.set(name, { name, error: example?.code ? "pinned example has no top-level component" : "no pinned example" });
 }
 
+// Every pinned theme gets one picture of the same small screen (ThemeSample.jsx), in the same bundle.
+const THEMES = catalog.themes.map(theme => theme.slug), SAMPLE = "ThemeSample";
+sources.set(SAMPLE, { code: fs.readFileSync(new URL("./astryx-examples/ThemeSample.jsx", import.meta.url), "utf8"), label: "theme sample" });
+
 // 2. One bundle for all of them; an example that does not compile is dropped and the rest rebuilt.
-const vendor = '@import "@astryxdesign/core/reset.css";\n@import "@astryxdesign/core/astryx.css";\n@import "@astryxdesign/theme-neutral/theme.css";\n';
-const main = list => `import {Component} from "react";\nimport {createRoot} from "react-dom/client";\nimport {flushSync} from "react-dom";\nimport {Theme} from "@astryxdesign/core/theme";\nimport {neutralTheme} from "@astryxdesign/theme-neutral/built";\n${list.map((name, i) => `import E${i} from "./examples/${name}.tsx";`).join("\n")}\nconst all = {${list.map((name, i) => `${JSON.stringify(name)}: E${i}`).join(", ")}};\nclass Guard extends Component { state = {error: null}; static getDerivedStateFromError(error) { return {error}; } render() { if (this.state.error) { window.shotError = String(this.state.error.message || this.state.error); return null; } return this.props.children; } }\nconst root = createRoot(document.getElementById("root"));\nwindow.show = name => { window.shotError = null; const Example = all[name]; flushSync(() => root.render(<Theme theme={neutralTheme} mode="light"><div id="shot" key={name} style={{display:"inline-block",padding:24,minWidth:320,maxWidth:640,background:"#fff"}}><Guard><Example/></Guard></div></Theme>)); return new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => done(window.shotError), 150)))); };\n`;
+const vendor = `@import "@astryxdesign/core/reset.css";\n@import "@astryxdesign/core/astryx.css";\n${THEMES.map(slug => `@import "@astryxdesign/theme-${slug}/theme.css";\n`).join("")}`;
+const main = list => `import {Component} from "react";\nimport {createRoot} from "react-dom/client";\nimport {flushSync} from "react-dom";\nimport {Theme} from "@astryxdesign/core/theme";\n${THEMES.map(slug => `import {${slug}Theme} from "@astryxdesign/theme-${slug}/built";\n`).join("")}const themes = {${THEMES.map(slug => `${slug}: ${slug}Theme`).join(", ")}};\n${list.map((name, i) => `import E${i} from "./examples/${name}.tsx";`).join("\n")}\nconst all = {${list.map((name, i) => `${JSON.stringify(name)}: E${i}`).join(", ")}};\nclass Guard extends Component { state = {error: null}; static getDerivedStateFromError(error) { return {error}; } render() { if (this.state.error) { window.shotError = String(this.state.error.message || this.state.error); return null; } return this.props.children; } }\nconst root = createRoot(document.getElementById("root"));\nwindow.show = (name, theme = "neutral") => { window.shotError = null; const Example = all[name]; flushSync(() => root.render(<Theme theme={themes[theme]} mode="light"><div id="shot" key={name + theme} style={name === "ThemeSample" ? {display:"inline-block",padding:32,width:520,background:"var(--color-background-body)"} : {display:"inline-block",padding:24,minWidth:320,maxWidth:640,background:"#fff"}}><Guard><Example/></Guard></div></Theme>)); return new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => done(window.shotError), 150)))); };\n`;
 let list = [...sources.keys()], built;
 for (let attempt = 0; !built && list.length; attempt++) {
 	const files = [["src/main.jsx", main(list)], ["src/vendor.css", vendor], ...list.map(name => [`src/examples/${name}.tsx`, sources.get(name).code])];
@@ -102,13 +106,13 @@ const contextMenu = "(() => { const r = document.getElementById('shot').getBound
 // Union of the picture and everything outside #root (portals) or in the top layer, clamped to the viewport.
 const openedBox = "new Promise(done => setTimeout(() => { const parts = [document.getElementById('shot'), ...[...document.body.children].filter(el => el.id !== 'root' && el.tagName !== 'SCRIPT').flatMap(el => [el, ...el.querySelectorAll('*')]), ...document.querySelectorAll(':popover-open, :popover-open *, dialog[open], dialog[open] *')]; let [l, t, r, b] = [Infinity, Infinity, -Infinity, -Infinity]; for (const el of parts) { const box = el.getBoundingClientRect(); if (!box.width || !box.height || getComputedStyle(el).visibility === 'hidden') continue; l = Math.min(l, box.left); t = Math.min(t, box.top); r = Math.max(r, box.right); b = Math.max(b, box.bottom); } l = Math.max(0, l); t = Math.max(0, t); done([l, t, Math.min(innerWidth, r) - l, Math.min(innerHeight, b) - t]); }, 700))";
 fs.mkdirSync(out, { recursive: true });
-const images = new Map(), shotPng = path.join(page, "shot.png");
+const images = new Map(), themeImages = new Map(), shotPng = path.join(page, "shot.png");
 try {
 	browser(undefined, "set", "viewport", "720", "900", "2");
 	browser(undefined, "open", pathToFileURL(path.join(page, "index.html")).href);
 	try { browser(undefined, "wait", "--fn", "typeof window.show === 'function'"); }
 	catch (error) { throw new Error(`The picture page did not start: ${browser(undefined, "errors")}`.slice(0, 1500), { cause: error }); }
-	for (const name of list) {
+	for (const name of list.filter(name => name !== SAMPLE)) {
 		const failed = JSON.parse(browser(`window.show(${JSON.stringify(name)})`, "--json", "eval", "--stdin")).data.result;
 		// Examples link remote photos the offline page cannot load: a grey stand-in beats a broken-image icon.
 		browser("(async () => { const imgs = [...document.querySelectorAll('#shot img')]; for (let i = 0; i < 30 && !imgs.every(img => img.complete); i++) await new Promise(r => setTimeout(r, 100)); for (const img of imgs) if (!img.naturalWidth) { img.alt = ''; img.srcset = ''; img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"3\"><rect width=\"4\" height=\"3\" fill=\"#d9dde3\"/></svg>'); } await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); })()", "eval", "--stdin");
@@ -128,6 +132,18 @@ try {
 		images.set(name, webp);
 		rows.set(name, { name, example: sources.get(name).label + (OPEN[name] ? `, opened by ${OPEN[name]}` : ""), width: crop ? Math.round(crop[2] * 2) : png.readUInt32BE(16), height: crop ? Math.round(crop[3] * 2) : png.readUInt32BE(20), webp: webp.length });
 	}
+	// Theme fonts only now (Google Fonts, as each theme's fonts.css says), so component pictures stay neutral-font.
+	if (!list.includes(SAMPLE)) throw new Error(`${SAMPLE}.jsx did not compile: ${rows.get(SAMPLE)?.error}`);
+	const fonts = THEMES.flatMap(slug => [...fs.readFileSync(path.join(runtime.directory, `node_modules/@astryxdesign/theme-${slug}/fonts.css`), "utf8").matchAll(/@import url\('(https:\/\/fonts\.googleapis\.com\/[^']+)'\)/g)].map(match => match[1]));
+	browser(`(() => { for (const href of ${JSON.stringify(fonts)}) document.head.append(Object.assign(document.createElement("link"), { rel: "stylesheet", href })); })()`, "eval", "--stdin");
+	for (const slug of THEMES) {
+		const failed = JSON.parse(browser(`window.show("${SAMPLE}", ${JSON.stringify(slug)}).then(async error => { await document.fonts.ready; return error; })`, "--json", "eval", "--stdin")).data.result;
+		if (failed) throw new Error(`The ${slug} theme sample crashed: ${failed}`);
+		browser(undefined, "screenshot", "#shot", shotPng);
+		const png = fs.readFileSync(shotPng), webp = Buffer.from(JSON.parse(browser(toWebp(png), "--json", "eval", "--stdin")).data.result, "base64");
+		themeImages.set(slug, webp);
+		console.log(`theme ${slug}: ${png.readUInt32BE(16)}x${png.readUInt32BE(20)} webp ${kb(webp.length)}`);
+	}
 } finally { try { browser(undefined, "close"); } catch {} if (!process.env.KEEP_PAGE) fs.rmSync(page, { recursive: true, force: true }); else console.log(page); }
 
 // 4. Write: the trial folder, or the bundle (stale pictures removed) with its manifest.
@@ -137,9 +153,9 @@ const unique = new Map([...images.values()].map(bytes => [sha(bytes), bytes]));
 const total = [...unique.values()].reduce((n, bytes) => n + bytes.length, 0);
 if (!picked.length && total > BUDGET) throw new Error(`Component pictures total ${kb(total)}, over the ${kb(BUDGET)} budget; nothing was written.`);
 if (!picked.length) for (const file of fs.readdirSync(out)) if (file.endsWith(".webp")) fs.rmSync(path.join(out, file));
-if (picked.length) for (const [name, bytes] of images) fs.writeFileSync(path.join(out, `${name}.webp`), bytes);
+if (picked.length) for (const [name, bytes] of [...images, ...[...themeImages].map(([slug, bytes]) => [`theme-${slug}`, bytes])]) fs.writeFileSync(path.join(out, `${name}.webp`), bytes);
 else {
-	for (const [hash, bytes] of unique) fs.writeFileSync(path.join(out, `${hash}.webp`), bytes);
+	for (const [hash, bytes] of [...unique, ...[...themeImages.values()].map(bytes => [sha(bytes), bytes])]) fs.writeFileSync(path.join(out, `${hash}.webp`), bytes);
 	// Inspect shows usage and props with no runtime installed (V-10), so they are bundled beside the pictures.
 	const docs = {};
 	for (const name of names) {
@@ -148,7 +164,7 @@ else {
 		docs[name] = { description: usage?.description, practices: usage?.bestPractices?.map(item => ({ do: item.guidance, text: item.description })), props: Array.isArray(props) ? props.map(({ name: prop, type, default: fallback, required, description }) => ({ name: prop, type, default: fallback, required, description })) : [] };
 	}
 	fs.writeFileSync(path.join(out, "docs.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, docs })}\n`);
-	fs.writeFileSync(path.join(out, "components.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, version: catalog.version, images: Object.fromEntries([...images].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) => [name, sha(bytes)])) }, null, 1)}\n`);
+	fs.writeFileSync(path.join(out, "components.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, version: catalog.version, images: Object.fromEntries([...images].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) => [name, sha(bytes)])), themes: Object.fromEntries([...themeImages].map(([slug, bytes]) => [slug, sha(bytes)])) }, null, 1)}\n`);
 }
 for (const name of names) { const row = rows.get(name); console.log(row.error ? `- ${name}: ${row.error}` : `${name}: ${row.width}x${row.height} webp ${kb(row.webp)} (${row.example})`); }
 console.log(`${images.size}/${names.length} pictured, ${kb(total)} total; ${out}`);

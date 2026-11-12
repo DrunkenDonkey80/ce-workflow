@@ -14,25 +14,22 @@ export type CatalogEntry = {
 	license: string; provenance: string; category?: string; description?: string; url?: string; imageRevision?: string;
 	folder?: string; page?: string; handle?: string; designRevision?: string; status?: string;
 };
-const IMAGE_REVISION = "fd5cf0df987791117e96ccc0bec603c64be8b136";
-const IMAGE_THEMES = ["butter", "gothic", "matcha", "neutral", "stone", "y2k"];
 export function designImage(id: string | null, revision: string | null, cwd?: string, owner?: string) {
 	if (id?.startsWith("found:")) return cwd && owner && revision === id.slice(6) ? foundImage(cwd, owner, revision) : undefined;
 	const component = id?.startsWith("astryx:component:") ? id.slice(17) : undefined;
-	if (component) return revision === shots.lockDigest && Object.hasOwn(shots.images, component) ? fs.readFileSync(new URL(`./astryx-runtime/previews/components/${shots.images[component]}.webp`, import.meta.url)) : undefined;
-	const slug = IMAGE_THEMES.find(name => id === `astryx:theme:${name}`);
-	if (!slug || revision !== IMAGE_REVISION) return undefined;
-	return fs.readFileSync(new URL(`./astryx-runtime/previews/${slug}.webp`, import.meta.url));
+	const theme = id?.startsWith("astryx:theme:") ? id.slice(13) : undefined, pictures = component ? shots.images : theme ? shots.themes : {};
+	const name = component ?? theme;
+	return name && revision === shots.lockDigest && Object.hasOwn(pictures, name) ? fs.readFileSync(new URL(`./astryx-runtime/previews/components/${pictures[name]}.webp`, import.meta.url)) : undefined;
 }
 let astryx;
 try { astryx = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/catalog.json", import.meta.url), "utf8")); }
 catch (cause) { throw new Error("The bundled design catalog is unreadable; reinstall ce-workflow.", { cause }); }
 if (astryx.lockDigest !== astryxRuntime.lockDigest || astryx.version !== astryxRuntime.versions["@astryxdesign/core"]) throw new Error("Design catalog does not match the reviewed Astryx pin.");
-// Component pictures from scripts/astryx-component-shots.mjs; a stale set (older pin) is shown as no picture.
-let shots: { lockDigest: string; images: Record<string, string> };
+// Component and theme pictures from scripts/astryx-component-shots.mjs; a stale set (older pin) is shown as no picture.
+let shots: { lockDigest: string; images: Record<string, string>; themes: Record<string, string> };
 try { shots = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/previews/components/components.json", import.meta.url), "utf8")); }
-catch { shots = { lockDigest: "", images: {} }; }
-if (shots.lockDigest !== astryx.lockDigest) shots = { lockDigest: "", images: {} };
+catch { shots = { lockDigest: "", images: {}, themes: {} }; }
+if (shots.lockDigest !== astryx.lockDigest || !shots.themes) shots = { lockDigest: "", images: {}, themes: {} };
 // Usage and props for one component, bundled by the same script; read on Inspect, not in the catalog listing.
 export function designDocs(id: string | null) {
 	const name = id?.startsWith("astryx:component:") ? id.slice(17) : undefined;
@@ -159,12 +156,12 @@ export async function designCatalog(cwd: string, owner?: string) {
 		}
 	}
 	for (const theme of astryx.themes) {
-		const image = IMAGE_THEMES.includes(theme.slug);
+		const image = Object.hasOwn(shots.themes, theme.slug);
 		entries.push({
 			id: `astryx:theme:${theme.slug}`, source: "astryx", kind: "theme", name: theme.displayName, description: theme.description,
 			revision: astryx.lockDigest, preview: image ? "image" : "none", availability: image ? "cached" : "unavailable", license: "MIT",
-			imageRevision: image ? IMAGE_REVISION : undefined, url: image ? `https://github.com/meta/astryx/blob/${IMAGE_REVISION}/apps/docsite/public/theme-${theme.slug}-preview.png` : undefined,
-			provenance: `Astryx ${astryx.version} theme metadata. ${image ? `Static source image from docs 0.7.13 (${IMAGE_REVISION.slice(0, 7)}). ` : "No supplied image. "}Inspiration does not install or select a theme.`,
+			imageRevision: image ? shots.lockDigest : undefined,
+			provenance: `Astryx ${astryx.version} theme; ${image ? "picture of a sample screen rendered in this theme" : "no picture"}. Inspiration does not install or select a theme.`,
 		});
 	}
 	for (const [group, components] of Object.entries(astryx.groups) as [string, { name: string; package: string }[]][]) {

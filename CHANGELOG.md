@@ -13,6 +13,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
   ![The Components tab: a picture per component](docs/changelog/design-library-components.png)
   ![Inspecting Button: picture, usage and props](docs/changelog/design-library-component-inspect.png)
   ![Image search with a saved pick](docs/changelog/design-library-image-search.png)
+- Theme cards now show each Astryx theme on a real sample screen (heading, badges, input, switch, buttons) instead of the docs' mood photos, and Chocolate has a picture too. All seven theme packages are now part of the Astryx runtime, so its next use asks to download it again (about 29 MB).
+  ![Themes tab: every theme on the same sample screen](docs/changelog/design-library-themes.png)
 - Ask the chat to find existing interfaces ("top POS screens") and the agent's picks from a Google image search show up as **Web results** cards in that conversation's Design library, with their source page and why each one fits. Add one as an `@ref`, or **Capture page** to screenshot its source site.
   ![A web result card in the Design library](docs/changelog/design-library-found.png)
 - Hub links between whole projects: in **Hub links…**, the other hub's sessions now show as a tree by project, and clicking a project heading links the two projects. Every session of either project then reaches every live session of the other as `project-name~hub`, and replies go back to whoever sent. Both hubs need this version (link comm 2).

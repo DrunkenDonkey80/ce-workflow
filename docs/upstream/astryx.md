@@ -22,6 +22,10 @@ Advancing a git review does **not** upgrade those npm pins, the host cache, a de
 
 No upstream palette/discovery implementation was copied: the optional installed public API supplies its results; our token mapping, validation, build/publication and hub workflow are local code. Full dependency license texts ship with the reviewed runtime and editable exports. Source availability is not a trademark grant; separately introduced fonts/icons/assets need their own review. The foundation is optional and experimental; the Windows cache/build/handoff checks do not certify the entire component catalog, Safari or touch hardware. Remote transport and final quality evidence stay separately scoped in plan 55b392b8.
 
+## Bundled library images
+
+All seven theme packages (`@astryxdesign/theme-<name>` 0.7.12, MIT) are in the pinned runtime. `node scripts/astryx-component-shots.mjs` renders every component and one sample screen per theme (`scripts/astryx-examples/ThemeSample.jsx`, with the theme's Google fonts) into `extensions/astryx-runtime/previews/components/`, beside the upstream MIT notice in `extensions/astryx-runtime/previews/LICENSE.txt` (copyright 2026 Meta Platforms, Inc.). `components.json` names them by content hash under the pin's lock digest, so a pin update reruns the script. The docs-site mood photos used before are no longer bundled.
+
 ## November 11 review
 
 Reviewed through b8335ba; dropped the deleted generated API report from the watch list, retaining the public API export watch. Runtime remains 0.7.12: rejected the 0.7.13 Core Markdown URL, shared layer runtime, touch-pan light-dismiss and disabled-submit hydration changes, CLI keyword lookup/error-pointer/skipped-theme changes, Selector entrance-side positioning and shared React theme/icon registries because none fixes a failure in our pinned single-Core foundation.

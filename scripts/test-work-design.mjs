@@ -89,10 +89,12 @@ try {
 		const folder = new URL("../extensions/astryx-runtime/previews/components/", import.meta.url);
 		const shots = JSON.parse(fs.readFileSync(new URL("components.json", folder), "utf8"));
 		assert.equal(shots.lockDigest, astryxRuntime.lockDigest, "component pictures are stale: run node scripts/astryx-component-shots.mjs after a pin update");
-		const hashes = [...new Set(Object.values(shots.images))];
+		const catalog = JSON.parse(fs.readFileSync(new URL("../extensions/astryx-runtime/catalog.json", import.meta.url), "utf8"));
+		assert.deepEqual(Object.keys(shots.themes).sort(), catalog.themes.map(theme => theme.slug).sort(), "every pinned theme has a rendered picture");
+		const hashes = [...new Set([...Object.values(shots.images), ...Object.values(shots.themes)])], themed = new Set(Object.values(shots.themes));
 		let total = 0;
 		for (const sha of hashes) {
-			const bytes = fs.readFileSync(new URL(`${sha}.webp`, folder)); total += bytes.length;
+			const bytes = fs.readFileSync(new URL(`${sha}.webp`, folder)); if (!themed.has(sha)) total += bytes.length;
 			assert.equal(createHash("sha256").update(bytes).digest("hex"), sha, `${sha}.webp is the picture components.json names`);
 		}
 		assert.deepEqual(fs.readdirSync(folder).filter(file => file.endsWith(".webp")).sort(), hashes.map(sha => `${sha}.webp`).sort(), "no unlisted pictures");

@@ -52,7 +52,7 @@ try {
 	}
 	if (found) {
 		const { publishFound } = await import("../../extensions/design-references.ts"), downloads = join(root, "downloads"); fs.mkdirSync(downloads);
-		fs.copyFileSync(new URL("../../extensions/astryx-runtime/previews/neutral.webp", import.meta.url), join(downloads, "01.webp"));
+		fs.copyFileSync(new URL(`../../extensions/astryx-runtime/previews/components/${JSON.parse(fs.readFileSync(new URL("../../extensions/astryx-runtime/previews/components/components.json", import.meta.url), "utf8")).themes.neutral}.webp`, import.meta.url), join(downloads, "01.webp"));
 		await publishFound(folder, id, [{ title: "Example web result", page: "https://pos.example/kiosk", image: join(downloads, "01.webp"), why: "Why the agent picked it, in one line" }], downloads);
 	}
 	await rpc.send({ type: "prompt", message: "/state " + JSON.stringify(design ? { plan: null, modes: { design: "design-1" } } : { plan: { id: "12345678", title: "Sample plan", status: "active", done: 1, total: 2, focus: "S02", bias: 0 }, modes: { research: "off", night: "off" } }) });

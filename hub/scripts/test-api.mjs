@@ -98,9 +98,10 @@ try {
 	assert.equal(hub.host.live.has(id), false, "browsing does not wake a parked model");
 	assert.equal(await rawGet(`/s/${id}/api/designcatalog`, {}), 401, "catalog requires normal session authentication");
 	const images = catalog.body.entries.filter(item => item.preview === "image" && item.kind === "theme");
-	assert.equal(images.length, 6, "only six themes have supplied source images");
+	assert.deepEqual(images.map(item => item.id.slice(13)).sort(), Object.keys(shots.themes).sort(), "every pinned theme has its rendered picture");
+	assert.equal(images.length, 7);
 	for (const item of images) {
-		assert.equal(item.imageRevision, "fd5cf0df987791117e96ccc0bec603c64be8b136", "image provenance is separate from the runtime pin");
+		assert.equal(item.imageRevision, shots.lockDigest, "theme pictures belong to the rendered set for this pin");
 		const route = `designimage?id=${encodeURIComponent(item.id)}&revision=${item.imageRevision}`, image = await get(id, route);
 		assert.equal(image.status, 200); assert.equal(image.headers.get("content-type"), "image/webp");
 		assert.equal(image.body.toString("ascii", 0, 4), "RIFF"); assert.equal(image.body.toString("ascii", 8, 12), "WEBP");
@@ -109,7 +110,7 @@ try {
 	}
 	assert.equal((await get(id, `designimage?id=astryx:theme:neutral&revision=${"0".repeat(40)}`)).status, 404, "a stale image revision never serves different bytes");
 	assert.equal((await get(id, `designimage?id=../../sessions.json&revision=${images[0].imageRevision}`)).status, 404, "image names are a whitelist, not filesystem paths");
-	assert.equal((await get(id, `designimage?id=astryx:theme:chocolate&revision=${images[0].imageRevision}`)).status, 404, "missing source images are honest, not placeholders");
+	assert.equal((await get(id, `designimage?id=astryx:theme:__proto__&revision=${images[0].imageRevision}`)).status, 404, "theme picture names are own keys only");
 	assert.equal(hub.host.live.has(id), false, "images do not wake a parked model");
 	{
 		const input = { action: "add", id: images[0].id, revision: images[0].revision, aspect: "colors", note: "<img src=x onerror=alert(1)>" };
@@ -747,7 +748,7 @@ try {
 	}
 	// P3-11: the agent's web picks become this conversation's library cards; only downloaded images, never other files.
 	{
-		const project = path.join(root, "found"), downloads = path.join(root, "downloads"), webp = fs.readFileSync(new URL("../../extensions/astryx-runtime/previews/neutral.webp", import.meta.url));
+		const project = path.join(root, "found"), downloads = path.join(root, "downloads"), webp = fs.readFileSync(new URL(`../../extensions/astryx-runtime/previews/components/${JSON.parse(fs.readFileSync(new URL("../../extensions/astryx-runtime/previews/components/components.json", import.meta.url), "utf8")).themes.neutral}.webp`, import.meta.url));
 		fs.mkdirSync(path.join(downloads, "set"), { recursive: true }); fs.writeFileSync(project + ".jsonl", ""); fs.writeFileSync(project + "-other.jsonl", ""); fs.mkdirSync(project);
 		fs.writeFileSync(path.join(downloads, "set", "01.webp"), webp); fs.writeFileSync(path.join(downloads, "set", "02.jpg"), "not an image"); fs.writeFileSync(path.join(root, "outside.webp"), webp);
 		const mine = hub.registry.add({ name: "found", folder: project, sessionFile: project + ".jsonl", state: "parked" }).id, other = hub.registry.add({ name: "other", folder: project, sessionFile: project + "-other.jsonl", state: "parked" }).id;

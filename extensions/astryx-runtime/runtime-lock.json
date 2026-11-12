@@ -10,7 +10,13 @@
       "dependencies": {
         "@astryxdesign/cli": "0.7.12",
         "@astryxdesign/core": "0.7.12",
+        "@astryxdesign/theme-butter": "0.7.12",
+        "@astryxdesign/theme-chocolate": "0.7.12",
+        "@astryxdesign/theme-gothic": "0.7.12",
+        "@astryxdesign/theme-matcha": "0.7.12",
         "@astryxdesign/theme-neutral": "0.7.12",
+        "@astryxdesign/theme-stone": "0.7.12",
+        "@astryxdesign/theme-y2k": "0.7.12",
         "@stylexjs/stylex": "0.19.1",
         "esbuild": "0.28.2",
         "react": "19.3.1",
@@ -75,10 +81,88 @@
         "react-dom": ">=19.0.0"
       }
     },
+    "node_modules/@astryxdesign/theme-butter": {
+      "version": "0.7.12",
+      "resolved": "https://registry.npmjs.org/@astryxdesign/theme-butter/-/theme-butter-0.7.12.tgz",
+      "integrity": "sha512-LM8xOI2Z0XuxRocJXEr1kHIh0VgdxKcfseVayX/OyUHFRZLMpVNr6baTdNXrxe2BhEhejI4zg1yCU+hkcP0vew==",
+      "license": "MIT",
+      "dependencies": {
+        "lucide-react": "^1.18.0"
+      },
+      "peerDependencies": {
+        "@astryxdesign/core": "0.7.12",
+        "react": ">=19"
+      }
+    },
+    "node_modules/@astryxdesign/theme-chocolate": {
+      "version": "0.7.12",
+      "resolved": "https://registry.npmjs.org/@astryxdesign/theme-chocolate/-/theme-chocolate-0.7.12.tgz",
+      "integrity": "sha512-6Xw663zgw03rSszXp7Ao53ZHsF2Q0leUqLkFpRsQ2v7GY9kkYMD067t40uj8BLIIkQGRguXruH4H+M5rHr6qoA==",
+      "license": "MIT",
+      "dependencies": {
+        "lucide-react": "^1.18.0"
+      },
+      "peerDependencies": {
+        "@astryxdesign/core": "0.7.12",
+        "react": ">=19"
+      }
+    },
+    "node_modules/@astryxdesign/theme-gothic": {
+      "version": "0.7.12",
+      "resolved": "https://registry.npmjs.org/@astryxdesign/theme-gothic/-/theme-gothic-0.7.12.tgz",
+      "integrity": "sha512-ftcbfZgN19Nh2/5b6ISahOLM4RkfvA7sMU25JvnnWEWVaOYf5i175Uzp6/p1Sd9lcLtUdLzTOVzyz6jqt3LRDA==",
+      "license": "MIT",
+      "dependencies": {
+        "lucide-react": "^1.18.0"
+      },
+      "peerDependencies": {
+        "@astryxdesign/core": "0.7.12",
+        "react": ">=19"
+      }
+    },
+    "node_modules/@astryxdesign/theme-matcha": {
+      "version": "0.7.12",
+      "resolved": "https://registry.npmjs.org/@astryxdesign/theme-matcha/-/theme-matcha-0.7.12.tgz",
+      "integrity": "sha512-XslgV6hEbjGZ4R/v6y4Fge8z8V2P8RxJYtsisz2p1h9Twuv1krspuM9fM+q5+I3aObrv1bV9AAYr5N7EPcXWXA==",
+      "license": "MIT",
+      "dependencies": {
+        "lucide-react": "^1.18.0"
+      },
+      "peerDependencies": {
+        "@astryxdesign/core": "0.7.12",
+        "react": ">=19"
+      }
+    },
     "node_modules/@astryxdesign/theme-neutral": {
       "version": "0.7.12",
       "resolved": "https://registry.npmjs.org/@astryxdesign/theme-neutral/-/theme-neutral-0.7.12.tgz",
       "integrity": "sha512-eBj8Sw6BzIVfxUFilskhjUxy0MLjG5/V3zayLQvyR7pMoh+j+fvqIQFbmhiVM0DUrKP8dBC/aEB31qzCiljJJQ==",
+      "license": "MIT",
+      "dependencies": {
+        "lucide-react": "^1.18.0"
+      },
+      "peerDependencies": {
+        "@astryxdesign/core": "0.7.12",
+        "react": ">=19"
+      }
+    },
+    "node_modules/@astryxdesign/theme-stone": {
+      "version": "0.7.12",
+      "resolved": "https://registry.npmjs.org/@astryxdesign/theme-stone/-/theme-stone-0.7.12.tgz",
+      "integrity": "sha512-KtawXmhC4HS/bAEJH5MocMms+cww3NFGls8/rNEw409uyZ5a2maCHBUFurO3pSeym8CKsKA7NO/LKLrcyddnTQ==",
+      "license": "MIT",
+      "dependencies": {
+        "lucide-react": "^1.18.0"
+      },
+      "peerDependencies": {
+        "@astryxdesign/core": "0.7.12",
+        "react": ">=19"
+      }
+    },
+    "node_modules/@astryxdesign/theme-y2k": {
+      "version": "0.7.12",
+      "resolved": "https://registry.npmjs.org/@astryxdesign/theme-y2k/-/theme-y2k-0.7.12.tgz",
+      "integrity": "sha512-MkHK7HVdYWYpISvgw39ExTwuruf/ByNQawNMAeYvNCvm2RTj6nXX2wbUb21X9SdUH82JKAdNOlTyBlUpYGwUdQ==",
       "license": "MIT",
       "dependencies": {
         "lucide-react": "^1.18.0"
