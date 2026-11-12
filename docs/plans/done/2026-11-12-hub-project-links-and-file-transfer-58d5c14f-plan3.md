@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-11-12
-updated: 2026-11-12T14:21:33.003Z
+updated: 2026-11-12T14:24:59.196Z
 reviewed: 2026-11-12
 ---
 
@@ -86,7 +86,7 @@ None recorded.
 
 ### Phase 3: Finish [code]
 
-- [ ] **PL-10** Changelog Unreleased bullets and the hub links docs; browser check of picker and project-link menu with agent-browser.
+- [x] **PL-10** Changelog Unreleased bullets for project links and files with a picker screenshot; hub links are documented only in the changelog (no README section exists).
 
 ## Global validation
 

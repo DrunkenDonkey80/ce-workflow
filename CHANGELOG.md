@@ -11,6 +11,9 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
   ![Inspecting a reference, with its chip above the chat box](docs/changelog/design-library-reference.png)
 - Ask the chat to find existing interfaces ("top POS screens") and the agent's picks from a Google image search show up as **Web results** cards in that conversation's Design library, with their source page and why each one fits. Add one as an `@ref`, or **Capture page** to screenshot its source site.
   ![A web result card in the Design library](docs/changelog/design-library-found.png)
+- Hub links between whole projects: in **Hub links…**, the other hub's sessions now show as a tree by project, and clicking a project heading links the two projects. Every session of either project then reaches every live session of the other as `project-name~hub`, and replies go back to whoever sent. Both hubs need this version (link comm 2).
+  ![Hub links picker: projects with their sessions](docs/changelog/hub-links-project-tree.png)
+- Files over hub links: attach `{type: "file", content: "@<absolute path>"}` to an intercom message to a `~hub` session. The file (any type, up to 5 MB per message, from your project or the temp folder) is saved in the other project's `.pi/inbox/` and the message names where. If it takes longer than intercom waits, the sender is told when it arrives.
 
 ### Fixed
 - Idle cold-cache compaction now waits until Pi's last idle cache warm expires, including slow final warms. The hub compacts before parking when only idle warms kept the cache fresh, but still respects a recent real request and long cache retention.
