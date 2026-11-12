@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T20:46:59.961Z
+updated: 2026-11-12T20:51:19.323Z
 size: plan
 started: 2026-11-12T20:41:04.471Z
 ---
@@ -128,13 +128,9 @@ Commands (referenced by steps):
 ### Phase 1: Review [think]
 
 - [x] **HR-01** Clone at pin in C:\SOFT\git\haystack-review\haystack; Astra brief with area table and counterpart summaries in docs/proposals/haystack-review/astra-brief.md.
-- [wip] **HR-02** Launch Astra (D-07) on `astra-brief.md` and the clone, async, writing `astra-verdicts.md`; do HR-03 meanwhile.
-  - Brief asks for a verdict, reason and `path:line` per area A1 to A16, its own top ideas, and nothing from `docs/plans/`.
-  - Call `subagents_enable` first; follow the pi-subagents skill.
+- [x] **HR-02** Astra (gpt-6-astra:high) independent review landed: 16 verdicts + top 5 ideas in docs/proposals/haystack-review/astra-verdicts.md.
 - [x] **HR-03** Desk review written: 16 area rows (Test first A1, A2, A3, A16; Already covered A4-A6, A8-A10, A12; Skip A7, A11, A13-A15), 5 candidate ideas, out-of-scope list; Astra verdicts not read.
-- [ ] **HR-04** Merge Astra's verdicts as a column; count agreements; settle each disagreement by checking the code; pick the shortlist.
-  - Shortlist: areas where either review says Adopt idea or Test first and the merge keeps it. Write the shortlist with reasons at the end of the review doc.
-  - Check: every row A1 to A16 has both verdicts (R1, R2).
+- [x] **HR-04** Merged Astra column + Final verdicts: agree on 9 of 16; 6 disagreements settled in code (A1, A3, A5, A14 kept/raised; A13, A16 dropped); shortlist of 5 ideas written.
 
 ### Phase 2: Idea review [think]
 
@@ -157,7 +153,7 @@ Commands (referenced by steps):
 
 ## Resume context
 
-HR-01 done (c93bd0dd). HR-02 wip: Astra (reviewer, openai-codex/gpt-6-astra:high) launched async, run 3dd537b0, output → docs/proposals/haystack-review/astra-verdicts.md; mark HR-02 done when it lands (do not read it before HR-03 is written). HR-03 in progress: draft notes in docs/proposals/2026-11-12-haystack-review.md cover A1, A2, A6; next read A3 hooks/budget/hooks.py, then A4 to A16, then rewrite the doc as the A1 to A16 table plus out-of-scope list.
+HR-01 done (c93bd0dd), HR-03 done (2f3ebfe3: 16-row desk review in docs/proposals/2026-11-12-haystack-review.md, 5 candidate ideas). HR-02 wip: Astra run 3dd537b0 still running (native completion wakes the session) → docs/proposals/haystack-review/astra-verdicts.md. Next when it lands: mark HR-02 done, then HR-04 merge (add Astra verdict column, agreement count, shortlist).
 
 ## Amendments
 
