@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-11
-updated: 2026-11-12T08:33:52.371Z
+updated: 2026-11-12T11:58:31.532Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:56:51.270Z
 ---
@@ -149,24 +149,17 @@ Limits: host fetch concurrency 4; kit.html ≤ 64 KB, components/preview pages �
 
 ### Phase 3: Validate the complete kickoff flow [code]
 
-- [ ] **P3-06** Extend targeted tests for catalog safety, stable references, draft persistence and variant kickoff.
-  - Extend C1–C6 and C9/C10 where touched; tests accompany each implementation step, then this step exercises the integrated fixture flow. Fake provider/session plumbing keeps it deterministic, with no paid generation assumed.
-  - Test malformed IDs and URLs, cross-project access, no silent installs, duplicate sends, missing sources, variant count and each attached asset reaching the right session.
-  - C3/C4/C5 cover a draft-only design, an export with no remaining studio record, identical draft/export content, diverged revisions, and source changes during attachment. Labels and the attached snapshot must match the displayed revision; updates must not retarget an existing reference.
-  - Include protected-bundle write refusal, two captures from the same host, recapture during drafting and after Send, digest corruption, legacy sessions without bundle metadata, clone/reopen/export provenance, duplicate start after a lost response and separate creation versus first-prompt failures. C9 exercises the real message handler; C10 protects existing command and diagram forwarding.
-- [ ] **P3-07** Verify the desktop and mobile browser flow with controlled fixtures and capture both controls and dialogs.
-  - Browse, inspect, select aspects, paste URL, remove a reference, request two variants, enter their sessions and refine. Verify keyboard controls, touch-sized targets, overflow and no draft loss.
-  - Run C5 with desktop, 390px phone, narrow 320px and landscape layouts, enlarged UI and reduced motion. Inspect small cropped captures with screen_read, including both reference controls and the detail/annotation view.
-  - Record actual browser and transport; emulated phone layout is not physical touch or production remote verification. C8 checks changed source; no full repository suite unless requested.
+- [x] **P3-06** Integrated fixture tests cover the catalog, URL references, stable IDs (including same-host and recapture), frozen bundles, the exact variant count and per-variant asset delivery, plus duplicate, lost and uncertain launches and provenance export; existing suites cover legacy stores, corruption, protected writes and C9/C10 forwarding.
+- [x] **P3-07** Headless agent-browser (Chromium) with a throwaway hub and fake Pi: checked the library, URL form, detail, annotate dialog and reference draft at 1280x800, 390x844, 320x640 and 844x390. Fixed phone Back (it now returns to the view the library was opened from) with a regression test. Emulated layouts only: no physical touch, Safari or production remote.
 - [blocked] **P3-08** Verify the new flow on an approved paired remote touch device.
   - Prerequisite: an approved, reachable production-paired test environment and agent-controllable physical device. Pixel 10a was previously offered, but the earlier ADB fixture tunnel did not verify production pairing.
   - Exercise touch selection, hold versus scroll, mobile Browse/Chat, URL references and both variant links using agent tools. Do not ask the user to substitute for automated verification or change global networking/security.
 
 ### Phase 4: Document the shipped workflow [code]
 
-- [ ] **P3-09** Document discoverability, reference semantics and limitations; add focused changelog screenshots.
-  - Update C:/SOFT/git/ce-workflow/README.md, command/tool help, C:/SOFT/git/ce-workflow/extensions/design-guide.md as needed and C:/SOFT/git/ce-workflow/CHANGELOG.md. Keep hub and /wo wording together; explain source previews versus samples and inspiration versus runtime selection. Record attribution in existing upstream ledgers for copied assets/code.
-  - Use C7 for the entry control, gallery and reference-detail view. No version bump, commit or push is part of this planning request.
+- [x] **P3-09** The README "Design library (/wo design)" section and an Unreleased changelog Added bullet cover entry, @ref semantics, consent-gated page capture, inspiration vs runtime and browser-only drafts, with three C7 shots. Fixed "1 references". The Astryx image attribution is already in docs/upstream/astryx.md but uncommitted (a protected dirty file).
+- [ ] **P3-11** Found row: add a design tool action (e.g. `design found`) that lets the conversation's agent publish curated web results (title, source page URL, saved original from image_search/browser_fetch, one-line why) into the current session's library as a "Found" section labelled web result / inspiration only. Store images under the project's references area with the existing size/PNG/WebP/JPEG validation and source metadata; reject non-image, oversized or unsafe-URL entries; no automatic capture of pages. Files: extensions/design.ts, extensions/design-references.ts, extensions/browser-search.ts (reuse imageSearch save), hub/web/design-library.ts. Checks: C3, C4, C8.
+- [ ] **P3-12** Found cards become references: Add reference on a found card attaches its saved image as a normal stable @ref (aspect + note + region crop as for static images), and an optional "Capture page" uses the existing consent-gated page capture of its source URL. Found entries survive reload and are scoped to the session; removing one never renumbers refs. Guide/prompt text tells the agent to prefer real product screenshots over stock mockups and to borrow style, never logos or copy. Checks: C3, C5 (fake Pi publishes found entries; add one as @ref; Send delivers it), C7 shot of the Found row, README/CHANGELOG bullet.
 
 ## Global validation
 
@@ -199,7 +192,7 @@ Real touch and paired-remote verification are P3-08's separate environmental gat
 
 ## Resume context
 
-P3-05 done. P3-04 remains WIP: URL capture stays gated because scripts/test-work-design.mjs fails its C3 external-lookup containment check (unrelated dirty design-render.ts/design-network.ts). Next is P3-06. No push, paid generation, downloads or outside traffic. Preserve unrelated dirty files.
+9/10 done; HEAD ed408796 (P3-06 2d1afcac, P3-07 a8195c84, P3-09 ed408796). Only P3-08 remains: blocked on a paired real touch device (user has Pixel 9a/10a) through the hub remote. Not verified: physical touch, Safari, live Helium capture of an external site. docs/upstream/astryx.md image-attribution hunk is uncommitted (protected dirty file). No push, no version bump.
 
 ## Amendments
 
@@ -224,3 +217,4 @@ Review changed this plan only. Source inspection validates these findings, not i
 - 2026-11-11: Applied Q-02 Both drafts and exports to source enumeration, labels, snapshot semantics, P3-01/P3-03/P3-06 and global acceptance. Added targeted cases for draft-only entries, exports whose studio records are gone, identical content and diverged revisions. This resolves the question raised by review finding 8; no new steps or product changes.
 P3-04 prefactor approved by the user: extract the existing browser-worker screenshot routine and reuse it for consent-gated read-only URL capture through browser_fetch/Helium, rather than duplicating browser_act capture logic or expanding browser-control grants. Preserve per-site approval, opaque reference snapshots and owned-fixture-only checks. The earlier guarded-Chromium URL-capture attempt remains unverified and must not be exposed; replace its integration rather than keep two capture implementations.
 - 2026-11-12: Added P3-10 after P3-03: User-approved P3-04 prefactor: reuse Helium's existing per-site read approval and browser_act's bounded screenshot routine rather than copy capture logic. This prerequisite does not expose studio URL capture or relax Global validation.
+- 2026-11-12: Added P3-11, P3-12 after P3-09: User request: let the design agent search the web for matching existing interfaces (e.g. top 20 POS systems) and show them as library cards that can become @refs instead of chat text. image_search verified 2026-11-12: Google query "restaurant POS system interface screenshot" returned 30 results with source page URLs; save [1,4,8,25,30] stored 4 real originals (dribbble cdn JPEG 516 KB, bpapos PNG 1280x877, website-files WebP 1418x1418, ctfassets PNG 708x708) with only the google.com approval, no per-image-host prompt; Instagram lookaside proxy URL failed (not an image). Results include stock/mockup/template sites, so agent curation is needed.
