@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-12
-updated: 2026-11-12T13:53:25.755Z
+updated: 2026-11-12T14:07:08.945Z
 reviewed: 2026-11-12
 ---
 
@@ -82,10 +82,7 @@ Findings (this session, verified by reading code or fetching):
 ### Phase 2: OpenDesign previews [code]
 
 - [x] **V-03** fetchSystem (exported) publishes an OpenDesign package as one unit per index commit (DESIGN.md, tokens.css, components.html, preview/colors.html, SOURCE.json) via temp folder + folder swap under the plan lock; same-commit hits never refetch, failed updates keep the old unit; hub trigger and card retry note come with V-04.
-- [ ] **V-04** Show big lazy previews on Designs cards: a sandboxed, scaled frame of the cached page, fetched when the card scrolls into view.
-  - Studio drafts and selected exports use their own page the same way. Frames are not interactive on the card; Inspect opens the explorer.
-  - Card frames must not use `designexample`: `referencePage` (hub/src/explore.ts:123) allows one pending and eight live reference views per session and returns 429 beyond that. Use a lightweight read-only card route over the cached files (same sandbox and CSP as the viewer, no temp copy), keep a bounded number of frames live, and unload frames that scroll away, are filtered out, or belong to another tab. Inspect keeps `designexample` and calls `unview` as today.
-  - Acceptance: browser test scrolls the Designs tab and sees frames load only for visible cards, with no network fetch for cards never shown; scrolls past more than eight cards and back, then opens Inspect without a 429.
+- [x] **V-04** Designs cards show a big scaled sandboxed frame of their cached page, loaded when near the view and unloaded when it leaves (max 12 live; server keeps 16 card views per session outside the reference limit of 8); OpenDesign cards download their package on scroll (3 at a time) via designfetch; failures show Retry preview.
 - [ ] **V-12** Show OpenDesign color pages as big lazy Themes cards: fetch preview/colors.html with tokens.css via V-03's path, then frame it like V-04.
   - Cache at .pi/designs/systems/<name>/preview/colors.html so its ../tokens.css link resolves; same commit check, 1 MB cap and retry note as V-03.
   - Acceptance: browser test opens Themes, scrolls, and sees OpenDesign color frames load only for visible cards; Add reference attaches the colors page.

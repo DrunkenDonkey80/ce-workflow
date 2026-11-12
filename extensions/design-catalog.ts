@@ -86,14 +86,18 @@ function savedEntries(cwd: string, entries: CatalogEntry[], warnings: string[]) 
 	} catch (error) { warnings.push(error.message); }
 }
 
-/** Resolve only catalog IDs; capture is local, bounded and never builds or provisions a runtime. */
-export async function catalogFiles(cwd: string, id: unknown, revision: unknown) {
+/** A cached sample's served folder; card previews read it in place, without a copy. */
+export async function catalogFolder(cwd: string, id: unknown, revision: unknown) {
 	if (typeof id !== "string" || id.length > 240 || typeof revision !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(revision)) throw Object.assign(new Error("Invalid catalog identity."), { status: 400 });
 	const item = (await designCatalog(cwd)).entries.find(entry => entry.id === id);
 	if (!item) throw Object.assign(new Error("No such catalog entry."), { status: 404 });
 	if (item.revision !== revision) throw Object.assign(new Error("Source changed; refresh the library before inspecting it."), { status: 409 });
 	if (!item.folder || !item.page) throw Object.assign(new Error("No local sample is cached. No download or build was started."), { status: 404 });
-	const directory = appPreviewFolder(confined(cwd, item.folder), item.source !== "draft");
+	return { item, directory: appPreviewFolder(confined(cwd, item.folder), item.source !== "draft") };
+}
+/** Resolve only catalog IDs; capture is local, bounded and never builds or provisions a runtime. */
+export async function catalogFiles(cwd: string, id: unknown, revision: unknown) {
+	const { item, directory } = await catalogFolder(cwd, id, revision);
 	const files = boundedTree(directory);
 	if (!files.has(item.page)) throw Object.assign(new Error("The cached sample is missing."), { status: 404 });
 	const captured = digest(files);

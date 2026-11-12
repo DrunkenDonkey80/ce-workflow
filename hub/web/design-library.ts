@@ -60,6 +60,45 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   img.addEventListener("error", () => img.replaceWith(make("p", "Image unavailable on this host. Metadata is still available.")), { once: true });
   return img;
  }
+ // V-04: big card previews load when a card scrolls into view and unload when it leaves, so few frames stay live.
+ const frames = new Map<HTMLElement, string | undefined>(), cardItems = new WeakMap<HTMLElement, CatalogEntry>(), waiting: (() => void)[] = [];
+ let downloads = 0;
+ const unload = (wrap: HTMLElement) => { const id = frames.get(wrap); frames.delete(wrap); if (id) release(id); wrap.querySelector("iframe")?.remove(); };
+ const seen = new IntersectionObserver(changes => { for (const change of changes) { const wrap = change.target as HTMLElement; if (change.isIntersecting) void preview(wrap); else if (frames.has(wrap)) unload(wrap); } }, { root, rootMargin: "200px 0px" });
+ const fit = new ResizeObserver(changes => { for (const change of changes) (change.target as HTMLElement).style.setProperty("--scale", String((change.target as HTMLElement).clientWidth / 1280)); });
+ async function fetched(item: CatalogEntry) {
+  if (downloads >= 3) await new Promise<void>(go => waiting.push(go));
+  downloads++;
+  try { const value = await post("designfetch", { id: item.id }); if (value.entry) Object.assign(item, value.entry); return item.availability === "cached"; }
+  finally { downloads--; waiting.shift()?.(); }
+ }
+ async function preview(wrap: HTMLElement) {
+  if (frames.has(wrap)) return;
+  if (frames.size >= 12) unload(frames.keys().next().value!);
+  frames.set(wrap, undefined); wrap.setAttribute("aria-busy", "true");
+  const item = cardItems.get(wrap)!;
+  try {
+   if (item.source === "od" && item.availability !== "cached") {
+    const cached = await fetched(item);
+    const add = wrap.closest("article")?.querySelector<HTMLButtonElement>("[data-add]"); if (add) add.disabled = !cached;
+    if (!cached) throw new Error("this package has no preview page");
+   }
+   if (!frames.has(wrap)) return;
+   const value = await post("designcard", { id: item.id, revision: item.revision });
+   if (!frames.has(wrap) || !wrap.isConnected) { release(value.key); return; }
+   frames.set(wrap, value.key);
+   const frame = make("iframe"); frame.title = item.name + " preview"; frame.tabIndex = -1; frame.setAttribute("aria-hidden", "true"); frame.setAttribute("sandbox", "allow-scripts"); frame.referrerPolicy = "no-referrer";
+   frame.addEventListener("load", () => wrap.setAttribute("aria-busy", "false"), { once: true });
+   frame.src = `/x/${value.key}/${value.open.split("/").map(encodeURIComponent).join("/")}`; wrap.replaceChildren(frame);
+  } catch (error) {
+   frames.delete(wrap); wrap.setAttribute("aria-busy", "false");
+   const retry = make("button", "Retry preview"); retry.type = "button"; retry.addEventListener("click", () => void preview(wrap));
+   wrap.replaceChildren(make("p", "Preview unavailable: " + error.message), retry);
+  }
+ }
+ function cardPreview(item: CatalogEntry) {
+  const wrap = make("div"); wrap.className = "library-card-preview"; cardItems.set(wrap, item); seen.observe(wrap); fit.observe(wrap); return wrap;
+ }
  function sample(item: CatalogEntry) {
   const request = inspection, loading = make("p", "Opening isolated source sample…"); loading.setAttribute("role", "status"); detail.append(loading);
   void post("designexample", { id: item.id, revision: item.revision }).then(value => {
@@ -150,6 +189,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    addButton.addEventListener("click", pick); open.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) pick(); else inspect(item); });
    gestures(row, () => { if (!addButton.disabled) pick(); });
    if (item.preview === "image" && item.imageRevision) row.append(image(item, true));
+   else if (item.preview === "sample" && (item.availability === "cached" || item.source === "od")) row.append(cardPreview(item));
    if (item.status) row.append(make("p", item.status));
    row.append(title, details, provenance);
    if (item.description) row.append(make("p", item.description));
@@ -158,6 +198,8 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    if (url) { const page = make("button", "Capture page"); page.type = "button"; page.dataset.capture = ""; page.title = url; page.addEventListener("click", () => void capture(url, "whole", page, feedback)); row.append(page); }
    row.append(feedback); return row;
   };
+  for (const wrap of [...frames.keys()]) unload(wrap);
+  seen.disconnect(); fit.disconnect();
   const groups = new Map<string, CatalogEntry[]>();
   for (const item of matches) { const group = item.availability === "cached" && item.designRevision ? item.designRevision : item.id; if (!groups.has(group)) groups.set(group, []); groups.get(group)!.push(item); }
   list.replaceChildren(...[...groups.values()].map(items => {

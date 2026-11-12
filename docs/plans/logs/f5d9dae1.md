@@ -41,3 +41,11 @@ Draft, 0/12, no open questions. Q-02 settled as D8: the extension sends per-resu
   - A failed fetch leaves the card's "preview unavailable" note and offers retry; nothing else breaks.
   - Acceptance: test-work-design.mjs covers fetch, cache hit, wrong commit, an oversized file, two concurrent requests (one download), an interrupted update, and stale components, colors or tokens from an older commit, with a fake fetch.
   - check: node scripts/test-work-design.mjs → "design tool tests passed" (new V-03 block: concurrent asks download once, catalog marks od:stripe cached, cache hit no fetch, other-commit refetch drops stale preview, oversized components.html left out, interrupted update keeps old unit, no temp folders)
+
+## 2026-11-12T14:07:08.946Z V-04 done: Designs cards show a big scaled sandboxed frame of their cached page, loaded when near the view and unloaded when it leaves (max 12 live; server keeps 16 card views per session outside the reference limit of 8); OpenDesign cards download their package on scroll (3 at a time) via designfetch; failures show Retry preview.
+
+- [x] **V-04** Show big lazy previews on Designs cards: a sandboxed, scaled frame of the cached page, fetched when the card scrolls into view.
+  - Studio drafts and selected exports use their own page the same way. Frames are not interactive on the card; Inspect opens the explorer.
+  - Card frames must not use `designexample`: `referencePage` (hub/src/explore.ts:123) allows one pending and eight live reference views per session and returns 429 beyond that. Use a lightweight read-only card route over the cached files (same sandbox and CSP as the viewer, no temp copy), keep a bounded number of frames live, and unload frames that scroll away, are filtered out, or belong to another tab. Inspect keeps `designexample` and calls `unview` as today.
+  - Acceptance: browser test scrolls the Designs tab and sees frames load only for visible cards, with no network fetch for cards never shown; scrolls past more than eight cards and back, then opens Inspect without a 429.
+  - check: node hub/scripts/test-browser.mjs → ok (new V-04 block: 16 OD cards, only cards near the view hold frames, scroll to bottom and back, then Inspect od:fixture-style and export open without 429); node hub/scripts/test-api.mjs → api ok; node scripts/test-work-design.mjs → design tool tests passed

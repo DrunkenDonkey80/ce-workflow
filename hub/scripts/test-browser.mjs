@@ -68,7 +68,9 @@ writePlan("12345678", sample.title, 5, 2, "2026-10-18T12:00:00Z"); writePlan("ab
 const diagramFile = join(folder, planFile("12345678", sample.title).replace(/\.md$/, ".diagram.json")), productFile = join(folder, "docs/architecture/product.diagram.json");
 const persist = () => { fs.writeFileSync(diagramFile, JSON.stringify(diagram)); if (product.revision) { fs.mkdirSync(join(productFile, ".."), { recursive: true }); fs.writeFileSync(productFile, JSON.stringify(product)); } };
 persist();
-write(".pi/designs/systems/index.json", JSON.stringify({ commit: "1".repeat(40), names: ["fixture-style"], fetched: Date.now() }));
+const moreStyles = Array.from({ length: 15 }, (_, i) => `fixture-${i + 10}`); // V-04: enough Designs cards to scroll past
+write(".pi/designs/systems/index.json", JSON.stringify({ commit: "1".repeat(40), names: ["fixture-style", ...moreStyles], fetched: Date.now() }));
+for (const name of moreStyles) { write(`.pi/designs/systems/${name}/SOURCE.json`, JSON.stringify({ commit: "1".repeat(40) })); write(`.pi/designs/systems/${name}/components.html`, `<h1 style="font:64px system-ui">${name}</h1>`); }
 const libraryHTML = `<h1>Library fixture</h1><input id="unfinished" value="initial"><style>body{font:18px system-ui;background:#faf4e5;color:#24394c}h1{border-bottom:4px solid #876959}</style><script>
 addEventListener("message",async event=>{if(event.data?.type!=="fixture:library")return;let isolated=false,violation=false;try{parent.document.body}catch{isolated=true}if(typeof event.data.value==="string")document.getElementById("unfinished").value=event.data.value;if(event.data.probe){addEventListener("securitypolicyviolation",e=>{if(e.effectiveDirective==="connect-src")violation=true},{once:true});try{await fetch(event.data.probe)}catch{}await new Promise(resolve=>setTimeout(resolve,30));}parent.postMessage({type:"fixture:library-result",request:event.data.request,width:innerWidth,isolated,violation,value:document.getElementById("unfinished").value},"*");});
 </script>`;
@@ -163,8 +165,16 @@ try {
    const ids = await evaluate("[...document.querySelectorAll('#library [data-entry]')].map(node => node.dataset.entry)");
    assert(ids.every(entry => pattern.test(entry)), `the ${tab} tab shows only its type: ${ids.filter(entry => !pattern.test(entry))}`); total += ids.length;
   }
-  assert.equal(total, 184);
+  assert.equal(total, 199);
   assert.deepEqual(await evaluate("(() => { const a = document.querySelector('#library input[type=search]').getBoundingClientRect(), b = document.querySelector('#library input[type=url]').getBoundingClientRect(), c = document.querySelector('#library form button').getBoundingClientRect(), d = document.querySelector('#library form select').getBoundingClientRect(); return [a.left === b.left, a.right === c.right, a.height === b.height && b.height === c.height && c.height === d.height]; })()"), [true, true, true], "the input rows line up");
+ }
+ { // V-04: Designs cards frame their cached page only near the view; scrolling away unloads them and back reloads them.
+  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260]; })";
+  const settled = `(states => states.every(([frame, near]) => !frame || near) && states.some(([frame]) => frame))(${framed})`;
+  await browser("click", "#library [data-tab=designs]"); await browser("wait", "--fn", settled);
+  const states = await evaluate(framed);
+  assert(states.some(([, near]) => !near), `the fixture has cards far below the view: ${JSON.stringify(states)}`);
+  for (const top of ["1e6", "0"]) { await evaluate(`document.getElementById('library').scrollTop = ${top}`); await browser("wait", "--fn", settled); }
  }
  await browser("click", "#library [data-tab=themes]"); await browser("fill", "#library input[type=search]", "neutral");
  assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 1);
@@ -226,7 +236,7 @@ try {
  await browser("fill", "#library input[type=search]", ""); await browser("click", "#library [data-tab=designs]");
  assert.equal(await evaluate("document.querySelectorAll('.library-group [data-entry]').length"), 2, "identical authored exports retain both source cards");
  const probeLibrary = (selector, data = {}) => evaluate(`new Promise((resolve,reject)=>{const frame=document.querySelector(${JSON.stringify(selector)}),request=crypto.randomUUID(),timer=setTimeout(()=>{removeEventListener('message',reply);reject(Error('Library sample did not reply'));},3000);const reply=event=>{if(event.source!==frame.contentWindow||event.data?.type!=='fixture:library-result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',reply);resolve({...event.data,origin:event.origin});};addEventListener('message',reply);frame.contentWindow.postMessage({type:'fixture:library',request,...${JSON.stringify(data)}},'*');})`);
- await browser("click", "#library [data-entry='od:fixture-style'] button");
+ await clickShown("#library [data-entry='od:fixture-style'] [data-inspect]");
  await browser("wait", ".library-preview[aria-busy=false]");
  assert.equal(await evaluate("document.querySelector('.library-preview iframe').getAttribute('sandbox')"), "allow-scripts");
  await browser("select", "select[aria-label='Preview viewport width']", "390");
@@ -239,7 +249,7 @@ try {
  assert.equal((await probeLibrary(".library-preview iframe")).width, 1280);
  assert(await evaluate("document.documentElement.scrollWidth <= innerWidth"), "wide sample scrolls inside its panel, not the phone page");
  await browser("click", ".library-detail button"); await browser("set", "viewport", "1280", "800");
- await browser("click", "#library [data-entry='export:First export'] button"); await browser("wait", ".library-preview[aria-busy=false]");
+ await clickShown("#library [data-entry='export:First export'] [data-inspect]"); await browser("wait", ".library-preview[aria-busy=false]");
  assert.match(await evaluate("document.querySelector('.library-detail').textContent"), /Selected export v1/);
  await browser("click", ".library-detail button");
  await reload("document.getElementById('title').textContent === 'ce-workflow - 1' && document.querySelectorAll('#library article').length > 0");

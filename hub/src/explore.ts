@@ -13,7 +13,7 @@ import { sevenZip } from "./wormhole.ts";
 import { DESIGN_CSP, SANDBOX_CSP } from "../../extensions/design-render.ts";
 import { withBridge } from "./design-bridge.ts";
 import { appPreviewFolder, buildInfo } from "../../extensions/design-build.ts";
-import { catalogFiles, type CatalogEntry } from "../../extensions/design-catalog.ts";
+import { catalogFiles, catalogFolder, type CatalogEntry } from "../../extensions/design-catalog.ts";
 import { confined } from "../../extensions/plan3-files.ts";
 
 export const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
@@ -25,7 +25,7 @@ const unpacked = new Map<string, string>(), folders = new Map<string, string>();
 // A viewed page's live folder: each file served must pass the same check as a chat link for that project and device.
 // One key per open viewer (D3): the real files it served are watched, and a change tells that viewer (notify) to reload.
 // own: a design session's mirror (designPage), confined to its folder instead of the chat-link check (which refuses .pi).
-type View = { project: string; remote: boolean; own?: boolean; owner?: string; reference?: boolean; sample?: { item: CatalogEntry; names: string[] }; cleanup?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout>; extra?: FSWatcher[] };
+type View = { project: string; remote: boolean; own?: boolean; owner?: string; reference?: boolean; card?: boolean; sample?: { item: CatalogEntry; names: string[] }; cleanup?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout>; extra?: FSWatcher[] };
 const live = new Map<string, View>();
 const referencePending = new Set<string>();
 // Folders, not files, are watched: an atomic save (temp file + rename) or delete-and-recreate replaces the file's inode.
@@ -121,7 +121,7 @@ export async function watchDesign(key: string, project: string, handle: string, 
 }
 /** Library samples are bounded local copies, never live roots or executable build inputs. */
 export async function referencePage(project: string, id: unknown, revision: unknown, owner: string, remote: boolean) {
-	if (referencePending.has(owner) || referencePending.size >= 4 || [...live.values()].filter(view => view.owner === owner && view.reference).length >= 8) throw fail(429, "A reference preview is busy; close an earlier preview and retry.");
+	if (referencePending.has(owner) || referencePending.size >= 4 || [...live.values()].filter(view => view.owner === owner && view.reference && !view.card).length >= 8) throw fail(429, "A reference preview is busy; close an earlier preview and retry.");
 	referencePending.add(owner);
 	let directory: string | undefined;
 	try {
@@ -134,6 +134,16 @@ export async function referencePage(project: string, id: unknown, revision: unkn
 		return { ...view, open: sample.item.page, files: [...sample.files].map(([path, bytes]) => ({ path, size: bytes.length })), revision: sample.revision, note: sample.note };
 	} catch (error) { if (directory) await rm(directory, { recursive: true, force: true }); throw error; }
 	finally { referencePending.delete(owner); }
+}
+
+/** V-04: a library card's preview serves the cached folder in place (no copy), with the sample CSP; a session keeps its newest 16. */
+export async function cardPage(project: string, id: unknown, revision: unknown, owner: string, remote: boolean) {
+	const { item, directory } = await catalogFolder(project, id, revision);
+	const key = randomBytes(16).toString("hex");
+	folders.set(key, directory); live.set(key, { project, remote, own: true, owner, reference: true, card: true, served: new Set() });
+	const cards = [...live].filter(([, view]) => view.owner === owner && view.card);
+	for (const [old] of cards.slice(0, Math.max(0, cards.length - 16))) unview(old);
+	return { key, open: item.page };
 }
 
 /** Attach the exact isolated sample shown, even when its original studio source has since changed. */

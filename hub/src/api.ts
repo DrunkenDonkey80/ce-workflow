@@ -13,12 +13,13 @@ import { freezeReferenceBundle } from "../../extensions/design-bundles.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { ARCHIVE, designLists, designPage, explore, referencePage, referenceSnapshot, unview, viewPage, watchDesign } from "./explore.ts";
+import { ARCHIVE, cardPage, designLists, designPage, explore, referencePage, referenceSnapshot, unview, viewPage, watchDesign } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
 import { buildInfo } from "../../extensions/design-build.ts";
 import { catalogReference, designCatalog, designImage } from "../../extensions/design-catalog.ts";
+import { fetchSystem } from "../../extensions/design.ts";
 import { addDesignReference, designReferences, editDesignReference, referenceAssets, urlReference, urlSnapshot } from "../../extensions/design-references.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
@@ -460,6 +461,19 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 					return addDesignReference(folder(id), id, { ...data, id: page.id, revision: page.revision }, async () => urlSnapshot(page, await call(id, "/api/designurl", { url: page.url })));
 				}
 				return addDesignReference(folder(id), id, data, () => data.previewKey === undefined ? catalogReference(folder(id), data.id, data.revision, id) : referenceSnapshot(folder(id), data.previewKey, data.id, data.revision, id));
+			}
+			case "designcard": {
+				only(data, ["target", "id", "revision"], "Invalid fields.");
+				return cardPage(folder(id), data.id, data.revision, id, remote);
+			}
+			// D1: an OpenDesign card scrolled into view downloads its package once per commit; the fresh entry comes back.
+			case "designfetch": {
+				only(data, ["target", "id"], "Invalid fields.");
+				const name = typeof data.id === "string" && /^od:([a-z0-9][a-z0-9-]{0,60})$/.exec(data.id)?.[1];
+				if (!name) throw fail(400, "Only OpenDesign systems download on demand.");
+				const fetched = await fetchSystem(folder(id), name);
+				const entry = (await designCatalog(folder(id))).entries.find(item => item.id === data.id);
+				return { entry, stale: (fetched as { stale?: string }).stale };
 			}
 			case "designexample": {
 				only(data, ["target", "id", "revision"], "Invalid fields.");

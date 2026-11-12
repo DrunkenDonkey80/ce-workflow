@@ -345,7 +345,7 @@ async function systems(cwd: string, args, handle: string | undefined, tools: Too
 	return system;
 }
 /** V-03: one OD package at the index commit, published as a unit; the catalog previews its components.html and preview/colors.html. */
-export async function fetchSystem(cwd: string, name, tools: Tools) {
+export async function fetchSystem(cwd: string, name, tools: Tools = { hub: hubCall }) {
 	if (typeof name !== "string" || !/^[a-z0-9][a-z0-9-]{0,60}$/.test(name)) throw new Error(`A design system is one name from design {action:"systems"}, e.g. airbnb; got ${clip(String(name), 80)}.`);
 	const folder = `${SYSTEMS}/${name}`, saved = (() => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${folder}/SOURCE.json`), "utf8")); } catch { return undefined; } })();
 	const files = (dir: string) => fs.readdirSync(confined(cwd, dir)).sort();

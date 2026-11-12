@@ -77,7 +77,10 @@ h2 { font-size: 15px; font-weight: 600; }
 .library-tabs [role=tab][aria-selected=true] { border-color: var(--line); border-bottom-color: var(--ink); font-weight: 600; }
 .library-tabs + .library-row { margin-top: 12px; }
 #library-results { margin-top: 8px; }
-.library-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.library-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; }
+.library-card-preview { position: relative; aspect-ratio: 16 / 10; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); }
+.library-card-preview iframe { position: absolute; inset: 0 auto auto 0; width: 1280px; height: 800px; border: 0; transform: scale(var(--scale, 0.25)); transform-origin: 0 0; pointer-events: none; }
+.library-card-preview > p { margin: 12px; }
 .library-list article { border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow-wrap: anywhere; }
 .library-list h3 { margin: 0 0 8px; font-size: 15px; }
 .library-list small, .library-list p { color: var(--muted); font-size: 12px; }
