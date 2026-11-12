@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 process.env.PI_CODING_AGENT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "wo-hub-")); // the CLI child inherits it: no real hub
-const { hubCli, hubMenu, joinedSession, scheduleTool, liveTarget, dialogReason, longSleepWait, undeclaredBackground } = await import("../extensions/hub-command.ts");
+const { handleDesignLibraryCommand, hubCli, hubMenu, joinedSession, scheduleTool, liveTarget, dialogReason, longSleepWait, undeclaredBackground } = await import("../extensions/hub-command.ts");
 // Long sleep-waits are blocked (the ainews session polled a finished run for an hour); short waits and real work are not.
 for (const [command, timeout, blocked] of [
 	["sleep 900; cat log", 960, true], ["sleep 5m", undefined, true], ["powershell Start-Sleep -Seconds 600", undefined, true],
@@ -57,6 +57,27 @@ let parsed; try { parsed = JSON.parse(status.text); } catch { assert.fail("statu
 assert.equal(parsed.running, false); assert.equal(parsed.remote.on, false);
 const restart = await hubCli(["stop"], 30_000);
 assert.match(restart.text, /Not running/);
+// Library entry preserves the identified conversation; plain terminals reuse their explicit fallback, never a same-folder peer.
+{
+ const old = process.env.PI_HUB_SESSION, notices = [], saved = [], calls = [];
+ const id = "00000000-0000-0000-0000-000000000001";
+ const ctx = { cwd: "/project with spaces", hasUI: true, ui: { notify: text => notices.push(text) }, sessionManager: { getBranch: () => saved } };
+ const pi = { appendEntry: (customType, data) => saved.push({ type: "custom", customType, data }) };
+ const cli = async args => { calls.push(args); return { ok: true, text: JSON.stringify({ id, url: "http://localhost/s/" + id + "/?view=library", created: !args.includes("--session") }) }; };
+ process.env.PI_HUB_SESSION = id;
+ await handleDesignLibraryCommand("", ctx, pi, cli);
+ assert.deepEqual(calls[0], ["open", "--view", "library", "--folder", ctx.cwd, "--json", "--session", id]);
+ assert.equal(saved.length, 0, "current hub conversation never creates a briefing");
+ delete process.env.PI_HUB_SESSION;
+ await handleDesignLibraryCommand("", ctx, pi, cli);
+ assert(!calls[1].includes("--session")); assert.equal(saved.length, 1, "plain terminal saves its fallback identity");
+ await handleDesignLibraryCommand("", ctx, pi, cli);
+ assert.deepEqual(calls[2].slice(-2), ["--session", id], "repeat opens exactly the saved briefing");
+ await handleDesignLibraryCommand("start", ctx, pi, cli); assert.equal(calls.length, 3, "no generation arguments accepted");
+ await handleDesignLibraryCommand("", ctx, pi, async () => ({ ok: false, text: "Not running" }));
+ assert.match(notices.at(-1), /Start the hub with \/wo hub start/); assert.equal(saved.length, 1);
+ if (old === undefined) delete process.env.PI_HUB_SESSION; else process.env.PI_HUB_SESSION = old;
+}
 // S-04: the schedule tool refuses outside a hub session and passes CLI errors through.
 delete process.env.PI_HUB_SESSION;
 await assert.rejects(scheduleTool.execute("t", { action: "list" }), /started by pi-control-hub/);

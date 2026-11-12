@@ -210,7 +210,29 @@ try {
 	} else if (verb === "open") {
 		const running = marker();
 		if (!running) throw new Error("The hub is not running; run pi-hub start.");
-		if (rest[0] === "remote") {
+		const viewAt = rest.indexOf("--view"), sessionAt = rest.indexOf("--session");
+		if (viewAt !== -1 || sessionAt !== -1) {
+			const view = viewAt === -1 ? undefined : rest[viewAt + 1];
+			if (view !== undefined && view !== "library") throw new Error("Only --view library is supported.");
+			if (viewAt !== -1 && !view) throw new Error("--view needs library.");
+			const status = await call("/api/status"), id = sessionAt === -1 ? undefined : rest[sessionAt + 1];
+			const remote = rest[0] === "remote";
+			if (remote && !status.remote.url) throw new Error(remoteLine(status.remote));
+			if (sessionAt !== -1 && (!id || !/^[0-9a-f-]{36}$/.test(id))) throw new Error("--session needs a hub session id.");
+			let record = id ? status.sessions.find(s => s.id === id) : undefined;
+			if (id && !record) throw new Error("That hub session is no longer available; no other session was adopted.");
+			const created = !record;
+			if (!record) {
+				const folderAt = rest.indexOf("--folder");
+				if (view !== "library" || folderAt === -1 || !rest[folderAt + 1]) throw new Error("A new library briefing needs --folder.");
+				record = await call("/api/sessions", { folder: path.resolve(rest[folderAt + 1]), name: "Design brief" });
+			}
+			const url = new URL(`/s/${record.id}/`, remote ? status.remote.url : `http://127.0.0.1:${running.port}`);
+			if (!remote) url.searchParams.set("token", readConfig()!.localKey);
+			if (view) url.searchParams.set("view", view);
+			if (rest.includes("--json")) console.log(JSON.stringify({ id: record.id, url: url.href, created }));
+			else { openInBrowser(url.href); console.log(url.href); }
+		} else if (rest[0] === "remote") {
 			const remote = (await call("/api/status")).remote;
 			if (!remote.url) throw new Error(remoteLine(remote));
 			openInBrowser(remote.url);

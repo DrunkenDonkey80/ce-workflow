@@ -71,7 +71,7 @@ const WEB = new URL("../web/", import.meta.url);
 const JS = "text/javascript; charset=utf-8";
 const ASSETS: Record<string, [string, string]> = {
 	"app.js": ["app.ts", JS], "layout.js": ["layout.ts", JS], "diagram.js": ["diagram.ts", JS], "prompts.js": ["prompts.ts", JS],
-	"files.js": ["files.ts", JS], "design-view.js": ["design-view.ts", JS], "design-state.js": ["../../extensions/design-state.ts", JS], "stream.js": ["stream.ts", JS], "annotate.js": ["annotate.ts", JS], "pair.js": ["pair.ts", JS], "icons.js": ["icons.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
+	"files.js": ["files.ts", JS], "design-library.js": ["design-library.ts", JS], "design-view.js": ["design-view.ts", JS], "design-state.js": ["../../extensions/design-state.ts", JS], "stream.js": ["stream.ts", JS], "annotate.js": ["annotate.ts", JS], "pair.js": ["pair.ts", JS], "icons.js": ["icons.ts", JS], "vendor/rough.js": ["vendor/rough.ts", JS], "styles.css": ["styles.css", "text/css; charset=utf-8"],
 };
 // Read once at start, so pages always match this process's server code: an update downloaded under running sessions, or a
 // half-done local edit, must not serve new web files against old hub code. New web files arrive with the next hub restart;

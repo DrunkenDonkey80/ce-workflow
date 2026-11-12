@@ -207,6 +207,22 @@ export function intercomParkedSessions(pi) {
 
 export type HubStatus = { pairing?: { code: string; label?: string; login?: string } | null; running: boolean; autostart: boolean; command: boolean; local?: string; remote: { on: boolean; url?: string; error?: string; missing?: string[] }; sessions?: number; live?: number; busy?: number };
 
+/** Terminal entry; browser entry is local and never becomes a model prompt. */
+export async function handleDesignLibraryCommand(args: string, ctx, pi, cli = hubCli) {
+	const tell = (text: string, ok = true) => {
+		if (ctx.hasUI) ctx.ui?.notify?.(text, ok ? "info" : "warning");
+		else console.log(text);
+	};
+	if (args.trim()) return tell("Use /wo design without arguments to browse and collect references.", false);
+	const saved = ctx.sessionManager?.getBranch?.().findLast(entry => entry.type === "custom" && entry.customType === "design-library-view")?.data?.session;
+	const id = process.env.PI_HUB_SESSION ?? saved;
+	const result = await cli(["open", "--view", "library", "--folder", ctx.cwd, "--json", ...(id ? ["--session", id] : [])]);
+	if (!result.ok) return tell(`${result.text}\nStart the hub with /wo hub start, then try /wo design again.`, false);
+	let opened; try { opened = JSON.parse(result.text); } catch { return tell("The hub returned an invalid library link. Update/restart the hub and retry.", false); }
+	if (!id && opened.id) pi.appendEntry("design-library-view", { session: opened.id });
+	tell(`${opened.created ? "Opened a new design briefing (no generation started)." : "Opened this conversation's design library."} ${opened.url}`);
+}
+
 export async function handleHubCommand(args: string, ctx) {
 	const notify = (text: string, ok = true) => ctx.ui?.notify?.(text, ok ? "info" : "warning");
 	// Typed form: /wo hub install | start | stop | restart | open [remote] | remote on|off | autostart on|off | new … | update
