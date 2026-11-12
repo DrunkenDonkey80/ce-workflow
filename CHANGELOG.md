@@ -9,6 +9,10 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
   ![The Design library tab](docs/changelog/design-library-entry.png)
   ![Library with an Astryx theme added as @ref1](docs/changelog/design-library-gallery.png)
   ![Inspecting a reference, with its chip above the chat box](docs/changelog/design-library-reference.png)
+- The Design library has tabs: **Designs**, **Themes**, **Components** and **Image search**. Design cards show the real page as you scroll. Every Astryx component card is a picture of the component, and **Inspect** shows its usage and props without installing anything. In **Image search**, press Enter or **Search** to search Google Images; picks you add stay when you search again. Choosing the Design library tab narrows the chat; other tabs keep the width you left them at.
+  ![The Components tab: a picture per component](docs/changelog/design-library-components.png)
+  ![Inspecting Button: picture, usage and props](docs/changelog/design-library-component-inspect.png)
+  ![Image search with a saved pick](docs/changelog/design-library-image-search.png)
 - Ask the chat to find existing interfaces ("top POS screens") and the agent's picks from a Google image search show up as **Web results** cards in that conversation's Design library, with their source page and why each one fits. Add one as an `@ref`, or **Capture page** to screenshot its source site.
   ![A web result card in the Design library](docs/changelog/design-library-found.png)
 - Hub links between whole projects: in **Hub links…**, the other hub's sessions now show as a tree by project, and clicking a project heading links the two projects. Every session of either project then reaches every live session of the other as `project-name~hub`, and replies go back to whoever sent. Both hubs need this version (link comm 2).

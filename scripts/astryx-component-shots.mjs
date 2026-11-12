@@ -110,6 +110,8 @@ try {
 	catch (error) { throw new Error(`The picture page did not start: ${browser(undefined, "errors")}`.slice(0, 1500), { cause: error }); }
 	for (const name of list) {
 		const failed = JSON.parse(browser(`window.show(${JSON.stringify(name)})`, "--json", "eval", "--stdin")).data.result;
+		// Examples link remote photos the offline page cannot load: a grey stand-in beats a broken-image icon.
+		browser("(async () => { const imgs = [...document.querySelectorAll('#shot img')]; for (let i = 0; i < 30 && !imgs.every(img => img.complete); i++) await new Promise(r => setTimeout(r, 100)); for (const img of imgs) if (!img.naturalWidth) { img.alt = ''; img.srcset = ''; img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"4\" height=\"3\"><rect width=\"4\" height=\"3\" fill=\"#d9dde3\"/></svg>'); } await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); })()", "eval", "--stdin");
 		const box = JSON.parse(browser("(() => { const r = document.getElementById('shot').getBoundingClientRect(); return [r.width, r.height]; })()", "--json", "eval", "--stdin")).data.result;
 		if (failed) { rows.set(name, { name, error: `crashes when rendered: ${String(failed).slice(0, 200)}` }); continue; }
 		// 24 px padding each side: anything taller drew something (StatusDot rows are ~10 px).

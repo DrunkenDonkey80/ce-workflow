@@ -220,7 +220,8 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    });
    actions.append(pick); detail.append(make("p", "Pick a region with Crop, then Save. A cropped thumbnail, original image and crop coordinates are attached; drawings are not. Marker notes are kept."));
   }
-  if (item.preview === "image" && item.imageRevision) detail.append(image(item), make("p", item.kind === "component" ? "Rendered from its pinned example in the neutral theme. A still picture: it does not demonstrate responsive behaviour or interactive controls." : "Static source image, not a generated preview. It does not demonstrate responsive behaviour or interactive controls."));
+  // The picture leads: you pick by look, then read the details.
+  if (item.preview === "image" && item.imageRevision) actions.before(image(item), make("p", item.kind === "component" ? "Rendered from its pinned example in the neutral theme. A still picture: it does not demonstrate responsive behaviour or interactive controls." : "Static source image, not a generated preview. It does not demonstrate responsive behaviour or interactive controls."));
   else if (item.preview === "sample" && item.availability === "cached") sample(item);
   else detail.append(make("p", item.preview === "sample" ? "This source sample is not cached for viewing on this host yet. No download was started." : "No supplied visual sample. This entry is metadata only; nothing was generated."));
   if (item.kind === "component") void docs(item);
