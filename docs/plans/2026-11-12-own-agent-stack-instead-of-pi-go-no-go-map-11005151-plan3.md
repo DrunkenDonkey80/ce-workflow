@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T18:17:50.588Z
+updated: 2026-11-12T18:23:40.671Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -57,6 +57,8 @@ One line per resolved ticket: gist and ticket ID.
 - **D-07 Today's model access is a hard gate (Q-01).** Every path must keep the Claude subscription (pi-provider-claude-ex), the OpenAI Codex subscription logins and the other enabled providers; a path that cannot fails, whatever its score. Source: user via ask_user /plan3 resolve, 2026-11-12.
 - **D-08 Server OS: Windows native, WSL and Linux; macOS as client only (Q-02).** A path must run the server on all three; macOS and iOS need only the clients (Swift app, web). Source: user via ask_user /plan3 resolve, 2026-11-12.
 - **D-09 Usage inventory (T-01).** In 30 days, about 85% of tool calls go to Pi's core file and shell tools and codemode. Daily needs: compaction, the session tree and custom entries, both subscription logins, the 33-event extension model, and the hub's RPC and SDK surface. pi-subagents and `lens_diagnostics` are daily too, pi-web-access is weekly, and pi-goal and most pi-lens extras are rare. Evidence: `docs/proposals/own-agent-stack/inventory.md`.
+- **D-10 Baseline (T-02).** Pi core is fast outside the model: 0.27 s to ready, about 120 MB private memory per session, about 10 ms of overhead per turn. Our packages add about 1.1 s warm and 2.7 s on the first start, plus 150 MB per session; long live sessions use 340 to 580 MB. The speed pain is package load and memory, not the agent loop. Evidence: `docs/proposals/own-agent-stack/baseline.md` (S1 to S5).
+
 
 
 
@@ -87,11 +89,7 @@ None.
 ### Tickets [think]
 
 - [x] **T-01** Inventory written: core tools and codemode carry about 85% of calls; daily needs listed by owner (D-09).
-- [ ] **T-02** How fast and heavy is today's stack, and where does time go outside the model?
-  - type: research
-  - Define shared scenarios any server can run: cold start to first ready reply, warm start, memory idle and with 5 sessions, one short turn's overhead outside the model; set repetitions and cold or warm conditions.
-  - Pi-only metrics (`/reload`, extension load, hub spawn at `hub/src/rpc-client.ts` `start()`) are recorded but marked not comparable.
-  - Output `baseline.md` with the script text, the machine, and sanitized raw results; these are startup and resource numbers, not workflow speed (AGENTS.md Optimization Regression Rule).
+- [x] **T-02** Baseline measured: Pi core 0.27 s and 120 MB per session; our packages add 1.1 to 2.7 s and 150 MB (D-10).
 - [ ] **T-03** What can an agent or extension do on this machine today, and what would a sandbox stop?
   - type: research
   - Count npm packages and install scripts we run; list file, network and process rights; name realistic threats.
