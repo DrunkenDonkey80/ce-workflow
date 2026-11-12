@@ -85,7 +85,10 @@ async function handle(cmd) {
 				if (cmd.message.startsWith("/pi-hub ")) {
 					const call = JSON.parse(cmd.message.slice(8));
 					const result = process.env.FAKE_PI_HUB_URL ? await (await fetch(process.env.FAKE_PI_HUB_URL, { method: "POST", body: JSON.stringify({ endpoint: call.endpoint, data: call.data }) })).json()
-						: call.endpoint === "/api/fail" ? { ok: false, status: 404, error: "Displayed plan no longer exists." } : { ok: true, value: { endpoint: call.endpoint, data: call.data } };
+						: call.endpoint === "/api/fail" ? { ok: false, status: 404, error: "Displayed plan no longer exists." }
+						// Mirrors browser-fetch.ts captureUrlReference: "denied.test" is refused like an unapproved site, "junk.test" returns a non-PNG.
+						: call.endpoint === "/api/designurl" ? (/denied\.test/.test(call.data.url) ? { ok: false, status: 500, error: "browser_fetch refused: not approved" } : { ok: true, value: { finalUrl: call.data.url, title: "<b>Page</b>", png: /junk\.test/.test(call.data.url) ? "aGVsbG8=" : Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]).toString("base64") } })
+						: { ok: true, value: { endpoint: call.endpoint, data: call.data } };
 					out({ type: "extension_ui_request", id: crypto.randomUUID(), method: "setStatus", statusKey: "pi-hub:result", statusText: JSON.stringify({ id: call.id, ...result }) });
 				}
 				// Mirrors ce-workflow plan3.ts publishHub(): `/state <json>` publishes pi-hub:state.

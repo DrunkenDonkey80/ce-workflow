@@ -89,6 +89,7 @@ function stub(endpoint, body) {
   product = { ...result.diagram, revision: product.revision + 1 }; persist(); publish("diagram", { target: { kind: "product" }, diagram: product });
   return { diagram: product, line: planned.line, removed: result.removed };
  }
+ if (endpoint === "/api/designurl") throw fail(500, "browser_fetch refused: not approved"); // D12: the session's per-site approval said no
  if (!(endpoint === "/api/message" && body.target === "product")) assert.equal(body.target, "12345678"); // a chat message may be sent from the Project tab
  if (endpoint === "/api/command") { commands.push(body.command); return { ok: true }; }
  if (endpoint === "/api/message" && body.text.startsWith("/")) { commands.push(body.text); return { accepted: true }; }
@@ -203,6 +204,9 @@ try {
  assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 1, "Ctrl-click, right-click and hold select one stable reference");
  await browser("click", "#reference-draft button[aria-label=\"Remove @ref3\"]");
  await browser("wait", "--fn", "!document.querySelector('#reference-draft article')");
+ await browser("fill", "#library input[type=url]", "https://denied.test/page"); await browser("click", "#library form button");
+ await browser("wait", "--fn", "document.querySelector('#library form [role=status]').textContent.includes('not approved')");
+ assert.deepEqual(await evaluate("[document.querySelector('#library input[type=url]').value, document.querySelectorAll('#reference-draft article').length]"), ["https://denied.test/page", 0], "a refused page keeps the typed address and adds nothing");
  await browser("click", "#library [data-entry='astryx:theme:neutral'] [data-inspect]");
  await browser("click", ".library-detail button");
  assert.deepEqual(await evaluate("[document.querySelectorAll('#library [data-entry]').length, document.querySelector('.library-detail').hidden, document.activeElement.textContent]"), [1, true, "Inspect Neutral"], "Back preserves filtered results and keyboard focus");

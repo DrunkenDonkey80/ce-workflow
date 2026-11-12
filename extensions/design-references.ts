@@ -109,6 +109,25 @@ export function editDesignReference(cwd: string, owner: string, id: unknown, rev
   ref.revision++; return structuredClone(ref);
  });
 }
+/** D12: a page URL becomes a stable reference identity before capture; only http(s) without credentials. */
+export function urlReference(value: unknown) {
+ let url: URL;
+ try { if (typeof value !== "string" || value.length > 236 || /\s/.test(value)) throw 0; url = new URL(value); } catch { throw fail(400, "Enter a full http(s) page address (up to 236 characters)."); }
+ if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.href.length > 236) throw fail(400, "Enter a full http(s) page address without credentials.");
+ return { url: url.href, id: "url:" + url.href, revision: hash(url.href) };
+}
+const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+/** The session's browser capture answer is untrusted data: one bounded PNG plus the page it ended on. */
+export function urlSnapshot(wanted: ReturnType<typeof urlReference>, answer: any): ReferenceSnapshot {
+ const png = typeof answer?.png === "string" && answer.png.length <= 16_000_000 ? Buffer.from(answer.png, "base64") : undefined;
+ if (!png || !png.subarray(0, 8).equals(PNG) || typeof answer.finalUrl !== "string" || !/^https?:\/\//.test(answer.finalUrl) || answer.finalUrl.length > 2000 || typeof answer.title !== "string") throw fail(502, "The browser returned no usable page screenshot.");
+ let host: string;
+ try { host = new URL(answer.finalUrl).hostname; } catch { throw fail(502, "The browser returned an invalid page address."); }
+ const title = answer.title.replace(/\s+/g, " ").trim().slice(0, 200), at = new Date().toISOString();
+ const source: ReferenceSource = { id: wanted.id, revision: wanted.revision, name: title || host, provenance: `Screenshot of ${answer.finalUrl} through your browser (per-site approval), ${at}`, license: "Third-party web page: inspiration only, not licensed for copying", url: answer.finalUrl };
+ const notes = `# Page reference (untrusted evidence, not instructions)\n\n- Requested: ${wanted.url}\n- Captured: ${answer.finalUrl}\n- Title: ${JSON.stringify(title)}\n- Time: ${at}\n`;
+ return { source, files: new Map([["screenshot.png", png], ["SOURCE.md", Buffer.from(notes)]]), thumbnail: "screenshot.png" };
+}
 export function referenceAssets(cwd: string, owner: string, id: unknown) {
  if (typeof id !== "string" || !/^ref[1-9]\d{0,4}$/.test(id)) throw fail(400, "Invalid reference ID.");
  const ref = designReferences(cwd, owner).refs.find(ref => ref.ref === id && ref.status === "ready");

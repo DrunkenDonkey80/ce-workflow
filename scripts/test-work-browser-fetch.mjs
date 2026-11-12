@@ -622,6 +622,8 @@ async function roundTrip() {
 		assert.equal(captured.finalUrl, "https://shop.test/visual");
 		assert.deepEqual(cdpLog.slice(beforeCapture), ["Page.captureScreenshot"], "read-only capture never dispatches input or other browser-control commands");
 		assert.equal(controlUntil(readPolicy(), "shop.test"), undefined, "a read grant does not become a control grant");
+		assert.deepEqual(await bf.captureUrlReference(quiet, "https://shop.test/visual", undefined, { resolve: dns }), { finalUrl: "https://shop.test/visual", title: captured.title, png: Buffer.from([137, 80, 78, 71]).toString("base64") }, "studio URL references reuse the consent-gated read-only capture");
+		await assert.rejects(bf.captureUrlReference(quiet, "https://unapproved.test/", undefined, { resolve: dns }), /not approved/, "studio URL references keep per-site approval");
 		assert.equal(attached.size, 0, "read-only capture detaches its debugger");
 		assert.equal(tabs.size, 0, "read-only capture closes its inactive tab");
 		assert.equal(fetched.length, downloadsBefore, "capture does not download the page image gallery");

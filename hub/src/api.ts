@@ -19,7 +19,7 @@ import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
 import { buildInfo } from "../../extensions/design-build.ts";
 import { catalogReference, designCatalog, designImage } from "../../extensions/design-catalog.ts";
-import { addDesignReference, designReferences, editDesignReference, referenceAssets } from "../../extensions/design-references.ts";
+import { addDesignReference, designReferences, editDesignReference, referenceAssets, urlReference, urlSnapshot } from "../../extensions/design-references.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
@@ -447,12 +447,18 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return ARCHIVE.test(real) ? explore(real) : viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) });
 			}
 			case "designreference": {
-				only(data, ["target", "action", "id", "revision", "aspect", "note", "region", "previewKey"], "Invalid reference fields.");
+				only(data, ["target", "action", "id", "revision", "aspect", "note", "region", "previewKey", "url"], "Invalid reference fields.");
 				if (data.action === "remove" || data.action === "note") {
 					if (data.action === "note" && typeof data.note !== "string") throw fail(400, "A reference note is required.");
 					return editDesignReference(folder(id), id, data.id, data.revision, data.action === "note" ? data.note : undefined);
 				}
 				if (data.action !== "add") throw fail(400, "Invalid reference action.");
+				// D12: pages are captured by this session's consent-gated browser_fetch, never by a hub-side browser.
+				if (data.url !== undefined) {
+					if (data.id !== undefined || data.revision !== undefined || data.previewKey !== undefined) throw fail(400, "A URL reference names only its address.");
+					const page = urlReference(data.url);
+					return addDesignReference(folder(id), id, { ...data, id: page.id, revision: page.revision }, async () => urlSnapshot(page, await call(id, "/api/designurl", { url: page.url })));
+				}
 				return addDesignReference(folder(id), id, data, () => data.previewKey === undefined ? catalogReference(folder(id), data.id, data.revision) : referenceSnapshot(folder(id), data.previewKey, data.id, data.revision, id));
 			}
 			case "designexample": {

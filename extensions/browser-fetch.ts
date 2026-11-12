@@ -325,6 +325,14 @@ export function inbox(handlers: Link["handlers"], id: string, signal?: AbortSign
 
 type FetchResult = { url: string; finalUrl: string; title: string; text: string; truncated: boolean; screenshot?: string; links: { text: string; href: string }[]; imageUrls: string[]; images: { url: string; path: string; bytes: number }[]; skipped: number; results?: any[] };
 
+/** Studio URL reference (D12): one consent-gated read-only screenshot; the hub validates and stores it as untrusted evidence. */
+export async function captureUrlReference(ctx, url: string, signal?: AbortSignal, options?: { resolve?: typeof lookup }) {
+	const page = await browserFetch(ctx, { url, screenshot: true }, signal, options);
+	// shortcut: the PNG rides the hub call as base64 (~4/3 size); move to a shared file handoff if pages exceed 12 MB.
+	if (statSync(page.screenshot!).size > 12 * 1024 * 1024) throw new Error("The page screenshot is larger than 12 MB.");
+	return { finalUrl: page.finalUrl, title: page.title, png: readFileSync(page.screenshot!).toString("base64") };
+}
+
 /** `extract` (plan 71dc4da4): the add-on runs a Google results extractor instead of the page reader and returns raw `results`. */
 export async function browserFetch(ctx, params: { url: string; images?: boolean; screenshot?: boolean; extract?: "web" | "images" }, signal?: AbortSignal, { resolve = lookup } = {}): Promise<FetchResult> {
 	const id = randomUUID(), hops: string[] = [];

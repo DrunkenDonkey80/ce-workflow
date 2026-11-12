@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-11
-updated: 2026-11-12T08:16:05.111Z
+updated: 2026-11-12T08:33:52.371Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:56:51.270Z
 ---
@@ -144,14 +144,7 @@ Limits: host fetch concurrency 4; kit.html ≤ 64 KB, components/preview pages �
 - [x] **P3-02** Added /wo design dispatch, same-chat library entry/deep links, approved terminal fallback reuse, and authenticated pinned metadata without generation or provisioning.
 - [x] **P3-03** Library now inspects cached OD samples, six Astryx images, live drafts and retained exports in isolated, bounded previews, groups identical authored sources, and restores the live studio without losing unsaved forms.
 - [x] **P3-10** Shared bounded screenshot helper now serves browser_act and internal read-only browser_fetch capture, retaining site approval without control grants.
-- [wip] **P3-04** Attach whole styles, selected aspects and URL references to the draft with stable IDs and notes.
-  - Visible Add reference plus Ctrl-click, right-click and hold shortcuts where safe; removable thumbnails; no accidental selection during scrolling or text selection.
-  - Extend the existing composer/draft storage to keep references with text; retain compatibility with plain-string drafts. Persist the bounded in-flight submission until acknowledgment/reconciliation, separately from newer edits, so reload or a lost response neither discards the brief nor blindly resends it. Use the existing annotation/pick mechanisms for parts, not a second editor. Duplicate adds should select the existing chip, while distinct aspects may be separate references.
-  - Preserve selections across layout changes and navigation; removed IDs must not silently point to different assets. Materialize safe project-local assets through a constrained host path, preserving URL/source provenance; treat them as untrusted reference data, never agent instructions.
-  - Enforce the URL/network boundaries in Global validation before capture. No automatic logged-in browser fallback. Verify C3/C4/C5 for stale preview completion, malicious assets, native gesture conflicts and draft persistence.
-  - note: Continuing directly: stable project-local reference snapshots and composer persistence first; URLs remain unwired until their capture boundary is constrained.
-  - note: Local reference selection and recovery verified; C3 URL renderer containment remains open. Continue independent P3-05 wiring; do not treat this checkpoint as a stopping point.
-  - check: node "hub/scripts/test-api.mjs" — api ok; node "hub/scripts/test-browser.mjs" — real headless hub/fake-Pi suite passed, including stable/aspect-specific IDs, duplicate selection, reload, note/remove, safe gesture logic and separate pending/new edits; git diff --check — passed. Crop test was red (full WebP instead of PNG) before the host-side fix. Physical native touch/Safari not verified. LSP probe reports no TypeScript errors on touched code but silent push-only rechecks are inconclusive; existing app safety-comment errors remain outside this diff.
+- [x] **P3-04** References attach with stable IDs and notes; page URLs are captured only through the session's per-site-approved browser_fetch screenshot (user decision), validated as a PNG and stored as untrusted, inspiration-only evidence; the guarded hub-side Chromium capture was set aside (patch in .pi/backups) and the design containment suite is green again.
 - [x] **P3-05** Reference-led Send freezes and authorizes one bundle, starts the existing variant workflow at most once per bundle with source-asset prompt context, tracks hub creation/first-prompt stages without blind resend, and keeps clone/export provenance.
 
 ### Phase 3: Validate the complete kickoff flow [code]

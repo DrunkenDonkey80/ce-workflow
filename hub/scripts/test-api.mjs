@@ -388,6 +388,18 @@ try {
 		for (const file of [`.pi/designs/references/bundles/${submission}/bundle.json`, `.pi/designs/references/bundles/${submission}/assets/${ref.ref}/source.webp`, `.pi/designs/references/library/${id}/index.json`, ".pi/designs/references/library", ".pi/designs/references/bundles"]) assert.match(writeRefusal(folder, "design-1", file), /read-only/, "design sessions cannot rewrite evidence or its authorization");
 		assert.equal(writeRefusal(folder, "design-1", ".pi/designs/references/site/STYLE.md"), undefined, "ordinary site reference guidance remains writable");
 	}
+	{
+		// D12: page references are captured by the session's consent-gated browser_fetch and stored by the hub.
+		for (const url of ["file:///etc/passwd", "data:text/html,x", "https://user:pw@site.test/", "not a url", "https://site.test/" + "x".repeat(240)]) assert.equal((await post(id, "designreference", { action: "add", url, aspect: "whole" })).status, 400, url);
+		assert.equal((await post(id, "designreference", { action: "add", url: "https://site.test/", id: "astryx:x", aspect: "whole" })).status, 400, "a URL reference cannot borrow a catalog identity");
+		assert.match((await post(id, "designreference", { action: "add", url: "https://denied.test/", aspect: "whole" })).body.error, /not approved/, "per-site approval refusals reach the page");
+		assert.equal((await post(id, "designreference", { action: "add", url: "https://junk.test/", aspect: "whole" })).status, 502, "non-PNG captures are refused");
+		const page = await post(id, "designreference", { action: "add", url: "https://site.test/a", aspect: "layout", note: "spacing" });
+		assert.equal(page.status, 200); assert.equal(page.body.status, "ready"); assert.equal(page.body.thumbnail, "screenshot.png"); assert.equal(page.body.source.url, "https://site.test/a");
+		assert.match(page.body.source.license, /inspiration only/); assert.equal(page.body.source.name, "<b>Page</b>", "titles stay data; the page renders them as text");
+		assert.equal((await get(id, `designreferenceimage?ref=${page.body.ref}`)).status, 200);
+		assert.equal((await post(id, "designreference", { action: "add", url: "https://site.test/a", aspect: "layout" })).body.ref, page.body.ref, "the same page keeps one stable reference identity");
+	}
 	assert.equal(hub.host.live.has(id), true);
 	assert.deepEqual((await post(id, "command", { target: "bbbbbbbb", command: "review" })).body.endpoint, "/api/command");
 	assert.deepEqual(Object.keys((await get(id, "usage")).body), ["summary", "accounts"], "usage comes from the hub, not the session");
