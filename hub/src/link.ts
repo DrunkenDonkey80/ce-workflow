@@ -3,7 +3,9 @@
 // the ce-workflow version: hubs on different releases keep their links while their COMM numbers are equal (D6).
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { writeJsonAtomic } from "./registry.ts";
 import type { createDeviceRegistry, createPairing } from "./remote.ts";
@@ -13,6 +15,41 @@ import { agentDir } from "./rpc-client.ts";
 export const COMM = 2;
 /** S02 deadlines: a forwarded message must be confirmed inside pi-intercom's 5 s receipt window; hubs ping every 30 s. */
 const DELIVER_MS = 3_000, PING_MS = 30_000;
+/** D-09: files in one message total at most 5 MB; `/link/file` takes one file as base64 plus 64 KB of metadata. */
+const FILES_MAX = 5 * 1024 * 1024;
+export const FILE_BODY = 4 * Math.ceil(FILES_MAX / 3) + 65_536;
+const inside = (root: string, real: string) => { const rel = path.relative(root, real); return rel !== "" && rel.split(/[\\/]/)[0] !== ".." && !path.isAbsolute(rel); };
+const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+/** PL-08: saves an arriving file as `<folder>/.pi/inbox/<time>-<random>-<name>`; the inbox's real path must stay in the project. */
+export async function saveInbox(folder: string, bytes: Buffer, name: unknown) {
+	const inbox = path.join(folder, ".pi", "inbox");
+	await mkdir(inbox, { recursive: true });
+	const [root, real] = await Promise.all([realpath(folder), realpath(inbox)]);
+	if (!inside(root, real)) throw Object.assign(new Error("the project's .pi/inbox leads outside the project"), { status: 403 });
+	// As savePastedImage: no separators, spaces or leading dots, and wx never overwrites.
+	const safe = (typeof name === "string" ? path.basename(name.replaceAll("\\", "/")) : "").replace(/[^\w.()-]/g, "_").replace(/^[._]+/, "").slice(-120) || "file";
+	const file = path.join(real, `${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 8)}-${safe}`);
+	await writeFile(file, bytes, { flag: "wx" });
+	return file;
+}
+
+/** PL-07 (D-06, D-07, D-09): `@<absolute path>` files a sender may ship, real paths inside its project or the temp folder, 5 MB in total. */
+export async function checkFiles(files: { name?: unknown; content: string }[], folder: string) {
+	const roots = await Promise.all([folder, tmpdir()].map(root => realpath(root).catch(() => root))), checked: { real: string; name: string; size: number }[] = [];
+	for (const file of files) {
+		const wanted = file.content.slice(1).trim();
+		if (!path.isAbsolute(wanted)) throw new Error(`${wanted} is not an absolute path`);
+		const real = await realpath(wanted).catch(() => { throw new Error(`${wanted} does not exist`); });
+		if (!roots.some(root => inside(root, real))) throw new Error(`${wanted} is outside this project and the temp folder`);
+		const info = await stat(real);
+		if (!info.isFile()) throw new Error(`${wanted} is not a file`);
+		checked.push({ real, name: typeof file.name === "string" && file.name.trim() ? file.name : path.basename(real), size: info.size });
+	}
+	const total = checked.reduce((sum, file) => sum + file.size, 0);
+	if (total > FILES_MAX) throw new Error(`the files total ${megabytes(total)}, over the 5 MB limit`);
+	return checked;
+}
 
 /** null when the peer speaks this hub's comm; otherwise a message naming both numbers and which hub to update. */
 export function commMismatch(theirs: unknown, peer: string, mine = COMM): string | null {
@@ -58,7 +95,7 @@ export type Reply = [status: number, body: Record<string, unknown>];
 /** One hub-to-hub request: `op` on the hub at `url` (its tailscale serve address); tests swap in the fake serve headers. */
 export type LinkRequest = (url: string, op: string, body: Record<string, unknown>, credential?: string) => Promise<Reply>;
 const fetchRequest: LinkRequest = async (url, op, body, credential) => {
-	const response = await fetch(`${url}/link/${op}`, { method: "POST", headers: { "content-type": "application/json", ...(credential ? { "x-hub-link": credential } : {}) }, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
+	const response = await fetch(`${url}/link/${op}`, { method: "POST", headers: { "content-type": "application/json", ...(credential ? { "x-hub-link": credential } : {}) }, body: JSON.stringify(body), signal: AbortSignal.timeout(op === "file" ? 120_000 : 15_000) });
 	return [response.status, await response.json().catch(() => ({}))];
 };
 const CREDENTIAL = /^[A-Za-z0-9_-]{12}\.[A-Za-z0-9_-]{43}$/;
@@ -104,7 +141,7 @@ export function createLinks(options: {
 	/** Answers one `/link/<op>` after the hub checked the tailnet owner; credential, then comm, then payload. */
 	async function serve(op: string, headers: Headers, data: unknown, login: string, closed: Promise<unknown>): Promise<Reply> {
 		if (!data || typeof data !== "object" || Array.isArray(data)) return fail(400, "Expected a JSON object.");
-		const body = data as { comm?: unknown; id?: unknown; offer?: unknown; hub?: { name?: unknown; url?: unknown }; link?: unknown; message?: unknown; from?: unknown; to?: unknown }, open = op === "pair-start" || op === "pair-status";
+		const body = data as { comm?: unknown; id?: unknown; offer?: unknown; hub?: { name?: unknown; url?: unknown }; link?: unknown; message?: unknown; from?: unknown; to?: unknown; file?: unknown }, open = op === "pair-start" || op === "pair-status";
 		const credential = headers["x-hub-link"], device = typeof credential === "string" ? credential.split(".")[0] : "";
 		if (!open && !(typeof credential === "string" && await devices.check(credential, login, "hub"))) return fail(401, "unpaired");
 		// After pair-finish the caller is the paired hub its credential was issued to.
@@ -163,22 +200,26 @@ export function createLinks(options: {
 			misses.delete(caller!.url);
 			if (offline.delete(caller!.url)) await sync();
 			if (op === "ping") return [200, { comm: COMM, hub: self()?.name, os: process.platform, links: store.list().filter(item => item.hub === caller!.url).map(item => { if (item.kind === "project") return { id: item.id, folder: item.folder, sessions: listed(item.folder!) }; const local = sessions().find(s => s.record === item.session); return { id: item.id, name: local?.name ?? "", folder: local?.folder }; }) }];
+			if (op === "file") {
+				const file = body.file as { name?: unknown; data?: unknown } | undefined;
+				if (typeof file?.data !== "string") return fail(400, "file.data required.");
+				const bytes = Buffer.from(file.data, "base64");
+				if (bytes.length > FILES_MAX) return fail(413, `over the 5 MB limit (${megabytes(bytes.length)})`);
+				const link = store.list().find(item => item.id === body.link && item.hub === caller!.url);
+				if (!link) return fail(404, "not-linked");
+				const end = await ends(link, body, caller!.url), local = !Array.isArray(end) && sessions().find(s => s.record === end.record);
+				if (Array.isArray(end)) return end;
+				if (!local) return fail(410, "session-gone");
+				return [200, { comm: COMM, path: await saveInbox(local.folder, bytes, file.name) }];
+			}
 			if (op === "deliver") {
 				const message = body.message as { id?: unknown; text?: unknown; expectsReply?: unknown; replyTo?: unknown } | undefined;
 				if (typeof message?.id !== "string" || message.id.length > 100 || typeof message.text !== "string" || (message.replyTo !== undefined && typeof message.replyTo !== "string")) return fail(400, "message.id and message.text required.");
 				const link = store.list().find(item => item.id === body.link && item.hub === caller!.url);
 				if (!link) return fail(404, "not-linked");
-				// A project link names both ends: `to` must be in this hub's linked folder, `from` a session the other hub listed for its folder.
-				let record = link.session!, standin = standins.get(link.id), back = {};
-				if (link.kind === "project") {
-					const to = inFolder(link.folder!).find(s => s.record === body.to), known = () => remotes.get(link.id)?.some(s => s.record === body.from);
-					if (!to) return fail(403, "not-in-project");
-					// A session started there since the last ping: ask once before refusing.
-					if (!known()) { await refresh(caller!.url); await sync(); }
-					if (!known()) return fail(403, "unknown-sender");
-					record = to.record; standin = standins.get(`${link.id}/${body.from}`); back = { from: to.record, to: body.from };
-				}
-				const local = sessions().find(s => s.record === record);
+				const end = await ends(link, body, caller!.url);
+				if (Array.isArray(end)) return end;
+				const { record, standin, back } = end, local = sessions().find(s => s.record === record);
 				if (!local) return fail(410, "session-gone");
 				if (!standin) return fail(502, "not-delivered", { reason: unavailable ?? "its stand-in is not connected" });
 				const send = { text: message.text, messageId: message.id, ...(message.expectsReply === true ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) };
@@ -191,6 +232,17 @@ export function createLinks(options: {
 			return fail((error as { status?: number }).status ?? 500, (error as Error).message);
 		}
 		return fail(404, "Unknown link operation.");
+	}
+
+	/** Where a `deliver` or `file` lands: the link's session; for a project link `to` in its folder, sent by a `from` the other hub listed. */
+	async function ends(link: Link, body: { from?: unknown; to?: unknown }, url: string): Promise<Reply | { record: string; standin?: Standin; back: Record<string, unknown> }> {
+		if (link.kind !== "project") return { record: link.session!, standin: standins.get(link.id), back: {} };
+		const to = inFolder(link.folder!).find(s => s.record === body.to), known = () => remotes.get(link.id)?.some(s => s.record === body.from);
+		if (!to) return fail(403, "not-in-project");
+		// A session started there since the last ping: ask once before refusing.
+		if (!known()) { await refresh(url); await sync(); }
+		if (!known()) return fail(403, "unknown-sender");
+		return { record: to.record, standin: standins.get(`${link.id}/${body.from}`), back: { from: to.record, to: body.from } };
 	}
 
 	/** A refusal as the user reads it: comm mismatch names both numbers (D6). */
@@ -305,7 +357,7 @@ export function createLinks(options: {
 		const local = sessions().find(s => s.record === link.session); return local ? sessionRef(local.folder, local.name) : undefined;
 	};
 	/** What intercom shows for a stand-in: name, the remote place as cwd, and its owner as the model column. */
-	const describe = (link: Link, to = link.remote) => ({ name: standinName(link, to), cwd: remotePlace(link), model: `hub-link for ${owner(link) ?? "a removed session"}` });
+	const describe = (link: Link, to = link.remote) => ({ name: standinName(link, to), cwd: remotePlace(link), model: `hub-link for ${owner(link) ?? "a removed session"}; files: attach {type:"file", content:"@<absolute path>"}, 5 MB total` });
 	/** The local session behind intercom id `from` that may send through a link's stand-ins, if any. */
 	async function senderOf(link: Link, from: string) {
 		for (const session of link.kind === "project" ? inFolder(link.folder!) : sessions().filter(s => s.record === link.session)) if (from === await options.intercom!.intercomId(session.record)) return session;
@@ -336,16 +388,33 @@ export function createLinks(options: {
 	}).catch(() => {});
 
 	/** A local message to a stand-in: only its linked session's crosses (D9); the receipt waits for the other hub (S02). */
-	async function forward({ link, to, name, client }: Standin, from: { id: string }, message: { id: string; content?: { text?: string }; expectsReply?: boolean; replyTo?: string }) {
+	async function forward({ link, to, name, client }: Standin, from: { id: string }, message: { id: string; content?: { text?: string; attachments?: Attachment[] }; expectsReply?: boolean; replyTo?: string }) {
 		const tell = (text: string) => client.send(from.id, { text }).catch(() => {}), sender = await senderOf(link, from.id);
 		if (!sender && link.kind === "project") return void tell(`${name} is linked to ${owner(link)} on this hub; only its sessions may send through it. Not forwarded.`);
 		if (!sender) { const local = sessions().find(s => s.record === link.session); return void tell(`${name} is linked to ${local ? sessionRef(local.folder, local.name) : "another session"} on this hub, not to this session; not forwarded. Only that session may send through it.`); }
-		const peer = peers.get(link.hub)?.name ?? link.hub;
-		const sent = await Promise.race([
-			call(link.hub, "deliver", { link: link.id, ...(link.kind === "project" ? { from: sender.record, to: to.record } : {}), message: { id: message.id, text: message.content?.text ?? "", ...(message.expectsReply ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) } }),
-			new Promise<undefined>(done => setTimeout(done, DELIVER_MS)),
-		]).catch(() => undefined);
-		if (sent && !sent.error) return client.sendMessageReceipt({ messageId: message.id, status: "receiver_received", timestamp: Date.now() });
+		const peer = peers.get(link.hub)?.name ?? link.hub, route = link.kind === "project" ? { from: sender.record, to: to.record } : {}, started = Date.now();
+		// D-06: `@path` file attachments travel as files; any other attachment as text, the way pi-intercom shows it.
+		const attachments = Array.isArray(message.content?.attachments) ? message.content.attachments : [];
+		const files = attachments.filter(item => item?.type === "file" && typeof item.content === "string" && item.content.startsWith("@"));
+		let text = (message.content?.text ?? "") + attachments.filter(item => !files.includes(item)).map(item => `\n\n---\nAttachment: ${item.name}\n${item.language ? `~~~${item.language}\n${item.content}\n~~~` : item.content}`).join("");
+		// D-08: files go first, each by its own `/link/file`; a failure here is told back and never takes the hub offline.
+		if (files.length) {
+			let checked: Awaited<ReturnType<typeof checkFiles>>;
+			try { checked = await checkFiles(files, sender.folder); } catch (error) { return void tell(`Not delivered to ${name}: ${(error as Error).message}.`); }
+			for (const file of checked) {
+				const saved = await call(link.hub, "file", { link: link.id, ...route, file: { name: file.name, data: (await readFile(file.real)).toString("base64") } });
+				if (saved.error) return void tell(`Not delivered to ${name}: ${file.name} was not saved on ${peer} (${saved.error}).`);
+				text += `\n\n---\nFile: ${file.name} (${megabytes(file.size)}) saved at ${saved.reply[1].path}`;
+			}
+		}
+		const delivering = call(link.hub, "deliver", { link: link.id, ...route, message: { id: message.id, text, ...(message.expectsReply ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) } });
+		const sent = await (files.length ? delivering : Promise.race([delivering, new Promise<undefined>(done => setTimeout(done, DELIVER_MS))])).catch(() => undefined);
+		if (sent && !sent.error) {
+			client.sendMessageReceipt({ messageId: message.id, status: "receiver_received", timestamp: Date.now() });
+			// Past pi-intercom's receipt window the sender already saw "not confirmed": tell it the files did arrive.
+			if (Date.now() - started > DELIVER_MS) await tell(`Delivered to ${name} after all, with ${files.length} file(s); the files took ${Math.round((Date.now() - started) / 1000)} s.`);
+			return;
+		}
 		const code = sent?.reply[1].error, reason = sent?.reply[1].reason;
 		const cause = !sent ? `${peer} hub did not answer within ${DELIVER_MS / 1000} s` : code === "not-linked" ? `the link was removed on ${peer}`
 			: code === "session-gone" ? `${to.name} on ${peer} was closed` : code === "not-delivered" ? `${to.name} on ${peer} did not take it (${reason})`
@@ -431,6 +500,8 @@ export function createLinks(options: {
 	};
 }
 
+/** A pi-intercom message attachment (its types.ts). */
+type Attachment = { type: string; name: string; content: string; language?: string };
 /** One link (D8, D10): a session on this hub and a session record on a paired hub; or (kind project, D-04) a folder here and a folder there. */
 export type Link = { id: string; kind?: "project"; session?: string; folder?: string; hub: string; remote: { record?: string; name: string; folder?: string; os?: string }; created: number };
 /** The optional remote details, only those the other hub sent (older hubs send none). */

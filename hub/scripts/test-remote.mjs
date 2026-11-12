@@ -12,7 +12,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-remote-"));
 process.env.PI_CODING_AGENT_DIR = root;
 const { startHub } = await import("../src/hub.ts");
 const { createDeviceRegistry, tailscaleCommand } = await import("../src/remote.ts");
-const { COMM } = await import("../src/link.ts");
+const { COMM, FILE_BODY } = await import("../src/link.ts");
 const windowsTailscale = "/mnt/c/Program Files/Tailscale/tailscale.exe";
 assert.equal(tailscaleCommand("linux", true, candidate => candidate === windowsTailscale), windowsTailscale, "WSL reuses Windows Tailscale without depending on PATH");
 assert.equal(tailscaleCommand("linux", true, () => false), "tailscale", "WSL without Windows Tailscale keeps the native command");
@@ -180,6 +180,11 @@ try {
 	assert.equal((await link("pair-finish", { comm: COMM + 1, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 409);
 	assert.equal((await link("pair-finish", { comm: COMM, offer: "short", hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 400);
 	assert.equal((await link("pair-finish", { comm: COMM, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 200);
+	// Plan 58d5c14f D-09: only /link/file takes a 5 MB file as base64 plus 64 KB; every other /link/ op keeps 64 KB.
+	const sized = size => ({ comm: COMM, pad: "x".repeat(size - JSON.stringify({ comm: COMM, pad: "" }).length) });
+	assert.deepEqual(await link("file", sized(FILE_BODY), credential), [400, { comm: COMM, error: "file.data required." }], "exactly the cap is read");
+	assert.deepEqual(await link("file", sized(FILE_BODY + 1), credential), [413, { error: "Request too large." }], "one byte over is refused");
+	assert.deepEqual(await link("deliver", sized(65_537), credential), [413, { error: "Request too large." }], "deliver keeps 64 KB");
 	assert.deepEqual((await local("/api/hubs")).body.hubs.map(h => [h.name, h.url, "credential" in h]), [["mac", "https://mac.tail.ts.net:7781", false]]);
 	// This hub's side: pairing with another hub (here served by itself) returns the code, then finishes after approval there.
 	assert.equal((await local("/api/hubs/pair", { url: "pc.tail.ts.net:" + port })).status, 400, "not with itself");

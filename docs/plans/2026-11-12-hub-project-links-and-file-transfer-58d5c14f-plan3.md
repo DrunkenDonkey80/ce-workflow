@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-12
-updated: 2026-11-12T14:14:57.199Z
+updated: 2026-11-12T14:21:33.003Z
 reviewed: 2026-11-12
 ---
 
@@ -37,6 +37,7 @@ reviewed: 2026-11-12
   - Files saved before a failed `deliver` stay in the inbox; the failure message names them.
 - **D-09 (user, Q-04)** 5 MB is the total of all files in one message. The `/link/file` body cap is 5 MB as base64 (6,990,508 bytes) plus 64 KB for metadata; every other `/link/` op keeps 64 KB. The sending hub sums file sizes before reading any and refuses over 5 MB with the total.
 - **D-10 (assumed)** A project link keeps stand-ins only for the other project's live sessions; parked ones disappear at the next ping and come back when resumed. A `deliver` from a session the hub has not seen yet triggers one ping of that hub before it is refused.
+- **D-11 (assumed)** A traversal file name (`../../x`) is not refused: it is reduced to its sanitized base name inside `.pi/inbox`, as `savePastedImage` does, so the file still arrives.
 
 ## Open questions
 
@@ -78,17 +79,10 @@ None recorded.
 
 ### Phase 2: Files [code]
 
-- [ ] **PL-07a** Add the `/link/file` op with its own body cap (D-09); `deliver` and other `/link/` ops keep 64 KB.
-  - Real HTTP test in `test-remote.mjs`: exactly the maximum accepted, one byte over refused.
-- [ ] **PL-07** Sending side checks `@path` files (D-06, D-07) total ≤ 5 MB (D-09), uploads each by `/link/file`, then delivers the text (D-08).
-  - Text attachments pass through unchanged; refusals go back to the sender via the stand-in's `tell()`.
-  - The stand-in description line names the `@path` convention and the 5 MB limit.
-- [ ] **PL-08** Receiving side checks size, sanitizes the name, writes `.pi/inbox/<time>-<name>`, appends the saved path to the message.
-  - The real path of `.pi/inbox` must stay inside the project; write with `wx` and a random suffix, as `savePastedImage` does. Failures go back to the sender.
-  - `/link/file` returns the saved path; the receipt waits for `deliver` (D-08). A late success or failure is told to the sender; a slow upload never marks the hub offline.
-- [ ] **PL-09** Tests: binary round trip, over-limit refused, traversal name refused, path outside project and temp refused.
-  - Also: an inbox junction leaving the project refused, two same-name arrivals both kept, delayed upload with late success and late failure messages (D-08), two files totalling over 5 MB refused before any upload.
-  - Include a symlink or junction from the project to outside it, refused after real-path resolution.
+- [x] **PL-07a** `/link/file` reads up to FILE_BODY (5 MB base64 + 64 KB); deliver and other /link/ ops keep 64 KB; fetch timeout 120 s for files.
+- [x] **PL-07** forward() checks `@path` files (real path in sender project or temp, absolute, ≤5 MB total), uploads each by /link/file, then delivers text naming saved paths; other attachments as text; stand-in model line names the convention.
+- [x] **PL-08** saveInbox writes `.pi/inbox/<iso time>-<random>-<sanitized name>` with wx after checking the inbox real path stays in the project; late success told as "after all", upload failures told and never take the hub offline.
+- [x] **PL-09** test-link: binary round trip, snippet as text, same-name kept, traversal name kept in inbox, outside/junction/relative/over-5MB refused before upload, inbox junction refused, late success and late failure; test-remote: exact cap 400, +1 byte 413, deliver 64 KB.
 
 ### Phase 3: Finish [code]
 

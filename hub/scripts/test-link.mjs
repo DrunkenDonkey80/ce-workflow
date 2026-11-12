@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { COMM, commMismatch, createLinks, createPeers, loadIntercom } from "../src/link.ts";
+import { COMM, commMismatch, createLinks, createPeers, loadIntercom, saveInbox } from "../src/link.ts";
 import { createDeviceRegistry, createPairing } from "../src/remote.ts";
 import { agentDir } from "../src/rpc-client.ts";
 
@@ -50,8 +50,9 @@ try {
 	} else console.log("skipped: pi-intercom not installed here");
 
 	// S06: two hubs in one process, requests passed as JSON between their /link/ handlers; `offline` drops one.
-	const hubs = {}, offline = new Set(), login = "me@example.com";
+	const hubs = {}, offline = new Set(), login = "me@example.com", slow = { file: 0 };
 	const request = async (url, op, body, credential) => {
+		if (op === "file" && slow.file) await new Promise(done => setTimeout(done, slow.file));
 		if (offline.has(url)) throw new Error("connect ECONNREFUSED");
 		const [status, reply] = await hubs[url].links.serve(op, credential ? { "x-hub-link": credential } : {}, JSON.parse(JSON.stringify(body)), login, new Promise(() => {}));
 		return [status, JSON.parse(JSON.stringify(reply))];
@@ -69,7 +70,7 @@ try {
 				return new Promise(resolve => {
 					const timer = setTimeout(() => { pending.delete(id); resolve({ id, delivered: false, reason: "no receipt" }); }, 1000);
 					pending.set(id, () => { clearTimeout(timer); resolve({ id, delivered: true }); });
-					target.emit("message", this.info, { id, content: { text: options.text }, expectsReply: options.expectsReply, replyTo: options.replyTo });
+					target.emit("message", this.info, { id, content: { text: options.text, attachments: options.attachments }, expectsReply: options.expectsReply, replyTo: options.replyTo });
 				});
 			}
 			sendMessageReceipt({ messageId }) { pending.get(messageId)?.(); pending.delete(messageId); }
@@ -131,7 +132,7 @@ for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", pcRecords], 
 	await Promise.all([pc.links.sync(), mac.links.sync()]);
 	assert.deepEqual([pc.links.standins(), mac.links.standins()], [[{ id: link.id, name: "belot-beta~mac" }], [{ id: link.id, name: "emailupload-alpha~pc" }]], "D11 names with the folder, one stand-in on each hub");
 	const info = pc.broker.clients.get(`hublink-${link.id}`).info;
-	assert.deepEqual([info.name, info.cwd, info.model], ["belot-beta~mac", `mac (${OS}): /Users/f/belot`, "hub-link for emailupload/ALPHA"], "fixed id per link; intercom shows where it runs and whose it is");
+	assert.deepEqual([info.name, info.cwd, info.model], ["belot-beta~mac", `mac (${OS}): /Users/f/belot`, 'hub-link for emailupload/ALPHA; files: attach {type:"file", content:"@<absolute path>"}, 5 MB total'], "fixed id per link; intercom shows where it runs and whose it is");
 	// Send: the receipt comes only after the other hub's session took it.
 	assert.equal((await alpha.send("belot-beta~mac", { text: "hello" })).delivered, true);
 	assert.deepEqual(beta.inbox.map(m => [m.from, m.content.text]), [["emailupload-alpha~pc", "hello"]]);
@@ -178,7 +179,7 @@ for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", pcRecords], 
 	const project = await pc.links.linkProject("alpha", macUrl, "/Users/f/belot");
 	await mac.links.sync();
 	assert.deepEqual([project.standins.sort(), mac.links.standins().map(s => s.name).sort()], [["belot-eps~mac", "belot-gamma~mac"], ["emailupload-alpha~pc", "emailupload-delta~pc"]], "one stand-in per live session of the other project");
-	assert.equal(pc.broker.clients.get(`hublink-${project.id}-gamma`).info.model, "hub-link for project emailupload");
+	assert.match(pc.broker.clients.get(`hublink-${project.id}-gamma`).info.model, /^hub-link for project emailupload; files: /);
 	await assert.rejects(pc.links.linkProject("delta", macUrl, "/Users/f/belot"), /already linked/);
 	await assert.rejects(pc.links.linkProject("alpha", macUrl, "/Users/f/nothing"), /no sessions on the other hub/);
 	assert.deepEqual(pc.links.linksOf("delta").filter(l => l.kind === "project").map(l => l.label), [`project belot on mac (${OS})`], "every session of the folder sees the project link");
@@ -208,6 +209,53 @@ for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", pcRecords], 
 	assert.deepEqual(await pc.links.unlink(project.id), { ok: true });
 	await Promise.all([pc.links.sync(), mac.links.sync()]);
 	assert.deepEqual([pc.links.standins().filter(s => s.id === project.id), mac.links.standins(), mac.links.store.list()], [[], [], []]);
+	// PL-09: `@path` file attachments land in the target project's .pi/inbox and the message names the saved path (D-06 to D-09).
+	const pcProj = path.join(root, "pc proj"), macProj = path.join(root, "mac proj"), macInbox = path.join(macProj, ".pi", "inbox"), outside = path.dirname(process.execPath);
+	for (const dir of [pcProj, macProj]) fs.mkdirSync(dir);
+	pcRecords.push("fp"); state.fp = { name: "FP", folder: pcProj, live: true };
+	macRecords.push("fm"); state.fm = { name: "FM", folder: macProj, live: true };
+	const fp = pc.agents.fp = await pc.broker.agent("fp"), fm = mac.agents.fm = await mac.broker.agent("fm"), toFm = "mac-proj-fm~mac";
+	await pc.links.linkProject("fp", macUrl, macProj);
+	const binary = Buffer.from(Array.from({ length: 4096 }, (_, i) => (i * 37) % 256)), binFile = path.join(pcProj, "bin.dat");
+	fs.writeFileSync(binFile, binary);
+	const file = (content, name = "bin.dat") => ({ type: "file", name, content });
+	const saved = () => { const match = /File: .+ saved at (.+)$/.exec(fm.inbox.at(-1).content.text); return match?.[1]; };
+	assert.equal((await fp.send(toFm, { text: "see file", attachments: [file(`@${binFile}`), { type: "snippet", name: "note", content: "x = 1", language: "js" }] })).delivered, true);
+	const first = saved();
+	assert.match(fm.inbox.at(-1).content.text, /^see file\n\n---\nAttachment: note\n~~~js\nx = 1\n~~~\n\n---\nFile: bin\.dat \(0\.0 MB\) saved at /, "text attachments travel as text, files by saved path");
+	assert.deepEqual([path.dirname(first), fs.readFileSync(first).equals(binary)], [fs.realpathSync(macInbox), true], "binary round trip into the project inbox");
+	assert.equal((await fp.send(toFm, { text: "again", attachments: [file(`@${binFile}`, "../../evil.dat")] })).delivered, true);
+	assert.notEqual(saved(), first, "two same-name arrivals both kept");
+	assert.deepEqual([path.dirname(saved()), path.basename(saved()).endsWith("-evil.dat")], [fs.realpathSync(macInbox), true], "a traversal name stays in the inbox");
+	// Refused before any upload, with the reason back to the sender.
+	fs.symlinkSync(outside, path.join(pcProj, "out"), "junction");
+	fs.writeFileSync(path.join(pcProj, "a.bin"), Buffer.alloc(3 * 1024 * 1024)); fs.writeFileSync(path.join(pcProj, "b.bin"), Buffer.alloc(3 * 1024 * 1024));
+	for (const [attachments, reason] of [
+		[[file(`@${process.execPath}`)], /is outside this project and the temp folder/],
+		[[file(`@${path.join(pcProj, "out", path.basename(process.execPath))}`)], /is outside this project and the temp folder/],
+		[[file("@bin.dat")], /bin\.dat is not an absolute path/],
+		[[file(`@${path.join(pcProj, "a.bin")}`), file(`@${path.join(pcProj, "b.bin")}`)], /the files total 6\.0 MB, over the 5 MB limit/],
+	]) {
+		const before = fs.readdirSync(macInbox).length;
+		assert.equal((await fp.send(toFm, { text: "refused", attachments })).delivered, false);
+		assert.match(fp.inbox.at(-1).content.text, reason);
+		assert.equal(fs.readdirSync(macInbox).length, before, "nothing uploaded");
+	}
+	// An inbox whose real path leaves the project is refused.
+	const jumped = path.join(root, "jumped"); fs.mkdirSync(jumped); fs.symlinkSync(path.join(root, "pc"), path.join(jumped, ".pi"), "junction");
+	await assert.rejects(saveInbox(jumped, binary, "x"), /leads outside the project/);
+	// Uploads past pi-intercom's receipt window: the sender hears the late outcome; a failed upload never takes the hub offline.
+	slow.file = 3_100;
+	assert.equal((await fp.send(toFm, { text: "slow", attachments: [file(`@${binFile}`)] })).delivered, false, "receipt window missed");
+	for (let i = 0; i < 50 && !/after all/.test(fp.inbox.at(-1).content.text); i++) await new Promise(done => setTimeout(done, 100));
+	assert.match(fp.inbox.at(-1).content.text, /^Delivered to mac-proj-fm~mac after all, with 1 file\(s\)/);
+	assert.match(fm.inbox.at(-1).content.text, /^slow\n/);
+	slow.file = 1_200; offline.add(macUrl);
+	assert.equal((await fp.send(toFm, { text: "late fail", attachments: [file(`@${binFile}`)] })).delivered, false);
+	for (let i = 0; i < 30 && !/was not saved/.test(fp.inbox.at(-1).content.text); i++) await new Promise(done => setTimeout(done, 100));
+	assert.match(fp.inbox.at(-1).content.text, /^Not delivered to mac-proj-fm~mac: bin\.dat was not saved on mac \(mac hub unreachable: connect ECONNREFUSED\)/);
+	assert.equal(pc.links.state().hubs[0].online, true, "a failed upload does not take the hub offline");
+	slow.file = 0; offline.delete(macUrl);
 	await Promise.all([pc.links.stop(), mac.links.stop()]);
 	assert.equal(pc.broker.clients.has(`hublink-${link.id}`), false, "stop disconnects stand-ins");
 

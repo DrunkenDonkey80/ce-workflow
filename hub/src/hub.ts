@@ -26,7 +26,7 @@ import { browserExtension, changelogImage, hubVersion, readChangelog, since, VER
 import { agentDir } from "./rpc-client.ts";
 import { maintenanceCommand } from "./maintenance.ts";
 import { ICONS, iconSvg } from "../web/icons.ts";
-import { createLinks, type LinkRequest } from "./link.ts";
+import { createLinks, FILE_BODY, type LinkRequest } from "./link.ts";
 import { cookieOf, createDeviceRegistry, createPairing, deviceCookie, exec, serveAdd, serveRemove, tailscaleStatus, type Exec, type Tailnet } from "./remote.ts";
 import { sendExplored, viewers } from "./explore.ts";
 import { pruneSessions, sessionTrash, trimCompacted } from "./session-prune.ts";
@@ -280,7 +280,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 				// Another hub: its own path and credential, before the browser Origin and cookie rules (plan d21eefbf, comm protocol).
 				if (url.pathname.startsWith("/link/")) {
 					if (request.method !== "POST") return send(405, { error: "POST only." });
-					const [status, value] = await links.serve(url.pathname.slice(6), request.headers, await body(request, PAGE_BODY), tailnet!.login!, new Promise(done => response.once("close", done)));
+					const [status, value] = await links.serve(url.pathname.slice(6), request.headers, await body(request, url.pathname === "/link/file" ? FILE_BODY : PAGE_BODY), tailnet!.login!, new Promise(done => response.once("close", done)));
 					return send(status, value);
 				}
 				if (request.method === "POST" && origin === undefined) return send(403, { error: "Missing Origin rejected." });
