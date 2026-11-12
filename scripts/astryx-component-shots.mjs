@@ -106,7 +106,8 @@ const contextMenu = "(() => { const r = document.getElementById('shot').getBound
 // Union of the picture and everything outside #root (portals) or in the top layer, clamped to the viewport.
 const openedBox = "new Promise(done => setTimeout(() => { const parts = [document.getElementById('shot'), ...[...document.body.children].filter(el => el.id !== 'root' && el.tagName !== 'SCRIPT').flatMap(el => [el, ...el.querySelectorAll('*')]), ...document.querySelectorAll(':popover-open, :popover-open *, dialog[open], dialog[open] *')]; let [l, t, r, b] = [Infinity, Infinity, -Infinity, -Infinity]; for (const el of parts) { const box = el.getBoundingClientRect(); if (!box.width || !box.height || getComputedStyle(el).visibility === 'hidden') continue; l = Math.min(l, box.left); t = Math.min(t, box.top); r = Math.max(r, box.right); b = Math.max(b, box.bottom); } l = Math.max(0, l); t = Math.max(0, t); done([l, t, Math.min(innerWidth, r) - l, Math.min(innerHeight, b) - t]); }, 700))";
 fs.mkdirSync(out, { recursive: true });
-const images = new Map(), themeImages = new Map(), shotPng = path.join(page, "shot.png");
+const SWATCHES = [["Background", "--color-background-body"], ["Card", "--color-background-card"], ["Text", "--color-text-primary"], ["Muted text", "--color-text-secondary"], ["Accent", "--color-accent"], ["Border", "--color-border"], ["Success", "--color-success"], ["Warning", "--color-warning"], ["Error", "--color-error"]];
+const images = new Map(), themeImages = new Map(), themeColors = new Map(), shotPng = path.join(page, "shot.png");
 try {
 	browser(undefined, "set", "viewport", "720", "900", "2");
 	browser(undefined, "open", pathToFileURL(path.join(page, "index.html")).href);
@@ -142,6 +143,8 @@ try {
 		browser(undefined, "screenshot", "#shot", shotPng);
 		const png = fs.readFileSync(shotPng), webp = Buffer.from(JSON.parse(browser(toWebp(png), "--json", "eval", "--stdin")).data.result, "base64");
 		themeImages.set(slug, webp);
+		// The swatches theme cards show beside the picture: each token resolved to a plain hex through a probe element.
+		themeColors.set(slug, JSON.parse(browser(`(() => { const probe = document.getElementById("shot").appendChild(document.createElement("i")), hex = n => Math.round(n * 255).toString(16).padStart(2, "0"); const out = Object.fromEntries(${JSON.stringify(SWATCHES)}.map(([name, token]) => { probe.style.color = "var(" + token + ")"; const ctx = new OffscreenCanvas(1, 1).getContext("2d"); ctx.fillStyle = getComputedStyle(document.getElementById("shot")).backgroundColor; ctx.fillRect(0, 0, 1, 1); ctx.fillStyle = getComputedStyle(probe).color; ctx.fillRect(0, 0, 1, 1); const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data; return [name, "#" + [r, g, b].map(v => hex(v / 255)).join("")]; })); probe.remove(); return out; })()`, "--json", "eval", "--stdin")).data.result);
 		console.log(`theme ${slug}: ${png.readUInt32BE(16)}x${png.readUInt32BE(20)} webp ${kb(webp.length)}`);
 	}
 } finally { try { browser(undefined, "close"); } catch {} if (!process.env.KEEP_PAGE) fs.rmSync(page, { recursive: true, force: true }); else console.log(page); }
@@ -164,7 +167,7 @@ else {
 		docs[name] = { description: usage?.description, practices: usage?.bestPractices?.map(item => ({ do: item.guidance, text: item.description })), props: Array.isArray(props) ? props.map(({ name: prop, type, default: fallback, required, description }) => ({ name: prop, type, default: fallback, required, description })) : [] };
 	}
 	fs.writeFileSync(path.join(out, "docs.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, docs })}\n`);
-	fs.writeFileSync(path.join(out, "components.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, version: catalog.version, images: Object.fromEntries([...images].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) => [name, sha(bytes)])), themes: Object.fromEntries([...themeImages].map(([slug, bytes]) => [slug, sha(bytes)])) }, null, 1)}\n`);
+	fs.writeFileSync(path.join(out, "components.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, version: catalog.version, images: Object.fromEntries([...images].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) => [name, sha(bytes)])), themes: Object.fromEntries([...themeImages].map(([slug, bytes]) => [slug, sha(bytes)])), colors: Object.fromEntries(themeColors) }, null, 1)}\n`);
 }
 for (const name of names) { const row = rows.get(name); console.log(row.error ? `- ${name}: ${row.error}` : `${name}: ${row.width}x${row.height} webp ${kb(row.webp)} (${row.example})`); }
 console.log(`${images.size}/${names.length} pictured, ${kb(total)} total; ${out}`);

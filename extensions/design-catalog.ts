@@ -12,7 +12,7 @@ export type CatalogEntry = {
 	id: string; source: "od" | "astryx" | "draft" | "export" | "web"; kind: "system" | "theme" | "component" | "design" | "screenshot";
 	name: string; revision: string; preview: "sample" | "image" | "none"; availability: "cached" | "not-cached" | "unavailable";
 	license: string; provenance: string; category?: string; description?: string; url?: string; imageRevision?: string;
-	folder?: string; page?: string; handle?: string; designRevision?: string; status?: string;
+	folder?: string; page?: string; handle?: string; designRevision?: string; status?: string; colors?: Record<string, string>;
 };
 export function designImage(id: string | null, revision: string | null, cwd?: string, owner?: string) {
 	if (id?.startsWith("found:")) return cwd && owner && revision === id.slice(6) ? foundImage(cwd, owner, revision) : undefined;
@@ -26,7 +26,7 @@ try { astryx = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/catalog.json
 catch (cause) { throw new Error("The bundled design catalog is unreadable; reinstall ce-workflow.", { cause }); }
 if (astryx.lockDigest !== astryxRuntime.lockDigest || astryx.version !== astryxRuntime.versions["@astryxdesign/core"]) throw new Error("Design catalog does not match the reviewed Astryx pin.");
 // Component and theme pictures from scripts/astryx-component-shots.mjs; a stale set (older pin) is shown as no picture.
-let shots: { lockDigest: string; images: Record<string, string>; themes: Record<string, string> };
+let shots: { lockDigest: string; images: Record<string, string>; themes: Record<string, string>; colors?: Record<string, Record<string, string>> };
 try { shots = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/previews/components/components.json", import.meta.url), "utf8")); }
 catch { shots = { lockDigest: "", images: {}, themes: {} }; }
 if (shots.lockDigest !== astryx.lockDigest || !shots.themes) shots = { lockDigest: "", images: {}, themes: {} };
@@ -160,7 +160,7 @@ export async function designCatalog(cwd: string, owner?: string) {
 		entries.push({
 			id: `astryx:theme:${theme.slug}`, source: "astryx", kind: "theme", name: theme.displayName, description: theme.description,
 			revision: astryx.lockDigest, preview: image ? "image" : "none", availability: image ? "cached" : "unavailable", license: "MIT",
-			imageRevision: image ? shots.lockDigest : undefined,
+			imageRevision: image ? shots.lockDigest : undefined, colors: shots.colors?.[theme.slug],
 			provenance: `Astryx ${astryx.version} theme; ${image ? "picture of a sample screen rendered in this theme" : "no picture"}. Inspiration does not install or select a theme.`,
 		});
 	}

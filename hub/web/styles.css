@@ -93,6 +93,8 @@ h2 { font-size: 15px; font-weight: 600; }
 /* A component picture is the whole component: show all of it, never crop. */
 .library-thumb.library-thumb-whole { height: 220px; object-fit: contain; object-position: center; background: #fff; border-radius: 4px; }
 .library-docs table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.library-swatches { display: flex; flex-wrap: wrap; gap: 6px 10px; list-style: none; margin: 0 0 12px; padding: 0; font-size: 12px; color: var(--muted); }
+.library-swatches li::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 4px; vertical-align: -3px; border-radius: 3px; border: 1px solid var(--line); background: var(--swatch); }
 .library-docs th, .library-docs td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .library-docs th, .library-docs code { white-space: nowrap; }
 .library-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

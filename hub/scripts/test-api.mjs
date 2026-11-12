@@ -100,6 +100,7 @@ try {
 	const images = catalog.body.entries.filter(item => item.preview === "image" && item.kind === "theme");
 	assert.deepEqual(images.map(item => item.id.slice(13)).sort(), Object.keys(shots.themes).sort(), "every pinned theme has its rendered picture");
 	assert.equal(images.length, 7);
+	assert(images.every(item => Object.values(item.colors ?? {}).length === 9 && Object.values(item.colors).every(hex => /^#[0-9a-f]{6}$/.test(hex))), "theme cards carry their nine swatches as hex");
 	for (const item of images) {
 		assert.equal(item.imageRevision, shots.lockDigest, "theme pictures belong to the rendered set for this pin");
 		const route = `designimage?id=${encodeURIComponent(item.id)}&revision=${item.imageRevision}`, image = await get(id, route);

@@ -239,7 +239,8 @@ function setTab(name) {
  $("files").hidden = name !== "files"; $("library").hidden = name !== "library"; $("canvas").hidden = name === "files" || name === "library"; $("canvas").setAttribute("aria-labelledby", "tab-" + name);
  $("zoom-controls").hidden = $("edit-bar").hidden = name === "files" || name === "library";
  if (name === "files" || name === "library") setTool("select");
- remember("plan3-tab", name);
+ // Per session: the library opened in one session must not open in every other one; the global key only seeds new sessions.
+ remember("plan3-tab:" + location.pathname, name); if (name !== "library") remember("plan3-tab", name);
  if (name === "files") { filesView.shown(); return; }
  if (name === "library") { void libraryView.open(); return; }
  diagramTab = name; renderDiagram(true);
@@ -287,7 +288,7 @@ function setMobile(view, restoring = false) {
  workspace.dataset.mobile = view === "chat" ? "chat" : "panel";
  for (const name of mobileViews) { const tab = $("mobile-" + name); tab.setAttribute("aria-selected", String(name === view)); tab.tabIndex = name === view ? 0 : -1; }
  if (view !== "chat" && !(restoring && !phone.matches)) setTab(view); // on a desktop reload the remembered desktop tab wins
- remember("plan3-mobile", view);
+ remember("plan3-mobile:" + location.pathname, view); if (view !== "library") remember("plan3-mobile", view);
 }
 for (const name of mobileViews) {
  $("mobile-" + name).addEventListener("click", () => { setMobile(name); setDrawer(false); });
@@ -697,8 +698,8 @@ function openLibrary() {
  setLeft("full");
 }
 // /plan3 architecture links open on the Project tab.
-setTab(target === "product" ? "project" : remembered("plan3-tab", [...LEFT_TABS, "diagram"], "plan"));
-{ const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view, true); }
+setTab(target === "product" ? "project" : remembered("plan3-tab:" + location.pathname, [...LEFT_TABS, "diagram"], remembered("plan3-tab", ["files", "project", "plan", "diagram"], "plan")));
+{ const view = remembered("plan3-mobile:" + location.pathname, [...mobileViews, "diagram"], remembered("plan3-mobile", ["chat", "files", "project", "plan", "diagram"], "chat")); setMobile(view === "diagram" ? "plan" : view, true); }
 if (new URLSearchParams(location.search).get("view") === "library") openLibrary();
 $("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
 $("search").addEventListener("keydown", event => {

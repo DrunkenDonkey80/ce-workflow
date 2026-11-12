@@ -15,8 +15,10 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  type Tab = typeof kinds[number][0];
  const tabOf = (item: CatalogEntry): Tab => item.kind === "theme" ? "themes" : item.kind === "component" ? "components" : item.source === "web" ? "image" : "designs";
  let tab: Tab = "designs";
+ // Each tab keeps its own search text: a Google query must not filter Themes down to nothing.
+ const queries: Partial<Record<Tab, string>> = {};
  tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", "Reference type"); tabs.className = "library-tabs"; list.id = "library-results";
- const tabButtons = kinds.map(([value, label]) => { const button = make("button", label); button.type = "button"; button.setAttribute("role", "tab"); button.dataset.tab = value; button.setAttribute("aria-controls", list.id); button.addEventListener("click", () => { tab = value; filter(); }); return button; });
+ const tabButtons = kinds.map(([value, label]) => { const button = make("button", label); button.type = "button"; button.setAttribute("role", "tab"); button.dataset.tab = value; button.setAttribute("aria-controls", list.id); button.addEventListener("click", () => { queries[tab] = search.value; tab = value; search.value = queries[tab] ?? ""; filter(); }); return button; });
  tabs.addEventListener("keydown", event => {
   const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key]; if (!step) return;
   const next = tabButtons[(kinds.findIndex(([value]) => value === tab) + step + kinds.length) % kinds.length]; event.preventDefault(); next.click(); next.focus();
@@ -32,7 +34,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  async function webSearch() {
   const query = search.value.trim(); if (tab !== "image" || !query || searching) return;
   searching = searchButton.disabled = true; status.textContent = "Searching Google Images in your browser… approve google.com when asked.";
-  try { found = { query, ...await post("designsearch", { query }) }; draw(); status.textContent = `${found!.results.length} results for "${query}".`; }
+  try { found = { query, ...await post("designsearch", { query }) }; draw(); remember(); status.textContent = `${found!.results.length} results for "${query}".` + (found!.results.length && !found!.results.some(item => item.thumb) ? " No thumbnails came back: reload the Pi browser fetch extension in your browser (extensions page, Reload); thumbnails need version 1.8." : ""); }
   catch (error) { status.textContent = "Image search failed: " + error.message; }
   finally { searching = searchButton.disabled = false; }
  }
@@ -93,14 +95,17 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  const key = "design-library:" + location.pathname;
  try {
   const saved = JSON.parse(sessionStorage.getItem(key) ?? "null");
-  if (typeof saved?.query === "string") search.value = saved.query.slice(0, 200);
   if (kinds.some(([value]) => value === saved?.tab)) tab = saved.tab;
+  for (const [value] of kinds) if (typeof saved?.queries?.[value] === "string") queries[value] = saved.queries[value].slice(0, 200);
+  search.value = queries[tab] ?? "";
+  const results = JSON.parse(sessionStorage.getItem(key + ":found") ?? "null");
+  if (typeof results?.set === "string" && typeof results.query === "string" && Array.isArray(results.results)) found = results;
   if (typeof saved?.selected === "string") selected = saved.selected;
   if (typeof saved?.previewKey === "string" && /^[a-f0-9]{32}$/.test(saved.previewKey)) abandoned = saved.previewKey;
   if (["", "390", "768", "1280"].includes(saved?.viewport)) viewport = saved.viewport;
   if (Number.isFinite(saved?.scroll) && saved.scroll >= 0) gridScroll = saved.scroll;
  } catch { /* private mode: browsing still works without persistence */ }
- const remember = () => { try { sessionStorage.setItem(key, JSON.stringify({ query: search.value, tab, selected, scroll: gridScroll, viewport, previewKey: viewed })); } catch { /* private mode */ } };
+ const remember = () => { try { queries[tab] = search.value; sessionStorage.setItem(key, JSON.stringify({ queries, tab, selected, scroll: gridScroll, viewport, previewKey: viewed })); if (found) sessionStorage.setItem(key + ":found", JSON.stringify(found)); } catch { /* private mode or full: results stay in memory */ } };
  const release = (id: string) => { void post("unview", { key: id }).catch(() => {}); };
  if (abandoned) release(abandoned);
  const cancelSample = () => { inspection++; if (viewed) { release(viewed); viewed = undefined; } };
@@ -263,6 +268,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    addButton.addEventListener("click", pick); open.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) pick(); else inspect(item); });
    gestures(row, () => { if (!addButton.disabled) pick(); });
    if (item.preview === "image" && item.imageRevision) { const thumb = image(item, true); if (item.kind === "component") thumb.classList.add("library-thumb-whole"); row.append(thumb); }
+   if (item.colors) { const swatches = make("ul"); swatches.className = "library-swatches"; swatches.setAttribute("aria-label", item.name + " colors"); for (const [name, hex] of Object.entries(item.colors)) { const swatch = make("li", name); swatch.style.setProperty("--swatch", hex); swatch.title = `${name} ${hex}`; swatches.append(swatch); } row.append(swatches); }
    else if (item.preview === "sample" && (item.availability === "cached" || item.source === "od")) row.append(cardPreview(item));
    if (item.status) row.append(make("p", item.status));
    row.append(title, details, provenance);
