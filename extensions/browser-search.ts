@@ -1,6 +1,6 @@
 // browser_search and image_search (plan 71dc4da4): Google in the user's own browser profile through the Pi browser fetch add-on.
 // The search page rides browserFetch (grant for google.com, redirects, final-URL check, log); originals use a download-only request.
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { blockedList, browserFetch, checkUrl, connect, dnsCheck, installed, inbox, logFetch, readPolicy, rememberSearchSites } from "./browser-fetch.ts";
@@ -69,12 +69,13 @@ export function formatImages(query: string, set: string, items: Img[], sheet: bo
 }
 
 // Last result sets of this Pi session (P3-02); numbers always refer to one exact set.
-const sets = new Map<string, { query: string; items: Img[] }>();
+// thumbs: result number -> the add-on's own thumbnail file (V-05); originals: number -> saved original, kept for this set.
+const sets = new Map<string, { query: string; items: Img[]; thumbs: Map<number, string>; originals: Map<number, string> }>();
 let setCount = 0;
 export const clearSets = () => sets.clear();
-function remember(query: string, items: Img[]) {
+function remember(query: string, items: Img[], thumbs: Map<number, string>) {
 	const id = `s${++setCount}`;
-	sets.set(id, { query, items });
+	sets.set(id, { query, items, thumbs, originals: new Map() });
 	while (sets.size > SETS) sets.delete(sets.keys().next().value!);
 	return id;
 }
@@ -96,9 +97,27 @@ export async function imageSearch(ctx, query: string, signal?: AbortSignal, { re
 	let page;
 	try { page = await browserFetch(ctx, { url: searchUrl(query.trim(), true), extract: "images" }, signal, { resolve }); }
 	catch (error) { throw withFallback(error); }
-	const items = normalizeImages(page.results), sheet = page.images[0]?.path;
-	const set = items.length ? remember(query.trim(), items) : "";
-	return { text: formatImages(query.trim(), set, items, Boolean(sheet)), sheet, set };
+	const items = normalizeImages(page.results), sheet = page.images.find(image => image.url === "contact-sheet")?.path;
+	const thumbs = new Map<number, string>(page.images.flatMap(image => { const n = Number(/^thumb:(\d+)$/.exec(image.url)?.[1]); return n ? [[n, image.path] as [number, string]] : []; }));
+	const set = items.length ? remember(query.trim(), items, thumbs) : "";
+	return { text: formatImages(query.trim(), set, items, Boolean(sheet)), sheet, set, items };
+}
+
+const dataUrl = (file: string) => `data:image/${/\.jpg$/.test(file) ? "jpeg" : file.split(".").pop()};base64,${readFileSync(file).toString("base64")}`;
+/** V-05: the hub's Image search tab. Same consent and CAPTCHA path as image_search; tiles come back inline, never as file paths or third-party URLs. */
+export async function searchForHub(ctx, query: string, signal?: AbortSignal, options?: { resolve?: typeof lookup }) {
+	const { set, items } = await imageSearch(ctx, query, signal, options);
+	const thumbs = sets.get(set)?.thumbs;
+	return { set, results: items.map((item, n) => ({ n: n + 1, title: item.title, site: item.site, page: item.page, width: item.width, height: item.height, original: Boolean(item.original), thumb: thumbs?.has(n + 1) ? dataUrl(thumbs.get(n + 1)!) : "" })) };
+}
+/** One original of this session's set, downloaded once and kept for the set (8 MB cap from the host). */
+export async function originalForHub(ctx, set: string, n: number, signal?: AbortSignal, options?: { resolve?: typeof lookup }) {
+	const entry = sets.get(set);
+	if (entry && !entry.originals.has(n)) await saveOriginals(ctx, set, [n], signal, options);
+	const file = entry?.originals.get(n);
+	if (!file) throw new Error(entry ? "The original could not be downloaded (not an image, too large, refused or unreachable)." : `Unknown or expired result set "${set}": search again.`);
+	if (statSync(file).size > 8 * 1024 * 1024) throw new Error("The original is larger than 8 MB.");
+	return { n, url: entry!.items[n - 1].original, image: dataUrl(file) };
 }
 
 /** Originals of one set (D8, Q-01): fresh policy, block list and local-address checks, no cookies, 8 MB each, 30 per call. */
@@ -142,6 +161,7 @@ export async function saveOriginals(ctx, set: string, numbers: unknown, signal?:
 			link.send({ type: "done", id });
 		}
 	}
+	for (const item of saved) entry.originals.set(item.n, item.path);
 	const got = new Set(saved.map(item => item.n));
 	for (const n of list.flatMap(item => wanted.get(item.url) ?? [])) if (!got.has(n)) notes.push(`${n}: download failed (not an image, too large, redirected or unreachable)`);
 	saved.sort((a, b) => a.n - b.n);

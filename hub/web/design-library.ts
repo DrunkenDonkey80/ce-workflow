@@ -23,7 +23,43 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  });
  tabs.append(...tabButtons);
  tools.className = "library-row"; list.className = "library-list"; list.setAttribute("role", "tabpanel"); detail.className = "library-detail"; detail.hidden = true;
- tools.append(search);
+ // V-05: in the Image search tab, Enter or Search runs the session's image_search; elsewhere the box only filters.
+ const searchButton = make("button", "Search"), results = make("div");
+ searchButton.type = "button"; results.className = "library-list library-results"; results.setAttribute("aria-label", "Image search results");
+ tools.append(search, searchButton);
+ type Found = { n: number; title: string; site: string; page: string; width: number; height: number; original: boolean; thumb: string };
+ let found: { set: string; query: string; results: Found[] } | undefined, searching = false;
+ async function webSearch() {
+  const query = search.value.trim(); if (tab !== "image" || !query || searching) return;
+  searching = searchButton.disabled = true; status.textContent = "Searching Google Images in your browser… approve google.com when asked.";
+  try { found = { query, ...await post("designsearch", { query }) }; draw(); status.textContent = `${found!.results.length} results for "${query}".`; }
+  catch (error) { status.textContent = "Image search failed: " + error.message; }
+  finally { searching = searchButton.disabled = false; }
+ }
+ searchButton.addEventListener("click", () => void webSearch());
+ search.addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); void webSearch(); } });
+ function result(item: Found, set: string) {
+  const tile = make("article"), title = make("h3", item.title || "(no title)"), open = make("button", "Open " + (item.title || "result " + item.n)), feedback = make("p");
+  tile.dataset.result = String(item.n); open.type = "button"; open.dataset.open = ""; feedback.setAttribute("role", "status");
+  if (item.thumb) { const img = make("img"); img.src = item.thumb; img.alt = item.title || "Search result " + item.n; img.className = "library-result-thumb"; tile.append(img); }
+  tile.append(title, make("small", [item.site, item.width ? `${item.width}×${item.height}` : ""].filter(Boolean).join(" · ")));
+  open.disabled = !item.original;
+  open.addEventListener("click", () => void showResult(item, set, open, feedback));
+  tile.append(open, feedback); return tile;
+ }
+ async function showResult(item: Found, set: string, button: HTMLButtonElement, feedback: HTMLElement) {
+  button.disabled = true; feedback.textContent = "Downloading the original…";
+  try {
+   const got = await post("designoriginal", { set, n: item.n });
+   cancelSample(); gridScroll = root.scrollTop;
+   const back = make("button", "Back to results"), img = make("img"); back.type = "button"; img.src = got.image; img.alt = item.title || "Search result " + item.n; img.className = "library-image";
+   back.addEventListener("click", () => { detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; root.scrollTop = gridScroll; button.focus({ preventScroll: true }); });
+   detail.replaceChildren(back, make("h3", item.title || "Search result " + item.n), img);
+   if (item.page) { const link = make("a", "Open source page"); link.href = item.page; link.target = "_blank"; link.rel = "noopener noreferrer"; detail.append(link); }
+   tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = results.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); feedback.textContent = "";
+  } catch (error) { feedback.textContent = "Could not open the original: " + error.message; }
+  finally { button.disabled = !item.original; }
+ }
  // D12: a page is captured by this session's browser_fetch, after your per-site approval; nothing loads in this page.
  const page = make("form"), address = make("input"), pageAspect = make("select"), pageAdd = make("button", "Add page reference"), pageStatus = make("p");
  address.type = "url"; address.required = true; address.maxLength = 236; address.placeholder = "https://… a page to borrow from"; address.setAttribute("aria-label", "Page address");
@@ -37,7 +73,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  }
  page.addEventListener("submit", async event => { event.preventDefault(); if (await capture(address.value, pageAspect.value, pageAdd, pageStatus)) address.value = ""; });
  page.append(address, pageAspect, pageAdd, pageStatus);
- root.append(head, purpose, tabs, tools, page, status, list, detail);
+ root.append(head, purpose, tabs, tools, page, status, results, list, detail);
  let entries: CatalogEntry[] = [], offline = "", loaded: Promise<void> | undefined, selected = "", gridScroll = 0, viewport = "", inspection = 0, viewed: string | undefined, abandoned: string | undefined;
  const key = "design-library:" + location.pathname;
  try {
@@ -142,7 +178,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   const back = make("button", "Back to library"), title = make("h3", item.name), provenance = make("p", item.provenance);
   back.type = "button";
   back.addEventListener("click", () => {
-   cancelSample(); detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; selected = ""; remember();
+   cancelSample(); detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; selected = ""; remember();
    list.querySelector<HTMLButtonElement>(`[data-entry="${CSS.escape(item.id)}"] button`)?.focus({ preventScroll: true }); root.scrollTop = gridScroll;
   });
   detail.replaceChildren(back, title, provenance, make("p", `${item.license}; catalog revision ${item.revision}`));
@@ -173,12 +209,15 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   else if (item.preview === "sample" && item.availability === "cached") sample(item);
   else detail.append(make("p", item.preview === "sample" ? "This source sample is not cached for viewing on this host yet. No download was started." : "No supplied visual sample. This entry is metadata only; nothing was generated."));
   if (item.url) { const link = make("a", "View original source"); link.href = item.url; link.target = "_blank"; link.rel = "noopener noreferrer"; detail.append(link); }
-  tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); remember();
+  tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = results.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); remember();
  }
  const draw = () => {
   for (const button of tabButtons) { const on = button.dataset.tab === tab; button.setAttribute("aria-selected", String(on)); button.tabIndex = on ? 0 : -1; }
-  search.placeholder = `Search ${kinds.find(([value]) => value === tab)![1].toLowerCase().replace("image search", "saved picks")}`;
-  const query = search.value.toLowerCase().trim(), matches = entries.filter(item => tabOf(item) === tab && (!query || [item.name, item.category, item.description, item.status].some(text => text?.toLowerCase().includes(query))));
+  const imaging = tab === "image";
+  search.placeholder = imaging ? "Search Google Images, then press Enter" : `Search ${kinds.find(([value]) => value === tab)![1].toLowerCase()}`;
+  searchButton.hidden = results.hidden = !imaging; tools.classList.toggle("searching", imaging);
+  results.replaceChildren(...imaging && found ? [make("h3", `Results for "${found.query}"`), ...found.results.map(item => result(item, found!.set))] : []);
+  const query = imaging ? "" : search.value.toLowerCase().trim(), matches = entries.filter(item => tabOf(item) === tab && (!query || [item.name, item.category, item.description, item.status].some(text => text?.toLowerCase().includes(query))));
   status.textContent = `${matches.length} ${matches.length === 1 ? "reference" : "references"}.${offline ? " " + offline : ""}`;
   const card = (item: CatalogEntry) => {
    const row = make("article"), title = make("h3", item.name), provenance = make("p", item.provenance), details = make("small", `${item.source} / ${item.kind} · ${item.revision.slice(0, 12)} · ${item.license}`), open = make("button", "Inspect " + item.name);
@@ -207,13 +246,14 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    const group = make("section"), rows = make("div"); group.className = "library-group"; rows.className = "library-list";
    rows.append(...items.map(card)); group.append(make("h3", "Same authored files · separate source snapshots"), rows); return group;
   }));
-  if (!matches.length) list.append(make("p", entries.length ? "No matches. Clear your search or filters." : "No cached references yet. Reopen the library when the host is online."));
+  if (imaging) list.prepend(make("h3", "Saved picks"));
+  if (!matches.length) list.append(make("p", imaging ? "No saved picks yet. Search, then add a result." : entries.length ? "No matches. Clear your search or filters." : "No cached references yet. Reopen the library when the host is online."));
   root.scrollTop = gridScroll;
  };
  const filter = () => { gridScroll = 0; draw(); remember(); };
- search.addEventListener("input", filter);
+ search.addEventListener("input", () => { if (tab !== "image") filter(); else remember(); });
  root.addEventListener("scroll", () => { if (detail.hidden) { gridScroll = root.scrollTop; remember(); } }, { passive: true });
- refresh.addEventListener("click", () => { cancelSample(); selected = ""; detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; loaded = undefined; void open(); remember(); });
+ refresh.addEventListener("click", () => { cancelSample(); selected = ""; detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; results.hidden = tab !== "image"; loaded = undefined; void open(); remember(); });
  function open() {
   return loaded ??= (async () => {
    status.textContent = "Loading reference metadata…";

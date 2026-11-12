@@ -246,6 +246,7 @@ function extractImages() {
 // One numbered grid of the thumbnails (D7); only Google's own thumbnails or inline data are fetched, without cookies.
 async function sendSheet(job, results) {
 	if (!results.length) return;
+	const blobs = [];
 	try {
 		const canvas = new OffscreenCanvas(SHEET_COLS * CELL, Math.ceil(results.length / SHEET_COLS) * CELL), g = canvas.getContext("2d");
 		g.fillStyle = "#fff";
@@ -254,7 +255,7 @@ async function sendSheet(job, results) {
 		const draw = async (thumb, n) => {
 			if (thumb) try {
 				const response = await fetch(thumb, { credentials: "omit", signal: AbortSignal.any([job.abort.signal, AbortSignal.timeout(IMAGE_MS)]) });
-				const bitmap = await createImageBitmap(await response.blob()), scale = Math.min((CELL - 8) / bitmap.width, (CELL - 8) / bitmap.height);
+				const blob = blobs[n] = await response.blob(), bitmap = await createImageBitmap(blob), scale = Math.min((CELL - 8) / bitmap.width, (CELL - 8) / bitmap.height);
 				const w = bitmap.width * scale, h = bitmap.height * scale;
 				g.drawImage(bitmap, (n % SHEET_COLS) * CELL + (CELL - w) / 2, Math.floor(n / SHEET_COLS) * CELL + (CELL - h) / 2, w, h);
 			} catch { /* a missing thumbnail leaves its cell blank, numbers never shift */ }
@@ -271,6 +272,8 @@ async function sendSheet(job, results) {
 		const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: "image/png" })).arrayBuffer());
 		if (jobs.has(job.id)) send({ type: "image", id: job.id, n: 0, url: "contact-sheet", mime: "image/png", data: base64(bytes) });
 	} catch (error) { console.warn("Pi contact sheet:", error); } // the numbered list still works without it
+	// V-05: each result's own thumbnail as well (the hub's Image search tab), from the same cookie-free fetch.
+	for (const [n, blob] of blobs.entries()) if (blob && jobs.has(job.id)) try { send({ type: "image", id: job.id, n: n + 1, url: `thumb:${n + 1}`, mime: blob.type, data: base64(new Uint8Array(await blob.arrayBuffer())) }); } catch { /* that tile stays empty */ }
 }
 function base64(bytes) {
 	let text = "";

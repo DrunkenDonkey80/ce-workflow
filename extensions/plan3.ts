@@ -15,6 +15,7 @@ import { createActivityMirror, forwardDiagramChat, WebError, webTarget, type Web
 import { createNight } from "./plan3-night.ts";
 import { deliverReferenceBundle } from "./design-bundles.ts";
 import { captureUrlReference } from "./browser-fetch.ts";
+import { originalForHub, searchForHub } from "./browser-search.ts";
 import { reworkRequest } from "./plan3-rework.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -857,6 +858,15 @@ export default function plan3(pi) {
 		if (endpoint === "/api/designurl") {
 			if (Object.keys(data).some(key => key !== "url") || typeof data.url !== "string") throw new WebError(400, "Invalid URL reference fields.");
 			return captureUrlReference(ctx, data.url);
+		}
+		// V-05: the library's Image search tab runs this session's image_search (consent, CAPTCHA pause) without a model turn.
+		if (endpoint === "/api/designsearch") {
+			if (Object.keys(data).some(key => key !== "query") || typeof data.query !== "string" || !data.query.trim() || data.query.length > 200) throw new WebError(400, "Invalid image search.");
+			return searchForHub(ctx, data.query);
+		}
+		if (endpoint === "/api/designoriginal") {
+			if (Object.keys(data).some(key => !["set", "n"].includes(key)) || typeof data.set !== "string" || !Number.isInteger(data.n)) throw new WebError(400, "Invalid image result.");
+			return originalForHub(ctx, data.set, data.n);
 		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
 		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams", "bundle"].includes(key))) throw new WebError(400, "Invalid message fields.");
@@ -2004,7 +2014,7 @@ export default function plan3(pi) {
 	pi.registerCommand("plans3", commands.plans3);
 	pi.registerCommand("resume3", commands.resume3);
 	// H3-09: the hub calls the page's plan operations with the browser's chosen plan; the result comes back by id as pi-hub:result.
-	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move", "/api/message", "/api/designurl"]);
+	const HUB_CALLS = new Set(["/api/command", "/api/bias", "/api/generate", "/api/edit", "/api/comment", "/api/move", "/api/message", "/api/designurl", "/api/designsearch", "/api/designoriginal"]);
 	// H5-03: what only this Pi knows (scoped models, work-models usage and command lists).
 	const HUB_READS = new Set(["/api/models", "/api/commands"]);
 	if (hubActive()) pi.registerCommand("pi-hub", {

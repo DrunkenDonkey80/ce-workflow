@@ -81,7 +81,7 @@ const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.e
 git("init", "-q"); git("add", "-A"); git("commit", "-qm", "init"); write("src/app.ts", "new line\n");
 
 // What ce-workflow answers through /pi-hub, as the old in-process stub did; fake Pi relays each call here.
-const pool = { acts: [] }; const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, holdMessage = null, activity = { working: false };
+const pool = { acts: [] }, imageSearches = []; const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, holdMessage = null, activity = { working: false };
 const fail = (status, error) => Object.assign(new Error(error), { status });
 function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
@@ -94,6 +94,10 @@ function stub(endpoint, body) {
   return { diagram: product, line: planned.line, removed: result.removed };
  }
  if (endpoint === "/api/designurl") throw fail(500, "browser_fetch refused: not approved"); // D12: the session's per-site approval said no
+ // V-05: the session's image_search (browser-search.ts searchForHub/originalForHub); the original is larger than its tile.
+ const svg = (w, h) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="teal"/></svg>`);
+ if (endpoint === "/api/designsearch") { imageSearches.push(body.query); return { set: "s1", results: [{ n: 1, title: "Kiosk grid", site: "pos.test", page: "https://pos.test/a", width: 400, height: 300, original: true, thumb: svg(40, 30) }, { n: 2, title: "No original", site: "", page: "", width: 0, height: 0, original: false, thumb: "" }] }; }
+ if (endpoint === "/api/designoriginal") return { n: body.n, url: "https://img.pos.test/a.png", image: svg(400, 300) };
  if (!(endpoint === "/api/message" && body.target === "product")) assert.equal(body.target, "12345678"); // a chat message may be sent from the Project tab
  if (endpoint === "/api/command") { commands.push(body.command); return { ok: true }; }
  if (endpoint === "/api/message" && body.text.startsWith("/")) { commands.push(body.text); return { accepted: true }; }
@@ -166,7 +170,7 @@ try {
    assert(ids.every(entry => pattern.test(entry)), `the ${tab} tab shows only its type: ${ids.filter(entry => !pattern.test(entry))}`); total += ids.length;
   }
   assert.equal(total, 215);
-  assert.deepEqual(await evaluate("(() => { const a = document.querySelector('#library input[type=search]').getBoundingClientRect(), b = document.querySelector('#library input[type=url]').getBoundingClientRect(), c = document.querySelector('#library form button').getBoundingClientRect(), d = document.querySelector('#library form select').getBoundingClientRect(); return [a.left === b.left, a.right === c.right, a.height === b.height && b.height === c.height && c.height === d.height]; })()"), [true, true, true], "the input rows line up");
+  assert.deepEqual(await evaluate("(() => { const a = document.querySelector('#library input[type=search]').getBoundingClientRect(), right = Math.max(a.right, document.querySelector('#library input[type=search] + button').getBoundingClientRect().right), b = document.querySelector('#library input[type=url]').getBoundingClientRect(), c = document.querySelector('#library form button').getBoundingClientRect(), d = document.querySelector('#library form select').getBoundingClientRect(); return [a.left === b.left, right === c.right, a.height === b.height && b.height === c.height && c.height === d.height]; })()"), [true, true, true], "the input rows line up");
  }
  { // V-04: Designs cards frame their cached page only near the view; scrolling away unloads them and back reloads them.
   const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260]; })";
@@ -309,7 +313,22 @@ try {
   const frozen = fs.readdirSync(join(folder, ".pi/designs/references"), { recursive: true }).map(String).filter(file => /bundles/.test(file) && file.endsWith("source.png"));
   assert(frozen.length > 0, "the bundle carries the saved image, not a live URL");
   await browser("wait", "--fn", "document.getElementById('connection').dataset.state === 'idle'");
+  // V-05: Enter with an empty box sends nothing; typed text searches through the session and shows pictures.
+  await browser("click", "#library [data-tab=image]"); await browser("fill", "#library input[type=search]", " ");
+  await browser("press", "Enter"); await new Promise(done => setTimeout(done, 300));
+  assert.equal(imageSearches.length, 0, "an empty search box sends nothing");
+  await browser("fill", "#library input[type=search]", "pos kiosk"); await browser("press", "Enter");
+  await browser("wait", "--fn", "document.querySelector('#library [data-result=\"1\"] img')?.naturalWidth === 40");
+  assert.deepEqual(imageSearches, ["pos kiosk"]);
+  assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 1, "saved picks stay listed and are not filtered by the web query");
+  assert.equal(await evaluate("document.querySelector('#library [data-result=\"2\"] [data-open]').disabled"), true, "a result without an original cannot be opened");
+  await clickShown("#library [data-result='1'] [data-open]");
+  await browser("wait", "--fn", "document.querySelector('.library-detail img')?.naturalWidth === 400");
+  assert.match(await evaluate("document.querySelector('.library-detail a').href"), /^https:\/\/pos\.test\/a/);
+  await clickShown(".library-detail button"); await browser("wait", "#library [data-result='1']");
+  await browser("fill", "#library input[type=search]", "");
   await browser("click", "#library [data-tab=designs]");
+  assert.equal(await evaluate("document.querySelector('.library-results').hidden"), true, "results show only in the Image search tab");
  }
  // Later reload checks exercise remembered tabs, not the explicit library deep link.
  await evaluate("(() => { const url = new URL(location.href); url.searchParams.delete('view'); history.replaceState(null, '', url); })()");

@@ -70,6 +70,10 @@ h2 { font-size: 15px; font-weight: 600; }
 .library-row > input[type=search] { grid-column: 1 / -1; }
 .library-row > p { grid-column: 1 / -1; margin: 0; }
 .library-row > p:empty { display: none; }
+.library-row.searching > input[type=search] { grid-column: 1 / -2; }
+.library-results { margin-bottom: 16px; }
+.library-list > h3 { grid-column: 1 / -1; margin: 8px 0 0; }
+.library-result-thumb { display: block; max-width: 100%; height: auto; margin: 0 auto 12px; }
 .design-library { container-type: inline-size; }
 @container (max-width: 520px) { .library-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .library-row > input { grid-column: 1 / -1; } }
 .library-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }

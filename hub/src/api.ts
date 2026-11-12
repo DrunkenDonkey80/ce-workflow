@@ -462,6 +462,17 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				}
 				return addDesignReference(folder(id), id, data, () => data.previewKey === undefined ? catalogReference(folder(id), data.id, data.revision, id) : referenceSnapshot(folder(id), data.previewKey, data.id, data.revision, id));
 			}
+			// V-05: the Image search tab; the session's image_search asks for consent and keeps its own result sets.
+			case "designsearch": {
+				only(data, ["target", "query"], "Invalid fields.");
+				if (typeof data.query !== "string" || !data.query.trim() || data.query.length > 200) throw fail(400, "Type what to search for.");
+				return call(id, "/api/designsearch", { query: data.query.trim() });
+			}
+			case "designoriginal": {
+				only(data, ["target", "set", "n"], "Invalid fields.");
+				if (typeof data.set !== "string" || !/^s\d{1,9}$/.test(data.set) || !Number.isInteger(data.n) || (data.n as number) < 1 || (data.n as number) > 100) throw fail(400, "Invalid image result.");
+				return call(id, "/api/designoriginal", { set: data.set, n: data.n });
+			}
 			case "designcard": {
 				only(data, ["target", "id", "revision"], "Invalid fields.");
 				return cardPage(folder(id), data.id, data.revision, id, remote);

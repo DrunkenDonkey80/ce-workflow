@@ -579,10 +579,27 @@ async function roundTrip() {
 		assert.equal(shot.set, "s1");
 		assert.match(shot.text, /^UNTRUSTED[\s\S]*Result set s1; the attached contact sheet[\s\S]*1\. One — P site — 900×600\n   https:\/\/img\.test\/1\.jpg\?w=900\n   page: https:\/\/p\.test\/1\n2\. Two — 1×1\n   http:\/\/127\.0\.0\.1\/x\.png\n3\. Three\n   original unknown\n4\. Four/);
 		assert.equal((await images("fox")).set, "s2", "the same query gives a new set");
+		// V-05: the hub tab gets each fetched thumbnail inline (none for refused ones), and originals by set and number only.
+		const hub = await bs.searchForHub(quiet, "fox", undefined, opts);
+		assert.equal(hub.set, "s3");
+		assert.deepEqual(hub.results.map(r => [r.n, r.thumb.slice(0, 22), r.original]), [[1, "data:image/png;base64,", true], [2, "", true], [3, "", false], [4, "data:image/png;base64,", true]]);
+		assert.equal(hub.results[0].page, "https://p.test/1");
+		const fetchedOriginal = fetched.length;
+		const original = await bs.originalForHub(quiet, "s3", 1, undefined, opts);
+		assert.equal(original.url, "https://img.test/1.jpg?w=900");
+		assert.match(original.image, /^data:image\/png;base64,/);
+		await bs.originalForHub(quiet, "s3", 1, undefined, opts);
+		assert.equal(fetched.length, fetchedOriginal + 1, "an opened original is kept for its set");
+		await assert.rejects(bs.originalForHub(quiet, "s3", 2, undefined, opts), /could not be downloaded/, "a refused original fails");
+		await assert.rejects(bs.originalForHub(quiet, "s99", 1, undefined, opts), /Unknown or expired/);
+		await updatePolicy(p => { delete p.grants["google.com"]; });
+		await assert.rejects(bs.searchForHub(quiet, "no grant", undefined, opts), /not approved/, "the hub tab needs the same google.com grant");
+		await updatePolicy(p => { p.grants["google.com"] = { until: null }; });
 		// save: originals from that exact set, no cookies, blocked and local refused, no new search.
 		before = searched.length;
 		const fetchedSave = fetched.length;
 		const saved = await bs.saveOriginals(quiet, "s1", [4, 1, 2, 3], undefined, opts);
+		assert.equal(searched.length, before, "save does not search again");
 		assert.equal(searched.length, before, "save does not search again");
 		assert.deepEqual(fetched.slice(fetchedSave).map(f => [f.url, f.credentials]), [["https://img.test/1.jpg?w=900", "omit"]]);
 		assert.match(saved, /^Saved 1 original from set s1; view them with read:\n1\. .*01\.png \(https:\/\/img\.test\/1\.jpg\?w=900\)\nNot saved:\n2: refused \(127\.0\.0\.1 is a local or private address\)\n3: original unknown\n4: refused \(mail\.google\.com is on the browser access block list/);

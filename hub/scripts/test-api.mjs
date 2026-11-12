@@ -394,6 +394,11 @@ try {
 		assert.equal((await post(id, "designreference", { action: "add", url: "https://site.test/", id: "astryx:x", aspect: "whole" })).status, 400, "a URL reference cannot borrow a catalog identity");
 		assert.match((await post(id, "designreference", { action: "add", url: "https://denied.test/", aspect: "whole" })).body.error, /not approved/, "per-site approval refusals reach the page");
 		assert.equal((await post(id, "designreference", { action: "add", url: "https://junk.test/", aspect: "whole" })).status, 502, "non-PNG captures are refused");
+		// V-05: the Image search tab asks the session (fake Pi echoes the call); empty queries and foreign shapes never reach it.
+		assert.deepEqual((await post(id, "designsearch", { query: "  pos ui " })).body, { endpoint: "/api/designsearch", data: { query: "pos ui" } });
+		for (const body of [{ query: " " }, { query: 1 }, { query: "x", path: "/tmp" }]) assert.equal((await post(id, "designsearch", body)).status, 400);
+		assert.deepEqual((await post(id, "designoriginal", { set: "s2", n: 3 })).body, { endpoint: "/api/designoriginal", data: { set: "s2", n: 3 } });
+		for (const body of [{ set: "../x", n: 1 }, { set: "s1", n: 0 }, { set: "s1", n: "1" }, { set: "s1", n: 1, path: "/tmp/a.png" }]) assert.equal((await post(id, "designoriginal", body)).status, 400);
 		const page = await post(id, "designreference", { action: "add", url: "https://site.test/a", aspect: "layout", note: "spacing" });
 		assert.equal(page.status, 200); assert.equal(page.body.status, "ready"); assert.equal(page.body.thumbnail, "screenshot.png"); assert.equal(page.body.source.url, "https://site.test/a");
 		assert.match(page.body.source.license, /inspiration only/); assert.equal(page.body.source.name, "<b>Page</b>", "titles stay data; the page renders them as text");
