@@ -18,6 +18,8 @@ const IMAGE_REVISION = "fd5cf0df987791117e96ccc0bec603c64be8b136";
 const IMAGE_THEMES = ["butter", "gothic", "matcha", "neutral", "stone", "y2k"];
 export function designImage(id: string | null, revision: string | null, cwd?: string, owner?: string) {
 	if (id?.startsWith("found:")) return cwd && owner && revision === id.slice(6) ? foundImage(cwd, owner, revision) : undefined;
+	const component = id?.startsWith("astryx:component:") ? id.slice(17) : undefined;
+	if (component) return revision === shots.lockDigest && Object.hasOwn(shots.images, component) ? fs.readFileSync(new URL(`./astryx-runtime/previews/components/${component}.webp`, import.meta.url)) : undefined;
 	const slug = IMAGE_THEMES.find(name => id === `astryx:theme:${name}`);
 	if (!slug || revision !== IMAGE_REVISION) return undefined;
 	return fs.readFileSync(new URL(`./astryx-runtime/previews/${slug}.webp`, import.meta.url));
@@ -26,6 +28,11 @@ let astryx;
 try { astryx = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/catalog.json", import.meta.url), "utf8")); }
 catch (cause) { throw new Error("The bundled design catalog is unreadable; reinstall ce-workflow.", { cause }); }
 if (astryx.lockDigest !== astryxRuntime.lockDigest || astryx.version !== astryxRuntime.versions["@astryxdesign/core"]) throw new Error("Design catalog does not match the reviewed Astryx pin.");
+// Component pictures from scripts/astryx-component-shots.mjs; a stale set (older pin) is shown as no picture.
+let shots: { lockDigest: string; images: Record<string, string> };
+try { shots = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/previews/components/components.json", import.meta.url), "utf8")); }
+catch { shots = { lockDigest: "", images: {} }; }
+if (shots.lockDigest !== astryx.lockDigest) shots = { lockDigest: "", images: {} };
 
 function smallJson(cwd: string, file: string) {
 	const full = confined(cwd, file);
@@ -154,11 +161,15 @@ export async function designCatalog(cwd: string, owner?: string) {
 		});
 	}
 	for (const [group, components] of Object.entries(astryx.groups) as [string, { name: string; package: string }[]][]) {
-		for (const component of components) entries.push({
-			id: `astryx:component:${component.name}`, source: "astryx", kind: "component", name: component.name, category: group,
-			revision: astryx.lockDigest, preview: "none", availability: "unavailable", license: "MIT",
-			provenance: `${component.package} ${astryx.version}; no supplied visual sample. Metadata only, not an installed project dependency.`,
-		});
+		for (const component of components) {
+			const image = Object.hasOwn(shots.images, component.name);
+			entries.push({
+				id: `astryx:component:${component.name}`, source: "astryx", kind: "component", name: component.name, category: group,
+				revision: astryx.lockDigest, preview: image ? "image" : "none", availability: image ? "cached" : "unavailable", license: "MIT",
+				imageRevision: image ? shots.lockDigest : undefined,
+				provenance: `${component.package} ${astryx.version}; ${image ? "picture rendered from its pinned example" : "no picture (its pinned examples do not render alone)"}. Not an installed project dependency.`,
+			});
+		}
 	}
 	const warnings: string[] = [];
 	if (owner) webEntries(cwd, owner, entries, warnings);

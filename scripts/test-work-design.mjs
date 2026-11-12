@@ -85,6 +85,18 @@ try {
 	const themeArgs = { accent: "#808080" }, themeParams = themeInput(themeArgs);
 	const tonal = Object.fromEntries(Array.from({ length: 21 }, (_, i) => [i * 5, "#" + Math.round(i * 255 / 20).toString(16).padStart(2, "0").repeat(3)]));
 	const palette = { schemaVersion: 1, recipe: "astryx-oklch-v1", stops: Array.from({ length: 21 }, (_, i) => i * 5), palette: { accent: { light: tonal, dark: tonal }, neutral: { light: tonal, dark: tonal } } };
+	{ // V-09 pin guard: bundled component pictures belong to this pin; a pin update reruns scripts/astryx-component-shots.mjs.
+		const folder = new URL("../extensions/astryx-runtime/previews/components/", import.meta.url);
+		const shots = JSON.parse(fs.readFileSync(new URL("components.json", folder), "utf8"));
+		assert.equal(shots.lockDigest, astryxRuntime.lockDigest, "component pictures are stale: run node scripts/astryx-component-shots.mjs after a pin update");
+		let total = 0;
+		for (const [name, sha] of Object.entries(shots.images)) {
+			const bytes = fs.readFileSync(new URL(`${name}.webp`, folder)); total += bytes.length;
+			assert.equal(createHash("sha256").update(bytes).digest("hex"), sha, `${name}.webp matches components.json`);
+		}
+		assert.deepEqual(fs.readdirSync(folder).filter(file => file.endsWith(".webp")).sort(), Object.keys(shots.images).map(name => `${name}.webp`).sort(), "no unlisted pictures");
+		assert(total <= 1.5 * 1024 * 1024, "component pictures stay within the approved ~1.5 MB");
+	}
 	const provenance = { version: "0.7.12", lockDigest: astryxRuntime.lockDigest };
 	const generatedTheme = themeTokens(themeParams, palette, provenance);
 	assert.deepEqual(generatedTheme, themeTokens(themeParams, palette, provenance));

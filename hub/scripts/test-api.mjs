@@ -83,10 +83,18 @@ try {
 	assert.equal(catalog.body.entries.filter(item => item.kind === "component").length, 174);
 	assert.equal(catalog.body.entries.filter(item => item.kind === "theme").length, 8, "7 Astryx themes and the OpenDesign colors page");
 	assert(catalog.body.entries.every(item => item.license && item.provenance && item.revision));
-	assert(catalog.body.entries.filter(item => item.kind === "component").every(item => item.preview === "none" && item.availability === "unavailable"), "metadata never pretends a component has a visual sample");
+	const shots = JSON.parse(fs.readFileSync(new URL("../../extensions/astryx-runtime/previews/components/components.json", import.meta.url), "utf8"));
+	for (const item of catalog.body.entries.filter(entry => entry.kind === "component")) {
+		const pictured = Object.hasOwn(shots.images, item.name);
+		assert.deepEqual([item.preview, item.availability, item.imageRevision], pictured ? ["image", "cached", item.revision] : ["none", "unavailable", undefined], `${item.name}: a picture only when one was rendered for this pin`);
+	}
+	const picturedButton = await get(id, `designimage?id=astryx:component:Button&revision=${shots.lockDigest}`);
+	assert.equal(picturedButton.status, 200); assert.equal(picturedButton.body.toString("ascii", 8, 12), "WEBP");
+	assert.equal((await get(id, `designimage?id=astryx:component:Button&revision=${"0".repeat(64)}`)).status, 404, "a component picture from another pin is never served");
+	assert.equal((await get(id, `designimage?id=${encodeURIComponent("astryx:component:../catalog")}&revision=${shots.lockDigest}`)).status, 404, "component picture names are a whitelist");
 	assert.equal(hub.host.live.has(id), false, "browsing does not wake a parked model");
 	assert.equal(await rawGet(`/s/${id}/api/designcatalog`, {}), 401, "catalog requires normal session authentication");
-	const images = catalog.body.entries.filter(item => item.preview === "image");
+	const images = catalog.body.entries.filter(item => item.preview === "image" && item.kind === "theme");
 	assert.equal(images.length, 6, "only six themes have supplied source images");
 	for (const item of images) {
 		assert.equal(item.imageRevision, "fd5cf0df987791117e96ccc0bec603c64be8b136", "image provenance is separate from the runtime pin");
