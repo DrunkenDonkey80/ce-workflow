@@ -511,6 +511,35 @@ try {
 	assert.match((await runDesign(cwd, { action: "systems", refresh: true }, net)).offline, /refresh failed: offline/);
 	await assert.rejects(runDesign(cwd, { action: "systems", name: "../x" }, net), /one name from design/);
 	await assert.rejects(runDesign(cwd, { action: "systems", name: "nope" }, net), /No design system nope/);
+	{ // V-03: a package is one unit per commit (previews beside their tokens); concurrent asks download once.
+		const pkg = { "DESIGN.md": "# Stripe", "tokens.css": ":root{--a:1}", "components.html": "<h1>kit</h1>", "preview/colors.html": "<link rel=stylesheet href=../tokens.css>" }, hits = [];
+		let gate = Promise.resolve();
+		const stripe = { ...tools, async fetch(url) {
+			const file = url.match(new RegExp(`/${sha}/design-systems/stripe/(.+)$`))?.[1]; hits.push(file); await gate;
+			const body = typeof pkg[file] === "function" ? pkg[file]() : pkg[file];
+			return { ok: body !== undefined, status: body === undefined ? 404 : 200, text: async () => body ?? "" };
+		} };
+		const dir = path.join(cwd, ".pi/designs/systems/stripe"), ask = () => runDesign(cwd, { action: "systems", name: "stripe" }, stripe);
+		const commitOf = () => JSON.parse(fs.readFileSync(path.join(dir, "SOURCE.json"), "utf8")).commit, age = () => fs.writeFileSync(path.join(dir, "SOURCE.json"), JSON.stringify({ commit: "b".repeat(40) }));
+		let open; gate = new Promise(resolve => { open = resolve; });
+		const both = Promise.all([ask(), ask()]); await new Promise(resolve => setTimeout(resolve, 50)); open(); gate = Promise.resolve();
+		assert.deepEqual((await both).map(item => item.cached), [false, true], "the waiting request finds the published unit");
+		assert.equal(hits.filter(file => file === "DESIGN.md").length, 1, "two concurrent requests download once");
+		assert.deepEqual(fs.readdirSync(dir).sort(), ["DESIGN.md", "SOURCE.json", "components.html", "preview", "tokens.css"]);
+		assert.equal(fs.readFileSync(path.join(dir, "preview/colors.html"), "utf8"), pkg["preview/colors.html"], "the colors page sits where ../tokens.css resolves");
+		const { designCatalog } = await import("../extensions/design-catalog.ts");
+		assert.deepEqual((({ availability, page }) => [availability, page])((await designCatalog(cwd)).entries.find(item => item.id === "od:stripe")), ["cached", "components.html"], "the catalog marks the fetched preview cached");
+		hits.length = 0; assert.equal((await ask()).cached, true); assert.deepEqual(hits, [], "a cache hit for the same commit never refetches");
+		age(); delete pkg["preview/colors.html"]; pkg["components.html"] = "x".repeat(1_000_001);
+		assert.equal((await ask()).cached, false, "a cache from another commit is refetched");
+		assert.deepEqual([commitOf(), fs.existsSync(path.join(dir, "preview")), fs.existsSync(path.join(dir, "components.html"))], [sha, false, false], "older-commit files are dropped and an oversized page is left out");
+		age(); pkg["tokens.css"] = () => { throw new Error("network down"); };
+		const interrupted = await ask();
+		assert.deepEqual([interrupted.cached, commitOf(), fs.existsSync(path.join(dir, "DESIGN.md"))], [true, "b".repeat(40), true], "an interrupted update keeps the old unit whole");
+		assert.match(interrupted.stale, /update failed: .*network down/);
+		assert.deepEqual(fs.readdirSync(path.join(cwd, ".pi/designs/systems")).filter(name => name.startsWith(".")), [], "no temp folders remain");
+		fs.rmSync(dir, { recursive: true });
+	}
 	online = true; hubCalls.length = 0;
 	const withSystem = await runDesign(cwd, { action: "start", brief: "b", directions: ["y"], names: ["Y"], title: "t", system: "airbnb" }, net);
 	assert.deepEqual(withSystem.sessions[0].system, { name: "airbnb", commit: sha });

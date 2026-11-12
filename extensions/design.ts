@@ -2,7 +2,7 @@
 // Pi session named by its direction whose own agent builds the design there while the hub's design page previews it live.
 // select exports it to docs/designs/<name>/ and hands it to the starting session or a new one; clone forks another approach.
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { referenceBundleAssets, referenceBundleContext } from "./design-bundles.ts";
 import type { ThemeOptions } from "./design-theme.ts";
 import fs from "node:fs";
@@ -344,7 +344,8 @@ async function systems(cwd: string, args, handle: string | undefined, tools: Too
 	if (handle) await change(cwd, store => Object.assign(session(store, handle), { system: systemRef(system) }));
 	return system;
 }
-async function fetchSystem(cwd: string, name, tools: Tools) {
+/** V-03: one OD package at the index commit, published as a unit; the catalog previews its components.html and preview/colors.html. */
+export async function fetchSystem(cwd: string, name, tools: Tools) {
 	if (typeof name !== "string" || !/^[a-z0-9][a-z0-9-]{0,60}$/.test(name)) throw new Error(`A design system is one name from design {action:"systems"}, e.g. airbnb; got ${clip(String(name), 80)}.`);
 	const folder = `${SYSTEMS}/${name}`, saved = (() => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${folder}/SOURCE.json`), "utf8")); } catch { return undefined; } })();
 	const files = (dir: string) => fs.readdirSync(confined(cwd, dir)).sort();
@@ -357,18 +358,33 @@ async function fetchSystem(cwd: string, name, tools: Tools) {
 		}
 		return { ...source, folder, files: files(folder), cached };
 	}
-	if (saved?.commit) return { name, commit: saved.commit, folder, files: files(folder), cached: true };
-	const index = await systemIndex(cwd, tools);
+	const cachedAs = (commit: string, note?: string) => ({ name, commit, folder, files: files(folder), cached: true, ...note ? { stale: note } : {} });
+	const index = await systemIndex(cwd, tools).catch(error => { if (saved?.commit) return undefined; throw error; });
+	if (!index || saved?.commit === index.commit) return cachedAs(saved.commit);
 	if (!index.names.includes(name)) throw new Error(`No design system ${name}; see design {action:"systems"} (refresh: true for the newest list).`);
-	const raw = (file: string) => get(tools, `https://raw.githubusercontent.com/${OD}/${index.commit}/design-systems/${name}/${file}`);
-	const design = await raw("DESIGN.md"), tokens = await raw("tokens.css").catch(() => undefined); // legacy packages have DESIGN.md only
-	let manifest: Record<string, unknown> = {};
-	try { manifest = JSON.parse(await raw("manifest.json")); } catch { /* legacy package: no manifest */ }
-	atomic(confined(cwd, `${folder}/DESIGN.md`), design);
-	if (tokens !== undefined) atomic(confined(cwd, `${folder}/tokens.css`), tokens);
-	const source = { repo: `github.com/${OD}`, path: `design-systems/${name}`, commit: index.commit, license: "Apache-2.0", name: manifest.name, category: manifest.category, description: manifest.description, source: manifest.source };
-	atomic(confined(cwd, `${folder}/SOURCE.json`), `${JSON.stringify(source, null, "\t")}\n`);
-	return { name, commit: index.commit, folder, files: files(folder), cached: false };
+	return withPlanLock(confined(cwd, folder), async () => {
+		const current = (() => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${folder}/SOURCE.json`), "utf8")).commit; } catch { return undefined; } })();
+		if (current === index.commit) return cachedAs(current); // another request published it while this one waited
+		try { await publishSystem(cwd, name, index.commit, tools); return { name, commit: index.commit, folder, files: files(folder), cached: false }; }
+		catch (error) { if (current) return cachedAs(current, `kept ${current.slice(0, 7)}; update failed: ${clip(error.message, 200)}`); throw error; }
+	});
+}
+/** Downloads into a temp folder, then swaps whole folders, so files from an older commit never sit beside the new ones. */
+async function publishSystem(cwd: string, name: string, commit: string, tools: Tools) {
+	const raw = (file: string) => get(tools, `https://raw.githubusercontent.com/${OD}/${commit}/design-systems/${name}/${file}`);
+	// Missing (404) or oversized optional files are left out; any other failure aborts so a partial unit is never marked current.
+	const optional = (file: string) => raw(file).catch(error => { if (/HTTP 404$|over 1 MB$/.test(error.message)) return undefined; throw error; });
+	const temp = confined(cwd, `${SYSTEMS}/.${name}-${randomUUID()}`), old = `${temp}.old`, target = confined(cwd, `${SYSTEMS}/${name}`);
+	try {
+		const [design, tokens, components, colors, manifestText] = await Promise.all([raw("DESIGN.md"), ...["tokens.css", "components.html", "preview/colors.html", "manifest.json"].map(optional)]); // legacy packages have DESIGN.md only
+		let manifest: Record<string, unknown> = {};
+		try { manifest = JSON.parse(manifestText ?? "{}"); } catch { /* no usable manifest */ }
+		for (const [file, body] of [["DESIGN.md", design], ["tokens.css", tokens], ["components.html", components], ["preview/colors.html", colors]]) if (body !== undefined) atomic(path.join(temp, file), body);
+		const source = { repo: `github.com/${OD}`, path: `design-systems/${name}`, commit, license: "Apache-2.0", name: manifest.name, category: manifest.category, description: manifest.description, source: manifest.source };
+		atomic(path.join(temp, "SOURCE.json"), `${JSON.stringify(source, null, "\t")}\n`);
+		if (fs.existsSync(target)) fs.renameSync(target, old);
+		try { fs.renameSync(temp, target); } catch (error) { if (fs.existsSync(old)) fs.renameSync(old, target); throw error; }
+	} finally { for (const dir of [temp, old]) fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
 /** One session's design folder: its files and first page. */

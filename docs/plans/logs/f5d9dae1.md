@@ -28,3 +28,16 @@ Draft, 0/12. Review done: five advisor findings accepted and folded into V-02, V
   - Key both the layout mode (`plan3-left`, `setLeft`) and the splitter size (`plan3-chat-width`, `resizeChat` in hub/web/app.ts:360-363, used by styles.css:56 and :216) by session and tab; update startup restore, the splitter handlers and `libraryReturn`.
   - Acceptance: browser test drags different widths in two sessions, switches library ↔ Files and reloads, and sees each session's dragged widths and modes restored (not only `data-left`).
   - check: node hub/scripts/test-browser.mjs → ok (V-02 block: library 280/full, Files 640 restored, reload keeps Files 640+narrow and library 290, another session's seeded layout ignored and untouched)
+
+## 2026-11-12T13:46:14.919Z Superseded resume context
+
+Draft, 0/12, no open questions. Q-02 settled as D8: the extension sends per-result thumbnails (extension 1.7 needs a version bump and one user reload); V-05 opens a result's original on demand at full size so tiles stay workable, and records measured thumbnail sizes. Review findings folded in earlier (Amendments). No product code changed; plan file not yet committed (research mode). Next: /plan3 finish, then V-01. Plan b2863bb6 P3-08 stays blocked there.
+
+## 2026-11-12T13:53:25.755Z V-03 done: fetchSystem (exported) publishes an OpenDesign package as one unit per index commit (DESIGN.md, tokens.css, components.html, preview/colors.html, SOURCE.json) via temp folder + folder swap under the plan lock; same-commit hits never refetch, failed updates keep the old unit; hub trigger and card retry note come with V-04.
+
+- [x] **V-03** Fetch and cache an OpenDesign system's `components.html` on demand, so the catalog marks it cached and Inspect and Add reference work.
+  - Fetch from raw.githubusercontent.com at the indexed commit, capped at 1 MB, into `.pi/designs/systems/<name>/`, recorded with its commit; a cached file for the same commit is never refetched.
+  - Publish each preview with its dependencies for one commit as a unit (download to a temp folder, then rename under the existing plan lock), recheck the cache under the lock so concurrent sessions download once, and drop files from an older commit. Today `fetchSystem` (extensions/design.ts:360) treats any saved commit as a hit and writes files one by one.
+  - A failed fetch leaves the card's "preview unavailable" note and offers retry; nothing else breaks.
+  - Acceptance: test-work-design.mjs covers fetch, cache hit, wrong commit, an oversized file, two concurrent requests (one download), an interrupted update, and stale components, colors or tokens from an older commit, with a fake fetch.
+  - check: node scripts/test-work-design.mjs → "design tool tests passed" (new V-03 block: concurrent asks download once, catalog marks od:stripe cached, cache hit no fetch, other-commit refetch drops stale preview, oversized components.html left out, interrupted update keeps old unit, no temp folders)

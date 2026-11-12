@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-12
-updated: 2026-11-12T13:45:58.700Z
+updated: 2026-11-12T13:53:25.755Z
 reviewed: 2026-11-12
 ---
 
@@ -81,11 +81,7 @@ Findings (this session, verified by reading code or fetching):
 
 ### Phase 2: OpenDesign previews [code]
 
-- [ ] **V-03** Fetch and cache an OpenDesign system's `components.html` on demand, so the catalog marks it cached and Inspect and Add reference work.
-  - Fetch from raw.githubusercontent.com at the indexed commit, capped at 1 MB, into `.pi/designs/systems/<name>/`, recorded with its commit; a cached file for the same commit is never refetched.
-  - Publish each preview with its dependencies for one commit as a unit (download to a temp folder, then rename under the existing plan lock), recheck the cache under the lock so concurrent sessions download once, and drop files from an older commit. Today `fetchSystem` (extensions/design.ts:360) treats any saved commit as a hit and writes files one by one.
-  - A failed fetch leaves the card's "preview unavailable" note and offers retry; nothing else breaks.
-  - Acceptance: test-work-design.mjs covers fetch, cache hit, wrong commit, an oversized file, two concurrent requests (one download), an interrupted update, and stale components, colors or tokens from an older commit, with a fake fetch.
+- [x] **V-03** fetchSystem (exported) publishes an OpenDesign package as one unit per index commit (DESIGN.md, tokens.css, components.html, preview/colors.html, SOURCE.json) via temp folder + folder swap under the plan lock; same-commit hits never refetch, failed updates keep the old unit; hub trigger and card retry note come with V-04.
 - [ ] **V-04** Show big lazy previews on Designs cards: a sandboxed, scaled frame of the cached page, fetched when the card scrolls into view.
   - Studio drafts and selected exports use their own page the same way. Frames are not interactive on the card; Inspect opens the explorer.
   - Card frames must not use `designexample`: `referencePage` (hub/src/explore.ts:123) allows one pending and eight live reference views per session and returns 429 beyond that. Use a lightweight read-only card route over the cached files (same sandbox and CSP as the viewer, no temp copy), keep a bounded number of frames live, and unload frames that scroll away, are filtered out, or belong to another tab. Inspect keeps `designexample` and calls `unview` as today.
@@ -141,7 +137,7 @@ Acceptance: in a fresh hub, every Designs card shows a picture once scrolled int
 
 ## Resume context
 
-Draft, 0/12, no open questions. Q-02 settled as D8: the extension sends per-result thumbnails (extension 1.7 needs a version bump and one user reload); V-05 opens a result's original on demand at full size so tiles stay workable, and records measured thumbnail sizes. Review findings folded in earlier (Amendments). No product code changed; plan file not yet committed (research mode). Next: /plan3 finish, then V-01. Plan b2863bb6 P3-08 stays blocked there.
+V-01 (957c2b0c) and V-02 (e426c8cf) committed; test-browser.mjs green. Next: V-03 on-demand OpenDesign preview fetch/cache in extensions/design.ts (fetchSystem ~:360) with tests in test-work-design.mjs. Unrelated dirty files from other sessions (app.ts notice hunks @57/@901/@1457, index.html, styles.css .notices lines, AGENTS/README/GLOSSARY, docs/upstream, video scripts) stay unstaged; never push.
 
 ## Amendments
 
