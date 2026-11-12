@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T18:28:32.197Z
+updated: 2026-11-12T18:57:42.564Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -61,6 +61,8 @@ One line per resolved ticket: gist and ticket ID.
 - **D-11 Security (T-03).** Everything runs with full user rights over about 500 auto-updated npm packages, and credentials are reachable (`auth.json`, `~/.ssh`, `~/.aws`, gh, Claude, Codex). The top threat is prompt injection into the shell; no candidate fixes it alone. Only Codex ships a Windows-native sandbox, and its code is Apache-2.0 and usable from Pi. Hardening is possible on Pi: pin and review packages, add a per-command bash sandbox, or run the stack in WSL as a separate user. Evidence: `docs/proposals/own-agent-stack/security.md`.
 - **D-12 Wishes against Pi (T-04).** All four multi-hub wishes and the security and speed pains are possible on Pi. Ownership and simplicity are only partly met: full ownership needs a fork, and the extension layer stays in any stack. No D-01 item strictly needs a new stack, so a rewrite rests on the T-06 value weights. Six follow-up drafts are listed. Evidence: `docs/proposals/own-agent-stack/wishes.md`.
 - **D-13 Candidates (T-05).** Pi passes both gates with today's direct Claude OAuth. Codex fails G1 for Claude (addable) but has the best server (multi-thread app-server over WebSocket) and the only Windows-native sandbox. Goose passes G1 only through the `claude` binary over ACP, which loses session fork and resume, and it has no sandbox. OpenCode fails G1 for its own Claude login. Anthropic's policy forbids third-party agents from using subscription OAuth, so today's Claude path carries that risk on every stack. T-07 finalists: Codex app-server against Pi, with Goose as the reserve. Evidence: `docs/proposals/own-agent-stack/candidates.md`.
+- **D-14 Weights and Claude route (T-06, user, 2026-11-12).** Weights out of 10: wishes 8, security 6, speed 6, simplicity 5, ownership 3. Q-01: G1 means today's direct Claude subscription OAuth through our own provider code, and the policy risk is accepted. A stack passes G1 for Claude only if it runs our provider code or a port of it. Goose drops to an unlikely candidate, because ACP loses fork and resume.
+
 
 
 
@@ -73,7 +75,7 @@ One line per resolved ticket: gist and ticket ID.
 
 ### Blocking
 
-- **Q-01 (T-06, user):** for G1, does Claude count as "kept" only with today's direct subscription OAuth (pi-provider-claude-ex, which carries the Anthropic policy risk), or also through the policy-safe route that runs the unmodified `claude` binary (Claude turns then run in Claude Code's own loop)? Evidence: `docs/proposals/own-agent-stack/candidates.md`.
+None.
 
 ### Deferred
 
@@ -99,9 +101,7 @@ None.
 - [x] **T-03** Security written: hardening possible on Pi at three cost levels; Codex sandbox code is the only Windows-native option (D-11).
 - [x] **T-04** Every D-01 item is possible or partly possible on Pi; six follow-up drafts listed (D-12).
 - [x] **T-05** Candidates compared on gates and fit; finalists Codex app-server and Pi; Claude policy raised as Q-01 (D-13).
-- [human] **T-06** How should security, speed, ownership, simplicity and the wishes be weighted?
-  - type: grill
-  - Ask with T-01 to T-05 numbers in hand; D-07 and D-08 are gates, not weights.
+- [x] **T-06** User weights: wishes 8, security 6, speed 6, simplicity 5, ownership 3; G1 Claude = direct OAuth (D-14).
 - [ ] **T-07** How do the top one or two candidates measure on this machine?
   - type: research
   - Run the T-02 scenarios on Windows native and WSL; one real turn each through the Claude subscription and the OpenAI Codex login (the enabled providers in `settings.json` `enabledModels`).
@@ -121,7 +121,7 @@ None.
 
 ## Resume context
 
-T-01 to T-03 done and committed. Next: T-04 wishes.md (start from pi-sync.json, pi-provider-claude-ex sync.ts, the hub's in-process pi-sdk use, and D-10 and D-11 for the pains), then T-05 candidates.md from %TEMP%\own-agent-stack\candidates-research.md. T-06 and T-09 need the user. No blockers.
+T-01 to T-05 done (HEAD 99e70be3). Now T-06 [human]: asking the user for weights plus Q-01 (Claude route). After the answer: record D-14, then T-07 (measure the Codex app-server against the Pi baseline on Windows native and WSL).
 
 ## Amendments
 
