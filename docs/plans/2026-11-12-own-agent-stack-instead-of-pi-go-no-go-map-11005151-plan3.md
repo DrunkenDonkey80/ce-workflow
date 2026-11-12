@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T18:26:35.994Z
+updated: 2026-11-12T18:28:32.197Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -60,6 +60,8 @@ One line per resolved ticket: gist and ticket ID.
 - **D-10 Baseline (T-02).** Pi core is fast outside the model: 0.27 s to ready, about 120 MB private memory per session, about 10 ms of overhead per turn. Our packages add about 1.1 s warm and 2.7 s on the first start, plus 150 MB per session; long live sessions use 340 to 580 MB. The speed pain is package load and memory, not the agent loop. Evidence: `docs/proposals/own-agent-stack/baseline.md` (S1 to S5).
 - **D-11 Security (T-03).** Everything runs with full user rights over about 500 auto-updated npm packages, and credentials are reachable (`auth.json`, `~/.ssh`, `~/.aws`, gh, Claude, Codex). The top threat is prompt injection into the shell; no candidate fixes it alone. Only Codex ships a Windows-native sandbox, and its code is Apache-2.0 and usable from Pi. Hardening is possible on Pi: pin and review packages, add a per-command bash sandbox, or run the stack in WSL as a separate user. Evidence: `docs/proposals/own-agent-stack/security.md`.
 - **D-12 Wishes against Pi (T-04).** All four multi-hub wishes and the security and speed pains are possible on Pi. Ownership and simplicity are only partly met: full ownership needs a fork, and the extension layer stays in any stack. No D-01 item strictly needs a new stack, so a rewrite rests on the T-06 value weights. Six follow-up drafts are listed. Evidence: `docs/proposals/own-agent-stack/wishes.md`.
+- **D-13 Candidates (T-05).** Pi passes both gates with today's direct Claude OAuth. Codex fails G1 for Claude (addable) but has the best server (multi-thread app-server over WebSocket) and the only Windows-native sandbox. Goose passes G1 only through the `claude` binary over ACP, which loses session fork and resume, and it has no sandbox. OpenCode fails G1 for its own Claude login. Anthropic's policy forbids third-party agents from using subscription OAuth, so today's Claude path carries that risk on every stack. T-07 finalists: Codex app-server against Pi, with Goose as the reserve. Evidence: `docs/proposals/own-agent-stack/candidates.md`.
+
 
 
 
@@ -71,7 +73,7 @@ One line per resolved ticket: gist and ticket ID.
 
 ### Blocking
 
-None.
+- **Q-01 (T-06, user):** for G1, does Claude count as "kept" only with today's direct subscription OAuth (pi-provider-claude-ex, which carries the Anthropic policy risk), or also through the policy-safe route that runs the unmodified `claude` binary (Claude turns then run in Claude Code's own loop)? Evidence: `docs/proposals/own-agent-stack/candidates.md`.
 
 ### Deferred
 
@@ -96,11 +98,7 @@ None.
 - [x] **T-02** Baseline measured: Pi core 0.27 s and 120 MB per session; our packages add 1.1 to 2.7 s and 150 MB (D-10).
 - [x] **T-03** Security written: hardening possible on Pi at three cost levels; Codex sandbox code is the only Windows-native option (D-11).
 - [x] **T-04** Every D-01 item is possible or partly possible on Pi; six follow-up drafts listed (D-12).
-- [wip] **T-05** Which existing agents could we fork, and how do they fit?
-  - type: research
-  - Pin and read `codex-rs`, Goose, Pi itself, and any other active Rust or TS agent found; Haystack as reference.
-  - Per candidate: license, server protocol, providers, extensions, MCP, sandbox, activity. Output `candidates.md`.
-  - Gates first, per candidate and gate: passed (shipped support, cited), addable (missing, but shown feasible by evidence such as pi-provider-claude-ex's working login code), unverified, or failed. A cost estimate alone never makes a gate pass.
+- [x] **T-05** Candidates compared on gates and fit; finalists Codex app-server and Pi; Claude policy raised as Q-01 (D-13).
 - [human] **T-06** How should security, speed, ownership, simplicity and the wishes be weighted?
   - type: grill
   - Ask with T-01 to T-05 numbers in hand; D-07 and D-08 are gates, not weights.
