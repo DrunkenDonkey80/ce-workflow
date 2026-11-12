@@ -18,21 +18,23 @@ Goose and OpenCode drop out: Goose reaches Claude only through ACP, which loses 
 
 Coarse effort estimates, in weeks of focused agent-assisted work, from the sizes in D-09 and `inventory.md`. They are judgement, not measurement; treat anything above 8 weeks as plus or minus 50%.
 
+No terminal UI (user, after T-09): the new server is hub and web only, so C, D and E carry no TUI work. That leaves out about 35k of Pi's 116k core lines: `pi-tui` (16.3k) and the coding agent's interactive mode (18.5k lines of built JS). A and B are unchanged, because Pi's TUI comes with them anyway.
+
 | Driver | A | B | C | D | E |
 |---|---|---|---|---|---|
 | Hub protocol (today `rpc-client.ts` spawns `pi --mode rpc`, 22 commands) | in-process SDK: 2 to 4 | same | rewrite onto `thread/*`, `turn/*` and `item/*` events: 2 to 3 | design and build: 3 to 5 | design and build: 3 to 5 |
 | Hub's in-process Pi use (`pi-sdk.ts`: models, sessions, settings, packages) | none | none | replace: 1 to 2 | replace: 1 to 2 | replace: 1 to 2 |
-| Agent core: loop, 7 tools, codemode, compaction with our modes, session tree, custom entries | none | none | compaction modes, custom entries, context edits as Rust changes in the fork: 6 to 12 | all of it (Pi core is 116k lines): 20 to 35 | all of it, part copied from Pi (MIT): 12 to 20 |
+| Agent core: loop, 7 tools, codemode, compaction with our modes, session tree, custom entries | none | none | compaction modes, custom entries, context edits as Rust changes in the fork: 6 to 12 | all of it, without the TUI (about 81k of Pi's 116k lines): 14 to 25 | all of it, part copied from Pi (MIT): 9 to 14 |
 | Logins: Claude pool (rotation-safe locks, tool renaming), Codex, OpenRouter | none | none | port pi-provider-claude-ex to Rust: 2 to 4 | Claude port 2 to 4, plus Codex and OpenRouter: 1 to 2 | copy: 1 |
-| Extension model: 33 events, `registerTool`, commands, `ctx.ui` dialogs, custom TUI | none | none | dynamic tools carry tools; events and dialogs have no equivalent: 8 to 12 | design and port 25k lines: 10 to 16 | design and port: 6 to 10 |
+| Extension model: 33 events, `registerTool`, commands, `ctx.ui` dialogs (hub-drawn only) | none | none | dynamic tools carry tools; events and dialogs have no equivalent: 8 to 12 | design and port 25k lines: 10 to 16 | design and port: 6 to 10 |
 | Big packages: pi-subagents (with supervisor and intercom), pi-lens (`lens_diagnostics`), pi-web-access | hardening: replace pi-lens with a small owned tool, 1 to 2 | same | Codex subagents differ; rebuild supervisor and intercom, run the others as MCP (which start once per thread, D-15): 4 to 8 | rebuild: 6 to 10 | rebuild, or port the TS: 4 to 6 |
-| TUI (terminal sessions) | none | none | Codex's Rust TUI without our dialogs; rebuild them or go hub-only: 4 to 8 | build: 6 to 10 | Pi's `pi-tui` (MIT) reusable: 2 to 4 |
+| TUI (terminal sessions) | none (comes with Pi) | none | not needed | not needed | not needed |
 | Sessions and settings migration, side-by-side running | none | small: 1 | convert `.jsonl` to Codex rollouts, run both for weeks: 2 to 3 | 2 to 3 | 2 to 3 |
 | Security (`security.md`) | bash sandbox plus pinned packages: 2 to 4 | same | the sandbox ships with Codex: 0 to 1 | reuse Codex crates: 2 to 4 | as A: 2 to 4 |
 | Wishes (`wishes.md`): settings sync, hub notices, login hub | 3 to 5 | same | 3 to 5 | 3 to 5 | 3 to 5 |
-| **Total to parity** | **8 to 15 weeks, each piece ships on its own** | **9 to 16** | **34 to 66** | **56 to 98** | **38 to 64** |
+| **Total to parity** | **8 to 15 weeks, each piece ships on its own** | **9 to 16** | **30 to 58** | **44 to 78** | **33 to 54** |
 | Upkeep | Pi releases weekly; packages updated after review | merge upstream by choice: about half a day a week, or freeze | `codex-rs` moves daily (0.166 to 0.167 within days); a diverged fork means owning a very large Rust tree | everything; providers change OAuth and APIs without notice | everything except what we keep copying from Pi |
-| Main risk | in-process sessions share extension state, and one crash stops every session (`wishes.md`) | fork drift | OpenAI-centred design; the extension model shrinks to tools only | years before parity, while Pi keeps moving | converges with B but costs 4 times more |
+| Main risk | in-process sessions share extension state, and one crash stops every session (`wishes.md`) | fork drift | OpenAI-centred design; the extension model shrinks to tools only | years before parity, while Pi keeps moving | converges with B but costs 3 to 4 times more |
 
 ## Scores (0 to 10 at the end state, after the cost is paid)
 
@@ -46,7 +48,7 @@ Weights from D-14: wishes 8, security 6, speed 6, simplicity 5, ownership 3.
 | Simplicity (5) | 5 | 6 | 5 | 6 | 7 | C means two languages plus a bridge from tools to the protocol. E is one language and one process, designed for us |
 | Ownership (3) | 3 | 7 | 7 | 10 | 9 | B, C: a fork is ours, but a fork of a fast-moving upstream |
 | **Weighted (of 10)** | **6.1** | **6.9** | **7.1** | **7.4** | **7.3** | |
-| **Weeks to parity** | **8 to 15** | **9 to 16** | **34 to 66** | **56 to 98** | **38 to 64** | |
+| **Weeks to parity** | **8 to 15** | **9 to 16** | **30 to 58** | **44 to 78** | **33 to 54** | |
 
 How the weighted score is computed: the sum of score times weight, divided by 28.
 
@@ -55,7 +57,7 @@ How the weighted score is computed: the sum of score times weight, divided by 28
 - **End state:** D and E score about 1.2 above A. The gap is mostly ownership (weight 3) and small speed and simplicity margins. Wishes, the heaviest weight, are equal or better on Pi.
 - **Speed:** most of today's speed pain is our own package load (D-10). A rewrite carrying the same features would pay much of that cost again. What Codex shows is the gain from in-process sessions (621 MB against 50 MB for five), and A reaches for the same gain through Pi's SDK.
 - **Security:** no path removes prompt injection; each needs a boundary (D-11). The only shipped Windows boundary is Codex's code, and A can use it.
-- **Cost:** A reaches most of the value in 2 to 4 months, piece by piece, with Pi still running. C, D and E need 8 to 24 months to reach parity while Pi keeps moving, and they deliver nothing usable until parity, apart from side-by-side running.
+- **Cost:** A reaches most of the value in 2 to 4 months, piece by piece, with Pi still running. C, D and E need about 7 to 18 months to reach parity (without a TUI) while Pi keeps moving, and they deliver nothing usable until parity, apart from side-by-side running.
 - **Upkeep:** forking Codex (C) means owning OpenAI's very active Rust tree, and its design is centred on OpenAI. D is the purest "own it all", but it is the longest road and has the highest upkeep (providers, OAuth, three server OSes).
 
 ## Recommendation (draft)

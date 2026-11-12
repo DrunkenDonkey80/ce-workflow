@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T21:31:02.433Z
+updated: 2026-11-12T21:57:05.992Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -144,3 +144,4 @@ Append material changes and their reasons.
   - F4 cost drivers in Not yet specified had no ticket: accepted. T-08 now settles a coarse approach per finalist (`hub/src/pi-sdk.ts` `ModelRuntime` and `SessionManager` uses confirmed); detailed design stays under Not yet specified.
   - F5 T-04 covered only multi-hub wishes: accepted. T-04 covers every D-01 item; T-03 adds a hardening verdict.
   - Own finding: `~/.pi/agent/pi-sync.json` (git settings sync) and pi-provider-claude-ex `sync.ts` (account sync) already exist; T-04 starts from them.
+- 2026-11-12, after T-10: the user said the new server needs no terminal UI. `decision.md` costs revised: C 30 to 58 weeks, D 44 to 78, E 33 to 54 (the TUI row and about 35k of Pi's core lines drop out); A and B unchanged; scores and the D-17 choice unchanged. D-16 keeps its original figures as recorded.

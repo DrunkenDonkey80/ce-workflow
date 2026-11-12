@@ -30,9 +30,9 @@ Requirements (user decisions from the map):
 - **Security (D-11):** prompt injection into the shell is the leading threat. Commands run inside a sandbox from the start, not added later.
 
 Non-goals for this first plan:
-- Parity with Pi. That is about 56 to 98 weeks by the map's estimate (D-16).
+- Parity with Pi. That is about 44 to 78 weeks by the map's estimate without a TUI (D-16, revised in `decision.md`).
 - Porting pi-subagents, pi-lens or pi-web-access.
-- A TUI.
+- A terminal UI, in this plan or later (user decision, see Decisions).
 - Migrating old sessions.
 - Retiring Pi.
 
@@ -41,6 +41,7 @@ Non-goals for this first plan:
 Carried from the map (user decisions unless marked):
 - **D-07 / D-08:** gates G1 and G2 as above.
 - **D-14:** weights and the G1 meaning: direct OAuth only.
+- **No terminal UI (user, after map T-10):** the server has hub, web and native-app clients only. That drops `pi-tui` and Pi's interactive mode (about 35k of Pi's 116k core lines). Extension dialogs (`ctx.ui`) are drawn by the hub only.
 - **D-17:** go on D, Rust from scratch, chosen against the draft recommendation A (stay on Pi). Planning only until approval.
 - **Map findings this plan relies on (evidence, not user decisions):**
   - Codex core starts in 88 ms with 37 MB, and holds 5 threads in about 50 MB, against 621 MB for 5 Pi processes (D-15).
@@ -85,9 +86,6 @@ Agent proposals (not settled):
   - Recommendation: decide per crate in T-04, after the skeleton exists.
   - Option: Sandbox only — least coupling
   - Option: Per crate, vendored — copy what saves time and own it from then on
-- **Q-05** A TUI, or hub and web only?
-  - Context: the TUI is 6 to 10 weeks for D (D-16). The hub's web and native clients already cover the hub sessions.
-  - Recommendation: hub only until parity; revisit after the first plan.
 
 ## Relevant files and approach
 
