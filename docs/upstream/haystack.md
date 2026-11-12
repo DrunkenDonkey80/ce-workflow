@@ -2,19 +2,24 @@
 
 Upstream: [deepset-ai/haystack](https://github.com/deepset-ai/haystack) (Apache-2.0). Reviewed at commit `104a83f8799b1b8d9d18a88eb9a08305133aea2d` (2026-11-12, `VERSION.txt` 3.6.0-rc0), agent-runtime overlap only (areas A1 to A16). Evidence: plan `docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md`, desk review with Astra merged `docs/proposals/2026-11-12-haystack-review.md`, Astra's independent review `docs/proposals/haystack-review/astra-verdicts.md` (agreement 9 of 16).
 
-No catch-up watch yet. The first follow-up plan that builds an idea adds the `deepset-ai/haystack` entry to `extensions/work-catch-up-baseline.json`, with `paths` limited to the adopted ideas' upstream paths below. Code ports carry the Apache-2.0 license and attribution notice; re-implementing needs neither.
+No catch-up watch: the two kept ideas are re-implementations, not ports, so no upstream path is tracked (umbrella plan D-11).
 
-## Accepted, build pending
+## Adopted
 
-Each idea has its own follow-up Plan3 draft that builds and measures it; nothing is adopted until that plan keeps it.
+All five accepted ideas were measured in one umbrella plan, `docs/plans/done/2026-11-12-umbrella-plan-for-the-five-accepted-haystack-ideas-review-pl-b71bab2b-plan3.md`, which replaced the five per-idea drafts.
 
-| Idea | Upstream path | Our counterpart | Follow-up |
+| Idea | Upstream path (idea source) | Ours | Evidence |
 |---|---|---|---|
-| Warn before stopping a runaway run (A3) | `haystack/hooks/budget/hooks.py` | Runaway-run plan `docs/plans/2026-09-27-001-fix-unbounded-direct-agent-runs-plan.md`, `extensions/plan3-night.ts` | draft `docs/plans/2026-11-12-warn-before-stopping-a-runaway-run-from-haystack-review-5bd4eebd-plan3.md` |
-| Pair benchmark runs with the baseline and show missing ones (A14) | `haystack/evaluation/eval_run_result.py` | `scripts/benchmark-context-cache-live.mjs`, AGENTS.md Optimization Regression Rule | draft `docs/plans/2026-11-12-pair-benchmark-runs-with-the-baseline-and-show-missing-ones--0c43697c-plan3.md` |
-| Better compaction summaries: two prompt rules and error feedback (A1, A5) | `haystack/hooks/compaction/summarization.py`, `haystack/hooks/structured_output/hooks.py` | `extensions/work-compaction-memory.ts` | draft `docs/plans/2026-11-12-better-compaction-summaries-two-prompt-rules-and-error-feedb-83818785-plan3.md` |
-| Prune old tool results at the Ultrafull checkpoint (A1) | `haystack/hooks/compaction/tool_result_pruning.py` | `extensions/work-compaction.ts`, Ultrafull mode in `extensions/work-models.ts` | draft `docs/plans/2026-11-12-prune-old-tool-results-at-the-ultrafull-checkpoint-from-hays-ac641457-plan3.md` |
-| Save large non-bash tool results to a file with a pointer (A2) | `haystack/hooks/tool_result_offloading/` | Giant-result cut in `extensions/work-models.ts`, `extensions/work-images.ts` | draft `docs/plans/2026-11-12-save-large-non-bash-tool-results-to-a-file-with-a-pointer-fr-1feda303-plan3.md` |
+| Pair benchmark runs with the baseline and show missing ones (A14) | `haystack/evaluation/eval_run_result.py` | `scripts/compare-benchmark-runs.mjs`, named in the AGENTS.md Optimization Regression Rule | HU-01 |
+| Warn before stopping a runaway run (A3) | `haystack/hooks/budget/hooks.py` | `extensions/run-budget.ts`: turns without progress since the last human message, reminder 10 turns before the limit (default 150, `runBudget.turns`), then tools blocked and night mode paused | HU-02, D-03 to D-06 |
+
+## Dropped after measurement
+
+| Idea | Why |
+|---|---|
+| Better compaction summaries: two prompt rules and error feedback (A1, A5) | Fallback is already 0.2% (1 of 541) since the checkpoint got real room; no failure left to fix (D-08) |
+| Prune old tool results at the Ultrafull checkpoint (A1) | A safe cut saves 6% of the kept tail (D-09) |
+| Save large non-bash tool results to a file with a pointer (A2) | In-scope tools' large results are 0% of tool-result characters (D-10) |
 
 ## Rejected
 

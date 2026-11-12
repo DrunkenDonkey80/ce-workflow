@@ -1,7 +1,7 @@
 # Bound runaway agent runs without losing 150K context filtering
 
 Date: 2026-09-27
-Status: Investigation recorded; proposed fixes, not implemented. Persistence redesign and budget values remain undecided.
+Status: P1 superseded by `extensions/run-budget.ts` (turns without progress, plan b71bab2b, 2026-11-12). P2 to P4 are not implemented.
 
 ## Objective and constraints
 
