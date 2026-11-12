@@ -339,6 +339,8 @@ try {
  await browser("click", "#wo-commands"); await browser("wait", ".command-option[data-command='/wo design']");
  await browser("click", ".command-option[data-command='/wo design']"); await browser("wait", "#library article");
  assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('workspace').dataset.mobile, document.getElementById('mobile-library').getAttribute('aria-selected')]"), ["Keep this mobile brief", "panel", "true"], "the menu opens Browse without replacing the unsent brief");
+ await browser("click", ".library-heading button");
+ assert.deepEqual(await evaluate("[document.getElementById('workspace').dataset.mobile, document.getElementById('message-input').value]"), ["chat", "Keep this mobile brief"], "phone Back returns to the chat Browse was opened from");
  await browser("click", "#drawer-toggle"); await browser("click", "#mobile-plan"); // restore the diagram for the remaining canvas checks
  await browser("click", "#drawer-toggle"); await browser("click", "#mobile-chat");
  assert.equal(await evaluate("document.getElementById('message-input').value"), "Keep this mobile brief", "Browse/Chat preserves the brief");

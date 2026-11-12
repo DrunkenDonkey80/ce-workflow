@@ -263,7 +263,10 @@ cacheMissToggle.addEventListener("change", () => {
 });
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
 const mobileViews = ["chat", "library", "files", "project", "plan"];
+let mobileReturn = "chat"; // phone Back returns to the view Browse was opened from
 function setMobile(view) {
+ const current = mobileViews.find(name => $("mobile-" + name).getAttribute("aria-selected") === "true");
+ if (view === "library" && current && current !== "library") mobileReturn = current;
  workspace.dataset.mobile = view === "chat" ? "chat" : "panel";
  for (const name of mobileViews) { const tab = $("mobile-" + name); tab.setAttribute("aria-selected", String(name === view)); tab.tabIndex = name === view ? 0 : -1; }
  if (view !== "chat") setTab(view);
@@ -666,8 +669,8 @@ function attachReference(ref: DesignReference) {
 }
 const libraryView = createDesignLibrary($("library"), { get, post, attached: attachReference, back() {
  if (phone.matches) {
-  setMobile(libraryReturn.tab);
-  const panel = $(libraryReturn.tab === "files" ? "files" : "canvas"); panel.tabIndex = -1; panel.focus({ preventScroll: true });
+  setMobile(mobileReturn);
+  const panel = $(mobileReturn === "chat" ? "message-input" : mobileReturn === "files" ? "files" : "canvas"); panel.tabIndex = -1; panel.focus({ preventScroll: true });
  } else { setTab(libraryReturn.tab); $("tab-" + libraryReturn.tab).focus(); }
  setLeft(libraryReturn.left);
  if (!filesView.exploring) void loadSessions();
