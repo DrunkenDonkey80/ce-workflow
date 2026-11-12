@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T18:25:34.520Z
+updated: 2026-11-12T18:26:35.994Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -59,6 +59,8 @@ One line per resolved ticket: gist and ticket ID.
 - **D-09 Usage inventory (T-01).** In 30 days, about 85% of tool calls go to Pi's core file and shell tools and codemode. Daily needs: compaction, the session tree and custom entries, both subscription logins, the 33-event extension model, and the hub's RPC and SDK surface. pi-subagents and `lens_diagnostics` are daily too, pi-web-access is weekly, and pi-goal and most pi-lens extras are rare. Evidence: `docs/proposals/own-agent-stack/inventory.md`.
 - **D-10 Baseline (T-02).** Pi core is fast outside the model: 0.27 s to ready, about 120 MB private memory per session, about 10 ms of overhead per turn. Our packages add about 1.1 s warm and 2.7 s on the first start, plus 150 MB per session; long live sessions use 340 to 580 MB. The speed pain is package load and memory, not the agent loop. Evidence: `docs/proposals/own-agent-stack/baseline.md` (S1 to S5).
 - **D-11 Security (T-03).** Everything runs with full user rights over about 500 auto-updated npm packages, and credentials are reachable (`auth.json`, `~/.ssh`, `~/.aws`, gh, Claude, Codex). The top threat is prompt injection into the shell; no candidate fixes it alone. Only Codex ships a Windows-native sandbox, and its code is Apache-2.0 and usable from Pi. Hardening is possible on Pi: pin and review packages, add a per-command bash sandbox, or run the stack in WSL as a separate user. Evidence: `docs/proposals/own-agent-stack/security.md`.
+- **D-12 Wishes against Pi (T-04).** All four multi-hub wishes and the security and speed pains are possible on Pi. Ownership and simplicity are only partly met: full ownership needs a fork, and the extension layer stays in any stack. No D-01 item strictly needs a new stack, so a rewrite rests on the T-06 value weights. Six follow-up drafts are listed. Evidence: `docs/proposals/own-agent-stack/wishes.md`.
+
 
 
 
@@ -93,12 +95,8 @@ None.
 - [x] **T-01** Inventory written: core tools and codemode carry about 85% of calls; daily needs listed by owner (D-09).
 - [x] **T-02** Baseline measured: Pi core 0.27 s and 120 MB per session; our packages add 1.1 to 2.7 s and 150 MB (D-10).
 - [x] **T-03** Security written: hardening possible on Pi at three cost levels; Codex sandbox code is the only Windows-native option (D-11).
-- [ ] **T-04** Which D-01 wishes and pains are possible on Pi today, and at what cost?
-  - type: research
-  - Every D-01 item gets "possible on Pi" or "needs a new stack" (D-05): settings sync between hubs, hub-to-hub updates, one machine holding LLM logins, in-process calls, and security, speed, ownership, simplicity (linking T-02 and T-03 evidence).
-  - Start from what exists: `~/.pi/agent/pi-sync.json` (git-backed settings sync, setup last used July 29, its package not loaded today) and pi-provider-claude-ex `sync.ts` (Claude account sync).
-  - Name the small Pi follow-up for each "possible" item. Output `wishes.md`.
-- [ ] **T-05** Which existing agents could we fork, and how do they fit?
+- [x] **T-04** Every D-01 item is possible or partly possible on Pi; six follow-up drafts listed (D-12).
+- [wip] **T-05** Which existing agents could we fork, and how do they fit?
   - type: research
   - Pin and read `codex-rs`, Goose, Pi itself, and any other active Rust or TS agent found; Haystack as reference.
   - Per candidate: license, server protocol, providers, extensions, MCP, sandbox, activity. Output `candidates.md`.
