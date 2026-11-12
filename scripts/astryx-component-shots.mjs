@@ -13,7 +13,7 @@ const jiti = createJiti(import.meta.url);
 const { runAstryx } = await jiti.import("../extensions/design-library.ts");
 const { ensureDesignRuntime } = await jiti.import("../extensions/design-runtime.ts");
 const [outArg, ...picked] = process.argv.slice(2);
-const out = path.resolve(outArg ?? path.join(os.tmpdir(), "astryx-component-shots"));
+const out = path.resolve(outArg || path.join(os.tmpdir(), "astryx-component-shots"));
 const names = picked.length ? picked : ["Button", "Card", "TextInput", "Banner", "Badge"];
 const runtime = () => ensureDesignRuntime({ confirm: async () => false }); // declined: a missing runtime fails instead of downloading
 const session = `astryx-shots-${process.pid}`;
@@ -30,12 +30,18 @@ try {
 	browser("set", "viewport", "720", "560", "2");
 	for (const name of names) try {
 		const started = Date.now();
-		const { value } = await runAstryx("libraryLookup", { catalog: "component", name, section: "examples" }, { runtime });
-		const example = value?.data?.examples?.[0];
-		if (!example?.code) { rows.push({ name, error: "no pinned example" }); continue; }
-		const component = [...example.code.matchAll(/^function ([A-Z]\w*)\s*\(/gm)].at(-1)?.[1];
-		if (!component) { rows.push({ name, error: "example has no top-level component" }); continue; }
-		const sources = [["src/main.jsx", main], ["src/vendor.css", vendor], ["src/Example.tsx", `${example.code}\nexport default ${component};\n`]].map(([file, text]) => [file, Buffer.from(text).toString("base64")]);
+		// V-08: a hand-written example in scripts/astryx-examples wins; otherwise the first pinned example.
+		const own = new URL(`./astryx-examples/${name}.jsx`, import.meta.url);
+		let code, label;
+		if (fs.existsSync(own)) { code = fs.readFileSync(own, "utf8"); label = "hand-written"; } else {
+			const { value } = await runAstryx("libraryLookup", { catalog: "component", name, section: "examples" }, { runtime });
+			const example = value?.data?.examples?.[0];
+			if (!example?.code) { rows.push({ name, error: "no pinned example and no scripts/astryx-examples file" }); continue; }
+			const component = [...example.code.matchAll(/^function ([A-Z]\w*)\s*\(/gm)].at(-1)?.[1];
+			if (!component) { rows.push({ name, error: "example has no top-level component" }); continue; }
+			code = `${example.code}\nexport default ${component};\n`; label = example.label;
+		}
+		const sources = [["src/main.jsx", main], ["src/vendor.css", vendor], ["src/Example.tsx", code]].map(([file, text]) => [file, Buffer.from(text).toString("base64")]);
 		const built = (await runAstryx("bundleApp", { sources }, { runtime })).value;
 		const dir = path.join(out, name);
 		fs.mkdirSync(path.join(dir, "assets"), { recursive: true });
@@ -51,7 +57,7 @@ try {
 		browser.input = toWebp(0.8).replace("__PNG__", `data:image/png;base64,${pngBytes.toString("base64")}`);
 		const webp = Buffer.from(JSON.parse(browser("--json", "eval", "--stdin")).data.result, "base64");
 		fs.writeFileSync(path.join(out, `${name}.webp`), webp);
-		rows.push({ name, example: example.label, width: pngBytes.readUInt32BE(16), height: pngBytes.readUInt32BE(20), png: pngBytes.length, webp: webp.length, bundleMs: bundled - started, shotMs: shot - bundled });
+		rows.push({ name, example: label, width: pngBytes.readUInt32BE(16), height: pngBytes.readUInt32BE(20), png: pngBytes.length, webp: webp.length, bundleMs: bundled - started, shotMs: shot - bundled });
 	} catch (error) { rows.push({ name, error: String(error.message).split("\n")[0].slice(0, 300) }); }
 } finally { try { browser("close"); } catch {} }
 
