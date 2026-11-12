@@ -23,7 +23,7 @@ Video ingestion lives in yt-ingest; ce-workflow review state lives in `docs/upst
 
 ## Optimization Regression Rule
 
-Never retain or describe a workflow optimization as successful from focused tests or fewer turns alone. Re-run the same end-to-end benchmark, aggregate every continuation session, and compare runtime, total provider tokens, cost, turns, and tool calls against the last accepted baseline. Revert the optimization when it causes a material overall regression; do not rationalize the regression from one improved submetric.
+Never retain or describe a workflow optimization as successful from focused tests or fewer turns alone. Re-run the same end-to-end benchmark, aggregate every continuation session, and compare runtime, total provider tokens, cost, turns, and tool calls against the last accepted baseline. Revert the optimization when it causes a material overall regression; do not rationalize the regression from one improved submetric. Compare `results.json` files with `node scripts/compare-benchmark-runs.mjs <baseline> <candidate>`: it pairs runs by scenario and repetition and keeps failed or missing runs out of the totals.
 
 ## Dialog UX Rule
 
