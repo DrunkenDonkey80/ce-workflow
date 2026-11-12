@@ -130,7 +130,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  }
  const draw = () => {
   const query = search.value.toLowerCase().trim(), matches = entries.filter(item => (!source.value || item.source === source.value) && (!kind.value || item.kind === kind.value) && (!query || [item.name, item.category, item.description, item.status].some(text => text?.toLowerCase().includes(query))));
-  status.textContent = `${matches.length} references.${offline ? " " + offline : ""}`;
+  status.textContent = `${matches.length} ${matches.length === 1 ? "reference" : "references"}.${offline ? " " + offline : ""}`;
   const card = (item: CatalogEntry) => {
    const row = make("article"), title = make("h3", item.name), provenance = make("p", item.provenance), details = make("small", `${item.source} / ${item.kind} · ${item.revision.slice(0, 12)} · ${item.license}`), open = make("button", "Inspect " + item.name);
    row.dataset.entry = item.id; open.type = "button"; open.dataset.inspect = "";

@@ -194,6 +194,15 @@ The agent checks its work with `look` (headless renders at device presets with a
 
 Sessions are kept in `.pi/designs/sessions.json`.
 
+### Design library (`/wo design`)
+
+`/wo design` (or the hub's **Design library** tab; **Browse designs** on a phone) opens a visual library beside the current chat, in the same conversation. It lists OpenDesign systems, the pinned Astryx themes and components, and this project's studio drafts and selected exports, each labelled with its source, license and revision. Cards show what actually exists: a cached source sample, a static source image, or "metadata only". Nothing is generated, downloaded or installed just by browsing, and picking Astryx inspiration never switches the design to the Astryx runtime.
+
+- **Add reference** (also Ctrl-click, right-click or a long press) attaches the card as a numbered `@ref1`, `@ref2`, ... chip above the chat box, with an aspect (whole style, colors, typography, layout, background, component) and an optional note. Static images can attach a cropped region. IDs never change or get reused, so a removed `@ref2` never points at something else.
+- **Add page reference** takes an `https://` address. The screenshot comes from your own browser through `browser_fetch`, after its usual per-site approval prompt. A refused or failed capture adds nothing and keeps the typed address.
+- Describe the mix in chat ("@ref1 overall, @ref2 cards, background like @ref3; two variants") and Send. The selected references are frozen once, and the existing design sessions start one per direction, each receiving the same snapshot as untrusted, inspiration-only evidence. Retrying the same Send never starts a second batch. Selected exports list the reference sources in `REFERENCE-SOURCES.json` (provenance only; source assets are not copied).
+- Unsent selections survive reload, session switches, Back and the phone Browse/Chat switch. They are kept in this browser only, not synced across devices.
+
 ### Optional Astryx foundation
 
 - Ordinary HTML and HTML-only decks need no Astryx installation. Explicit `kind: "app", system: "astryx"` starts an experimental React/component design; selecting the Astryx reference for a web design does not convert it into an app.

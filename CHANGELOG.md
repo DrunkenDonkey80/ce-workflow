@@ -4,6 +4,12 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+### Added
+- `/wo design` and the hub's **Design library** tab (**Browse designs** on phones) show OpenDesign systems, Astryx themes and components, and your own design drafts and exports beside the chat. Add a card, an image region or a web page as a numbered `@ref` chip, describe the mix, and Send starts the usual design variants with exactly those references. Browsing never generates, downloads or installs anything. Page screenshots go through your browser's per-site approval.
+  ![The Design library tab](docs/changelog/design-library-entry.png)
+  ![Library with an Astryx theme added as @ref1](docs/changelog/design-library-gallery.png)
+  ![Inspecting a reference, with its chip above the chat box](docs/changelog/design-library-reference.png)
+
 ### Fixed
 - Idle cold-cache compaction now waits until Pi's last idle cache warm expires, including slow final warms. The hub compacts before parking when only idle warms kept the cache fresh, but still respects a recent real request and long cache retention.
 
