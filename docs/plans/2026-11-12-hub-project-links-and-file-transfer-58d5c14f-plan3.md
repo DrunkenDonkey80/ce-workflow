@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-12
-updated: 2026-11-12T14:13:17.456Z
+updated: 2026-11-12T14:14:57.199Z
 reviewed: 2026-11-12
 ---
 
@@ -73,8 +73,7 @@ None recorded.
 - [x] **PL-02** `link` serves and calls projects (linkProject); `ping` lists each linked project's sessions.
 - [x] **PL-03** One stand-in per live remote session per project link, keyed link/record, refreshed on tick, names deduped.
 - [x] **PL-04** forward() accepts any session of the linked folder; deliver carries from/to, checked against the folder and the remote list (one refresh on miss).
-- [ ] **PL-05** Page API and Hub links menu: link this project to a remote project (pick a tree heading), list and unlink.
-  - Group the tree by full remote folder; same-named projects show their parent path to tell them apart.
+- [x] **PL-05** Hub links menu groups remote sessions by full folder (same names show parent), the heading links the whole project; unlink shows the project label; page API passes folder to linkProject.
 - [x] **PL-06** test-link covers project link, 2x2 matrix with replies to the sender only, forged ends, outside sender, new session, parked drop, unlink; test-remote uses COMM.
 
 ### Phase 2: Files [code]

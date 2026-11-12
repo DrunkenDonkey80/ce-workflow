@@ -682,6 +682,8 @@ body.has-switcher.switcher-open { padding-left: 200px; }
 .switcher[data-open=false] .session-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 /* H5-05: folder groups with a + for New, a ⋯ per row, Recents closed by default. */
 .session-menu { z-index: 9; }
+.session-menu .menu-group { font-weight: 600; }
+.session-menu .menu-child { padding-left: 22px; }
 .session[data-parked] :is(.session-label, .session-state) { color: var(--muted); font-style: italic; }
 .session[data-parked] .session-label::before { content: "💤 "; font-style: normal; }
 .session[data-parked] .session-letter { position: relative; }
