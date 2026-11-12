@@ -1,11 +1,13 @@
 // H5-03: the page API under /s/<id>/api/ (endpoint map in plan 0db155f7 Findings) and the request checks kept from plan3-web.
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+import { addDesignReference, designReferences, editDesignReference, referenceAssets } from "../../extensions/design-references.ts";
 import { saveDiagram } from "../../extensions/plan3-diagram.ts";
 import { appStarter } from "../../extensions/design-app.ts";
 import { appPublication, ensureAppBuilt } from "../../extensions/design-build.ts";
@@ -68,6 +70,128 @@ try {
 	fs.writeFileSync(path.join(folder, "s.jsonl"), "");
 	const record = hub.registry.add({ name: "1", folder, sessionFile: path.join(folder, "s.jsonl"), state: "parked" });
 	const id = record.id;
+
+	// Library metadata uses this project's pinned index; no runtime/provisioning or Pi start on reads.
+	const cache = path.join(folder, ".pi/designs/systems/index.json"), commit = "1".repeat(40);
+	fs.mkdirSync(path.dirname(cache), { recursive: true });
+	fs.writeFileSync(cache, JSON.stringify({ commit, names: ["example", "../../escape"], fetched: Date.now() }));
+	const catalog = await get(id, "designcatalog");
+	assert.equal(catalog.status, 200);
+	assert.deepEqual(catalog.body.entries.filter(item => item.source === "od").map(item => [item.id, item.revision]), [["od:example", commit]]);
+	assert.equal(catalog.body.entries.filter(item => item.kind === "component").length, 174);
+	assert.equal(catalog.body.entries.filter(item => item.kind === "theme").length, 7);
+	assert(catalog.body.entries.every(item => item.license && item.provenance && item.revision));
+	assert(catalog.body.entries.filter(item => item.kind === "component").every(item => item.preview === "none" && item.availability === "unavailable"), "metadata never pretends a component has a visual sample");
+	assert.equal(hub.host.live.has(id), false, "browsing does not wake a parked model");
+	assert.equal(await rawGet(`/s/${id}/api/designcatalog`, {}), 401, "catalog requires normal session authentication");
+	const images = catalog.body.entries.filter(item => item.preview === "image");
+	assert.equal(images.length, 6, "only six themes have supplied source images");
+	for (const item of images) {
+		assert.equal(item.imageRevision, "fd5cf0df987791117e96ccc0bec603c64be8b136", "image provenance is separate from the runtime pin");
+		const route = `designimage?id=${encodeURIComponent(item.id)}&revision=${item.imageRevision}`, image = await get(id, route);
+		assert.equal(image.status, 200); assert.equal(image.headers.get("content-type"), "image/webp");
+		assert.equal(image.body.toString("ascii", 0, 4), "RIFF"); assert.equal(image.body.toString("ascii", 8, 12), "WEBP");
+		assert(image.body.length < 256_000, "bundled source images stay bounded");
+		assert.equal(await rawGet(`/s/${id}/api/${route}`, {}), 401, "image bytes require session authentication too");
+	}
+	assert.equal((await get(id, `designimage?id=astryx:theme:neutral&revision=${"0".repeat(40)}`)).status, 404, "a stale image revision never serves different bytes");
+	assert.equal((await get(id, `designimage?id=../../sessions.json&revision=${images[0].imageRevision}`)).status, 404, "image names are a whitelist, not filesystem paths");
+	assert.equal((await get(id, `designimage?id=astryx:theme:chocolate&revision=${images[0].imageRevision}`)).status, 404, "missing source images are honest, not placeholders");
+	assert.equal(hub.host.live.has(id), false, "images do not wake a parked model");
+	{
+		const input = { action: "add", id: images[0].id, revision: images[0].revision, aspect: "colors", note: "<img src=x onerror=alert(1)>" };
+		const duplicates = await Promise.all([post(id, "designreference", input), post(id, "designreference", input)]);
+		assert(duplicates.every(result => result.status === 200)); assert.equal(duplicates[0].body.ref, duplicates[1].body.ref, "duplicate writers share one stable reference identity");
+		let ref = (await get(id, "designreferences")).body.refs[0]; assert.equal(ref.ref, "ref1"); assert.equal(ref.status, "ready"); assert.equal(ref.note, input.note);
+		assert.equal(await rawGet(`/s/${id}/api/designreferences`, {}), 401);
+		assert.equal((await post(id, "designreference", { ...input, path: "../escape" })).status, 400);
+		assert.equal((await post(id, "designreference", { ...input, aspect: "not-an-aspect" })).status, 400);
+		assert.equal((await post(id, "designreference", { ...input, revision: "0".repeat(64) })).status, 409);
+		assert.equal((await post(id, "designreference", { ...input, region: [0, 0, 1, 1] })).status, 400);
+		assert.equal((await get(id, "designreferenceimage?ref=ref1")).status, 200);
+		const second = hub.registry.add({ name: "reference-owner-test", folder, state: "parked" });
+		try { assert.equal((await get(second.id, "designreferenceimage?ref=ref1")).status, 404, "another session cannot read reference assets"); }
+		finally { hub.registry.remove(second.id); }
+		assert.equal((await post(id, "designreference", { action: "note", id: ref.ref, revision: 1, note: "stale" })).status, 409);
+		ref = (await post(id, "designreference", { action: "note", id: ref.ref, revision: ref.revision, note: "Use these colors" })).body;
+		const asset = path.join(folder, ".pi/designs/references/library", id, ref.snapshot, "source.webp"), original = fs.readFileSync(asset), tampered = Buffer.from(original); tampered[20] ^= 1; fs.writeFileSync(asset, tampered);
+		assert.equal((await get(id, "designreferenceimage?ref=ref1")).status, 409, "asset hashes are rechecked rather than trusting mutable reference paths"); fs.writeFileSync(asset, original);
+		assert.equal((await post(id, "designreference", { action: "remove", id: ref.ref, revision: ref.revision })).body.status, "removed");
+		assert.equal((await get(id, "designreferenceimage?ref=ref1")).status, 404);
+		const again = await post(id, "designreference", input); assert.equal(again.status, 200); assert.notEqual(again.body.ref, "ref1", "removed IDs never point to newly captured assets");
+		const owner = randomUUID(), source = { id: "test:source", revision: "1".repeat(64), name: "Owned fixture", provenance: "Test", license: "Test" };
+		let release; const captured = new Promise(resolve => release = resolve);
+		const pending = addDesignReference(folder, owner, { ...source, aspect: "whole" }, async () => { await captured; return { source, files: new Map([["index.html", Buffer.from("original")]]) }; });
+		const prepared = await until(() => designReferences(folder, owner).refs[0]); await editDesignReference(folder, owner, prepared.ref, prepared.revision); release();
+		assert.equal((await pending).status, "removed", "stale asynchronous completion never resurrects a removed reference");
+		assert(!fs.existsSync(path.join(folder, ".pi/designs/references/library", owner, prepared.snapshot)), "stale captures do not publish files");
+		assert.throws(() => referenceAssets(folder, owner, prepared.ref), /unavailable/);
+		assert.equal(hub.host.live.has(id), false, "selecting references never wakes a model");
+	}
+	{
+		const write = (name, text) => { const target = path.join(folder, name); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, text); };
+		const html = "<h1>Source sample</h1><link rel=stylesheet href=assets/colors.css><script>window.sample = true</script>";
+		write(".pi/designs/sessions.json", JSON.stringify({ version: 2, next: 2, sessions: [{ handle: "design-1", name: "Draft", direction: "A test", kind: "web", inputs: [], references: [], created: 1 }] }));
+		for (const root of [".pi/designs/design-1", "docs/designs/Selected"]) { write(root + "/index.html", html); write(root + "/assets/colors.css", "h1 { color: purple }"); }
+		write("docs/designs/Selected/DESIGN.json", JSON.stringify({ handle: "design-1", name: "Selected", version: 1 }));
+		write("docs/designs/Orphan/DESIGN.json", JSON.stringify({ handle: "design-77", name: "Retained export", version: 2 }));
+		write("docs/designs/Orphan/pages/main.html", "<h1>Retained export</h1>");
+		write(".pi/designs/systems/example/SOURCE.json", JSON.stringify({ commit })); write(".pi/designs/systems/example/components.html", html);
+		const saved = (await get(id, "designcatalog")).body.entries, draft = saved.find(item => item.id === "draft:design-1"), selected = saved.find(item => item.id === "export:Selected");
+		assert.equal(saved.filter(item => item.kind === "design").length, 3, "live drafts and retained exports are independent catalog entries");
+		assert.equal(draft.designRevision, selected.designRevision, "identical authored files can group without losing separate provenance");
+		assert.notEqual(draft.revision, selected.revision, "export handoff metadata remains in its exact source revision");
+		assert(saved.some(item => item.id === "export:Orphan" && /v2/.test(item.status)), "an export survives without a studio record");
+		assert.equal(saved.find(item => item.id === "od:example").page, "components.html", "legacy samples fall back from kit to components");
+		assert.equal((await post(id, "designexample", { id: draft.id, revision: draft.revision, path: "../escape" })).status, 400, "sample requests do not accept paths");
+		assert.equal((await post(id, "designexample", { id: "draft:../escape", revision: draft.revision })).status, 404);
+		assert.equal(await rawGet(`/s/${id}/api/designexample`, {}), 401);
+		const captured = await post(id, "designexample", { id: draft.id, revision: draft.revision }); assert.equal(captured.status, 200);
+		const sampleURL = `${origin}/x/${captured.body.key}/${captured.body.open}`, page = await fetch(sampleURL);
+		assert.equal(await page.text(), html, "reference HTML never receives the privileged studio comment bridge");
+		const policy = page.headers.get("content-security-policy");
+		assert.match(policy, /default-src 'none'/); assert(!policy.includes("https:"), "reference CSP has no blanket remote network access");
+		assert(policy.includes(`connect-src ${origin}/x/${captured.body.key}/`), "scripts may only fetch this snapshot, not hub APIs or other projects");
+		assert.equal(page.headers.get("referrer-policy"), "no-referrer");
+		assert.equal(await (await fetch(`${origin}/x/${captured.body.key}/assets/colors.css`)).text(), "h1 { color: purple }");
+		write(".pi/designs/design-1/index.html", "<h1>Changed later</h1>");
+		assert.equal(await (await fetch(sampleURL)).text(), html, "an inspected snapshot survives source edits");
+		const attached = await post(id, "designreference", { action: "add", id: draft.id, revision: draft.revision, previewKey: captured.body.key, aspect: "layout", note: "Keep this earlier layout" });
+		assert.equal(attached.status, 200); assert.equal(referenceAssets(folder, id, attached.body.ref).files.get("index.html").toString(), html, "attachments keep the exact inspected source snapshot");
+		assert.equal((await post(id, "designreference", { action: "add", id: draft.id, revision: draft.revision, previewKey: "0".repeat(32), aspect: "typography" })).status, 404);
+		assert.equal((await post(id, "designexample", { id: draft.id, revision: draft.revision })).status, 409, "stale catalog revisions cannot silently select newer files");
+		const changed = (await get(id, "designcatalog")).body.entries;
+		assert.notEqual(changed.find(item => item.id === draft.id).designRevision, selected.designRevision, "diverged draft/export files remain distinguishable");
+		const orphan = saved.find(item => item.id === "export:Orphan"), nested = await post(id, "designexample", { id: orphan.id, revision: orphan.revision });
+		assert.equal(nested.status, 200); assert.equal(nested.body.open, "pages/main.html");
+		assert.equal(await (await fetch(`${origin}/x/${nested.body.key}/pages/main.html`)).text(), "<h1>Retained export</h1>");
+		assert.equal((await fetch(`${origin}/x/${captured.body.key}/..%2F..%2Fsessions.json`)).status, 404);
+		await post(id, "unview", { key: captured.body.key }); await post(id, "unview", { key: nested.body.key });
+		assert.equal((await fetch(sampleURL)).status, 404, "closing an inspector revokes its capability");
+		const tooLarge = path.join(folder, ".pi/designs/design-1/huge.bin"); fs.writeFileSync(tooLarge, ""); fs.truncateSync(tooLarge, 33 * 1024 * 1024);
+		const bounded = (await get(id, "designcatalog")).body;
+		assert(bounded.entries.some(item => item.id === draft.id && item.availability === "unavailable"), "large drafts stay discoverable without loading their bytes");
+		assert(bounded.warnings.some(message => /32 MiB/.test(message)));
+		fs.rmSync(path.join(folder, "docs/designs"), { recursive: true });
+		assert.equal(hub.host.live.has(id), false, "all source browsing remains Pi-free");
+	}
+	fs.rmSync(path.join(folder, ".pi"), { recursive: true });
+	const cli = (...args) => new Promise((resolve, reject) => execFile(process.execPath, [fileURLToPath(new URL("../src/cli.ts", import.meta.url)), "open", ...args, "--json"], { windowsHide: true, timeout: 20_000 }, (error, stdout, stderr) => error ? reject(new Error(stderr || error.message)) : resolve(JSON.parse(stdout))));
+	const linked = await cli("--view", "library", "--session", id);
+	assert.equal(linked.created, false); assert.equal(linked.id, id);
+	assert.equal(new URL(linked.url).searchParams.get("view"), "library");
+	assert.equal(new URL(linked.url).searchParams.get("token"), localKey);
+	assert.equal(hub.host.live.has(id), false, "a session link does not wake it");
+	await assert.rejects(cli("--view", "untrusted", "--session", id), /Only --view library/);
+	await assert.rejects(cli("--view", "library", "--session", "ffffffff-ffff-ffff-ffff-ffffffffffff"), /no other session was adopted/);
+	const countBeforeFallback = hub.registry.list().length;
+	await assert.rejects(cli("remote", "--view", "library", "--folder", folder), /Remote off/);
+	assert.equal(hub.registry.list().length, countBeforeFallback, "remote unavailable fails before creating a briefing");
+	const briefing = await cli("--view", "library", "--folder", folder);
+	assert.equal(briefing.created, true); assert.notEqual(briefing.id, id, "plain terminals never adopt an unrelated same-folder session");
+	assert.equal((await cli("--view", "library", "--session", briefing.id)).created, false);
+	assert.deepEqual((await get(briefing.id, "snapshot")).body.chat, [], "new fallback sends no generation prompt");
+	await hub.host.park(briefing.id); hub.registry.remove(briefing.id);
 
 	// Parked: plans, diagram, files and images come from the folder; nothing starts.
 	const plans = await get(id, "plans");

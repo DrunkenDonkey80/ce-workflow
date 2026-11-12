@@ -5,7 +5,7 @@ import type http from "node:http";
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createReadStream, type FSWatcher, watch } from "node:fs";
-import { mkdir, readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join, relative, resolve, isAbsolute } from "node:path";
 import { linkedFile } from "./linked-files.ts";
@@ -13,6 +13,8 @@ import { sevenZip } from "./wormhole.ts";
 import { DESIGN_CSP, SANDBOX_CSP } from "../../extensions/design-render.ts";
 import { withBridge } from "./design-bridge.ts";
 import { appPreviewFolder, buildInfo } from "../../extensions/design-build.ts";
+import { catalogFiles, type CatalogEntry } from "../../extensions/design-catalog.ts";
+import { confined } from "../../extensions/plan3-files.ts";
 
 export const ARCHIVE = /\.(?:zip|7z|rar|tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i;
 const TAR_FAMILY = /\.(?:tar|tgz|tbz2?|txz|tar\.(?:gz|bz2|xz|zst))$/i, MAX_ARCHIVE = 2e9, MAX_FILES = 5000;
@@ -23,8 +25,9 @@ const unpacked = new Map<string, string>(), folders = new Map<string, string>();
 // A viewed page's live folder: each file served must pass the same check as a chat link for that project and device.
 // One key per open viewer (D3): the real files it served are watched, and a change tells that viewer (notify) to reload.
 // own: a design session's mirror (designPage), confined to its folder instead of the chat-link check (which refuses .pi).
-type View = { project: string; remote: boolean; own?: boolean; owner?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout>; extra?: FSWatcher[] };
+type View = { project: string; remote: boolean; own?: boolean; owner?: string; reference?: boolean; sample?: { item: CatalogEntry; names: string[] }; cleanup?: string; notify?: (key: string) => void; served: Set<string>; timer?: ReturnType<typeof setTimeout>; extra?: FSWatcher[] };
 const live = new Map<string, View>();
+const referencePending = new Set<string>();
 // Folders, not files, are watched: an atomic save (temp file + rename) or delete-and-recreate replaces the file's inode.
 const watched = new Map<string, { watcher: FSWatcher; keys: Set<string> }>();
 const idle = new Map<string, ReturnType<typeof setTimeout>>();
@@ -65,7 +68,7 @@ export async function explore(real: string) {
  * A chat-linked file (a validated real path) shown in the Files viewer: its folder served live. An HTML page lists the
  * folder (its relative images, scripts and data load); any other file lists only itself, so a big folder is never walked.
  */
-export async function viewPage(real: string, project: string, remote: boolean, watcher?: { owner: string; notify: (key: string) => void }, own = false) {
+export async function viewPage(real: string, project: string, remote: boolean, watcher?: { owner: string; notify?: (key: string) => void }, own = false) {
 	const folder = dirname(real), key = randomBytes(16).toString("hex");
 	folders.set(key, folder); live.set(key, { project, remote, own, ...watcher, served: new Set() });
 	const files: { path: string; size: number }[] = [];
@@ -116,11 +119,39 @@ export async function watchDesign(key: string, project: string, handle: string, 
 		try { const watcher = watch(dir, check); watcher.on("error", () => watcher.close()); return [watcher]; } catch { return []; } // gone or out of handles: no live lists
 	});
 }
+/** Library samples are bounded local copies, never live roots or executable build inputs. */
+export async function referencePage(project: string, id: unknown, revision: unknown, owner: string, remote: boolean) {
+	if (referencePending.has(owner) || referencePending.size >= 4 || [...live.values()].filter(view => view.owner === owner && view.reference).length >= 8) throw fail(429, "A reference preview is busy; close an earlier preview and retry.");
+	referencePending.add(owner);
+	let directory: string | undefined;
+	try {
+		const sample = await catalogFiles(project, id, revision);
+		directory = await mkdtemp(join(tmpdir(), "pi-hub-reference-"));
+		for (const [name, bytes] of sample.files) { const target = confined(directory, name); await mkdir(dirname(target), { recursive: true }); await writeFile(target, bytes); }
+		const view = await viewPage(confined(directory, sample.item.page!), project, remote, { owner }, true);
+		folders.set(view.key, directory);
+		Object.assign(live.get(view.key)!, { reference: true, cleanup: directory, sample: { item: sample.item, names: [...sample.files.keys()] } });
+		return { ...view, open: sample.item.page, files: [...sample.files].map(([path, bytes]) => ({ path, size: bytes.length })), revision: sample.revision, note: sample.note };
+	} catch (error) { if (directory) await rm(directory, { recursive: true, force: true }); throw error; }
+	finally { referencePending.delete(owner); }
+}
+
+/** Attach the exact isolated sample shown, even when its original studio source has since changed. */
+export async function referenceSnapshot(project: string, key: unknown, id: unknown, revision: unknown, owner: string) {
+ if (typeof key !== "string" || !/^[a-f0-9]{32}$/.test(key)) throw fail(400, "Invalid sample capability.");
+ const view = live.get(key), folder = folders.get(key);
+ if (!view?.reference || view.owner !== owner || view.project !== project || !folder || !view.sample || view.sample.item.id !== id || view.sample.item.revision !== revision) throw fail(404, "No such reference sample in this session.");
+ const files = new Map<string, Buffer>();
+ for (const name of view.sample.names) files.set(name, await readFile(confined(folder, name)));
+ return { source: view.sample.item, files };
+}
+
 /** The viewer closed: its key stops serving and its watches close. */
 export function unview(key: string, owner?: string) {
 	const view = live.get(key);
 	if (!view || owner !== undefined && view.owner !== owner) return false;
 	clearTimeout(view.timer); live.delete(key); folders.delete(key);
+	if (view.cleanup) void rm(view.cleanup, { recursive: true, force: true }).catch(() => {});
 	for (const watcher of view.extra ?? []) watcher.close();
 	for (const [dir, entry] of watched) if (entry.keys.delete(key) && !entry.keys.size) { entry.watcher.close(); watched.delete(dir); }
 	return true;
@@ -177,12 +208,16 @@ export async function sendExplored(pathname: string, download: boolean, origin: 
 	if (access) track(match[1], access, real!);
 	const type = TYPES[extname(real!).toLowerCase()] ?? "text/plain; charset=utf-8"; // unknown: plain text, never sniffed into a page
 	// S10: a design session's own pages get the comment bridge; other explored pages are served as they are.
-	const bridged = access?.own && !download && type.startsWith("text/html") ? Buffer.from(withBridge(await readFile(real!, "utf8"))) : undefined;
+	const bridged = access?.own && !access.reference && !download && type.startsWith("text/html") ? Buffer.from(withBridge(await readFile(real!, "utf8"))) : undefined;
 	response.writeHead(200, {
 		"content-type": download ? "application/octet-stream" : type, "content-length": bridged?.length ?? info.size, "cache-control": "private, no-store", "x-content-type-options": "nosniff",
 		// Opaque origin (no allow-same-origin): page scripts run but cannot read the hub. https: lets pages load libraries from a CDN;
 		// their module scripts and fetches are cross-origin to this opaque page, hence allow-origin * (the key is the capability).
-		"content-security-policy": (access?.own ? DESIGN_CSP : SANDBOX_CSP)(origin),
+		"content-security-policy": access?.reference
+			? `sandbox allow-scripts; default-src 'none'; script-src ${origin}/x/${match[1]}/ 'unsafe-inline' 'unsafe-eval'; style-src ${origin}/x/${match[1]}/ 'unsafe-inline'; img-src ${origin}/x/${match[1]}/ data: blob:; font-src ${origin}/x/${match[1]}/ data:; media-src ${origin}/x/${match[1]}/ data: blob:; connect-src ${origin}/x/${match[1]}/; base-uri 'none'; form-action 'none'; object-src 'none'`
+			: (access?.own ? DESIGN_CSP : SANDBOX_CSP)(origin),
+		"referrer-policy": "no-referrer",
+		"x-dns-prefetch-control": "off",
 		"access-control-allow-origin": "*",
 		"content-disposition": `${download ? "attachment" : "inline"}; filename*=UTF-8''${encodeURIComponent(basename(real!))}`,
 	});

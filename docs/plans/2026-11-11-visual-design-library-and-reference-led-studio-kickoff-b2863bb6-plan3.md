@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: ready
+status: active
 created: 2026-11-11
-updated: 2026-11-11T20:58:43.190Z
+updated: 2026-11-12T06:26:40.615Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:56:51.270Z
 ---
@@ -50,7 +50,7 @@ Non-goals: replacing the studio, restoring the OpenDesign runtime, promoting Ast
   - Answer: {"kind":"selection","selections":["Both drafts and exports"]}
   - Source: user via ask_user /plan3 resolve; not independently verified.
 - D9 — Q-02 reconciled: the user selected Both drafts and exports. Saved designs includes current-project live studio drafts and selected exports, visibly labelled with source/status. Freeze the exact chosen revision when attached; identical-content grouping must preserve provenance and must not hide diverged revisions. This settles source coverage, not verification of discovery or snapshot consistency.
-- D10 — assumed: Astryx component catalog cards are out of v1 because browsing it would require the consent-gated runtime download; Astryx element references use regions of supplied theme previews. Reversible; logged in Backlog.
+- D10 — withdrawn assumption: excluding Astryx component cards would change approved scope. Keep component metadata discovery and honest unavailable-preview states; never provision a runtime merely by browsing. Theme-preview regions remain an additional element-reference path.
 
 
 
@@ -62,11 +62,16 @@ Non-goals: replacing the studio, restoring the OpenDesign runtime, promoting Ast
 
 ### Blocking
 
-None.
+None for local-reference UI and draft work.
 
 ### Deferred
 
-None. Missing-preview decisions that need the P3-01 asset audit belong in that step until the evidence is available.
+- **Q-03** How should URL capture proceed after the guarded Chromium startup check remains unverified?
+  - Context: P3-04 requires public-only URL capture. The DNS-pinned HTTP/CONNECT proxy passes owned-origin checks, but the guarded renderer attempts Google background connections even with a fresh profile, empty config, cleaned environment and PreconnectToSearch disabled. Those requests were blocked by the owned-origin test policy; no real external test traffic was allowed. Plain open is documented to stay on about:blank; explicit open about:blank is rejected by the CLI domain guard. One read-only oracle round did not resolve the failure. Local-reference API checks pass independently. Sources: extensions/design-network.ts, extensions/design-render.ts, scripts/test-work-design.mjs; oracle artifact dae5cc67-632d-4571-8802-3f10b333e7c4_oracle_output.md.
+  - Recommendation: Continue local references and draft persistence without exposing URL capture; resolve the isolated-browser startup before claiming P3-04 complete. This is a proposed temporary limitation, not an accepted scope change.
+  - Option: Continue browser isolation — Keep the approved URL feature and authorize a further bounded investigation of the failing owned-origin browser test; do not relax the public-network boundary or allow external test traffic.
+  - Option: Defer URL capture temporarily — Finish the other features with a visible unavailable state; URL capture remains unfinished and requires a later verified implementation.
+  - Option: Pause implementation — Stop at the current checkpoint until the browser environment is resolved.
 
 ## Relevant files and approach
 
@@ -117,9 +122,9 @@ The user writes the product brief and count in normal language. Existing orchest
 
 | Source | Entries | Supplied preview | Strategy | Rights / revision |
 |---|---|---|---|---|
-| OpenDesign design-systems @ 6147958 (tree API, not truncated) | 152 systems (plus `_schema`) | All 152 ship self-contained HTML: `system/kit.html` (~6–7 KB, inline tokens), `components.html` (15–57 KB), `preview/{colors,typography,spacing}.html`; 2 PNGs total (tom-modern) | Card = upstream `system/kit.html`; detail = `components.html` + preview pages. Fetched on demand per visible card from the pinned index commit, cached beside existing `.pi/designs/systems/<name>/` with commit; rendered in a sandboxed iframe (no scripts) under a `default-src 'none'; style-src 'unsafe-inline'; img-src data:` CSP, so webfonts fall back. Labelled "Source sample". No prose-only systems, so no generation question. | Apache-2.0 (repo LICENSE); attribution already in docs/upstream/open-design.md |
-| Astryx themes @ fd5cf0d (= pinned runtime sourceRevision) | 7 published: neutral, stone, gothic, matcha, y2k, butter, chocolate (probe is a private test fixture, excluded) | 6 docsite PNGs (0.5–1.4 MB); chocolate none | Package downscaled copies (ImageMagick, ≤960 px wide, JPEG) under hub web assets; chocolate shows "No supplied preview" with metadata only. Labelled "Source preview". Only theme-neutral is installed in the pin: cards say inspiration, not installed theme. | MIT (Meta), same revision as the pin; record in docs/upstream/astryx.md |
-| Astryx components | pinned catalog via existing lookup | none static | Not browsed in v1 (lookup needs the consent-gated runtime; browsing must not download). Element references come from regions of theme previews. Backlog: component cards when runtime is warm. | — |
+| OpenDesign design-systems @ 6147958 (tree API, not truncated) | 152 systems (plus `_schema`) | All 152 contain `components.html`, `tokens.css` and a preview directory. Exactly 150 contain `system/kit.html`; cloudflare-kumo and tom-modern do not. Airbnb/linear-app/stripe representative component files are 15–57 KB; this is not a bound on all systems. Two PNGs total (tom-modern). | Card = upstream `system/kit.html` when present, otherwise `components.html`; detail = `components.html` + supplied preview pages. Fetched on demand per visible card from the pinned index commit, cached beside existing `.pi/designs/systems/<name>/` with commit; rendered in a sandboxed iframe (no scripts) under a `default-src 'none'; style-src 'unsafe-inline'; img-src data:` CSP, so webfonts fall back. Labelled "Source sample". No prose-only systems, so no generation question. | Apache-2.0 (repo LICENSE); attribution already in docs/upstream/open-design.md |
+| Astryx themes @ fd5cf0d (= pinned runtime sourceRevision) | 7 non-private source theme packages: neutral, stone, gothic, matcha, y2k, butter, chocolate (probe is a private test fixture, excluded); source package presence is not proof of publication. Chocolate package.json is 0.7.13, unlike the 0.7.12 runtime. | 6 docsite PNGs (0.5–1.4 MB); chocolate none | Package downscaled copies (ImageMagick, ≤960 px wide, JPEG) under hub web assets; chocolate shows "No supplied preview" with metadata only. Labelled "Source preview". Only theme-neutral is installed in the pin: cards say inspiration, not installed theme. | MIT (Meta), same sourceRevision as runtime notices, but source themes must not be represented as installed 0.7.12 themes; record in docs/upstream/astryx.md |
+| Astryx components | pinned catalog via existing lookup | none static | Retain component discovery using pinned metadata without automatic provisioning; unavailable visual samples must be labelled honestly. Theme regions also support element references. Verified locally against the already-warm 0.7.12 runtime (no download): `component()` lists 174 components in 78 groups and `themeListAvailable()` lists all 7 themes, chocolate included (bundled). Neither supplies per-component preview images, so component cards are text/metadata with a 'no visual sample' label; when the runtime is not warm, the Components tab says so and offers the existing consent-gated provisioning, never auto-downloads. | — |
 | Saved designs (D9) | `.pi/designs/design-N/` drafts + `docs/designs/<name>/` exports | their own HTML | Sandboxed iframe of the screen's index.html via a new browse route, labelled Draft / Selected export; export DESIGN.json handle links to its draft, identical content grouped. | project-owned |
 
 Contracts. Catalog entry: `{ id: "<source>:<name>", source: "od"|"astryx"|"draft"|"export", name, category?, revision, preview: "sample"|"image"|"none", license, url? }`. Reference: `{ ref: "ref<N>", entry id, revision, aspect: "whole"|"colors"|"typography"|"layout"|"background"|"component"|"region", region?: [x,y,w,h], note, digest }`; bundle = `{ id, refs[], urls[] }` frozen at Send into `.pi/designs/briefs/<id>/`.
@@ -133,27 +138,18 @@ Limits: host fetch concurrency 4; kit.html ≤ 64 KB, components/preview pages �
 
 ### Phase 1: Confirm the visual catalog contract [think]
 
-- [x] **P3-01** Audited sources: 152 OD systems all ship self-contained HTML samples (Apache-2.0 @6147958); 6/7 Astryx themes have MIT docsite previews at the pinned fd5cf0d; saved drafts/exports render their own HTML; contracts, limits and offline behaviour recorded.
+- [x] **P3-01** Audit corrected: OD 152 systems (150 kit.html, 2 fall back to components.html); Astryx runtime 0.7.12 lists 174 components/78 groups and 7 themes with no per-component images; component cards stay in scope as metadata, no auto-download.
 
 ### Phase 2: Implement reference browsing and briefing [code]
 
-- [ ] **P3-02** Add the `/wo design` entry point and authenticated reference-library data using existing hub conventions.
-  - Touch command discovery and dispatch in work-models.ts, hub-command.ts/CLI as needed, and session-scoped API routing. Put any shared catalog code imported by an extension in a focused .ts module.
-  - In the page, intercept an exact `/wo design` command before the normal message POST; command/menu entry uses the same local openLibrary action, without sending draft references to the model or creating a transcript turn. Preserve any existing draft when entering through the menu. Keep the Pi command registered for terminal/help.
-  - Add an allowlisted `view=library` session deep link for terminal entry. An identified hub session opens its own page; without one, use the approved new-briefing-session fallback, return/open its link and send no generation prompt. Extend the CLI's root-only open behavior narrowly; never adopt an unrelated same-folder session or expose a local key in remote links.
-  - Repeated opens reuse the current view and draft. Treat plain terminal without PI_HUB_SESSION as the expected fallback case; do not add live terminal-session attachment machinery merely to avoid this approved fallback.
-  - Expose source, revision, availability and provenance. Reuse catalog caches and existing consent; retain offline metadata and cached images. Show an actionable missing-hub state in terminal/non-TUI modes. Any prompt uses ask-user, never direct ctx.ui input/confirm.
-  - Verify C1, C2, C3 and C4 as applicable before proceeding; read current source again and preserve concurrent edits.
-- [ ] **P3-03** Render the visual library beside chat, with inspectable examples and a mobile Browse/Chat layout.
-  - Use design-library.ts with app.ts layout hooks, index.html and existing CSS tokens. Include OD, Astryx and both current-project studio drafts and selected exports, with searchable visual examples and supported detail controls; no new design framework. Label each saved source clearly, preserve exports without a live studio record, and distinguish diverged draft/export revisions.
-  - Add Library to LEFT_TABS, mobileViews and their matching HTML/accessibility/CSS rules. In a design session, Library temporarily replaces the left view; Back restores the existing live design preview without reloading its unsaved draft or allowing auto-showDesign to steal focus.
-  - Register design-library.js → design-library.ts in hub/src/hub.ts ASSETS so it participates in WEB_FILES/BUILD invalidation. Host serves bounded lazy thumbnails and isolated detail previews; preserve search, scroll and draft on Back/reload, with honest unavailable states.
-  - Verify C4/C5 for authenticated assets, narrow layouts, keyboard navigation and no provider calls during browsing.
-- [ ] **P3-04** Attach whole styles, selected aspects and URL references to the draft with stable IDs and notes.
+- [x] **P3-02** Added /wo design dispatch, same-chat library entry/deep links, approved terminal fallback reuse, and authenticated pinned metadata without generation or provisioning.
+- [x] **P3-03** Library now inspects cached OD samples, six Astryx images, live drafts and retained exports in isolated, bounded previews, groups identical authored sources, and restores the live studio without losing unsaved forms.
+- [wip] **P3-04** Attach whole styles, selected aspects and URL references to the draft with stable IDs and notes.
   - Visible Add reference plus Ctrl-click, right-click and hold shortcuts where safe; removable thumbnails; no accidental selection during scrolling or text selection.
   - Extend the existing composer/draft storage to keep references with text; retain compatibility with plain-string drafts. Persist the bounded in-flight submission until acknowledgment/reconciliation, separately from newer edits, so reload or a lost response neither discards the brief nor blindly resends it. Use the existing annotation/pick mechanisms for parts, not a second editor. Duplicate adds should select the existing chip, while distinct aspects may be separate references.
   - Preserve selections across layout changes and navigation; removed IDs must not silently point to different assets. Materialize safe project-local assets through a constrained host path, preserving URL/source provenance; treat them as untrusted reference data, never agent instructions.
   - Enforce the URL/network boundaries in Global validation before capture. No automatic logged-in browser fallback. Verify C3/C4/C5 for stale preview completion, malicious assets, native gesture conflicts and draft persistence.
+  - note: Continuing directly: stable project-local reference snapshots and composer persistence first; URLs remain unwired until their capture boundary is constrained.
 - [ ] **P3-05** Deliver the mixed-reference brief to the existing multi-variant workflow without changing its runtime defaults.
   - Agent receives source assets, selected aspect and notes, not only thumbnail labels. Two requested variants share the same reference bundle and each have their own existing design session.
   - A browse action never starts a paid generation. Preserve ordinary follow-up chat and existing variant refinement/select behavior. Keep the current 1–6 direction bound and designModel setting; do not add a separate variant executor or choose Astryx from a visual selection alone.
@@ -214,7 +210,7 @@ Real touch and paired-remote verification are P3-08's separate environmental gat
 
 ## Resume context
 
-Planning only; both user choices settled: Q-01 uses the current conversation (approved terminal fallback retained); Q-02 includes both drafts and selected exports with source labels and exact-revision snapshots. Reconciled coverage, deduplication/provenance and targeted test cases. No unanswered user choices remain; keep draft, not ready. Next complete P3-01's bounded preview-coverage and asset-rights audit. P3-08 still needs an approved paired remote touch environment. Review dispositions remain in Amendments; C1–C10 are planned checks, not executed feature tests. No product edits, downloads, paid calls, commits or pushes; preserve shared work and archived prior plan 55b392b8.
+P3-04 wip. Local backend snapshots implemented in extensions/design-references.ts, catalogReference in extensions/design-catalog.ts, referenceSnapshot in hub/src/explore.ts, authenticated reference CRUD/image routes in hub/src/api.ts. C4: node "C:/SOFT/git/ce-workflow/hub/scripts/test-api.mjs" passed (api ok); cases cover duplicate adds, notes/revision conflicts, stable tombstones, stale async completion, asset digest mismatch, owner isolation and exact inspected snapshots after original edits. Active LSP probe found no blocking errors; push-only coverage remains partly inconclusive and style warnings remain. C3 currently FAILS in the new guarded URL-capture fixture: after oracle-recommended PreconnectToSearch disabling, recorded hosts still include accounts.google.com/www.google.com. Do not treat the earlier pre-integration C3 pass as current. Q-03 records the unanswered URL-boundary decision; no URL route is exposed. Next runnable work: wire library Add/aspect controls and composer reference chips/persistence, reuse annotation for theme regions, extend C4/C5. P3-04 is not complete; later frozen-bundle delivery still belongs to P3-05.
 
 ## Amendments
 

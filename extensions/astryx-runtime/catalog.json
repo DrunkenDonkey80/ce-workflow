@@ -1,0 +1,896 @@
+{
+	"version": "0.7.12",
+	"lockDigest": "93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5",
+	"sourceRevision": "fd5cf0df987791117e96ccc0bec603c64be8b136",
+	"groups": {
+		"AppShell": [
+			{
+				"name": "AppShell",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"AspectRatio": [
+			{
+				"name": "AspectRatio",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Avatar": [
+			{
+				"name": "Avatar",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "AvatarGroup",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "AvatarGroupOverflow",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "AvatarStatusDot",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Badge": [
+			{
+				"name": "Badge",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Banner": [
+			{
+				"name": "Banner",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Blockquote": [
+			{
+				"name": "Blockquote",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"BottomSheet": [
+			{
+				"name": "BottomSheet",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "BottomSheetSwitcher",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Breadcrumbs": [
+			{
+				"name": "BreadcrumbItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Breadcrumbs",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Button": [
+			{
+				"name": "Button",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ButtonGroup",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "IconButton",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ToggleButton",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ToggleButtonGroup",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Calendar": [
+			{
+				"name": "Calendar",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Card": [
+			{
+				"name": "Card",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ClickableCard",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SelectableCard",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Carousel": [
+			{
+				"name": "Carousel",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Chat": [
+			{
+				"name": "ChatComposer",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatComposerDrawer",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatComposerInput",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatDictationButton",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatLayout",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatLayoutScrollButton",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatMessage",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatMessageBubble",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatMessageList",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatMessageMetadata",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatSendButton",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatSystemMessage",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatTokenizedText",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ChatToolCalls",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Checkbox": [
+			{
+				"name": "CheckboxInput",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CheckboxList",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CheckboxListItem",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Citation": [
+			{
+				"name": "Citation",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Code": [
+			{
+				"name": "Code",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"CodeBlock": [
+			{
+				"name": "CodeBlock",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Collapsible": [
+			{
+				"name": "Collapsible",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CollapsibleGroup",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"CommandPalette": [
+			{
+				"name": "CommandPalette",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CommandPaletteEmpty",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CommandPaletteFooter",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CommandPaletteGroup",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CommandPaletteInput",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CommandPaletteItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "CommandPaletteList",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"ContextMenu": [
+			{
+				"name": "ContextMenu",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"DateInput": [
+			{
+				"name": "DateInput",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DateRangeInput",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DateTimeInput",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Dialog": [
+			{
+				"name": "AlertDialog",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Dialog",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DialogHeader",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Divider": [
+			{
+				"name": "Divider",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Drawer": [
+			{
+				"name": "Drawer",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DrawerHeader",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"DropdownMenu": [
+			{
+				"name": "DropdownMenu",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DropdownMenuCheckboxItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DropdownMenuDivider",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DropdownMenuGroup",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DropdownMenuItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DropdownMenuRadioGroup",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DropdownMenuRadioItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "DropdownMenuSubMenu",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"EmptyState": [
+			{
+				"name": "EmptyState",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Field": [
+			{
+				"name": "Field",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "FieldLabel",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "FieldStatus",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "InputGroup",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "InputGroupText",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"FileInput": [
+			{
+				"name": "FileInput",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Heading": [
+			{
+				"name": "Heading",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"HoverCard": [
+			{
+				"name": "HoverCard",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Icon": [
+			{
+				"name": "Icon",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"InfoTip": [
+			{
+				"name": "InfoTip",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Item": [
+			{
+				"name": "Item",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Kbd": [
+			{
+				"name": "Kbd",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Layout": [
+			{
+				"name": "Center",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "FormLayout",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Grid",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "GridSpan",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "HStack",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Layout",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "LayoutContent",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "LayoutFooter",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "LayoutHeader",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "LayoutPanel",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Section",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Stack",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "VStack",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Lightbox": [
+			{
+				"name": "Lightbox",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Link": [
+			{
+				"name": "Link",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"List": [
+			{
+				"name": "List",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "ListItem",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Markdown": [
+			{
+				"name": "Markdown",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"MetadataList": [
+			{
+				"name": "MetadataList",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "MetadataListItem",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"MoreMenu": [
+			{
+				"name": "MoreMenu",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Navigation": [
+			{
+				"name": "MobileNav",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "NavIcon",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SideNav",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SideNavCollapseButton",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SideNavHeading",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SideNavItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SideNavSection",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TopNav",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TopNavHeading",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TopNavItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TopNavMegaMenu",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TopNavMegaMenuFeaturedCard",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TopNavMegaMenuItem",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TopNavMenu",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"NumberInput": [
+			{
+				"name": "NumberInput",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Outline": [
+			{
+				"name": "Outline",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"OverflowList": [
+			{
+				"name": "OverflowList",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Overlay": [
+			{
+				"name": "Overlay",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Pagination": [
+			{
+				"name": "Pagination",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Popover": [
+			{
+				"name": "Popover",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"PowerSearch": [
+			{
+				"name": "PowerSearch",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"ProgressBar": [
+			{
+				"name": "ProgressBar",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Radio": [
+			{
+				"name": "RadioList",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "RadioListItem",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"ScrollableArea": [
+			{
+				"name": "ScrollableArea",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"SegmentedControl": [
+			{
+				"name": "SegmentedControl",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SegmentedControlItem",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Selector": [
+			{
+				"name": "ComplexSelector",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "MultiSelector",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Selector",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "SelectorOption",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Skeleton": [
+			{
+				"name": "Skeleton",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Slider": [
+			{
+				"name": "Slider",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Spinner": [
+			{
+				"name": "Spinner",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"StatusDot": [
+			{
+				"name": "StatusDot",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Stepper": [
+			{
+				"name": "Step",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Stepper",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Switch": [
+			{
+				"name": "Switch",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Table": [
+			{
+				"name": "Table",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TableBody",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TableCell",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TableFooter",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TableHeader",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TableHeaderCell",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TableRow",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TableSelectionToolbar",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Tabs": [
+			{
+				"name": "Tab",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TabList",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TabMenu",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Text": [
+			{
+				"name": "Text",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"TextArea": [
+			{
+				"name": "TextArea",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"TextInput": [
+			{
+				"name": "TextInput",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Thumbnail": [
+			{
+				"name": "Thumbnail",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"TimeInput": [
+			{
+				"name": "TimeInput",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Timer": [
+			{
+				"name": "Timer",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Timestamp": [
+			{
+				"name": "Timestamp",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Toast": [
+			{
+				"name": "Toast",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Token": [
+			{
+				"name": "Token",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Tokenizer": [
+			{
+				"name": "Tokenizer",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Toolbar": [
+			{
+				"name": "Toolbar",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Tooltip": [
+			{
+				"name": "Tooltip",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"TreeList": [
+			{
+				"name": "TreeList",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Typeahead": [
+			{
+				"name": "BaseTypeahead",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Typeahead",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "TypeaheadItem",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"Utilities": [
+			{
+				"name": "InternationalizationProvider",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "LinkProvider",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "MediaTheme",
+				"package": "@astryxdesign/core"
+			},
+			{
+				"name": "Theme",
+				"package": "@astryxdesign/core"
+			}
+		],
+		"VisuallyHidden": [
+			{
+				"name": "VisuallyHidden",
+				"package": "@astryxdesign/core"
+			}
+		]
+	},
+	"themes": [
+		{
+			"slug": "butter",
+			"displayName": "Butter",
+			"description": "Warm, creamy yellows with a friendly blue accent. Playful enough for consumer surfaces, soft enough to stay readable."
+		},
+		{
+			"slug": "chocolate",
+			"displayName": "Chocolate",
+			"description": "Warm chocolate theme for Astryx — rich brown palette with Fraunces headings, Albert Sans body, and Lucide icons"
+		},
+		{
+			"slug": "gothic",
+			"displayName": "Gothic",
+			"description": "Deep blue-grays and a signature display serif. Dramatic and editorial, for surfaces that want to be remembered."
+		},
+		{
+			"slug": "matcha",
+			"displayName": "Matcha",
+			"description": "Earthy greens with a calm, organic feel. Naturalistic and grounded, great for wellness or content-first apps."
+		},
+		{
+			"slug": "neutral",
+			"displayName": "Neutral",
+			"description": "Restrained warm grays. Minimal and quiet, so the content stays the focus."
+		},
+		{
+			"slug": "stone",
+			"displayName": "Stone",
+			"description": "Warm stone and slate, earthy and understated, with just enough character to feel handcrafted."
+		},
+		{
+			"slug": "y2k",
+			"displayName": "Y2K",
+			"description": "Hot pinks, lime greens, and Poppins. Bubbly, playful, and unmistakably retro."
+		}
+	]
+}

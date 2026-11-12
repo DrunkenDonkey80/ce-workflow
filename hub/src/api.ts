@@ -12,11 +12,13 @@ import { webTarget } from "../../extensions/plan3-web.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
-import { ARCHIVE, designLists, designPage, explore, unview, viewPage, watchDesign } from "./explore.ts";
+import { ARCHIVE, designLists, designPage, explore, referencePage, referenceSnapshot, unview, viewPage, watchDesign } from "./explore.ts";
 import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
 import { buildInfo } from "../../extensions/design-build.ts";
+import { catalogReference, designCatalog, designImage } from "../../extensions/design-catalog.ts";
+import { addDesignReference, designReferences, editDesignReference, referenceAssets } from "../../extensions/design-references.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
 import { toForm, toResponse } from "./forms.ts";
 import { nextName as nextFreeName, type Registry, scanRecents, star } from "./registry.ts";
@@ -340,6 +342,20 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return { target, diagram: loadDiagram(folder(id), resolved) ?? emptyDiagram(resolved) };
 			}
 			case "files": return listFiles(folder(id));
+			case "designcatalog": return designCatalog(folder(id));
+			case "designreferences": return { refs: designReferences(folder(id), id).refs.filter(ref => ref.status !== "removed") };
+			case "designreferenceimage": {
+				const { ref, files } = referenceAssets(folder(id), id, params.get("ref"));
+				const bytes = ref.thumbnail && files.get(ref.thumbnail);
+				if (!bytes) throw fail(404, "No reference thumbnail.");
+				response.writeHead(200, { "content-type": ref.thumbnail!.endsWith(".webp") ? "image/webp" : "image/png", "content-length": bytes.length, "cache-control": "private, no-cache", "x-content-type-options": "nosniff" }); response.end(bytes); return;
+			}
+			case "designimage": {
+				const bytes = designImage(params.get("id"), params.get("revision"));
+				if (!bytes) throw fail(404, "No supplied image at this revision.");
+				response.writeHead(200, { "content-type": "image/webp", "content-length": bytes.length, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff" });
+				response.end(bytes); return;
+			}
 			case "file": case "diff":
 				try { return await (endpoint === "file" ? readProjectFile : readProjectDiff)(folder(id), params.get("path")); }
 				catch (error) { throw error instanceof FileRefused ? fail(403, error.message) : error; }
@@ -419,6 +435,19 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				if (!real) throw fail(404, "File not found or not shared.");
 				// Not an archive: its folder is served live (each file checked like a chat link) and the file shown in the viewer.
 				return ARCHIVE.test(real) ? explore(real) : viewPage(real, folder(id), remote, { owner: id, notify: key => views.get(id)?.publish("file-changed", { key }) });
+			}
+			case "designreference": {
+				only(data, ["target", "action", "id", "revision", "aspect", "note", "region", "previewKey"], "Invalid reference fields.");
+				if (data.action === "remove" || data.action === "note") {
+					if (data.action === "note" && typeof data.note !== "string") throw fail(400, "A reference note is required.");
+					return editDesignReference(folder(id), id, data.id, data.revision, data.action === "note" ? data.note : undefined);
+				}
+				if (data.action !== "add") throw fail(400, "Invalid reference action.");
+				return addDesignReference(folder(id), id, data, () => data.previewKey === undefined ? catalogReference(folder(id), data.id, data.revision) : referenceSnapshot(folder(id), data.previewKey, data.id, data.revision, id));
+			}
+			case "designexample": {
+				only(data, ["target", "id", "revision"], "Invalid fields.");
+				return referencePage(folder(id), data.id, data.revision, id, remote);
 			}
 			// D7: a design session's own mirrored page; it names no path, so no other folder or session can be asked for.
 			case "designpreview": {

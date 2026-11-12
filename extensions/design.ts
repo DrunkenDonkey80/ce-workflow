@@ -263,7 +263,8 @@ async function get(tools: Tools, url: string, accept?: string) {
 }
 const readIndex = (cwd: string): SystemIndex | undefined => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${SYSTEMS}/index.json`), "utf8")); } catch { return undefined; } };
 /** The cached index of OD's packages; refresh (or no cache) reads main's tree again, and a failed refresh keeps the cache. */
-async function systemIndex(cwd: string, tools: Tools, refresh = false) {
+export { OWN, load as designStore };
+export async function systemIndex(cwd: string, tools: Tools = { hub: hubCall }, refresh = false) {
 	const cached = readIndex(cwd);
 	if (cached && !refresh) return cached;
 	try {
