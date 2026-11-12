@@ -399,6 +399,14 @@ try {
 		assert.match(page.body.source.license, /inspiration only/); assert.equal(page.body.source.name, "<b>Page</b>", "titles stay data; the page renders them as text");
 		assert.equal((await get(id, `designreferenceimage?ref=${page.body.ref}`)).status, 200);
 		assert.equal((await post(id, "designreference", { action: "add", url: "https://site.test/a", aspect: "layout" })).body.ref, page.body.ref, "the same page keeps one stable reference identity");
+		const sibling = (await post(id, "designreference", { action: "add", url: "https://site.test/b", aspect: "layout" })).body;
+		assert.notEqual(sibling.ref, page.body.ref, "two pages from the same host are separate references");
+		const pageBundle = randomUUID(); await freezeReferenceBundle(folder, id, pageBundle, [{ ref: page.body.ref, revision: page.body.revision }], { text: "Use the page", target: "product" });
+		await post(id, "designreference", { action: "remove", id: page.body.ref, revision: page.body.revision });
+		const recaptured = (await post(id, "designreference", { action: "add", url: "https://site.test/a", aspect: "layout" })).body;
+		assert.notEqual(recaptured.ref, page.body.ref, "recapture after removal never reuses the removed ID");
+		assert.equal(referenceBundleAssets(folder, pageBundle).bundle.refs[0].note, "spacing", "recapture after Send leaves the frozen submission unchanged");
+		for (const ref of [sibling, recaptured]) await post(id, "designreference", { action: "remove", id: ref.ref, revision: ref.revision });
 	}
 	assert.equal(hub.host.live.has(id), true);
 	assert.deepEqual((await post(id, "command", { target: "bbbbbbbb", command: "review" })).body.endpoint, "/api/command");
@@ -703,11 +711,14 @@ try {
 			const [failed] = await runDesign(project, { action: "open", handle: bold.handle }, tools); assert(failed.hubSessionId); assert.equal(failed.hubStage, "uncertain");
 			const afterFailure = calls.length; await runDesign(project, { action: "open", handle: bold.handle }, tools); await runDesign(project, { action: "open", handle: calm.handle }, tools);
 			assert.equal(calls.length, afterFailure, "a created session with ambiguous first-prompt delivery is never blindly resent");
+			assert.equal(handles.length, 2, "the requested variant count starts exactly two designs");
 			promptFails = false;
 			// Simulate a reconciled/crash-before-dispatch stage, including an existing scaffold.
 			const storeFile = path.join(project, ".pi/designs/sessions.json"), store = JSON.parse(fs.readFileSync(storeFile)); store.sessions.find(item => item.handle === bold.handle).hubStage = "created"; fs.writeFileSync(storeFile, JSON.stringify(store));
 			for (const handle of handles) fs.writeFileSync(path.join(project, ".pi/designs", handle, "index.html"), "<h1>Owned fixture</h1>");
 			await runDesign(project, { action: "open", handle: bold.handle }, tools); assert.equal(calls.at(-1)[1], failed.hubSessionId); assert.match(calls.at(-1)[2], /Build the design now:[\s\S]*untrusted design evidence/);
+			const sessionIds = new Set((await runDesign(project, { action: "status" }, tools)).filter(item => handles.includes(item.handle)).map(item => item.hubSessionId));
+			assert.equal(sessionIds.size, 2); for (const session of sessionIds) assert(calls.some(parts => parts[0] === "prompt" && parts[1] === session && /Only these colors[\s\S]*colors\.css/.test(parts[2])), "each variant session receives the attached reference assets");
 			const [clone] = await runDesign(project, { action: "clone", handle: calm.handle, name: "Calm copy" }, tools); assert.equal(clone.bundle, submission); assert(!handles.includes(clone.handle));
 			assert.deepEqual((await runDesign(project, args, tools)).sessions.map(item => item.handle), handles, "clones retain provenance but never join the original launch reservation");
 			const selected = await runDesign(project, { action: "select", handle: calm.handle }, tools), exported = path.join(project, selected.folder), evidence = JSON.parse(fs.readFileSync(path.join(exported, "REFERENCE-SOURCES.json")));
