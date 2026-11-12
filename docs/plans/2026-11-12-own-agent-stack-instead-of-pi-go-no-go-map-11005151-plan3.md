@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T19:33:43.857Z
+updated: 2026-11-12T21:31:02.433Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -80,6 +80,8 @@ One line per resolved ticket: gist and ticket ID.
   | E: own TS server | 7.3 | 38 to 64 |
 
   The rewrite paths gain mainly on ownership (weight 3), while wishes (weight 8) are equal or better on Pi. Draft recommendation: no-go on a rewrite now; do A, with B as a ready option and named triggers for re-opening the decision. If the call is go, start with E grown from B, or with a 3-week spike on C. Evidence: `docs/proposals/own-agent-stack/decision.md`.
+- **D-17 Go/no-go (T-09).** The user chose go on D (Rust from scratch), against the draft recommendation (A). This stays investigation and planning: T-10 drafts the first build plan, and no implementation starts from this map. Source: user pick, 2026-11-12.
+
 
 
 
@@ -124,17 +126,12 @@ None.
 - [x] **T-06** User weights: wishes 8, security 6, speed 6, simplicity 5, ownership 3; G1 Claude = direct OAuth (D-14).
 - [x] **T-07** Codex app-server and Pi measured on Windows native and WSL; matrix and raw results appended to baseline.md (D-15).
 - [x] **T-08** decision.md drafted: five paths costed and scored; draft = no-go on rewrite, go on A with B ready (D-16).
-- [human] **T-09** Go or no-go, and which path?
-  - type: grill
-  - The user decides from `decision.md`; record it there and in Decisions.
-- [ ] **T-10** Create the follow-up drafts.
-  - type: task
-  - On go: `plan3 create` the first build plan. Wishes "possible on Pi": one draft each, also on go if they help before the switch.
-  - Pass `plan: "11005151"` to later `plan3` calls on this map, since `create` moves the current plan.
+- [x] **T-09** User chose go on D (Rust from scratch); still investigation only (D-17).
+- [x] **T-10** Draft build plan ed06fbe5 (Rust walking skeleton, 3 blocking questions) created; Pi wish drafts left to the user's call.
 
 ## Resume context
 
-T-01 to T-08 are done and committed. T-09 [human] go/no-go is being asked now. After the answer: record D-17, then T-10 drafts the follow-up plans for the chosen path. WSL scratch installs are in ~/oas.
+Map complete: the user chose go on D (D-17). The follow-up is draft plan ed06fbe5 (Rust walking skeleton), waiting for /plan3 resolve on Q-01 to Q-03. WSL scratch installs in ~/oas can be deleted.
 
 ## Amendments
 

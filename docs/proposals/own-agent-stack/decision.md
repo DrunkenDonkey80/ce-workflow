@@ -87,3 +87,7 @@ How the weighted score is computed: the sum of score times weight, divided by 28
   - Kill criteria: a Claude turn through the port, plus compaction with our modes, both inside the spike.
 
 Not checked: the cost figures are estimates; in-process SDK sessions in the hub are untested; Codex's Windows sandbox strength is untested; Codex with a login in WSL is untested.
+
+## Decision (T-09, 2026-11-12)
+
+The user chose **go on D: Rust from scratch**, against the draft recommendation. This remains investigation, as the user asked: T-10 drafts the first build plan; no implementation starts from this map.
