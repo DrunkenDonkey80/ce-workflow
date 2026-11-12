@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T18:57:42.564Z
+updated: 2026-11-12T19:32:05.344Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -62,6 +62,14 @@ One line per resolved ticket: gist and ticket ID.
 - **D-12 Wishes against Pi (T-04).** All four multi-hub wishes and the security and speed pains are possible on Pi. Ownership and simplicity are only partly met: full ownership needs a fork, and the extension layer stays in any stack. No D-01 item strictly needs a new stack, so a rewrite rests on the T-06 value weights. Six follow-up drafts are listed. Evidence: `docs/proposals/own-agent-stack/wishes.md`.
 - **D-13 Candidates (T-05).** Pi passes both gates with today's direct Claude OAuth. Codex fails G1 for Claude (addable) but has the best server (multi-thread app-server over WebSocket) and the only Windows-native sandbox. Goose passes G1 only through the `claude` binary over ACP, which loses session fork and resume, and it has no sandbox. OpenCode fails G1 for its own Claude login. Anthropic's policy forbids third-party agents from using subscription OAuth, so today's Claude path carries that risk on every stack. T-07 finalists: Codex app-server against Pi, with Goose as the reserve. Evidence: `docs/proposals/own-agent-stack/candidates.md`.
 - **D-14 Weights and Claude route (T-06, user, 2026-11-12).** Weights out of 10: wishes 8, security 6, speed 6, simplicity 5, ownership 3. Q-01: G1 means today's direct Claude subscription OAuth through our own provider code, and the policy risk is accepted. A stack passes G1 for Claude only if it runs our provider code or a port of it. Goose drops to an unlikely candidate, because ACP loses fork and resume.
+- **D-15 Measured candidates (T-07).**
+  - Codex core starts about 3 times faster than Pi core (88 against 270 ms on Windows) and uses about a third of the memory. One Codex process holding five threads uses about 50 MB, against 621 MB for five Pi processes.
+  - Fully loaded, both are heavy: our Pi takes 276 MB and 1.3 s per session. The user's Codex takes 364 MB and 21 processes per session, and it starts its MCP servers once per thread (72 processes for five threads).
+  - On the same model, Codex full took 3.2 s to the first token against 1.7 s for Pi; the cause was not separated.
+  - Claude cannot run on Codex (G1). Codex in WSL was not tested with the shared Windows config.
+  - A WSL server must keep its config on ext4: Pi starts in 1.8 s from `/mnt/c` against 0.15 s from ext4.
+  - Evidence: `docs/proposals/own-agent-stack/baseline.md`, section T-07.
+
 
 
 
@@ -102,12 +110,8 @@ None.
 - [x] **T-04** Every D-01 item is possible or partly possible on Pi; six follow-up drafts listed (D-12).
 - [x] **T-05** Candidates compared on gates and fit; finalists Codex app-server and Pi; Claude policy raised as Q-01 (D-13).
 - [x] **T-06** User weights: wishes 8, security 6, speed 6, simplicity 5, ownership 3; G1 Claude = direct OAuth (D-14).
-- [ ] **T-07** How do the top one or two candidates measure on this machine?
-  - type: research
-  - Run the T-02 scenarios on Windows native and WSL; one real turn each through the Claude subscription and the OpenAI Codex login (the enabled providers in `settings.json` `enabledModels`).
-  - Fill a matrix: candidate by server OS (Windows native, WSL, Linux) by provider, each cell tested, cited from primary sources, or unknown. No standalone Linux machine is known, so its cells cite sources and say so.
-  - Append to `baseline.md`.
-- [ ] **T-08** What does each path cost and score?
+- [x] **T-07** Codex app-server and Pi measured on Windows native and WSL; matrix and raw results appended to baseline.md (D-15).
+- [wip] **T-08** What does each path cost and score?
   - type: research
   - Per finalist, a coarse approach for each cost driver: hub protocol (today `hub/src/rpc-client.ts` spawns `pi --mode rpc`), Pi SDK uses in the hub (`hub/src/pi-sdk.ts` `ModelRuntime`, `SessionManager`), extension model, the big packages (pi-subagents, pi-lens, pi-web-access), sessions and settings migration, side-by-side running.
   - Porting cost per inventory item, upkeep (providers, OS), risks, scored with T-06 weights. Draft `decision.md` with a recommendation.
