@@ -89,12 +89,13 @@ try {
 		const folder = new URL("../extensions/astryx-runtime/previews/components/", import.meta.url);
 		const shots = JSON.parse(fs.readFileSync(new URL("components.json", folder), "utf8"));
 		assert.equal(shots.lockDigest, astryxRuntime.lockDigest, "component pictures are stale: run node scripts/astryx-component-shots.mjs after a pin update");
+		const hashes = [...new Set(Object.values(shots.images))];
 		let total = 0;
-		for (const [name, sha] of Object.entries(shots.images)) {
-			const bytes = fs.readFileSync(new URL(`${name}.webp`, folder)); total += bytes.length;
-			assert.equal(createHash("sha256").update(bytes).digest("hex"), sha, `${name}.webp matches components.json`);
+		for (const sha of hashes) {
+			const bytes = fs.readFileSync(new URL(`${sha}.webp`, folder)); total += bytes.length;
+			assert.equal(createHash("sha256").update(bytes).digest("hex"), sha, `${sha}.webp is the picture components.json names`);
 		}
-		assert.deepEqual(fs.readdirSync(folder).filter(file => file.endsWith(".webp")).sort(), Object.keys(shots.images).map(name => `${name}.webp`).sort(), "no unlisted pictures");
+		assert.deepEqual(fs.readdirSync(folder).filter(file => file.endsWith(".webp")).sort(), hashes.map(sha => `${sha}.webp`).sort(), "no unlisted pictures");
 		assert(total <= 1.5 * 1024 * 1024, "component pictures stay within the approved ~1.5 MB");
 	}
 	const provenance = { version: "0.7.12", lockDigest: astryxRuntime.lockDigest };

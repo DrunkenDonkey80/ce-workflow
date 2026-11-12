@@ -43,14 +43,20 @@ for (const folder of fs.existsSync(blocks) ? fs.readdirSync(blocks) : []) for (c
 	const target = fs.readFileSync(path.join(blocks, folder, file), "utf8").match(/exampleFor:\s*['"](\w+)['"]/)?.[1];
 	const tsx = path.join(blocks, folder, file.replace(/\.doc\.mjs$/, ".tsx"));
 	if (target && fs.existsSync(tsx)) templates.set(target, [...templates.get(target) ?? [], tsx].sort((a, b) => Number(b.endsWith(`${target}Showcase.tsx`)) - Number(a.endsWith(`${target}Showcase.tsx`))));
-	// Sub-parts (TableRow, DropdownMenuRadioItem) rarely have their own template: any template that uses them, later.
-	const used = fs.readFileSync(path.join(blocks, folder, file), "utf8").match(/componentsUsed:\s*\[([^\]]*)\]/)?.[1] ?? "";
-	if (fs.existsSync(tsx)) for (const [, part] of used.matchAll(/['"](\w+)['"]/g)) if (part !== target) usedBy.set(part, [...usedBy.get(part) ?? [], tsx]);
+	// Sub-parts (DropdownMenuSubMenu, DropdownMenuRadioItem) rarely have their own template: any template that renders them, later.
+	if (fs.existsSync(tsx)) for (const part of new Set([...fs.readFileSync(tsx, "utf8").matchAll(/<([A-Z]\w*)\b/g)].map(match => match[1]))) if (part !== target) usedBy.set(part, [...usedBy.get(part) ?? [], tsx]);
+}
+// A hand-written example may picture several parts: a "// pictures: TableRow TableCell" line in it.
+const shared = new Map();
+for (const file of fs.existsSync(new URL("./astryx-examples/", import.meta.url)) ? fs.readdirSync(new URL("./astryx-examples/", import.meta.url)) : []) {
+	const code = fs.readFileSync(new URL(`./astryx-examples/${file}`, import.meta.url), "utf8");
+	for (const part of code.match(/^\/\/ pictures: (.+)$/m)?.[1].trim().split(/\s+/) ?? []) shared.set(part, code);
 }
 const sources = new Map(), rows = new Map();
 for (const name of names) {
 	const own = new URL(`./astryx-examples/${name}.jsx`, import.meta.url);
 	if (fs.existsSync(own)) { sources.set(name, { code: fs.readFileSync(own, "utf8"), label: "hand-written" }); continue; }
+	if (shared.has(name)) { sources.set(name, { code: shared.get(name), label: "hand-written, shared" }); continue; }
 	const template = (templates.get(name) ?? []).find(file => usable(fs.readFileSync(file, "utf8")));
 	if (template) { sources.set(name, { code: fs.readFileSync(template, "utf8"), label: `template ${path.basename(template, ".tsx")}` }); continue; }
 	const user = (usedBy.get(name) ?? []).find(file => usable(fs.readFileSync(file, "utf8")) && new RegExp(`<${name}\\b`).test(fs.readFileSync(file, "utf8")));
@@ -87,10 +93,10 @@ fs.writeFileSync(path.join(page, "index.html"), `<!doctype html><html><head><met
 // crop: [x, y, w, h] in CSS pixels of a viewport shot (2x); none for an element shot.
 const toWebp = (png, crop) => `(async () => { const img = new Image(); img.src = "data:image/png;base64,${png.toString("base64")}"; await img.decode(); const [x, y, w, h] = ${JSON.stringify(crop?.map(n => Math.round(n * 2)) ?? null)} ?? [0, 0, img.naturalWidth, img.naturalHeight]; const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(img, x, y, w, h, 0, 0, w, h); return c.toDataURL("image/webp", 0.8).split(",")[1]; })()`;
 // Components whose showcase is only a trigger until used: open them first, then picture the trigger plus what opened.
-const OPEN = { Tooltip: "hover", HoverCard: "hover", InfoTip: "hover", ContextMenu: "contextmenu", ContextMenuItem: "contextmenu" };
-for (const name of ["BottomSheet", "BottomSheetSwitcher", "Drawer", "DrawerHeader", "DropdownMenu", "DropdownMenuGroup", "DropdownMenuItem", "Lightbox", "MobileNav", "MoreMenu", "Popover", "TabMenu"]) OPEN[name] = "click";
+const OPEN = { Tooltip: "hover", HoverCard: "hover", InfoTip: "hover", TopNavMenu: "click", TopNavMegaMenu: "click", BaseTypeahead: "click", ContextMenu: "contextmenu", ContextMenuItem: "contextmenu" };
+for (const name of ["BottomSheet", "BottomSheetSwitcher", "Drawer", "DrawerHeader", "DropdownMenu", "DropdownMenuDivider", "DropdownMenuGroup", "DropdownMenuItem", "DropdownMenuSubMenu", "Lightbox", "MobileNav", "MoreMenu", "Popover", "TabMenu"]) OPEN[name] = "click";
 // A menu trigger (aria-haspopup) wins over the first button, so TabMenu opens "More" instead of selecting a tab.
-const markTrigger = "(() => { const shot = document.getElementById('shot'); (shot.querySelector('[aria-haspopup]:not([aria-haspopup=false])') ?? shot.querySelector('button, [role=button], a[href], img'))?.setAttribute('data-shot-trigger', ''); })()";
+const markTrigger = "(() => { const shot = document.getElementById('shot'); (shot.querySelector('[aria-haspopup]:not([aria-haspopup=false])') ?? shot.querySelector('button, [role=button], a[href], img, input'))?.setAttribute('data-shot-trigger', ''); })()";
 const TRIGGER = "[data-shot-trigger]";
 const contextMenu = "(() => { const r = document.getElementById('shot').getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2; document.elementFromPoint(x, y).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 })); })()";
 // Union of the picture and everything outside #root (portals) or in the top layer, clamped to the viewport.
@@ -123,10 +129,16 @@ try {
 } finally { try { browser(undefined, "close"); } catch {} if (!process.env.KEEP_PAGE) fs.rmSync(page, { recursive: true, force: true }); else console.log(page); }
 
 // 4. Write: the trial folder, or the bundle (stale pictures removed) with its manifest.
-const total = [...images.values()].reduce((n, bytes) => n + bytes.length, 0);
+// Bundle files are named by content hash, so parts sharing one example (TableRow, TableCell) ship one file.
+const sha = bytes => createHash("sha256").update(bytes).digest("hex");
+const unique = new Map([...images.values()].map(bytes => [sha(bytes), bytes]));
+const total = [...unique.values()].reduce((n, bytes) => n + bytes.length, 0);
 if (!picked.length && total > BUDGET) throw new Error(`Component pictures total ${kb(total)}, over the ${kb(BUDGET)} budget; nothing was written.`);
 if (!picked.length) for (const file of fs.readdirSync(out)) if (file.endsWith(".webp")) fs.rmSync(path.join(out, file));
-for (const [name, bytes] of images) fs.writeFileSync(path.join(out, `${name}.webp`), bytes);
-if (!picked.length) fs.writeFileSync(path.join(out, "components.json"), JSON.stringify({ lockDigest: catalog.lockDigest, version: catalog.version, images: Object.fromEntries([...images].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) => [name, createHash("sha256").update(bytes).digest("hex")])) }, null, 1) + "\n");
+if (picked.length) for (const [name, bytes] of images) fs.writeFileSync(path.join(out, `${name}.webp`), bytes);
+else {
+	for (const [hash, bytes] of unique) fs.writeFileSync(path.join(out, `${hash}.webp`), bytes);
+	fs.writeFileSync(path.join(out, "components.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, version: catalog.version, images: Object.fromEntries([...images].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) => [name, sha(bytes)])) }, null, 1)}\n`);
+}
 for (const name of names) { const row = rows.get(name); console.log(row.error ? `- ${name}: ${row.error}` : `${name}: ${row.width}x${row.height} webp ${kb(row.webp)} (${row.example})`); }
 console.log(`${images.size}/${names.length} pictured, ${kb(total)} total; ${out}`);

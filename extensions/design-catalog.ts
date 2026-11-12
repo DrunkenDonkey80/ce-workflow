@@ -19,7 +19,7 @@ const IMAGE_THEMES = ["butter", "gothic", "matcha", "neutral", "stone", "y2k"];
 export function designImage(id: string | null, revision: string | null, cwd?: string, owner?: string) {
 	if (id?.startsWith("found:")) return cwd && owner && revision === id.slice(6) ? foundImage(cwd, owner, revision) : undefined;
 	const component = id?.startsWith("astryx:component:") ? id.slice(17) : undefined;
-	if (component) return revision === shots.lockDigest && Object.hasOwn(shots.images, component) ? fs.readFileSync(new URL(`./astryx-runtime/previews/components/${component}.webp`, import.meta.url)) : undefined;
+	if (component) return revision === shots.lockDigest && Object.hasOwn(shots.images, component) ? fs.readFileSync(new URL(`./astryx-runtime/previews/components/${shots.images[component]}.webp`, import.meta.url)) : undefined;
 	const slug = IMAGE_THEMES.find(name => id === `astryx:theme:${name}`);
 	if (!slug || revision !== IMAGE_REVISION) return undefined;
 	return fs.readFileSync(new URL(`./astryx-runtime/previews/${slug}.webp`, import.meta.url));
