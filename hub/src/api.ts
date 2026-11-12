@@ -343,7 +343,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				return { target, diagram: loadDiagram(folder(id), resolved) ?? emptyDiagram(resolved) };
 			}
 			case "files": return listFiles(folder(id));
-			case "designcatalog": return designCatalog(folder(id));
+			case "designcatalog": return designCatalog(folder(id), id);
 			case "designreferences": return { refs: designReferences(folder(id), id).refs.filter(ref => ref.status !== "removed") };
 			case "designreferenceimage": {
 				const { ref, files } = referenceAssets(folder(id), id, params.get("ref"));
@@ -352,9 +352,9 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				response.writeHead(200, { "content-type": ref.thumbnail!.endsWith(".webp") ? "image/webp" : "image/png", "content-length": bytes.length, "cache-control": "private, no-cache", "x-content-type-options": "nosniff" }); response.end(bytes); return;
 			}
 			case "designimage": {
-				const bytes = designImage(params.get("id"), params.get("revision"));
+				const bytes = designImage(params.get("id"), params.get("revision"), folder(id), id);
 				if (!bytes) throw fail(404, "No supplied image at this revision.");
-				response.writeHead(200, { "content-type": "image/webp", "content-length": bytes.length, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff" });
+				response.writeHead(200, { "content-type": bytes[0] === 0x89 ? "image/png" : "image/webp", "content-length": bytes.length, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff" });
 				response.end(bytes); return;
 			}
 			case "file": case "diff":
@@ -459,7 +459,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 					const page = urlReference(data.url);
 					return addDesignReference(folder(id), id, { ...data, id: page.id, revision: page.revision }, async () => urlSnapshot(page, await call(id, "/api/designurl", { url: page.url })));
 				}
-				return addDesignReference(folder(id), id, data, () => data.previewKey === undefined ? catalogReference(folder(id), data.id, data.revision) : referenceSnapshot(folder(id), data.previewKey, data.id, data.revision, id));
+				return addDesignReference(folder(id), id, data, () => data.previewKey === undefined ? catalogReference(folder(id), data.id, data.revision, id) : referenceSnapshot(folder(id), data.previewKey, data.id, data.revision, id));
 			}
 			case "designexample": {
 				only(data, ["target", "id", "revision"], "Invalid fields.");

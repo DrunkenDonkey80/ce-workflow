@@ -6,16 +6,18 @@ import { OWN, designStore, readTree, systemIndex } from "./design.ts";
 import { appPreviewFolder, BUILD_FILE, BUILD_STATUS } from "./design-build.ts";
 import { astryxRuntime } from "./design-runtime.ts";
 import { confined } from "./plan3-files.ts";
+import { foundImage, foundItems } from "./design-references.ts";
 
 export type CatalogEntry = {
-	id: string; source: "od" | "astryx" | "draft" | "export"; kind: "system" | "theme" | "component" | "design";
+	id: string; source: "od" | "astryx" | "draft" | "export" | "web"; kind: "system" | "theme" | "component" | "design" | "screenshot";
 	name: string; revision: string; preview: "sample" | "image" | "none"; availability: "cached" | "not-cached" | "unavailable";
 	license: string; provenance: string; category?: string; description?: string; url?: string; imageRevision?: string;
 	folder?: string; page?: string; handle?: string; designRevision?: string; status?: string;
 };
 const IMAGE_REVISION = "fd5cf0df987791117e96ccc0bec603c64be8b136";
 const IMAGE_THEMES = ["butter", "gothic", "matcha", "neutral", "stone", "y2k"];
-export function designImage(id: string | null, revision: string | null) {
+export function designImage(id: string | null, revision: string | null, cwd?: string, owner?: string) {
+	if (id?.startsWith("found:")) return cwd && owner && revision === id.slice(6) ? foundImage(cwd, owner, revision) : undefined;
 	const slug = IMAGE_THEMES.find(name => id === `astryx:theme:${name}`);
 	if (!slug || revision !== IMAGE_REVISION) return undefined;
 	return fs.readFileSync(new URL(`./astryx-runtime/previews/${slug}.webp`, import.meta.url));
@@ -100,19 +102,28 @@ export async function catalogFiles(cwd: string, id: unknown, revision: unknown) 
 }
 
 /** Reference capture preserves source bytes; metadata-only entries remain explicitly metadata-only. */
-export async function catalogReference(cwd: string, id: unknown, revision: unknown) {
+export async function catalogReference(cwd: string, id: unknown, revision: unknown, owner?: string) {
  if (typeof id !== "string" || id.length > 240 || typeof revision !== "string") throw Object.assign(new Error("Invalid catalog identity."), { status: 400 });
- const item = (await designCatalog(cwd)).entries.find(entry => entry.id === id);
+ const item = (await designCatalog(cwd, owner)).entries.find(entry => entry.id === id);
  if (!item) throw Object.assign(new Error("No such catalog entry."), { status: 404 });
  if (item.revision !== revision) throw Object.assign(new Error("Source changed; refresh the library before adding it."), { status: 409 });
  if (item.folder && item.page) { const sample = await catalogFiles(cwd, id, revision); return { source: sample.item, files: sample.files }; }
  const files = new Map<string, Buffer>([["SOURCE.json", Buffer.from(JSON.stringify(item, null, 2))]]);
- if (item.preview === "image") { const bytes = designImage(item.id, item.imageRevision ?? null); if (!bytes) throw new Error("Source image is missing."); files.set("source.webp", bytes); }
+ const image = item.source === "web" ? "source.png" : "source.webp";
+ if (item.preview === "image") { const bytes = designImage(item.id, item.imageRevision ?? null, cwd, owner); if (!bytes) throw new Error("Source image is missing."); files.set(image, bytes); }
  if (item.source === "od") throw Object.assign(new Error("The OpenDesign source is not cached. No download was started."), { status: 404 });
- return { source: item, files, thumbnail: files.has("source.webp") ? "source.webp" : undefined };
+ return { source: item, files, thumbnail: files.has(image) ? image : undefined };
 }
 
-export async function designCatalog(cwd: string) {
+/** P3-11: the conversation's own web results; another session's owner never sees them. */
+function webEntries(cwd: string, owner: string, entries: CatalogEntry[], warnings: string[]) {
+	try {
+		for (const item of foundItems(cwd, owner).reverse()) entries.push({ id: `found:${item.sha}`, source: "web", kind: "screenshot", name: item.title, description: item.why, url: item.page,
+			revision: item.sha, imageRevision: item.sha, preview: "image", availability: "cached", license: "Third-party web image: inspiration only, not licensed for copying",
+			provenance: `Found by the agent on ${new URL(item.page).hostname} (web search, ${item.at.slice(0, 10)}).` });
+	} catch (error) { warnings.push(error.message); }
+}
+export async function designCatalog(cwd: string, owner?: string) {
 	const index: { commit: string; names: string[]; offline?: string } = await systemIndex(cwd).catch(error => ({ commit: "", names: [], offline: String(error.message).slice(0, 240) }));
 	const entries: CatalogEntry[] = [];
 	if (/^[0-9a-f]{40}$/.test(index.commit ?? "") && Array.isArray(index.names)) {
@@ -142,6 +153,7 @@ export async function designCatalog(cwd: string) {
 		});
 	}
 	const warnings: string[] = [];
+	if (owner) webEntries(cwd, owner, entries, warnings);
 	savedEntries(cwd, entries, warnings);
 	return { entries, own: OWN.filter(file => fs.existsSync(confined(cwd, file))), offline: index.offline, warnings, version: astryx.version };
 }

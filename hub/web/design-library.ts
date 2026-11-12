@@ -11,7 +11,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  const tools = make("div"), search = make("input"), source = make("select"), kind = make("select"), status = make("p"), list = make("div"), detail = make("section");
  search.type = "search"; search.maxLength = 200; search.placeholder = "Search designs and components"; search.setAttribute("aria-label", "Search design library");
  source.setAttribute("aria-label", "Reference source"); kind.setAttribute("aria-label", "Reference type"); status.setAttribute("role", "status");
- for (const [select, rows] of [[source, [["", "All sources"], ["od", "OpenDesign"], ["astryx", "Astryx"], ["draft", "Studio drafts"], ["export", "Selected exports"]]], [kind, [["", "All types"], ["system", "Design systems"], ["theme", "Themes"], ["component", "Components"], ["design", "Saved designs"]]]] as [HTMLSelectElement, string[][]][]) {
+ for (const [select, rows] of [[source, [["", "All sources"], ["od", "OpenDesign"], ["astryx", "Astryx"], ["draft", "Studio drafts"], ["export", "Selected exports"], ["web", "Web results"]]], [kind, [["", "All types"], ["system", "Design systems"], ["theme", "Themes"], ["component", "Components"], ["design", "Saved designs"], ["screenshot", "Web screenshots"]]]] as [HTMLSelectElement, string[][]][]) {
   for (const [value, label] of rows) { const option = make("option", label); option.value = value; select.append(option); }
  }
  tools.className = "library-tools"; list.className = "library-list"; detail.className = "library-detail"; detail.hidden = true;

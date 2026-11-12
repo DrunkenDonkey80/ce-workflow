@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import { addDesignReference, designReferences, editDesignReference, referenceAssets } from "../../extensions/design-references.ts";
+import { addDesignReference, designReferences, editDesignReference, publishFound, referenceAssets } from "../../extensions/design-references.ts";
 import { saveDiagram } from "../../extensions/plan3-diagram.ts";
 import { authorizeReferenceBundle, deliverReferenceBundle, freezeReferenceBundle, referenceBundle, referenceBundleAssets } from "../../extensions/design-bundles.ts";
 import { appStarter } from "../../extensions/design-app.ts";
@@ -727,6 +727,28 @@ try {
 			const fresh = randomUUID(); await freezeReferenceBundle(project, owner, fresh, [{ ref: ref.ref, revision: ref.revision }], data); await authorizeReferenceBundle(project, owner, fresh, data);
 			const another = await runDesign(project, { ...args, bundle: fresh }, tools); assert(another.sessions.every(item => !handles.includes(item.handle)), "an explicit fresh submission creates another batch");
 		} finally { if (previousOwner === undefined) delete process.env.PI_HUB_SESSION; else process.env.PI_HUB_SESSION = previousOwner; }
+	}
+	// P3-11: the agent's web picks become this conversation's library cards; only downloaded images, never other files.
+	{
+		const project = path.join(root, "found"), downloads = path.join(root, "downloads"), webp = fs.readFileSync(new URL("../../extensions/astryx-runtime/previews/neutral.webp", import.meta.url));
+		fs.mkdirSync(path.join(downloads, "set"), { recursive: true }); fs.writeFileSync(project + ".jsonl", ""); fs.writeFileSync(project + "-other.jsonl", ""); fs.mkdirSync(project);
+		fs.writeFileSync(path.join(downloads, "set", "01.webp"), webp); fs.writeFileSync(path.join(downloads, "set", "02.jpg"), "not an image"); fs.writeFileSync(path.join(root, "outside.webp"), webp);
+		const mine = hub.registry.add({ name: "found", folder: project, sessionFile: project + ".jsonl", state: "parked" }).id, other = hub.registry.add({ name: "other", folder: project, sessionFile: project + "-other.jsonl", state: "parked" }).id;
+		const good = { title: "Kiosk POS", page: "https://pos.example/kiosk", image: path.join(downloads, "set", "01.webp"), why: "large tiles" };
+		const published = await publishFound(project, mine, [good, { ...good, image: path.join(downloads, "set", "02.jpg") }, { ...good, image: path.join(root, "outside.webp") }, { ...good, page: "file:///etc/passwd" }], downloads);
+		assert.equal(published.added, 1); assert.equal(published.skipped.length, 3); assert.match(published.skipped.join("\n"), /saved by image_search/);
+		assert.equal((await publishFound(project, mine, [good], downloads)).shown, 1, "republishing the same image does not duplicate its card");
+		const web = (await get(mine, "designcatalog")).body.entries.filter(item => item.source === "web");
+		assert.equal(web.length, 1); assert.equal(web[0].url, good.page); assert.match(web[0].license, /inspiration only/);
+		assert.equal((await get(other, "designcatalog")).body.entries.filter(item => item.source === "web").length, 0, "another conversation never sees these results");
+		const route = `designimage?id=${encodeURIComponent(web[0].id)}&revision=${web[0].imageRevision}`, image = await get(mine, route);
+		assert.equal(image.status, 200); assert.equal(image.headers.get("content-type"), "image/png"); assert.equal((await get(other, route)).status, 404);
+		const ref = await post(mine, "designreference", { action: "add", id: web[0].id, revision: web[0].revision, aspect: "layout" });
+		assert.equal(ref.status, 200); assert.equal(ref.body.status, "ready"); assert.equal(ref.body.thumbnail, "source.png");
+		assert.equal((await post(mine, "designreference", { action: "add", id: web[0].id, revision: web[0].revision, aspect: "region", region: [0, 0, 40, 30] })).status, 200, "found images support region crops");
+		const saved = process.env.PI_HUB_SESSION; delete process.env.PI_HUB_SESSION;
+		try { await assert.rejects(runDesign(project, { action: "found", items: [good] }, { hub: async () => ({ ok: false, text: "" }) }), /\/wo design/); }
+		finally { if (saved !== undefined) process.env.PI_HUB_SESSION = saved; }
 	}
 	console.log("api ok");
 } finally {
