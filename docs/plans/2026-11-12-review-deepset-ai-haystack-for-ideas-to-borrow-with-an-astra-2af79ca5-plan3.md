@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T20:42:26.782Z
+updated: 2026-11-12T20:46:59.961Z
 size: plan
 started: 2026-11-12T20:41:04.471Z
 ---
@@ -128,11 +128,10 @@ Commands (referenced by steps):
 ### Phase 1: Review [think]
 
 - [x] **HR-01** Clone at pin in C:\SOFT\git\haystack-review\haystack; Astra brief with area table and counterpart summaries in docs/proposals/haystack-review/astra-brief.md.
-- [ ] **HR-02** Launch Astra (D-07) on `astra-brief.md` and the clone, async, writing `astra-verdicts.md`; do HR-03 meanwhile.
+- [wip] **HR-02** Launch Astra (D-07) on `astra-brief.md` and the clone, async, writing `astra-verdicts.md`; do HR-03 meanwhile.
   - Brief asks for a verdict, reason and `path:line` per area A1 to A16, its own top ideas, and nothing from `docs/plans/`.
   - Call `subagents_enable` first; follow the pi-subagents skill.
-- [ ] **HR-03** Desk review of A1 to A16 into `docs/proposals/2026-11-12-haystack-review.md` without reading `astra-verdicts.md`.
-  - Read each Haystack area and its counterpart in our code; verdict, reason, counterpart, `path:line`. Add the out-of-scope list.
+- [x] **HR-03** Desk review written: 16 area rows (Test first A1, A2, A3, A16; Already covered A4-A6, A8-A10, A12; Skip A7, A11, A13-A15), 5 candidate ideas, out-of-scope list; Astra verdicts not read.
 - [ ] **HR-04** Merge Astra's verdicts as a column; count agreements; settle each disagreement by checking the code; pick the shortlist.
   - Shortlist: areas where either review says Adopt idea or Test first and the merge keeps it. Write the shortlist with reasons at the end of the review doc.
   - Check: every row A1 to A16 has both verdicts (R1, R2).
@@ -158,7 +157,7 @@ Commands (referenced by steps):
 
 ## Resume context
 
-Planning done; D-01 to D-10 settled, no open questions. Research only: this plan changes only docs/ (D-10); catch-up watch and any port-with-notice (D-09) belong to follow-up plans. Next: HR-01 (clone at pin 104a83f8 into C:\SOFT\git\haystack-review\haystack, write docs/proposals/haystack-review/astra-brief.md). Planning-time shallow clone in system temp (pi-research-BHo8do\haystack) is not durable. No blockers.
+HR-01 done (c93bd0dd). HR-02 wip: Astra (reviewer, openai-codex/gpt-6-astra:high) launched async, run 3dd537b0, output → docs/proposals/haystack-review/astra-verdicts.md; mark HR-02 done when it lands (do not read it before HR-03 is written). HR-03 in progress: draft notes in docs/proposals/2026-11-12-haystack-review.md cover A1, A2, A6; next read A3 hooks/budget/hooks.py, then A4 to A16, then rewrite the doc as the A1 to A16 table plus out-of-scope list.
 
 ## Amendments
 
