@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T19:32:05.344Z
+updated: 2026-11-12T19:33:43.857Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -69,6 +69,18 @@ One line per resolved ticket: gist and ticket ID.
   - Claude cannot run on Codex (G1). Codex in WSL was not tested with the shared Windows config.
   - A WSL server must keep its config on ext4: Pi starts in 1.8 s from `/mnt/c` against 0.15 s from ext4.
   - Evidence: `docs/proposals/own-agent-stack/baseline.md`, section T-07.
+- **D-16 Cost and score (T-08).** Weighted end-state scores out of 10, with weeks to parity:
+
+  | Path | Score | Weeks to parity |
+  |---|---|---|
+  | A: stay on Pi and reshape | 6.1 | 8 to 15 |
+  | B: fork Pi | 6.9 | 9 to 16 |
+  | C: Rust on a Codex fork | 7.1 | 34 to 66 |
+  | D: Rust from scratch | 7.4 | 56 to 98 |
+  | E: own TS server | 7.3 | 38 to 64 |
+
+  The rewrite paths gain mainly on ownership (weight 3), while wishes (weight 8) are equal or better on Pi. Draft recommendation: no-go on a rewrite now; do A, with B as a ready option and named triggers for re-opening the decision. If the call is go, start with E grown from B, or with a 3-week spike on C. Evidence: `docs/proposals/own-agent-stack/decision.md`.
+
 
 
 
@@ -111,10 +123,7 @@ None.
 - [x] **T-05** Candidates compared on gates and fit; finalists Codex app-server and Pi; Claude policy raised as Q-01 (D-13).
 - [x] **T-06** User weights: wishes 8, security 6, speed 6, simplicity 5, ownership 3; G1 Claude = direct OAuth (D-14).
 - [x] **T-07** Codex app-server and Pi measured on Windows native and WSL; matrix and raw results appended to baseline.md (D-15).
-- [wip] **T-08** What does each path cost and score?
-  - type: research
-  - Per finalist, a coarse approach for each cost driver: hub protocol (today `hub/src/rpc-client.ts` spawns `pi --mode rpc`), Pi SDK uses in the hub (`hub/src/pi-sdk.ts` `ModelRuntime`, `SessionManager`), extension model, the big packages (pi-subagents, pi-lens, pi-web-access), sessions and settings migration, side-by-side running.
-  - Porting cost per inventory item, upkeep (providers, OS), risks, scored with T-06 weights. Draft `decision.md` with a recommendation.
+- [x] **T-08** decision.md drafted: five paths costed and scored; draft = no-go on rewrite, go on A with B ready (D-16).
 - [human] **T-09** Go or no-go, and which path?
   - type: grill
   - The user decides from `decision.md`; record it there and in Decisions.
@@ -125,7 +134,7 @@ None.
 
 ## Resume context
 
-T-01 to T-05 done (HEAD 99e70be3). Now T-06 [human]: asking the user for weights plus Q-01 (Claude route). After the answer: record D-14, then T-07 (measure the Codex app-server against the Pi baseline on Windows native and WSL).
+T-01 to T-08 are done and committed. T-09 [human] go/no-go is being asked now. After the answer: record D-17, then T-10 drafts the follow-up plans for the chosen path. WSL scratch installs are in ~/oas.
 
 ## Amendments
 
