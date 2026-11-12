@@ -21,12 +21,13 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  address.type = "url"; address.required = true; address.maxLength = 236; address.placeholder = "https://… a page to borrow from"; address.setAttribute("aria-label", "Page address");
  pageAspect.setAttribute("aria-label", "Page reference aspect"); pageStatus.setAttribute("role", "status"); page.className = "library-tools";
  for (const [value, label] of [["whole", "Whole style"], ["colors", "Colors"], ["typography", "Typography"], ["layout", "Layout"], ["background", "Background"], ["component", "Component"]]) { const option = make("option", label); option.value = value; pageAspect.append(option); }
- page.addEventListener("submit", async event => {
-  event.preventDefault(); pageAdd.disabled = true; pageStatus.textContent = "Approve the site when asked; your browser takes a screenshot…";
-  try { const ref = await post("designreference", { action: "add", url: address.value, aspect: pageAspect.value }); attached(ref); address.value = ""; pageStatus.textContent = `Selected @${ref.ref}. Describe how to use it in Chat.`; }
-  catch (error) { pageStatus.textContent = "Could not add page: " + error.message; }
-  finally { pageAdd.disabled = false; }
- });
+ async function capture(url: string, aspect: string, button: HTMLButtonElement, feedback: HTMLElement) {
+  button.disabled = true; feedback.textContent = "Approve the site when asked; your browser takes a screenshot…";
+  try { const ref = await post("designreference", { action: "add", url, aspect }); attached(ref); feedback.textContent = `Selected @${ref.ref}. Describe how to use it in Chat.`; return true; }
+  catch (error) { feedback.textContent = "Could not add page: " + error.message; return false; }
+  finally { button.disabled = false; }
+ }
+ page.addEventListener("submit", async event => { event.preventDefault(); if (await capture(address.value, pageAspect.value, pageAdd, pageStatus)) address.value = ""; });
  page.append(address, pageAspect, pageAdd, pageStatus);
  root.append(head, purpose, tools, page, status, list, detail);
  let entries: CatalogEntry[] = [], offline = "", loaded: Promise<void> | undefined, selected = "", gridScroll = 0, viewport = "", inspection = 0, viewed: string | undefined, abandoned: string | undefined;
@@ -141,7 +142,12 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    gestures(row, () => { if (!addButton.disabled) pick(); });
    if (item.preview === "image" && item.imageRevision) row.append(image(item, true));
    if (item.status) row.append(make("p", item.status));
-   row.append(title, details, provenance, open, addButton, feedback); return row;
+   row.append(title, details, provenance);
+   if (item.description) row.append(make("p", item.description));
+   row.append(open, addButton);
+   const url = item.source === "web" ? item.url : undefined;
+   if (url) { const page = make("button", "Capture page"); page.type = "button"; page.dataset.capture = ""; page.title = url; page.addEventListener("click", () => void capture(url, "whole", page, feedback)); row.append(page); }
+   row.append(feedback); return row;
   };
   const groups = new Map<string, CatalogEntry[]>();
   for (const item of matches) { const group = item.availability === "cached" && item.designRevision ? item.designRevision : item.id; if (!groups.has(group)) groups.set(group, []); groups.get(group)!.push(item); }

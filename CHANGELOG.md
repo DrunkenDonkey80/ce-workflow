@@ -9,6 +9,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
   ![The Design library tab](docs/changelog/design-library-entry.png)
   ![Library with an Astryx theme added as @ref1](docs/changelog/design-library-gallery.png)
   ![Inspecting a reference, with its chip above the chat box](docs/changelog/design-library-reference.png)
+- Ask the chat to find existing interfaces ("top POS screens") and the agent's picks from a Google image search show up as **Web results** cards in that conversation's Design library, with their source page and why each one fits. Add one as an `@ref`, or **Capture page** to screenshot its source site.
+  ![A web result card in the Design library](docs/changelog/design-library-found.png)
 
 ### Fixed
 - Idle cold-cache compaction now waits until Pi's last idle cache warm expires, including slow final warms. The hub compacts before parking when only idle warms kept the cache fresh, but still respects a recent real request and long cache retention.

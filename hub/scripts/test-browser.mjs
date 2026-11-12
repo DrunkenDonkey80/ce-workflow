@@ -255,6 +255,27 @@ try {
   assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 0, "sent references leave the draft");
   await browser("wait", "--fn", "document.getElementById('connection').dataset.state === 'idle'"); // the fake run starts no turn; let the optimistic Working state lapse
  }
+ { // P3-12: the agent's web picks show as this conversation's cards; one becomes a normal @ref and Send delivers its saved image.
+  const { publishFound } = await import("../../extensions/design-references.ts"), downloads = join(root, "downloads");
+  fs.mkdirSync(join(downloads, "set"), { recursive: true }); fs.copyFileSync(new URL("../../extensions/astryx-runtime/previews/neutral.webp", import.meta.url), join(downloads, "set", "01.webp"));
+  assert.equal((await publishFound(folder, id, [{ title: "Kiosk POS", page: "https://pos.example/kiosk", image: join(downloads, "set", "01.webp"), why: "Large tiles for fast orders" }], downloads)).added, 1);
+  await evaluate("[...document.querySelectorAll('#library .library-heading button')].find(button => button.textContent === 'Refresh sources').click()");
+  await browser("fill", "#library input[type=search]", ""); await browser("select", "select[aria-label='Reference source']", "web");
+  await browser("wait", "--fn", "document.querySelectorAll('#library [data-entry]').length === 1 && document.querySelector(\"#library [data-entry^='found:'] img\")?.naturalWidth > 0");
+  assert.match(await evaluate("document.querySelector(\"#library [data-entry^='found:']\").textContent"), /Kiosk POS[\s\S]*inspiration only[\s\S]*pos\.example[\s\S]*Large tiles/);
+  await browser("click", "#library [data-entry^='found:'] [data-capture]");
+  await browser("wait", "--fn", "document.querySelector(\"#library [data-entry^='found:'] [role=status]\").textContent.includes('not approved')");
+  assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 0, "a refused page capture adds nothing");
+  await browser("click", "#library [data-entry^='found:'] [data-add]"); await browser("wait", "#reference-draft [data-reference] img");
+  const sentBefore = messages.length;
+  await browser("fill", "#message-input", "A POS like this"); await evaluate("document.getElementById('composer').requestSubmit()");
+  for (let i = 0; i < 100 && messages.length === sentBefore; i++) await new Promise(done => setTimeout(done, 50));
+  assert(messages.at(-1).bundle, "the found image is delivered as a frozen bundle");
+  const frozen = fs.readdirSync(join(folder, ".pi/designs/references"), { recursive: true }).map(String).filter(file => /bundles/.test(file) && file.endsWith("source.png"));
+  assert(frozen.length > 0, "the bundle carries the saved image, not a live URL");
+  await browser("wait", "--fn", "document.getElementById('connection').dataset.state === 'idle'");
+  await browser("select", "select[aria-label='Reference source']", "");
+ }
  // Later reload checks exercise remembered tabs, not the explicit library deep link.
  await evaluate("(() => { const url = new URL(location.href); url.searchParams.delete('view'); history.replaceState(null, '', url); })()");
  await browser("fill", "#message-input", ""); await browser("click", "#tab-plan");

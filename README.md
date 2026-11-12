@@ -202,6 +202,7 @@ Sessions are kept in `.pi/designs/sessions.json`.
 - **Add page reference** takes an `https://` address. The screenshot comes from your own browser through `browser_fetch`, after its usual per-site approval prompt. A refused or failed capture adds nothing and keeps the typed address.
 - Describe the mix in chat ("@ref1 overall, @ref2 cards, background like @ref3; two variants") and Send. The selected references are frozen once, and the existing design sessions start one per direction, each receiving the same snapshot as untrusted, inspiration-only evidence. Retrying the same Send never starts a second batch. Selected exports list the reference sources in `REFERENCE-SOURCES.json` (provenance only; source assets are not copied).
 - Unsent selections survive reload, session switches, Back and the phone Browse/Chat switch. They are kept in this browser only, not synced across devices.
+- **Web results**: ask the chat to find existing interfaces ("find 10 restaurant POS screens"). The agent searches Google Images through your browser (`image_search`), is told to keep real product screenshots over stock mockups, and shows its picks as cards in this conversation's library, each with its source page and why it matches. Add one like any other card, or **Capture page** to screenshot its source page (per-site approval as above). They are third-party images: inspiration only, kept for this conversation (newest 60), never copied into an export.
 
 ### Optional Astryx foundation
 
