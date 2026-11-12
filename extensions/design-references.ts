@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { atomic, confined, read, withPlanLock } from "./plan3-files.ts";
+import { processPng } from "./screen-read.ts";
 
 export const REFERENCE_ASPECTS = ["whole", "colors", "typography", "layout", "background", "component", "region"] as const;
 export type ReferenceSource = { id: string; revision: string; name: string; provenance: string; license: string; url?: string };
@@ -12,7 +13,7 @@ type References = { version: 1; next: number; refs: DesignReference[] };
 const fail = (status: number, message: string) => Object.assign(new Error(message), { status });
 const hash = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-function root(cwd: string, owner: string) {
+function root(_cwd: string, owner: string) {
  if (typeof owner !== "string" || !uuid.test(owner)) throw fail(400, "Invalid reference owner.");
  return `.pi/designs/references/library/${owner}`;
 }
@@ -28,7 +29,9 @@ export function designReferences(cwd: string, owner: string): References {
 async function change<T>(cwd: string, owner: string, update: (store: References) => T) {
  return withPlanLock(index(cwd, owner), () => {
   const store = designReferences(cwd, owner), result = update(store);
-  atomic(index(cwd, owner), JSON.stringify(store)); return result;
+  const encoded = JSON.stringify(store);
+  if (Buffer.byteLength(encoded) > 2_000_000) throw fail(413, "Reference draft metadata limit reached; remove unused references.");
+  atomic(index(cwd, owner), encoded); return result;
  });
 }
 export function referenceInput(input: { id?: unknown; revision?: unknown; aspect?: unknown; note?: unknown; region?: unknown }) {
@@ -36,7 +39,8 @@ export function referenceInput(input: { id?: unknown; revision?: unknown; aspect
  const aspect = input.aspect ?? "whole", note = input.note ?? "";
  if (!REFERENCE_ASPECTS.includes(aspect as typeof REFERENCE_ASPECTS[number]) || typeof note !== "string" || note.length > 4000) throw fail(400, "Invalid reference aspect or note.");
  const region = input.region;
- if (region !== undefined && (aspect !== "region" || !Array.isArray(region) || region.length !== 4 || region.some(n => !Number.isFinite(n) || n < 0 || n > 10000) || region[2] <= 0 || region[3] <= 0)) throw fail(400, "Invalid reference region.");
+ if (aspect === "region" && region === undefined) throw fail(400, "A reference region is required.");
+ if (region !== undefined && (aspect !== "region" || !Array.isArray(region) || region.length !== 4 || region.some(n => !Number.isSafeInteger(n) || n < 0 || n > 10000) || region[2] <= 0 || region[3] <= 0)) throw fail(400, "Invalid reference region.");
  return { id: input.id, revision: input.revision, aspect: aspect as string, note, ...(region ? { region: region as number[] } : {}) };
 }
 export async function addDesignReference(cwd: string, owner: string, input: Parameters<typeof referenceInput>[0], capture: () => Promise<ReferenceSnapshot>) {
@@ -54,9 +58,22 @@ export async function addDesignReference(cwd: string, owner: string, input: Para
   if (captured.source.id !== wanted.id || captured.source.revision !== wanted.revision) throw fail(409, "Captured source revision changed.");
   let bytes = 0;
   if (!captured.files.size || captured.files.size > 5000) throw fail(413, "Reference needs 1–5000 source files.");
-  for (const [name, data] of captured.files) { confined(cwd, `${root(cwd, owner)}/${prepared.ref.snapshot}/${name}`); bytes += data.length; }
+  const snapshotRoot = confined(cwd, `${root(cwd, owner)}/${prepared.ref.snapshot}`);
+  for (const [name, data] of captured.files) { confined(snapshotRoot, name); bytes += data.length; }
   if (bytes > 32 * 1024 * 1024) throw fail(413, "Reference exceeds 32 MiB.");
   if (captured.thumbnail && (!/\.(?:png|webp)$/i.test(captured.thumbnail) || !captured.files.has(captured.thumbnail))) throw fail(400, "Invalid reference thumbnail.");
+  if (wanted.region) {
+   if (!captured.thumbnail) throw fail(400, "A region needs a supplied image.");
+   const original = captured.files.get(captured.thumbnail)!;
+   const { convertToPng } = await import("@earendil-works/pi-coding-agent");
+   const png = await convertToPng(original.toString("base64"), captured.thumbnail.endsWith(".png") ? "image/png" : "image/webp");
+   if (!png) throw fail(503, "The host could not decode this source image; no region was attached.");
+   let crop: Buffer;
+   try { crop = processPng(Buffer.from(png.data, "base64"), wanted.region, 320).png; }
+   catch (error) { throw fail(400, "Invalid reference crop: " + error.message); }
+   if (captured.files.size >= 5000 || bytes + crop.length > 32 * 1024 * 1024) throw fail(413, "Cropped reference exceeds its snapshot limit.");
+   captured.thumbnail = `region-${prepared.ref.snapshot}.png`; captured.files.set(captured.thumbnail, crop);
+  }
   return await change(cwd, owner, store => {
    const ref = store.refs.find(ref => ref.ref === prepared.ref.ref)!;
    // A removed/revised reference cannot be resurrected by an older asynchronous capture.
@@ -65,7 +82,7 @@ export async function addDesignReference(cwd: string, owner: string, input: Para
    fs.mkdirSync(folder, { recursive: true });
    try {
     const files = [...captured.files].map(([name, data]) => {
-     const file = confined(cwd, `${root(cwd, owner)}/${ref.snapshot}/${name}`);
+     const file = confined(folder, name);
      fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data, { flag: "wx", mode: 0o600 });
      return { path: name, digest: hash(data), bytes: data.length };
     });
@@ -88,7 +105,7 @@ export function editDesignReference(cwd: string, owner: string, id: unknown, rev
   if (!ref || ref.status === "removed") throw fail(404, "No such reference.");
   if (ref.revision !== revision) throw fail(409, "Reference changed; refresh before editing it.");
   if (note !== undefined && ref.status !== "ready") throw fail(409, "Wait for the reference capture before editing its note.");
-  if (note === undefined) ref.status = "removed"; else ref.note = note as string;
+  if (note === undefined) { ref.status = "removed"; ref.files = undefined; ref.thumbnail = undefined; ref.note = ""; ref.source = { id: ref.source.id, revision: ref.source.revision, name: "Removed reference", provenance: "Removed", license: "Removed" }; } else ref.note = note as string;
   ref.revision++; return structuredClone(ref);
  });
 }
@@ -99,7 +116,7 @@ export function referenceAssets(cwd: string, owner: string, id: unknown) {
  const files = new Map<string, Buffer>(); let total = 0;
  for (const file of ref.files) {
   if (typeof file.path !== "string" || !/^[a-f0-9]{64}$/.test(file.digest) || !Number.isSafeInteger(file.bytes) || file.bytes < 0 || (total += file.bytes) > 32 * 1024 * 1024) throw fail(409, "Invalid reference asset manifest.");
-  const source = confined(cwd, `${root(cwd, owner)}/${ref.snapshot}/${file.path}`), info = fs.lstatSync(source);
+  const source = confined(confined(cwd, `${root(cwd, owner)}/${ref.snapshot}`), file.path), info = fs.lstatSync(source);
   if (!info.isFile() || info.isSymbolicLink() || info.size !== file.bytes) throw fail(409, "Reference assets changed or are missing.");
   const data = fs.readFileSync(source);
   if (hash(data) !== file.digest) throw fail(409, "Reference asset digest mismatch.");

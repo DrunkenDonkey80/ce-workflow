@@ -109,6 +109,16 @@ try {
 		assert.equal((await post(id, "designreference", { ...input, revision: "0".repeat(64) })).status, 409);
 		assert.equal((await post(id, "designreference", { ...input, region: [0, 0, 1, 1] })).status, 400);
 		assert.equal((await get(id, "designreferenceimage?ref=ref1")).status, 200);
+		const region = await post(id, "designreference", { ...input, aspect: "region", region: [12, 16, 80, 40] });
+		assert.equal(region.status, 200);
+		const cropped = await get(id, `designreferenceimage?ref=${region.body.ref}`);
+		assert.equal(cropped.body.readUInt32BE(0), 0x89504e47, "region thumbnails must contain cropped PNG pixels, not the full WebP image");
+		assert.equal(cropped.body.readUInt32BE(16), 80); assert.equal(cropped.body.readUInt32BE(20), 40);
+		assert.deepEqual(region.body.region, [12, 16, 80, 40]);
+		assert(referenceAssets(folder, id, region.body.ref).files.has("source.webp"), "a crop keeps its original source for provenance");
+		assert.equal((await post(id, "designreference", { ...input, aspect: "region" })).status, 400);
+		assert.equal((await post(id, "designreference", { ...input, aspect: "region", region: [0.5, 0, 80, 40] })).status, 400);
+		assert.equal((await post(id, "designreference", { ...input, aspect: "region", region: [9999, 9999, 80, 40] })).status, 400);
 		const second = hub.registry.add({ name: "reference-owner-test", folder, state: "parked" });
 		try { assert.equal((await get(second.id, "designreferenceimage?ref=ref1")).status, 404, "another session cannot read reference assets"); }
 		finally { hub.registry.remove(second.id); }

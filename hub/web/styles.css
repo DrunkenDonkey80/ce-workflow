@@ -54,10 +54,29 @@ h2 { font-size: 15px; font-weight: 600; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--chat-width); flex: 1; min-height: 0; }
 .left-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .left-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
-.left-tabs [role=tablist] { display: flex; gap: 4px; margin-right: auto; }
+.left-tabs [role=tablist] { display: flex; flex-wrap: wrap; gap: 4px; margin-right: auto; }
 .left-tabs [role=tab] { border-color: transparent; }
 .left-tabs [role=tab][aria-selected=true] { border-color: var(--ink); }
 #narrow-left[aria-pressed=true] { border-color: var(--focus); }
+.design-library { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+.design-library > p { color: var(--muted); max-width: 70ch; margin: 8px 0 16px; }
+.library-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.library-tools :is(input, select) { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; min-height: 44px; min-width: 0; }
+.library-tools input { flex: 1 1 200px; }
+.library-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.library-list article { border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow-wrap: anywhere; }
+.library-list h3 { margin: 0 0 8px; font-size: 15px; }
+.library-list small, .library-list p { color: var(--muted); font-size: 12px; }
+.library-list p { margin-top: 8px; }
+.library-thumb { display: block; width: 100%; height: 160px; object-fit: cover; object-position: top; margin-bottom: 12px; }
+.library-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.library-heading h2 { flex: 1; margin: 0; }
+.library-heading button, .library-list button, .library-detail button { min-height: 44px; }
+.library-group { grid-column: 1 / -1; min-width: 0; }
+.library-preview { overflow: auto; width: 100%; height: min(65vh, 700px); margin-top: 12px; border: 1px solid var(--line); }
+.library-preview iframe { display: block; height: 100%; max-width: none; border: 0; }
+.library-detail { max-width: 100%; overflow-wrap: anywhere; }
+.library-image { display: block; max-width: 100%; height: auto; margin: 16px 0; }
 /* D2: tree beside the viewer on desktop, above it on phones. */
 .files { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(180px, 30%) minmax(0, 1fr); font-size: 13px; }
 .files-tree { overflow: auto; padding: 8px; border-right: 1px solid var(--line); }
@@ -312,7 +331,7 @@ h2 { font-size: 15px; font-weight: 600; }
 .session-git-files strong { display: block; margin-top: 4px; font-family: system-ui, sans-serif; }
 .session-git-files strong:first-child { margin-top: 0; }
 .session-git-files em { display: block; color: var(--muted); }
-@media (hover: hover) { .session-git:hover .session-git-files { display: block; } } /* a tap on touch screens would stick it open over the list */
+@media (hover: hover) { .session-git:hover:not(:has(.session-git-actions:hover)) .session-git-files { display: block; } } /* a tap on touch screens would stick it open over the list */
 .session-git { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; margin: 0 0 2px; min-height: 20px; }
 .session-git-branch { font-size: 11px; font-weight: 600; color: #ae3ec9; margin: 0 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .session-git-actions { margin-left: auto; display: flex; gap: 2px; }
@@ -456,6 +475,19 @@ h2 { font-size: 15px; font-weight: 600; }
 .messages { list-style: none; margin: 0; padding: 16px 16px 0; }
 .row-full { display: block; margin-top: 4px; padding: 0; border: 0; background: none; color: var(--focus); font-size: 13px; text-decoration: underline; cursor: pointer; }
 .composer { position: relative; padding: 8px 12px; border-top: 1px solid var(--line); }
+.draft-recovery { border: 1px solid var(--line); padding: 8px; margin-bottom: 6px; }
+.draft-recovery p { margin: 0 0 6px; color: var(--muted); font-size: 12px; }
+.draft-recovery pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 100px; overflow: auto; }
+.draft-recovery button { min-height: 44px; }
+.reference-draft { display: grid; gap: 6px; max-height: 24vh; overflow: auto; }
+.reference-draft:empty { display: none; }
+.reference-chip { display: flex; align-items: start; gap: 6px; border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
+.reference-chip:focus { outline: 2px solid var(--focus); outline-offset: -2px; }
+.reference-chip details { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.reference-chip summary { cursor: pointer; min-height: 44px; }
+.reference-chip img { width: 44px; height: 44px; object-fit: cover; vertical-align: middle; margin-right: 6px; }
+.reference-chip small { display: block; color: var(--muted); }
+.reference-chip button { min-height: 44px; }
 /* Typing / lists matching commands above the message box, like Pi's terminal. */
 .slash-menu { position: absolute; z-index: 5; left: 12px; right: 12px; bottom: 100%; max-height: 40vh; overflow: auto; display: grid; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 4px 16px #0003; }
 .slash-menu[hidden] { display: none; }
@@ -683,7 +715,7 @@ body.has-switcher.switcher-open { padding-left: 200px; }
  .drawer { display: block; position: fixed; z-index: 7; left: 0; top: 0; bottom: 0; width: min(320px, 85vw); overflow: auto; padding: 8px 0 16px; background: var(--chat); border-right: 1px solid var(--line); box-shadow: 4px 0 16px #0003; transform: translateX(-105%); transition: transform .18s; }
  .drawer[data-open=true] { transform: none; }
  .drawer > h2 { margin: 12px 16px 4px; font-size: 12px; color: var(--muted); }
- .drawer .mobile-tabs { border-bottom: 0; }
+ .drawer .mobile-tabs { border-bottom: 0; flex-wrap: wrap; }
  .drawer .status-line { display: grid; gap: 6px; padding: 6px 16px; }
  .drawer .status-row { display: flex; gap: 6px; min-width: 0; }
  .drawer .status-row > button { flex: 1 1 auto; }

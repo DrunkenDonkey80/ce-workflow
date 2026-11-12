@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-11
-updated: 2026-11-12T06:57:32.799Z
+updated: 2026-11-12T07:35:24.354Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:56:51.270Z
 ---
@@ -150,6 +150,8 @@ Limits: host fetch concurrency 4; kit.html ≤ 64 KB, components/preview pages �
   - Preserve selections across layout changes and navigation; removed IDs must not silently point to different assets. Materialize safe project-local assets through a constrained host path, preserving URL/source provenance; treat them as untrusted reference data, never agent instructions.
   - Enforce the URL/network boundaries in Global validation before capture. No automatic logged-in browser fallback. Verify C3/C4/C5 for stale preview completion, malicious assets, native gesture conflicts and draft persistence.
   - note: Continuing directly: stable project-local reference snapshots and composer persistence first; URLs remain unwired until their capture boundary is constrained.
+  - note: Local reference selection and recovery verified; C3 URL renderer containment remains open. Continue independent P3-05 wiring; do not treat this checkpoint as a stopping point.
+  - check: node "hub/scripts/test-api.mjs" — api ok; node "hub/scripts/test-browser.mjs" — real headless hub/fake-Pi suite passed, including stable/aspect-specific IDs, duplicate selection, reload, note/remove, safe gesture logic and separate pending/new edits; git diff --check — passed. Crop test was red (full WebP instead of PNG) before the host-side fix. Physical native touch/Safari not verified. LSP probe reports no TypeScript errors on touched code but silent push-only rechecks are inconclusive; existing app safety-comment errors remain outside this diff.
 - [ ] **P3-05** Deliver the mixed-reference brief to the existing multi-variant workflow without changing its runtime defaults.
   - Agent receives source assets, selected aspect and notes, not only thumbnail labels. Two requested variants share the same reference bundle and each have their own existing design session.
   - A browse action never starts a paid generation. Preserve ordinary follow-up chat and existing variant refinement/select behavior. Keep the current 1–6 direction bound and designModel setting; do not add a separate variant executor or choose Astryx from a visual selection alone.
@@ -210,7 +212,7 @@ Real touch and paired-remote verification are P3-08's separate environmental gat
 
 ## Resume context
 
-P3-04 remains WIP. P3-10 approved capture prefactor is verified: shared bounded helper in browser-fetch/extension/background.js, reused by control.js and internal browserFetch({screenshot:true}); native host saves the screenshot and the caller retains site/read approval, not browser-control grants. Existing scripts/test-work-browser-fetch.mjs passes including consent, redirect, stale-page and cleanup coverage; no live sites were opened. This is not studio URL integration or proof of strict public-only subresource containment. Global validation is unchanged. The earlier guarded-Chromium C3 capture test remains a known failure (blocked Google background DNS); no URL route is exposed. Q-03 implementation direction is resolved by D11–D12, not a scope deferral. Next: finish P3-04 library Add/aspect controls and composer reference chips/durability (legacy string drafts plus separately persisted in-flight submission and newer edits), reuse existing annotation for regions, extend C4/C5. Then integrate explicit consent-gated URL materialization without weakening the remaining security checks. P3-05 frozen bundles/launch handling remains future work. Preserve unrelated worktree changes; no installs, downloads, paid generation, external test traffic, background verifiers or push.
+P3-04 remains WIP. node "C:/SOFT/git/ce-workflow/hub/scripts/test-browser.mjs" passes (real headless hub/fake Pi) after new chip/draft/recovery checks. app.ts now wires Add, thumbnails, stable-ID-only selection persistence, authoritative metadata reload, note editing/removal, legacy plain-text drafts, separate pending sends and newer edits, explicit recovery after uncertainty. Reference-led Send is explicitly gated until P3-05 freezes/authorizes bundles, so it cannot silently discard selected refs. Next finish actual cropped region thumbnails and C4/C5 gesture checks, then P3-05. Studio URL capture stays unwired: C3 strict renderer containment still fails; preserve that fixture, no external sites/paid work/downloads/installs. LSP: no reported new TypeScript errors; existing unrelated safety-comment findings remain. Preserve unrelated worktree edits. Do not stop at this checkpoint; continue runnable work.
 
 ## Amendments
 

@@ -97,6 +97,7 @@
  </aside>
  <nav id="mobile-tabs" class="mobile-tabs" role="tablist" aria-label="Views">
   <button id="mobile-chat" type="button" role="tab" aria-controls="chat" aria-selected="true">Chat</button>
+  <button id="mobile-library" type="button" role="tab" aria-controls="library" aria-selected="false" tabindex="-1">Browse designs</button>
   <button id="mobile-files" type="button" role="tab" aria-controls="files" aria-selected="false" tabindex="-1">Files</button>
   <button id="mobile-project" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4.5h6M4 6.5v4M12 6.5v4" stroke="#868e96" stroke-width="1.4" fill="none"/><rect x="1" y="1.5" width="6" height="5" rx="1.5" fill="#4c6ef5"/><rect x="9" y="1.5" width="6" height="5" rx="1.5" fill="#2f9e44"/><rect x="5" y="10" width="6" height="5" rx="1.5" fill="#e8590c"/></svg>UML Project</button>
   <button id="mobile-plan" type="button" role="tab" aria-controls="canvas" aria-selected="false" tabindex="-1"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="13.5" rx="2" fill="#fff4e6" stroke="#e8590c" stroke-width="1.2"/><rect x="5" y=".8" width="6" height="2.6" rx="1" fill="#e8590c"/><rect x="4" y="5.5" width="3.5" height="3" rx=".8" fill="#7048e8"/><rect x="8.5" y="10.5" width="3.5" height="3" rx=".8" fill="#1098ad"/><path d="M5.8 8.5v3.5h2.7" stroke="#495057" stroke-width="1.1" fill="none"/></svg>UML Plan</button>
@@ -105,6 +106,7 @@
   <section id="left-panel" class="left-panel" aria-label="Project">
   <div class="left-tabs">
    <div role="tablist" aria-label="Project views">
+    <button id="tab-library" type="button" role="tab" aria-selected="false" aria-controls="library" tabindex="-1">Design library</button>
     <button id="tab-files" type="button" role="tab" aria-selected="false" aria-controls="files" tabindex="-1">Files</button>
     <button id="tab-project" type="button" role="tab" aria-selected="false" aria-controls="canvas" tabindex="-1" title="The whole product's architecture"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 4.5h6M4 6.5v4M12 6.5v4" stroke="#868e96" stroke-width="1.4" fill="none"/><rect x="1" y="1.5" width="6" height="5" rx="1.5" fill="#4c6ef5"/><rect x="9" y="1.5" width="6" height="5" rx="1.5" fill="#2f9e44"/><rect x="5" y="10" width="6" height="5" rx="1.5" fill="#e8590c"/></svg>UML Project</button>
     <button id="tab-plan" type="button" role="tab" aria-selected="true" aria-controls="canvas" title="The displayed plan's own diagram"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="13.5" rx="2" fill="#fff4e6" stroke="#e8590c" stroke-width="1.2"/><rect x="5" y=".8" width="6" height="2.6" rx="1" fill="#e8590c"/><rect x="4" y="5.5" width="3.5" height="3" rx=".8" fill="#7048e8"/><rect x="8.5" y="10.5" width="3.5" height="3" rx=".8" fill="#1098ad"/><path d="M5.8 8.5v3.5h2.7" stroke="#495057" stroke-width="1.1" fill="none"/></svg>UML Plan</button>
@@ -126,6 +128,7 @@
    <button id="narrow-left" type="button" aria-pressed="false" title="Narrow this panel to the chat's width">Narrow</button>
   </div>
   <section id="files" class="files" role="tabpanel" aria-labelledby="tab-files" hidden></section>
+  <section id="library" class="design-library" role="tabpanel" aria-labelledby="tab-library" hidden></section>
   <section id="canvas" class="canvas" role="tabpanel" aria-labelledby="tab-plan">
    <svg id="diagram" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Architecture diagram" tabindex="0"></svg>
    <p id="empty-diagram" class="empty-diagram"></p>
@@ -146,6 +149,13 @@
    </div>
    <button id="to-bottom" class="to-bottom" type="button" aria-label="Scroll to the newest message" hidden>↓ New messages</button>
    <form id="composer" class="composer">
+    <section id="draft-recovery" class="draft-recovery" aria-label="Saved submission recovery" hidden>
+     <p>This message has no acknowledgment on this page. Check Chat before resending; nothing is sent automatically.</p>
+     <pre id="draft-recovery-text"></pre>
+     <button id="draft-restore" type="button">Restore for editing</button>
+     <button id="draft-dismiss" type="button">Dismiss recovery copy</button>
+    </section>
+    <div id="reference-draft" class="reference-draft" aria-label="Selected design references"></div>
     <div id="mentions" class="mentions" aria-label="Mentioned elements"></div>
     <div id="slash-menu" class="slash-menu" role="listbox" aria-label="Commands" hidden></div>
     <div class="input-wrap"><div class="history-nav" title="Your earlier messages (↑ twice at the start of the box, ↓ at its end)"><button id="history-older" type="button" aria-label="Older message">▲</button><button id="history-newer" type="button" aria-label="Newer message">▼</button><span id="history-when"></span></div>

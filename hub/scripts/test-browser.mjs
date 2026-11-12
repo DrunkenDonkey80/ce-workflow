@@ -11,7 +11,7 @@ import { promisify } from "node:util";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyDiagramOperations, toolbarEdit } from "../../extensions/plan3-diagram.ts";
-import { decodePng } from "../../extensions/screen-read.ts";
+import { decodePng, encodePng } from "../../extensions/screen-read.ts";
 import { themeInput, themeTokens } from "../../extensions/design-theme.ts";
 import { appStarter } from "../../extensions/design-app.ts";
 import { appPublication, BUILD_STATUS, ensureAppBuilt } from "../../extensions/design-build.ts";
@@ -66,6 +66,12 @@ writePlan("12345678", sample.title, 5, 2, "2026-10-18T12:00:00Z"); writePlan("ab
 const diagramFile = join(folder, planFile("12345678", sample.title).replace(/\.md$/, ".diagram.json")), productFile = join(folder, "docs/architecture/product.diagram.json");
 const persist = () => { fs.writeFileSync(diagramFile, JSON.stringify(diagram)); if (product.revision) { fs.mkdirSync(join(productFile, ".."), { recursive: true }); fs.writeFileSync(productFile, JSON.stringify(product)); } };
 persist();
+write(".pi/designs/systems/index.json", JSON.stringify({ commit: "1".repeat(40), names: ["fixture-style"], fetched: Date.now() }));
+const libraryHTML = `<h1>Library fixture</h1><input id="unfinished" value="initial"><style>body{font:18px system-ui;background:#faf4e5;color:#24394c}h1{border-bottom:4px solid #876959}</style><script>
+addEventListener("message",async event=>{if(event.data?.type!=="fixture:library")return;let isolated=false,violation=false;try{parent.document.body}catch{isolated=true}if(typeof event.data.value==="string")document.getElementById("unfinished").value=event.data.value;if(event.data.probe){addEventListener("securitypolicyviolation",e=>{if(e.effectiveDirective==="connect-src")violation=true},{once:true});try{await fetch(event.data.probe)}catch{}await new Promise(resolve=>setTimeout(resolve,30));}parent.postMessage({type:"fixture:library-result",request:event.data.request,width:innerWidth,isolated,violation,value:document.getElementById("unfinished").value},"*");});
+</script>`;
+write(".pi/designs/systems/fixture-style/SOURCE.json", JSON.stringify({ commit: "1".repeat(40) })); write(".pi/designs/systems/fixture-style/kit.html", libraryHTML);
+for (const [name, version] of [["First export", 1], ["Other export", 2]]) { write(`docs/designs/${name}/DESIGN.json`, JSON.stringify({ handle: "design-7", name, version })); write(`docs/designs/${name}/index.html`, libraryHTML); }
 write("docs/readme.md", "# Readme\n"); write("docs/notes.md", "# Notes\n"); write("src/app.ts", "old line\n"); write("top.txt", "<img src=x onerror=alert(1)>\nplain\n"); write(".gitignore", "fake-*\n*.lock\n");
 const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: folder, stdio: "pipe" });
 git("init", "-q"); git("add", "-A"); git("commit", "-qm", "init"); write("src/app.ts", "new line\n");
@@ -77,7 +83,7 @@ function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
  if (endpoint === "/api/usage") return { summary: [{ id: "claude", label: "Claude", window: "7d", left: 53, color: "text", bars: [{ label: "7d", left: 53, color: "text" }], warnings: [{ text: "flex1: 40% unused, login ends in 4h 12m", color: "error" }], notes: ["70% in 2h 0m"] }, { id: "codex", label: "Codex", window: "7d", left: 12, color: "error", resets: "1d 14h", soon: [{ left: 75, in: "18h 19m" }, { left: 65, in: "1d 9m" }], bars: [{ label: "5h", left: 80, color: "text", resets: "2h 3m" }, { label: "7d", left: 12, color: "error", resets: "1d 14h", at: "Tue 10:00" }], warnings: [], notes: [] }], lines: [[{ text: "Claude", color: "accent" }, { text: " 7d [████░░░░] 53% · 5h 20% │ " }, { text: "Codex", color: "accent" }, { text: " 7d 12%", color: "error" }]] };
  if (endpoint === "/api/pool") { if (body.act) { pool.acts.push(body.act + ":" + (body.text ?? body.label) + (body.value === undefined ? "" : ":" + body.value)); if (body.act === "login") return { login: { url: "https://claude.ai/oauth/authorize?x=1", email: "flex@datecs.bg" } }; return { message: "done " + body.act }; } return { title: "Claude accounts", drain7d: false, rows: [{ label: "flex1", priority: 0, state: "ok", login: "ok", fiveHour: { pct: 20, resets: "2h" }, sevenDay: { pct: 53, tone: "warning", resets: "4h 12m", clock: "error" }, notes: [{ text: "as of 3m ago" }], active: true, favorite: true, weekend: false, disabled: false, dead: false }, { label: "flex2", priority: -1, state: "ok", login: "ok", fiveHour: null, sevenDay: { pct: 90, tone: "error" }, notes: [], active: false, favorite: false, weekend: false, disabled: false, dead: false }] }; }
- if (endpoint === "/api/commands") return { pi: [{ name: "plan3", description: "Plan" }], wo: [{ value: "share", description: "Toggle sharing" }], args: { wo: [{ value: "share", description: "Toggle sharing" }], plan3: [{ value: "review", description: "Review" }, { value: "review all", description: "Review" }] } };
+ if (endpoint === "/api/commands") { const wo = [{ value: "share", description: "Toggle sharing" }, { value: "design", description: "Browse design references" }]; return { pi: [{ name: "plan3", description: "Plan" }], wo, args: { wo, plan3: [{ value: "review", description: "Review" }, { value: "review all", description: "Review" }] } }; }
  if (endpoint === "/api/edit" && body.target === "product") { // E-05: Project-tab edits
   const planned = toolbarEdit(product, body.edit), result = applyDiagramOperations(product, planned.operations); toolbarEdits.push(body.edit);
   product = { ...result.diagram, revision: product.revision + 1 }; persist(); publish("diagram", { target: { kind: "product" }, diagram: product });
@@ -140,6 +146,98 @@ try {
  await browser("network", "unroute", "**/icons.js?*");
  await reload("document.getElementById(\"title\").textContent === \"ce-workflow - 1\"");
  await browser("set", "viewport", "1280", "800");
+ // Library entry stays in this chat: the tab preserves the draft; exact command and deep link send no prompt.
+ const beforeLibrary = { messages: messages.length, commands: commands.length, sessions: hub.registry.list().length };
+ await browser("fill", "#message-input", "Keep this unfinished brief");
+ await browser("click", "#tab-library"); await browser("wait", "#library article");
+ assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('library').hidden, document.getElementById('canvas').hidden, document.getElementById('command-picker').open]"), ["Keep this unfinished brief", false, true, false]);
+ assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 184);
+ await browser("fill", "#library input[type=search]", "neutral");
+ assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 1);
+ await browser("click", "#library [data-entry='astryx:theme:neutral'] button");
+ await browser("wait", "--fn", "document.querySelector('.library-detail img')?.naturalWidth > 0");
+ assert.match(await evaluate("document.querySelector('.library-detail').textContent"), /Static source image, not a generated preview/);
+ await browser("click", ".library-detail [data-add]"); await browser("wait", "#reference-draft [data-reference=ref1] img");
+ await browser("click", ".library-detail [data-add]");
+ await browser("wait", "--fn", "!document.querySelector(\".library-detail [data-add]\").disabled");
+ assert.equal(await evaluate("document.querySelectorAll(\"#reference-draft [data-reference]\").length"), 1, "duplicate adds focus the existing chip");
+ assert.equal(await evaluate("document.activeElement.dataset.reference"), "ref1");
+ await browser("select", "select[aria-label=\"Reference aspect\"]", "colors");
+ await browser("fill", "textarea[aria-label=\"Reference note\"]", "Use the colors, not the layout");
+ await browser("click", ".library-detail [data-add]"); await browser("wait", "#reference-draft [data-reference=ref2]");
+ assert.deepEqual(await evaluate("JSON.parse(localStorage.getItem(\"plan3-draft:\" + location.pathname.split(\"/\")[2])).refs"), ["ref1", "ref2"], "distinct aspects have separate stable draft references");
+ assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this unfinished brief");
+ await reload("!document.querySelector('.library-detail').hidden && document.querySelector('.library-detail img')?.naturalWidth > 0");
+ assert.equal(await evaluate("document.querySelector('#library input[type=search]').value"), "neutral", "library search and inspection survive reload");
+ await browser("wait", "--fn", "document.querySelector(\"[data-reference=ref1] img\")?.naturalWidth > 0 && document.querySelector(\"textarea[aria-label='Note for @ref2']\")?.value === 'Use the colors, not the layout'");
+ assert.equal(await evaluate("document.querySelectorAll(\"#reference-draft [data-reference]\").length"), 2, "reference IDs reload with authoritative source metadata");
+ await browser("click", "#reference-draft [data-reference=ref2] summary");
+ await browser("fill", "textarea[aria-label=\"Note for @ref2\"]", "<img src=x onerror=alert(1)> Keep contrast");
+ await evaluate("document.querySelector(\"#reference-draft [data-reference=ref2] details button\").scrollIntoView({block: 'nearest'})");
+ await browser("click", "#reference-draft [data-reference=ref2] details button");
+ await browser("wait", "--fn", "document.getElementById(\"notice\").textContent === 'Reference note saved.'");
+ assert.equal(await evaluate("document.querySelectorAll(\"#reference-draft img\").length"), 2, "notes remain plain text");
+ await evaluate("document.querySelector(\"#reference-draft button[aria-label='Remove @ref1']\").scrollIntoView({block: 'nearest'})");
+ await browser("click", "#reference-draft button[aria-label=\"Remove @ref1\"]");
+ await browser("wait", "--fn", "!document.querySelector(\"[data-reference=ref1]\")");
+ await evaluate("document.querySelector(\"#reference-draft button[aria-label='Remove @ref2']\").scrollIntoView({block: 'nearest'})");
+ await browser("click", "#reference-draft button[aria-label=\"Remove @ref2\"]");
+ await browser("wait", "--fn", "!document.querySelector(\"#reference-draft article\")");
+ assert.deepEqual(await evaluate("JSON.parse(localStorage.getItem(\"plan3-draft:\" + location.pathname.split(\"/\")[2])).refs"), [], "removing a reference updates the draft without altering its text");
+ await browser("click", ".library-detail button");
+ const neutralTitle = "document.querySelector(\"#library [data-entry='astryx:theme:neutral'] h3\")";
+ assert.equal(await evaluate(`(() => { const node = ${neutralTitle}, range = document.createRange(); range.selectNodeContents(node); getSelection().removeAllRanges(); getSelection().addRange(range); const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true }); node.dispatchEvent(event); getSelection().removeAllRanges(); return event.defaultPrevented; })()`), false, "selecting text keeps its native context menu");
+ assert.equal(await evaluate(`(() => { const node = ${neutralTitle}.parentElement.querySelector('[data-add]'), event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true }); node.dispatchEvent(event); return event.defaultPrevented; })()`), false, "interactive controls retain their native context menu");
+ await evaluate(`(async () => { const node = ${neutralTitle}; node.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true, clientX: 10, clientY: 10 })); node.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'touch', clientX: 10, clientY: 50 })); await new Promise(resolve => setTimeout(resolve, 720)); node.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' })); })()`);
+ assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 0, "scroll movement cancels a hold without selecting anything");
+ await evaluate(`${neutralTitle}.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true, cancelable: true }))`);
+ await browser("wait", "#reference-draft [data-reference=ref3]");
+ await browser("wait", "--fn", "!document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-add]\").disabled");
+ await evaluate(`(() => { const node = ${neutralTitle}; node.tabIndex = -1; node.focus(); node.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); })()`);
+ await browser("wait", "--fn", "document.activeElement.dataset.reference === 'ref3'");
+ await browser("wait", "--fn", "!document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-add]\").disabled");
+ await evaluate(`(() => { const node = ${neutralTitle}; node.focus(); node.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true, clientX: 10, clientY: 10 })); })()`);
+ await browser("wait", "--fn", "document.activeElement.dataset.reference === 'ref3'");
+ await evaluate(`${neutralTitle}.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }))`);
+ await browser("wait", "--fn", "!document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-add]\").disabled");
+ assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 1, "Ctrl-click, right-click and hold select one stable reference");
+ await browser("click", "#reference-draft button[aria-label=\"Remove @ref3\"]");
+ await browser("wait", "--fn", "!document.querySelector('#reference-draft article')");
+ await browser("click", "#library [data-entry='astryx:theme:neutral'] [data-inspect]");
+ await browser("click", ".library-detail button");
+ assert.deepEqual(await evaluate("[document.querySelectorAll('#library [data-entry]').length, document.querySelector('.library-detail').hidden, document.activeElement.textContent]"), [1, true, "Inspect Neutral"], "Back preserves filtered results and keyboard focus");
+ await browser("fill", "#library input[type=search]", "");
+ assert.equal(await evaluate("document.querySelectorAll('.library-group [data-entry]').length"), 2, "identical authored exports retain both source cards");
+ const probeLibrary = (selector, data = {}) => evaluate(`new Promise((resolve,reject)=>{const frame=document.querySelector(${JSON.stringify(selector)}),request=crypto.randomUUID(),timer=setTimeout(()=>{removeEventListener('message',reply);reject(Error('Library sample did not reply'));},3000);const reply=event=>{if(event.source!==frame.contentWindow||event.data?.type!=='fixture:library-result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',reply);resolve({...event.data,origin:event.origin});};addEventListener('message',reply);frame.contentWindow.postMessage({type:'fixture:library',request,...${JSON.stringify(data)}},'*');})`);
+ await browser("click", "#library [data-entry='od:fixture-style'] button");
+ await browser("wait", ".library-preview[aria-busy=false]");
+ assert.equal(await evaluate("document.querySelector('.library-preview iframe').getAttribute('sandbox')"), "allow-scripts");
+ await browser("select", "select[aria-label='Preview viewport width']", "390");
+ const isolated = await probeLibrary(".library-preview iframe", { probe: origin + "/harmless-security-probe" });
+ assert.deepEqual([isolated.width, isolated.isolated, isolated.origin, isolated.violation], [390, true, "null", true], "source scripts run opaquely and cannot fetch even other host paths");
+ await reload("!!document.querySelector('.library-preview[aria-busy=false]')");
+ assert.equal((await probeLibrary(".library-preview iframe")).width, 390, "inspection width survives reload");
+ await browser("set", "viewport", "390", "844"); await browser("click", "#drawer-toggle"); await browser("click", "#mobile-library");
+ await browser("select", "select[aria-label='Preview viewport width']", "1280");
+ assert.equal((await probeLibrary(".library-preview iframe")).width, 1280);
+ assert(await evaluate("document.documentElement.scrollWidth <= innerWidth"), "wide sample scrolls inside its panel, not the phone page");
+ await browser("click", ".library-detail button"); await browser("set", "viewport", "1280", "800");
+ await browser("click", "#library [data-entry='export:First export'] button"); await browser("wait", ".library-preview[aria-busy=false]");
+ assert.match(await evaluate("document.querySelector('.library-detail').textContent"), /Selected export v1/);
+ await browser("click", ".library-detail button");
+ await reload("document.getElementById('title').textContent === 'ce-workflow - 1' && document.querySelectorAll('#library article').length > 0");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), "Keep this unfinished brief");
+ await browser("fill", "#message-input", "/wo design");
+ await evaluate("document.getElementById('composer').requestSubmit()");
+ assert.equal(await evaluate("document.getElementById('library').hidden"), false);
+ await browser("open", server.url({ id: "12345678" }) + "&view=library");
+ await browser("wait", "#library article");
+ assert.equal(await evaluate("document.getElementById('left-panel').getClientRects().length > 0"), true, "deep-linked library is not collapsed by initial snapshots");
+ assert.deepEqual({ messages: messages.length, commands: commands.length, sessions: hub.registry.list().length }, beforeLibrary, "browsing neither starts sessions nor forwards a provider prompt");
+ assert.equal(await evaluate("location.pathname"), "/s/" + id + "/", "the invoking conversation stays current");
+ // Later reload checks exercise remembered tabs, not the explicit library deep link.
+ await evaluate("(() => { const url = new URL(location.href); url.searchParams.delete('view'); history.replaceState(null, '', url); })()");
+ await browser("fill", "#message-input", ""); await browser("click", "#tab-plan");
  // Ctrl+wheel: the page 10% bigger, still exactly filling the window; and back.
  const wheel = (up, first = false) => `(() => { const event = new WheelEvent("wheel", { deltaY: ${up ? -100 : 100}, ctrlKey: true, bubbles: true, cancelable: true }); ${first ? `Object.defineProperty(event, "timeStamp", { value: 0 });` : ""} document.getElementById("chat").dispatchEvent(event); })()`;
  // A first event at page time zero must not be throttled by an imaginary previous wheel.
@@ -217,12 +315,24 @@ try {
  assert(await evaluate("(() => { const bar = document.querySelector('.topbar'), was = document.getElementById('connection').dataset.state; document.getElementById('connection').dataset.state = 'working'; const orange = getComputedStyle(bar).backgroundColor; document.getElementById('connection').dataset.state = 'idle'; const idle = getComputedStyle(bar).backgroundColor; document.getElementById('connection').dataset.state = was; return orange !== idle && /rgb/.test(orange); })()"), "phone: the top bar turns orange while working");
  assert(await evaluate("(() => { const top = id => document.getElementById(id).getBoundingClientRect().top, wide = id => document.getElementById(id).getBoundingClientRect().width; return Math.abs(top('model-button') - top('context-button')) < 2 && top('bias-button') > top('model-button') + 20 && top('plan-button') < top('model-button') && top('settings-button') < top('mobile-chat') && document.getElementById('drawer-gear').contains(document.getElementById('settings-menu')) && document.querySelector('#context-button .context-label').offsetParent === null && wide('model-button') > 120; })()"), "phone: gear by View, plan under Session, then model + context, then think and load; context numbers only");
  assert(await evaluate("(() => { const plan = document.getElementById('title-plan'), r = id => document.getElementById(id).getBoundingClientRect(); return !plan.hidden && plan.lastElementChild.textContent === '2/5' && r('title-plan').top >= r('title').bottom && r('title-plan').top > r('connection').bottom; })()"), "phone: plan name and steps on a second top-bar line under the session name and state");
+ await browser("fill", "#message-input", "Keep this mobile brief");
+ await browser("click", "#wo-commands"); await browser("wait", ".command-option[data-command='/wo design']");
+ await browser("click", ".command-option[data-command='/wo design']"); await browser("wait", "#library article");
+ assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('workspace').dataset.mobile, document.getElementById('mobile-library').getAttribute('aria-selected')]"), ["Keep this mobile brief", "panel", "true"], "the menu opens Browse without replacing the unsent brief");
+ await browser("click", "#drawer-toggle"); await browser("click", "#mobile-plan"); // restore the diagram for the remaining canvas checks
+ await browser("click", "#drawer-toggle"); await browser("click", "#mobile-chat");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), "Keep this mobile brief", "Browse/Chat preserves the brief");
+ await browser("click", "#drawer-toggle");
  await browser("click", "#wo-commands"); await browser("wait", ".command-option");
- await browser("click", ".command-option"); assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('command-picker').open, document.getElementById('drawer').dataset.open]"), ["/wo share ", false, "false"], "a picked command goes into the composer");
+ await browser("click", ".command-option[data-command='/wo share']"); assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('command-picker').open, document.getElementById('drawer').dataset.open]"), ["/wo share ", false, "false"], "a picked command goes into the composer");
  await browser("fill", "#message-input", "");
  // Phone: the drawer's Commit and push icon asks which tests to run, and a choice sends that request.
- await browser("click", "#drawer-toggle"); await browser("click", ".session-git-action[data-git=git-push]");
- assert(await evaluate("(() => { const menu = document.getElementById('push-menu'), r = menu.getBoundingClientRect(); return !menu.hidden && r.width > 0 && r.left >= 0 && r.bottom <= innerHeight; })()"), "phone: the push test menu shows in the drawer");
+ await browser("click", "#drawer-toggle");
+ await browser("hover", ".session-git-action[data-git=git-push]");
+ assert.equal(await evaluate("getComputedStyle(document.querySelector('#drawer .session-git-files')).display"), "none", "phone: hovering a git action does not open the file list over it");
+ await browser("click", ".session-git-action[data-git=git-push]");
+ const pushLayout = await evaluate("(() => { const menu = document.getElementById('push-menu'), r = menu.getBoundingClientRect(), drawer = document.getElementById('drawer'); return { hidden: menu.hidden, width: r.width, left: r.left, top: r.top, bottom: r.bottom, height: innerHeight, drawerScroll: drawer.scrollTop, drawerTransform: getComputedStyle(drawer).transform }; })()");
+ assert(!pushLayout.hidden && pushLayout.width > 0 && pushLayout.left >= 0 && pushLayout.bottom <= pushLayout.height, "phone: the push test menu shows in the drawer: " + JSON.stringify(pushLayout));
  await browser("click", ".push-choice"); await browser("wait", "--fn", "document.getElementById('push-menu').hidden");
  assert.match(messages.at(-1).text, /^commit and push; before pushing run only the targeted tests/, "phone: Scoped tests sends commit and push with scoped tests");
  messages.pop(); await evaluate("document.getElementById('drawer-backdrop').click()"); // later checks read messages from the first one
@@ -319,8 +429,10 @@ try {
   assert.equal((await hub_({ idleParkMinutes: -1 })).status, 400);
   await hub_({ idleParkMinutes: 0, icon: "", usageHidden: [] }); }
  { const r = await fetch(`${origin}/s/${id}/api/paste`, { method: "POST", headers: { authorization: `Bearer ${hub.config.localKey}`, origin }, body: "<svg onload=alert(1)>" }); assert.match((await r.json()).error, /PNG, JPEG/, "non-image paste rejected by magic bytes"); }
+ // A one-pixel canvas is not a reliable pointer target after browser coordinate rounding.
+ const clipboardPng = encodePng(32, 32, Buffer.alloc(32 * 32 * 4, 255)).toString("base64");
  // Clipboard image paste: saved as a temp file, path inserted into the draft.
- await evaluate("(() => { const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob(\"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\"), c => c.charCodeAt(0))], \"shot.png\", { type: \"image/png\" })); document.getElementById(\"message-input\").dispatchEvent(new ClipboardEvent(\"paste\", { clipboardData: data, bubbles: true, cancelable: true })); })()");
+ await evaluate(`(() => { const data = new DataTransfer(); data.items.add(new File([Uint8Array.from(atob(${JSON.stringify(clipboardPng)}), c => c.charCodeAt(0))], "shot.png", { type: "image/png" })); document.getElementById("message-input").dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true })); })()`);
  await browser("wait", "--fn", "/pi-clipboard-[0-9a-f-]+\\.png/.test(document.getElementById(\"message-input\").value)");
  const pasted = (await evaluate("document.getElementById(\"message-input\").value")).trim();
  assert.deepEqual([...(await readFile(pasted))].slice(0, 8), [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -665,12 +777,13 @@ try {
  await evaluate("document.querySelector('#chat-search [data-find=close]').click()");
  assert.equal(await evaluate("document.getElementById('chat-search').hidden"), true, "the close button closes the search");
  // Pi-style colour coding: tool blocks by state, an edit's diff instead of its arguments, labels only for screen readers.
- publish("message", { id: "assistant_4", role: "assistant", text: "", streaming: false, blocks: [
+ const blockRow = { id: "assistant_4", role: "assistant", text: "", streaming: false, blocks: [
   { type: "thinking", text: "hmm" },
   { type: "tool", id: "t1", name: "edit", title: "edit a.ts", args: "{oldText}", result: "ok", diff: "-1 old\n+1 new\n 2 same" },
   { type: "tool", id: "t2", name: "bash", title: "bash ls", args: "{}", result: "boom", error: true },
   { type: "thinking", text: "more" },
-  { type: "tool", id: "t3", name: "read", title: "read b.ts", args: "{}" }] });
+  { type: "tool", id: "t3", name: "read", title: "read b.ts", args: "{}" }] };
+ chatRows.set(blockRow.id, blockRow); publish("message", blockRow);
  await browser("wait", "#messages [data-id=assistant_4] .block-tool");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] details')].map(item => item.className)"), ["block block-thinking", "block block-tool block-change block-ok", "block block-tool block-error", "block block-thinking", "block block-tool block-read block-pending"]);
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#messages [data-id=assistant_4] .diff span')].map(span => span.className)"), ["diff-del", "diff-add", ""]);
@@ -692,21 +805,39 @@ try {
  assert.equal(await evaluate("document.querySelectorAll(\".mention-chip\").length"), 2, "emails are not mentions");
  await browser("click", "#send"); await browser("wait", "--fn", "document.getElementById(\"message-input\").value === \"\"");
  assert(messages[0].text.includes("@web_client")); assert.equal(await evaluate("document.querySelector(\"#messages img\")"), null);
- // Leaving the page while a send is in flight must not restore the sent text from storage.
+ // Keep an in-flight submission separately from newer edits until acknowledgment.
  let release; holdMessage = new Promise(resolve => release = resolve);
  await browser("fill", "#message-input", "Sent while leaving"); await browser("click", "#send");
  await browser("wait", "--fn", "document.getElementById(\"send\").disabled");
- assert.equal(await evaluate("localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])"), null, "a send in flight drops the stored draft");
+ const sendingDraft = await evaluate("JSON.parse(localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2]) ?? 'null')");
+ assert.equal(sendingDraft?.pending?.text, "Sent while leaving", "an in-flight submission must persist until acknowledgment");
+ await browser("fill", "#message-input", "Newer edits while sending");
+ const newerDraft = await evaluate("JSON.parse(localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2]))");
+ assert.equal(newerDraft.text, "Newer edits while sending", "new edits persist independently of the older send");
+ assert.equal(newerDraft.pending.text, "Sent while leaving", "new edits do not replace the in-flight submission");
  const commandError = "Plan3: /plan3 optimize needs an existing Plan3 plan, not source code.";
  rpc().emit("ui", { type: "extension_ui_request", method: "notify", message: commandError, notifyType: "error" });
  await browser("wait", "--fn", `document.getElementById("notice").textContent === ${JSON.stringify(commandError)}`);
- holdMessage = null; release(); await browser("wait", "--fn", "document.getElementById(\"message-input\").value === \"\"");
+ holdMessage = null; release(); await browser("wait", "--fn", "!document.getElementById(\"send\").disabled");
+ assert.equal(await evaluate("document.getElementById('message-input').value"), "Newer edits while sending", "acknowledgment cannot clear newer edits");
+ assert.equal(await evaluate("JSON.parse(localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])).pending === undefined"), true, "acknowledgment clears only the completed submission");
  assert.equal(await evaluate("document.getElementById('notice').textContent"), commandError, "send success must not overwrite a command error received while sending");
  assert.equal(await evaluate("document.getElementById('notice').checkVisibility()"), true);
  rejectMessage = true; await browser("fill", "#message-input", "Keep this draft"); await browser("press", "Control+Enter");
  await browser("wait", "--fn", "document.getElementById(\"notice\").textContent.includes(\"draft is kept\")");
  assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this draft");
- assert.equal(await evaluate("localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])"), "Keep this draft", "a failed send stores the draft again");
+ assert.equal(await evaluate("JSON.parse(localStorage.getItem('plan3-draft:' + location.pathname.split('/')[2])).text"), "Keep this draft", "a failed send retains the draft");
+ // An explicit recovery action is required after a response that cannot prove non-delivery.
+ await browser("wait", "#draft-recovery:not([hidden])");
+ await reload("document.getElementById(\"draft-recovery\").checkVisibility() && !document.getElementById(\"connection\").textContent.includes(\"Disconnected\")");
+ assert.equal(await evaluate("document.getElementById(\"draft-recovery-text\").textContent"), "Keep this draft", "reload preserves the unacknowledged submission");
+ assert.equal(await evaluate("document.getElementById(\"send\").disabled"), true, "reload never blindly resends an uncertain submission");
+ // Display-only rows published directly to SSE are not part of fake Pi's RPC history.
+ for (const row of chatRows.values()) publish("message", row);
+ await browser("wait", "#messages [data-id=assistant_4]");
+ await browser("click", "#draft-restore");
+ assert.equal(await evaluate("document.getElementById(\"message-input\").value"), "Keep this draft");
+ assert.equal(await evaluate("JSON.parse(localStorage.getItem(\"plan3-draft:\" + location.pathname.split(\"/\")[2])).pending === undefined"), true);
  ask({ question: "Pick a colour", context: "Single choice", options: [{ title: "Blue" }, { title: "Pink" }, { title: "Docs https://example.com/a" }], allowMultiple: false, allowFreeform: true, allowComment: true });
  await browser("wait", "--fn", "document.getElementById(\"prompt\").open");
  assert.deepEqual(await evaluate("[...document.querySelectorAll('#prompt-form .prompt-option a')].map(a => a.getAttribute('href'))"), ["https://example.com/a"], "links in options work like in chat");
@@ -1247,8 +1378,14 @@ try {
  assert.deepEqual([answers.at(-1).selections, answers.at(-1).comment], [["Pink"], "Kept across pages"]);
  assert.equal(await evaluate("Object.keys(localStorage).filter(k => k.startsWith('ask-draft:')).length"), 0, "an answered ask drops its draft");
  // S07: a design session's page opens its mirrored design beside the chat: no file tree, Desktop and Phone (390 px) widths.
- const designDir = join(folder, ".pi", "designs", "design-1"); fs.mkdirSync(designDir, { recursive: true }); fs.writeFileSync(join(designDir, "index.html"), "<h1>Calm</h1>");
+ const designDir = join(folder, ".pi", "designs", "design-1"); fs.mkdirSync(designDir, { recursive: true }); fs.writeFileSync(join(designDir, "index.html"), libraryHTML.replace("<h1>Library fixture</h1>", "<h1>Calm</h1>"));
+ await evaluate("window.libraryFetch=fetch;window.fetch=async(...args)=>{const response=await libraryFetch(...args),url=String(args[0]);if(url.includes('api/designpreview')){window.pendingDesignKey=(await response.clone().json()).key;return new Promise(resolve=>{window.releaseDesignPreview=()=>resolve(response);});}if(url.includes('api/unview')&&JSON.parse(args[1].body).key===window.pendingDesignKey)window.designPreviewDiscarded=true;return response;}");
  await rpc().send({ type: "prompt", message: "/state " + JSON.stringify({ plan: null, modes: { design: "design-1" }, compacting: false, subagents: [] }) });
+ await browser("wait", "--fn", "typeof window.releaseDesignPreview === 'function'");
+ await browser("click", "#tab-library"); await evaluate("window.releaseDesignPreview()");
+ await browser("wait", "--fn", "window.designPreviewDiscarded");
+ assert.equal(await evaluate("document.getElementById('library').hidden"), false, "a late automatic design preview cannot steal Library focus");
+ await evaluate("window.fetch=libraryFetch"); await browser("click", ".library-heading button:first-child");
  await browser("wait", "--fn", "document.getElementById('files').classList.contains('tree-hidden') && !!document.querySelector('#files .files-frame')");
  // Keep phone toolbar labels whole and every control inside its viewer, including enlarged UI and landscape.
  for(const [width,height,zoom]of[[320,800,1],[390,844,1],[844,390,1],[390,844,2]]){
@@ -1260,6 +1397,11 @@ try {
   assert(toolbar.every(control=>control.fits&&control.width>=44&&control.height>=44),"Design toolbar controls must fit and keep 44px touch targets: "+JSON.stringify(toolbar));
  }
  await evaluate("document.body.style.zoom='1'");await browser("set","viewport","1280","800");
+ await probeLibrary("#files .files-frame", { value: "Unsent form draft" });
+ await evaluate("window.libraryLiveFrame=document.querySelector('#files .files-frame');window.libraryLiveWindow=libraryLiveFrame.contentWindow");
+ await browser("click", "#tab-library"); await browser("click", ".library-heading button:first-child");
+ assert(await evaluate("!document.getElementById('files').hidden && document.querySelector('#files .files-frame')===libraryLiveFrame && libraryLiveFrame.contentWindow===libraryLiveWindow"), "Back restores the existing live frame without reloading it");
+ assert.equal((await probeLibrary("#files .files-frame")).value, "Unsent form draft", "library navigation preserves an unsaved form inside the design");
  // S08: one device picker (Desktop first, the panel's width), rotate, the frame scaled to fit; the choice is kept per design.
  assert.deepEqual(await evaluate("[document.querySelector('#files .design-device').value, document.querySelector('#files .design-rotate').disabled, !!document.querySelector('#files .design-screen')]"), ["Desktop", true, false]);
  assert.match(await evaluate("document.querySelector('#files .design-device').title"), /size only.*input stays with your browser/i);

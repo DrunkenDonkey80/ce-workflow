@@ -1,5 +1,6 @@
 // Browser-only source; the server strips erasable types without a build step.
 import type { Diagram } from "../../extensions/plan3-diagram.ts";
+import type { DesignReference } from "../../extensions/design-references.ts";
 import type { createActivityMirror } from "../../extensions/plan3-web.ts";
 // @ts-ignore Browser URL includes the workspace token.
 import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
@@ -8,6 +9,8 @@ import { createDiagramView, element, seed } from "./diagram.js?token=__TOKEN__";
 const { ICONS, iconSvg, BUTTON_ICONS } = await import("./icons.js?token=__TOKEN__").catch(() => ({ ICONS: {} as Record<string, [string, string, boolean]>, iconSvg: (_name: string, _states?: string[]) => "", BUTTON_ICONS: {} as Record<string, [string, string]> }));
 // @ts-ignore Browser URL includes the workspace token.
 import { createFilesView } from "./files.js?token=__TOKEN__";
+// @ts-ignore Browser URL includes the workspace token.
+import { createDesignLibrary } from "./design-library.js?token=__TOKEN__";
 // @ts-ignore Browser URL includes the workspace token.
 import { elementName, setDesignPins } from "./design-view.js?token=__TOKEN__";
 let designPick = null, designPins = []; // S11 (declared first: renderMentions runs during start-up)
@@ -33,6 +36,9 @@ type Model = { provider: string; id: string; name: string };
 type Plan = { id: string; title: string; done?: number; total?: number; focus?: string; bias?: number; open?: number; planning?: boolean; finishable?: boolean };
 const state: { connected: boolean; diagram: Diagram | null; plan: Plan | null; status: { model: Model | null; effort: string | null; context?: number | null; tokens?: number | null; estimated?: boolean; window?: number | null; git?: GitFiles | null; folder?: string; tab?: string; parked?: boolean; commands?: ProjectCommand[] } | null; activity: Partial<ReturnType<ReturnType<typeof createActivityMirror>["snapshot"]> & { thinkingLength: number }>; pinning: boolean; more: boolean } = { connected: false, diagram: null, plan: null, status: null, activity: {}, pinning: false, more: false };
 let commentPoint, hoverTimer, messageSending = false, commandSending = false;
+let pendingSubmission: { text: string; refs: string[]; at: number } | undefined, draftEdits = 0;
+let selectedReferenceIds: string[] = [];
+const referenceRows = new Map<string, DesignReference>();
 const chat = new Map();
 
 const BIAS_LABEL = { "-2": "Worker (Plan)", "-1": "Worker (Task)", 0: "Default", 1: "Thinker (Task)", 2: "Thinker (Plan)" };
@@ -122,7 +128,7 @@ function renderShell() {
  for (const id of ["git-pull", "git-commit", "git-push", "env-var", "drawer-env-var"]) ($(id) as HTMLButtonElement).disabled = busy;
  for (const button of document.querySelectorAll<HTMLButtonElement>(".session-git-action")) button.disabled = busy; // the sidebar copies (the drawer on phones)
  renderCommands(status?.commands ?? [], busy);
- $("send").disabled = !state.connected || messageSending; $("send").textContent = state.activity.working ? "Queue" : "Send";
+ $("send").disabled = !state.connected || messageSending || !!pendingSubmission; $("send").textContent = state.activity.working ? "Queue" : "Send";
  $("stop").hidden = !state.activity.working; $("stop").disabled = !state.connected;
  const waiting = state.connected && state.activity.dialog && !promptView.busy ? "Pi is waiting for a terminal dialog: " + state.activity.dialog : "";
  $("waiting").textContent = waiting; $("waiting").hidden = !waiting;
@@ -185,7 +191,7 @@ let diagramTab: DiagramTab = "plan";
 const diagrams: Record<DiagramTab, Diagram | null> = { project: null, plan: null };
 const planTarget = () => target && target !== "product" ? target : undefined;
 const diagramTarget = () => diagramTab === "project" ? "product" : planTarget();
-const LEFT_TABS = ["files", "project", "plan"];
+const LEFT_TABS = ["library", "files", "project", "plan"];
 function renderDiagram(refit = false) {
  state.diagram = diagrams[diagramTab];
  // SAFETY: render only reads nodes, edges, notes and revision, which this empty stand-in provides.
@@ -198,14 +204,25 @@ function setDiagram(tab: DiagramTab, value: Diagram | null, refit = false) {
  diagrams[tab] = value;
  if (tab === diagramTab) { renderDiagram(refit); renderMentions(); renderShell(); }
 }
+let libraryReturn = { tab: "plan", left: "full" }, tabInitialized = false;
+try {
+ const saved = JSON.parse(sessionStorage.getItem("design-library-back:" + location.pathname) ?? "null");
+ if (["files", "project", "plan"].includes(saved?.tab) && ["full", "narrow", "collapsed"].includes(saved?.left)) libraryReturn = { tab: saved.tab, left: saved.left };
+} catch { /* private mode */ }
 function setTab(name) {
+ if (name === "library" && tabInitialized && $("library").hidden) {
+  libraryReturn = { tab: LEFT_TABS.find(view => $("tab-" + view).getAttribute("aria-selected") === "true") ?? "plan", left: workspace.dataset.left ?? "full" };
+  try { sessionStorage.setItem("design-library-back:" + location.pathname, JSON.stringify(libraryReturn)); } catch { /* private mode */ }
+ }
+ tabInitialized = true;
  if (name === "diagram") name = "plan"; // remembered from before the Project/Plan split
  for (const view of LEFT_TABS) { const selected = view === name; $("tab-" + view).setAttribute("aria-selected", String(selected)); $("tab-" + view).tabIndex = selected ? 0 : -1; }
- $("files").hidden = name !== "files"; $("canvas").hidden = name === "files"; $("canvas").setAttribute("aria-labelledby", "tab-" + name);
- $("zoom-controls").hidden = $("edit-bar").hidden = name === "files";
- if (name === "files") setTool("select");
+ $("files").hidden = name !== "files"; $("library").hidden = name !== "library"; $("canvas").hidden = name === "files" || name === "library"; $("canvas").setAttribute("aria-labelledby", "tab-" + name);
+ $("zoom-controls").hidden = $("edit-bar").hidden = name === "files" || name === "library";
+ if (name === "files" || name === "library") setTool("select");
  remember("plan3-tab", name);
  if (name === "files") { filesView.shown(); return; }
+ if (name === "library") { void libraryView.open(); return; }
  diagramTab = name; renderDiagram(true);
  // Before the first snapshot the chat helpers are not ready; the snapshot renders them.
  if (state.connected) { renderMentions(); renderShell(); }
@@ -243,7 +260,7 @@ cacheMissToggle.addEventListener("change", () => {
  document.documentElement.classList.toggle("show-cache-misses", cacheMissToggle.checked); pinChat(); fillChat();
 });
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
-const mobileViews = ["chat", "files", "project", "plan"];
+const mobileViews = ["chat", "library", "files", "project", "plan"];
 function setMobile(view) {
  workspace.dataset.mobile = view === "chat" ? "chat" : "panel";
  for (const name of mobileViews) { const tab = $("mobile-" + name); tab.setAttribute("aria-selected", String(name === view)); tab.tabIndex = name === view ? 0 : -1; }
@@ -602,9 +619,65 @@ const filesView = createFilesView($("files"), { get, image: src => openViewer(sr
   },
   restore: async version => { try { await post("message", { text: `Restore version ${version}` }); showNotice(`Asked to restore version ${version}.`, true); } catch (error) { showNotice(error.message); } },
  } });
+function renderReferenceDraft() {
+ const root = $("reference-draft"); root.replaceChildren();
+ for (const id of selectedReferenceIds) {
+  const ref = referenceRows.get(id), row = html("article", { className: "reference-chip", tabIndex: -1 }), detail = html("details"), summary = html("summary"); row.dataset.reference = id;
+  if (ref?.thumbnail && ref.status === "ready") {
+   const img = html("img", { alt: "", src: `api/designreferenceimage?ref=${encodeURIComponent(id)}&token=__TOKEN__` });
+   img.addEventListener("error", () => img.remove(), { once: true }); summary.append(img);
+  }
+  summary.append(html("span", { textContent: `@${id} · ${ref ? ref.source.name + " · " + ref.aspect + (ref.status === "ready" ? "" : " · " + ref.status) : "Metadata unavailable"}` })); detail.append(summary);
+  const remove = html("button", { type: "button", textContent: "Remove", disabled: pendingSubmission?.refs.includes(id) ?? false }); remove.setAttribute("aria-label", "Remove @" + id);
+  remove.addEventListener("click", async () => {
+   remove.disabled = true;
+   try {
+    if (ref) await post("designreference", { action: "remove", id, revision: ref.revision });
+    selectedReferenceIds = selectedReferenceIds.filter(value => value !== id); draftEdits++; saveDraft(); renderReferenceDraft();
+   } catch (error) { showNotice(error.message); await loadReferenceRows(); remove.disabled = false; }
+  });
+  if (ref) {
+   detail.append(html("small", { textContent: ref.source.provenance + " · " + ref.source.license }));
+   const note = html("textarea", { value: ref.note, maxLength: 4000, rows: 2 }), save = html("button", { type: "button", textContent: "Save note", disabled: ref.status !== "ready" || (pendingSubmission?.refs.includes(id) ?? false) });
+   note.setAttribute("aria-label", "Note for @" + id); note.disabled = save.disabled;
+   save.addEventListener("click", async () => {
+    save.disabled = true;
+    try { const updated = await post("designreference", { action: "note", id, revision: ref.revision, note: note.value }); referenceRows.set(id, updated); ref.revision = updated.revision; draftEdits++; saveDraft(); showNotice("Reference note saved.", true); }
+    catch (error) { showNotice(error.message); }
+    finally { save.disabled = false; }
+   });
+   detail.append(note, save);
+  }
+  row.append(detail, remove); root.append(row);
+ }
+}
+async function loadReferenceRows() {
+ if (!selectedReferenceIds.length && !pendingSubmission?.refs.length) return;
+ try { const value = await get("designreferences"); referenceRows.clear(); for (const ref of value.refs) referenceRows.set(ref.ref, ref); renderReferenceDraft(); }
+ catch (error) { renderReferenceDraft(); showNotice("Reference metadata unavailable: " + error.message + ". The selected IDs are kept."); }
+}
+function attachReference(ref: DesignReference) {
+ if (ref.status === "removed") { showNotice("This reference was removed during capture. Add it again to select a new snapshot."); return; }
+ referenceRows.set(ref.ref, ref);
+ if (!selectedReferenceIds.includes(ref.ref)) { selectedReferenceIds.push(ref.ref); draftEdits++; saveDraft(); }
+ renderReferenceDraft(); $("reference-draft").querySelector<HTMLElement>(`[data-reference="${CSS.escape(ref.ref)}"]`)?.focus({ preventScroll: true });
+}
+const libraryView = createDesignLibrary($("library"), { get, post, attached: attachReference, back() {
+ if (phone.matches) {
+  setMobile(libraryReturn.tab);
+  const panel = $(libraryReturn.tab === "files" ? "files" : "canvas"); panel.tabIndex = -1; panel.focus({ preventScroll: true });
+ } else { setTab(libraryReturn.tab); $("tab-" + libraryReturn.tab).focus(); }
+ setLeft(libraryReturn.left);
+ if (!filesView.exploring) void loadSessions();
+} });
+function openLibrary() {
+ if (phone.matches) setMobile("library"); else setTab("library");
+ setLeft("full");
+}
 // /plan3 architecture links open on the Project tab.
 setTab(target === "product" ? "project" : remembered("plan3-tab", [...LEFT_TABS, "diagram"], "plan"));
 { const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view); }
+if (new URLSearchParams(location.search).get("view") === "library") openLibrary();
 $("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
 $("search").addEventListener("keydown", event => {
  if (event.key === "Enter") { event.preventDefault(); diagramView.search($("search").value, true); }
@@ -1058,7 +1131,11 @@ async function exploreArchive(path: string) {
 let designPreview = false;
 async function showDesign() {
  designPreview = true;
- try { showExplored(await post("designpreview", {})); } catch { designPreview = false; }
+ try {
+  const value = await post("designpreview", {});
+  if (!$("library").hidden) { designPreview = false; void post("unview", { key: value.key }).catch(() => {}); return; }
+  showExplored(value);
+ } catch { designPreview = false; }
 }
 function showExplored(value) {
  if (!filesView.exploring) {
@@ -1330,7 +1407,14 @@ function showHistory(at: number, caret: number) {
  box.dispatchEvent(new Event("input"));
 }
 $("composer").addEventListener("submit", async event => {
- event.preventDefault(); if (messageSending || !state.connected) return;
+ event.preventDefault();
+ if ($("message-input").value.trim() === "/wo design") {
+  $("message-input").value = historyAt === -1 ? "" : historyDraft;
+  historyAt = -1; $("message-input").classList.remove("editing-last", "from-history"); $("message-input").title = ""; renderHistoryNav(); saveDraft(); openLibrary(); return;
+ }
+ if (messageSending || !state.connected) return;
+ if (pendingSubmission) { showNotice("Resolve the saved submission before sending another message."); return; }
+ if (selectedReferenceIds.length) { showNotice("Your references are saved. Reference-led launch is not available in this build yet."); return; }
  if (chatUploads.size) {
   messageSending = true; showNotice("Waiting for the pasted file\u2026");
   try { while (chatUploads.size) await Promise.allSettled([...chatUploads]); } finally { messageSending = false; }
@@ -1341,15 +1425,21 @@ $("composer").addEventListener("submit", async event => {
  // Toolbar lines still in the message carry their diagram's context, grouped per diagram (A2).
  const sent = editLines.filter(item => text.split("\n").includes(item.line)), parts = new Map();
  for (const item of sent) parts.set(item.target, [...new Set([...(parts.get(item.target) ?? []), ...item.ids])]);
- messageSending = true; saveDraft(); expectWork(); renderShell(); // the stored draft goes now: leaving the page mid-send must not bring the sent text back
+ const submittedEdits = draftEdits;
+ pendingSubmission = { text, refs: [...selectedReferenceIds], at: Date.now() };
+ messageSending = true; saveDraft(); expectWork(); renderShell();
  // Sending jumps to the newest message; later rows keep following from the bottom.
  toBottom();
  const replacing = $("message-input").classList.contains("editing-last") ? prompts().at(-1)?.text : undefined;
  historyAt = -1; $("message-input").classList.remove("editing-last", "from-history"); $("message-input").title = ""; renderHistoryNav();
  try {
-  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); if ($("message-input").value === text) $("message-input").value = ""; renderMentions(); if (noticeVersion === noticeBefore) showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
- catch (error) { expectWork(false); showNotice(error.message + ". Your message draft is kept."); }
- finally { messageSending = false; saveDraft(); renderShell(); }
+  if (replacing !== undefined) await post("drop", { text: replacing }); const result = await post("message", { text, target: diagramTarget() ?? target, ...(parts.size ? { diagrams: [...parts].map(([target, ids]) => ({ target, ids })) } : {}) }); editLines = editLines.filter(item => !sent.includes(item)); pendingSubmission = undefined; if (draftEdits === submittedEdits && $("message-input").value === text) $("message-input").value = ""; renderMentions(); if (noticeVersion === noticeBefore) showNotice(result.queued ? "Sent; it steers the running agent." : "Message sent.", true); }
+ catch (error) {
+  // An explicit refusal before acceptance is retryable; a missing response is not evidence of non-delivery.
+  if (Number.isInteger(error.status) && error.status >= 400 && error.status < 500 && error.status !== 408 && draftEdits === submittedEdits) pendingSubmission = undefined;
+  expectWork(false); showNotice(error.message + ". Your message draft is kept.");
+ }
+ finally { messageSending = false; saveDraft(); renderRecovery(); renderShell(); }
 });
 // Sending shows Working at once instead of when the agent starts seconds later. The server's next activity event
 // replaces this guess; if none comes (a command that starts no turn), it drops back after 15 s.
@@ -1563,10 +1653,38 @@ function gitLine(git?: GitFiles | null, own = false) {
 }
 type Recent = { file: string; folder: string; label: string; name: string | null; modified: number };
 const sessionId = location.pathname.split("/")[2] ?? "";
-// The unsent message survives switching sessions and reloads, per session; pagehide also catches programmatic edits (send clears it).
-const draftKey = "plan3-draft:" + sessionId, saveDraft = () => { try { const value = messageSending ? "" : $("message-input").value; if (value) localStorage.setItem(draftKey, value); else localStorage.removeItem(draftKey); } catch { /* private mode */ } };
-try { if (!$("message-input").value) $("message-input").value = localStorage.getItem(draftKey) ?? ""; } catch { /* private mode */ }
-$("message-input").addEventListener("input", saveDraft);
+// Keep the editable draft separate from a send whose response may never reach this page.
+const draftKey = "plan3-draft:" + sessionId;
+function saveDraft() {
+ try {
+  const text = $("message-input").value;
+  if (text || selectedReferenceIds.length || pendingSubmission) localStorage.setItem(draftKey, JSON.stringify({ version: 1, text, refs: selectedReferenceIds, pending: pendingSubmission }));
+  else localStorage.removeItem(draftKey);
+ } catch { /* private mode */ }
+}
+try {
+ const raw = localStorage.getItem(draftKey) ?? "";
+ let value; try { value = JSON.parse(raw); } catch { /* legacy plain-text draft */ }
+ const structured = value?.version === 1 && typeof value.text === "string";
+ const ids = (rows: unknown): string[] => Array.isArray(rows) ? [...new Set(rows.filter((id): id is string => typeof id === "string" && /^ref[1-9]\d{0,4}$/.test(id)))].slice(0, 16) : [];
+ if (!$("message-input").value) $("message-input").value = structured ? value.text : raw;
+ if (structured) selectedReferenceIds = ids(value.refs);
+ if (structured && typeof value.pending?.text === "string" && value.pending.text.length <= 20000 && Number.isFinite(value.pending.at)) pendingSubmission = { text: value.pending.text, refs: ids(value.pending.refs), at: value.pending.at };
+} catch { /* private mode */ }
+function renderRecovery() {
+ $("draft-recovery").hidden = !pendingSubmission || messageSending;
+ $("draft-recovery-text").textContent = pendingSubmission ? [pendingSubmission.text, pendingSubmission.refs.map(id => "@" + id).join(" ")].filter(Boolean).join("\n") : "";
+}
+$("draft-restore").addEventListener("click", () => {
+ if (!pendingSubmission) return;
+ const box = $("message-input"), text = !box.value || box.value === pendingSubmission.text ? pendingSubmission.text : pendingSubmission.text + "\n\n" + box.value;
+ const refs = [...new Set([...pendingSubmission.refs, ...selectedReferenceIds])];
+ if (text.length > box.maxLength || refs.length > 16) { showNotice("Both drafts are kept. Copy the saved text separately; merging would exceed the message limit."); return; }
+ box.value = text; selectedReferenceIds = refs; pendingSubmission = undefined; box.dispatchEvent(new Event("input")); box.focus(); renderRecovery(); renderReferenceDraft(); renderShell();
+});
+$("draft-dismiss").addEventListener("click", () => { pendingSubmission = undefined; saveDraft(); renderRecovery(); renderReferenceDraft(); renderShell(); });
+renderRecovery(); renderReferenceDraft(); void loadReferenceRows();
+$("message-input").addEventListener("input", () => { draftEdits++; saveDraft(); });
 // S-12: typing into a parked session starts it once, so Pi is (nearly) ready when the message is sent.
 let waking = false;
 $("message-input").addEventListener("input", () => {
@@ -1635,7 +1753,7 @@ async function loadSessions() {
   // A run that finished here turns blue too; it clears only once this page is in front of the user.
   // Looking at it also drops it from the attention key's list.
   const own = groups.flatMap(group => group.sessions).find(session => session.id === sessionId);
-  if (own?.design && !designPreview && !filesView.exploring) void showDesign();
+  if (own?.design && !designPreview && !filesView.exploring && $("library").hidden) void showDesign();
   if (seenNow() && own && (own.tone === "unseen" || own.attention)) { void post("seen", {}).catch(() => {}); delete own.attention; }
   // Questions first, then the newest: a question blocks work, a finished run can wait.
   attentionList = groups.flatMap(group => group.sessions).filter(session => session.attention).sort((a, b) => Number(b.tone === "waiting") - Number(a.tone === "waiting") || b.attention! - a.attention!);
@@ -2248,8 +2366,9 @@ async function pickCommand(kind: "pi" | "wo") {
   const rows = kind === "pi" ? value.pi.map(item => ["/" + item.name, item.description]) : value.wo.map(item => ["/wo " + item.value, item.description]);
   list.replaceChildren(...rows.length ? rows.map(([command, description]) => {
    const button = document.createElement("button"); button.type = "button"; button.className = "command-option";
+   button.dataset.command = command;
    button.append(Object.assign(document.createElement("strong"), { textContent: command }), Object.assign(document.createElement("small"), { textContent: description }));
-   button.addEventListener("click", () => { dialog.close(); const input = $("message-input"); input.value = command + " "; input.focus(); input.setSelectionRange(input.value.length, input.value.length); });
+   button.addEventListener("click", () => { dialog.close(); if (command === "/wo design") return openLibrary(); const input = $("message-input"); input.value = command + " "; input.focus(); input.setSelectionRange(input.value.length, input.value.length); });
    return button;
   }) : ["No commands available."]);
  } catch (error) { list.replaceChildren("Commands failed to load: " + error.message); }
@@ -2819,7 +2938,7 @@ listen("snapshot", value => {
  for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell();
  void Promise.all([loadDiagram("project"), loadDiagram("plan")]).then(() => {
   // A session with no diagrams opens with the chat expanded; not remembered, so sessions with diagrams keep the reader's layout.
-  if (firstSnapshot && !filesView.exploring && !Object.values(diagrams).some(item => item?.nodes?.length || item?.notes?.length)) { setLeft("collapsed"); remember("plan3-left", leftChoice); }
+  if (firstSnapshot && $("library").hidden && !filesView.exploring && !Object.values(diagrams).some(item => item?.nodes?.length || item?.notes?.length)) { setLeft("collapsed"); remember("plan3-left", leftChoice); }
   firstSnapshot = false;
  });
 });
