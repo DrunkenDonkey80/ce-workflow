@@ -14,6 +14,19 @@ const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const hostOf = url => { try { return new URL(url).hostname.toLowerCase().replace(/\.$/, "").replace(/^www\./, ""); } catch { return ""; } };
 const sleep = ms => new Promise(done => setTimeout(done, ms));
 
+async function captureScreenshot(command) {
+	const capture = async (params, ms) => {
+		let timer;
+		try {
+			return await Promise.race([command("Page.captureScreenshot", { format: "png", ...params }), new Promise(done => { timer = setTimeout(done, ms); })]);
+		} finally { clearTimeout(timer); }
+	};
+	// Background tabs may not paint: retry once forcing a fresh render, without activating the tab.
+	const shot = await capture({}, 10_000) ?? await capture({ captureBeyondViewport: true }, 20_000);
+	if (!shot) throw new Error("The tab did not paint a screenshot within 30 s (a background tab the browser throttles); snapshot still works.");
+	return shot.data;
+}
+
 function connect() {
 	if (port) return;
 	try { port = chrome.runtime.connectNative(HOST); } catch { port = undefined; return; }
@@ -119,6 +132,18 @@ async function start(m, job = register(m)) {
 			cooldown = 0;
 			if (m.extract === "images") await sendSheet(job, result.results ?? []);
 		}
+		if (m.screenshot) {
+			const target = { tabId: job.tab };
+			await chrome.debugger.attach(target, "1.3");
+			try {
+				if (!jobs.has(m.id)) throw new Error("cancelled");
+				result.png = await captureScreenshot((method, params) => chrome.debugger.sendCommand(target, method, params));
+				const current = await chrome.tabs.get(target.tabId);
+				if (current.url !== result.url || !job.hosts.includes(hostOf(current.url))) throw new Error("The page changed during capture; try again.");
+				result.seq = 0;
+			} finally { await chrome.debugger.detach(target).catch(() => {}); }
+		}
+		if (!jobs.has(m.id)) return;
 		send({ type: "page", id: m.id, ...result });
 		chrome.tabs.remove(job.tab).catch(() => {});
 		job.tab = undefined;

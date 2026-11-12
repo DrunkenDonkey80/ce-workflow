@@ -145,7 +145,7 @@ async function roundTrip() {
 	const findNode = (tabId, id) => { const n = nodesOf(tabId).find(entry => entry.id === id); if (!n) throw new Error("No node with given id found"); return n; };
 	const ax = n => ({ nodeId: String(n.id), ignored: n.role === "generic", role: { value: n.role }, name: { value: n.name }, backendDOMNodeId: n.id, ...(n.value ? { value: { value: n.value } } : {}) });
 	const at = (tabId, x, y) => nodesOf(tabId).find(n => n.box && n.role !== "generic" && x >= n.box[0] && x <= n.box[0] + n.box[2] && y >= n.box[1] && y <= n.box[1] + n.box[3]);
-	let focused, hang = false, intercept = false, intruder = 0, openDialog, pageScript;
+	let focused, hang = false, intercept = false, intruder = 0, openDialog, pageScript, screenshotEffect;
 	const sendCommand = async ({ tabId }, method, params = {}) => {
 		if (!attached.has(tabId)) throw new Error("Debugger is not attached to the tab");
 		if (intruder) throw new Error("Cannot access a chrome-extension:// URL of different extension");
@@ -186,7 +186,7 @@ async function roundTrip() {
 			}
 			case "Page.addScriptToEvaluateOnNewDocument": pageScript = params.source; return {};
 			case "Runtime.evaluate": return { result: { value: params.expression.includes("iframe") ? ["https://ads.test/f"] : undefined } };
-			case "Page.captureScreenshot": if (hang) return new Promise(() => {}); return { data: Buffer.from([137, 80, 78, 71]).toString("base64") };
+			case "Page.captureScreenshot": if (hang) return new Promise(() => {}); if (screenshotEffect) return screenshotEffect(tabId); return { data: Buffer.from([137, 80, 78, 71]).toString("base64") };
 			default: return {};
 		}
 	};
@@ -283,6 +283,27 @@ async function roundTrip() {
 	const load = name => vm.runInContext(readFileSync(new URL(`../browser-fetch/extension/${name}`, import.meta.url), "utf8"), worker, { filename: name });
 	worker.importScripts = load;
 	load("background.js");
+
+	// Exercise the same helper both browser paths call, with immediate fixture timers instead of 30 seconds.
+	const deadlines = [], timers = new Set();
+	const capture = vm.runInNewContext(`(${vm.runInContext("captureScreenshot.toString()", worker)})`, {
+		setTimeout: (done, ms) => { deadlines.push(ms); const id = setTimeout(() => { timers.delete(id); done(); }, 0); timers.add(id); return id; },
+		clearTimeout: id => { timers.delete(id); clearTimeout(id); },
+	});
+	const commands = [];
+	assert.equal(await capture(async (method, params) => { commands.push([method, { ...params }]); return { data: "first" }; }), "first");
+	assert.deepEqual(commands, [["Page.captureScreenshot", { format: "png" }]]);
+	assert.equal(timers.size, 0, "successful capture clears its deadline timer");
+	let attempts = 0;
+	assert.equal(await capture(async (_method, params) => { attempts++; if (!params.captureBeyondViewport) return new Promise(() => {}); return { data: "retry" }; }), "retry");
+	assert.equal(attempts, 2, "an unpainted background tab gets exactly one forced-render retry");
+	assert.deepEqual(deadlines.slice(-2), [10_000, 20_000]);
+	await assert.rejects(capture(() => new Promise(() => {})), /did not paint a screenshot within 30 s/);
+	assert.equal(timers.size, 0, "timed-out capture leaves no timer running");
+	attempts = 0;
+	await assert.rejects(capture(async () => { attempts++; throw new Error("detached fixture"); }), /detached fixture/);
+	assert.equal(attempts, 1, "capture errors do not trigger a second request");
+	assert.equal(timers.size, 0, "failed capture clears its deadline timer");
 
 	const dns = async host => [{ address: host === "private.test" ? "10.0.0.5" : "93.184.216.34" }];
 	const quiet = { cwd: agent, hasUI: false };
@@ -593,6 +614,37 @@ async function roundTrip() {
 		assert.match(bf.formatResult(page, true), /^UNTRUSTED[\s\S]*Images saved \(2, 3 skipped\)/);
 		assert.match(bf.formatResult(page, false), /set images: true/);
 		assert.equal(removed.length, 1, "agent tab closed");
+		assert.equal(page.screenshot, undefined, "ordinary fetches do not request screenshots");
+		const beforeCapture = cdpLog.length, downloadsBefore = fetched.length;
+		assert.equal(controlUntil(readPolicy(), "shop.test"), undefined);
+		const captured = await run(quiet, { url: "https://shop.test/visual", screenshot: true });
+		assert.deepEqual([...readFileSync(captured.screenshot)], [137, 80, 78, 71], "read-only fetch saves the screenshot through the native host");
+		assert.equal(captured.finalUrl, "https://shop.test/visual");
+		assert.deepEqual(cdpLog.slice(beforeCapture), ["Page.captureScreenshot"], "read-only capture never dispatches input or other browser-control commands");
+		assert.equal(controlUntil(readPolicy(), "shop.test"), undefined, "a read grant does not become a control grant");
+		assert.equal(attached.size, 0, "read-only capture detaches its debugger");
+		assert.equal(tabs.size, 0, "read-only capture closes its inactive tab");
+		assert.equal(fetched.length, downloadsBefore, "capture does not download the page image gallery");
+		const captureRequests = requests.length;
+		await assert.rejects(run(quiet, { url: "https://unapproved.test/", screenshot: true }), /not approved/);
+		await assert.rejects(run(quiet, { url: "https://mail.google.com/", screenshot: true }), /block list/);
+		await assert.rejects(run(quiet, { url: "https://private.test/", screenshot: true }), /private address/);
+		assert.equal(requests.length, captureRequests, "read-only capture preserves pre-navigation consent and URL checks");
+		await assert.rejects(run(quiet, { url: "https://shop.test/go", screenshot: true }), /redirect to https:\/\/other\.test\/page: not approved/);
+		assert(!requests.includes("https://other.test/page"), "capture cannot bypass redirect consent");
+		try {
+			screenshotEffect = () => { throw new Error("capture fixture failed"); };
+			await assert.rejects(run(quiet, { url: "https://shop.test/visual", screenshot: true }), /capture fixture failed/);
+			assert.equal(attached.size, 0, "failed capture detaches its debugger");
+			assert.equal(tabs.size, 0, "failed capture closes its tab");
+			screenshotEffect = id => { tabs.get(id).url = "https://shop.test/changed"; return { data: "changed" }; };
+			await assert.rejects(run(quiet, { url: "https://shop.test/visual", screenshot: true }), /page changed during capture/);
+			assert.equal(attached.size, 0, "stale capture detaches its debugger");
+			assert.equal(tabs.size, 0, "stale capture closes its tab");
+			screenshotEffect = () => ({});
+			await assert.rejects(run(quiet, { url: "https://shop.test/visual", screenshot: true }), /returned no screenshot/);
+			assert.equal(tabs.size, 0, "missing screenshot fails closed instead of publishing a partial capture");
+		} finally { screenshotEffect = undefined; }
 
 		// Redirect to an unapproved site without UI: refused, and the destination got no request (D12).
 		await assert.rejects(run(quiet, { url: "https://shop.test/go" }), /redirect to https:\/\/other\.test\/page: not approved/);
@@ -607,8 +659,9 @@ async function roundTrip() {
 		// Approval dialog (native list fallback): once, shared grants, deny, block (R2, D8, D13).
 		let asked = 0, wait;
 		const answer = label => ({ cwd: agent, hasUI: true, ui: { notify() {}, select: async (_title, labels) => { asked++; await wait; return labels.find(l => l.startsWith(label)); } } });
-		const once = await run(answer("Allow this request once"), { url: "https://shop.test/go" });
+		const once = await run(answer("Allow this request once"), { url: "https://shop.test/go", screenshot: true });
 		assert.equal(once.finalUrl, "https://other.test/page");
+		assert.deepEqual([...readFileSync(once.screenshot)], [137, 80, 78, 71], "read-only capture honors a one-request redirect approval");
 		assert.ok(requests.includes("https://other.test/page"));
 		assert.equal(asked, 1);
 		assert.equal(granted(readPolicy(), "other.test"), false, "allow once stores no grant");

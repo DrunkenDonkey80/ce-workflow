@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-11
-updated: 2026-11-12T06:26:40.615Z
+updated: 2026-11-12T06:57:32.799Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:56:51.270Z
 ---
@@ -51,6 +51,10 @@ Non-goals: replacing the studio, restoring the OpenDesign runtime, promoting Ast
   - Source: user via ask_user /plan3 resolve; not independently verified.
 - D9 — Q-02 reconciled: the user selected Both drafts and exports. Saved designs includes current-project live studio drafts and selected exports, visibly labelled with source/status. Freeze the exact chosen revision when attached; identical-content grouping must preserve provenance and must not hide diverged revisions. This settles source coverage, not verification of discovery or snapshot consistency.
 - D10 — withdrawn assumption: excluding Astryx component cards would change approved scope. Keep component metadata discovery and honest unavailable-preview states; never provision a runtime merely by browsing. Theme-preview regions remain an additional element-reference path.
+D11 — User clarification for Q-03: an existing URL/browser capture extension uses the user's local browser (Helium). Inspect its supported output and per-site consent plumbing as a reuse candidate before further guarded-Chromium fixes; this clarification is not approval to browse arbitrary sites or bypass the existing per-site approval. Q-03 remains under investigation, not an accepted URL-feature deferral.
+D12 — User selected Shared read-only capture helper (recommended). Reuse the existing Helium/browser_fetch path and its per-site approval for URL reference capture. First extract the existing bounded screenshot routine from browser_act's browser worker into a shared read-only helper; browser_fetch may use that helper without granting the studio click/type control. No external browsing was performed or authorized by this implementation choice.
+
+
 
 
 
@@ -62,16 +66,11 @@ Non-goals: replacing the studio, restoring the OpenDesign runtime, promoting Ast
 
 ### Blocking
 
-None for local-reference UI and draft work.
+None.
 
 ### Deferred
 
-- **Q-03** How should URL capture proceed after the guarded Chromium startup check remains unverified?
-  - Context: P3-04 requires public-only URL capture. The DNS-pinned HTTP/CONNECT proxy passes owned-origin checks, but the guarded renderer attempts Google background connections even with a fresh profile, empty config, cleaned environment and PreconnectToSearch disabled. Those requests were blocked by the owned-origin test policy; no real external test traffic was allowed. Plain open is documented to stay on about:blank; explicit open about:blank is rejected by the CLI domain guard. One read-only oracle round did not resolve the failure. Local-reference API checks pass independently. Sources: extensions/design-network.ts, extensions/design-render.ts, scripts/test-work-design.mjs; oracle artifact dae5cc67-632d-4571-8802-3f10b333e7c4_oracle_output.md.
-  - Recommendation: Continue local references and draft persistence without exposing URL capture; resolve the isolated-browser startup before claiming P3-04 complete. This is a proposed temporary limitation, not an accepted scope change.
-  - Option: Continue browser isolation — Keep the approved URL feature and authorize a further bounded investigation of the failing owned-origin browser test; do not relax the public-network boundary or allow external test traffic.
-  - Option: Defer URL capture temporarily — Finish the other features with a visible unavailable state; URL capture remains unfinished and requires a later verified implementation.
-  - Option: Pause implementation — Stop at the current checkpoint until the browser environment is resolved.
+None. Q-03 was resolved by D11–D12: reuse consent-gated browser_fetch/Helium with the approved shared read-only capture prefactor.
 
 ## Relevant files and approach
 
@@ -144,6 +143,7 @@ Limits: host fetch concurrency 4; kit.html ≤ 64 KB, components/preview pages �
 
 - [x] **P3-02** Added /wo design dispatch, same-chat library entry/deep links, approved terminal fallback reuse, and authenticated pinned metadata without generation or provisioning.
 - [x] **P3-03** Library now inspects cached OD samples, six Astryx images, live drafts and retained exports in isolated, bounded previews, groups identical authored sources, and restores the live studio without losing unsaved forms.
+- [x] **P3-10** Shared bounded screenshot helper now serves browser_act and internal read-only browser_fetch capture, retaining site approval without control grants.
 - [wip] **P3-04** Attach whole styles, selected aspects and URL references to the draft with stable IDs and notes.
   - Visible Add reference plus Ctrl-click, right-click and hold shortcuts where safe; removable thumbnails; no accidental selection during scrolling or text selection.
   - Extend the existing composer/draft storage to keep references with text; retain compatibility with plain-string drafts. Persist the bounded in-flight submission until acknowledgment/reconciliation, separately from newer edits, so reload or a lost response neither discards the brief nor blindly resends it. Use the existing annotation/pick mechanisms for parts, not a second editor. Duplicate adds should select the existing chip, while distinct aspects may be separate references.
@@ -210,7 +210,7 @@ Real touch and paired-remote verification are P3-08's separate environmental gat
 
 ## Resume context
 
-P3-04 wip. Local backend snapshots implemented in extensions/design-references.ts, catalogReference in extensions/design-catalog.ts, referenceSnapshot in hub/src/explore.ts, authenticated reference CRUD/image routes in hub/src/api.ts. C4: node "C:/SOFT/git/ce-workflow/hub/scripts/test-api.mjs" passed (api ok); cases cover duplicate adds, notes/revision conflicts, stable tombstones, stale async completion, asset digest mismatch, owner isolation and exact inspected snapshots after original edits. Active LSP probe found no blocking errors; push-only coverage remains partly inconclusive and style warnings remain. C3 currently FAILS in the new guarded URL-capture fixture: after oracle-recommended PreconnectToSearch disabling, recorded hosts still include accounts.google.com/www.google.com. Do not treat the earlier pre-integration C3 pass as current. Q-03 records the unanswered URL-boundary decision; no URL route is exposed. Next runnable work: wire library Add/aspect controls and composer reference chips/persistence, reuse annotation for theme regions, extend C4/C5. P3-04 is not complete; later frozen-bundle delivery still belongs to P3-05.
+P3-04 remains WIP. P3-10 approved capture prefactor is verified: shared bounded helper in browser-fetch/extension/background.js, reused by control.js and internal browserFetch({screenshot:true}); native host saves the screenshot and the caller retains site/read approval, not browser-control grants. Existing scripts/test-work-browser-fetch.mjs passes including consent, redirect, stale-page and cleanup coverage; no live sites were opened. This is not studio URL integration or proof of strict public-only subresource containment. Global validation is unchanged. The earlier guarded-Chromium C3 capture test remains a known failure (blocked Google background DNS); no URL route is exposed. Q-03 implementation direction is resolved by D11–D12, not a scope deferral. Next: finish P3-04 library Add/aspect controls and composer reference chips/durability (legacy string drafts plus separately persisted in-flight submission and newer edits), reuse existing annotation for regions, extend C4/C5. Then integrate explicit consent-gated URL materialization without weakening the remaining security checks. P3-05 frozen bundles/launch handling remains future work. Preserve unrelated worktree changes; no installs, downloads, paid generation, external test traffic, background verifiers or push.
 
 ## Amendments
 
@@ -233,3 +233,5 @@ P3-04 wip. Local backend snapshots implemented in extensions/design-references.t
 
 Review changed this plan only. Source inspection validates these findings, not implemented behavior; no feature tests or paid runs were executed.
 - 2026-11-11: Applied Q-02 Both drafts and exports to source enumeration, labels, snapshot semantics, P3-01/P3-03/P3-06 and global acceptance. Added targeted cases for draft-only entries, exports whose studio records are gone, identical content and diverged revisions. This resolves the question raised by review finding 8; no new steps or product changes.
+P3-04 prefactor approved by the user: extract the existing browser-worker screenshot routine and reuse it for consent-gated read-only URL capture through browser_fetch/Helium, rather than duplicating browser_act capture logic or expanding browser-control grants. Preserve per-site approval, opaque reference snapshots and owned-fixture-only checks. The earlier guarded-Chromium URL-capture attempt remains unverified and must not be exposed; replace its integration rather than keep two capture implementations.
+- 2026-11-12: Added P3-10 after P3-03: User-approved P3-04 prefactor: reuse Helium's existing per-site read approval and browser_act's bounded screenshot routine rather than copy capture logic. This prerequisite does not expose studio URL capture or relax Global validation.

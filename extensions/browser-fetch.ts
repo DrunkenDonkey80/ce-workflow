@@ -323,10 +323,10 @@ export function inbox(handlers: Link["handlers"], id: string, signal?: AbortSign
 	};
 }
 
-type FetchResult = { url: string; finalUrl: string; title: string; text: string; truncated: boolean; links: { text: string; href: string }[]; imageUrls: string[]; images: { url: string; path: string; bytes: number }[]; skipped: number; results?: any[] };
+type FetchResult = { url: string; finalUrl: string; title: string; text: string; truncated: boolean; screenshot?: string; links: { text: string; href: string }[]; imageUrls: string[]; images: { url: string; path: string; bytes: number }[]; skipped: number; results?: any[] };
 
 /** `extract` (plan 71dc4da4): the add-on runs a Google results extractor instead of the page reader and returns raw `results`. */
-export async function browserFetch(ctx, params: { url: string; images?: boolean; extract?: "web" | "images" }, signal?: AbortSignal, { resolve = lookup } = {}): Promise<FetchResult> {
+export async function browserFetch(ctx, params: { url: string; images?: boolean; screenshot?: boolean; extract?: "web" | "images" }, signal?: AbortSignal, { resolve = lookup } = {}): Promise<FetchResult> {
 	const id = randomUUID(), hops: string[] = [];
 	const entry: Record<string, unknown> = { id, project: ctx.cwd, url: params.url, ...(params.extract ? { tool: params.extract === "web" ? "browser_search" : "image_search" } : {}) };
 	const refuse = (reason: string): never => { logFetch({ ...entry, hops, outcome: "refused", by: reason }); throw new Error(`browser_fetch refused: ${reason}`); };
@@ -351,7 +351,7 @@ export async function browserFetch(ctx, params: { url: string; images?: boolean;
 	const next = inbox(connection!.handlers, id, signal);
 	let left = REQUEST_MS;
 	try {
-		connection!.send({ type: "fetch", id, url: params.url, hosts: [...approved], blocked: blockedList(readPolicy()), ...(params.extract ? { extract: params.extract } : {}) });
+		connection!.send({ type: "fetch", id, url: params.url, hosts: [...approved], blocked: blockedList(readPolicy()), ...(params.extract ? { extract: params.extract } : {}), ...(params.screenshot ? { screenshot: true } : {}) });
 		let page;
 		const images: FetchResult["images"] = [];
 		for (;;) {
@@ -373,6 +373,7 @@ export async function browserFetch(ctx, params: { url: string; images?: boolean;
 		const final = checkUrl(String(page.url), blockedList(readPolicy()));
 		if (final.refused !== undefined) refuse(`the page ended on ${page.url}: ${final.refused}`);
 		if (!approved.has(grantKey(final.host!))) refuse(`the page ended on ${page.url}, which was not approved`);
+		if (params.screenshot && (typeof page.path !== "string" || !page.path)) throw new Error("The browser extension returned no screenshot. Reload the browser extension and try again.");
 		const imageUrls: string[] = [...new Set<string>((Array.isArray(page.images) ? page.images : []).filter(url => typeof url === "string"))].slice(0, 100);
 		let skipped = 0;
 		if (params.images && imageUrls.length) {
@@ -398,6 +399,7 @@ export async function browserFetch(ctx, params: { url: string; images?: boolean;
 		const result = {
 			url: params.url, finalUrl: String(page.url), title: String(page.title ?? ""), text: text.slice(0, TEXT_CHARS), truncated: text.length > TEXT_CHARS,
 			links: (Array.isArray(page.links) ? page.links : []).slice(0, 200), imageUrls, images, skipped,
+			...(params.screenshot ? { screenshot: page.path as string } : {}),
 			...(params.extract ? { results: Array.isArray(page.results) ? page.results : [] } : {}),
 		};
 		logFetch({ ...entry, finalUrl: result.finalUrl, hops, outcome: "ok", images: images.length });

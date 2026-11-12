@@ -95,7 +95,7 @@ export function runHost({ input = process.stdin, output = process.stdout, pipe =
 	const reading = (async () => {
 		for await (const message of frames(input)) {
 			if (message.type === "image") saveImage(message);
-			else if (message.type === "result" && typeof message.png === "string") saveShot(message);
+			else if (["result", "page"].includes(message.type) && typeof message.png === "string") saveShot(message);
 			else if (typeof message.id === "string" && owners.has(message.id)) toPi(owners.get(message.id), message);
 		}
 	})();

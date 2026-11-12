@@ -144,11 +144,8 @@ async function act(s, m) {
 			await chrome.tabs.goBack(s.tab).catch(() => { throw new Error("There is no previous page."); });
 			return await after(s, 30_000, before);
 		case "screenshot": {
-			// A background tab may never paint the frame a capture waits for: give up after 10 s and retry once forcing a fresh render.
-			const capture = (params, ms) => Promise.race([cdp(s, "Page.captureScreenshot", { format: "png", ...params }), sleep(ms).then(() => undefined)]);
-			const shot = await capture({}, 10_000) ?? await capture({ captureBeyondViewport: true }, 20_000);
-			if (!shot) throw new Error("The tab did not paint a screenshot within 30 s (a background tab the browser throttles); snapshot still works.");
-			return { ...await page(s), png: shot.data }; // the host saves it and replaces png with path (D10)
+			const png = await captureScreenshot((method, params) => cdp(s, method, params));
+			return { ...await page(s), png }; // the host saves it and replaces png with path (D10)
 		}
 		case "click": case "type": case "select": case "upload": {
 			const target = await resolve(s, m);
