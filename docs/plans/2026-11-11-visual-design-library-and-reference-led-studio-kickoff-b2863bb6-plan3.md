@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-11
-updated: 2026-11-12T11:58:31.532Z
+updated: 2026-11-12T12:19:43.200Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:56:51.270Z
 ---
@@ -158,8 +158,8 @@ Limits: host fetch concurrency 4; kit.html ≤ 64 KB, components/preview pages �
 ### Phase 4: Document the shipped workflow [code]
 
 - [x] **P3-09** The README "Design library (/wo design)" section and an Unreleased changelog Added bullet cover entry, @ref semantics, consent-gated page capture, inspiration vs runtime and browser-only drafts, with three C7 shots. Fixed "1 references". The Astryx image attribution is already in docs/upstream/astryx.md but uncommitted (a protected dirty file).
-- [ ] **P3-11** Found row: add a design tool action (e.g. `design found`) that lets the conversation's agent publish curated web results (title, source page URL, saved original from image_search/browser_fetch, one-line why) into the current session's library as a "Found" section labelled web result / inspiration only. Store images under the project's references area with the existing size/PNG/WebP/JPEG validation and source metadata; reject non-image, oversized or unsafe-URL entries; no automatic capture of pages. Files: extensions/design.ts, extensions/design-references.ts, extensions/browser-search.ts (reuse imageSearch save), hub/web/design-library.ts. Checks: C3, C4, C8.
-- [ ] **P3-12** Found cards become references: Add reference on a found card attaches its saved image as a normal stable @ref (aspect + note + region crop as for static images), and an optional "Capture page" uses the existing consent-gated page capture of its source URL. Found entries survive reload and are scoped to the session; removing one never renumbers refs. Guide/prompt text tells the agent to prefer real product screenshots over stock mockups and to borrow style, never logos or copy. Checks: C3, C5 (fake Pi publishes found entries; add one as @ref; Send delivers it), C7 shot of the Found row, README/CHANGELOG bullet.
+- [x] **P3-11** design {action:"found"} publishes the agent's picks (image_search/browser_fetch downloads only, ≤8 MB, PNG-normalized, deduped, newest 60) as per-conversation Web results cards; Add reference and region crops work (0f033d98).
+- [x] **P3-12** Found cards add as normal @refs (region crops too), Capture page uses the consent-gated URL capture, tool text steers to real screenshots and style-only borrowing; browser test, changelog shot, README/CHANGELOG (948a2352).
 
 ## Global validation
 
@@ -192,7 +192,7 @@ Real touch and paired-remote verification are P3-08's separate environmental gat
 
 ## Resume context
 
-9/10 done; HEAD ed408796 (P3-06 2d1afcac, P3-07 a8195c84, P3-09 ed408796). Only P3-08 remains: blocked on a paired real touch device (user has Pixel 9a/10a) through the hub remote. Not verified: physical touch, Safari, live Helium capture of an external site. docs/upstream/astryx.md image-attribution hunk is uncommitted (protected dirty file). No push, no version bump.
+11/12 done. P3-11/P3-12 committed (0f033d98, 948a2352): the design tool's `found` action publishes curated image_search picks as per-conversation Web results cards that add as @refs or Capture page. Only P3-08 remains, blocked on a paired Pixel 9a/10a touch check. Running hub predates e466820f+; restart it and reload Pi before live use. Unverified: live image_search → found → design session end to end, real Helium page capture, physical touch, Safari. Not pushed; unrelated dirty files left unstaged.
 
 ## Amendments
 
