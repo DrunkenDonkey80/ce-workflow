@@ -317,7 +317,7 @@ function poolWindows(store, accounts, entries, used, t) {
 		.sort((a, b) => a.left - b.left)[0];
 	if (dying) windows.push(text("drain", `${dying.cause}: ${formatDuration(dying.left)} (${Math.round(dying.free)}%) ${short(dying.label)}`, "error"));
 	const ending = accounts
-		.filter((a) => !a.dead && finite(a.refreshExpires) && a.refreshExpires - t < LOGIN_WARN_MS)
+		.filter((a) => !a.dead && !a.disabled && finite(a.refreshExpires) && a.refreshExpires - t < LOGIN_WARN_MS)
 		.sort((a, b) => a.refreshExpires - b.refreshExpires)[0];
 	if (ending) {
 		const left = ending.refreshExpires - t;

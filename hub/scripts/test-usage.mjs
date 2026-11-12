@@ -75,6 +75,16 @@ try {
 	fs.writeFileSync(path.join(root, "claude-pool-usage.json"), JSON.stringify({ a: reading(30), b: reading(50), c: reading(0) }));
 	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => async () => undefined });
 	await usage.start(); assert.equal(usage.usage().summary[0].left, 60, "the −− account's 100% is not averaged in"); usage.stop();
+	// A disabled account is out of the pool entirely: no gauge share, no "unused" or "login ends" warning (it was ddenkov).
+	const soon = Date.now() + 3_600_000;
+	fs.writeFileSync(path.join(root, "claude-pool.json"), JSON.stringify({ active: "a", accounts: [{ label: "a" }, { label: "b" }, { label: "d", disabled: true, refreshExpires: soon }] }));
+	fs.writeFileSync(path.join(root, "claude-pool-usage.json"), JSON.stringify({ a: reading(30), b: reading(50), d: { at: Date.now(), five_hour: { pct: 0, resets_at: week.resets_at }, seven_day: { pct: 83, resets_at: new Date(soon).toISOString() } } }));
+	usage = createUsage({ dataDir: root, agentDir: root, fetchImpl, auth: async () => async () => undefined });
+	await usage.start();
+	assert.equal(usage.usage().summary[0].left, 60, "the disabled account is not averaged in");
+	assert.deepEqual((usage.usage().summary[0].warnings ?? []).filter((w) => w.text.startsWith("d:") || w.text.includes("(d)")), [], "no warnings about a disabled account");
+	assert(!usage.usage().accounts.some((a) => /^(→ )?d /.test(a.text)), "the disabled account is not in the account list");
+	usage.stop();
 	fs.rmSync(path.join(root, "claude-pool-usage.json"));
 
 	// Issue #5: GLM/Kimi ids carry an index and Copilot has only a month, yet each shows; the headline window is named.
