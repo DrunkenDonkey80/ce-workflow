@@ -2,7 +2,7 @@
 plan3: true
 status: ready
 created: 2026-11-12
-updated: 2026-11-12T18:23:40.671Z
+updated: 2026-11-12T18:25:34.520Z
 size: map
 kind: map
 reviewed: 2026-11-12
@@ -58,6 +58,8 @@ One line per resolved ticket: gist and ticket ID.
 - **D-08 Server OS: Windows native, WSL and Linux; macOS as client only (Q-02).** A path must run the server on all three; macOS and iOS need only the clients (Swift app, web). Source: user via ask_user /plan3 resolve, 2026-11-12.
 - **D-09 Usage inventory (T-01).** In 30 days, about 85% of tool calls go to Pi's core file and shell tools and codemode. Daily needs: compaction, the session tree and custom entries, both subscription logins, the 33-event extension model, and the hub's RPC and SDK surface. pi-subagents and `lens_diagnostics` are daily too, pi-web-access is weekly, and pi-goal and most pi-lens extras are rare. Evidence: `docs/proposals/own-agent-stack/inventory.md`.
 - **D-10 Baseline (T-02).** Pi core is fast outside the model: 0.27 s to ready, about 120 MB private memory per session, about 10 ms of overhead per turn. Our packages add about 1.1 s warm and 2.7 s on the first start, plus 150 MB per session; long live sessions use 340 to 580 MB. The speed pain is package load and memory, not the agent loop. Evidence: `docs/proposals/own-agent-stack/baseline.md` (S1 to S5).
+- **D-11 Security (T-03).** Everything runs with full user rights over about 500 auto-updated npm packages, and credentials are reachable (`auth.json`, `~/.ssh`, `~/.aws`, gh, Claude, Codex). The top threat is prompt injection into the shell; no candidate fixes it alone. Only Codex ships a Windows-native sandbox, and its code is Apache-2.0 and usable from Pi. Hardening is possible on Pi: pin and review packages, add a per-command bash sandbox, or run the stack in WSL as a separate user. Evidence: `docs/proposals/own-agent-stack/security.md`.
+
 
 
 
@@ -90,11 +92,7 @@ None.
 
 - [x] **T-01** Inventory written: core tools and codemode carry about 85% of calls; daily needs listed by owner (D-09).
 - [x] **T-02** Baseline measured: Pi core 0.27 s and 120 MB per session; our packages add 1.1 to 2.7 s and 150 MB (D-10).
-- [ ] **T-03** What can an agent or extension do on this machine today, and what would a sandbox stop?
-  - type: research
-  - Count npm packages and install scripts we run; list file, network and process rights; name realistic threats.
-  - Give a "possible on Pi" verdict for hardening (sandbox, fewer packages) with its cost; T-04 links it.
-  - Survey sandboxes for the server OSes (Windows native, WSL, Linux; D-08) usable with Pi and with each candidate. Output `security.md`.
+- [x] **T-03** Security written: hardening possible on Pi at three cost levels; Codex sandbox code is the only Windows-native option (D-11).
 - [ ] **T-04** Which D-01 wishes and pains are possible on Pi today, and at what cost?
   - type: research
   - Every D-01 item gets "possible on Pi" or "needs a new stack" (D-05): settings sync between hubs, hub-to-hub updates, one machine holding LLM logins, in-process calls, and security, speed, ownership, simplicity (linking T-02 and T-03 evidence).
@@ -127,7 +125,7 @@ None.
 
 ## Resume context
 
-Charting done and reviewed (advisor findings F1 to F5 accepted, see Amendments): D-01 to D-08 settled, no open questions. Next: T-01 inventory into docs/proposals/own-agent-stack/inventory.md. T-06 and T-09 need the user. No blockers.
+T-01 to T-03 done and committed. Next: T-04 wishes.md (start from pi-sync.json, pi-provider-claude-ex sync.ts, the hub's in-process pi-sdk use, and D-10 and D-11 for the pains), then T-05 candidates.md from %TEMP%\own-agent-stack\candidates-research.md. T-06 and T-09 need the user. No blockers.
 
 ## Amendments
 
