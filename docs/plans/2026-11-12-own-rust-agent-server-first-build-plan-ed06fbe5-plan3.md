@@ -42,6 +42,9 @@ Carried from the map (user decisions unless marked):
 - **D-07 / D-08:** gates G1 and G2 as above.
 - **D-14:** weights and the G1 meaning: direct OAuth only.
 - **No terminal UI (user, after map T-10):** the server has hub, web and native-app clients only. That drops `pi-tui` and Pi's interactive mode (about 35k of Pi's 116k core lines). Extension dialogs (`ctx.ui`) are drawn by the hub only.
+- **Pure Rust (user):** no embedded Node or JS runtime and no extension host. Our extensions are ported to Rust natively; the user judges the few we use as easy to port. This settles the old Q-01.
+- **Native subagents (user):** subagents, the supervisor channel and intercom become sessions inside the core, not a package.
+- **pi-lens replacement (agent finding):** `lens_diagnostics` and code search are rebuilt natively on LSP clients plus the ast-grep and tree-sitter crates, which are Rust already.
 - **D-17:** go on D, Rust from scratch, chosen against the draft recommendation A (stay on Pi). Planning only until approval.
 - **Map findings this plan relies on (evidence, not user decisions):**
   - Codex core starts in 88 ms with 37 MB, and holds 5 threads in about 50 MB, against 621 MB for 5 Pi processes (D-15).
@@ -58,13 +61,13 @@ Agent proposals (not settled):
 
 ### Blocking
 
-- **Q-01** How do extensions (our 25k lines of TS: plan3, ask_user, schedule and others) run on a Rust server?
-  - Context: the 33-event extension model and `ctx.ui` dialogs are the biggest cost driver (D-16: 10 to 16 weeks). Pi loads them in-process with full rights (D-11). Codex offers only client-side tools (`item/tool/call`), hooks and MCP. MCP servers start once per thread (D-15: 72 processes for 5 threads).
-  - Recommendation: one shared out-of-process extension host per server (Node, later replaceable), speaking a small event and tool protocol. That keeps the TS code and isolates it from the core; Rust-native rewrites follow only where speed matters.
-  - Option: Shared extension host — one Node process per server runs all TS extensions over a protocol; reuses code, one process, can be sandboxed
-  - Option: WASM plugins — extensions compiled to WASM inside the server; strongest isolation, but every extension is rewritten
-  - Option: Rust-only — port each extension to Rust; fastest and simplest at the end, longest road
-  - Option: MCP plus hooks — standard, but loses events and dialogs, and starts a server per thread unless shared
+- **Q-01** What replaces codemode, given no embedded JS?
+  - Context: codemode is the model writing a short JS program that calls tools. In the last 30 days of session files there were 12,817 codemode calls. 53% only call tools and return the results. 47% use logic between the calls: loops 28%, conditionals 23%, string operations 18%, filter and map 15%. The logic is mostly loops over search results and cutting long outputs down before they reach the context, which is where the token savings come from.
+  - Recommendation: a batch tool first (parallel or ordered tool calls, each with built-in output cuts such as line filter, head and limit). It covers the 53% and much of the cutting. Measure turns and tokens against Pi's codemode in Phase 3, and add a script language only if the batch tool loses.
+  - Option: Batch tool with output cuts — pure Rust and simplest; no loops or branches, so some work takes extra turns
+  - Option: Starlark (pure-Rust crate) — a small Python-like language that models write well; sandboxed and deterministic
+  - Option: Rhai (pure-Rust crate) — Rust-like scripting; models know it less well
+  - Option: Boa (JS engine written in Rust) — the model keeps writing JS, but it is a whole JS engine inside the server
   - Independent: yes
 - **Q-02** What session file format does the new server write?
   - Context: the hub reads Pi `.jsonl` session files directly (`hub/src/sessions.ts`). Daily features include the session tree and custom entries (`plan3-current`, `jev-compaction-note` and others; inventory.md).
@@ -107,7 +110,7 @@ Approach: build the thinnest path that a real session needs, measure it against 
 
 ### Phase 1: Design [think]
 
-- [ ] **T-01** Write the server design: process model, session tasks, client protocol, extension host (Q-01), session format (Q-02).
+- [ ] **T-01** Write the server design: process model, session tasks, client protocol, the in-core tool and event API for ported extensions, session format (Q-02).
   - Output: `docs/proposals/own-agent-stack/server-design.md` in the agent repo or ce-workflow (Q-03).
   - The protocol covers the 22 hub RPC commands (`prompt`, `steer`, `follow_up`, `abort`, `get_state`, `set_model`, `fork` and others) and the event stream.
 - [ ] **T-02** Define the acceptance benchmark and targets from `baseline.md`.
@@ -126,8 +129,8 @@ Approach: build the thinnest path that a real session needs, measure it against 
 
 ### Phase 3: Measure and decide [think]
 
-- [ ] **T-08** Run the acceptance benchmark against Pi on Windows native and WSL; append the results to `baseline.md`.
-- [ ] **T-09** From the numbers, rank the next build plan: codemode, compaction with our modes, extension host, subagents.
+- [ ] **T-08** Run the acceptance benchmark, including a codemode comparison (turns and tokens on the same tasks) if the batch tool from Q-01 was built, against Pi on Windows native and WSL; append the results to `baseline.md`.
+- [ ] **T-09** From the numbers, rank the next build plan: codemode replacement (Q-01), compaction with our modes, extension ports, subagents.
 
 ## Global validation
 
@@ -141,9 +144,9 @@ Approach: build the thinnest path that a real session needs, measure it against 
 ## Backlog
 
 - Codemode, compaction with our custom modes, context edits, custom entries.
-- Extension host and the ports of plan3, ask_user, schedule and knowledge.
-- pi-subagents replacement: supervisor channel and intercom.
-- `lens_diagnostics` replacement, then web search and fetch.
+- Native ports of our extensions: plan3, ask_user (hub-drawn), schedule, knowledge, compaction modes, then the device tools (screen_read, app_act, mobile_act, vm_act).
+- Native subagents with the supervisor channel and intercom.
+- Native `lens_diagnostics` (LSP plus ast-grep), then web search and fetch.
 - Wishes: settings sync, hub-to-hub notices, a login hub.
 - Session migration from Pi, then retiring Pi.
 
