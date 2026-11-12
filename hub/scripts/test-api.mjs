@@ -92,6 +92,9 @@ try {
 	assert.equal(picturedButton.status, 200); assert.equal(picturedButton.body.toString("ascii", 8, 12), "WEBP");
 	assert.equal((await get(id, `designimage?id=astryx:component:Button&revision=${"0".repeat(64)}`)).status, 404, "a component picture from another pin is never served");
 	assert.equal((await get(id, `designimage?id=${encodeURIComponent("astryx:component:../catalog")}&revision=${shots.lockDigest}`)).status, 404, "component picture names are a whitelist");
+	const buttonDocs = await get(id, "designdocs?id=astryx:component:Button");
+	assert.equal(buttonDocs.status, 200); assert(buttonDocs.body.description && buttonDocs.body.props.some(prop => prop.name === "label" && prop.required), "Inspect gets bundled usage and props without a runtime");
+	assert.equal((await get(id, "designdocs?id=astryx:component:__proto__")).status, 404, "docs names are own keys only");
 	assert.equal(hub.host.live.has(id), false, "browsing does not wake a parked model");
 	assert.equal(await rawGet(`/s/${id}/api/designcatalog`, {}), 401, "catalog requires normal session authentication");
 	const images = catalog.body.entries.filter(item => item.preview === "image" && item.kind === "theme");

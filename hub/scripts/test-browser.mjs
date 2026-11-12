@@ -181,6 +181,15 @@ try {
   assert(states.some(([, near]) => !near), `the fixture has cards far below the view: ${JSON.stringify(states)}`);
   for (const top of ["1e6", "0"]) { await evaluate(`document.getElementById('library').scrollTop = ${top}`); await browser("wait", "--fn", settled); }
  }
+ { // V-10: every component card is a picture; Inspect shows bundled usage and props (no runtime involved).
+  await browser("click", "#library [data-tab=components]");
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('#library [data-entry]')].filter(card => !card.querySelector('img.library-thumb-whole[src*=designimage]')).map(card => card.dataset.entry)"), [], "every component card has its picture");
+  await browser("wait", "--fn", "document.querySelector('#library img.library-thumb-whole')?.naturalWidth > 0");
+  await browser("fill", "#library input[type=search]", "Button"); await clickShown("#library [data-entry='astryx:component:Button'] [data-inspect]");
+  await browser("wait", "--fn", "document.querySelector('.library-detail img')?.naturalWidth > 0 && document.querySelector('.library-docs table')");
+  assert.match(await evaluate("document.querySelector('.library-docs').textContent"), /Usage[\s\S]*Props[\s\S]*label \*/);
+  await browser("click", ".library-detail button"); await browser("fill", "#library input[type=search]", "");
+ }
  await browser("click", "#library [data-tab=themes]"); await browser("fill", "#library input[type=search]", "neutral");
  assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 1);
  await clickShown("#library [data-entry='astryx:theme:neutral'] button");

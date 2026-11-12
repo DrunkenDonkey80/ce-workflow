@@ -18,7 +18,7 @@ import { sevenZip, startUpload, uploadJob } from "./wormhole.ts";
 import { renderDesign, reportText } from "../../extensions/design-render.ts";
 import { designStateJson, type DesignJson } from "../../extensions/design-state.ts";
 import { buildInfo } from "../../extensions/design-build.ts";
-import { catalogReference, designCatalog, designImage } from "../../extensions/design-catalog.ts";
+import { catalogReference, designCatalog, designDocs, designImage } from "../../extensions/design-catalog.ts";
 import { fetchSystem } from "../../extensions/design.ts";
 import { addDesignReference, designReferences, editDesignReference, referenceAssets, urlReference, urlSnapshot } from "../../extensions/design-references.ts";
 import { currentPlan, listPlans } from "../../extensions/plan3.ts";
@@ -352,6 +352,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				if (!bytes) throw fail(404, "No reference thumbnail.");
 				response.writeHead(200, { "content-type": ref.thumbnail!.endsWith(".webp") ? "image/webp" : "image/png", "content-length": bytes.length, "cache-control": "private, no-cache", "x-content-type-options": "nosniff" }); response.end(bytes); return;
 			}
+			case "designdocs": return designDocs(params.get("id")) ?? (() => { throw fail(404, "No bundled usage or props for this entry."); })();
 			case "designimage": {
 				const bytes = designImage(params.get("id"), params.get("revision"), folder(id), id);
 				if (!bytes) throw fail(404, "No supplied image at this revision.");

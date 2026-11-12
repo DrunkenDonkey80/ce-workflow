@@ -138,6 +138,14 @@ if (!picked.length) for (const file of fs.readdirSync(out)) if (file.endsWith(".
 if (picked.length) for (const [name, bytes] of images) fs.writeFileSync(path.join(out, `${name}.webp`), bytes);
 else {
 	for (const [hash, bytes] of unique) fs.writeFileSync(path.join(out, `${hash}.webp`), bytes);
+	// Inspect shows usage and props with no runtime installed (V-10), so they are bundled beside the pictures.
+	const docs = {};
+	for (const name of names) {
+		const section = async part => (await libraryLookup(runtime.directory, { catalog: "component", name, section: part }).catch(() => undefined))?.data;
+		const usage = (await section("usage"))?.usage, props = await section("props");
+		docs[name] = { description: usage?.description, practices: usage?.bestPractices?.map(item => ({ do: item.guidance, text: item.description })), props: Array.isArray(props) ? props.map(({ name: prop, type, default: fallback, required, description }) => ({ name: prop, type, default: fallback, required, description })) : [] };
+	}
+	fs.writeFileSync(path.join(out, "docs.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, docs })}\n`);
 	fs.writeFileSync(path.join(out, "components.json"), `${JSON.stringify({ lockDigest: catalog.lockDigest, version: catalog.version, images: Object.fromEntries([...images].sort(([a], [b]) => a.localeCompare(b)).map(([name, bytes]) => [name, sha(bytes)])) }, null, 1)}\n`);
 }
 for (const name of names) { const row = rows.get(name); console.log(row.error ? `- ${name}: ${row.error}` : `${name}: ${row.width}x${row.height} webp ${kb(row.webp)} (${row.example})`); }

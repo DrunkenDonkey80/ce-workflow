@@ -220,11 +220,30 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    });
    actions.append(pick); detail.append(make("p", "Pick a region with Crop, then Save. A cropped thumbnail, original image and crop coordinates are attached; drawings are not. Marker notes are kept."));
   }
-  if (item.preview === "image" && item.imageRevision) detail.append(image(item), make("p", "Static source image, not a generated preview. It does not demonstrate responsive behaviour or interactive controls."));
+  if (item.preview === "image" && item.imageRevision) detail.append(image(item), make("p", item.kind === "component" ? "Rendered from its pinned example in the neutral theme. A still picture: it does not demonstrate responsive behaviour or interactive controls." : "Static source image, not a generated preview. It does not demonstrate responsive behaviour or interactive controls."));
   else if (item.preview === "sample" && item.availability === "cached") sample(item);
   else detail.append(make("p", item.preview === "sample" ? "This source sample is not cached for viewing on this host yet. No download was started." : "No supplied visual sample. This entry is metadata only; nothing was generated."));
+  if (item.kind === "component") void docs(item);
   if (item.url) { const link = make("a", "View original source"); link.href = item.url; link.target = "_blank"; link.rel = "noopener noreferrer"; detail.append(link); }
   tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = results.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); remember();
+ }
+ // V-10: usage and props ship with the hub, so Inspect needs no runtime install.
+ async function docs(item: CatalogEntry) {
+  const request = inspection, box = make("section"); box.className = "library-docs"; box.append(make("p", "Loading usage and props…")); detail.append(box);
+  try {
+   const value: { description?: string; practices?: { do: boolean; text: string }[]; props: { name: string; type?: string; default?: string; required?: boolean; description?: string }[] } = await get(`designdocs?id=${encodeURIComponent(item.id)}`);
+   if (request !== inspection) return;
+   const parts: HTMLElement[] = [make("h4", "Usage")];
+   if (value.description) parts.push(make("p", value.description));
+   if (value.practices?.length) { const practices = make("ul"); practices.append(...value.practices.map(item => make("li", `${item.do ? "Do" : "Don't"}: ${item.text}`))); parts.push(practices); }
+   parts.push(make("h4", "Props"));
+   if (value.props.length) {
+    const table = make("table"), head = make("tr"); head.append(...["Prop", "Type", "Default", "Description"].map(text => make("th", text))); table.append(head);
+    for (const prop of value.props) { const row = make("tr"), name = make("td"), code = make("code", prop.name + (prop.required ? " *" : "")); name.append(code); row.append(name, make("td", prop.type ?? ""), make("td", prop.default ?? ""), make("td", prop.description ?? "")); table.append(row); }
+    parts.push(table, make("small", "* required"));
+   } else parts.push(make("p", "No documented props."));
+   box.replaceChildren(...parts);
+  } catch (error) { if (request === inspection) box.replaceChildren(make("p", "Usage and props unavailable: " + error.message)); }
  }
  const draw = () => {
   for (const button of tabButtons) { const on = button.dataset.tab === tab; button.setAttribute("aria-selected", String(on)); button.tabIndex = on ? 0 : -1; }
@@ -242,7 +261,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    addButton.disabled = (item.preview === "sample" || item.source === "od") && item.availability !== "cached"; // OpenDesign is added only as its cached page
    addButton.addEventListener("click", pick); open.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) pick(); else inspect(item); });
    gestures(row, () => { if (!addButton.disabled) pick(); });
-   if (item.preview === "image" && item.imageRevision) row.append(image(item, true));
+   if (item.preview === "image" && item.imageRevision) { const thumb = image(item, true); if (item.kind === "component") thumb.classList.add("library-thumb-whole"); row.append(thumb); }
    else if (item.preview === "sample" && (item.availability === "cached" || item.source === "od")) row.append(cardPreview(item));
    if (item.status) row.append(make("p", item.status));
    row.append(title, details, provenance);

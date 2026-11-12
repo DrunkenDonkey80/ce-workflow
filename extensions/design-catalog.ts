@@ -33,6 +33,13 @@ let shots: { lockDigest: string; images: Record<string, string> };
 try { shots = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/previews/components/components.json", import.meta.url), "utf8")); }
 catch { shots = { lockDigest: "", images: {} }; }
 if (shots.lockDigest !== astryx.lockDigest) shots = { lockDigest: "", images: {} };
+// Usage and props for one component, bundled by the same script; read on Inspect, not in the catalog listing.
+export function designDocs(id: string | null) {
+	const name = id?.startsWith("astryx:component:") ? id.slice(17) : undefined;
+	let bundle: { lockDigest: string; docs: Record<string, unknown> };
+	try { bundle = JSON.parse(fs.readFileSync(new URL("./astryx-runtime/previews/components/docs.json", import.meta.url), "utf8")); } catch { return undefined; }
+	return name && bundle.lockDigest === astryx.lockDigest && Object.hasOwn(bundle.docs, name) ? bundle.docs[name] : undefined;
+}
 
 function smallJson(cwd: string, file: string) {
 	const full = confined(cwd, file);
