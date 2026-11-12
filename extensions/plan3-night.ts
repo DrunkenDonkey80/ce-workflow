@@ -34,7 +34,7 @@ export function nightBlockReason(event) {
 const git = promisify(execFile);
 const STATS = ":(exclude,glob)**/*.stats.json"; // Plan3 telemetry changes every turn; it is not progress.
 const NEEDS = ":(exclude,glob)**/*.needs.json"; // The user switching requirements is not progress either.
-async function fingerprint(cwd, file) {
+export async function fingerprint(cwd, file = "") {
 	const out = (args) => git("git", args, { cwd, maxBuffer: 64 * 1024 * 1024 }).then((result) => result.stdout, () => "");
 	const parts = await Promise.all([out(["rev-parse", "HEAD"]), out(["status", "--porcelain", "--", ".", STATS, NEEDS]), out(["diff", "HEAD", "--", ".", STATS, NEEDS]), readFile(file, "utf8").catch(() => "")]);
 	return createHash("sha256").update(parts.join("\0")).digest("hex");
@@ -54,7 +54,7 @@ export const stopCheckMessage = (plan) => !plan.wip.length && !plan.next
 	? `Plan3: you stopped while "${plan.title}" has [human] steps (${plan.human.join(", ")}) and the user is here. Ask with ask_user whether to do ${plan.human[0]} now (what you need, how long it takes, your recommendation); on yes mark it wip and do it with the user, on no or later leave it [human]. If the user already declined or asked you to stop, say so in one line and stop.`
 	: `Plan3: you stopped while "${plan.title}" still has runnable work (next: ${plan.wip[0] ?? plan.next}). If there is a real reason (a decision only the user can make, a physical action, a blocker for all remaining runnable work, or the user asked you to stop or asked something else), say it in one line and stop. Otherwise continue with the next step now; a checkpoint or finished step is not a reason to stop.`;
 
-export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging, switchNeeds = undefined }) {
+export function createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging, switchNeeds = undefined, budgetSpent = undefined }) {
 	let night = null; // { plan, rules, fp, stalls, paused?, complete?, retryAt? }
 	let baseline; // Outside night mode: fingerprint when the /resume3 run started or was last nudged.
 	let awake, retry;
@@ -153,7 +153,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 	// Outside night mode, a /resume3 run that did work and stops with runnable steps left gets one
 	// "is there a reason?" continue; a stop after no new work (the reason reply, a chat answer) settles.
 	async function stopCheck(event, ctx) {
-		if (baseline === undefined || event.outcome !== "completed" || event.continue) return;
+		if (baseline === undefined || event.outcome !== "completed" || event.continue || budgetSpent?.(ctx)) return;
 		const plan = await runPlan(ctx);
 		if (!plan || plan.status === "complete" || (!plan.next && !plan.wip.length && !plan.human.length)) return;
 		const fp = await fingerprint(ctx.cwd, plan.file);
@@ -175,6 +175,7 @@ export function createNight(pi, { listPlans, currentPlan, resume, research, exec
 			return;
 		}
 		if (night.retryAt) { night.retryAt = undefined; persist(); }
+		if (budgetSpent?.(ctx)) return stop(ctx, "run budget reached");
 		const plan = (await listPlans(ctx.cwd)).find((candidate) => candidate.id === night.plan);
 		if (!plan || plan.status === "complete" || (plan.total && plan.done === plan.total)) return stop(ctx, "", true);
 		if (!plan.next && !plan.wip.length) return stop(ctx, "every remaining step is blocked or needs you");

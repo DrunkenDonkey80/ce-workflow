@@ -12,7 +12,8 @@ import { loadPlan3Ask } from "./plan3-ask.ts";
 import { withPlanLock, tryPlanLock, movePlanWithDiagram, stablePlanId } from "./plan3-files.ts";
 import { applyDiagram, toolbarEdit, diagramPath, emptyDiagram, loadDiagram, saveDiagram, diagramChatMessage, type DiagramTarget } from "./plan3-diagram.ts";
 import { createActivityMirror, forwardDiagramChat, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
-import { createNight } from "./plan3-night.ts";
+import { createNight, fingerprint } from "./plan3-night.ts";
+import { createRunBudget } from "./run-budget.ts";
 import { deliverReferenceBundle } from "./design-bundles.ts";
 import { captureUrlReference } from "./browser-fetch.ts";
 import { originalForHub, pickForHub, searchForHub } from "./browser-search.ts";
@@ -1196,7 +1197,8 @@ export default function plan3(pi) {
 	pi.registerShortcut?.("alt+=", { description: "Plan3: bias toward the thinking model (Thinker (Task), then Thinker (Plan))", handler: (ctx) => shiftBias(ctx, 1) });
 	pi.registerShortcut?.("alt+-", { description: "Plan3: bias toward the coding model (Worker (Task), then Worker (Plan))", handler: (ctx) => shiftBias(ctx, -1) });
 	pi.registerShortcut?.("alt+a", { description: "Plan3 requirements: what the agent may use now", handler: async (ctx) => { try { await editNeeds(ctx, currentPlan(ctx, await listPlans(ctx.cwd))); } catch (error) { report(ctx, error); } } });
-	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging: () => Boolean(tagging), switchNeeds });
+	const runBudget = createRunBudget(pi, { fingerprint });
+	const night = createNight(pi, { listPlans, currentPlan, resume, research, executingPlan, tagging: () => Boolean(tagging), switchNeeds, budgetSpent: runBudget.exhausted });
 	// shortcut: a run counts while the session's current plan is the one /resume3 executes, so later chat in that session counts too.
 	createStats(pi, {
 		plan: async (ctx) => {
@@ -2063,6 +2065,7 @@ export default function plan3(pi) {
 			}
 			if (info) sessionLock = { file: sessionFile, info };
 		}
+		runBudget.restore(ctx);
 		await night.restore(ctx);
 		return refresh(ctx);
 	});

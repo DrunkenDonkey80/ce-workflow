@@ -107,6 +107,8 @@ check(
 const tests = [
 	"test-jev-tools.mjs",
 	"test-advisor-model.mjs",
+	"test-run-budget.mjs",
+	"test-compare-benchmark-runs.mjs",
 	...listed("scripts").filter((name) => /^test-work-.*\.mjs$/.test(name)),
 ];
 const gitConfigCount = Number(process.env.GIT_CONFIG_COUNT ?? 0);
