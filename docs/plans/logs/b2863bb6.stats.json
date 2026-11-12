@@ -1,0 +1,1536 @@
+{
+ "version": 1,
+ "activeMs": 19984094,
+ "runs": 13,
+ "waitingMs": 606125,
+ "toolWallMs": 7341070,
+ "compactions": {
+  "count": 2,
+  "ms": 37619
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 262,
+   "thinkingMs": 933999,
+   "actingMs": 560629,
+   "input": 620,
+   "output": 131596,
+   "cacheRead": 28268902,
+   "cacheWrite": 2031244,
+   "cost": 18.444400399999996,
+   "errors": 0
+  },
+  "openai-codex/gpt-6.1-sol:high": {
+   "replies": 352,
+   "thinkingMs": 8420985,
+   "actingMs": 1024343,
+   "input": 2337297,
+   "output": 272481,
+   "cacheRead": 33694464,
+   "cacheWrite": 0,
+   "cost": 10.768850400000005,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "plan3": {
+   "count": 88,
+   "ms": 8268,
+   "maxMs": 1757,
+   "failures": 0
+  },
+  "bash": {
+   "count": 335,
+   "ms": 6374235,
+   "maxMs": 298604,
+   "failures": 39
+  },
+  "codemode": {
+   "count": 168,
+   "ms": 2224553,
+   "maxMs": 283235,
+   "failures": 11
+  },
+  "read": {
+   "count": 417,
+   "ms": 7479,
+   "maxMs": 2083,
+   "failures": 9
+  },
+  "edit": {
+   "count": 166,
+   "ms": 3284,
+   "maxMs": 1685,
+   "failures": 4
+  },
+  "write": {
+   "count": 9,
+   "ms": 18,
+   "maxMs": 3,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 17,
+   "ms": 200350,
+   "maxMs": 29021,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 9,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 1
+  },
+  "intercom": {
+   "count": 3,
+   "ms": 11,
+   "maxMs": 4,
+   "failures": 0
+  },
+  "screen_read": {
+   "count": 3,
+   "ms": 3664,
+   "maxMs": 2120,
+   "failures": 0
+  },
+  "subagents_enable": {
+   "count": 2,
+   "ms": 2,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "subagent": {
+   "count": 3,
+   "ms": 1001,
+   "maxMs": 576,
+   "failures": 0
+  },
+  "lsp_navigation": {
+   "count": 1,
+   "ms": 44,
+   "maxMs": 44,
+   "failures": 0
+  },
+  "module_report": {
+   "count": 19,
+   "ms": 736,
+   "maxMs": 135,
+   "failures": 3
+  },
+  "project_report": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "jev_evidence": {
+   "count": 4,
+   "ms": 11409,
+   "maxMs": 9351,
+   "failures": 1
+  },
+  "read_symbol": {
+   "count": 21,
+   "ms": 732,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "read_enclosing": {
+   "count": 1,
+   "ms": 110,
+   "maxMs": 110,
+   "failures": 0
+  },
+  "lens_diagnostic_mark": {
+   "count": 3,
+   "ms": 97,
+   "maxMs": 45,
+   "failures": 0
+  },
+  "tools_enable": {
+   "count": 2,
+   "ms": 2,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "image_search": {
+   "count": 4,
+   "ms": 30396,
+   "maxMs": 22623,
+   "failures": 0
+  },
+  "design": {
+   "count": 1,
+   "ms": 493,
+   "maxMs": 493,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 259,
+   "ms": 1545498,
+   "maxMs": 196157,
+   "failures": 12
+  },
+  "test": {
+   "count": 76,
+   "ms": 4828737,
+   "maxMs": 298604,
+   "failures": 27
+  }
+ },
+ "commands": {
+  "bash\u0000git -C \".\" status --short | head -40; git -C \".\" log --oneline -3; rg -n \"systems|DESIGN.md|tokens.css|raw.githubusercontent|OD_|open-design\" \"./extensions/design.ts\" | head -40; rg -n \"pin|version|re": {
+   "count": 1,
+   "ms": 704,
+   "maxMs": 704,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; head -30 extensions/design-library.ts; ls extensions/astryx-runtime; ls .pi/designs 2>&1 | head; ls .pi/designs/systems 2>&1 | head; ls docs/designs 2>&1 | head; rg -n \"lookupCache|cacheDir|LO": {
+   "count": 1,
+   "ms": 1264,
+   "maxMs": 1264,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"directory|homedir|cache\" extensions/design-runtime.ts | head -15; cat extensions/astryx-runtime/manifest.json | head -30; cat extensions/astryx-runtime/notices.json | head -c 1500": {
+   "count": 1,
+   "ms": 482,
+   "maxMs": 482,
+   "failures": 0
+  },
+  "bash\u0000C=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\"; ls \"$C\" | head; git -C \"$C\" rev-parse HEAD; head -5 \"$C/LICENSE\"; ls -la \"$C/apps/docsite/public/\" | rg -i \"preview|theme\"; ls \"$C/packa": {
+   "count": 1,
+   "ms": 632,
+   "maxMs": 632,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; rg -n \"preview|screenshot|commit|design-systems\" docs/upstream/open-design.md | head -20; ls node_modules | rg -i \"^(sharp|jimp|pngjs|playwright|puppeteer)$\"; where ffmpeg magick 2>&1 | head -": {
+   "count": 1,
+   "ms": 1046,
+   "maxMs": 1046,
+   "failures": 0
+  },
+  "bash\u0000cd \"%TEMP%\" 2>/dev/null; curl -s \"https://api.github.com/repos/nexu-io/open-design/contents/design-systems?ref=614795896e09a2c1682b24cc1406529baf531bd7\" -o \"$TEMP/od-list.json\"; node -e \"const l=requi": {
+   "count": 1,
+   "ms": 2458,
+   "maxMs": 2458,
+   "failures": 0
+  },
+  "bash\u0000curl -s \"https://api.github.com/repos/nexu-io/open-design/git/trees/614795896e09a2c1682b24cc1406529baf531bd7?recursive=1\" -o \"$TEMP/od-tree.json\"; node -e \" const t=require(process.env.TEMP+'/od-tree.": {
+   "count": 1,
+   "ms": 1584,
+   "maxMs": 1584,
+   "failures": 0
+  },
+  "bash\u0000B=\"https://raw.githubusercontent.com/nexu-io/open-design/614795896e09a2c1682b24cc1406529baf531bd7/design-systems/airbnb\"; curl -s \"$B/system/kit.html\" | head -c 2500; echo; echo ----; curl -s \"$B/comp": {
+   "count": 1,
+   "ms": 945,
+   "maxMs": 945,
+   "failures": 0
+  },
+  "bash\u0000C=\"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx\"; head -c 1500 \"$C/apps/docsite/src/components/themeExplorerData.ts\"; echo; ls \"$C/packages/themes/probe\" \"$C/packages/themes/chocolate\"; ": {
+   "count": 1,
+   "ms": 205,
+   "maxMs": 205,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add \"docs/plans/2026-11-11-visual-design-library-and-reference-led-studio-kickoff-b2863bb6-plan3.md\" \"docs/plans/logs/b2863bb6.md\"; git commit -q -m \"P3-01 visual library source audit and ": {
+   "count": 1,
+   "ms": 492,
+   "maxMs": 492,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const t=require(process.env.TEMP+'/od-tree.json').tree;const roots=t.filter(e=>e.type==='tree'&&/^design-systems\\/[^/]+$/.test(e.path)&&!e.path.includes('/_'));for(const f of ['system/kit.htm": {
+   "count": 1,
+   "ms": 886,
+   "maxMs": 886,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx\"; rg -n \"components|screenshots|preview\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/apps/docsite/src/generated/componentRegist": {
+   "count": 1,
+   "ms": 1937,
+   "maxMs": 1937,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx\" -maxdepth 4 -name \"receipt.json\"; ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/apps/docsite/src\"; find \"C:/Users/Flex/AppD": {
+   "count": 1,
+   "ms": 472,
+   "maxMs": 472,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"woSubcommands|hubCommand|sub ===|registerCommand|design\" \"./extensions/work-models.ts\" | tail -28; rg -n \"case .open|command === .open|openBrowser|openUrl|open\" \"./hub/src/cli.ts\" | tail -20; r": {
+   "count": 1,
+   "ms": 656,
+   "maxMs": 656,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx\" -path \"*/@astryxdesign/core/*\" -maxdepth 9 -iname \"*manifest*\" | head -12; ls \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb8": {
+   "count": 1,
+   "ms": 390,
+   "maxMs": 390,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/core/dist\" -maxdepth 2 -name \"*catalog*": {
+   "count": 1,
+   "ms": 1073,
+   "maxMs": 1073,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64\"; ls \"$D/node_modules/@astryxdesign/cli\"; ls \"$D/node_modules/@astryx": {
+   "count": 1,
+   "ms": 3308,
+   "maxMs": 3308,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64\" && node -e \"import('./node_modules/@astryxdesign/cli/api/index.mjs'": {
+   "count": 3,
+   "ms": 4436,
+   "maxMs": 1784,
+   "failures": 0
+  },
+  "bash\u0000ls \"./hub\"; find \"./hub\" -maxdepth 3 -iname \"app*\" -o -iname \"index.html\"; rg -n \"design|session/\" \"./hub/src/server.ts\" | head -30; ls \"./hub/test\" | head -25; rg -n \"design\" \"./package.json\"": {
+   "count": 1,
+   "ms": 224,
+   "maxMs": 224,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"submit|sendMessage|send\\(|design|onCommand|command:\" \"./hub/web/app.ts\" | head -85; ls \"./hub/scripts\" | head -35; rg -n \"extensions.*design|callDesign|design-tool\" \"./hub/src/api.ts\"; rg -n \"c": {
+   "count": 1,
+   "ms": 520,
+   "maxMs": 520,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function.*(View|view)|leftView|leftMode|setLeft|mobileView|tab-files|mobile-files|wo-commands|openWo\" \"./hub/web/app.ts\" | head -70; rg -n \"function|export|createFilesView\" \"./hub/web/files.ts\"": {
+   "count": 1,
+   "ms": 269,
+   "maxMs": 269,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"create|register|app.get|pathname|/api/sessions|endpoint\" \"./hub/src/hub.ts\" | tail -30; rg -n \"test\\(|cli\" \"./hub/scripts/test-browser.mjs\" | head -18; rg -n \"library|astryx\" \"./docs/plans/2026": {
+   "count": 1,
+   "ms": 1329,
+   "maxMs": 1329,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"export|case .list|action === .list|case .status\" \"./extensions/design.ts\" | tail -18; rg -n \"drafts|exports|selected|docs/designs|SOURCE|BRIEF\" \"./extensions/design.ts\" | tail -20; ls \"C:/Users": {
+   "count": 1,
+   "ms": 463,
+   "maxMs": 463,
+   "failures": 0
+  },
+  "bash\u0000find \"C:/Users/Flex/AppData/Local/Temp\" -maxdepth 4 -type d -name \"design-systems\" 2>/dev/null | head -12; git -C \".\" status --short": {
+   "count": 1,
+   "ms": 20432,
+   "maxMs": 20432,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"open-design|inventory|6147958|Temp|kit.html\" \"./docs/plans/2026-11-11-visual-design-library-and-reference-led-studio-kickoff-b2863bb6-plan3.log.md\" \"./docs/plans/2026-11-11-visual-design-librar": {
+   "count": 1,
+   "ms": 924,
+   "maxMs": 924,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function status|created:|return \\{.*sessions\" \"./extensions/design.ts\"; rg -n \"body|topbar|hidden|grid-template-rows\" \"./hub/web/styles.css\" | head -20; rg -n \"firstSnapshot|setTab\\(|setMobile\\": {
+   "count": 1,
+   "ms": 462,
+   "maxMs": 462,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64\" && node -e \"import(\\\"./node_modules/@astryxdesign/cli/api/index.mjs": {
+   "count": 1,
+   "ms": 1267,
+   "maxMs": 1267,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"LEFT_TABS|mobileViews|createFilesView|exploring|ownDesign|showExplored|showDesign\" \"./hub/web/app.ts\"; rg -n \"mobile-view|data-view|data-mobile\" \"./hub/web/styles.css\" | tail -12": {
+   "count": 1,
+   "ms": 190,
+   "maxMs": 190,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"files.js|design-view.js|token=__TOKEN__|declare module\" \"./hub\" -g \"*.d.ts\" -g \"tsconfig*\"": {
+   "count": 1,
+   "ms": 331,
+   "maxMs": 331,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"files.js\\?token|design-view.js\\?token|declare module\" \".\" -g \"*.ts\" -g \"*.json\" -g \"*.d.ts\" -g \"!package-lock.json\" | head -35; rg -n \"removed|design\" \"./scripts/test-work-wo-control.mjs\"": {
+   "count": 1,
+   "ms": 892,
+   "maxMs": 892,
+   "failures": 0
+  },
+  "bash\u0000node \"./scripts/test-work-hub-command.mjs\"": {
+   "count": 1,
+   "ms": 1399,
+   "maxMs": 1399,
+   "failures": 0
+  },
+  "bash\u0000node \"./scripts/test-work-wo-control.mjs\"": {
+   "count": 1,
+   "ms": 1615,
+   "maxMs": 1615,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-api.mjs\"": {
+   "count": 8,
+   "ms": 129836,
+   "maxMs": 25798,
+   "failures": 2
+  },
+  "bash\u0000node \"./scripts/test-work-design.mjs\"": {
+   "count": 7,
+   "ms": 896188,
+   "maxMs": 264949,
+   "failures": 4
+  },
+  "bash\u0000rg -n \"fetch|timeout|runtime|setTimeout|console.log|await |while|for \\(\" \"./scripts/test-work-design.mjs\" | tail -38; git -C \".\" diff --stat; git -C \".\" diff --check": {
+   "count": 1,
+   "ms": 224,
+   "maxMs": 224,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"test-work-design|component lifecycle|design tool tests\" \"./docs/plans/logs/55b392b8.md\" | tail -8; rg -n \"BROWSER|console.log|agentBrowser\\(\" \"./scripts/test-work-design.mjs\"": {
+   "count": 1,
+   "ms": 153,
+   "maxMs": 153,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"sessions.length|host.live.size|registry\\.(list|all|remove)|status.*live\" \"./hub/scripts/test-api.mjs\"; rg -n \"registry\\.list|registry\\.all|/api/sessions\" \"./hub/src/hub.ts\" | head -12": {
+   "count": 1,
+   "ms": 391,
+   "maxMs": 391,
+   "failures": 0
+  },
+  "bash\u0000node \"./scripts/test-work-tool-loader.mjs\"": {
+   "count": 2,
+   "ms": 268,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-browser.mjs\"": {
+   "count": 18,
+   "ms": 1417693,
+   "maxMs": 198954,
+   "failures": 12
+  },
+  "bash\u0000rg -n \"wo-commands|phone\\.|function move|function mount|append\\(\" \"./hub/web/app.ts\" | head -42; rg -n \"drawer.*commands|commands.*drawer|wo-commands\" \"./hub/web/styles.css\"": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"push-menu|push-choice|git-action|positionMenu|function toggleMenu\" \"./hub/web/app.ts\" \"./hub/web/styles.css\"; rg -n \"finally|browser\\(\\\"close|console.log\" \"./hub/scripts/test-browser.mjs\" | tai": {
+   "count": 1,
+   "ms": 430,
+   "maxMs": 430,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-browser.mjs\" --keep-browser": {
+   "count": 2,
+   "ms": 25345,
+   "maxMs": 13456,
+   "failures": 2
+  },
+  "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" --session \"hub-ui-46236\" --json eval \"JSON.stringify({pushDisabled:document.getElementById('git-push').di": {
+   "count": 1,
+   "ms": 374,
+   "maxMs": 374,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"git-tip|git.*hover|hover.*git|\\.hover-card|function hover\" \"./hub/web/app.ts\" \"./hub/web/styles.css\" | head -24": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" --session \"hub-ui-46236\" --json close": {
+   "count": 1,
+   "ms": 692,
+   "maxMs": 692,
+   "failures": 0
+  },
+  "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" --session \"hub-ui-3496\" --json close": {
+   "count": 1,
+   "ms": 696,
+   "maxMs": 696,
+   "failures": 0
+  },
+  "bash\u0000rm -rf \"C:/Users/Flex/.pi/agent/sessions/--C--SOFT-git-ce-workflow--/2026-11-09T10-49-03-483Z_01a1bfed-02f9-7250-b266-97f578ec10cd/forks/065c3a3d-2be0-44bf-b477-14e4b97fe255\"; git diff --check": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000magick identify -ping \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/apps/docsite/public/theme-neutral-preview.png\" \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/apps/docsit": {
+   "count": 1,
+   "ms": 721,
+   "maxMs": 721,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/\"LICENSE*; mkdir -p \"./extensions/astryx-runtime/previews\"; for name in butter gothic matcha neutral stone y2k; do magick \"C:/Users/Flex/": {
+   "count": 1,
+   "ms": 1082,
+   "maxMs": 1082,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"catalog|library-list\" \"./hub/scripts/test-api.mjs\" \"./hub/web/styles.css\"; rg -n \"const own =|const ownHeaders|authorization:|function page|const page\" \"./hub/scripts/test-api.mjs\" | head -18": {
+   "count": 1,
+   "ms": 664,
+   "maxMs": 664,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"__TOKEN__|token=\" \"./hub/web/files.ts\" | head -12; rg -n \"auth\" \"./hub/web/files.ts\" | head -8": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000cp \"C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/astryx/LICENSE\" \"./extensions/astryx-runtime/previews/LICENSE.txt\"": {
+   "count": 1,
+   "ms": 1049,
+   "maxMs": 1049,
+   "failures": 0
+  },
+  "bash\u0000git diff --check": {
+   "count": 4,
+   "ms": 410,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000git diff --check; git rev-parse HEAD; git status --short": {
+   "count": 1,
+   "ms": 1957,
+   "maxMs": 1957,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"DESIGN_CSP|SANDBOX_CSP\" \"./extensions/design-render.ts\"; rg -n \"viewPage\\(\" \"./hub/src\"": {
+   "count": 1,
+   "ms": 430,
+   "maxMs": 430,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"designs/sessions|design-1|No source|metadata\" \"./hub/scripts/test-browser.mjs\" | head -22; rg -n \"unview\\(|setTimeout.*unview\" \"./hub/src/explore.ts\"": {
+   "count": 1,
+   "ms": 141,
+   "maxMs": 141,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"unview|unexplore\" \"./hub/src/api.ts\" \"./hub/web/files.ts\" -a; rg -n \"for \\(const|function (get|post)|const (get|post)\" \"./hub/web/app.ts\" | head -9": {
+   "count": 1,
+   "ms": 923,
+   "maxMs": 923,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"async function showDesign|showDesign\\(|modes\\.design|ownDesign\" \"./hub/web/app.ts\" | head -20; rg -n \"type.*State|modes:\" \"./hub/web/app.ts\" | head -8": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"frame.*#|browser\\(\\\"frame\\\"|library-entry|beforeLibrary|Inspect Neutral\" \"./hub/scripts/test-browser.mjs\" | head -25; rg -n \"addEventListener\\(\\\"message\\\"|DESIGN_READY|design-ready\" \"./hub/src/": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"async function post|function post\\(|const post =|function get\\(\" \"./hub/web/app.ts\"; rg -n \"unview|pagehide\" \"./hub/web/files.ts\" -a": {
+   "count": 1,
+   "ms": 137,
+   "maxMs": 137,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"iframe|max-width.*100|width.*important\" \"./hub/web/styles.css\"; rg -n \"session =|function browser|const browser\" \"./hub/scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 1310,
+   "maxMs": 1310,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-browser.mjs\" \"--keep-browser\"": {
+   "count": 1,
+   "ms": 3770,
+   "maxMs": 3770,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"browse-library|library-browse|mobile-library|Browse|library-chat\" \"./hub/web/index.html\" \"./hub/web/app.ts\"; rg -n \"drawer-open|drawer-button|menu-toggle\" \"./hub/scripts/test-browser.mjs\" | hea": {
+   "count": 1,
+   "ms": 407,
+   "maxMs": 407,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"aria-controls=\\\"drawer\\\"|setDrawer\\(\" \"./hub/web/index.html\" \"./hub/web/app.ts\" | head -12; rg -n \"#menu\" \"./hub/scripts/test-browser.mjs\" | head -8": {
+   "count": 1,
+   "ms": 182,
+   "maxMs": 182,
+   "failures": 0
+  },
+  "bash\u0000\"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" --session \"hub-ui-2992\" close": {
+   "count": 1,
+   "ms": 673,
+   "maxMs": 673,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"randomBytes|key =|smallJson\" \"./hub/src/explore.ts\" \"./extensions/design-catalog.ts\"; git status --short; git diff --check": {
+   "count": 1,
+   "ms": 459,
+   "maxMs": 459,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"draft|reconcil|pendingSend|requestId|idempoten|async function send|async function submit\" \"./hub/web/app.ts\" \"./hub/src/api.ts\"; rg --files \"./extensions\" \"./hub/web\" -g \"*reference*\" -g \"*anno": {
+   "count": 1,
+   "ms": 777,
+   "maxMs": 777,
+   "failures": 0
+  },
+  "bash\u0000rg --files \"./extensions\" \"./hub/src\" -g \"*design*\" -g \"*render*\" -g \"*capture*\" -g \"*snapshot*\" -g \"*net*\"": {
+   "count": 1,
+   "ms": 1484,
+   "maxMs": 1484,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"captureSite|reference\" \"./scripts/test-work-design.mjs\" | head -30; rg -n \"proxy-server|proxyBypass|--proxy|--args\" \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/dist\" -g \"*.js\"": {
+   "count": 1,
+   "ms": 762,
+   "maxMs": 762,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser\"; rg -n \"proxy|--args|browser.args|bypass\" \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/README.md\" | head -30; rg -n \"": {
+   "count": 1,
+   "ms": 480,
+   "maxMs": 480,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/cli\"; rg -n \"allowedDomains|allowed-domains|wildcard|proxyBypass\" \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/skill-d": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"allowed_domains|allowed-domains|proxy_bypass|proxy-bypass\" \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/cli/src\" -g \"*.rs\" | head -30; rg --files \"C:/Users/Flex/AppData/Roaming": {
+   "count": 1,
+   "ms": 238,
+   "maxMs": 238,
+   "failures": 0
+  },
+  "bash\u0000rg -n -A 5 -B 3 -- \"--args|allowed-domains\" \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/README.md\" | head -75": {
+   "count": 1,
+   "ms": 368,
+   "maxMs": 368,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/agents\"; printenv \"PI_SESSION_FILE\"; df -h \"C:/Users/Flex/.pi/agent\"": {
+   "count": 1,
+   "ms": 1047,
+   "maxMs": 1047,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"designcatalog|designexample|designimage|case .message|async function message|requestId|submission\" \"./hub/src/api.ts\"; rg -n \"createDesignLibrary|draft|submit|reference|annotat\" \"./hub/web/app.": {
+   "count": 1,
+   "ms": 185,
+   "maxMs": 185,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function get|function post|messageSending|renderChat|message-input|image-thumbs\" \"./hub/web/app.ts\" \"./hub/web/index.html\" | head -40; rg -n \"reference|bundle\" \"./docs/plans/2026-11-11-visual-d": {
+   "count": 1,
+   "ms": 442,
+   "maxMs": 442,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"writeRefusal|briefs\" \"./extensions/design.ts\"; rg -n \"maxBody|body.*size|1024.*1024|readBody\" \"./hub/src/hub.ts\" | head -15": {
+   "count": 1,
+   "ms": 138,
+   "maxMs": 138,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat; rg -n \"MAX_BODY|bodyLimit|body.*length|8_000|8 \\* 1024|16 \\* 1024|32 \\* 1024\" \"./hub/src/hub.ts\" | head -15": {
+   "count": 1,
+   "ms": 445,
+   "maxMs": 445,
+   "failures": 0
+  },
+  "bash\u0000git diff --check; ls \"./extensions/astryx-runtime/previews\"; git diff --cached --stat; git add -- \"extensions/design.ts\" \"extensions/design-catalog.ts\" \"extensions/design-references.ts\" \"extensions/as": {
+   "count": 1,
+   "ms": 822,
+   "maxMs": 822,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function annotate|export|onSave|region|crop|selection|imageSource\" \"./hub/web/annotate.ts\"; rg -n \"composer-thumbs|library-\" \"./hub/web/index.html\" \"./hub/web/styles.css\" | tail -45; rg -n \"lib": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000rg --files \"./extensions\" | rg \"browser|fetch|url\"; ls \"C:/Users/Flex/.pi/agent/npm/node_modules\" | rg \"browser|web|fetch\"; rg -n \"browser_fetch|Helium|helium|browser-fetch\" \"C:/Users/Flex/.pi/agent/s": {
+   "count": 1,
+   "ms": 375,
+   "maxMs": 375,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"capture|screenshot|export|action|control\" \"./extensions/browser-act.ts\" | head -55; rg -n \"capture|screenshot|image|cookies|redirect|subresource\" \"./browser-fetch/extension/background.js\" \"./br": {
+   "count": 1,
+   "ms": 184,
+   "maxMs": 184,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"captureScreenshot|screenshot|debugger.attach|export\" \"./browser-fetch/extension/control.js\"; rg -n \"browser-fetch|browser-act\" \"./package.json\"; rg -n \"screen|shot|frame|allowed|validId\" \"./bro": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000rg --files \"./scripts\" | rg \"browser-(fetch|act)\"; rg -n \"screenshot|captureScreenshot|importScripts|control.js|vm\\.|background.js\" \"./scripts/test-work-browser-fetch.mjs\" \"./scripts/test-work-browser": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 0
+  },
+  "bash\u0000git diff -- \"docs/plans/2026-11-11-visual-design-library-and-reference-led-studio-kickoff-b2863bb6-plan3.md\" | tail -125; git status --short; git branch --show-current": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"browserFetch\\(\" \"./extensions\" \"./scripts\" | head -45; rg -n \"test-work-browser-fetch\" \"./package.json\" \"./scripts\" | head -15": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000node \"./scripts/test-work-browser-fetch.mjs\"": {
+   "count": 2,
+   "ms": 213764,
+   "maxMs": 107679,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"browser-fetch/extension/background.js\" \"browser-fetch/extension/control.js\" \"browser-fetch/host.mjs\" \"extensions/browser-fetch.ts\" \"scripts/test-work-browser-fetch.mjs\"; git diff -": {
+   "count": 1,
+   "ms": 153,
+   "maxMs": 153,
+   "failures": 0
+  },
+  "bash\u0000git diff --check; git status --short": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"./browser-fetch/extension/background.js\" \"./browser-fetch/extension/control.js\" \"./browser-fetch/host.mjs\" \"./extensions/browser-fetch.ts\" \"./scripts/test-work-browser-fetch.mjs\" \"./docs/p": {
+   "count": 1,
+   "ms": 198,
+   "maxMs": 198,
+   "failures": 0
+  },
+  "bash\u0000git status --short; rg -n \"saveDraft|loadDraft|draftKey|dropDraft|designLibrary|reference|api/message\" \"./hub/web/app.ts\" | head -75; rg -n \"draft|design-library|Reference|reference\" \"./hub/scripts/te": {
+   "count": 1,
+   "ms": 168,
+   "maxMs": 168,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"id=\\\"composer|id=\\\"message-input|library-detail|library-thumb|composer\" \"./hub/web/index.html\" \"./hub/web/styles.css\" | head -35; rg -n \"function renderMentions|function html|messageSending\" \".": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000git diff --check; node \"./hub/scripts/test-browser.mjs\"": {
+   "count": 2,
+   "ms": 35596,
+   "maxMs": 32024,
+   "failures": 2
+  },
+  "bash\u0000rg -n \"catalogReference|crop|reference\" \"./extensions/design-catalog.ts\" \"./scripts/test-work-design.mjs\" | tail -30; git diff --stat": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"thinking|stream_snapshot|chatRows|publish =|function publish|rpc =\" \"./hub/scripts/test-browser.mjs\" | head -40; rg -n \"thinking|stream\" \"./hub/web/app.ts\" | tail -22": {
+   "count": 1,
+   "ms": 181,
+   "maxMs": 181,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"chatRows|blocks|snapshot|message\" \"./hub/scripts/fake-pi.mjs\" | head -40; rg -n \"chatRows\" \"./hub/scripts/test-browser.mjs\"; rg -n \"excerpt|blocks|async function chat|messages:\" \"./hub/src/api.": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"designreference|referenceInput|addDesignReference|ref1|catalogReference\" \"./hub/scripts/test-api.mjs\" \"./scripts/test-work-design-catalog.mjs\" \"./scripts/test-work-design-references.mjs\"; rg -n": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"export async function annotate|dataURL|toDataURL|crop\" \"./hub/web/annotate.ts\" | tail -20; rg -n \"crop|png|pixel|resize\" \"./extensions/image-utils.ts\" \"./extensions/design-render.ts\" | head -25": {
+   "count": 1,
+   "ms": 147,
+   "maxMs": 147,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"convertToPng|resizeImage|processPng\" \"./extensions/work-images.ts\" \"./extensions/design-render.ts\"; rg -n \"reference-draft|selectedReference|pendingSubmission\" \"./hub/web/app.ts\"; git diff --nu": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function convertToPng|function resizeImage\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/dist\" | head -12": {
+   "count": 1,
+   "ms": 650,
+   "maxMs": 650,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"addDesignReference|referenceInput|designreferenceimage|reference =\" \"./hub/scripts/test-api.mjs\"; rg -l \"addDesignReference|referenceInput\" \"./scripts\" \"./hub/src\"; git status --short": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"designreferenceimage\" \"./hub/src/api.ts\"; rg -n \"decodePng|encodePng\" \"./extensions/screen-read.ts\" | head -6; rg -n \"addDesignReference\" \"./extensions\" \"./hub\" --glob \"*.ts\"": {
+   "count": 1,
+   "ms": 153,
+   "maxMs": 153,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"annotate-note|onFailure|screenshot\" \"./hub/scripts/test-browser.mjs\" | head -15; git diff --stat \"./hub/web/app.ts\" \"./hub/web/design-library.ts\" \"./extensions/design-references.ts\"; git log -1": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000node \"./hub/scripts/test-api.mjs\"; git diff --check": {
+   "count": 2,
+   "ms": 42133,
+   "maxMs": 21742,
+   "failures": 0
+  },
+  "bash\u0000git add \"./extensions/design-references.ts\" \"./hub/web/design-library.ts\" \"./hub/web/app.ts\" \"./hub/web/index.html\" \"./hub/web/styles.css\" \"./hub/scripts/test-api.mjs\" \"./hub/scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 274,
+   "maxMs": 274,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"api/message|forwardDiagramChat|Invalid message\" \"./extensions/plan3.ts\"; rg -n \"api/message|Invalid fields|message.*diagram|forwardDiagramChat\" \"./scripts/test-work-plan3.mjs\" \"./scripts/test-w": {
+   "count": 1,
+   "ms": 181,
+   "maxMs": 181,
+   "failures": 0
+  },
+  "bash\u0000rg --files \"./hub\" -g \"app.ts\"; rg -n \"C4|again.body|frozenFile|writeRefusal\" \"./hub/scripts/test-api.mjs\" \"./scripts/test-work-design.mjs\"; rg -n \"diagramChatMessage|forwardDiagramChat\" \"./extensions": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3-web.mjs\" && node \"scripts/test-work-plan3.mjs\" && node \"hub/scripts/test-api.mjs\"": {
+   "count": 1,
+   "ms": 4012,
+   "maxMs": 4012,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && node \"hub/scripts/test-api.mjs\"": {
+   "count": 1,
+   "ms": 26852,
+   "maxMs": 26852,
+   "failures": 1
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\"": {
+   "count": 1,
+   "ms": 19964,
+   "maxMs": 19964,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\" && node \"scripts/test-work-plan3-web.mjs\" && git diff --check": {
+   "count": 2,
+   "ms": 25000,
+   "maxMs": 23591,
+   "failures": 1
+  },
+  "bash\u0000git diff --check && git add \"extensions/design-bundles.ts\" \"extensions/design.ts\" \"extensions/plan3-diagram.ts\" \"extensions/plan3-web.ts\" \"extensions/plan3.ts\" \"hub/src/api.ts\" \"hub/scripts/test-api.m": {
+   "count": 1,
+   "ms": 850,
+   "maxMs": 850,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\" && node \"scripts/test-work-plan3.mjs\"": {
+   "count": 1,
+   "ms": 20231,
+   "maxMs": 20231,
+   "failures": 1
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\" && node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-plan3-web.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 32054,
+   "maxMs": 32054,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-design.mjs\"": {
+   "count": 1,
+   "ms": 3380,
+   "maxMs": 3380,
+   "failures": 1
+  },
+  "bash\u0000node \"hub/scripts/test-browser.mjs\" 2>&1 | tail -25": {
+   "count": 1,
+   "ms": 10489,
+   "maxMs": 10489,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-browser.mjs\" 2>&1 | tail -15": {
+   "count": 2,
+   "ms": 218562,
+   "maxMs": 201853,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"session-git-action\\[data-git=git-push\\]\" \"hub/scripts/test-browser.mjs\"; rg -n \"session-git-action\" \"hub/web/app.ts\" | head": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-browser.mjs\" 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 52441,
+   "maxMs": 52441,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-browser.mjs\" 2>&1 | rg -n -m 3 \"AssertionError|at file\"": {
+   "count": 1,
+   "ms": 50613,
+   "maxMs": 50613,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"messages\\[[0-9]\\]\" \"hub/scripts/test-browser.mjs\"; node \"hub/scripts/test-browser.mjs\" 2>&1 | rg -n -m 3 \"AssertionError|at file|browser ok|ok$\"": {
+   "count": 1,
+   "ms": 187067,
+   "maxMs": 187067,
+   "failures": 1
+  },
+  "bash\u0000node \"hub/scripts/test-browser.mjs\" > \"/tmp/tb.log\" 2>&1; echo \"exit $?\"; tail -20 \"/tmp/tb.log\"": {
+   "count": 1,
+   "ms": 180751,
+   "maxMs": 180751,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\" 2>&1 | tail -1 && node \"scripts/test-work-plan3.mjs\" && node \"scripts/test-work-plan3-web.mjs\" && git diff --check && echo CLEAN": {
+   "count": 1,
+   "ms": 32424,
+   "maxMs": 32424,
+   "failures": 0
+  },
+  "bash\u0000git add \"extensions/design.ts\" \"extensions/design-bundles.ts\" \"hub/web/app.ts\" \"hub/web/index.html\" \"hub/scripts/test-api.mjs\" \"hub/scripts/test-browser.mjs\" \"docs/plans/2026-11-11-visual-design-libra": {
+   "count": 1,
+   "ms": 220,
+   "maxMs": 220,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"P3-10\" \"docs/plans/logs/b2863bb6.md\" | head; git log --oneline -12; rg -n -l \"captureReference|referenceProxy|readOnlyCapture|captureScreenshot|boundedScreenshot\" --glob \"!node_modules\" . | hea": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000git show --stat \"01be3d18\" | head -20; rg -n \"screenshot\" \"extensions/browser-fetch.ts\" 2>/dev/null | head -30; ls extensions | rg -i \"browser|fetch\"": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"relay\\(|piHub|/pi-hub|async function relay|case \\\"generate\\\"|case \\\"message\\\"\" hub/src/api.ts | head -20; rg -n \"\\\"/api/generate\\\"|endpoint ===|case \\\"/api/\" extensions/hub-command.ts | head -3": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \".pi/backups\" && git diff -- \"extensions/design-render.ts\" \"scripts/test-work-design.mjs\" > \".pi/backups/p3-04-guarded-chromium.patch\" && cp \"extensions/design-network.ts\" \".pi/backups/design": {
+   "count": 1,
+   "ms": 298604,
+   "maxMs": 298604,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"/api/generate|/api/bias|endpoint ===|function handle|ctx\\b.*=|import \" extensions/hub-command.ts | head -40; rg -n \"async function approve|function approve\" -A 25 extensions/browser-fetch.ts | ": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function call\\b|const call =|async function call\" -A 14 hub/src/api.ts | head -40; rg -n \"pi-hub:result|HUB_CALL_MS|callTimeout\" hub/src/*.ts 2>/dev/null | head; rg -n \"pi-hub:result|result.*ti": {
+   "count": 1,
+   "ms": 174,
+   "maxMs": 174,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"const run =|async function run|browserFetch\\b|^import\" scripts/test-work-browser-fetch.mjs | head -20; sed -n 612,624p scripts/test-work-browser-fetch.mjs | cut -c1-260": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\" 2>&1 | grep -v \"Pi SDK not found\" | tail -8; node \"scripts/test-work-browser-fetch.mjs\" 2>&1 | tail -4": {
+   "count": 1,
+   "ms": 19780,
+   "maxMs": 19780,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-browser-fetch.mjs\" 2>&1 | grep -v \"^ at \" | tail -25": {
+   "count": 1,
+   "ms": 2449,
+   "maxMs": 2449,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-browser-fetch.mjs\" 2>&1 | grep -v \"^ at \" | tail -6; node \"hub/scripts/test-api.mjs\" 2>&1 | grep -v \"Pi SDK not found\" | grep -v \"^ at \" | tail -10": {
+   "count": 1,
+   "ms": 131284,
+   "maxMs": 131284,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"attached|const post|post\\(\" hub/web/design-library.ts | head -8; git status --short | head -40": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"\\\"(build|check|typecheck)[^\\\"]*\\\":\" hub/package.json package.json; rg -n \"Add reference|data-add|library\" hub/scripts/test-browser.mjs | head -8": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"browser\\(\\\"wait\\\", \\\"--fn\\\"\" hub/scripts/test-browser.mjs | head -2; node \"hub/scripts/test-browser.mjs\" 2>&1 | grep -v \"^ at \" | tail -12": {
+   "count": 1,
+   "ms": 28588,
+   "maxMs": 28588,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-browser.mjs\" 2>&1 | grep -v \"^ at \" | tail -8": {
+   "count": 1,
+   "ms": 179224,
+   "maxMs": 179224,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"extensions/browser-fetch.ts\" \"extensions/design-references.ts\" \"extensions/plan3.ts\" \"hub/scripts/fake-pi.mjs\" \"hub/scripts/test-api.mjs\" \"hub/scripts/test-browser.mjs\" \"hub/src/ap": {
+   "count": 1,
+   "ms": 8682,
+   "maxMs": 8682,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/browser-fetch.ts\" \"extensions/design-references.ts\" \"extensions/plan3.ts\" \"hub/scripts/fake-pi.mjs\" \"hub/scripts/test-api.mjs\" \"hub/scripts/test-browser.mjs\" \"hub/src/api.ts\" \"h": {
+   "count": 1,
+   "ms": 341,
+   "maxMs": 341,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/logs/b2863bb6.md\" && git commit -q -m \"Record P3-04 evidence\" && git log --oneline -2": {
+   "count": 1,
+   "ms": 202,
+   "maxMs": 202,
+   "failures": 0
+  },
+  "bash\u0000for p in \"cross-project|another session|another project\" \"silent install|no download|downloadBytes|without download\" \"duplicate send|same submission|transport retry\" \"missing source|not cached\" \"varia": {
+   "count": 1,
+   "ms": 1727,
+   "maxMs": 1727,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 93,
+   "ms": 8557,
+   "maxMs": 126,
+   "failures": 4
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\" 2>&1 | grep -v \"Pi SDK not found\" | grep -v \"^ at \" | tail -12": {
+   "count": 1,
+   "ms": 20145,
+   "maxMs": 20145,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-design.mjs\" 2>&1 | tail -1; git diff --check -- \"hub/scripts/test-api.mjs\" && git add -- \"hub/scripts/test-api.mjs\" && git commit -q -m \"Test page reference recapture, same-hos": {
+   "count": 1,
+   "ms": 287244,
+   "maxMs": 287244,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"$TEMP/p307\" && for s in 1280x800 390x844 320x640 844x390; do node \"hub/scripts/changelog-shot.mjs\" \"#library\" \"$TEMP/p307/library-$s.png\" \"document.getElementById('tab-library')?.click() ?? ": {
+   "count": 1,
+   "ms": 196157,
+   "maxMs": 196157,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/changelog-shot.mjs\" \"#library\" \"$TEMP/p307/library-1280x800.png\" \"document.getElementById('tab-library').click(); await new Promise(r => setTimeout(r, 1500));\" \"--size=1280x800\" \"--p": {
+   "count": 1,
+   "ms": 4061,
+   "maxMs": 4061,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/changelog-shot.mjs\" \"body\" \"$TEMP/p307/desk-body.png\" \"document.getElementById('tab-library').click(); await new Promise(r => setTimeout(r, 2500)); document.title = JSON.stringify([d": {
+   "count": 1,
+   "ms": 65532,
+   "maxMs": 65532,
+   "failures": 0
+  },
+  "bash\u0000cd \"hub\" && S=\"document.getElementById('expand-left').click(); document.getElementById('tab-library').click(); await new Promise(r => setTimeout(r, 2500));\"; node \"scripts/changelog-shot.mjs\" \"#left-p": {
+   "count": 1,
+   "ms": 196117,
+   "maxMs": 196117,
+   "failures": 0
+  },
+  "bash\u0000cd \"hub\" && S=\"document.getElementById('expand-left').click(); document.getElementById('tab-library').click(); await new Promise(r => setTimeout(r, 2500)); const q = document.querySelector('#library i": {
+   "count": 1,
+   "ms": 137636,
+   "maxMs": 137636,
+   "failures": 0
+  },
+  "bash\u0000cd \"hub\" && A=\"const q = document.querySelector('#library input[type=search]'); q.value = 'neutral'; q.dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 300));\"; D=\"document.getE": {
+   "count": 2,
+   "ms": 70250,
+   "maxMs": 70187,
+   "failures": 1
+  },
+  "bash\u0000cd \"hub\" && timeout 600 node \"scripts/test-browser.mjs\" 2>&1 | grep -v \"Pi SDK not found\" | grep -v \"^ at \" | tail -8": {
+   "count": 1,
+   "ms": 179728,
+   "maxMs": 179728,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"prefers-reduced-motion\" hub/web/*.css | head -3; cd \"hub\" && timeout 300 node \"scripts/changelog-shot.mjs\" \"body\" \"$TEMP/p307/m320.png\" \"document.getElementById('drawer-toggle').click(); docume": {
+   "count": 1,
+   "ms": 65151,
+   "maxMs": 65151,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"hub/web/app.ts\" \"hub/scripts/test-browser.mjs\"; git diff --check -- \"hub/web/app.ts\" \"hub/scripts/test-browser.mjs\" && git add -- \"hub/web/app.ts\" \"hub/scripts/test-browser.mjs\" &&": {
+   "count": 1,
+   "ms": 243,
+   "maxMs": 243,
+   "failures": 0
+  },
+  "bash\u0000sed -n 1,30p CHANGELOG.md | cut -c1-300; echo ===; rg -n -i \"wo design|design library|design studio|Browse designs\" README.md extensions/design-guide.md | cut -c1-200 | head -20; echo ===; git status ": {
+   "count": 1,
+   "ms": 153,
+   "maxMs": 153,
+   "failures": 0
+  },
+  "bash\u0000rg -n -i \"design\" README.md | cut -c1-220 | head -20; echo ===; git diff --stat README.md; echo ===; rg -n \"^#|wo design|library|reference\" extensions/design-guide.md | cut -c1-160 | head -40; rg -n \"": {
+   "count": 1,
+   "ms": 196,
+   "maxMs": 196,
+   "failures": 0
+  },
+  "bash\u0000sed -n 179,200p README.md | cut -c1-700; echo ===; rg -n \"\\\"design\\\"|'design'|/wo design\" extensions/work-*.ts extensions/hub-command.ts | rg -v \"work-models\" | cut -c1-240 | head; sed -n 12,17p exten": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000rg -n -i \"0.7.13|theme image|docs image|fd5cf0d\" docs/upstream/astryx.md docs/upstream/*.md | cut -c1-250 | head; git diff --stat docs/upstream/astryx.md; rg -n -l \"fd5cf0d\" --glob \"!node_modules\" . 2": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000cd \"hub\" && D=\"document.getElementById('expand-left').click(); document.getElementById('tab-library').click(); await new Promise(r => setTimeout(r, 2500)); const q = document.querySelector('#library i": {
+   "count": 1,
+   "ms": 69463,
+   "maxMs": 69463,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"references\\\\.\\\\\\\\b|\\\\d+ references|/\\\\\\\\d\\+ references/\" hub/scripts/test-browser.mjs | cut -c1-200 | head; cd \"hub\" && D=\"document.getElementById('expand-left').click(); document.getElementByI": {
+   "count": 1,
+   "ms": 69160,
+   "maxMs": 69160,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"\\d+ references|references\\.\" hub/scripts/*.mjs | cut -c1-200 | head -5; cd \"hub\" && D=\"document.getElementById('expand-left').click(); document.getElementById('tab-library').click(); await new ": {
+   "count": 1,
+   "ms": 68613,
+   "maxMs": 68613,
+   "failures": 0
+  },
+  "bash\u0000git diff -U0 README.md > \"$TEMP/p307/readme.patch\" && node -e \"const fs=require('fs');const f=process.argv[1];const t=fs.readFileSync(f,'utf8');const i=t.indexOf('@@ -72,0');const j=t.indexOf('@@ -196": {
+   "count": 1,
+   "ms": 439,
+   "maxMs": 439,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const fs=require('fs');const t=fs.readFileSync('README.md','utf8');const out=t.replace(/\\*\\*Video review tracking stays here:\\*\\*[^\\n]*\\n\\n/,'');if(out===t)process.exit(1);fs.writeFileSync(pr": {
+   "count": 1,
+   "ms": 332,
+   "maxMs": 332,
+   "failures": 0
+  },
+  "bash\u0000git log --oneline -1 -S \"Use /wo design without arguments\" -- extensions/hub-command.ts; git diff extensions/hub-command.ts | rg -c \"wo design\"; rg -n \"\\\"build|\\\"start|\\\"dev\" hub/package.json; rg -n \"": {
+   "count": 1,
+   "ms": 261,
+   "maxMs": 261,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat extensions/hub-command.ts hub/src/cli.ts hub/src/hub.ts; git diff extensions/hub-command.ts | rg \"^[+-]\" | cut -c1-170 | head -60": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000git diff hub/src/cli.ts hub/src/hub.ts scripts/test-work-hub-command.mjs | rg \"^[+-]\" | cut -c1-200; rg -n \"handleDesignLibraryCommand\" extensions scripts hub --glob \"*.{ts,mjs}\" | cut -c1-160": {
+   "count": 1,
+   "ms": 141,
+   "maxMs": 141,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-hub-command.mjs\" 2>&1 | tail -3; echo \"exit $?\"; git diff --stat scripts/test-work-hub-command.mjs": {
+   "count": 1,
+   "ms": 862,
+   "maxMs": 862,
+   "failures": 0
+  },
+  "bash\u0000git add -- extensions/hub-command.ts hub/src/cli.ts hub/src/hub.ts scripts/test-work-hub-command.mjs && git diff --cached --check && git commit -q -m \"Commit /wo design entry: hub open --view library,": {
+   "count": 1,
+   "ms": 299,
+   "maxMs": 299,
+   "failures": 0
+  },
+  "bash\u0000pi-hub status 2>&1 | head -5": {
+   "count": 1,
+   "ms": 493,
+   "maxMs": 493,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"(Get-Process -Id 12228).StartTime.ToString('s')\"; git log -1 --format=%ci -- hub/src/hub.ts hub/web/design-library.ts hub/src/cli.ts; git log --format=\"%h %ci %s\" -8 --": {
+   "count": 1,
+   "ms": 279,
+   "maxMs": 279,
+   "failures": 0
+  },
+  "bash\u0000cd \"$LOCALAPPDATA/Temp/pi-browser-fetch/78eacc84-1614-4b07-af67-ad035ae88279\" && for f in *; do printf \"%s \" \"$f\"; file -b \"$f\" | cut -c1-70; done; ls -la | awk \"{print \\$5, \\$9}\"; cd /c/SOFT/git/ce-w": {
+   "count": 1,
+   "ms": 413,
+   "maxMs": 413,
+   "failures": 0
+  },
+  "bash\u0000P=\"docs/plans/2026-11-11-visual-design-library-and-reference-led-studio-kickoff-b2863bb6-plan3.md\"; git add -- \"$P\" && git commit -q -m \"Plan b2863bb6: add Found web results row (P3-11, P3-12)\" -- \"$P": {
+   "count": 1,
+   "ms": 180,
+   "maxMs": 180,
+   "failures": 0
+  },
+  "bash\u0000wc -l extensions/design.ts extensions/design-references.ts extensions/design-catalog.ts hub/web/design-library.ts; rg -n \"action ===|case \\\"|Type.Union|StringEnum|actions:\" extensions/design.ts | head": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"designcatalog|designimage|designreference|designCatalog|catalogReference|designImage|designurl\" hub/src/hub.ts | cut -c1-260; rg -n \"pi-browser-fetch\" extensions/*.ts | cut -c1-200 | head": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000rg -ln \"designcatalog|designCatalog\" hub/src extensions | head; rg -n \"tmpdir|saveDir|mkdtemp\" extensions/browser-fetch.ts extensions/browser-search.ts | cut -c1-200 | head": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"design(catalog|image|reference|references|refasset|url|sample)|designCatalog|catalogReference|designImage|referenceAssets|addDesignReference|urlSnapshot\" hub/src/api.ts | cut -c1-300; rg -n \"pi": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent\" && rg -n \"export (async )?function convertToPng\" -A25 dist | head -40": {
+   "count": 1,
+   "ms": 708,
+   "maxMs": 708,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-api.mjs\" 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 21667,
+   "maxMs": 21667,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"javascript:\" \"hub/scripts/test-api.mjs\"; node \"hub/scripts/test-api.mjs\" 2>&1 | tail -12": {
+   "count": 1,
+   "ms": 22798,
+   "maxMs": 22798,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-design.mjs\" 2>&1 | tail -4; git diff --check -- extensions hub/src hub/web hub/scripts; echo diffcheck=$?": {
+   "count": 1,
+   "ms": 274344,
+   "maxMs": 274344,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"extensions/design-references.ts\" \"extensions/design-catalog.ts\" \"extensions/design.ts\" \"hub/src/api.ts\" \"hub/web/design-library.ts\" \"hub/scripts/test-api.mjs\" && git add -- \"extens": {
+   "count": 1,
+   "ms": 227,
+   "maxMs": 227,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"bundle|referencesubmit|Send.*ref|designsubmit\" hub/scripts/test-browser.mjs | cut -c1-240 | head; rg -n \"^ *const .*refs|designsubmission|case \\\"designsend|bundle\" hub/src/api.ts | cut -c1-200 ": {
+   "count": 1,
+   "ms": 149,
+   "maxMs": 149,
+   "failures": 0
+  },
+  "bash\u0000node -p \"require('./package.json').version\"; git log --oneline -3; ls docs/changelog | rg \"design-library\"": {
+   "count": 1,
+   "ms": 195,
+   "maxMs": 195,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/changelog-shot.mjs\" \"#library [data-entry^='found:']\" \"docs/changelog/design-library-found.png\" \"document.getElementById('tab-library').click(); for (let i = 0; i < 100 && !document.": {
+   "count": 1,
+   "ms": 74281,
+   "maxMs": 74281,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/changelog-shot.mjs\" \"body\" \"%TEMP%/found-debug.png\" \"document.getElementById('tab-library').click(); for (let i = 0; i < 100 && !document.querySelector(\\\"#library [data-entry^='found": {
+   "count": 1,
+   "ms": 75180,
+   "maxMs": 75180,
+   "failures": 0
+  },
+  "bash\u0000git show -s --format=%B ed408796; rm -f \"%TEMP%/found-debug.png\"; rmdir \"%TEMP%\" 2>/dev/null; ls -d \"%TEMP%\" 2>&1 | head -1": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"left-panel|expand|collapsed\" hub/web/*.ts -l | head; rg -n \"id=\\\"left-toggle\\\"|left-toggle|panel-toggle\" hub/web/index.html | head -5": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/changelog-shot.mjs\" \"#library [data-entry^='found:']\" \"docs/changelog/design-library-found.png\" \"document.getElementById('expand-left').click(); await new Promise(r => setTimeout(r, ": {
+   "count": 1,
+   "ms": 75674,
+   "maxMs": 75674,
+   "failures": 0
+  },
+  "bash\u0000node \"hub/scripts/test-changelog.mjs\" 2>&1 | tail -3; git diff --check; echo dc=$?; git diff -U0 README.md | rg \"^@@|^[+-]\" | cut -c1-120": {
+   "count": 1,
+   "ms": 296,
+   "maxMs": 296,
+   "failures": 0
+  },
+  "bash\u0000git diff -U0 README.md > \"$TEMP/readme.patch\" && node -e \"const fs=require('fs');const p=fs.readFileSync(process.argv[1],'utf8');const [head,...hunks]=p.split(/(?=^@@)/m);fs.writeFileSync(process.argv": {
+   "count": 1,
+   "ms": 292,
+   "maxMs": 292,
+   "failures": 0
+  },
+  "bash\u0000git commit -q -m \"Design library: Found cards add as @ref or Capture page; browser test, changelog shot, docs\" && git log --oneline -1": {
+   "count": 1,
+   "ms": 138,
+   "maxMs": 138,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-11-11-visual-design-library-and-reference-led-studio-kickoff-b2863bb6-plan3.md\" \"docs/plans/logs/b2863bb6.md\" && git commit -q -m \"Plan b2863bb6: P3-11 and P3-12 done\" && g": {
+   "count": 1,
+   "ms": 164,
+   "maxMs": 164,
+   "failures": 0
+  },
+  "bash\u0000echo \"hub=$PI_HUB_SESSION\"; curl -s -o /dev/null -w \"%{http_code}\\n\" \"http://127.0.0.1:$(node -p \"try{require(require('os').homedir()+'/.pi/agent/hub/config.json').port}catch{''}\")/\" 2>&1 | head -1": {
+   "count": 1,
+   "ms": 246,
+   "maxMs": 246,
+   "failures": 0
+  },
+  "bash\u0000wc -l hub/web/design-library.ts extensions/design-catalog.ts; rg -n \"preview|disabled|metadata only|imageRevision|availability\" hub/web/design-library.ts | cut -c1-200 | head -40": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 0
+  },
+  "bash\u0000ls .pi/designs/systems 2>&1 | head; ls .pi/designs/systems/* 2>/dev/null | head -20; rg -n \"systemIndex|async function fetchSystem|raw.githubusercontent|codeload|tarball\" extensions/design.ts | cut -c": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 0
+  },
+  "bash\u0000c=$(node -p \"require('./.pi/designs/systems/index.json').commit\"); for n in airbnb agentic bmw; do echo \"== $n\"; curl -s -H \"user-agent: ce\" \"https://api.github.com/repos/nexu-io/open-design/contents/": {
+   "count": 1,
+   "ms": 1164,
+   "maxMs": 1164,
+   "failures": 0
+  },
+  "bash\u0000c=$(node -p \"require('./.pi/designs/systems/index.json').commit\"); for d in preview system; do echo \"== airbnb/$d\"; curl -s -H \"user-agent: ce\" \"https://api.github.com/repos/nexu-io/open-design/conten": {
+   "count": 1,
+   "ms": 1138,
+   "maxMs": 1138,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"browser_fetch|browserFetch|captureUrl|capturePage\" hub/src/*.ts extensions/design-references.ts extensions/*.ts -l | head; rg -n \"examples|usage\" extensions/design-lookup.ts | cut -c1-180 | hea": {
+   "count": 1,
+   "ms": 156,
+   "maxMs": 156,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"browser_fetch|browserFetch|hubTool|pageCapture|capture\" hub/src/api.ts | cut -c1-220 | head -12; rg -n \"astryx|cli|catalog\" extensions/design-lookup.ts | cut -c1-200 | head -20": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md\" && git commit -q -m \"Plan f5d9dae1: visual design library (tabs, real previews, image search)": {
+   "count": 1,
+   "ms": 219,
+   "maxMs": 219,
+   "failures": 1
+  }
+ },
+ "steps": {
+  "P3-01": {
+   "ms": 134544,
+   "testMs": 1584,
+   "replies": 17,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 17
+   }
+  },
+  "P3-02": {
+   "ms": 2184159,
+   "testMs": 295045,
+   "replies": 93,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 93
+   },
+   "failures": 12
+  },
+  "P3-03": {
+   "ms": 3677166,
+   "testMs": 281458,
+   "replies": 94,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 94
+   },
+   "failures": 9
+  },
+  "P3-04": {
+   "ms": 8555162,
+   "testMs": 1563101,
+   "replies": 225,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 165,
+    "anthropic/claude-opus-5-5:high": 60
+   },
+   "failures": 11
+  },
+  "P3-06": {
+   "ms": 362576,
+   "testMs": 309116,
+   "replies": 10,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 10
+   }
+  },
+  "P3-07": {
+   "ms": 1077652,
+   "testMs": 179728,
+   "replies": 32,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 32
+   },
+   "failures": 5
+  },
+  "P3-09": {
+   "ms": 342105,
+   "testMs": 0,
+   "replies": 20,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 20
+   },
+   "failures": 1
+  },
+  "(none)": {
+   "ms": 377975,
+   "testMs": 862,
+   "replies": 47,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 47
+   },
+   "failures": 1
+  },
+  "P3-11": {
+   "ms": 536926,
+   "testMs": 296082,
+   "replies": 37,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 37
+   },
+   "failures": 3
+  },
+  "P3-12": {
+   "ms": 590581,
+   "testMs": 202149,
+   "replies": 39,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 39
+   }
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-11T20:56:43.953Z",
+   "ms": 6917093
+  },
+  {
+   "start": "2026-11-11T22:52:01.072Z",
+   "ms": 965647
+  },
+  {
+   "start": "2026-11-12T06:17:51.861Z",
+   "ms": 2415625
+  },
+  {
+   "start": "2026-11-12T06:58:07.532Z",
+   "ms": 4691787
+  },
+  {
+   "start": "2026-11-12T08:16:19.347Z",
+   "ms": 1079643
+  },
+  {
+   "start": "2026-11-12T08:34:19.010Z",
+   "ms": 1864550
+  },
+  {
+   "start": "2026-11-12T09:28:36.886Z",
+   "ms": 35397
+  },
+  {
+   "start": "2026-11-12T11:50:00.209Z",
+   "ms": 20316
+  },
+  {
+   "start": "2026-11-12T11:57:56.891Z",
+   "ms": 47836
+  },
+  {
+   "start": "2026-11-12T11:58:44.747Z",
+   "ms": 1278824
+  },
+  {
+   "start": "2026-11-12T12:23:36.031Z",
+   "ms": 56749
+  },
+  {
+   "start": "2026-11-12T12:57:01.228Z",
+   "ms": 6971
+  },
+  {
+   "start": "2026-11-12T13:10:36.257Z",
+   "ms": 566036
+  }
+ ],
+ "hints": [
+  {
+   "at": "2026-11-12T08:51:24.151Z",
+   "step": "P3-07",
+   "shape": "S=document.getElementById(expand-left).click()"
+  }
+ ]
+}

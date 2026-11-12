@@ -2,7 +2,7 @@
 
 What changed in ce-workflow and its hub (pi-control-hub), newest first. One version covers both.
 
-## Unreleased
+## 0.8.0 — 2026-11-12
 
 ### Added
 - `/wo design` and the hub's **Design library** tab (**Browse designs** on phones) show OpenDesign systems, Astryx themes and components, and your own design drafts and exports beside the chat. Add a card, an image region or a web page as a numbered `@ref` chip, describe the mix, and Send starts the usual design variants with exactly those references. Browsing never generates, downloads or installs anything. Page screenshots go through your browser's per-site approval.
@@ -27,6 +27,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 - Idle cold-cache compaction now waits until Pi's last idle cache warm expires, including slow final warms. The hub compacts before parking when only idle warms kept the cache fresh, but still respects a recent real request and long cache retention.
 
 ### Changed
+- Hub notices (such as "message not delivered") now show just above the chat box instead of over the top of the chat, and a click dismisses them.
+- `node scripts/work-video-status.mjs <digest folder>` lists the video digests not yet reviewed for ce-workflow; reviewed and skipped videos are recorded in `docs/upstream/processed-videos.json`.
 - In the hub and `/wo`, cold-cache compaction now uses one configurable share of the active mode's auto-compact trigger (70% by default); set it with `/wo context cold <percent>` and inspect it with `/wo context status`.
 
 ## 0.7.0 — 2026-11-11

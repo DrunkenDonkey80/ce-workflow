@@ -54,7 +54,7 @@ function setBar(item: HTMLElement, percent: number, tone: string) {
 }
 let noticeTimer: ReturnType<typeof setTimeout> | undefined, noticeVersion = 0;
 // Confirmations (brief) fade after ~1.5 s; errors and hints stay until replaced.
-function showNotice(text, brief = false) { noticeVersion++; clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (brief && text) noticeTimer = setTimeout(() => showNotice(""), 1500); }
+function showNotice(text, brief = false) { noticeVersion++; clearTimeout(noticeTimer); $("notice").textContent = text; $("notice").hidden = !text; if (text) noticeTimer = setTimeout(() => showNotice(""), brief ? 1500 : 10_000); }
 let sessionStates: string[] = [], ownTone = "", iconKey = "", appleFor = "";
 let navRequest: { n: number; dir: number; ctrl: boolean } | null = null; // a back/forward press for the app (see piHubGo)
 // D5: inside the desktop app (user agent marker) the title is a machine line the app reads for its tab, taskbar and tray.
@@ -917,6 +917,7 @@ async function loadEarlier() {
  } catch (error) { showNotice(error.message); } finally { loadingEarlier = false; if (loaded) fillChat(); }
 }
 $("to-bottom").addEventListener("click", () => toBottom());
+$("notice").addEventListener("click", () => showNotice(""));
 // Final replies fetched in full once each (a failed fetch is not retried on every render).
 const finalLoads = new Set<string>();
 function renderChat() {
@@ -1472,7 +1473,7 @@ async function sendSubmission(saved: NonNullable<typeof pendingSubmission>, mess
  } catch (error) {
   // Reference retries keep the exact envelope even on refusal; never turn uncertainty into a fresh launch ID.
   if (!saved.request && Number.isInteger(error.status) && error.status >= 400 && error.status < 500 && error.status !== 408 && draftEdits === submittedEdits) pendingSubmission = undefined;
-  expectWork(false); showNotice(error.message + ". Your message draft is kept.");
+  expectWork(false); showNotice(error.message.replace(/\.$/, "") + ". Your message draft is kept.");
  } finally { messageSending = false; saveDraft(); renderRecovery(); renderReferenceDraft(); renderShell(); }
 }
 // Sending shows Working at once instead of when the agent starts seconds later. The server's next activity event

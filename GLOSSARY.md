@@ -25,3 +25,11 @@ a snapshot of the design folder after an agent turn that changed it, numbered fr
 
 **Reference**:
 a captured site in `.pi/designs/references/<site>/` (screenshots plus `STYLE.md` of measured tokens).
+
+**Cold-cache compaction**:
+ce-workflow compacting a large session because its prompt cache has expired, so the next request would re-bill the whole prompt anyway.
+_Avoid_: early compaction
+
+**Idle cache warming**:
+Pi re-sending the last prompt between runs, with a one-token output cap, to keep its cache alive.
+_Avoid_: keep-alive

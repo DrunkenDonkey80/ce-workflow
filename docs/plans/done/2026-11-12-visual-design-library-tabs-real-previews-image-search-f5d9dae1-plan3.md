@@ -1,9 +1,10 @@
 ---
 plan3: true
-status: active
+status: complete
 created: 2026-11-12
-updated: 2026-11-12T14:18:39.385Z
+updated: 2026-11-12T16:29:56.632Z
 reviewed: 2026-11-12
+started: 2026-11-12T15:55:09.588Z
 ---
 
 # Visual design library: tabs, real previews, image search
@@ -47,6 +48,8 @@ Non-goals: no model-curated search inside the tab (the `design found` tool actio
   - Fact checked after the answer: colors.html is about 2.7 KB and loads `../tokens.css` (airbnb, agentic, bmw at the indexed commit), so it must be cached at `preview/colors.html` beside the system's `tokens.css`, which `fetchSystem` already saves. No other external links were found.
 - D8 (user, Q-02 via /plan3 resolve) The browser extension sends each result's own thumbnail as a separate image, alongside the unchanged contact sheet for the image_search tool. The user added: "but big enough to be workable". Rejected: cutting tiles from the contact sheet (number badges, at most 162 px) and downloading every original per search.
   - Implication (agent): Google's grid thumbnails are small, and their real size is not measured yet. Tiles show the thumbnail at its natural size, never upscaled past it; opening a result fetches that one original on demand (the existing save path, 8 MB cap, consent rules) and shows it full size, so a promising result is always workable without downloading all 30. The extension update needs the user to update and reload the browser extension once (/wo → Settings → Browser access).
+- V-07/V-08 (user, after the prototype numbers): ship component pictures at 2× webp q0.8 within ~1.5 MB total. When a component's pinned example is missing or not representative (TextInput, Badge, Banner), use a small hand-written example kept in this repo, so every card gets a real picture; it needs upkeep when Astryx changes.
+
 
 
 
@@ -87,36 +90,22 @@ Findings (this session, verified by reading code or fetching):
 
 ### Phase 3: Image search tab [code]
 
-- [ ] **V-05** Add a hub-to-session image search route and the Image search tab: Enter or Search runs it, and results show as pictures.
-  - The route runs the existing `image_search` code in the user's browser without a model turn. It reuses image_search's consent and CAPTCHA handling, and returns titles, sites, page URLs and locally served thumbnails.
-  - Tiles (D8): the extension sends each result's thumbnail separately (only gstatic or inline data, no cookies, as the sheet does today); serve them from the session's temp folder, never hotlink third-party URLs into the hub page. Bump the extension version so the setup check asks for the update.
-  - Opening a result downloads that one original on demand and shows it full size, cached in the session's temp folder for this search; adding it reuses that file.
-  - Measure while building: the thumbnails' real sizes on a live search; record them in the step check.
-  - Add structured internal results to `imageSearch` and `saveOriginals` (extensions/browser-search.ts:94 and :105 return formatted text today) while keeping the image_search tool's replies unchanged.
-  - Add session handlers for search and save next to `/api/designurl` in extensions/plan3.ts (~857) and allow them in `HUB_CALLS` (~2007). The page names results by the session's own set ID and result number, never by file path; a session cannot reach another session's sets.
-  - Acceptance: hub/scripts/test-api.mjs covers the hub route with a fake session; scripts/test-work-browser-fetch.mjs covers the real session handlers: denied consent, expired set, failed original and another session's set; the browser test types a query, presses Enter and sees result pictures, and an empty box sends nothing; opening a result shows its original larger than the tile (fixture original bigger than its thumbnail).
-- [ ] **V-06** Let a result be added: save its original into the conversation's saved picks, then attach it as a reference. Picks survive new searches.
-  - Uses `publishFound` (8 MB cap, PNG, newest 60). Capture page stays on saved picks.
-  - Acceptance: browser test adds a result, runs a second search, and the saved pick and its source link are still listed and attachable.
+- [x] **V-05** Image search tab: Enter/Search (typed text only) runs the session's image_search via hub designsearch → /api/designsearch (searchForHub); extension 1.8 sends each cookie-free thumbnail separately, returned inline as data URLs; Open fetches one original via designoriginal (originalForHub, kept per set) and shows it full size with its source link. Committed b4025622.
+- [x] **V-06** Image search tiles have "Add reference": designpick → session /api/designpick (pickForHub: originalForHub + publishFound) saves the original as a found: pick and attaches it; picks survive later searches with their source link. Committed cb58da78.
 
 ### Phase 4: Component pictures [think]
 
-- [ ] **V-07** Prototype rendering five Astryx components from their pinned examples into images; measure quality, file size and render time.
-  - Use the consent-provisioned lookup cache and a local headless browser in a maintainer script, never during browsing.
-  - With the numbers, ask the user about the bundle size budget and image size (add it as an open question then).
-- [ ] **V-08** Decide the per-component example choice and the fallback for components whose examples do not render alone.
+- [x] **V-07** Prototype scripts/astryx-component-shots.mjs (f05d80c3) renders pinned examples via the installed runtime + headless agent-browser: 3/5 rendered crisp at 2x (Button 16.8 KB, Card 17.0 KB, Banner 2.6 KB webp q0.8, avg 12.1 KB); TextInput and Badge have no pinned example; Banner's example only shows a button before interaction; build ~48 s per component, render+shot ~1.2 s.
+- [x] **V-08** Example choice: scripts/astryx-examples/<Name>.jsx (hand-written, default export) wins, else the first pinned example; TextInput, Badge, Banner now have hand-written ones (bd020e30). User decided: 2x webp within ~1.5 MB total.
 
 ### Phase 5: Component and theme pictures in the library [code]
 
-- [ ] **V-09** Render all 174 components and the theme without a bundled image; bundle them with the pin digest as revision; make the script part of the pin update.
-  - The same script exports each component's usage and props as small bundled metadata keyed to the pin, because the lookup (`runAstryx` in extensions/design-library.ts:16-18) provisions the runtime first and browsing must not.
-  - Acceptance: catalog entries for components report `preview: "image"`; a test fails when the bundled images or metadata do not match the pin.
-- [ ] **V-10** Show Components and Themes as big picture cards, with Inspect showing the picture plus the bundled usage and props.
-  - Acceptance: browser test opens the Components tab and sees an image on every card; Components Inspect shows usage and props with no runtime installed and provisioning forbidden.
+- [x] **V-09** 36c3e265: astryx-component-shots.mjs renders each component's pinned CLI showcase template (overlays opened first) → 162/174 bundled 2x webp, 1480.7 KB, components.json keyed by lockDigest; catalog/designimage serve them; test-work-design fails on a pin move without rerun. 12 sub-parts without a usable template stay picture-less.
+- [x] **V-10** f54533d2 + bacde83c: all 174 components pictured (5 hand-written examples, hash-named files, 1529.8 KB); component cards show the whole picture; Inspect shows bundled usage+props via api/designdocs (docs.json 587 KB) with no runtime. Themes keep their existing picture cards.
 
 ### Phase 6: Docs and release notes [code]
 
-- [ ] **V-11** Update the browser test end to end, take changelog shots of each tab, and update README and CHANGELOG.
+- [x] **V-11** ef4bbddf: browser test covers Components pictures + Inspect usage/props; changelog shots (components, component inspect, image search); README tabs bullet; CHANGELOG Unreleased entry; Inspect shows the picture first; grey stand-ins for example photos that can't load offline.
 
 ## Global validation
 

@@ -49,4 +49,6 @@ Issue-tracker flows (`engineering/triage`, `engineering/implement-spec`, `engine
 
 ## From the videos
 
+Per-video processing is tracked by YouTube ID in [processed-videos.json](processed-videos.json), independently of yt-ingest. The initial batch below is recorded as 44 reviewed and 2 deliberately skipped (Rust and TypeScript tips); review completion is separate from whether an idea was adopted or its experiment is finished. Run `node "scripts/work-video-status.mjs" "<digest directory>"` before another batch.
+
 Ideas from 46 video digests: `docs/proposals/2026-11-09-matt-video-ideas.md`. Done: A1-A9 prompt tunings and skill routing (50cca66), B1 Plan → Map mid-grill (39fa417), B2 glossary redefinitions at finish (f71de98), B3 compaction auto-facts limited to observed facts (80c1de7), D docs (README and this ledger). Open: B4 map frontier (only when a real map stalls), C1-C6 experiments (a benchmark plan, nothing run yet).

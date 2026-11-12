@@ -1,0 +1,324 @@
+[
+  {
+    "id": "5C_HPTJg5ek",
+    "title": "Rust in 100 Seconds",
+    "status": "skipped",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "lraHlXpuhKs",
+    "title": "6 TypeScript tips to turn you into a WIZARD",
+    "status": "skipped",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "E5-QK3CDVQM",
+    "title": "I Open-Sourced My Own AFK Software Factory",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "6BB6exR8Zd8",
+    "title": "I stopped using /grill-me for coding. Here’s what I use instead:",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "dtAJ2dOd3ko",
+    "title": "/handoff is my new favourite skill",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "UzMNBN6xLLA",
+    "title": "9 Things People Get Wrong With My /grill-* skills",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "A8mokin_YOs",
+    "title": "New Skills! v1.1 brings /wayfinder, /research, /implement, /to-spec, /to-tickets",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "CE57AICfAew",
+    "title": "A dictionary of AI Coding",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "e-pFrQ_Rh0s",
+    "title": "AI Coding is exhausting",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "SF1Ab0Y-9BY",
+    "title": "Don't know which model to choose? *taps the graph*",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "8WLi98SEdeU",
+    "title": "/handoff + /teach is awesome for learning while coding",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "H-JHumbpORI",
+    "title": "My agent hallucinated - what do I do?",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "iQb3F9UzBR4",
+    "title": "Your effort level is TOO DAMN HIGH",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "oLx4yCbeklQ",
+    "title": "Claude Code's system tools are SO BLOATED",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "Fj8DKMbdIzU",
+    "title": "Delete (most of) your docs",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "eEjBhVI9Qok",
+    "title": "Do software fundamentals still matter?",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "U832hShMVnc",
+    "title": "I'm thinking about changing my most popular skill",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "M6mYodf0dJM",
+    "title": "mattpocock/skills: A complete AI Coding workflow, end-to-end",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "t34UuBxB2YQ",
+    "title": "My #1 book recommendation for strategic programming",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "glaIO6OYh74",
+    "title": "My /teach skill is still insane",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "32LyZyFQhCQ",
+    "title": "Framework Hell, Tutorial Hell... now Skill Hell",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "A0scuiiGBC4",
+    "title": "Kill your MEMORY.md",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "tLyfDIt9wHg",
+    "title": "This change makes /grill-me SO MUCH BETTER",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "Yn8h5Ip-L9c",
+    "title": "Do you even need human review?",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "5hYsBUMmr-I",
+    "title": "Using /grill-me for interviews?!",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "sOd7svdu_1I",
+    "title": "What is the dumb zone?",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "0l7zOp260yc",
+    "title": "There is no such thing as greenfield",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "n0VhIVtviC0",
+    "title": "Don't waste time on specs: /prototype instead",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "F3lL98Pj90o",
+    "title": "/wayfinder: Nothing is too big to plan anymore",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "gaDdrDdczO4",
+    "title": "New Skills! v1.2 brings /wait-what, /writing-for-agents, and fixes /grill-me",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "BsJGo1wFTvQ",
+    "title": "New Skills! v1.3 brings /pr, /implement-spec, and /retro",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "LGj1oUidC7Q",
+    "title": "Don't underestimate the communication barrier",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "Q8XzzKUbp0Y",
+    "title": "/retro is a banger of a skill",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "zgy8_ApYNDk",
+    "title": "STOP running your checks in harness hooks",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "9uSygtI-6lw",
+    "title": "Tell your agents to CARE about the codebase",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "JgEsphDAXnY",
+    "title": "Your effort level is STILL TOO HIGH",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "y81cjELJMI0",
+    "title": "Your skills are WAY TOO LONG",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "djSbndoByr8",
+    "title": "Mutation testing is AWESOME",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "fn3iRGgRuWU",
+    "title": "Give your agent a goal, and let it be creative",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "GAUWSmFmT3w",
+    "title": "WHY ARE YOU TYPING",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "r8FYE2ZOj0E",
+    "title": "The secret to building robust frontend apps with agents",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "k2zgcTDq4aQ",
+    "title": "When should you NOT use /grill-me?",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "Vo33extKAeA",
+    "title": "Your agent is a tactical tornado",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "Z1saoyb_98M",
+    "title": "Junior engineers: don't wait for permission",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "Jy8vX_CIsBw",
+    "title": "Is vibe coding an insult?",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  },
+  {
+    "id": "KJr1Q-k-yH0",
+    "title": "Someone wrote a PAPER about my skill",
+    "status": "reviewed",
+    "processedOn": "2026-11-09",
+    "evidence": "docs/proposals/2026-11-09-matt-video-ideas.md"
+  }
+]

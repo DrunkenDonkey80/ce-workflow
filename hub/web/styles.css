@@ -48,7 +48,9 @@ h2 { font-size: 15px; font-weight: 600; }
 #commands { display: flex; gap: 6px; flex-wrap: wrap; font-size: 13px; }
 /* Notices are small tabs floating at the top of the chat, not full-width bars. */
 .chat { position: relative; }
-.notices { position: absolute; top: 4px; left: 0; right: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+/* Zero-height strip just above the composer; flex-end overflows the notices upward over the feed's empty bottom. */
+.notices { position: relative; height: 0; z-index: 2; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; transform: translateY(-8px); pointer-events: none; }
+#notice { pointer-events: auto; cursor: pointer; }
 .notice { margin: 0; max-width: calc(100% - 32px); padding: 3px 10px; border-radius: 999px; background: var(--changed); font-size: 12px; box-shadow: 0 1px 4px #0003; }
 .notice[hidden] { display: none; }
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 12px var(--chat-width); flex: 1; min-height: 0; }
@@ -68,12 +70,12 @@ h2 { font-size: 15px; font-weight: 600; }
 .library-row :is(input, select, button) { min-height: 44px; min-width: 0; box-sizing: border-box; }
 .library-row :is(input, select) { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
 .library-row > input[type=search] { grid-column: 1 / -1; }
-.library-row > p { grid-column: 1 / -1; margin: 0; }
-.library-row > p:empty { display: none; }
 .library-row.searching > input[type=search] { grid-column: 1 / -2; }
 .library-results { margin-bottom: 16px; }
 .library-list > h3 { grid-column: 1 / -1; margin: 8px 0 0; }
 .library-result-thumb { display: block; max-width: 100%; height: auto; margin: 0 auto 12px; }
+.library-row > p { grid-column: 1 / -1; margin: 0; }
+.library-row > p:empty { display: none; }
 .design-library { container-type: inline-size; }
 @container (max-width: 520px) { .library-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .library-row > input { grid-column: 1 / -1; } }
 .library-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
@@ -91,10 +93,10 @@ h2 { font-size: 15px; font-weight: 600; }
 .library-list p { margin-top: 8px; }
 .library-thumb { display: block; width: 100%; height: 160px; object-fit: cover; object-position: top; margin-bottom: 12px; }
 /* A component picture is the whole component: show all of it, never crop. */
-.library-thumb.library-thumb-whole { height: 220px; object-fit: contain; object-position: center; background: #fff; border-radius: 4px; }
-.library-docs table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .library-swatches { display: flex; flex-wrap: wrap; gap: 6px 10px; list-style: none; margin: 0 0 12px; padding: 0; font-size: 12px; color: var(--muted); }
 .library-swatches li::before { content: ""; display: inline-block; width: 14px; height: 14px; margin-right: 4px; vertical-align: -3px; border-radius: 3px; border: 1px solid var(--line); background: var(--swatch); }
+.library-thumb.library-thumb-whole { height: 220px; object-fit: contain; object-position: center; background: #fff; border-radius: 4px; }
+.library-docs table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .library-docs th, .library-docs td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .library-docs th, .library-docs code { white-space: nowrap; }
 .library-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

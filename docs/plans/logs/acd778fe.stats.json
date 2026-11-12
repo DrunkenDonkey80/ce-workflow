@@ -1,0 +1,513 @@
+{
+ "version": 1,
+ "activeMs": 1891333,
+ "runs": 5,
+ "waitingMs": 43886,
+ "toolWallMs": 754597,
+ "compactions": {
+  "count": 1,
+  "ms": 25427
+ },
+ "models": {
+  "openai-codex/gpt-6.1-sol:high": {
+   "replies": 41,
+   "thinkingMs": 396647,
+   "actingMs": 211410,
+   "input": 485326,
+   "output": 21992,
+   "cacheRead": 3256960,
+   "cacheWrite": 0,
+   "cost": 1.5162680000000002,
+   "errors": 0
+  },
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 33,
+   "thinkingMs": 148975,
+   "actingMs": 72664,
+   "input": 76,
+   "output": 19994,
+   "cacheRead": 2631518,
+   "cacheWrite": 344244,
+   "cost": 2.647707600000001,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "read": {
+   "count": 62,
+   "ms": 8894,
+   "maxMs": 2582,
+   "failures": 0
+  },
+  "plan3": {
+   "count": 28,
+   "ms": 13211,
+   "maxMs": 4664,
+   "failures": 0
+  },
+  "bash": {
+   "count": 56,
+   "ms": 448606,
+   "maxMs": 350647,
+   "failures": 13
+  },
+  "codemode": {
+   "count": 35,
+   "ms": 333103,
+   "maxMs": 36306,
+   "failures": 2
+  },
+  "edit": {
+   "count": 30,
+   "ms": 589,
+   "maxMs": 317,
+   "failures": 1
+  },
+  "module_report": {
+   "count": 2,
+   "ms": 189,
+   "maxMs": 181,
+   "failures": 0
+  },
+  "read_symbol": {
+   "count": 4,
+   "ms": 116,
+   "maxMs": 47,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 7,
+   "ms": 43538,
+   "maxMs": 11784,
+   "failures": 0
+  },
+  "test_sensitivity": {
+   "count": 1,
+   "ms": 8440,
+   "maxMs": 8440,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 1,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "intercom": {
+   "count": 5,
+   "ms": 9,
+   "maxMs": 3,
+   "failures": 1
+  },
+  "write": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 41,
+   "ms": 21594,
+   "maxMs": 6636,
+   "failures": 6
+  },
+  "test": {
+   "count": 15,
+   "ms": 427012,
+   "maxMs": 350647,
+   "failures": 7
+  }
+ },
+ "commands": {
+  "bash\u0000git status --short && git branch --show-current && git diff --stat": {
+   "count": 1,
+   "ms": 2371,
+   "maxMs": 2371,
+   "failures": 0
+  },
+  "bash\u0000npm install --save-dev --save-exact \"@earendil-works/pi-coding-agent@1.5.2\" && node -p \"require('./node_modules/@earendil-works/pi-coding-agent/package.json').version\"": {
+   "count": 1,
+   "ms": 6636,
+   "maxMs": 6636,
+   "failures": 0
+  },
+  "bash\u0000git diff -- \"package.json\" \"package-lock.json\"": {
+   "count": 1,
+   "ms": 469,
+   "maxMs": 469,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"package.json\" \"package-lock.json\" \"docs/plans/2026-11-11-catch-up-pi-packages-and-upstream-design-repos-nov-11-acd778fe-plan3.md\" \"docs/plans/logs/acd778fe.md\" && git commit -m \"CU-01 pin ": {
+   "count": 1,
+   "ms": 201,
+   "maxMs": 201,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && rg -n \"api-report\" \"extensions\" \"docs/upstream\"": {
+   "count": 1,
+   "ms": 14900,
+   "maxMs": 14900,
+   "failures": 1
+  },
+  "bash\u0000git add -- \"extensions/work-catch-up-baseline.json\" \"docs/upstream/astryx.md\" \"docs/upstream/open-design.md\" \"docs/plans/2026-11-11-catch-up-pi-packages-and-upstream-design-repos-nov-11-acd778fe-plan3": {
+   "count": 1,
+   "ms": 219,
+   "maxMs": 219,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"coldCacheCompactMinutes|compactTriggerTokens|nativeCompactionTrigger|armIdleCompact|0\\.65|context set|context status\" \"extensions/work-models.ts\" \"scripts\" \"README.md\" && rg -n \"Unreleased\" \"CH": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"cache_warming_decision|cacheWarming|reserveTokens\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md\" \"extensions/work-models.ts\" \"": {
+   "count": 1,
+   "ms": 121,
+   "maxMs": 121,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"65%|cold cache|cold-cache|context.*set|early|idleCompact\" \"scripts/test-work-compaction-notifications.mjs\" && rg -n \"DEFAULT_CONTEXT\" \"extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"compact early|subcommand === .compact|case .compact|clearTimeout\\(idleCompactTimer\" \"extensions/work-models.ts\" && rg -n \"context (set|status)|context guard\" \"scripts/test-work-wo-control.mjs\" ": {
+   "count": 1,
+   "ms": 132,
+   "maxMs": 132,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"shouldCompact|reserveTokens\" \"node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js\" && rg -n \"handleWorkContextCommand|context:\" \"extensions/work-models.ts\"": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-compaction-notifications.mjs\"": {
+   "count": 7,
+   "ms": 15733,
+   "maxMs": 3322,
+   "failures": 4
+  },
+  "bash\u0000rg -n \"WO_UTILITY_ACTIONS|registerCommand\\(.wo|maintenanceCheckout|work-context\" \"extensions/work-models.ts\" \"scripts/test-work-wo-control.mjs\"": {
+   "count": 1,
+   "ms": 360,
+   "maxMs": 360,
+   "failures": 0
+  },
+  "bash\u0000git diff --check && git diff --stat && git diff -U1 -- \"README.md\"": {
+   "count": 1,
+   "ms": 208,
+   "maxMs": 208,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const {execFileSync}=require(\\\"node:child_process\\\"); const d=execFileSync(\\\"git\\\",[\\\"diff\\\",\\\"--\\\",\\\"README.md\\\"],{encoding:\\\"utf8\\\"}).split(/(?=^@@)/m); execFileSync(\\\"git\\\",[\\\"apply\\\",\\\"--": {
+   "count": 1,
+   "ms": 385,
+   "maxMs": 385,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"compact early|compactBeforePark|cache_warm\" \"hub/scripts/test-sessions.mjs\" \"hub/scripts/fake-pi.mjs\" \"hub/src/sessions.ts\" && git diff --check": {
+   "count": 1,
+   "ms": 138,
+   "maxMs": 138,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-models.ts\" \"scripts/test-work-compaction-notifications.mjs\" \"docs/plans/2026-11-11-catch-up-pi-packages-and-upstream-design-repos-nov-11-acd778fe-plan3.md\" \"docs/plans/logs": {
+   "count": 1,
+   "ms": 217,
+   "maxMs": 217,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"startEarlyCompact|lastPromptCacheTime|coldCacheCompactMinutes|compactBeforePark\" \"extensions\" \"hub/src\" \"scripts\" \"hub/scripts\"": {
+   "count": 1,
+   "ms": 84,
+   "maxMs": 84,
+   "failures": 0
+  },
+  "bash\u0000cd \"hub\" && node --test \"scripts/test-sessions.mjs\"": {
+   "count": 1,
+   "ms": 5904,
+   "maxMs": 5904,
+   "failures": 0
+  },
+  "bash\u0000git diff --check && git diff -- \"extensions/work-models.ts\" \"hub/src/sessions.ts\" \"hub/scripts/fake-pi.mjs\" \"hub/scripts/test-sessions.mjs\"": {
+   "count": 1,
+   "ms": 439,
+   "maxMs": 439,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-models.ts\" \"scripts/test-work-compaction-notifications.mjs\" \"hub/src/sessions.ts\" \"hub/scripts/fake-pi.mjs\" \"hub/scripts/test-sessions.mjs\" \"CHANGELOG.md\" \"docs/plans/2026-": {
+   "count": 1,
+   "ms": 2078,
+   "maxMs": 2078,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"docs/plans/2026-11-11-catch-up-pi-packages-and-upstream-design-repos-nov-11-acd778fe-plan3.md\" \"docs/plans/logs/acd778fe.md\" && git commit -m \"CU-90 checkpoint before full verification\" &&": {
+   "count": 1,
+   "ms": 859,
+   "maxMs": 859,
+   "failures": 0
+  },
+  "bash\u0000npm run verify:quiet": {
+   "count": 1,
+   "ms": 350647,
+   "maxMs": 350647,
+   "failures": 1
+  },
+  "bash\u0000git status --short && git log -6 --oneline": {
+   "count": 1,
+   "ms": 482,
+   "maxMs": 482,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"recordCatchUp|record-catch|--record|catch-up\" \"scripts/work-catch-up.mjs\" \"package.json\" && git diff --stat": {
+   "count": 1,
+   "ms": 609,
+   "maxMs": 609,
+   "failures": 1
+  },
+  "bash\u0000rg -n \"recordCatchUp|record-catch|--record\" \"scripts\" \"extensions/work-catch-up.ts\" \"package.json\" && git diff -- \"extensions/work-models.ts\" && git diff --stat": {
+   "count": 1,
+   "ms": 354,
+   "maxMs": 354,
+   "failures": 1
+  },
+  "bash\u0000cd \"hub\" && node --test \"scripts/test-app-install.mjs\"": {
+   "count": 1,
+   "ms": 2324,
+   "maxMs": 2324,
+   "failures": 0
+  },
+  "bash\u0000cd \"hub\" && node --test \"scripts/test-browser.mjs\"": {
+   "count": 1,
+   "ms": 10100,
+   "maxMs": 10100,
+   "failures": 1
+  },
+  "bash\u0000node \"scripts/work-catch-up-record.mjs\" \"acd778fe\" && node \"scripts/test-work-plan3.mjs\"": {
+   "count": 1,
+   "ms": 13126,
+   "maxMs": 13126,
+   "failures": 0
+  },
+  "bash\u0000git diff --stat -- \"extensions/work-catch-up-baseline.json\" && git diff -- \"extensions/work-catch-up-baseline.json\" && git diff --check": {
+   "count": 1,
+   "ms": 177,
+   "maxMs": 177,
+   "failures": 0
+  },
+  "bash\u0000git add -- \"extensions/work-catch-up-baseline.json\" \"docs/plans/2026-11-11-catch-up-pi-packages-and-upstream-design-repos-nov-11-acd778fe-plan3.md\" \"docs/plans/logs/acd778fe.md\" && git commit -m \"CU-9": {
+   "count": 2,
+   "ms": 2309,
+   "maxMs": 1470,
+   "failures": 0
+  },
+  "bash\u0000node \"scripts/test-work-plan3.mjs\" && git diff --check": {
+   "count": 1,
+   "ms": 13893,
+   "maxMs": 13893,
+   "failures": 0
+  },
+  "bash\u0000rg -n -i \"executor|worker model|delegat|context: \\\"fork\\\"|spawnSubagentRpc\\(\" \"extensions\" \"agents\" --glob \"!*.json\" | rg -v \"test\" | head -40; ls \"agents\" 2>/dev/null": {
+   "count": 1,
+   "ms": 133,
+   "maxMs": 133,
+   "failures": 1
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\" && rg -n -A12 \"^#+ .*tool_result\" \"extensions.md\" | head -50; cd \".\" && rg -n -l \"on\\(\\\"tool_resul": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"Cannot park while|draft is kept\" \"hub\" --glob \"!*.test*\" | head; rg -n \"function (toast|showToast|notify|flash)\\b|\\.toast\\b|#toast|class=\\\"toast\" \"hub/web\" | head -30": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function showNotice\" -A12 \"hub/web/app.ts\"; rg -n \"id=\\\"notice\\\"\" \"hub/web/index.html\"; rg -n \"#notice\" -A6 \"hub/web/styles.css\"; rg -n \"notice\" \"hub/scripts/test-browser.mjs\" | head ": {
+   "count": 1,
+   "ms": 201,
+   "maxMs": 201,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\.notices?\\b\" -A3 \"hub/web/styles.css\" | head -40; rg -n \"noticeTimer|noticeVersion\" \"hub/web/app.ts\" | head": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"140,147p\" \"hub/web/index.html\"; git diff --stat -- \"hub/web/app.ts\" \"hub/web/styles.css\"; git diff -U0 -- \"hub/web/styles.css\" | rg -n \"^@@\" | head": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^\\.chat \\{|^\\.chat\\{|^\\.feed \\{|^\\.composer|^#composer|^\\.chat-form\" \"hub/web/styles.css\"; sed -n \"148,160p\" \"hub/web/index.html\" | cut -c1-200": {
+   "count": 1,
+   "ms": 91,
+   "maxMs": 91,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"^const \\\\$ =|function \\\\$\\(|^\\s*const \\\\$\\b\" \"hub/web/app.ts\" | head -3; rg -n \"\\\"to-bottom\\\"\\)\\.(onclick|addEventListener)\" \"hub/web/app.ts\"; rg -n \"\\.to-bottom\" \"hub/web/styles.css\"": {
+   "count": 1,
+   "ms": 197,
+   "maxMs": 197,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && rg -n \"\\\\$\\b\" \"hub/web/app.ts\" | head -3; ls \"hub/scripts\" | rg -i \"check|build|tsc\"; rg -n \"\\\"scripts\\\"\" -A8 \"hub/package.json\"": {
+   "count": 1,
+   "ms": 167,
+   "maxMs": 167,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"\\(parked\\)\" \"hub/web\" \"hub/src\" | head;": {
+   "count": 1,
+   "ms": 117,
+   "maxMs": 117,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"sendTo|\\\"send-to\\\"|/send|intercom\" \"hub/src/api.ts\" \"hub/src/hub.ts\" \"hub/src/sessions.ts\" | head -30; rg -n \"function showMenu\" -A15 \"hub/web/app.ts\" | head -25": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"standin\" \"hub/src\" \"extensions\" | xargs wc -l; ls \"docs/plans\" | rg \"d21eefbf\"; rg -n \"standin\" \"hub/src/links.ts\" 2>/dev/null | head -40": {
+   "count": 1,
+   "ms": 217,
+   "maxMs": 217,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -l \"standin\" \"hub/src\" \"extensions/plan3.ts\"; wc -l \"hub/src/link.ts\"; ls \"docs/plans\" \"docs/plans/done\" | rg \"d21eefbf\"; rg -n \"standin|record|maxBody|limit|bytes|function |export \" \"hub": {
+   "count": 1,
+   "ms": 212,
+   "maxMs": 212,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"function menuItem\" -A4 \"hub/web/app.ts\"; rg -n \"#session-menu|\\.session-menu\" \"hub/web/styles.css\" | head -5": {
+   "count": 1,
+   "ms": 114,
+   "maxMs": 114,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && rg -n \"menuItem\\s*=|const menuItem|menuItem\\(\" \"hub/web\" | head -5; rg -n \"session-menu\" \"hub/web/styles.css\" \"hub/web/index.html\" | head": {
+   "count": 1,
+   "ms": 187,
+   "maxMs": 187,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls \"hub/scripts\" | rg -i \"link\"; rg -n \"attachments\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-intercom/types.ts\" \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-intercom/broker/client.ts\" 2": {
+   "count": 1,
+   "ms": 222,
+   "maxMs": 222,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/npm/node_modules/pi-intercom\" && rg -n -i \"cross-machine|remote machine|tailnet|other machine\" \"README.md\" | head -20; rg -n \"\\\"version\\\"\" \"package.json\"": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "CU-01": {
+   "ms": 59762,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 4
+   }
+  },
+  "CU-02": {
+   "ms": 57856,
+   "testMs": 0,
+   "replies": 2,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 2
+   }
+  },
+  "CU-03": {
+   "ms": 242994,
+   "testMs": 0,
+   "replies": 12,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 12
+   }
+  },
+  "CU-04": {
+   "ms": 135646,
+   "testMs": 1310,
+   "replies": 6,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 6
+   },
+   "failures": 1
+  },
+  "CU-05": {
+   "ms": 150025,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 4
+   }
+  },
+  "CU-90": {
+   "ms": 472371,
+   "testMs": 350647,
+   "replies": 8,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 8
+   },
+   "failures": 1
+  },
+  "CU-91": {
+   "ms": 75617,
+   "testMs": 0,
+   "replies": 2,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 2
+   },
+   "failures": 1
+  },
+  "(none)": {
+   "ms": 337166,
+   "testMs": 0,
+   "replies": 36,
+   "models": {
+    "openai-codex/gpt-6.1-sol:high": 3,
+    "anthropic/claude-opus-5-5:high": 33
+   },
+   "failures": 3
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-11T20:54:58.239Z",
+   "ms": 1521225
+  },
+  {
+   "start": "2026-11-12T09:35:53.178Z",
+   "ms": 21916
+  },
+  {
+   "start": "2026-11-12T09:48:09.110Z",
+   "ms": 28226
+  },
+  {
+   "start": "2026-11-12T12:58:23.776Z",
+   "ms": 104609
+  },
+  {
+   "start": "2026-11-12T13:47:47.599Z",
+   "ms": 189930
+  }
+ ],
+ "hints": []
+}

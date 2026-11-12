@@ -142,12 +142,12 @@
    <div id="job-progress" class="job-progress" role="progressbar" aria-valuemin="0" hidden><span></span><i><b></b></i></div>
    <div id="plan-actions" class="plan-actions" role="group" aria-label="Plan actions" hidden><button type="button" data-command="resolve" data-plan>Resolve</button><button id="review-button" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="review-menu">Review</button><button type="button" data-command="finish" data-plan>Finish</button><button type="button" data-command="resume" data-plan>Resume</button><div id="review-menu" class="status-menu" role="group" aria-label="Review" hidden><button type="button" data-command="review" data-plan>Review (normal)</button><button type="button" data-command="review all" data-plan>Review (all advisors)</button></div></div>
    <div id="chat-search" class="chat-search" role="search" hidden><input id="chat-find" type="search" placeholder="Search the chat" aria-label="Search the shown chat; Enter next, Shift+Enter previous"><output id="chat-find-count" aria-live="polite"></output><button type="button" data-find="first" title="First match" aria-label="First match">⏮</button><button type="button" data-find="prev" title="Previous (Shift+Enter)" aria-label="Previous match">▲</button><button type="button" data-find="next" title="Next (Enter)" aria-label="Next match">▼</button><button type="button" data-find="last" title="Last match" aria-label="Last match">⏭</button><button type="button" data-find="close" title="Close (Esc)" aria-label="Close search">✕</button></div>
-   <div class="notices"><p id="notice" class="notice" role="status" hidden></p><p id="waiting" class="notice" role="status" hidden></p></div>
    <div id="feed" class="feed">
     <ol id="messages" class="messages" role="log" aria-label="Conversation" aria-live="polite"></ol>
     <section id="activity" class="activity" aria-label="Agent activity"></section>
    </div>
    <button id="to-bottom" class="to-bottom" type="button" aria-label="Scroll to the newest message" hidden>↓ New messages</button>
+   <div class="notices"><p id="notice" class="notice" role="status" title="Click to dismiss" hidden></p><p id="waiting" class="notice" role="status" hidden></p></div>
    <form id="composer" class="composer">
     <section id="draft-recovery" class="draft-recovery" aria-label="Saved submission recovery" hidden>
      <p>This message has no acknowledgment on this page. Check Chat before resending; nothing is sent automatically.</p>

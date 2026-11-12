@@ -17,6 +17,10 @@ Install with:
 
 If project workflow behavior can be handled in code without losing functionality, prefer coded automation over prompt-only or manual process guidance.
 
+## Video Review Tracking
+
+Video ingestion lives in yt-ingest; ce-workflow review state lives in `docs/upstream/processed-videos.json`, keyed by YouTube ID. Before reviewing a batch, run `node "scripts/work-video-status.mjs" "<digest directory>"` to list only unprocessed digests. After review or an intentional skip, add the ID, title, `reviewed`/`skipped` status, `processedOn` date and `evidence` path (including the reason for a skip). Downloaded/seen is not reviewed, and reviewed does not mean every idea was adopted. Do not mark unfinished reviews or infer status from titles.
+
 ## Optimization Regression Rule
 
 Never retain or describe a workflow optimization as successful from focused tests or fewer turns alone. Re-run the same end-to-end benchmark, aggregate every continuation session, and compare runtime, total provider tokens, cost, turns, and tool calls against the last accepted baseline. Revert the optimization when it causes a material overall regression; do not rationalize the regression from one improved submetric.

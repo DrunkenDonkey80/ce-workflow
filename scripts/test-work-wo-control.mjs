@@ -31,11 +31,13 @@ try {
 	assert(!Object.keys(commands).some(name => name.startsWith("__orchestrator")));
 	assert(tools.knowledge && tools.compaction_note && tools.research_note);
 	const names = commands.wo.getArgumentCompletions("").map(item => item.value);
-	for (const name of ["goal", "pause", "monitor", "resume-work", "design", "redesign", "telemetry", "usage", "share"]) assert(!names.includes(name), name);
-	for (const name of ["plan", "plans", "resume", "settings", "compact", "fact"]) assert(names.includes(name), name);
+	for (const name of ["goal", "pause", "monitor", "resume-work", "redesign", "telemetry", "usage", "share"]) assert(!names.includes(name), name);
+	for (const name of ["plan", "plans", "resume", "settings", "compact", "fact", "design"]) assert(names.includes(name), name);
 	for (const args of ["plan finish", "plans", "resume abc"]) await commands.wo.handler(args, ctx);
 	assert.deepEqual(forwarded.filter(([name]) => name === "plan3:command"), [["plan3:command", "plan3", "finish"], ["plan3:command", "plans3", ""], ["plan3:command", "resume3", "abc"]]);
-	for (const action of ["goal", "monitor", "telemetry", "usage", "design", "redesign", "resume-work", "pause"])
+	await commands.wo.handler("design forbidden", { ...ctx, hasUI: true });
+	assert.match(notices.at(-1), /Use \/wo design without arguments/);
+	for (const action of ["goal", "monitor", "telemetry", "usage", "redesign", "resume-work", "pause"])
 		await commands.wo.handler(`${action} forbidden`, ctx);
 	assert.equal(sent.length, 0);
 	assert.match(notices.at(-1), /Unknown \/wo command/);

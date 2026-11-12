@@ -1,0 +1,624 @@
+{
+ "version": 1,
+ "activeMs": 11866793,
+ "runs": 1,
+ "waitingMs": 8528743,
+ "toolWallMs": 2217516,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 105,
+   "thinkingMs": 440534,
+   "actingMs": 456169,
+   "input": 236,
+   "output": 88623,
+   "cacheRead": 10221658,
+   "cacheWrite": 590028,
+   "cost": 6.767875600000001,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "plan3": {
+   "count": 45,
+   "ms": 6672,
+   "maxMs": 404,
+   "failures": 2
+  },
+  "bash": {
+   "count": 71,
+   "ms": 2121553,
+   "maxMs": 900119,
+   "failures": 6
+  },
+  "subagent": {
+   "count": 3,
+   "ms": 319,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "write": {
+   "count": 10,
+   "ms": 23,
+   "maxMs": 11,
+   "failures": 0
+  },
+  "edit": {
+   "count": 4,
+   "ms": 9,
+   "maxMs": 3,
+   "failures": 0
+  },
+  "read": {
+   "count": 5,
+   "ms": 2299,
+   "maxMs": 2280,
+   "failures": 0
+  },
+  "web_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "web_search": {
+   "count": 2,
+   "ms": 2401,
+   "maxMs": 1841,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 2,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "fetch_content": {
+   "count": 1,
+   "ms": 8487,
+   "maxMs": 8487,
+   "failures": 0
+  },
+  "get_search_content": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "lens_diagnostics": {
+   "count": 1,
+   "ms": 5817,
+   "maxMs": 5817,
+   "failures": 0
+  },
+  "research_exit": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 67,
+   "ms": 2063735,
+   "maxMs": 900119,
+   "failures": 6
+  },
+  "test": {
+   "count": 3,
+   "ms": 57679,
+   "maxMs": 51307,
+   "failures": 0
+  },
+  "build": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -20; git log --oneline -3; ls docs/proposals/own-agent-stack 2>&1 | head": {
+   "count": 1,
+   "ms": 169,
+   "maxMs": 169,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && f=$(ls -t */*.jsonl | head -1); echo $f; head -c 1500 \"$f\"; echo; grep -o \"\\\"type\\\":\\\"[a-z_]*\\\"\" \"$f\" | sort | uniq -c | sort -rn | head; find . -name \"*.jsonl": {
+   "count": 1,
+   "ms": 35842,
+   "maxMs": 35842,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && f=$(ls -t -- */*.jsonl | head -1); echo \"$f\"; head -c 1200 -- \"$f\"; echo; grep -o \"\\\"type\\\":\\\"[a-zA-Z_]*\\\"\" -- \"$f\" | sort | uniq -c | sort -rn | head -15; fin": {
+   "count": 1,
+   "ms": 648,
+   "maxMs": 648,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && cat > \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack/usage.mjs\" <<'EOF' // T-01 usage scan: tool calls, custom entries, providers per ": {
+   "count": 1,
+   "ms": 4427,
+   "maxMs": 4427,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && cat usage.tsv; find \"C:/Users/Flex/.pi/agent/sessions\" -name \"session.jsonl\" | head -3; find \"C:/Users/Flex/.pi/agent/sessions\" -name \"session.": {
+   "count": 1,
+   "ms": 329,
+   "maxMs": 329,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const p=require('./package.json');console.log(JSON.stringify(p.pi))\"; node -e \"const s=require('C:/Users/Flex/.pi/agent/settings.json');console.log(JSON.stringify(s.packages));conso": {
+   "count": 1,
+   "ms": 230,
+   "maxMs": 230,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && echo EVENTS; grep -rhoE \"pi\\.on\\(\\\"[a-z_]+\\\"\" extensions | sort | uniq -c | sort -rn | awk '{printf \"%s %s; \", $1, $2}'; echo; echo UI; grep -rhoE \"ctx\\.ui\\.[a-zA-Z]+\" extensions | sort | un": {
+   "count": 1,
+   "ms": 321,
+   "maxMs": 321,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && T=$(grep \"^tool:\" usage.tsv | cut -f1 | sed \"s/tool://\" | grep -vE \"^(mcp__pi__codemode)$\"); N=\"C:/Users/Flex/.pi/agent/npm/node_modules\"; R=\"C": {
+   "count": 1,
+   "ms": 51307,
+   "maxMs": 51307,
+   "failures": 0
+  },
+  "bash\u0000N=\"C:/Users/Flex/.pi/agent/npm/node_modules\"; for t in compaction_note subagents_enable tools_enable web_enable subagent_supervisor bg_wait goal_wait video_digest test_sensitivity codemode; do o=$(gre": {
+   "count": 1,
+   "ms": 1945,
+   "maxMs": 1945,
+   "failures": 0
+  },
+  "bash\u0000ls \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works\"; grep -rlE \"video_digest|test_sensitivity\" \"./hub/src\" \"./extensions\" \"C:/Users/Flex/.pi/agent/install/releases/1.5.2/n": {
+   "count": 1,
+   "ms": 836,
+   "maxMs": 836,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && node -e \"const a=require('C:/Users/Flex/.pi/agent/auth.json');console.log(Object.entries(a).map(([k,v])=>k+':'+(v&&v.type)).join(' '))\"; node -e \"try{const m=require('C:/Users/Flex/.pi/agent": {
+   "count": 1,
+   "ms": 299,
+   "maxMs": 299,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/proposals/own-agent-stack/inventory.md\" \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" \"docs/plans/logs/11005151.md\" && git commit -q -m \"": {
+   "count": 1,
+   "ms": 324,
+   "maxMs": 324,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"function defaultCommand\" -A12 hub/src/rpc-client.ts; pi --help 2>&1 | grep -iE \"no-ext|extension|mode|session|--no\" | head -20; nproc; node -v; wmic cpu get name 2>/dev/null | sed -": {
+   "count": 1,
+   "ms": 2411,
+   "maxMs": 2411,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"defaultCommand\" hub/src/*.ts | head -3; pi --help 2>&1 | grep -iE \"no-extensions|--no-skills|--offline|no-ne|-ne \" | head; powershell -NoProfile -c \"(Get-CimInstance Win32_Processor": {
+   "count": 1,
+   "ms": 2444,
+   "maxMs": 2444,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"export function defaultCommand\" -A10 hub/src/rpc-client.ts; head -c 600 /c/Users/Flex/.pi/agent/bin/pi; ls /c/Users/Flex/.pi/agent/bin": {
+   "count": 1,
+   "ms": 83,
+   "maxMs": 83,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"defaultCommand\" hub/src/rpc-client.ts | head; grep -n \"defaultCommand =\\|function defaultCommand\\|const defaultCommand\" -A8 hub/src/*.ts | head -20": {
+   "count": 1,
+   "ms": 84,
+   "maxMs": 84,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; ls \"$D\" | tr \"\\n\" \" \"; echo; grep -nE \"^#+ |\\\"type\\\": \\\"(reload|get_state|prompt)\\\"\" \"$D/rpc.md\" |": {
+   "count": 1,
+   "ms": 105,
+   "maxMs": 105,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; sed -n 22,100p \"$D/rpc.md\"; grep -nE \"^#+ \" \"$D/rpc-commands.md\" | head -50; grep -n -i \"reload\" \"": {
+   "count": 1,
+   "ms": 109,
+   "maxMs": 109,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && node bench.mjs bare start 1 && node bench.mjs full start 1": {
+   "count": 1,
+   "ms": 40288,
+   "maxMs": 40288,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && for a in \"bare start 5\" \"full start 5\" \"bare five 2\" \"full five 2\" \"full reload 3\" \"bare turn 3\" \"full turn 3\"; do node bench.mjs $a; done | te": {
+   "count": 1,
+   "ms": 193450,
+   "maxMs": 193450,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && node -e \" const r=require('fs').readFileSync('results.jsonl','utf8').trim().split('\\n').map(JSON.parse); const med=a=>{a=[...a].sort((x,y)=>x-y": {
+   "count": 1,
+   "ms": 69,
+   "maxMs": 69,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"\\$p=Get-CimInstance Win32_Process -Filter \\\"Name='node.exe'\\\"|?{\\$_.CommandLine -match 'pi-launcher|pi-coding-agent'}; '{0} processes, {1:N0} MB working set, {2:N0} MB ": {
+   "count": 1,
+   "ms": 306,
+   "maxMs": 306,
+   "failures": 0
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='node.exe'\\\"|?{\\$_.CommandLine -match 'pi-launcher|pi-coding-agent'}|%{ '{0} {1:N0}MB {2}' -f \\$_.ProcessId,(\\$_.WorkingSet": {
+   "count": 1,
+   "ms": 321,
+   "maxMs": 321,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && { cat <<'EOF' # Baseline: today's stack outside the model (T-02) Part of the map `docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/proposals/own-agent-stack/baseline.md \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" docs/plans/logs/11005151.md && git commit -q -m \"Own-a": {
+   "count": 2,
+   "ms": 1536,
+   "maxMs": 1342,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; cat \"$D/security.md\" | head -120; echo ======; grep -nE \"^#+ \" \"$D/containerization.md\"": {
+   "count": 1,
+   "ms": 72,
+   "maxMs": 72,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/own-agent-stack\" && cat > pkgs.mjs <<'EOF' // Count installed npm packages and those with install scripts under given node_modules roots. import { readdirSync, rea": {
+   "count": 1,
+   "ms": 1130,
+   "maxMs": 1130,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; sed -n 1,30p \"$D/containerization.md\"; sed -n 82,104p \"$D/containerization.md\"; sed -n 153,175p \"$": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/git/github.com/DrunkenDonkey80/pi-provider-claude-ex\" && ls; head -60 README.md 2>/dev/null; git log -1 --format=\"%h %cs\"": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd ~ && for p in .ssh .aws .azure .docker/config.json .npmrc .gitconfig .git-credentials .config/gh/hosts.yml .pi/agent/auth.json .pi/agent/claude-pool.json .claude/.credentials.json .codex/auth.json ": {
+   "count": 1,
+   "ms": 197,
+   "maxMs": 197,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && grep -nE \"listen\\(|0\\.0\\.0\\.0|127\\.0\\.0\\.1|token|password\" src/hub.ts src/remote.ts src/wormhole.ts 2>/dev/null | head -15; grep -nE \"update|npm install|pi update\" src/auto-update.ts | h": {
+   "count": 1,
+   "ms": 85,
+   "maxMs": 85,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/proposals/own-agent-stack/security.md \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" docs/plans/logs/11005151.md && git commit -q -m \"Own-a": {
+   "count": 1,
+   "ms": 210,
+   "maxMs": 210,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; grep -nE \"^#+ |createAgentSession|AgentSessionRuntime|multiple sessions|in-process\" \"$D/sdk.md\" | ": {
+   "count": 1,
+   "ms": 126,
+   "maxMs": 126,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/proposals/own-agent-stack/wishes.md \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" docs/plans/logs/11005151.md && git commit -q -m \"Own-age": {
+   "count": 1,
+   "ms": 197,
+   "maxMs": 197,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/proposals/own-agent-stack\" && sed -i \"s/Q-03/Q-01/g\" candidates.md && grep -c \"Q-01\" candidates.md": {
+   "count": 1,
+   "ms": 318,
+   "maxMs": 318,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/proposals/own-agent-stack/candidates.md \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" docs/plans/logs/11005151.md && git commit -q -m \"Own": {
+   "count": 1,
+   "ms": 192,
+   "maxMs": 192,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" docs/plans/logs/11005151.md && git commit -q -m \"Own-agent-stack map: T-06 weights\" && git log --": {
+   "count": 1,
+   "ms": 3597,
+   "maxMs": 3597,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/proposals/own-agent-stack\" && grep -n \"^#\\|Claude\\|anthropic\\|claude\" baseline.md | head -30; sed -n 40,200p \"$TEMP/own-agent-stack/bench.mjs\"; head -5 /c/Users/Flex/.pi/agent/bin/pi; grep ": {
+   "count": 1,
+   "ms": 98,
+   "maxMs": 98,
+   "failures": 1
+  },
+  "bash\u0000grep -n -A8 \"enabledModels\" /c/Users/Flex/.pi/agent/settings.json | head -14; codex app-server --help 2>&1 | head -30": {
+   "count": 1,
+   "ms": 266,
+   "maxMs": 266,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && codex app-server generate-json-schema --out schema >/dev/null 2>&1; ls schema | head -50; ls schema | wc -l": {
+   "count": 1,
+   "ms": 396,
+   "maxMs": 396,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack/schema\" && node -e \" const s=require('./ClientRequest.json');const m=JSON.stringify(s).match(/\\\"method\\\":\\{\\\"enum\\\":\\[\\\"[^\\\"]+\\\"/g)||[];console.log(m.map(x=>x.split('[\\\"')[1]": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack/schema\" && ls v2 | grep -iE \"^(Initialize|ThreadStart|TurnStart)\" ; node -e \" const all=require('./codex_app_server_protocol.v2.schemas.json');const d=all.definitions||all['\\": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000find /c/Users/Flex/AppData/Roaming/npm/node_modules/@openai -name \"codex*.exe\" 2>/dev/null | head; grep -E \"^model|^\\[\" ~/.codex/config.toml | head; node -e \"const all=require(process.env.TEMP+'/own-a": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && node codex-bench.mjs start 1 2>&1 | tail -5 && node codex-bench.mjs turn 1 2>&1 | tail -5": {
+   "count": 1,
+   "ms": 141944,
+   "maxMs": 141944,
+   "failures": 0
+  },
+  "bash\u0000grep -E \"^\\[\" ~/.codex/config.toml | grep -v \"^\\[projects\" ; powershell -NoProfile -Command \"Get-Process codex* | Select Name,Id | Format-Table -HideTableHeaders\" | head": {
+   "count": 1,
+   "ms": 292,
+   "maxMs": 292,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const a=require(process.env.USERPROFILE+'/.codex/auth.json');console.log(Object.keys(a), a.last_refresh, a.auth_mode)\"": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && sed -i \"s/candidate: \\\"codex app-server\\\", scenario/candidate: \\\"codex app-server\\\", config: process.env.CODEX_HOME ? \\\"bare\\\" : \\\"full\\\", scenario/\" codex-bench.mjs && m": {
+   "count": 1,
+   "ms": 18816,
+   "maxMs": 18816,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && B=\"$TEMP/own-agent-stack/codex-bare\"; for a in \"start 5\" \"five 2\" \"fiveThreads 2\"; do CODEX_HOME=\"$B\" node codex-bench.mjs $a | tee -a results.jsonl; done; for a in \"star": {
+   "count": 1,
+   "ms": 900119,
+   "maxMs": 900119,
+   "failures": 1
+  },
+  "bash\u0000powershell -NoProfile -Command \"Get-CimInstance Win32_Process | ? { \\$_.CommandLine -match 'codex-bench|codex.exe.*app-server' } | Select ProcessId,Name,@{n='cmd';e={\\$_.CommandLine.Substring(0,[Math]": {
+   "count": 1,
+   "ms": 540,
+   "maxMs": 540,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && timeout 120 node codex-bench.mjs five 1": {
+   "count": 1,
+   "ms": 60169,
+   "maxMs": 60169,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && echo '{\"candidate\":\"codex app-server\",\"config\":\"full\",\"scenario\":\"five\",\"model\":\"gpt-6-luna\",\"platform\":\"win32\",\"results\":[{\"rep\":0,\"allReadyMs\":511,\"wsMB\":2920,\"privateM": {
+   "count": 1,
+   "ms": 232618,
+   "maxMs": 232618,
+   "failures": 0
+  },
+  "bash\u0000D=\"C:/Users/Flex/.pi/agent/install/releases/1.5.2/node_modules/@earendil-works/pi-coding-agent/docs\"; grep -n \"AGENT_DIR\\|PI_HOME\" \"$D/environment-variables.md\" | head -5; head -30 /c/Users/Flex/.pi/a": {
+   "count": 1,
+   "ms": 75,
+   "maxMs": 75,
+   "failures": 0
+  },
+  "bash\u0000wsl -d Ubuntu-26.04 -- bash -lc \"mkdir -p ~/oas && cd ~/oas && npm init -y >/dev/null && npm i --no-audit --no-fund @earendil-works/pi-coding-agent@1.5.2 @openai/codex@0.166.0 2>&1 | tail -3; ls node_": {
+   "count": 1,
+   "ms": 15081,
+   "maxMs": 15081,
+   "failures": 0
+  },
+  "bash\u0000cp \"$TEMP/own-agent-stack/bench.mjs\" \"$TEMP/own-agent-stack/codex-bench.mjs\" \"$TEMP/own-agent-stack/wsl-run.sh\" /dev/null 2>/dev/null; cat > \"$TEMP/own-agent-stack/wsl-run.sh\" <<'EOF' #!/bin/bash # T-": {
+   "count": 1,
+   "ms": 5357,
+   "maxMs": 5357,
+   "failures": 0
+  },
+  "bash\u0000MSYS_NO_PATHCONV=1 wsl -d Ubuntu-26.04 -- bash /mnt/c/Users/Flex/AppData/Local/Temp/own-agent-stack/wsl-run.sh 2>&1 | grep -v \"^\\s*$\" | tee -a \"$TEMP/own-agent-stack/results-wsl.jsonl\" | cut -c1-700": {
+   "count": 1,
+   "ms": 222075,
+   "maxMs": 222075,
+   "failures": 0
+  },
+  "bash\u0000cat > \"$TEMP/own-agent-stack/wsl-run2.sh\" <<'EOF' #!/bin/bash # T-07 WSL rerun: Codex native binary directly (no npm node shim), plus a per-process memory breakdown. cd ~/oas CX=$(find node_modules/@o": {
+   "count": 1,
+   "ms": 91,
+   "maxMs": 91,
+   "failures": 1
+  },
+  "bash\u0000sed -i \"s/timeout 300/timeout 120/\" \"$TEMP/own-agent-stack/wsl-run2.sh\" && MSYS_NO_PATHCONV=1 wsl -d Ubuntu-26.04 -- bash /mnt/c/Users/Flex/AppData/Local/Temp/own-agent-stack/wsl-run2.sh 2>&1 | cut -c": {
+   "count": 1,
+   "ms": 55,
+   "maxMs": 55,
+   "failures": 1
+  },
+  "bash\u0000MSYS_NO_PATHCONV=1 wsl -d Ubuntu-26.04 -- bash /mnt/c/Users/Flex/AppData/Local/Temp/own-agent-stack/wsl-run2.sh 2>&1 | tr -d \"\\r\" | cut -c1-600": {
+   "count": 1,
+   "ms": 123161,
+   "maxMs": 123161,
+   "failures": 0
+  },
+  "bash\u0000MSYS_NO_PATHCONV=1 wsl -d Ubuntu-26.04 -- bash /mnt/c/Users/Flex/AppData/Local/Temp/own-agent-stack/wsl-run3.sh 2>&1 | tr -d \"\\r\" | cut -c1-600": {
+   "count": 1,
+   "ms": 52778,
+   "maxMs": 52778,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && cat >> results-wsl.jsonl <<'EOF' {\"note\":\"wsl-run2: codex native binary (no npm shim)\",\"candidate\":\"codex app-server\",\"config\":\"bare\",\"scenario\":\"start\",\"platform\":\"linux": {
+   "count": 1,
+   "ms": 66,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && grep -h \"codex app-server\\|claude-opus\" results.jsonl | grep -v '\"allReadyMs\":511,\"wsMB\":2920,\"privateMB\":1873}\\],\"note\"' | head -20 | wc -l; tail -c 300 \"./docs/proposal": {
+   "count": 1,
+   "ms": 79,
+   "maxMs": 79,
+   "failures": 0
+  },
+  "bash\u0000cd \"$TEMP/own-agent-stack\" && F=\"./docs/proposals/own-agent-stack/baseline.md\" && { cat <<'EOF' ## Candidates measured on this machine (T-07) Measured 2026-11-12, same machine. Finalists from T-05: **": {
+   "count": 1,
+   "ms": 146,
+   "maxMs": 146,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/proposals/own-agent-stack\" && grep -c \"\" baseline.md; grep -n \"^```\" baseline.md | tail -8": {
+   "count": 1,
+   "ms": 923,
+   "maxMs": 923,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && grep -rn \"D-09\\|116k\\|600k\\|25k\" \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" | cut -c1-400 | head -6; git log --oneline -15 -- \"C:/Users/Flex/.pi/age": {
+   "count": 1,
+   "ms": 108,
+   "maxMs": 108,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add docs/proposals/own-agent-stack/decision.md \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" docs/plans/logs/11005151.md && git commit -q -m \"Own-a": {
+   "count": 1,
+   "ms": 198,
+   "maxMs": 198,
+   "failures": 0
+  },
+  "bash\u0000cd \"./docs/proposals/own-agent-stack\" && cat >> decision.md <<'EOF' ## Decision (T-09, 2026-11-12) The user chose **go on D: Rust from scratch**, against the draft recommendation. The user confirmed t": {
+   "count": 1,
+   "ms": 65,
+   "maxMs": 65,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short docs/ | head; grep -n \"ed06fbe5\\|first-build\" \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" | head": {
+   "count": 1,
+   "ms": 804,
+   "maxMs": 804,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"T-10\" \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" | cut -c1-200": {
+   "count": 1,
+   "ms": 57,
+   "maxMs": 57,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/plans/2026-11-12-own-agent-stack-instead-of-pi-go-no-go-map-11005151-plan3.md\" docs/plans/logs/11005151.md docs/proposals/own-agent-stack/decision.md \"docs/plans/2026-11-12-own": {
+   "count": 2,
+   "ms": 296,
+   "maxMs": 231,
+   "failures": 1
+  }
+ },
+ "steps": {
+  "T-01": {
+   "ms": 238697,
+   "testMs": 57679,
+   "replies": 15,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 15
+   }
+  },
+  "T-02": {
+   "ms": 334326,
+   "testMs": 0,
+   "replies": 15,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 15
+   }
+  },
+  "T-03": {
+   "ms": 76733,
+   "testMs": 0,
+   "replies": 9,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 9
+   }
+  },
+  "T-04": {
+   "ms": 43502,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
+  },
+  "T-05": {
+   "ms": 79402,
+   "testMs": 0,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   }
+  },
+  "(none)": {
+   "ms": 80693,
+   "testMs": 0,
+   "replies": 14,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 14
+   },
+   "failures": 2
+  },
+  "T-07": {
+   "ms": 2027389,
+   "testMs": 0,
+   "replies": 32,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 32
+   },
+   "failures": 5
+  },
+  "T-08": {
+   "ms": 89421,
+   "testMs": 0,
+   "replies": 4,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 4
+   }
+  },
+  "T-10": {
+   "ms": 74123,
+   "testMs": 0,
+   "replies": 6,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 6
+   },
+   "failures": 1
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-12T18:13:43.960Z",
+   "ms": 11866793
+  }
+ ],
+ "hints": []
+}

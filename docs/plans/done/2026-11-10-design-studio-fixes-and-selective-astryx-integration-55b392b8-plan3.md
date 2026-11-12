@@ -1,8 +1,8 @@
 ---
 plan3: true
-status: blocked
+status: complete
 created: 2026-11-10
-updated: 2026-11-11T16:12:41.600Z
+updated: 2026-11-11T20:31:25.485Z
 reviewed: 2026-11-10
 started: 2026-11-10T20:34:40.770Z
 ---
@@ -264,3 +264,4 @@ Measured dashboard artifacts remain 52,523 B raw / 14,038 B gzip (HTML) versus 1
 Sources: Context7 /meta/astryx, https://github.com/meta/astryx/wiki/Why-StyleX and https://github.com/meta/astryx/wiki/Distribution; audited source packages/cli/api/swizzle/swizzle.doc.mjs at fd5cf0df987791117e96ccc0bec603c64be8b136; installed 0.7.12 manifests and comparison/astryx/build.mjs under C:/Users/Flex/AppData/Local/Temp/pi-research-62ygWq/. The pilot establishes neither a general library cost multiplier nor that copying equivalent component behavior would be cheaper. No product tests rerun for this discussion.
 - Reconciled the applied Q-01 selection into D14 and P3-02/P3-18/P3-10/P3-14/P3-17: first-use host download, consent/progress, no mandatory runtime in the base package, cold-offline failure and warm-cache reuse checks, and remote-browser provisioning coverage. No new steps or scope changes required; Open questions is empty. P3-16's external device prerequisite remains unresolved.
 P3-04 validation prerequisite, approved via ask_user 2026-11-10: user chose Fix both prerequisites (recommended). Read-only oracle635d6e82 identified first-wheel throttle initialized at0 and an existing stale-drag CDP synchronisation gap. Parent verified the throttle source. Scope adds only zoomedAt=-Infinity in shared app.ts, a deterministic first-event timestamp0 regression in C4 and the same1000ms settle already used by the neighboring CDP drag; no assertions weakened, skip flags or extra retries. Validate original failures via one sequential C4; drag root cause remains unproven until retest. Preserve unrelated app/test hunks with partial staging.
+- 2026-11-11: Force-finished by the user with unfinished steps: P3-14, P3-16.

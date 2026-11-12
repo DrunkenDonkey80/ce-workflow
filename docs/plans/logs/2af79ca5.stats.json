@@ -1,0 +1,601 @@
+{
+ "version": 1,
+ "activeMs": 2992054,
+ "runs": 2,
+ "waitingMs": 2095606,
+ "toolWallMs": 2312028,
+ "compactions": {
+  "count": 0,
+  "ms": 0
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 94,
+   "thinkingMs": 250352,
+   "actingMs": 298135,
+   "input": 198,
+   "output": 55639,
+   "cacheRead": 9933912,
+   "cacheWrite": 411621,
+   "cost": 5.158459400000003,
+   "errors": 0
+  }
+ },
+ "tools": {
+  "bash": {
+   "count": 72,
+   "ms": 60411,
+   "maxMs": 28421,
+   "failures": 3
+  },
+  "plan3": {
+   "count": 24,
+   "ms": 2097923,
+   "maxMs": 2095633,
+   "failures": 0
+  },
+  "read": {
+   "count": 6,
+   "ms": 47,
+   "maxMs": 16,
+   "failures": 0
+  },
+  "write": {
+   "count": 4,
+   "ms": 9,
+   "maxMs": 6,
+   "failures": 0
+  },
+  "subagents_enable": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "subagent": {
+   "count": 2,
+   "ms": 236,
+   "maxMs": 226,
+   "failures": 0
+  },
+  "compaction_note": {
+   "count": 1,
+   "ms": 0,
+   "maxMs": 0,
+   "failures": 0
+  },
+  "bg_wait": {
+   "count": 1,
+   "ms": 85878,
+   "maxMs": 85878,
+   "failures": 0
+  },
+  "codemode": {
+   "count": 3,
+   "ms": 26336,
+   "maxMs": 15691,
+   "failures": 1
+  },
+  "research_exit": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 69,
+   "ms": 59990,
+   "maxMs": 28421,
+   "failures": 3
+  },
+  "test": {
+   "count": 3,
+   "ms": 421,
+   "maxMs": 158,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000cd \".\" && git status --short | head -20; git log --oneline -3; ls \"C:/SOFT/git/haystack-review\" 2>&1": {
+   "count": 1,
+   "ms": 120,
+   "maxMs": 120,
+   "failures": 1
+  },
+  "bash\u0000mkdir -p \"C:/SOFT/git/haystack-review\" && cd \"C:/SOFT/git/haystack-review\" && git clone --filter=blob:none --no-checkout \"https://github.com/deepset-ai/haystack.git\" \"haystack\" 2>&1 | tail -2 && git -": {
+   "count": 1,
+   "ms": 15210,
+   "maxMs": 15210,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && wc -l README.md GLOSSARY.md; grep -n \"^#\" README.md | head -60": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && head -25 extensions/tool-loader.ts; ls docs/plans/done | grep -i \"2026-09-27\"; ls benchmarks/*; grep -rln \"usage footer\\|budget\" extensions/*.ts | head; grep -n \"stripPayload\\|function strip": {
+   "count": 1,
+   "ms": 162,
+   "maxMs": 162,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"budget\" extensions/plan3.ts extensions/work-compaction.ts | head -8; grep -n \"^export function\\|^function \\(strip\\|age\\|evidence\\)\" extensions/work-compaction.ts | head -40; grep -n": {
+   "count": 1,
+   "ms": 848,
+   "maxMs": 848,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"payload strip\\|stripPayload\\|payload-strip\\|aged payload\\|evidence strip\" extensions scripts | head; grep -n \"^export function\\|^export const\" extensions/work-images.ts | head": {
+   "count": 1,
+   "ms": 851,
+   "maxMs": 851,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && head -20 scripts/audit-payload-strip.mjs; grep -n \"payload\" extensions/work-models.ts | head -5; ls ../ | grep -i \"context\\|strip\\|pi-\" | head": {
+   "count": 1,
+   "ms": 106,
+   "maxMs": 106,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack\" && for p in haystack/hooks/compaction haystack/hooks/tool_result_offloading haystack/hooks/budget haystack/hooks/human_in_the_loop haystack/hooks/structured_o": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/proposals/haystack-review/astra-brief.md\" \"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md\" \"docs/plans/logs/2af79ca5.md\" &": {
+   "count": 1,
+   "ms": 2167,
+   "maxMs": 2167,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && wc -l hooks/*.py hooks/*/*.py hooks/*/*/*.py 2>/dev/null | sort -n | tail -60": {
+   "count": 1,
+   "ms": 242,
+   "maxMs": 242,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks\" && cat -n compaction/AGENTS.md | head -80; cat -n protocol.py": {
+   "count": 1,
+   "ms": 69,
+   "maxMs": 69,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks/compaction\" && grep -n \"class \\|def \\|\\\"\\\"\\\"$\" hooks.py | head -40; sed -n 1,80p tool_result_pruning.py | cat -n | sed -n 1,80p": {
+   "count": 1,
+   "ms": 90,
+   "maxMs": 90,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks/compaction\" && sed -n 54,130p hooks.py | cat -n; sed -n 183,281p hooks.py": {
+   "count": 1,
+   "ms": 62,
+   "maxMs": 62,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks/compaction\" && grep -n \"class \\|_DEFAULT\\|PROMPT\\|def __init__\\|:param\" summarization.py sliding_window.py tool_result_offloading.py | head -70": {
+   "count": 1,
+   "ms": 62,
+   "maxMs": 62,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks\" && sed -n 34,75p compaction/summarization.py; sed -n 153,200p compaction/summarization.py; sed -n 420,470p compaction/summarization.py": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"Identifiers\\|character for character\\|exact\\b.*path\\|not instructions\\|absent\" extensions/work-compaction*.ts | head -15": {
+   "count": 1,
+   "ms": 62,
+   "maxMs": 62,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"systemPrompt\\|You are\\|summar.*prompt\\|PROMPT\" extensions/work-compaction-memory.ts extensions/work-models.ts | head -20": {
+   "count": 1,
+   "ms": 73,
+   "maxMs": 73,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rn \"summarizer\\|hybrid\" extensions/work-compaction.ts | head -8; grep -rln \"checkpoint.*knowledge\\|\\\"checkpoint\\\"\" extensions/*.ts | head": {
+   "count": 1,
+   "ms": 94,
+   "maxMs": 94,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"Return only JSON\\|rolling checkpoint\\|systemPrompt\\|status.*observed.*decision\" extensions/work-compaction-memory.ts | head -10": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks/tool_result_offloading\" && sed -n 1,120p hooks.py | grep -v \"^$\" | head -110": {
+   "count": 1,
+   "ms": 62,
+   "maxMs": 62,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks/tool_result_offloading\" && grep -n \"def _offloaded_message\" -A40 utils.py | head -55; grep -n \"class \\|def \" stores.py": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks\" && sed -n 1,193p budget/hooks.py | grep -v \"^$\" | grep -v \"^\\s*#\" | head -150": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && grep -n \"^class \\|^_FINAL\\|^_STEPS\" hooks/budget/hooks.py; grep -n \"^class \\|def run\\b\" hooks/human_in_the_loop/*.py | head -40": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack/hooks/human_in_the_loop\" && sed -n 41,79p policies.py; sed -n 10,72p dataclasses.py | grep -v \"^$\"; sed -n 68,140p strategies.py | grep -v \"^$\" | head": {
+   "count": 1,
+   "ms": 97,
+   "maxMs": 97,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && grep -n \"^class \\|^_\\w* = \\|allowed_hook_points\\|max_retries\\|def run\" hooks/structured_output/hooks.py | head; sed -n \"$(grep -n '^class ' hooks/": {
+   "count": 1,
+   "ms": 103,
+   "maxMs": 103,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"JSON.parse\" extensions/work-compaction-memory.ts | head -5; grep -n \"catch\" extensions/work-compaction-memory.ts | sed -n 1,10p": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && ls components/agents components/agents/*/ 2>/dev/null; wc -l tools/searchable_toolset.py tools/skills/*.py skill_stores/*.py skill_stores/*/*.py 2": {
+   "count": 1,
+   "ms": 186,
+   "maxMs": 186,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && sed -n \"$(grep -n '^class ' tools/skills/skill_toolset.py | head -1 | cut -d: -f1),+50p\" tools/skills/skill_toolset.py; grep -n \"def \\|^class \" sk": {
+   "count": 1,
+   "ms": 145,
+   "maxMs": 145,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && grep -n \"^class \\|:param\\b\" tools/agent_tool.py | head -20; wc -l core/pipeline/breakpoint.py; grep -n \"^def \\|^class \" core/pipeline/breakpoint.p": {
+   "count": 1,
+   "ms": 100,
+   "maxMs": 100,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && sed -n 51,115p tools/agent_tool.py | grep -v \"^$\" | head -40; sed -n 29,42p core/pipeline/breakpoint.py; sed -n 141,170p core/pipeline/breakpoint.": {
+   "count": 1,
+   "ms": 113,
+   "maxMs": 113,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && ls token_counters tracing telemetry evaluation components/evaluators components/caching; grep -n \"^class \\|chars_per_token\\|/ 4\\|ceil\" token_count": {
+   "count": 1,
+   "ms": 88,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack/haystack\" && sed -n 19,45p token_counters/openai_counter.py | grep -v \"^$\"; sed -n 1,40p components/caching/cache_checker.py | grep -n \"class\\|\\\"\\\"\\\"\" ; grep -": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack\" && wc -l AGENTS.md; grep -n \"^#\\|release note\\|reno\\|e2e\\|test\" AGENTS.md | head -40; ls e2e | head; ls releasenotes/notes | head -3; ls releasenotes/notes | ": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack\" && sed -n 55,133p AGENTS.md; find . -name AGENTS.md -not -path \"./node_modules/*\" | wc -l; find . -name AGENTS.md | head -20": {
+   "count": 1,
+   "ms": 316,
+   "maxMs": 316,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/SOFT/git/haystack-review/haystack\" && cat test/AGENTS.md | head -40; ls e2e/pipelines | head; grep -n \"class \\|def \" haystack/tracing/tracer.py | head -20": {
+   "count": 1,
+   "ms": 122,
+   "maxMs": 122,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls extensions | head -80; ls docs/upstream 2>/dev/null": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -rln \"maxTurns\\|max_turns\\|turnLimit\\|steps remaining\" extensions agents 2>/dev/null | head; grep -rn \"\\\"tool_call\\\"\" extensions/*.ts | head -8; grep -rn \"tracing\\|opentelemetry\\|langfu": {
+   "count": 1,
+   "ms": 207,
+   "maxMs": 207,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls scripts | grep -i \"bench\\|audit\\|eval\\|compaction\" | head -20; grep -n \"retry\\|schema\" extensions/work-verification-contract.ts | head -8; sed -n 130,160p extensions/plan3-night.ts": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git ls-files | grep -i \"AGENTS.md\\|CLAUDE.md\"; grep -n \"billed\\|usage\\|estimate\" extensions/work-compaction.ts | head -12; wc -l AGENTS.md": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"A1[0-6]\\b\\|A[1-9]\\b\\|Adopt\\|Verdict\" \"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md\" | head -30": {
+   "count": 1,
+   "ms": 70,
+   "maxMs": 70,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls docs/plans | grep \"2026-09-27-001\"; grep -rn \"^# \\|^title\" docs/plans/2026-09-27-001* | head -3": {
+   "count": 1,
+   "ms": 76,
+   "maxMs": 76,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1,30p \"docs/plans/2026-09-27-001-fix-unbounded-direct-agent-runs-plan.md\"": {
+   "count": 1,
+   "ms": 44,
+   "maxMs": 44,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"budget\\|reminder\\|warn\" \"docs/plans/2026-09-27-001-fix-unbounded-direct-agent-runs-plan.md\" | head -20": {
+   "count": 1,
+   "ms": 57,
+   "maxMs": 57,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' import re,io p=\"docs/proposals/2026-11-12-haystack-review.md\" s=open(p,encoding=\"utf-8\").read() lines=s.split(\"\\n\") start=[i for i,l in enumerate(lines) if l.startswith(\"| A": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"docs/proposals/2026-11-12-haystack-review.md\" s=open(p,encoding=\"utf-8\").read() for a,b in [(\"1. **Prune\",\"2. **Prune\"),(\"2. **Tighten\",\"3. **Tighten\"),(\"3. **Offload\",\"4": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short docs/proposals; git check-ignore -v docs/proposals/2026-11-12-haystack-review.md": {
+   "count": 1,
+   "ms": 86,
+   "maxMs": 86,
+   "failures": 1
+  },
+  "bash\u0000cd \".\" && ls docs/proposals/haystack-review/": {
+   "count": 1,
+   "ms": 44,
+   "maxMs": 44,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/proposals/2026-11-12-haystack-review.md\" \"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md\" \"docs/plans/logs/2af79ca5.md\" &&": {
+   "count": 1,
+   "ms": 237,
+   "maxMs": 237,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"^- \\[.\\] \\*\\*HR-0[4-7]\" -A4 \"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md\"; ls docs/proposals/haystack-review/": {
+   "count": 1,
+   "ms": 61,
+   "maxMs": 61,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1895,1970p extensions/work-models.ts | grep -n \"ultra\\|mode\\|giant\\|function\\|const \" | head -30": {
+   "count": 1,
+   "ms": 78,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"stripProcessedPayloads(\\|giantResults\\|ultracompact\\|ultrafull\" extensions/work-models.ts | head -30": {
+   "count": 1,
+   "ms": 59,
+   "maxMs": 59,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 1210,1225p extensions/work-models.ts; sed -n 1772,1782p extensions/work-models.ts": {
+   "count": 1,
+   "ms": 66,
+   "maxMs": 66,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 174,190p extensions/work-compaction-memory.ts; sed -n 240,262p extensions/work-compaction-memory.ts": {
+   "count": 1,
+   "ms": 78,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && grep -rhoE \"\\\"mode\\\":\\\"(hybrid|fallback)\\\"\" --include=\"*.jsonl\" . 2>/dev/null | sort | uniq -c; grep -rhoE \"(Invalid memory JSON|Invalid memory schema|Invalid ": {
+   "count": 1,
+   "ms": 28421,
+   "maxMs": 28421,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/.pi/agent/sessions\" && grep -rhoE \"\\\"type\\\":\\\"compaction\\\".{0,0}\" --include=\"*.jsonl\" . | wc -l; grep -rhE \"\\\"type\\\":\\\"compaction\\\"\" --include=\"*.jsonl\" . | grep -oE \"\\\"(mode|compact": {
+   "count": 1,
+   "ms": 5689,
+   "maxMs": 5689,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"compact\" extensions/plan3-stats.ts | head -15; grep -n \"compactionMode\\|attempts\\|fallback\" scripts/audit-compaction.mjs | head -10": {
+   "count": 1,
+   "ms": 78,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -a -n \"compact\" extensions/plan3-stats.ts | cut -c1-220 | head -15; sed -n 70,90p scripts/audit-compaction.mjs": {
+   "count": 1,
+   "ms": 78,
+   "maxMs": 78,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n 95,140p scripts/benchmark-context-cache-live.mjs; ls benchmarks benchmarks/context-continuity 2>/dev/null | head -30": {
+   "count": 1,
+   "ms": 71,
+   "maxMs": 71,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"docs/proposals/2026-11-12-haystack-review.md\" s=open(p,encoding=\"utf-8\").read() astra={\"A1\":\"Already covered\",\"A2\":\"Test first\",\"A3\":\"Adopt idea\",\"A4\":\"Already covered\",\"": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"docs/proposals/2026-11-12-haystack-review.md\" s=open(p,encoding=\"utf-8\").read() start=s.index(\"## Candidate ideas\") end=s.index(\"## Out of scope\") merge='''## Merge with ": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python -c \" import re for l in open('docs/proposals/2026-11-12-haystack-review.md',encoding='utf-8'): if re.match(r'\\| A\\d',l): c=[x.strip() for x in l.split('|')] print(c[1].split()[0],c[2]": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add \"docs/proposals/2026-11-12-haystack-review.md\" \"docs/proposals/haystack-review/astra-verdicts.md\" \"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-": {
+   "count": 1,
+   "ms": 208,
+   "maxMs": 208,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && grep -n \"^###\\|^- \\[.\\] \\*\\*\" \"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md\" | head -60": {
+   "count": 1,
+   "ms": 60,
+   "maxMs": 60,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' import re p=\"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md\" s=open(p,encoding=\"utf-8\").read() n0=len(s) s=re.sub(r\"^- ": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && sed -n \"/^## Out of scope/,\\$p\" \"docs/proposals/2026-11-12-haystack-review.md\"": {
+   "count": 1,
+   "ms": 43,
+   "maxMs": 43,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --porcelain docs/plans | head; ls -t docs/plans | head -3": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && ls docs/plans/2026-11-12-*.md; f=$(ls docs/plans/2026-11-12-pair-*.md); wc -l \"$f\"; head -40 \"$f\"": {
+   "count": 1,
+   "ms": 91,
+   "maxMs": 91,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && for f in docs/plans/2026-11-12-*plan3.md; do echo \"$f :: $(grep -m1 \"^# \" \"$f\")\"; done": {
+   "count": 1,
+   "ms": 172,
+   "maxMs": 172,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && python - <<'EOF' p=\"docs/upstream/haystack.md\" s=open(p,encoding=\"utf-8\").read() m={\"Warn before stopping\":\"5bd4eebd\",\"Pair benchmark runs\":\"0c43697c\",\"Better compaction summaries\":\"83818785": {
+   "count": 1,
+   "ms": 101,
+   "maxMs": 101,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat -- extensions/work-catch-up-baseline.json; git status --porcelain docs/plans/logs | grep -E \"5bd4eebd|0c43697c|83818785|ac641457|1feda303|2af79ca5\"": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add -A -- \"docs/plans/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borrow-with-an-astra-2af79ca5-plan3.md\" \"docs/plans/done/2026-11-12-review-deepset-ai-haystack-for-ideas-to-borro": {
+   "count": 2,
+   "ms": 293,
+   "maxMs": 228,
+   "failures": 1
+  }
+ },
+ "steps": {
+  "HR-01": {
+   "ms": 86464,
+   "testMs": 0,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
+   },
+   "failures": 1
+  },
+  "HR-02": {
+   "ms": 341590,
+   "testMs": 158,
+   "replies": 50,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 50
+   },
+   "failures": 1
+  },
+  "HR-04": {
+   "ms": 107680,
+   "testMs": 263,
+   "replies": 12,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 12
+   }
+  },
+  "HR-05": {
+   "ms": 2157442,
+   "testMs": 0,
+   "replies": 5,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 5
+   }
+  },
+  "HR-06": {
+   "ms": 16417,
+   "testMs": 0,
+   "replies": 2,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 2
+   }
+  },
+  "HR-08": {
+   "ms": 85495,
+   "testMs": 0,
+   "replies": 8,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 8
+   },
+   "failures": 1
+  },
+  "(none)": {
+   "ms": 23658,
+   "testMs": 0,
+   "replies": 5,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 5
+   },
+   "failures": 1
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-12T20:40:56.197Z",
+   "ms": 391131
+  },
+  {
+   "start": "2026-11-12T20:47:27.379Z",
+   "ms": 2600923
+  }
+ ],
+ "hints": []
+}

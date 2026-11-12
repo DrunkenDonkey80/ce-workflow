@@ -56,3 +56,52 @@ Draft, 0/12, no open questions. Q-02 settled as D8: the extension sends per-resu
   - Cache at .pi/designs/systems/<name>/preview/colors.html so its ../tokens.css link resolves; same commit check, 1 MB cap and retry note as V-03.
   - Acceptance: browser test opens Themes, scrolls, and sees OpenDesign color frames load only for visible cards; Add reference attaches the colors page.
   - check: node hub/scripts/test-browser.mjs → ok (V-12 block: 16 color cards framed only near view, scroll down/up, fixture-style without page disabled, Add attaches fixture-10); node scripts/test-work-design.mjs → design tool tests passed (colors entry, legacy refetch, unavailable without retry); node hub/scripts/test-api.mjs → catalog assertions pass, then fails at line 642 links comm 2≠1 from another session's commit 2eb6f32d (COMM 2), not this change
+
+## 2026-11-12T14:32:28.468Z V-05 done: Image search tab: Enter/Search (typed text only) runs the session's image_search via hub designsearch → /api/designsearch (searchForHub); extension 1.8 sends each cookie-free thumbnail separately, returned inline as data URLs; Open fetches one original via designoriginal (originalForHub, kept per set) and shows it full size with its source link. Committed b4025622.
+
+- [x] **V-05** Add a hub-to-session image search route and the Image search tab: Enter or Search runs it, and results show as pictures.
+  - The route runs the existing `image_search` code in the user's browser without a model turn. It reuses image_search's consent and CAPTCHA handling, and returns titles, sites, page URLs and locally served thumbnails.
+  - Tiles (D8): the extension sends each result's thumbnail separately (only gstatic or inline data, no cookies, as the sheet does today); serve them from the session's temp folder, never hotlink third-party URLs into the hub page. Bump the extension version so the setup check asks for the update.
+  - Opening a result downloads that one original on demand and shows it full size, cached in the session's temp folder for this search; adding it reuses that file.
+  - Measure while building: the thumbnails' real sizes on a live search; record them in the step check.
+  - Add structured internal results to `imageSearch` and `saveOriginals` (extensions/browser-search.ts:94 and :105 return formatted text today) while keeping the image_search tool's replies unchanged.
+  - Add session handlers for search and save next to `/api/designurl` in extensions/plan3.ts (~857) and allow them in `HUB_CALLS` (~2007). The page names results by the session's own set ID and result number, never by file path; a session cannot reach another session's sets.
+  - Acceptance: hub/scripts/test-api.mjs covers the hub route with a fake session; scripts/test-work-browser-fetch.mjs covers the real session handlers: denied consent, expired set, failed original and another session's set; the browser test types a query, presses Enter and sees result pictures, and an empty box sends nothing; opening a result shows its original larger than the tile (fixture original bigger than its thumbnail).
+  - check: node scripts/test-work-browser-fetch.mjs → all ok (hub thumbs, original cached per set, refused original, expired set, no google grant); node hub/scripts/test-browser.mjs → ok (empty Enter sends nothing, tile 40px, original 400px); node hub/scripts/test-api.mjs → new designsearch/designoriginal asserts pass, then the unrelated hub-link comm 2≠1 failure. NOT done: live thumbnail size measurement needs the user to update/reload the browser extension (1.8).
+
+## 2026-11-12T14:50:14.852Z V-06 done: Image search tiles have "Add reference": designpick → session /api/designpick (pickForHub: originalForHub + publishFound) saves the original as a found: pick and attaches it; picks survive later searches with their source link. Committed cb58da78.
+
+- [x] **V-06** Let a result be added: save its original into the conversation's saved picks, then attach it as a reference. Picks survive new searches.
+  - Uses `publishFound` (8 MB cap, PNG, newest 60). Capture page stays on saved picks.
+  - Acceptance: browser test adds a result, runs a second search, and the saved pick and its source link are still listed and attachable.
+  - check: node hub/scripts/test-browser.mjs → ok (pick attached, second search keeps 2 saved picks, source link kept, attachable); node scripts/test-work-browser-fetch.mjs → ok; node hub/scripts/test-api.mjs → new designpick assert passes, then the known unrelated hub-link comm 2≠1 failure at line 648.
+
+## 2026-11-12T14:59:51.529Z V-07 done: Prototype scripts/astryx-component-shots.mjs (f05d80c3) renders pinned examples via the installed runtime + headless agent-browser: 3/5 rendered crisp at 2x (Button 16.8 KB, Card 17.0 KB, Banner 2.6 KB webp q0.8, avg 12.1 KB); TextInput and Badge have no pinned example; Banner's example only shows a button before interaction; build ~48 s per component, render+shot ~1.2 s.
+
+- [x] **V-07** Prototype rendering five Astryx components from their pinned examples into images; measure quality, file size and render time.
+  - Use the consent-provisioned lookup cache and a local headless browser in a maintainer script, never during browsing.
+  - With the numbers, ask the user about the bundle size budget and image size (add it as an open question then).
+  - check: node scripts/astryx-component-shots.mjs → 3 images written to %TEMP%\astryx-component-shots, 2 "no pinned example" rows (exit 1 by design); images inspected visually.
+
+## 2026-11-12T15:07:55.543Z V-08 done: Example choice: scripts/astryx-examples/<Name>.jsx (hand-written, default export) wins, else the first pinned example; TextInput, Badge, Banner now have hand-written ones (bd020e30). User decided: 2x webp within ~1.5 MB total.
+
+- [x] **V-08** Decide the per-component example choice and the fallback for components whose examples do not render alone.
+  - check: node scripts/astryx-component-shots.mjs "" TextInput Badge Banner → TextInput 9.0 KB, Badge 7.2 KB, Banner 12.6 KB webp, all hand-written; images inspected visually.
+
+## 2026-11-12T15:40:47.215Z V-09 done: 36c3e265: astryx-component-shots.mjs renders each component's pinned CLI showcase template (overlays opened first) → 162/174 bundled 2x webp, 1480.7 KB, components.json keyed by lockDigest; catalog/designimage serve them; test-work-design fails on a pin move without rerun. 12 sub-parts without a usable template stay picture-less.
+
+- [x] **V-09** Render all 174 components and the theme without a bundled image; bundle them with the pin digest as revision; make the script part of the pin update.
+  - The same script exports each component's usage and props as small bundled metadata keyed to the pin, because the lookup (`runAstryx` in extensions/design-library.ts:16-18) provisions the runtime first and browsing must not.
+  - Acceptance: catalog entries for components report `preview: "image"`; a test fails when the bundled images or metadata do not match the pin.
+  - check: node scripts/astryx-component-shots.mjs → 162/174 pictured, 1480.7 KB; node scripts/test-work-design.mjs → design tool tests passed; node hub/scripts/test-api.mjs → new component-picture asserts pass, then the known unrelated hub-link failure (now line 656).
+
+## 2026-11-12T16:03:16.469Z V-10 done: f54533d2 + bacde83c: all 174 components pictured (5 hand-written examples, hash-named files, 1529.8 KB); component cards show the whole picture; Inspect shows bundled usage+props via api/designdocs (docs.json 587 KB) with no runtime. Themes keep their existing picture cards.
+
+- [x] **V-10** Show Components and Themes as big picture cards, with Inspect showing the picture plus the bundled usage and props.
+  - Acceptance: browser test opens the Components tab and sees an image on every card; Components Inspect shows usage and props with no runtime installed and provisioning forbidden.
+  - check: node hub/scripts/test-browser.mjs → ok (new V-10 block: every component card has its picture; Button Inspect shows Usage/Props/label *); node hub/scripts/test-api.mjs → designdocs/designimage asserts pass, then known unrelated hub-link failure (line 659); node scripts/test-work-design.mjs → passed.
+
+## 2026-11-12T16:29:44.852Z V-11 done: ef4bbddf: browser test covers Components pictures + Inspect usage/props; changelog shots (components, component inspect, image search); README tabs bullet; CHANGELOG Unreleased entry; Inspect shows the picture first; grey stand-ins for example photos that can't load offline.
+
+- [x] **V-11** Update the browser test end to end, take changelog shots of each tab, and update README and CHANGELOG.
+  - check: node hub/scripts/test-browser.mjs → ok (3 earlier runs failed in unrelated early steps: agent-browser daemon EOF, chat wait, voice eval; the 4th passed); node scripts/test-work-design.mjs → passed; node hub/scripts/test-changelog.mjs → ok; node hub/scripts/test-api.mjs → design asserts pass, fails only at the known unrelated hub-link line 659.

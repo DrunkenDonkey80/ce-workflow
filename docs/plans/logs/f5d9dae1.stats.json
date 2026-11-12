@@ -1,0 +1,1455 @@
+{
+ "version": 1,
+ "activeMs": 14111937,
+ "runs": 8,
+ "waitingMs": 92572,
+ "toolWallMs": 10491730,
+ "compactions": {
+  "count": 2,
+  "ms": 50947
+ },
+ "models": {
+  "anthropic/claude-opus-5-5:high": {
+   "replies": 571,
+   "thinkingMs": 2173476,
+   "actingMs": 1116911,
+   "input": 1558,
+   "output": 314224,
+   "cacheRead": 66245268,
+   "cacheWrite": 2170121,
+   "cost": 30.390370600000015,
+   "errors": 1
+  }
+ },
+ "tools": {
+  "research_exit": {
+   "count": 1,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 0
+  },
+  "bash": {
+   "count": 394,
+   "ms": 10040217,
+   "maxMs": 408496,
+   "failures": 6
+  },
+  "read": {
+   "count": 125,
+   "ms": 2398,
+   "maxMs": 107,
+   "failures": 0
+  },
+  "edit": {
+   "count": 86,
+   "ms": 725,
+   "maxMs": 45,
+   "failures": 5
+  },
+  "compaction_note": {
+   "count": 8,
+   "ms": 1,
+   "maxMs": 1,
+   "failures": 2
+  },
+  "plan3": {
+   "count": 27,
+   "ms": 2144,
+   "maxMs": 272,
+   "failures": 1
+  },
+  "lens_diagnostics": {
+   "count": 5,
+   "ms": 35474,
+   "maxMs": 11233,
+   "failures": 0
+  },
+  "write": {
+   "count": 3,
+   "ms": 3,
+   "maxMs": 1,
+   "failures": 0
+  }
+ },
+ "categories": {
+  "shell": {
+   "count": 323,
+   "ms": 4357758,
+   "maxMs": 265320,
+   "failures": 5
+  },
+  "test": {
+   "count": 64,
+   "ms": 5670804,
+   "maxMs": 408496,
+   "failures": 1
+  },
+  "build": {
+   "count": 7,
+   "ms": 11655,
+   "maxMs": 4355,
+   "failures": 0
+  }
+ },
+ "commands": {
+  "bash\u0000git status --short | head -30; git log --oneline -3; wc -l hub/web/design-library.ts": {
+   "count": 1,
+   "ms": 156,
+   "maxMs": 156,
+   "failures": 0
+  },
+  "bash\u0000cd hub/scripts && node -e \" const fs=require('fs');let s=fs.readFileSync('test-browser.mjs','utf8');const rep=(a,b)=>{if(s.split(a).length!==2)throw Error('not unique: '+a);s=s.replace(a,b)}; rep(\\`as": {
+   "count": 1,
+   "ms": 130,
+   "maxMs": 130,
+   "failures": 1
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | tail -25": {
+   "count": 2,
+   "ms": 9027,
+   "maxMs": 5751,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | grep -E \"DEBUG|error\\\":\" | cut -c1-700": {
+   "count": 1,
+   "ms": 5528,
+   "maxMs": 5528,
+   "failures": 0
+  },
+  "bash\u0000node --check hub/scripts/test-browser.mjs && node hub/scripts/test-browser.mjs 2>&1 | grep -vE \"ExperimentalWarning|trace-warnings\" | tail -15 | cut -c1-600": {
+   "count": 1,
+   "ms": 24352,
+   "maxMs": 24352,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | grep -vE \"ExperimentalWarning|trace-warnings\" | tail -15 | cut -c1-600": {
+   "count": 1,
+   "ms": 158716,
+   "maxMs": 158716,
+   "failures": 0
+  },
+  "bash\u0000git diff -U0 hub/web/styles.css | grep -n \"^@@\"": {
+   "count": 2,
+   "ms": 163,
+   "maxMs": 88,
+   "failures": 0
+  },
+  "bash\u0000git diff -U0 hub/web/styles.css > \"$TEMP/s.patch\" && node -e \"const fs=require('fs');const p=process.env.TEMP+'/s.patch';const t=fs.readFileSync(p,'utf8');const i=t.indexOf('@@ -51');const j=t.indexOf": {
+   "count": 1,
+   "ms": 347,
+   "maxMs": 347,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"chat-width|aria-valuenow\" hub/web/styles.css hub/web/index.html | head; rg -n \"plan3-chat-width|plan3-left|plan3-layout\" hub/scripts/test-browser.mjs | cut -c1-250": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000npx tsc --noEmit -p hub/web 2>&1 | head; ls hub/web/tsconfig.json hub/tsconfig.json 2>&1 | head -3": {
+   "count": 1,
+   "ms": 3029,
+   "maxMs": 3029,
+   "failures": 0
+  },
+  "bash\u0000npx tsc --noEmit -p hub 2>&1 | grep -v \"^npm\" | head": {
+   "count": 1,
+   "ms": 4355,
+   "maxMs": 4355,
+   "failures": 0
+  },
+  "bash\u0000npx tsc --noEmit -p hub 2>&1 | grep -E \"hub/web/(app|design-library)\" | head": {
+   "count": 1,
+   "ms": 3758,
+   "maxMs": 3758,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | grep -vE \"ExperimentalWarning|trace-warnings\" | tail -12 | cut -c1-700": {
+   "count": 2,
+   "ms": 75009,
+   "maxMs": 72130,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | grep DEBUG | cut -c1-1500": {
+   "count": 1,
+   "ms": 3241,
+   "maxMs": 3241,
+   "failures": 0
+  },
+  "bash\u0000cd hub/scripts && sed -i \"s|await browser(\\\"click\\\", \\\"#narrow-left\\\"); await reload(\\\"!document.getElementById('files').hidden\\\");|await browser(\\\"click\\\", \\\"#narrow-left\\\"); await reload(\\\"document.": {
+   "count": 1,
+   "ms": 47041,
+   "maxMs": 47041,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"function setMobile\" -A 14 hub/web/app.ts | cut -c1-260": {
+   "count": 1,
+   "ms": 237,
+   "maxMs": 237,
+   "failures": 0
+  },
+  "bash\u0000cd hub/scripts && sed -i \"s|await reload(\\\"document.readyState === 'complete'\\\"); await new Promise(r => setTimeout(r, 1500)); console.error(\\\"DEBUG\\\", await evaluate(\\\"JSON.stringify(\\[localStorage.g": {
+   "count": 1,
+   "ms": 192423,
+   "maxMs": 192423,
+   "failures": 0
+  },
+  "bash\u0000git diff -U0 hub/web/app.ts > \"$TEMP/a.patch\" && node -e \"const fs=require('fs');const p=process.env.TEMP+'/a.patch';const t=fs.readFileSync(p,'utf8');const parts=t.split(/(?=^@@ )/m);const keep=parts": {
+   "count": 1,
+   "ms": 199,
+   "maxMs": 199,
+   "failures": 0
+  },
+  "bash\u0000git add hub/scripts/test-browser.mjs docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md docs/plans/logs/f5d9dae1.md && git commit -qm \"V-02: per-session, per": {
+   "count": 1,
+   "ms": 222,
+   "maxMs": 222,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"test-work-design\" package.json | head -3; node scripts/test-work-design.mjs 2>&1 | grep -vE \"ExperimentalWarning|trace-warnings\" | tail -15 | cut -c1-500": {
+   "count": 1,
+   "ms": 264806,
+   "maxMs": 264806,
+   "failures": 0
+  },
+  "bash\u0000git add extensions/design.ts scripts/test-work-design.mjs docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md docs/plans/logs/f5d9dae1.md && git commit -qm \"V": {
+   "count": 1,
+   "ms": 234,
+   "maxMs": 234,
+   "failures": 0
+  },
+  "bash\u0000wc -l hub/web/design-library.ts; rg -n \"async function get\\b|function get\\(|type Tools\" extensions/design.ts | head; rg -n \"function |IntersectionObserver|designexample|designimage|availability|previe": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000cd hub/scripts && python - <<'EOF' import re p=\"test-browser.mjs\"; s=open(p,encoding=\"utf-8\").read() old='write(\".pi/designs/systems/index.json\", JSON.stringify({ commit: \"1\".repeat(40), names: [\"fixt": {
+   "count": 1,
+   "ms": 20628,
+   "maxMs": 20628,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | tail -25 | cut -c1-600": {
+   "count": 1,
+   "ms": 8656,
+   "maxMs": 8656,
+   "failures": 0
+  },
+  "bash\u0000sed -i \"239s|await browser(\\\"click\\\", \\\"#library \\[data-entry='od:fixture-style'\\] button\\\");|await clickShown(\\\"#library [data-entry='od:fixture-style'] [data-inspect]\\\");|; 252s|await browser(\\\"clic": {
+   "count": 1,
+   "ms": 194946,
+   "maxMs": 194946,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-api.mjs 2>&1 | tail -1; node scripts/test-work-design.mjs 2>&1 | tail -1; git status --short | head -40": {
+   "count": 1,
+   "ms": 281686,
+   "maxMs": 281686,
+   "failures": 0
+  },
+  "bash\u0000git diff -U0 hub/web/styles.css > \"%TEMP%/x\" 2>/dev/null; P=\"$(mktemp)\"; git diff -U0 hub/web/styles.css | awk \"NR<=4 || (NR>=10 && NR<=15)\" > \"$P\" && sed -i \"s/^@@ -80 +82,4 @@/@@ -80 +80,4 @@/\" \"$P\"": {
+   "count": 1,
+   "ms": 363,
+   "maxMs": 363,
+   "failures": 0
+  },
+  "bash\u0000git add docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md docs/plans/logs/f5d9dae1.md && git commit -qm \"V-04: lazy big previews on Designs library cards\" &": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000cd scripts && python - <<'EOF' p=\"test-work-design.mjs\"; s=open(p,encoding=\"utf-8\").read() old=''' hits.length = 0; assert.equal((await ask()).cached, true); assert.deepEqual(hits, [], \"a cache hit fo": {
+   "count": 1,
+   "ms": 211402,
+   "maxMs": 211402,
+   "failures": 0
+  },
+  "bash\u0000git status --short hub/src/ ; git log -1 --format=\"%h %s\" -- hub/src/link.ts": {
+   "count": 1,
+   "ms": 787,
+   "maxMs": 787,
+   "failures": 0
+  },
+  "bash\u0000cd hub/scripts && python - <<'EOF' p=\"test-browser.mjs\"; s=open(p,encoding=\"utf-8\").read() def rep(old,new): global s assert s.count(old)==1, old[:80]; s=s.replace(old,new) rep('''write(`.pi/designs/s": {
+   "count": 1,
+   "ms": 8986,
+   "maxMs": 8986,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | grep -v Warning | tail -12 | cut -c1-700": {
+   "count": 1,
+   "ms": 196864,
+   "maxMs": 196864,
+   "failures": 0
+  },
+  "bash\u0000git diff -U0 hub/src/api.ts | grep \"^[-+]\" | grep -v \"^[-+][-+]\" | cut -c1-140; node hub/scripts/test-api.mjs 2>&1 | tail -1; git diff --stat": {
+   "count": 1,
+   "ms": 399,
+   "maxMs": 399,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-api.mjs 2>&1 | grep -v Warning | grep -B2 -A14 \"Error\\|assert\" | head -40 | cut -c1-400": {
+   "count": 1,
+   "ms": 573,
+   "maxMs": 573,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-api.mjs 2>&1 | grep -v Warning | grep -A12 \"AssertionError\\|^api ok\" | head -30 | cut -c1-400": {
+   "count": 1,
+   "ms": 372,
+   "maxMs": 372,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-api.mjs 2>&1 | grep -v Warning | grep -A12 \"AssertionError\\|^api ok\\|Error:\" | head -30 | cut -c1-400": {
+   "count": 1,
+   "ms": 19620,
+   "maxMs": 19620,
+   "failures": 0
+  },
+  "bash\u0000git diff hub/src/link.ts hub/src/hub.ts | grep -n \"comm\" | head; git diff --stat hub/src/link.ts hub/src/hub.ts hub/scripts/test-remote.mjs": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000git status --short hub/; rg -n \"comm:\" hub/src/*.ts | head -5 | cut -c1-200": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000git add extensions/design-catalog.ts extensions/design.ts hub/scripts/test-browser.mjs hub/scripts/test-api.mjs hub/src/api.ts hub/web/design-library.ts scripts/test-work-design.mjs && git diff --cach": {
+   "count": 1,
+   "ms": 127,
+   "maxMs": 127,
+   "failures": 0
+  },
+  "bash\u0000git add docs/plans/2026-11-12-visual-design-library-tabs-real-previews-image-search-f5d9dae1-plan3.md docs/plans/logs/f5d9dae1.md && git commit -qm \"V-12: OpenDesign color pages as Themes cards\" && gi": {
+   "count": 1,
+   "ms": 206,
+   "maxMs": 206,
+   "failures": 0
+  },
+  "bash\u0000rg -ln \"contact sheet|contactSheet|extract.*images|\\\"images\\\"\" --glob \"!node_modules\" --glob \"!docs/**\" . | head -20; rg -n \"captureUrlReference\" extensions/*.ts | head -3": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/web/design-library.ts\" s=open(p,encoding=\"utf8\").read() a=\"tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = true; detail.hidden = false; root.scrollTop ": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/web/styles.css\" s=open(p,encoding=\"utf8\").read() s=s.replace(\".library-results { margin-bottom: 16px; }\\n\",\".library-results { margin-bottom: 16px; }\\n.library-list > h3 { grid": {
+   "count": 1,
+   "ms": 136,
+   "maxMs": 136,
+   "failures": 0
+  },
+  "bash\u0000node scripts/test-work-browser-fetch.mjs 2>&1 | tail -15": {
+   "count": 1,
+   "ms": 108669,
+   "maxMs": 108669,
+   "failures": 0
+  },
+  "bash\u0000git status --short hub/web/annotate.ts; node hub/scripts/test-api.mjs 2>&1 | tail -8": {
+   "count": 1,
+   "ms": 19083,
+   "maxMs": 19083,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() def rep(a,b): global s assert s.count(a)==1,a s=s.replace(a,b) rep(\"\"\" if (endpoint === \"/api/designurl\") throw fail(": {
+   "count": 1,
+   "ms": 155,
+   "maxMs": 155,
+   "failures": 0
+  },
+  "bash\u0000git log -1 --format=\"%h %an %s\" -- hub/web/annotate.ts; rg -n \"pos\\\\\\\\.test\" hub/scripts/test-browser.mjs | cut -c1-200": {
+   "count": 1,
+   "ms": 371,
+   "maxMs": 371,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a=\"const a = document.querySelector('#library input[type=search]').getBoundingClientRect(),\" assert s.count(a)==1 s=s": {
+   "count": 1,
+   "ms": 195421,
+   "maxMs": 195421,
+   "failures": 0
+  },
+  "bash\u0000git diff --check -- extensions/browser-search.ts extensions/plan3.ts hub/src/api.ts hub/web/design-library.ts hub/web/styles.css hub/scripts/test-api.mjs hub/scripts/test-browser.mjs scripts/test-work": {
+   "count": 1,
+   "ms": 193,
+   "maxMs": 193,
+   "failures": 0
+  },
+  "bash\u0000git add browser-fetch/extension/background.js browser-fetch/extension/manifest.json extensions/browser-search.ts extensions/plan3.ts hub/src/api.ts hub/web/design-library.ts hub/scripts/test-api.mjs h": {
+   "count": 1,
+   "ms": 260,
+   "maxMs": 260,
+   "failures": 0
+  },
+  "bash\u0000git diff --cached --check; git diff --cached -- hub/web/styles.css | cat -A | grep \"^+\" | head -6": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000git reset -q -- hub/web/styles.css && sed -i \"s/\\r$//\" \"C:/Users/Flex/AppData/Local/Temp/mine.diff\" && git apply --cached --unidiff-zero \"C:/Users/Flex/AppData/Local/Temp/mine.diff\" && git diff --cach": {
+   "count": 1,
+   "ms": 166,
+   "maxMs": 166,
+   "failures": 0
+  },
+  "bash\u0000git commit -q -m \"Design library: Image search tab runs the session's image_search (V-05)\" -m \"Enter or Search in the Image search tab calls the session through designsearch; tiles are the add-on's ow": {
+   "count": 1,
+   "ms": 163,
+   "maxMs": 163,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' import re def edit(p, pairs): s=open(p,encoding=\"utf8\").read() for a,b in pairs: assert s.count(a)==1,(p,a) s=s.replace(a,b) open(p,\"w\",encoding=\"utf8\").write(s) edit(\"extensions/desi": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"designpick|s\\\\\\\\d\\{1,9\\}\" hub/src/api.ts | cut -c1-200; sed -n \"405,407p\" hub/src/api.ts | cut -c1-160": {
+   "count": 1,
+   "ms": 853,
+   "maxMs": 853,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/web/design-library.ts\" s=open(p,encoding=\"utf8\").read() def rep(a,b): global s assert s.count(a)==1,a s=s.replace(a,b) rep(\"\"\" open.disabled = !item.original; open.addEventList": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() def rep(a,b): global s assert s.count(a)==1,a s=s.replace(a,b) rep(\"\"\" if (endpoint === \"/api/designoriginal\") return": {
+   "count": 1,
+   "ms": 9766,
+   "maxMs": 9766,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs 2>&1 | tail -6 | cut -c1-400": {
+   "count": 1,
+   "ms": 72070,
+   "maxMs": 72070,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a=\"\"\" await browser(\"wait\", \"--fn\", `document.querySelectorAll('#reference-draft [data-reference]').length === ${draf": {
+   "count": 1,
+   "ms": 71215,
+   "maxMs": 71215,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a=\"\"\"document.querySelector('#library [role=status]').textContent + ' | ' +\"\"\" assert s.count(a)==1 s=s.replace(a,\"\"\"": {
+   "count": 1,
+   "ms": 10138,
+   "maxMs": 10138,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; grep -n \"DEBUG\\|^ok\\|Error\\|assert\" \"C:/Users/Flex/AppData/Local/Temp/tb.log\" | head -10 | cut -c1-600": {
+   "count": 1,
+   "ms": 70673,
+   "maxMs": 70673,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a=\"\"\"const { ids } = await publishFound(folder, id, [{ title: \"Kiosk grid\", page: \"https://pos.test/a\", image: join(d": {
+   "count": 1,
+   "ms": 70892,
+   "maxMs": 70892,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/web/design-library.ts\" s=open(p,encoding=\"utf8\").read() a='if (!entry) throw new Error(\"the saved pick is not listed\");' assert s.count(a)==1 s=s.replace(a,'if (!entry) throw n": {
+   "count": 1,
+   "ms": 71402,
+   "maxMs": 71402,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' def edit(p, pairs): s=open(p,encoding=\"utf8\").read() for a,b in pairs: assert s.count(a)==1,(p,a) s=s.replace(a,b) open(p,\"w\",encoding=\"utf8\").write(s) edit(\"hub/scripts/test-browser.": {
+   "count": 1,
+   "ms": 71481,
+   "maxMs": 71481,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a='fs.copyFileSync(new URL(\"../../extensions/astryx-runtime/previews/neutral.webp\", import.meta.url), join(downloads,": {
+   "count": 1,
+   "ms": 192,
+   "maxMs": 192,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-browser.mjs\" s=open(p,encoding=\"utf8\").read() a='join(downloads, \"set\", \"02.webp\")); // a different picture: the same bytes would merge into the first pick' assert": {
+   "count": 1,
+   "ms": 197135,
+   "maxMs": 197135,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"hub/scripts/test-api.mjs\" s=open(p,encoding=\"utf8\").read() a='\\t\\tfor (const body of [{ set: \"../x\", n: 1 },' assert s.count(a)==1 s=s.replace(a,'\\t\\tassert.deepEqual((await post(i": {
+   "count": 1,
+   "ms": 109394,
+   "maxMs": 109394,
+   "failures": 0
+  },
+  "bash\u0000git add extensions/browser-search.ts extensions/plan3.ts extensions/design-references.ts hub/src/api.ts hub/web/design-library.ts hub/scripts/test-api.mjs hub/scripts/test-browser.mjs && git diff --ca": {
+   "count": 1,
+   "ms": 295,
+   "maxMs": 295,
+   "failures": 0
+  },
+  "bash\u0000cat > \"C:/Users/Flex/AppData/Local/Temp/ex.mjs\" <<'EOF' import { createJiti } from \"jiti\"; const jiti = createJiti(import.meta.url); const { runAstryx } = await jiti.import(\"./extensions/design-librar": {
+   "count": 1,
+   "ms": 12810,
+   "maxMs": 12810,
+   "failures": 0
+  },
+  "bash\u0000agent-browser screenshot --help 2>&1 | head -25; agent-browser set --help 2>&1 | head -15": {
+   "count": 1,
+   "ms": 411,
+   "maxMs": 411,
+   "failures": 0
+  },
+  "bash\u0000agent-browser eval --help 2>&1 | head -20": {
+   "count": 1,
+   "ms": 188,
+   "maxMs": 188,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs 2>&1 | tail -15 | cut -c1-400": {
+   "count": 1,
+   "ms": 118846,
+   "maxMs": 118846,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs 2>&1 | grep -m3 \"Astryx\\|Error:\" | cut -c1-600": {
+   "count": 1,
+   "ms": 118915,
+   "maxMs": 118915,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"scripts/astryx-component-shots.mjs\" s=open(p,encoding=\"utf8\").read() for a,b in [('[\"Button\", \"Card\", \"TextInput\", \"Tabs\", \"Badge\"]','[\"Button\", \"Card\", \"TextInput\", \"Banner\", \"Bad": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs 2>&1 | tail -8 | cut -c1-400": {
+   "count": 1,
+   "ms": 164924,
+   "maxMs": 164924,
+   "failures": 0
+  },
+  "bash\u0000git add scripts/astryx-component-shots.mjs && git commit -q -m \"Maintainer prototype: render pinned Astryx component examples to images (V-07)\" -m \"Uses the installed pinned runtime only (never instal": {
+   "count": 1,
+   "ms": 158,
+   "maxMs": 158,
+   "failures": 0
+  },
+  "bash\u0000cat > scripts/.tmp-ex.mjs <<'EOF' import { createJiti } from \"jiti\"; const { runAstryx } = await createJiti(import.meta.url).import(\"../extensions/design-library.ts\"); for (const name of [\"Badge\", \"Ba": {
+   "count": 1,
+   "ms": 35619,
+   "maxMs": 35619,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p scripts/astryx-examples && cd scripts/astryx-examples && cat > Badge.jsx <<'EOF' // Hand-written picture example (V-08): the pinned Badge has no example. import {Badge} from '@astryxdesign/co": {
+   "count": 1,
+   "ms": 66215,
+   "maxMs": 66215,
+   "failures": 0
+  },
+  "bash\u0000rm -f Banner.png Banner.webp report.json; rm -rf Banner; git status --short | grep -v \"^ M\\|^ D\" ; node scripts/astryx-component-shots.mjs \"\" TextInput Badge Banner 2>&1 | grep -v -i deprecation | tai": {
+   "count": 1,
+   "ms": 150065,
+   "maxMs": 150065,
+   "failures": 0
+  },
+  "bash\u0000sleep 5; rm -rf Banner 2>&1; ls -d Banner 2>&1 | head -1; git add scripts/astryx-component-shots.mjs scripts/astryx-examples && git commit -q -m \"Component pictures: hand-written examples for TextInpu": {
+   "count": 1,
+   "ms": 5275,
+   "maxMs": 5275,
+   "failures": 0
+  },
+  "bash\u0000node -e \"const c=require('./extensions/astryx-runtime/catalog.json');const n=Object.values(c.groups).flat();console.log(n.length, new Set(n.map(x=>x.package)), c.themes.map(t=>t.slug+':'+(t.package||t": {
+   "count": 1,
+   "ms": 167,
+   "maxMs": 167,
+   "failures": 0
+  },
+  "bash\u0000rg -ln \"catalog\\.json|runtime-lock\" --glob \"!docs/**\" --glob \"!node_modules/**\" . | head; rg -n \"\\\"scripts\\\"\" -A 30 package.json | rg -i \"astryx|pin|design\"": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"export (async )?function libraryLookup\" -A 8 extensions/design-lookup.ts | cut -c1-220": {
+   "count": 1,
+   "ms": 150,
+   "maxMs": 150,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs Button Badge Card Tooltip AppShell 2>&1 | grep -v -i \"deprecation\" | tail -8 | cut -c1-300": {
+   "count": 1,
+   "ms": 64571,
+   "maxMs": 64571,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"scripts/astryx-component-shots.mjs\" s=open(p,encoding=\"utf8\",newline=\"\").read() a=\"\"\" browser(undefined, \"wait\", \"--fn\", \"typeof window.show === 'function'\");\"\"\" assert s.count(a)=": {
+   "count": 1,
+   "ms": 69054,
+   "maxMs": 69054,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/AppData/Local/Temp/astryx-shots-7iHERL\"; ls -la \"$P\" \"$P/assets\" | head; agent-browser --session dbg open \"file:///$P/index.html\" >/dev/null; sleep 2; agent-browser --session dbg eval": {
+   "count": 1,
+   "ms": 3496,
+   "maxMs": 3496,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"scripts/astryx-component-shots.mjs\" s=open(p,encoding=\"utf8\",newline=\"\").read() a=\"\"\"const browser = (input, ...rest) => execFileSync(\"agent-browser\", [\"--session\", session, ...res": {
+   "count": 1,
+   "ms": 50553,
+   "maxMs": 50553,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; tail -1 \"C:/Users/Flex/AppData/Local/Temp/shots.log\" | cut -c1-300; grep -c \"^- \" \"C:/Users": {
+   "count": 1,
+   "ms": 60682,
+   "maxMs": 60682,
+   "failures": 0
+  },
+  "bash\u0000python - <<'EOF' p=\"scripts/astryx-component-shots.mjs\" s=open(p,encoding=\"utf8\",newline=\"\").read() a=\"\"\" if (component) sources.set(name, { code: `${example.code}\\\\nexport default ${component};\\\\n`, ": {
+   "count": 1,
+   "ms": 48512,
+   "maxMs": 48512,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; grep -v -i \"deprecation\\|launched\" \"C:/Users/Flex/AppData/Local/Temp/shots.log\" | grep -m3 ": {
+   "count": 4,
+   "ms": 386527,
+   "maxMs": 130106,
+   "failures": 0
+  },
+  "bash\u0000KEEP_PAGE=1 node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; P=$(grep -o \"C:.*astryx-shots-[A-Za-z0-9]*\" \"C:/Users/Flex/AppData/Local/Temp/shots.log\" | tail": {
+   "count": 1,
+   "ms": 84891,
+   "maxMs": 84891,
+   "failures": 0
+  },
+  "bash\u0000ls -td \"C:/Users/Flex/AppData/Local/Temp/\"astryx-shots-* | head -2; grep -v -i \"deprecation\\|launched\" \"C:/Users/Flex/AppData/Local/Temp/shots.log\" | head -5 | cut -c1-300": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/AppData/Local/Temp/astryx-shots-bK3LvN\"; B=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; ls -la \"$P/assets\"; \"$B\" --session dbg open \"file:///$P/index.htm": {
+   "count": 1,
+   "ms": 3903,
+   "maxMs": 3903,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/AppData/Local/Temp/astryx-shots-bK3LvN\"; B=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; sed -i \"s#<div id=\\\"root\\\"></div>#<div id=\\\"root\\\"></div><script>": {
+   "count": 1,
+   "ms": 3835,
+   "maxMs": 3835,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/AppData/Local/Temp/astryx-shots-bK3LvN\"; B=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; node -e \"const fs=require('fs'),p=process.argv[1];let h=fs.readFi": {
+   "count": 1,
+   "ms": 4761,
+   "maxMs": 4761,
+   "failures": 0
+  },
+  "bash\u0000curl -s \"https://api.github.com/repos/meta/astryx/git/trees/fd5cf0df987791117e96ccc0bec603c64be8b136?recursive=1\" -o \"C:/Users/Flex/AppData/Local/Temp/astryx-tree.json\"; node -e \"const t=require('C:/U": {
+   "count": 1,
+   "ms": 1288,
+   "maxMs": 1288,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/cli/assets/templates/blocks/components\"; l": {
+   "count": 3,
+   "ms": 13663,
+   "maxMs": 6930,
+   "failures": 0
+  },
+  "bash\u0000N=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules\"; R=\"$N/@astryxdesign/cli/assets/templates/blocks/compon": {
+   "count": 1,
+   "ms": 160,
+   "maxMs": 160,
+   "failures": 0
+  },
+  "bash\u0000mv scripts/astryx-examples \"C:/Users/Flex/AppData/Local/Temp/ax-hold\" && node scripts/astryx-component-shots.mjs --out \"C:/Users/Flex/AppData/Local/Temp/ax-trial\" TextInput Badge Banner Avatar Tooltip": {
+   "count": 1,
+   "ms": 55011,
+   "maxMs": 55011,
+   "failures": 0
+  },
+  "bash\u0000git rm -q -r scripts/astryx-examples; node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; grep -v -i \"deprecation\\|launched\" \"C:/Users/Flex/App": {
+   "count": 1,
+   "ms": 116658,
+   "maxMs": 116658,
+   "failures": 0
+  },
+  "bash\u0000cd extensions/astryx-runtime/previews/components && for f in MobileNav MoreMenu DropdownMenu Popover Slider Lightbox SegmentedControl Stepper Typeahead Toast; do echo -n \"$f \"; node -e \"const b=requir": {
+   "count": 1,
+   "ms": 460,
+   "maxMs": 460,
+   "failures": 0
+  },
+  "bash\u0000cd extensions/astryx-runtime/previews/components && node -e \" const fs=require('fs');const names=fs.readdirSync('.').filter(f=>f.endsWith('.webp')); // webp VP8X/VP8 dims: read canvas size from VP8X o": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs --out \"C:/Users/Flex/AppData/Local/Temp/ax-trial\" Tooltip HoverCard ContextMenu DropdownMenu Popover Drawer BottomSheet Lightbox MobileNav MoreMenu TabMenu Butt": {
+   "count": 1,
+   "ms": 68500,
+   "maxMs": 68500,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs --out \"C:/Users/Flex/AppData/Local/Temp/ax-trial\" TabMenu Drawer Lightbox Button 2>&1 | grep -v -i \"deprecation\\|launched\" | tail -5 | cut -c1-300": {
+   "count": 1,
+   "ms": 58620,
+   "maxMs": 58620,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/cli/assets/templates/blocks/components\"; g": {
+   "count": 1,
+   "ms": 144,
+   "maxMs": 144,
+   "failures": 0
+  },
+  "bash\u0000rg -n \"lockDigest\" scripts/*.mjs extensions/design-runtime.ts | cut -c1-200 | head; rg -n \"designImage\\|IMAGE_REVISION\" --glob \"!docs/**\" -g \"*.ts\" -g \"*.mjs\" . | cut -c1-200 | head -20": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "\u0000(other)": {
+   "count": 178,
+   "ms": 15438,
+   "maxMs": 123,
+   "failures": 4
+  },
+  "bash\u0000rg -n \"\\\"files\\\"\" -A 20 package.json | rg -n \"extensions|previews\" | head; rg -n \"IMAGE_REVISION|previews\" scripts/test-work-design.mjs | head": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000node scripts/test-work-design.mjs 2>&1 | grep -v -i deprecation | tail -4 | cut -c1-300; node hub/scripts/test-api.mjs 2>&1 | grep -v -i deprecation | tail -6 | cut -c1-400": {
+   "count": 1,
+   "ms": 228067,
+   "maxMs": 228067,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-api.mjs 2>&1 | grep -m3 \"test-api.mjs:[0-9]*\" -o": {
+   "count": 1,
+   "ms": 14152,
+   "maxMs": 14152,
+   "failures": 0
+  },
+  "bash\u0000rmdir Banner 2>/dev/null; git add scripts/astryx-component-shots.mjs extensions/astryx-runtime/previews/components extensions/design-catalog.ts scripts/test-work-design.mjs hub/scripts/test-api.mjs &&": {
+   "count": 1,
+   "ms": 760,
+   "maxMs": 760,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign\"; for n in TableRow TableCell DropdownMenu": {
+   "count": 1,
+   "ms": 2187,
+   "maxMs": 2187,
+   "failures": 0
+  },
+  "bash\u0000C=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/core\"; ls \"$C/src/Table\" | head -40; grep ": {
+   "count": 1,
+   "ms": 266,
+   "maxMs": 266,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/cli/assets/templates/blocks/components\"; g": {
+   "count": 1,
+   "ms": 453,
+   "maxMs": 453,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/cli/assets/templates\"; for n in DropdownMe": {
+   "count": 1,
+   "ms": 585,
+   "maxMs": 585,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5/win32-x64/node_modules/@astryxdesign/cli/assets/templates/blocks/components\"; s": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000mkdir -p scripts/astryx-examples && cd scripts/astryx-examples && cat > TopNavMenu.jsx <<'EOF' // Hand-written picture example: the pinned TopNavHoverMenu needs @heroicons, which the shot bundle lacks": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000grep -n \"markTrigger = \" scripts/astryx-component-shots.mjs | cut -c1-80; node scripts/astryx-component-shots.mjs --out \"C:/Users/Flex/AppData/Local/Temp/ax-trial\" TopNavMenu TopNavMegaMenu EmptyState": {
+   "count": 1,
+   "ms": 49560,
+   "maxMs": 49560,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs --out \"C:/Users/Flex/AppData/Local/Temp/ax-trial\" TopNavMenu TopNavMegaMenu EmptyState BaseTypeahead TableRow TableCell DropdownMenuDivider DropdownMenuSubMenu ": {
+   "count": 1,
+   "ms": 49953,
+   "maxMs": 49953,
+   "failures": 0
+  },
+  "bash\u0000cd scripts/astryx-examples && sed -i \"s| <Table style={{width: 480}}>| <div style={{width: 520}}><Table>|; s| </Table>| </Table></div>|\" TableParts.jsx && cat TableParts.jsx | sed -n \"6,13p\" && cd ../": {
+   "count": 1,
+   "ms": 124250,
+   "maxMs": 124250,
+   "failures": 0
+  },
+  "bash\u0000node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; grep -v -i \"deprecation\\|launched\" \"C:/Users/Flex/AppData/Local/Temp/shots.log\" | grep \"pic": {
+   "count": 2,
+   "ms": 260874,
+   "maxMs": 132882,
+   "failures": 0
+  },
+  "bash\u0000node scripts/test-work-design.mjs 2>&1 | grep -v -i deprecation | tail -1; node hub/scripts/test-api.mjs 2>&1 | grep -m1 -o \"test-api.mjs:[0-9]*\"": {
+   "count": 1,
+   "ms": 223132,
+   "maxMs": 223132,
+   "failures": 0
+  },
+  "bash\u0000git add -A extensions/astryx-runtime/previews/components scripts/astryx-examples && git add scripts/astryx-component-shots.mjs extensions/design-catalog.ts scripts/test-work-design.mjs && git diff --c": {
+   "count": 1,
+   "ms": 410,
+   "maxMs": 410,
+   "failures": 0
+  },
+  "bash\u0000cat > \"C:/Users/Flex/AppData/Local/Temp/lk.mjs\" <<'EOF' import { createJiti } from \"jiti\"; const jiti = createJiti(import.meta.url); const { libraryLookup } = await jiti.import(\"./extensions/design-lo": {
+   "count": 1,
+   "ms": 902,
+   "maxMs": 902,
+   "failures": 0
+  },
+  "bash\u0000grep -n \"const get = \\|async function get\" hub/scripts/test-api.mjs | head -3 | cut -c1-250; sed -n \"160,200p\" hub/scripts/test-browser.mjs | cut -c1-250": {
+   "count": 1,
+   "ms": 157,
+   "maxMs": 157,
+   "failures": 0
+  },
+  "bash\u0000npm run 2>/dev/null | grep -i \"hub\\|build\" | head; ls hub/scripts | head -30": {
+   "count": 1,
+   "ms": 343,
+   "maxMs": 343,
+   "failures": 0
+  },
+  "bash\u0000node hub/scripts/test-api.mjs 2>&1 | grep -m1 -o \"test-api.mjs:[0-9]*\"; node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; echo \"browser exit $?\"; grep -v -i deprecati": {
+   "count": 1,
+   "ms": 175989,
+   "maxMs": 175989,
+   "failures": 0
+  },
+  "bash\u0000git add extensions/astryx-runtime/previews/components extensions/design-catalog.ts scripts/astryx-component-shots.mjs hub/src/api.ts hub/web/design-library.ts hub/scripts/test-api.mjs hub/scripts/test": {
+   "count": 1,
+   "ms": 266,
+   "maxMs": 266,
+   "failures": 0
+  },
+  "bash\u0000P=\"C:/Users/Flex/AppData/Local/Temp/st.patch\"; { sed -n \"1,4p\" \"$P\"; sed -n \"16,\\$p\" \"$P\"; } > \"C:/Users/Flex/AppData/Local/Temp/st2.patch\" && git apply --cached --unidiff-zero \"C:/Users/Flex/AppData/": {
+   "count": 1,
+   "ms": 312,
+   "maxMs": 312,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; S=\"new Promise(r => { document.getElementById('tab-library').click(); setTimeout(r, 1500); })\"; node hub/scripts/changelog-shot.mjs \"#library\" \"docs/changelog/design-library-components.png\" \"n": {
+   "count": 1,
+   "ms": 62068,
+   "maxMs": 62068,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; W=\"const until = (f, n = 100) => new Promise((ok, no) => { const t = setInterval(() => { const v = f(); if (v) { clearInterval(t); ok(v); } else if (!n--) { clearInterval(t); no(new Error('tim": {
+   "count": 9,
+   "ms": 571150,
+   "maxMs": 125308,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/astryx-component-shots.mjs AspectRatio Avatar 2>&1 | grep -v -i \"deprecation\\|launched\\|experimental\\|trace-warn\" | tail -3; ls \"C:/Users/Flex/AppData/Local/Temp/astryx-component-": {
+   "count": 1,
+   "ms": 42104,
+   "maxMs": 42104,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; grep \"pictured\\|^Error\\|budget\" \"C:/Users/Flex/AppData/Local/Temp/shots.log\" | cut ": {
+   "count": 1,
+   "ms": 364076,
+   "maxMs": 364076,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; echo \"browser exit $?\"; grep \"^ok\\|error\\\"\" \"C:/Users/Flex/AppData/Local/Temp/tb.log\" | head -3 | cut -c1-40": {
+   "count": 1,
+   "ms": 86428,
+   "maxMs": 86428,
+   "failures": 0
+  },
+  "bash\u0000tasklist 2>/dev/null | grep -ci \"agent-browser\\|chrome-headless\\|chrome.exe\"; cd \".\"; node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; echo \"browser exit $?\"; grep \"": {
+   "count": 1,
+   "ms": 46593,
+   "maxMs": 46593,
+   "failures": 0
+  },
+  "bash\u0000tasklist 2>/dev/null | grep -i \"agent-browser\" | wc -l; \"C:/Users/Flex/AppData/Roaming/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\" session list 2>&1 | head -20": {
+   "count": 1,
+   "ms": 354,
+   "maxMs": 354,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; echo \"browser exit $?\"; grep \"^ok\\|cmd:\\|error\\\"\\|AssertionError\" \"C:/Users/Flex/AppData/Local/Temp/tb.log\" ": {
+   "count": 1,
+   "ms": 192744,
+   "maxMs": 192744,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git grep -n -i \"chat.*width\\|narrow\" -- hub/web/app.ts | head -5 | cut -c1-200; git log --oneline -12 | cut -c1-100; node hub/scripts/test-changelog.mjs 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 243,
+   "maxMs": 243,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; T=\"C:/Users/Flex/AppData/Local/Temp\"; for f in README.md hub/web/styles.css; do git diff -U0 \"$f\" > \"$T/p.patch\"; grep -n \"^@@\" \"$T/p.patch\" | cut -c1-80; echo \"--- $f\"; done": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; T=\"C:/Users/Flex/AppData/Local/Temp\"; git diff -U0 README.md > \"$T/r.patch\"; sed -n \"8,9p\" \"$T/r.patch\" | cut -c1-80; git diff -U0 hub/web/styles.css > \"$T/s.patch\" 2>/dev/null; sed -n \"16,25p": {
+   "count": 1,
+   "ms": 159,
+   "maxMs": 159,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; T=\"C:/Users/Flex/AppData/Local/Temp\"; { sed -n \"1,4p\" \"$T/r.patch\"; sed -n \"8,9p\" \"$T/r.patch\"; } > \"$T/r2.patch\"; { sed -n \"1,4p\" \"$T/s.patch\"; sed -n \"16,\\$p\" \"$T/s.patch\"; } > \"$T/s2.patch\"": {
+   "count": 1,
+   "ms": 436,
+   "maxMs": 436,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -q -m \"Design library: picture leads in Inspect, grey stand-ins for unloadable example photos; docs and changelog shots (V-11)\" && git log -1 --format=\"%h\"; git status --short | gre": {
+   "count": 1,
+   "ms": 233,
+   "maxMs": 233,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"0.7.13\\|fd5cf0d\\|IMAGE_THEMES\" extensions/design-catalog.ts | cut -c1-220; ls extensions/astryx-runtime/previews/*.webp; node -e \"const c=require('./extensions/astryx-runtime/catalog.": {
+   "count": 1,
+   "ms": 12427,
+   "maxMs": 12427,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for t in butter chocolate gothic matcha stone y2k; do echo \"$t: $(npm view \"@astryxdesign/theme-$t@0.7.12\" version dist.integrity license dependencies peerDependencies --json 2>&1 | tr -d '\\n ": {
+   "count": 1,
+   "ms": 5422,
+   "maxMs": 5422,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \"const c=require('./extensions/astryx-runtime/catalog.json'); console.log(c.lockDigest, Object.keys(c).join(','))\"; node -e \"const l=require('./extensions/astryx-runtime/runtime-lock.j": {
+   "count": 1,
+   "ms": 203,
+   "maxMs": 203,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn \"lockDigest\" extensions/design-catalog.ts hub/src/*.ts extensions/*.ts | grep -v \"^extensions/design-runtime.ts\" | cut -c1-220 | head -20; grep -rn \"93973bb8\" --include=*.ts --include": {
+   "count": 1,
+   "ms": 30220,
+   "maxMs": 30220,
+   "failures": 1
+  },
+  "bash\u0000cd \".\"; T=\"C:/Users/Flex/AppData/Local/Temp/astryx-pin\"; rm -rf \"$T\"; mkdir -p \"$T\"; node -e \" const fs=require('fs');const m=JSON.parse(fs.readFileSync('extensions/astryx-runtime/manifest.json','utf8": {
+   "count": 1,
+   "ms": 5108,
+   "maxMs": 5108,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/astryx-pin\"; cd \"$T\"; mkdir -p pk; for t in butter chocolate gothic matcha stone y2k; do npm pack \"@astryxdesign/theme-$t@0.7.12\" --pack-destination pk --silent >/d": {
+   "count": 1,
+   "ms": 15952,
+   "maxMs": 15952,
+   "failures": 0
+  },
+  "bash\u0000T=\"C:/Users/Flex/AppData/Local/Temp/astryx-pin\"; cd \"$T\"; head -c 300 pk/butter/package/dist/butter.d.ts; echo; cat pk/butter/package/fonts.css | head -5 | cut -c1-200; grep -o \"url([^)]*)\" pk/*/packa": {
+   "count": 1,
+   "ms": 223,
+   "maxMs": 223,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; T=\"C:/Users/Flex/AppData/Local/Temp/astryx-pin\"; cp \"$T/package.json\" extensions/astryx-runtime/manifest.json; cp \"$T/package-lock.json\" extensions/astryx-runtime/runtime-lock.json; node -e \" ": {
+   "count": 1,
+   "ms": 283,
+   "maxMs": 283,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; NEW=7d7b94381550256324de3e2b6b850b308bd0b5e1f3a0e4b0e7c4d125f8cc95f3; OLD=93973bb82266e3f12b669f500aeef2d0be05e66b7b0b73d4c99fc79ebaa6dbe5; grep -c \"$OLD\" extensions/astryx-runtime/catalog.jso": {
+   "count": 1,
+   "ms": 13326,
+   "maxMs": 13326,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/7d7b94381550256324de3e2b6b850b308bd0b5e1f3a0e4b0e7c4d125f8cc95f3/win32-x64/node_modules/@astryxdesign\"; head -c 600 \"$R/theme-butter/dist/theme.": {
+   "count": 1,
+   "ms": 249,
+   "maxMs": 249,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; cat scripts/astryx-examples/EmptyState.jsx | head -30; R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/7d7b94381550256324de3e2b6b850b308bd0b5e1f3a0e4b0e7c4d125f8cc95f3/win32-x64/node_m": {
+   "count": 1,
+   "ms": 135,
+   "maxMs": 135,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/7d7b94381550256324de3e2b6b850b308bd0b5e1f3a0e4b0e7c4d125f8cc95f3/win32-x64/node_modules/@astryxdesign\"; ls \"$R/theme-neutral\"; grep -o \"\\-\\-colo": {
+   "count": 1,
+   "ms": 667,
+   "maxMs": 667,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/7d7b94381550256324de3e2b6b850b308bd0b5e1f3a0e4b0e7c4d125f8cc95f3/win32-x64/node_modules/@astryxdesign\"; node -e \"const e=require('$R/core/packag": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/7d7b94381550256324de3e2b6b850b308bd0b5e1f3a0e4b0e7c4d125f8cc95f3/win32-x64/node_modules/@astryxdesign\"; for t in neutral butter chocolate gothic": {
+   "count": 1,
+   "ms": 371,
+   "maxMs": 371,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/astryx-component-shots.mjs Button 2>&1 | tail -12 | cut -c1-300": {
+   "count": 1,
+   "ms": 65453,
+   "maxMs": 65453,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; grep \"^theme\\|pictured\\|Error\" \"C:/Users/Flex/AppData/Local/Temp/shots.log\" | cut -": {
+   "count": 1,
+   "ms": 265320,
+   "maxMs": 265320,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git rm -q extensions/astryx-runtime/previews/butter.webp extensions/astryx-runtime/previews/gothic.webp extensions/astryx-runtime/previews/matcha.webp extensions/astryx-runtime/previews/neutra": {
+   "count": 1,
+   "ms": 148,
+   "maxMs": 148,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); const pic=s=>'new URL(\\`../../extensions/astryx-runtime/previews/components/\\${JSON.parse(fs.readFileSync(new URL(\\\"../../extensions/astryx-runtime/previews/c": {
+   "count": 1,
+   "ms": 141,
+   "maxMs": 141,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-design.mjs > \"C:/Users/Flex/AppData/Local/Temp/twd.log\" 2>&1; echo \"design exit $?\"; tail -3 \"C:/Users/Flex/AppData/Local/Temp/twd.log\" | cut -c1-300; node hub/scripts/t": {
+   "count": 1,
+   "ms": 259377,
+   "maxMs": 259377,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for i in 1 2 3; do node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; c=$?; echo \"browser run $i exit $c\"; [ $c = 0 ] && break; grep \"cmd:\\|AssertionError\\|err": {
+   "count": 1,
+   "ms": 197957,
+   "maxMs": 197957,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff -U0 docs/upstream/astryx.md | grep \"^@@\" | cut -c1-80; git diff -U0 CHANGELOG.md | grep \"^@@\" | cut -c1-60; git status --short scripts hub/scripts extensions | cut -c1-90 | grep -v \"p": {
+   "count": 1,
+   "ms": 195,
+   "maxMs": 195,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff docs/upstream/astryx.md | cut -c1-140; git log -1 --format=%h -- docs/upstream/astryx.md": {
+   "count": 1,
+   "ms": 125,
+   "maxMs": 125,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git show HEAD:docs/upstream/astryx.md | grep -n \"Bundled library\\|Six theme images\" | cut -c1-80; git grep -n \"Six theme images\\|Bundled library images\" HEAD -- docs README.md | cut -c1-120": {
+   "count": 1,
+   "ms": 141,
+   "maxMs": 141,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git add extensions/astryx-runtime extensions/design-catalog.ts hub/scripts/changelog-shot.mjs hub/scripts/test-api.mjs hub/scripts/test-browser.mjs scripts/astryx-component-shots.mjs scripts/t": {
+   "count": 1,
+   "ms": 483,
+   "maxMs": 483,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -rn \"designsearch\\|thumb\" hub/src/*.ts | cut -c1-260 | head -20; grep -n \"library-result-thumb\\|library-results\\|\\.library-row\\|#library\" hub/web/styles.css | cut -c1-200": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git log -L276,276:browser-fetch/extension/background.js --format=\"%h %ad %s\" --date=short -s | head -3; grep -n \"version\" browser-fetch/extension/manifest.json; sed -n \"255,280p\" browser-fetch": {
+   "count": 1,
+   "ms": 162,
+   "maxMs": 162,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git show b4025622 --stat | cat | head -20; timeout 20 git grep -n \"EXTENSION_VERSION\\|extensionVersion\\|manifest.json\\|\\\"1\\.8\\\"\\|reload the extension\\|Reload\" -- extensions/browser-fetch*.ts b": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"imageDir *=\\|imageDir =\" browser-fetch/host.mjs | cut -c1-200; D=$(node -e \"console.log(require('os').tmpdir())\"); ls -dt \"$D\"/pi-browser-fetch*/* 2>/dev/null | head -3;": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000cd \"C:/Users/Flex/AppData/Local/Temp/pi-browser-fetch\"; for d in $(ls -t | head -4); do echo \"$d $(stat -c %y $d | cut -c1-19): $(ls $d | head -40 | tr '\\n' ' ' | cut -c1-200)\"; done": {
+   "count": 1,
+   "ms": 426,
+   "maxMs": 426,
+   "failures": 0
+  },
+  "bash\u0000R=\"C:/Users/Flex/.pi/agent/cache/design-runtimes/astryx/7d7b94381550256324de3e2b6b850b308bd0b5e1f3a0e4b0e7c4d125f8cc95f3/win32-x64/node_modules/@astryxdesign\"; grep -o \"\\-\\-color-text-[a-z-]*\\|--color": {
+   "count": 1,
+   "ms": 123,
+   "maxMs": 123,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); const f='extensions/design-catalog.ts'; let t=fs.readFileSync(f,'utf8'); const r=(a,b)=>{ if(!t.includes(a)) throw new Error('miss '+a); t=t.replace(a,b); }; ": {
+   "count": 1,
+   "ms": 139,
+   "maxMs": 139,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); const f='hub/web/design-library.ts'; let t=fs.readFileSync(f,'utf8'); const r=(a,b)=>{ if(!t.includes(a)) throw new Error('miss '+a.slice(0,60)); t=t.replace(": {
+   "count": 1,
+   "ms": 131,
+   "maxMs": 131,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; file hub/web/design-library.ts extensions/design-catalog.ts; git diff --stat hub/web/design-library.ts | cat": {
+   "count": 1,
+   "ms": 154,
+   "maxMs": 154,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'); const f='hub/web/design-library.ts'; let t=fs.readFileSync(f,'utf8').replace(/\\r\\n/g,'\\n'); const r=(a,b)=>{ if(!t.includes(a)) throw new Error('miss '+a.slic": {
+   "count": 1,
+   "ms": 128,
+   "maxMs": 128,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -o \"\\-\\-muted:\\|--line:\" hub/web/styles.css | sort -u; node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; tail -1 \"C:/Users/Flex/": {
+   "count": 1,
+   "ms": 157523,
+   "maxMs": 157523,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff --stat hub/web/app.ts | cat; sed -n \"1795,1810p\" hub/web/app.ts | cut -c1-260; grep -n \"async function showDesign\\|function showDesign\" -A12 hub/web/app.ts | cut -c1-240": {
+   "count": 1,
+   "ms": 142,
+   "maxMs": 142,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/astryx-component-shots.mjs > \"C:/Users/Flex/AppData/Local/Temp/shots.log\" 2>&1; echo \"exit $?\"; tail -1 \"C:/Users/Flex/AppData/Local/Temp/shots.log\"; node -e \"const c=require('./e": {
+   "count": 1,
+   "ms": 159028,
+   "maxMs": 159028,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-design.mjs > \"C:/Users/Flex/AppData/Local/Temp/twd.log\" 2>&1; echo \"design exit $?\"; node hub/scripts/test-api.mjs > \"C:/Users/Flex/AppData/Local/Temp/ta.log\" 2>&1; echo": {
+   "count": 1,
+   "ms": 408496,
+   "maxMs": 408496,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for i in 1 2; do node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; c=$?; echo \"browser $i exit $c\"; [ $c = 0 ] && break; grep -m2 \"test-browser.mjs:[0-9]*\\|\\\"": {
+   "count": 1,
+   "ms": 190259,
+   "maxMs": 190259,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; grep -n \"Command failed\" \"C:/Users/Flex/AppData/Local/Temp/tb.log\" | head -2 | cut -c1-200; grep -n \"at file.*test-browser\" \"C:/Users/Flex/AppData/Local/Temp/tb.log\" | head -3; git stash list ": {
+   "count": 1,
+   "ms": 143,
+   "maxMs": 143,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; tasklist 2>/dev/null | grep -ci \"agent-browser\\|chrome\" ; node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; echo \"exit $?\"; node -e \"const t=require('fs').rea": {
+   "count": 1,
+   "ms": 62603,
+   "maxMs": 62603,
+   "failures": 0
+  },
+  "bash\u0000tasklist 2>/dev/null | grep -i \"agent-browser\" | head; tasklist 2>/dev/null | grep -ci \"agent-browser\"; tasklist 2>/dev/null | awk \"{print \\$1}\" | sort | uniq -c | sort -rn | head -8": {
+   "count": 1,
+   "ms": 903,
+   "maxMs": 903,
+   "failures": 0
+  },
+  "bash\u0000agent-browser session list 2>&1 | head -12": {
+   "count": 1,
+   "ms": 221,
+   "maxMs": 221,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for i in 1 2 3; do node hub/scripts/test-browser.mjs > \"C:/Users/Flex/AppData/Local/Temp/tb.log\" 2>&1; c=$?; echo \"browser $i exit $c\"; [ $c = 0 ] && break; node -e \"const t=require('fs').read": {
+   "count": 1,
+   "ms": 300141,
+   "maxMs": 300141,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const {execSync}=require('child_process'); const fs=require('fs'); const keep=(file,pred)=>{ const d=execSync('git diff -U0 \\\"'+file+'\\\"').toString(); const [head,...hunks]=d.split(/": {
+   "count": 1,
+   "ms": 354,
+   "maxMs": 354,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git commit -q -m \"Design library: per-tab search, kept image results, theme swatches, per-session tab\" && git log --oneline -1 | cat; git status --short hub/web | cat": {
+   "count": 1,
+   "ms": 255,
+   "maxMs": 255,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git fetch origin 2>&1 | tail -2; git status -sb | head -1; git log --oneline HEAD..origin/master | cat | head -20; echo ---; git diff --name-only HEAD...origin/master | head -40; echo ---; git": {
+   "count": 1,
+   "ms": 974,
+   "maxMs": 974,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git log --oneline origin/master..HEAD -- hub/src/usage.ts hub/scripts/test-usage.mjs | cat; git log --merges --oneline -3 | cat": {
+   "count": 1,
+   "ms": 170,
+   "maxMs": 170,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git diff 72d0f74c^ 72d0f74c > \"$TEMP/a.diff\"; git diff 924c8dcb^ 924c8dcb > \"$TEMP/b.diff\"; diff -q \"$TEMP/a.diff\" \"$TEMP/b.diff\" && echo same-patch; git diff HEAD origin/master -- hub/src/usa": {
+   "count": 1,
+   "ms": 237,
+   "maxMs": 237,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git merge --no-edit origin/master 2>&1 | tail -3; git status -sb | head -1; git diff HEAD~1 HEAD --stat | cat": {
+   "count": 1,
+   "ms": 343,
+   "maxMs": 343,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -p \"require('./package.json').version\"; git ls-files package-lock.json; git diff --stat | cat; git log -1 --format=%h%x20%s -- package.json | cat; grep -n \"^## \" CHANGELOG.md | head -3": {
+   "count": 1,
+   "ms": 288,
+   "maxMs": 288,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; git ls-files -o --exclude-standard | xargs wc -c | cat; git ls-files -o --exclude-standard | xargs grep -liE \"api[_-]?key|token\\\"?\\s*[:=]\\s*\\\"[A-Za-z0-9_-]{20,}|secret|password\" | cat; git dif": {
+   "count": 1,
+   "ms": 261,
+   "maxMs": 261,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; npm run verify:quiet > \"$TEMP/verify.log\" 2>&1; echo \"exit $?\"; tail -30 \"$TEMP/verify.log\" | cut -c1-250": {
+   "count": 1,
+   "ms": 318524,
+   "maxMs": 318524,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; for i in 1 2 3; do node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"plan3 $i exit $?\"; done; grep -m2 \"AssertionError\\|test-work-plan3.mjs:[0-9]*\" \"$TEMP/p3.log\" | cut -c1-200": {
+   "count": 1,
+   "ms": 25772,
+   "maxMs": 25772,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node scripts/test-work-plan3.mjs > \"$TEMP/p3.log\" 2>&1; echo \"plan3 exit $?\"; sed -n \"650,662p\" hub/scripts/test-api.mjs | cut -c1-260; git log --oneline -2 -- hub/scripts/test-api.mjs hub/src": {
+   "count": 1,
+   "ms": 9175,
+   "maxMs": 9175,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; node -e \" const fs=require('fs'),f='hub/scripts/test-api.mjs'; let t=fs.readFileSync(f,'utf8'); const a='{ comm: 1, hubs: [], pairing: null, links: [] }'; if(!t.includes(a)) throw 1; fs.writeF": {
+   "count": 1,
+   "ms": 16306,
+   "maxMs": 16306,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; npm version 0.8.0 --no-git-tag-version > /dev/null && node -p \"require('./package.json').version + ' ' + require('./package-lock.json').version + ' ' + require('./package-lock.json').packages[": {
+   "count": 1,
+   "ms": 560,
+   "maxMs": 560,
+   "failures": 0
+  },
+  "bash\u0000cd \".\"; npm run verify:quiet > \"$TEMP/verify.log\" 2>&1; echo \"exit $?\"; grep -n \"^FAIL\\|✖ scripts\" \"$TEMP/verify.log\" | sort -u -t: -k2 | head; tail -4 \"$TEMP/verify.log\" | cut -c1-200": {
+   "count": 1,
+   "ms": 406665,
+   "maxMs": 406665,
+   "failures": 0
+  }
+ },
+ "steps": {
+  "V-01": {
+   "ms": 372578,
+   "testMs": 194588,
+   "replies": 29,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 29
+   },
+   "failures": 3
+  },
+  "V-02": {
+   "ms": 524705,
+   "testMs": 78250,
+   "replies": 33,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 33
+   },
+   "failures": 1
+  },
+  "V-03": {
+   "ms": 399720,
+   "testMs": 0,
+   "replies": 18,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 18
+   }
+  },
+  "V-04": {
+   "ms": 729233,
+   "testMs": 311092,
+   "replies": 28,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 28
+   }
+  },
+  "V-12": {
+   "ms": 590550,
+   "testMs": 437817,
+   "replies": 24,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 24
+   }
+  },
+  "V-05": {
+   "ms": 693309,
+   "testMs": 307521,
+   "replies": 61,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 61
+   }
+  },
+  "V-06": {
+   "ms": 949821,
+   "testMs": 754506,
+   "replies": 28,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 28
+   }
+  },
+  "V-07": {
+   "ms": 530004,
+   "testMs": 0,
+   "replies": 26,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 26
+   },
+   "failures": 1
+  },
+  "V-08": {
+   "ms": 332669,
+   "testMs": 0,
+   "replies": 11,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 11
+   },
+   "failures": 1
+  },
+  "V-09": {
+   "ms": 1776658,
+   "testMs": 292864,
+   "replies": 70,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 70
+   },
+   "failures": 1
+  },
+  "V-10": {
+   "ms": 1199775,
+   "testMs": 399121,
+   "replies": 50,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 50
+   },
+   "failures": 2
+  },
+  "V-11": {
+   "ms": 1490645,
+   "testMs": 698978,
+   "replies": 51,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 51
+   },
+   "failures": 1
+  },
+  "(none)": {
+   "ms": 3781683,
+   "testMs": 2196067,
+   "replies": 142,
+   "models": {
+    "anthropic/claude-opus-5-5:high": 142
+   },
+   "failures": 4
+  }
+ },
+ "spans": [
+  {
+   "start": "2026-11-12T13:28:25.831Z",
+   "ms": 3034526
+  },
+  {
+   "start": "2026-11-12T14:19:00.380Z",
+   "ms": 3975873
+  },
+  {
+   "start": "2026-11-12T15:25:16.332Z",
+   "ms": 3895565
+  },
+  {
+   "start": "2026-11-12T16:44:24.545Z",
+   "ms": 32082
+  },
+  {
+   "start": "2026-11-12T16:46:25.400Z",
+   "ms": 1360887
+  },
+  {
+   "start": "2026-11-12T17:21:55.989Z",
+   "ms": 12744
+  },
+  {
+   "start": "2026-11-12T21:47:34.985Z",
+   "ms": 1732214
+  },
+  {
+   "start": "2026-11-12T22:16:42.009Z",
+   "ms": 17099
+  }
+ ],
+ "hints": [
+  {
+   "at": "2026-11-12T14:47:11.369Z",
+   "step": "V-06",
+   "shape": "python <<EOF"
+  },
+  {
+   "at": "2026-11-12T22:14:15.465Z",
+   "shape": "for i"
+  }
+ ]
+}

@@ -1054,7 +1054,7 @@ try {
 				assert.equal(referenceBundle(cwd, bundle).authorized, true);
 				assert.match(messages.at(-1).message, /untrusted design evidence[\s\S]*colors.css/);
 				assert.match(messages.at(-1).message, /"aspect":"colors"[\s\S]*Source note/);
-				assert.deepEqual(results.find(result => result.id === "r1").value.mentions, ["api"], "reference IDs do not enter diagram mention resolution");
+				assert.deepEqual(results.slice(-2).find(result => !result.value.duplicate).value.mentions, ["api"], "reference IDs do not enter diagram mention resolution");
 				await run("pi-hub", JSON.stringify({ id: "r3", endpoint: "/api/message", data: { ...message, bundle, text: "Different brief" } }));
 				assert.equal(results.at(-1).status, 403);
 				process.env.PI_HUB_SESSION = randomUUID();
