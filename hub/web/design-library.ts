@@ -8,18 +8,26 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text?: string) => { const item = document.createElement(tag); if (text !== undefined) item.textContent = text; return item; };
  const heading = make("h2", "Design library"), purpose = make("p", "Browse references before asking for a design. Choosing inspiration does not install or select a project foundation."), head = make("div"), leaveButton = make("button", "Back to workspace"), refresh = make("button", "Refresh sources");
  leaveButton.type = refresh.type = "button"; leaveButton.addEventListener("click", leave); head.className = "library-heading"; head.append(leaveButton, heading, refresh);
- const tools = make("div"), search = make("input"), source = make("select"), kind = make("select"), status = make("p"), list = make("div"), detail = make("section");
- search.type = "search"; search.maxLength = 200; search.placeholder = "Search designs and components"; search.setAttribute("aria-label", "Search design library");
- source.setAttribute("aria-label", "Reference source"); kind.setAttribute("aria-label", "Reference type"); status.setAttribute("role", "status");
- for (const [select, rows] of [[source, [["", "All sources"], ["od", "OpenDesign"], ["astryx", "Astryx"], ["draft", "Studio drafts"], ["export", "Selected exports"], ["web", "Web results"]]], [kind, [["", "All types"], ["system", "Design systems"], ["theme", "Themes"], ["component", "Components"], ["design", "Saved designs"], ["screenshot", "Web screenshots"]]]] as [HTMLSelectElement, string[][]][]) {
-  for (const [value, label] of rows) { const option = make("option", label); option.value = value; select.append(option); }
- }
- tools.className = "library-tools"; list.className = "library-list"; detail.className = "library-detail"; detail.hidden = true;
- tools.append(search, source, kind);
+ const tools = make("div"), tabs = make("div"), search = make("input"), status = make("p"), list = make("div"), detail = make("section");
+ search.type = "search"; search.maxLength = 200; search.setAttribute("aria-label", "Search design library"); status.setAttribute("role", "status");
+ // R1: one tab per kind of reference; the search box filters within the tab.
+ const kinds = [["designs", "Designs"], ["themes", "Themes"], ["components", "Components"], ["image", "Image search"]] as const;
+ type Tab = typeof kinds[number][0];
+ const tabOf = (item: CatalogEntry): Tab => item.kind === "theme" ? "themes" : item.kind === "component" ? "components" : item.source === "web" ? "image" : "designs";
+ let tab: Tab = "designs";
+ tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", "Reference type"); tabs.className = "library-tabs"; list.id = "library-results";
+ const tabButtons = kinds.map(([value, label]) => { const button = make("button", label); button.type = "button"; button.setAttribute("role", "tab"); button.dataset.tab = value; button.setAttribute("aria-controls", list.id); button.addEventListener("click", () => { tab = value; filter(); }); return button; });
+ tabs.addEventListener("keydown", event => {
+  const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key]; if (!step) return;
+  const next = tabButtons[(kinds.findIndex(([value]) => value === tab) + step + kinds.length) % kinds.length]; event.preventDefault(); next.click(); next.focus();
+ });
+ tabs.append(...tabButtons);
+ tools.className = "library-row"; list.className = "library-list"; list.setAttribute("role", "tabpanel"); detail.className = "library-detail"; detail.hidden = true;
+ tools.append(search);
  // D12: a page is captured by this session's browser_fetch, after your per-site approval; nothing loads in this page.
  const page = make("form"), address = make("input"), pageAspect = make("select"), pageAdd = make("button", "Add page reference"), pageStatus = make("p");
  address.type = "url"; address.required = true; address.maxLength = 236; address.placeholder = "https://… a page to borrow from"; address.setAttribute("aria-label", "Page address");
- pageAspect.setAttribute("aria-label", "Page reference aspect"); pageStatus.setAttribute("role", "status"); page.className = "library-tools";
+ pageAspect.setAttribute("aria-label", "Page reference aspect"); pageStatus.setAttribute("role", "status"); page.className = "library-row"; pageAdd.type = "submit";
  for (const [value, label] of [["whole", "Whole style"], ["colors", "Colors"], ["typography", "Typography"], ["layout", "Layout"], ["background", "Background"], ["component", "Component"]]) { const option = make("option", label); option.value = value; pageAspect.append(option); }
  async function capture(url: string, aspect: string, button: HTMLButtonElement, feedback: HTMLElement) {
   button.disabled = true; feedback.textContent = "Approve the site when asked; your browser takes a screenshot…";
@@ -29,20 +37,19 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
  }
  page.addEventListener("submit", async event => { event.preventDefault(); if (await capture(address.value, pageAspect.value, pageAdd, pageStatus)) address.value = ""; });
  page.append(address, pageAspect, pageAdd, pageStatus);
- root.append(head, purpose, tools, page, status, list, detail);
+ root.append(head, purpose, tabs, tools, page, status, list, detail);
  let entries: CatalogEntry[] = [], offline = "", loaded: Promise<void> | undefined, selected = "", gridScroll = 0, viewport = "", inspection = 0, viewed: string | undefined, abandoned: string | undefined;
  const key = "design-library:" + location.pathname;
  try {
   const saved = JSON.parse(sessionStorage.getItem(key) ?? "null");
   if (typeof saved?.query === "string") search.value = saved.query.slice(0, 200);
-  if (typeof saved?.source === "string") source.value = saved.source;
-  if (typeof saved?.kind === "string") kind.value = saved.kind;
+  if (kinds.some(([value]) => value === saved?.tab)) tab = saved.tab;
   if (typeof saved?.selected === "string") selected = saved.selected;
   if (typeof saved?.previewKey === "string" && /^[a-f0-9]{32}$/.test(saved.previewKey)) abandoned = saved.previewKey;
   if (["", "390", "768", "1280"].includes(saved?.viewport)) viewport = saved.viewport;
   if (Number.isFinite(saved?.scroll) && saved.scroll >= 0) gridScroll = saved.scroll;
  } catch { /* private mode: browsing still works without persistence */ }
- const remember = () => { try { sessionStorage.setItem(key, JSON.stringify({ query: search.value, source: source.value, kind: kind.value, selected, scroll: gridScroll, viewport, previewKey: viewed })); } catch { /* private mode */ } };
+ const remember = () => { try { sessionStorage.setItem(key, JSON.stringify({ query: search.value, tab, selected, scroll: gridScroll, viewport, previewKey: viewed })); } catch { /* private mode */ } };
  const release = (id: string) => { void post("unview", { key: id }).catch(() => {}); };
  if (abandoned) release(abandoned);
  const cancelSample = () => { inspection++; if (viewed) { release(viewed); viewed = undefined; } };
@@ -96,7 +103,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   const back = make("button", "Back to library"), title = make("h3", item.name), provenance = make("p", item.provenance);
   back.type = "button";
   back.addEventListener("click", () => {
-   cancelSample(); detail.replaceChildren(); detail.hidden = true; tools.hidden = page.hidden = list.hidden = status.hidden = false; selected = ""; remember();
+   cancelSample(); detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; selected = ""; remember();
    list.querySelector<HTMLButtonElement>(`[data-entry="${CSS.escape(item.id)}"] button`)?.focus({ preventScroll: true }); root.scrollTop = gridScroll;
   });
   detail.replaceChildren(back, title, provenance, make("p", `${item.license}; catalog revision ${item.revision}`));
@@ -127,10 +134,12 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   else if (item.preview === "sample" && item.availability === "cached") sample(item);
   else detail.append(make("p", item.preview === "sample" ? "This source sample is not cached for viewing on this host yet. No download was started." : "No supplied visual sample. This entry is metadata only; nothing was generated."));
   if (item.url) { const link = make("a", "View original source"); link.href = item.url; link.target = "_blank"; link.rel = "noopener noreferrer"; detail.append(link); }
-  tools.hidden = page.hidden = list.hidden = status.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); remember();
+  tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = true; detail.hidden = false; root.scrollTop = 0; back.focus(); remember();
  }
  const draw = () => {
-  const query = search.value.toLowerCase().trim(), matches = entries.filter(item => (!source.value || item.source === source.value) && (!kind.value || item.kind === kind.value) && (!query || [item.name, item.category, item.description, item.status].some(text => text?.toLowerCase().includes(query))));
+  for (const button of tabButtons) { const on = button.dataset.tab === tab; button.setAttribute("aria-selected", String(on)); button.tabIndex = on ? 0 : -1; }
+  search.placeholder = `Search ${kinds.find(([value]) => value === tab)![1].toLowerCase().replace("image search", "saved picks")}`;
+  const query = search.value.toLowerCase().trim(), matches = entries.filter(item => tabOf(item) === tab && (!query || [item.name, item.category, item.description, item.status].some(text => text?.toLowerCase().includes(query))));
   status.textContent = `${matches.length} ${matches.length === 1 ? "reference" : "references"}.${offline ? " " + offline : ""}`;
   const card = (item: CatalogEntry) => {
    const row = make("article"), title = make("h3", item.name), provenance = make("p", item.provenance), details = make("small", `${item.source} / ${item.kind} · ${item.revision.slice(0, 12)} · ${item.license}`), open = make("button", "Inspect " + item.name);
@@ -160,9 +169,9 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   root.scrollTop = gridScroll;
  };
  const filter = () => { gridScroll = 0; draw(); remember(); };
- search.addEventListener("input", filter); source.addEventListener("change", filter); kind.addEventListener("change", filter);
+ search.addEventListener("input", filter);
  root.addEventListener("scroll", () => { if (detail.hidden) { gridScroll = root.scrollTop; remember(); } }, { passive: true });
- refresh.addEventListener("click", () => { cancelSample(); selected = ""; detail.replaceChildren(); detail.hidden = true; tools.hidden = page.hidden = list.hidden = status.hidden = false; loaded = undefined; void open(); remember(); });
+ refresh.addEventListener("click", () => { cancelSample(); selected = ""; detail.replaceChildren(); detail.hidden = true; tabs.hidden = tools.hidden = page.hidden = list.hidden = status.hidden = false; loaded = undefined; void open(); remember(); });
  function open() {
   return loaded ??= (async () => {
    status.textContent = "Loading reference metadata…";

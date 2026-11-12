@@ -63,6 +63,20 @@ h2 { font-size: 15px; font-weight: 600; }
 .library-tools { display: flex; flex-wrap: wrap; gap: 8px; }
 .library-tools :is(input, select) { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; min-height: 44px; min-width: 0; }
 .library-tools input { flex: 1 1 200px; }
+/* R9: the search and page-address rows share columns, so their inputs and buttons line up. */
+.library-row { display: grid; grid-template-columns: minmax(0, 1fr) 10rem 12rem; gap: 8px; margin-top: 8px; }
+.library-row :is(input, select, button) { min-height: 44px; min-width: 0; box-sizing: border-box; }
+.library-row :is(input, select) { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.library-row > input[type=search] { grid-column: 1 / -1; }
+.library-row > p { grid-column: 1 / -1; margin: 0; }
+.library-row > p:empty { display: none; }
+.design-library { container-type: inline-size; }
+@container (max-width: 520px) { .library-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .library-row > input { grid-column: 1 / -1; } }
+.library-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); }
+.library-tabs [role=tab] { min-height: 44px; border-color: transparent; border-radius: 6px 6px 0 0; }
+.library-tabs [role=tab][aria-selected=true] { border-color: var(--line); border-bottom-color: var(--ink); font-weight: 600; }
+.library-tabs + .library-row { margin-top: 12px; }
+#library-results { margin-top: 8px; }
 .library-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .library-list article { border: 1px solid var(--line); border-radius: 6px; padding: 12px; overflow-wrap: anywhere; }
 .library-list h3 { margin: 0 0 8px; font-size: 15px; }

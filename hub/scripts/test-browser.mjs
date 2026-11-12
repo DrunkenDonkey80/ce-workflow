@@ -152,8 +152,19 @@ try {
  await browser("fill", "#message-input", "Keep this unfinished brief");
  await browser("click", "#tab-library"); await browser("wait", "#library article");
  assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('library').hidden, document.getElementById('canvas').hidden, document.getElementById('command-picker').open]"), ["Keep this unfinished brief", false, true, false]);
- assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 184);
- await browser("fill", "#library input[type=search]", "neutral");
+ assert.equal(await evaluate("document.querySelector('#library [role=tab][aria-selected=true]').dataset.tab"), "designs", "the library opens on Designs");
+ { // V-01: each tab lists only its type, together all 184 entries; the search and page rows share both edges.
+  const kinds = { designs: /^(od|draft|export):/, themes: /^astryx:theme:/, components: /^astryx:component:/, image: /^found:/ };
+  let total = 0;
+  for (const [tab, pattern] of Object.entries(kinds)) {
+   await browser("click", `#library [data-tab=${tab}]`);
+   const ids = await evaluate("[...document.querySelectorAll('#library [data-entry]')].map(node => node.dataset.entry)");
+   assert(ids.every(entry => pattern.test(entry)), `the ${tab} tab shows only its type: ${ids.filter(entry => !pattern.test(entry))}`); total += ids.length;
+  }
+  assert.equal(total, 184);
+  assert.deepEqual(await evaluate("(() => { const a = document.querySelector('#library input[type=search]').getBoundingClientRect(), b = document.querySelector('#library input[type=url]').getBoundingClientRect(), c = document.querySelector('#library form button').getBoundingClientRect(), d = document.querySelector('#library form select').getBoundingClientRect(); return [a.left === b.left, a.right === c.right, a.height === b.height && b.height === c.height && c.height === d.height]; })()"), [true, true, true], "the input rows line up");
+ }
+ await browser("click", "#library [data-tab=themes]"); await browser("fill", "#library input[type=search]", "neutral");
  assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 1);
  await browser("click", "#library [data-entry='astryx:theme:neutral'] button");
  await browser("wait", "--fn", "document.querySelector('.library-detail img')?.naturalWidth > 0");
@@ -207,10 +218,11 @@ try {
  await browser("fill", "#library input[type=url]", "https://denied.test/page"); await browser("click", "#library form button");
  await browser("wait", "--fn", "document.querySelector('#library form [role=status]').textContent.includes('not approved')");
  assert.deepEqual(await evaluate("[document.querySelector('#library input[type=url]').value, document.querySelectorAll('#reference-draft article').length]"), ["https://denied.test/page", 0], "a refused page keeps the typed address and adds nothing");
+ await evaluate("document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-inspect]\").scrollIntoView({ block: 'nearest' })");
  await browser("click", "#library [data-entry='astryx:theme:neutral'] [data-inspect]");
  await browser("click", ".library-detail button");
  assert.deepEqual(await evaluate("[document.querySelectorAll('#library [data-entry]').length, document.querySelector('.library-detail').hidden, document.activeElement.textContent]"), [1, true, "Inspect Neutral"], "Back preserves filtered results and keyboard focus");
- await browser("fill", "#library input[type=search]", "");
+ await browser("fill", "#library input[type=search]", ""); await browser("click", "#library [data-tab=designs]");
  assert.equal(await evaluate("document.querySelectorAll('.library-group [data-entry]').length"), 2, "identical authored exports retain both source cards");
  const probeLibrary = (selector, data = {}) => evaluate(`new Promise((resolve,reject)=>{const frame=document.querySelector(${JSON.stringify(selector)}),request=crypto.randomUUID(),timer=setTimeout(()=>{removeEventListener('message',reply);reject(Error('Library sample did not reply'));},3000);const reply=event=>{if(event.source!==frame.contentWindow||event.data?.type!=='fixture:library-result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',reply);resolve({...event.data,origin:event.origin});};addEventListener('message',reply);frame.contentWindow.postMessage({type:'fixture:library',request,...${JSON.stringify(data)}},'*');})`);
  await browser("click", "#library [data-entry='od:fixture-style'] button");
@@ -240,7 +252,7 @@ try {
  assert.deepEqual({ messages: messages.length, commands: commands.length, sessions: hub.registry.list().length }, beforeLibrary, "browsing neither starts sessions nor forwards a provider prompt");
  assert.equal(await evaluate("location.pathname"), "/s/" + id + "/", "the invoking conversation stays current");
  { // Explicit reference Send: an uncertain failure retries the same frozen submission only.
-  await browser("fill", "#library input[type=search]", "neutral");
+  await browser("click", "#library [data-tab=themes]"); await browser("fill", "#library input[type=search]", "neutral");
   await evaluate("document.querySelector(\"#library [data-entry='astryx:theme:neutral'] h3\").dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true, cancelable: true }))");
   await browser("wait", "--fn", "document.querySelector('#reference-draft [data-reference]') && !document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-add]\").disabled");
   const sentBefore = messages.length; rejectMessage = true;
@@ -260,9 +272,10 @@ try {
   fs.mkdirSync(join(downloads, "set"), { recursive: true }); fs.copyFileSync(new URL("../../extensions/astryx-runtime/previews/neutral.webp", import.meta.url), join(downloads, "set", "01.webp"));
   assert.equal((await publishFound(folder, id, [{ title: "Kiosk POS", page: "https://pos.example/kiosk", image: join(downloads, "set", "01.webp"), why: "Large tiles for fast orders" }], downloads)).added, 1);
   await evaluate("[...document.querySelectorAll('#library .library-heading button')].find(button => button.textContent === 'Refresh sources').click()");
-  await browser("fill", "#library input[type=search]", ""); await browser("select", "select[aria-label='Reference source']", "web");
+  await browser("fill", "#library input[type=search]", ""); await browser("click", "#library [data-tab=image]");
   await browser("wait", "--fn", "document.querySelectorAll('#library [data-entry]').length === 1 && document.querySelector(\"#library [data-entry^='found:'] img\")?.naturalWidth > 0");
   assert.match(await evaluate("document.querySelector(\"#library [data-entry^='found:']\").textContent"), /Kiosk POS[\s\S]*inspiration only[\s\S]*pos\.example[\s\S]*Large tiles/);
+  await evaluate("document.querySelector(\"#library [data-entry^='found:'] [data-capture]\").scrollIntoView({ block: 'nearest' })");
   await browser("click", "#library [data-entry^='found:'] [data-capture]");
   await browser("wait", "--fn", "document.querySelector(\"#library [data-entry^='found:'] [role=status]\").textContent.includes('not approved')");
   assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 0, "a refused page capture adds nothing");
@@ -274,7 +287,7 @@ try {
   const frozen = fs.readdirSync(join(folder, ".pi/designs/references"), { recursive: true }).map(String).filter(file => /bundles/.test(file) && file.endsWith("source.png"));
   assert(frozen.length > 0, "the bundle carries the saved image, not a live URL");
   await browser("wait", "--fn", "document.getElementById('connection').dataset.state === 'idle'");
-  await browser("select", "select[aria-label='Reference source']", "");
+  await browser("click", "#library [data-tab=designs]");
  }
  // Later reload checks exercise remembered tabs, not the explicit library deep link.
  await evaluate("(() => { const url = new URL(location.href); url.searchParams.delete('view'); history.replaceState(null, '', url); })()");
