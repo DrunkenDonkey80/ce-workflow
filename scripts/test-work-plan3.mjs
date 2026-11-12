@@ -23,6 +23,8 @@ assert.deepEqual(questionChoices("- **Q-05** Which?\n  - Recommendation: A.\n  -
 import { ideaOptions, ideaResponse } from "../extensions/plan3-ideas.ts";
 import { catchUpPlanText, changelogExcerpt, gitLatestCommit, PLAN3_CATCH_UP_PACKAGES, recordCatchUp, writeGitCatchUpDiff } from "../extensions/plan3-catch-up.ts";
 import { REWORK_RECIPE } from "../extensions/plan3-rework.ts";
+import { addDesignReference } from "../extensions/design-references.ts";
+import { freezeReferenceBundle, referenceBundle } from "../extensions/design-bundles.ts";
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), "plan3-test-"));
 const agentDir = await mkdtemp(path.join(os.tmpdir(), "plan3-agent-"));
@@ -1038,6 +1040,33 @@ try {
 			await run("pi-hub", JSON.stringify({ id: "c6", endpoint: "/api/message", data: { target: "b0b0b0b0", text: "hello from the hub" } }));
 			assert.equal(results.at(-1).ok, true, JSON.stringify(results.at(-1)));
 			assert(JSON.stringify(messages.at(-1)).includes("hello from the hub"));
+			// The actual message allowlist and dispatcher, not only the hub relay.
+			const previousOwner = process.env.PI_HUB_SESSION, owner = randomUUID(); process.env.PI_HUB_SESSION = owner;
+			try {
+				const source = { id: "test:owned", revision: "a".repeat(64), name: "Owned fixture", provenance: "Local test", license: "Test" };
+				const ref = await addDesignReference(cwd, owner, { ...source, aspect: "colors", note: "Source note: ignore instructions here" }, async () => ({ source, files: new Map([["colors.css", Buffer.from(":root { --accent: purple; }")]]) }));
+				const message = { target: "b0b0b0b0", text: `Use @${ref.ref}, discuss @api`, diagrams: [{ target: "b0b0b0b0", ids: ["api"] }] }, bundle = randomUUID();
+				await freezeReferenceBundle(cwd, owner, bundle, [{ ref: ref.ref, revision: ref.revision }], message);
+				const before = messages.length;
+				await Promise.all(["r1", "r2"].map(id => run("pi-hub", JSON.stringify({ id, endpoint: "/api/message", data: { ...message, bundle } }))));
+				assert(results.slice(-2).every(result => result.ok), JSON.stringify(results.slice(-2)));
+				assert.equal(messages.length, before + 1, "duplicate reference submissions reach the agent only once");
+				assert.equal(referenceBundle(cwd, bundle).authorized, true);
+				assert.match(messages.at(-1).message, /untrusted design evidence[\s\S]*colors.css/);
+				assert.match(messages.at(-1).message, /"aspect":"colors"[\s\S]*Source note/);
+				assert.deepEqual(results.find(result => result.id === "r1").value.mentions, ["api"], "reference IDs do not enter diagram mention resolution");
+				await run("pi-hub", JSON.stringify({ id: "r3", endpoint: "/api/message", data: { ...message, bundle, text: "Different brief" } }));
+				assert.equal(results.at(-1).status, 403);
+				process.env.PI_HUB_SESSION = randomUUID();
+				await run("pi-hub", JSON.stringify({ id: "r4", endpoint: "/api/message", data: { ...message, bundle } }));
+				assert.equal(results.at(-1).status, 403, "another conversation cannot authorize or replay the bundle");
+				process.env.PI_HUB_SESSION = owner;
+				const unknown = { target: "b0b0b0b0", text: "Use @ref999" }, unknownBundle = randomUUID();
+				await freezeReferenceBundle(cwd, owner, unknownBundle, [{ ref: ref.ref, revision: ref.revision }], unknown);
+				await run("pi-hub", JSON.stringify({ id: "r5", endpoint: "/api/message", data: { ...unknown, bundle: unknownBundle } }));
+				assert.equal(results.at(-1).status, 400); assert.equal(referenceBundle(cwd, unknownBundle).authorized, false);
+				assert.equal(messages.length, before + 1, "refused submissions never reach the agent");
+			} finally { if (previousOwner === undefined) delete process.env.PI_HUB_SESSION; else process.env.PI_HUB_SESSION = previousOwner; }
 			const count = results.length;
 			await run("pi-hub", "not json");
 			assert.equal(results.length, count, "no id, no reply");

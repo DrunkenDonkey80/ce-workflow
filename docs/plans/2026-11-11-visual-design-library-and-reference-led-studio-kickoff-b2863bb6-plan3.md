@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-11
-updated: 2026-11-12T07:35:24.354Z
+updated: 2026-11-12T07:52:24.503Z
 reviewed: 2026-11-11
 started: 2026-11-11T20:56:51.270Z
 ---
@@ -152,13 +152,16 @@ Limits: host fetch concurrency 4; kit.html ≤ 64 KB, components/preview pages �
   - note: Continuing directly: stable project-local reference snapshots and composer persistence first; URLs remain unwired until their capture boundary is constrained.
   - note: Local reference selection and recovery verified; C3 URL renderer containment remains open. Continue independent P3-05 wiring; do not treat this checkpoint as a stopping point.
   - check: node "hub/scripts/test-api.mjs" — api ok; node "hub/scripts/test-browser.mjs" — real headless hub/fake-Pi suite passed, including stable/aspect-specific IDs, duplicate selection, reload, note/remove, safe gesture logic and separate pending/new edits; git diff --check — passed. Crop test was red (full WebP instead of PNG) before the host-side fix. Physical native touch/Safari not verified. LSP probe reports no TypeScript errors on touched code but silent push-only rechecks are inconclusive; existing app safety-comment errors remain outside this diff.
-- [ ] **P3-05** Deliver the mixed-reference brief to the existing multi-variant workflow without changing its runtime defaults.
+- [wip] **P3-05** Deliver the mixed-reference brief to the existing multi-variant workflow without changing its runtime defaults.
   - Agent receives source assets, selected aspect and notes, not only thumbnail labels. Two requested variants share the same reference bundle and each have their own existing design session.
   - A browse action never starts a paid generation. Preserve ordinary follow-up chat and existing variant refinement/select behavior. Keep the current 1–6 direction bound and designModel setting; do not add a separate variant executor or choose Astryx from a visual selection alone.
   - The hub freezes and authorizes the submitted bundle before forwarding the user's message; extend the actual message handler in extensions/plan3.ts (its field allowlist currently rejects bundle metadata), not only the relay in hub/src/api.ts. Preserve existing diagram mentions and plain messages; resolve @ref IDs only within the supplied bundle. The parent agent then calls the existing design start with the optional bundle ID.
   - Extend Session/load, start tool schema, buildPrompt and reopenPrompt with the dedicated untrusted-reference contract. Snapshot chosen saved-design assets consistently so later writes do not alter them. Clone retains bundle provenance without joining the original start's launch group; export copies permitted evidence or reports provenance-only assets with licenses, rather than broken project-local paths.
   - The browser reuses one submission/bundle ID for a failed or ambiguous delivery retry. Explicitly requesting another batch creates a fresh submission even when assets are reused. In start, atomically reserve the original direction handles in the existing sessions store keyed by bundle ID; concurrent calls return those same handles. Compare a request fingerprint and refuse changed arguments against an existing reservation; do not silently create extras. Revalidate authorization inside the lock.
   - Reuse open for explicit retry when no hub session was created. For a created session whose first prompt failed, track that stage separately: the current openSession returns early on hubSessionId and is not sufficient. Keep successful links, avoid duplicate prompts, and surface ambiguous delivery for reconciliation instead of blindly resending. Verify C3/C4/C5/C6, including partial failure at both stages.
+  - note: Beginning independent local bundle/launch work while P3-04 URL containment stays open. Keep the existing variant executor and runtime defaults, and preserve the successful ordinary-message draft path.
+  - note: Backend bundle transport is wired through hub/src/api.ts and the real plan3.ts allowlist. Immutable assets, conversation-bound authorization, reference/diagram namespace separation, duplicate-send suppression and persisted uncertain-delivery refusal are covered. Frozen bundles/library writes are blocked for design sessions. Frontend Send stays gated until start reservation, prompt provenance, clone/export and failure-stage handling are complete.
+  - check: node "scripts/test-work-plan3.mjs" passed; node "hub/scripts/test-api.mjs" passed; node "scripts/test-work-plan3-web.mjs" passed; git diff --check passed. Active LSP batch: 1 confirmed clean, 8 inconclusive (not a clean batch).
 
 ### Phase 3: Validate the complete kickoff flow [code]
 
@@ -212,7 +215,7 @@ Real touch and paired-remote verification are P3-08's separate environmental gat
 
 ## Resume context
 
-P3-04 remains WIP. node "C:/SOFT/git/ce-workflow/hub/scripts/test-browser.mjs" passes (real headless hub/fake Pi) after new chip/draft/recovery checks. app.ts now wires Add, thumbnails, stable-ID-only selection persistence, authoritative metadata reload, note editing/removal, legacy plain-text drafts, separate pending sends and newer edits, explicit recovery after uncertainty. Reference-led Send is explicitly gated until P3-05 freezes/authorizes bundles, so it cannot silently discard selected refs. Next finish actual cropped region thumbnails and C4/C5 gesture checks, then P3-05. Studio URL capture stays unwired: C3 strict renderer containment still fails; preserve that fixture, no external sites/paid work/downloads/installs. LSP: no reported new TypeScript errors; existing unrelated safety-comment findings remain. Preserve unrelated worktree edits. Do not stop at this checkpoint; continue runnable work.
+P3-05 backend transport now freezes immutable bundles at the hub, authorizes them in the real plan3.ts message handler, keeps @ref IDs out of diagram resolution, deduplicates dispatch and persists uncertainty rather than blindly resending. Targeted API, plan3 command and diagram-web suites pass; diff check passes. Frontend reference Send is still gated. Next: add bundle-aware Session/load/start reservation and request fingerprint in the existing sessions store, source context in build/reopen, safe hub creation/first-prompt stages, clone/export provenance, then browser recovery/Send tests. P3-04 URL containment remains open. No paid generation, downloads, outside-site traffic or push. Preserve unrelated dirty files. LSP batch was 1 confirmed clean and 8 inconclusive, not proof of a clean batch.
 
 ## Amendments
 

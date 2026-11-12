@@ -293,12 +293,12 @@ export async function applyDiagram(cwd: string, target: DiagramTarget, operation
 
 // A2: several diagrams may contribute context; each part lists the ids that belong to it (toolbar lines remember
 // their diagram), so the same id in two diagrams is never confused. The first part is the displayed one and owns comments.
-export function diagramChatMessage(diagrams: Diagram | { diagram: Diagram; ids?: string[] }[], message: unknown, commentIds: unknown = []) {
+export function diagramChatMessage(diagrams: Diagram | { diagram: Diagram; ids?: string[] }[], message: unknown, commentIds: unknown = [], referenceIds: string[] = []) {
 	const parts = Array.isArray(diagrams) ? diagrams : [{ diagram: diagrams }];
 	if (!parts.length || parts.length > 4) throw new Error("Invalid diagram parts.");
 	text(message, "chat message", 20_000);
 	if (!Array.isArray(commentIds) || commentIds.length > 50 || commentIds.some(id => typeof id !== "string" || !ID.test(id))) throw new Error("Invalid comment ids.");
-	const mentions = [...new Set([...message.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))];
+	const mentions = [...new Set([...message.matchAll(/(?<![\w@])@([a-z][a-z0-9_]{0,47})(?![A-Za-z0-9_])/g)].map(match => match[1]))].filter(id => !referenceIds.includes(id));
 	const resolved = new Set<string>(), claimed = new Set(parts.slice(1).flatMap(part => part.ids ?? []));
 	const blocks = parts.map(({ diagram, ids }, index) => {
 		validateDiagram(diagram);

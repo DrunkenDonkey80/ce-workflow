@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import path from "node:path";
 import { emptyDiagram, loadDiagram } from "../../extensions/plan3-diagram.ts";
 import { webTarget } from "../../extensions/plan3-web.ts";
+import { freezeReferenceBundle } from "../../extensions/design-bundles.ts";
 import { FileRefused, gitReadEnv, listFiles, readProjectDiff, readProjectFile } from "./files.ts";
 import { readLinkedImage, readPastedImage, savePastedImage } from "./images.ts";
 import { linkedFile, linkedFiles, openLinkedFile, sendLinkedFile } from "./linked-files.ts";
@@ -407,6 +408,15 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			case "typing": { const live = host.live.get(id); if (live) live.lastActivity = Date.now(); return { ok: true }; } // typing in the chat keeps it from auto-parking
 			case "seen": seen(id); return { ok: true }; // the page showing this session is visible and focused
 			case "message":
+				if (data.references !== undefined) {
+					only(data, ["target", "text", "comments", "diagrams", "references"], "Invalid reference message fields.");
+					const selected = data.references as { submission?: unknown; refs?: unknown };
+					if (!selected || typeof selected !== "object" || Array.isArray(selected) || Object.keys(selected).some(key => !["submission", "refs"].includes(key))) throw fail(400, "Invalid reference submission.");
+					const { references: _references, ...message } = data;
+					const bundle = await freezeReferenceBundle(folder(id), id, selected.submission, selected.refs, message);
+					return call(id, "/api/message", { ...message, bundle: bundle.id });
+				}
+				if (data.bundle !== undefined) throw fail(400, "Submit reference selections, not a bundle path.");
 				// RPC has no reload; D12: Reload is park + resume (idle only).
 				if (typeof data.text === "string" && /^\/(wo )?reload$/.test(data.text.trim())) { await host.restart(id); return { ok: true }; }
 				// /new is a Pi built-in (no extension can run it): a fresh session, and the pages reconnect to its empty chat.

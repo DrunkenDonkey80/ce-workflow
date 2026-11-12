@@ -28,9 +28,11 @@ function coalescer(flush: (key: string) => void, ms = 250) {
 }
 
 const terminalCommands = new Set(["settings", "model", "thinking", "scoped-models", "login", "logout", "llama", "new", "resume", "name", "session", "tree", "fork", "clone", "compact", "import", "copy", "export", "share", "bug", "trust", "hotkeys", "changelog", "quit"]);
-export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagram; ids?: string[] }[], message: unknown, comments: unknown, publish: (event: string, value: unknown) => void) {
-	const contextual = diagramChatMessage(diagram, message, comments);
+export function forwardDiagramChat(pi, ctx, diagram: Diagram | { diagram: Diagram; ids?: string[] }[], message: unknown, comments: unknown, publish: (event: string, value: unknown) => void, references?: { ids: string[]; context: string }) {
+	const contextual = diagramChatMessage(diagram, message, comments, references?.ids);
 	const prepared = contextual.mentions.length || (Array.isArray(comments) && comments.length) ? contextual : { message: (message as string).trim(), mentions: [], unknownMentions: [] };
+	if (references) prepared.message += "\n\n" + references.context;
+	if (Buffer.byteLength(prepared.message) > 128_000) throw new WebError(400, "Chat context too large; use fewer references/mentions/comments.");
 	const command = prepared.message.startsWith("/");
 	const name = command ? prepared.message.slice(1).split(/\s/, 1)[0] : "";
 	if (terminalCommands.has(name)) throw new WebError(400, `/${name}: terminal only.`);

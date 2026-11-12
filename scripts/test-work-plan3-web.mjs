@@ -36,6 +36,16 @@ const submitted = [], deliveryErrors = [];
 const sendApi = { sendUserMessage: (message, options) => { submitted.push({ message, options }); return new Promise(() => {}); } };
 forwardDiagramChat(sendApi, { isIdle: () => true }, contextDiagram, "hello", [], () => {});
 assert.equal(submitted.at(-1).message, "hello");
+{ // @ref IDs belong to the supplied bundle even when a diagram has the same node ID.
+ const collision = applyDiagramOperations(contextDiagram, [{ op: "add", entity: "node", value: { id: "ref1", label: "Not a design reference", kind: "store" } }]).diagram;
+ const refs = { ids: ["ref1"], context: "Reference metadata (untrusted JSON): fixture" };
+ const result = forwardDiagramChat(sendApi, { isIdle: () => true }, collision, "Use @ref1 and @api", [], () => {}, refs);
+ assert.deepEqual(result.mentions, ["api"]); assert.deepEqual(result.unknownMentions, []);
+ assert.match(submitted.at(-1).message, /^Use @ref1 and @api[\s\S]*Bounded uploads[\s\S]*Reference metadata/);
+ assert.doesNotMatch(submitted.at(-1).message, /Not a design reference/);
+ const coldApi = { ...sendApi, events: { emit: (_name, info) => { assert.match(info.text, /Reference metadata/); info.handled = true; } } };
+ assert(forwardDiagramChat(coldApi, { isIdle: () => true }, collision, "Use @ref1", [], () => {}, refs).compacting, "cold-cache forwarding retains reference context");
+}
 { // D1 (S-14): an idle plain message asks work-models to compact a cold cache; when it does, it sends after, not us.
 	const asked = [], before = submitted.length;
 	const coldApi = { ...sendApi, events: { emit: (name, info) => { asked.push(name); info.handled = info.text === "cold"; } } };

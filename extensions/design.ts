@@ -220,6 +220,7 @@ async function restore(cwd: string, handle: string, version, tools: Tools) {
 /** D9: a design session writes only inside its own folder and the shared references; undefined when the path is allowed. */
 export function writeRefusal(cwd: string, handle: string, file: string) {
 	const target = path.resolve(cwd, file), inside = (dir: string) => { const rel = path.relative(path.resolve(cwd, dir), target); return rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel); };
+	if ([".pi/designs/references/library", ".pi/designs/references/bundles"].some(dir => target === path.resolve(cwd, dir) || inside(dir))) return "Reference snapshots and bundles are read-only evidence owned by the studio.";
 	if (inside(designFolder(handle)) && load(cwd).sessions.find(item => item.handle === handle)?.foundation) {
 		const rel = path.relative(path.resolve(cwd, designFolder(handle)), target).split(path.sep).join("/");
 		if (/^(?:assets\/|\.design-|APP\.json$|package(?:-lock)?\.json$|THIRD_PARTY_NOTICES\.md$|[^/]+\.html?$|node_modules\/)/.test(rel)) return `Component source lives in src/ (screen shells: src/screens/). ${rel} is extension-owned output/provenance; call design look to build, never shell builds or package installs.`;

@@ -10,9 +10,10 @@ import { askConfirm, progressBar, showAskDialog, showListDialog } from "./ask-us
 import { decideIdea, ideaBlock, ideaOptions, ideaPopupContext, ideaResponse, ideaSchema, storedIdeas } from "./plan3-ideas.ts";
 import { loadPlan3Ask } from "./plan3-ask.ts";
 import { withPlanLock, tryPlanLock, movePlanWithDiagram, stablePlanId } from "./plan3-files.ts";
-import { applyDiagram, toolbarEdit, diagramPath, emptyDiagram, loadDiagram, saveDiagram, type DiagramTarget } from "./plan3-diagram.ts";
+import { applyDiagram, toolbarEdit, diagramPath, emptyDiagram, loadDiagram, saveDiagram, diagramChatMessage, type DiagramTarget } from "./plan3-diagram.ts";
 import { createActivityMirror, forwardDiagramChat, WebError, webTarget, type WebTarget } from "./plan3-web.ts";
 import { createNight } from "./plan3-night.ts";
+import { deliverReferenceBundle } from "./design-bundles.ts";
 import { reworkRequest } from "./plan3-rework.ts";
 import { createStats, statsItems } from "./plan3-stats.ts";
 import { HUMAN, HUMAN_TEXT, availLine, changeMessage, chooseAvail, isOn, needsFile, readAvail, setBoth, setMode, unset, writeAvail } from "./plan3-needs.ts";
@@ -852,10 +853,17 @@ export default function plan3(pi) {
 			return { ok: true };
 		}
 		if (endpoint !== "/api/message") throw new WebError(501, "This session endpoint is not attached yet.");
-		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams"].includes(key))) throw new WebError(400, "Invalid message fields.");
+		if (Object.keys(data).some(key => !["target", "text", "comments", "diagrams", "bundle"].includes(key))) throw new WebError(400, "Invalid message fields.");
 		const target = await resolveWebTarget(await displayedWebTarget(data.target));
 		const diagram = loadDiagram(webCtx.cwd, target) ?? emptyDiagram(target);
-		if (data.diagrams === undefined) return forwardDiagramChat(pi, webCtx, diagram, data.text, data.comments, notifyWeb);
+		const send = (context) => {
+			if (data.bundle === undefined) return forwardDiagramChat(pi, ctx, context, data.text, data.comments, notifyWeb);
+			// Validate diagram/comment context before granting launch permission.
+			diagramChatMessage(context, data.text, data.comments);
+			return deliverReferenceBundle(ctx.cwd, process.env.PI_HUB_SESSION ?? "", data.bundle, data, (references, uncertain) =>
+				forwardDiagramChat(pi, ctx, context, data.text, data.comments, (event, value) => { notifyWeb(event, value); void uncertain().catch(error => notifyWeb("error", { message: error.message })); }, references));
+		};
+		if (data.diagrams === undefined) return send(diagram);
 		// A2: toolbar lines from another diagram tab bring that diagram's context, scoped to their ids.
 		if (!Array.isArray(data.diagrams) || data.diagrams.length > 4 || data.diagrams.some(part => !part || typeof part !== "object" || Object.keys(part).some(key => !["target", "ids"].includes(key)) || !Array.isArray(part.ids))) throw new WebError(400, "Invalid message diagrams.");
 		const parts = [];
@@ -866,8 +874,8 @@ export default function plan3(pi) {
 			else parts.unshift({ diagram, ids: part.ids });
 		}
 		if (!parts.length || parts[0].diagram !== diagram) parts.unshift({ diagram, ids: [] });
-		try { return forwardDiagramChat(pi, webCtx, parts, data.text, data.comments, notifyWeb); }
-		catch (error) { if (error.code) throw error; throw new WebError(400, error.message); }
+		try { return await send(parts); }
+		catch (error) { if (error.code || error.status) throw error; throw new WebError(400, error.message); }
 	}
 	async function readWeb(endpoint: string) {
 		if (endpoint === "/api/models") return { ...webStatus(webCtx), ...await webModels(webCtx), efforts: EFFORTS };

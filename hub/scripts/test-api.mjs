@@ -9,7 +9,9 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { addDesignReference, designReferences, editDesignReference, referenceAssets } from "../../extensions/design-references.ts";
 import { saveDiagram } from "../../extensions/plan3-diagram.ts";
+import { authorizeReferenceBundle, deliverReferenceBundle, freezeReferenceBundle, referenceBundle, referenceBundleAssets } from "../../extensions/design-bundles.ts";
 import { appStarter } from "../../extensions/design-app.ts";
+import { writeRefusal } from "../../extensions/design.ts";
 import { appPublication, ensureAppBuilt } from "../../extensions/design-build.ts";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-api-"));
@@ -129,6 +131,30 @@ try {
 		assert.equal((await post(id, "designreference", { action: "remove", id: ref.ref, revision: ref.revision })).body.status, "removed");
 		assert.equal((await get(id, "designreferenceimage?ref=ref1")).status, 404);
 		const again = await post(id, "designreference", input); assert.equal(again.status, 200); assert.notEqual(again.body.ref, "ref1", "removed IDs never point to newly captured assets");
+		const submission = randomUUID(), selection = [{ ref: again.body.ref, revision: again.body.revision }], brief = { text: "Mix these colors into two variants", target: "product" };
+		const bundles = await Promise.all([freezeReferenceBundle(folder, id, submission, selection, brief), freezeReferenceBundle(folder, id, submission, selection, brief)]);
+		assert.deepEqual(bundles[0], bundles[1], "duplicate submissions freeze one identical bundle");
+		assert.equal(referenceBundle(folder, submission).authorized, false, "freezing alone never authorizes generation");
+		await assert.rejects(freezeReferenceBundle(folder, id, submission, selection, { ...brief, text: "Changed brief" }), /different brief/);
+		await assert.rejects(authorizeReferenceBundle(folder, randomUUID(), submission, brief), /cannot authorize/);
+		await authorizeReferenceBundle(folder, id, submission, brief);
+		assert.equal(referenceBundle(folder, submission).authorized, true);
+		await editDesignReference(folder, id, again.body.ref, again.body.revision, "New draft note");
+		assert.equal(referenceBundleAssets(folder, submission).bundle.refs[0].note, input.note, "later draft edits cannot change a submitted reference");
+		assert.equal((await freezeReferenceBundle(folder, id, submission, selection, brief)).refs[0].note, input.note, "retries use the frozen selection rather than newer draft data");
+		const freshSelection = [{ ref: again.body.ref, revision: designReferences(folder, id).refs.find(ref => ref.ref === again.body.ref).revision }], uncertainId = randomUUID();
+		await freezeReferenceBundle(folder, id, uncertainId, freshSelection, brief);
+		await assert.rejects(deliverReferenceBundle(folder, id, uncertainId, brief, () => { throw new Error("Transport broke after dispatch"); }), /Transport broke/);
+		assert.equal(referenceBundle(folder, uncertainId).delivery, "uncertain");
+		await assert.rejects(deliverReferenceBundle(folder, id, uncertainId, brief, () => assert.fail("must never resend an ambiguous delivery")), /uncertain/);
+		const asyncId = randomUUID(); await freezeReferenceBundle(folder, id, asyncId, freshSelection, brief);
+		let markUncertain;
+		await deliverReferenceBundle(folder, id, asyncId, brief, (_context, uncertain) => { markUncertain = uncertain; return { queued: true }; });
+		await markUncertain(); assert.equal(referenceBundle(folder, asyncId).delivery, "uncertain", "a later SDK rejection remains uncertain across a reload");
+		await assert.rejects(deliverReferenceBundle(folder, id, asyncId, brief, () => assert.fail("must not retry an asynchronous failure")), /uncertain/);
+		const frozenFile = path.join(folder, ".pi/designs/references/bundles", submission, "assets", again.body.ref, "source.webp"), frozenBytes = fs.readFileSync(frozenFile), corrupt = Buffer.from(frozenBytes); corrupt[20] ^= 1; fs.writeFileSync(frozenFile, corrupt);
+		assert.throws(() => referenceBundleAssets(folder, submission), /digest mismatch/); fs.writeFileSync(frozenFile, frozenBytes);
+		await assert.rejects(freezeReferenceBundle(folder, id, "../escape", selection, brief), /Invalid reference bundle/);
 		const owner = randomUUID(), source = { id: "test:source", revision: "1".repeat(64), name: "Owned fixture", provenance: "Test", license: "Test" };
 		let release; const captured = new Promise(resolve => release = resolve);
 		const pending = addDesignReference(folder, owner, { ...source, aspect: "whole" }, async () => { await captured; return { source, files: new Map([["index.html", Buffer.from("original")]]) }; });
@@ -349,6 +375,19 @@ try {
 	// A write starts a parked session; message goes to ce-workflow as a hub call.
 	const sent = await post(id, "message", { target: "bbbbbbbb", text: "hi" });
 	assert.deepEqual(sent.body, { endpoint: "/api/message", data: { target: "bbbbbbbb", text: "hi" } });
+	{
+		const source = { id: "test:relay", revision: "a".repeat(64), name: "Relay fixture", provenance: "Local test", license: "Test" };
+		const ref = await addDesignReference(folder, id, { ...source, aspect: "colors" }, async () => ({ source, files: new Map([["colors.css", Buffer.from("body { color: purple; }")]]) })), submission = randomUUID();
+		const message = { target: "product", text: `Borrow @${ref.ref}`, references: { submission, refs: [{ ref: ref.ref, revision: ref.revision }] } };
+		const relayed = await post(id, "message", message);
+		assert.equal(relayed.status, 200); assert.deepEqual(relayed.body.data, { target: "product", text: message.text, bundle: submission });
+		assert.equal(referenceBundle(folder, submission).authorized, false, "the fake Pi relay cannot authorize a launch; the real handler must do it");
+		assert.equal((await post(id, "message", message)).body.data.bundle, submission, "transport retry retains the frozen bundle ID");
+		assert.equal((await post(id, "message", { ...message, text: "/new" })).status, 400, "references cannot trigger command shortcuts");
+		assert.equal((await post(id, "message", { text: "Forged", bundle: submission })).status, 400);
+		for (const file of [`.pi/designs/references/bundles/${submission}/bundle.json`, `.pi/designs/references/bundles/${submission}/assets/${ref.ref}/source.webp`, `.pi/designs/references/library/${id}/index.json`, ".pi/designs/references/library", ".pi/designs/references/bundles"]) assert.match(writeRefusal(folder, "design-1", file), /read-only/, "design sessions cannot rewrite evidence or its authorization");
+		assert.equal(writeRefusal(folder, "design-1", ".pi/designs/references/site/STYLE.md"), undefined, "ordinary site reference guidance remains writable");
+	}
 	assert.equal(hub.host.live.has(id), true);
 	assert.deepEqual((await post(id, "command", { target: "bbbbbbbb", command: "review" })).body.endpoint, "/api/command");
 	assert.deepEqual(Object.keys((await get(id, "usage")).body), ["summary", "accounts"], "usage comes from the hub, not the session");
