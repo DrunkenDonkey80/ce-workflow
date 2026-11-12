@@ -325,7 +325,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 		switch (data.action) {
 			case "list": return { ...links.state(), links: links.linksOf(session) };
 			case "sessions": return links.remoteSessions(hub);
-			case "link": return links.link(session, hub, String(data.record ?? ""));
+			case "link": return typeof data.folder === "string" ? links.linkProject(session, hub, data.folder) : links.link(session, hub, String(data.record ?? ""));
 			case "unlink": if (!links.linksOf(session).some(item => item.id === data.link)) throw fail(404, "Unknown link."); return links.unlink(String(data.link));
 			case "pair": return links.pairWith(String(data.url ?? ""));
 		}

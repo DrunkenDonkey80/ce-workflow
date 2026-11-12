@@ -9,7 +9,8 @@ import { writeJsonAtomic } from "./registry.ts";
 import type { createDeviceRegistry, createPairing } from "./remote.ts";
 import { agentDir } from "./rpc-client.ts";
 
-export const COMM = 1;
+// 2: project links (plan 58d5c14f): `link` with kind project, `ping` lists project sessions, `deliver` carries from and to.
+export const COMM = 2;
 /** S02 deadlines: a forwarded message must be confirmed inside pi-intercom's 5 s receipt window; hubs ping every 30 s. */
 const DELIVER_MS = 3_000, PING_MS = 30_000;
 
@@ -69,6 +70,14 @@ const OS_NAMES: Record<string, string> = { win32: "Windows", darwin: "macOS", li
 const folderName = (folder?: string) => folder?.split(/[\\/]/).filter(Boolean).pop();
 /** "emailupload/1": how the hub page names a session, so a link reads the same on both hubs. */
 const sessionRef = (folder: string | undefined, name: string) => folderName(folder) ? `${folderName(folder)}/${name}` : name;
+/** Same local project folder (case-insensitive on Windows); only this hub's own folders are compared. */
+const folderKey = (folder: string) => { const full = path.resolve(folder).replace(/[\\/]+$/, ""); return process.platform === "win32" ? full.toLowerCase() : full; };
+const sameFolder = (a?: string, b?: string) => !!a && !!b && folderKey(a) === folderKey(b);
+/** A remote project's sessions as the other hub reported them (record, name, live); bounded and cleaned. */
+type RemoteSession = { record: string; name: string; live: boolean };
+const cleanSessions = (value: unknown): RemoteSession[] => Array.isArray(value) ? value.slice(0, 100)
+	.filter(item => typeof item?.record === "string" && item.record.length > 0 && item.record.length <= 100)
+	.map(item => ({ record: item.record, name: cleanName(item.name) || "session", live: item.live === true })) : [];
 
 /** The `/link/` operations (plan section "Comm protocol") and this hub's side of pairing with another hub. */
 export function createLinks(options: {
@@ -87,11 +96,15 @@ export function createLinks(options: {
 	const { devices, pairing, self, sessions, request = fetchRequest } = options, peers = createPeers(options.dataDir), store = createLinkStore(options.dataDir);
 	let outgoing: { url: string; code?: string; state: string; error?: string } | undefined;
 	const fail = (status: number, error: string, extra: Record<string, unknown> = {}): Reply => [status, { comm: COMM, error, ...extra }];
+	const inFolder = (folder: string) => sessions().filter(session => sameFolder(session.folder, folder));
+	const listed = (folder: string) => inFolder(folder).map(({ record, name, live }) => ({ record, name, live }));
+	/** Project links (D-01): the other hub's sessions in its linked folder, from its last `link` or `ping` reply. */
+	const remotes = new Map<string, RemoteSession[]>();
 
 	/** Answers one `/link/<op>` after the hub checked the tailnet owner; credential, then comm, then payload. */
 	async function serve(op: string, headers: Headers, data: unknown, login: string, closed: Promise<unknown>): Promise<Reply> {
 		if (!data || typeof data !== "object" || Array.isArray(data)) return fail(400, "Expected a JSON object.");
-		const body = data as { comm?: unknown; id?: unknown; offer?: unknown; hub?: { name?: unknown; url?: unknown }; link?: unknown; message?: unknown }, open = op === "pair-start" || op === "pair-status";
+		const body = data as { comm?: unknown; id?: unknown; offer?: unknown; hub?: { name?: unknown; url?: unknown }; link?: unknown; message?: unknown; from?: unknown; to?: unknown }, open = op === "pair-start" || op === "pair-status";
 		const credential = headers["x-hub-link"], device = typeof credential === "string" ? credential.split(".")[0] : "";
 		if (!open && !(typeof credential === "string" && await devices.check(credential, login, "hub"))) return fail(401, "unpaired");
 		// After pair-finish the caller is the paired hub its credential was issued to.
@@ -119,7 +132,18 @@ export function createLinks(options: {
 			}
 			if (op === "sessions") return [200, { comm: COMM, hub: self()?.name, sessions: sessions() }];
 			if (op === "link") {
-				const link = body.link as { id?: unknown; from?: { record?: unknown; name?: unknown; folder?: unknown }; to?: { record?: unknown } } | undefined;
+				const link = body.link as { id?: unknown; kind?: unknown; from?: { record?: unknown; name?: unknown; folder?: unknown; sessions?: unknown }; to?: { record?: unknown; folder?: unknown } } | undefined;
+				if (link?.kind === "project") {
+					const from = cleanFolder(link.from?.folder);
+					if (typeof link.id !== "string" || !/^[0-9a-f-]{36}$/.test(link.id) || !from || typeof link.to?.folder !== "string") return fail(400, "link.id, link.from.folder and link.to.folder required.");
+					if (store.list().some(other => other.id === link.id && other.hub !== caller!.url)) return fail(409, "link id taken");
+					const local = sessions().find(session => sameFolder(session.folder, link.to!.folder as string));
+					if (!local) return fail(410, "project-gone");
+					store.add({ id: link.id, kind: "project", folder: local.folder, hub: caller!.url, remote: { name: folderName(from) ?? "project", ...details(from, (body as { os?: unknown }).os) }, created: Date.now() });
+					remotes.set(link.id, cleanSessions(link.from?.sessions));
+					void sync();
+					return [200, { comm: COMM, os: process.platform, folder: local.folder, sessions: listed(local.folder) }];
+				}
 				if (typeof link?.id !== "string" || !/^[0-9a-f-]{36}$/.test(link.id) || typeof link.from?.record !== "string" || typeof link.to?.record !== "string") return fail(400, "link.id, link.from and link.to required.");
 				const existing = store.list().find(other => other.id === link.id);
 				if (existing && existing.hub !== caller!.url) return fail(409, "link id taken");
@@ -138,18 +162,28 @@ export function createLinks(options: {
 			// A call from a hub proves it is back: its stand-ins reconnect (D13).
 			misses.delete(caller!.url);
 			if (offline.delete(caller!.url)) await sync();
-			if (op === "ping") return [200, { comm: COMM, hub: self()?.name, os: process.platform, links: store.list().filter(item => item.hub === caller!.url).map(item => { const local = sessions().find(s => s.record === item.session); return { id: item.id, name: local?.name ?? "", folder: local?.folder }; }) }];
+			if (op === "ping") return [200, { comm: COMM, hub: self()?.name, os: process.platform, links: store.list().filter(item => item.hub === caller!.url).map(item => { if (item.kind === "project") return { id: item.id, folder: item.folder, sessions: listed(item.folder!) }; const local = sessions().find(s => s.record === item.session); return { id: item.id, name: local?.name ?? "", folder: local?.folder }; }) }];
 			if (op === "deliver") {
 				const message = body.message as { id?: unknown; text?: unknown; expectsReply?: unknown; replyTo?: unknown } | undefined;
 				if (typeof message?.id !== "string" || message.id.length > 100 || typeof message.text !== "string" || (message.replyTo !== undefined && typeof message.replyTo !== "string")) return fail(400, "message.id and message.text required.");
 				const link = store.list().find(item => item.id === body.link && item.hub === caller!.url);
 				if (!link) return fail(404, "not-linked");
-				const local = sessions().find(s => s.record === link.session), standin = standins.get(link.id);
+				// A project link names both ends: `to` must be in this hub's linked folder, `from` a session the other hub listed for its folder.
+				let record = link.session!, standin = standins.get(link.id), back = {};
+				if (link.kind === "project") {
+					const to = inFolder(link.folder!).find(s => s.record === body.to), known = () => remotes.get(link.id)?.some(s => s.record === body.from);
+					if (!to) return fail(403, "not-in-project");
+					// A session started there since the last ping: ask once before refusing.
+					if (!known()) { await refresh(caller!.url); await sync(); }
+					if (!known()) return fail(403, "unknown-sender");
+					record = to.record; standin = standins.get(`${link.id}/${body.from}`); back = { from: to.record, to: body.from };
+				}
+				const local = sessions().find(s => s.record === record);
 				if (!local) return fail(410, "session-gone");
 				if (!standin) return fail(502, "not-delivered", { reason: unavailable ?? "its stand-in is not connected" });
 				const send = { text: message.text, messageId: message.id, ...(message.expectsReply === true ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) };
-				if (!local.live) { void wakeAndSend(link, standin, send, local.name); return [200, { comm: COMM, delivered: true, resuming: true }]; }
-				const target = await options.intercom!.intercomId(link.session);
+				if (!local.live) { void wakeAndSend(link, standin, send, record, local.name, back); return [200, { comm: COMM, delivered: true, resuming: true }]; }
+				const target = await options.intercom!.intercomId(record);
 				const result = target ? await standin.client.send(target, send).catch((error: Error) => ({ delivered: false, reason: error.message })) : { delivered: false, reason: "it has no intercom session" };
 				return result.delivered ? [200, { comm: COMM, delivered: true }] : fail(502, "not-delivered", { reason: result.reason ?? "not delivered" });
 			}
@@ -220,6 +254,21 @@ export function createLinks(options: {
 		return { ...made, standin: standinName(made) };
 	}
 
+	/** Links this session's project folder to `folder` on the hub at `url` (D-01): every session there reaches every session here. */
+	async function linkProject(session: string, url: string, folder: string) {
+		const me = self(), local = sessions().find(candidate => candidate.record === session);
+		if (!me) throw Object.assign(new Error("Turn on remote access first: hubs link over the tailnet."), { status: 409 });
+		if (!local) throw Object.assign(new Error("Unknown session."), { status: 404 });
+		if (store.list().some(item => item.kind === "project" && item.hub === url && sameFolder(item.folder, local.folder) && item.remote.folder === folder)) throw Object.assign(new Error("These projects are already linked."), { status: 409 });
+		const id = randomUUID(), { reply, error } = await call(url, "link", { os: process.platform, link: { id, kind: "project", from: { folder: local.folder, sessions: listed(local.folder) }, to: { folder } } });
+		if (error) throw Object.assign(new Error(error === "project-gone" ? "That project has no sessions on the other hub any more." : error), { status: 409 });
+		const there = cleanFolder(reply[1].folder) ?? folder, made: Link = { id, kind: "project", folder: local.folder, hub: url, remote: { name: folderName(there) ?? "project", ...details(there, reply[1].os) }, created: Date.now() };
+		try { store.add(made); } catch (failure) { await call(url, "unlink", { link: id }); throw failure; }
+		remotes.set(id, cleanSessions(reply[1].sessions));
+		await sync();
+		return { ...made, standins: [...standins.values()].filter(standin => standin.link.id === id).map(standin => standin.name) };
+	}
+
 	/** Unlinks here at once; the other hub hears now, or later from the pending list (D12). */
 	async function unlink(id: string) {
 		const removed = store.remove(id, true);
@@ -230,82 +279,96 @@ export function createLinks(options: {
 		return { ok: true, ...(error ? { pending: error } : {}) };
 	}
 
-	// S07 stand-ins (D9-D13): one pi-intercom session per link, named for the other side, while that hub is online.
-	type Standin = { link: Link; name: string; key: string; client: any };
+	// S07 stand-ins (D9-D13): one pi-intercom session per link, named for the other side, while that hub is online;
+	// a project link has one per live session of the other project (D-01), keyed `<link>/<record>`.
+	type Remote = Link["remote"];
+	type Standin = { link: Link; to: Remote; name: string; key: string; client: any };
+	const standinId = (link: Link, to: Remote) => link.kind === "project" ? `${link.id}/${to.record}` : link.id;
+	const targets = (link: Link): Remote[] => link.kind !== "project" ? [link.remote]
+		: (remotes.get(link.id) ?? []).filter(session => session.live).map(({ record, name }) => ({ ...link.remote, record, name }));
 	const standins = new Map<string, Standin>(), offline = new Set<string>(), misses = new Map<string, number>();
 	let unavailable: string | undefined, client: Promise<IntercomLoad> | undefined, syncing = Promise.resolve(), ticking = false, timer: NodeJS.Timeout | undefined;
 	const safe = (text: string) => text.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "session";
 	const hubName = (link: Link) => peers.get(link.hub)?.name ?? link.hub.slice(8).split(".")[0];
-	function standinName(link: Link) {
+	function standinName(link: Link, to = link.remote) {
 		// "emailupload-1~flexpc": the folder tells apart sessions that share a name ("1") across projects.
-		const hub = safe(hubName(link)), folder = folderName(link.remote.folder), who = (folder ? `${safe(folder)}-` : "") + safe(link.remote.name), plain = `${who}~${hub}`;
+		const hub = safe(hubName(link)), folder = folderName(to.folder), who = (folder ? `${safe(folder)}-` : "") + safe(to.name), plain = `${who}~${hub}`, id = standinId(link, to);
 		// shortcut: collisions checked against this hub's sessions and stand-ins only, not other intercom sessions on the machine; upgrade if names clash in practice.
-		const taken = new Set([...sessions().map(s => s.name.toLowerCase()), ...[...standins.values()].filter(s => s.link.id !== link.id).map(s => s.name)]);
-		return taken.has(plain) ? `${who}-${link.remote.record.slice(0, 4)}~${hub}` : plain;
+		const taken = new Set([...sessions().map(s => s.name.toLowerCase()), ...[...standins].filter(([other]) => other !== id).map(([, s]) => s.name)]);
+		return taken.has(plain) ? `${who}-${(to.record ?? "").slice(0, 4)}~${hub}` : plain;
 	}
 	/** Where the other session runs ("FlexPC (Windows): C:\\x\\emailupload"), shown as the stand-in's intercom cwd. */
 	const remotePlace = (link: Link) => `${hubName(link)}${link.remote.os ? ` (${OS_NAMES[link.remote.os] ?? link.remote.os})` : ""}: ${link.remote.folder ?? link.hub}`;
-	/** This hub's session a link belongs to; only it may send through the stand-in (D9). */
-	const owner = (link: Link) => { const local = sessions().find(s => s.record === link.session); return local ? sessionRef(local.folder, local.name) : undefined; };
+	/** This hub's session a link belongs to; only it may send through the stand-in (D9). A project link belongs to its folder. */
+	const owner = (link: Link) => {
+		if (link.kind === "project") return `project ${folderName(link.folder) ?? link.folder}`;
+		const local = sessions().find(s => s.record === link.session); return local ? sessionRef(local.folder, local.name) : undefined;
+	};
 	/** What intercom shows for a stand-in: name, the remote place as cwd, and its owner as the model column. */
-	const describe = (link: Link) => ({ name: standinName(link), cwd: remotePlace(link), model: `hub-link for ${owner(link) ?? "a removed session"}` });
+	const describe = (link: Link, to = link.remote) => ({ name: standinName(link, to), cwd: remotePlace(link), model: `hub-link for ${owner(link) ?? "a removed session"}` });
+	/** The local session behind intercom id `from` that may send through a link's stand-ins, if any. */
+	async function senderOf(link: Link, from: string) {
+		for (const session of link.kind === "project" ? inFolder(link.folder!) : sessions().filter(s => s.record === link.session)) if (from === await options.intercom!.intercomId(session.record)) return session;
+	}
 
 	/** Starts and stops stand-ins to match the links whose hub is online; serialized, never throws. */
 	const sync = () => syncing = syncing.then(async () => {
 		let links: Link[] = [];
 		try { links = store.list(); } catch { /* corrupt list: every stand-in off */ }
-		const wanted = new Map(links.filter(item => !offline.has(item.hub) && peers.get(item.hub)).map(item => [item.id, item]));
+		const wanted = new Map(links.filter(item => !offline.has(item.hub) && peers.get(item.hub)).flatMap(link => targets(link).map(to => [standinId(link, to), { link, to }] as const)));
 		// A changed name, folder, OS or owner re-registers the stand-in under the same id (D11).
-		for (const [id, standin] of standins) { const now = wanted.get(id); if (!now || JSON.stringify(describe(now)) !== standin.key) { standins.delete(id); await standin.client.disconnect().catch(() => {}); } }
+		for (const [id, standin] of standins) { const now = wanted.get(id); if (!now || JSON.stringify(describe(now.link, now.to)) !== standin.key) { standins.delete(id); await standin.client.disconnect().catch(() => {}); } }
 		if (!wanted.size || !options.intercom) return;
 		const loaded = await (client ??= (options.intercom.load ?? loadIntercom)());
 		unavailable = loaded.unavailable;
 		if (!loaded.IntercomClient) return;
-		for (const link of wanted.values()) if (!standins.has(link.id)) {
-			const shown = describe(link), standin: Standin = { link, name: shown.name, key: JSON.stringify(shown), client: new loaded.IntercomClient() }, now = Date.now();
+		for (const [id, { link, to }] of wanted) if (!standins.has(id)) {
+			const shown = describe(link, to), standin: Standin = { link, to, name: shown.name, key: JSON.stringify(shown), client: new loaded.IntercomClient() }, now = Date.now();
 			standin.client.on("message", (from: { id: string }, message: any) => void forward(standin, from, message).catch(() => {}));
 			standin.client.on("error", () => {});
-			standin.client.on("disconnected", () => { if (standins.get(link.id) === standin) standins.delete(link.id); });
+			standin.client.on("disconnected", () => { if (standins.get(id) === standin) standins.delete(id); });
 			try {
-				// A fixed id per link: a reconnect gets pi-intercom's mailbox for plain sends made while offline (D11, D13).
-				await standin.client.connect({ cwd: shown.cwd, model: shown.model, pid: process.pid, startedAt: now, lastActivity: now, name: standin.name, status: "idle", acknowledgesReceipts: true }, `hublink-${link.id}`);
-				standins.set(link.id, standin);
+				// A fixed id per link (and remote session): a reconnect gets pi-intercom's mailbox for plain sends made while offline (D11, D13).
+				await standin.client.connect({ cwd: shown.cwd, model: shown.model, pid: process.pid, startedAt: now, lastActivity: now, name: standin.name, status: "idle", acknowledgesReceipts: true }, `hublink-${id.replace("/", "-")}`);
+				standins.set(id, standin);
 			} catch { /* broker not running: the next ping retries */ }
 		}
 	}).catch(() => {});
 
 	/** A local message to a stand-in: only its linked session's crosses (D9); the receipt waits for the other hub (S02). */
-	async function forward({ link, name, client }: Standin, from: { id: string }, message: { id: string; content?: { text?: string }; expectsReply?: boolean; replyTo?: string }) {
-		const local = sessions().find(s => s.record === link.session), tell = (text: string) => client.send(from.id, { text }).catch(() => {});
-		if (!local || from.id !== await options.intercom!.intercomId(link.session)) return void tell(`${name} is linked to ${local ? sessionRef(local.folder, local.name) : "another session"} on this hub, not to this session; not forwarded. Only that session may send through it.`);
+	async function forward({ link, to, name, client }: Standin, from: { id: string }, message: { id: string; content?: { text?: string }; expectsReply?: boolean; replyTo?: string }) {
+		const tell = (text: string) => client.send(from.id, { text }).catch(() => {}), sender = await senderOf(link, from.id);
+		if (!sender && link.kind === "project") return void tell(`${name} is linked to ${owner(link)} on this hub; only its sessions may send through it. Not forwarded.`);
+		if (!sender) { const local = sessions().find(s => s.record === link.session); return void tell(`${name} is linked to ${local ? sessionRef(local.folder, local.name) : "another session"} on this hub, not to this session; not forwarded. Only that session may send through it.`); }
 		const peer = peers.get(link.hub)?.name ?? link.hub;
 		const sent = await Promise.race([
-			call(link.hub, "deliver", { link: link.id, message: { id: message.id, text: message.content?.text ?? "", ...(message.expectsReply ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) } }),
+			call(link.hub, "deliver", { link: link.id, ...(link.kind === "project" ? { from: sender.record, to: to.record } : {}), message: { id: message.id, text: message.content?.text ?? "", ...(message.expectsReply ? { expectsReply: true } : {}), ...(message.replyTo ? { replyTo: message.replyTo } : {}) } }),
 			new Promise<undefined>(done => setTimeout(done, DELIVER_MS)),
 		]).catch(() => undefined);
 		if (sent && !sent.error) return client.sendMessageReceipt({ messageId: message.id, status: "receiver_received", timestamp: Date.now() });
 		const code = sent?.reply[1].error, reason = sent?.reply[1].reason;
 		const cause = !sent ? `${peer} hub did not answer within ${DELIVER_MS / 1000} s` : code === "not-linked" ? `the link was removed on ${peer}`
-			: code === "session-gone" ? `${link.remote.name} on ${peer} was closed` : code === "not-delivered" ? `${link.remote.name} on ${peer} did not take it (${reason})` : sent.error!;
+			: code === "session-gone" ? `${to.name} on ${peer} was closed` : code === "not-delivered" ? `${to.name} on ${peer} did not take it (${reason})`
+			: code === "not-in-project" ? `${to.name} on ${peer} is no longer in the linked project` : code === "unknown-sender" ? `${peer} does not list this session in the linked project` : sent.error!;
 		// The cause first, while this stand-in is still connected; then an unreachable hub takes its stand-ins offline (D13).
 		await tell(`Not delivered to ${name}: ${cause}.`);
 		if (!sent || sent.reply[0] === 502 && code !== "not-delivered") { offline.add(link.hub); void sync(); }
 	}
 
 	/** A parked target: resume it, wait until it joins intercom (60 s), then send; a failure goes back as a message. */
-	async function wakeAndSend(link: Link, standin: Standin, send: Record<string, unknown>, localName: string) {
+	async function wakeAndSend(link: Link, standin: Standin, send: Record<string, unknown>, record: string, localName: string, back: Record<string, unknown>) {
 		try {
-			await options.intercom!.wake?.(link.session);
+			await options.intercom!.wake?.(record);
 			let target: string | undefined;
 			for (const until = Date.now() + 60_000; Date.now() < until; await new Promise(done => setTimeout(done, 1000))) {
-				const id = await options.intercom!.intercomId(link.session);
+				const id = await options.intercom!.intercomId(record);
 				if (id && (await standin.client.listSessions()).some((s: { id: string }) => s.id === id)) { target = id; break; }
 			}
 			if (!target) throw new Error(`${localName} did not join intercom within 60 s`);
 			const result = await standin.client.send(target, send);
 			if (!result.delivered) throw new Error(result.reason ?? "not delivered");
 		} catch (error) {
-			await call(link.hub, "deliver", { link: link.id, message: { id: randomUUID(), text: `Not delivered to ${localName}: ${(error as Error).message}.` } }).catch(() => {});
+			await call(link.hub, "deliver", { link: link.id, ...back, message: { id: randomUUID(), text: `Not delivered to ${localName}: ${(error as Error).message}.` } }).catch(() => {});
 		}
 	}
 
@@ -316,23 +379,25 @@ export function createLinks(options: {
 		ticking = true;
 		try {
 			const links = store.list(), unlinks = store.unlinks();
-			for (const url of new Set([...links.map(item => item.hub), ...unlinks.map(item => item.hub)])) {
-				if (!peers.get(url)) continue;
-				const { reply, error } = await call(url, "ping", {});
-				if (error) { const missed = (misses.get(url) ?? 0) + 1; misses.set(url, missed); if (missed >= 2) offline.add(url); continue; }
-				misses.delete(url); offline.delete(url);
-				const theirs = new Map((Array.isArray(reply[1].links) ? reply[1].links : []).map((item: { id: string; name: unknown; folder?: unknown }) => [item.id, item]));
-				for (const link of links.filter(item => item.hub === url)) {
-					const item = theirs.get(link.id);
-					// A minute's grace: the hub that started a link stores it just after this one.
-					if (item === undefined) { if (Date.now() - link.created > 60_000) store.remove(link.id); continue; }
-					const remote = { ...link.remote, ...(cleanName(item.name) ? { name: cleanName(item.name) } : {}), ...details(item.folder, reply[1].os) };
-					if (JSON.stringify(remote) !== JSON.stringify(link.remote)) store.add({ ...link, remote });
-				}
-				for (const item of unlinks.filter(u => u.hub === url)) if (!(await call(url, "unlink", { link: item.id })).error) store.confirmed(item.id);
-			}
+			for (const url of new Set([...links.map(item => item.hub), ...unlinks.map(item => item.hub)])) if (peers.get(url)) await refresh(url, links, unlinks);
 		} catch { /* corrupt list or unpaired hub: nothing to ping */ } finally { ticking = false; }
 		await sync();
+	}
+	/** One hub's ping: offline after two misses, renames and project sessions from the reply, pending unlinks retried. */
+	async function refresh(url: string, links = store.list(), unlinks = store.unlinks()) {
+		const { reply, error } = await call(url, "ping", {});
+		if (error) { const missed = (misses.get(url) ?? 0) + 1; misses.set(url, missed); if (missed >= 2) offline.add(url); return; }
+		misses.delete(url); offline.delete(url);
+		const theirs = new Map((Array.isArray(reply[1].links) ? reply[1].links : []).map((item: { id: string; name: unknown; folder?: unknown; sessions?: unknown }) => [item.id, item]));
+		for (const link of links.filter(item => item.hub === url)) {
+			const item = theirs.get(link.id);
+			// A minute's grace: the hub that started a link stores it just after this one.
+			if (item === undefined) { if (Date.now() - link.created > 60_000) store.remove(link.id); continue; }
+			if (link.kind === "project") remotes.set(link.id, cleanSessions(item.sessions));
+			const remote = { ...link.remote, ...(link.kind !== "project" && cleanName(item.name) ? { name: cleanName(item.name) } : {}), ...details(item.folder, reply[1].os) };
+			if (JSON.stringify(remote) !== JSON.stringify(link.remote)) store.add({ ...link, remote });
+		}
+		for (const item of unlinks.filter(u => u.hub === url)) if (!(await call(url, "unlink", { link: item.id })).error) store.confirmed(item.id);
 	}
 
 	return {
@@ -350,10 +415,15 @@ export function createLinks(options: {
 			standins.clear();
 		},
 		link,
+		linkProject,
 		unlink,
-		/** A session's links with their hub names, for its menu (D7). */
-		linksOf: (session: string) => store.list().filter(item => item.session === session).map(item => ({ ...item, hubName: peers.get(item.hub)?.name ?? item.hub, online: !offline.has(item.hub), standin: standins.get(item.id)?.name ?? null,
-			label: `${sessionRef(item.remote.folder, item.remote.name)} on ${hubName(item)}${item.remote.os ? ` (${OS_NAMES[item.remote.os] ?? item.remote.os})` : ""}` })),
+		/** A session's links with their hub names, for its menu (D7), plus its folder's project links (D-01). */
+		linksOf: (session: string) => {
+			const mine = sessions().find(s => s.record === session);
+			return store.list().filter(item => item.kind === "project" ? sameFolder(item.folder, mine?.folder) : item.session === session).map(item => ({ ...item, hubName: peers.get(item.hub)?.name ?? item.hub, online: !offline.has(item.hub),
+				standin: item.kind === "project" ? null : standins.get(item.id)?.name ?? null, standins: [...standins.values()].filter(s => s.link.id === item.id).map(s => s.name),
+				label: `${item.kind === "project" ? `project ${item.remote.name}` : sessionRef(item.remote.folder, item.remote.name)} on ${hubName(item)}${item.remote.os ? ` (${OS_NAMES[item.remote.os] ?? item.remote.os})` : ""}` }));
+		},
 		store,
 		/** For the local page: paired hubs (no credentials) and the pairing in progress. */
 		state: () => ({ comm: COMM, hubs: peers.list().map(({ name, url, paired }) => ({ name, url, paired, online: !offline.has(url) })), pairing: outgoing ?? null, ...(unavailable ? { unavailable } : {}) }),
@@ -361,12 +431,12 @@ export function createLinks(options: {
 	};
 }
 
-/** One link (D8, D10): a session on this hub and a session record on a paired hub. */
-export type Link = { id: string; session: string; hub: string; remote: { record: string; name: string; folder?: string; os?: string }; created: number };
+/** One link (D8, D10): a session on this hub and a session record on a paired hub; or (kind project, D-04) a folder here and a folder there. */
+export type Link = { id: string; kind?: "project"; session?: string; folder?: string; hub: string; remote: { record?: string; name: string; folder?: string; os?: string }; created: number };
 /** The optional remote details, only those the other hub sent (older hubs send none). */
 const details = (folder: unknown, os: unknown) => ({ ...(cleanFolder(folder) ? { folder: cleanFolder(folder) } : {}), ...(cleanOs(os) ? { os: cleanOs(os) } : {}) });
-const validLink = (link: Link) => typeof link?.id === "string" && typeof link.session === "string" && /^https:\/\/[^/\s]+$/.test(link.hub)
-	&& typeof link.remote?.record === "string" && typeof link.remote.name === "string" && Number.isFinite(link.created);
+const validLink = (link: Link) => typeof link?.id === "string" && /^https:\/\/[^/\s]+$/.test(link.hub) && typeof link.remote?.name === "string" && Number.isFinite(link.created)
+	&& (link.kind === "project" ? typeof link.folder === "string" && typeof link.remote.folder === "string" : link.kind === undefined && typeof link.session === "string" && typeof link.remote.record === "string");
 
 /** Links in `<dataDir>/links.json`, plus unlinks the other hub has not confirmed yet (D12); corrupt fails closed. */
 export function createLinkStore(dataDir: string) {

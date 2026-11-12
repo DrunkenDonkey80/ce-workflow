@@ -175,7 +175,7 @@ export async function startHub({ command = envCommand(), run = exec as Exec, ope
 		"POST /api/hubs/pair": data => links.pairWith(String(data.url ?? "")),
 		"POST /api/hubs/sessions": data => links.remoteSessions(String(data.url ?? "")),
 		"GET /api/sessions/([0-9a-f-]{36})/links": (_d, m) => ({ links: links.linksOf(m[1]) }),
-		"POST /api/sessions/([0-9a-f-]{36})/links": (data, m) => links.link(m[1], String(data.hub ?? ""), String(data.record ?? "")),
+		"POST /api/sessions/([0-9a-f-]{36})/links": (data, m) => typeof data.folder === "string" ? links.linkProject(m[1], String(data.hub ?? ""), data.folder) : links.link(m[1], String(data.hub ?? ""), String(data.record ?? "")),
 		"POST /api/links/([0-9a-f-]{36})/unlink": (_d, m) => links.unlink(m[1]),
 		"POST /api/devices/([A-Za-z0-9_-]{12})/revoke": async (_d, m) => { const ok = await devices.revoke(m[1]); dropDevice(m[1]); return { ok }; },
 		"POST /api/sessions": data => host.create(String(data.folder ?? ""), String(data.name ?? "")),

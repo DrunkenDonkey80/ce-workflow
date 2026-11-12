@@ -12,6 +12,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "hub-remote-"));
 process.env.PI_CODING_AGENT_DIR = root;
 const { startHub } = await import("../src/hub.ts");
 const { createDeviceRegistry, tailscaleCommand } = await import("../src/remote.ts");
+const { COMM } = await import("../src/link.ts");
 const windowsTailscale = "/mnt/c/Program Files/Tailscale/tailscale.exe";
 assert.equal(tailscaleCommand("linux", true, candidate => candidate === windowsTailscale), windowsTailscale, "WSL reuses Windows Tailscale without depending on PATH");
 assert.equal(tailscaleCommand("linux", true, () => false), "tailscale", "WSL without Windows Tailscale keeps the native command");
@@ -28,7 +29,7 @@ await createDeviceRegistry(oldDir, () => Date.now() - 100 * 86_400_000).pair("Ex
 // Fake tailscale: status JSON for a ready tailnet; every call is recorded.
 const calls = [];
 let ready = true;
-const run = async (command, args) => {
+const run = async (_command, args) => {
 	calls.push(args.join(" "));
 	if (args[0] === "status") return { code: 0, killed: false, stderr: "", stdout: JSON.stringify(ready
 		? { BackendState: "Running", Self: { DNSName: "pc.tail.ts.net.", UserID: 7 }, CurrentTailnet: { MagicDNSEnabled: true }, CertDomains: ["pc.tail.ts.net"], User: { 7: { LoginName: "me@example.com" } } }
@@ -161,14 +162,14 @@ try {
 	// Plan d21eefbf S05: another hub pairs through /link/ with no Origin; its credential is a hub credential.
 	const link = (op, body, credential) => linkRequest("", op, body, credential);
 	assert.equal((await remote("/link/pair-start")).status, 405, "POST only");
-	assert.deepEqual(await link("pair-start", { hub: { name: "mac" } }), [409, { comm: 1, error: "comm-mismatch" }], "comm is checked before the payload");
-	assert.equal((await remote("/link/pair-start", { method: "POST", origin: null, body: { comm: 1, hub: { name: "mac" } }, login: "other@example.com" })).status, 403, "tailnet owner first");
-	assert.deepEqual((await link("pair-finish", { comm: 1 }))[0], 401, "other operations need a hub credential");
-	assert.deepEqual((await link("pair-finish", { comm: 1 }, cookie))[0], 401, "a browser device cookie is no hub credential");
-	const hubStart = await link("pair-start", { comm: 1, hub: { name: "mac" } });
+	assert.deepEqual(await link("pair-start", { hub: { name: "mac" } }), [409, { comm: COMM, error: "comm-mismatch" }], "comm is checked before the payload");
+	assert.equal((await remote("/link/pair-start", { method: "POST", origin: null, body: { comm: COMM, hub: { name: "mac" } }, login: "other@example.com" })).status, 403, "tailnet owner first");
+	assert.deepEqual((await link("pair-finish", { comm: COMM }))[0], 401, "other operations need a hub credential");
+	assert.deepEqual((await link("pair-finish", { comm: COMM }, cookie))[0], 401, "a browser device cookie is no hub credential");
+	const hubStart = await link("pair-start", { comm: COMM, hub: { name: "mac" } });
 	assert.equal(hubStart[0], 200); assert.match(hubStart[1].code, /^\d{3} \d{3}$/); assert.equal(hubStart[1].hub, os.hostname());
 	assert.equal((await local("/api/pairing")).body.pending.label, "Hub mac", "approval on this hub's page names the hub");
-	const hubWaiting = link("pair-status", { comm: 1, id: hubStart[1].id });
+	const hubWaiting = link("pair-status", { comm: COMM, id: hubStart[1].id });
 	await new Promise(done => setTimeout(done, 100));
 	await local("/api/pairing", { approve: true });
 	const [, hubApproved] = await hubWaiting;
@@ -176,9 +177,9 @@ try {
 	const credential = hubApproved.credential;
 	assert.equal((await remote(`/s/${id}/api/snapshot`, { cookie: credential })).status, 401, "a hub credential never opens session pages");
 	assert.equal((await remote(`/s/${id}/api/snapshot`, { headers: { "x-hub-link": credential } })).status, 401);
-	assert.equal((await link("pair-finish", { comm: 2, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 409);
-	assert.equal((await link("pair-finish", { comm: 1, offer: "short", hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 400);
-	assert.equal((await link("pair-finish", { comm: 1, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 200);
+	assert.equal((await link("pair-finish", { comm: COMM + 1, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 409);
+	assert.equal((await link("pair-finish", { comm: COMM, offer: "short", hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 400);
+	assert.equal((await link("pair-finish", { comm: COMM, offer: credential, hub: { name: "mac", url: "https://mac.tail.ts.net:7781" } }, credential))[0], 200);
 	assert.deepEqual((await local("/api/hubs")).body.hubs.map(h => [h.name, h.url, "credential" in h]), [["mac", "https://mac.tail.ts.net:7781", false]]);
 	// This hub's side: pairing with another hub (here served by itself) returns the code, then finishes after approval there.
 	assert.equal((await local("/api/hubs/pair", { url: "pc.tail.ts.net:" + port })).status, 400, "not with itself");

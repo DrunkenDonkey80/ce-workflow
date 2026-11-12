@@ -84,7 +84,8 @@ try {
 	};
 	const state = { alpha: { name: "ALPHA", folder: "C:\\w\\emailupload", live: true }, beta: { name: "BETA", folder: "/Users/f/belot", live: true }, gamma: { name: "GAMMA", folder: "/Users/f/belot", live: true } }, woken = [];
 	const OS = { win32: "Windows", darwin: "macOS", linux: "Linux" }[process.platform];
-	for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", ["alpha"]], ["mac", "https://mac.t.ts.net:2", ["beta", "gamma"]]]) {
+	const pcRecords = ["alpha"], macRecords = ["beta", "gamma"];
+for (const [name, url, records] of [["pc", "https://pc.t.ts.net:1", pcRecords], ["mac", "https://mac.t.ts.net:2", macRecords]]) {
 		const dataDir = path.join(root, name), devices = createDeviceRegistry(dataDir), pairing = createPairing(devices), fake = broker();
 		fs.mkdirSync(dataDir);
 		hubs[url] = { pairing, devices, broker: fake, links: createLinks({ dataDir, devices, pairing, request, self: () => ({ name, url, login }),
@@ -170,6 +171,43 @@ try {
 	mac.links.store.remove(link.id); await mac.links.sync();
 	assert.equal((await alpha.send("review-reviewer~mac", { text: "gone?" })).delivered, false);
 	assert.match(alpha.inbox.at(-1).content.text, /the link was removed on mac/);
+	// Plan 58d5c14f: a project link joins emailupload on pc and belot on mac, every session to every session (D-01).
+	pcRecords.push("delta"); state.delta = { name: "DELTA", folder: state.alpha.folder, live: true };
+	macRecords.push("eps"); state.eps = { name: "EPS", folder: "/Users/f/belot", live: true };
+	const delta = pc.agents.delta = await pc.broker.agent("delta"), gamma = mac.agents.gamma = await mac.broker.agent("gamma"), eps = mac.agents.eps = await mac.broker.agent("eps");
+	const project = await pc.links.linkProject("alpha", macUrl, "/Users/f/belot");
+	await mac.links.sync();
+	assert.deepEqual([project.standins.sort(), mac.links.standins().map(s => s.name).sort()], [["belot-eps~mac", "belot-gamma~mac"], ["emailupload-alpha~pc", "emailupload-delta~pc"]], "one stand-in per live session of the other project");
+	assert.equal(pc.broker.clients.get(`hublink-${project.id}-gamma`).info.model, "hub-link for project emailupload");
+	await assert.rejects(pc.links.linkProject("delta", macUrl, "/Users/f/belot"), /already linked/);
+	await assert.rejects(pc.links.linkProject("alpha", macUrl, "/Users/f/nothing"), /no sessions on the other hub/);
+	assert.deepEqual(pc.links.linksOf("delta").filter(l => l.kind === "project").map(l => l.label), [`project belot on mac (${OS})`], "every session of the folder sees the project link");
+	// 2 by 2: each sender reaches each target, and the reply returns only to the actual sender.
+	for (const [sender, peer] of [[alpha, delta], [delta, alpha]]) for (const target of [gamma, eps]) {
+		const standin = `belot-${target.info.name}~mac`, before = peer.inbox.length, asked = await sender.send(standin, { text: `hi from ${sender.info.name}`, expectsReply: true });
+		assert.equal(asked.delivered, true, `${sender.info.name} to ${standin}`);
+		const got = target.inbox.at(-1);
+		assert.deepEqual([got.from, got.content.text, got.id], [`emailupload-${sender.info.name}~pc`, `hi from ${sender.info.name}`, asked.id]);
+		assert.equal((await target.send(got.from, { text: "back", replyTo: asked.id })).delivered, true);
+		assert.deepEqual([sender.inbox.at(-1).from, sender.inbox.at(-1).replyTo, peer.inbox.length], [standin, asked.id, before], "reply to the sender only");
+	}
+	// Forged ends are refused: a target outside the linked folder, a sender pc does not list for its project.
+	const asPc = body => request(macUrl, "deliver", { comm: COMM, link: project.id, message: { id: randomUUID(), text: "forged" }, ...body }, pc.links.peers.get(macUrl).credential);
+	assert.deepEqual([(await asPc({ from: "alpha", to: "beta" }))[1].error, (await asPc({ from: "other", to: "gamma" }))[1].error], ["not-in-project", "unknown-sender"]);
+	// A local session outside the folder sees the stand-ins but cannot send through them.
+	assert.equal((await other.send("belot-gamma~mac", { text: "sneak" })).delivered, false);
+	assert.match(other.inbox.at(-1).content.text, /linked to project emailupload on this hub; only its sessions may send through it/);
+	// A session started on mac since pc's last ping: pc asks mac once, then delivers through its new stand-in.
+	macRecords.push("zeta"); state.zeta = { name: "ZETA", folder: "/Users/f/belot", live: true };
+	const zeta = mac.agents.zeta = await mac.broker.agent("zeta");
+	assert.equal((await zeta.send("emailupload-alpha~pc", { text: "new here" })).delivered, true);
+	assert.deepEqual([alpha.inbox.at(-1).from, alpha.inbox.at(-1).content.text], ["belot-zeta~mac", "new here"]);
+	// A parked session drops its stand-in at the next ping; unlink removes the rest on both hubs.
+	state.eps.live = false; await pc.links.tick();
+	assert.deepEqual(pc.links.standins().filter(s => s.id === project.id).map(s => s.name).sort(), ["belot-gamma~mac", "belot-zeta~mac"]);
+	assert.deepEqual(await pc.links.unlink(project.id), { ok: true });
+	await Promise.all([pc.links.sync(), mac.links.sync()]);
+	assert.deepEqual([pc.links.standins().filter(s => s.id === project.id), mac.links.standins(), mac.links.store.list()], [[], [], []]);
 	await Promise.all([pc.links.stop(), mac.links.stop()]);
 	assert.equal(pc.broker.clients.has(`hublink-${link.id}`), false, "stop disconnects stand-ins");
 
