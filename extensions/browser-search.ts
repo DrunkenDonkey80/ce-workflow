@@ -117,7 +117,14 @@ export async function originalForHub(ctx, set: string, n: number, signal?: Abort
 	const file = entry?.originals.get(n);
 	if (!file) throw new Error(entry ? "The original could not be downloaded (not an image, too large, refused or unreachable)." : `Unknown or expired result set "${set}": search again.`);
 	if (statSync(file).size > 8 * 1024 * 1024) throw new Error("The original is larger than 8 MB.");
-	return { n, url: entry!.items[n - 1].original, image: dataUrl(file) };
+	return { n, url: entry!.items[n - 1].original, image: dataUrl(file), file };
+}
+/** V-06: one result becomes a saved pick of this conversation (publishFound: PNG, newest 60), so it outlives later searches. */
+export async function pickForHub(ctx, owner: string, set: string, n: number, signal?: AbortSignal, options?: { resolve?: typeof lookup }) {
+	const { file, url } = await originalForHub(ctx, set, n, signal, options), item = sets.get(set)!.items[n - 1];
+	const published = await (await import("./design-references.ts")).publishFound(ctx.cwd, owner, [{ title: item.title || item.site || "Image result", page: item.page || url, image: file }]);
+	if (!published.ids.length) throw new Error(`Could not save the pick: ${published.skipped.join("; ")}`);
+	return { id: published.ids[0] };
 }
 
 /** Originals of one set (D8, Q-01): fresh policy, block list and local-address checks, no cookies, 8 MB each, 30 per call. */

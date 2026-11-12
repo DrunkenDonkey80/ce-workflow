@@ -81,7 +81,7 @@ const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.e
 git("init", "-q"); git("add", "-A"); git("commit", "-qm", "init"); write("src/app.ts", "new line\n");
 
 // What ce-workflow answers through /pi-hub, as the old in-process stub did; fake Pi relays each call here.
-const pool = { acts: [] }, imageSearches = []; const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, holdMessage = null, activity = { working: false };
+const pool = { acts: [] }, imageSearches = []; let onPick; const answers = [], messages = [], commands = [], chatRows = new Map(); let rejectMessage = false, holdMessage = null, activity = { working: false };
 const fail = (status, error) => Object.assign(new Error(error), { status });
 function stub(endpoint, body) {
  if (endpoint === "/api/models") return { ...status, efforts: ["low", "high"], scoped: [{ provider: "fake", id: "fake-1", name: "Fake One" }, { provider: "fake", id: "fake-2", name: "Fake Two" }], others: [{ provider: "b", id: "other", name: "Other" }] };
@@ -97,6 +97,7 @@ function stub(endpoint, body) {
  // V-05: the session's image_search (browser-search.ts searchForHub/originalForHub); the original is larger than its tile.
  const svg = (w, h) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="teal"/></svg>`);
  if (endpoint === "/api/designsearch") { imageSearches.push(body.query); return { set: "s1", results: [{ n: 1, title: "Kiosk grid", site: "pos.test", page: "https://pos.test/a", width: 400, height: 300, original: true, thumb: svg(40, 30) }, { n: 2, title: "No original", site: "", page: "", width: 0, height: 0, original: false, thumb: "" }] }; }
+ if (endpoint === "/api/designpick") return onPick(body);
  if (endpoint === "/api/designoriginal") return { n: body.n, url: "https://img.pos.test/a.png", image: svg(400, 300) };
  if (!(endpoint === "/api/message" && body.target === "product")) assert.equal(body.target, "12345678"); // a chat message may be sent from the Project tab
  if (endpoint === "/api/command") { commands.push(body.command); return { ok: true }; }
@@ -123,7 +124,7 @@ function stub(endpoint, body) {
 const relay = http.createServer((request, response) => {
  let text = ""; request.on("data", chunk => text += chunk); request.on("end", async () => {
   let result;
-  try { const { endpoint, data } = JSON.parse(text); if (endpoint === "/api/message" && holdMessage) await holdMessage; result = { ok: true, value: stub(endpoint, data) }; } catch (error) { result = { ok: false, status: error.status ?? 500, error: error.message }; }
+  try { const { endpoint, data } = JSON.parse(text); if (endpoint === "/api/message" && holdMessage) await holdMessage; result = { ok: true, value: await stub(endpoint, data) }; } catch (error) { result = { ok: false, status: error.status ?? 500, error: error.message }; }
   response.end(JSON.stringify(result));
  });
 });
@@ -326,6 +327,16 @@ try {
   await browser("wait", "--fn", "document.querySelector('.library-detail img')?.naturalWidth === 400");
   assert.match(await evaluate("document.querySelector('.library-detail a').href"), /^https:\/\/pos\.test\/a/);
   await clickShown(".library-detail button"); await browser("wait", "#library [data-result='1']");
+  // V-06: Add saves the result as a pick (the session's publishFound) and attaches it; a new search keeps the pick.
+  onPick = async ({ set, n }) => { assert.deepEqual([set, n], ["s1", 1]); fs.copyFileSync(new URL("../../extensions/astryx-runtime/previews/stone.webp", import.meta.url), join(downloads, "set", "02.webp")); const { ids } = await publishFound(folder, id, [{ title: "Kiosk grid", page: "https://pos.test/a", image: join(downloads, "set", "02.webp") }], downloads); return { id: ids[0] }; }; // stone, not neutral: the same bytes would merge into the first pick
+  const draftBefore = await evaluate("document.querySelectorAll('#reference-draft [data-reference]').length");
+  await clickShown("#library [data-result='1'] [data-pick]");
+  await browser("wait", "--fn", `document.querySelectorAll('#reference-draft [data-reference]').length === ${draftBefore + 1}`);
+  await browser("fill", "#library input[type=search]", "second search"); await browser("press", "Enter");
+  await browser("wait", "--fn", "document.querySelectorAll('#library [data-entry]').length === 2");
+  assert.deepEqual(imageSearches, ["pos kiosk", "second search"]);
+  assert.match(await evaluate("document.querySelector(\"#library [data-entry^='found:'] [data-capture][title='https://pos.test/a']\").closest('article').textContent"), /Kiosk grid/, "the pick keeps its source page");
+  assert.equal(await evaluate("[...document.querySelectorAll(\"#library [data-entry^='found:'] [data-add]\")].every(button => !button.disabled)"), true, "saved picks stay attachable");
   await browser("fill", "#library input[type=search]", "");
   await browser("click", "#library [data-tab=designs]");
   assert.equal(await evaluate("document.querySelector('.library-results').hidden"), true, "results show only in the Image search tab");

@@ -43,9 +43,24 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   tile.dataset.result = String(item.n); open.type = "button"; open.dataset.open = ""; feedback.setAttribute("role", "status");
   if (item.thumb) { const img = make("img"); img.src = item.thumb; img.alt = item.title || "Search result " + item.n; img.className = "library-result-thumb"; tile.append(img); }
   tile.append(title, make("small", [item.site, item.width ? `${item.width}×${item.height}` : ""].filter(Boolean).join(" · ")));
-  open.disabled = !item.original;
+  const keep = make("button", "Add reference"); keep.type = "button"; keep.dataset.pick = "";
+  open.disabled = keep.disabled = !item.original;
   open.addEventListener("click", () => void showResult(item, set, open, feedback));
-  tile.append(open, feedback); return tile;
+  keep.addEventListener("click", () => void pickResult(item, set, keep, feedback));
+  tile.append(open, keep, feedback); return tile;
+ }
+ // V-06: the original becomes a saved pick (outlives later searches), then attaches like any other card.
+ async function pickResult(item: Found, set: string, button: HTMLButtonElement, feedback: HTMLElement) {
+  button.disabled = true; feedback.textContent = "Saving the original as a pick…";
+  try {
+   const { id } = await post("designpick", { set, n: item.n });
+   loaded = undefined; await open();
+   const entry = entries.find(candidate => candidate.id === id);
+   if (!entry) throw new Error("the saved pick is not listed");
+   const ref = await post("designreference", { action: "add", id: entry.id, revision: entry.revision, aspect: "whole" });
+   attached(ref); status.textContent = `Selected @${ref.ref} (${entry.name}). Describe how to use it in Chat.`;
+  } catch (error) { feedback.textContent = "Could not add result: " + error.message; status.textContent = feedback.textContent; }
+  finally { button.disabled = !item.original; }
  }
  async function showResult(item: Found, set: string, button: HTMLButtonElement, feedback: HTMLElement) {
   button.disabled = true; feedback.textContent = "Downloading the original…";

@@ -468,10 +468,10 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 				if (typeof data.query !== "string" || !data.query.trim() || data.query.length > 200) throw fail(400, "Type what to search for.");
 				return call(id, "/api/designsearch", { query: data.query.trim() });
 			}
-			case "designoriginal": {
+			case "designoriginal": case "designpick": { // V-06: designpick saves the result as this conversation's pick
 				only(data, ["target", "set", "n"], "Invalid fields.");
 				if (typeof data.set !== "string" || !/^s\d{1,9}$/.test(data.set) || !Number.isInteger(data.n) || (data.n as number) < 1 || (data.n as number) > 100) throw fail(400, "Invalid image result.");
-				return call(id, "/api/designoriginal", { set: data.set, n: data.n });
+				return call(id, `/api/${endpoint}`, { set: data.set, n: data.n });
 			}
 			case "designcard": {
 				only(data, ["target", "id", "revision"], "Invalid fields.");

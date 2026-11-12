@@ -398,6 +398,7 @@ try {
 		assert.deepEqual((await post(id, "designsearch", { query: "  pos ui " })).body, { endpoint: "/api/designsearch", data: { query: "pos ui" } });
 		for (const body of [{ query: " " }, { query: 1 }, { query: "x", path: "/tmp" }]) assert.equal((await post(id, "designsearch", body)).status, 400);
 		assert.deepEqual((await post(id, "designoriginal", { set: "s2", n: 3 })).body, { endpoint: "/api/designoriginal", data: { set: "s2", n: 3 } });
+		assert.deepEqual((await post(id, "designpick", { set: "s2", n: 3 })).body, { endpoint: "/api/designpick", data: { set: "s2", n: 3 } }, "V-06: picks go to the session by set and number");
 		for (const body of [{ set: "../x", n: 1 }, { set: "s1", n: 0 }, { set: "s1", n: "1" }, { set: "s1", n: 1, path: "/tmp/a.png" }]) assert.equal((await post(id, "designoriginal", body)).status, 400);
 		const page = await post(id, "designreference", { action: "add", url: "https://site.test/a", aspect: "layout", note: "spacing" });
 		assert.equal(page.status, 200); assert.equal(page.body.status, "ready"); assert.equal(page.body.thumbnail, "screenshot.png"); assert.equal(page.body.source.url, "https://site.test/a");

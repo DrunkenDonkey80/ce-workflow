@@ -175,7 +175,7 @@ export async function publishFound(cwd: string, owner: string, items: unknown, d
   for (const sha of kept.keys()) if (!keep.has(sha)) fs.rmSync(path.join(folder, `${sha}.png`), { force: true });
   atomic(path.join(folder, "index.json"), JSON.stringify(list)); return list.length;
  });
- return { added: ready.length, skipped, shown, note: "Shown under Web results in this conversation's design library; the user adds the ones they want as references." };
+ return { added: ready.length, skipped, shown, ids: ready.map(item => `found:${item.sha}`), note: "Shown under Web results in this conversation's design library; the user adds the ones they want as references." };
 }
 export function referenceAssets(cwd: string, owner: string, id: unknown) {
  if (typeof id !== "string" || !/^ref[1-9]\d{0,4}$/.test(id)) throw fail(400, "Invalid reference ID.");
