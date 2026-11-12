@@ -181,8 +181,8 @@ function renderActivity() {
 // R7: full split, narrowed to the chat's width, or collapsed to >>; the choice and tab survive reloads.
 const workspace = $("workspace"), remembered = (key, values, fallback) => { try { const value = localStorage.getItem(key); return values.includes(value) ? value : fallback; } catch { return fallback; } };
 const remember = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
-function setLeft(mode) {
- workspace.dataset.left = mode; remember("plan3-left", mode);
+function setLeft(mode, save = true) {
+ workspace.dataset.left = mode; if (save) saveLayout();
  $("expand-left").hidden = mode !== "collapsed"; $("collapse-left").hidden = mode === "collapsed";
  $("narrow-left").setAttribute("aria-pressed", String(mode === "narrow")); $("narrow-left").textContent = mode === "narrow" ? "Widen" : "Narrow";
  for (const id of ["expand-left", "collapse-left"]) $(id).setAttribute("aria-expanded", String(mode !== "collapsed"));
@@ -207,6 +207,22 @@ function setDiagram(tab: DiagramTab, value: Diagram | null, refit = false) {
  if (tab === diagramTab) { renderDiagram(refit); renderMentions(); renderShell(); }
 }
 let libraryReturn = { tab: "plan", left: "full" }, tabInitialized = false;
+// R8: each session keeps the pane mode and chat width per left tab; the library defaults to a wide left pane (narrow chat).
+// The global keys only seed tabs a session has not used yet, so the library's narrow chat never leaks into them.
+const layoutKey = "plan3-layout:" + location.pathname, LEFT_MODES = ["full", "narrow", "collapsed"];
+const currentTab = () => LEFT_TABS.find(view => $("tab-" + view).getAttribute("aria-selected") === "true");
+const savedLayouts = () => { try { return JSON.parse(localStorage.getItem(layoutKey) ?? "{}") ?? {}; } catch { return {}; } };
+function saveLayout() {
+ const tab = currentTab(), left = workspace.dataset.left!, width = $("splitter").getAttribute("aria-valuenow")!;
+ if (!tabInitialized || !tab || filesView.exploring) return; // exploring a design borrows the Files tab; its closing restores the layout
+ remember(layoutKey, JSON.stringify({ ...savedLayouts(), [tab]: { left, width: Number(width) } }));
+ if (tab !== "library") { remember("plan3-left", left); remember("plan3-chat-width", width); }
+}
+function applyLayout(tab) {
+ let width = 380; try { width = Number(localStorage.getItem("plan3-chat-width")) || 380; } catch { /* private mode */ }
+ const saved = savedLayouts()[tab], fallback = tab === "library" ? { left: "full", width: 280 } : { left: remembered("plan3-left", LEFT_MODES, "full"), width };
+ setLeft(LEFT_MODES.includes(saved?.left) ? saved.left : fallback.left); resizeChat(Number(saved?.width) || fallback.width);
+}
 try {
  const saved = JSON.parse(sessionStorage.getItem("design-library-back:" + location.pathname) ?? "null");
  if (["files", "project", "plan"].includes(saved?.tab) && ["full", "narrow", "collapsed"].includes(saved?.left)) libraryReturn = { tab: saved.tab, left: saved.left };
@@ -219,6 +235,7 @@ function setTab(name) {
  tabInitialized = true;
  if (name === "diagram") name = "plan"; // remembered from before the Project/Plan split
  for (const view of LEFT_TABS) { const selected = view === name; $("tab-" + view).setAttribute("aria-selected", String(selected)); $("tab-" + view).tabIndex = selected ? 0 : -1; }
+ if (!phone.matches && !filesView.exploring) applyLayout(name);
  $("files").hidden = name !== "files"; $("library").hidden = name !== "library"; $("canvas").hidden = name === "files" || name === "library"; $("canvas").setAttribute("aria-labelledby", "tab-" + name);
  $("zoom-controls").hidden = $("edit-bar").hidden = name === "files" || name === "library";
  if (name === "files" || name === "library") setTool("select");
@@ -264,12 +281,12 @@ cacheMissToggle.addEventListener("change", () => {
 // R9 phones: one view at a time; Files and Diagram reuse the desktop tab panels.
 const mobileViews = ["chat", "library", "files", "project", "plan"];
 let mobileReturn = "chat"; // phone Back returns to the view Browse was opened from
-function setMobile(view) {
+function setMobile(view, restoring = false) {
  const current = mobileViews.find(name => $("mobile-" + name).getAttribute("aria-selected") === "true");
  if (view === "library" && current && current !== "library") mobileReturn = current;
  workspace.dataset.mobile = view === "chat" ? "chat" : "panel";
  for (const name of mobileViews) { const tab = $("mobile-" + name); tab.setAttribute("aria-selected", String(name === view)); tab.tabIndex = name === view ? 0 : -1; }
- if (view !== "chat") setTab(view);
+ if (view !== "chat" && !(restoring && !phone.matches)) setTab(view); // on a desktop reload the remembered desktop tab wins
  remember("plan3-mobile", view);
 }
 for (const name of mobileViews) {
@@ -357,11 +374,11 @@ new ResizeObserver(() => document.body.style.setProperty("--chat-px", $("chat").
 new ResizeObserver(() => document.body.style.setProperty("--topbar-h", document.querySelector<HTMLElement>(".topbar")!.offsetHeight + "px")).observe(document.querySelector(".topbar")!);
 const splitter = $("splitter"); let resize;
 // The chat width survives reloads and restarts.
-queueMicrotask(() => { try { const saved = Number(localStorage.getItem("plan3-chat-width")); if (saved) resizeChat(saved); } catch { /* private mode */ } });
+// The chat width survives reloads and restarts per session and tab (applyLayout).
 function resizeChat(width) {
  const value = Math.max(280, Math.min(640, width));
- $("workspace").style.setProperty("--chat-width", value + "px"); remember("plan3-chat-width", String(value));
- splitter.setAttribute("aria-valuenow", String(value));
+ $("workspace").style.setProperty("--chat-width", value + "px");
+ splitter.setAttribute("aria-valuenow", String(value)); saveLayout();
 }
 splitter.addEventListener("pointerdown", event => {
  if (event.button !== 0) return;
@@ -681,7 +698,7 @@ function openLibrary() {
 }
 // /plan3 architecture links open on the Project tab.
 setTab(target === "product" ? "project" : remembered("plan3-tab", [...LEFT_TABS, "diagram"], "plan"));
-{ const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view); }
+{ const view = remembered("plan3-mobile", [...mobileViews, "diagram"], "chat"); setMobile(view === "diagram" ? "plan" : view, true); }
 if (new URLSearchParams(location.search).get("view") === "library") openLibrary();
 $("search").addEventListener("input", () => { const count = diagramView.search($("search").value); $("search-count").textContent = $("search").value.trim() ? String(count) : ""; });
 $("search").addEventListener("keydown", event => {
@@ -2968,7 +2985,7 @@ listen("snapshot", value => {
  for (const ask of value.dialogs ?? []) if (ask.brief) get("dialog?id=" + encodeURIComponent(ask.askId)).then(full => { promptView.pending(full); renderShell(); }, error => showNotice(error.message)); renderActivity(); renderChat(); showNotice(""); renderShell();
  void Promise.all([loadDiagram("project"), loadDiagram("plan")]).then(() => {
   // A session with no diagrams opens with the chat expanded; not remembered, so sessions with diagrams keep the reader's layout.
-  if (firstSnapshot && $("library").hidden && !filesView.exploring && !Object.values(diagrams).some(item => item?.nodes?.length || item?.notes?.length)) { setLeft("collapsed"); remember("plan3-left", leftChoice); }
+  if (firstSnapshot && $("library").hidden && !filesView.exploring && !Object.values(diagrams).some(item => item?.nodes?.length || item?.notes?.length)) setLeft("collapsed", false);
   firstSnapshot = false;
  });
 });

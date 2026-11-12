@@ -21,3 +21,10 @@ Draft, 0/12. Review done: five advisor findings accepted and folded into V-02, V
   - The page-address row and the search row share one grid, so the inputs and buttons have the same heights and edges.
   - Acceptance: switching tabs shows only that type; the input rows' left and right edges match in the browser test.
   - check: node hub/scripts/test-browser.mjs → ok (new V-01 block: each tab shows only its type, 184 total; search/page row left+right edges and heights equal)
+
+## 2026-11-12T13:45:58.700Z V-02 done: Pane mode and chat width are saved per session and per left tab; the library opens wide with a 280px chat, other tabs restore theirs; desktop reload no longer lets the remembered phone view override the tab.
+
+- [x] **V-02** Make the left pane width follow the tab per session: Design library opens wide (chat narrow), other tabs restore their last width.
+  - Key both the layout mode (`plan3-left`, `setLeft`) and the splitter size (`plan3-chat-width`, `resizeChat` in hub/web/app.ts:360-363, used by styles.css:56 and :216) by session and tab; update startup restore, the splitter handlers and `libraryReturn`.
+  - Acceptance: browser test drags different widths in two sessions, switches library ↔ Files and reloads, and sees each session's dragged widths and modes restored (not only `data-left`).
+  - check: node hub/scripts/test-browser.mjs → ok (V-02 block: library 280/full, Files 640 restored, reload keeps Files 640+narrow and library 290, another session's seeded layout ignored and untouched)

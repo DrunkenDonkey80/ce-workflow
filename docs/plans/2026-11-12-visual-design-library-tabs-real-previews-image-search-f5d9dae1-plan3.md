@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-12
-updated: 2026-11-12T13:35:28.530Z
+updated: 2026-11-12T13:45:58.700Z
 reviewed: 2026-11-12
 ---
 
@@ -77,9 +77,7 @@ Findings (this session, verified by reading code or fetching):
 ### Phase 1: Library tabs, alignment and chat width [code]
 
 - [x] **V-01** Library has Designs/Themes/Components/Image search tabs (saved per page, arrow keys) instead of source/type dropdowns; search and page rows share one grid.
-- [ ] **V-02** Make the left pane width follow the tab per session: Design library opens wide (chat narrow), other tabs restore their last width.
-  - Key both the layout mode (`plan3-left`, `setLeft`) and the splitter size (`plan3-chat-width`, `resizeChat` in hub/web/app.ts:360-363, used by styles.css:56 and :216) by session and tab; update startup restore, the splitter handlers and `libraryReturn`.
-  - Acceptance: browser test drags different widths in two sessions, switches library ↔ Files and reloads, and sees each session's dragged widths and modes restored (not only `data-left`).
+- [x] **V-02** Pane mode and chat width are saved per session and per left tab; the library opens wide with a 280px chat, other tabs restore theirs; desktop reload no longer lets the remembered phone view override the tab.
 
 ### Phase 2: OpenDesign previews [code]
 

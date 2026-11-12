@@ -26,6 +26,8 @@ async function browser(...args) {
  let result; try { result = JSON.parse(stdout); } catch { throw new Error("agent-browser returned non-JSON: " + stdout.slice(0, 500)); }
  assert(result.success, JSON.stringify(result)); return result.data;
 }
+// Library cards can sit below the fold; agent-browser refuses to click outside the viewport.
+async function clickShown(selector) { await evaluate(`document.querySelector(${JSON.stringify(selector)}).scrollIntoView({ block: "nearest" })`); await browser("click", selector); }
 // agent-browser 0.38.2 drops held mouse modifiers; CDP sends trusted input with explicit bits.
 async function withPageCdp(origin, run) {
  const { cdpUrl } = await browser("get", "cdp-url"); assert(cdpUrl.startsWith("ws://127.0.0.1:"));
@@ -166,7 +168,7 @@ try {
  }
  await browser("click", "#library [data-tab=themes]"); await browser("fill", "#library input[type=search]", "neutral");
  assert.equal(await evaluate("document.querySelectorAll('#library [data-entry]').length"), 1);
- await browser("click", "#library [data-entry='astryx:theme:neutral'] button");
+ await clickShown("#library [data-entry='astryx:theme:neutral'] button");
  await browser("wait", "--fn", "document.querySelector('.library-detail img')?.naturalWidth > 0");
  assert.match(await evaluate("document.querySelector('.library-detail').textContent"), /Static source image, not a generated preview/);
  await browser("click", ".library-detail [data-add]"); await browser("wait", "#reference-draft [data-reference=ref1] img");
@@ -218,8 +220,7 @@ try {
  await browser("fill", "#library input[type=url]", "https://denied.test/page"); await browser("click", "#library form button");
  await browser("wait", "--fn", "document.querySelector('#library form [role=status]').textContent.includes('not approved')");
  assert.deepEqual(await evaluate("[document.querySelector('#library input[type=url]').value, document.querySelectorAll('#reference-draft article').length]"), ["https://denied.test/page", 0], "a refused page keeps the typed address and adds nothing");
- await evaluate("document.querySelector(\"#library [data-entry='astryx:theme:neutral'] [data-inspect]\").scrollIntoView({ block: 'nearest' })");
- await browser("click", "#library [data-entry='astryx:theme:neutral'] [data-inspect]");
+ await clickShown("#library [data-entry='astryx:theme:neutral'] [data-inspect]");
  await browser("click", ".library-detail button");
  assert.deepEqual(await evaluate("[document.querySelectorAll('#library [data-entry]').length, document.querySelector('.library-detail').hidden, document.activeElement.textContent]"), [1, true, "Inspect Neutral"], "Back preserves filtered results and keyboard focus");
  await browser("fill", "#library input[type=search]", ""); await browser("click", "#library [data-tab=designs]");
@@ -275,8 +276,7 @@ try {
   await browser("fill", "#library input[type=search]", ""); await browser("click", "#library [data-tab=image]");
   await browser("wait", "--fn", "document.querySelectorAll('#library [data-entry]').length === 1 && document.querySelector(\"#library [data-entry^='found:'] img\")?.naturalWidth > 0");
   assert.match(await evaluate("document.querySelector(\"#library [data-entry^='found:']\").textContent"), /Kiosk POS[\s\S]*inspiration only[\s\S]*pos\.example[\s\S]*Large tiles/);
-  await evaluate("document.querySelector(\"#library [data-entry^='found:'] [data-capture]\").scrollIntoView({ block: 'nearest' })");
-  await browser("click", "#library [data-entry^='found:'] [data-capture]");
+  await clickShown("#library [data-entry^='found:'] [data-capture]");
   await browser("wait", "--fn", "document.querySelector(\"#library [data-entry^='found:'] [role=status]\").textContent.includes('not approved')");
   assert.equal(await evaluate("document.querySelectorAll('#reference-draft article').length"), 0, "a refused page capture adds nothing");
   await browser("click", "#library [data-entry^='found:'] [data-add]"); await browser("wait", "#reference-draft [data-reference] img");
@@ -325,6 +325,20 @@ try {
  assert(await width("chat") > await width("workspace") - 60, "collapsed: chat takes the width");
  assert.equal(await evaluate("localStorage.getItem(\"plan3-left\")"), "collapsed");
  await browser("click", "#expand-left"); assert.equal(await width("chat"), 640);
+ { // V-02: per session, each tab keeps its own pane mode and chat width; the library opens with a narrow chat.
+  const other = JSON.stringify({ library: { left: "narrow", width: 600 } }), layout = "[document.getElementById('workspace').dataset.left, document.getElementById('splitter').getAttribute('aria-valuenow')]";
+  await evaluate(`localStorage.setItem("plan3-layout:/s/other/", ${JSON.stringify(other)})`);
+  await browser("click", "#tab-library"); await browser("wait", "#library article");
+  assert.deepEqual(await evaluate(layout), ["full", "280"], "the library narrows the chat, ignoring another session's layout");
+  await browser("focus", "#splitter"); await browser("press", "ArrowLeft");
+  await browser("click", "#tab-files"); assert.deepEqual(await evaluate(layout), ["full", "640"], "Files restores its own width");
+  await browser("click", "#narrow-left"); await reload("!document.getElementById('files').hidden");
+  assert.equal(await evaluate(layout + "[1]"), "640", "Files' width survives reload");
+  await browser("click", "#tab-library"); assert.deepEqual(await evaluate(layout), ["full", "290"], "the library's dragged width survives reload");
+  await browser("click", "#tab-files"); assert.deepEqual(await evaluate(layout), ["narrow", "640"], "Files' mode survives too");
+  await browser("click", "#narrow-left"); await browser("click", "#tab-plan"); assert.deepEqual(await evaluate(layout), ["full", "640"]);
+  assert.equal(await evaluate("localStorage.getItem('plan3-layout:/s/other/')"), other, "another session's layout is untouched");
+ }
  await browser("click", "#tab-files");
  assert.deepEqual(await evaluate("[document.getElementById(\"files\").hidden, document.getElementById(\"canvas\").hidden, document.getElementById(\"tab-files\").getAttribute(\"aria-selected\")]"), [false, true, "true"]);
  assert.equal(await evaluate("document.getElementById('zoom-controls').hidden"), true, "zoom controls belong to the diagram tab");
