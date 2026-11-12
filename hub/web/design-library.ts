@@ -153,7 +153,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
   if (item.kind === "component") aspect.value = "component";
   note.maxLength = 4000; note.rows = 2; note.placeholder = "What should we borrow? (optional)"; note.setAttribute("aria-label", "Reference note");
   addButton.type = "button"; addButton.dataset.add = ""; feedback.setAttribute("role", "status"); actions.className = "library-tools";
-  addButton.disabled = item.preview === "sample";
+  addButton.disabled = item.preview === "sample" || item.source === "od";
   addButton.addEventListener("click", () => void add(item, addButton, feedback, aspect.value, note.value));
   actions.append(aspect, addButton); detail.append(actions, note, feedback);
   if (item.preview === "image") {
@@ -185,7 +185,7 @@ export function createDesignLibrary(root: HTMLElement, { get, post, back: leave,
    row.dataset.entry = item.id; open.type = "button"; open.dataset.inspect = "";
    const addButton = make("button", "Add reference"), feedback = make("p"); addButton.type = "button"; addButton.dataset.add = ""; feedback.setAttribute("role", "status");
    const pick = () => void add(item, addButton, feedback, item.kind === "component" ? "component" : "whole");
-   addButton.disabled = item.preview === "sample" && item.availability !== "cached";
+   addButton.disabled = (item.preview === "sample" || item.source === "od") && item.availability !== "cached"; // OpenDesign is added only as its cached page
    addButton.addEventListener("click", pick); open.addEventListener("click", event => { if (event.ctrlKey || event.metaKey) pick(); else inspect(item); });
    gestures(row, () => { if (!addButton.disabled) pick(); });
    if (item.preview === "image" && item.imageRevision) row.append(image(item, true));

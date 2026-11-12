@@ -132,12 +132,16 @@ export async function designCatalog(cwd: string, owner?: string) {
 	const entries: CatalogEntry[] = [];
 	if (/^[0-9a-f]{40}$/.test(index.commit ?? "") && Array.isArray(index.names)) {
 		for (const name of index.names) if (typeof name === "string" && /^[a-z0-9][a-z0-9-]{0,60}$/.test(name)) {
-			const folder = `.pi/designs/systems/${name}`;
-			let page: string | undefined;
-			try { if (smallJson(cwd, `${folder}/SOURCE.json`)?.commit === index.commit) page = ["kit.html", "components.html"].find(file => fs.statSync(confined(cwd, `${folder}/${file}`), { throwIfNoEntry: false })?.isFile()); } catch { /* metadata-only caches have no supplied HTML */ }
-			entries.push({ id: `od:${name}`, source: "od", kind: "system", name, revision: index.commit, preview: "sample", availability: page ? "cached" : "not-cached",
-				folder: page ? folder : undefined, page, license: "Apache-2.0", provenance: "OpenDesign source sample (inspiration, not a project foundation)", url: `https://github.com/nexu-io/open-design/tree/${index.commit}/design-systems/${name}`,
-			});
+			const folder = `.pi/designs/systems/${name}`, url = `https://github.com/nexu-io/open-design/tree/${index.commit}/design-systems/${name}`;
+			let source: { commit?: string; files?: unknown } | undefined;
+			try { source = smallJson(cwd, `${folder}/SOURCE.json`); } catch { /* not downloaded yet */ }
+			const current = source?.commit === index.commit, complete = current && Array.isArray(source.files);
+			// V-12: each package gives a Designs card (its components page) and a Themes card (its colors page beside ../tokens.css).
+			for (const [id, kind, pages, provenance] of [[`od:${name}`, "system", ["kit.html", "components.html"], "OpenDesign source sample (inspiration, not a project foundation)"], [`od-colors:${name}`, "theme", ["preview/colors.html"], "OpenDesign color page (inspiration, not a project foundation)"]] as const) {
+				const page = current ? pages.find(file => fs.statSync(confined(cwd, `${folder}/${file}`), { throwIfNoEntry: false })?.isFile()) : undefined;
+				entries.push({ id, source: "od", kind, name, revision: index.commit, preview: page || !complete ? "sample" : "none", availability: page ? "cached" : complete ? "unavailable" : "not-cached",
+					folder: page ? folder : undefined, page, license: "Apache-2.0", provenance: page || !complete ? provenance : `${provenance}. This package has no such page.`, url });
+			}
 		}
 	}
 	for (const theme of astryx.themes) {

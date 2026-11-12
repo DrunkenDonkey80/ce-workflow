@@ -70,11 +70,11 @@ const persist = () => { fs.writeFileSync(diagramFile, JSON.stringify(diagram)); 
 persist();
 const moreStyles = Array.from({ length: 15 }, (_, i) => `fixture-${i + 10}`); // V-04: enough Designs cards to scroll past
 write(".pi/designs/systems/index.json", JSON.stringify({ commit: "1".repeat(40), names: ["fixture-style", ...moreStyles], fetched: Date.now() }));
-for (const name of moreStyles) { write(`.pi/designs/systems/${name}/SOURCE.json`, JSON.stringify({ commit: "1".repeat(40) })); write(`.pi/designs/systems/${name}/components.html`, `<h1 style="font:64px system-ui">${name}</h1>`); }
+for (const name of moreStyles) { write(`.pi/designs/systems/${name}/SOURCE.json`, JSON.stringify({ commit: "1".repeat(40), files: ["components.html", "preview/colors.html", "tokens.css"] })); write(`.pi/designs/systems/${name}/components.html`, `<h1 style="font:64px system-ui">${name}</h1>`); write(`.pi/designs/systems/${name}/tokens.css`, ":root{--brand:#876959}"); write(`.pi/designs/systems/${name}/preview/colors.html`, `<link rel="stylesheet" href="../tokens.css"><div style="background:var(--brand);height:100vh"></div>`); }
 const libraryHTML = `<h1>Library fixture</h1><input id="unfinished" value="initial"><style>body{font:18px system-ui;background:#faf4e5;color:#24394c}h1{border-bottom:4px solid #876959}</style><script>
 addEventListener("message",async event=>{if(event.data?.type!=="fixture:library")return;let isolated=false,violation=false;try{parent.document.body}catch{isolated=true}if(typeof event.data.value==="string")document.getElementById("unfinished").value=event.data.value;if(event.data.probe){addEventListener("securitypolicyviolation",e=>{if(e.effectiveDirective==="connect-src")violation=true},{once:true});try{await fetch(event.data.probe)}catch{}await new Promise(resolve=>setTimeout(resolve,30));}parent.postMessage({type:"fixture:library-result",request:event.data.request,width:innerWidth,isolated,violation,value:document.getElementById("unfinished").value},"*");});
 </script>`;
-write(".pi/designs/systems/fixture-style/SOURCE.json", JSON.stringify({ commit: "1".repeat(40) })); write(".pi/designs/systems/fixture-style/kit.html", libraryHTML);
+write(".pi/designs/systems/fixture-style/SOURCE.json", JSON.stringify({ commit: "1".repeat(40), files: ["kit.html"] })); write(".pi/designs/systems/fixture-style/kit.html", libraryHTML);
 for (const [name, version] of [["First export", 1], ["Other export", 2]]) { write(`docs/designs/${name}/DESIGN.json`, JSON.stringify({ handle: "design-7", name, version })); write(`docs/designs/${name}/index.html`, libraryHTML); }
 write("docs/readme.md", "# Readme\n"); write("docs/notes.md", "# Notes\n"); write("src/app.ts", "old line\n"); write("top.txt", "<img src=x onerror=alert(1)>\nplain\n"); write(".gitignore", "fake-*\n*.lock\n");
 const git = (...args) => execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: folder, stdio: "pipe" });
@@ -158,14 +158,14 @@ try {
  assert.deepEqual(await evaluate("[document.getElementById('message-input').value, document.getElementById('library').hidden, document.getElementById('canvas').hidden, document.getElementById('command-picker').open]"), ["Keep this unfinished brief", false, true, false]);
  assert.equal(await evaluate("document.querySelector('#library [role=tab][aria-selected=true]').dataset.tab"), "designs", "the library opens on Designs");
  { // V-01: each tab lists only its type, together all 184 entries; the search and page rows share both edges.
-  const kinds = { designs: /^(od|draft|export):/, themes: /^astryx:theme:/, components: /^astryx:component:/, image: /^found:/ };
+  const kinds = { designs: /^(od|draft|export):/, themes: /^(astryx:theme|od-colors):/, components: /^astryx:component:/, image: /^found:/ };
   let total = 0;
   for (const [tab, pattern] of Object.entries(kinds)) {
    await browser("click", `#library [data-tab=${tab}]`);
    const ids = await evaluate("[...document.querySelectorAll('#library [data-entry]')].map(node => node.dataset.entry)");
    assert(ids.every(entry => pattern.test(entry)), `the ${tab} tab shows only its type: ${ids.filter(entry => !pattern.test(entry))}`); total += ids.length;
   }
-  assert.equal(total, 199);
+  assert.equal(total, 215);
   assert.deepEqual(await evaluate("(() => { const a = document.querySelector('#library input[type=search]').getBoundingClientRect(), b = document.querySelector('#library input[type=url]').getBoundingClientRect(), c = document.querySelector('#library form button').getBoundingClientRect(), d = document.querySelector('#library form select').getBoundingClientRect(); return [a.left === b.left, a.right === c.right, a.height === b.height && b.height === c.height && c.height === d.height]; })()"), [true, true, true], "the input rows line up");
  }
  { // V-04: Designs cards frame their cached page only near the view; scrolling away unloads them and back reloads them.
@@ -233,6 +233,18 @@ try {
  await clickShown("#library [data-entry='astryx:theme:neutral'] [data-inspect]");
  await browser("click", ".library-detail button");
  assert.deepEqual(await evaluate("[document.querySelectorAll('#library [data-entry]').length, document.querySelector('.library-detail').hidden, document.activeElement.textContent]"), [1, true, "Inspect Neutral"], "Back preserves filtered results and keyboard focus");
+ { // V-12: OpenDesign color pages are Themes cards, framed only near the view; Add reference attaches the page with its tokens.
+  await browser("fill", "#library input[type=search]", "fixture");
+  const framed = "[...document.querySelectorAll('#library .library-card-preview')].map(node => { const box = document.getElementById('library').getBoundingClientRect(), r = node.getBoundingClientRect(); return [!!node.querySelector('iframe[src]'), r.bottom > box.top - 260 && r.top < box.bottom + 260]; })";
+  const settled = `(states => states.every(([frame, near]) => !frame || near) && states.some(([frame]) => frame))(${framed})`;
+  await browser("wait", "--fn", settled);
+  assert((await evaluate(framed)).some(([, near]) => !near), "some color cards start far below the view");
+  assert.equal(await evaluate("document.querySelector(\"#library [data-entry='od-colors:fixture-style']\").querySelector('.library-card-preview, [data-add]:not([disabled])')"), null, "a package without a colors page shows no frame and cannot be added");
+  for (const top of ["1e6", "0"]) { await evaluate(`document.getElementById('library').scrollTop = ${top}`); await browser("wait", "--fn", settled); }
+  await clickShown("#library [data-entry='od-colors:fixture-10'] [data-add]"); await browser("wait", "#reference-draft article");
+  assert.match(await evaluate("document.querySelector('#reference-draft article').textContent"), /fixture-10/);
+  await browser("click", "#reference-draft article button[aria-label^='Remove @']"); await browser("wait", "--fn", "!document.querySelector('#reference-draft article')");
+ }
  await browser("fill", "#library input[type=search]", ""); await browser("click", "#library [data-tab=designs]");
  assert.equal(await evaluate("document.querySelectorAll('.library-group [data-entry]').length"), 2, "identical authored exports retain both source cards");
  const probeLibrary = (selector, data = {}) => evaluate(`new Promise((resolve,reject)=>{const frame=document.querySelector(${JSON.stringify(selector)}),request=crypto.randomUUID(),timer=setTimeout(()=>{removeEventListener('message',reply);reject(Error('Library sample did not reply'));},3000);const reply=event=>{if(event.source!==frame.contentWindow||event.data?.type!=='fixture:library-result'||event.data.request!==request)return;clearTimeout(timer);removeEventListener('message',reply);resolve({...event.data,origin:event.origin});};addEventListener('message',reply);frame.contentWindow.postMessage({type:'fixture:library',request,...${JSON.stringify(data)}},'*');})`);

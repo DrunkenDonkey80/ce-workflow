@@ -529,10 +529,14 @@ try {
 		assert.equal(fs.readFileSync(path.join(dir, "preview/colors.html"), "utf8"), pkg["preview/colors.html"], "the colors page sits where ../tokens.css resolves");
 		const { designCatalog } = await import("../extensions/design-catalog.ts");
 		assert.deepEqual((({ availability, page }) => [availability, page])((await designCatalog(cwd)).entries.find(item => item.id === "od:stripe")), ["cached", "components.html"], "the catalog marks the fetched preview cached");
+		assert.deepEqual((({ availability, page }) => [availability, page])((await designCatalog(cwd)).entries.find(item => item.id === "od-colors:stripe")), ["cached", "preview/colors.html"], "the colors page is a Themes entry");
 		hits.length = 0; assert.equal((await ask()).cached, true); assert.deepEqual(hits, [], "a cache hit for the same commit never refetches");
+		fs.writeFileSync(path.join(dir, "SOURCE.json"), JSON.stringify({ commit: sha }));
+		assert.equal((await ask()).cached, false, "a same-commit package cached before preview pages (no files list) is fetched once more");
 		age(); delete pkg["preview/colors.html"]; pkg["components.html"] = "x".repeat(1_000_001);
 		assert.equal((await ask()).cached, false, "a cache from another commit is refetched");
 		assert.deepEqual([commitOf(), fs.existsSync(path.join(dir, "preview")), fs.existsSync(path.join(dir, "components.html"))], [sha, false, false], "older-commit files are dropped and an oversized page is left out");
+		assert.deepEqual((await designCatalog(cwd)).entries.filter(item => item.name === "stripe").map(item => [item.availability, item.preview]), [["unavailable", "none"], ["unavailable", "none"]], "a complete package without the pages offers no preview and no retry loop");
 		age(); pkg["tokens.css"] = () => { throw new Error("network down"); };
 		const interrupted = await ask();
 		assert.deepEqual([interrupted.cached, commitOf(), fs.existsSync(path.join(dir, "DESIGN.md"))], [true, "b".repeat(40), true], "an interrupted update keeps the old unit whole");

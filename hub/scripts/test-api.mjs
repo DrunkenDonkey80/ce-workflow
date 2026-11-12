@@ -79,9 +79,9 @@ try {
 	fs.writeFileSync(cache, JSON.stringify({ commit, names: ["example", "../../escape"], fetched: Date.now() }));
 	const catalog = await get(id, "designcatalog");
 	assert.equal(catalog.status, 200);
-	assert.deepEqual(catalog.body.entries.filter(item => item.source === "od").map(item => [item.id, item.revision]), [["od:example", commit]]);
+	assert.deepEqual(catalog.body.entries.filter(item => item.source === "od").map(item => [item.id, item.revision]), [["od:example", commit], ["od-colors:example", commit]]);
 	assert.equal(catalog.body.entries.filter(item => item.kind === "component").length, 174);
-	assert.equal(catalog.body.entries.filter(item => item.kind === "theme").length, 7);
+	assert.equal(catalog.body.entries.filter(item => item.kind === "theme").length, 8, "7 Astryx themes and the OpenDesign colors page");
 	assert(catalog.body.entries.every(item => item.license && item.provenance && item.revision));
 	assert(catalog.body.entries.filter(item => item.kind === "component").every(item => item.preview === "none" && item.availability === "unavailable"), "metadata never pretends a component has a visual sample");
 	assert.equal(hub.host.live.has(id), false, "browsing does not wake a parked model");

@@ -2,7 +2,7 @@
 plan3: true
 status: active
 created: 2026-11-12
-updated: 2026-11-12T14:07:08.945Z
+updated: 2026-11-12T14:18:39.385Z
 reviewed: 2026-11-12
 ---
 
@@ -83,9 +83,7 @@ Findings (this session, verified by reading code or fetching):
 
 - [x] **V-03** fetchSystem (exported) publishes an OpenDesign package as one unit per index commit (DESIGN.md, tokens.css, components.html, preview/colors.html, SOURCE.json) via temp folder + folder swap under the plan lock; same-commit hits never refetch, failed updates keep the old unit; hub trigger and card retry note come with V-04.
 - [x] **V-04** Designs cards show a big scaled sandboxed frame of their cached page, loaded when near the view and unloaded when it leaves (max 12 live; server keeps 16 card views per session outside the reference limit of 8); OpenDesign cards download their package on scroll (3 at a time) via designfetch; failures show Retry preview.
-- [ ] **V-12** Show OpenDesign color pages as big lazy Themes cards: fetch preview/colors.html with tokens.css via V-03's path, then frame it like V-04.
-  - Cache at .pi/designs/systems/<name>/preview/colors.html so its ../tokens.css link resolves; same commit check, 1 MB cap and retry note as V-03.
-  - Acceptance: browser test opens Themes, scrolls, and sees OpenDesign color frames load only for visible cards; Add reference attaches the colors page.
+- [x] **V-12** Each OpenDesign package also gives a Themes card (od-colors:<name>) that shows its preview/colors.html in the same lazy framed preview and can be added as a reference; packages without that page show no frame and cannot be added; same-commit caches from before V-03 (no files list) are fetched once more.
 
 ### Phase 3: Image search tab [code]
 

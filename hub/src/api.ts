@@ -469,7 +469,7 @@ export function createPageApi({ host, registry, views, scheduler, usage, pool, m
 			// D1: an OpenDesign card scrolled into view downloads its package once per commit; the fresh entry comes back.
 			case "designfetch": {
 				only(data, ["target", "id"], "Invalid fields.");
-				const name = typeof data.id === "string" && /^od:([a-z0-9][a-z0-9-]{0,60})$/.exec(data.id)?.[1];
+				const name = typeof data.id === "string" && /^od(?:-colors)?:([a-z0-9][a-z0-9-]{0,60})$/.exec(data.id)?.[1];
 				if (!name) throw fail(400, "Only OpenDesign systems download on demand.");
 				const fetched = await fetchSystem(folder(id), name);
 				const entry = (await designCatalog(folder(id))).entries.find(item => item.id === data.id);

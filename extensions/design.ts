@@ -360,11 +360,12 @@ export async function fetchSystem(cwd: string, name, tools: Tools = { hub: hubCa
 	}
 	const cachedAs = (commit: string, note?: string) => ({ name, commit, folder, files: files(folder), cached: true, ...note ? { stale: note } : {} });
 	const index = await systemIndex(cwd, tools).catch(error => { if (saved?.commit) return undefined; throw error; });
-	if (!index || saved?.commit === index.commit) return cachedAs(saved.commit);
+	// Packages cached before V-03 have no files list (and no preview pages), so they are fetched again once.
+	if (!index || saved?.commit === index.commit && Array.isArray(saved.files)) return cachedAs(saved.commit);
 	if (!index.names.includes(name)) throw new Error(`No design system ${name}; see design {action:"systems"} (refresh: true for the newest list).`);
 	return withPlanLock(confined(cwd, folder), async () => {
-		const current = (() => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${folder}/SOURCE.json`), "utf8")).commit; } catch { return undefined; } })();
-		if (current === index.commit) return cachedAs(current); // another request published it while this one waited
+		const now = (() => { try { return JSON.parse(fs.readFileSync(confined(cwd, `${folder}/SOURCE.json`), "utf8")); } catch { return undefined; } })(), current = now?.commit;
+		if (current === index.commit && Array.isArray(now.files)) return cachedAs(current); // another request published it while this one waited
 		try { await publishSystem(cwd, name, index.commit, tools); return { name, commit: index.commit, folder, files: files(folder), cached: false }; }
 		catch (error) { if (current) return cachedAs(current, `kept ${current.slice(0, 7)}; update failed: ${clip(error.message, 200)}`); throw error; }
 	});
@@ -379,8 +380,8 @@ async function publishSystem(cwd: string, name: string, commit: string, tools: T
 		const [design, tokens, components, colors, manifestText] = await Promise.all([raw("DESIGN.md"), ...["tokens.css", "components.html", "preview/colors.html", "manifest.json"].map(optional)]); // legacy packages have DESIGN.md only
 		let manifest: Record<string, unknown> = {};
 		try { manifest = JSON.parse(manifestText ?? "{}"); } catch { /* no usable manifest */ }
-		for (const [file, body] of [["DESIGN.md", design], ["tokens.css", tokens], ["components.html", components], ["preview/colors.html", colors]]) if (body !== undefined) atomic(path.join(temp, file), body);
-		const source = { repo: `github.com/${OD}`, path: `design-systems/${name}`, commit, license: "Apache-2.0", name: manifest.name, category: manifest.category, description: manifest.description, source: manifest.source };
+		const written = ([["DESIGN.md", design], ["tokens.css", tokens], ["components.html", components], ["preview/colors.html", colors]] as const).filter(([, body]) => body !== undefined).map(([file, body]) => { atomic(path.join(temp, file), body!); return file; });
+		const source = { repo: `github.com/${OD}`, path: `design-systems/${name}`, commit, files: written, license: "Apache-2.0", name: manifest.name, category: manifest.category, description: manifest.description, source: manifest.source };
 		atomic(path.join(temp, "SOURCE.json"), `${JSON.stringify(source, null, "\t")}\n`);
 		if (fs.existsSync(target)) fs.renameSync(target, old);
 		try { fs.renameSync(temp, target); } catch (error) { if (fs.existsSync(old)) fs.renameSync(old, target); throw error; }
