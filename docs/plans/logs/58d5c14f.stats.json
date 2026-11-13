@@ -1,42 +1,42 @@
 {
  "version": 1,
- "activeMs": 1590112,
- "runs": 3,
+ "activeMs": 2955278,
+ "runs": 6,
  "waitingMs": 0,
- "toolWallMs": 1308757,
+ "toolWallMs": 1592921,
  "compactions": {
-  "count": 2,
-  "ms": 57004
+  "count": 3,
+  "ms": 69602
  },
  "models": {
   "anthropic/claude-opus-5-5:high": {
-   "replies": 135,
-   "thinkingMs": 619171,
-   "actingMs": 326749,
-   "input": 350,
-   "output": 99179,
-   "cacheRead": 14801989,
-   "cacheWrite": 563218,
-   "cost": 7.7614678,
+   "replies": 168,
+   "thinkingMs": 710360,
+   "actingMs": 399727,
+   "input": 432,
+   "output": 116116,
+   "cacheRead": 17573730,
+   "cacheWrite": 768880,
+   "cost": 9.683193999999999,
    "errors": 0
   }
  },
  "tools": {
   "bash": {
-   "count": 94,
-   "ms": 1140713,
+   "count": 118,
+   "ms": 1389154,
    "maxMs": 600151,
-   "failures": 3
+   "failures": 6
   },
   "read": {
-   "count": 28,
-   "ms": 878,
+   "count": 33,
+   "ms": 962,
    "maxMs": 558,
    "failures": 0
   },
   "edit": {
-   "count": 27,
-   "ms": 1526,
+   "count": 36,
+   "ms": 1687,
    "maxMs": 1048,
    "failures": 2
   },
@@ -67,14 +67,14 @@
  },
  "categories": {
   "shell": {
-   "count": 79,
-   "ms": 80464,
+   "count": 102,
+   "ms": 115040,
    "maxMs": 63297,
-   "failures": 2
+   "failures": 5
   },
   "test": {
-   "count": 15,
-   "ms": 1060249,
+   "count": 16,
+   "ms": 1274114,
    "maxMs": 600151,
    "failures": 1
   }
@@ -637,6 +637,150 @@
    "ms": 410,
    "maxMs": 410,
    "failures": 0
+  },
+  "bash\u0000cd \".\" && git status --short && git add -u && git commit -q -m \"Release 0.9.0: runaway-run guard, design library cards, Ctrl+Tab sessions, parked sessions keep project links and plan actions\" && git p": {
+   "count": 1,
+   "ms": 3198,
+   "maxMs": 3198,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub/web\" && rg -n \"table|\\bt[dh]\\b|anywhere|break-all|word-break\" styles.css | cut -c1-220 | head -40; git -C .. status --short": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && cat > /tmp/tbl.mjs <<'EOF' import { chromium } from \"playwright\"; import fs from \"node:fs\"; const css = fs.readFileSync(\"web/styles.css\", \"utf8\"); const b = await chromium.launch(); cons": {
+   "count": 1,
+   "ms": 134,
+   "maxMs": 134,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"^import .*(playwright|puppeteer|chrome)\" scripts/test-browser.mjs | head -3": {
+   "count": 1,
+   "ms": 82,
+   "maxMs": 82,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"import|launch|chrome|msedge\" scripts/test-browser.mjs | head -12 | cut -c1-200": {
+   "count": 1,
+   "ms": 81,
+   "maxMs": 81,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && T=\"$(cygpath -w /tmp 2>/dev/null || echo C:/Users/Flex/AppData/Local/Temp)\"; f=\"$LOCALAPPDATA/Temp/tbl.html\"; { printf '<meta name=\"viewport\" content=\"width=device-width\"><link rel=\"styl": {
+   "count": 1,
+   "ms": 112,
+   "maxMs": 112,
+   "failures": 1
+  },
+  "bash\u0000ls \"/c/Program Files/Google/Chrome/Application/chrome.exe\" \"/c/Program Files (x86)/Google/Chrome/Application/chrome.exe\" \"/c/Program Files/Microsoft/Edge/Application/msedge.exe\" 2>/dev/null": {
+   "count": 1,
+   "ms": 58,
+   "maxMs": 58,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"execFile\\w*\\(|spawn\\(\" scripts/test-browser.mjs | head -5 | cut -c1-220": {
+   "count": 1,
+   "ms": 76,
+   "maxMs": 76,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"agent-browser|browser\\b.*=|cdp|headless\" scripts/test-browser.mjs | head -6 | cut -c1-220": {
+   "count": 1,
+   "ms": 68,
+   "maxMs": 68,
+   "failures": 0
+  },
+  "bash\u0000B=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; f=\"$LOCALAPPDATA/Temp/tbl.html\"; { printf '<link rel=\"stylesheet\" href=\"file:///./hub/web/styles.css\"><body style=\"width:34": {
+   "count": 1,
+   "ms": 687,
+   "maxMs": 687,
+   "failures": 0
+  },
+  "bash\u0000B=\"$APPDATA/npm/node_modules/agent-browser/bin/agent-browser-win32-x64.exe\"; f=\"$LOCALAPPDATA/Temp/tbl.html\"; sed -i \"s#<tr><td>Link</td><td>[^<]*</td></tr>##\" \"$f\"; S=\"--session tblcheck\"; \"$B\" $S op": {
+   "count": 1,
+   "ms": 671,
+   "maxMs": 671,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git diff --stat -- hub/web/styles.css && git add hub/web/styles.css CHANGELOG.md && git commit -q -m \"Hub: chat tables keep words whole on phones instead of one letter per line\" && git log -": {
+   "count": 1,
+   "ms": 231,
+   "maxMs": 231,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"cpu|loadavg|freemem|totalmem\" src web --glob \"*.ts\" | cut -c1-220 | head -30; git -C .. status --short": {
+   "count": 1,
+   "ms": 129,
+   "maxMs": 129,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"systemLoad|topPrograms|\\\"load\\\"|load-cpu|load-memory|id=\\\"load\" src web --glob \"*.{ts,html,css}\" | cut -c1-240": {
+   "count": 1,
+   "ms": 74,
+   "maxMs": 74,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"390,396p\" src/api.ts | cut -c1-200; rg -n \"^import\" src/api.ts | rg \"fs|child\" ; sed -n \"436,442p\" web/styles.css | cut -c1-260; sed -n \"26,31p\" web/index.html; node -e \"require(": {
+   "count": 1,
+   "ms": 219,
+   "maxMs": 219,
+   "failures": 1
+  },
+  "bash\u0000cd \"./hub\" && node -e \"const fs=require('fs');for(const d of 'CDEFGZ'){try{const s=fs.statfsSync(d+':/');console.log(d,s.bsize,s.blocks,s.bavail,s.bfree)}catch(e){console.log(d,e.code)}}\"; rg -n \"load": {
+   "count": 1,
+   "ms": 152,
+   "maxMs": 152,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -n \"262,268p;410,416p\" web/styles.css | cut -c1-260": {
+   "count": 1,
+   "ms": 55,
+   "maxMs": 55,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && sed -i \"s#<div id=\\\"load-cpu\\\" class=\\\"load\\\"#<div id=\\\"load-cpu\\\" class=\\\"load\\\" data-label=\\\"CPU\\\"#; s#<div id=\\\"load-memory\\\" class=\\\"load\\\"#<div id=\\\"load-memory\\\" class=\\\"load\\\" dat": {
+   "count": 1,
+   "ms": 124,
+   "maxMs": 124,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"\\\"system\\\"|load-cpu|load-memory|\\\"processes\\\"\" scripts/*.mjs | cut -c1-220; node -e \"import('./src/api.ts').then(async m=>{console.log(await m.systemLoad()); console.log(await m.v": {
+   "count": 1,
+   "ms": 291,
+   "maxMs": 291,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && node -e \"import('./src/api.ts').then(async m=>{console.log(JSON.stringify(await m.systemLoad()))})\" 2>&1 | tail -2": {
+   "count": 1,
+   "ms": 290,
+   "maxMs": 290,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && git -C .. status --short; timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo ok || { echo FAIL; rg -n \"Assertion|Error|expected|actual\" /tmp/tb.log | head -20 | cut -c1": {
+   "count": 1,
+   "ms": 27345,
+   "maxMs": 27345,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && rg -n \"data-inspect\" scripts/test-browser.mjs web/*.ts | cut -c1-200 | head; sed -n \"1,30p\" /tmp/tb.log | cut -c1-300; git log --oneline -3 -- web/design-library.ts scripts/test-browser.": {
+   "count": 1,
+   "ms": 119,
+   "maxMs": 119,
+   "failures": 0
+  },
+  "bash\u0000cd \"./hub\" && timeout 600 node scripts/test-browser.mjs > /tmp/tb.log 2>&1 && echo ok || { echo FAIL; rg -n \"\\\"error\\\"|AssertionError\" /tmp/tb.log | head -5 | cut -c1-300; }": {
+   "count": 1,
+   "ms": 213865,
+   "maxMs": 213865,
+   "failures": 0
+  },
+  "bash\u0000cd \".\" && git add hub/scripts/test-browser.mjs hub/src/api.ts hub/web/app.ts hub/web/index.html hub/web/styles.css CHANGELOG.md && git commit -q -m \"Hub: system disk load box with per-volume hover; CP": {
+   "count": 1,
+   "ms": 246,
+   "maxMs": 246,
+   "failures": 0
   }
  },
  "steps": {
@@ -676,13 +820,13 @@
    "failures": 1
   },
   "(none)": {
-   "ms": 1215230,
-   "testMs": 907740,
-   "replies": 60,
+   "ms": 1628083,
+   "testMs": 1121605,
+   "replies": 93,
    "models": {
-    "anthropic/claude-opus-5-5:high": 60
+    "anthropic/claude-opus-5-5:high": 93
    },
-   "failures": 3
+   "failures": 6
   }
  },
  "spans": [
@@ -697,6 +841,18 @@
   {
    "start": "2026-11-13T09:30:40.636Z",
    "ms": 217410
+  },
+  {
+   "start": "2026-11-13T09:49:47.127Z",
+   "ms": 897890
+  },
+  {
+   "start": "2026-11-13T11:28:19.911Z",
+   "ms": 72000
+  },
+  {
+   "start": "2026-11-13T11:36:34.261Z",
+   "ms": 382678
   }
  ],
  "hints": []

@@ -4,6 +4,8 @@ What changed in ce-workflow and its hub (pi-control-hub), newest first. One vers
 
 ## Unreleased
 
+## 0.9.1 — 2026-11-13
+
 ### Added
 - Hub: a third load box shows how full the system disk is, and turns red at 90%. Hovering it lists every volume with its used % and GB. The CPU, RAM and DISK boxes now carry a small caption on top.
 - Hub: F4 narrows the chat to a thin column beside the left panel, and F4 again restores it as it was.
